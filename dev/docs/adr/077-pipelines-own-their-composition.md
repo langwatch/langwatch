@@ -1,4 +1,4 @@
-# ADR-077: A pipeline is defined in its own file
+# ADR-077: A pipeline is defined in its own file, in layers
 
 - Status: proposed
 - Date: 2026-07-28
@@ -6,8 +6,8 @@
   introduced the "only the executor dependencies are injected" rule that this
   ADR generalises), ADR-074 (package topology), ADR-075 (post-event work is
   subscribers and process managers), ADR-076 (the unit of dispatched work)
-- Applies to: `src/server/event-sourcing/pipelineRegistry.ts` and every
-  `pipelines/*/pipeline.ts`
+- Applies to: `src/server/event-sourcing/pipelineRegistry.ts`, every
+  `pipelines/*/**`, and `src/server/app-layer/presets.ts`
 
 ## Context
 
@@ -33,7 +33,10 @@ The measurements, taken 2026-07-28 on `feat/retire-reactors`:
 | Command instances constructed | **3** |
 | `new Deferred<…>` late-bindings | **7** (plus 2 hand-rolled `let x = null` thunks and 1 `getPipeline()` lookup — three mechanisms for one problem) |
 | Standalone `registerJob` calls | **3** |
-| Pipelines whose registration order is load-bearing | **3** (`codingAgent` before metric/log/trace; `evaluation` before trace) |
+| `automationDispatch.wiring.ts` | **284 lines**, 41 `import` statements, **2 exports**; `buildAutomationDispatchPorts` runs lines **68–284** — one **216-line** function |
+| `createTestApp` (`presets.ts:1322`) | **377 lines**, 84 uses of one `const noop`, 27 distinct `new Null*Repository()` |
+| `as any` / `as unknown as` in `pipelines/**` tests | **262** |
+| Optional (`?:`) members across the twelve pipeline `Deps` | **15**, nine of them on `trace-processing` |
 
 And on the other side of the seam, across the twelve `pipelines/*/pipeline.ts`
 files: **63 `Deps` members, of which 27 are behaviour** — a
@@ -50,49 +53,112 @@ written.** Converting `gatewayBudgetSync`, `governanceKpisSync` and
 `ReactorDefinition` deps with three `MapProjectionDefinition` deps on the same
 pipeline, still constructed in the registry, still injected, still guarded by
 `if (deps.x)`. The reactor retirement changes *what kind* of behaviour is
-injected. It does not change *that* behaviour is injected. Every conversion in
-ADR-075's remaining classes will land the same way unless the seam itself moves.
+injected. It does not change *that* behaviour is injected.
 
-Three concrete symptoms:
+### The diagnosis: "wiring" is not a concern
 
-**You cannot read a pipeline.** `trace-processing/pipeline.ts` registers seven
-reactors, three optional projections, two subscribers and an open-ended
-`subscribers[]` array, and names none of what they do. `originGateReactor` could
-be anything. The file is a list of holes.
+The first draft of this ADR proposed moving composition out of the registry and
+into each pipeline's own directory, and held up
+`pipelines/automations/automationDispatch.wiring.ts` as the pattern to copy. It
+is not. It has the right *instinct* — the pipeline owns its composition — and
+the wrong *execution*, and measuring it against the repo's own code checklist
+(`review-code`, `references/code-checklist.md`) says so without needing an
+opinion:
 
-**The registry is a god object by accretion, not by design.** It holds S3
-offload policy with its own feature-flag fail-open (30 lines inside
-`registerEvaluationPipeline`), an in-memory `setTimeout` fallback for when Redis
-is absent, the dataset-normalize job — which has nothing to do with traces and
-is mounted on the trace pipeline because that pipeline was handy — and a
-`registerDatasetNormalizeEnqueue` call into a global mutable setter. None of
-this is composition. It is domain code that ended up in the composition root
-because the composition root was where the pieces met.
+- **Function > 50 LOC is a smell.** `buildAutomationDispatchPorts` is 216 lines.
+  Four times over.
+- **SRP — "describe it in one sentence without using *and*."** It constructs
+  services *and* decides Redis topology *and* maintains an in-flight coalescing
+  cache *and* adapts ports. Four reasons to change. Inside it: 11 construction
+  sites, 2 topology decisions, 4 lines of inline mutable caching, and roughly 5
+  lines of actual port adaptation. **The adaptation is 2% of the function.**
+- **Dependency direction is strictly downward.** This file sits in
+  `event-sourcing/pipelines/` and imports `createOrUpdateQueueItems` from
+  `~/server/api/routers/annotation` and `getProtectionsForProject` from
+  `~/server/api/utils` — a pipeline file reaching *up* into the tRPC router
+  layer.
+- **Domain-aware helpers belong in the right domain module, not a grab bag.**
+  `protectionsInFlight` / `getProtectionsDeduped` is a promise-coalescing cache
+  strategy, hand-rolled inline. That is an implementation. It belongs in
+  `TraceService` or a shared `dedupeInFlight()`, not in a composition file.
+- **Hidden mutability is bug bait.** `protectionsInFlight` is a `Map` mutated
+  inside a closure in a file whose job is supposed to be declarative.
+- **File > 300 LOC is a smell.** `pipelineRegistry.ts` is 1,450. Five times
+  over.
 
-**Late binding is solved three different ways in one file.** `Deferred` (7
-sites), a `let x: T | null = null` closure that throws a bespoke message (topic
-clustering, and again in `ee/event-sourcing/pipelineSet.ts`), and
-`eventSourcing.getPipeline(NAME).commands.x.send(...)` (billing). All three do
-the same thing.
+The common cause of all six is one thing: **"wiring" is not a concern. It is a
+junk drawer named after a verb.** Nobody can state what belongs in a file called
+`*.wiring.ts`, so everything does. This is exactly why the first draft's rule —
+which bound `pipeline.ts` and stopped there — would have failed: under it,
+`getProtectionsDeduped` is fully compliant while being obviously wrong. Moving
+the mess out of the registry and into thirteen pipeline directories relocates it
+and calls that progress.
 
-The tests already voted. **No test constructs `PipelineRegistry`** — the two
-test files that reference the module import its *introspection* functions.
-`createTestApp` (`presets.ts:1322`) bypasses it entirely and hand-builds an
-`App` with noop command dispatchers. The ten test files that exercise a real
-pipeline call its factory directly with a hand-built `Deps`, and in those files
-the stores are `{} as any` while the behaviour has to be faked one stub at a
-time — `subscriberWiring.test.ts` writes a `reactorStub()` helper and calls it
-seven times to test two subscribers.
+So the decision below is not a rule about `Deps` members. It is a set of named
+layers with a downward-only dependency rule and a one-line membership test each,
+binding **every file in a pipeline's directory**.
+
+### On "100% compile-time safety"
+
+The constraint driving the type-level parts of this ADR is that errors should be
+compile-time, never runtime. Taken literally that is not achievable and chasing
+it produces the opposite: queue payloads arrive deserialised from Redis,
+ClickHouse rows arrive as `unknown`, env vars arrive as strings. Those
+boundaries are validated at runtime by construction — that is what the Zod
+command schemas are *for*.
+
+The achievable and correct form of the constraint, which this ADR adopts, is:
+
+> **No cast may bridge a gap the compiler could have checked.**
+
+That is a rule about `as`, not about eliminating runtime errors, and it is
+mechanically greppable. Every unsoundness identified below is an instance of it:
+`this.deps.redis as Redis`, `{…} as unknown as PromptTagRepository`, and the 262
+`as any` in pipeline tests.
 
 ## Decision
 
-**A pipeline's topology is declared in its own `pipeline.ts`, from symbols that
-file imports. Its `Deps` carry data access and nothing else.**
+### 1. Six layers, one membership test each, dependencies downward only
 
-### The boundary, stated so it needs no judgement
+| # | Layer | Owns | Membership test | May import values from |
+| --- | --- | --- | --- | --- |
+| 1 | **Infrastructure** | Clients, connections, topology | Does it hold a socket, a pool, or a decision about how they are shaped? | — |
+| 2 | **Repository** | Data access over exactly one storage system | Could you swap the storage engine behind it with no caller noticing? | 1 |
+| 3 | **Service** | Behaviour over repositories | Does it *decide* anything — retry, cache, coalesce, fan out, validate, authorise? | 1, 2 |
+| 4 | **Port** | The narrow function *types* a pipeline declares it needs | Is it a `type`, declared in the pipeline's own directory, naming no implementation? | nothing — ports are types |
+| 5 | **Adapter** | `service.method` → port | Is every line of the form `port: (args) => something.method(args)`? | 3, 4 |
+| 6 | **Pipeline** | Structure | Is every statement a `.with*()` call, or the construction of an argument to one? | 2, 4, 5 |
 
-Two rules. Both are mechanical, both are greppable, and together they decide
-every case.
+**Dependency direction is strictly downward for values.** Types may be imported
+in any direction — a type import has no runtime edge — which is what lets layer
+6 name an app-layer type without depending on it. Layer 4 is types-only by
+construction, so it is importable from anywhere.
+
+**The membership test that matters most, stated on its own:** *if a file whose
+job is composition **constructs**, **decides**, or **caches**, it is in the
+wrong layer.* Adaptation only. A 216-line adapter is not a long function; it is
+a category error.
+
+This binds every file in `pipelines/<x>/`, and directory position declares
+layer:
+
+| Path | Layer |
+| --- | --- |
+| `pipelines/<x>/pipeline.ts` | 6 — structure |
+| `pipelines/<x>/*.adapter.ts` (today: `*.wiring.ts`) | 5 — adaptation |
+| `pipelines/<x>/ports.ts` | 4 — port types |
+| `pipelines/<x>/{commands,subscribers,projections,process-manager}/` | domain code; imports layer-4 types, never layer-3 values |
+| `pipelines/<x>/repositories/` | 2 |
+
+**Renaming `*.wiring.ts` to `*.adapter.ts` is not cosmetic.** "Wiring" has no
+membership test, which is why the file grew to 284 lines. "Adapter" has one, and
+`buildAutomationDispatchPorts` fails it on line 1.
+
+### 2. What the layering does to the two `Deps` rules
+
+The first draft's two rules survive, demoted from the decision to the layer-6
+membership test — they are what "is every statement a `.with*()` call" means in
+practice.
 
 **Rule 1 — nothing in `Deps` may be a value the builder registers.** Every
 argument to `.withFoldProjection`, `.withMapProjection`, `.withProjection`,
@@ -110,46 +176,110 @@ may never *be* one.
   new GovernanceKpisMapProjection({ store: deps.governanceKpisRepository }))
 ```
 
-**Rule 2 — a dep is a noun, never a verb.** Every `Deps` member is a
-repository, a store, a client (prisma, redis, an object store), a scalar
-config value, or a named port function over one of those. If a member's type
-name ends in `Reactor`, `Subscriber`, `Projection`, `Command`, or `Pipeline`,
-Rule 1 has already rejected it; if it ends in `Service` and the pipeline calls
-more than one of its methods, it is a verb wearing a noun's clothes and should
-be narrowed to the ports actually used.
+**Rule 2 — a dep is a noun, never a verb.** Every `Deps` member is a repository
+(layer 2), a store, a client (layer 1), a scalar config value, or a port (layer
+4). If a member's type name ends in `Reactor`, `Subscriber`, `Projection`,
+`Command` or `Pipeline`, Rule 1 has already rejected it; if it ends in `Service`
+and the pipeline calls more than one of its methods, it is a layer-3 value that
+should be narrowed to the layer-4 ports actually used.
 
-The pipeline-owned **`Ports` / `DispatchDeps` bundle stays legal**, because it
-is a record of narrow functions the pipeline calls, its type is declared inside
-the pipeline's own directory, and the process builder consumes it through an
-applier the pipeline file constructs — `scenarioExecutionPM(deps.dispatch)`.
-That is exactly the shape ADR-052 approved and five pipelines already use.
+### 3. Infrastructure resolves `Redis | Cluster` once — and `this.cached()` is a bug, not a policy
 
-### Where each thing lives
+The first draft listed `pipelineRegistry.cached()` as centralised policy worth
+preserving. It is the opposite: it is the clearest single instance of a cast
+bridging a gap the compiler could have checked.
 
-| Thing | Lives in | Constructed by | Crosses `Deps` as |
-| --- | --- | --- | --- |
-| Command handler | `pipelines/<x>/commands/` | `pipeline.ts` | the repositories/ports its constructor takes |
-| Fold / map projection | `pipelines/<x>/projections/` | `pipeline.ts` | — |
-| Projection **store adapter** (`TraceSummaryStore`, `SpanAppendStore`) | `pipelines/<x>/projections/` | `pipeline.ts` | the **repository** it wraps |
-| Redis fold cache | framework | `pipeline.ts` | a `foldCache.wrap(store, prefix)` port |
-| Subscriber | `pipelines/<x>/subscribers/` | `pipeline.ts` | the ports its `Deps` declare |
-| Process-manager `evolve`/`onWake` | `pipelines/<x>/process-manager/*.process.ts` | `pipeline.ts`, via the in-file `xPM()` applier | — |
-| Process-manager **intent handler** | `pipelines/<x>/process-manager/*IntentHandlers.ts` | `pipeline.ts` | its `DispatchDeps` port bundle |
-| Cross-pipeline dispatcher | the *consuming* pipeline's `subscribers/` | `pipeline.ts` | the command bus (below) |
-| App-layer glue too impure for `pipeline.ts` | `pipelines/<x>/wiring.ts` | the composition root | the ports it produces |
+- `RedisCachedFoldStore`'s constructor takes `redis: Redis` — standalone client
+  only.
+- `PipelineRegistryDeps.redis` (`pipelineRegistry.ts:295`) is `Redis | Cluster`.
+- `pipelineRegistry.ts:362` reconciles the two with
+  `new RedisCachedFoldStore<State>(inner, this.deps.redis as Redis, { keyPrefix })`
+  — an unchecked cast narrowing a union that genuinely includes `Cluster`.
+- `automationDispatch.wiring.ts:99–106` guards the *same* construction with
+  `redis && !(redis instanceof Cluster)` and falls back to the uncached store.
 
-That last row is not a loophole invented here — `pipelines/automations/
-automationDispatch.wiring.ts` already is it. It takes prisma, redis, services
-and a repository and produces `AutomationDispatchPorts`, and it lives inside the
-pipeline's own directory, so "read the pipeline" is still one place to look. The
-division is: **`wiring.ts` builds ports, `pipeline.ts` builds topology**, and
-`pipeline.ts` may import a *type* from `~/server/app-layer/**` but never a
-*value*.
+So there are two implementations of one policy and **they disagree** — and they
+disagree about the same store, wrapped with the same key prefix. Both wrap a
+`TraceSummaryStore` with `keyPrefix: "trace_summaries"`; under a Cluster client
+the registry path caches and the automations path does not. Six pipelines go
+through the casting one. This is not an abstraction to protect. It is a
+divergence hiding behind a helper that *looks* like shared policy, which is a
+better motivation for this whole restructure than "the file is long."
 
-### Self-reference and cross-pipeline dispatch are one problem
+It is also worth being precise about the blast radius rather than overstating
+it: `RedisCachedFoldStore` only issues `get` and `set` (lines 196 and 314), both
+single-key, both of which ioredis' Cluster client handles. The cast is unsound
+in the type system and survivable at runtime *today*. It becomes a live bug the
+moment anyone adds `mget`, `pipeline`, `scan` or a multi-key `del` — which is
+precisely the change nobody will think to check, because the type says `Redis`.
 
-Every cross-pipeline coupling in this codebase — all eleven of them — is
-command dispatch. Not one is "pipeline A needs pipeline B's handler":
+**The decision: infrastructure publishes a resolved capability, not a client.**
+
+```ts
+// layer 1
+export interface FoldCache {
+  wrap<S>(inner: FoldProjectionStore<S>, keyPrefix: string): FoldProjectionStore<S>;
+}
+
+export function createFoldCache(redis: Redis | Cluster | null): FoldCache {
+  // The union is discriminated exactly once, here, at construction.
+  if (!redis || redis instanceof Cluster) return { wrap: (inner) => inner };
+  return { wrap: (inner, keyPrefix) => new RedisCachedFoldStore(inner, redis, { keyPrefix }) };
+}
+```
+
+`FoldCache` is a layer-4-shaped port produced by layer 1. Every downstream site
+gets a total `wrap` and never sees a redis client at all, so `as Redis` cannot
+be written — there is nothing to cast. The registry's `cached()` and the
+automations ternary collapse into one call each, and the divergence cannot
+recur because there is one branch.
+
+**A sharpening of the general rule, because the absolute version is wrong.** The
+`Redis | Cluster` union appears at 62 non-test sites, and three of them
+discriminate on it legitimately: `groupQueue.ts:342` (Cluster needs
+`.duplicate()` with no args for blocking connections) and
+`envelopeBlobLifecycle.ts:67` (Cluster needs hash-tagged queue names) are
+infrastructure code that genuinely must know. So the rule is not "collapse the
+union once and nothing ever sees it again". It is:
+
+> **The `Redis | Cluster` union is legitimate inside layer 1 and must not cross
+> into layers 2–6.** Layers above receive a resolved capability, never a client
+> and never a union.
+
+`pipelineRegistry.ts:362` and `automationDispatch.wiring.ts:100` are both
+layer-5/6 files holding the union. Both are violations. `groupQueue.ts` is not.
+
+**This is the one place the restructure is not behaviour-preserving, and that is
+the point.** If any deployment runs Redis in cluster mode, six pipelines
+currently run a cached fold store the class was never written for, and after this
+change they will run uncached — the same thing the automations path already
+does. That is a deliberate correction, and it should be called out in the PR
+rather than discovered from a latency graph.
+
+### 4. Where each thing lives
+
+| Thing | Lives in | Layer | Constructed by | Crosses `Deps` as |
+| --- | --- | --- | --- | --- |
+| Command handler | `pipelines/<x>/commands/` | domain | `pipeline.ts` | the repositories/ports its constructor takes |
+| Fold / map projection | `pipelines/<x>/projections/` | domain | `pipeline.ts` | — |
+| Projection **store adapter** (`TraceSummaryStore`, `SpanAppendStore`) | `pipelines/<x>/projections/` | 2 | `pipeline.ts` | the **repository** it wraps |
+| Fold cache | `event-sourcing/projections/` | 1 | app boundary | a `FoldCache` port |
+| Subscriber | `pipelines/<x>/subscribers/` | domain | `pipeline.ts` | the ports its `Deps` declare |
+| Process-manager `evolve`/`onWake` | `pipelines/<x>/process-manager/*.process.ts` | domain | `pipeline.ts`, via the in-file `xPM()` applier | — |
+| Process-manager **intent handler** | `pipelines/<x>/process-manager/*IntentHandlers.ts` | domain | `pipeline.ts` | its `DispatchDeps` port bundle |
+| Cross-pipeline dispatcher | the *consuming* pipeline's `subscribers/` | domain | `pipeline.ts` | the command bus (§5) |
+| Caching / coalescing / retry strategy | the owning **service** | 3 | the app boundary | as a port on the service it belongs to |
+| `service.method` → port adaptation | `pipelines/<x>/*.adapter.ts` | 5 | the composition root | the ports it produces |
+
+`getProtectionsDeduped` lands in row 9, not row 10 — in `TraceService`, or as a
+shared `dedupeInFlight()` if a second caller appears. That single reassignment
+is most of what makes `automationDispatch.wiring.ts` shrink to something a
+person can read.
+
+### 5. Cross-pipeline dispatch: a command bus keyed on identity, not strings
+
+Every cross-pipeline coupling in this codebase — all eleven of them — is command
+dispatch. Not one is "pipeline A needs pipeline B's handler":
 
 | From | To | What is dispatched |
 | --- | --- | --- |
@@ -165,14 +295,13 @@ command dispatch. Not one is "pipeline A needs pipeline B's handler":
 | billing | billing (self) | `reportUsageForMonth` |
 | EE ingestion pull | itself | the two run-outcome commands |
 
-Self-reference is therefore not a separate problem, and the `Deferred` pattern
-is not inherent to it — it is an artefact of building the dispatching *handler*
+Self-reference is therefore not a separate problem, and the `Deferred` pattern is
+not inherent to it — it is an artefact of building the dispatching *handler*
 outside the pipeline, at a moment when the pipeline does not exist yet. Move the
 handler in, and the only thing that still has to be late is the *lookup*.
 
-**The repo already contains the right mechanism and nobody generalised it.**
-`billing-reporting` does this today in one line, with no `Deferred`, no resolve
-step and no ordering constraint:
+`billing-reporting` already does the late lookup in one line, with no `Deferred`,
+no resolve step and no ordering constraint:
 
 ```ts
 selfDispatch: (data) =>
@@ -181,41 +310,295 @@ selfDispatch: (data) =>
     .commands.reportUsageForMonth.send(data),
 ```
 
-Promote it to a typed, name-keyed **command bus** — a client, in exactly the
-sense redis is a client, with no domain behaviour of its own. Each pipeline
-exports a typed reference beside its factory:
+But `getPipeline(name: string)` returns `PipelineWithCommandHandlers<any, any>`,
+so that line is entirely untyped — two string keys and an `any`. It is the right
+*timing* with none of the safety. The bus keeps the timing and adds the types by
+keying on the **imported command class itself**.
+
+#### The signature
+
+Verified against `commands/commandHandlerClass.ts`, `commands/commandSchema.ts`,
+`pipeline/staticBuilder.ts` and `mapCommands.ts`:
 
 ```ts
-// pipelines/simulation-processing/pipeline.ts
-export const SIMULATION_PIPELINE = pipelineRef<SimulationCommands>("simulation_processing");
+import type { CommandHandlerClassStatic, ExtractCommandHandlerPayload }
+  from "../commands/commandHandlerClass";
+import type { QueueSendOptions } from "../queues";
+
+export interface CommandBus {
+  send<C extends CommandHandlerClassStatic<any, any>>(
+    command: C,
+    data: ExtractCommandHandlerPayload<C>,
+    options?: QueueSendOptions<ExtractCommandHandlerPayload<C>>,
+  ): Promise<void>;
+
+  sendBatch<C extends CommandHandlerClassStatic<any, any>>(
+    command: C,
+    data: ExtractCommandHandlerPayload<C>[],
+    options?: QueueSendOptions<ExtractCommandHandlerPayload<C>>,
+  ): Promise<void>;
+
+  /** Bind once, hand the result to a subscriber as a layer-4 port. */
+  port<C extends CommandHandlerClassStatic<any, any>>(
+    command: C,
+  ): CommandDispatcher<ExtractCommandHandlerPayload<C>>;
+}
 ```
 
-and any pipeline — including itself — dispatches through it:
+Call site — no string keys, no `declare module` augmentation, no central
+registry type to keep in sync, and the import *is* the type:
 
 ```ts
-// pipelines/trace-processing/pipeline.ts
-const simulationMetricsSync = createSimulationMetricsSyncSubscriber({
-  computeRunMetrics: deps.commands.of(SIMULATION_PIPELINE).computeRunMetrics,
+// pipelines/metric-processing/pipeline.ts
+import { ContributeMetricFactsCommand }
+  from "../coding-agent-processing/commands/contributeMetricFactsCommand";
+
+const factsDispatch = createCodingAgentMetricFactsDispatchSubscriber({
+  contributeMetricFacts: deps.bus.port(ContributeMetricFactsCommand),
 });
 ```
 
-The ref is a type-only import, so there is no runtime cycle. Resolution happens
-at *call* time, which is what removes registration order as a constraint: today
-`registerAll` carries the comment *"Registered BEFORE the metric, log and trace
-pipelines: their coding-agent dispatch subscribers close over this pipeline's
-contribution commands"*, and under the bus that sentence stops being true of
-anything.
+#### Four things this signature was checked against, and one correction
 
-**This is not weaker than `Deferred`, and it is important to be precise about
-why.** A `Deferred` throws on an unresolved call, not at boot — it never gave a
-startup guarantee, only a better error message. The bus must keep that error
-message (name the ref, list what is registered, which `getPipeline` already
-does). To recover the guarantee everyone *assumed* `Deferred` provided, the
-composition root asserts after registration that every ref reachable from a
-registered pipeline resolves — a boot check that does not exist today in any
-form.
+**(a) The constraint is `CommandHandlerClassStatic`, not `DefinedCommandClass`.**
+This matters and the obvious choice is wrong. `DefinedCommandClass<P, T>` is
+`CommandHandlerClass<P, T, Event> & { makeJobId? }`, and `CommandHandlerClass`
+includes `new () => CommandHandler<…>` — a **zero-argument constructor**. Four
+commands are registered through `.withCommandInstance` precisely because they
+take constructor DI and therefore have no zero-arg constructor:
 
-### What `pipelineRegistry.ts` is left holding
+| Command | Constructor |
+| --- | --- |
+| `ExecuteEvaluationCommand` | `constructor(private readonly deps: ExecuteEvaluationCommandDeps) {}` |
+| `ComputeRunMetricsCommand` | `constructor(private readonly deps: ComputeRunMetricsDeps) {}` |
+| `ReportUsageForMonthCommand` | `constructor(private readonly deps: ReportUsageForMonthCommandDeps) {}` |
+| `RecordSpanCommand` | conditional `withCommandInstance` at `trace-processing/pipeline.ts:298` |
+
+Constraining the bus to `DefinedCommandClass` would exclude `executeEvaluation`
+(trace → evaluation), `computeRunMetrics` (trace → simulation *and* simulation →
+self) and `reportUsageForMonth` (billing → self) — four of the eleven rows above,
+including the one the pattern was derived from. `CommandHandlerClassStatic<any,
+any>` is the widest constraint that covers both registration paths, and the
+builder already proves it works: `withCommand` extracts with
+`ExtractCommandHandlerPayload<handlerClass>` (line 528) and `withCommandInstance`
+with `ExtractCommandHandlerPayload<TStatic>` (line 577), where `TStatic extends
+CommandHandlerClassStatic<any, any>`.
+
+**(b) `ExtractCommandHandlerPayload` is not a new helper.** It already exists in
+`commands/commandHandlerClass.ts` and is the mechanism the entire typed command
+surface runs on today — `commands.traces.recordSpan` gets its payload type
+through it. Reusing it means the bus cannot drift from the builder.
+
+**(c) A correction to a premise this ADR was drafted against.**
+`ContributeMetricFactsCommand` is *not* a `defineCommand(...)` export. It is a
+hand-written class with `static readonly schema = defineCommandSchema(...)`.
+Both shapes satisfy `CommandHandlerClassStatic`, which is another reason the
+constraint has to be the static interface rather than `defineCommand`'s return
+type — the codebase has at least three command shapes (`defineCommand` results,
+hand-written zero-arg classes, and DI'd classes) and the bus must accept all
+three.
+
+**(d) The runtime index is buildable and exact.**
+`StaticPipelineBuilder.commands` is
+`Array<{ name, handlerClass: CommandHandlerClass<any,any,any>, handlerInstance?, options? }>`
+(`staticBuilder.ts:134`), and the array survives into
+`StaticPipelineDefinition.commands`. `EventSourcing.register()` already walks
+`pipeline.service.getCommandQueues()` into a `dispatchers` record keyed by name
+(`eventSourcing.ts:319–323`). Adding
+`this.byCommandClass.set(cmd.handlerClass, dispatchers[cmd.name])` in that same
+loop is a four-line change and gives true object identity — no string, not even
+`schema.type`, is involved in resolution.
+
+#### Where safety can still be lost, and the guard
+
+Because `ExtractCommandHandlerPayload<C>` is a deferred conditional type, `C` is
+inferred solely from the first argument. That is the desired behaviour — the
+imported symbol drives the type, and a typo in a payload literal is an
+excess-property error. But it means **`C` must be inferred from the class
+directly**. If a command class is first stored in a variable annotated
+`CommandHandlerClassStatic<any, any>`, `C` is inferred as that widened type, the
+payload collapses to `any`, and the bus silently stops checking anything. The
+rule is: pass the imported symbol, never a widened variable.
+
+That is not a rule worth trusting to discipline, and it is also the one claim in
+this section that is structural inference rather than a read of existing code. So
+the first migration step ships a compile-time guard, using machinery the repo
+already has rather than introducing `expectTypeOf`:
+
+```ts
+// a *.type.test.ts checked by `pnpm typecheck:tests`
+// @ts-expect-error — payload must reject an unknown member
+bus.send(ContributeMetricFactsCommand, { ...validPayload, typo: 1 });
+```
+
+If the bus ever degrades to `any`, the `@ts-expect-error` becomes unused and
+`typecheck:tests` fails. The guard cannot rot, and it costs one file.
+
+#### What the bus deletes
+
+Resolution happens at *call* time, which removes registration order as a
+constraint. The first draft listed registration order under "what is better than
+it looks". That was wrong: the constraint is self-inflicted. `mapCommands` does
+`Object.entries(commands)` — an eager enumeration — and the function it returns
+is already deferred. The eagerness, and only the eagerness, is why the three
+ordering comments in `registerAll` exist. Under an identity-keyed bus those three
+comments are **deleted, not honoured**. The residual risk is re-introducing an
+eager lookup somewhere else, which the boot assertion below catches.
+
+**The bus is not weaker than `Deferred`, and it is important to be precise about
+why.** A `Deferred` throws on an unresolved *call*, not at boot — it never gave a
+startup guarantee, only a better error message (`deferred.ts` names the binding
+in the message, and that must survive). To recover the guarantee everyone
+*assumed* `Deferred` provided, the composition root asserts after registration
+that every command class reachable from a registered pipeline resolves in the
+identity map — a boot check that does not exist today in any form, and which
+should ship with the first migration step rather than the last.
+
+### 6. Exhaustive composition: prefer the mechanism that already works
+
+The ask was: *adding a dependency to a pipeline should be a compile error until
+every composition site supplies it* — and whether a pipeline should export its
+dependency contract as a **value** so the `Deps` type and an exhaustiveness check
+derive from one declaration.
+
+**Verdict: contract-as-value does not earn its complexity here, because plain
+structural checking already delivers the property and three specific holes are
+what defeat it.** Each pipeline factory takes a `Deps` interface and is called
+from exactly one production site; adding a *required* member is already a compile
+error at `createXPipeline({…})`. There is no framework to build. There are three
+leaks to close:
+
+**Hole 1 — optional members.** Fifteen `?:` members across the twelve pipeline
+`Deps`, nine on `trace-processing`. Adding an optional dep and forgetting to pass
+it is silent by definition, and this is exactly the EE-feature pattern. Fix:
+**required-but-nullable beats optional.**
+
+```ts
+// silent when the composition root forgets
+governanceKpisRepository?: GovernanceKpisRepository;
+
+// compile error until every site says `null` on purpose
+governanceKpisRepository: GovernanceKpisRepository | null;
+```
+
+The `if (deps.x)` guard at the use site is unchanged. What changes is that
+omission is no longer expressible. This is a one-character-class edit per member
+and it is the whole of Addition 2's requested property.
+
+**Hole 2 — casts at test composition sites.** 262 `as any` / `as unknown as` in
+`pipelines/**` tests. A `Deps` literal built with `{} as any` satisfies any
+interface forever. Fix: `satisfies XDeps` on dep literals, and the null/in-memory
+doubles of §7 so that `as any` stops being the path of least resistance. This is
+the same rule as §"100% compile-time safety" above — no cast may bridge a gap the
+compiler could have checked.
+
+**Hole 3 — `Partial<AppDependencies>`.** `createTestApp(overrides?:
+Partial<AppDependencies>)` is correct for an *override bag* and should stay; the
+body already must satisfy the full `AppDependencies` because `new App({…})` takes
+it. The genuine defect in that file is not the `Partial` — it is
+`{ seedForOrg: async () => {} } as unknown as PromptTagRepository` (`presets.ts`
+~1355): a two-property object asserted to be a full repository. Green typecheck,
+runtime crash the moment anything else on `PromptTagRepository` is called. That
+is the trap of §7 already present in the codebase.
+
+**On the `Record<PipelineName, …>` alternative:** an exhaustive record at the
+composition root is worth having, but for a different property. It catches a
+*missing pipeline*, not a missing dep, and it is the natural home for the boot
+assertion in §5 (every registered pipeline named exactly once, every reachable
+command class resolvable). Adopt it for that, not for dep exhaustiveness.
+
+**Where contract-as-value does earn its keep** is §7, and only there — not
+because it improves type checking, but because it is the only way to give a
+generator a *runtime* description of a contract. That is the next section, and it
+is the honest reason to build the small amount of machinery it needs.
+
+### 7. Auto-generated test doubles: the port half only, and why that is the honest line
+
+The ask was *"typesafe null versions auto generated for tests"*, against a
+`createTestApp` that is **377 lines**, uses one hand-rolled
+`const noop = async () => {}` **84 times**, and hand-instantiates **27 distinct
+`Null*Repository` classes**.
+
+**The trap, stated first, because it decides the design.** TypeScript types are
+erased. Nothing can generate an implementation from a type alone. A `Proxy`
+declared as the contract type *looks* maximally type-safe and is a lie:
+
+- For a **function** member, a no-op is a real, total implementation. `(data) =>
+  Promise.resolve()` genuinely satisfies `(data: T) => Promise<void>`.
+- For an **object** member, it is unsound. `repo.findAll` on a no-op Proxy
+  returns a *function* where the caller expects an array; the very next line
+  crashes. That is a runtime failure wearing a green typecheck — the exact
+  inversion of the constraint driving this ADR.
+
+So the boundary falls exactly where the owner drew it — *"repos, but never
+implementations"*:
+
+| | Auto-generatable? | Why |
+| --- | --- | --- |
+| **Ports** returning `void` / `Promise<void>` | **Yes** | A no-op is a total implementation. Nothing observes a return value. |
+| **Ports** returning a value | **Only with a declared default** | `decideSweepCandidates: () => Promise<GraphTriggerSweepCandidate[]>` and `pruneWebhookDeliveries: () => Promise<number>` are both real ports in `AutomationDispatchPorts`. No generator can invent `[]` vs `null` vs `0` correctly. |
+| **Stores / repositories** | **No** | Their return values *are* their behaviour. Inventing them is how you get tests that pass for the wrong reason. |
+
+The port half needs the runtime descriptor from §6 — this is the one place a
+contract-as-value pays for itself, because the generator needs to *see* which
+members are ports and what each non-void one returns:
+
+```ts
+// pipelines/automations/ports.ts — layer 4
+export const automationDispatchPorts = {
+  evaluateGraphTrigger: voidPort<(p: EvaluateGraphTriggerInput) => Promise<void>>(),
+  decideSweepCandidates: port<() => Promise<GraphTriggerSweepCandidate[]>>(() => []),
+  pruneWebhookDeliveries: port<() => Promise<number>>(() => 0),
+} as const;
+
+export type AutomationDispatchPorts = InferPorts<typeof automationDispatchPorts>;
+export const nullAutomationDispatchPorts = nullify(automationDispatchPorts);
+```
+
+`port<T>(default)` requiring its default is what makes the value-returning case a
+compile error rather than a silent `undefined`. `nullify` is ~20 lines. Adding a
+port to the contract adds it to the null double automatically, which is the
+"never miss one" property applied where it is soundly achievable.
+
+**The store half must be hand-written, and this is not a limitation to
+apologise for.** A null store's return values are a *decision*: does
+`findByTraceId` return `null` (absent) or throw (should never be called in this
+test)? Does `findAll` return `[]` or the one row this suite needs? Those choices
+determine whether a test can fail. A generator that picks for you produces
+doubles that make every test pass. The correct move is to reuse the two things
+the repo already has rather than invent anything:
+
+**Yes — in-memory and null implementations already exist, in both flavours.**
+
+- **39 `Null*Repository` / `Null*Client` / `Null*Service` classes**, e.g.
+  `NullTraceSummaryRepository`, `NullSpanStorageRepository`,
+  `NullEvaluationRunRepository`, `NullTopicRepository`,
+  `NullCodingAgentSessionRepository`, `NullTriggerRepository`. Every one is
+  `implements XRepository`, which means **the compile-time property already
+  holds for the store half**: adding a method to a repository interface is
+  already an error at every null implementation. Generation was never what
+  delivered that — `implements` is. What generation would save is typing the
+  bodies, and the bodies are the part that carries meaning.
+- **`BaseMemoryProjectionStore`** (`event-sourcing/stores/baseMemoryProjectionStore.ts`)
+  — a real `Map`-backed `ProjectionStore<T>` with `getProjection` /
+  `storeProjection`, subclassed by exactly two repositories today
+  (`simulationRunState.memory.repository.ts`,
+  `experimentRunState.memory.repository.ts`). This is the right base for the
+  ~21 `PipelineRepositories` members, and it is currently used by two of them.
+
+So the store-half plan is: **extend `BaseMemoryProjectionStore` to the remaining
+projection repositories, and keep hand-writing `Null*` for everything else.**
+Both already exist, both already give the compile-time guarantee, and neither
+needs a framework.
+
+**One cost worth stating plainly**, because it cuts against the constraint: a
+generated no-op port makes a test pass when production code *should* have
+dispatched something. The 39 `Null*` classes have the same property. Null doubles
+buy compile-time completeness at the price of behavioural blindness, which is why
+§"Consequences" argues the real win is `subscriberWiring.test.ts` running the
+*real* handlers over in-memory stores rather than getting better stubs.
+
+### 8. What `pipelineRegistry.ts` is left holding
 
 Three things, and it should be a function, not a class:
 
@@ -226,61 +609,80 @@ Three things, and it should be a function, not a class:
    that gives the whole app `commands.traces.recordSpan` with types. This is
    load-bearing and must stay in exactly one place.
 
-The class exists only to hang `this.deps` and `this.cached` off; both move. What
-remains is roughly 150 lines of `const x = es.register(createXPipeline({…}))`.
+The class exists only to hang `this.deps` and `this.cached` off; both move —
+`cached` into the layer-1 `FoldCache` of §3. What remains is roughly 150 lines of
+`const x = es.register(createXPipeline({…}))`.
 
 **The introspection tail moves out.** `getProjectionMetadata`,
 `getReactorMetadata`, `getEventSubscriberMetadata`, `getProcessManagerMetadata`,
-`getKillSwitchDescriptors` and `getDejaViewProjections` — 200 lines at the
-bottom of the file, importing `getApp()` — read the *live runtime*, not the
-registry. They are a consumer of registration, not part of it, and they are
-already the only thing tests import from this module. They belong in
-`introspection.ts`.
+`getKillSwitchDescriptors` and `getDejaViewProjections` — 200 lines at the bottom
+of the file, importing `getApp()` — read the *live runtime*, not the registry.
+They are a consumer of registration, not part of it, and they are already the
+only thing tests import from this module. They belong in `introspection.ts`.
 
-**The registry keeps a small residue that is genuinely nobody's pipeline**, and
-this ADR does not pretend otherwise. See "What does not move".
-
-### Migration order
+## Migration order
 
 Ten-plus pipelines, one at a time, each independently shippable. Ordered by what
 each step *proves*, not by size.
 
-1. **`metric-processing` and `log-processing` first.** Sixty-two and thirty-nine
+**The checklist says not to impose a layering in a single PR. That caveat mostly
+does not apply here, and it is worth saying why:** the layers already exist in
+this codebase. `app-layer/` has services and repositories, with 39 null
+implementations and a repository/service split CLAUDE.md already enforces
+(`findAll`/`findById` on repositories, `getAll`/`getById` on services). Layers 4
+and 6 exist in five pipelines under ADR-052. What does not exist is layer 5 as a
+*bounded* thing, and what is not respected is the boundary at composition. That
+is a much smaller ask than inventing a layering, and it is why this can proceed
+incrementally instead of as one PR.
+
+0. **`FoldCache` and the layer-1 seam, before any pipeline moves.** It deletes
+   `as Redis`, deletes the `instanceof Cluster` ternary, and reconciles the two
+   divergent cache paths. It touches six pipelines' construction but no
+   pipeline's contents, and it is the step that carries the deliberate
+   behaviour change, so it should land alone and be called out.
+1. **`metric-processing` and `log-processing`.** Sixty-two and thirty-nine
    lines, one illegal dep each (`subscribers`), and that dep is precisely the
    cross-pipeline dispatch case — so the smallest possible diff is the one that
-   proves the command bus. It also deletes the first of the three load-bearing
-   ordering constraints in `registerAll`, which is the payoff made visible.
+   proves the command bus. Ships with the `@ts-expect-error` type guard and the
+   boot assertion. Deletes the first of the three ordering comments.
    `metricCommandLanes.unit.test.ts` stubs only stores today, so the test delta
    is a clean read on whether the new shape helps.
-2. **`coding-agent-processing`** — already compliant under Rule 1; only the three
-   store adapters re-home. This is the step that establishes
-   "repository crosses, store adapter does not" with no behaviour in play.
-3. **`simulation-processing`** — self-dispatch, cross-dispatch and a constructed
-   command in one file. Proves the bus on a self-reference and kills two
-   `Deferred`s.
-4. **`langy-conversation-processing`, `topic-clustering-processing`,
+2. **`automations`.** Out of order relative to the first draft, and deliberately:
+   it is already Rule-1 compliant, so this step is *purely* the layering.
+   `automationDispatch.wiring.ts` becomes `automationDispatch.adapter.ts`,
+   `getProtectionsDeduped` moves to `TraceService`, the eleven construction sites
+   move to the composition root or to services, and what is left should be under
+   50 lines of `port: (args) => service.method(args)`. This is the step that
+   proves the layering does what it claims, on the worst file.
+3. **`coding-agent-processing`** — only the three store adapters re-home.
+   Establishes "repository crosses, store adapter does not" with no behaviour in
+   play.
+4. **`simulation-processing`** — self-dispatch, cross-dispatch and a
+   `withCommandInstance` command in one file. Proves the bus on a self-reference
+   and on a DI'd command, and kills two `Deferred`s.
+5. **`langy-conversation-processing`, `topic-clustering-processing`,
    `billing-reporting`, `experiment-run-processing`** — mechanical; each removes
-   one late-binding mechanism.
-5. **`evaluation-processing`** — the honest one. See below.
-6. **`trace-processing` last**, when everything it dispatches into already
-   exposes a ref and the bus has run in production for weeks.
+   one late-binding mechanism. `billing-reporting` retires the untyped
+   `getPipeline()` self-dispatch.
+6. **`evaluation-processing`** — the honest one. See below.
+7. **`trace-processing` last**, when everything it dispatches into already
+   exposes its command classes and the bus has run in production for weeks. Its
+   nine optional deps become nullable in the same step.
 
-The `automations`, `blob-maintenance` and EE `ingestion-pull` pipelines are
-already compliant and need no step.
-
-### What does not move
+## What does not move
 
 - **`ExecuteEvaluationCommand`'s dependencies are seven app-layer services**
-  (monitors, span storage, trace events, evaluation execution, cost recorder,
-  an Azure env resolver, and the inputs-offload gate). Constructing it inside
+  (monitors, span storage, trace events, evaluation execution, cost recorder, an
+  Azure env resolver, and the inputs-offload gate). Constructing it inside
   `evaluation-processing/pipeline.ts` moves the `new` but not the service-ness:
-  that pipeline's `Deps` will name seven services, not seven repositories. This
-  is more honest than hiding them in the registry, and it is not "repos only".
-  Say so rather than pretending. Narrowing them to ports is a decomposition of
-  the evaluation-execution service and belongs in its own decision.
+  that pipeline's `Deps` will name seven layer-3 values, not seven repositories.
+  This is more honest than hiding them in the registry, and it is not "repos
+  only". Say so rather than pretending. Narrowing them to layer-4 ports is a
+  decomposition of the evaluation-execution service and belongs in its own
+  decision.
 - **The `offloadInputs` closure** — 30 lines of feature-flag reads and fail-open
   policy currently inline in `registerEvaluationPipeline`. It is evaluation
-  domain policy. It moves *sideways*, into
+  domain policy, i.e. layer 3. It moves *sideways*, into
   `pipelines/evaluation-processing/commands/`, not up into `pipeline.ts`.
 - **`datasetNormalize`.** A standalone GroupQueue job over Postgres and S3,
   mounted on the trace pipeline for no reason but proximity, wired into the
@@ -289,91 +691,120 @@ already compliant and need no step.
   registry-held wiring, and it is the clearest single piece of evidence that the
   registry became a place to put things.
 - **The `if (deps.x)` optional-dep pattern.** It is how enterprise features stay
-  out of OSS builds. It survives verbatim — what changes is that the optional
-  dep is a repository, not a projection.
+  out of OSS builds. The *guard* survives verbatim; what changes is that the dep
+  becomes `T | null` rather than `T?` (§6) and that the thing guarded is a
+  repository, not a projection.
 - **`registerEnterprisePipelineSet`.** `ee/` cannot be imported unconditionally
   from OSS pipeline files. The enterprise set stays a separate composition
   called from the core one, and gets the same treatment inside its own boundary.
 
-### What is better than it looks
+## What is better than it looks
 
-Four things in the current design are load-bearing and must survive the move.
-
-**Registration order is a real constraint, correctly observed.** The comments in
-`registerAll` are not clutter; they are the only documentation of a genuine
-dependency. They stop mattering *only because* the bus resolves late. Anyone who
-"simplifies" the bus to resolve eagerly reintroduces the constraint silently.
+Two things in the current design are load-bearing and must survive the move. The
+first draft listed four; two of them were wrong and are corrected above.
 
 **`Deferred` is the honest version of a hard problem.** It names the binding and
-throws with that name. Whatever replaces it must keep the named error; a bare
-thunk would be a regression.
+throws with that name (`deferred.ts`: *`Deferred "x" not yet resolved — pipeline
+registration order issue`*). Whatever replaces it must keep the named error; a
+bare thunk would be a regression. The bus's resolution failure must name the
+command class and list what is registered, which `getPipeline` already models.
 
-**`this.cached()` is a policy, centralised.** Six pipelines get identical
-Redis-cached-fold semantics and one key-prefix convention from one three-line
-method. Scattering `new RedisCachedFoldStore(...)` across six files would lose
-that. Hence a `foldCache` port in `Deps` rather than inlining the wrapper — the
-policy stays in one place, the *decision to apply it* moves to the pipeline that
-owns the fold.
+**Five pipelines already do this.** `automations` and
+`topic-clustering-processing` declare their whole topology inline; "only the
+executor dependencies are injected" is `automations`' own docblock, from ADR-052.
+The `Ports` / `DispatchDeps` bundle those five use is layer 4 in everything but
+name — a record of narrow function types declared inside the pipeline's own
+directory, consumed through an applier the pipeline file constructs
+(`scenarioExecutionPM(deps.dispatch)`). This ADR generalises a shape that is
+already load-bearing in production, which is why it is a restructure and not an
+experiment.
 
-**`automationDispatch.wiring.ts` already solved the layering problem.** A
-pipeline-owned wiring module that takes raw clients and produces ports is the
-shape to copy. It was not recognised as a pattern; it is one.
+**Corrected — `automationDispatch.wiring.ts` is not the pattern to copy.** It had
+the right instinct and the wrong execution; see "The diagnosis" above. It is
+cited here as the file the layering exists to fix, and as migration step 2.
+
+**Corrected — `this.cached()` is not centralised policy.** It is one of two
+divergent implementations of one policy, held together by a cast; see §3.
 
 ## Consequences
 
 - `pipeline.ts` becomes the file you read. `trace-processing/pipeline.ts` goes
-  from 309 lines of holes to roughly 450 lines of statements.
+  from 316 lines of holes to roughly 450 lines of statements.
 - **`Deps` interfaces get wider, not narrower.** Trace-processing trades fifteen
   behaviour members for the repositories, clients and ports those fifteen
   handlers actually need, and the member count may well go up. The win is not
   fewer dependencies; it is that every remaining dependency is inert — you can
   read the file and know what happens, and a test can satisfy it with an
   in-memory store instead of a `vi.fn()`.
+- **A file called `*.wiring.ts` stops existing.** Every file in a pipeline
+  directory has a layer, and every layer has a one-line membership test, so
+  "where does this go" has an answer that does not require taste.
+- `as Redis` and the `instanceof Cluster` ternary both disappear, and the two
+  fold-cache paths stop disagreeing.
 - Tests get simpler at exactly the point they are worst today.
   `subscriberWiring.test.ts`'s seven `reactorStub()` calls become the real
-  handlers over fake stores, so the test starts asserting against what runs in
-  production rather than against placeholder objects with the right shape.
+  handlers over in-memory stores, so the test starts asserting against what runs
+  in production rather than against placeholder objects with the right shape.
 - **Cost: there stops being one file that shows the whole wiring graph.** Today
   you can read `pipelineRegistry.ts` and see what talks to what. After this you
   cannot, and that is a genuine loss for exactly the question people most often
   ask. The mitigation is to extend the introspection functions to include
-  cross-pipeline command refs, so the ops explorer answers it from the live
-  runtime — better than a source read did, but only if that work actually ships
-  with the migration rather than after it.
+  cross-pipeline command dispatch, so the ops explorer answers it from the live
+  runtime — better than a source read did, but only if that work ships with the
+  migration rather than after it.
 - **Cost: the command bus defers existence checking to first call**, unless the
-  boot assertion described above ships with it. It should ship with the first
-  step, not the last.
-- **Cost: pipeline files gain imports from `~/server/app-layer/**`.** The
-  type-only rule bounds the cycle risk but does not eliminate the coupling; the
-  `wiring.ts` escape hatch exists precisely for the cases where it would.
+  boot assertion ships with it. It ships in step 1, not the last step.
+- **Cost: null doubles buy completeness at the price of blindness.** A generated
+  no-op port cannot fail a test that should have failed. This is why the port
+  generator is scoped to ports and why in-memory stores, not null stores, are the
+  target for the repository half.
+- **Cost: `pipeline.ts` gains type imports from `~/server/app-layer/**`.** Types
+  carry no runtime edge, so the layering holds, but the coupling is real; the
+  layer-5 adapter exists precisely for the cases where a *value* would otherwise
+  be needed.
 - Registration order stops being load-bearing, which removes a whole class of
   boot-order bug that currently has no test guarding it.
 - One late-binding mechanism instead of three.
-- This is a refactor with no behavioural change and therefore no spec of its own
-  beyond a corrected `specs/event-sourcing/pipeline-model.feature`, whose three
-  scenarios are currently **untagged and therefore enforce nothing**. Rule 1 is
-  mechanically checkable and should become a lint rule or a bound scenario —
-  otherwise the next ADR-075-style conversion re-adds an injected projection and
-  nothing notices, which is exactly how the current state was reached.
+- This is a refactor with no behavioural change **except the fold-cache
+  correction in §3**, and therefore no spec of its own beyond a corrected
+  `specs/event-sourcing/pipeline-model.feature`, whose three scenarios are
+  currently **untagged and therefore enforce nothing**. The layer membership
+  tests are mechanically checkable and should become lint rules or bound
+  scenarios — otherwise the next ADR-075-style conversion re-adds an injected
+  projection, or the next composition file grows a cache, and nothing notices.
+  That is exactly how the current state was reached.
 
 ## References
 
+- `dev/docs/CODING_STANDARDS.md` and the `review-code` skill's
+  `references/code-checklist.md` — the length, SRP, layering, utility-placement
+  and hidden-mutability tests applied above; this ADR invents no new standard
 - [`specs/event-sourcing/pipeline-model.feature`](../../../specs/event-sourcing/pipeline-model.feature)
-  — untagged today; Rule 1 is the scenario it is missing
+  — untagged today; the layer membership tests are the scenarios it is missing
 - [`specs/event-sourcing/post-event-work.feature`](../../../specs/event-sourcing/post-event-work.feature)
 - `src/server/event-sourcing/README.md` — "Step 1: Define the Pipeline (static,
   no runtime deps)", the claim this ADR makes true
-- `src/server/event-sourcing/pipelines/automations/pipeline.ts` and
-  `topic-clustering-processing/pipeline.ts` — the two pipelines that already
-  declare their whole topology inline; "only the executor dependencies are
-  injected" is their own docblock
+- `src/server/event-sourcing/commands/commandHandlerClass.ts` —
+  `CommandHandlerClassStatic` and `ExtractCommandHandlerPayload`, the two types
+  the bus signature is built from
+- `src/server/event-sourcing/pipeline/staticBuilder.ts` — `withCommand` (528) and
+  `withCommandInstance` (577) already extract payloads exactly this way;
+  `commands` (134) is the array the identity map is built from
+- `src/server/event-sourcing/eventSourcing.ts` — `register()` (319–323) is where
+  the identity map is populated; `getPipeline()` (196) is the untyped bus
+- `src/server/event-sourcing/pipelineRegistry.ts:295,362` — the `Redis | Cluster`
+  dep and the `as Redis` cast that hides it
 - `src/server/event-sourcing/pipelines/automations/automationDispatch.wiring.ts`
-  — the pipeline-owned wiring module, generalised here
-- `src/server/event-sourcing/pipelines/billing-reporting/pipeline.ts` and
-  `registerBillingReportingPipeline` in `pipelineRegistry.ts` —
-  `getPipeline()` self-dispatch, the command bus in its untyped form
+  — the file this ADR's layering exists to fix; migration step 2
+- `src/server/event-sourcing/projections/redisCachedFoldStore.ts` — takes
+  `redis: Redis`, issues only `get`/`set`; the narrow requirement the union
+  cannot satisfy
+- `src/server/event-sourcing/stores/baseMemoryProjectionStore.ts` and the two
+  `*.memory.repository.ts` subclasses — the existing in-memory store half
+- `src/server/app-layer/presets.ts:1322` — `createTestApp`, 377 lines, and the
+  `as unknown as PromptTagRepository` that is the §7 trap already in the tree
 - `src/server/event-sourcing/deferred.ts` — the mechanism this replaces, and the
-  error message the replacement must keep
+  named error the replacement must keep
 - ADR-052 (automations on the process-manager substrate) — where "only the
   executor dependencies are injected" was first written down, for one pipeline
 - ADR-074 (package topology) — the same boundary question one level up
