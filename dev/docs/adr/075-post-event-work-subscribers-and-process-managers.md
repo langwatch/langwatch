@@ -229,6 +229,34 @@ splits: the debit rows are the projection, and the best-effort
 `virtualKey.lastUsedAt` touch is a subscriber, because it is a side effect on
 Prisma rather than derived state.
 
+Two questions that come up during the conversion, both already answered by the
+repo — settled here so they are not reopened:
+
+**OCSF rows are keyed per span, not per trace.** Migration 00026's header is
+explicit: *"Each governance span/log emits ONE OCSF row keyed by (TenantId,
+EventId). EventId is the span_id (hex) for span-shaped traces and the log
+record id for flat-event traces."* `folds.feature` says the same. The reactor
+keyed on `traceId` and justified it in a docblock as "too noisy for SIEM
+consumers" — that was a unilateral deviation from its own table's documented
+contract, and it is also what made the stream un-rebuildable, since a trace is
+not one immutable event. Restoring span grain is a bug fix, not a product
+decision. SIEM volume is bounded by the export's cursor pagination and `limit`,
+not by row grain, so the objection the docblock raised was already handled a
+layer up.
+
+**Log-record governance ingest has never worked, and this ADR does not fix it.**
+Migration 00026 and `folds.feature` both provide for it, and the receiver does
+stamp the origin attributes — but the trace pipeline only sees log attributes
+through `liftCanonicalAttributesFromLogRecord`, whose extractor registry is a
+set of *vendor* adapters (ClaudeCode, Codex, GenAI, SpringAI). `langwatch.origin.*`
+is not a vendor attribute needing extraction; it is already canonical and
+simply needs passing through. So webhook-ingested governance data produces no
+KPI or OCSF rows and never has, under the reactor or after conversion. Scope
+the projections to `span_received` to match real coverage. The gap is a genuine
+defect on a compliance surface and deserves its own fix — but it is orthogonal
+to which substrate writes the rows, and folding it in here would grow a
+substrate change into an ingest change.
+
 **Class D — work dispatch → process manager outbox (6).** `scenarioExecution`
 (this is ADR-073 step 2), `evaluationTrigger`, `customEvaluationSync`,
 `billingMeterDispatch`, `traceMetricsSync`, `simulationMetricsSync`. Each
@@ -236,10 +264,38 @@ dispatches work that must happen. `evaluationTrigger`'s per-monitor
 `delay: monitor.threadIdleTimeout * 1000` and `simulationMetricsSync`'s
 `delay: 60_000` become deadlines rather than queue delays.
 
-**Class E — deferred re-check → process manager wake (2).** `originGate`
-(`DEFERRED_CHECK_DELAY_MS`, 5 minutes) and `projectMetadata` (which also owns
-the ADR-051 topic-clustering bootstrap). Both are already process managers
-written by hand.
+**Class E — deferred re-check → process manager wake (1).** `originGate`
+(`DEFERRED_CHECK_DELAY_MS`, 5 minutes) is a process manager written by hand:
+its whole job happens *later*, so there is a deadline worth making durable.
+
+**`projectMetadata` was in this class and does not belong here.** It has no
+`delay` at all — its options are `makeJobId` + `ttl: 60_000`, which is a dedup
+window, not a deferral. It runs immediately on the first event of each window,
+so a process manager would buy a durable deadline it does not have, at the cost
+of an instance row and an inbox transition per *trace* to do work that is
+per *project*. The classification confused "debounced" with "deferred". Two
+independent conversion attempts both refused the assignment before this was
+corrected.
+
+It is also two concerns fused, and the fusion was a live defect: the ADR-051
+clustering bootstrap sat inside the metadata write's `try`, after a Prisma read,
+so a database blip skipped the clustering re-assertion and reported it as
+"Failed to update project metadata" — the clustering outage was invisible and
+mislabelled. They split:
+
+- the metadata write (`firstMessage` / `integrated` / `language`) reads three
+  keys off `foldState.attributes`, so it is a **fold-bound subscriber**. Not a
+  projection, for the same reason `virtualKey.lastUsedAt` is not: it is a side
+  effect on a Prisma row with its own lifecycle, not derived state.
+- the clustering bootstrap is a **liveness poke** and becomes its own
+  subscriber, failing forward on a read error rather than skipping. Making it a
+  process manager would be a process manager whose only job is to ensure another
+  process manager exists — the durable deadline already exists one pipeline
+  over, on the right key and cadence.
+
+Longer term it should not ride the ingest path at all: a `.schedule()` sweep
+inside the topic-clustering pipeline removes the coupling entirely. That is a
+behaviour change and belongs in its own decision.
 
 ### Migration order
 
@@ -390,17 +446,32 @@ enqueue filter narrows on `eventTypes` alone.
   from the ledger is reported" is therefore not satisfied by conversion alone.
   Widening the probe is a one-line `WHERE` change and should ship with it.
 
-- **Map projections have no enqueue filter, and Class C needs one.** ADR-069
-  phase 1 put `EnqueueDispatchOptions` on the *subscriber* contract only;
-  `MapProjectionDefinition` has no equivalent. So a Class C conversion that
-  lands as a map projection mints a job for every `span_received` event — on the
-  busiest path in the product — even when the derivation returns `null` for all
-  but gateway spans. The subscriber half of the same conversion gets a filter
-  and costs nothing; the projection half cannot. Giving `MapProjectionDefinition`
-  the same seam, applied in `dispatchToMapProjections`, should land **before**
-  the remaining Class C conversions rather than after them. It is a router
-  change affecting all 15 map-projection registrations, which is why it is
-  called out here rather than folded into a class.
+- **The enqueue seam exists on one of three registration paths, and that blocks
+  Classes C and E.** ADR-069 phase 1 put `EnqueueDispatchOptions` (filter +
+  claim-check staging) on `EventSubscriberDefinition` only. The other two paths
+  a retired reactor can land on have nothing:
+
+  - `MapProjectionDefinition` has no equivalent, so a Class C conversion mints a
+    job for every `span_received` — on the busiest path in the product — even
+    when the derivation returns `null` for all but gateway spans. The subscriber
+    half of the same conversion gets a filter and costs nothing; the projection
+    half cannot.
+  - `ProcessRuntime.registerPipeline` builds a process manager's subscriber as
+    `{ name, eventTypes, handle }` with **no `options` object at all** — no
+    dedup, no delay, no filter. So Class E is the largest row-count change in
+    the whole retirement, not the mechanical tail it looks like. `originGate`
+    today is `ttl: 15_000` + `delay: 5_000`, i.e. one job per trace per 15
+    seconds. As a trace-keyed process manager it becomes a queue job, an inbox
+    row and an optimistic-concurrency update on one instance row **per span** —
+    a 10k-span trace goes from a handful of jobs to 10k durable Postgres
+    transitions, serialised on a single key, with revision conflicts throwing
+    back to the queue under contention. That is the amplification
+    `specs/event-sourcing/hot-trace-fold-amplification.feature` exists for.
+
+  Extending the seam to both paths is a router change touching all 15
+  map-projection registrations and every process manager, which is why it is
+  called out here rather than folded into a class. **It should land before the
+  remaining Class C and Class E conversions, not after them.**
 
 ## References
 
