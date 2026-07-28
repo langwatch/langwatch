@@ -83,19 +83,19 @@ describe("execWithNoScriptRecovery", () => {
           new Error("Connection is closed."),
           null,
         ];
-        let reran = false;
+        let wasRerun = false;
 
         const results = await execWithNoScriptRecovery(
           pipelineReturning([connectionLost]),
           async () => {
-            reran = true;
+            wasRerun = true;
             return 1;
           },
         );
 
         // Ambiguous failures (a reset after send) may or may not have executed,
         // so leaving them alone is the conservative choice.
-        expect(reran).toBe(false);
+        expect(wasRerun).toBe(false);
         expect(results).toEqual([connectionLost]);
       });
     });
