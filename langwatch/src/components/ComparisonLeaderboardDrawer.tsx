@@ -34,7 +34,10 @@ import { LeaderboardStep } from "./batch-evaluation-results/LeaderboardStep";
 import { LeaderboardTrustPanel } from "./batch-evaluation-results/LeaderboardTrustPanel";
 import { LeaderboardVerdictPanel } from "./batch-evaluation-results/LeaderboardVerdictPanel";
 import { ParetoScatterChart } from "./batch-evaluation-results/ParetoScatterChart";
-import { PairwiseLeaderboard } from "./batch-evaluation-results/PairwiseLeaderboard";
+import {
+  DEFAULT_WARN_THRESHOLD,
+  PairwiseLeaderboard,
+} from "./batch-evaluation-results/PairwiseLeaderboard";
 import type { BatchComparisonColumn, BatchResultRow } from "./batch-evaluation-results/types";
 import { useDrawer } from "~/hooks/useDrawer";
 import { Drawer } from "./ui/drawer";
@@ -50,8 +53,7 @@ export type ComparisonLeaderboardDrawerProps = {
   judgeModel?: string | null;
 };
 
-/** Matchups per variant below which Bradley-Terry scores are unstable. */
-const WARN_THRESHOLD = 30;
+
 
 export function ComparisonLeaderboardDrawer({
   column,
@@ -119,7 +121,7 @@ export function ComparisonLeaderboardDrawer({
   );
 
   const trustHasProblem =
-    leaderboard.minMatchups < WARN_THRESHOLD ||
+    leaderboard.minMatchups < DEFAULT_WARN_THRESHOLD ||
     leaderboard.hasDegenerate ||
     !leaderboard.didConverge ||
     judgeIndependence.sharedFamilyVariantIds.length > 0 ||
@@ -189,7 +191,7 @@ export function ComparisonLeaderboardDrawer({
                   judgeIndependence={judgeIndependence}
                   variantMetrics={variantMetrics}
                   variantNames={variantNames}
-                  warnThreshold={WARN_THRESHOLD}
+                  warnThreshold={DEFAULT_WARN_THRESHOLD}
                 />
               </LeaderboardVerdictPanel>
             </LeaderboardStep>
@@ -213,7 +215,7 @@ export function ComparisonLeaderboardDrawer({
             >
               <LeaderboardTrustPanel
                 leaderboard={leaderboard}
-                warnThreshold={WARN_THRESHOLD}
+                warnThreshold={DEFAULT_WARN_THRESHOLD}
                 sampleAdequacy={sampleAdequacy}
                 verbosity={verbosity}
                 judgeIndependence={judgeIndependence}
@@ -248,7 +250,7 @@ export function ComparisonLeaderboardDrawer({
                 <PairwiseLeaderboard
                   leaderboard={leaderboard}
                   variantNames={variantNames}
-                  warnThreshold={WARN_THRESHOLD}
+                  warnThreshold={DEFAULT_WARN_THRESHOLD}
                   showWarnings={false}
                   onCellClick={(winnerId, opponentId) =>
                     setSelectedPair({ winnerId, opponentId })

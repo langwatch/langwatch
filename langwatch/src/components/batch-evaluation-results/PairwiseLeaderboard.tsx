@@ -42,7 +42,13 @@ export type PairwiseLeaderboardProps = {
 type SortKey = "rank" | "score" | "winRate" | "matchups";
 type SortDir = "asc" | "desc";
 
-const DEFAULT_WARN_THRESHOLD = 30;
+/**
+ * Matchups per variant below which a Bradley-Terry score is treated as
+ * unstable. Exported because the drawer gates its own trust panel on the same
+ * number — two copies would let the table's warnings and the panel's verdict
+ * drift apart inside one view, with nothing enforcing that they agree.
+ */
+export const DEFAULT_WARN_THRESHOLD = 30;
 
 export function PairwiseLeaderboard({
   leaderboard,
