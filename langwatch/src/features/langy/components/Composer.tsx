@@ -113,7 +113,6 @@ function ComposerImpl({
   onRemoveChip,
   addableChips = [],
   onAddChip,
-  onKindIntent,
   placeholder = COMPOSER_PLACEHOLDER,
   cardRef,
 }: {
@@ -145,11 +144,6 @@ function ComposerImpl({
   /** Dismissed context the "+ context" control can add back. */
   addableChips?: LangyContextChip[];
   onAddChip?: (id: string) => void;
-  /** `#trace`-style asks in the palette: reveal on this page, or go browse. */
-  onKindIntent?: (intent: {
-    kind: LangyRevealableKind;
-    action: "reveal" | "browse";
-  }) => void;
   placeholder?: string;
 }) {
   const floating = variant === "floating";
@@ -390,7 +384,6 @@ function ComposerImpl({
                 closePalette();
               }}
               onPickSkill={pickSkill}
-              onKindIntent={onKindIntent}
               onClose={closePalette}
             />
           ) : null}

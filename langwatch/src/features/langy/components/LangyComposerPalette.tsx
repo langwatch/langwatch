@@ -139,7 +139,6 @@ export function LangyComposerPalette({
   onQueryChange,
   onPickChip,
   onPickSkill,
-  onKindIntent,
   onClose,
 }: {
   mode: PaletteMode;
@@ -150,11 +149,6 @@ export function LangyComposerPalette({
   onPickChip: (id: string) => void;
   /** A skill picked from `/` — the composer drops its question into the draft. */
   onPickSkill?: (skill: LangySkill) => void;
-  /** `#trace`-style kind intents: reveal targets here, or browse the surface. */
-  onKindIntent?: (intent: {
-    kind: LangyRevealableKind;
-    action: "reveal" | "browse";
-  }) => void;
   onClose: () => void;
 }) {
   // The registry of things mounted on the page (only populated while the panel
@@ -240,14 +234,6 @@ export function LangyComposerPalette({
       if (target) absorbContextTarget(target);
       onClose();
       return;
-    }
-    if (value.startsWith("intent:")) {
-      const [, action, kind] = value.split(":");
-      onKindIntent?.({
-        kind: kind as LangyRevealableKind,
-        action: action as "reveal" | "browse",
-      });
-      onClose();
     }
   };
 

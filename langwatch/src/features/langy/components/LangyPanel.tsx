@@ -95,7 +95,6 @@ import {
 } from "../logic/langyChatTransport";
 import { langyChoicesTimeline } from "../logic/langyChoicesTimeline";
 import { mergeContextChips } from "../logic/langyContextChips";
-import { SURFACE_PATH_FOR_KIND } from "../logic/langyContextKindIntent";
 import {
   explainLangyError,
   readLangyStreamError,
@@ -459,25 +458,6 @@ function LangyPanel({
   const utils = api.useUtils();
   const router = useRouter();
 
-  // `#trace` in the palette, answered: light matching targets up here, or —
-  // when this page has none — go to the surface that has them and let the
-  // pending reveal light them up as they mount.
-  const requestReveal = useLangyContextTargetStore((s) => s.requestReveal);
-  const onKindIntent = useCallback(
-    ({
-      kind,
-      action,
-    }: {
-      kind: LangyRevealableKind;
-      action: "reveal" | "browse";
-    }) => {
-      requestReveal({ kind });
-      if (action === "browse" && project?.slug) {
-        void router.push(`/${project.slug}/${SURFACE_PATH_FOR_KIND[kind]}`);
-      }
-    },
-    [requestReveal, project?.slug, router],
-  );
 
   // ── Client/UI state (single store) ────────────────────────────────────────
   const isOpen = useLangyStore((s) => s.isOpen);
@@ -2812,7 +2792,6 @@ function LangyPanel({
                     onRemoveChip={removeContextChip}
                     addableChips={addableChips}
                     onAddChip={chooseChip}
-                    onKindIntent={onKindIntent}
                   />
                 </Box>
               </>
