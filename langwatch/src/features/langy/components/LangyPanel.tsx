@@ -361,8 +361,14 @@ function LangyLauncher({
   // itself, not ambient chrome). Disabled under reduced motion. `transform` is
   // driven imperatively from the hook's rAF, so the button's own transition
   // must NOT list transform, or it would double-smooth and lag the deform.
+  // `isOpen` must be part of `enabled`: the launcher stays MOUNTED while the
+  // panel is open and merely renders null below, and the hook's effect keys on
+  // [enabled] alone. Without this the listeners bind once against the orb node,
+  // survive the button unmounting when the panel opens (rAF keeps writing
+  // styles to a detached element, retaining it), and never rebind afterwards —
+  // so the proximity glow is dead for the rest of the session.
   const { orbRef, glowRef, activate } = useLangyOrbProximity({
-    enabled: !reduceMotion,
+    enabled: !reduceMotion && !isOpen,
   });
   if (isOpen) return null;
   return (
@@ -828,9 +834,16 @@ function LangyPanel({
   // No model resolves for Langy's gate key => the chat route will 409 ("no
   // model configured"). Surface an inline setup instead of letting the user
   // type into a dead composer.
+  // Gate on SUCCESS, not on "no longer loading". An errored query also reports
+  // isLoading === false with data === undefined, so testing !isLoading made a
+  // transient failure of the gate lookup indistinguishable from "this project
+  // has no model configured" — and the branch below replaces the whole
+  // conversation with the provider-onboarding grid. With staleTime 300s, no
+  // refetchInterval and refetchOnWindowFocus off, nothing would refetch it, so
+  // the user's open transcript stayed hidden until a full reload.
   const langyNeedsModel =
     !!projectId &&
-    !resolvedDefaultQuery.isLoading &&
+    resolvedDefaultQuery.isSuccess &&
     !resolvedDefaultQuery.data?.model;
 
   // The project's Langy VK carries an optional `modelsAllowed` allowlist. When

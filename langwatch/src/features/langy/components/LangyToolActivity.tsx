@@ -881,15 +881,24 @@ function CapabilityBatchRow({
   batch: CapabilityBatch;
   devMode: boolean;
 }) {
+  const isBatched = batch.entries.length > 1;
   const [open, setOpen] = useState(true);
   const userToggled = useRef(false);
+  // Only arm the auto-collapse once this row actually renders the batch UI.
+  // Running it unconditionally drove `open` to false while the row was still a
+  // single card, so the moment a second entry arrived the batch rendered
+  // ALREADY collapsed — hiding both cards the reader was looking at behind a
+  // summary header they never clicked. Keying on `isBatched` also restarts the
+  // timer at the instant the batch appears, which is when the 2.2s reading
+  // window is supposed to begin.
   useEffect(() => {
+    if (!isBatched) return;
     const timer = window.setTimeout(() => {
       if (!userToggled.current) setOpen(false);
     }, 2200);
     return () => window.clearTimeout(timer);
-  }, []);
-  if (batch.entries.length === 1) {
+  }, [isBatched]);
+  if (!isBatched) {
     const entry = batch.entries[0]!;
     return <CapabilityCardRow call={entry.call} devMode={devMode} />;
   }
