@@ -3,7 +3,11 @@ import {
   explainHandledError,
   explainUnhandledError,
 } from "./presentation";
-import { readEnvelopeTraceId, readHandledError } from "./readHandledError";
+import {
+  type HandledErrorShape,
+  readEnvelopeTraceId,
+  readHandledError,
+} from "./readHandledError";
 
 /** Everything a surface needs to render an error, resolved once. */
 export interface ResolvedErrorCopy {
@@ -75,8 +79,40 @@ export function resolveErrorCopy({
       description: explanation.description,
     }),
     docsUrl: handled?.docsUrl,
-    traceId: handled?.traceId || readEnvelopeTraceId(error),
+    traceId: isSelfServiceable({ handled, explanation })
+      ? undefined
+      : handled?.traceId || readEnvelopeTraceId(error),
   };
+}
+
+/**
+ * Whether this failure is the customer's own to resolve, with words that tell
+ * them how.
+ *
+ * The trace id is an escalation handle — the one technical detail a customer
+ * sees, and the thing they quote to support (ADR-045). Offering it next to
+ * "that name is taken" invites a ticket for a rename, and on the anonymous
+ * share page it handed a stranger an internal identifier for a link that had
+ * simply expired. Three conditions have to hold before we stay quiet about it:
+ *
+ *   - the failure is handled — an unknown one is ours by definition;
+ *   - the registry has copy for its code — an unrecognised code degrades to
+ *     the humanised slug, which tells nobody what to do, so the id is all
+ *     they have;
+ *   - it is the customer's fault in the ADR-045 sense. A `platform` or
+ *     `provider` fault is an incident on someone else's side no matter how
+ *     well we word it, and the id is how it gets traced.
+ */
+function isSelfServiceable({
+  handled,
+  explanation,
+}: {
+  handled: HandledErrorShape | null;
+  explanation: ErrorExplanation;
+}): boolean {
+  return (
+    handled !== null && explanation.isRegistered && handled.fault === "customer"
+  );
 }
 
 /**

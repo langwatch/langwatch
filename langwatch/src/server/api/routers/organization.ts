@@ -560,6 +560,16 @@ export const organizationRouter = createTRPCRouter({
 
       const inviteService = InviteService.create(prisma);
 
+      // Before anything is written: inviting someone who is already a member
+      // used to succeed silently, adding a pending invite beside the membership
+      // it duplicated. Checked ahead of the licence limit so an admin who is at
+      // their seat cap is told the real reason rather than being sold an
+      // upgrade for a seat they already own.
+      await inviteService.assertNotAlreadyMembers({
+        emails: input.invites.map((invite) => invite.email),
+        organizationId: input.organizationId,
+      });
+
       // Check license limits using the service
       try {
         await inviteService.checkLicenseLimits({

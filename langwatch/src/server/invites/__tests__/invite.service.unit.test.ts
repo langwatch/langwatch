@@ -146,6 +146,9 @@ describe("InviteService", () => {
       organization: {
         findFirst: vi.fn(),
       },
+      organizationUser: {
+        findFirst: vi.fn(),
+      },
       customRole: {
         findMany: vi.fn(),
       },
@@ -165,6 +168,63 @@ describe("InviteService", () => {
       mockLicenseRepo,
       mockPlanProvider
     );
+  });
+
+  /**
+   * Inviting an address that is already a member used to succeed, writing a
+   * pending invite row beside the membership it duplicated — so the members
+   * page showed the same person as both an ADMIN and freshly "Invited", and
+   * whatever the admin was actually trying to do never happened.
+   *
+   * Asserted on `code`, not prose: the sentence a customer reads comes from the
+   * presentation registry keyed by that code (ADR-045).
+   */
+  describe("assertNotAlreadyMembers()", () => {
+    describe("when one of the addresses already belongs to a member", () => {
+    /** @scenario "Inviting an existing member is refused with a reason" */
+      it("refuses the batch and names the address", async () => {
+        mockPrisma.organizationUser.findFirst.mockResolvedValue({
+          user: { email: "already@example.com" },
+        });
+
+        await expect(
+          service.assertNotAlreadyMembers({
+            emails: ["new@example.com", "already@example.com"],
+            organizationId: "org-1",
+          }),
+        ).rejects.toMatchObject({
+          code: "already_organization_member",
+          httpStatus: 409,
+          fault: "customer",
+          meta: { email: "already@example.com" },
+        });
+      });
+    });
+
+    describe("when none of the addresses belong to a member", () => {
+    /** @scenario "Inviting a new address still succeeds" */
+      it("lets the invites through", async () => {
+        mockPrisma.organizationUser.findFirst.mockResolvedValue(null);
+
+        await expect(
+          service.assertNotAlreadyMembers({
+            emails: ["new@example.com"],
+            organizationId: "org-1",
+          }),
+        ).resolves.toBeUndefined();
+      });
+    });
+
+    describe("when there is nothing to check", () => {
+      it("does not query at all", async () => {
+        await service.assertNotAlreadyMembers({
+          emails: [],
+          organizationId: "org-1",
+        });
+
+        expect(mockPrisma.organizationUser.findFirst).not.toHaveBeenCalled();
+      });
+    });
   });
 
   describe("checkDuplicateInvite()", () => {

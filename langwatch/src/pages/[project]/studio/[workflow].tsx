@@ -1,5 +1,7 @@
-import ErrorPage from "~/utils/compat/next-error";
+import { Alert, Box } from "@chakra-ui/react";
 import { useEffect } from "react";
+import { DashboardLayout } from "~/components/DashboardLayout";
+import { HandledErrorAlert } from "~/features/errors";
 import OptimizationStudio from "../../../optimization_studio/components/OptimizationStudio";
 import { useLoadWorkflow } from "../../../optimization_studio/hooks/useLoadWorkflow";
 import {
@@ -73,8 +75,33 @@ export default function Studio() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [!!workflow.data]);
 
-  if (workflow.isFetched && !workflow.data) {
-    return <ErrorPage statusCode={404} />;
+  // A workflow that isn't there is a thing we can name, and the person looking
+  // at it needs a way out. This used to be a bare full-screen "404 / An error
+  // occurred" with no navigation and no explanation, while the query underneath
+  // it held a perfectly good `workflow_not_found`. Rendered inside
+  // `DashboardLayout` for the same reason the experiments page does it: the
+  // sidebar is the way back.
+  if (workflow.isError || (workflow.isFetched && !workflow.data)) {
+    return (
+      <DashboardLayout>
+        <Box padding={6}>
+          {workflow.error ? (
+            <HandledErrorAlert
+              error={workflow.error}
+              fallbackTitle="Couldn't open this workflow"
+            />
+          ) : (
+            <Alert.Root status="warning">
+              <Alert.Indicator />
+              <Alert.Title>Workflow not found</Alert.Title>
+              <Alert.Description>
+                It may have been deleted, or you may not have access to it.
+              </Alert.Description>
+            </Alert.Root>
+          )}
+        </Box>
+      </DashboardLayout>
+    );
   }
 
   return <OptimizationStudio />;

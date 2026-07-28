@@ -1,8 +1,8 @@
 import { Readable } from "node:stream";
+import { HandledError } from "@langwatch/handled-error";
 import type { MiddlewareHandler } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { anyAuthenticated, createServiceApp } from "~/server/api/security";
-import { LiteMemberRestrictedError } from "~/server/app-layer/permissions/errors";
 import { requireProjectPermission } from "~/server/auth/permissions";
 import { prisma } from "~/server/db";
 import { rateLimit } from "~/server/rateLimit";
@@ -56,19 +56,26 @@ export function requiredPermissionForPurpose(
   return purpose === "trace_content" ? "traces:view" : "scenarios:view";
 }
 
+/** The codes `requireProjectPermission` raises when it refuses the caller. */
+const DENIAL_CODES: ReadonlySet<string> = new Set([
+  "project_permission_denied",
+  "lite_member_restricted",
+]);
+
 /**
- * True only for the denial shapes `requireProjectPermission` documents
- * (LiteMemberRestrictedError, or its plain-Error denial message). Anything
- * else — a dropped database connection, a Prisma fault — is an
+ * True only for the denial shapes `requireProjectPermission` documents.
+ * Anything else — a dropped database connection, a Prisma fault — is an
  * infrastructure failure that must bubble up as a 5xx, never be masked as
  * a 403.
+ *
+ * Matched on `code`, never on prose. This used to compare the denial's message
+ * word for word, which made a copy edit a silent behaviour change: reword the
+ * sentence and every denial here quietly becomes a 500. Codes are the stable
+ * half of a handled error precisely so control flow can rest on them, and
+ * `code` survives a serialisation boundary where `instanceof` would not.
  */
-function isPermissionDenial(err: unknown): boolean {
-  if (err instanceof LiteMemberRestrictedError) return true;
-  return (
-    err instanceof Error &&
-    err.message === "You do not have permission to access this project resource"
-  );
+export function isPermissionDenial(err: unknown): boolean {
+  return HandledError.isHandled(err) && DENIAL_CODES.has(err.code);
 }
 
 /**

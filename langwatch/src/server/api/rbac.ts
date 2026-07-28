@@ -6,7 +6,10 @@ import {
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { env } from "~/env.mjs";
-import { LiteMemberRestrictedError } from "~/server/app-layer/permissions/errors";
+import {
+  LiteMemberRestrictedError,
+  ProjectPermissionDeniedError,
+} from "~/server/app-layer/permissions/errors";
 import type { Session } from "~/server/auth";
 import { isAdmin } from "../../../ee/admin/isAdmin";
 
@@ -666,9 +669,20 @@ export const checkProjectPermission =
           ),
         });
       }
+      // `cause` carries the handled error, exactly as the EXTERNAL branch
+      // above does. Without it this denial crossed the boundary as bare prose,
+      // so the client had no code to key copy off and rendered the generic
+      // "unknown" state for a refusal we can name — and one the customer can
+      // act on by asking an admin for the permission named in `meta`.
+      //
+      // The tRPC code stays UNAUTHORIZED rather than moving to FORBIDDEN even
+      // though the handled error is a 403: the client's interceptors branch on
+      // it, and re-tagging every project denial is a behaviour change that has
+      // nothing to do with giving this error its words back.
       throw new TRPCError({
         code: "UNAUTHORIZED",
         message: "You do not have permission to access this project resource",
+        cause: new ProjectPermissionDeniedError(permission),
       });
     }
 
