@@ -86,20 +86,6 @@ export const FEATURE_FLAGS = [
     family: "Event sourcing",
     legacyEnvVar: "LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD",
   },
-  // Claim-check producer gate (ADR-069). Default OFF is the deploy-safety
-  // half of the doctrine: a job staged as a reference by a new worker and
-  // drained by a not-yet-cycled one fails that build's type check, RETURNS,
-  // and completes the job — no throw, no retry, no counter — so the facts are
-  // gone. Turning this on only after the fleet has cycled is what makes the
-  // producer consumer-first in a single-release deploy.
-  {
-    key: "ops_es_span_claim_check_staging_enabled",
-    scope: "SYSTEM",
-    defaultValue: false,
-    description:
-      "Enables claim-check staging on event-sourcing subscriber fan-out (ADR-069): a matched span_received job is staged as a small span_referenced reference instead of the whole event. Leave OFF until every worker in the fleet runs a build that understands the reference — an older worker silently completes such a job and drops its facts. With it off the full event is staged, which every build handles.",
-    family: "Event sourcing",
-  },
   // Strict-PII analysis-service kill switch. The native secrets + essential
   // PII floor in the ingestion pipeline is light and always runs; this only
   // sheds the heavy strict pass that calls the external analysis service

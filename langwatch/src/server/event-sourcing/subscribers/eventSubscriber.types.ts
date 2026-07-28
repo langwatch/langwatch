@@ -55,30 +55,16 @@ export interface EnqueueDispatchOptions<E extends Event = Event> {
    * here is reported loudly and still loses this subscriber's job for this
    * event permanently. `stage` must be total for the same reason `filter` is.
    *
-   * Staging is gated — see `stageFlag`. A `stage` hook declared without one
-   * never runs, because shipping a producer ungated is the defect ADR-069
-   * records against this very seam.
+   * **Introducing a `stage` hook is a deploy-order dependency.** A reference is
+   * a different event type, and subscriber fan-out is never replayed, so during
+   * a rolling deploy a job staged by a new worker can be drained by one running
+   * the previous build — whose handler does not recognise the reference,
+   * returns, and *completes* the job, with no throw, no retry, no drop counter
+   * and no log. Ship the consumer half at least one release ahead of the
+   * producer half, and see ADR-069 for the exposure this leaves on upgrades
+   * that cross both in one step.
    */
   stage?: (event: E) => Event;
-  /**
-   * The flag that turns `stage` ON, resolved per tenant at fan-out.
-   *
-   * **Required for `stage` to have any effect, and default-OFF by design.**
-   * A reference is a different event type, and subscriber fan-out is never
-   * replayed: during a rolling deploy a job staged by a new worker can be
-   * drained by one running the previous build, whose handler does not
-   * recognise the reference, returns, and *completes* the job — no throw, no
-   * retry, no drop counter, no log. The facts are gone permanently.
-   *
-   * So the producer and consumer halves cannot safely ship in one release
-   * unless the producer starts dark: deploy with the flag off, let the fleet
-   * cycle, then enable it. With it off the full event is staged, which every
-   * build — old and new — already handles.
-   *
-   * Resolution failure is read as OFF: the seam cannot confirm the fleet has
-   * cycled, and staging the full event is only more expensive, never wrong.
-   */
-  stageFlag?: FeatureFlagKey;
 }
 
 export interface EventSubscriberOptions<E extends Event = Event> {

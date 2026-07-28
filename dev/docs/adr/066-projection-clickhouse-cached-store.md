@@ -212,14 +212,13 @@ Recorded here so the application-side and server-side levers are visible togethe
 - Redelivery dedup travels with the state (applied-event-id set, reset on each fresh delivery, bounded to the in-flight batch) — and, for read-back folds, persists durably next to the state row (migration 00054), so it survives cache loss.
 - **High-fan-in `event_log` producers coalesce their appends** — a batched multi-row insert per drained batch, not one insert per item. A producer where a single aggregate can mint events faster than they drain, and does not coalesce, is a part-buildup regression. Any cap on coalescing coverage is logged, not silent.
 
-## Deploying an adopter: the migration must land before the workers
+## Deploying an adopter: the rollout window fails loudly and retries
 
-**A read-back adopter's schema migration is a deploy-order dependency, and the
-chart does not express it.** `clickhouse:migrate` runs from `start:prepare:db`,
-which is on the **app** pod's entrypoint only; the workers Deployment overrides
-its command to `start:workers` and never migrates. The two Deployments roll
-concurrently, so new worker code folds against the old schema for the length of
-the rollout.
+A read-back adopter's migration is a migration like any other: it runs when
+migrations run. `clickhouse:migrate` runs from `start:prepare:db` on the app
+pod's entrypoint; the workers Deployment runs `start:workers`. The two roll
+concurrently, so for the length of a rollout new worker code can fold against
+the old schema.
 
 Both halves then fail, deliberately:
 
@@ -235,53 +234,24 @@ passes the version gate and decodes as real state. That corruption launders
 itself past the very gate that exists to reject it, and nothing later rebuilds
 it. A retry storm is recoverable; that is not.
 
-So the ordering is a **release procedure**, not something the code can absorb:
+Nothing further is needed, because the failure is self-limiting: jobs retry on
+the shared platform budget (25 attempts, ≈2h27m) and recover the moment the
+migration lands, which is what a retrying queue is for. `es_fold_projection_total{status="failed"}`
+shows the window if anyone wants to watch it.
 
-1. Apply the migration out of band **before** rolling the workers, and confirm
-   `SKIP_CLICKHOUSE_MIGRATE` is unset.
-2. Watch `es_fold_projection_total{status="failed"}` through the window.
+### A version bump re-folds during the rollout
 
-The failure is self-limiting if the order is missed — jobs retry on the shared
-platform budget (25 attempts, ≈2h27m) and recover the moment the app pod
-migrates — but a migration that has not landed within that budget exhausts the
-jobs and blocks their groups. Promoting the migration to a `pre-upgrade` Helm
-hook Job would make the dependency structural rather than procedural (the
-pattern exists in `charts/clickhouse-serverless/templates/preflight-secrets-job.yaml`);
-it is deliberately **not** taken here, because it makes a failed migration fail
-the whole release, and that is a deployment-policy decision rather than an
-engineering one.
+The gate is strict equality, so an old pod reading a row a new pod stamped
+reports `undecodable` and re-folds it — and each side rewrites at its own stamp,
+so the other refuses it again until the fleet has cycled. That is inherent: an
+old build cannot be taught a stamp that did not exist when it was compiled.
+`es_fold_refold_on_miss_total{outcome="performed"}` rises for the window and
+settles afterwards.
 
-### The version stamp is a second deploy-order dependency
-
-The gate is strict equality on both sides, which is right for correctness and
-costly for one release window: an old pod reads a row a new pod stamped, does
-not recognise the stamp, and reports `undecodable` exactly as it would for a
-stale row. So **every projection-version bump makes the concurrent rollout
-refold from `event_log`**, in both directions — each side rewrites at its own
-stamp, so the other refuses it again on the next delivery — for every aggregate
-that receives traffic during the window. On a hot aggregate carrying a long
-history that is the shape this ADR exists to remove, re-entered by a routine
-deploy.
-
-Nothing in the gate can fix this: an old build cannot be taught a stamp that
-did not exist when it was compiled. Accepting a set of known-decodable versions
-(as `TRACE_SUMMARY_PROJECTION_VERSIONS` does) removes the *new pod reads old
-row* half after the first release, but never the *old pod reads new row* half.
-So a bump is a release procedure too:
-
-1. Bump versions in their own release, separate from a migration.
-2. Keep the rollout short, and prefer a low-traffic window — the cost is
-   proportional to how long the two builds coexist, not to the fleet size.
-3. Watch `es_fold_refold_on_miss_total{outcome="performed"}`; it should return
-   to its pre-deploy level once the fleet has cycled, and a floor that does not
-   come back down means an adopter has a class of aggregate that never reads
-   back (see `traceAnalytics`' two).
-
-Do not soften the gate to avoid this. A build that decodes a row it does not
+Do not soften the gate to avoid it. A build that decodes a row it does not
 understand writes a current-stamped partial state over a complete one, and that
-corruption is undetectable afterwards — the executor now refuses to fold onto
-an empty state when a row was found and refused and no re-fold path exists,
-rather than letting it happen quietly.
+corruption is undetectable afterwards — which is why the executor refuses to
+fold onto an empty state when a row was found, refused, and has no re-fold path.
 
 ## References
 

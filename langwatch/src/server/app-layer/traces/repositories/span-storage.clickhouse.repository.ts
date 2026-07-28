@@ -1118,20 +1118,11 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
    * SINGLE_SPAN_FETCH_SETTINGS above. The doc's "Anti-Pattern 1"
    * rule predates LazilyRead and isn't load-bearing on this shape.
    *
-   * KNOWN MISMATCH, pre-existing and deliberately not changed here:
-   * `stored_spans` is `ReplacingMergeTree(StartTime)`, so `StartTime` — not
-   * `UpdatedAt` — is the engine's version column, and
-   * `dev/docs/best_practices/clickhouse-queries.md` says to dedup this table on
-   * it. Ordering by `UpdatedAt` therefore answers last-written-wins before a
-   * background merge and largest-`StartTime`-wins after one, for the same span,
-   * whenever a re-export CHANGES `StartTime` (a re-export at the same start is
-   * unaffected, which is the ordinary case). #6117 widened the blast radius by
-   * building the claim-check resolution on this read, so a span's facts now
-   * derive from whichever version the merge state happens to expose rather than
-   * only its rendering. Reconciling the two means either re-ordering this read
-   * (and re-validating the LazilyRead behaviour the settings above depend on)
-   * or changing the engine's version column — neither belongs in a review
-   * follow-up, but neither should stay unwritten either.
+   * KNOWN MISMATCH, pre-existing: the engine's version column is `StartTime`
+   * (`ReplacingMergeTree(StartTime)`), not `UpdatedAt`. So a span re-exported
+   * with a CHANGED StartTime answers last-written-wins before a merge and
+   * largest-StartTime-wins after one. #6117 widened the blast radius by
+   * resolving claim-checks through this read, not just the UI.
    */
   private async fetchNormalizedSpanRow({
     tenantId,

@@ -50,13 +50,6 @@ Feature: Payload cost governs the scheduling plane
     And neither event's facts are dropped in favour of the other's
 
   @unit
-  Scenario: a rolling deploy never hands a worker a payload shape it cannot read
-    Given the pointer form of queued work has not been switched on for the project
-    When a relevant event is published
-    Then the whole event is queued, which every running release can process
-    And no pointer is minted for a worker that could not resolve it
-
-  @unit
   Scenario: work queued before the relevance rule existed still reaches the same outcome
     Given work queued by the previous release, which queued every event
     And that work carries an event the subscriber would now consider not relevant

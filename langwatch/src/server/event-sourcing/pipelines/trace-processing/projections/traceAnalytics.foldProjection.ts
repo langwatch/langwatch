@@ -903,26 +903,17 @@ export class TraceAnalyticsFoldProjection
    * fallback-named trace, and reset the MAX_PROCESSED_SPANS cap so already-
    * committed cost/tokens were counted twice.
    *
-   * TWO CLASSES DO NOT SELF-HEAL, so "transitional" does not yet describe this
-   * adopter and `es_fold_refold_on_miss_total` cannot reach zero for it. Both
-   * are known and neither is closed here:
+   * TWO CLASSES DO NOT SELF-HEAL, so `es_fold_refold_on_miss_total` cannot
+   * reach zero for this adopter:
    *
-   *   1. A log-only trace folds `occurredAt: 0`, so its row commits into
-   *      partition `197001` with a TTL deadline of `1970 + retention` — already
-   *      past. Before the reap the windowed read misses it and the executor
-   *      pays an unwindowed retry per delivery; after the reap `get()` misses
-   *      forever and every delivery past the cache TTL refolds the whole
-   *      history. Reusing `occurredAt` as the storage anchor is NOT the fix —
-   *      it is `SpanTimingService`'s baseline sentinel, and seeding it from a
-   *      log measured the first span from the platform accept time, inflating
-   *      TotalDurationMs and TokensPerSecond by the ingest lag. The fix is a
-   *      storage anchor held separately from the timing baseline (ADR-071
-   *      step 3), which needs its own column and migration.
-   *   2. A dimension-only trace (topic or annotation, no span and no log
-   *      record) folds a state `hasPersistableSignal` refuses, so no row is
-   *      written at all — and a refold's own result is refused by the same
-   *      gate, so the miss recurs on every delivery past the cache TTL rather
-   *      than healing once.
+   *   1. A log-only trace folds `occurredAt: 0`, so its row lands in partition
+   *      `197001` already past its TTL. Reusing `occurredAt` as the storage
+   *      anchor is NOT the fix — it is `SpanTimingService`'s baseline, and
+   *      seeding it from a log inflates TotalDurationMs and TokensPerSecond by
+   *      the ingest lag. A separate anchor (ADR-071 step 3) is.
+   *   2. A dimension-only trace (topic or annotation, no span, no log record)
+   *      folds a state `hasPersistableSignal` refuses, so no row is written —
+   *      and a refold's result is refused by the same gate, so it recurs.
    *
    * `coalesceMaxBatch` — see below.
    *
