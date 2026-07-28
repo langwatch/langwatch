@@ -105,6 +105,8 @@ import {
   createBillingReportingPipeline,
 } from "./pipelines/billing-reporting/pipeline";
 import { createBlobMaintenancePipeline } from "./pipelines/blob-maintenance/pipeline";
+import { reapExpiredLangySessionApiKeys } from "~/server/app-layer/langy/langyApiKey";
+import { createLangyMaintenancePipeline } from "./pipelines/langy-maintenance/pipeline";
 import { createCodingAgentProcessingPipeline } from "./pipelines/coding-agent-processing/pipeline";
 import type { CodingAgentSessionState } from "./pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
 import { CodingAgentSessionStore } from "./pipelines/coding-agent-processing/projections/codingAgentSession.store";
@@ -415,6 +417,20 @@ export class PipelineRegistry {
       createBlobMaintenancePipeline({
         cleanup: {
           sweep: () => blobSweeper.sweep(),
+          deleteDispatchedBefore: (params) =>
+            this.deps.repositories.processStore.deleteDispatchedBefore(params),
+        },
+      }),
+    );
+
+    // Langy credential maintenance, on the same footing. The reaper existed and
+    // was routed for cron, but the chart ships no CronJobs — so until now the
+    // backstop for keys orphaned by a SIGKILLed manager had no caller at all.
+    this.deps.eventSourcing.register(
+      createLangyMaintenancePipeline({
+        sessionKeyReap: {
+          reap: () =>
+            reapExpiredLangySessionApiKeys({ prisma: this.deps.prisma }),
           deleteDispatchedBefore: (params) =>
             this.deps.repositories.processStore.deleteDispatchedBefore(params),
         },

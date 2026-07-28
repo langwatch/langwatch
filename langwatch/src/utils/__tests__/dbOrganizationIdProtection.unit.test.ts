@@ -345,3 +345,62 @@ describe("organization-tenancy regime partition", () => {
     expect(exemptWithoutColumn).toEqual([]);
   });
 });
+
+/**
+ * The expired-Langy-session sweep is deliberately cross-tenant: it revokes every
+ * elapsed platform-minted session key, whoever owns it. It carries no
+ * organizationId, no row id and no lookupId, so the guard rejected it on every
+ * run — the reaper its own docstring calls "THE GUARANTEE" had never revoked a
+ * single key, and the metric that was meant to warn when revoke-on-death slipped
+ * was pinned at zero.
+ */
+describe("guardOrganizationId — platform-owned API-key sweeps", () => {
+  describe("when the expired-Langy-session reaper runs its updateMany", () => {
+    it("does NOT throw — a reserved key name reaches platform rows only", async () => {
+      await expect(
+        runGuard({
+          model: "ApiKey",
+          action: "updateMany",
+          args: {
+            where: {
+              name: "Langy session",
+              revokedAt: null,
+              expiresAt: { not: null, lte: new Date() },
+            },
+            data: { revokedAt: new Date() },
+          },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("when a query names a key a customer could own", () => {
+    it("THROWS — only RESERVED names are platform-owned by construction", async () => {
+      await expect(
+        runGuard({
+          model: "ApiKey",
+          action: "updateMany",
+          args: {
+            where: { name: "My production key", revokedAt: null },
+            data: { revokedAt: new Date() },
+          },
+        }),
+      ).rejects.toThrow();
+    });
+  });
+
+  describe("when a query tries to widen a reserved name with a matcher", () => {
+    it("THROWS — the name must match exactly, not by contains/startsWith", async () => {
+      await expect(
+        runGuard({
+          model: "ApiKey",
+          action: "updateMany",
+          args: {
+            where: { name: { contains: "Langy session" } },
+            data: { revokedAt: new Date() },
+          },
+        }),
+      ).rejects.toThrow();
+    });
+  });
+});

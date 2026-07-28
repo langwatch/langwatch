@@ -1,4 +1,5 @@
 import type { Prisma } from "@prisma/client";
+import { HIDDEN_SYSTEM_KEY_NAMES } from "~/server/api-key/reserved-names";
 
 /**
  * Organization-tenancy guard: the org-level mirror of guardProjectId.
@@ -27,6 +28,15 @@ type OrgScopedModelConfig = {
    */
   extraBound?: (clause: any) => boolean;
 };
+
+/**
+ * A reserved, system-managed API-key name. Only the platform can create or
+ * rename a key into one (`ApiKeyService.create` refuses otherwise), so a query
+ * bounded by such a name reaches platform-owned rows only — never a customer's.
+ * Matched exactly: no `contains`/`startsWith`, which would widen the reach.
+ */
+const isSystemManagedKeyName = (value: any): boolean =>
+  typeof value === "string" && HIDDEN_SYSTEM_KEY_NAMES.includes(value);
 
 const isNonEmptyStringList = (value: any): boolean =>
   value &&
@@ -105,7 +115,16 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   ApiKey: {
     // lookupId is the globally-unique public half of an API token; the auth
     // path resolves a bearer token to its single owning org through it.
-    extraBound: (c) => typeof c?.lookupId === "string",
+    //
+    // A system-managed key NAME is the other bounded predicate. These names are
+    // reserved: `ApiKeyService.create` refuses them unless the caller is
+    // system-managed, and renaming a key into one is blocked, so no customer
+    // can own a row a name-bounded query would reach. That makes such a query
+    // platform-owned by construction — which is what the expired-Langy-session
+    // sweep is. Without this the sweep, whose whole job is to be cross-tenant,
+    // was rejected by this guard on every run and had never revoked a key.
+    extraBound: (c) =>
+      typeof c?.lookupId === "string" || isSystemManagedKeyName(c?.name),
   },
   RoutingPolicy: {},
   AiToolEntry: {},
