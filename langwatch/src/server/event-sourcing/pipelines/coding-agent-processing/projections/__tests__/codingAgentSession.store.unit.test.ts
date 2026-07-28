@@ -360,9 +360,11 @@ describe("CodingAgentSessionStore read-back gate", () => {
           context(),
         );
 
-        // Asserted explicitly: a result carrying BOTH a state and a miss
-        // would satisfy every assertion below while still sending the
-        // executor down the refold path this test exists to retire.
+        // Asserted explicitly, because the executor cannot catch this one:
+        // `loadWithApplied` returns as soon as a state is present, so a
+        // result carrying BOTH a state and a miss is read as a plain success
+        // and the miss is never looked at again. A store that reported one
+        // would go unnoticed everywhere else.
         expect(miss).toBeUndefined();
         expect(state?.subAgentIds).toEqual(["sub-a", "sub-b"]);
         expect(state?.previousCallContextTokens).toBe(12_000);

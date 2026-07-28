@@ -348,7 +348,7 @@ export class FoldProjectionExecutor {
       key,
       context: loadContext,
     });
-    this.assertUndecodableIsRecoverable(projection, miss);
+    if (loaded === null) this.assertUndecodableIsRecoverable(projection, miss);
 
     if (loaded === null && this.shouldRefoldOnMiss(projection)) {
       const refolded = await this.refoldUpToDelivered(
@@ -514,7 +514,7 @@ export class FoldProjectionExecutor {
       key,
       context: loadContext,
     });
-    this.assertUndecodableIsRecoverable(projection, miss);
+    if (loaded === null) this.assertUndecodableIsRecoverable(projection, miss);
 
     if (loaded === null && this.shouldRefoldOnMiss(projection)) {
       const refolded = await this.refoldUpToDelivered(
