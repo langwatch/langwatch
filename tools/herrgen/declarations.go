@@ -22,6 +22,36 @@ var herrConstructors = map[string]int{"New": 1, "NewLight": 1}
 // `herr.E{Code: "..."}` form.
 const herrErrorType = "E"
 
+// herrgenExternalMarker opts one `herr.Code(...)` conversion out of the
+// must-be-a-literal rule, for a discriminant that belongs to someone else and
+// therefore has no enumerable set of values (see fileDeclarations). Written on
+// the conversion's own line or the line above it.
+const herrgenExternalMarker = "herrgen:external"
+
+// markedExternal reports whether the site at node carries the opt-out marker.
+//
+// The marker may sit anywhere in the comment block directly above the site, or
+// trailing on the site's own line. The whole block counts, not just the line
+// above it: the marker earns its place with an explanation of WHY the code is
+// someone else's, and that explanation runs to several lines, which would put
+// the marker itself well above the code it applies to.
+func markedExternal(fset *token.FileSet, file *ast.File, node ast.Node) bool {
+	line := fset.Position(node.Pos()).Line
+	for _, group := range file.Comments {
+		adjacent := fset.Position(group.End()).Line == line-1 ||
+			fset.Position(group.Pos()).Line == line
+		if !adjacent {
+			continue
+		}
+		for _, comment := range group.List {
+			if strings.Contains(comment.Text, herrgenExternalMarker) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // fileDeclarations returns the herr codes declared in one file.
 //
 // Every `herr.Code(...)` in the file is read, wherever it sits — a const block, a
@@ -33,6 +63,16 @@ const herrErrorType = "E"
 // A `herr.Code(...)` whose argument cannot be folded to a string is an error,
 // never a skip: it is the one shape that would leave a live code with no
 // customer copy while the drift check stayed green.
+//
+// The one exception is a code that is not ours to enumerate: a discriminant
+// relayed from a third party (a model provider's `error.type`, say) is an
+// unbounded set of strings arriving at runtime, so no literal exists to write
+// and no registry entry could ever be exhaustive over it. Such a site marks
+// itself with `herrgenExternalMarker` and is skipped. It has to be explicit —
+// the default stays strict, because "built from a variable" is otherwise
+// exactly the mistake this check exists to catch. Codes that arrive this way
+// are handled at the client: an unregistered code degrades to its humanized
+// self rather than to a blank error.
 func fileDeclarations(fset *token.FileSet, file *ast.File, herrName string) ([]Declaration, error) {
 	var (
 		found []Declaration
@@ -74,14 +114,32 @@ func fileDeclarations(fset *token.FileSet, file *ast.File, herrName string) ([]D
 				target := expr
 				if isCall {
 					target = call.Args[0]
-				} else if !isCodeType(value.Type, herrName) {
+				} else if !isSelector(value.Type, herrName, "Code") {
+					// Only the qualified form: a file that does not import
+					// pkg/herr is skipped before we get here, and pkg/herr
+					// declares no codes of its own outside its tests (which the
+					// walk skips), so an unqualified `Code` cannot reach this.
 					continue
 				}
 				code, ok := foldString(target)
 				if !ok {
+					// The opt-out is consulted here, not only in the sweep
+					// below: `read[call]` above has already claimed this call,
+					// so a marked named declaration would never reach the
+					// second sweep — the only other place that looks at the
+					// marker — and the escape hatch would be unreachable from
+					// the `var X = herr.Code(upstream.Type)` form entirely.
+					// `expr` is the conversion itself when there is one and the
+					// declared value otherwise, so the typed
+					// `const X herr.Code = ...` form can be marked too.
+					if markedExternal(fset, file, expr) {
+						// Someone else's discriminant, relayed. Nothing to
+						// generate and nothing to write copy for.
+						continue
+					}
 					unreadable(target, fmt.Sprintf(
-						"%s is declared as a herr code herrgen cannot read; write the code as a plain string literal",
-						name.Name,
+						"%s is declared as a herr code herrgen cannot read; write the code as a plain string literal, or mark the line `%s` if it relays a code that is not ours to enumerate",
+						name.Name, herrgenExternalMarker,
 					))
 					continue
 				}
@@ -106,7 +164,15 @@ func fileDeclarations(fset *token.FileSet, file *ast.File, herrName string) ([]D
 				}
 				code, ok := foldString(call.Args[0])
 				if !ok {
-					unreadable(call.Args[0], "herr.Code(...) is built from something herrgen cannot read; write the code as a plain string literal")
+					if markedExternal(fset, file, call) {
+						// Someone else's discriminant, relayed. Nothing to
+						// generate and nothing to write copy for.
+						return true
+					}
+					unreadable(call.Args[0], fmt.Sprintf(
+						"herr.Code(...) is built from something herrgen cannot read; write the code as a plain string literal, or mark the line `%s` if it relays a code that is not ours to enumerate",
+						herrgenExternalMarker,
+					))
 					return true
 				}
 				found = append(found, Declaration{Code: code})
@@ -180,17 +246,6 @@ func errorLiteralCode(lit *ast.CompositeLit, herrName string) (string, bool) {
 		return stringLiteral(kv.Value)
 	}
 	return "", false
-}
-
-// isCodeType reports whether a const's declared type is herr.Code, covering the
-// `const X herr.Code = "x"` form.
-//
-// Only the qualified form: a file that does not import pkg/herr is skipped
-// before we get here, and pkg/herr declares no codes of its own outside its
-// tests (which the walk skips), so an unqualified `Code` cannot reach this.
-func isCodeType(expr ast.Expr, herrName string) bool {
-	selector, ok := expr.(*ast.SelectorExpr)
-	return ok && herrName != "" && isSelector(selector, herrName, "Code")
 }
 
 // stringLiteral unquotes an untyped string literal.

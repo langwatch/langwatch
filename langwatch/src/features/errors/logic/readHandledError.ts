@@ -248,13 +248,15 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * Derived from the same helper that BUILDS them (`utils/docsUrl`), so the
  * allowlist cannot drift from what the server actually sends: the canonical
  * docs site, and the local Mintlify a developer runs against a localhost app.
- * Passing the hostname explicitly pins each branch without reading
- * `window.location`, which is exactly what that argument exists for.
+ * Both inputs are passed explicitly so each branch is pinned without reading
+ * `window.location` or the build mode — this list has to hold every origin the
+ * server might send, not the one this particular bundle would build.
  */
 const DOCS_ORIGINS = new Set(
-  ["localhost", "app.langwatch.ai"].map(
-    (hostname) => new URL(getDocsBaseUrl(hostname)).origin,
-  ),
+  [
+    getDocsBaseUrl({ hostname: "app.langwatch.ai", isDev: false }),
+    getDocsBaseUrl({ hostname: "localhost", isDev: true }),
+  ].map((base) => new URL(base).origin),
 );
 
 /**
