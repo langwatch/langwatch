@@ -231,10 +231,13 @@ describe("PromptPlaygroundChat ref methods", () => {
         </ChakraProvider>,
       );
 
-      const AssistantMessageProp = captured.chatProps
-        ?.AssistantMessage as unknown as React.ComponentType<
-        Record<string, unknown>
-      >;
+      // Re-widen: the `= null` above narrows the property to `null`, and the
+      // render that repopulates it is opaque to control-flow analysis.
+      const chatProps = captured.chatProps as Record<string, any> | null;
+      const AssistantMessageProp =
+        chatProps?.AssistantMessage as unknown as React.ComponentType<
+          Record<string, unknown>
+        >;
       expect(AssistantMessageProp).toBeDefined();
 
       render(
