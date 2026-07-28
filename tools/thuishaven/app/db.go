@@ -166,10 +166,43 @@ func (o *Orchestrator) managedStackEnv(ctx context.Context, slug string) ([]stri
 	if o.cfg.ShouldManagePostgres && st.PostgresDatabase == "" {
 		return nil, fmt.Errorf("managed postgres is unavailable — cannot rebuild database %q", domain.DatabaseForSlug(slug))
 	}
+	ensured := st.OverlayEnv()
 	if reg, ok := o.stackBySlug(slug); ok {
-		return reg.OverlayEnv(), nil
+		// A registered stack's overlay wins where it has a value — it describes
+		// the ports the running stack actually bound. But it only carries a
+		// database URL if it recorded one, so a stack registered while haven was
+		// not managing that server has none, and the child would fall through to
+		// whatever `.env` names: the guards above would have vouched for `st`
+		// while the seed ran somewhere else entirely. Fill those gaps from the
+		// endpoints just ensured.
+		return devNodeEnv(withMissingEnv(reg.OverlayEnv(), ensured)), nil
 	}
-	return st.OverlayEnv(), nil
+	return devNodeEnv(ensured), nil
+}
+
+// withMissingEnv appends any KEY=… from extra whose KEY is absent from base.
+// Order matters to the children: earlier assignments win, so base is authoritative.
+func withMissingEnv(base, extra []string) []string {
+	for _, kv := range extra {
+		key, _, ok := strings.Cut(kv, "=")
+		if !ok || hasEnvKey(base, key) {
+			continue
+		}
+		base = append(base, kv)
+	}
+	return base
+}
+
+// devNodeEnv marks the one-shot lanes (prepare, seed, codegen) as development.
+// The long-running Node children get NODE_ENV from the plan; these did not, and
+// they load the same modules — including the retention resolver, which refuses
+// haven's LANGWATCH_DEFAULT_RETENTION_DAYS override outside development or test.
+// Without this a seed would die at module load on a stack haven itself set up.
+func devNodeEnv(env []string) []string {
+	if hasEnvKey(env, "NODE_ENV") {
+		return env
+	}
+	return append(env, "NODE_ENV=development")
 }
 
 // DBSeed reseeds this stack's database WITHOUT dropping anything — the
@@ -205,7 +238,7 @@ func (o *Orchestrator) seedEnv(p UpParams) []string {
 	if o.cfg.LocalAPIKey != "" && !hasEnvKey(env, "HAVEN_SEED_LANGWATCH_API_KEY") {
 		env = append(env, "HAVEN_SEED_LANGWATCH_API_KEY="+o.cfg.LocalAPIKey)
 	}
-	return env
+	return devNodeEnv(env)
 }
 
 // DBURL prints this stack's connection string for one engine — or all of

@@ -320,6 +320,14 @@ func TestDBSeed(t *testing.T) {
 			if strings.Contains(joined, "HAVEN_SEED_PRESET") {
 				t.Errorf("env = %v, want no preset by default", sup.envs[0])
 			}
+			// The seed lanes load the same modules the app does, including the
+			// retention resolver, which refuses haven's own
+			// LANGWATCH_DEFAULT_RETENTION_DAYS override outside development or
+			// test. Without NODE_ENV the seed dies at module load on a stack
+			// haven itself provisioned.
+			if !strings.Contains(joined, "NODE_ENV=development") {
+				t.Errorf("env = %v, want the one-shot lane marked as development", sup.envs[0])
+			}
 		})
 	})
 
