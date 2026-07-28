@@ -161,7 +161,7 @@ export class ProjectService {
     let teamId: string;
 
     if (params.teamId) {
-      const destinationTeam = await this.repo.findTeamInOrganization({
+      const destinationTeam = await this.repo.findActiveTeamInOrganization({
         teamId: params.teamId,
         organizationId: params.organizationId,
       });

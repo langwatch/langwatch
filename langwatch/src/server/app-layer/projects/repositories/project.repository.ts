@@ -110,10 +110,6 @@ export interface ProjectRepository {
     slug: string;
     teamId: string;
   }): Promise<Project | null>;
-  findTeamInOrganization(params: {
-    teamId: string;
-    organizationId: string;
-  }): Promise<{ id: string; isPersonal: boolean } | null>;
   findActiveTeamInOrganization(params: {
     teamId: string;
     organizationId: string;
@@ -195,13 +191,6 @@ export class NullProjectRepository implements ProjectRepository {
     slug: string;
     teamId: string;
   }): Promise<Project | null> {
-    return null;
-  }
-
-  async findTeamInOrganization(_params: {
-    teamId: string;
-    organizationId: string;
-  }): Promise<{ id: string; isPersonal: boolean } | null> {
     return null;
   }
 

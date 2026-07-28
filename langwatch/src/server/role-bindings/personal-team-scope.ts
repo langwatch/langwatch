@@ -36,25 +36,46 @@ export interface RoleBindingScope {
  *
  * Pass every scope a write touches, creates and deletes alike: removing the
  * owner's binding is as much a membership change as adding someone else's.
+ * Both TEAM and PROJECT scopes are resolved, since a binding on the personal
+ * project reaches the same private space as one on the personal team.
  */
 export async function scopesTouchPersonalTeam(
   client: Client,
   scopes: RoleBindingScope[],
 ): Promise<boolean> {
-  const teamIds = [
+  const idsOfType = (scopeType: RoleBindingScopeType) => [
     ...new Set(
       scopes
-        .filter((scope) => scope.scopeType === RoleBindingScopeType.TEAM)
+        .filter((scope) => scope.scopeType === scopeType)
         .map((scope) => scope.scopeId),
     ),
   ];
-  if (teamIds.length === 0) return false;
 
-  const personalTeam = await client.team.findFirst({
-    where: { id: { in: teamIds }, isPersonal: true },
-    select: { id: true },
-  });
-  return !!personalTeam;
+  const teamIds = idsOfType(RoleBindingScopeType.TEAM);
+  if (teamIds.length > 0) {
+    const personalTeam = await client.team.findFirst({
+      where: { id: { in: teamIds }, isPersonal: true },
+      select: { id: true },
+    });
+    if (personalTeam) return true;
+  }
+
+  // A project-scoped binding on the personal project reaches the same private
+  // space the team-scoped one does, so naming the project rather than the team
+  // cannot be the way around this.
+  const projectIds = idsOfType(RoleBindingScopeType.PROJECT);
+  if (projectIds.length > 0) {
+    const personalProject = await client.project.findFirst({
+      where: {
+        id: { in: projectIds },
+        OR: [{ isPersonal: true }, { team: { isPersonal: true } }],
+      },
+      select: { id: true },
+    });
+    if (personalProject) return true;
+  }
+
+  return false;
 }
 
 /** tRPC entry points: refuses with FORBIDDEN. */

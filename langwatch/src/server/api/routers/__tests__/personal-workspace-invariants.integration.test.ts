@@ -441,7 +441,7 @@ describe("given a personal workspace beside a shared team in one organization", 
         select: { userId: true, role: true },
       });
 
-    /** @scenario Granting a role binding on a personal team is refused */
+    /** @scenario Giving someone else access to a personal workspace is refused */
     it("refuses roleBinding.create for a second user", async () => {
       await expect(
         callerAsOwner().roleBinding.create({
@@ -460,7 +460,7 @@ describe("given a personal workspace beside a shared team in one organization", 
       ]);
     });
 
-    /** @scenario Granting a role binding on a personal team is refused */
+    /** @scenario Giving a group access to a personal workspace is refused */
     it("refuses group.addBinding, which would make it multi-member by proxy", async () => {
       const group = await prisma.group.create({
         data: {
@@ -488,7 +488,7 @@ describe("given a personal workspace beside a shared team in one organization", 
       ]);
     });
 
-    /** @scenario Removing the owner's binding on a personal team is refused */
+    /** @scenario Taking the owner's access to their own workspace away is refused */
     it("refuses roleBinding.delete on the owner's own binding", async () => {
       const binding = await prisma.roleBinding.findFirstOrThrow({
         where: {
@@ -515,7 +515,7 @@ describe("given a personal workspace beside a shared team in one organization", 
       ]);
     });
 
-    /** @scenario Demoting the owner on their own personal team is refused */
+    /** @scenario Changing the owner's role on their own workspace is refused */
     it("refuses organization.updateTeamMemberRole demoting the owner", async () => {
       await expect(
         callerAsOwner().organization.updateTeamMemberRole({
@@ -533,7 +533,33 @@ describe("given a personal workspace beside a shared team in one organization", 
       ]);
     });
 
-    /** @scenario Removing the owner's binding on a personal team is refused */
+    /** @scenario Giving someone else access to a personal workspace is refused */
+    it("refuses a binding that names the personal project instead of the team", async () => {
+      await expect(
+        callerAsOwner().roleBinding.create({
+          organizationId,
+          userId: colleagueUserId,
+          role: TeamUserRole.MEMBER,
+          scopeType: RoleBindingScopeType.PROJECT,
+          scopeId: personalProjectId,
+        }),
+      ).rejects.toMatchObject({
+        code: "FORBIDDEN",
+        message: expect.stringContaining("exactly one member"),
+      });
+
+      const projectBindings = await prisma.roleBinding.findMany({
+        where: {
+          organizationId,
+          scopeType: RoleBindingScopeType.PROJECT,
+          scopeId: personalProjectId,
+        },
+        select: { id: true },
+      });
+      expect(projectBindings).toEqual([]);
+    });
+
+    /** @scenario Taking the owner's access to their own workspace away is refused */
     it("leaves the workspace resolvable after every refusal", async () => {
       await expect(ensureWorkspace()).resolves.toMatchObject({
         created: false,

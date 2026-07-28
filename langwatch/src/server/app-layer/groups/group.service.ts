@@ -124,6 +124,21 @@ export class GroupRestService {
       scopeId: b.scopeId,
     }));
 
+    // Every scope must belong to this organization, the same check
+    // `addBinding` makes. Without it a group created with bindings could reach
+    // another organization's team or project.
+    for (const binding of bindingInputs) {
+      const scopeValid = await this.repo.validateScopeInOrganization({
+        organizationId,
+        scopeType: binding.scopeType,
+        scopeId: binding.scopeId,
+      });
+      if (!scopeValid) {
+        throw new ScopeNotInOrganizationError(
+          "Scope does not belong to this organization",
+        );
+      }
+    }
     await this.assertNoPersonalTeamScope(bindingInputs);
 
     return this.repo.createAtomic({

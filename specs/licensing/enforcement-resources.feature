@@ -235,32 +235,39 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     When I rename the personal team
     Then the team is renamed successfully
 
-  # Team membership is really role bindings, written from the team editor, the
-  # member-role path, the role-binding API and groups. Only some of those share
-  # a code path, so the invariant is stated where the bindings are written
-  # rather than at any one editor.
+  # A personal workspace stays one person's however the organization is
+  # administered: through the team editor, through a group, by changing
+  # someone's role, or by naming the personal project instead of the team.
 
   @integration
-  Scenario: Granting a role binding on a personal team is refused
+  Scenario: Giving someone else access to a personal workspace is refused
     Given the organization has 1 personal team
     And another member of the organization
-    When I grant that member a role on the personal team
+    When I give that member access to the personal workspace
     Then the request fails with FORBIDDEN
-    And the personal team still has exactly its owner
+    And the personal workspace is still only its owner's
 
   @integration
-  Scenario: Removing the owner's binding on a personal team is refused
+  Scenario: Giving a group access to a personal workspace is refused
     Given the organization has 1 personal team
-    When I remove the owner's binding on the personal team
+    And a group in the organization
+    When I give that group access to the personal workspace
+    Then the request fails with FORBIDDEN
+    And the personal workspace is still only its owner's
+
+  @integration
+  Scenario: Taking the owner's access to their own workspace away is refused
+    Given the organization has 1 personal team
+    When I remove the owner from their personal workspace
     Then the request fails with FORBIDDEN
     And the owner still has a personal workspace
 
   @integration
-  Scenario: Demoting the owner on their own personal team is refused
+  Scenario: Changing the owner's role on their own workspace is refused
     Given the organization has 1 personal team
-    When I change the owner's role on the personal team
+    When I change the owner's role on their personal workspace
     Then the request fails with FORBIDDEN
-    And the personal team still has exactly its owner
+    And the personal workspace is still only its owner's
 
   # Archiving a personal team cannot be undone by the owner: the uniqueness of
   # a personal team per (organization, owner) covers archived rows too, while
