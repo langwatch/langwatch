@@ -279,7 +279,7 @@ describe("EvaluationAnalyticsClickHouseRepository insert settings", () => {
     conversationId: null,
     customerId: null,
     origin: null,
-    durationMs: null,
+    durationMs: 0,
     totalCost: null,
     nonBilledCost: null,
     attributes: {},
