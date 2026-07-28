@@ -8,11 +8,30 @@
 -- alone is also not a rollback: it removes the only uniqueness the inbox has,
 -- so the idempotency guarantee lapses silently rather than loudly.
 --
--- To roll back the CODE, deploy the previous build and leave this schema in
--- place — the added column and index are inert to it (it neither reads nor
--- writes them), so no data step is needed. Undoing the SCHEMA is a manual,
--- remediated operation: prune or truncate any row whose `sourceEventId`
--- exceeds the btree limit first, then recreate the old index by hand.
+-- Rolling back the CODE means deploying the previous build and leaving this
+-- schema in place. That runs, but it is NOT free, and the cost is the same one
+-- the rollout window pays: the previous build does not write `sourceEventKey`,
+-- so its rows carry NULL, and a btree treats NULLs as distinct — the new unique
+-- index does not constrain them at all.
+--
+-- What still protects those writers: the store checks for the row before
+-- inserting, under a transaction-scoped advisory lock. That lock is keyed on
+-- (processName, projectId, processKey), while inbox uniqueness spans
+-- (processName, projectId, sourceEventId) — ACROSS process keys. So a
+-- same-process-key redelivery is still deduplicated, and the one case that
+-- loses its guard is the same source event reaching two DIFFERENT process keys
+-- concurrently. The dropped index was what caught that; nothing does while an
+-- old writer is serving.
+--
+-- Consequences to accept before rolling back: that race can consume one source
+-- event twice. It is narrow and bounded by however long old pods serve, which
+-- is why a drain is the safe way to roll back across this migration. Note the
+-- alternative was strictly worse — a NOT NULL column fails every old-pod commit
+-- outright, which is the outage this whole change exists to end.
+--
+-- Undoing the SCHEMA is a manual, remediated operation: prune or truncate any
+-- row whose `sourceEventId` exceeds the btree limit first, then recreate the
+-- old index by hand.
 --
 -- The inbox's uniqueness moves off the raw source event id and onto a
 -- fixed-width digest of it.

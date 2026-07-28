@@ -3146,8 +3146,14 @@ model ProcessManagerInbox {
   ///
   /// Nullable ONLY for the rolling deploy that introduces it — pods running the
   /// previous build write rows without it, and a NOT NULL would fail their
-  /// commits. The store always supplies it. A follow-up migration tightens this
-  /// once the fleet has cycled.
+  /// commits outright. The store always supplies it.
+  ///
+  /// The trade, stated plainly: a NULL is not constrained by the unique index
+  /// (btree treats NULLs as distinct), so while an old writer is serving, the
+  /// one case that loses its guard is the same source event reaching two
+  /// different process keys at once — the store's own read-check plus its
+  /// per-processKey advisory lock cover everything else. A follow-up migration
+  /// adds NOT NULL once the fleet has cycled and closes it.
   sourceEventKey String?
   consumedAt     DateTime @db.Timestamptz(3)
 
