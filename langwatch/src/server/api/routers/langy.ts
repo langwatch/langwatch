@@ -680,7 +680,7 @@ export const langyRouter = createTRPCRouter({
     ),
 
   /**
-   * Stop an in-flight turn FOR REAL (ADR-072). The browser's `useChat` stop only
+   * Stop an in-flight turn FOR REAL (ADR-078). The browser's `useChat` stop only
    * aborts its own subscription and lets the worker keep burning tokens; this
    * records the durable stopped terminal (the confirmation the client waits on),
    * ends the live stream, and best-effort asks the worker to abandon the run.

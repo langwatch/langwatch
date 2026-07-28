@@ -85,7 +85,7 @@ type sseEvent struct {
 	Properties        struct {
 		SessionID string `json:"sessionID"`
 		SessionId string `json:"sessionId"`
-		// Stream B (ADR-071): a message.part.delta carries the token text in
+		// Stream B (ADR-077): a message.part.delta carries the token text in
 		// properties.delta when properties.field=="text". Decoded here so the raw
 		// token fast-path reads the same single sseEvent decode as session routing.
 		Field string `json:"field"`

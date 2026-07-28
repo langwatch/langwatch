@@ -220,7 +220,7 @@ export interface LangyTurnServiceDeps {
    */
   resolveModel: (args: { projectId: string }) => Promise<{ modelId: string }>;
   /** Direct fast-path dispatch plus durable process-effect recovery. `cancel`
-   * is the best-effort worker abort behind a user Stop (ADR-072). */
+   * is the best-effort worker abort behind a user Stop (ADR-078). */
   worker: Pick<LangyWorkerPort, "probe" | "dispatch" | "cancel"> | null;
   /**
    * The durable token buffer (ADR-044). A user Stop reads its `delta` tail to
@@ -260,7 +260,7 @@ export interface LangyTurnServiceDeps {
 
 /**
  * Reconstruct the partial answer text from the durable buffer's `delta` entries
- * (ADR-072). The buffer batches deltas and flushes its tail on `markEnd`, so this
+ * (ADR-078). The buffer batches deltas and flushes its tail on `markEnd`, so this
  * is the durable truth up to the last flush; a handful of un-flushed words still
  * in the worker's memory are not the control plane's to see, and "the partial is
  * preserved" does not require them. Non-`delta` entries (status, reasoning, tool,
@@ -286,7 +286,7 @@ export class LangyTurnService {
   }
 
   /**
-   * Stop an in-flight turn FOR REAL (ADR-072). The browser's `useChat` stop only
+   * Stop an in-flight turn FOR REAL (ADR-078). The browser's `useChat` stop only
    * aborts its own subscription; this ends the turn on the durable record — the
    * confirmation — and only then, best-effort, asks the worker to abandon the
    * generation. The order matters: the truthful stop must not depend on a live,

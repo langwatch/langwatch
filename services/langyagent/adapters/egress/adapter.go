@@ -16,7 +16,7 @@ import (
 	"github.com/langwatch/langwatch/pkg/ssrf"
 )
 
-// egressAdapter is the per-worker outbound forward proxy (ADR-070). It is the
+// egressAdapter is the per-worker outbound forward proxy (ADR-076). It is the
 // egress twin of the workerpool authProxy: the authProxy fronts a worker's
 // INBOUND opencode control port; this fronts the worker's OUTBOUND traffic. The
 // worker's tools (`gh`, `git`, `npm`, `curl`, `pip`) egress through it via
@@ -33,7 +33,7 @@ import (
 //	                            with the TLS SNI as a cross-check.
 //	rung 0   monitor          — every decision above ALSO flags (see event.go).
 //
-// Honest limit (ADR-070 "Where FQDN enforcement lives"): within one pod netns
+// Honest limit (ADR-076 "Where FQDN enforcement lives"): within one pod netns
 // nothing forces a worker's traffic THROUGH this loopback proxy — a hostile
 // worker can ignore HTTPS_PROXY and connect() straight to an external IP:443.
 // This adapter is authoritative for COOPERATING clients (the primary
@@ -221,7 +221,7 @@ func (a *egressAdapter) handleConnect(w http.ResponseWriter, r *http.Request) {
 	// differing SNI would NOT pass the same allow set, it never reaches the
 	// destination. A benign quirk (SNI differs but is itself allowed) proceeds.
 	if a.cfg.sniCrossCheck {
-		sni, sawHandshake, replay, _ := peekClientHelloSNI(clientConn, a.cfg.sniPeekTimeout)
+		sni, sawHandshake, replay, perr := peekClientHelloSNI(clientConn, a.cfg.sniPeekTimeout)
 		clientConn = replay
 		switch {
 		case sni != "" && sni != fqdn:
@@ -230,13 +230,25 @@ func (a *egressAdapter) handleConnect(w http.ResponseWriter, r *http.Request) {
 					fmt.Sprintf("sni %q not allowed (authority was %q)", sni, fqdn), 0)
 				return
 			}
-		case sni == "" && sawHandshake && a.cfg.policy.enforcing():
-			// It IS a TLS handshake, yet no SNI came out of it. Under an
-			// enforcing policy that has to fail closed: an unreadable hello is
-			// exactly what a client fronting a shared CDN would produce on
-			// purpose, and treating it as "nothing to check" made the whole
-			// cross-check opt-out. Monitor-only is unaffected — nothing is
-			// blocked there anyway — so opaque and non-TLS tunnels still pass.
+		case sni == "" && sniUnreadable(sawHandshake, perr) &&
+			!isIPLiteral(host) && a.cfg.policy.enforcing():
+			// We could not positively read an SNI out of something we were
+			// meant to check. Under an enforcing policy that fails closed.
+			//
+			// The condition is "could not read", NOT "saw a handshake byte".
+			// Keying on the latter left the control bypassable by doing
+			// nothing at all: send CONNECT, then stall past sniPeekTimeout, and
+			// the read errors before the 5-byte header completes, so
+			// sawHandshake stays false, the error was discarded, neither branch
+			// fired and the tunnel was spliced uninspected. A `sleep` defeated
+			// the whole cross-check.
+			//
+			// Two deliberate exemptions. A stream that is CLEANLY not TLS
+			// (complete header, wrong content type, no error) still passes —
+			// require-TLS is the rung that governs cleartext, not this one. And
+			// an IP-literal authority is exempt because RFC 6066 forbids an SNI
+			// there, so an allow-listed bare address would otherwise be denied
+			// for obeying the spec.
 			a.record(fqdn, port, egressDeniedSNIUnreadable,
 				fmt.Sprintf("unreadable TLS ClientHello under an enforcing policy (authority was %q)", fqdn), 0)
 			return

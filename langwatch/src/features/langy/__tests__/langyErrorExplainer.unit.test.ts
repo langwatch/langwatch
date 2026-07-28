@@ -404,7 +404,7 @@ describe("explainLangyError", () => {
       expect(presentation.title).toBe("Langy is still replying");
       expect(presentation.action).toBeUndefined();
       // A wait, not a turn failure: a dismissable notice attached above the
-      // composer that keeps the user's draft — not a red history card (ADR-072).
+      // composer that keeps the user's draft — not a red history card (ADR-078).
       expect(presentation.render).toBe("composer-notice");
     });
   });

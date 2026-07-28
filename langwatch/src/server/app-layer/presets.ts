@@ -1056,7 +1056,7 @@ export function initializeDefaultApp(options?: {
       getVercelAIModel({ projectId, featureKey: LANGY_CHAT_FEATURE_KEY }),
     worker: langyAgentUrl && langyInternalSecret ? langyWorker : null,
     // The durable buffer backs a user Stop: reconstruct the partial answer and
-    // end the live stream (ADR-072). Null without Redis, like the stores below.
+    // end the live stream (ADR-078). Null without Redis, like the stores below.
     tokenBuffer: redis ? langyTokenBuffer : null,
     reservePermit: reserveLangyGithubPrPermit,
     releasePermit: releaseLangyGithubPrPermit,

@@ -173,3 +173,53 @@ func TestPeekClientHelloSNI_BoundsEndlessFragments(t *testing.T) {
 		t.Fatal("peek did not terminate on an endless fragment stream")
 	}
 }
+
+// The regression the review caught: keying the fail-closed branch on
+// "saw a handshake byte" left it bypassable by sending NOTHING. The read errors
+// before the 5-byte header completes, so sawHandshake stays false — and if the
+// caller also discards the error, the tunnel is spliced uninspected.
+func TestSNIUnreadable_TreatsAStalledHelloAsUnreadable(t *testing.T) {
+	// A peer that opens the tunnel and then says nothing: io.ReadFull returns
+	// an error with no complete header, so sawHandshake is false.
+	sni, sawHandshake, _, err := peekClientHelloSNI(
+		fakeConn{r: bytes.NewReader(nil), w: io.Discard}, 0)
+
+	if sni != "" || sawHandshake {
+		t.Fatalf("expected no SNI and no handshake, got sni=%q sawHandshake=%v", sni, sawHandshake)
+	}
+	if err == nil {
+		t.Fatal("a stalled/empty hello must surface an error for the caller to fail closed on")
+	}
+	if !sniUnreadable(sawHandshake, err) {
+		t.Fatal("a stalled hello must count as unreadable, or a `sleep` defeats the cross-check")
+	}
+}
+
+func TestSNIUnreadable_LetsACleanlyNonTLSStreamThrough(t *testing.T) {
+	// A complete record header with a non-handshake content type and no error:
+	// an opaque tunnel, governed by require-TLS rather than by this rung.
+	_, sawHandshake, _, err := peekClientHelloSNI(
+		fakeConn{r: bytes.NewReader([]byte("GET / HTTP/1.1\r\n\r\n")), w: io.Discard}, 0)
+
+	if err != nil || sawHandshake {
+		t.Fatalf("expected a clean non-TLS read, got sawHandshake=%v err=%v", sawHandshake, err)
+	}
+	if sniUnreadable(sawHandshake, err) {
+		t.Fatal("a cleanly non-TLS stream must NOT be treated as unreadable")
+	}
+}
+
+func TestIsIPLiteral_ExemptsBareAddressesFromTheSNIRequirement(t *testing.T) {
+	// RFC 6066 forbids server_name for an IP literal, so a conforming client
+	// legitimately sends none and must not be failed closed for it.
+	for _, host := range []string{"203.0.113.10", "2001:db8::1", "127.0.0.1"} {
+		if !isIPLiteral(host) {
+			t.Errorf("%q should be recognized as an IP literal", host)
+		}
+	}
+	for _, host := range []string{"allowed.example", "github.com", ""} {
+		if isIPLiteral(host) {
+			t.Errorf("%q is a name, not an IP literal", host)
+		}
+	}
+}

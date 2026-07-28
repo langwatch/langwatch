@@ -3,7 +3,7 @@ Feature: Langy dual-stream — a raw token fast-path beside the durable event-so
   I want the answer to start typing instantly and smoothly, token by token
   So that Langy feels fast, while the durable reconciled answer stays the source of truth
 
-  # ADR-071. Two streams run per turn:
+  # ADR-077. Two streams run per turn:
   #   - Stream A (durable, the truth): the ADR-044/046 path — the Redis token
   #     buffer bridged to useChat, the event-sourced agent_responded final answer,
   #     the langy_conversation_updated broadcast, ephemeral status/progress. It

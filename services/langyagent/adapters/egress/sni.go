@@ -4,12 +4,13 @@ import (
 	"errors"
 	"io"
 	"net"
+	"net/netip"
 	"strings"
 	"time"
 )
 
 // The egress adapter reads the FQDN from the CONNECT authority as the primary,
-// enforceable destination (ADR-070 "Where FQDN enforcement lives"). It ALSO
+// enforceable destination (ADR-076 "Where FQDN enforcement lives"). It ALSO
 // peeks the TLS ClientHello SNI as a cross-check: a cooperative-but-hostile
 // client that sends `CONNECT allowed.com:443` and then negotiates TLS with SNI
 // `attacker.com` (domain-fronting a shared CDN) would otherwise slip past an
@@ -215,4 +216,28 @@ func (c *prefixConn) Read(p []byte) (int, error) {
 		return n, nil
 	}
 	return c.Conn.Read(p)
+}
+
+// sniUnreadable reports whether the peek failed to produce a positive answer
+// about the stream's SNI.
+//
+// True in two cases: the stream IS a TLS handshake but no server_name came out
+// of it, or the peek errored before it could tell (a stall past the deadline, a
+// truncated header, a record length out of range). Both mean "we were supposed
+// to check and could not".
+//
+// False for a stream that is cleanly not TLS — a complete record header with a
+// non-handshake content type and no error. That is an opaque tunnel, and
+// require-TLS is the rung that governs it.
+func sniUnreadable(sawHandshake bool, err error) bool {
+	return sawHandshake || err != nil
+}
+
+// isIPLiteral reports whether the CONNECT authority is a bare address rather
+// than a name. RFC 6066 forbids sending server_name for an IP literal, so a
+// conforming client legitimately produces no SNI and must not be failed closed
+// for it.
+func isIPLiteral(host string) bool {
+	_, err := netip.ParseAddr(strings.TrimSuffix(strings.TrimSpace(host), "."))
+	return err == nil
 }

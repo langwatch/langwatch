@@ -1,4 +1,4 @@
-# ADR-070: Langy egress enforcement — monitor first, enforce last
+# ADR-076: Langy egress enforcement — monitor first, enforce last
 
 **Date:** 2026-07-10
 

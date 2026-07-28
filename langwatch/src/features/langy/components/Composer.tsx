@@ -124,7 +124,7 @@ function ComposerImpl({
   langyDefaultModel?: string | null;
   onModelChange: (model: string) => void;
   onSend: (input: string) => void;
-  /** Stop the in-flight turn (the panel owns the real backend stop, ADR-072). */
+  /** Stop the in-flight turn (the panel owns the real backend stop, ADR-078). */
   onStop: () => void;
   /**
    * Floating is a card; sidebar is already bounded and stays deliberately
@@ -162,7 +162,7 @@ function ComposerImpl({
   // was enough main-thread work to look like a page reload.
   const input = useLangyStore((s) => s.draft);
   const onInputChange = useLangyStore((s) => s.setDraft);
-  // The turn phase is the SINGLE source for the send/stop affordance (ADR-072):
+  // The turn phase is the SINGLE source for the send/stop affordance (ADR-078):
   // `idle` lets the composer send; `active`/`stopping` disable sending and show
   // Stop. Gating on the durable phase — not the client stream's flaky isBusy —
   // is what stops a second send slipping through the instant the first token

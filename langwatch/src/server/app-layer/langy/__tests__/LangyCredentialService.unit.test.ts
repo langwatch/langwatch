@@ -484,7 +484,7 @@ describe("LangyCredentialService", () => {
     });
   });
 
-  // Per-project Langy egress allow-list (ADR-070). Read by /langy/chat and
+  // Per-project Langy egress allow-list (ADR-076). Read by /langy/chat and
   // threaded into the credentials envelope; the agent's egress adapter is
   // constructed with it at spawn. null/empty = monitor-only (watch, never
   // block); a set list = the enforced set (floor ∪ list). Parsed through Zod so

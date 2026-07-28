@@ -462,7 +462,7 @@ export function LangyDeclarativeCard({
   // Read against the card that was DECIDED, never a kind re-derived from the
   // command's name here — that is a second decision point, and a promoted
   // result would be read by the schema of the card it did not get. See
-  // ADR-073 §1.
+  // ADR-079 §1.
   const parsed = parseCardResult({ kind: descriptor.render, output });
   const document = parsed.ok ? parsed.card : null;
 

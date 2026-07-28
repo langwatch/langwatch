@@ -347,7 +347,7 @@ export function foldLangyConversationTurn<
     case LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONDED: {
       // Three terminal outcomes on the one answer-carrying event: a user stop
       // keeps the partial answer (AnswerParts) but renders distinctly from a
-      // clean finish, and is never an error (ADR-072). A `failed` outcome here
+      // clean finish, and is never an error (ADR-078). A `failed` outcome here
       // is the ran-but-failed answer; the no-answer stall is
       // agent_response_failed, handled above.
       const outcome = event.data.outcome;

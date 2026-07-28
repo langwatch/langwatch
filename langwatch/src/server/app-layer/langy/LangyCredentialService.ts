@@ -18,7 +18,7 @@ const logger = createLogger("langwatch:langy:credentials");
 const githubLogger = createLogger("langwatch:langy:credentials:github");
 
 /**
- * The per-project Langy egress allow-list (ADR-070). Each entry is either an
+ * The per-project Langy egress allow-list (ADR-076). Each entry is either an
  * exact host (`registry.npmjs.org`) or a single-leading-label wildcard
  * (`*.internal.acme.com`). Validated at read time so a drifted column value
  * fails closed (throws) rather than silently disabling enforcement — the same
@@ -243,7 +243,7 @@ export type LangyCredentials = {
    */
   githubRepoScopeKey?: string;
   /**
-   * The project's Langy egress allow-list (ADR-070). Threaded into the agent's
+   * The project's Langy egress allow-list (ADR-076). Threaded into the agent's
    * per-request credentials envelope; the worker's egress adapter is
    * constructed with it at spawn. Absent/empty ⇒ monitor-only (the adapter
    * watches but blocks nothing); non-empty ⇒ the adapter restricts outbound to
@@ -538,7 +538,7 @@ export class LangyCredentialService {
   }
 
   /**
-   * Returns the project's Langy egress allow-list (ADR-070 rung 2), or `null`
+   * Returns the project's Langy egress allow-list (ADR-076 rung 2), or `null`
    * when unset/empty. `null` ⇒ monitor-only (the agent's egress adapter
    * watches but blocks nothing); a non-empty array ⇒ the enforced set (the
    * adapter restricts outbound to floor ∪ this list). Same `null-means-watch`
@@ -547,7 +547,7 @@ export class LangyCredentialService {
    * Unlike the model allow-list — which lives on the VirtualKey because the
    * *gateway* enforces it — the egress list is a project network policy
    * enforced by the *agent pod's egress adapter*, so it lives on the Project
-   * (ADR-070 §"Where the allow-list config lives"). The value is parsed through
+   * (ADR-076 §"Where the allow-list config lives"). The value is parsed through
    * Zod so a drifted/corrupt column fails closed (throws) rather than silently
    * disabling enforcement — a stray non-array or a bad host pattern must not
    * quietly open egress.
@@ -587,7 +587,7 @@ export class LangyCredentialService {
   }
 
   /**
-   * Writes the project's Langy egress allow-list (ADR-070). Validates + trims
+   * Writes the project's Langy egress allow-list (ADR-076). Validates + trims
    * every entry through the same Zod schema the resolver reads by, so a client
    * cannot persist a malformed host pattern. An empty array clears the column
    * to `null` (monitor-only) — the canonical "unset" state — rather than

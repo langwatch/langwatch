@@ -1,4 +1,4 @@
-# ADR-071: Langy dual-stream — raw token fast-path (Stream B) alongside the durable event-sourced stream (Stream A)
+# ADR-077: Langy dual-stream — raw token fast-path (Stream B) alongside the durable event-sourced stream (Stream A)
 
 **Date:** 2026-07-11
 

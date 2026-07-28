@@ -1,4 +1,4 @@
-# ADR-073: Card selection is deterministic — the model supplies data, never presentation
+# ADR-079: Card selection is deterministic — the model supplies data, never presentation
 
 **Date:** 2026-07-21
 
@@ -341,7 +341,7 @@ payload through the envelope and into a rendered card**
 
 ## References
 
-- Related: ADR-072 (Langy user-initiated turn controls) for the turn lifecycle
+- Related: ADR-078 (Langy user-initiated turn controls) for the turn lifecycle
   these cards render within.
 - Vercel AI SDK — generative UI as tool-result → component:
   https://ai-sdk.dev/docs/ai-sdk-ui/generative-user-interfaces ·

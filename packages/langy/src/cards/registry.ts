@@ -407,7 +407,7 @@ export const parseCliResult = ({
  * choice travels on the envelope — so re-deriving a kind from the command's
  * name at render time is a second decision that can disagree with the first.
  * It did: a promoted result parsed against the card its name would have earned
- * rather than the card it was stamped with. See ADR-073 §1.
+ * rather than the card it was stamped with. See ADR-079 §1.
  */
 export const parseCardResult = ({
   kind,

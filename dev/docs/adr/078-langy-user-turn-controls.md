@@ -1,4 +1,4 @@
-# ADR-072: Langy user-initiated turn controls — stop for real, continue, resume-on-refresh
+# ADR-078: Langy user-initiated turn controls — stop for real, continue, resume-on-refresh
 
 **Date:** 2026-07-21
 
@@ -6,7 +6,7 @@
 
 **Builds on:** ADR-044 (event-driven turns: Redis token buffer + liveness),
 ADR-046 (event-sourced conversations: the `langy_conversation` aggregate, the
-`agent_responded` terminal, the one-terminal-per-turn idempotency slot), ADR-048
+`agent_responded` terminal, the one-terminal-per-turn idempotency slot), ADR-077
 (dual-stream + "the buffered tail is the resume state"), ADR-049 (Postgres
 operational projections). Adds three USER-initiated controls; changes none of
 those transports.
@@ -28,7 +28,7 @@ control of one in-flight turn:
 2. **Continue a stopped chat.** With no real stop there is no real resume. Even the
    conversation lifecycle has no notion of "the user stopped here."
 
-3. **Carry on after a refresh.** ADR-071 made the durable token buffer the resume
+3. **Carry on after a refresh.** ADR-077 made the durable token buffer the resume
    state and the server already settles a turn whose terminal frame was missed
    (`langyTurnSettlement.ts`), but the browser never *rejoins* a running turn on a
    cold mount — `reconnectToStream()` returns null and the "Catching up…" state is

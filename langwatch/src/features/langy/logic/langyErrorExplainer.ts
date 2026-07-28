@@ -40,7 +40,7 @@ export type LangyErrorRender =
   | "suppress"
   // A transient composer-level notice, not a message-history card: rendered as a
   // dismissable box attached above the composer, leaving the user's draft in
-  // place (ADR-072). Used for "one turn at a time" — a wait, not a turn failure.
+  // place (ADR-078). Used for "one turn at a time" — a wait, not a turn failure.
   | "composer-notice";
 
 export interface LangyErrorAction {

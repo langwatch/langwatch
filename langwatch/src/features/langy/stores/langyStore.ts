@@ -403,7 +403,7 @@ interface LangyState extends TurnPhaseState {
   pinFeedback: (messageId: string) => void;
 
   // The turn phase — the SINGLE, event-driven source for the composer's send/stop
-  // affordance and every "is a turn in flight" read (ADR-072). It replaces the
+  // affordance and every "is a turn in flight" read (ADR-078). It replaces the
   // old scatter of isBusy / serverTurnInFlight / isStopping / settled-marker
   // booleans derived per-render across the panel: components read `turnPhase`,
   // and it changes ONLY through the four actions below.

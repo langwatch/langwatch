@@ -11,7 +11,7 @@ import (
 )
 
 // egressDecision is the verb attached to every observed outbound flow. Rung 0
-// (ADR-070) makes every enforcement action ALSO a monitored event, so a
+// (ADR-076) makes every enforcement action ALSO a monitored event, so a
 // deny/throttle is a monitored deny/throttle — the same event with a different
 // verb. The control plane never sees these; they are pod-local telemetry.
 type egressDecision string
@@ -69,7 +69,7 @@ type egressEvent struct {
 	Bytes          int64
 }
 
-// egressMonitor is the rung-0 flag sink (ADR-070). The enforcing adapter calls
+// egressMonitor is the rung-0 flag sink (ADR-076). The enforcing adapter calls
 // record() on every per-CONNECT decision so enforcement and monitoring are the
 // same event. The default is logEgressMonitor (pod log); an operator wiring a
 // richer attributed-telemetry sink injects it at NewEnforcingGuard time.

@@ -977,7 +977,7 @@ function LangyPanel({
   }, [isActiveConversationUnconfirmed, refetchHistory]);
 
   // The turn phase — the SINGLE, event-driven source of "is a turn in flight"
-  // (ADR-072). It lives in the store as a machine (idle → active → stopping →
+  // (ADR-078). It lives in the store as a machine (idle → active → stopping →
   // idle); here we only FEED it the durable fold signal so it reflects turns
   // this tab did not start (another tab, a resume after refresh) and settles
   // once the fold that CONFIRMED the turn goes idle. The old per-render
@@ -988,7 +988,7 @@ function LangyPanel({
     useLangyStore.getState().observeBackendTurn(isFoldTurnInFlight);
   }, [isFoldTurnInFlight]);
 
-  // A user Stop is a REAL backend stop (ADR-072): the durable stopped terminal is
+  // A user Stop is a REAL backend stop (ADR-078): the durable stopped terminal is
   // the confirmation. `requestStop()` moves the phase to `stopping` (the Composer
   // shows the spinner) and it clears to `idle` only when the fold that saw the
   // turn goes idle — never on isBusy, which the client abort flips instantly,
@@ -2826,7 +2826,7 @@ function LangyPanel({
                     </chakra.button>
                   </HStack>
                 ) : null}
-                {/* The composer reads the turn phase straight from the store (ADR-072):
+                {/* The composer reads the turn phase straight from the store (ADR-078):
             it shows Send when idle and Stop while a turn is in flight or
             stopping — no isBusy / serverTurnInFlight / isStopping / queue props. */}
                 <Box

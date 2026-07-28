@@ -244,7 +244,7 @@ export type LangyAgentResponseFailedEventData = z.infer<
  * `outcome` is the terminal discriminant on the ONE answer-carrying terminal:
  * `completed` (the agent finished), `failed` (it ran but ended in failure, still
  * with something to carry — distinct from `agent_response_failed`, which is the
- * no-answer stall), and `stopped` (the USER stopped the turn mid-answer, ADR-072).
+ * no-answer stall), and `stopped` (the USER stopped the turn mid-answer, ADR-078).
  * A stop is not a failure and carries the partial answer streamed so far, so it
  * rides this event and its `turn-terminal` idempotency slot rather than inventing
  * a parallel terminal.
