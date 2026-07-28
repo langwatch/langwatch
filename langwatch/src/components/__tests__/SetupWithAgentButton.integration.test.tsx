@@ -50,10 +50,10 @@ const REPO_CONNECTED: SetupSurface[] = [
   "simulationRuns",
 ];
 
-function renderButton(surface: SetupSurface, label?: string) {
+function renderButton(surface: SetupSurface) {
   return render(
     <ChakraProvider value={defaultSystem}>
-      <SetupWithAgentButton surface={surface} label={label} />
+      <SetupWithAgentButton surface={surface} />
     </ChakraProvider>,
   );
 }
@@ -105,22 +105,14 @@ describe("setupAgentPrompt()", () => {
 });
 
 describe("SetupWithAgentButton", () => {
-  describe("the per-surface trigger label", () => {
-    /** @scenario shared-project surfaces keep "Setup via Agent" */
-    it("defaults to Setup via Agent", () => {
-      renderButton("simulations");
+  describe("the trigger label", () => {
+    /** @scenario the traces empty state keeps Setup via Agent on every project */
+    it("reads Setup via Agent with no per-surface override", () => {
+      renderButton("traces");
       expect(
         screen.getByRole("button", { name: /setup via agent/i }),
       ).toBeDefined();
-    });
-
-    /** @scenario the personal traces empty state labels the button "Connect your agent" */
-    it("renders the caller's label where a surface passes one", () => {
-      renderButton("traces", "Connect your agent");
-      expect(
-        screen.getByRole("button", { name: /connect your agent/i }),
-      ).toBeDefined();
-      expect(screen.queryByText(/setup via agent/i)).toBeNull();
+      expect(screen.queryByText(/connect your agent/i)).toBeNull();
     });
   });
 

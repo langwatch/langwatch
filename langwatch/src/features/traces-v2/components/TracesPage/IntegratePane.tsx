@@ -134,15 +134,7 @@ export const IntegratePane: React.FC = () => {
               </Text>
             </VStack>
             <HStack gap={2} flexShrink={0}>
-              {/* On the personal (/me) project the job is connecting your own
-                  agent, not setting a feature up; shared projects keep the
-                  default "Setup via Agent". */}
-              <SetupWithAgentButton
-                surface="traces"
-                label={
-                  project.isPersonal ? "Connect your agent" : "Setup via Agent"
-                }
-              />
+              <SetupWithAgentButton surface="traces" />
               <Button
                 size="sm"
                 variant="outline"

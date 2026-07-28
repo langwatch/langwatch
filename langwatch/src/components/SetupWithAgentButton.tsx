@@ -121,15 +121,10 @@ Use LangWatch's "${setup.skill}" skill for this: install it with \`npx skills ad
 export function SetupWithAgentButton({
   surface,
   size = "sm",
-  label = "Setup via Agent",
 }: {
   surface: SetupSurface;
   /** Match the sibling buttons of the empty state this sits in. */
   size?: "sm" | "md";
-  /** Per-surface trigger copy. Shared-project empty states really are
-   *  setting a feature up, so the default stands there; the personal (/me)
-   *  surface passes "Connect your agent", an action with an outcome. */
-  label?: string;
 }) {
   const setup = SETUP_SURFACES[surface];
   const canAsk = useCanAskLangy();
@@ -161,7 +156,7 @@ export function SetupWithAgentButton({
             page's own buttons rather than a themed import. */}
         <Button variant="outline" size={size} aria-haspopup="menu">
           <LuSparkles size={14} />
-          {label}
+          Setup via Agent
           <LuChevronDown size={14} />
         </Button>
       </Menu.Trigger>
@@ -172,7 +167,7 @@ export function SetupWithAgentButton({
             paddingY={2}
             onClick={() => askLangy(setup.langyPrompt)}
           >
-            <SetupOption
+            <AgentMenuOption
               icon={LuSparkles}
               accent
               label="Ask Langy to set it up"
@@ -181,7 +176,7 @@ export function SetupWithAgentButton({
           </Menu.Item>
         ) : null}
         <Menu.Item value="copy-prompt" paddingY={2} onClick={copyPrompt}>
-          <SetupOption
+          <AgentMenuOption
             icon={LuTerminal}
             label="Copy a prompt for your coding agent"
             hint="Paste it into Claude Code, Cursor, or whatever you use"
@@ -189,7 +184,7 @@ export function SetupWithAgentButton({
         </Menu.Item>
         <Menu.Item value="docs" paddingY={2} asChild>
           <chakra.a href={setup.docsUrl} target="_blank" rel="noreferrer">
-            <SetupOption
+            <AgentMenuOption
               icon={LuBookOpen}
               label={`Read the ${setup.docsLabel}`}
               hint="The overview, and every path into the feature"
@@ -201,7 +196,12 @@ export function SetupWithAgentButton({
   );
 }
 
-function SetupOption({
+/**
+ * The icon + label + hint row every agent-menu entry renders. Exported so
+ * sibling agent menus (e.g. the /me ConnectYourAgentButton) keep the exact
+ * same item anatomy as this one.
+ */
+export function AgentMenuOption({
   icon: Icon,
   label,
   hint,
