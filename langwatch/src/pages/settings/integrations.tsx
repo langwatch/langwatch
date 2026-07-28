@@ -58,7 +58,7 @@ function IntegrationsContent({ organizationId }: { organizationId: string }) {
     void router.replace(
       { pathname: router.pathname, query: rest },
       undefined,
-      { shallow: true },
+      { shallow: true, scroll: false },
     );
     // router is a fresh compat object each render; only re-run when the error itself changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps

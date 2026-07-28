@@ -19,7 +19,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const mockRouterQuery = vi.hoisted(() => ({
   current: {} as Record<string, string>,
 }));
-const routerReplace = vi.fn();
+// Applies the replacement query like the real router.replace would, so a
+// rerender after cleanup reflects the post-cleanup URL.
+const routerReplace = vi.fn(
+  (url: { pathname?: string; query?: Record<string, string> }) => {
+    mockRouterQuery.current = { ...(url.query ?? {}) };
+    return Promise.resolve(true);
+  },
+);
 
 vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
@@ -96,7 +103,7 @@ describe("<IntegrationsSettings/>", () => {
       );
     });
 
-    it("strips githubError from the URL so a refresh doesn't re-show it", () => {
+    it("strips githubError from the URL without scrolling away from the GitHub card", () => {
       mockRouterQuery.current = {
         githubError: "Installation link already used",
       };
@@ -109,8 +116,28 @@ describe("<IntegrationsSettings/>", () => {
           query: {},
         },
         undefined,
-        { shallow: true },
+        { shallow: true, scroll: false },
       );
+    });
+
+    it("does not repeat the toast once the URL cleanup has landed", () => {
+      mockRouterQuery.current = {
+        githubError: "Installation link already used",
+      };
+
+      const { rerender } = renderPage();
+      expect(toaster.create).toHaveBeenCalledTimes(1);
+
+      // The mocked replace() above already applied the cleaned query to
+      // mockRouterQuery.current; rerender to pick it up, as a real
+      // navigation would re-render this page with the new URL.
+      rerender(
+        <ChakraProvider value={defaultSystem}>
+          <IntegrationsSettings />
+        </ChakraProvider>,
+      );
+
+      expect(toaster.create).toHaveBeenCalledTimes(1);
     });
   });
 
