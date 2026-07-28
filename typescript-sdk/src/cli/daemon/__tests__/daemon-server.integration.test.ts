@@ -210,6 +210,43 @@ describe("daemon over a unix socket", () => {
           DaemonAlreadyRunningError,
         );
       });
+
+      it("leaves nothing behind but the socket clients dial", async () => {
+        await startDaemon();
+
+        // The daemon binds a private, pid-scoped path and publishes the result
+        // under the shared name; the private one must not survive that.
+        expect(fs.readdirSync(dir)).toEqual([path.basename(socketPath)]);
+      });
+    });
+
+    describe("when its socket has been taken over by a successor", () => {
+      it("leaves the live socket alone on the way out", async () => {
+        // The state a crash sweep plus a concurrent auto-spawn produces: this
+        // daemon is still running, but its name now leads to somebody else's
+        // socket. (recordMissAndDecideToSpawn permits concurrent spawns by
+        // design, and a SIGKILLed or `process.exit(70)`-ed daemon leaves a
+        // corpse for them to clean.)
+        const orphan = await startDaemon({
+          executor: scriptedExecutor(() => ({ stdout: "orphan\n" })),
+        });
+
+        fs.unlinkSync(socketPath);
+        await startDaemon({
+          executor: scriptedExecutor(() => ({ stdout: "successor\n" })),
+        });
+
+        await orphan.stop("idle");
+
+        // Unlinking by path here used to delete the successor's socket,
+        // orphaning a live daemon on an unreachable inode and making every
+        // later invocation cold-start.
+        expect(fs.existsSync(socketPath)).toBe(true);
+
+        const { outcome, stdout } = await exec(["trace", "search"]);
+        expect(outcome).toEqual({ served: true, exitCode: 0 });
+        expect(stdout).toBe("successor\n");
+      });
     });
 
     describe("when a command succeeds", () => {

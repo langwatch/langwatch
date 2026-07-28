@@ -135,16 +135,143 @@ export async function isSocketAlive(socketPath: string): Promise<boolean> {
   });
 }
 
-/** Remove a socket file that nothing is listening on. Safe to call always. */
-export async function cleanStaleSocket(socketPath: string): Promise<boolean> {
-  if (!fs.existsSync(socketPath)) return false;
-  if (await isSocketAlive(socketPath)) return false;
+/**
+ * Which FILE a path pointed at, at a moment in time.
+ *
+ * The socket path is shared by every daemon this identity ever runs, so "the
+ * socket at this path" is not an identity — `unlink(path)` deletes whatever is
+ * there NOW, which need not be the thing the caller meant. (dev, ino) is the
+ * identity; the path is only a name that currently happens to lead to it.
+ */
+export interface FileIdentity {
+  dev: number;
+  ino: number;
+}
+
+/** What `filePath` points at right now, or null if nothing does. */
+function identifyFile(filePath: string): FileIdentity | null {
   try {
-    fs.unlinkSync(socketPath);
+    const stat = fs.statSync(filePath, { throwIfNoEntry: false });
+    return stat ? { dev: stat.dev, ino: stat.ino } : null;
+  } catch {
+    // A path we cannot even stat is certainly not one we may delete.
+    return null;
+  }
+}
+
+/**
+ * Unlink `filePath`, but only while it still holds the file `expected`
+ * identified. Reports whether it removed anything.
+ *
+ * This is the module's one deletion primitive, and it exists so a single rule
+ * holds everywhere: a process only ever removes a socket file it created
+ * itself. Deleting somebody else's is not a tidy-up, it is an outage — a live
+ * daemon whose name is unlinked keeps running on an unreachable inode, holding
+ * credentials, serving nobody, while every caller sees "no daemon" and pays a
+ * cold start forever.
+ *
+ * There is no POSIX "unlink this inode", so the check narrows the window
+ * rather than closing it. What it removes is the LONG window (a probe, or ten
+ * idle minutes) in which the file genuinely does change hands; what is left is
+ * the microseconds between the stat and the unlink.
+ */
+export function unlinkIfSameFile(
+  filePath: string,
+  expected: FileIdentity | null,
+): boolean {
+  if (expected === null) return false;
+
+  const current = identifyFile(filePath);
+  if (
+    current === null ||
+    current.dev !== expected.dev ||
+    current.ino !== expected.ino
+  ) {
+    return false;
+  }
+
+  try {
+    fs.unlinkSync(filePath);
     return true;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
     throw error;
+  }
+}
+
+/** Remove a socket file that nothing is listening on. Safe to call always. */
+export async function cleanStaleSocket(socketPath: string): Promise<boolean> {
+  // Identify the corpse BEFORE probing it, and remove it only if the path
+  // still leads to that same file afterwards.
+  //
+  // `isSocketAlive` can take up to a second (a connect, or its own timeout),
+  // and a daemon starting concurrently can bind the path inside that window —
+  // concurrent starts are not exotic, `recordMissAndDecideToSpawn` deletes the
+  // hint file the moment it says yes, so several callers can each decide to
+  // spawn at once. Unlinking by path alone would then delete a LIVE daemon's
+  // socket on the strength of a probe that answered about a file which no
+  // longer exists.
+  const corpse = identifyFile(socketPath);
+  if (corpse === null) return false;
+  if (await isSocketAlive(socketPath)) return false;
+  return unlinkIfSameFile(socketPath, corpse);
+}
+
+/**
+ * The private path a daemon BINDS, before publishing the result under the
+ * shared one. See `publishSocket` for why the shared path is never bound.
+ *
+ * Pid-scoped, so two daemons racing to start never bind the same file. The
+ * `.sock` suffix is REPLACED rather than appended to, to keep the bound path
+ * inside sockaddr_un.sun_path: `isSocketPathUsable` budgets 100 bytes against
+ * a real limit of 103 (macOS) / 107 (Linux), and a pid is at most three bytes
+ * longer than the `.sock` it stands in for.
+ */
+export function stagingSocketPath(socketPath: string, pid: number): string {
+  const base = socketPath.endsWith(".sock")
+    ? socketPath.slice(0, -".sock".length)
+    : socketPath;
+  return `${base}.${pid}`;
+}
+
+/**
+ * Give a bound socket its shared name.
+ *
+ * `link` rather than `rename` because link is fail-CLOSED. If another daemon
+ * won the race and published first, link throws EEXIST and this one loses
+ * politely; a rename would silently unlink the winner and orphan a live,
+ * credential-holding process on an inode no client can reach.
+ *
+ * Publishing at all — rather than binding the shared path directly — is what
+ * keeps node from doing the same thing on our behalf: libuv unlinks the path
+ * it bound when the handle closes, by path and unconditionally, so a daemon
+ * binding the shared path deletes whatever is there when it shuts down, ten
+ * idle minutes later, even if that is a successor's live socket. Binding a
+ * private name puts THAT unlink somewhere harmless and leaves the shared name
+ * under the control of `unlinkIfSameFile`.
+ */
+function publishSocket(stagingPath: string, socketPath: string): void {
+  try {
+    fs.linkSync(stagingPath, socketPath);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "EEXIST") {
+      throw new DaemonAlreadyRunningError(socketPath);
+    }
+    // Hard links to a socket are POSIX and work on every filesystem the daemon
+    // is supported on; should some exotic one refuse, an atomic rename still
+    // beats silently never running a daemon there.
+    fs.renameSync(stagingPath, socketPath);
+    return;
+  }
+
+  // The socket now answers to the shared name; drop the staging one. (This is
+  // also the name libuv will unlink at close, which we want to be a no-op.)
+  try {
+    fs.unlinkSync(stagingPath);
+  } catch {
+    // We are published either way, and reporting a failed start over a
+    // leftover private name would be a lie. It is 0600 inside our own 0700
+    // directory, and the next daemon to inherit this pid sweeps it.
   }
 }
 
@@ -163,6 +290,13 @@ export function createDaemonServer(options: DaemonServerOptions): DaemonServer {
   let stopping = false;
   let idleTimer: NodeJS.Timeout | undefined;
   let uninstallInterceptors: (() => void) | undefined;
+  /**
+   * The socket file THIS daemon published, recorded once it is listening. Every
+   * later unlink is checked against it, so shutdown can never remove a
+   * successor's socket — and a daemon that never got as far as publishing
+   * (`null`) removes nothing at all.
+   */
+  let publishedSocket: FileIdentity | null = null;
   /** Live client connections, so shutdown can cut them if a drain times out. */
   const connections = new Set<net.Socket>();
   /** Woken when `inflight` reaches zero. Only `stop()` ever waits on this. */
@@ -220,13 +354,19 @@ export function createDaemonServer(options: DaemonServerOptions): DaemonServer {
     });
 
     server.close();
-    // The daemon is the only writer of its socket file; unlinking it here (not
-    // just closing the server) is what makes the next client see "no daemon"
-    // rather than a corpse it has to probe.
+    // Unlinking here (not just closing the server) is what makes the next
+    // client see "no daemon" rather than a corpse it has to probe.
+    //
+    // Only while the path still leads to the file WE published, though. A
+    // daemon lives for ten idle minutes and this one may have been orphaned
+    // long ago — its name unlinked by a crash sweep and rebound by a successor
+    // it knows nothing about. Unlinking by path there would kill a live daemon
+    // on the way out, which is how "the daemon keeps disappearing" becomes
+    // self-sustaining: every casualty takes its replacement with it.
     try {
-      fs.unlinkSync(options.socketPath);
+      unlinkIfSameFile(options.socketPath, publishedSocket);
     } catch {
-      // Already gone — someone cleaned up a stale file, or we never bound.
+      // Already gone — someone cleaned up a stale file, or we never published.
     }
 
     // `window.reset()` below restores the daemon's OWN cwd and environment. A
@@ -480,7 +620,13 @@ export function createDaemonServer(options: DaemonServerOptions): DaemonServer {
   };
 
   const listen = async (): Promise<void> => {
-    if (!isSocketPathUsable(options.socketPath)) {
+    // The staging path is the one actually handed to bind(), so it is the one
+    // that has to fit sockaddr_un.
+    const stagingPath = stagingSocketPath(options.socketPath, process.pid);
+    if (
+      !isSocketPathUsable(options.socketPath) ||
+      !isSocketPathUsable(stagingPath)
+    ) {
       throw new Error(
         `socket path is too long for a unix domain socket: ${options.socketPath}`,
       );
@@ -503,6 +649,12 @@ export function createDaemonServer(options: DaemonServerOptions): DaemonServer {
       throw new DaemonAlreadyRunningError(options.socketPath);
     }
     await cleanStaleSocket(options.socketPath);
+    // And our own staging path, in the rare case a daemon was killed between
+    // binding and publishing and this process inherited its pid. Only one
+    // process holds a pid at a time, so a file there is definitionally the
+    // debris of a dead predecessor, never a live daemon's socket. Costs
+    // nothing when it does not exist, which is essentially always.
+    await cleanStaleSocket(stagingPath);
 
     // Only patch the process globals once we are actually going to serve.
     uninstallInterceptors = installProcessInterceptors();
@@ -511,15 +663,31 @@ export function createDaemonServer(options: DaemonServerOptions): DaemonServer {
 
     await new Promise<void>((resolve, reject) => {
       server.once("error", reject);
-      server.listen(options.socketPath, () => {
+      server.listen(stagingPath, () => {
         server.removeListener("error", reject);
         resolve();
       });
     });
 
-    // listen() creates the socket with 0755 & ~umask. Until this chmod lands,
-    // any local user could connect to a process holding our credentials.
-    secureSocketFile(options.socketPath);
+    // listen() creates the socket with 0755 & ~umask, i.e. connectable by any
+    // local user. Doing this while it still only answers to the private name
+    // means there is no instant at which a loose socket is reachable under the
+    // shared path every client dials.
+    secureSocketFile(stagingPath);
+
+    try {
+      publishSocket(stagingPath, options.socketPath);
+    } catch (error) {
+      // We are not the daemon after all. Give the globals back and close the
+      // handle — libuv takes the staging socket file with it — so losing the
+      // race leaves nothing behind but the winner.
+      uninstallInterceptors?.();
+      uninstallInterceptors = undefined;
+      server.close();
+      throw error;
+    }
+
+    publishedSocket = identifyFile(options.socketPath);
 
     // Only once we are actually serving: a daemon that lost the race to bind
     // must not install handlers it will never remove.

@@ -114,6 +114,40 @@ describe("evaluateEligibility", () => {
     });
   });
 
+  describe("when a value-taking global option comes before the command", () => {
+    // The root program's `-o <format>`, `--json <fields>` and `--jq <expr>`
+    // parse ahead of the subcommand, so the first bare word is the option's
+    // VALUE, not the command. Reading it as the command let `-o json open`
+    // through to a daemon with no display environment and stdio on /dev/null:
+    // no browser opened, and for the wrappers the caller's output vanished.
+    it.each([
+      [["-o", "json", "open", "/traces"]],
+      [["--output", "json", "request-increase"]],
+      [["-o", "json", "claude", "-p", "summarise this"]],
+      [["--json", "id,name", "config", "set", "daemon", "off"]],
+      [["--jq", ".projects[].id", "login"]],
+    ])("refuses %j", (args) => {
+      expect(evaluateEligibility(piped({ args }))).toEqual({
+        eligible: false,
+        reason: "denied-command",
+      });
+    });
+
+    it("still serves an allowed command behind the same option", () => {
+      expect(
+        evaluateEligibility(piped({ args: ["-o", "json", "trace", "search"] })),
+      ).toEqual({ eligible: true });
+    });
+  });
+
+  describe("when a denied name appears somewhere other than the command", () => {
+    it("refuses anyway, because a needless cold start is the cheap mistake", () => {
+      expect(
+        evaluateEligibility(piped({ args: ["prompt", "get", "open"] })),
+      ).toEqual({ eligible: false, reason: "denied-command" });
+    });
+  });
+
   describe("when the command would never terminate", () => {
     it("refuses --follow", () => {
       expect(

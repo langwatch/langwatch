@@ -117,14 +117,39 @@ export function evaluateEligibility(input: EligibilityInput): Eligibility {
     return { eligible: false, reason: "interactive-tty" };
   }
 
-  const command = input.args.find((arg) => !arg.startsWith("-"));
-  if (!command) {
+  const operand = input.args.find((arg) => !arg.startsWith("-"));
+  if (!operand) {
     // Bare `langwatch`, or only flags (`--help`, `--version`). Cheap already,
     // and commander's help output is the one thing we gain nothing by warming.
     return { eligible: false, reason: "no-command" };
   }
 
-  if (DENIED_COMMANDS.has(command)) {
+  // Every argument is checked, not just the first operand — because the first
+  // operand is NOT reliably the command.
+  //
+  // The root program takes value-bearing global options (`-o <format>`,
+  // `--json <fields>`, `--jq <expr>`; see registerOutputOptions) and enables
+  // positional options, so those parse BEFORE the subcommand and their VALUE
+  // is the first thing here that does not start with `-`. Under the old
+  // first-operand rule `langwatch -o json open /traces` therefore read as the
+  // command `json`, sailed through this gate, and ran `open` inside a daemon
+  // that is detached with stdio `/dev/null` and carries none of the caller's
+  // display or session environment — so no browser ever opened. `-o json
+  // claude -p '…'` was worse still: the wrapper ran with its output going to
+  // /dev/null, and the caller got nothing back.
+  //
+  // Skipping the known value-taking globals instead would fix today's argv and
+  // rot on tomorrow's: this module is deliberately dependency-free (it runs on
+  // every invocation, before anything else loads), so it cannot consult the
+  // program's real option table, and a hand-copied list silently reopens the
+  // hole the moment a global option is added. Scanning every argument depends
+  // on neither argument position nor that table, so there is nothing to keep
+  // in sync and no ordering trick to bypass it.
+  //
+  // It over-rejects — `langwatch prompt get open` is not the `open` command —
+  // and that is the correct direction to be wrong in: a needless rejection
+  // costs one cold start, while a wrong acceptance is a behaviour change.
+  if (input.args.some((arg) => DENIED_COMMANDS.has(arg))) {
     return { eligible: false, reason: "denied-command" };
   }
 
