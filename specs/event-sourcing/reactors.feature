@@ -1,5 +1,17 @@
+# SUPERSEDED by dev/docs/adr/075-post-event-work-subscribers-and-process-managers.md
+# and specs/event-sourcing/post-event-work.feature.
+#
+# ADR-075 retires the reactor as a concept: post-event work becomes a
+# subscriber or a process manager, and derived state goes through a projection
+# that replay can rebuild. This file stays until the last of the seventeen
+# reactors has moved, because it still describes how the ones that remain
+# behave — then it is deleted along with ReactorDefinition.
+#
+# Do not add scenarios here. New post-event behaviour belongs in
+# post-event-work.feature.
+#
 # See dev/docs/adr/026-reactor-should-react-predicate.md for the
-# shouldReact predicate rationale.
+# shouldReact predicate rationale (also superseded by ADR-075).
 Feature: Reactors
 
   Reactors are post-fold side-effect handlers. they allow reacting to the
