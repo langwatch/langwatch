@@ -55,6 +55,18 @@ Feature: haven CLI surface
     And "--yes" replaces the prompt for scripts and agents
     And a preset name after "reset" seeds that preset, as in "haven db reset demo"
 
+  # The shared database is what every worktree that never asked for its own
+  # falls back to, so resetting it from the primary checkout takes data the
+  # developer has no reason to think of as "this stack's". Bound by cmd/db_test.go.
+  Scenario: Resetting the shared database asks for more than a keystroke
+    Given the worktree's stack resolves to the shared main database
+    When the developer runs "haven db reset"
+    Then the prompt says the database is shared by every worktree without its own
+    And only typing the database name continues — "y" does not
+    And in agent mode it refuses, naming what the database is, until "--yes" is passed
+    And "--yes" says which database it is about to drop before dropping it
+    And a worktree's own database still takes a plain yes or no
+
   Scenario: Connection strings come from one place
     When the developer runs "haven db url postgres"
     Then this stack's Postgres connection string is printed

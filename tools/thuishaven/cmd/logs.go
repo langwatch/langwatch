@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -23,6 +24,15 @@ import (
 
 // logsTailLines is how much history a plain `haven logs` prints.
 const logsTailLines = 200
+
+// logReadCapBytes bounds how much of one capture file a single read pulls into
+// memory. A stack left up overnight writes a capture far larger than anything
+// this command prints — the default view is the last 200 lines — and reading
+// every byte of every selected service to find them is the difference between
+// a few megabytes and a few hundred. 8 MiB is tens of thousands of lines, so
+// the cap is invisible to every ordinary `--since` window and only bites where
+// the alternative was reading a file nothing was ever going to display.
+const logReadCapBytes = 8 << 20
 
 // cliToFileService maps a CLI service name to its capture-file basename.
 func cliToFileService(name string) string {
@@ -85,10 +95,16 @@ func runLogsCmd(ctx context.Context, d deps, inv invocation) error {
 		return err
 	}
 
-	lines, offsets := readLogTails(dir, services)
+	lines, offsets, elided := readLogTails(dir, services)
 	lines = filterLogLines(lines, since, level)
 	if since.IsZero() && len(lines) > logsTailLines {
 		lines = lines[len(lines)-logsTailLines:]
+	}
+	if elided {
+		// stderr, so a `haven logs | grep` or an agent parsing stdout sees only
+		// log lines — but the developer is still told their window was clipped
+		// rather than silently shown a shorter history than they asked for.
+		fmt.Fprintf(os.Stderr, "(reading the last %d MiB of each capture — older history elided)\n", logReadCapBytes>>20)
 	}
 	for _, l := range lines {
 		printLogLine(l, d.isAgent)
@@ -169,22 +185,81 @@ func parseLogLine(service, raw string) (logLine, bool) {
 	return logLine{ts: t, service: fileToCLIService(service), text: rest}, true
 }
 
+// readLogTail reads at most the last logReadCapBytes of path.
+func readLogTail(path string) (data []byte, size int64, capped bool, err error) {
+	return readLogTailCapped(path, logReadCapBytes)
+}
+
+// readLogTailCapped reads at most the last capBytes of path. It returns the
+// bytes, the file's full size (what a follow must continue from, not what was
+// read), and whether the cap truncated the history. A capped read lands
+// mid-line, so the leading partial line is dropped rather than parsed.
+//
+// The cap is a parameter so a test can exercise the truncation against a small
+// fixture: sizing one from logReadCapBytes would make the test cost whatever
+// that constant is next raised to.
+func readLogTailCapped(path string, capBytes int64) (data []byte, size int64, capped bool, err error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, 0, false, err
+	}
+	defer func() { _ = f.Close() }()
+	info, err := f.Stat()
+	if err != nil {
+		return nil, 0, false, err
+	}
+	size = info.Size()
+	start := int64(0)
+	if size > capBytes {
+		start, capped = size-capBytes, true
+	}
+	buf := make([]byte, size-start)
+	// A short read means the file was rotated or truncated under us; whatever
+	// arrived is still valid lines, so keep it rather than discarding the read.
+	n, err := f.ReadAt(buf, start)
+	if n == 0 && err != nil {
+		return nil, size, capped, err
+	}
+	buf = buf[:n]
+	if capped {
+		buf = dropPartialFirstLine(buf)
+	}
+	return buf, size, capped, nil
+}
+
+// dropPartialFirstLine discards everything up to and including the first
+// newline — what a read that started at an arbitrary byte offset picked up
+// mid-line.
+func dropPartialFirstLine(buf []byte) []byte {
+	if i := bytes.IndexByte(buf, '\n'); i >= 0 {
+		return buf[i+1:]
+	}
+	return nil
+}
+
 // readLogTails reads every selected service's capture (rotated generation
-// first, then live), returning the parsed lines merged in time order and each
-// live file's end offset for a follow to continue from.
-func readLogTails(dir string, services []string) ([]logLine, map[string]int64) {
+// first, then live), returning the parsed lines merged in time order, each
+// live file's end offset for a follow to continue from, and whether any file
+// was large enough that logReadCapBytes elided older history.
+func readLogTails(dir string, services []string) ([]logLine, map[string]int64, bool) {
+	return readLogTailsCapped(dir, services, logReadCapBytes)
+}
+
+func readLogTailsCapped(dir string, services []string, capBytes int64) ([]logLine, map[string]int64, bool) {
 	var lines []logLine
 	offsets := map[string]int64{}
+	elided := false
 	for _, svc := range services {
 		live := filepath.Join(dir, svc+".log")
 		for _, path := range []string{live + ".1", live} {
-			b, err := os.ReadFile(path)
+			b, size, capped, err := readLogTailCapped(path, capBytes)
 			if err != nil {
 				continue
 			}
 			if path == live {
-				offsets[svc] = int64(len(b))
+				offsets[svc] = size
 			}
+			elided = elided || capped
 			for _, raw := range strings.Split(string(b), "\n") {
 				if raw == "" {
 					continue
@@ -196,7 +271,7 @@ func readLogTails(dir string, services []string) ([]logLine, map[string]int64) {
 		}
 	}
 	sort.SliceStable(lines, func(i, j int) bool { return lines[i].ts.Before(lines[j].ts) })
-	return lines, offsets
+	return lines, offsets, elided
 }
 
 // logLevelRank orders the severities a --level filter understands.
@@ -315,8 +390,18 @@ func followLogs(ctx context.Context, dir string, args []string, offsets map[stri
 			if err != nil {
 				continue
 			}
-			buf := make([]byte, info.Size()-offset)
-			if _, err := f.ReadAt(buf, offset); err == nil {
+			// Same bound as the initial read: a service that dumps a burst
+			// between two ticks (or a rotation that reset the offset to 0 on a
+			// file that is already large) must not size an allocation off it.
+			start := offset
+			if info.Size()-start > logReadCapBytes {
+				start = info.Size() - logReadCapBytes
+			}
+			buf := make([]byte, info.Size()-start)
+			if _, err := f.ReadAt(buf, start); err == nil {
+				if start != offset {
+					buf = dropPartialFirstLine(buf)
+				}
 				for _, raw := range strings.Split(string(buf), "\n") {
 					if raw == "" {
 						continue

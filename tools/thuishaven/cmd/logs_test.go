@@ -27,7 +27,7 @@ func TestReadLogTailsInterleavesByTime(t *testing.T) {
 	writeLog(t, dir, "nlp", stamp(base.Add(2*time.Second))+" nlp second")
 	writeLog(t, dir, "app", stamp(base.Add(1*time.Second))+" app first", stamp(base.Add(3*time.Second))+" app third")
 
-	lines, offsets := readLogTails(dir, []string{"app", "nlp"})
+	lines, offsets, _ := readLogTails(dir, []string{"app", "nlp"})
 	if len(lines) != 3 {
 		t.Fatalf("lines = %d, want 3", len(lines))
 	}
@@ -150,8 +150,104 @@ func TestReadLogTailsIncludesRotatedGeneration(t *testing.T) {
 	}
 	writeLog(t, dir, "app", stamp(base.Add(time.Second))+" live generation")
 
-	lines, _ := readLogTails(dir, []string{"app"})
+	lines, _, _ := readLogTails(dir, []string{"app"})
 	if len(lines) != 2 || lines[0].text != "old generation" {
 		t.Errorf("lines = %v, want the rotated generation first", lines)
 	}
+}
+
+// A stack left up writes a capture far larger than any view of it. Reading the
+// whole file to print the last 200 lines is the difference between megabytes
+// and hundreds of them, and `haven logs` is the command an agent reaches for
+// most — so the read is bounded, and the bound never costs the lines the
+// command was going to display.
+//
+// The cap is injected rather than taken from logReadCapBytes: a fixture sized
+// off the production constant would cost whatever that constant is next raised
+// to, which is how this test first hung instead of failing.
+//
+// @scenario "A huge capture is read from its tail, not whole"
+func TestReadLogTailsBoundsWhatItReadsFromAHugeCapture(t *testing.T) {
+	const capBytes = 16 << 10
+
+	dir := t.TempDir()
+	base := time.Date(2026, 7, 23, 10, 0, 0, 0, time.UTC)
+
+	// ~100 bytes a line, written well past the cap so the tail is a small
+	// fraction of the file — the shape of a stack left up overnight.
+	filler := strings.Repeat("x", 64)
+	var b strings.Builder
+	written := 0
+	for i := 0; b.Len() < capBytes*8; i++ {
+		b.WriteString(stamp(base.Add(time.Duration(i) * time.Millisecond)))
+		b.WriteString(" ")
+		b.WriteString(filler)
+		b.WriteString("\n")
+		written++
+	}
+	path := filepath.Join(dir, "app.log")
+	if err := os.WriteFile(path, []byte(b.String()), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Run("given a capture larger than the read cap", func(t *testing.T) {
+		t.Run("when the tail is read", func(t *testing.T) {
+			data, size, capped, err := readLogTailCapped(path, capBytes)
+			if err != nil {
+				t.Fatalf("readLogTailCapped: %v", err)
+			}
+			if !capped {
+				t.Error("a capture past the cap must report that history was elided")
+			}
+			if int64(len(data)) > capBytes {
+				t.Errorf("read %d bytes, want no more than the %d-byte cap", len(data), capBytes)
+			}
+			if size != info.Size() {
+				t.Errorf("size = %d, want the file's full size %d so a follow continues from the end", size, info.Size())
+			}
+			// A capped read starts mid-line; that fragment must never be parsed
+			// as a line, so what survives begins at a real record boundary.
+			if _, ok := parseLogLine("app", strings.SplitN(string(data), "\n", 2)[0]); !ok {
+				t.Error("the first surviving line is a fragment — the partial leading line was not dropped")
+			}
+		})
+
+		t.Run("when the command reads its tails", func(t *testing.T) {
+			lines, offsets, elided := readLogTailsCapped(dir, []string{"app"}, capBytes)
+			if !elided {
+				t.Error("readLogTails must report the elision so the developer is told")
+			}
+			if len(lines) >= written {
+				t.Errorf("parsed %d lines of %d written; the read was not bounded", len(lines), written)
+			}
+			if len(lines) == 0 {
+				t.Fatal("the bounded read produced nothing")
+			}
+			if offsets["app"] != info.Size() {
+				t.Errorf("offset = %d, want the full size %d — a follow must not replay the whole tail", offsets["app"], info.Size())
+			}
+			// The tail is the newest history, which is the part anyone asked for.
+			if last := lines[len(lines)-1].ts; !last.Equal(base.Add(time.Duration(written-1) * time.Millisecond)) {
+				t.Errorf("last line is %v, want the newest line written", last)
+			}
+		})
+	})
+
+	// The production cap has to be generous enough that no ordinary capture ever
+	// meets it — a developer must not be told history was elided on a file the
+	// command would have read whole anyway.
+	t.Run("given an ordinary capture", func(t *testing.T) {
+		t.Run("when the command reads its tails", func(t *testing.T) {
+			ordinary := t.TempDir()
+			writeLog(t, ordinary, "app", stamp(base)+" one line")
+
+			if _, _, elided := readLogTails(ordinary, []string{"app"}); elided {
+				t.Error("a one-line capture was reported as elided; the production cap is too small")
+			}
+		})
+	})
 }

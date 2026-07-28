@@ -329,6 +329,71 @@ func TestRejectRemovedSelectionEnv(t *testing.T) {
 	})
 }
 
+// The refusal has to read intent, not one literal. start.sh tests
+// LANGWATCH_SKIP_* against "1" and START_WORKERS against "true" or "1";
+// start.ts tests WORKERS_IN_PROCESS against "1" or "true". Matching any single
+// one of those exactly lets a developer's "off" or "yes" through, and through
+// means haven runs a service they believe they turned off — silently, which is
+// the one outcome this mechanism exists to prevent.
+//
+// @scenario "A removed selection variable is read for intent, not one spelling"
+func TestRemovedSelectionEnvIsReadForIntentNotOneSpelling(t *testing.T) {
+	t.Run("given a value that means off in every spelling but the one that was matched", func(t *testing.T) {
+		for _, value := range []string{"0", "false", "FALSE", "False", "off", "no", "  0  "} {
+			t.Run("when up runs with WORKERS_IN_PROCESS="+value, func(t *testing.T) {
+				onlyRemovedKnobSet(t, "WORKERS_IN_PROCESS", value)
+				err := rejectRemovedSelectionEnv()
+				if err == nil {
+					t.Fatalf("WORKERS_IN_PROCESS=%q was accepted; the app reads it as a standalone workers lane", value)
+				}
+				if !strings.Contains(err.Error(), "haven up +workers") {
+					t.Errorf("error %q does not point at the sticky replacement", err)
+				}
+			})
+		}
+	})
+
+	t.Run("given a value that means on in every spelling", func(t *testing.T) {
+		for _, value := range []string{"yes", "on", "TRUE", "True"} {
+			t.Run("when up runs with LANGWATCH_SKIP_NLP="+value, func(t *testing.T) {
+				onlyRemovedKnobSet(t, "LANGWATCH_SKIP_NLP", value)
+				err := rejectRemovedSelectionEnv()
+				if err == nil {
+					t.Fatalf("LANGWATCH_SKIP_NLP=%q was accepted; haven would run nlp for someone who believes it is off", value)
+				}
+				if !strings.Contains(err.Error(), "haven up -nlp") {
+					t.Errorf("error %q does not point at the sticky replacement", err)
+				}
+			})
+		}
+	})
+
+	// Blanking a line is how a .env unsets a knob. There is no intent left in it
+	// to refuse, and refusing would leave the developer deleting an empty line to
+	// start a stack.
+	t.Run("given a variable blanked out to nothing", func(t *testing.T) {
+		for _, name := range []string{"WORKERS_IN_PROCESS", "START_WORKERS", "LANGWATCH_SKIP_NLP"} {
+			t.Run("when up runs with "+name+" empty", func(t *testing.T) {
+				onlyRemovedKnobSet(t, name, "")
+				if err := rejectRemovedSelectionEnv(); err != nil {
+					t.Errorf("%s= blocked a stack: %v", name, err)
+				}
+			})
+		}
+	})
+
+	// START_WORKERS=true is what `pnpm dev` itself exports, so a checkout that
+	// carries it must still be able to start a stack.
+	t.Run("given START_WORKERS set to what pnpm dev exports", func(t *testing.T) {
+		t.Run("when up runs", func(t *testing.T) {
+			onlyRemovedKnobSet(t, "START_WORKERS", "true")
+			if err := rejectRemovedSelectionEnv(); err != nil {
+				t.Errorf("START_WORKERS=true blocked a stack: %v", err)
+			}
+		})
+	})
+}
+
 // WORKERS_IN_PROCESS=1 is still how plain `pnpm dev` asks for a single process
 // outside haven, and it is what haven itself passes to the app child. Only the
 // values that used to steer haven's own selection are refused, so a checkout

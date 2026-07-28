@@ -56,3 +56,14 @@ Feature: haven logs
   Scenario: Log files never grow without bound
     Given a service that logs heavily for days
     Then its captured log stays within the per-service size cap
+
+  # Rotation bounds the file; this bounds the read, and they are not the same
+  # thing. One generation of a busy service is still far larger than any view
+  # of it, and the default view is the last 200 lines. Bound by cmd/logs_test.go.
+  Scenario: A huge capture is read from its tail, not whole
+    Given a captured log far larger than the command will ever print
+    When the developer runs "haven logs"
+    Then only the tail of the capture is read into memory
+    And the newest lines still appear
+    And a following tail resumes from the end of the file, not the end of what was read
+    And the developer is told that older history was elided

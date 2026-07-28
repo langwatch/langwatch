@@ -248,8 +248,31 @@ var removedSelectionEnv = []struct {
 	},
 }
 
-func isTrue(v string) bool  { return v == "1" || v == "true" }
-func isFalse(v string) bool { return v == "0" || v == "false" }
+// isTrue and isFalse read a removed knob for intent, not for one literal.
+//
+// The consumers outside haven each spell truthiness their own way — start.sh
+// tests LANGWATCH_SKIP_* against "1" and START_WORKERS against "true" or "1",
+// start.ts tests WORKERS_IN_PROCESS against "1" or "true" — so matching any one
+// of them exactly would let the others through. And the two directions of being
+// wrong are not symmetric: refusing a value that never did anything costs one
+// line deleted from a .env, while missing one means haven silently runs a
+// service the developer believes they turned off, which is the failure this
+// whole mechanism exists to prevent. So both predicates read generously.
+func isTrue(v string) bool {
+	switch strings.ToLower(strings.TrimSpace(v)) {
+	case "1", "true", "yes", "on":
+		return true
+	}
+	return false
+}
+
+// isFalse is "set to something, and that something is not true" — so "0",
+// "false", "FALSE" and "off" all count, as does any value the app would not
+// read as on. An empty value does not: blanking a line is how a .env unsets a
+// knob, and there is no intent left in it to refuse.
+func isFalse(v string) bool {
+	return strings.TrimSpace(v) != "" && !isTrue(v)
+}
 
 // rejectRemovedSelectionEnv fails `up` when a removed selection variable is still
 // set to the value that used to matter, naming the one command that replaces it.
@@ -501,12 +524,7 @@ func startDetachedUp(d deps, rest []string) (detachedStack, error) {
 		return detachedStack{}, err
 	}
 	root := trustedRepoRoot()
-	argv := selfArgv(root, "up")
-	for _, a := range rest {
-		if a != "-d" && a != "--detach" {
-			argv = append(argv, a)
-		}
-	}
+	argv := detachedUpArgv(root, rest)
 	cmd := exec.Command(argv[0], argv[1:]...)
 	cmd.Dir = d.worktree
 	cmd.Env = childEnvWithTrustedRoot(root)
@@ -531,6 +549,23 @@ func startDetachedUp(d deps, rest []string) (detachedStack, error) {
 	_ = f.Close()
 	go func() { _ = cmd.Wait() }() // reap if it exits while we're still around
 	return detachedStack{slug: slug, pid: cmd.Process.Pid, logPath: logPath}, nil
+}
+
+// detachedUpArgv builds the argv of the backgrounded `haven up`. The detach
+// flags are dropped: the child IS the detached run, and passing them on would
+// have it background itself again, forever.
+//
+// Everything else is carried through untouched, which is what makes `haven up`
+// and `haven up -d` the same stack: both run this identical child, so it writes
+// the same per-service captures, and `haven logs` cannot tell them apart.
+func detachedUpArgv(repoRoot string, rest []string) []string {
+	argv := selfArgv(repoRoot, "up")
+	for _, a := range rest {
+		if a != "-d" && a != "--detach" {
+			argv = append(argv, a)
+		}
+	}
+	return argv
 }
 
 // runUpDetached is `haven up -d`: background the stack and return.
@@ -580,6 +615,16 @@ func stdoutIsTTY() bool {
 	fi, err := os.Stdout.Stat()
 	return err == nil && fi.Mode()&os.ModeCharDevice != 0
 }
+
+// upRunsAttached decides how `haven up` presents itself. A human terminal gets
+// the background stack plus the attached log view on top, so quitting the view
+// detaches and leaves the stack running.
+//
+// A pipe (`pnpm dev:haven | tee`) or an agent gets neither: the alt-screen
+// viewer would render escape codes into the pipe, so up streams plainly in the
+// foreground instead — and because that path never backgrounds the launcher,
+// the stack is this process's own children and Ctrl-C takes it down with them.
+func upRunsAttached(isAgent, isTTY bool) bool { return !isAgent && isTTY }
 
 // prWorktreeBase is where `haven pr` puts new PR worktrees: HAVEN_WORKTREE_DIR if
 // set, else the sibling `worktrees/` dir next to the main checkout (matching the

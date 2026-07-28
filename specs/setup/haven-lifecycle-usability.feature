@@ -96,17 +96,32 @@ Feature: haven lifecycle usability
     And "a" bounces every service
     And a managed service refuses with a toast instead of a restart
 
+  # The attached viewer takes the alt-screen, so it can only ever be for a human
+  # terminal. Everything else streams plainly, and because that path never
+  # backgrounds the launcher the stack is this process's own children.
+  # Bound by cmd/uplifecycle_test.go.
+  @unit
   Scenario: A piped up streams in the foreground
     When "haven up" runs with output piped (pnpm dev:haven | tee)
     Then it streams plainly in the foreground and Ctrl-C stops the stack
+    And agent mode streams the same way even from a terminal
 
+  # Attached and detached run the identical backgrounded child — the viewer is
+  # only attached on top — so there is no second logging path to keep in step.
+  # Bound by cmd/uplifecycle_test.go.
+  @unit
   Scenario: A detached up logs the same as an attached one
     When the developer runs "haven up --detach"
     Then the stack starts in the background
     And "haven logs -t" follows it exactly as it would an attached stack
+    And the detach flag itself is never passed to the backgrounded child
     And "haven down" stops it
 
+  # Bound by app/switch_test.go.
+  @unit
   Scenario: Switching to a worktree by name
     Given shell integration from "haven shell-init" is installed
     When the developer runs "haven switch" with a unique name prefix
     Then the shell changes directory to that worktree
+    And a prefix matching several worktrees names them all rather than picking one
+    And a name matching none lists what there is

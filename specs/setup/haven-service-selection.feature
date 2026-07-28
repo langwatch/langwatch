@@ -69,3 +69,25 @@ Feature: haven service selection
     Given the developer sets "WORKERS_IN_PROCESS=1", which asks plain "pnpm dev" for a single process
     When they run "haven up"
     Then the stack starts normally
+
+  # Every consumer outside haven spells truthiness differently, so matching one
+  # literal lets the others through — and letting one through means running a
+  # service the developer believes they turned off, which is what this whole
+  # mechanism exists to prevent. Bound by cmd/root_test.go.
+  Scenario: A removed selection variable is read for intent, not one spelling
+    Given the developer wrote "WORKERS_IN_PROCESS=off" rather than "=0"
+    When they run "haven up"
+    Then it is refused exactly as "=0" would be
+    And the same holds for "LANGWATCH_SKIP_NLP=yes" as for "=1"
+    And a variable blanked out to nothing carries no intent and blocks nothing
+
+  # The sticky selection is a file on disk that a developer can open, and the
+  # natural thing to hand-write in it is the service you want, not all four.
+  # Decoded as a whole selection, everything unwritten reads as off. Bound by
+  # adapters/fileregistry/store_test.go.
+  Scenario: A selection file that names only some services keeps the defaults for the rest
+    Given a hand-written selection file that turns langy on and says nothing else
+    When haven reads the worktree's selection
+    Then langy is on
+    And gateway and nlp keep the defaults they would have had
+    And a file that names no services at all is treated as never written
