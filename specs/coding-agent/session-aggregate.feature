@@ -75,6 +75,10 @@ Feature: Coding-agent sessions
     Then the session is not listed for that period
     And no version of it is shown with the totals it held before that signal
 
+  # Not shipped: the session's retention deadline is anchored on a start time
+  # that a late earlier signal can still move, so it can move closer. The freeze
+  # that makes this true is ADR-071 sequencing step 3. Recorded as the target.
+  @unimplemented
   Scenario: a late signal does not shorten how long a session is kept
     Given a session near the end of the project's retention period
     When a signal arrives reporting an earlier start than the session had

@@ -14,7 +14,7 @@
 
 `coding_agent_sessions` overloads **one mutable column** with three storage jobs:
 
-```
+```sql
 ENGINE = ReplacingMergeTree(UpdatedAt)      -- migration 00051:192
 PARTITION BY toYearWeek(StartedAt)          -- 00051:193
 ORDER BY (TenantId, StartedAt, SessionId)   -- 00051:194  (the RMT dedup key)
@@ -33,7 +33,7 @@ startedAtMs:
     : Math.min(state.startedAtMs, data.occurredAt),
 ```
 
-Every fold delivery can move it, and it only ever moves **backwards**. So the dedup key, the partition key and the TTL anchor are all a moving target, and each moves for a different reason than the others care about.
+Every fold delivery can move it, and for a live aggregate that reads its own state back it only ever moves **backwards** (it can also be re-stamped *forwards* on a read-back miss — see "What 'freeze' means concretely" below, which is why no bound on it is safe in a dedup scope). So the dedup key, the partition key and the TTL anchor are all a moving target, and each moves for a different reason than the others care about.
 
 ADR-056 chose this deliberately, and its own migration comment says so — *"the engine only collapses rows sharing the FULL sort key, and `StartedAt` can shift when an earlier signal arrives late, so every read MUST dedup by `(TenantId, SessionId, max(UpdatedAt))`"* (00051:38-41). That was a correct diagnosis of **one** of the four consequences. This ADR prices the other three.
 
@@ -182,37 +182,17 @@ Stated plainly, because the cheap option is only honest if the expensive one is 
 
 For a table that is **one bounded row per coding-agent session**, this is a lot of machinery to buy a keyed seek and a one-off orphan cleanup, when the writer change removes the cause outright.
 
-## The `MetricSeries` question
+## Why the `MetricSeries` column is not dropped here
 
-**Verdict: they genuinely duplicate the same data, and ADR-066 already decided to drop the embedded copy. This ADR does not re-open that, and does not bundle it.**
+**Investigated, because a re-key would be the cheap moment to do it.** `coding_agent_sessions.MetricSeries` (00053) and `session_metric_series` (00052) genuinely duplicate: same event, same converged units, and the same three attribute dimensions (`type`, `decision`, `language`). They are not one read served twice — the embedded copy is read only by the fold's own read-back on the **write** path, the sibling table only by `withMetricTotals`' totals read on the **read** path.
 
-Both are fed by the **same event** (`MetricFactsContributedEvent`) and both persist the **same converged units**. The attribute projections coincide exactly, which is the part worth checking rather than assuming: the map projection persists precisely `type`, `decision`, `language` —
-
-```ts
-// sessionMetricSeries.mapProjection.ts:39
-const PERSISTED_ATTRIBUTE_KEYS = new Set(["type", "decision", "language"]);
-```
-
-— and the embedded column is `Array(Tuple(SeriesId, MetricName, Type, Decision, Language, Value))` (00053:60). Same three dimensions. This is duplication, not two different shapes.
-
-**Who reads which, which is what decides it:**
-
-| | Read by | On which path |
-|---|---|---|
-| `coding_agent_sessions.MetricSeries` (embedded, 00053) | the fold's own read-back — `fromRecord` rebuilding `metricSeries` so `recomputeMetricOverlay` reproduces the nine metric-fed fields | **write** path, per delivery |
-| `session_metric_series` (table, 00052) | `CodingAgentSessionService.withMetricTotals` → `findTotalsBySessionIds` (`coding-agent-session.service.ts:243`) | **read** path, per query |
-
-So this is *not* one read served twice. It is a write-side state round-trip and a read-side aggregate, which is a legitimate CQRS split — **but that is not why the embedded copy exists**. Migration 00053 says so itself: *"Transitional per ADR-066 step 2: this map later leaves the fold for `session_metric_series`"* (00053:38-41), and ADR-066 §169 sequences the removal: drop `metricSeries`, `recomputeMetricOverlay` and the nine metric-fed columns from the fold, and serve those values from the already-existing service overlay, extending `findTotalsBySessionIds` to bucket by `decision` and `language` as well as `type`.
-
-That sequencing is right, and one hazard is worth recording because it is the obvious wrong way to do it: **the embedded copy must not be replaced by having the fold read `session_metric_series` back on the delivery path.** That would make one projection's hot path depend on another projection's write having landed, and a not-yet-visible series would silently reconstruct state with that series missing — which, because the overlay *replaces* per series rather than incrementing, regresses the metric-fed fields to zero and then rewrites them. ADR-066 step 2 does not do this (it removes the nine fields from the fold entirely, so the fold stops needing the map at all), and any future shortcut that does should be rejected.
-
-**Interaction with this ADR:** a re-key's backfill rewrites every row anyway, so it would be the cheapest moment to drop the column — an `ALTER TABLE DROP COLUMN` is otherwise a mutation that rewrites parts on a replicated table. That is a genuine argument for bundling the two **if** the re-key happens. Since we are deferring the re-key, it evaporates: ADR-066 step 2 stands on its own, unchanged, and is gated on its own number-changing validation.
+**The decision to remove the embedded copy is [ADR-066](./066-projection-clickhouse-cached-store.md)'s, not this one's, and is already sequenced there as step 2** (along with the hazard to avoid in doing it). This ADR neither re-opens it nor bundles it. The only argument for bundling was timing: a re-key's backfill rewrites every row anyway, making it the cheapest moment for an `ALTER TABLE DROP COLUMN` that otherwise rewrites parts on a replicated table. Deferring the re-key evaporates that argument, so ADR-066 step 2 stands on its own, gated on its own number-changing validation.
 
 ## Sequencing and risk
 
-1. **Now, and shipping with this ADR — the point read's tiebreak.** `findLatestRecord` ended in `LIMIT 1` with no `ORDER BY`, so two versions sharing `max(UpdatedAt)` resolved arbitrarily. It now orders by how far each version's fold got: the progress watermark, then span/log accumulator total, then converged metric-unit count (the only progress signal a metric-only session has), then applied-id count, then `StartedAt ASC` — smallest is best-informed, because it is the minimum. This is **defence in depth, not a live bug fix**: `nextVersionStamp` already makes a tie unreachable while per-aggregate serialization holds. Reversible, no migration, no behaviour change when there is no tie. Matches the fix applied to the two sibling analytics repositories.
+1. **Now, and shipping with this ADR — the point read's tiebreak.** `findLatestRecord` ended in `LIMIT 1` with no `ORDER BY`, so two versions sharing `max(UpdatedAt)` resolved arbitrarily. It now orders by how far each version's fold got: the progress watermark, then span/log accumulator total, then converged metric-unit count (the only progress signal a metric-only session has), then applied-id count, then `StartedAt ASC`. That last key is a **deterministic last-resort tie-break** whose only job is to make the ordering total — it is deliberately *not* a progress signal, because a read-back miss can re-stamp `StartedAt` forwards (above), so its direction says nothing about which version folded more. This is **defence in depth, not a live bug fix**: `nextVersionStamp` already makes a tie unreachable while per-aggregate serialization holds. Reversible, no migration, no behaviour change when there is no tie. Matches the fix applied to the two sibling analytics repositories.
 2. **Now, and shipping with this ADR — the list read's dedup scope.** `findManyRecent`'s inner `max(UpdatedAt)` subquery no longer filters on `StartedAt`; only the outer scope does. **This closes consequence 4** — the wrong answer — ahead of the freeze rather than behind it, because it needs no migration and no writer change. It costs an unwindowed dedup scan per list read (compact: sort-key columns plus `UpdatedAt`, one group row per session) until step 3 makes the pruning bound safe again. Reversible, no migration.
-3. **Next — freeze the writer.** `StartedAt` becomes first-observed; add `EarliestSignalAt` for the business truth; point the session view and list display/sort at it. One additive migration, one fold change, one read-path change. **This is the change that closes consequences 1-3**, and it is what lets step 2's dedup scope take its pruning bound back. Reversible in the sense that reverting stops the freeze — it does not un-write frozen rows, and does not need to. It is an interim step, not the target: it stops the anchor moving but leaves it producer-supplied. None of it is wasted if the accept-time re-key later happens — `EarliestSignalAt` stays the displayed business truth either way, and splitting anchor from business value is a prerequisite for both.
+3. **Next — freeze the writer.** `StartedAt` becomes first-observed; add `EarliestSignalAt` for the business truth; point the session view and list display/sort at it. One additive migration, one fold change, one read-path change. **This is the change that closes consequences 1-3**, and it is what lets step 2's dedup scope take its pruning bound back. The retention guarantee is therefore *not* shipping here: `session-aggregate.feature`'s scenario *"a late signal does not shorten how long a session is kept"* is tagged `@unimplemented` and records this step's target rather than today's behaviour — untag it when the freeze lands. Reversible in the sense that reverting stops the freeze — it does not un-write frozen rows, and does not need to. It is an interim step, not the target: it stops the anchor moving but leaves it producer-supplied. None of it is wasted if the accept-time re-key later happens — `EarliestSignalAt` stays the displayed business truth either way, and splitting anchor from business value is a prerequisite for both.
 4. **Then — audit the other range-filtered dedup scopes.** Consequence 4 is a *pattern*, not one query: any read that puts a mutable column in an IN-tuple dedup subquery has it. `findManyRecent` was the instance found here and is fixed; the sweep for others is not done, and `trace_analytics` and `evaluation_analytics` are the first places to look, since both anchor on a moving column too. This is what ADR-068's windowed-read discipline should be extended to say.
 5. **Not now — ADR-066 step 2** (`MetricSeries` out of the fold). Independent, number-changing, its own validation.
 6. **Not now, and gated on a human — the TTL semantics decision.** Adopting accept time as the anchor changes retention from *"N days after it happened"* to *"N days after we accepted it"*. Recorded above with the argument for it; it needs a deliberate sign-off, not an engineering judgement call, and nothing here presumes the answer.
@@ -240,7 +220,7 @@ We accept both. Neither is a wrong answer on an ordinary read once this change l
 - **A column that is a storage anchor and a displayed business value at the same time is a bug waiting for a late event.** Split them: the anchor is accept time (frozen business time is the interim step, not the target), the business value is free to move.
 - **Prune on the anchor, answer on the business value.** When the anchor is accept time and the caller asks in business time, bound accept time by `[businessFrom − maxLag, businessTo]` for partition pruning and apply the exact business-time predicate in the outer scope. The window prunes; the exact predicate is what is correct (ADR-068).
 - **A dedup subquery must never filter on a column that can move a row out of the caller's range.** The outer scope may be range-filtered for partition pruning; the inner `max(version)` scope must resolve the true latest. Both reads on this table now obey it and say why in their docblocks — `findLatestRecord` always did, and `findManyRecent`'s range filter was removed from its dedup scope in this change. Narrowings on **stable** columns (`TenantId`, `UserId`) stay in both scopes: they cannot move a version out of its group. **Not even an upper bound is safe on a moving column**, because a read-back miss re-stamps the anchor *forwards*, so "the latest version holds the smallest value" does not hold.
-- **A latest-version point read ends in a deterministic `ORDER BY … LIMIT 1`**, ranked by fold progress, even where a write-side version stamp already makes ties unreachable. The stamp is the mechanism; the tiebreak is the backstop, and it costs nothing because the IN-tuple has already cut the input to the tied rows.
+- **A latest-version point read ends in a deterministic `ORDER BY … LIMIT 1`**, ranked by fold progress and closed by a stable key that makes the order total, even where a write-side version stamp already makes ties unreachable. The stamp is the mechanism; the tiebreak is the backstop, and it costs nothing because the IN-tuple has already cut the input to the tied rows. **The closing key buys determinism, not correctness** — do not justify it as picking the better-informed row unless the column it reads is itself a monotonic progress signal.
 - **`TenantId` is first in every scope, outer and inner.** Unchanged, restated because this ADR touches both scopes of two queries.
 
 ## References
