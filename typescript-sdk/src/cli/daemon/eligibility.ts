@@ -117,13 +117,12 @@ export function evaluateEligibility(input: EligibilityInput): Eligibility {
     return { eligible: false, reason: "interactive-tty" };
   }
 
-  const operand = input.args.find((arg) => !arg.startsWith("-"));
-  if (!operand) {
-    // Bare `langwatch`, or only flags (`--help`, `--version`). Cheap already,
-    // and commander's help output is the one thing we gain nothing by warming.
-    return { eligible: false, reason: "no-command" };
-  }
-
+  // The denied names and flags are checked BEFORE asking whether there is a
+  // command at all: they are facts about the argument list that hold wherever
+  // the word sits, so checking them first keeps the sharper reason — and keeps
+  // `--verbose login` reading as `denied-command` rather than as an argument
+  // list we could not find a command in.
+  //
   // Every argument is checked, not just the first operand — because the first
   // operand is NOT reliably the command.
   //
@@ -157,7 +156,48 @@ export function evaluateEligibility(input: EligibilityInput): Eligibility {
     return { eligible: false, reason: "long-running-flag" };
   }
 
+  if (!hasCommandOperand(input.args)) {
+    // Bare `langwatch`, only flags (`--help`, `--version`), or nothing but a
+    // global option and its value. Cheap already, and commander's help output
+    // is the one thing we gain nothing by warming.
+    return { eligible: false, reason: "no-command" };
+  }
+
   return { eligible: true };
+}
+
+/**
+ * Could any of these arguments actually BE a command?
+ *
+ * An operand is not a command when the option in front of it is eating it. The
+ * root program's value-taking globals (`-o <format>`, `--json <fields>`,
+ * `--jq <expr>`) parse ahead of the subcommand, so `langwatch -o json` carries
+ * no command at all — `json` is a format. Under a plain "is there a bare word?"
+ * rule that invocation sailed through as eligible and commander rendered the
+ * ROOT HELP inside the daemon, where the program name comes from the daemon's
+ * own argv[1]: a caller who typed `lw` could be shown usage lines for
+ * `langwatch`, because the two bin names share one daemon (`resolveBuildId`
+ * stats the same symlink target for both).
+ *
+ * Which options take a value is exactly what this module cannot look up — it
+ * is dependency-free by design and cannot consult the program's option table,
+ * and a hand-copied list rots (see the note above). So it assumes any `-x`
+ * might take one, and treats only `-x=value`, which carries its own, as
+ * certainly not. That over-rejects a one-word command behind a boolean flag
+ * (`langwatch --agent status`) for the price of one cold start, and never lets
+ * a commandless invocation through. Anything longer is unaffected:
+ * in `--agent trace list`, `list` follows an operand rather than a flag.
+ */
+function hasCommandOperand(args: string[]): boolean {
+  return args.some((arg, index) => {
+    if (arg.startsWith("-")) return false;
+    const previous = index === 0 ? undefined : args[index - 1];
+    return (
+      previous === undefined ||
+      !previous.startsWith("-") ||
+      previous.includes("=")
+    );
+  });
 }
 
 /** Whether the client may auto-spawn a daemon it did not find. */

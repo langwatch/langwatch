@@ -172,6 +172,43 @@ describe("evaluateEligibility", () => {
         reason: "no-command",
       });
     });
+
+    // A global option's VALUE is a bare word too, so `-o json` used to read as
+    // the command `json` and reach the daemon — where commander renders the
+    // root help against the DAEMON's argv[1], not the caller's, so a caller who
+    // typed `lw` could be shown `langwatch` usage lines.
+    it.each([
+      [["-o", "json"]],
+      [["--output", "yaml"]],
+      [["--jq", ".projects[].id"]],
+      [["--json", "id,name"]],
+      [["-o", "json", "--jq", ".id"]],
+    ])("refuses %j, which names no command at all", (args) => {
+      expect(evaluateEligibility(piped({ args }))).toEqual({
+        eligible: false,
+        reason: "no-command",
+      });
+    });
+
+    it("still serves a command that follows a global option's value", () => {
+      expect(
+        evaluateEligibility(piped({ args: ["-o", "json", "trace", "list"] })),
+      ).toEqual({ eligible: true });
+    });
+
+    it("still serves a command behind a boolean global option", () => {
+      // `--agent` takes no value, so `trace` is the command — and `list`,
+      // following an operand rather than a flag, is what proves it.
+      expect(
+        evaluateEligibility(piped({ args: ["--agent", "trace", "list"] })),
+      ).toEqual({ eligible: true });
+    });
+
+    it("reads an option that carries its own value as not eating the command", () => {
+      expect(
+        evaluateEligibility(piped({ args: ["--output=json", "trace"] })),
+      ).toEqual({ eligible: true });
+    });
   });
 
   describe("given windows", () => {

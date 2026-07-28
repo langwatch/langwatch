@@ -249,17 +249,47 @@ export function stagingSocketPath(socketPath: string, pid: number): string {
  * idle minutes later, even if that is a successor's live socket. Binding a
  * private name puts THAT unlink somewhere harmless and leaves the shared name
  * under the control of `unlinkIfSameFile`.
+ *
+ * Hard links to a socket are POSIX and work on every filesystem the daemon is
+ * supported on. Should some exotic one refuse, publishing falls back to an
+ * atomic rename — but only onto a name nothing holds, because rename is
+ * fail-OPEN and such a filesystem sends EVERY start down that branch. See the
+ * note on the fallback below.
  */
-function publishSocket(stagingPath: string, socketPath: string): void {
+export function publishSocket(stagingPath: string, socketPath: string): void {
   try {
     fs.linkSync(stagingPath, socketPath);
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "EEXIST") {
       throw new DaemonAlreadyRunningError(socketPath);
     }
-    // Hard links to a socket are POSIX and work on every filesystem the daemon
-    // is supported on; should some exotic one refuse, an atomic rename still
-    // beats silently never running a daemon there.
+
+    // link() failed for a reason that is NOT "somebody got there first" — a
+    // filesystem that will not hard-link a socket at all (EPERM/EOPNOTSUPP).
+    // rename(2) is the only other atomic publish, and it REPLACES whatever
+    // holds the target: precisely the fail-open behaviour link was chosen to
+    // avoid. On such a filesystem every start lands here, so renaming
+    // unconditionally would not merely lose a rare race — the fail-closed
+    // property would be absent permanently, and silently.
+    //
+    // So: rename only onto a name nothing holds. `listen()` cleared this path
+    // moments ago (cleanStaleSocket) and has been binding ever since, so an
+    // occupant now is a daemon that published while we were starting. Refusing
+    // costs this process its daemon and nothing else — `listen()` closes the
+    // handle, libuv takes the staging file with it, and the caller runs the
+    // command in-process. Renaming would cost the WINNER its reachability: a
+    // live process holding resolved credentials on an inode no client can
+    // dial, which `stop()`'s `unlinkIfSameFile` then (correctly) declines to
+    // clean up, so it lingers for its full idle timeout.
+    //
+    // Reported as DaemonAlreadyRunningError, exactly as the branch above
+    // reports the same situation whenever link CAN tell us about it.
+    //
+    // Between this check and the rename the usual microsecond window remains;
+    // what it removes is the one that is open by construction.
+    if (identifyFile(socketPath) !== null) {
+      throw new DaemonAlreadyRunningError(socketPath);
+    }
     fs.renameSync(stagingPath, socketPath);
     return;
   }
