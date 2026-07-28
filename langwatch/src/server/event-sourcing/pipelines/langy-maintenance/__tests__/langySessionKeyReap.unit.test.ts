@@ -42,7 +42,8 @@ describe("langySessionKeyReap process", () => {
           wakeContext(2_000) as never,
         );
 
-        expect(redelivered.intents[0]).toEqual(first.intents[0]);
+        expect(redelivered.intents?.[0]).toEqual(first.intents?.[0]);
+        expect(redelivered.intents?.[0]).toBeDefined();
       });
     });
   });
