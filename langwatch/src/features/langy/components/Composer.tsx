@@ -31,10 +31,7 @@ import { Tooltip } from "~/components/ui/tooltip";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import type { LangySkill } from "~/shared/langy/langySkills";
 import { describeChipContext } from "../logic/langyChipContext";
-import {
-  type LangyRevealableKind,
-  useLangyContextTargetStore,
-} from "../stores/langyContextTargetStore";
+import { useLangyContextTargetStore } from "../stores/langyContextTargetStore";
 import { type LangyContextChip, useLangyStore } from "../stores/langyStore";
 import { LangyComposerPalette, type PaletteMode } from "./LangyComposerPalette";
 import { LangyModelPill } from "./LangyModelPill";

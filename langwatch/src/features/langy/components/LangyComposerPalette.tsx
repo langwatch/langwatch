@@ -13,7 +13,6 @@ import { LANGY_SKILLS, type LangySkill } from "~/shared/langy/langySkills";
 import {
   absorbContextTarget,
   type LangyContextTarget,
-  type LangyRevealableKind,
   useLangyContextTargetStore,
 } from "../stores/langyContextTargetStore";
 import type { LangyContextChip } from "../stores/langyStore";

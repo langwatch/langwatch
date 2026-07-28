@@ -54,6 +54,10 @@ describe("KNOWN_LANGY_ERROR_KINDS", () => {
       "langy_egress_misconfigured",
       "langy_insufficient_scope",
       "langy_turn_in_progress",
+      // Sending faster than the per-user limit allows: without an entry here it
+      // fell into the generic default, which tells a throttled user Langy is
+      // broken and offers a retry into the same limit.
+      "langy_rate_limited",
       // Codex (sign-in-with-OpenAI): dead OAuth session / ChatGPT plan limit,
       // promoted off the agent-errored reason chain by exact reason code.
       "langy_codex_session_expired",
@@ -406,6 +410,32 @@ describe("explainLangyError", () => {
       // A wait, not a turn failure: a dismissable notice attached above the
       // composer that keeps the user's draft — not a red history card (ADR-078).
       expect(presentation.render).toBe("composer-notice");
+    });
+  });
+
+  describe("given the sender tripped the per-user message limit", () => {
+    describe("when the refusal is explained", () => {
+      it("asks for patience without a retry, and never claims Langy is broken", () => {
+        const generic = explainLangyError(domain({ code: "some_new_kind" }));
+        const presentation = explainLangyError(
+          domain({
+            code: "langy_rate_limited",
+            httpStatus: 429,
+            // The server puts its sentence here because `serialize()` drops the
+            // HandledError message; before this kind had copy, that sentence
+            // was the ONLY correct thing on an otherwise wrong card.
+            meta: { message: "Too many messages. Please slow down." },
+          }),
+        );
+
+        expect(presentation.title).not.toBe(generic.title);
+        // A retry is the one action that makes throttling worse — it spends
+        // another request against the limit that just refused this one.
+        expect(presentation.action).toBeUndefined();
+        // A wait, not a turn failure: it rides above the composer and keeps the
+        // user's draft, rather than a red card in the transcript.
+        expect(presentation.render).toBe("composer-notice");
+      });
     });
   });
 

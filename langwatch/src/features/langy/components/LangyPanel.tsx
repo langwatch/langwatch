@@ -127,10 +127,6 @@ import { resolveLangyStopTarget } from "../logic/langyStopTarget";
 import { buildTimeTravelView } from "../logic/langyTimeTravel";
 import { deriveWaveActivity } from "../logic/langyWaveMotion";
 import { isInternalHref } from "../logic/spaLink";
-import {
-  type LangyRevealableKind,
-  useLangyContextTargetStore,
-} from "../stores/langyContextTargetStore";
 import { tapeForConversation, useLangyDevLog } from "../stores/langyDevLog";
 import {
   attachedContextToChip,

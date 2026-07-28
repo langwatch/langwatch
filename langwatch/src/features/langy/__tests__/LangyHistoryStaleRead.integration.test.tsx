@@ -32,6 +32,10 @@ const historyState = {
   hasData: true,
   /** Is the query reporting a failure right now? */
   errored: false,
+  /** Does the durable transcript carry the question yet? */
+  hasMessages: true,
+  /** Does the fold say a turn is running for this conversation? */
+  turnInFlight: false,
 };
 const historyListeners = new Set<() => void>();
 const setHistory = (next: Partial<typeof historyState>) =>
@@ -137,23 +141,26 @@ vi.mock("~/utils/api", async () => {
     // react-query's own behaviour on a failed BACKGROUND refetch: `data` is
     // retained from the last success, `status` becomes error. That coexistence
     // is the whole subject of this file.
+    const turnId = historyState.turnInFlight ? "turn-live" : null;
     const data =
       enabled && historyState.hasData
         ? {
-            messages: [
-              {
-                id: "m1",
-                role: "user" as const,
-                parts: [{ type: "text", text: QUESTION }],
-                createdAtMs: 0,
-              },
-            ],
+            messages: historyState.hasMessages
+              ? [
+                  {
+                    id: "m1",
+                    role: "user" as const,
+                    parts: [{ type: "text", text: QUESTION }],
+                    createdAtMs: 0,
+                  },
+                ]
+              : [],
             lastError: null,
-            isTurnInFlight: false,
-            inFlightTurnId: null,
+            isTurnInFlight: historyState.turnInFlight,
+            inFlightTurnId: turnId,
             shouldAskFeedback: false,
             eventCursor: null,
-            currentTurnId: null,
+            currentTurnId: turnId,
           }
         : undefined;
     return {
@@ -327,10 +334,19 @@ describe("a failed read of an open conversation's history", () => {
     historyState.version = 0;
     historyState.hasData = true;
     historyState.errored = false;
+    historyState.hasMessages = true;
+    historyState.turnInFlight = false;
     engine.messages = [];
     engine.version = 0;
     useLangyStore.setState({ scopeAnnounced: false });
     useLangyStore.getState().resetForProject(PROJECT_ID);
+    // The store is a module singleton, so the turn-phase machine outlives a
+    // test. Park it at idle explicitly — a leaked `active` would make the
+    // failure-card case below pass or fail for the wrong reason.
+    useLangyStore.setState({
+      turnPhase: "idle",
+      backendSawTurnInFlight: false,
+    });
   });
 
   afterEach(() => {
@@ -375,6 +391,30 @@ describe("a failed read of an open conversation's history", () => {
 
         await waitFor(() => expect(staleNote()).toBeNull());
         expect(document.body.textContent).toContain(QUESTION);
+      });
+    });
+  });
+
+  describe("given a turn is running before its question has landed", () => {
+    describe("when the poll behind it fails", () => {
+      it("keeps the working column instead of the failure card", async () => {
+        // The OTHER half of the stale condition, and the one an empty
+        // transcript hides: a turn in flight is content of its own. Between
+        // send and a terminal state the column owes the reader a working line
+        // — never a card claiming the conversation is gone — even though there
+        // is not a single message on screen to protect yet. Narrow the
+        // condition to `!isEmpty` and this case loses its live turn to the
+        // failure card.
+        historyState.hasMessages = false;
+        historyState.turnInFlight = true;
+
+        renderOpenPanel();
+        await waitFor(() => expect(failureCard()).toBeNull());
+
+        setHistory({ errored: true });
+
+        await waitFor(() => expect(staleNote()).toBeTruthy());
+        expect(failureCard()).toBeNull();
       });
     });
   });

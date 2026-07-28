@@ -235,6 +235,14 @@ const POLICIES: Record<string, LangyRecoveryPolicy> = {
   langy_insufficient_scope: terminal("langy_insufficient_scope"),
   langy_turn_in_progress: terminal("langy_turn_in_progress"),
 
+  // Throttled by the per-user message limit. TERMINAL in the sense that matters
+  // here: an automatic re-drive is the single worst response, because it spends
+  // another request against the very limit that refused this one — the client
+  // hammering the wall it was just told to back off from. The explainer renders
+  // it as a composer notice asking for a few seconds' patience, and the user
+  // decides when to send again.
+  langy_rate_limited: terminal("langy_rate_limited"),
+
   // Codex (sign-in-with-OpenAI). Both TERMINAL: an auto-retry re-drives the
   // SAME failure. A dead OAuth session is fixed only by re-authenticating (the
   // explainer's card carries the "Sign in to Codex" action, which re-drives the

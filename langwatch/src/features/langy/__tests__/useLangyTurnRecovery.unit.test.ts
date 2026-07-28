@@ -215,12 +215,18 @@ describe("useLangyTurnRecovery", () => {
   });
 
   describe("when nothing about the failure changed", () => {
-    // The panel threads this object into `useCallback` deps — `onChoiceSelect`,
-    // which goes to every memo(MessageContent) in the column. A fresh object
-    // literal per render made that callback fresh per render, so memo bought
-    // nothing and a streaming turn re-ran every message's tool-part scan on
-    // every token.
-    it("hands back the same object, so callbacks built on it stay stable", () => {
+    // The hook's handle only changes when the recovery state does — the
+    // contract that lets a consumer put it in a dep array, or hand it to a
+    // memo'd child, without churning on every render.
+    //
+    // The panel used to do exactly that (`onChoiceSelect`, which goes to every
+    // memo(MessageContent) in the column): a fresh object literal per render
+    // made that callback fresh per render, so memo bought nothing and a
+    // streaming turn re-ran every message's tool-part scan on every token. That
+    // callback now comes off an implementation-ref, so no consumer reads the
+    // identity today — which is precisely why it is pinned here rather than
+    // left to be rediscovered the expensive way.
+    it("hands back the same handle, so a consumer's dep array does not churn", () => {
       const errorId = { id: 1 };
       const { result, rerender } = setup({ errorId });
       const first = result.current;

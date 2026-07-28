@@ -190,13 +190,22 @@ export function useLangyTurnRecovery({
       sideEffectsObserved,
     });
 
-  // MEMOISED, and that is load-bearing rather than tidiness. The panel threads
-  // this object straight into `useCallback` deps (the choices card's
-  // `onChoiceSelect`), so a fresh object literal per render minted a fresh
-  // callback per render, which is a changed prop on every `memo(MessageContent)`
-  // in the column — a streaming turn then re-rendered every message in the
-  // conversation on every token. The identity has to be as stable as the state
-  // behind it.
+  // MEMOISED so the handle is as stable as the state behind it.
+  //
+  // This is now belt-and-braces rather than load-bearing, and the history is
+  // the reason it stays. The panel used to thread this object into
+  // `useCallback` deps (the choices card's `onChoiceSelect`), so a fresh object
+  // literal per render minted a fresh callback per render — a changed prop on
+  // every `memo(MessageContent)` in the column, and a streaming turn re-rendered
+  // every message in the conversation on every token. That callback has since
+  // moved to an implementation-ref, so today nothing reads this identity; the
+  // panel only reads properties off it.
+  //
+  // A hook that hands out an OBJECT owes callers a stable one anyway: the
+  // caller cannot see the difference until it costs them a render storm, and
+  // this panel has already paid that bill once. Dropping the memo would make
+  // the next `[recovery]` dep array — or the next time it is passed to a memo'd
+  // child — a silent regression instead of a non-event.
   return useMemo(() => {
     if (!pending) {
       return {

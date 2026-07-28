@@ -136,6 +136,12 @@ export const KNOWN_LANGY_ERROR_KINDS = [
   "langy_egress_misconfigured",
   "langy_insufficient_scope",
   "langy_turn_in_progress",
+  // Sending faster than the per-user limit allows. Explicit copy matters more
+  // here than almost anywhere: the generic default titles every unknown kind
+  // "Langy couldn't finish that" and hands it a "Try again" button, which tells
+  // a merely-throttled user the product is broken and then invites them to hit
+  // the same limit again.
+  "langy_rate_limited",
   // Codex (the sign-in-with-OpenAI provider): the OAuth session died and the
   // user must re-authenticate, or their ChatGPT plan's usage limit refused
   // the turn. Promoted off the agent-errored reason chain — see
@@ -498,6 +504,23 @@ export function explainLangyError(
       // It is a WAIT, not a turn failure, so it rides above the composer as a
       // dismissable notice that keeps the user's draft — not a red history card.
       return { ...copy, render: "composer-notice", ...debug };
+
+    case "langy_rate_limited":
+      // Throttled, not broken. Nothing failed, nothing was lost, and the only
+      // fix is a few seconds of patience — so there is no "Try again" action,
+      // which would be an invitation to walk straight back into the limit.
+      // Like `langy_turn_in_progress` this is a WAIT rather than a turn
+      // failure, so it rides above the composer as a dismissable notice and
+      // the draft the user tried to send stays in the field (ADR-078), instead
+      // of a red history card that claims Langy is the thing at fault.
+      return {
+        kind: domain.code,
+        title: "You're sending messages too quickly",
+        description:
+          "Slow down a moment and send this again in a few seconds — your draft is still in the composer.",
+        render: "composer-notice",
+        ...debug,
+      };
 
     case "unknown":
       // The shared module owns this state's words (ADR-045) — a third Langy

@@ -39,37 +39,41 @@ function bashCall({
 }
 
 describe("langy activity readers", () => {
-  describe("given the same parts array is read more than once", () => {
-    it("answers from the first read instead of walking the parts again", () => {
-      const parts = [
-        bashCall({
-          command: "langwatch trace search --format json",
-          output: JSON.stringify({ traces: [] }),
-        }),
-      ];
+  describe("given a settled tool call to read", () => {
+    describe("when the same parts array is asked for twice", () => {
+      it("answers from the first read instead of walking the parts again", () => {
+        const parts = [
+          bashCall({
+            command: "langwatch trace search --format json",
+            output: JSON.stringify({ traces: [] }),
+          }),
+        ];
 
-      // Two different views over ONE parts array: the memo keys on the parts,
-      // which is what makes MessageContent's guard and the render itself share
-      // a single walk.
-      expect(toCapabilityCalls({ parts })).toBe(toCapabilityCalls({ parts }));
-      expect(toActivityGroups({ parts })).toBe(toActivityGroups({ parts }));
-      expect(toFailedToolCalls({ parts })).toBe(toFailedToolCalls({ parts }));
+        // Two different views over ONE parts array: the memo keys on the parts,
+        // which is what makes MessageContent's guard and the render itself share
+        // a single walk.
+        expect(toCapabilityCalls({ parts })).toBe(toCapabilityCalls({ parts }));
+        expect(toActivityGroups({ parts })).toBe(toActivityGroups({ parts }));
+        expect(toFailedToolCalls({ parts })).toBe(toFailedToolCalls({ parts }));
+      });
     });
 
-    it("reads a fresh array afresh — a new token is a new answer", () => {
-      const first = [bashCall({ command: "cat notes.md", output: "ok" })];
-      const second = [
-        ...first,
-        bashCall({ id: "call-2", command: "cat other.md", output: "ok" }),
-      ];
+    describe("when a streamed token appends a call to a fresh array", () => {
+      it("reads the new array afresh — a new token is a new answer", () => {
+        const first = [bashCall({ command: "cat notes.md", output: "ok" })];
+        const second = [
+          ...first,
+          bashCall({ id: "call-2", command: "cat other.md", output: "ok" }),
+        ];
 
-      expect(toActivityGroups({ parts: second })).not.toBe(
-        toActivityGroups({ parts: first }),
-      );
-      // Both shell calls collapse into one group, so the second read is only
-      // visibly newer in the calls it carries.
-      expect(toActivityGroups({ parts: first })[0]?.calls).toHaveLength(1);
-      expect(toActivityGroups({ parts: second })[0]?.calls).toHaveLength(2);
+        expect(toActivityGroups({ parts: second })).not.toBe(
+          toActivityGroups({ parts: first }),
+        );
+        // Both shell calls collapse into one group, so the second read is only
+        // visibly newer in the calls it carries.
+        expect(toActivityGroups({ parts: first })[0]?.calls).toHaveLength(1);
+        expect(toActivityGroups({ parts: second })[0]?.calls).toHaveLength(2);
+      });
     });
   });
 
@@ -84,13 +88,15 @@ describe("langy activity readers", () => {
       }),
     ];
 
-    it("does not turn it into a failure", () => {
-      expect(toFailedToolCalls({ parts })).toHaveLength(0);
-    });
+    describe("when the readers classify the call", () => {
+      it("does not turn it into a failure", () => {
+        expect(toFailedToolCalls({ parts })).toHaveLength(0);
+      });
 
-    it("keeps it in the completed receipt, where the reader can see it ran", () => {
-      const [group] = toActivityGroups({ parts });
-      expect(group?.done).toBe(true);
+      it("keeps it in the completed receipt, where the reader can see it ran", () => {
+        const [group] = toActivityGroups({ parts });
+        expect(group?.done).toBe(true);
+      });
     });
   });
 
@@ -104,46 +110,52 @@ describe("langy activity readers", () => {
       }),
     ];
 
-    it("reads it as the successful command it was", () => {
-      expect(toFailedToolCalls({ parts })).toHaveLength(0);
-      expect(toActivityGroups({ parts })).toHaveLength(1);
+    describe("when the readers classify the call", () => {
+      it("reads it as the successful command it was", () => {
+        expect(toFailedToolCalls({ parts })).toHaveLength(0);
+        expect(toActivityGroups({ parts })).toHaveLength(1);
+      });
     });
   });
 
   describe("given the CLI announced its own failure", () => {
-    it("still recognises the marker at the head of a line", () => {
-      const parts = [
-        bashCall({
-          command: "langwatch trace search --format json",
-          output: JSON.stringify({
-            kind: "text",
-            text: "- Searching traces...\n✖ Failed to search traces: fetch failed",
+    describe("when the marker heads a line of the output", () => {
+      it("still reads the call as failed", () => {
+        const parts = [
+          bashCall({
+            command: "langwatch trace search --format json",
+            output: JSON.stringify({
+              kind: "text",
+              text: "- Searching traces...\n✖ Failed to search traces: fetch failed",
+            }),
           }),
-        }),
-      ];
+        ];
 
-      expect(toFailedToolCalls({ parts })).toHaveLength(1);
-      expect(toActivityGroups({ parts })).toHaveLength(0);
+        expect(toFailedToolCalls({ parts })).toHaveLength(1);
+        expect(toActivityGroups({ parts })).toHaveLength(0);
+      });
     });
 
-    it("recognises a handled failure document even with no marker in sight", () => {
-      const parts = [
-        bashCall({
-          command: "langwatch scenario create Demo --format json",
-          output: JSON.stringify({
-            ok: false,
-            error: {
-              code: "resource_limit_exceeded",
-              message: "Your plan doesn't include another scenario.",
-              httpStatus: 403,
-              meta: { limitType: "scenarios" },
-            },
+    describe("when a handled failure document arrives with no marker in sight", () => {
+      it("reads the failure off the document's own shape", () => {
+        const parts = [
+          bashCall({
+            command: "langwatch scenario create Demo --format json",
+            output: JSON.stringify({
+              ok: false,
+              error: {
+                code: "resource_limit_exceeded",
+                message: "Your plan doesn't include another scenario.",
+                httpStatus: 403,
+                meta: { limitType: "scenarios" },
+              },
+            }),
           }),
-        }),
-      ];
+        ];
 
-      expect(toFailedToolCalls({ parts })).toHaveLength(1);
-      expect(toActivityGroups({ parts })).toHaveLength(0);
+        expect(toFailedToolCalls({ parts })).toHaveLength(1);
+        expect(toActivityGroups({ parts })).toHaveLength(0);
+      });
     });
   });
 });
