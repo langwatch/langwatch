@@ -16,7 +16,11 @@ import type { StudioServerEvent } from "~/optimization_studio/types/events";
 import { nodeErrorToDomainError } from "~/optimization_studio/utils/nodeErrorDomain";
 import { EvaluatorExecutionError } from "~/server/app-layer/evaluations/errors";
 import type { SingleEvaluationResult } from "~/server/evaluations/evaluators";
-import type { EvaluationV3EvaluatorResult, EvaluationV3Event } from "./types";
+import {
+  type EvaluationV3EvaluatorResult,
+  type EvaluationV3Event,
+  UNNAMED_FAILURE,
+} from "./types";
 
 /**
  * Configuration for result mapping.
@@ -388,29 +392,20 @@ export const mapNlpEvent = (
   return null;
 };
 
-/** The one line a customer reads for a cell failure we could not name. */
-const UNNAMED_CELL_FAILURE = "This row couldn't be run";
-
-/**
- * The same, for a failure that took the whole run with it.
- *
- * The two route-level catches fire when the orchestrator itself threw — there
- * is no row and no target, and every cell is gone. Telling that user "this row
- * couldn't be run" describes a scope of damage they can see is wrong.
- */
-const UNNAMED_RUN_FAILURE = "The evaluation couldn't be completed";
-
 /**
  * Maps a *thrown* failure to an error SSE event.
  *
  * A handled error travels as its code on `domainError`, and the client renders
  * the registry's copy for it. An unhandled one has nothing safe to say — its
  * `message` can carry a Prisma string, a hostname or a Go net error — so the
- * WIRE message degrades to one fixed line. See ADR-045.
+ * frame carries {@link UNNAMED_FAILURE}, a marker, and the client's own
+ * fallback copy owns the words. See ADR-045.
  *
- * The real message still rides on `serverMessage`, which `toClientEvent`
- * strips: the run row we persist and the log line are ours, and blanking them
- * loses the only record of what actually happened.
+ * The failure's own message is neither sent nor stored. It goes to the log
+ * line at the catch site, beside the trace id this frame carries, which is
+ * what ties "it broke" to what actually broke. Storing it instead put a
+ * `connect ECONNREFUSED 10.0.0.5:5432` into the customer's cell every time
+ * they reloaded the run.
  */
 export const mapThrownErrorEvent = ({
   error,
@@ -424,14 +419,12 @@ export const mapThrownErrorEvent = ({
   evaluatorId?: string;
 }): EvaluationV3Event => {
   const activeTraceId = otelTrace.getActiveSpan()?.spanContext().traceId;
-  const serverMessage = error instanceof Error ? error.message : undefined;
 
   if (HandledError.isHandled(error)) {
     return {
       type: "error",
       // The wire message for a handled error is its code (#5984).
       message: error.code,
-      ...(serverMessage ? { serverMessage } : {}),
       domainError: error.serialize(),
       traceId: error.traceId ?? activeTraceId,
       rowIndex,
@@ -442,25 +435,12 @@ export const mapThrownErrorEvent = ({
 
   return {
     type: "error",
-    message:
-      rowIndex === undefined ? UNNAMED_RUN_FAILURE : UNNAMED_CELL_FAILURE,
-    ...(serverMessage ? { serverMessage } : {}),
+    message: UNNAMED_FAILURE,
     traceId: activeTraceId,
     rowIndex,
     targetId,
     evaluatorId,
   };
-};
-
-/**
- * Strips the server-only fields from an event before it is serialised for a
- * client. Every SSE writer goes through this — that is what keeps
- * `serverMessage` a server field rather than a comment claiming to be one.
- */
-export const toClientEvent = (event: EvaluationV3Event): EvaluationV3Event => {
-  if (event.type !== "error" || event.serverMessage === undefined) return event;
-  const { serverMessage: _serverMessage, ...clientEvent } = event;
-  return clientEvent;
 };
 
 /**
@@ -483,7 +463,15 @@ export const mapWorkflowEvaluatorResult = (
     outputs?: Record<string, unknown>;
     cost?: number;
     error?: string;
-    error_type?: string;
+    /**
+     * The engine's stable code for the failure (`NodeError.Type`).
+     *
+     * Named apart from the result's own `error_type` below, which is a
+     * free-text display label ("EvaluatorError") on `SingleEvaluationResult`.
+     * One identifier meaning both a stable code and a display string, twelve
+     * lines apart, is how a code ends up rendered as a label.
+     */
+    nodeErrorCode?: string;
     upstream_status?: number;
     trace_id?: string;
   },
@@ -497,9 +485,9 @@ export const mapWorkflowEvaluatorResult = (
   // target side (`mapTargetResult`): the client renders registry copy for the
   // code and keeps `details` for the raw-text popover. See
   // `nodeErrorToDomainError`.
-  const domainError = executionState.error_type
+  const domainError = executionState.nodeErrorCode
     ? nodeErrorToDomainError({
-        errorType: executionState.error_type,
+        errorType: executionState.nodeErrorCode,
         message: executionState.error,
         upstreamStatus: executionState.upstream_status,
         traceId: executionState.trace_id,

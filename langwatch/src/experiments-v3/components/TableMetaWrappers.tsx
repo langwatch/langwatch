@@ -3,6 +3,7 @@
  * These keep column definitions stable by avoiding closures over dynamic data.
  */
 import { Checkbox } from "@chakra-ui/react";
+import type { SerializedHandledError } from "@langwatch/handled-error";
 import type { HeaderContext } from "@tanstack/react-table";
 
 import type { TableMeta, TableRowData } from "../types";
@@ -120,6 +121,7 @@ export const TargetCellFromMeta = ({
         output: unknown;
         evaluators: Record<string, unknown>;
         error?: string | null;
+        domainError?: SerializedHandledError;
         isLoading?: boolean;
         traceId?: string | null;
         duration?: number | null;
@@ -161,6 +163,7 @@ export const TargetCellFromMeta = ({
       output={data?.output}
       evaluatorResults={data?.evaluators ?? {}}
       error={data?.error}
+      domainError={data?.domainError}
       isLoading={data?.isLoading}
       traceId={data?.traceId}
       duration={data?.duration}

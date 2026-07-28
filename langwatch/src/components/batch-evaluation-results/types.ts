@@ -5,8 +5,9 @@
  * and V3 evaluations (multiple targets, inline evaluators per target).
  */
 
-import type { ExperimentRunWithItems } from "~/server/experiments-v3/services/types";
+import type { SerializedHandledError } from "@langwatch/handled-error";
 import { resolveVerdictLabel } from "~/experiments-v3/utils/normalizeComparison";
+import type { ExperimentRunWithItems } from "~/server/experiments-v3/services/types";
 
 /**
  * Run data with color assignment for comparison mode
@@ -47,8 +48,18 @@ export type BatchTargetOutput = {
   cost: number | null;
   /** Duration in milliseconds */
   duration: number | null;
-  /** Error message if execution failed */
+  /**
+   * The engine's engineer-facing failure string. NOT customer copy — a cell
+   * renders it only when the row carries no `domainError` (rows written before
+   * the code was persisted).
+   */
   error: string | null;
+  /**
+   * The failure's stable code. What the customer reads comes from the
+   * presentation registry keyed on it, so a reload shows the same words the
+   * live run did (ADR-045).
+   */
+  domainError?: SerializedHandledError;
   /** Trace ID for viewing execution details */
   traceId: string | null;
   /** Evaluator results for this target on this row */
@@ -428,6 +439,7 @@ export const transformBatchEvaluationData = (
         cost: targetEntry?.cost ?? null,
         duration: targetEntry?.duration ?? null,
         error: targetEntry?.error ?? null,
+        domainError: targetEntry?.domainError,
         traceId: targetEntry?.traceId ?? null,
         evaluatorResults,
       };

@@ -120,7 +120,7 @@ export const usePostEvent = () => {
 
         showErrorToast({
           error,
-          fallbackTitle: "Couldn't reach the workflow engine",
+          fallbackTitle: "Couldn't run this workflow",
         });
 
         // Update evaluation state if relevant
@@ -130,7 +130,7 @@ export const usePostEvent = () => {
             run_id: undefined,
             error: describeError({
               error,
-              fallbackTitle: "Couldn't reach the workflow engine",
+              fallbackTitle: "Couldn't run this workflow",
             }),
             timestamps: { finished_at: Date.now() },
           });
@@ -141,7 +141,7 @@ export const usePostEvent = () => {
             status: "error",
             error: describeError({
               error,
-              fallbackTitle: "Couldn't reach the workflow engine",
+              fallbackTitle: "Couldn't run this workflow",
             }),
             timestamps: { finished_at: Date.now() },
           });
@@ -224,22 +224,31 @@ export const useHandleServerMessage = ({
    *
    * The words come from the state's `error_type` via the code-keyed registry
    * (ADR-045). A state with no code — or one whose code the registry has no
-   * copy for — falls back to its raw message. See
-   * `explainExecutionStateError`, which explains why saying "we've been
-   * notified" there would be untrue.
+   * copy for — degrades to the generic unknown state under the caller's own
+   * headline, plus the trace id as a copyable error id. The engine's raw
+   * message is not copy and does not appear here; it is in the node properties
+   * panel. See `explainExecutionStateError`.
    */
   const alertOnError = useCallback(
-    (failure: CodedExecutionFailure | undefined) => {
-      const explanation = explainExecutionStateError(failure);
+    ({
+      failure,
+      fallbackTitle,
+    }: {
+      failure: CodedExecutionFailure | undefined;
+      fallbackTitle?: string;
+    }) => {
+      const explanation = explainExecutionStateError({
+        state: failure,
+        fallbackTitle,
+      });
       const wasStopped = isDeliberateStop(failure);
 
       // Keyed by what the toast actually SAYS, so a repeating failure (the
       // engine down while the studio retries) updates one toast instead of
-      // stacking a wall of them — while two different failures stay two
-      // toasts. Keying on `error_type` alone collapsed every uncoded failure
-      // onto one id, so a second, different one would silently replace the
-      // first — and that includes a code the registry doesn't know, which
-      // presents from its raw message just like an uncoded one does.
+      // stacking a wall of them, and two failures that read identically —
+      // which every failure we could not name now does — are one toast rather
+      // than the same sentence twice. A code the registry knows keys on the
+      // code, so it never collapses onto an unrelated failure.
       const dedupeId = `studio-${wasStopped ? "stopped" : "error"}-${
         explanation.isRegistered
           ? failure?.error_type
@@ -269,6 +278,10 @@ export const useHandleServerMessage = ({
           type: "error",
           meta: {
             closable: true,
+            // The copyable error id. For a failure we could not name it is the
+            // only thing the customer can hand support — ADR-045's "generic
+            // unknown PLUS a trace id", both halves.
+            traceId: explanation.traceId,
           },
           duration: 5000,
         });
@@ -344,8 +357,15 @@ export const useHandleServerMessage = ({
               workflowStore.setSelectedNode(focusNodeId);
               workflowStore.setPropertiesExpanded(true);
             }
-            alertOnError(message.payload.execution_state);
-            stopWorkflowIfRunning(message.payload.execution_state.error);
+            alertOnError({
+              failure: message.payload.execution_state,
+              fallbackTitle: "This run didn't finish",
+            });
+            // The whole coded failure, not just its message: every node still
+            // running is about to be marked failed by the SAME failure, and
+            // handing them a bare string left them uncoded, so the properties
+            // panel fell back to raw engine text for a failure we could name.
+            stopWorkflowIfRunning(message.payload.execution_state);
           }
           break;
         case "evaluation_state_change":
@@ -364,7 +384,10 @@ export const useHandleServerMessage = ({
           const currentEvaluationState = getWorkflow().state.evaluation;
           setEvaluationState(evaluationState);
           if (evaluationState?.status === "error") {
-            alertOnError(evaluationState);
+            alertOnError({
+              failure: evaluationState,
+              fallbackTitle: "This run didn't finish",
+            });
             if (currentEvaluationState?.status !== "waiting") {
               setTimeout(() => {
                 setOpenResultsPanelRequest("evaluations");
@@ -377,7 +400,10 @@ export const useHandleServerMessage = ({
           const currentOptimizationState = getWorkflow().state.optimization;
           setOptimizationState(message.payload.optimization_state);
           if (message.payload.optimization_state?.status === "error") {
-            alertOnError(message.payload.optimization_state);
+            alertOnError({
+              failure: message.payload.optimization_state,
+              fallbackTitle: "This run didn't finish",
+            });
             if (currentOptimizationState?.status !== "waiting") {
               setTimeout(() => {
                 setOpenResultsPanelRequest("optimizations");
@@ -391,11 +417,16 @@ export const useHandleServerMessage = ({
             "error event received from server",
           );
           checkIfUnreachableErrorMessage(message.payload.message);
-          stopWorkflowIfRunning(message.payload.message);
+          stopWorkflowIfRunning({ error: message.payload.message });
           // The stream's `error` frame carries no code (see StudioServerEvent),
           // so this presents as the generic unknown state — the message rides
-          // along only so a deliberate stop still reads as "Stopped".
-          alertOnError({ error: message.payload.message });
+          // along only so a deliberate stop still reads as "Stopped", and so
+          // the "runtime is unreachable" check above can read it. It is never
+          // shown.
+          alertOnError({
+            failure: { error: message.payload.message },
+            fallbackTitle: "This run didn't finish",
+          });
           break;
         case "debug":
           break;

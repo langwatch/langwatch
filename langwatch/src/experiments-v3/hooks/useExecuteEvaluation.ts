@@ -1,17 +1,15 @@
+import type { SerializedHandledError } from "@langwatch/handled-error";
 import { useCallback, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { toaster } from "~/components/ui/toaster";
-import {
-  describeError,
-  explainSerializedError,
-  showErrorToast,
-} from "~/features/errors";
+import { describeError, showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { transposeColumnsFirstToRowsFirstWithId } from "~/optimization_studio/utils/datasetUtils";
-import type {
-  EvaluationV3Event,
-  ExecutionRequest,
-  ExecutionScope,
+import {
+  type EvaluationV3Event,
+  type ExecutionRequest,
+  type ExecutionScope,
+  UNNAMED_FAILURE,
 } from "~/server/experiments-v3/execution/types";
 import { fetchSSE } from "~/utils/sse/fetchSSE";
 import type { EvaluationResults } from "../types";
@@ -64,6 +62,21 @@ export type UseExecuteEvaluationReturn = {
   /** Reset state to idle */
   reset: () => void;
 };
+
+/**
+ * The SSE error frame, in the envelope the error layer already reads.
+ *
+ * `readHandledError` and `showErrorToast` take the tRPC shape — the handled
+ * payload under `data.error`, the trace id beside it under `data.traceId` —
+ * so presenting the frame's two fields under those names is all it takes to
+ * get registry copy for a coded failure and, for one we couldn't name, the
+ * generic unknown state PLUS the copyable error id (ADR-045). Without the
+ * trace id that second case tells the customer, and support, nothing at all.
+ */
+const asHandledEnvelope = (event: {
+  domainError?: SerializedHandledError;
+  traceId?: string;
+}) => ({ data: { error: event.domainError, traceId: event.traceId } });
 
 // ============================================================================
 // Hook
@@ -171,13 +184,29 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
 
   /**
    * Helper to update target error in the store.
+   *
+   * Stores the failure, not the sentence: the engine's raw string in `errors`
+   * and the failure's CODE beside it in `targetMetadata`. The cell derives its
+   * copy from the code at render time (`describeCellFailure`), so rewriting an
+   * error's copy changes what every past run says — where concatenating the
+   * rendered title and description into `errors` froze one release's words
+   * into the workbench's autosaved state, then re-parsed them with a regex.
    */
   const updateTargetError = useCallback(
-    (rowIndex: number, targetId: string, errorMsg: string) => {
+    (
+      rowIndex: number,
+      targetId: string,
+      errorMsg: string,
+      domainError?: SerializedHandledError,
+    ) => {
       useEvaluationsV3Store.setState((state) => {
         const existingErrors = state.results.errors[targetId] ?? [];
         const newErrors = [...existingErrors];
         newErrors[rowIndex] = errorMsg;
+
+        const existingMeta = state.results.targetMetadata[targetId] ?? [];
+        const newMeta = [...existingMeta];
+        newMeta[rowIndex] = { ...(newMeta[rowIndex] ?? {}), domainError };
 
         // NOTE: We do NOT remove the cell from executingCells here.
         // The cell stays in executingCells until execution cleanup happens.
@@ -189,6 +218,10 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
             errors: {
               ...state.results.errors,
               [targetId]: newErrors,
+            },
+            targetMetadata: {
+              ...state.results.targetMetadata,
+              [targetId]: newMeta,
             },
             // Keep executingCells unchanged
           },
@@ -269,19 +302,16 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
           break;
 
         case "target_result":
-          if (event.domainError) {
-            // The failure carries a code, so the customer reads the registry's
-            // copy — never the raw engine string (`httpblock: … no such host`).
-            const { title, description } = explainSerializedError(
-              event.domainError,
-            );
+          if (event.domainError ?? event.error) {
+            // The code and the engine's raw string, side by side. The cell
+            // shows the registry's copy for the code and keeps the raw string
+            // for whoever asks — never as the headline.
             updateTargetError(
               event.rowIndex,
               event.targetId,
-              description ? `${title}. ${description}` : title,
+              event.error ?? UNNAMED_FAILURE,
+              event.domainError,
             );
-          } else if (event.error) {
-            updateTargetError(event.rowIndex, event.targetId, event.error);
           } else {
             updateTargetOutput(event.rowIndex, event.targetId, event.output, {
               cost: event.cost,
@@ -312,18 +342,20 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
           break;
 
         case "error": {
-          // A coded frame reads from the registry; an uncoded one carries the
-          // engine's own diagnostic (missing column, evaluator crash), which
-          // the server already vetted as safe to show and which is the only
-          // thing that tells the user what to change.
-          const coded = event.domainError
-            ? explainSerializedError(event.domainError)
-            : null;
-          const detail = coded
-            ? coded.description
-              ? `${coded.title}. ${coded.description}`
-              : coded.title
-            : event.message;
+          // Every `error` frame is built by `mapThrownErrorEvent`: a handled
+          // failure carries its code on `domainError`, an unhandled one carries
+          // the unnamed-failure marker and a trace id, and neither carries the
+          // thrown error's own words. So the words here are the client's:
+          // registry copy for a code, our own fallback for a failure nobody
+          // could name.
+          const envelope = asHandledEnvelope(event);
+          const detail = describeError({
+            error: envelope,
+            fallbackTitle:
+              event.rowIndex === undefined
+                ? "The evaluation couldn't be completed"
+                : "This row couldn't be run",
+          });
 
           if (event.rowIndex !== undefined && event.targetId) {
             if (event.evaluatorId) {
@@ -343,20 +375,25 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
                 },
               );
             } else {
-              // Target error
-              updateTargetError(event.rowIndex, event.targetId, detail);
+              // Target error — the code, not the sentence it renders as.
+              updateTargetError(
+                event.rowIndex,
+                event.targetId,
+                event.message,
+                event.domainError,
+              );
             }
           } else {
             // Fatal error
             setError(detail);
             setResults({ status: "error" });
-            toaster.create({
-              title: coded?.title ?? "Couldn't finish the evaluation",
-              description: coded
-                ? coded.description || undefined
-                : event.message,
-              type: "error",
-              meta: { closable: true },
+            // Through `showErrorToast` so the trace id becomes the copyable
+            // error id in the toast. An unhandled failure tells the customer
+            // nothing else, and "Something went wrong" with no id to quote
+            // leaves support nothing to search on.
+            showErrorToast({
+              error: envelope,
+              fallbackTitle: "Couldn't finish the evaluation",
             });
           }
           break;

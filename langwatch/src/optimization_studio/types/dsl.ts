@@ -78,13 +78,12 @@ export interface ExecutionState {
    * The raw engineer-facing failure message — it can name a URL or a Go net
    * error, so it is never a headline.
    *
-   * Where the state carries an `error_type`, the studio presents from that
-   * code via the registry and this string stays in the debug panel and the
-   * logs (see ADR-045 and `utils/executionStateError`). Where it does NOT —
-   * a client-side timeout, the stream's top-level error frame, the
-   * optimization runner — this is the only thing anyone has, and showing it
-   * beats telling the user "we've been notified" about something nobody was
-   * notified of.
+   * The studio presents from `error_type` via the registry; this string stays
+   * in the node properties panel and the logs, where an engineer looks for it
+   * (see ADR-045 and `utils/executionStateError`). Where there is no code — a
+   * client-side timeout, the stream's top-level error frame, the optimization
+   * runner — the customer gets the generic unknown state plus the trace id,
+   * not this, because nothing has vetted what is in it.
    */
   error?: string;
   /**

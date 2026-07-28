@@ -12,8 +12,8 @@ import {
   mapThrownErrorEvent,
   mapWorkflowEvaluatorResult,
   parseNodeId,
-  toClientEvent,
 } from "../resultMapper";
+import { UNNAMED_FAILURE } from "../types";
 
 class DatasetColumnMissingError extends HandledError {
   constructor() {
@@ -977,22 +977,22 @@ describe("mapThrownErrorEvent", () => {
     const connectionRefused = () =>
       new Error("connect ECONNREFUSED 10.0.0.5:5432");
 
-    it("puts neither host nor port on the wire", () => {
-      const event = toClientEvent(
-        mapThrownErrorEvent({
-          error: connectionRefused(),
-          rowIndex: 0,
-          targetId: "target-1",
-        }),
-      );
+    it("puts neither host nor port anywhere on the event", () => {
+      const event = mapThrownErrorEvent({
+        error: connectionRefused(),
+        rowIndex: 0,
+        targetId: "target-1",
+      });
 
-      const wire = JSON.stringify(event);
-      expect(wire).not.toContain("10.0.0.5");
-      expect(wire).not.toContain("5432");
-      expect(wire).not.toContain("ECONNREFUSED");
+      // The whole event, not just the wire slice: this one is persisted into
+      // the run row too, and the row is read back into the customer's grid.
+      const serialised = JSON.stringify(event);
+      expect(serialised).not.toContain("10.0.0.5");
+      expect(serialised).not.toContain("5432");
+      expect(serialised).not.toContain("ECONNREFUSED");
     });
 
-    it("keeps the real message for the server's own record", () => {
+    it("carries a marker rather than words somebody has to write", () => {
       const event = mapThrownErrorEvent({
         error: connectionRefused(),
         rowIndex: 0,
@@ -1001,12 +1001,13 @@ describe("mapThrownErrorEvent", () => {
 
       expect(event.type).toBe("error");
       if (event.type !== "error") return;
-      expect(event.serverMessage).toBe("connect ECONNREFUSED 10.0.0.5:5432");
+      expect(event.message).toBe(UNNAMED_FAILURE);
+      expect(event.domainError).toBeUndefined();
     });
   });
 
   describe("given a failure that took the whole run", () => {
-    it("does not blame a single row", () => {
+    it("names no failure it could not name, wherever it happened", () => {
       const runLevel = mapThrownErrorEvent({ error: new Error("boom") });
       const cellLevel = mapThrownErrorEvent({
         error: new Error("boom"),
@@ -1017,17 +1018,12 @@ describe("mapThrownErrorEvent", () => {
       expect(runLevel.type).toBe("error");
       expect(cellLevel.type).toBe("error");
       if (runLevel.type !== "error" || cellLevel.type !== "error") return;
-      expect(runLevel.message).not.toBe(cellLevel.message);
-      expect(runLevel.message.toLowerCase()).not.toContain("row");
-    });
-  });
-});
-
-describe("toClientEvent", () => {
-  describe("when the event carries no server-only field", () => {
-    it("returns it untouched", () => {
-      const event = mapThrownErrorEvent({ error: "not an Error at all" });
-      expect(toClientEvent(event)).toBe(event);
+      // Scope is `rowIndex`, which the client reads; the message is a marker,
+      // and the words for each scope are the client's to choose.
+      expect(runLevel.message).toBe(UNNAMED_FAILURE);
+      expect(cellLevel.message).toBe(UNNAMED_FAILURE);
+      expect(runLevel.rowIndex).toBeUndefined();
+      expect(cellLevel.rowIndex).toBe(0);
     });
   });
 });

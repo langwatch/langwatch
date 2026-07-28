@@ -43,16 +43,27 @@ describe("nodeErrorToDomainError", () => {
     });
   });
 
-  describe("given an unregistered code forwarded from the code runner", () => {
+  describe("given a code neither list names", () => {
     /**
-     * `engine.go` forwards `res.Error.Type` straight through, so a Python
-     * exception class name arrives as the code. Blaming a provider for it
-     * sends the customer looking at our integrations for their own bug.
+     * Reachable whenever a client is older than the engine that minted the
+     * code. Unattributable is not the same as somebody else's fault, and
+     * guessing "provider" tells the operator there is nothing to look at.
      */
-    it("does not blame a provider", () => {
+    it("attributes it to the platform", () => {
+      expect(nodeErrorToDomainError({ errorType: "ValueError" }).fault).toBe(
+        "platform",
+      );
+    });
+
+    /**
+     * Go's `classifyNodeFault` has no provider entry for this one, and the two
+     * classifications drifting apart means the customer reads one story while
+     * the operator's log line tells another.
+     */
+    it("does not blame a provider for a failed attachment fetch", () => {
       expect(
-        nodeErrorToDomainError({ errorType: "ValueError" }).fault,
-      ).not.toBe("provider");
+        nodeErrorToDomainError({ errorType: "attachment_fetch_error" }).fault,
+      ).toBe("platform");
     });
   });
 

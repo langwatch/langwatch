@@ -4,6 +4,7 @@
  * canonical camelCase service types.
  */
 
+import type { SerializedHandledError } from "@langwatch/handled-error";
 import { parseClickHouseDateTimeMs } from "~/server/clickhouse/dateTime";
 import type { ESBatchEvaluationTarget } from "~/server/experiments/types";
 import type {
@@ -58,6 +59,8 @@ export interface ClickHouseExperimentRunItemRow {
   TargetCost: number | null;
   TargetDurationMs: number | null;
   TargetError: string | null;
+  /** Serialised handled error (JSON) — the coded half of `TargetError`. */
+  TargetDomainError: string | null;
   TraceId: string | null;
   EvaluatorId: string | null;
   EvaluatorName: string | null;
@@ -166,6 +169,27 @@ export function mapClickHouseRunToExperimentRun({
 }
 
 /**
+ * Reads the stored handled error back off a row.
+ *
+ * Anything unparseable is treated as absent rather than thrown on: a run's
+ * results are worth more than the one cell whose code we can't read, and the
+ * raw `error` string is still there to fall back on.
+ */
+function parseDomainError(
+  stored: string | null,
+): SerializedHandledError | undefined {
+  if (!stored) return undefined;
+  try {
+    const parsed: unknown = JSON.parse(stored);
+    return typeof parsed === "object" && parsed !== null
+      ? (parsed as SerializedHandledError)
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Maps ClickHouse `experiment_runs` and `experiment_run_items` rows
  * into the canonical `ExperimentRunWithItems` type.
  *
@@ -223,6 +247,9 @@ export function mapClickHouseItemsToRunWithItems({
         cost: item.TargetCost,
         duration: item.TargetDurationMs,
         error: item.TargetError,
+        // The code the customer's copy comes from. Rows written before the
+        // column existed have none, and read back on the raw string as before.
+        domainError: parseDomainError(item.TargetDomainError),
         traceId: item.TraceId,
       });
     } else if (item.ResultType === "evaluator") {

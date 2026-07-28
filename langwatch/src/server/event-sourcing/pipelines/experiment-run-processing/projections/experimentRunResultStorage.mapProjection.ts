@@ -25,6 +25,8 @@ export interface ClickHouseExperimentRunResultRecord {
   TargetCost: number | null;
   TargetDurationMs: number | null;
   TargetError: string | null;
+  /** Serialised handled error (JSON) — the coded half of `TargetError`. */
+  TargetDomainError: string | null;
   TraceId: string | null;
   EvaluatorId: string | null;
   EvaluatorName: string | null;
@@ -86,6 +88,9 @@ export class ExperimentRunResultStorageMapProjection
       TargetCost: event.data.cost ?? null,
       TargetDurationMs: normalizeDurationMs(event.data.duration),
       TargetError: event.data.error ?? null,
+      TargetDomainError: event.data.domainError
+        ? JSON.stringify(event.data.domainError)
+        : null,
       TraceId: event.data.traceId ?? null,
       EvaluatorId: null,
       EvaluatorName: null,
@@ -124,6 +129,7 @@ export class ExperimentRunResultStorageMapProjection
       TargetCost: null,
       TargetDurationMs: null,
       TargetError: null,
+      TargetDomainError: null,
       TraceId: null,
       EvaluatorId: event.data.evaluatorId,
       EvaluatorName: event.data.evaluatorName ?? null,

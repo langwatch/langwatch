@@ -34,9 +34,12 @@ export const useAlertOnComponent = () => {
 
       // The node's raw `error` names hosts, URLs and Go internals — it stays in
       // the properties panel and the logs. The customer reads the copy the
-      // registry holds for the node's code. See ADR-045.
-      const { title, description } =
-        explainExecutionStateError(execution_state);
+      // registry holds for the node's code, or, for a failure with no code,
+      // the generic unknown state under this headline. See ADR-045.
+      const { title, description, traceId } = explainExecutionStateError({
+        state: execution_state,
+        fallbackTitle: "That step didn't run",
+      });
 
       toaster.create({
         title,
@@ -64,6 +67,9 @@ export const useAlertOnComponent = () => {
         duration: 5000,
         meta: {
           closable: true,
+          // The copyable error id, which is all a customer gets of the
+          // technical detail when the failure carried no code.
+          traceId,
         },
       });
     },

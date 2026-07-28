@@ -59,11 +59,12 @@ import {
   type ResultMapperConfig,
 } from "./resultMapper";
 import { createSemaphore } from "./semaphore";
-import type {
-  EvaluationV3Event,
-  ExecutionCell,
-  ExecutionScope,
-  ExecutionSummary,
+import {
+  type EvaluationV3Event,
+  type ExecutionCell,
+  type ExecutionScope,
+  type ExecutionSummary,
+  UNNAMED_FAILURE,
 } from "./types";
 import { buildCellWorkflow } from "./workflowBuilder";
 
@@ -1361,9 +1362,18 @@ export async function* executeWorkflowCell(
     let totalCost = 0;
     let sawCost = false;
     let targetFailed = false;
-    let targetError: string | undefined;
-    let targetErrorType: string | undefined;
-    let targetUpstreamStatus: number | undefined;
+    /**
+     * The failing state, captured whole.
+     *
+     * One assignment, not three latches: message, code and upstream status
+     * describe ONE failure. Latching them independently (`ex.error ?? previous`
+     * and so on) let a state carrying only `error` be followed by one carrying
+     * only `error_type`, yielding a `domainError` whose code came from one node
+     * and whose message came from another.
+     */
+    let targetFailure:
+      | { error?: string; errorType?: string; upstreamStatus?: number }
+      | undefined;
     let durationMs: number | undefined;
     let finalTraceId = traceId;
     const evaluatorEvents: EvaluationV3Event[] = [];
@@ -1383,9 +1393,11 @@ export async function* executeWorkflowCell(
         }
         if (ex?.status === "error") {
           targetFailed = true;
-          targetError = ex.error ?? targetError;
-          targetErrorType = ex.error_type ?? targetErrorType;
-          targetUpstreamStatus = ex.upstream_status ?? targetUpstreamStatus;
+          targetFailure = {
+            error: ex.error,
+            errorType: ex.error_type,
+            upstreamStatus: ex.upstream_status,
+          };
         }
         continue;
       }
@@ -1428,7 +1440,7 @@ export async function* executeWorkflowCell(
               error: execution_state.error,
               // The coded half of the failure — without it the evaluator cell
               // renders the engine's raw message verbatim.
-              error_type: execution_state.error_type,
+              nodeErrorCode: execution_state.error_type,
               upstream_status: execution_state.upstream_status,
               trace_id: execution_state.trace_id ?? finalTraceId,
             },
@@ -1446,15 +1458,18 @@ export async function* executeWorkflowCell(
       cost: sawCost ? totalCost : undefined,
       duration: durationMs,
       traceId: finalTraceId,
+      // The engine's own words when it gave any; otherwise the marker, so the
+      // client's fallback copy owns what the customer reads rather than a
+      // sentence written here.
       error: targetFailed
-        ? (targetError ?? "Workflow execution failed")
+        ? (targetFailure?.error ?? UNNAMED_FAILURE)
         : undefined,
-      ...(targetFailed && targetErrorType
+      ...(targetFailed && targetFailure?.errorType
         ? {
             domainError: nodeErrorToDomainError({
-              errorType: targetErrorType,
-              message: targetError,
-              upstreamStatus: targetUpstreamStatus,
+              errorType: targetFailure.errorType,
+              message: targetFailure.error,
+              upstreamStatus: targetFailure.upstreamStatus,
               traceId: finalTraceId,
             }),
           }
@@ -1730,12 +1745,15 @@ export const buildTargetMetadata = ({
  * `{ output: value }` (only null/undefined become a null `predicted`), and
  * error events must land as predicted-null rows carrying the error message.
  *
- * The stored message is the failure's OWN (`serverMessage`), not the wire
- * line. This row is the run history that support and the customer's own run
- * views read back; recording "This row couldn't be run" for a Prisma failure,
- * an OOM and a bad mapping alike leaves nothing to read back. ADR-045 is about
- * what the customer is shown live, not about erasing our own record — and
- * `toClientEvent` is what keeps the two apart.
+ * The row stores the failure's CODE (`domainError`) as well as its string.
+ * This row is what the grid renders after a reload, so a row holding only the
+ * engine's raw text (`httpblock: Post "…": no such host`) meant the customer
+ * read registry copy live and raw Go on refresh — the leak this event's
+ * `domainError` closes only for as long as the tab stays open.
+ *
+ * A thrown failure's own message is NOT stored. Nothing about it is
+ * customer-safe, and this column is customer-visible; it belongs on the log
+ * line at the catch site, next to the trace id this row also carries.
  */
 export const buildTargetResultDispatch = ({
   tenantId,
@@ -1767,6 +1785,7 @@ export const buildTargetResultDispatch = ({
       cost: event.cost ?? null,
       duration: event.duration ?? null,
       error: event.error ?? null,
+      domainError: event.domainError ?? null,
       traceId: event.traceId ?? null,
       occurredAt,
     };
@@ -1787,7 +1806,11 @@ export const buildTargetResultDispatch = ({
       predicted: null,
       cost: null,
       duration: null,
-      error: event.serverMessage ?? event.message,
+      // The wire message: a handled failure's code, or the unnamed-failure
+      // marker. Both are safe to read back; the thrown error's own words are
+      // not, and are logged instead.
+      error: event.message,
+      domainError: event.domainError ?? null,
       traceId: event.traceId ?? null,
       occurredAt,
     };

@@ -1331,8 +1331,11 @@ export function EvaluationsV3Table({
                 results,
                 index,
               ),
-              // Error for this target/row
+              // Error for this target/row: the engine's raw string, plus the
+              // code the cell reads its customer-facing copy from.
               error: results.errors[target.id]?.[index] ?? null,
+              domainError:
+                results.targetMetadata?.[target.id]?.[index]?.domainError,
               // Loading if this specific cell is in the executing set AND has no output/error yet
               // Once target output or error arrives, show it instead of skeleton
               isLoading:

@@ -266,62 +266,75 @@ describe("alertOnError", () => {
   });
 
   describe("given an uncoded failure", () => {
-    it("shows the message we do have rather than claiming we were notified", () => {
+    /**
+     * ADR-045 §3: an unhandled failure's raw detail is logged with the trace
+     * id, never presented. The engine's message is arbitrary text — it can
+     * name a URL, a temp path or a Go net error — so the toast says what we
+     * were doing and nothing we cannot vouch for. The message is still in the
+     * node properties panel for whoever is debugging.
+     */
+    it("names the action instead of quoting the engine", () => {
       const toast = handleErroredExecution({
         error: "Timeout",
       });
 
       expect(toast?.type).toBe("error");
-      expect(toast?.description).toBe("Timeout");
+      expect(toast?.title).toBe("This run didn't finish");
+      expect(toast?.description ?? "").not.toContain("Timeout");
     });
 
-    it("caps a wall of Go so it cannot fill the toast", () => {
+    it("keeps a wall of Go out of the toast entirely", () => {
       const wall = "goroutine stack ".repeat(40);
       const toast = handleErroredExecution({ error: wall });
 
-      expect(toast?.description).toBeDefined();
-      expect(toast!.description!.length).toBeLessThan(wall.length);
-      expect(toast!.description!.length).toBeLessThanOrEqual(160);
+      expect(toast?.description ?? "").not.toContain("goroutine");
+      expect(toast?.title).not.toContain("goroutine");
+    });
+
+    /**
+     * "We've been notified" has to be true when we say it. A failure with no
+     * trace id has no log line behind it — the studio's own client-side
+     * timeout, for one — so the toast makes no promise nobody kept.
+     */
+    it("only claims we were notified when there is a trace to be notified by", () => {
+      const untraced = handleErroredExecution({ error: "Timeout" });
+      expect(untraced?.description ?? "").toBe("");
+
+      const traced = handleErroredExecution({
+        error: "Timeout",
+        trace_id: "4bf92f3577b34da6a3ce929d0e0e4736",
+      });
+      expect(traced?.description ?? "").toContain("notified");
     });
   });
 
-  describe("when two different uncoded failures arrive", () => {
+  describe("when two uncoded failures arrive", () => {
     /**
-     * The dedupe id is keyed on what the toast SAYS. Keying it on
-     * `error_type` alone collapsed every uncoded failure onto one id, so the
-     * second one silently replaced the first instead of stacking beside it.
+     * The dedupe id is keyed on what the toast SAYS, and two failures we could
+     * not name say the same thing — so they are one toast, not two identical
+     * ones stacked. A failure the registry HAS copy for still keys on its own
+     * code, so it never collapses onto an unrelated one.
      */
-    it("gives them two toast ids", () => {
+    it("shows one toast, not two identical ones", () => {
       handleErroredExecution({ error: "Timeout" });
       const first = lastToast()?.id;
       handleErroredExecution({ error: "Connection reset" });
       const second = lastToast()?.id;
 
       expect(first).toBeDefined();
-      expect(second).toBeDefined();
-      expect(first).not.toBe(second);
+      expect(first).toBe(second);
     });
-  });
 
-  describe("when two failures share a code the registry has no copy for", () => {
-    /**
-     * `engine.go` forwards the code runner's own error type, so two unrelated
-     * Python failures can arrive under the same unregistered code. They
-     * present from their raw messages, so they must not share a toast id.
-     */
-    it("gives them two toast ids", () => {
+    it("keeps a named failure on its own toast", () => {
+      handleErroredExecution({ error: "Timeout" });
+      const unnamed = lastToast()?.id;
       handleErroredExecution({
-        error_type: "ValueError",
-        error: "invalid literal for int() with base 10: 'abc'",
+        error_type: "invalid_dataset",
+        error: "dataset: column missing",
       });
-      const first = lastToast()?.id;
-      handleErroredExecution({
-        error_type: "ValueError",
-        error: "could not convert string to float: 'x'",
-      });
-      const second = lastToast()?.id;
+      const named = lastToast()?.id;
 
-      expect(first).not.toBe(second);
+      expect(named).not.toBe(unnamed);
     });
   });
 

@@ -86,13 +86,21 @@ const CUSTOMER_FAULT_CODES = new Set([
   "evaluator_missing_slug",
 ]);
 
-/** Node codes owned by a third party we called out to. */
+/**
+ * Node codes owned by a third party we called out to.
+ *
+ * Exactly Go's list (`classifyNodeFault`). `attachment_fetch_error` used to be
+ * here and is not in Go's, which meant one failure told the customer a third
+ * party had let them down while logging a platform incident for the operator —
+ * the two stories this file exists to keep identical. Without a status to go
+ * on, a failed attachment fetch is not attributable, and unattributable is
+ * `platform` by the rule below.
+ */
 const PROVIDER_FAULT_CODES = new Set([
   "llm_error",
   "evaluator_error",
   "agent_workflow_error",
   "custom_workflow_error",
-  "attachment_fetch_error",
 ]);
 
 /**
@@ -103,22 +111,25 @@ const PROVIDER_FAULT_CODES = new Set([
  * when present, then the code decides, then a default. The two drifting apart
  * means the customer reads one story while the operator reads another.
  *
- * The code sets here are a superset of Go's — the node-configuration codes
- * (`agent_missing_type`, `llm_model_not_set`, `evaluator_missing_slug`, …) are
- * plainly the customer's and Go's list has not caught up with them. Anything
- * neither list names lands on the default.
+ * The customer set here is a deliberate superset of Go's, and only there. The
+ * additions are the node-CONFIGURATION codes — `invalid_condition`,
+ * `llm_model_not_set`, `jsonpath_no_match`, `agent_missing_type`,
+ * `agent_unknown_type`, `agent_missing_workflow_id`,
+ * `custom_missing_workflow_id`, `evaluator_missing_slug` — each of which names
+ * a field the customer filled in wrong, and none of which Go's list has caught
+ * up with. The provider set matches Go's exactly, because "a third party let
+ * you down" is a claim, not a default. Anything neither list names lands on
+ * the default below.
  *
  * This used to be hard-coded to `"provider"` under a comment claiming the
- * fallback was unreachable because the registry covers every node code. It is
- * not: `engine.go` forwards the code runner's own error type through
- * (`&NodeError{Type: res.Error.Type}`), so a Python `ValueError` in a code
- * node arrives as the code `ValueError` — unregistered, and squarely the
- * customer's. Telling them "a connected service didn't respond" sends them
- * looking at our integrations for a bug in their own function.
- *
- * An unrecognised code defaults to `platform`, matching the engine: when we
- * genuinely do not know, saying it is on us is the honest answer and the one
- * that gets somebody looking.
+ * fallback was unreachable because the registry covers every node code. The
+ * fallback IS reachable — a browser tab open across a deploy holds a client
+ * older than the engine that minted the code — and `platform` is the honest
+ * answer there, matching Go: an unrecognised code is by definition one we
+ * cannot attribute, and the failure we cannot attribute is the one that most
+ * needs somebody looking at it. Blaming a provider by default did the
+ * opposite: it sent the customer to check our integrations and told the
+ * operator there was nothing to investigate.
  */
 function nodeErrorFault({
   errorType,

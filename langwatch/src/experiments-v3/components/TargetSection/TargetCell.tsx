@@ -7,6 +7,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import type { SerializedHandledError } from "@langwatch/handled-error";
 import {
   useCallback,
   useEffect,
@@ -24,6 +25,7 @@ import {
   LuSquare,
 } from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
+import { describeCellFailure } from "~/experiments-v3/utils/cellFailure";
 import { TraceIdPeek } from "~/features/traces-v2/components/TraceIdPeek";
 import { useDrawer } from "~/hooks/useDrawer";
 import { parseLLMError } from "~/utils/formatLLMError";
@@ -49,8 +51,17 @@ type TargetCellContentProps = {
   output: unknown;
   evaluatorResults: Record<string, unknown>;
   row: number;
-  /** Error message for this cell (from results.errors) */
+  /**
+   * The engine's raw failure string for this cell (from `results.errors`).
+   * Not copy — see `domainError`, which is what the customer actually reads.
+   */
   error?: string | null;
+  /**
+   * The failure's stable code (from `results.targetMetadata`). The cell renders
+   * the presentation registry's copy for it, so the words stay the same live
+   * and after a reload, and stay re-derivable when they are rewritten.
+   */
+  domainError?: SerializedHandledError;
   /** Whether this cell is currently being executed */
   isLoading?: boolean;
   /** Trace ID for this execution (if available) */
@@ -77,6 +88,7 @@ export function TargetCellContent({
   output,
   evaluatorResults,
   error,
+  domainError,
   isLoading,
   traceId,
   duration,
@@ -125,8 +137,12 @@ export function TargetCellContent({
     }
   }, [output]);
 
+  // What this cell says when it failed: registry copy for the code, the raw
+  // engine string only when there is no code to read it from.
+  const failure = describeCellFailure({ error, domainError });
+
   // Check if error is likely to overflow 2 lines (~100 chars is a rough heuristic)
-  const isErrorOverflowing = (error?.length ?? 0) > 100;
+  const isErrorOverflowing = (failure?.title.length ?? 0) > 100;
 
   // Handler to open trace drawer (also closes expanded view)
   const handleViewTrace = useCallback(() => {
@@ -193,8 +209,9 @@ export function TargetCellContent({
       );
     }
 
-    // Error state - show error message
-    if (error) {
+    // Error state - the registry's copy for the code, never the raw string
+    if (failure) {
+      const isOpen = expanded || isErrorExpanded;
       return (
         <Box position="relative">
           <HStack
@@ -216,14 +233,35 @@ export function TargetCellContent({
             <Box flexShrink={0} paddingTop={0.5}>
               <LuCircleAlert size={16} />
             </Box>
-            <Text
-              lineClamp={expanded || isErrorExpanded ? undefined : 2}
-              userSelect="text"
-              whiteSpace="pre-wrap"
-              wordBreak="break-word"
-            >
-              {parseLLMError(error).message}
-            </Text>
+            <VStack align="start" gap={0.5}>
+              <Text
+                lineClamp={isOpen ? undefined : 2}
+                userSelect="text"
+                whiteSpace="pre-wrap"
+                wordBreak="break-word"
+              >
+                {parseLLMError(failure.title).message}
+              </Text>
+              {failure.description && (
+                <Text fontSize="12px" color="fg.muted" userSelect="text">
+                  {failure.description}
+                </Text>
+              )}
+              {/* The engine's own words, for the person debugging the target
+                  they built — on request (the expanded cell), never as the
+                  headline. See ADR-045. */}
+              {isOpen && failure.raw && failure.raw !== failure.title && (
+                <Text
+                  fontSize="12px"
+                  opacity={0.7}
+                  userSelect="text"
+                  whiteSpace="pre-wrap"
+                  wordBreak="break-word"
+                >
+                  {parseLLMError(failure.raw).message}
+                </Text>
+              )}
+            </VStack>
           </HStack>
         </Box>
       );

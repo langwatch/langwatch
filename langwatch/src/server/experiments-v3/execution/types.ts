@@ -206,6 +206,20 @@ export type EvaluationV3EvaluatorResult = SingleEvaluationResult & {
 };
 
 /**
+ * The `message` an error frame carries when the failure has no code.
+ *
+ * A marker, deliberately not a sentence. An unhandled failure has nothing safe
+ * to say — its own message can carry a hostname, a Prisma string or a Go net
+ * error — and the generic line that replaced it was still SERVER-authored copy,
+ * which then got persisted and painted into a cell on read-back. The words for
+ * an unnamed failure belong in the client's presentation registry with every
+ * other error's words (ADR-045); this only says "there were none".
+ *
+ * The failure's own words go to the log line, beside the trace id.
+ */
+export const UNNAMED_FAILURE = "lw.unnamed_failure";
+
+/**
  * All SSE events emitted during evaluation execution.
  */
 export type EvaluationV3Event =
@@ -248,22 +262,14 @@ export type EvaluationV3Event =
       type: "error";
       /**
        * Wire message. For a coded failure this is the code itself (#5984); for
-       * an unhandled one it is a fixed generic line — never a thrown error's
-       * own `message`, which is server copy naming internal services.
+       * an unhandled one it is {@link UNNAMED_FAILURE} — a marker, not copy.
+       *
+       * Never a thrown error's own `message`: that is server prose naming
+       * internal services, and it is not the app's UI copy either. The words a
+       * customer reads are written in the client's presentation registry,
+       * keyed by code.
        */
       message: string;
-      /**
-       * The failure's own words, for OUR record — the run row in ClickHouse and
-       * the log line beside it. ADR-045 stops the CUSTOMER reading internals;
-       * it does not ask us to blank our own history, which is what persisting
-       * the generic wire line did (a Prisma failure, an OOM and a bad mapping
-       * all stored as the same eleven words).
-       *
-       * Server-only: `toClientEvent` strips it before the SSE writer, so it
-       * never reaches a browser. Everything that serialises an event for a
-       * client goes through that function.
-       */
-      serverMessage?: string;
       /**
        * The coded failure, when we knew what went wrong. The client presents
        * from this via the registry, exactly as it does for `target_result`.
