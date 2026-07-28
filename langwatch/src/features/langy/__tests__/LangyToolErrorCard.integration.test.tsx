@@ -242,6 +242,42 @@ describe("Langy tool failure card", () => {
     expect([...transcript.children][0]?.contains(alert)).toBe(true);
   });
 
+  // A step that WORKED must never be reported as broken. The failure markers
+  // used to be matched anywhere in the payload, so a successful `bash` whose
+  // stdout merely quoted one — a grep for the phrase, a tailed log, a test
+  // summary — drew a red card AND vanished from the completed receipt.
+  describe("given a command that succeeded while printing a failure phrase", () => {
+    const grepForThePhrase = {
+      id: "assistant-grep",
+      role: "assistant",
+      parts: [
+        {
+          type: "tool-bash",
+          toolCallId: "call-grep",
+          state: "output-available",
+          input: { command: 'grep -rn "failed to" src/' },
+          output:
+            'src/server/queue.ts:44:    throw new Error("failed to connect");',
+        },
+      ],
+    } as UIMessage;
+
+    it("renders no error card for it", () => {
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <LangyToolActivity message={grepForThePhrase} />
+        </ChakraProvider>,
+      );
+
+      expect(screen.queryByRole("alert")).toBeNull();
+    });
+
+    it("keeps it in the completed receipt", () => {
+      expect(toFailedToolCalls(grepForThePhrase)).toHaveLength(0);
+      expect(toActivityGroups(grepForThePhrase)).toHaveLength(1);
+    });
+  });
+
   it("collapses a mis-associated trace-search payload into a receipt", () => {
     const value = {
       id: "assistant-2",

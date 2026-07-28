@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   canAutoRecover,
   isMutatingLangyTool,
@@ -190,24 +190,33 @@ export function useLangyTurnRecovery({
       sideEffectsObserved,
     });
 
-  if (!pending) {
+  // MEMOISED, and that is load-bearing rather than tidiness. The panel threads
+  // this object straight into `useCallback` deps (the choices card's
+  // `onChoiceSelect`), so a fresh object literal per render minted a fresh
+  // callback per render, which is a changed prop on every `memo(MessageContent)`
+  // in the column — a streaming turn then re-rendered every message in the
+  // conversation on every token. The identity has to be as stable as the state
+  // behind it.
+  return useMemo(() => {
+    if (!pending) {
+      return {
+        isRecovering: false,
+        willAutoRecover,
+        message: null,
+        attempt: 0,
+        attempts: errorKind ? langyRecoveryPolicy(errorKind).attempts : 0,
+        reset,
+      };
+    }
+
+    const policy = langyRecoveryPolicy(pending.kind);
     return {
-      isRecovering: false,
+      isRecovering: true,
       willAutoRecover,
-      message: null,
-      attempt: 0,
-      attempts: errorKind ? langyRecoveryPolicy(errorKind).attempts : 0,
+      message: policy.recoveringMessage,
+      attempt: pending.attempt,
+      attempts: policy.attempts,
       reset,
     };
-  }
-
-  const policy = langyRecoveryPolicy(pending.kind);
-  return {
-    isRecovering: true,
-    willAutoRecover,
-    message: policy.recoveringMessage,
-    attempt: pending.attempt,
-    attempts: policy.attempts,
-    reset,
-  };
+  }, [pending, willAutoRecover, errorKind, reset]);
 }

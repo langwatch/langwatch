@@ -1047,7 +1047,7 @@ describe("when the project holding Langy's versioned prompts is configured", () 
     delete process.env[PROJECT_ENV];
   });
 
-  /** @scenario A promoted prompt row is what the turn actually runs on */
+  /** @scenario "A production-tagged registry version is used when present" */
   it("sends the promoted registry text as the system override", async () => {
     process.env[PROJECT_ENV] = "project-system";
     const getPromptByIdOrHandle = vi.fn(async () => ({
@@ -1065,7 +1065,7 @@ describe("when the project holding Langy's versioned prompts is configured", () 
     expect(systemOf(mocks.dispatch)).toContain("REGISTRY OVERRIDE TEXT");
   });
 
-  /** @scenario A registry that cannot answer never blocks a turn */
+  /** @scenario "A registry read failure falls back to the in-repo copy" */
   it("falls back to the in-repo text when the registry read throws", async () => {
     process.env[PROJECT_ENV] = "project-system";
     const { deps, mocks } = makeDeps({
@@ -1084,7 +1084,7 @@ describe("when the project holding Langy's versioned prompts is configured", () 
 });
 
 describe("when no prompt project is configured", () => {
-  /** @scenario An install that opted into nothing pays nothing */
+  /** @scenario "A turn runs from the in-repo copy when no registry row exists" */
   it("never consults the registry", async () => {
     delete process.env.LANGY_PROMPT_PROJECT_ID;
     const getPromptByIdOrHandle = vi.fn();

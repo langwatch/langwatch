@@ -214,6 +214,37 @@ describe("useLangyTurnRecovery", () => {
     });
   });
 
+  describe("when nothing about the failure changed", () => {
+    // The panel threads this object into `useCallback` deps — `onChoiceSelect`,
+    // which goes to every memo(MessageContent) in the column. A fresh object
+    // literal per render made that callback fresh per render, so memo bought
+    // nothing and a streaming turn re-ran every message's tool-part scan on
+    // every token.
+    it("hands back the same object, so callbacks built on it stay stable", () => {
+      const errorId = { id: 1 };
+      const { result, rerender } = setup({ errorId });
+      const first = result.current;
+
+      rerender({ errorKind: RESTARTING, errorId, sideEffectsObserved: false });
+      rerender({ errorKind: RESTARTING, errorId, sideEffectsObserved: false });
+
+      expect(result.current).toBe(first);
+    });
+
+    it("hands back a new one when the recovery state actually moves", () => {
+      const { result } = setup({});
+      const recovering = result.current;
+      expect(recovering.isRecovering).toBe(true);
+
+      act(() => {
+        vi.advanceTimersByTime(langyRecoveryPolicy(RESTARTING).delayMs(1));
+      });
+
+      expect(result.current).not.toBe(recovering);
+      expect(result.current.isRecovering).toBe(false);
+    });
+  });
+
   describe("when the panel unmounts with a retry pending", () => {
     it("does not fire the retry", () => {
       const { unmount, onRetry } = setup({});
