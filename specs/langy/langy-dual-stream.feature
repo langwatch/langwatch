@@ -223,6 +223,32 @@ Feature: Langy dual-stream — a raw token fast-path beside the durable event-so
     Then the relay re-reads the token instead of reusing the cached miss
     And the later frame is authenticated and applied
 
+  # The other half of the same contract, from the SIGNING side. The turn service
+  # used to collapse a failed or absent runToken read to "", which is an empty
+  # HMAC key: publicly computable, and rejected by the relay as no-run-token. The
+  # turn then ran to completion, emitted nothing, and never reached a terminal
+  # state — a silent hang with no error surfaced to the user.
+  @unit
+  Scenario: A turn that cannot be signed is refused instead of hanging
+    Given the conversation's runToken cannot be read because the store is unavailable
+    When the user sends a message
+    Then the turn is refused with an agent-unavailable error
+    And no worker is dispatched
+
+  @unit
+  Scenario: A conversation carrying no runToken cannot start an unsignable turn
+    Given the conversation has no runToken recorded
+    When the user sends a message
+    Then the turn is refused with an agent-unavailable error
+    And no worker is dispatched
+
+  @unit
+  Scenario: The worker is never handed an empty signing key
+    Given the conversation's runToken resolves to an empty value
+    When the user sends a message
+    Then the turn is refused before dispatch
+    And the worker never receives an empty signing key
+
   # The durable token buffer used to hold tokens until ~64 words accumulated,
   # so short answers rendered nothing until the turn was nearly over.
   @unit
