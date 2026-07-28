@@ -160,7 +160,6 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
     const built = buildPrisma();
     prisma = built.prisma;
     mockTx = built.mockTx;
-    txState = built.txState;
     service = ApiKeyService.create(prisma);
     mockCheckPermission.mockResolvedValue(true);
   });

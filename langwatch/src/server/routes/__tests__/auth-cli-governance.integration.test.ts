@@ -489,7 +489,6 @@ describe("GET /api/auth/cli/governance/*", () => {
         sourceType: "codex",
         createdByDeviceLabel: null,
       });
-      ingestionKeyLookupId = result.token.split("_")[0]?.replace("ik-lw-", "");
 
       // Mint a second key then revoke it immediately — it must not appear
       const revokedResult = await service.ensureForPersonalProject({
@@ -498,9 +497,6 @@ describe("GET /api/auth/cli/governance/*", () => {
         sourceType: "claude_code",
         createdByDeviceLabel: null,
       });
-      revokedKeyLookupId = revokedResult.token
-        .split("_")[0]
-        ?.replace("ik-lw-", "");
       // Revoke by setting revokedAt directly to avoid needing full admin context
       await prisma.apiKey.updateMany({
         where: {
