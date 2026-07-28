@@ -129,7 +129,7 @@ export interface SimulationRunStateData {
   BatchRunId: string;
   ScenarioSetId: string;
   /**
-   * How many runs the dispatching batch intended to queue (ADR-061). Every
+   * How many runs the dispatching batch intended to queue (ADR-072). Every
    * child of a batch carries the same value, so the batch's denominator is
    * available from whichever row lands first rather than from a separate
    * suite-run record. 0 means unknown — runs queued before this field existed,

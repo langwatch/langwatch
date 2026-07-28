@@ -1,10 +1,10 @@
-# ADR-061: Run aggregates are queries, not pipelines
+# ADR-072: Run aggregates are queries, not pipelines
 
 **Date:** 2026-07-22
 
 **Status:** Accepted
 
-**Related:** ADR-062 (run execution on the process-manager substrate — supplies
+**Related:** ADR-073 (run execution on the process-manager substrate — supplies
 the liveness guarantee this ADR's derived status depends on), ADR-034
 (event-sourced analytics materialization), ADR-052 (the reactor/process-manager
 split this ADR applies to run aggregates).
@@ -94,11 +94,11 @@ A batch is finished when none of its simulation runs is still in flight, and
 failed when any of them failed. Nothing compares a progress count against an
 expected total, which is what removes the hang.
 
-It is also why this ADR depends on ADR-062: a derived status only terminates
+It is also why this ADR depends on ADR-073: a derived status only terminates
 if every simulation run reaches a terminal state, which is exactly the
-guarantee the execution process manager provides. Until ADR-062 lands, a run
+guarantee the execution process manager provides. Until ADR-073 lands, a run
 abandoned at `QUEUED` keeps its batch in flight — the same symptom as today,
-from a cause ADR-062 removes at the source rather than one no sweep can
+from a cause ADR-073 removes at the source rather than one no sweep can
 repair.
 
 ### The denominator is carried by the children
@@ -237,7 +237,7 @@ that does serve users already reads the source those rows were derived from.
   Giving the key real force — by deriving run ids from
   `(idempotencyKey, scenarioId, targetId, repeat)` so the fan-out re-dispatches
   identical `queueRun` commands and the event log collapses them — is a
-  separate change, and belongs with ADR-062's dispatch identity rather than
+  separate change, and belongs with ADR-073's dispatch identity rather than
   here.
 - The `suite_runs` retention and TTL entries stay until the drop migration, so
   existing rows keep ageing out of a table nothing writes.
@@ -265,5 +265,5 @@ that does serve users already reads the source those rows were derived from.
 
 - [`specs/suites/suite-run-aggregates.feature`](../../../specs/suites/suite-run-aggregates.feature)
 - [`specs/experiments-v3/experiment-run-aggregates.feature`](../../../specs/experiments-v3/experiment-run-aggregates.feature)
-- ADR-062 (run execution on the process-manager substrate)
+- ADR-073 (run execution on the process-manager substrate)
 - [`dev/docs/best_practices/clickhouse-queries.md`](../best_practices/clickhouse-queries.md)

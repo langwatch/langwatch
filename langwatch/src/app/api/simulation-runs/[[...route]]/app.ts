@@ -51,7 +51,7 @@ const batchSummarySchema = z.object({
   batchRunId: z.string(),
   totalCount: z.number(),
   /** How many runs the batch set out to queue; exceeds totalCount when part
-   *  of the fan-out never reached the queue (ADR-061). */
+   *  of the fan-out never reached the queue (ADR-072). */
   expectedCount: z.number(),
   passCount: z.number(),
   failCount: z.number(),

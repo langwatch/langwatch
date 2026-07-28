@@ -124,7 +124,7 @@ export class SuiteRunService {
             langwatch: { targetReferenceId: item.target.referenceId },
           },
           target: { type: item.target.type, referenceId: item.target.referenceId },
-          // The batch denominator travels with every child (ADR-061), so the
+          // The batch denominator travels with every child (ADR-072), so the
           // suite's progress is readable from the first row that lands.
           batchTotal: total,
           occurredAt: now,

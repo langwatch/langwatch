@@ -120,7 +120,7 @@ export class ExperimentRunStateFoldProjection
    * Cost is deliberately absent. It used to be a running sum fed partly by a
    * per-trace map that was never persisted, which made the fold diverge on a
    * cache miss and again on replay. It is now summed from
-   * `experiment_run_items` at read time — see ADR-061.
+   * `experiment_run_items` at read time — see ADR-072.
    */
   readonly options = { refoldOnOutOfOrder: false } as const;
 

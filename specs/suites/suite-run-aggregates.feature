@@ -2,7 +2,7 @@ Feature: Suite run progress is derived from its simulation runs
   A suite run is a group of simulation runs sharing a batch. Its progress and
   outcome are computed from those runs when they are read, not accumulated
   into a separate record, so a lost or repeated update cannot change what the
-  user sees. (ADR-061; run liveness per ADR-062.)
+  user sees. (ADR-072; run liveness per ADR-073.)
 
   Background:
     Given a suite with scenarios and targets

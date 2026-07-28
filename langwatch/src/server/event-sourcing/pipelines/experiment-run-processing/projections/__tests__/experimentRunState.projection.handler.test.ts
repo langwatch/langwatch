@@ -279,7 +279,7 @@ describe("experimentRunStateFoldProjection", () => {
   describe("when results carry costs", () => {
     // The fold holds no cost at all. Cost is summed from experiment_run_items
     // at read time, and an item that reports none is priced from its trace —
-    // see ADR-061 and ExperimentRunService.enrichItemsWithTraceCosts. The
+    // see ADR-072 and ExperimentRunService.enrichItemsWithTraceCosts. The
     // deleted fold added a trace's cost *on top of* its target's inline cost,
     // which double-counted a traced target; the read path treats them as
     // alternatives.

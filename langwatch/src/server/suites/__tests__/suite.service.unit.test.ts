@@ -677,13 +677,13 @@ describe("SuiteService", () => {
       describe("when the same suite run is triggered twice", () => {
         // The key is accepted by the public API but has never made a repeated
         // submit idempotent: every call mints fresh scenarioRunIds, so both
-        // submits queue a full set of runs. Before ADR-061 it deduplicated the
+        // submits queue a full set of runs. Before ADR-072 it deduplicated the
         // `suite_run.started` event, which no read path consulted — so a
         // double submit produced one suite-run record claiming N items
         // alongside 2N actual simulation runs. This pins the behaviour that
         // is actually observable, so that giving the key real force (by
         // deriving run ids from it) is a visible change rather than a silent
-        // one. See ADR-061 "Consequences".
+        // one. See ADR-072 "Consequences".
         it("queues a full set of runs each time", async () => {
           const { service, suiteRunService } = createService();
           const suite = makeSuite();

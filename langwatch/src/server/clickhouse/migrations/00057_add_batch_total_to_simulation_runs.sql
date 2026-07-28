@@ -1,7 +1,7 @@
 -- +goose Up
 -- +goose ENVSUB ON
 
--- ADR-061: run aggregates are queries, not pipelines.
+-- ADR-072: run aggregates are queries, not pipelines.
 --
 -- A suite run's progress is a GROUP BY over its simulation runs. Every field
 -- of it derives from the children except the denominator — how many runs the

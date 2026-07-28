@@ -34,7 +34,7 @@ export interface ExperimentRunProcessingPipelineDeps {
  * - Stored in experiment_runs ClickHouse table
  * - Cost is NOT held here: it is summed from experiment_run_items at read
  *   time, and priced from the item's trace where the item carries no cost of
- *   its own. See ADR-061.
+ *   its own. See ADR-072.
  *
  * Map Projection: experimentRunResultStorage
  * - Writes individual results to experiment_run_items for query-optimized access

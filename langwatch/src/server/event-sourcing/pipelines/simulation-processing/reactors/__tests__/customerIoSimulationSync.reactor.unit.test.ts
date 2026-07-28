@@ -32,6 +32,7 @@ function createFoldState(
     ScenarioId: "scenario-1",
     BatchRunId: "batch-1",
     ScenarioSetId: "set-1",
+    BatchTotal: 0,
     Status: "SUCCESS",
     Name: "Test simulation",
     Description: null,

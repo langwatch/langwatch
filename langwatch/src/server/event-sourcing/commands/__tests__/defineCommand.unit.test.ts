@@ -10,10 +10,10 @@ const testEventDataSchema = z.object({
 });
 
 const TestCommand = defineCommand({
-  commandType: "lw.suite_run.start" as const,
-  eventType: "lw.suite_run.started" as const,
+  commandType: "test.integration.command" as const,
+  eventType: "test.integration.event" as const,
   eventVersion: "2026-03-01",
-  aggregateType: "suite_run",
+  aggregateType: "test_aggregate",
   schema: testEventDataSchema,
   aggregateId: (d) => d.batchRunId,
   idempotencyKey: (d) => `${d.tenantId}:${d.batchRunId}`,
@@ -28,7 +28,7 @@ function makeTestCommand(tenantId = "tenant-1") {
   return {
     tenantId: tenantId as TenantId,
     aggregateId: "batch-1",
-    type: "lw.suite_run.start" as const,
+    type: "test.integration.command" as const,
     data: {
       tenantId: "tenant-1",
       occurredAt: 1700000000000,
@@ -47,7 +47,7 @@ describe("defineCommand()", () => {
     });
 
     it("exposes a static schema with correct command type", () => {
-      expect(TestCommand.schema.type).toBe("lw.suite_run.start");
+      expect(TestCommand.schema.type).toBe("test.integration.command");
     });
 
     it("exposes static getAggregateId", () => {
@@ -93,7 +93,7 @@ describe("defineCommand()", () => {
       const events = await handler.handle(makeTestCommand());
 
       expect(events).toHaveLength(1);
-      expect(events[0]!.type).toBe("lw.suite_run.started");
+      expect(events[0]!.type).toBe("test.integration.event");
     });
 
     it("strips envelope fields from event data", async () => {
@@ -121,7 +121,7 @@ describe("defineCommand()", () => {
       const events = await handler.handle(makeTestCommand());
 
       const event = events[0]!;
-      expect(event.aggregateType).toBe("suite_run");
+      expect(event.aggregateType).toBe("test_aggregate");
       expect(event.aggregateId).toBe("batch-1");
       expect(event.tenantId).toBe("tenant-1");
     });
@@ -136,10 +136,10 @@ describe("defineCommand()", () => {
 
   describe("when spanAttributes is not provided", () => {
     const MinimalCommand = defineCommand({
-      commandType: "lw.suite_run.start" as const,
-      eventType: "lw.suite_run.started" as const,
+      commandType: "test.integration.command" as const,
+      eventType: "test.integration.event" as const,
       eventVersion: "2026-03-01",
-      aggregateType: "suite_run",
+      aggregateType: "test_aggregate",
       schema: testEventDataSchema,
       aggregateId: (d) => d.batchRunId,
       idempotencyKey: (d) => `${d.tenantId}:${d.batchRunId}`,

@@ -22,7 +22,7 @@ export class App {
   readonly dspySteps: AppDependencies["dspySteps"];
   readonly simulations: AppDependencies["simulations"] &
     AppCommands["simulations"];
-  /** Service only — suite runs have no pipeline of their own (ADR-061). */
+  /** Service only — suite runs have no pipeline of their own (ADR-072). */
   readonly suiteRuns: AppDependencies["suiteRuns"];
   readonly topicClustering: AppDependencies["topicClustering"] &
     AppCommands["topicClustering"];

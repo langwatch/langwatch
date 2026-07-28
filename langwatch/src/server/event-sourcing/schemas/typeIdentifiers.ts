@@ -61,6 +61,14 @@ import {
 const TEST_EVENT_TYPES = ["test.integration.event", "test.referenced"] as const;
 
 /**
+ * Test command type identifiers, the command-side counterpart to
+ * {@link TEST_EVENT_TYPES}. Tests that exercise the command machinery itself
+ * use these so they do not borrow a production pipeline's identifiers and then
+ * break when that pipeline is retired.
+ */
+const TEST_COMMAND_TYPES = ["test.integration.command"] as const;
+
+/**
  * All event type identifiers defined in schemas.
  */
 export const EVENT_TYPE_IDENTIFIERS = [
@@ -97,6 +105,7 @@ export const COMMAND_TYPE_IDENTIFIERS = [
   ...TOPIC_CLUSTERING_PROCESSING_COMMAND_TYPES,
   ...ENTERPRISE_COMMAND_TYPE_IDENTIFIERS,
   ...BILLING_REPORTING_COMMAND_TYPES,
+  ...TEST_COMMAND_TYPES,
 ] as const;
 
 /**
