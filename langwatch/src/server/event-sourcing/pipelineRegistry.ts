@@ -111,8 +111,6 @@ import {
   CodingAgentTraceSessionAppendStore,
   SessionMetricSeriesAppendStore,
 } from "./pipelines/coding-agent-processing/projections/stores";
-import { createCodingAgentLogFactsDispatchSubscriber } from "./pipelines/coding-agent-processing/subscribers/codingAgentLogFactsDispatch.subscriber";
-import { createCodingAgentMetricFactsDispatchSubscriber } from "./pipelines/coding-agent-processing/subscribers/codingAgentMetricFactsDispatch.subscriber";
 import { createCodingAgentSpanFactsDispatchSubscriber } from "./pipelines/coding-agent-processing/subscribers/codingAgentSpanFactsDispatch.subscriber";
 import { ExecuteEvaluationCommand } from "./pipelines/evaluation-processing/commands/executeEvaluation.command";
 import {
@@ -133,14 +131,8 @@ import { createLangyConversationProcessingPipeline } from "./pipelines/langy-con
 import type { LangyAnalyticsEventProjectionRecord } from "./pipelines/langy-conversation-processing/projections/langyAnalyticsEvent.mapProjection";
 import { resolveLogCommandShardCount as resolveCanonicalLogCommandShardCount } from "./pipelines/log-processing/canonicalLog";
 import { createLogProcessingPipeline } from "./pipelines/log-processing/pipeline";
-import { CanonicalLogAppendStore } from "./pipelines/log-processing/projections/stores";
 import { resolveMetricCommandShardCount } from "./pipelines/metric-processing/canonical/shards";
 import { createMetricProcessingPipeline } from "./pipelines/metric-processing/pipeline";
-import {
-  MetricDataPointAppendStore,
-  MetricSeriesCatalogAppendStore,
-  MetricTimeRollupAppendStore,
-} from "./pipelines/metric-processing/projections/stores";
 import {
   COMPUTE_METRICS_RETRY_DELAY_MS,
   ComputeRunMetricsCommand,
@@ -150,7 +142,6 @@ import { ScenarioService } from "../scenarios/scenario.service";
 import { createSimulationProcessingPipeline } from "./pipelines/simulation-processing/pipeline";
 import type { SimulationRunStateData } from "./pipelines/simulation-processing/projections/simulationRunState.foldProjection";
 import { createCancellationBroadcastReactor } from "./pipelines/simulation-processing/reactors/cancellationBroadcast.reactor";
-import type { ScenarioExecutionReactorHandle } from "./pipelines/simulation-processing/reactors/scenarioExecution.reactor";
 import { createScenarioExecutionDispatcher } from "../scenarios/execution/execution-dispatcher";
 import { executeScenarioRun } from "../scenarios/scenario.processor";
 import { createSnapshotUpdateBroadcastReactor } from "./pipelines/simulation-processing/reactors/snapshotUpdateBroadcast";
@@ -188,9 +179,10 @@ import { createSpanStorageBroadcastReactor } from "./pipelines/trace-processing/
 import { createTraceUpdateBroadcastReactor } from "./pipelines/trace-processing/reactors/traceUpdateBroadcast.reactor";
 import type { ResolveOriginCommandData } from "./pipelines/trace-processing/schemas/commands";
 import type { ProcessStore } from "./process-manager";
+import { CachedFoldStore } from "./projections/cachedFoldStore";
+import type { FoldCacheClient } from "./projections/foldCache/foldCacheClient";
 import type { FoldProjectionStore } from "./projections/foldProjection.types";
 import type { AppendStore } from "./projections/mapProjection.types";
-import { RedisCachedFoldStore } from "./projections/redisCachedFoldStore";
 import { RepositoryFoldStore } from "./projections/repositoryFoldStore";
 import type { StateProjectionStore } from "./projections/stateProjection.types";
 import { BlobSweeper } from "./queues/groupQueue/blobSweeper";
@@ -297,6 +289,12 @@ export interface PipelineRegistryDeps {
   eventSourcing: EventSourcing;
   repositories: PipelineRepositories;
   redis: Redis | Cluster;
+  /**
+   * ADR-077 §3: the cache tier fold projections read and write through, already
+   * chosen by the composition root. The registry composes stores with it and
+   * never decides what backs it.
+   */
+  foldCacheClient: FoldCacheClient;
   broadcast: BroadcastService;
   langy: {
     buffer: Pick<LangyTokenBuffer, "liveness" | "appendStatus" | "markError">;
@@ -359,15 +357,6 @@ export class PipelineRegistry {
     (projectId: string) => Promise<void>
   >("bootstrapTopicClustering");
 
-  private cached<State>(
-    inner: FoldProjectionStore<State>,
-    keyPrefix: string,
-  ): FoldProjectionStore<State> {
-    return new RedisCachedFoldStore<State>(inner, this.deps.redis as Redis, {
-      keyPrefix,
-    });
-  }
-
   registerAll() {
     // TODO: Customer.io reactors are implemented but not yet registered.
     // Counting strategy needs to be finalised (per-event ClickHouse queries)
@@ -375,9 +364,10 @@ export class PipelineRegistry {
     // See: customerIoTraceSyncReactor, customerIoEvaluationSyncReactor,
     //      customerIoSimulationSyncReactor
 
-    const traceSummaryStore = this.cached<TraceSummaryData>(
+    const traceSummaryStore = new CachedFoldStore<TraceSummaryData>(
       new TraceSummaryStore(this.deps.repositories.traceSummaryFold),
-      "trace_summaries",
+      this.deps.foldCacheClient,
+      { keyPrefix: "trace_summaries" },
     );
 
     const automationPorts = this.deps.automations.ports;
@@ -428,25 +418,15 @@ export class PipelineRegistry {
         graphActivityHandler,
       },
     });
-    // Registered BEFORE the metric, log and trace pipelines: their
-    // coding-agent dispatch subscribers close over this pipeline's
-    // contribution commands.
+    // Registered BEFORE the trace pipeline: its coding-agent span-facts
+    // dispatch subscriber is built here, out of the pipeline, and so closes
+    // over this pipeline's contribution command eagerly. Metric and log no
+    // longer care — they bind their dispatch through the command bus, which
+    // resolves at send time (ADR-077 §5).
     const codingAgentPipeline = this.registerCodingAgentPipeline();
     const codingAgentCommands = mapCommands(codingAgentPipeline.commands);
-    const metricPipeline = this.registerMetricPipeline({
-      subscribers: [
-        createCodingAgentMetricFactsDispatchSubscriber({
-          contributeMetricFacts: codingAgentCommands.contributeMetricFacts,
-        }),
-      ],
-    });
-    const logPipeline = this.registerLogPipeline({
-      subscribers: [
-        createCodingAgentLogFactsDispatchSubscriber({
-          contributeLogFacts: codingAgentCommands.contributeLogFacts,
-        }),
-      ],
-    });
+    const metricPipeline = this.registerMetricPipeline();
+    const logPipeline = this.registerLogPipeline();
     const { pipeline: tracePipeline, simComputeRunMetrics } =
       this.registerTracePipeline({
         evalPipeline,
@@ -484,6 +464,12 @@ export class PipelineRegistry {
       eventSourcing: this.deps.eventSourcing,
     });
     const billingPipeline = this.registerBillingReportingPipeline();
+
+    // ADR-077 §5 — every command port bound during registration must resolve
+    // now that registration is complete. Lazy resolution is what deletes the
+    // ordering constraint; this is what stops it deferring a missing command
+    // to the first production dispatch.
+    this.deps.eventSourcing.commandBus.assertPortsResolvable();
 
     logger.info("All pipelines registered");
 
@@ -692,27 +678,15 @@ export class PipelineRegistry {
     return { pipeline };
   }
 
-  private registerMetricPipeline({
-    subscribers,
-  }: {
-    subscribers: Parameters<
-      typeof createMetricProcessingPipeline
-    >[0]["subscribers"];
-  }) {
-    const repository = this.deps.repositories.metricDataPointStorage;
+  private registerMetricPipeline() {
     return this.deps.eventSourcing.register(
       createMetricProcessingPipeline({
-        metricDataPointAppendStore: new MetricDataPointAppendStore(repository),
-        metricSeriesCatalogAppendStore: new MetricSeriesCatalogAppendStore(
-          repository,
-        ),
-        metricTimeRollupAppendStore: new MetricTimeRollupAppendStore(
-          repository,
-        ),
+        metricDataPointRepository:
+          this.deps.repositories.metricDataPointStorage,
         metricCommandShardCount: resolveMetricCommandShardCount(
           process.env.METRIC_PROCESSING_SHARDS,
         ),
-        subscribers,
+        commands: this.deps.eventSourcing.commandBus,
       }),
     );
   }
@@ -721,8 +695,9 @@ export class PipelineRegistry {
    * ADR-056: the session-aggregate pipeline. Contribution commands are its
    * write surface; the session fold and the (trace → session) map are its
    * projections. The dispatch subscribers that feed it mount on the source
-   * pipelines and close over this pipeline's commands, so this registers
-   * first.
+   * pipelines; metric and log reach it through the command bus, and trace
+   * still closes over `contributeSpanFacts` eagerly, so this stays ahead of
+   * trace until trace-processing migrates too (ADR-077 step 7).
    */
   private registerCodingAgentPipeline() {
     return this.deps.eventSourcing.register(
@@ -731,11 +706,10 @@ export class PipelineRegistry {
         // the store reads its own last committed state back from
         // coding_agent_sessions (store.get() → findBySessionId → decode row).
         // The delivery path never reads event_log. Same wiring as trace_summaries.
-        codingAgentSessionStore: this.cached<CodingAgentSessionState>(
-          new CodingAgentSessionStore(
-            this.deps.repositories.codingAgentSession,
-          ),
-          "coding_agent_sessions",
+        codingAgentSessionStore: new CachedFoldStore<CodingAgentSessionState>(
+          new CodingAgentSessionStore(this.deps.repositories.codingAgentSession),
+          this.deps.foldCacheClient,
+          { keyPrefix: "coding_agent_sessions" },
         ),
         codingAgentTraceSessionAppendStore:
           new CodingAgentTraceSessionAppendStore(
@@ -748,22 +722,15 @@ export class PipelineRegistry {
     );
   }
 
-  private registerLogPipeline({
-    subscribers,
-  }: {
-    subscribers: Parameters<
-      typeof createLogProcessingPipeline
-    >[0]["subscribers"];
-  }) {
+  private registerLogPipeline() {
     return this.deps.eventSourcing.register(
       createLogProcessingPipeline({
-        canonicalLogAppendStore: new CanonicalLogAppendStore(
+        canonicalLogRecordRepository:
           this.deps.repositories.canonicalLogStorage,
-        ),
         logCommandShardCount: resolveCanonicalLogCommandShardCount(
           process.env.LOG_PROCESSING_SHARDS,
         ),
-        subscribers,
+        commands: this.deps.eventSourcing.commandBus,
       }),
     );
   }
@@ -834,11 +801,12 @@ export class PipelineRegistry {
         // through to the store's own ClickHouse read-back (ADR-066, migration
         // 00056) rather than re-folding the event log. Same wiring as
         // trace_analytics.
-        evaluationAnalyticsStore: this.cached<EvaluationAnalyticsData>(
+        evaluationAnalyticsStore: new CachedFoldStore<EvaluationAnalyticsData>(
           new EvaluationAnalyticsStore(
             this.deps.repositories.evaluationAnalytics,
           ),
-          "evaluation_analytics",
+          this.deps.foldCacheClient,
+          { keyPrefix: "evaluation_analytics" },
         ),
         evaluationAnalyticsRollupAppendStore:
           new EvaluationAnalyticsRollupAppendStore(
@@ -944,9 +912,10 @@ export class PipelineRegistry {
         // through to the store's own ClickHouse read-back (ADR-066, migration
         // 00056) rather than re-folding the event log. The wrapper still earns
         // its keep — it keeps the steady state off ClickHouse entirely.
-        traceAnalyticsStore: this.cached<TraceAnalyticsData>(
+        traceAnalyticsStore: new CachedFoldStore<TraceAnalyticsData>(
           new TraceAnalyticsStore(this.deps.repositories.traceAnalytics),
-          "trace_analytics",
+          this.deps.foldCacheClient,
+          { keyPrefix: "trace_analytics" },
         ),
         traceSummaryStore,
         originGateReactor,
@@ -1059,12 +1028,13 @@ export class PipelineRegistry {
       CommandDispatcher<ComputeRunMetricsCommandData>
     >;
   }) {
-    const simulationRunStore = this.cached<SimulationRunStateData>(
+    const simulationRunStore = new CachedFoldStore<SimulationRunStateData>(
       new RepositoryFoldStore<SimulationRunStateData>(
         this.deps.repositories.simulationRunState,
         SIMULATION_PROJECTION_VERSIONS.RUN_STATE,
       ),
-      "simulation_runs",
+      this.deps.foldCacheClient,
+      { keyPrefix: "simulation_runs" },
     );
     const snapshotUpdateBroadcastReactor = createSnapshotUpdateBroadcastReactor(
       {
@@ -1218,11 +1188,12 @@ export class PipelineRegistry {
   }
 
   private registerExperimentRunPipeline() {
-    const experimentRunStore = this.cached<ExperimentRunStateData>(
+    const experimentRunStore = new CachedFoldStore<ExperimentRunStateData>(
       createExperimentRunStateFoldStore(
         this.deps.repositories.experimentRunState,
       ),
-      "experiment_runs",
+      this.deps.foldCacheClient,
+      { keyPrefix: "experiment_runs" },
     );
 
     return this.deps.eventSourcing.register(
