@@ -76,28 +76,69 @@ and flipping the flag would silently switch what the application builds against.
 Linking the working copy is a real improvement but a separate decision with its
 own risk, and it is now a one-line change (`"langwatch": "workspace:*"`).
 
-**We will ship the root workspace inside the tarball and narrow the install with
-a filter.** The tarball carries `pnpm-workspace.yaml`, the root `pnpm-lock.yaml`
-and every member's `package.json`; first boot runs
+**We will publish `@langwatch/server` from a staging tree, with the whole
+artifact nested one directory down.** The tarball carries
+`pnpm-workspace.yaml`, `pnpm-lock.yaml` and every member's `package.json` under
+`app/`; first boot runs
 
 ```
-pnpm install --frozen-lockfile --filter @langwatch/web...
+pnpm install --frozen-lockfile --filter "@langwatch/web..."
 ```
 
-from the tarball root. The application and its transitive workspace
-dependencies install; the SDK, skills compiler and test suites do not.
+from `app/`. The application and its transitive workspace dependencies install;
+the SDK, skills compiler and test suites do not.
+
+The nesting is not cosmetic — it is the entire reason the artifact works.
+**npm deletes `pnpm-lock.yaml` from the package root unconditionally**, the same
+hardcoded rule that eats `.npmrc`. The exclusion is root-only: a lockfile one
+directory down ships fine. The old layout only worked by accident of shape —
+the lockfile lived at `langwatch/pnpm-lock.yaml`, already a subdirectory. A
+single workspace puts it at the package root, where npm removes it, leaving the
+end user's first boot with nothing for `--frozen-lockfile` to check.
+
+Nesting costs nothing on the consuming side because the CLI already locates the
+application by walking up for `langwatch/package.json`
+(`locatePackageSource()` in `packages/server/src/services/app-dir.ts`), so it
+finds `app/` by itself and every downstream path resolves unchanged.
+
+`scripts/pack-npm.sh` becomes the assembler. It reads `files` from
+`package.json` — still the single source of truth for *what* ships — and decides
+only *where* it lands. The two `.npmignore` files are deleted; their trimming
+rules move into one explicit exclude list next to the copy that applies them.
 
 ## Rationale / Trade-offs
 
-The alternative for the tarball was to keep generating a standalone lockfile for
-`langwatch/` at pack time. It preserves the end-user boot path byte-for-byte,
-but it reintroduces two lockfiles that can disagree, with the disagreement only
-observable in a published artifact — the worst place to find it.
+Three alternatives for the tarball were rejected before landing on staging.
 
-`pnpm deploy`, which bakes `node_modules` into the shipped tree and would let
-end users skip the install entirely (the slowest part of first boot), is
-unavailable: `bcrypt`, `@prisma/engines`, `sharp`, `msgpackr-extract` and
-`cpu-features` are native, so one tarball cannot serve four platforms.
+Generating a standalone `langwatch/pnpm-lock.yaml` at pack time preserves the
+end-user boot path byte-for-byte, but reintroduces two lockfiles that can
+disagree, with the disagreement only observable in a published artifact — the
+worst place to find it.
+
+Shipping the lockfile under a name npm will not strip, and copying it back on
+boot, works but is a rename dance: it leaves the artifact's layout coupled to
+the repo's, which is the thing that broke here and would break again on the next
+layout change.
+
+Dropping `--frozen-lockfile` for end users adds nothing and removes a flag, but
+it gives up reproducibility on precisely the install we control least.
+
+`pnpm deploy` was investigated and does not help. `--legacy` (required, since
+the workspace does not set `inject-workspace-packages`) emits no lockfile and
+does not rewrite `workspace:*` specifiers, so the output is only usable if
+`node_modules` ships with it — and it cannot, because `bcrypt`,
+`@prisma/engines`, `sharp`, `msgpackr-extract` and `cpu-features` are native, so
+one tarball cannot serve four platforms.
+
+The longer-term answer is to stop shipping an install step at all: bundle the
+server and ship native dependencies as per-platform `optionalDependencies`, the
+way esbuild and swc do. That would delete most of the defensive machinery in
+`node-deps.ts` and make first boot near-instant. It is deliberately not done
+here — the observability stack depends on `import-in-the-middle` /
+`require-in-the-middle` patching modules at runtime (which is why `.npmrc`
+carries those two hoist patterns), and bundling defeats module patching by
+construction. That is a rework of how instrumentation attaches, with its own
+ADR, not a packaging change.
 
 Merging the override lists was the fiddliest part, and there were more lists
 than the workspace files suggested. pnpm reads overrides from **both**
