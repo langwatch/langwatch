@@ -18,6 +18,7 @@ describe("the red-team CLI flags", () => {
   });
 
   describe("given a strategy and an objective", () => {
+    /** @scenario Configuring an attack persists it, whichever way it was created */
     it("sends both", () => {
       expect(
         toRedTeamBody({
@@ -108,6 +109,7 @@ describe("the red-team CLI flags", () => {
   });
 
   describe("given --standard", () => {
+    /** @scenario Clearing the attack turns the scenario back into a standard one */
     it("clears every red-team column", () => {
       expect(toRedTeamBody({ standard: true })).toEqual({
         redTeamStrategy: null,

@@ -117,6 +117,7 @@ describe("the scenarios REST API", () => {
   });
 
   describe("given a create request configuring an attack", () => {
+    /** @scenario Configuring an attack persists it, whichever way it was created */
     it("passes the attack to the service, not just the scenario fields", async () => {
       const res = await post({
         name: "Override extraction",
@@ -160,6 +161,7 @@ describe("the scenarios REST API", () => {
   });
 
   describe("given an update that clears the attack", () => {
+    /** @scenario Clearing the attack turns the scenario back into a standard one */
     it("clears the columns, spelling the Json null the way Prisma needs", async () => {
       await put("scenario_1", {
         redTeamStrategy: null,
@@ -192,6 +194,7 @@ describe("the scenarios REST API", () => {
   });
 
   describe("given an objective of only whitespace", () => {
+    /** @scenario An objective of only whitespace is refused */
     it("is rejected, and nothing is stored", async () => {
       const res = await post({
         name: "n",

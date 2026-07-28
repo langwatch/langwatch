@@ -19,6 +19,7 @@ const schema = z.object(redTeamFields);
 
 describe("the red-team write contract", () => {
   describe("given a caller configuring an attack", () => {
+    /** @scenario Configuring an attack persists it, whichever way it was created */
     it("carries every field through to the write", () => {
       const parsed = schema.parse({
         redTeamStrategy: "crescendo",
@@ -44,6 +45,7 @@ describe("the red-team write contract", () => {
   });
 
   describe("given a caller turning a red-team scenario back into a standard one", () => {
+    /** @scenario Clearing the attack turns the scenario back into a standard one */
     it("clears the columns, spelling the Json null the way Prisma needs", () => {
       const parsed = schema.parse({
         redTeamStrategy: null,
@@ -64,6 +66,7 @@ describe("the red-team write contract", () => {
   });
 
   describe("given an objective that is only whitespace", () => {
+    /** @scenario An objective of only whitespace is refused */
     it("is rejected, since the planner would have nothing to aim at", () => {
       expect(schema.safeParse({ redTeamTarget: "   " }).success).toBe(false);
     });
