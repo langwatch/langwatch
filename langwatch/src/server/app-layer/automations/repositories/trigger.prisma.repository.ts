@@ -178,7 +178,12 @@ export class PrismaTriggerRepository implements TriggerRepository {
     projectId: string;
     data: Prisma.TriggerUncheckedUpdateInput;
   }): Promise<Trigger> {
-    assertCanonicalEvaluationStateFilters(data.filters);
+    await assertCanonicalEvaluationStateFiltersOnUpdate({
+      prisma: this.prisma,
+      triggerId,
+      projectId,
+      filters: data.filters,
+    });
     return this.prisma.trigger.update({
       where: { id: triggerId, projectId },
       data,
@@ -374,6 +379,70 @@ function assertCanonicalEvaluationStateFilters(filters: unknown): void {
   const offense = findOffendingEvaluationStateEntries(
     parsedFilters["evaluations.state"],
   )[0];
+  if (!offense) return;
+
+  throw new InvalidEvaluationStateFilterError({
+    evaluatorKey: offense.evaluatorKey,
+    offendingValue: offense.offendingValue,
+    canonicalValues: evaluationRunDataSchema.shape.status.options,
+  });
+}
+
+/**
+ * Update-path write guard (#4805 AC10/AC10b). `assertCanonicalEvaluationStateFilters`'s
+ * unconditional reject is correct for `create` — there is no prior row to
+ * compare against — but is wrong here: `AutomationDrawer.tsx` rebuilds the
+ * whole payload from the draft on every save and always resends `filters`
+ * unchanged, so an unconditional reject on `update` would permanently lock
+ * out any automation that already holds a stale `evaluations.state` value
+ * (left by a removed ES index, or saved before #4903/#5395 shipped) the
+ * moment its owner touched an unrelated field — name, cadence, Slack
+ * channel. `EditAutomationFilterDrawer`, the one surface that can repair the
+ * value, would itself be gated by the same guard, making the lockout
+ * self-perpetuating.
+ *
+ * Grandfathers whatever non-canonical values this row already stores:
+ * rejects only offending values in the incoming payload that are not among
+ * the offending values already on the row. A payload that carries a stored
+ * offense through unchanged, or drops it in favour of a canonical value,
+ * always succeeds; one that introduces an offense the row didn't already
+ * have — including on a row with no prior offense at all — is rejected.
+ *
+ * Skips the extra read entirely when the incoming payload has no offending
+ * `evaluations.state` entries — the common case (no filter, or canonical
+ * values only) never touches the database for this check.
+ */
+async function assertCanonicalEvaluationStateFiltersOnUpdate({
+  prisma,
+  triggerId,
+  projectId,
+  filters,
+}: {
+  prisma: PrismaClient;
+  triggerId: string;
+  projectId: string;
+  filters: unknown;
+}): Promise<void> {
+  if (filters === undefined) return;
+
+  const incomingOffenses = findOffendingEvaluationStateEntries(
+    parseFilters(filters)["evaluations.state"],
+  );
+  if (incomingOffenses.length === 0) return;
+
+  const existing = await prisma.trigger.findUnique({
+    where: { id: triggerId, projectId },
+    select: { filters: true },
+  });
+  const alreadyStored = new Set(
+    findOffendingEvaluationStateEntries(
+      parseFilters(existing?.filters)["evaluations.state"],
+    ).map((offense) => offense.offendingValue),
+  );
+
+  const offense = incomingOffenses.find(
+    ({ offendingValue }) => !alreadyStored.has(offendingValue),
+  );
   if (!offense) return;
 
   throw new InvalidEvaluationStateFilterError({
