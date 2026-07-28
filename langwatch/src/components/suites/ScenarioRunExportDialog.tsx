@@ -11,19 +11,14 @@ import { Radio, RadioGroup } from "../ui/radio";
  */
 const MODES: { value: ScenarioRunExportMode; label: string; hint: string }[] = [
   {
-    value: "summary",
-    label: "Summary",
-    hint: "One row per run — pass rates, cost, duration",
+    value: "full",
+    label: "Full",
+    hint: "One row per message — the complete export",
   },
   {
     value: "criteria",
     label: "Criteria",
-    hint: "One row per criterion — rank what fails most",
-  },
-  {
-    value: "full",
-    label: "Full",
-    hint: "One row per message — read the transcripts",
+    hint: "One row per checklist item — rank what fails most",
   },
 ];
 
@@ -40,7 +35,7 @@ export function ScenarioRunExportDialog({
   runCount: number;
   hasFiltersApplied: boolean;
 }) {
-  const [mode, setMode] = useState<ScenarioRunExportMode>("summary");
+  const [mode, setMode] = useState<ScenarioRunExportMode>("full");
 
   return (
     <Dialog.Root open={isOpen} onOpenChange={({ open }) => !open && onClose()}>

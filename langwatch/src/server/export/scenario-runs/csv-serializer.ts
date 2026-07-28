@@ -1,8 +1,8 @@
 /**
  * CSV serialization for scenario run export.
  *
- * Three row axes over the same run record — see ScenarioRunExportMode. Every
- * mode shares the same column groups, so a column means the same thing
+ * Two row axes over the same run record — see ScenarioRunExportMode. Both
+ * modes share the same column groups, so a column means the same thing
  * whichever file you opened.
  *
  * Column order is deliberate: spreadsheets show the leftmost columns first, so
@@ -71,10 +71,10 @@ const TAIL_COLUMNS = [
 /**
  * The judged criteria, as JSON lists.
  *
- * Carried by summary AND full. Full mode is where someone reads a failing
- * transcript, and "why did this fail" is only half-answered by the judge's
- * prose `reasoning` — the other half is which specific criteria went unmet.
- * Counts alone cannot answer it.
+ * Carried by full mode, which is where someone reads a failing transcript.
+ * "Why did this fail" is only half-answered by the judge's prose `reasoning`
+ * — the other half is which specific criteria went unmet, and counts alone
+ * cannot say which.
  *
  * Criteria mode omits them: it already explodes the same data into one row
  * per criterion, so repeating both full lists on every one of those rows
@@ -96,10 +96,6 @@ const MESSAGE_COLUMNS = [
 // Public API — one function per mode
 // ---------------------------------------------------------------------------
 
-export function summaryHeaders(): string[] {
-  return [...CORE_COLUMNS, ...CRITERIA_LIST_COLUMNS, ...TAIL_COLUMNS];
-}
-
 export function criteriaHeaders(): string[] {
   return [...CORE_COLUMNS, ...CRITERIA_COLUMNS, ...TAIL_COLUMNS];
 }
@@ -111,22 +107,6 @@ export function fullHeaders(): string[] {
     ...MESSAGE_COLUMNS,
     ...TAIL_COLUMNS.map((c) => `run_${c}`),
   ];
-}
-
-/** One row per run. */
-export function serializeRunsToSummaryCsv({
-  runs,
-  includeHeader,
-}: {
-  runs: ExportableRun[];
-  includeHeader: boolean;
-}): string {
-  const rows = runs.map((run) => [
-    ...buildCoreValues(run),
-    ...buildCriteriaListValues(run),
-    ...buildTailValues(run),
-  ]);
-  return unparse({ headers: summaryHeaders(), rows, includeHeader });
 }
 
 /**

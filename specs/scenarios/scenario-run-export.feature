@@ -4,13 +4,16 @@ Feature: Scenario run CSV export
   So that I can rank failing criteria, track pass rates over time, and read
   failing transcripts in a spreadsheet instead of clicking through the UI
 
-  # Three modes, because a scenario run is nested (a run CONTAINS a conversation
+  # Two modes, because a scenario run is nested (a run CONTAINS a conversation
   # and CONTAINS a list of criteria) and CSV is flat. Each mode picks a
   # different row axis:
-  #   summary  — one row per run       → pass rates, cost, duration, trends
+  #   full     — one row per message   → everything; the complete export
   #   criteria — one row per criterion → "which criterion fails most?" (pivot)
-  #   full     — one row per message   → read the transcripts
-  # All three read the same underlying run record; no mode costs an extra query.
+  # Both read the same underlying run record; neither costs an extra query.
+  #
+  # There is deliberately no one-row-per-run mode: full already denormalizes
+  # every run field onto every message row, so de-duplicating on
+  # run_scenario_run_id yields exactly that.
 
   Background:
     Given I am logged into project "my-project"
@@ -25,37 +28,16 @@ Feature: Scenario run CSV export
     When I click "Export CSV" in the run history header
     Then an export config dialog appears
     And the dialog shows how many runs match my current filters
-    And the mode defaults to "Summary"
+    And the mode defaults to "Full"
 
-  Scenario: The dialog offers all three export depths
+  Scenario: The dialog offers both export depths
     Given the export config dialog is open
-    Then I can choose "Summary", "Criteria", or "Full"
+    Then I can choose "Full" or "Criteria"
     And each option states what one row represents
 
   Scenario: Export is unavailable when no runs match
     Given no runs match my current filters
     Then the "Export CSV" button is disabled
-
-  # ============================================================================
-  # Summary mode — one row per run
-  # ============================================================================
-
-  Scenario: Summary CSV writes one row per run
-    Given 49 runs match my current filters
-    And the export config dialog is open with mode "Summary"
-    When I export
-    Then the CSV has 49 data rows
-    And the CSV contains columns: scenario_run_id, scenario_id, scenario_name, batch_run_id, scenario_set_id
-    And the CSV contains columns: status, status_category, verdict, reasoning, error
-    And the CSV contains columns: met_criteria, unmet_criteria, met_criteria_count, unmet_criteria_count
-    And the CSV contains columns: started_at, finished_at, duration_ms, total_cost
-    And the CSV contains columns: target_type, target_reference_id, simulation_suite_id
-    And the CSV contains columns: message_count, trace_ids
-
-  Scenario: Summary rows carry criteria counts without needing to parse JSON
-    Given a run met 2 criteria and failed 3
-    When I export in Summary mode
-    Then that row has met_criteria_count "2" and unmet_criteria_count "3"
 
   # ============================================================================
   # Criteria mode — one row per run x criterion
@@ -149,7 +131,7 @@ Feature: Scenario run CSV export
 
   Scenario: Criteria are encoded so that their commas survive
     Given a criterion reads "stays polite, even when the customer escalates"
-    When I export in Summary mode
+    When I export in Full mode
     Then the met_criteria cell holds a JSON array
     And reading that cell back yields the criterion with its comma intact
 
@@ -158,11 +140,13 @@ Feature: Scenario run CSV export
     When I export
     Then its started_at cell reads "2026-07-27T18:48:35.009Z"
 
-  Scenario: Timestamps that do not exist yet are left empty
-    Given a run has not finished
+  Scenario: An in-flight run reports elapsed time, not a final duration
+    Given a run has started but not finished
     When I export
-    Then its finished_at cell is empty
-    And its duration_ms cell is empty
+    Then its duration_ms cell holds the time elapsed so far
+    And its status_category cell says the run is still in progress
+    # There is no finished_at column: the mapper does not surface FinishedAt,
+    # and deriving it from duration would be wrong for a run still running.
 
   Scenario: Conversation content keeps its commas, quotes, and newlines
     Given a message contains commas, double quotes, and newlines
@@ -214,6 +198,19 @@ Feature: Scenario run CSV export
     When I export
     Then a progress indicator reports how many runs have been written so far
     And the progress reaches the total when the download completes
+
+  Scenario: The download is compressed in transit
+    Given an export of several thousand runs
+    When I export
+    Then the response is gzip encoded
+    And the file written to disk is ordinary uncompressed CSV
+
+  Scenario: One row per run is a de-duplication away
+    Given the export config dialog is open with mode "Full"
+    When I export
+    And I remove duplicate rows on run_scenario_run_id
+    Then I am left with exactly one row per run
+    And every run-level column still holds that run's value
 
   Scenario: The header row is written once
     Given enough runs to require several batches

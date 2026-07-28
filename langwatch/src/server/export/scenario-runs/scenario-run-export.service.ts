@@ -17,7 +17,6 @@ import { categorizeRunStatus } from "~/server/scenarios/scenario-run-category";
 import {
   serializeRunsToCriteriaCsv,
   serializeRunsToFullCsv,
-  serializeRunsToSummaryCsv,
 } from "./csv-serializer";
 import type {
   ScenarioRunExportProgress,
@@ -146,8 +145,6 @@ function serializeBatch({
   includeHeader: boolean;
 }): string {
   switch (mode) {
-    case "summary":
-      return serializeRunsToSummaryCsv({ runs, includeHeader });
     case "criteria":
       return serializeRunsToCriteriaCsv({ runs, includeHeader });
     case "full":

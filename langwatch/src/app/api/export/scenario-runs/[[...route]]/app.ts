@@ -75,8 +75,13 @@ secured
       );
       const totalCount = await service.getTotalCount({ request });
 
+      // CSV of repeated run-level values compresses ~9x, and the browser
+      // inflates it transparently before writing the .csv to disk — so this is
+      // a pure transfer win with no change to the file the user ends up with.
       const headers = new Headers({
         "Content-Type": "text/csv; charset=utf-8",
+        "Content-Encoding": "gzip",
+        Vary: "Accept-Encoding",
         "Content-Disposition": `attachment; filename="${fileName}"`,
         "Transfer-Encoding": "chunked",
         "X-Export-Id": exportId,
@@ -129,7 +134,10 @@ secured
         },
       });
 
-      return new Response(stream, { headers });
+      return new Response(
+        stream.pipeThrough(new CompressionStream("gzip")),
+        { headers },
+      );
     },
   );
 

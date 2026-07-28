@@ -6,19 +6,20 @@ import { z } from "zod";
  * A run is nested — it contains a conversation and a list of judged criteria —
  * and CSV is flat, so each mode picks a different row axis:
  *
- *   summary  — one row per run       → pass rates, cost, duration, trends
+ *   full     — one row per message   → everything; the complete export
  *   criteria — one row per criterion → "which criterion fails most?" (pivot)
- *   full     — one row per message   → read the transcripts
  *
- * All three read the same fetched run, so no mode costs an extra query.
+ * Both read the same fetched run, so neither costs an extra query.
+ *
+ * There is deliberately no one-row-per-run mode. Full already denormalizes
+ * every run field onto every message row, so de-duplicating on
+ * `run_scenario_run_id` yields exactly that — and gzip makes the larger file
+ * cheaper to move than the per-run one was uncompressed. A third mode would
+ * have been a third public column contract for data already present.
  *
  * @see specs/scenarios/scenario-run-export.feature
  */
-export const scenarioRunExportModeSchema = z.enum([
-  "summary",
-  "criteria",
-  "full",
-]);
+export const scenarioRunExportModeSchema = z.enum(["full", "criteria"]);
 export type ScenarioRunExportMode = z.infer<typeof scenarioRunExportModeSchema>;
 
 /**

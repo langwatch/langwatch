@@ -5,7 +5,6 @@ import { ScenarioRunStatus, Verdict } from "~/server/scenarios/scenario-event.en
 import {
   serializeRunsToCriteriaCsv,
   serializeRunsToFullCsv,
-  serializeRunsToSummaryCsv,
 } from "../csv-serializer";
 
 function buildRun(overrides: Partial<ExportableRun> = {}): ExportableRun {
@@ -56,23 +55,23 @@ describe("scenario run CSV serializers", () => {
     ];
 
     it("leads with the columns a person reads", () => {
-      const csv = serializeRunsToSummaryCsv({
+      const csv = serializeRunsToFullCsv({
         runs: [buildRun()],
         includeHeader: true,
       });
       const header = csv.split("\r\n")[0]!.split(",");
 
       expect(header.slice(0, 4)).toEqual([
-        "scenario_name",
-        "status",
-        "status_category",
-        "verdict",
+        "run_scenario_name",
+        "run_status",
+        "run_status_category",
+        "run_verdict",
       ]);
     });
 
     it("puts every identifier after the readable columns", () => {
       for (const csv of [
-        serializeRunsToSummaryCsv({ runs: [buildRun()], includeHeader: true }),
+        serializeRunsToFullCsv({ runs: [buildRun()], includeHeader: true }),
         serializeRunsToCriteriaCsv({ runs: [buildRun()], includeHeader: true }),
         serializeRunsToFullCsv({ runs: [buildRun()], includeHeader: true }),
       ]) {
@@ -117,20 +116,20 @@ describe("scenario run CSV serializers", () => {
     });
   });
 
-  describe("given summary mode", () => {
-    it("writes one row per run", () => {
-      const csv = serializeRunsToSummaryCsv({
+  describe("given full mode, on the run-level columns", () => {
+    it("writes one row per run when the run has no messages", () => {
+      const csv = serializeRunsToFullCsv({
         runs: [buildRun({ scenarioRunId: "a" }), buildRun({ scenarioRunId: "b" })],
         includeHeader: true,
       });
 
       const rows = parse(csv);
       expect(rows).toHaveLength(2);
-      expect(rows.map((r) => r.scenario_run_id)).toEqual(["a", "b"]);
+      expect(rows.map((r) => r.run_scenario_run_id)).toEqual(["a", "b"]);
     });
 
     it("reports criteria counts without requiring the JSON to be parsed", () => {
-      const csv = serializeRunsToSummaryCsv({
+      const csv = serializeRunsToFullCsv({
         runs: [
           buildRun({
             results: {
@@ -146,13 +145,13 @@ describe("scenario run CSV serializers", () => {
       });
 
       const row = parse(csv)[0]!;
-      expect(row.met_criteria_count).toBe("2");
-      expect(row.unmet_criteria_count).toBe("3");
+      expect(row.run_met_criteria_count).toBe("2");
+      expect(row.run_unmet_criteria_count).toBe("3");
     });
 
     it("encodes criteria as JSON so their commas survive a round trip", () => {
       const criterion = "stays polite, even when the customer escalates";
-      const csv = serializeRunsToSummaryCsv({
+      const csv = serializeRunsToFullCsv({
         runs: [
           buildRun({
             results: {
@@ -168,29 +167,29 @@ describe("scenario run CSV serializers", () => {
       });
 
       const row = parse(csv)[0]!;
-      expect(JSON.parse(row.met_criteria!)).toEqual([criterion]);
+      expect(JSON.parse(row.run_met_criteria!)).toEqual([criterion]);
     });
 
     it("writes timestamps as ISO-8601 UTC", () => {
-      const csv = serializeRunsToSummaryCsv({
+      const csv = serializeRunsToFullCsv({
         runs: [buildRun({ timestamp: 1785177315009 })],
         includeHeader: true,
       });
 
-      expect(parse(csv)[0]!.started_at).toBe("2026-07-27T18:35:15.009Z");
+      expect(parse(csv)[0]!.run_started_at).toBe("2026-07-27T18:35:15.009Z");
     });
 
     it("leaves cost empty when the run reported none", () => {
-      const csv = serializeRunsToSummaryCsv({
+      const csv = serializeRunsToFullCsv({
         runs: [buildRun({ totalCost: undefined })],
         includeHeader: true,
       });
 
-      expect(parse(csv)[0]!.total_cost).toBe("");
+      expect(parse(csv)[0]!.run_total_cost).toBe("");
     });
 
     it("reports the run status alongside its outcome category", () => {
-      const csv = serializeRunsToSummaryCsv({
+      const csv = serializeRunsToFullCsv({
         runs: [
           buildRun({ scenarioRunId: "a", status: ScenarioRunStatus.ERROR }),
           buildRun({ scenarioRunId: "b", status: ScenarioRunStatus.FAILED }),
@@ -200,7 +199,7 @@ describe("scenario run CSV serializers", () => {
       });
 
       const rows = parse(csv);
-      expect(rows.map((r) => [r.status, r.status_category])).toEqual([
+      expect(rows.map((r) => [r.run_status, r.run_status_category])).toEqual([
         ["ERROR", "failure"],
         ["FAILED", "failure"],
         ["STALLED", "stalled"],
@@ -208,7 +207,7 @@ describe("scenario run CSV serializers", () => {
     });
 
     it("emits no aggregate columns", () => {
-      const csv = serializeRunsToSummaryCsv({
+      const csv = serializeRunsToFullCsv({
         runs: [buildRun()],
         includeHeader: true,
       });
@@ -217,7 +216,7 @@ describe("scenario run CSV serializers", () => {
     });
 
     it("extracts the target from the langwatch metadata namespace", () => {
-      const csv = serializeRunsToSummaryCsv({
+      const csv = serializeRunsToFullCsv({
         runs: [
           buildRun({
             metadata: {
@@ -233,24 +232,24 @@ describe("scenario run CSV serializers", () => {
       });
 
       const row = parse(csv)[0]!;
-      expect(row.target_type).toBe("http");
-      expect(row.target_reference_id).toBe("agent_42");
-      expect(row.simulation_suite_id).toBe("suite_7");
+      expect(row.run_target_type).toBe("http");
+      expect(row.run_target_reference_id).toBe("agent_42");
+      expect(row.run_simulation_suite_id).toBe("suite_7");
     });
 
     it("carries the scenario description", () => {
-      const csv = serializeRunsToSummaryCsv({
+      const csv = serializeRunsToFullCsv({
         runs: [buildRun({ description: "Tests refund policy under pressure" })],
         includeHeader: true,
       });
 
-      expect(parse(csv)[0]!.scenario_description).toBe(
+      expect(parse(csv)[0]!.run_scenario_description).toBe(
         "Tests refund policy under pressure",
       );
     });
 
     it("unions run-level and per-message trace ids without duplicating", () => {
-      const csv = serializeRunsToSummaryCsv({
+      const csv = serializeRunsToFullCsv({
         runs: [
           buildRun({
             traceIds: ["trace_a", "trace_b"],
@@ -263,7 +262,7 @@ describe("scenario run CSV serializers", () => {
         includeHeader: true,
       });
 
-      expect(JSON.parse(parse(csv)[0]!.trace_ids!)).toEqual([
+      expect(JSON.parse(parse(csv)[0]!.run_trace_ids!)).toEqual([
         "trace_a",
         "trace_b",
         "trace_c",
@@ -271,12 +270,12 @@ describe("scenario run CSV serializers", () => {
     });
 
     it("leaves target columns empty when metadata has no langwatch namespace", () => {
-      const csv = serializeRunsToSummaryCsv({
+      const csv = serializeRunsToFullCsv({
         runs: [buildRun({ metadata: { somethingElse: true } })],
         includeHeader: true,
       });
 
-      expect(parse(csv)[0]!.target_type).toBe("");
+      expect(parse(csv)[0]!.run_target_type).toBe("");
     });
   });
 
@@ -452,11 +451,11 @@ describe("scenario run CSV serializers", () => {
 
   describe("when a batch is not the first of a streamed export", () => {
     it("omits the header so the file has exactly one", () => {
-      const first = serializeRunsToSummaryCsv({
+      const first = serializeRunsToFullCsv({
         runs: [buildRun()],
         includeHeader: true,
       });
-      const second = serializeRunsToSummaryCsv({
+      const second = serializeRunsToFullCsv({
         runs: [buildRun({ scenarioRunId: "run_2" })],
         includeHeader: false,
       });
