@@ -12,6 +12,7 @@ import {
   serializeTracesToSummaryCsv,
   serializeTracesToFullCsv,
 } from "../serializers/csv-serializer";
+import { stripCsvHeader } from "../export.service";
 
 // ---------------------------------------------------------------------------
 // Test data builders
@@ -539,16 +540,11 @@ describe("serializeTracesToFullCsv()", () => {
 // Streaming: chunks are concatenated straight into one file
 // ---------------------------------------------------------------------------
 
-/**
- * Mirrors ExportService.serializeCsvBatch: the first batch keeps its header,
- * later batches have it stripped, and the pieces are concatenated with no
- * separator. Kept in sync with export.service.ts by construction — if the
- * chunk contract changes, these tests fail.
- */
-function stripCsvHeader(csv: string): string {
-  const firstBreak = csv.indexOf("\r\n");
-  return firstBreak === -1 ? "" : csv.slice(firstBreak + 2);
-}
+// These tests reproduce ExportService.serializeCsvBatch: the first batch keeps
+// its header, later batches are stripped with the SAME function production
+// uses, and the pieces are concatenated with no separator. Importing rather
+// than re-implementing stripCsvHeader is the point — a local copy could keep
+// passing while the real one regressed.
 
 describe("when an export spans several batches", () => {
   it("keeps every row intact across a batch boundary", () => {

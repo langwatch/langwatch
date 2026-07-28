@@ -349,8 +349,11 @@ function serializeJsonBatch({
  * Must search for the same sequence the serializer wrote. Splitting on "\n"
  * while the rows are terminated with "\r\n" leaves a stray carriage return at
  * the head of the chunk, which becomes a phantom leading field.
+ *
+ * Exported for the batch-boundary tests, which concatenate chunks exactly as
+ * this service does. A test-local copy could pass while this regressed.
  */
-function stripCsvHeader(csv: string): string {
+export function stripCsvHeader(csv: string): string {
   const firstBreak = csv.indexOf(CSV_NEWLINE);
   if (firstBreak === -1) return "";
   return csv.slice(firstBreak + CSV_NEWLINE.length);
