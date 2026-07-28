@@ -191,9 +191,13 @@ test_access_ingress() {
   assert_contains "Blocked path → blackhole Service" "$ingress_only" "name: ${RELEASE}-blackhole"
   # Longest-prefix wins on conformant controllers, but we also emit the blocked
   # path before the app catch-all for order-sensitive controllers (e.g. nginx).
+  # `|| true` on both: under `set -euo pipefail` a non-matching grep aborts the
+  # whole suite at the assignment, so the `fail` diagnostic below (and its
+  # `${app_line:-?}` fallback) would never print for the regression it exists to
+  # catch — e.g. the app path rendering as `path: "/"` after a quoting change.
   local api_internal_line app_line
-  api_internal_line=$(grep -n "path: /api/internal" <<< "$ingress_only" | head -1 | cut -d: -f1)
-  app_line=$(grep -nE "path: /$" <<< "$ingress_only" | head -1 | cut -d: -f1)
+  api_internal_line=$(grep -n "path: /api/internal" <<< "$ingress_only" | head -1 | cut -d: -f1 || true)
+  app_line=$(grep -nE "path: /$" <<< "$ingress_only" | head -1 | cut -d: -f1 || true)
   if [[ -n "$api_internal_line" && -n "$app_line" && "$api_internal_line" -lt "$app_line" ]]; then
     pass "Blocked path listed before app catch-all"
   else
@@ -220,6 +224,10 @@ test_access_ingress() {
     -f "${OVERLAYS}/access-ingress.yaml" \
     --set-json 'ingress.blockedPaths=[]')
   assert_not_contains "blockedPaths=[] drops the block" "$no_block" "${RELEASE}-blackhole"
+  # …and the path itself is gone, not merely re-pointed: a blocked path left in
+  # the ingress while the blackhole Service disappears would route to a
+  # nonexistent backend, which the Service-name assertion alone would miss.
+  assert_not_contains "blockedPaths=[] removes blocked path" "$no_block" "path: /api/internal"
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
