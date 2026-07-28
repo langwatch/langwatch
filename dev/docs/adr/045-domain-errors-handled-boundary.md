@@ -299,7 +299,7 @@ reads, in order: **`meta.message` → `message` → `code`**.
   generic "the request failed" invented over the top of it.
 
 The CLI implements this in `parseHandledError`
-(`packages/cli-cards/src/handled-error.ts`), and the Python SDK in
+(`packages/langy/src/cards/handled-error.ts`), and the Python SDK in
 `extract_api_error_detail` (which also appends `tips` and `docsUrl`, since those
 exist to be shown). The app's `errorDisplayMessage` (`src/utils/trpcError.ts`)
 used to as well; it was deleted by the 2026-07-21 amendment.
@@ -345,9 +345,15 @@ Three decisions close it:
    contributes only structured fact (`code`, `meta`, `tips`, `docsUrl`, `fault`,
    `traceId`). Where the server genuinely must author dynamic prose, it uses
    `meta.message` — the deliberate opt-in channel, mirroring Go's
-   `Meta["message"]`. An unrecognised code degrades on `fault`, never on the
-   code slug. A call site may supply a *fallback* title naming the action that
-   failed; registry copy outranks it, because it describes the actual failure.
+   `Meta["message"]`. An unrecognised code degrades to the **humanised code**
+   (`dataset_import_stalled` → "Dataset import stalled"), not to `fault`:
+   `fault` defaults to `customer` server-side, so heading an unrecognised code
+   with it made a platform failure on an older payload read "Check your input"
+   and a customer's own error read "A connected service didn't respond"
+   (`presentation.ts:1141`). The `fault` titles are reached only when there is
+   no code at all. A call site may supply a *fallback* title naming the action
+   that failed; registry copy outranks it, because it describes the actual
+   failure — the humanised code does not, so a supplied fallback wins there.
 
 2. **A customer sees message, tips, docs and a copyable error id — nothing
    else.** Raw `meta` and the reason chain are not rendered: they exist for
@@ -404,8 +410,10 @@ The rule is inverted, and this is the durable form of it:
 3. **Degrade towards the specific.** A consumer with nothing better shows the
    `code`. A bare slug is an ugly last resort but a precise one, and it beats a
    generic sentence invented over the top of a failure we had already named.
-   The app can do better than the slug because it has a registry (unregistered
-   codes degrade on `fault`); a consumer without one should not pretend to.
+   The app can do better than the slug for a code its registry knows; for one it
+   does not, it follows the same rule and shows the humanised code rather than a
+   `fault`-shaped guess (`presentation.ts:1141`). A consumer without a registry
+   should not pretend to either.
 4. **A foreign or unrecognised error maps to the nearest known code, else
    `unknown`.** Best effort, then the honest generic — never a fabricated
    domain code, which promises the caller an action they do not have.

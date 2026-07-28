@@ -26,7 +26,7 @@ Feature: Handled errors — what the customer actually reads
   # Where the words come from
   # ==========================================================================
 
-  @bdd @handled-errors @presentation
+  @unit @integration @bdd @handled-errors @presentation
   Scenario: A recognised code is described by the registry, never by the wire
     Given a procedure fails with the handled code "query_timeout"
     When the client surfaces that failure
@@ -34,7 +34,7 @@ Feature: Handled errors — what the customer actually reads
     And the customer never reads the code slug itself
     And the customer never reads the server's free-text message
 
-  @bdd @handled-errors @presentation
+  @unit @integration @bdd @handled-errors @presentation
   Scenario: A caller's generic headline loses to specific copy
     Given a call site surfaces an error with the fallback title "Couldn't create project"
     When the failure is a recognised code with its own title
@@ -43,19 +43,25 @@ Feature: Handled errors — what the customer actually reads
     Then the call site's fallback title is shown, so the customer still knows
       which action failed
 
-  @bdd @handled-errors @presentation
-  Scenario: An unrecognised code degrades on fault, not on the code
+  # This used to say the copy degrades on FAULT, and that was a guess dressed
+  # as a fact: `fault` defaults to `customer` server-side, so a platform
+  # failure on a payload predating the field told the customer to check their
+  # input, and a `provider` fault told them a connected service didn't answer
+  # about their own Python error. The code is the one thing actually known,
+  # and a customer can quote it to support. Fault is the fallback only when
+  # there is no code at all — which is when it genuinely is all we have.
+  @unit @bdd @handled-errors @presentation
+  Scenario: An unrecognised code degrades to the code itself, not to a guess at the fault
     Given the client receives a handled code it has no entry for
       # a Go service or a rolling deploy running ahead of this client
     When the client surfaces it
-    Then a "customer" fault reads as a problem with the input
-    And a "platform" fault reads as a problem on our end
-    And a "provider" fault reads as a connected service that didn't answer
-      # deliberately a third party — telling the customer it was us is both
-      # wrong and less actionable
-    And the code slug is never shown
+    Then the code is read back as a sentence — "Dataset import stalled"
+    And it says the same thing whatever the payload's fault claims
+    And a caller that named the action keeps its own headline instead
+    But when the failure carries no code at all
+    Then fault is the only thing known about it, and the copy degrades to that
 
-  @bdd @handled-errors @presentation
+  @unit @bdd @handled-errors @presentation
   Scenario: Server-authored prose travels only in the explicit channel
     Given a handled error carries prose in `meta.message`
       # the deliberate opt-in, mirroring Go's Meta["message"]
@@ -67,7 +73,7 @@ Feature: Handled errors — what the customer actually reads
   # What a customer may see
   # ==========================================================================
 
-  @bdd @handled-errors @presentation
+  @unit @integration @bdd @handled-errors @presentation
   Scenario: Remediation reaches the customer when we have nothing better
     Given a handled error carries tips and a docs URL
     And the client has no copy of its own for that code
@@ -77,20 +83,27 @@ Feature: Handled errors — what the customer actually reads
     Then the most actionable tip is folded into the description
       # a toast has room for a sentence, not a bulleted list
 
-  @bdd @handled-errors @presentation
-  Scenario: Our own copy replaces the tips rather than joining them
+  # This used to say our copy replaces the tips wholesale. It doesn't, and it
+  # shouldn't: suppressing every tip whenever the registry had ANY description
+  # threw away the escalation path on nearly every error —
+  # `clickhouse_unavailable`'s "check the status page or contact support"
+  # never once reached a customer. Only the tip that REPEATS the description
+  # is the duplicate.
+  @unit @integration @bdd @handled-errors @presentation
+  Scenario: A tip that repeats our copy is dropped, one that adds to it is kept
     Given a handled error carries tips and a docs URL
     And the client has copy of its own for that code
     When it is surfaced, inline or as a toast
-    Then the customer reads that copy and no tips at all
+    Then a tip saying what the description already said is not shown
       # the two are competing authorings of the same remediation — the
       # description and the first tip both say "narrow the time range" — so
       # showing both makes the surface repeat itself
+    And a tip that adds something the description did not say is still shown
     And the docs link is still offered
       # docs are an extra destination, not a second phrasing, so they never
       # compete with the description
 
-  @bdd @handled-errors @presentation
+  @unit @integration @bdd @handled-errors @presentation
   Scenario: Technical detail stops at the trace id
     Given a handled error carries meta and a chain of reasons
     When it is surfaced to a customer
@@ -99,7 +112,7 @@ Feature: Handled errors — what the customer actually reads
     And the reason chain is not rendered
       # both are for agents and logs; a person gets an id to quote at support
 
-  @bdd @handled-errors @presentation
+  @unit @bdd @handled-errors @presentation
   Scenario: meta is read only where the client knows its shape
     Given the registry entry for a code declares how to read its meta
     When that meta is present and of the expected type
@@ -107,7 +120,7 @@ Feature: Handled errors — what the customer actually reads
     But when it is absent, or of an unexpected type
     Then the description falls back rather than rendering the raw value
 
-  @bdd @handled-errors @presentation
+  @unit @integration @bdd @handled-errors @presentation
   Scenario: An unhandled failure says nothing, but stays traceable
     Given a procedure fails with an unhandled error
     When the client surfaces it
@@ -116,7 +129,7 @@ Feature: Handled errors — what the customer actually reads
     And a copyable error id is still offered, so support can correlate it
       # the one thing an unhandled error is allowed to tell the client
 
-  @bdd @handled-errors @presentation
+  @integration @bdd @handled-errors @presentation
   Scenario: An error id stays readable where it cannot be copied
     Given a failure carrying an error id
     And the browser offers no clipboard, as on an insecure origin
@@ -129,7 +142,7 @@ Feature: Handled errors — what the customer actually reads
   # Prose a procedure wrote for a person survives the migration
   # ==========================================================================
 
-  @bdd @handled-errors @presentation
+  @unit @bdd @handled-errors @presentation
   Scenario: A plain 4xx keeps the sentence its procedure authored
     Given a procedure fails with a plain client error carrying authored copy
       # e.g. "You've already used this invite" — several hundred such
@@ -138,7 +151,7 @@ Feature: Handled errors — what the customer actually reads
     Then the customer reads that sentence
     And the caller's own headline names the action that failed
 
-  @bdd @handled-errors @presentation
+  @unit @bdd @handled-errors @presentation
   Scenario Outline: Only the boundary decides what counts as authored copy
     Given a procedure fails with <shape>
       # the test needs the error's cause, which never crosses the wire, so the
@@ -154,7 +167,7 @@ Feature: Handled errors — what the customer actually reads
       # message is being the same sentence as something in the cause chain,
       # which is the tell that nobody wrote it for a person
 
-  @bdd @handled-errors @presentation
+  @unit @bdd @handled-errors @presentation
   Scenario Outline: A machine's diagnostic is not mistaken for authored copy
     Given a procedure fails with a plain client error whose message is <shape>
       # routers that wrap a caught failure in a 4xx would otherwise reopen at
@@ -176,7 +189,7 @@ Feature: Handled errors — what the customer actually reads
   # Workflow node failures cross the language boundary as codes
   # ==========================================================================
 
-  @bdd @handled-errors @presentation
+  @unit @bdd @handled-errors @presentation
   Scenario: A workflow node failure reaches the customer as a code, not a Go string
     Given an experiment target calls an HTTP agent whose host does not resolve
     When the nlpgo engine returns its NodeError for the failed node
@@ -187,7 +200,13 @@ Feature: Handled errors — what the customer actually reads
     And the customer reads the registry copy for the code ("Couldn't reach the
       agent"), never the Go net error
 
-  @bdd @handled-errors @presentation
+  # @unimplemented: the enforcement is the exhaustive `satisfies` in
+  # `presentation.ts`, so the failure is a type error and no runtime test can
+  # observe it. What IS pinned is that the check cannot go vacuous —
+  # `presentation.unit.test.ts` fails if the generated code sets come back
+  # empty, which is the one way a `Record` over `never` starts accepting
+  # anything.
+  @unit @unimplemented @bdd @handled-errors @presentation
   Scenario: A node error code with no customer copy fails the build
     Given the presentation registry is exhaustive over the generated node codes
     When the nlpgo engine gains a new `NodeError.Type`
@@ -199,7 +218,7 @@ Feature: Handled errors — what the customer actually reads
   # Validation belongs on the form
   # ==========================================================================
 
-  @bdd @handled-errors @presentation
+  @unit @bdd @handled-errors @presentation
   Scenario: A rejected submission lands on the fields that caused it
     Given a form submit fails with a validation error naming its fields
     When the form is bound to the handled-error bridge
@@ -207,7 +226,7 @@ Feature: Handled errors — what the customer actually reads
     And the first of them takes focus, so a rejection below the fold is seen
     And no toast is shown, because the rejection is already visible
 
-  @bdd @handled-errors @presentation
+  @unit @bdd @handled-errors @presentation
   Scenario: A validation error the form does not own is not swallowed
     Given a form submit fails with a validation error naming fields the form
       does not have
@@ -215,7 +234,7 @@ Feature: Handled errors — what the customer actually reads
     Then it declines it
     And the failure falls through to a toast rather than disappearing
 
-  @bdd @handled-errors @presentation
+  @unit @bdd @handled-errors @presentation
   Scenario: A form-level complaint is only claimed by a form that can show it
     Given a form submit fails with a validation error about the submission as
       a whole, rather than about any one field
@@ -224,7 +243,7 @@ Feature: Handled errors — what the customer actually reads
     Then the complaint is shown at the top of the form
     And no toast is shown, because the rejection is already visible
 
-  @bdd @handled-errors @presentation
+  @unit @bdd @handled-errors @presentation
   Scenario: A form with no error slot never swallows the rejection
     Given a form submit fails with a validation error about the submission as
       a whole
@@ -240,13 +259,16 @@ Feature: Handled errors — what the customer actually reads
   # Keeping it that way
   # ==========================================================================
 
-  @bdd @handled-errors @presentation
+  # @unimplemented: same reason as the node-code scenario above — the guard is
+  # a compile-time `satisfies`, not something a suite can execute. The
+  # scenario below it covers the half that IS executable.
+  @unit @unimplemented @bdd @handled-errors @presentation
   Scenario: A Go service's new code fails the build until its copy is written
     Given the presentation registry is exhaustive over every enumerated code
     When a new code is added to a Go service and the code list is regenerated
     Then the project fails to type-check until its copy is written
 
-  @bdd @handled-errors @presentation
+  @unit @bdd @handled-errors @presentation
   Scenario: A new app code is caught by the suite first, then by the compiler
     Given the presentation registry is exhaustive over every enumerated code
     When a new code is added to the TypeScript app
@@ -256,7 +278,7 @@ Feature: Handled errors — what the customer actually reads
     And once it is enumerated, the project fails to type-check until its copy
       is written
 
-  @bdd @handled-errors @presentation
+  @unit @bdd @handled-errors @presentation
   Scenario: The list of app codes cannot drift from the code that raises them
     Given the app error codes are enumerated for the registry to be keyed on
     And every tree that can raise one is searched — the app, the enterprise
@@ -269,7 +291,7 @@ Feature: Handled errors — what the customer actually reads
     And when a code is enumerated that nothing raises
     Then the suite fails too, because its copy is dead
 
-  @bdd @handled-errors @presentation
+  @unit @bdd @handled-errors @presentation
   Scenario: The raw-message habit cannot grow back
     Given error toasts must be raised through the shared helper
     When a call site renders an error's raw message into a toast instead

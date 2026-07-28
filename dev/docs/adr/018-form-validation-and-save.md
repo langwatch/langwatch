@@ -37,7 +37,7 @@ names fields lands on those fields via `applyHandledErrorToForm`.)*
 | Layer | Where | Tool | Surface |
 |---|---|---|---|
 | Field-level (sync schema rules) | `react-hook-form` + `zodResolver` | Schema | `<Field.ErrorText>` inline |
-| Cross-field (one input depends on another) | Submit handler | Manual | `toaster.create({type:"error"})` + `return` before mutation |
+| Cross-field (one input depends on another) | Submit handler | Manual | `toaster.create({type:"error"})` with copy **you** wrote + `return` before mutation |
 | Server-side field rejection (a `validation_error` naming fields) | Mutation `onError` | `applyHandledErrorToForm` | The offending fields, marked in place, plus `<FormServerError>` for form-level complaints |
 | Server-side, everything else (auth, conflicts, business rules) | Mutation `onError` | `showErrorToast` | Toast, with copy from the code-keyed presentation registry |
 
@@ -82,10 +82,15 @@ This ADR's third row originally said "server-side (uniqueness, auth, business
 rules) → `toaster.create({type:"error"})`", and that stopped being right twice
 over.
 
-First, **never call `toaster.create` for an error directly.** Since
-[#5984](https://github.com/langwatch/langwatch/pull/5984) a handled error's tRPC
-wire message is its stable `code`, so `description: error.message` renders
-`validation_error` at the customer. Use `showErrorToast({ error, fallbackTitle })`
+First, **never call `toaster.create` for an error that came back from the
+server.** Since [#5984](https://github.com/langwatch/langwatch/pull/5984) a
+handled error's tRPC wire message is its stable `code`, so
+`description: error.message` renders `validation_error` at the customer. That
+reasoning does not reach the second row: a cross-field complaint is copy the
+form wrote about state it can see, it never crossed a wire, and `toaster.create`
+remains correct for it. The dividing line is provenance, not the API — client
+copy toasts itself, a server error goes through
+`showErrorToast({ error, fallbackTitle })`
 from `~/features/errors`: it reads the handled payload, takes its copy from the
 code-keyed presentation registry, absorbs the global-handler dedup check, and
 degrades unrecognised failures to one calm generic state plus a copyable error
@@ -105,17 +110,32 @@ rejection, so the caller still toasts whatever it couldn't show:
 
 ```tsx
 onError: (error) => {
-  if (applyHandledErrorToForm({ error, form, hasFormErrorSlot: true })) return;
+  if (applyHandledErrorToForm({ error, form })) return;
   showErrorToast({ error, fallbackTitle: "Couldn't save the team" });
 },
 ```
 
-`hasFormErrorSlot` defaults to `false` and **must only be `true` if the form
-actually renders `<FormServerError form={form} />`.** Form-level complaints go
-to `root.serverError`, and `setError` succeeds whether or not anything displays
-it — so claiming the error without the slot suppresses the toast and shows
-nothing, and Save appears to do nothing at all. That is the exact failure mode
-of #3785, reintroduced by a default. The pair ships together.
+`hasFormErrorSlot` is omitted there on purpose: it defaults to `false`, and the
+default is the safe one — the bridge declines to claim a form-level complaint,
+so the toast still fires. **Only pass `true` in the same change that renders the
+slot**, and read the two together:
+
+```tsx
+onError: (error) => {
+  if (applyHandledErrorToForm({ error, form, hasFormErrorSlot: true })) return;
+  showErrorToast({ error, fallbackTitle: "Couldn't save the team" });
+},
+
+// …and in this form's JSX, the slot that `true` promised:
+//
+//   <FormServerError form={form} />
+//   {/* fields */}
+```
+
+Form-level complaints go to `root.serverError`, and `setError` succeeds whether
+or not anything displays it — so claiming the error without the slot suppresses
+the toast and shows nothing, and Save appears to do nothing at all. That is the
+exact failure mode of #3785, reintroduced by a default. The pair ships together.
 
 See `dev/docs/best_practices/error-handling.md` and
 [ADR-045](./045-domain-errors-handled-boundary.md).

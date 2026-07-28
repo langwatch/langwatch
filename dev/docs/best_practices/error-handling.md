@@ -115,7 +115,7 @@ This is the part that trips people up, so be precise about it:
 | `HandledError.message` | Logs, OTel, exception capture — **and the REST response body**. Customer-safe by rule, never the app's UI copy |
 | The wire `message` field | **Per transport.** tRPC collapses it to the `code` ([#5984](https://github.com/langwatch/langwatch/pull/5984)). REST sends `{ error: code, message }`, so the sentence rides *alongside* the code. SSE sends the code with the serialised payload beside it |
 | Server-authored dynamic prose | `meta.message`, an explicit opt-in — mirrors Go, where free text appears only when a caller sets `Meta["message"]`. Almost always prose *we* wrote; the exception is a third party's own sentence deliberately relayed because it is the whole answer (a model provider's "your credit balance is too low" — `llm_upstream_error`). Either way a registry entry that renders it passes it through `safeProse` first, and the codes allowed to render it at all are named one by one in `presentation.unit.test.ts` |
-| What a consumer with no registry reads | `meta.message` → `message` → `code`, in that order — the CLI (`packages/cli-cards/src/handled-error.ts`) and the Python SDK (`extract_api_error_detail`) both implement it |
+| What a consumer with no registry reads | `meta.message` → `message` → `code`, in that order — the CLI (`packages/langy/src/cards/handled-error.ts`) and the Python SDK (`extract_api_error_detail`) both implement it |
 
 Handled-error messages were leaking env vars and internal hostnames to browsers.
 Two things closed that, and only one of them is on the wire: tRPC now sends the
@@ -151,31 +151,87 @@ in order of how often they are violated:
    parser's message that never crossed the wire. Mark that one line
    `// no-raw-error-toast-ok` with a reason. Prefer the marker to the guard's
    file-level allowlist: an exemption entry blinds the guard to the whole file.
+
+   **The marker goes where the value is *used*, not where it is derived.** The
+   scanner tracks taint through locals to a fixpoint — `const message = e
+   instanceof Error ? e.message : "…"` taints `message`, and so does a second
+   local assigned from it — but it only ever reports the copy slot the tainted
+   value reaches. Suppression is matched against the line of that slot's key
+   (`title`, `description` or `fallbackTitle`), so a marker parked on the
+   assignment suppresses nothing:
+
+   ```ts
+   const friendly = e instanceof Error ? e.message : "Couldn't save";
+   toaster.create({
+     description: friendly, // no-raw-error-toast-ok — sanitised local, never on the wire
+     type: "error",
+   });
+   ```
+
+   When the formatter wraps a long value onto its own line, the marker may sit
+   anywhere from the key's line to the line the value ends on — so both the
+   compact and the wrapped spelling work.
+
+   **Write the marker *inside* the call or element it exempts.** Both guards
+   honour it there, and only there. GritQL sees a node as the span from its
+   first token to its last, so the Biome plugin can only see comments *between*
+   those tokens: a marker trailing the statement's closing `);` suppresses the
+   scanner but not the plugin, and the line still fails CI. Inside the
+   construct, either spelling is honoured:
+
+   ```tsx
+   toaster.create({
+     description: friendly, // no-raw-error-toast-ok — sanitised local
+     type: "error",
+   });
+
+   <Alert.Description>
+     {parseFailure /* no-raw-error-toast-ok — local parser, never on the wire */}
+   </Alert.Description>
+   ```
+
+   If you need a blanket escape hatch, `// biome-ignore lint: <reason>` on the
+   line above works. `// biome-ignore plugin: …` parses but suppresses nothing,
+   and `// biome-ignore plugin/no-raw-error-toast: …` is a hard parse error —
+   neither is a valid Biome suppression category.
+
 2. **Title and description both come from the `code`**, not the server. The
    registry owns the customer-facing copy. A code the registry does not know
    degrades to the humanised code itself (`dataset_import_stalled` → "Dataset
    import stalled") — specific, and quotable to support — because a client can
-   be older than the service that minted the code. The `fault`-based fallback
-   (customer → "Check your input", platform → "Something went wrong on our end",
-   provider → "A connected service didn't respond") is reached only when there
-   is no code at all. Those three are distinct on purpose — a provider fault is
-   a *third party* that didn't answer, and telling the customer it was us is
-   both wrong and less actionable.
-3. **`docsUrl` is always offered; `tips` are a fallback, not a supplement.**
-   `ErrorActions` renders the docs link whenever there is one. Tips render only
-   when the registry has **no** description for the code —
-   `<HandledErrorAlert>` lists them all, `showErrorToast` folds in the first
-   (`description || tips[0]`). The two are competing authorings of the same
-   remediation: `query_timeout`'s registry description and its first tip both
-   say "narrow the time range", so showing both makes the surface repeat
-   itself. The registry wins because it is written for this surface; tips exist
-   for agents driving the API/CLI/MCP, which have no registry to read. This is
-   deliberate and pinned by tests in
-   `logic/__tests__/showErrorToast.unit.test.ts` and
+   be older than the service that minted the code. **The caller's
+   `fallbackTitle` outranks that**, though: `showErrorToast` and
+   `<HandledErrorAlert>` only reach for the humanised code when the call site
+   supplied no fallback, because "Couldn't create project" at least names the
+   action, where a slug names only the failure. Registry copy is the one thing
+   that beats a fallback, since it describes this exact failure. So on the path
+   this doc tells you to write — always pass a `fallbackTitle` — the humanised
+   code is a *last* resort, not the usual unregistered-code headline. The
+   `fault`-based fallback (customer → "Check your input", platform → "Something
+   went wrong on our end", provider → "A connected service didn't respond") is
+   reached only when there is no code at all. Those three are distinct on
+   purpose — a provider fault is a *third party* that didn't answer, and telling
+   the customer it was us is both wrong and less actionable.
+3. **`docsUrl` is always offered; a `tip` shows unless it repeats the
+   description.** `ErrorActions` renders the docs link whenever there is one.
+   Tips are the server's remediation, written for agents driving the
+   API/CLI/MCP; the registry description is written for this surface. Where the
+   two say the same thing, the registry wins and the tip is dropped —
+   `query_timeout`'s description and its first tip both say "narrow the time
+   range", so showing both makes the surface repeat itself. Where a tip says
+   something the description does not, it is kept: dropping every tip whenever
+   the registry had *any* description threw away the escalation path on nearly
+   every error, and `clickhouse_unavailable`'s "check the status page or
+   contact support" never once reached a customer.
+
+   `resolveErrorCopy` (`logic/resolveErrorCopy.ts`) applies that comparison
+   once, on a normalised form, and both surfaces render its output:
+   `<HandledErrorAlert>` lists every remaining tip, `showErrorToast` folds in
+   the first. Pinned by `logic/__tests__/showErrorToast.unit.test.ts` and
    `components/__tests__/HandledErrorAlert.integration.test.tsx`.
 4. **Never render raw `meta` or the reason chain in the UI.** They are for agents
-   and logs. A customer sees a title, one description (registry copy, or tips
-   when there is none), a docs link, and a copyable error id. The
+   and logs. A customer sees a title, a description (registry copy, plus any
+   tip that adds to it), a docs link, and a copyable error id. The
    registry may read a *named* `meta` field where its entry declares the shape
    and the value is something the customer supplied or chose — a filter field
    they typed, a notification channel they picked. That is the whole of the
@@ -195,7 +251,8 @@ Everything lives in `langwatch/src/features/errors`:
 | `applyHandledErrorToForm` + `<FormServerError>` | A rejected submit. See the warning below — they ship as a pair. |
 | `describeError` | Slots that can only take a string: a `title=` tooltip, an `aria-label`, a state field typed `string`. It loses the tips, the docs link and the error id, so prefer a component wherever one can be rendered. |
 | `explainSerializedError` | A handled error that arrived already-structured on an event payload (a `target_result.domainError`) rather than off a transport envelope. |
-| `readHandledError` / `readErrorTraceId` | Lifting the payload when you need to branch on `code` yourself. |
+| `readHandledError` | Lifting the payload when you need to branch on `code` yourself. |
+| `resolveErrorCopy` | Title, description, supplemental tips, docs link and trace id, resolved once, for a surface that renders its own chrome. `showErrorToast`, `<HandledErrorAlert>` and `describeError` are all built on it — reach for it only when none of those three fits. |
 
 Do not hand-roll `error.data?.error` at a call site — three separate ad-hoc
 readers is how this got inconsistent the first time. In particular, do not

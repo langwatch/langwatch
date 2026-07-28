@@ -14,7 +14,8 @@ Code is organized into three layers. The **domain layer** (Service + Repository)
 │  API Layer (Router/Controller)                              │
 │  server/api/routers/suites/                                 │
 │  Translates HTTP/tRPC requests → domain calls.              │
-│  Handles auth, request validation, error mapping.           │
+│  Handles auth and request validation. Does NOT map errors — │
+│  the boundary serialises a HandledError on its own.         │
 ├─────────────────────────────────────────────────────────────┤
 │  Domain Layer (Service + Repository)                        │
 │  server/suites/                                             │
@@ -41,7 +42,7 @@ Code is organized into three layers. The **domain layer** (Service + Repository)
 
 | Layer | Responsibility | Examples |
 |-------|----------------|----------|
-| Router | Request/response handling, auth, error mapping | `suite.router.ts`, `dataset.router.ts` |
+| Router | Request/response handling, auth. Lets domain errors through untouched | `suite.router.ts`, `dataset.router.ts` |
 | Service | Business logic, orchestration, validation | `DatasetService`, `SuiteService` |
 | Repository | Pure data access (CRUD), no business logic | `DatasetRepository`, `SuiteRepository` |
 

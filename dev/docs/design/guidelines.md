@@ -269,8 +269,10 @@ const handleSubmit = async () => {
   await mutation.mutateAsync(payload);
 };
 
-// …and, at the top of the form, the slot the `true` above promised:
-<FormServerError form={form} />
+// …and, at the top of the form's JSX, the slot the `true` above promised:
+//
+//   <FormServerError form={form} />
+//   {/* fields */}
 ```
 
 `hasFormErrorSlot: true` is a promise that this form renders `<FormServerError>`.
