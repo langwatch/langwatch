@@ -116,7 +116,7 @@ describe("the real command tree", () => {
 
       // Launchers and passthroughs: they exec another tool and own its stdio.
       ...(
-        ["claude", "codex", "cursor", "gemini", "opencode", "open"] as const
+        ["claude", "codex", "cursor", "gemini", "opencode", "copilot", "open"] as const
       ).map((n) => [n, "launches another tool and owns its stdio"] as const),
       // Agent-only signal: prints the resource id for the relay to intercept;
       // it has no -o json data mode because it returns no platform result.

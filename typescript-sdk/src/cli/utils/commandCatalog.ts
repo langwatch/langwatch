@@ -83,6 +83,7 @@ export const PLUMBING_COMMANDS: ReadonlySet<string> = new Set([
   "cursor",
   "gemini",
   "opencode",
+  "copilot",
   // Support reporting: sends an issue report to the LangWatch team; no
   // platform resource to card. Mirrored in the app's capabilityCatalog
   // EXCLUDED_COMMANDS.
