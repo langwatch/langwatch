@@ -67,6 +67,32 @@ Feature: A staged job's id is its identity and its retry count rides on the mess
   Background:
     Given a GroupQueue dispatching per-aggregate FIFO groups
 
+  Rule: A retry records its attempt and re-stages together, or does neither
+
+    # Removing the marker from the id removed a carrier, and one reader depended
+    # on it more than the others: a re-staged SIBLING comes back with its
+    # original message and no attempt of its own, so for that job the group's
+    # retry chain is now the ONLY place the count lives.
+    #
+    # That makes a half-completed retry dangerous in a way it was not before. If
+    # the chain write fails on a brief connection blip and the re-stage then
+    # succeeds, the next claim led by such a sibling reads no attempt anywhere
+    # and starts over: a bounded ladder becomes unbounded, and a fold that uses
+    # the attempt to recognise a retry discards its record of what it already
+    # applied and folds the same events twice. So the two writes are one step.
+
+    @integration
+    Scenario: A retry that cannot record its attempt does not re-stage the job
+      Given a claimed job that fails with a retryable error
+      When the queue cannot record the attempt on the group's retry chain
+      Then the job is not re-staged as though it were on a fresh attempt
+
+    @integration
+    Scenario: A sibling-led claim after a retry still sees the attempt the ladder reached
+      Given a group whose retry was re-staged alongside an untouched sibling
+      When that sibling leads the next claim
+      Then it is counted on the attempt the ladder had reached, not the first
+
   Rule: A staged job keeps one id from the moment it is sent
 
     @integration

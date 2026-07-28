@@ -1380,6 +1380,15 @@ const RETRY_RESTAGE_LUA =
   `
 local activeKey       = KEYS[1]
 local totalPendingKey = KEYS[2]
+-- The group's retry chain. Written HERE rather than by the caller beforehand:
+-- with the staged job id no longer carrying a /r/<n> marker (ADR-080), this
+-- counter is the only attempt carrier a re-staged SIBLING has — a sibling is
+-- re-queued with its original envelope and no attempt of its own. A separate
+-- SET that failed while this script went on to succeed would hand the next
+-- sibling-led claim a fresh budget, restarting a bounded ladder and letting a
+-- fold re-apply what the chain had already applied. One script means both land
+-- or neither does.
+local attemptKey      = KEYS[3]
 
 local keyPrefix             = ARGV[1]
 local groupId               = ARGV[2]
@@ -1393,11 +1402,19 @@ local retryTtlSec           = tonumber(ARGV[7])
 -- in-flight retry's slot doesn't lapse out of the live count.
 local tenantCountKeyPrefix  = ARGV[8]
 local nowMs                 = tonumber(ARGV[9])
+local attempt               = ARGV[10]
+local attemptTtlSec         = tonumber(ARGV[11])
 
 -- 1. Validate active key matches
 local currentActive = redis.call("GET", activeKey)
 if currentActive ~= stagedJobId then
   return 0
+end
+
+-- 1b. Record the attempt on the group's retry chain. After the guard, so a
+--     worker that has lost the slot cannot advance a chain it no longer owns.
+if attempt ~= "" then
+  redis.call("SET", attemptKey, attempt, "EX", attemptTtlSec)
 end
 
 -- 2. Re-stage job with future score (backoff delay)
@@ -2137,6 +2154,8 @@ export class GroupStagingScripts {
     dispatchAfterMs,
     jobDataJson,
     backoffMs,
+    attempt,
+    attemptTtlSec,
   }: {
     groupId: string;
     stagedJobId: string;
@@ -2144,17 +2163,22 @@ export class GroupStagingScripts {
     dispatchAfterMs: number;
     jobDataJson: string;
     backoffMs: number;
+    /** Recorded on the group's retry chain in the same atomic step. */
+    attempt: number;
+    attemptTtlSec: number;
   }): Promise<boolean> {
     const activeKey = `${this.keyPrefix}group:${groupId}:active`;
     const totalPendingKey = `${this.keyPrefix}stats:total-pending`;
+    const attemptKey = `${this.keyPrefix}group:${groupId}:attempt`;
     // TTL = backoff + 2s buffer so the key expires just after the job becomes eligible
     const retryTtlSec = Math.ceil(backoffMs / 1000) + 2;
 
     const result = await retryRestageScript.run(
       this.redis,
-      2,
+      3,
       activeKey,
       totalPendingKey,
+      attemptKey,
       this.keyPrefix,
       groupId,
       stagedJobId,
@@ -2164,6 +2188,8 @@ export class GroupStagingScripts {
       String(retryTtlSec),
       `${this.keyPrefix}tenant_active_z:`,
       String(Date.now()),
+      String(attempt),
+      String(attemptTtlSec),
     );
 
     return result === 1;

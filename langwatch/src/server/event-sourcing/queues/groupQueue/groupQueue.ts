@@ -1375,10 +1375,6 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                   return;
                 }
 
-                await this.recordGroupAttempt({
-                  groupId,
-                  attempt: attempt + 1,
-                });
                 // STOP THE HEARTBEAT BEFORE THE RE-STAGE IS ISSUED, not after
                 // it returns (ADR-080).
                 //
@@ -1409,6 +1405,14 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                   dispatchAfterMs: Date.now() + backoffMs,
                   jobDataJson: retryJobData,
                   backoffMs,
+                  // Written inside the same script as the re-stage. The chain is
+                  // the only attempt carrier a re-staged SIBLING has — it comes
+                  // back with its original envelope and no `__attempt`, and the
+                  // id no longer carries a marker either — so a separate write
+                  // that failed while this succeeded would hand the next
+                  // sibling-led claim a fresh budget.
+                  attempt: attempt + 1,
+                  attemptTtlSec: GROUP_ATTEMPT_TTL_SECONDS,
                 });
                 // Only transfer once the replacement is actually staged.
                 // retryRestage returns false when the active key is stale —
@@ -1662,32 +1666,6 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         "Could not read the group retry-chain counter — a sibling-led retry may read as a fresh delivery and re-apply already-folded events",
       );
       return 0;
-    }
-  }
-
-  private async recordGroupAttempt({
-    groupId,
-    attempt,
-  }: {
-    groupId: string;
-    attempt: number;
-  }): Promise<void> {
-    try {
-      await this.redisConnection.set(
-        this.groupAttemptKey(groupId),
-        String(attempt),
-        "EX",
-        GROUP_ATTEMPT_TTL_SECONDS,
-      );
-    } catch (err) {
-      // Not best-effort. Losing this makes a sibling-led batch read as a fresh
-      // delivery, which restarts the retry budget AND lets a fold discard the
-      // record of what the chain already applied — so the same events get
-      // folded twice.
-      this.logger.error(
-        { queueName: this.queueName, groupId, attempt, err },
-        "Failed to record the group retry attempt — a sibling-led retry may re-apply already-folded events",
-      );
     }
   }
 
@@ -2093,15 +2071,21 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     // byte, so the content hash and the lease identity are untouched — a value
     // whose machinery does not live in the header comes back unchanged, and the
     // chain below is then the only thing keeping the ladder finite.
-    await this.recordGroupAttempt({ groupId, attempt });
-    await this.scripts.retryRestage({
+    const restaged = await this.scripts.retryRestage({
       groupId,
       stagedJobId,
       newStagedJobId: stagedJobId,
       dispatchAfterMs: Date.now() + backoffMs,
       jobDataJson: withJobAttempt({ value: jobDataJson, attempt }),
       backoffMs,
+      attempt,
+      attemptTtlSec: GROUP_ATTEMPT_TTL_SECONDS,
     });
+    // The script writes the chain in the same step, so a value whose machinery
+    // does not live in the header still advances — that write is what keeps
+    // this ladder finite. It returns false only when another worker owns the
+    // slot, in which case nothing was written and this job is no longer ours.
+    if (!restaged) return;
     this.logger.warn(
       {
         queueName: this.queueName,
