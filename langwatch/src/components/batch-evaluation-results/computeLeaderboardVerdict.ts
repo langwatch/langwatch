@@ -16,7 +16,10 @@
  */
 
 import type { BTLeaderboard, BTLeaderboardEntry } from "./computeBTLeaderboard";
-import type { VariantMetrics } from "./computeVariantMetrics";
+import {
+  MIN_PRICED_ROWS,
+  type VariantMetrics,
+} from "./computeVariantMetrics";
 import { areDistinguishable } from "./scoreSeparation";
 
 export type LeaderboardVerdict = {
@@ -101,13 +104,6 @@ export const computeLeaderboardVerdict = (
     tiedIds: tied.map((entry) => entry.variantId),
   };
 };
-
-/**
- * Priced rows a variant needs before its mean cost may drive a headline.
- * Low on purpose — this is a floor against "one row happened to record a
- * cost", not a statistical sample-size requirement.
- */
-export const MIN_PRICED_ROWS = 5;
 
 export type CheaperAlternative = {
   /** Cheapest variant among the tied set. May be the top-ranked one. */

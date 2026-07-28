@@ -22,12 +22,16 @@
  *     rest of this feature exists to suppress, and do it in the one place a
  *     reader is being told to drop a variant.
  *
- *   - COST and SPEED must differ by more than `TRADEOFF_NOISE_FLOOR` in
- *     relative terms. This is a floor against rounding noise, NOT a
- *     significance test: means have their own spread and this does not model
- *     it. It exists so that a fraction of a cent cannot promote itself into
- *     "cheaper", which would let dominance be decided by a difference no one
- *     would act on.
+ *   - COST and SPEED use the interval of the mean PER-ROW difference, paired
+ *     within the row because both variants answered the same rows and rows
+ *     vary far more than variants do. "Cheaper" means that interval sits
+ *     entirely below zero.
+ *
+ *     `TRADEOFF_NOISE_FLOOR` survives only as the fallback for runs that
+ *     produced no interval. It was the whole test once, and it was a guess
+ *     dressed as a rule: a flat 5% relative gap called a 6% difference over
+ *     two rows "cheaper" while missing a dead-certain 4% one over two
+ *     hundred. Sample size is exactly what it could not see.
  *
  * A dimension is only compared at all when every ranked variant recorded
  * enough of it, so a statement never silently rests on one variant's missing
@@ -40,8 +44,10 @@ import type {
   BTLeaderboardEntry,
   ScoreDifferenceCI,
 } from "./computeBTLeaderboard";
-import { MIN_PRICED_ROWS } from "./computeLeaderboardVerdict";
-import type { VariantMetrics } from "./computeVariantMetrics";
+import {
+  MIN_PRICED_ROWS,
+  type VariantMetrics,
+} from "./computeVariantMetrics";
 import { areDistinguishable } from "./scoreSeparation";
 
 /**
