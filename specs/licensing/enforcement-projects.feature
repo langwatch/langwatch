@@ -145,6 +145,12 @@ Feature: Project Limit Enforcement with License
   # (organization, owner), so the owner is left with no personal workspace and
   # no way to get one back.
 
+  Scenario: Creating a project in a personal workspace is refused
+    Given the organization has 1 personal team
+    When I create a project in the personal team
+    Then the request fails with FORBIDDEN
+    And the personal workspace still holds exactly one project
+
   Scenario: Archiving a personal project is refused
     Given the organization has 1 personal project
     When I archive the personal project

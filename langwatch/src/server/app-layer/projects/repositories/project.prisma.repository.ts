@@ -195,18 +195,17 @@ export class PrismaProjectRepository implements ProjectRepository {
     return this.prisma.project.findFirst({ where: { slug, teamId } });
   }
 
-  async teamBelongsToOrganization({
+  async findTeamInOrganization({
     teamId,
     organizationId,
   }: {
     teamId: string;
     organizationId: string;
-  }): Promise<boolean> {
-    const team = await this.prisma.team.findFirst({
+  }): Promise<{ id: string; isPersonal: boolean } | null> {
+    return this.prisma.team.findFirst({
       where: { id: teamId, organizationId },
-      select: { id: true },
+      select: { id: true, isPersonal: true },
     });
-    return !!team;
   }
 
   async findActiveTeamInOrganization({

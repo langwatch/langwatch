@@ -33,9 +33,22 @@ import {
   TeamUserRole,
 } from "@prisma/client";
 import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 
 import { PersonalWorkspaceService } from "../../../../../ee/governance/services/personalWorkspace.service";
+import { FREE_PLAN } from "../../../../../ee/licensing/constants";
+import { globalForApp, resetApp } from "../../../app-layer/app";
+import { createTestApp } from "../../../app-layer/presets";
+import { PlanProviderService } from "../../../app-layer/subscription/plan-provider";
 import { LicenseEnforcementRepository } from "../../../license-enforcement/license-enforcement.repository";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
@@ -403,6 +416,70 @@ describe("given a personal workspace beside a shared team in one organization", 
         created: false,
         team: { id: personalTeamId },
       });
+    });
+  });
+
+  describe("when the owner creates a second project in their personal team", () => {
+    // Plan limits are wired generously on purpose. Without them the creation
+    // would fail for want of an app rather than for the reason under test,
+    // and the assertion that no project appeared would pass even with the
+    // guard removed.
+    beforeEach(async () => {
+      await resetApp();
+      globalForApp.__langwatch_app = createTestApp({
+        planProvider: PlanProviderService.create({
+          getActivePlan: vi.fn().mockResolvedValue({
+            ...FREE_PLAN,
+            overrideAddingLimitations: false,
+            maxProjects: 100,
+          }),
+        }),
+        usageLimits: {
+          notifyResourceLimitReached: vi.fn().mockResolvedValue(undefined),
+          checkAndSendWarning: vi.fn().mockResolvedValue(undefined),
+        } as any,
+      });
+    });
+
+    afterEach(async () => {
+      await resetApp();
+    });
+
+    /** @scenario Creating a project in a personal workspace is refused */
+    it("refuses the creation", async () => {
+      await expect(
+        callerAsOwner().project.create({
+          organizationId,
+          teamId: personalTeamId,
+          name: "Second Personal Project",
+          language: "en",
+          framework: "test",
+        }),
+      ).rejects.toMatchObject({
+        code: "FORBIDDEN",
+        message: expect.stringContaining(
+          "cannot be created in a personal workspace",
+        ),
+      });
+    });
+
+    /** @scenario Creating a project in a personal workspace is refused */
+    it("leaves the workspace holding exactly its one project", async () => {
+      await expect(
+        callerAsOwner().project.create({
+          organizationId,
+          teamId: personalTeamId,
+          name: "Second Personal Project",
+          language: "en",
+          framework: "test",
+        }),
+      ).rejects.toThrow();
+
+      const projects = await prisma.project.findMany({
+        where: { teamId: personalTeamId, archivedAt: null },
+        select: { id: true },
+      });
+      expect(projects).toEqual([{ id: personalProjectId }]);
     });
   });
 

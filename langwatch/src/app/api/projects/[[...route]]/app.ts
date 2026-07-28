@@ -144,6 +144,9 @@ secured.access(requires("project:create")).post(
       if (error instanceof TeamNotInOrganizationError) {
         throw new BadRequestError(error.message);
       }
+      if (error instanceof PersonalWorkspaceBoundaryError) {
+        throw new ForbiddenError(error.message);
+      }
       if (error instanceof ProjectSlugConflictError) {
         return c.json({ error: "Conflict", message: error.message }, 409);
       }

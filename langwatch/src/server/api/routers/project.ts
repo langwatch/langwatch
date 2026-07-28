@@ -14,6 +14,7 @@ import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 import {
   personalWorkspaceArchiveViolation,
+  personalWorkspaceCreateViolation,
   personalWorkspaceMoveViolation,
 } from "~/server/app-layer/projects/project.service";
 import type { Session } from "~/server/auth";
@@ -74,6 +75,21 @@ export const projectRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }) => {
       const userId = ctx.session.user.id;
       const prisma = ctx.prisma;
+
+      // The owner is ADMIN of their own personal team, so `project:create`
+      // passes there. See the helper for why a second project does not belong.
+      if (input.teamId) {
+        const destinationTeam = await prisma.team.findFirst({
+          where: { id: input.teamId, organizationId: input.organizationId },
+          select: { isPersonal: true },
+        });
+        const createViolation = personalWorkspaceCreateViolation(
+          destinationTeam?.isPersonal ?? false,
+        );
+        if (createViolation) {
+          throw new TRPCError({ code: "FORBIDDEN", message: createViolation });
+        }
+      }
 
       const enforcement = createLicenseEnforcementService(prisma);
       try {

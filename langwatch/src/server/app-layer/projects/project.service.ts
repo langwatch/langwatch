@@ -67,6 +67,10 @@ export const PERSONAL_PROJECT_MOVE_OUT_REFUSAL =
 export const PERSONAL_PROJECT_MOVE_IN_REFUSAL =
   "Projects cannot be moved into a personal workspace. Personal workspaces hold only their owner's personal project.";
 
+/** The refusal a personal team gives to anything that would add a project to it. */
+export const PERSONAL_TEAM_PROJECT_CREATE_REFUSAL =
+  "Projects cannot be created in a personal workspace. A personal workspace holds only the personal project provisioned with it.";
+
 /** The refusal a personal project gives to anything that would archive it. */
 export const PERSONAL_PROJECT_ARCHIVE_REFUSAL =
   "Personal workspace projects cannot be archived. A personal workspace is its project, and archiving it leaves the owner without one in this organization.";
@@ -115,6 +119,23 @@ export function personalWorkspaceArchiveViolation(
   return isProjectPersonal ? PERSONAL_PROJECT_ARCHIVE_REFUSAL : null;
 }
 
+/**
+ * Whether creating a project in this team would put a second project in a
+ * personal workspace, and the reason to give back if it would.
+ *
+ * The workspace is one team holding one project, and the owner is ADMIN of
+ * their own team, so `project:create` passes there. A second project is
+ * counted correctly by plan limits but sits somewhere team selection
+ * deliberately hides, which is a project nobody but its owner can find.
+ * `PersonalWorkspaceService` provisions the one project that belongs there
+ * without going through this service.
+ */
+export function personalWorkspaceCreateViolation(
+  isDestinationTeamPersonal: boolean,
+): string | null {
+  return isDestinationTeamPersonal ? PERSONAL_TEAM_PROJECT_CREATE_REFUSAL : null;
+}
+
 export interface CreateProjectParams {
   organizationId: string;
   userId?: string | null;
@@ -140,14 +161,20 @@ export class ProjectService {
     let teamId: string;
 
     if (params.teamId) {
-      const belongsToOrg = await this.repo.teamBelongsToOrganization({
+      const destinationTeam = await this.repo.findTeamInOrganization({
         teamId: params.teamId,
         organizationId: params.organizationId,
       });
-      if (!belongsToOrg) {
+      if (!destinationTeam) {
         throw new TeamNotInOrganizationError(
           "Team does not belong to this organization",
         );
+      }
+      const createViolation = personalWorkspaceCreateViolation(
+        destinationTeam.isPersonal,
+      );
+      if (createViolation) {
+        throw new PersonalWorkspaceBoundaryError(createViolation);
       }
       teamId = params.teamId;
     } else {
