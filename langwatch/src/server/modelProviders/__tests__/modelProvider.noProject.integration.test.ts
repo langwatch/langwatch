@@ -591,7 +591,22 @@ describe("ModelProviderService on an organization with no project (real DB)", ()
           },
           scopes: [{ scopeType: "ORGANIZATION", scopeId: orgId }],
         }),
-      ).rejects.toThrow(/organization:manage/);
+        // The permission slug is asserted on `meta`, not on the message. It
+        // used to be readable in the prose only because the prose recited an
+        // internal RBAC identifier at the customer; the sentence is now copy,
+        // and `meta.requiredPermission` is the machine-readable fact. Which
+        // permission was demanded is still the claim under test — it is what
+        // separates this case from the TEAM-scope one below.
+      ).rejects.toMatchObject({
+        code: "FORBIDDEN",
+        cause: {
+          code: "model_provider_scope_forbidden",
+          meta: {
+            scopeType: "ORGANIZATION",
+            requiredPermission: "organization:manage",
+          },
+        },
+      });
 
       expect(fetchCalls).toEqual([]);
     });
@@ -608,7 +623,16 @@ describe("ModelProviderService on an organization with no project (real DB)", ()
           },
           scopes: [{ scopeType: "ORGANIZATION", scopeId: orgId }],
         }),
-      ).rejects.toThrow(/organization:manage/);
+      ).rejects.toMatchObject({
+        code: "FORBIDDEN",
+        cause: {
+          code: "model_provider_scope_forbidden",
+          meta: {
+            scopeType: "ORGANIZATION",
+            requiredPermission: "organization:manage",
+          },
+        },
+      });
 
       expect(fetchCalls).toEqual([]);
     });
@@ -625,7 +649,14 @@ describe("ModelProviderService on an organization with no project (real DB)", ()
           },
           scopes: [{ scopeType: "TEAM", scopeId: teamId }],
         }),
-      ).rejects.toThrow(/team:manage/);
+        // TEAM scope, so `team:manage` — the distinction this test exists for.
+      ).rejects.toMatchObject({
+        code: "FORBIDDEN",
+        cause: {
+          code: "model_provider_scope_forbidden",
+          meta: { scopeType: "TEAM", requiredPermission: "team:manage" },
+        },
+      });
 
       expect(fetchCalls).toEqual([]);
     });
@@ -686,7 +717,15 @@ describe("ModelProviderService on an organization with no project (real DB)", ()
           },
           ctxFor(outsiderUserId),
         ),
-      ).rejects.toThrow(/organization:manage/);
+        // Straight at the service, so no tRPC wrapper: the handled error
+        // itself is what arrives, and its `code` is the assertion.
+      ).rejects.toMatchObject({
+        code: "model_provider_scope_forbidden",
+        meta: {
+          scopeType: "ORGANIZATION",
+          requiredPermission: "organization:manage",
+        },
+      });
 
       const after = await prisma.modelProvider.count({
         where: { organizationId: orgId },
@@ -715,7 +754,13 @@ describe("ModelProviderService on an organization with no project (real DB)", ()
           },
           ctxFor(outsiderUserId),
         ),
-      ).rejects.toThrow(/team:manage/);
+        // The TEAM entry is the one that fails, and it fails the whole write:
+        // asserting `team:manage` is what proves the refusal came from that
+        // second scope rather than from the org the caller does own.
+      ).rejects.toMatchObject({
+        code: "model_provider_scope_forbidden",
+        meta: { scopeType: "TEAM", requiredPermission: "team:manage" },
+      });
 
       const after = await prisma.modelProvider.count({
         where: { organizationId: outsiderOrgId },

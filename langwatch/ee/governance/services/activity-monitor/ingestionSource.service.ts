@@ -117,6 +117,29 @@ export class IngestionSourceNotFoundError extends NotFoundError {
 }
 
 /**
+ * Thrown when a non-enterprise org already holds its full allowance of active
+ * ingestion sources.
+ *
+ * Handled, and raised from the service rather than the router, because that is
+ * the whole point of the guard: workers and webhook adapters reach it too, and
+ * a `TRPCError` means nothing to them. A plan cap is exactly-known and
+ * exactly-actionable — archive one or upgrade — so it gets a code, and
+ * `meta.max` lets the UI say the number without the message having to.
+ */
+export class IngestionSourceCapReachedError extends HandledError {
+  declare readonly code: "ingestion_source_cap_reached";
+
+  constructor(max: number) {
+    super(
+      "ingestion_source_cap_reached",
+      `Non-enterprise plans are limited to ${max} ingestion sources.`,
+      { httpStatus: 403, meta: { max } },
+    );
+    this.name = "IngestionSourceCapReachedError";
+  }
+}
+
+/**
  * The cron field, validated where the rejection can still say something
  * useful about it.
  *
@@ -286,19 +309,8 @@ export class IngestionSourceService {
         where: { organizationId: input.organizationId, archivedAt: null },
       });
       if (existing >= NON_ENTERPRISE_INGESTION_SOURCE_CAP) {
-        // Handled, and from the service rather than the router, because the
-        // comment above is the whole point: workers and webhook adapters
-        // reach this guard too, and a `TRPCError` means nothing to them. A
-        // plan cap is exactly-known and exactly-actionable — archive one or
-        // upgrade — so it gets a code, and `meta.max` lets the UI say the
-        // number without the message having to.
-        throw new HandledError(
-          "ingestion_source_cap_reached",
-          `Non-enterprise plans are limited to ${NON_ENTERPRISE_INGESTION_SOURCE_CAP} ingestion sources.`,
-          {
-            httpStatus: 403,
-            meta: { max: NON_ENTERPRISE_INGESTION_SOURCE_CAP },
-          },
+        throw new IngestionSourceCapReachedError(
+          NON_ENTERPRISE_INGESTION_SOURCE_CAP,
         );
       }
     }

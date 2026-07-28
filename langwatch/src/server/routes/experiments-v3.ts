@@ -35,6 +35,7 @@ import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 import {
   ExperimentNotFoundError,
+  InvalidExperimentConfigurationError,
   RunNotFoundError,
 } from "~/server/experiments/errors";
 import { ExperimentService } from "~/server/experiments/experiment.service";
@@ -402,11 +403,7 @@ secured.access(apiKeyAuth).post("/:slug/run", async (c) => {
     // The stored workbench state no longer matches its schema. The customer
     // did not type this and cannot repair it from the API, so it is ours:
     // `fault: "platform"` keeps it out of the customer-error noise.
-    throw new HandledError(
-      "invalid_experiment_configuration",
-      "This experiment's saved configuration could not be read.",
-      { httpStatus: 400, fault: "platform", meta: { slug } },
-    );
+    throw new InvalidExperimentConfigurationError(slug);
   }
 
   const workbenchState = parseResult.data;

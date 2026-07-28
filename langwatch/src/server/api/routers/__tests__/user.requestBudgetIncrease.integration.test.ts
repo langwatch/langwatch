@@ -204,10 +204,16 @@ describe("user.requestBudgetIncrease integration", () => {
           limitUsd: "10.00",
           spentUsd: "12.50",
         }),
-        // On `code`, not prose: the code is the stable contract the client's
-        // presentation registry is keyed by, and it is what survives the tRPC
-        // boundary. The old assertion pinned a hand-written slug in `message`.
-      ).rejects.toMatchObject({ code: "no_admin_configured" });
+        // On `code`, not prose. Both halves of the contract are asserted
+        // because they are separate promises: `PRECONDITION_FAILED` is the
+        // wire code (an unmapped 412 falls back to INTERNAL_SERVER_ERROR and
+        // books this as a server fault), and `cause.code` is the handled code
+        // the client's presentation registry is keyed by. The old assertion
+        // pinned a hand-written slug in `message`.
+      ).rejects.toMatchObject({
+        code: "PRECONDITION_FAILED",
+        cause: { code: "no_admin_configured" },
+      });
       expect(sendEmail).not.toHaveBeenCalled();
     });
   });

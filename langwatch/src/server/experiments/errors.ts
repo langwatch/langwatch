@@ -1,4 +1,4 @@
-import { NotFoundError } from "@langwatch/handled-error";
+import { HandledError, NotFoundError } from "@langwatch/handled-error";
 
 /**
  * Raised when an evaluation run cannot be served to the caller — no run state,
@@ -38,5 +38,26 @@ export class ExperimentNotFoundError extends NotFoundError {
       ...options,
     });
     this.name = "ExperimentNotFoundError";
+  }
+}
+
+/**
+ * Raised when an experiment's stored workbench state no longer parses against
+ * its schema. The customer did not author that blob and cannot repair it from
+ * the API, so `fault: "platform"` keeps it out of the customer-error noise
+ * while the caller still gets a code to branch on rather than a 500. The slug
+ * rides in `meta` so a UI can name the experiment without the message having
+ * to interpolate it.
+ */
+export class InvalidExperimentConfigurationError extends HandledError {
+  declare readonly code: "invalid_experiment_configuration";
+
+  constructor(slug: string) {
+    super(
+      "invalid_experiment_configuration",
+      "This experiment's saved configuration could not be read.",
+      { httpStatus: 400, fault: "platform", meta: { slug } },
+    );
+    this.name = "InvalidExperimentConfigurationError";
   }
 }
