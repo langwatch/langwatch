@@ -353,7 +353,6 @@ export function createDaemonServer(options: DaemonServerOptions): DaemonServer {
       reason,
     });
 
-    server.close();
     // Unlinking here (not just closing the server) is what makes the next
     // client see "no daemon" rather than a corpse it has to probe.
     //
@@ -363,11 +362,19 @@ export function createDaemonServer(options: DaemonServerOptions): DaemonServer {
     // it knows nothing about. Unlinking by path there would kill a live daemon
     // on the way out, which is how "the daemon keeps disappearing" becomes
     // self-sustaining: every casualty takes its replacement with it.
+    //
+    // BEFORE `server.close()`, deliberately. (dev, ino) only identifies a file
+    // while that inode is still referenced: drop the last reference and the
+    // number is free for immediate reuse — Linux reuses it readily — so a
+    // successor binding after our close could land on our old identity and be
+    // deleted by this very guard. While the socket is still bound we hold a
+    // reference, so the comparison cannot be fooled.
     try {
       unlinkIfSameFile(options.socketPath, publishedSocket);
     } catch {
       // Already gone — someone cleaned up a stale file, or we never published.
     }
+    server.close();
 
     // `window.reset()` below restores the daemon's OWN cwd and environment. A
     // request still executing when that lands would resolve its paths and read

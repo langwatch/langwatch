@@ -42,14 +42,26 @@ describe("unlinkIfSameFile", () => {
     it("leaves the replacement alone", () => {
       const mine = identify(filePath);
 
-      // What a successor daemon does: unlink the corpse, bind its own.
-      fs.unlinkSync(filePath);
-      fs.writeFileSync(filePath, "theirs");
-      const theirs = identify(filePath);
+      // Hold the original inode open for the duration, which is what the real
+      // daemon does — its socket is still bound while it decides whether to
+      // unlink the shared name. That is load-bearing, not test scaffolding:
+      // an inode with no remaining reference is free for immediate reuse, and
+      // Linux DOES reuse the number, so without a live handle the successor's
+      // file can land on the same (dev, ino) and the guard cannot tell the two
+      // apart. Keeping ours open is what makes the identity meaningful.
+      const held = fs.openSync(filePath, "r");
+      try {
+        // What a successor daemon does: unlink the corpse, bind its own.
+        fs.unlinkSync(filePath);
+        fs.writeFileSync(filePath, "theirs");
+        const theirs = identify(filePath);
 
-      expect(unlinkIfSameFile(filePath, mine)).toBe(false);
-      expect(fs.existsSync(filePath)).toBe(true);
-      expect(identify(filePath)).toEqual(theirs);
+        expect(unlinkIfSameFile(filePath, mine)).toBe(false);
+        expect(fs.existsSync(filePath)).toBe(true);
+        expect(identify(filePath)).toEqual(theirs);
+      } finally {
+        fs.closeSync(held);
+      }
     });
   });
 
