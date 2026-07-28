@@ -1,15 +1,4 @@
-import { Button, chakra } from "@chakra-ui/react";
-import {
-  LuBookOpen,
-  LuChevronDown,
-  LuSparkles,
-  LuTerminal,
-} from "react-icons/lu";
-import { AgentMenuOption } from "~/components/SetupWithAgentButton";
-import { Menu } from "~/components/ui/menu";
-import { toaster } from "~/components/ui/toaster";
-import { useCanAskLangy } from "~/features/langy/hooks/useCanAskLangy";
-import { useLangyStore } from "~/features/langy/stores/langyStore";
+import { AgentActionsMenu } from "~/components/SetupWithAgentButton";
 import { api } from "~/utils/api";
 import { docsUrl } from "~/utils/docsUrl";
 
@@ -61,81 +50,34 @@ export function ConnectYourAgentButton({
   /** The personal project whose first-traces flag gates the button. */
   projectId: string | null;
 }) {
-  const canAsk = useCanAskLangy();
-  const askLangy = useLangyStore((s) => s.askLangy);
-
   const hasFirstMessage = api.project.getHasFirstMessage.useQuery(
     { projectId: projectId ?? "" },
     { enabled: !!projectId, refetchOnWindowFocus: false },
   );
-
-  // A toast, not an inline label: zag's menu closes on select, so any
-  // confirmation rendered inside it would land in a menu that is already
-  // gone. Same shape as SetupWithAgentButton's copy action.
-  const copyPrompt = () => {
-    void navigator.clipboard?.writeText(EXPLORE_USAGE_AGENT_PROMPT).then(
-      () =>
-        toaster.create({
-          type: "success",
-          title: "Prompt copied. Paste it into your coding agent",
-        }),
-      () =>
-        toaster.create({
-          type: "error",
-          title: "Couldn't copy the prompt",
-        }),
-    );
-  };
 
   // Absent until the first trace is CONFIRMED: an unresolved read renders
   // nothing rather than flashing a button that may not apply.
   if (!hasFirstMessage.data?.firstMessage) return null;
 
   return (
-    <Menu.Root positioning={{ placement: "bottom-end", gutter: 6 }}>
-      <Menu.Trigger asChild>
-        <Button variant="outline" size="sm" aria-haspopup="menu">
-          <LuSparkles size={14} />
-          Connect your agent
-          <LuChevronDown size={14} />
-        </Button>
-      </Menu.Trigger>
-      <Menu.Content minWidth="300px" padding={1}>
-        {canAsk ? (
-          <Menu.Item
-            value="explore-langy"
-            paddingY={2}
-            onClick={() => askLangy(EXPLORE_USAGE_LANGY_PROMPT)}
-          >
-            <AgentMenuOption
-              icon={LuSparkles}
-              accent
-              label="Explore via Langy"
-              hint="Ask Langy where your tokens went"
-            />
-          </Menu.Item>
-        ) : null}
-        <Menu.Item value="copy-prompt" paddingY={2} onClick={copyPrompt}>
-          <AgentMenuOption
-            icon={LuTerminal}
-            label="Explore via your coding agent"
-            hint="Copy a prompt so Claude Code can inspect your own usage"
-          />
-        </Menu.Item>
-        <Menu.Item value="docs" paddingY={2} asChild>
-          <chakra.a
-            href={docsUrl(EXPLORE_USAGE_DOCS_PATH)}
-            target="_blank"
-            rel="noreferrer"
-          >
-            <AgentMenuOption
-              icon={LuBookOpen}
-              label="Read the guide"
-              hint="One-time setup and the questions your agent can answer"
-            />
-          </chakra.a>
-        </Menu.Item>
-      </Menu.Content>
-    </Menu.Root>
+    <AgentActionsMenu
+      triggerLabel="Connect your agent"
+      langy={{
+        prompt: EXPLORE_USAGE_LANGY_PROMPT,
+        label: "Explore via Langy",
+        hint: "Ask Langy where your tokens went",
+      }}
+      copy={{
+        prompt: EXPLORE_USAGE_AGENT_PROMPT,
+        label: "Explore via your coding agent",
+        hint: "Copy a prompt so Claude Code can inspect your own usage",
+        copiedTitle: "Prompt copied. Paste it into your coding agent",
+      }}
+      docs={{
+        href: docsUrl(EXPLORE_USAGE_DOCS_PATH),
+        label: "Read the guide",
+        hint: "One-time setup and the questions your agent can answer",
+      }}
+    />
   );
 }

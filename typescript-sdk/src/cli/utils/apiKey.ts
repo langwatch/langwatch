@@ -120,8 +120,11 @@ export const resolveCredentials = async (
     return { apiKey: flagKey, source: "flag", endpoint };
   }
 
-  const envKey = process.env.LANGWATCH_API_KEY;
-  if (envKey && envKey.trim() !== "") {
+  // Trimmed for use, not just for the emptiness check: a `.env` written as
+  // `LANGWATCH_API_KEY=sk-abc ` would otherwise ship `Bearer sk-abc ` and 401
+  // with nothing pointing at the trailing space.
+  const envKey = process.env.LANGWATCH_API_KEY?.trim();
+  if (envKey) {
     setResolvedApiKey(envKey);
     await maybePrintIdentityNotice({
       mode: "api-key",

@@ -238,7 +238,7 @@ beforeEach(() => {
 });
 
 describe("the /me usage home's Connect your agent button", () => {
-  describe("before the personal project has traces", () => {
+  describe("given a personal project with no traces yet", () => {
     /** @scenario the /me home hides Connect your agent before the first trace */
     it("stays absent while the first-traces flag is false or unresolved", () => {
       hasFirstMessageRef.current = false;
@@ -254,7 +254,7 @@ describe("the /me usage home's Connect your agent button", () => {
     });
   });
 
-  describe("once the personal project has traces", () => {
+  describe("given a personal project with traces", () => {
     /** @scenario the /me home shows Connect your agent once the personal project has traces */
     it("renders the menu button in the My Usage header", () => {
       renderPage();

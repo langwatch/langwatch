@@ -256,10 +256,8 @@ function userTokensIndexKey(userId: string): string {
 async function validateAccessToken(
   authHeader: string | null | undefined,
 ): Promise<AccessTokenRecord | null> {
-  if (!authHeader) return null;
-  const match = /^Bearer\s+(lw_at_[A-Za-z0-9_\-]+)$/.exec(authHeader.trim());
-  if (!match) return null;
-  const token = match[1]!;
+  const token = bearerAccessToken(authHeader);
+  if (!token) return null;
   const redis = getRedis();
   const raw = await redis.get(accessTokenKey(token));
   if (!raw) return null;
@@ -290,15 +288,71 @@ function getRedis() {
 }
 
 /**
+ * The authorization rule every endpoint that hands back a Project.apiKey
+ * shares (/approve with a project pick, /project-key): a personal project is
+ * honoured only as the caller's OWN explicit pick (the original hazard, per
+ * customer report, was a coding agent silently auto-selecting someone's
+ * personal project), and because the key is the shared write credential
+ * usable outside the UI's RBAC constraints, team membership alone is not
+ * enough: the caller needs a write-capable project permission. A view-only
+ * member cannot extract it.
+ *
+ * Returns the refusal response to send, or null when the handout is allowed.
+ */
+async function refuseProjectKeyHandout(
+  c: Context,
+  project: { id: string; isPersonal: boolean; ownerUserId: string | null },
+  userId: string,
+): Promise<Response | null> {
+  if (project.isPersonal && project.ownerUserId !== userId) {
+    return c.json(
+      {
+        error: "personal_project_not_allowed",
+        error_description:
+          "Another user's personal project can't back your API key. Pick a shared team project, or your own personal workspace.",
+      },
+      400,
+    );
+  }
+  const canWriteProject = await hasProjectPermission(
+    {
+      prisma,
+      session: { user: { id: userId } },
+    } as Parameters<typeof hasProjectPermission>[0],
+    project.id,
+    "project:update",
+  );
+  if (!canWriteProject) {
+    return c.json(
+      {
+        error: "forbidden",
+        error_description:
+          "You need write access to this project to retrieve its API key.",
+      },
+      403,
+    );
+  }
+  return null;
+}
+
+/**
+ * The one grammar for a CLI bearer access token. Both the validating reader
+ * (validateAccessToken) and the raw extraction below share it, so tightening
+ * it can never leave a second, more permissive copy behind on the auth
+ * boundary.
+ */
+const BEARER_ACCESS_TOKEN_REGEX = /^Bearer\s+(lw_at_[A-Za-z0-9_\-]+)$/;
+
+/**
  * Extract the Bearer access token from an Authorization header, or null.
- * Same shape validateAccessToken matches; kept separate so callers that need
- * the raw token string (to revoke it) don't re-run full validation.
+ * Kept separate from validateAccessToken so callers that need the raw token
+ * string (to revoke it) don't re-run full validation.
  */
 function bearerAccessToken(
   authHeader: string | null | undefined,
 ): string | null {
   if (!authHeader) return null;
-  const match = /^Bearer\s+(lw_at_[A-Za-z0-9_\-]+)$/.exec(authHeader.trim());
+  const match = BEARER_ACCESS_TOKEN_REGEX.exec(authHeader.trim());
   return match ? match[1]! : null;
 }
 
@@ -1259,34 +1313,8 @@ secured.access(CLI_POLICY).post("/project-key", async (c: Context) => {
       404,
     );
   }
-  if (project.isPersonal && project.ownerUserId !== tokenRecord.user_id) {
-    return c.json(
-      {
-        error: "personal_project_not_allowed",
-        error_description:
-          "Another user's personal project can't back your API key. Pick a shared team project.",
-      },
-      400,
-    );
-  }
-  const canWriteProject = await hasProjectPermission(
-    {
-      prisma,
-      session: { user: { id: tokenRecord.user_id } },
-    } as Parameters<typeof hasProjectPermission>[0],
-    project.id,
-    "project:update",
-  );
-  if (!canWriteProject) {
-    return c.json(
-      {
-        error: "forbidden",
-        error_description:
-          "You need write access to this project to retrieve its API key.",
-      },
-      403,
-    );
-  }
+  const refusal = await refuseProjectKeyHandout(c, project, tokenRecord.user_id);
+  if (refusal) return refusal;
   return c.json(
     {
       api_key: project.apiKey,
@@ -1936,43 +1964,11 @@ secured.access(CLI_POLICY).post("/approve", async (c: Context) => {
       );
     }
 
-    // Personal projects are allowed only as the caller's OWN, explicit pick.
-    // The original hazard (customer report) was a coding agent silently
-    // AUTO-selecting a personal project and routing evaluations there; the
-    // browser picker now lists personal as a clearly-labelled entry the user
-    // must deliberately choose, so an explicit self-pick is honoured. Another
-    // user's personal project is still refused outright, whatever the picker
-    // sent.
-    if (project.isPersonal && project.ownerUserId !== session.user.id) {
-      return c.json(
-        {
-          error: "personal_project_not_allowed",
-          error_description:
-            "Another user's personal project can't back your API key. Pick a shared team project, or your own personal workspace.",
-        },
-        400,
-      );
-    }
-
-    // The returned Project.apiKey is the shared write credential and is
-    // usable outside the UI's RBAC constraints, so team membership alone
-    // is not enough: require a write-capable project permission. A
-    // view-only member cannot extract it.
-    const canWriteProject = await hasProjectPermission(
-      { prisma, session },
-      project.id,
-      "project:update",
-    );
-    if (!canWriteProject) {
-      return c.json(
-        {
-          error: "forbidden",
-          error_description:
-            "You need write access to this project to retrieve its API key.",
-        },
-        403,
-      );
-    }
+    // The browser picker lists personal as a clearly-labelled entry the user
+    // must deliberately choose, so an explicit self-pick is honoured here;
+    // everything else the shared handout rule refuses.
+    const refusal = await refuseProjectKeyHandout(c, project, session.user.id);
+    if (refusal) return refusal;
 
     await approveDeviceCode({
       deviceCode: record.device_code,

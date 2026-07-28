@@ -28,7 +28,27 @@ import { DeviceFlowError, refresh } from "./device-flow";
 
 export interface SessionApiOptions {
   fetchImpl?: typeof fetch;
+  /** Per-request deadline. Defaults to SESSION_REQUEST_TIMEOUT_MS. */
+  timeoutMs?: number;
 }
+
+/**
+ * Deadline on every session-authenticated request (including the token
+ * refresh it may perform). The credential resolver awaits these calls on
+ * every command once the revalidation window lapses; without a bound, a
+ * black-holed control plane would hang every CLI command instead of letting
+ * the resolver fall back to the cached key.
+ */
+export const SESSION_REQUEST_TIMEOUT_MS = 10_000;
+
+/** Wrap a fetch so requests carry a timeout signal unless the caller set one. */
+const boundedFetch =
+  (f: typeof fetch, timeoutMs: number): typeof fetch =>
+  (input, init) =>
+    f(input, {
+      ...init,
+      signal: init?.signal ?? AbortSignal.timeout(timeoutMs),
+    });
 
 export class SessionApiError extends Error {
   constructor(
@@ -62,7 +82,13 @@ async function refreshSession(
   if (!cfg.refresh_token) return false;
   try {
     const rotated = await refresh(
-      { baseUrl: cfg.control_plane_url, fetchImpl: opts.fetchImpl },
+      {
+        baseUrl: cfg.control_plane_url,
+        fetchImpl: boundedFetch(
+          opts.fetchImpl ?? fetch,
+          opts.timeoutMs ?? SESSION_REQUEST_TIMEOUT_MS,
+        ),
+      },
       cfg.refresh_token,
     );
     cfg.access_token = rotated.access_token;
@@ -100,7 +126,10 @@ async function sessionRequest(
   if (isExpired(cfg)) {
     await refreshSession(cfg, opts);
   }
-  const f = opts.fetchImpl ?? fetch;
+  const f = boundedFetch(
+    opts.fetchImpl ?? fetch,
+    opts.timeoutMs ?? SESSION_REQUEST_TIMEOUT_MS,
+  );
   const doFetch = () =>
     f(cfg.control_plane_url.replace(/\/+$/, "") + path, {
       method,
@@ -230,5 +259,18 @@ export async function fetchProjectKeyBySlug(
       body.error_description ?? `project-key request failed (${res.status})`,
     );
   }
-  return (await res.json()) as SessionProjectKey;
+  // Same guard as fetchPersonalProject: a 200 with no key must fail loudly
+  // here, or the caller writes `LANGWATCH_API_KEY=undefined` into .env and
+  // reports success.
+  const parsed = (await res
+    .json()
+    .catch(() => null)) as SessionProjectKey | null;
+  if (!parsed?.api_key) {
+    throw new SessionApiError(
+      500,
+      "malformed_response",
+      "project-key exchange returned no api_key",
+    );
+  }
+  return parsed;
 }

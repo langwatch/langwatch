@@ -63,6 +63,7 @@ vi.mock("../../identityNotice", () => ({
   rememberProjectName: vi.fn(),
 }));
 
+import { loadConfig } from "../config";
 import { runUnifiedLoginFlow } from "../login-flow";
 
 const exchangeResult = (extra: Record<string, unknown> = {}) => ({
@@ -125,5 +126,30 @@ describe("runUnifiedLoginFlow (device session) personal-project persistence", ()
     const cfg = await runUnifiedLoginFlow({ kind: "device_session" });
 
     expect(cfg.personal_project).toBeUndefined();
+  });
+
+  it("clears the previous login's personal_project when the exchange omits the field", async () => {
+    // Log in as a DIFFERENT user against an older server: the prior user's
+    // cached key (with a fresh validation clock) must not survive into the
+    // new session, or commands would authenticate as the prior user.
+    vi.mocked(loadConfig).mockReturnValue({
+      control_plane_url: "https://app.langwatch.ai",
+      gateway_url: "https://gateway.langwatch.ai",
+      personal_project: {
+        id: "proj_prior",
+        slug: "personal-prior",
+        name: "Prior User Workspace",
+        api_key: "pkey_prior_user",
+        validated_at: Math.floor(Date.now() / 1000),
+      },
+    } as never);
+    pollUntilDone.mockResolvedValue(exchangeResult());
+
+    const cfg = await runUnifiedLoginFlow({ kind: "device_session" });
+
+    expect(cfg.personal_project).toBeUndefined();
+    expect(saveConfig).toHaveBeenCalledWith(
+      expect.not.objectContaining({ personal_project: expect.anything() }),
+    );
   });
 });

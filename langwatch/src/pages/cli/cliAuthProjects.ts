@@ -13,13 +13,14 @@
  *     implied by any other selection; picking it is a deliberate act, and
  *     the server (`/api/auth/cli/approve`) only honours the caller's own.
  *
- * The personal entry is matched by `ownerUserId === currentUserId`, never by
- * "first personal team in the payload". `organization.getAll` retains EVERY
- * team for an org admin, including OTHER members' personal workspaces; without
- * the owner filter an admin in a shared-project-less org would see a colleague's
- * workspace preselected and labelled "Personal", and approval would then fail
- * server-side with `personal_project_not_allowed`. The caller's id must be
- * passed for the personal entry to resolve at all.
+ * The personal entry is matched by the PROJECT's `ownerUserId ===
+ * currentUserId`, the same predicate `/api/auth/cli/approve` authorizes with,
+ * never by "first personal team in the payload". `organization.getAll`
+ * retains EVERY team for an org admin, including OTHER members' personal
+ * workspaces; without the owner filter an admin in a shared-project-less org
+ * would see a colleague's workspace preselected and labelled "Personal", and
+ * approval would then fail server-side with `personal_project_not_allowed`.
+ * The caller's id must be passed for the personal entry to resolve at all.
  *
  * The default selection prefers the last project the user worked in (when
  * offered), then the sole shared project, then, when the org has no shared
@@ -45,6 +46,7 @@ interface ProjectLike {
   name: string;
   slug: string;
   isPersonal?: boolean | null;
+  ownerUserId?: string | null;
   kind?: string | null;
 }
 
@@ -52,7 +54,6 @@ interface TeamLike {
   id: string;
   name: string;
   isPersonal?: boolean | null;
-  ownerUserId?: string | null;
   projects?: ProjectLike[] | null;
 }
 
@@ -70,9 +71,9 @@ export function resolveCliAuthProjects(args: {
 }): {
   projects: CliAuthProjectOption[];
   teams: CliAuthTeamOption[];
-  /** The caller's own personal workspace project, when one exists. The org
-   *  payload only ever carries the caller's own personal team (other
-   *  members' personal workspaces are private), so first match is it. */
+  /** The caller's own personal workspace project, when one exists: the
+   *  project whose `ownerUserId` is the caller. An admin's payload can carry
+   *  other members' personal workspaces too; those never match. */
   personalProject: CliAuthProjectOption | null;
   defaultProjectId: string | null;
 } {
@@ -88,15 +89,19 @@ export function resolveCliAuthProjects(args: {
       })),
   );
 
-  // Only the CALLER's own personal workspace is offered, matched by the
-  // owning team's ownerUserId. Without a caller id, no personal entry is
-  // shown (never guess a stranger's workspace).
+  // Only the CALLER's own personal workspace is offered, matched on the
+  // PROJECT's ownerUserId: the exact field the approve endpoint authorizes
+  // against, so the picker can never offer an entry the server would refuse.
+  // Without a caller id, no personal entry is shown (never guess a
+  // stranger's workspace).
   const personalProject = args.currentUserId
     ? (args.teams ?? []).reduce<CliAuthProjectOption | null>((found, team) => {
         if (found) return found;
-        if (team.ownerUserId !== args.currentUserId) return found;
         const personal = (team.projects ?? []).find(
-          (p) => p.isPersonal && p.kind !== "internal_governance",
+          (p) =>
+            p.isPersonal &&
+            p.ownerUserId === args.currentUserId &&
+            p.kind !== "internal_governance",
         );
         return personal
           ? {

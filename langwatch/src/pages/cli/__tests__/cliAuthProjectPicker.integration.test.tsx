@@ -111,6 +111,7 @@ const personalTeam = {
       slug: "personal-proj",
       name: "Personal Workspace",
       isPersonal: true,
+      ownerUserId: "user-1",
       kind: "application",
     },
   ],

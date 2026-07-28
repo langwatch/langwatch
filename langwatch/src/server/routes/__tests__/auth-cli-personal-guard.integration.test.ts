@@ -246,38 +246,39 @@ describe("CLI login personal-project guards", () => {
     delete process.env.RELEASE_UI_AI_GOVERNANCE_ENABLED;
   });
 
+  // Deletes are org-scoped rather than keyed on the fixture ids because the
+  // approve path under test PROVISIONS rows with generated ids (the personal
+  // team, its project, and role bindings); an id-list filter would strand
+  // them. Dependency order, and no error swallowing: Team and Project carry
+  // no cascade from Organization, so a stranded child would otherwise turn
+  // every later run's org delete into a silent no-op and the leak would be
+  // invisible.
   afterAll(async () => {
     delete process.env.FEATURE_FLAG_FORCE_ENABLE;
     delete process.env.RELEASE_UI_AI_GOVERNANCE_ENABLED;
-    await prisma.virtualKey
-      .deleteMany({ where: { principalUserId: { in: [USER_ID, OTHER_USER_ID] } } })
-      .catch(() => {});
-    await prisma.project
-      .deleteMany({
-        where: {
-          teamId: { in: [TEAM_ID, PTEAM_ID, OTHER_TEAM_ID, OTHER_PTEAM_ID] },
-        },
-      })
-      .catch(() => {});
-    await prisma.teamUser
-      .deleteMany({ where: { userId: { in: [USER_ID, OTHER_USER_ID] } } })
-      .catch(() => {});
-    await prisma.team
-      .deleteMany({
-        where: {
-          id: { in: [TEAM_ID, PTEAM_ID, OTHER_TEAM_ID, OTHER_PTEAM_ID] },
-        },
-      })
-      .catch(() => {});
-    await prisma.organizationUser
-      .deleteMany({ where: { userId: { in: [USER_ID, OTHER_USER_ID] } } })
-      .catch(() => {});
-    await prisma.user
-      .deleteMany({ where: { id: { in: [USER_ID, OTHER_USER_ID] } } })
-      .catch(() => {});
-    await prisma.organization
-      .deleteMany({ where: { id: ORG_ID } })
-      .catch(() => {});
+    // organizationId, not principalUserId-in-list: the tenancy guard
+    // extension on VirtualKey only honours scalar tenancy predicates, and
+    // the org id covers every key the approve path can have minted here.
+    await prisma.virtualKey.deleteMany({
+      where: { organizationId: ORG_ID },
+    });
+    await prisma.roleBinding.deleteMany({
+      where: { organizationId: ORG_ID },
+    });
+    await prisma.project.deleteMany({
+      where: { team: { organizationId: ORG_ID } },
+    });
+    await prisma.teamUser.deleteMany({
+      where: { team: { organizationId: ORG_ID } },
+    });
+    await prisma.team.deleteMany({ where: { organizationId: ORG_ID } });
+    await prisma.organizationUser.deleteMany({
+      where: { organizationId: ORG_ID },
+    });
+    await prisma.organization.deleteMany({ where: { id: ORG_ID } });
+    await prisma.user.deleteMany({
+      where: { id: { in: [USER_ID, OTHER_USER_ID] } },
+    });
     await stopTestContainers().catch(() => {});
   });
 

@@ -15,7 +15,20 @@
  * Feature: specs/ai-governance/cli-onboarding/me-credentials.feature
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { buildAuthHeaders } from "../api/auth";
+
+// The real openapi-fetch client keeps its header config private, so capture
+// what the factory hands it: the Authorization the transport would send is
+// exactly what these tests need to observe.
+const createClientCalls = vi.hoisted(
+  () => [] as Array<{ headers?: Record<string, string> }>,
+);
+vi.mock("openapi-fetch", () => ({
+  default: (config: { headers?: Record<string, string> }) => {
+    createClientCalls.push(config);
+    return { use: () => undefined };
+  },
+}));
+
 import { createLangWatchApiClient } from "../api/client";
 import {
   resetFallbackCredentialHolder,
@@ -71,32 +84,43 @@ describe("credentialContext", () => {
   });
 
   it("returns undefined outside any scope, so the factory falls back to env", () => {
-    expect(scopedApiKey()).toBeUndefined();
+    const savedEnvKey = process.env.LANGWATCH_API_KEY;
+    process.env.LANGWATCH_API_KEY = "env-key";
+    try {
+      expect(scopedApiKey()).toBeUndefined();
+
+      // A plain SDK embed sets no scope: the REAL factory's headers must
+      // carry the environment key, the unchanged pre-daemon behavior.
+      createClientCalls.length = 0;
+      createLangWatchApiClient();
+      expect(createClientCalls[0]?.headers?.authorization).toBe(
+        "Bearer env-key",
+      );
+    } finally {
+      if (savedEnvKey === undefined) delete process.env.LANGWATCH_API_KEY;
+      else process.env.LANGWATCH_API_KEY = savedEnvKey;
+    }
   });
 
   it("the API-client factory sends the scoped key, never a leaked env key", async () => {
     const savedEnvKey = process.env.LANGWATCH_API_KEY;
     process.env.LANGWATCH_API_KEY = "env-leak";
     try {
-      const authInScope = await runWithCredentialHolder(async () => {
-        setResolvedApiKey("scoped-key");
-        // buildAuthHeaders is what the client hands the transport, so its
-        // Authorization proves which key the factory default selected.
-        return buildAuthHeaders({
-          apiKey: scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "",
-        });
-      });
-
-      expect(JSON.stringify(authInScope)).toContain("scoped-key");
-      expect(JSON.stringify(authInScope)).not.toContain("env-leak");
-
-      // The real factory constructs without touching process.env.
-      const before = process.env.LANGWATCH_API_KEY;
-      runWithCredentialHolder(() => {
+      // The REAL factory, no arguments, called inside a holder scope: the
+      // Authorization it hands the transport proves which key its default
+      // selected. A regression to plain env reads would surface here.
+      createClientCalls.length = 0;
+      await runWithCredentialHolder(async () => {
         setResolvedApiKey("scoped-key");
         createLangWatchApiClient();
       });
-      expect(process.env.LANGWATCH_API_KEY).toBe(before);
+
+      const config = createClientCalls[0];
+      expect(config?.headers?.authorization).toBe("Bearer scoped-key");
+      expect(JSON.stringify(config)).not.toContain("env-leak");
+
+      // The factory reads the shared environment, never writes it.
+      expect(process.env.LANGWATCH_API_KEY).toBe("env-leak");
     } finally {
       if (savedEnvKey === undefined) delete process.env.LANGWATCH_API_KEY;
       else process.env.LANGWATCH_API_KEY = savedEnvKey;

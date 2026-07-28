@@ -13,7 +13,7 @@ npm install -g langwatch
 langwatch login
 ```
 
-`langwatch login` opens a browser sign-in. Approve it once and the CLI works with your personal account from then on: every command resolves your personal project by itself, with no API key and no env vars. `langwatch whoami` shows who you are logged in as.
+`langwatch login` opens a browser sign-in. Approve it once and the CLI works with your personal account from then on: when no API key is set (no `--api-key` flag, no `LANGWATCH_API_KEY` in the environment or `.env`), every command falls back to your device login and resolves your personal project by itself. `langwatch whoami` shows who you are logged in as.
 
 ## The prompt
 

@@ -138,6 +138,16 @@ describe("resolveCredentials()", () => {
       expect(resolved.apiKey).toBe("sk-explicit");
     });
 
+    it("trims surrounding whitespace off the environment key before use", async () => {
+      process.env.LANGWATCH_API_KEY = "  sk-from-env \n";
+
+      const resolved = await resolveCredentials();
+
+      // The published key must be the trimmed one, or `Bearer sk-from-env `
+      // 401s with nothing pointing at the stray whitespace.
+      expect(resolved.apiKey).toBe("sk-from-env");
+    });
+
     /** @scenario LANGWATCH_API_KEY beats the stored device session */
     it("prefers the environment over a stored device session", async () => {
       process.env.LANGWATCH_API_KEY = "sk-from-env";

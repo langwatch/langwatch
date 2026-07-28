@@ -224,12 +224,20 @@ Feature: Unified `langwatch login` UX — endpoint + auth-mode + storage discipl
       terminal) or to use `--api-key <key>` instead
 
   @bdd @cli @login @project @slug @integration
-  Scenario: the project-key endpoint enforces write access and refuses personal projects of others
+  Scenario: the project-key endpoint refuses a project the caller cannot write to
     Given a device-session bearer token
     When POST /api/auth/cli/project-key names a project the user cannot write to
     Then the server responds 403 and no key is returned
+
+  @bdd @cli @login @project @slug @integration
+  Scenario: the project-key endpoint returns the caller's own personal project key
+    Given a device-session bearer token
     When POST /api/auth/cli/project-key names the caller's own personal project slug
     Then the server returns the personal project's API key
+
+  @bdd @cli @login @project @slug @integration
+  Scenario: the project-key endpoint refuses another user's personal project
+    Given a device-session bearer token
     When POST /api/auth/cli/project-key names another user's personal project slug
     Then the server responds 400 personal_project_not_allowed
 

@@ -60,7 +60,7 @@ Feature: Connect your agent from the /me usage home
 
   @bdd @personal-portal @connect-your-agent @unit
   Scenario: readers who cannot ask Langy keep the prompt and guide routes
-    Given the reader lacks the langy:create permission
+    Given asking Langy is not available to the reader
     When the reader opens the Connect your agent menu
     Then "Explore via Langy" is absent
     And the coding-agent prompt and the guide remain

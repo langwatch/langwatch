@@ -305,7 +305,11 @@ function persistDeviceSession(
 	// The personal project's API key is what data commands (`langwatch trace
 	// search`, ...) authenticate with when no LANGWATCH_API_KEY is set, so a
 	// device login Just Works with zero env vars. Older servers omit the
-	// field; the credential resolver then lazily exchanges it once.
+	// field; the credential resolver then lazily exchanges it once. Either
+	// way the PREVIOUS login's cached project must go first: kept, its fresh
+	// validated_at could authenticate the new session as the prior user
+	// until the revalidation window lapsed.
+	delete cfg.personal_project;
 	if (result.personal_project?.api_key) {
 		cfg.personal_project = {
 			id: result.personal_project.id,

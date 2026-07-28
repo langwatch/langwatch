@@ -127,12 +127,12 @@ Feature: /me credentials just work - CLI credential resolution after device logi
     And the exchange succeeds with the refreshed token
 
   @bdd @cli-onboarding @credentials @integration
-  Scenario: GET /api/auth/cli/personal-project ensures the personal workspace
-    Given a valid device-session bearer token for a user with no personal workspace yet
+  Scenario: GET /api/auth/cli/personal-project returns the caller's personal project
+    Given a valid device-session bearer token whose personal workspace already exists
     And the user is an active member of the token's organization
     When the CLI calls GET /api/auth/cli/personal-project
-    Then the personal workspace is created
-    And the response carries the personal project's id, slug, name and api_key
+    Then the response carries the personal project's id, slug, name and api_key
+    And it is the same project the login exchange delivered
 
   # ─────────────────────────────────────────────────────────────────────
   # Tenancy boundary: current membership is proven before minting a key

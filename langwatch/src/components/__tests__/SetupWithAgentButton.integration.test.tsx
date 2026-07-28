@@ -105,7 +105,7 @@ describe("setupAgentPrompt()", () => {
 });
 
 describe("SetupWithAgentButton", () => {
-  describe("the trigger label", () => {
+  describe("when the button renders on any surface", () => {
     /** @scenario the traces empty state keeps Setup via Agent on every project */
     it("reads Setup via Agent with no per-surface override", () => {
       renderButton("traces");
@@ -205,7 +205,7 @@ describe("SetupWithAgentButton", () => {
     });
   });
 
-  describe("the docs route", () => {
+  describe("when the docs entry is followed", () => {
     it("links the surface's documentation overview", async () => {
       const user = userEvent.setup();
       renderButton("prompts");

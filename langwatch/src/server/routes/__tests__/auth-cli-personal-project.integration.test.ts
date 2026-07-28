@@ -208,9 +208,10 @@ describe("/me credentials delivery over the CLI auth surface", () => {
   }, 120_000);
 
   afterAll(async () => {
-    await prisma.virtualKey
-      .deleteMany({ where: { principalUserId: { in: [USER_ID, OTHER_USER_ID] } } })
-      .catch(() => {});
+    // organizationId, not principalUserId-in-list: the tenancy guard
+    // extension on VirtualKey only honours scalar tenancy predicates; the
+    // in-list form is rejected and the catch would hide the leak.
+    await prisma.virtualKey.deleteMany({ where: { organizationId: ORG_ID } });
     const personalTeams = await prisma.team.findMany({
       where: { organizationId: ORG_ID },
       select: { id: true },
@@ -293,7 +294,7 @@ describe("/me credentials delivery over the CLI auth surface", () => {
 
   describe("given the lazy personal-project exchange", () => {
     /** @scenario a session created before this change lazily exchanges once and rewrites the session file */
-    /** @scenario GET /api/auth/cli/personal-project ensures the personal workspace */
+    /** @scenario GET /api/auth/cli/personal-project returns the caller's personal project */
     it("returns the same personal project for a valid bearer, idempotently", async () => {
       const res = await app.request("/api/auth/cli/personal-project", {
         headers: { authorization: `Bearer ${exchange.access_token}` },
@@ -450,7 +451,7 @@ describe("/me credentials delivery over the CLI auth surface", () => {
       expect((json.project as { id: string }).id).toBe(SHARED_PROJECT_ID);
     });
 
-    /** @scenario the project-key endpoint enforces write access and refuses personal projects of others */
+    /** @scenario the project-key endpoint refuses another user's personal project */
     /** @scenario the server still refuses a personal project that is not the caller's own */
     it("refuses another user's personal project outright", async () => {
       const { status, json } = await projectKey(
@@ -463,6 +464,7 @@ describe("/me credentials delivery over the CLI auth surface", () => {
       expect(JSON.stringify(json)).not.toContain(OTHER_PERSONAL_API_KEY);
     });
 
+    /** @scenario the project-key endpoint returns the caller's own personal project key */
     it("returns the caller's own personal project by slug", async () => {
       const { status, json } = await projectKey(
         exchange.access_token,
@@ -473,6 +475,7 @@ describe("/me credentials delivery over the CLI auth surface", () => {
       expect(json.api_key).toBe(exchange.personal_project!.api_key);
     });
 
+    /** @scenario the project-key endpoint refuses a project the caller cannot write to */
     it("denies a project the caller cannot write, without leaking the key", async () => {
       vi.mocked(hasProjectPermission).mockResolvedValueOnce(false);
 
