@@ -21,7 +21,10 @@ import {
   queryWindowed,
   type WindowFragment,
 } from "../../clients/clickhouse/windowed-read";
-import type { SimulationRepository } from "./simulation.repository";
+import type {
+  ExportableRun,
+  SimulationRepository,
+} from "./simulation.repository";
 
 const TABLE_NAME = "simulation_runs" as const;
 
@@ -48,6 +51,34 @@ function simulationRunDedupPredicate(whereFilters: string): string {
     WHERE ${whereFilters}
     GROUP BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
   )`;
+}
+
+/**
+ * Dedup predicate for a query that reads simulation_runs through the `t` alias.
+ *
+ * The outer columns MUST be table-qualified. RUN_COLUMNS aliases the timestamp
+ * columns to strings (`toString(toUnixTimestamp64Milli(UpdatedAt)) AS UpdatedAt`)
+ * and ClickHouse resolves WHERE against SELECT aliases, so an unqualified
+ * `UpdatedAt` here compares a String against the subquery's DateTime64 and the
+ * IN-tuple matches nothing. That failure is silent — the query succeeds and
+ * returns zero rows — so it surfaces as a mysteriously empty result rather than
+ * an error. Qualifying with `t.` binds to the column instead of the alias.
+ */
+function qualifiedDedupPredicate(whereFilters: string): string {
+  return `AND (t.TenantId, t.ScenarioSetId, t.BatchRunId, t.ScenarioRunId, t.UpdatedAt) IN (
+    SELECT TenantId, ScenarioSetId, BatchRunId, ScenarioRunId, max(UpdatedAt)
+    FROM ${TABLE_NAME}
+    WHERE ${whereFilters}
+    GROUP BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
+  )`;
+}
+
+/**
+ * Strips the `t.` qualifier for reuse inside the dedup subquery, which selects
+ * from the bare table and has no such alias in scope.
+ */
+function unqualify(clause: string): string {
+  return clause.replace(/\bt\./g, "");
 }
 
 /**
@@ -1150,7 +1181,218 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     );
   }
 
+  // ---- Export sweep ----
+
+  async countRunsForExport({
+    projectId,
+    scenarioSetId,
+    scenarioId,
+    startDate,
+    endDate,
+  }: {
+    projectId: string;
+    scenarioSetId?: string;
+    scenarioId?: string;
+    startDate?: number;
+    endDate?: number;
+  }): Promise<number> {
+    const { whereClause, params } = this.buildExportFilters({
+      scenarioSetId,
+      scenarioId,
+      startDate,
+      endDate,
+    });
+
+    const rows = await this.queryRows<{ Total: string }>(
+      `SELECT toString(count()) AS Total
+       FROM ${TABLE_NAME} AS t
+       WHERE t.TenantId = {tenantId:String}
+         ${whereClause}
+         AND t.ArchivedAt IS NULL
+         ${qualifiedDedupPredicate(`TenantId = {tenantId:String} ${unqualify(whereClause)}`)}`,
+      { tenantId: projectId, ...params },
+    );
+
+    return Number(rows[0]?.Total ?? "0");
+  }
+
+  /**
+   * Forward-only page of runs for a CSV export sweep.
+   *
+   * Distinct from getRunDataForAllSuites, which caps at 100 and is shaped for
+   * the UI's freshness protocol (it can answer `changed: false` and skip the
+   * read entirely). An export needs a plain chronological sweep it can drive to
+   * exhaustion, so it gets its own read rather than bending that one.
+   *
+   * Keyset (not OFFSET) pagination on (StartedAt, ScenarioRunId): OFFSET makes
+   * ClickHouse re-scan and re-sort every preceding row for each page, so a large
+   * export degrades quadratically. The tuple is unique because ScenarioRunId
+   * breaks ties within a millisecond.
+   *
+   * Reads RUN_COLUMNS, never LIST_COLUMNS — the latter nulls out Reasoning and
+   * Error and truncates the conversation to 6 messages for grid cards, which
+   * would silently ship an export with empty judge reasoning.
+   */
+  async findRunsForExport({
+    projectId,
+    scenarioSetId,
+    scenarioId,
+    startDate,
+    endDate,
+    limit,
+    cursor,
+  }: {
+    projectId: string;
+    scenarioSetId?: string;
+    scenarioId?: string;
+    startDate?: number;
+    endDate?: number;
+    limit: number;
+    cursor?: string;
+  }): Promise<{
+    runs: ExportableRun[];
+    nextCursor?: string;
+    hasMore: boolean;
+  }> {
+    const validatedLimit = Math.min(Math.max(1, limit), 500);
+    const decoded = cursor ? this.decodeExportCursor(cursor) : null;
+
+    const { whereClause, params } = this.buildExportFilters({
+      scenarioSetId,
+      scenarioId,
+      startDate,
+      endDate,
+    });
+
+    const cursorPredicate = decoded
+      ? `AND (
+          (toUnixTimestamp64Milli(t.StartedAt) > toUInt64({cursorTs:String}))
+          OR (toUnixTimestamp64Milli(t.StartedAt) = toUInt64({cursorTs:String}) AND t.ScenarioRunId > {cursorRunId:String})
+        )`
+      : "";
+
+    const rows = await this.queryRows<ClickHouseSimulationRunRow>(
+      `SELECT ${RUN_COLUMNS}
+       FROM ${TABLE_NAME} AS t
+       WHERE t.TenantId = {tenantId:String}
+         ${whereClause}
+         ${cursorPredicate}
+         AND t.ArchivedAt IS NULL
+         ${qualifiedDedupPredicate(`TenantId = {tenantId:String} ${unqualify(whereClause)}`)}
+       ORDER BY t.StartedAt ASC, t.ScenarioRunId ASC
+       LIMIT {fetchLimit:UInt32}`,
+      {
+        tenantId: projectId,
+        ...params,
+        ...(decoded
+          ? { cursorTs: decoded.ts, cursorRunId: decoded.scenarioRunId }
+          : {}),
+        fetchLimit: String(validatedLimit + 1),
+      },
+      { expectedMaxDurationMs: 15000, expectedMaxReadBytes: 50_000_000 },
+    );
+
+    const hasMore = rows.length > validatedLimit;
+    const pageRows = hasMore ? rows.slice(0, validatedLimit) : rows;
+
+    const lastRow = pageRows[pageRows.length - 1];
+    const nextCursor =
+      hasMore && lastRow
+        ? this.encodeExportCursor(
+            lastRow.StartedAt ?? lastRow.CreatedAt,
+            lastRow.ScenarioRunId,
+          )
+        : undefined;
+
+    const now = Date.now();
+    return {
+      runs: pageRows.map((row) => ({
+        ...mapClickHouseRowToScenarioRunData(row, now),
+        scenarioSetId:
+          row.ScenarioSetId === "" ? DEFAULT_SET_ID : row.ScenarioSetId,
+      })),
+      nextCursor,
+      hasMore,
+    };
+  }
+
+  /**
+   * Shared WHERE fragment for the export sweep and its count, so the two can
+   * never drift and report a total the sweep does not produce.
+   *
+   * Note the pass/fail filter is deliberately absent: STALLED is derived from
+   * timestamps by resolveRunStatus at map time, not stored in the table, so it
+   * cannot be expressed in SQL. Category filtering happens after mapping.
+   */
+  private buildExportFilters({
+    scenarioSetId,
+    scenarioId,
+    startDate,
+    endDate,
+  }: {
+    scenarioSetId?: string;
+    scenarioId?: string;
+    startDate?: number;
+    endDate?: number;
+  }): { whereClause: string; params: Record<string, string | string[]> } {
+    const parts: string[] = [];
+    const params: Record<string, string | string[]> = {};
+
+    const dateFilter = buildDateFilter({ startDate, endDate });
+    if (dateFilter.whereClause) {
+      // buildDateFilter emits unqualified column names; the export queries read
+      // through the `t` alias, so qualify them here.
+      parts.push(
+        dateFilter.whereClause.replace(/^AND /, "").replace(/StartedAt/g, "t.StartedAt"),
+      );
+      Object.assign(params, dateFilter.params);
+    }
+
+    if (scenarioSetId) {
+      parts.push("t.ScenarioSetId IN ({exportSetIds:Array(String)})");
+      params.exportSetIds = expandSetIdFilter(scenarioSetId);
+    }
+
+    if (scenarioId) {
+      parts.push("t.ScenarioId = {exportScenarioId:String}");
+      params.exportScenarioId = scenarioId;
+    }
+
+    return {
+      whereClause: parts.length > 0 ? `AND ${parts.join(" AND ")}` : "",
+      params,
+    };
+  }
+
   // ---- Cursor helpers ----
+
+  /**
+   * Export cursors key on (StartedAt, ScenarioRunId); the batch cursors below
+   * key on (max(CreatedAt), BatchRunId). Separate encoders rather than one
+   * shared pair so neither payload carries a field named for the other's key.
+   */
+  private encodeExportCursor(ts: string, scenarioRunId: string): string {
+    return Buffer.from(JSON.stringify({ ts, scenarioRunId })).toString("base64");
+  }
+
+  private decodeExportCursor(
+    cursor: string,
+  ): { ts: string; scenarioRunId: string } | null {
+    try {
+      const parsed = JSON.parse(
+        Buffer.from(cursor, "base64").toString("utf-8"),
+      ) as Record<string, unknown>;
+      if (
+        typeof parsed.ts !== "string" ||
+        typeof parsed.scenarioRunId !== "string"
+      ) {
+        return null;
+      }
+      return { ts: parsed.ts, scenarioRunId: parsed.scenarioRunId };
+    } catch {
+      return null;
+    }
+  }
 
   private encodeCursor(ts: string, batchRunId: string): string {
     const payload: CursorPayload = { ts, batchRunId };

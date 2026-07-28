@@ -49,8 +49,10 @@ import {
   groupRunsByTarget,
   resolveOriginLabel,
 } from "./run-history-transforms";
+import { ScenarioRunExportDialog } from "./ScenarioRunExportDialog";
 import { useAutoExpansion } from "./useAutoExpansion";
 import { useCancelScenarioRun } from "./useCancelScenarioRun";
+import { useExportScenarioRuns } from "./useExportScenarioRuns";
 import { useRunHistoryPagination } from "./useRunHistoryPagination";
 import { useRunHistoryStore } from "./useRunHistoryStore";
 import { useScrollToBatch } from "./useScrollToBatch";
@@ -142,6 +144,23 @@ export function RunHistoryPanel({
     error,
     refetch,
   } = useRunHistoryPagination({ scenarioSetId, startDateMs, sseConnected });
+
+  // CSV export, scoped to whatever this panel is currently showing.
+  const {
+    isDialogOpen: isExportDialogOpen,
+    openExportDialog,
+    closeExportDialog,
+    startExport,
+  } = useExportScenarioRuns({
+    projectId: project?.id,
+    scenarioSetId,
+    scenarioId: filters.scenarioId || undefined,
+    passFailStatus: filters.passFailStatus
+      ? (filters.passFailStatus as "pass" | "fail" | "stalled")
+      : undefined,
+    startDate: startDateMs,
+    endDate: period.endDate.getTime(),
+  });
 
   // Fetch scenarios for filter options
   const { data: scenarios } = api.scenarios.getAll.useQuery(
@@ -423,6 +442,8 @@ export function RunHistoryPanel({
           onGroupByChange={setGroupBy}
           viewMode={viewMode}
           onViewModeChange={setViewMode}
+          onExport={openExportDialog}
+          isExportDisabled={totals.runCount === 0}
         />
       </Box>
 
@@ -551,6 +572,14 @@ export function RunHistoryPanel({
           )}
         </VStack>
       )}
+
+      <ScenarioRunExportDialog
+        isOpen={isExportDialogOpen}
+        onClose={closeExportDialog}
+        onExport={startExport}
+        runCount={totals.runCount}
+        hasFiltersApplied={hasFiltersApplied}
+      />
     </VStack>
   );
 }

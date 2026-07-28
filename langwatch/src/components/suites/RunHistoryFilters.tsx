@@ -5,8 +5,8 @@
  * and a Group-by selector on the right.
  */
 
-import { HStack, IconButton, NativeSelect, Text } from "@chakra-ui/react";
-import { LayoutGrid, List } from "lucide-react";
+import { Button, HStack, IconButton, NativeSelect, Text } from "@chakra-ui/react";
+import { Download, LayoutGrid, List } from "lucide-react";
 import { RUN_GROUP_TYPES, type RunGroupType } from "./run-history-transforms";
 import type { ViewMode } from "./useRunHistoryStore";
 
@@ -32,6 +32,14 @@ type RunHistoryFiltersProps = {
   groupByOptions?: RunGroupType[];
   viewMode?: ViewMode;
   onViewModeChange?: (value: ViewMode) => void;
+  /**
+   * Opens the CSV export dialog. Lives on the filter bar rather than the page
+   * header because the export honours these filters, and because the header is
+   * only rendered in the all-runs view while this bar shows in both.
+   */
+  onExport?: () => void;
+  /** Disables export when nothing would be written. */
+  isExportDisabled?: boolean;
 };
 
 export function RunHistoryFilters({
@@ -43,6 +51,8 @@ export function RunHistoryFilters({
   groupByOptions = [...RUN_GROUP_TYPES],
   viewMode,
   onViewModeChange,
+  onExport,
+  isExportDisabled = false,
 }: RunHistoryFiltersProps) {
   return (
     <HStack gap={3} flexWrap="wrap" justifyContent="space-between">
@@ -83,8 +93,19 @@ export function RunHistoryFilters({
         </NativeSelect.Root>
       </HStack>
 
-      {/* Right: view mode toggle + group-by selector */}
+      {/* Right: export + view mode toggle + group-by selector */}
       <HStack gap={3}>
+        {onExport && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={onExport}
+            disabled={isExportDisabled}
+          >
+            <Download size={14} />
+            Export CSV
+          </Button>
+        )}
         {onViewModeChange && (
           <HStack gap={1} role="group" aria-label="View mode">
             <IconButton
