@@ -654,8 +654,8 @@ function handledErrorToTRPCCode(error: HandledError): TRPCError["code"] {
     // 502/503/504 have no key in tRPC v10's code table (added in v11), so an
     // upstream failure has to fall through to INTERNAL_SERVER_ERROR here. The
     // domain status survives on the wire as `data.error.httpStatus`, and
-    // `logTrpcCall` logs the handled status rather than this one so a provider
-    // fault is not counted as our 500.
+    // `handleTrpcCallLogging` records the handled status rather than this one,
+    // so a provider fault is not counted as our 500.
   };
   return map[error.httpStatus] ?? "INTERNAL_SERVER_ERROR";
 }

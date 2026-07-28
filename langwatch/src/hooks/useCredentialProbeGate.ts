@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 /**
  * Decides whether a credential still has to be probed before saving.
@@ -49,13 +49,23 @@ export function useCredentialProbeGate({
   // key's verdict and slip through unprobed.
   const wasRefused = refusedCredentials === credentialsFingerprint;
 
+  // Both callbacks keep a stable identity across renders. The save handlers
+  // that consume them are `useCallback`s, and this component family also keys
+  // effects on callback identity — a fresh function per render re-runs those
+  // effects, which set state, which renders again.
+  const recordRefusal = useCallback(
+    () => setRefusedCredentials(credentialsFingerprint),
+    [credentialsFingerprint],
+  );
+  const clearRefusal = useCallback(() => setRefusedCredentials(null), []);
+
   return {
     /** Whether the credentials as entered still owe us a probe. */
     probeRequired: !wasRefused,
     /** Records that the provider refused exactly these credentials. */
-    recordRefusal: () => setRefusedCredentials(credentialsFingerprint),
+    recordRefusal,
     /** Forgets any refusal — the credentials were accepted. */
-    clearRefusal: () => setRefusedCredentials(null),
+    clearRefusal,
     /** What the save button should say, given the refusal is now readable. */
     saveLabel: wasRefused ? "Save anyway" : "Save",
   };
