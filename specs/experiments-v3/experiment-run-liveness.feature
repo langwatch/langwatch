@@ -3,28 +3,41 @@ Feature: Experiment runs always reach a terminal state
   producing results. If the work behind it disappears, the run is recorded as
   failed instead of staying started forever. (ADR-073.)
 
+  # @unimplemented: NONE of this is built yet. ADR-073 splits into two steps;
+  # step 1 shipped the equivalent process for *simulation* runs — see
+  # specs/scenarios/scenario-execution-process-manager.feature, which is bound.
+  # Experiment runs (evals v3) still execute in an async generator inside the
+  # web request's own process, with progress in Redis on a 24h TTL and no
+  # reaper of any kind. This file is the target these scenarios describe, kept
+  # here so the gap is stated rather than implied; bind each scenario as the
+  # `experimentRunExecution` process manager lands.
+
   Background:
     Given an experiment with a dataset and evaluators
 
   # --- Liveness ---
 
+  @unimplemented
   Scenario: Results keep a running experiment alive
     Given an experiment run that is producing results
     When it keeps producing results for longer than the silence allowed
     Then the run is not failed for inactivity
 
+  @unimplemented
   Scenario: An experiment run whose work disappears is failed
     Given an experiment run that has started
     When the work behind it stops producing results and never completes
     Then the run is reported as failed
     And the reason given is that it stalled
 
+  @unimplemented
   Scenario: An abandoned interactive run is recorded as failed
     Given an interactive experiment run streaming to a browser
     When the process running it is lost
     Then the run is reported as failed
     And it does not stay reported as running
 
+  @unimplemented
   Scenario: Recovery does not depend on a cached progress record
     Given an experiment run whose cached progress has expired
     When the run is read
@@ -32,12 +45,14 @@ Feature: Experiment runs always reach a terminal state
 
   # --- Dispatch ---
 
+  @unimplemented
   Scenario: A run started without a listener executes on the fleet
     Given an experiment run started for automated use
     When the request that started it has returned
     Then the run continues on the fleet
     And its outcome is recorded
 
+  @unimplemented
   Scenario: An interactive run keeps streaming to its listener
     Given an interactive experiment run
     When results are produced
@@ -45,12 +60,14 @@ Feature: Experiment runs always reach a terminal state
 
   # --- Stopping ---
 
+  @unimplemented
   Scenario: Stopping a run ends it
     Given an experiment run that is executing
     When the user stops it
     Then the work is signalled to stop
     And the run is reported as stopped
 
+  @unimplemented
   Scenario: A stop that is never observed still ends the run
     Given an experiment run whose work cannot be signalled
     When the user stops it
@@ -58,6 +75,7 @@ Feature: Experiment runs always reach a terminal state
 
   # --- Completion ---
 
+  @unimplemented
   Scenario: A completed run stops being watched
     Given an experiment run that completes normally
     When its completion is recorded

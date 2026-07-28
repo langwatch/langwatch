@@ -129,10 +129,6 @@ export const AGGREGATE_TYPE_IDENTIFIERS = [
   "experiment_run",
   "simulation_run",
   "simulation_set",
-  // Retired by ADR-072 — no command or event type produces it any more. It
-  // stays listed so the `event_log` rows committed before the retirement still
-  // decode; it goes when those rows do, with the `suite_runs` drop migration.
-  "suite_run",
   "langy_conversation",
   "topic_clustering",
   ...ENTERPRISE_AGGREGATE_TYPE_IDENTIFIERS,

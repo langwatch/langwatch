@@ -64,6 +64,7 @@ function known(
 
 describe("scenarioExecution process", () => {
   describe("given a run is queued", () => {
+    /** @scenario "A queued run is given time to be picked up" */
     it("arms a dispatch deadline", () => {
       const result = handleQueued(
         INITIAL_SCENARIO_EXECUTION_STATE,
@@ -91,6 +92,7 @@ describe("scenarioExecution process", () => {
   });
 
   describe("given a run is making progress", () => {
+    /** @scenario "A run that keeps reporting is left alone" */
     it("pushes the deadline out on every event", () => {
       const started = handleStarted(known(), IDENTITIES, makeCtx());
       const later = makeCtx({ at: NOW + 60_000, now: NOW + 60_000 });
@@ -123,6 +125,7 @@ describe("scenarioExecution process", () => {
   });
 
   describe("given the subscriber is backed up", () => {
+    /** @scenario "A backlog does not kill a healthy run" */
     it("schedules from now, not from the event's own instant", () => {
       const lagged = makeCtx({ at: NOW - 60 * 60 * 1000, now: NOW });
 
@@ -141,6 +144,7 @@ describe("scenarioExecution process", () => {
       expect(result.nextWakeAt).toBe(NOW + SCENARIO_CANCEL_DEADLINE_MS);
     });
 
+    /** @scenario "A cancelled run nobody honoured is still ended" */
     it("finalises as cancelled when the grace expires", () => {
       const armed = handleCancelRequested(known(), IDENTITIES, makeCtx());
 
@@ -158,6 +162,7 @@ describe("scenarioExecution process", () => {
       expect(result.state.settled).toBe(true);
     });
 
+    /** @scenario "A late report cannot revive a finished run" */
     it("is not re-armed by a straggling progress event", () => {
       const settled = handleSettled(known(), IDENTITIES, makeCtx());
 
@@ -172,6 +177,8 @@ describe("scenarioExecution process", () => {
       expect(straggler.nextWakeAt).toBeNull();
     });
 
+    /** @scenario "A run that finished on its own is never reaped" */
+    /** @scenario "A deleted run stops being watched" */
     it("writes nothing when a wake fires against it anyway", () => {
       const settled = handleSettled(known(), IDENTITIES, makeCtx());
 
@@ -183,6 +190,7 @@ describe("scenarioExecution process", () => {
   });
 
   describe("when the deadline fires on a live-looking run", () => {
+    /** @scenario "A run whose worker disappears is recorded as failed" */
     it("writes the terminal state", () => {
       const woken = scenarioExecutionWake(known(), makeCtx());
 
@@ -207,6 +215,7 @@ describe("scenarioExecution process", () => {
       expect(second.intents ?? []).toEqual([]);
     });
 
+    /** @scenario "Recording the death twice records it once" */
     it("addresses the write by the same key every time", () => {
       const a = scenarioExecutionWake(known(), makeCtx());
       const b = scenarioExecutionWake(known(), makeCtx({ now: NOW + 5000 }));
@@ -217,6 +226,7 @@ describe("scenarioExecution process", () => {
   });
 
   describe("given the process never learned who the run belongs to", () => {
+    /** @scenario "A run nothing is known about is abandoned rather than retried forever" */
     it("clears itself instead of being re-found forever", () => {
       const woken = scenarioExecutionWake(
         INITIAL_SCENARIO_EXECUTION_STATE,

@@ -14,6 +14,10 @@ import type { AggregateType } from "../domain/aggregateType";
  *  - `simulation_set` accumulates `simulation_run`s over its lifetime;
  *  - `test_aggregate` is test-only.
  *
+ * `suite_run` was removed with the aggregate itself (ADR-072). Nothing
+ * rehydrates it any more, and the historical `event_log` rows are unaffected:
+ * the enum is a write-time guard in `storeEvents`, never a read-time parser.
+ *
  * This list is the correctness contract for the optimisation: only add a type
  * here if every event of such an aggregate is guaranteed to occur within
  * REHYDRATION_WINDOW_MS of any other event of the same aggregate.
@@ -24,10 +28,6 @@ export const TIME_LOCAL_AGGREGATE_TYPES: ReadonlySet<AggregateType> =
     "evaluation",
     "experiment_run",
     "simulation_run",
-    // No pipeline writes `suite_run` any more (ADR-072), but events committed
-    // before it was retired are still in `event_log` and still time-local.
-    // Listed until those rows age out, so a scan that meets one stays bounded.
-    "suite_run",
   ]);
 
 /**
