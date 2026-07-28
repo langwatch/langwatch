@@ -324,6 +324,11 @@ describe("given a blocking budget on traffic the gateway is serving", () => {
     // therefore proves the rebuilt history is enforced, not merely shown.
     const PRE_SPEND_USD = "0.0040000000";
 
+    // Captured in beforeAll, while the schema is still on the 00055 view,
+    // so the assertions below never depend on live schema mutations from
+    // inside a test body.
+    let preRebuildDecision: Awaited<ReturnType<GatewayBudgetService["check"]>>;
+
     const decidePreProject = async () =>
       await service.check({
         organizationId: ORG_ID,
@@ -393,10 +398,10 @@ describe("given a blocking budget on traffic the gateway is serving", () => {
 
       // Pre-rebuild state: the 00055 view truncates periods in the server
       // session timezone.
-      await replayGooseMigrationUp(
+      await replayGooseMigrationUp({
         client,
-        "00055_gateway_budget_scope_totals_period_start.sql",
-      );
+        fileName: "00055_gateway_budget_scope_totals_period_start.sql",
+      });
 
       // History folded by the old view as a Sao Paulo server would fold
       // it: a synchronous insert so the view's SELECT runs under this
@@ -433,30 +438,43 @@ describe("given a blocking budget on traffic the gateway is serving", () => {
           session_timezone: "America/Sao_Paulo",
         },
       });
+
+      // The decision as a pre-upgrade deployment would compute it, then
+      // the upgrade under test: pin the truncation to UTC and rebuild the
+      // rollup from the ledger.
+      preRebuildDecision = await decidePreProject();
+      await replayGooseMigrationUp({
+        client,
+        fileName: "00058_gateway_budget_scope_totals_utc.sql",
+      });
+    }, 120_000);
+
+    afterAll(async () => {
+      // The replays above mutate shared database schema, not tenant data.
+      // Re-apply the current migration unconditionally so a failure
+      // anywhere in this describe can never leave later suites running
+      // against the 00055 view. Idempotent by the migration's own design.
+      const client = await getClickHouseClientForProject(PRE_PROJECT_ID);
+      await replayGooseMigrationUp({
+        client: client!,
+        fileName: "00058_gateway_budget_scope_totals_utc.sql",
+      });
     }, 120_000);
 
     describe("when the rollup rebuild has not run", () => {
       /** @scenario "Spend recorded before the rollup rebuild still counts after it" */
-      it("lets requests through as if nothing had been spent", async () => {
+      it("lets requests through as if nothing had been spent", () => {
         // The bug the rebuild exists for: $0.004 of $0.005 is spent, and
         // the decision neither warns nor blocks because the history sits
         // in a bucket the reader never asks about.
-        const decision = await decidePreProject();
-
-        expect(decision.decision).toBe("allow");
-        expect(decision.warnings).toHaveLength(0);
+        expect(preRebuildDecision.decision).toBe("allow");
+        expect(preRebuildDecision.warnings).toHaveLength(0);
       });
     });
 
     describe("when the rollup rebuild runs", () => {
       /** @scenario "Spend recorded before the rollup rebuild still counts after it" */
       it("counts the pre-rebuild spend and warns at 80% of the limit", async () => {
-        const client = await getClickHouseClientForProject(PRE_PROJECT_ID);
-        await replayGooseMigrationUp(
-          client!,
-          "00058_gateway_budget_scope_totals_utc.sql",
-        );
-
         const decision = await decidePreProject();
 
         expect(decision.decision).toBe("soft_warn");

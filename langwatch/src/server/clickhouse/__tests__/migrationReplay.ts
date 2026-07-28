@@ -18,10 +18,13 @@ import type { ClickHouseClient } from "@clickhouse/client";
 
 const MIGRATIONS_DIR = join(__dirname, "..", "migrations");
 
-export async function replayGooseMigrationUp(
-  client: ClickHouseClient,
-  fileName: string,
-): Promise<void> {
+export async function replayGooseMigrationUp({
+  client,
+  fileName,
+}: {
+  client: ClickHouseClient;
+  fileName: string;
+}): Promise<void> {
   const raw = await readFile(join(MIGRATIONS_DIR, fileName), "utf-8");
 
   // Only the Up section: the Down section keeps its own (commented-out)

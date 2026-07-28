@@ -254,7 +254,12 @@ WHERE r.TrueSpendUSD > c.CurSpendUSD
    OR r.TrueTokensInput > c.CurTokensInput
    OR r.TrueTokensOutput > c.CurTokensOutput
    OR r.TrueTokensCacheRead > c.CurTokensCacheRead
-   OR r.TrueTokensCacheWrite > c.CurTokensCacheWrite;
+   OR r.TrueTokensCacheWrite > c.CurTokensCacheWrite
+-- The delta arithmetic and the WHERE filter both rely on an unmatched
+-- LEFT JOIN row carrying zero-valued Cur* columns. A server or profile
+-- with join_use_nulls = 1 would make them NULL instead, so the setting
+-- is pinned on the statement.
+SETTINGS join_use_nulls = 0;
 -- +goose StatementEnd
 
 -- +goose StatementBegin
@@ -270,8 +275,12 @@ DROP TABLE IF EXISTS ${CLICKHOUSE_DATABASE}.gateway_budget_scope_totals_recon;
 -- +goose Down
 -- +goose ENVSUB ON
 
--- Down migrations are intentionally commented out to prevent accidental data loss.
--- To roll back, uncomment below and run manually.
+-- IRREVERSIBLE: the rebuild re-keys the rollup's persisted aggregate rows
+-- in place. Undoing it would mean another full rebuild under server-local
+-- boundaries, which re-hides current-period spend from the UTC reader,
+-- and the pre-rebuild aggregate rows no longer exist to restore. Rollback
+-- statements stay commented out and must be applied manually if ever
+-- needed.
 
 -- +goose StatementBegin
 -- DROP VIEW IF EXISTS ${CLICKHOUSE_DATABASE}.gateway_budget_scope_totals_mv;

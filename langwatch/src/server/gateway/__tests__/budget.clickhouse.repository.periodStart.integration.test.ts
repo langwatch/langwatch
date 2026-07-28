@@ -312,10 +312,10 @@ describe("given a debit recorded against a budget in ClickHouse", () => {
 
       // Pre-upgrade state: the 00055 view truncates periods in the server
       // session timezone.
-      await replayGooseMigrationUp(
-        client!,
-        "00055_gateway_budget_scope_totals_period_start.sql",
-      );
+      await replayGooseMigrationUp({
+        client: client!,
+        fileName: "00055_gateway_budget_scope_totals_period_start.sql",
+      });
 
       // Pre-upgrade history, folded by the old view as a Sao Paulo server
       // would fold it (same synchronous session_timezone technique as the
@@ -358,12 +358,24 @@ describe("given a debit recorded against a budget in ClickHouse", () => {
 
       // The upgrade under test: pin the truncation to UTC and rebuild the
       // rollup from the ledger.
-      await replayGooseMigrationUp(
-        client!,
-        "00058_gateway_budget_scope_totals_utc.sql",
-      );
+      await replayGooseMigrationUp({
+        client: client!,
+        fileName: "00058_gateway_budget_scope_totals_utc.sql",
+      });
 
       utcRowsAfterRebuild = await captureUtcRows();
+    }, 120_000);
+
+    afterAll(async () => {
+      // The replays above mutate shared database schema, not tenant data.
+      // Re-apply the current migration unconditionally so a failure
+      // anywhere in this describe can never leave later suites running
+      // against the 00055 view. Idempotent by the migration's own design.
+      const client = await getClickHouseClientForProject(TENANT_ID);
+      await replayGooseMigrationUp({
+        client: client!,
+        fileName: "00058_gateway_budget_scope_totals_utc.sql",
+      });
     }, 120_000);
 
     /** @scenario "Spend recorded before the rollup rebuild still counts after it" */

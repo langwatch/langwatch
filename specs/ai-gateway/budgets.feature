@@ -242,7 +242,7 @@ Feature: AI Gateway — Budgets
   Scenario: Spend recorded before the rollup rebuild still counts after it
     Given the underlying spend store computes period boundaries in its own local timezone
     And day, week, and month budgets already carry recorded spend
-    When the rollup is rebuilt with period boundaries pinned to UTC
+    When the deployment is upgraded to compute period boundaries in UTC
     Then each budget reports exactly the spend recorded before the rebuild
     And spend recorded on boundaries that were already UTC is unchanged
     And a budget blocks when spend recorded before and after the rebuild together pass its limit
