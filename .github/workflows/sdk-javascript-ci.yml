@@ -65,14 +65,18 @@ jobs:
         with:
           install: "langwatch..."
 
-      # No `-w`. That flag means "the workspace root", which used to BE
-      # typescript-sdk/ when it was its own install root; since ADR-076 the
-      # root is the repo, so `-w` would write the dependency into the root
-      # manifest and the shared lockfile instead of into the SDK. The job's
-      # working-directory already scopes this to typescript-sdk.
-      - name: Install TypeScript Native Preview
-        run: pnpm add -D @typescript/native-preview
-
+      # The "Install TypeScript Native Preview" step that used to sit here is
+      # gone. It ran `pnpm install -D -w @typescript/native-preview`, and `-w`
+      # means "the workspace root" — which used to BE typescript-sdk/ when it
+      # was its own install root. Since ADR-076 the root is the repo, so it
+      # would have written the dependency into the root manifest and the
+      # SHARED lockfile mid-job, leaving every later step running against a
+      # lockfile that no longer matches the repo.
+      #
+      # Dropping it rather than rescoping it, because nothing in this package
+      # uses it: `lint` is `eslint .` and `typecheck` is `tsc --noEmit`, and
+      # the SDK references neither `tsgo` nor native-preview anywhere. It was
+      # installing a toolchain no step invokes.
       - name: Run lint check
         run: pnpm run lint
 

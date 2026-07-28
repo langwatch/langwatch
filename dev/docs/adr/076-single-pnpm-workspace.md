@@ -81,7 +81,7 @@ artifact nested one directory down.** The tarball carries
 `pnpm-workspace.yaml`, `pnpm-lock.yaml` and every member's `package.json` under
 `app/`; first boot runs
 
-```
+```sh
 pnpm install --frozen-lockfile --filter "@langwatch/web..."
 ```
 

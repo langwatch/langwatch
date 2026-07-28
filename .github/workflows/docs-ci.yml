@@ -80,6 +80,14 @@ jobs:
         with:
           cache-dependency-path: pnpm-lock.yaml
 
+      # skills/ pulls node-pty, whose postinstall falls back to `node-gyp
+      # rebuild` on linux. The composite action above installs node-gyp only
+      # when it does the install itself, and here it does not, so it has to be
+      # installed explicitly before the install below reaches that lifecycle
+      # script — otherwise it ELIFECYCLEs with "node-gyp: not found".
+      - name: Install node-gyp (for node-pty postinstall)
+        run: npm install -g node-gyp@12.3.0
+
       # One install for the app and the skills compiler. skills/ used to need
       # `--ignore-workspace` to escape the root workspace it sat inside without
       # being a member of; it is a member now. See ADR-076.
