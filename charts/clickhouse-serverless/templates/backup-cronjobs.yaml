@@ -25,6 +25,11 @@ spec:
             app.kubernetes.io/component: backup-full
         spec:
           restartPolicy: Never
+          # Same ServiceAccount as the StatefulSets: these Jobs are configured
+          # by the chart's serviceAccount.* block, so they must not silently
+          # fall through to the namespace default SA (which would miss an IRSA
+          # annotation the backup path needs to reach S3).
+          serviceAccountName: {{ include "clickhouse-serverless.serviceAccountName" . }}
           # Backup jobs never call the Kubernetes API.
           automountServiceAccountToken: {{ .Values.serviceAccount.automountServiceAccountToken }}
           securityContext:
@@ -34,7 +39,8 @@ spec:
               type: RuntimeDefault
           volumes:
             - name: tmp
-              emptyDir: {}
+              emptyDir:
+                sizeLimit: {{ .Values.scratch.tmpSizeLimit }}
           containers:
             - name: full-backup
               image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -91,6 +97,11 @@ spec:
             app.kubernetes.io/component: backup-incremental
         spec:
           restartPolicy: Never
+          # Same ServiceAccount as the StatefulSets: these Jobs are configured
+          # by the chart's serviceAccount.* block, so they must not silently
+          # fall through to the namespace default SA (which would miss an IRSA
+          # annotation the backup path needs to reach S3).
+          serviceAccountName: {{ include "clickhouse-serverless.serviceAccountName" . }}
           # Backup jobs never call the Kubernetes API.
           automountServiceAccountToken: {{ .Values.serviceAccount.automountServiceAccountToken }}
           securityContext:
@@ -100,7 +111,8 @@ spec:
               type: RuntimeDefault
           volumes:
             - name: tmp
-              emptyDir: {}
+              emptyDir:
+                sizeLimit: {{ .Values.scratch.tmpSizeLimit }}
           containers:
             - name: incremental-backup
               image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -155,6 +167,11 @@ spec:
             app.kubernetes.io/component: restore-data
         spec:
           restartPolicy: Never
+          # Same ServiceAccount as the StatefulSets: these Jobs are configured
+          # by the chart's serviceAccount.* block, so they must not silently
+          # fall through to the namespace default SA (which would miss an IRSA
+          # annotation the backup path needs to reach S3).
+          serviceAccountName: {{ include "clickhouse-serverless.serviceAccountName" . }}
           # Backup jobs never call the Kubernetes API.
           automountServiceAccountToken: {{ .Values.serviceAccount.automountServiceAccountToken }}
           securityContext:
@@ -164,7 +181,8 @@ spec:
               type: RuntimeDefault
           volumes:
             - name: tmp
-              emptyDir: {}
+              emptyDir:
+                sizeLimit: {{ .Values.scratch.tmpSizeLimit }}
           containers:
             - name: restore-data
               image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"

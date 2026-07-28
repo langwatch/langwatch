@@ -112,6 +112,19 @@ keeper:
     size: 10Gi
     storageClass: ""  # defaults to parent storage.storageClass
 
+# Writable scratch (emptyDir) for the paths ClickHouse and Keeper touch outside
+# their data PVC, so both can run with a read-only root filesystem.
+#
+# These are bounded on purpose. An unbounded emptyDir is backed by the node's
+# ephemeral storage, so a pod stuck in a merge/replication error loop can fill
+# the node and trigger DiskPressure evictions for unrelated workloads. With a
+# sizeLimit the kubelet evicts only the offending pod. The shipped ClickHouse
+# config rotates server logs at 1000M x 10, so raise logsSizeLimit if you also
+# raise that.
+scratch:
+  logsSizeLimit: 2Gi
+  tmpSizeLimit: 1Gi
+
 # ServiceAccount
 serviceAccount:
   create: true

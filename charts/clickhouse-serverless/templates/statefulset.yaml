@@ -242,12 +242,13 @@ spec:
             - name: users-d
               mountPath: /etc/clickhouse-server/users.d
             # Writable scratch so the container runs read-only root: server
-            # logs, the pid dir, and /tmp. (config.d/users.d above are also
-            # writable emptyDirs, which is where ch-config renders config.)
+            # logs and /tmp. (config.d/users.d above are also writable
+            # emptyDirs, which is where ch-config renders config; everything
+            # else ClickHouse writes — preprocessed_configs, status, uuid,
+            # format_schemas, user_files, tmp, access — is under
+            # /var/lib/clickhouse on the PVC.)
             - name: ch-logs
               mountPath: /var/log/clickhouse-server
-            - name: ch-run
-              mountPath: /var/run/clickhouse-server
             - name: tmp
               mountPath: /tmp
             - name: secrets
@@ -260,11 +261,11 @@ spec:
         - name: users-d
           emptyDir: {}
         - name: ch-logs
-          emptyDir: {}
-        - name: ch-run
-          emptyDir: {}
+          emptyDir:
+            sizeLimit: {{ .Values.scratch.logsSizeLimit }}
         - name: tmp
-          emptyDir: {}
+          emptyDir:
+            sizeLimit: {{ .Values.scratch.tmpSizeLimit }}
         - name: secrets
           secret:
             secretName: {{ include "clickhouse-serverless.secretName" . }}

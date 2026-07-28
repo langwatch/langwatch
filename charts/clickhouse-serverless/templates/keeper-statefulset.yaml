@@ -128,8 +128,10 @@ spec:
           securityContext:
             runAsUser: 101  # clickhouse user
             runAsNonRoot: true
-            # Read-only root: keeper data is on the PVC and config is the
-            # keeper-config emptyDir; logs/pid/tmp are emptyDir-mounted below.
+            # Read-only root: keeper state, raft log and preprocessed configs
+            # all land on the PVC (they derive from log_storage_path), config
+            # is the keeper-config emptyDir, and logs/tmp are emptyDir-mounted
+            # below.
             readOnlyRootFilesystem: true
             allowPrivilegeEscalation: false
             capabilities:
@@ -161,11 +163,14 @@ spec:
               mountPath: /var/lib/clickhouse-keeper
             - name: keeper-config
               mountPath: /etc/clickhouse-keeper
-            # Writable scratch so keeper runs read-only root: logs, pid, /tmp.
+            # Writable scratch so keeper runs read-only root. Keeper's state,
+            # raft log and preprocessed configs all derive from
+            # log_storage_path and land on the PVC, so only these two are
+            # needed. /var/log is mounted because the shipped config logs to
+            # console only — an operator who turns file logging back on via
+            # extraConfig must not crashloop against a read-only root.
             - name: keeper-logs
               mountPath: /var/log/clickhouse-keeper
-            - name: keeper-run
-              mountPath: /var/run/clickhouse-keeper
             - name: tmp
               mountPath: /tmp
 
@@ -173,11 +178,11 @@ spec:
         - name: keeper-config
           emptyDir: {}
         - name: keeper-logs
-          emptyDir: {}
-        - name: keeper-run
-          emptyDir: {}
+          emptyDir:
+            sizeLimit: {{ .Values.scratch.logsSizeLimit }}
         - name: tmp
-          emptyDir: {}
+          emptyDir:
+            sizeLimit: {{ .Values.scratch.tmpSizeLimit }}
         - name: keeper-raft-template
           configMap:
             name: {{ $fullname }}-keeper-raft
