@@ -7,6 +7,7 @@ import {
   LuTriangleAlert,
 } from "react-icons/lu";
 import type { BTLeaderboard } from "./computeBTLeaderboard";
+import { winMatrixHasPairwiseDetail } from "./computeWinMatrixShape";
 
 /**
  * Bradley-Terry leaderboard panel for the Comparison evaluator (#5103).
@@ -336,11 +337,28 @@ function WinMatrixHeatmap({
   const ids = leaderboard.entries.map((e) => e.variantId);
   if (ids.length === 0) return null;
 
+  // When every verdict covered the whole field, a win makes the winner beat
+  // all the others at once, so each row is one number repeated. The grid then
+  // shows how often each variant won — not how it fared against any one
+  // opponent — and the per-cell tinting would otherwise imply a head-to-head
+  // result the run never measured.
+  const hasPairwiseDetail = winMatrixHasPairwiseDetail({
+    winMatrix: leaderboard.winMatrix,
+    variantIds: ids,
+  });
+
   return (
     <VStack align="stretch" gap={2}>
       <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
         Win matrix (row = winner, column = opponent) — click a cell for why
       </Text>
+      {!hasPairwiseDetail ? (
+        <Text fontSize="2xs" color="fg.muted">
+          Every verdict in this run judged all {ids.length} variants together,
+          so each row repeats one number: how often that variant won overall,
+          not how it did against a particular opponent.
+        </Text>
+      ) : null}
       <Box overflowX="auto">
         <Table.Root size="sm" variant="outline">
           <Table.Header>

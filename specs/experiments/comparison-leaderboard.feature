@@ -96,6 +96,24 @@ Feature: Comparison leaderboard (Bradley-Terry ranking on the results page)
     Then I see a grid with one row and one column per variant
     And each cell shows how often the row variant beat the column variant, tinted by win rate
 
+  Scenario: A matrix with no pairwise information says so
+    Given every verdict in the run judged all of the variants together
+    When I open the expanded leaderboard
+    Then I see that each row of the win matrix is the same number repeated
+    And I am told the grid shows how often each variant won overall, not how it fared against any particular opponent
+    # A Comparison judges the whole field at once, so one verdict makes the
+    # winner beat every other variant simultaneously. Every cell in a winner's
+    # row is then identical by construction, and the grid carries no more
+    # information than a win count — while its per-cell tinting implies
+    # head-to-head structure that the run never measured. Saying so costs a
+    # sentence; letting a reader infer "warm beats formal specifically" from a
+    # number that only means "warm won 28 rows" costs them a wrong decision.
+
+  Scenario: A matrix built from differing candidate sets keeps its pairwise reading
+    Given some verdicts judged only a subset of the variants
+    When I open the expanded leaderboard
+    Then the win matrix is presented as head-to-head detail with no such caveat
+
   Scenario: Clicking a win-matrix cell explains why
     Given variant_1 has beaten variant_2 on several rows
     When I click the cell where variant_1's row meets variant_2's column
