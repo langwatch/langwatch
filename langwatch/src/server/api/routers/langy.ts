@@ -727,6 +727,163 @@ export const langyRouter = createTRPCRouter({
     },
   ),
 
+  /**
+   * In-agent feedback capture ("How's Langy doing?" / thumbs).
+   *
+   * Two destinations, by design:
+   *  - Aggregate product analytics -> PostHog via the backend (never
+   *    client-side capture), so it lands in the same pipeline as the rest of
+   *    the product.
+   *  - The feedback itself (thumbs / frustration) is ALSO meant to flow back
+   *    into LangWatch as a feedback event tied to the conversation's trace id,
+   *    so we dogfood Langy in our own account. That routing is seamed on
+   *    `traceId` below — recording the LangWatch `thumbs_up_down` trace event
+   *    against `traceId` (via the events ingestion path) is the follow-up; the
+   *    id contract is captured here so the client already sends it.
+   *
+   * `shareConversationConsent` records that a (possibly frustrated) user
+   * granted permission to inspect the full conversation for debugging — the
+   * consent flag only; acting on it is a separate, gated flow.
+   */
+  // A write (it captures analytics and — per the documented follow-up — is
+  // meant to write a feedback event onto the conversation's trace), so it
+  // wants `langy:create`, not the read grant, matching the "reads want view,
+  // writes want create" doctrine the router documents.
+  recordFeedback: langyCreateProcedure
+    .input(
+      z.object({
+        conversationId: z.string().optional(),
+        messageId: z.string().optional(),
+        /** Trace id of the conversation turn, for LangWatch feedback events. */
+        traceId: z.string().optional(),
+        rating: z.enum(["up", "down"]),
+        sentiment: z.enum(["frustrated", "delighted", "neutral"]).optional(),
+        comment: z.string().max(2000).optional(),
+        shareConversationConsent: z.boolean().optional(),
+      }),
+    )
+    .mutation(async ({ input, ctx }): Promise<void> => {
+      // Only attach ids the caller actually owns. An unverified conversationId
+      // /traceId would fabricate attribution today, and once the trace-event
+      // follow-up lands it would let a caller write forged feedback onto any
+      // trace. A conversationId the caller cannot see is dropped (not
+      // rejected) so a genuine feedback ping still records its rating — it
+      // just carries no cross-user attribution.
+      let conversationId = input.conversationId;
+      if (conversationId) {
+        const conv = await getApp().langy.conversations.findByIdVisible({
+          id: conversationId,
+          projectId: input.projectId,
+          userId: ctx.session.user.id,
+        });
+        if (!conv) {
+          logger.warn(
+            {
+              projectId: input.projectId,
+              conversationId,
+              userId: ctx.session.user.id,
+            },
+            "dropping langy feedback ids for a conversation the caller cannot see",
+          );
+          conversationId = undefined;
+        }
+      }
+      // traceId is only trustworthy insofar as it belongs to a conversation
+      // the caller owns; without a verified conversation it is dropped too, so
+      // feedback can never be pinned to an arbitrary trace.
+      const traceId = conversationId ? input.traceId : undefined;
+      const messageId = conversationId ? input.messageId : undefined;
+
+      trackServerEvent({
+        userId: ctx.session.user.id,
+        event: "langy_feedback",
+        projectId: input.projectId,
+        properties: {
+          conversationId,
+          messageId,
+          traceId,
+          rating: input.rating,
+          sentiment: input.sentiment,
+          comment: input.comment,
+          shareConversationConsent: input.shareConversationConsent ?? false,
+        },
+      });
+    }),
+
+  /**
+   * The feedback card was SHOWN — start the quiet period (the backend-driven
+   * cadence, specs/langy/langy-feedback.feature). Showing counts as asking:
+   * without this, an ignored card would re-appear under every answer, which is
+   * exactly the nagging the cadence exists to prevent. A write, so it wants
+   * `langy:create`, same as recordFeedback.
+   */
+  feedbackPromptShown: langyCreateProcedure
+    .input(z.object({ conversationId: z.string().min(1) }))
+    .mutation(async ({ input, ctx }): Promise<void> => {
+      // Same doctrine as recordFeedback: never act on a conversation id the
+      // caller cannot actually see in this project. The visible-check runs the
+      // project + ownership/shared rules, so a forged or foreign id is a
+      // silent no-op instead of stamping the caller's cadence record with
+      // attribution they don't own.
+      const conversation = await getApp().langy.conversations.findByIdVisible({
+        id: input.conversationId,
+        projectId: input.projectId,
+        userId: ctx.session.user.id,
+      });
+      if (!conversation) {
+        logger.warn(
+          {
+            projectId: input.projectId,
+            conversationId: input.conversationId,
+            userId: ctx.session.user.id,
+          },
+          "dropping langy feedback-shown mark for a conversation the caller cannot see",
+        );
+        return;
+      }
+      await getApp().langy.feedbackPrompt.markShown({
+        userId: ctx.session.user.id,
+        conversationId: input.conversationId,
+      });
+    }),
+
+  /**
+   * SSE subscription pushing `langy_conversation_updated` signals to active
+   * browsers when a conversation's fold projection advances. The client
+   * listens, cancels + invalidates its TanStack cache, and refetches the slim
+   * projection — landing fresh data without a data push. Mirrors
+   * `traces.onTraceUpdate` / `tracesV2.onDiscoverUpdate` so `useSSESubscription`
+   * handles it unchanged.
+   */
+  onConversationUpdate: langyReadProcedure.subscription(async function* (opts) {
+    const { projectId } = opts.input;
+    const userId = opts.ctx.session.user.id;
+    const emitter = getApp().broadcast.getTenantEmitter(projectId);
+    try {
+      for await (const eventArgs of on(emitter, "langy_conversation_updated", {
+        // @ts-expect-error - signal is not typed on the events overload
+        signal: opts.signal,
+      })) {
+        const data = eventArgs[0] as { event?: unknown; timestamp?: number };
+        // User-scope gate: the broadcast is tenant-wide, so drop every signal
+        // for a conversation this user cannot access (not owner, not shared),
+        // mirroring the read routes' `(UserId = userId OR IsShared)` rule. A
+        // non-owner must never even learn that another user's private
+        // conversation is active. Fail-closed on any malformed payload.
+        if (
+          !isLangyConversationUpdateVisibleToUser({
+            eventPayload: data.event,
+            userId,
+          })
+        ) {
+          continue;
+        }
+        yield data;
+      }
+    } finally {
+      getApp().broadcast.cleanupTenantEmitter(projectId);
+    }
+  }),
 
   /**
    * The live turn stream. Yields the durable token-buffer entries for one turn
