@@ -1299,9 +1299,16 @@ describe.skipIf(!hasTestcontainers)(
           // Pre-ADR-080 nothing on the message or the chain moved at all: the
           // count lived only in a segment appended to the id.
           expect(rungs.map((r) => r.onMessage)).toEqual([1, 2, 3]);
-          // recordGroupAttempt runs before the re-stage, so the chain already
-          // holds the rung being staged — every attempt is recorded there.
-          expect(rungs.map((r) => r.onChain)).toEqual(["1", "2", "3"]);
+          // The chain is written INSIDE retryRestage, and this samples on the
+          // way in — so each rung sees what the PREVIOUS one recorded, and the
+          // first sees nothing because no re-stage has happened yet. That lag
+          // is the property: the chain only ever advances together with a
+          // re-stage that actually landed. It used to be written by the caller
+          // beforehand, which is how a failed write could leave a re-staged
+          // job with no record of its attempt anywhere.
+          expect(rungs.map((r) => r.onChain)).toEqual([null, "1", "2"]);
+          // And the last rung's write did land, so nothing is lost by the lag.
+          expect(await groupAttempt(name, groupId)).toBe("3");
           expect(await stagedIds(name, groupId)).toEqual([stagedJobId]);
         }, 60000);
       });

@@ -286,7 +286,7 @@ const PENDING_RECONCILE_SCAN_COUNT = 1000;
  * Returns the same `[err, value]` tuples `pipeline.exec()` does, so callers read
  * the results exactly as before.
  */
-async function execWithNoScriptRecovery(
+export async function execWithNoScriptRecovery(
   pipeline: ChainableCommander,
   rerun: (index: number) => Promise<unknown>,
 ): Promise<Array<[Error | null, unknown]>> {

@@ -103,37 +103,4 @@ describe("operator recovery clears every per-group counter", () => {
     });
   });
 
-  describe("given a Redis whose script cache has been flushed", () => {
-    describe("when an operator runs a bulk recovery", () => {
-      it("still does the work instead of silently reporting nothing", async () => {
-        // The bulk paths pipeline EVALSHA, and a queued command cannot retry
-        // itself — so on a cold cache every entry fails with NOSCRIPT. Without
-        // the recovery path this returns 0 and the operator's "unblock
-        // everything" quietly does nothing.
-        await redis.script("FLUSH");
-
-        const { unblockedCount } = await repo.unblockAll({ queueName });
-
-        expect(unblockedCount).toBe(1);
-        expect(await redis.sismember(`${prefix}blocked`, groupId)).toBe(0);
-        expect(await survivingCounters()).toEqual([]);
-      });
-
-      it("drains a whole tenant on a cold cache", async () => {
-        // drainTenant walks the ready set, so this one needs a LIVE group
-        // rather than the blocked fixture the other cases use.
-        await redis.srem(`${prefix}blocked`, groupId);
-        await redis.zadd(`${prefix}ready`, 1, groupId);
-        await redis.script("FLUSH");
-
-        const { groupsDrained } = await repo.drainTenant({
-          queueName,
-          tenantId: "project-1",
-        });
-
-        expect(groupsDrained).toBe(1);
-        expect(await survivingCounters()).toEqual([]);
-      });
-    });
-  });
 });
