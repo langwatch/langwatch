@@ -121,6 +121,7 @@ describe("red-team scenario configuration", () => {
   });
 
   describe("given a turn count outside the allowed range", () => {
+    /** @scenario Turn count is bounded */
     it("rejects a count above the maximum", () => {
       const result = ScenarioConfigSchema.safeParse({
         id: "scenario_1",
@@ -156,6 +157,7 @@ describe("red-team scenario configuration", () => {
      * would have been billed in full. The guard is only real if the boundary
      * runs it.
      */
+    /** @scenario Turn count is bounded */
     it("is rejected by the function the child process actually runs", () => {
       expect(() =>
         parseChildProcessJobData(
@@ -170,6 +172,7 @@ describe("red-team scenario configuration", () => {
       ).toBe(RED_TEAM_MAX_TURNS);
     });
 
+    /** @scenario Free-text attack settings are bounded */
     it("is rejected for an objective past the length cap", () => {
       expect(() =>
         parseChildProcessJobData(

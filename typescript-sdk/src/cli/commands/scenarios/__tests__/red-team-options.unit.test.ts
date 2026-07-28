@@ -79,6 +79,7 @@ describe("the red-team CLI flags", () => {
        * it checks, and answers 200. Asking the same question of the flags alone
        * made the CLI exit 1 on an operation the platform performs happily.
        */
+      /** @scenario Changing strategy on a configured scenario does not resend the objective */
       it("sends it, because the objective may already be stored", () => {
         expect(toRedTeamBody({ redTeamStrategy: "goat" }, update)).toEqual({
           redTeamStrategy: "goat",

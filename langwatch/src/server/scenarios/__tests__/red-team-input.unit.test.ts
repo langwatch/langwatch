@@ -250,6 +250,7 @@ describe("the red-team write contract", () => {
      * a run that can be fifty turns long, so an unbounded value is written
      * once and paid for fifty times.
      */
+    /** @scenario Free-text attack settings are bounded */
     it("refuses an objective past the cap", () => {
       expect(
         schema.safeParse({
@@ -263,6 +264,7 @@ describe("the red-team write contract", () => {
       ).toBe(true);
     });
 
+    /** @scenario Free-text attack settings are bounded */
     it("refuses an attack plan and a planning prompt past the cap", () => {
       expect(
         schema.safeParse({

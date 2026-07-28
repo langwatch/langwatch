@@ -299,6 +299,7 @@ describe("updateScenarioCommand()", () => {
   });
 
   describe("when switching strategy on an already-configured scenario", () => {
+    /** @scenario Changing strategy on a configured scenario does not resend the objective */
     it("sends the strategy without demanding the objective again", async () => {
       // The objective is already on the row; the API merges before it checks.
       mockUpdate.mockResolvedValue(makeScenario());

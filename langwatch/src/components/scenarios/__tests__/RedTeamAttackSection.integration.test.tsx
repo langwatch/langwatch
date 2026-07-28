@@ -74,7 +74,7 @@ const crescendoWithPlan: Partial<ScenarioFormData> = {
 describe("the attack section", () => {
   describe("given a Crescendo scenario with an attack plan", () => {
     describe("when the strategy is switched to GOAT", () => {
-      /** @scenario Planner settings are refused on a strategy that ignores them */
+      /** @scenario Switching to a strategy that ignores the planner clears it */
       it("drops the planner settings GOAT ignores", async () => {
         // Hiding the inputs is not the same as clearing them. GOAT never
         // plans, so the rule rejects a leftover plan — at `redTeamConfig`,
@@ -89,6 +89,7 @@ describe("the attack section", () => {
         });
       });
 
+      /** @scenario Switching to a strategy that ignores the planner clears it */
       it("can still be saved afterwards", async () => {
         const user = userEvent.setup();
         const { save, onValid, onInvalid } = renderForm(crescendoWithPlan);
@@ -120,6 +121,7 @@ describe("the attack section", () => {
 
   describe("given a turn count above the maximum", () => {
     describe("when saving", () => {
+      /** @scenario A rejected save says what is wrong */
       it("refuses, and says which field is wrong", async () => {
         // `min`/`max` on a number input are advisory — they colour the
         // spinner and nothing else. Typing 51 is allowed and the schema

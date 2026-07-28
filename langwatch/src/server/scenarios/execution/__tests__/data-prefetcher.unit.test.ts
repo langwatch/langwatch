@@ -234,6 +234,7 @@ describe("prefetchScenarioData", () => {
        * defaults while the editor still shows the settings the user picked,
        * and the only symptom is behaviour that does not match the screen.
        */
+      /** @scenario A stored attack setting that no longer validates is reported */
       it("keeps the run alive and says so", async () => {
         loggerWarn.mockClear();
         const deps = createMockDeps({
@@ -272,6 +273,7 @@ describe("prefetchScenarioData", () => {
        * outright; clamping keeps an old record runnable without billing for a
        * budget nobody could have set through the product.
        */
+      /** @scenario Turn count is bounded */
       it("clamps to the maximum rather than failing or billing for it", async () => {
         loggerWarn.mockClear();
         const deps = createMockDeps({
