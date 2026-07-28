@@ -945,3 +945,49 @@ podAffinity:
     {{- .Values.clickhouse.external.cluster -}}
   {{- end -}}
 {{- end -}}
+
+{{/*
+Ingress: validated + normalised `ingress.blockedPaths`, returned as a JSON array.
+
+Both templates/ingress.yaml and templates/blackhole-service.yaml resolve the
+blocked prefixes through here so they can never disagree about whether the block
+is on. Consume it with:
+
+  {{- $blocked := include "langwatch.ingress.blockedPaths" . | fromJsonArray }}
+
+Normalisation is security-relevant, not cosmetic. A prefix that survives
+unvalidated silently degrades the block into decoration:
+
+  - a trailing slash ("/api/internal/") makes the nested-path guard's
+    segment test build "/api/internal//", which matches nothing, so a nested
+    application path sails past the guard and out-matches the blackhole;
+  - a missing leading slash ("api/internal") renders an Ingress the API server
+    rejects, after the guard has already gone dark;
+  - a bare "/" would blackhole the entire site;
+  - a non-list value (what plain `--set 'x=[]'` assigns — a two-character
+    STRING) is truthy, so the block half-renders and then fails deep inside a
+    range with an error naming neither the value nor the fix.
+
+Each of those is rejected here, by name, once.
+*/}}
+{{- define "langwatch.ingress.blockedPaths" -}}
+  {{- $normalised := list -}}
+  {{- $raw := .Values.ingress.blockedPaths -}}
+  {{- if $raw -}}
+    {{- if not (kindIs "slice" $raw) -}}
+      {{- fail (printf "ingress.blockedPaths must be a list, got %s (%v). With --set, a list literal is assigned as a string — use --set-json 'ingress.blockedPaths=[\"/api/internal\"]', or set it in a values file." (kindOf $raw) $raw) -}}
+    {{- end -}}
+    {{- range $entry := $raw -}}
+      {{- $path := toString $entry -}}
+      {{- if not (hasPrefix "/" $path) -}}
+        {{- fail (printf "ingress.blockedPaths entry %q must be an absolute path beginning with \"/\". As written it renders an Ingress the API server rejects, and blocks nothing in the meantime." $path) -}}
+      {{- end -}}
+      {{- $trimmed := trimSuffix "/" $path -}}
+      {{- if eq $trimmed "" -}}
+        {{- fail "ingress.blockedPaths may not contain \"/\" — that would route the whole site to the blackhole. Block a specific prefix, or set ingress.enabled: false." -}}
+      {{- end -}}
+      {{- $normalised = append $normalised $trimmed -}}
+    {{- end -}}
+  {{- end -}}
+  {{- $normalised | uniq | toJson -}}
+{{- end -}}

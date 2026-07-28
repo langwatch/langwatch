@@ -1,36 +1,47 @@
 {{- /*
 Blackhole Service — the hard-block target for ingress.blockedPaths.
 
-A ClusterIP Service with NO selector never gets Endpoints, so a spec-conformant
-ingress controller returns 502/503 for any request routed to it. The ingress
-(templates/ingress.yaml) points a higher-priority `pathType: Prefix` path at
-this Service for every prefix in `.Values.ingress.blockedPaths` (default
-`/api/internal`), turning "never expose publicly" from a code comment into an
-enforced dead end at the edge.
+This Service has no selector, so nothing populates its Endpoints and the ingress
+controller has nowhere to forward a blocked request. The ingress
+(templates/ingress.yaml) points a higher-priority `pathType: Prefix` path here
+for every prefix in `.Values.ingress.blockedPaths` (default `/api/internal`),
+turning "never expose publicly" from a code comment into an enforced dead end at
+the edge.
 
-Rendered only when the ingress is enabled AND there is at least one blocked
-prefix — so `ingress.blockedPaths: []` cleanly drops both the paths and this
-Service.
+Both templates resolve the prefixes through `langwatch.ingress.blockedPaths`, so
+this Service and the paths that reference it can never disagree about whether
+the block is on — including when the value is malformed, which that helper
+rejects by name.
+
+See ingress.blockedPaths in values.yaml for the WHY, the per-controller response
+codes, and the AWS/GCE caveat on the Service type below.
 */ -}}
-{{- if and .Values.ingress.enabled .Values.ingress.blockedPaths }}
+{{- if and .Values.ingress.enabled (include "langwatch.ingress.blockedPaths" . | fromJsonArray) }}
 apiVersion: v1
 kind: Service
 metadata:
   name: {{ .Release.Name }}-blackhole
+  {{- /*
+    Merged as a dict, not appended as text: `ingress.labels` may legitimately
+    carry a key the standard set already defines (component, part-of), and a
+    textual append emits it twice — a duplicate mapping key that
+    `kubectl apply --validate` rejects. Operator labels win.
+  */}}
+  {{- $labels := include "langwatch.labels" . | fromYaml }}
+  {{- $_ := set $labels "app.kubernetes.io/component" "ingress-blackhole" }}
   labels:
-    app.kubernetes.io/name: {{ .Release.Name }}-blackhole
-    app.kubernetes.io/instance: {{ .Release.Name }}
-    app.kubernetes.io/component: ingress-blackhole
-  {{- if .Values.ingress.labels }}
-    {{- .Values.ingress.labels | toYaml | nindent 4 }}
-  {{- end }}
+    {{- toYaml (mergeOverwrite $labels (deepCopy (.Values.ingress.labels | default dict))) | nindent 4 }}
 spec:
+  # ClusterIP is correct for controllers that route to pod IPs (ingress-nginx,
+  # Traefik, GKE with NEG). Controllers that target node ports instead — the AWS
+  # load balancer controller with its default `target-type: instance`, or GKE
+  # Ingress without NEG — reject a ClusterIP backend and stop reconciling the
+  # whole Ingress. See the CONTROLLER SUPPORT note in values.yaml.
   type: ClusterIP
-  # No selector on purpose: this Service intentionally has no Endpoints, so the
-  # ingress controller cannot forward blocked requests anywhere (returns 502/503).
+  # No selector on purpose: nothing populates Endpoints, so the controller
+  # cannot forward blocked requests anywhere.
   ports:
     - port: 80
-      targetPort: 80
       protocol: TCP
       name: http
 {{- end }}

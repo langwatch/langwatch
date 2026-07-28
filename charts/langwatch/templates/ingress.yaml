@@ -1,20 +1,39 @@
 {{- if .Values.ingress.enabled }}
+{{- $blockedPaths := include "langwatch.ingress.blockedPaths" . | fromJsonArray }}
 {{- /*
-  Guard: a configured application path nested under a blocked prefix would
-  out-match the blackhole and route the private control plane straight to the
-  app, silently undoing the block. There is no topology in which that is what
-  you want, so refuse to render rather than ship a bypassed block.
+  Guard: an application path nested under a blocked prefix out-matches the
+  blackhole and routes the private control plane straight to the app, silently
+  undoing the block — the blocked path and the blackhole Service are both still
+  rendered, so nothing looks wrong. Refuse to render instead.
 
   The match is on `/`-separated segments, exactly like `pathType: Prefix`: a
   bare `hasPrefix $blocked $path.path` would also reject `/api/internal-status`,
   which the block genuinely does NOT cover and which is a legitimate app path.
 
-  Emptying `ingress.blockedPaths` disables the guard along with the block, so
-  an operator who knowingly opts out is never held up by it.
+  Known limit: the comparison is on literal paths. A `pathType:
+  ImplementationSpecific` path written as a regex that happens to cover the same
+  URLs (`/api/internal(/|$)(.*)`) is neither equal to nor nested under the
+  prefix, so it passes the guard — and on ingress-nginx with `use-regex`, a
+  regex location beats the blackhole's prefix location. Installs that combine
+  `use-regex`/`rewrite-target` with blocked prefixes have to verify that
+  themselves.
+
+  Emptying `ingress.blockedPaths` disables the guard along with the block, so an
+  operator who knowingly opts out is never held up by it. Operators running the
+  gateway or the Langy agent OUTSIDE this release (see gateway.controlPlane and
+  langyagent.controlPlane) legitimately need part of `/api/internal` published,
+  and that is the case this guard will stop — narrow the list rather than
+  fighting it.
 */ -}}
 {{- range $host := .Values.ingress.hosts }}
+  {{- if not $host.http }}
+    {{- fail (printf "ingress.hosts entry for host %q has no http.paths" (toString $host.host)) }}
+  {{- end }}
   {{- range $path := $host.http.paths }}
-    {{- range $blocked := $.Values.ingress.blockedPaths }}
+    {{- if not $path.path }}
+      {{- fail (printf "ingress.hosts entry for host %q has a path with no `path` key" (toString $host.host)) }}
+    {{- end }}
+    {{- range $blocked := $blockedPaths }}
       {{- if or (eq $path.path $blocked) (hasPrefix (printf "%s/" $blocked) $path.path) }}
         {{- fail (printf "ingress.hosts path %q is nested under the blocked prefix %q, so it would out-match the blackhole and re-expose the private control plane. Remove the path, or drop %q from ingress.blockedPaths to disable the block knowingly." $path.path $blocked $blocked) }}
       {{- end }}
@@ -53,27 +72,18 @@ spec:
       http:
         paths:
           {{- /*
-            Blocked prefixes come FIRST and route to the no-endpoints blackhole
-            Service (see templates/blackhole-service.yaml).
+            Blocked prefixes come first and route to the no-endpoints blackhole
+            Service (see templates/blackhole-service.yaml). What carries the
+            block is longest-match: `/api/internal` is a longer match than the
+            app's catch-all `/`. Emitting first is a hedge for controllers that
+            derive rule priority from list position (the AWS load balancer
+            controller) rather than from match length.
 
-            Emitting them first is load-bearing, not belt-and-braces. Kubernetes
-            only defines longest-match precedence for `pathType: Exact` and
-            `Prefix`; matching for `ImplementationSpecific` is left to the
-            IngressClass — and the app's catch-all `/` ships as
-            `ImplementationSpecific` (see ingress.hosts in values.yaml). So on
-            default values the ordering is what carries the block, with
-            longest-match precedence backing it up only once an operator pins
-            their paths to `Prefix`. Controllers that assign rule priority from
-            list order (e.g. the AWS load balancer controller) need the ordering
-            regardless of pathType.
-
-            Application paths nested under a blocked prefix would out-match the
-            blackhole under either rule; the guard at the top of this file
-            refuses to render them. See ingress.blockedPaths in values.yaml for
-            the WHY.
+            See ingress.blockedPaths in values.yaml for the WHY and the
+            controller caveats — this is the only copy of that argument.
           */}}
-          {{- range $.Values.ingress.blockedPaths }}
-          - path: {{ . }}
+          {{- range $blockedPaths }}
+          - path: {{ . | quote }}
             pathType: Prefix
             backend:
               service:
