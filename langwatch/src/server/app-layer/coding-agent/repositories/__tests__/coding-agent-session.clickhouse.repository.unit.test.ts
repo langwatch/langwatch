@@ -704,11 +704,16 @@ describe("CodingAgentSessionClickHouseRepository list-read dedup scope", () => {
 });
 
 /**
- * Reads the list-read duration histogram's sample count straight off the prom
- * registry, for this table — a spy on a destructured copy would intercept
+ * Reads the list-read duration histogram's observation count straight off the
+ * prom registry, for this table — a spy on a destructured copy would intercept
  * nothing and pass regardless. Deltas, never absolutes: the registry is
  * process-wide, so every earlier suite in this file that lists a window has
  * already moved these counters.
+ *
+ * The `+Inf` bucket is the count: it is cumulative over every bucket, so it
+ * holds every observation carrying these labels. It is also the only typed way
+ * to ask — prom-client stamps `metricName` on each value at runtime but leaves
+ * it off the published `MetricValue`.
  */
 async function listReadObservations(outcome: string): Promise<number> {
   const metric = await register
@@ -717,8 +722,7 @@ async function listReadObservations(outcome: string): Promise<number> {
   return (
     metric?.values.find(
       (value) =>
-        value.metricName ===
-          "coding_agent_session_list_read_duration_milliseconds_count" &&
+        value.labels.le === "+Inf" &&
         value.labels.table === "coding_agent_sessions" &&
         value.labels.outcome === outcome,
     )?.value ?? 0
