@@ -1,4 +1,4 @@
-import { checkApiKey } from "../../utils/apiKey";
+import { resolveCredentials } from "../../utils/apiKey";
 
 /**
  * Ask the platform to open, in the user's browser, a resource Langy already
@@ -23,6 +23,6 @@ import { checkApiKey } from "../../utils/apiKey";
 export const navigateOpenCommand = async (
   resourceId: string,
 ): Promise<void> => {
-  checkApiKey();
+  await resolveCredentials();
   console.log(JSON.stringify({ resourceId }));
 };
