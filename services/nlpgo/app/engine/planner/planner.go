@@ -314,7 +314,7 @@ func New(w *dsl.Workflow, opts ...Option) (*Plan, error) {
 	// no-Entry-node legacy fallback where scoping never ran, so there is no
 	// plan-membership signal to judge against. A workflow with no Entry AND
 	// a dangling End therefore reaches execution; engine.finalize's
-	// unreached_end_node guard is that shape's only defence.
+	// unreached_end_node guard is that shape's only defense.
 	if o.untilNodeID == "" && !o.endOptional {
 		if !hasEndNode(w.Nodes) {
 			return nil, &MissingEndNodeError{}
