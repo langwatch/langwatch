@@ -8,6 +8,7 @@
  * @see specs/coding-agent/session-aggregate.feature
  */
 import { describe, expect, it } from "vitest";
+import { ZodError } from "zod";
 import { CanonicalizeSpanAttributesService } from "~/server/app-layer/traces/canonicalisation";
 import {
   deserializeAttributes,
@@ -31,6 +32,7 @@ const TRACE_ID = "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6";
 function rawSpanEvent({
   name,
   spanId,
+  eventId = `evt-${spanId}`,
   resourceAttributes = {},
   attributes = {},
   startMs = 1_000,
@@ -39,6 +41,8 @@ function rawSpanEvent({
 }: {
   name: string;
   spanId: string;
+  /** The event envelope's own id — distinct per event even when the span is not. */
+  eventId?: string;
   resourceAttributes?: Record<string, string>;
   attributes?: Record<string, string | number>;
   startMs?: number;
@@ -47,7 +51,7 @@ function rawSpanEvent({
   statusCode?: number;
 }): TraceProcessingEvent {
   return {
-    id: `evt-${spanId}`,
+    id: eventId,
     aggregateId: TRACE_ID,
     aggregateType: "trace",
     tenantId: createTenantId("tenant-1"),
@@ -123,14 +127,18 @@ function makeSubscriber(
     tenantId: string;
     traceId: string;
     spanId: string;
-    occurredAtMs?: number;
+    occurredAtMs: number;
   }) => Promise<NormalizedSpan | null> = async () => null,
 ) {
   const dispatched: ContributeSpanFactsCommandData[] = [];
+  // `tenantId` is recorded on purpose: it is the predicate that scopes the
+  // claim-check read, and a regression that dropped or crossed it would be
+  // invisible to a recorder that only kept trace/span.
   const reads: Array<{
+    tenantId: string;
     traceId: string;
     spanId: string;
-    occurredAtMs?: number;
+    occurredAtMs: number;
   }> = [];
   const subscriber = createCodingAgentSpanFactsDispatchSubscriber({
     contributeSpanFacts: async (data) => {
@@ -138,6 +146,7 @@ function makeSubscriber(
     },
     getNormalizedSpanById: async (params) => {
       reads.push({
+        tenantId: params.tenantId,
         traceId: params.traceId,
         spanId: params.spanId,
         occurredAtMs: params.occurredAtMs,
@@ -227,7 +236,7 @@ describe("codingAgentSpanFactsDispatch", () => {
     //
     // NB: the parity checker only reads an annotation whose line ends in `*/`,
     // so this stays a one-line JSDoc with the prose above it.
-    /** @scenario a job staged before the filter existed is still gated by the handler */
+    /** @scenario work queued before the relevance rule existed still reaches the same outcome */
     it("is ignored without decoding it", async () => {
       const { subscriber, dispatched } = makeSubscriber();
 
@@ -270,7 +279,7 @@ describe("codingAgentSpanFactsDispatch", () => {
 
   describe("given the dedup key", () => {
     describe("when keying a span job", () => {
-      /** @scenario filtering leaves the dedup identity of the jobs that remain intact */
+      /** @scenario a redelivered event is not processed twice */
       it("keys on tenant, trace and span so two traces' spans never collide", () => {
         const { subscriber } = makeSubscriber();
         const event = rawSpanEvent({
@@ -293,7 +302,7 @@ describe("codingAgentSpanFactsDispatch", () => {
     });
 
     describe("when keying a claim-check job", () => {
-      /** @scenario a matched event's heavy payload travels as a claim-check, not inline */
+      /** @scenario relevant work waits in the queue at the cost of a pointer, not of its payload */
       it("derives the identical key from the reference shape", () => {
         const { subscriber } = makeSubscriber();
         const event = rawSpanEvent({
@@ -312,11 +321,52 @@ describe("codingAgentSpanFactsDispatch", () => {
         ).toBe(dedup.makeId(event));
       });
     });
+
+    describe("when two spans in one trace carry no wire span id", () => {
+      // The id-less span is the shape `makeSpanReferencedEvent` refuses to
+      // reference and stages whole, so this is a reachable production path,
+      // not a hypothetical. Keying it on an empty span id would make both
+      // spans share `…:<tenant>:<trace>:`, and the second one inside the 60s
+      // TTL would dedup away — its facts dropped, silently. The event's own
+      // correlation id keeps them distinct.
+      /** @scenario two relevant events that share no payload identity are still delivered separately */
+      it("keys each on its own event id instead of collapsing to the trace", () => {
+        const { subscriber } = makeSubscriber();
+        const first = rawSpanEvent({
+          name: "claude_code.tool",
+          spanId: "",
+          eventId: "evt-idless-1",
+          attributes: { tool_name: "Bash" },
+        });
+        const second = rawSpanEvent({
+          name: "claude_code.tool",
+          spanId: "",
+          eventId: "evt-idless-2",
+          attributes: { tool_name: "Read" },
+        });
+
+        const dedup = subscriber.options?.deduplication;
+        if (dedup === undefined || dedup === "aggregate") {
+          throw new Error("expected a custom deduplication config");
+        }
+
+        expect(dedup.makeId(first)).not.toBe(dedup.makeId(second));
+        // And the reference upgrade cannot change the key: a reference copies
+        // the source event's id, so an id-less span keys identically whichever
+        // shape the seam happened to stage.
+        expect(
+          dedup.makeId(
+            makeSpanReferencedEvent(first as SpanReceivedEvent) as
+              TraceProcessingEvent,
+          ),
+        ).toBe(dedup.makeId(first));
+      });
+    });
   });
 
   describe("given a claim-check staged job (ADR-069)", () => {
     describe("when the referenced span is readable in the store", () => {
-      /** @scenario a matched event's heavy payload travels as a claim-check, not inline */
+      /** @scenario relevant work waits in the queue at the cost of a pointer, not of its payload */
       it("lifts the identical command the full-event path produces", async () => {
         const event = rawSpanEvent({
           name: "claude_code.llm_request",
@@ -340,16 +390,47 @@ describe("codingAgentSpanFactsDispatch", () => {
         expect(refPath.dispatched).toHaveLength(1);
         expect(refPath.dispatched[0]).toEqual(fullPath.dispatched[0]);
         expect(refPath.reads).toEqual([
-          { traceId: TRACE_ID, spanId: "llm-ref", occurredAtMs: 1_000 },
+          {
+            tenantId: "tenant-1",
+            traceId: TRACE_ID,
+            spanId: "llm-ref",
+            occurredAtMs: 1_000,
+          },
         ]);
         // The full-event path never touches the store.
         expect(fullPath.reads).toHaveLength(0);
       });
     });
 
+    describe("when the reference belongs to another tenant", () => {
+      // The claim-check read is the one place span facts leave this event's
+      // envelope, so the tenant predicate has to travel with it. A read that
+      // dropped the tenant — or carried a hardcoded one — would resolve
+      // against the wrong project's spans, so the assertion uses a tenant
+      // that appears nowhere else in this suite.
+      it("scopes the store read to the referencing event's own tenant", async () => {
+        const base = rawSpanEvent({
+          name: "claude_code.tool",
+          spanId: "tool-tenant",
+          attributes: { tool_name: "Bash" },
+        }) as SpanReceivedEvent;
+        const event = { ...base, tenantId: createTenantId("tenant-other") };
+
+        const { subscriber, reads } = makeSubscriber(async () =>
+          normalizedFrom(event),
+        );
+        await subscriber.handle(
+          makeSpanReferencedEvent(event) as TraceProcessingEvent,
+          context,
+        );
+
+        expect(reads[0]?.tenantId).toBe("tenant-other");
+      });
+    });
+
     describe("when the store read-back deserialized numeric-looking scalars", () => {
-      /** @scenario a matched event's heavy payload travels as a claim-check, not inline */
-      it("keys the session and keeps the version fact identically to the full-event path", async () => {
+      /** @scenario relevant work waits in the queue at the cost of a pointer, not of its payload */
+      it("keys the session identically and keeps the version fact in canonicalized form", async () => {
         // A purely numeric session key and a numeric-looking service.version:
         // the Map(String, String) round-trip hands them back as NUMBERS, and
         // the lift must land on the same command either way — not fall back
@@ -385,7 +466,7 @@ describe("codingAgentSpanFactsDispatch", () => {
     });
 
     describe("when the referenced span outlived the ingest-time window", () => {
-      /** @scenario a reference that cannot be resolved yet retries, never drops */
+      /** @scenario work whose payload is not readable yet retries, never drops */
       it("centers the store read on the span's own start, not on ingest time", async () => {
         const threeDays = 3 * 24 * 60 * 60 * 1000;
         const startMs = 1_000_000;
@@ -408,7 +489,12 @@ describe("codingAgentSpanFactsDispatch", () => {
         );
 
         expect(reads).toEqual([
-          { traceId: TRACE_ID, spanId: "long-span", occurredAtMs: startMs },
+          {
+            tenantId: "tenant-1",
+            traceId: TRACE_ID,
+            spanId: "long-span",
+            occurredAtMs: startMs,
+          },
         ]);
       });
 
@@ -443,7 +529,7 @@ describe("codingAgentSpanFactsDispatch", () => {
     });
 
     describe("when the referenced span is not readable yet", () => {
-      /** @scenario a reference that cannot be resolved yet retries, never drops */
+      /** @scenario work whose payload is not readable yet retries, never drops */
       it("throws into the queue's retry instead of dropping silently", async () => {
         const event = rawSpanEvent({
           name: "claude_code.tool",
@@ -463,7 +549,7 @@ describe("codingAgentSpanFactsDispatch", () => {
     });
 
     describe("when the reference carries a version this build does not know", () => {
-      /** @scenario a reference this build cannot read fails loudly, never half-parses */
+      /** @scenario work a build cannot read fails loudly, never half-processed */
       it("throws into the queue's retry instead of no-opping as another shape", async () => {
         const event = rawSpanEvent({
           name: "claude_code.tool",
@@ -478,15 +564,25 @@ describe("codingAgentSpanFactsDispatch", () => {
           normalizedFrom(event),
         );
 
-        await expect(
-          subscriber.handle(future as TraceProcessingEvent, context),
-        ).rejects.toThrow();
+        // A bare `toThrow()` would green on a fixture typo or a stub fault as
+        // readily as on the version gate. Pin the failure to the gate itself:
+        // a schema rejection whose issue is the `version` field.
+        const failure: unknown = await subscriber
+          .handle(future as TraceProcessingEvent, context)
+          .then(
+            () => null,
+            (error: unknown) => error,
+          );
+        expect(failure).toBeInstanceOf(ZodError);
+        expect(
+          (failure as ZodError).issues.map((issue) => issue.path.join(".")),
+        ).toContain("version");
         expect(dispatched).toHaveLength(0);
       });
     });
 
     describe("when the matched span has no span id to reference", () => {
-      /** @scenario an event that cannot be referenced stages whole */
+      /** @scenario an event whose payload cannot be pointed at is still processed */
       it("stages the full event unchanged and the handler processes it as before", async () => {
         const event = rawSpanEvent({
           name: "claude_code.tool",

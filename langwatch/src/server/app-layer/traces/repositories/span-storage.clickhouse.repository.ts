@@ -25,6 +25,7 @@ import type {
   LangwatchSignalBucket,
   ModelSpanSampleRow,
   ModelUsageStatsRow,
+  NormalizedSpanByIdParams,
   OccurredAtHint,
   SpanLangwatchSignalsRow,
   SpanResourceInfo,
@@ -1056,26 +1057,28 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
    * every retry's window forever. Callers pass the reference's parsed
    * `startTimeUnixMs`, falling back to the envelope's occurredAt only when the
    * wire span carried no parseable start.
+   *
+   * The hint is REQUIRED, not an {@link OccurredAtHint}: `fallback: "none"`
+   * only bounds the read when there is a window to stay inside. A hintless
+   * call would fall straight through to the unbounded fragment and scan every
+   * partition, cold S3 tier included — precisely what this read promises not
+   * to do, and per retry.
    */
-  async getNormalizedSpanById({
+  async findNormalizedSpanById({
     tenantId,
     traceId,
     spanId,
     occurredAtMs,
-  }: {
-    tenantId: string;
-    traceId: string;
-    spanId: string;
-  } & OccurredAtHint): Promise<NormalizedSpan | null> {
+  }: NormalizedSpanByIdParams): Promise<NormalizedSpan | null> {
     EventUtils.validateTenantId(
       { tenantId },
-      "SpanStorageClickHouseRepository.getNormalizedSpanById",
+      "SpanStorageClickHouseRepository.findNormalizedSpanById",
     );
 
     try {
       return await queryWindowed<NormalizedSpan | null>({
         table: TABLE_NAME,
-        hintMs: occurredAtMs ?? null,
+        hintMs: occurredAtMs,
         windowMs: DEFAULT_PARTITION_WINDOW_MS,
         fallback: "none",
         isEmpty: (row) => row === null,
@@ -1098,7 +1101,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
 
   /**
    * Single-span fetch shared by {@link getSpanByIds} and
-   * {@link getNormalizedSpanById}. WHERE pins (TenantId, TraceId, SpanId) - the
+   * {@link findNormalizedSpanById}. WHERE pins (TenantId, TraceId, SpanId) - the
    * primary key prefix - so we hit a tiny granule range. ORDER BY
    * UpdatedAt DESC LIMIT 1 deliberately picks up CH 25.10's
    * LazilyRead optimiser: heavy columns (SpanAttributes, Events.*,

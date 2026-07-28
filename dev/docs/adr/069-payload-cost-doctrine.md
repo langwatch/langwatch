@@ -222,7 +222,7 @@ visible.
   section exists so this gap is a tracked plan, not an ambient hope — the
   ADR-066 scope-table deferral is the cautionary precedent.
 
-## Amendment: the claim-check half of phase 2, shipped early for one subscriber (2026-07, #6117)
+## Amendment: the claim-check half of phase 2, shipped early for one subscriber (2026-07, #6117 — stacked onto #6111)
 
 `codingAgentSpanFactsDispatch` no longer stages the matched span whole. The
 enqueue seam grew a second total hook (`stage`) beside `filter`, and a matched

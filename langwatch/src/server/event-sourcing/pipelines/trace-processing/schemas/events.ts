@@ -123,19 +123,29 @@ export function parseSpanReferencedEvent(
 /**
  * Builds the staged reference for a matched `span_received` event, mirroring
  * the envelope fields the scheduler orders, groups, and dedups by (same id,
- * aggregate, tenant, occurredAt). Total by construction: a span missing the
- * identity a reference needs stages the full event unchanged instead — the
- * pre-reference behavior, never a reference that could not resolve.
+ * aggregate, tenant, occurredAt). An event missing the identity a reference
+ * needs stages the full event unchanged instead — the pre-reference behavior,
+ * never a reference that could not resolve.
+ *
+ * Total at runtime, not merely against the type. This runs as an `enqueue`
+ * hook on the shared routing seam, which has no retry, so a throw here would
+ * permanently lose that subscriber's job (ADR-069). The schema types
+ * `data.span` as present, but the value reaching this function is untrusted
+ * wire data behind a cast, so an absent span is read as "no identity to
+ * reference" rather than trusted into a TypeError.
  */
 export function makeSpanReferencedEvent(
   event: SpanReceivedEvent,
 ): SpanReferencedEvent | SpanReceivedEvent {
-  const span = event.data.span as {
-    spanId?: unknown;
-    name?: unknown;
-    startTimeUnixNano?: unknown;
-  };
-  if (typeof span.spanId !== "string" || span.spanId.length === 0) {
+  const span = event.data.span as
+    | {
+        spanId?: unknown;
+        name?: unknown;
+        startTimeUnixNano?: unknown;
+      }
+    | null
+    | undefined;
+  if (!span || typeof span.spanId !== "string" || span.spanId.length === 0) {
     return event;
   }
   return {

@@ -1,142 +1,147 @@
 Feature: Payload cost governs the scheduling plane
-  A subscriber that needs a small slice of a large event must not mint a job for
-  every event it does not care about. The event is already in memory when it is
-  routed; that is where an irrelevant event is discarded — so the job never
-  exists. The routing seam is shared by the whole fan-out, so only cheap, total
-  work runs there: a predicate that declines an event, or a field-pick that
-  turns a matched event into a small reference. Deriving the slice from the
-  payload stays in the subscriber's own lane, where the payload's canonical
-  store already holds it and a failure retries only that subscriber's job. Work
-  waiting in a queue is cheap as a pointer and fatal as resident memory; when
-  the platform kills a worker for memory it did not choose to hold, a shedding
-  layer is missing. (ADR-069; the scenarios below are shipping, the planned
-  scenarios record phases 2–4.)
+  As an operator running the event-sourcing platform
+  I want a worker's memory to be governed by the work that actually matters to
+  it, not by the volume of traffic flowing past it
+  So that overload shows up as a visible backlog I can act on, instead of as a
+  worker the platform kills for memory it never chose to hold.
 
-  See dev/docs/adr/069-payload-cost-doctrine.md.
-
-  # --- Phase 1: filtering at ingest ---
+  # Why this exists — the worker probe-kill loop
+  #
+  # One subscriber needed a small slice of each relevant event, but every event
+  # in every project queued a copy of the whole payload for it. A single busy
+  # project's ordinary traffic was enough to fill a worker's memory ceiling and
+  # get it killed, taking the unrelated work queued beside it with it. The fix
+  # is a doctrine, not a patch: an irrelevant event costs nothing, and a
+  # relevant one waits in the queue at the cost of a pointer.
+  #
+  # See dev/docs/adr/069-payload-cost-doctrine.md. The scenarios below the last
+  # divider are @planned — phases 2-4, not yet built.
 
   Background:
-    Given an event subscriber that needs only a small derived slice of each relevant event
+    Given a subscriber that needs only a small derived slice of each relevant event
 
   @unit
   Scenario: a non-matching event never mints a job
     Given the subscriber declares which events are relevant to it
     And an event the subscriber considers not relevant
-    When the event is routed to subscribers
-    Then no job is staged for that subscriber
-    And the subscriber's handler never runs for that event
+    When the event is published
+    Then no work is queued for that subscriber
+    And the subscriber never processes that event
 
   @unit
   Scenario: a matching event mints a job for the subscriber
     Given an event the subscriber considers relevant
-    When the event is routed to subscribers
-    Then a job is staged for that subscriber
+    When the event is published
+    Then work is queued for that subscriber
 
   @unit
-  Scenario: filtering leaves the dedup identity of the jobs that remain intact
-    Given two relevant events for the same aggregate
-    When both are routed to subscribers
-    Then a redelivery of the same event inside the dedup window stages no second job
+  Scenario: a redelivered event is not processed twice
+    Given a relevant event already queued for the subscriber
+    When the same event is published again within the deduplication window
+    Then no second unit of work is queued
 
   @unit
-  Scenario: a job staged before the filter existed is still gated by the handler
-    Given a job staged by the previous release, which minted one for every event
-    And that job carries an event the filter would now decline
-    When the handler dequeues it after the upgrade
-    Then the handler discards it to the same outcome as before the upgrade
-
-  # The routing seam has no retry, so this is a reported loss, not a recovered
-  # one. That is precisely why an enqueue hook must be total — the scenario
-  # below pins the honest semantics so no future adopter builds on a promise
-  # the platform does not keep.
-  @unit
-  Scenario: a raising enqueue filter is reported as a failure, not as a decline
-    Given a relevant event whose filter predicate raises
-    When the event is routed to subscribers
-    Then the routing attempt reports the failure
-    And no job is staged for that subscriber
-    And the failure is distinguishable from the event having been filtered out
+  Scenario: two relevant events that share no payload identity are still delivered separately
+    Given two distinct relevant events on the same aggregate
+    And neither carries an identity of its own within that aggregate
+    When both are published within the deduplication window
+    Then each is queued as its own unit of work
+    And neither event's facts are dropped in favour of the other's
 
   @unit
-  Scenario: a raising enqueue filter loses only its own subscriber's job
+  Scenario: work queued before the relevance rule existed still reaches the same outcome
+    Given work queued by the previous release, which queued every event
+    And that work carries an event the subscriber would now consider not relevant
+    When the subscriber processes it after the upgrade
+    Then it reaches the same outcome as it did before the upgrade
+
+  # An event is discarded while it is being published, and publishing is not
+  # retried. The scenarios below pin the honest semantics: a subscriber that
+  # cannot decide relevance loses that event, and the loss is reported rather
+  # than disguised as a decision.
+  @unit
+  Scenario: a subscriber that cannot decide relevance is reported, not read as declining
+    Given a relevant event the subscriber errors on while deciding relevance
+    When the event is published
+    Then publishing reports the failure
+    And no work is queued for that subscriber
+    And the failure is distinguishable from the event having been considered irrelevant
+
+  @unit
+  Scenario: a subscriber that cannot decide relevance loses only its own work
     Given two subscribers observing the same event
-    And the first subscriber's filter predicate raises
-    When the event is routed to subscribers
+    And the first subscriber errors while deciding relevance
+    When the event is published
     Then the second subscriber still receives the event
-    And the other events in the same batch are still routed
+    And the other events published alongside it still reach their subscribers
 
   @unit
-  Scenario: a raising enqueue filter's job is never re-dispatched
-    Given a committed event whose filter predicate raises
-    When the storing service completes the write
-    Then the write succeeds
-    And the dispatch failure is logged for operators
-    And nothing re-dispatches the subscriber fan-out for that event
+  Scenario: a subscriber that cannot decide relevance never fails the write behind it
+    Given a recorded event the subscriber errors on while deciding relevance
+    When the recording completes
+    Then the record is kept
+    And the failure is reported to operators
+    And nothing retries that subscriber for that event
 
   @unit
   Scenario: enqueue outcomes are visible to operators
     Given a stream of relevant and irrelevant events
-    When they are routed to subscribers
-    Then an operator-visible count distinguishes events filtered out from events staged as a job
+    When they are published
+    Then an operator-visible count distinguishes events discarded as irrelevant from events queued as work
 
   @unit
-  Scenario: a job that fails to reach the queue is not counted as staged
-    Given a relevant event the subscriber's filter admits
+  Scenario: work that never reaches the queue is not counted as queued
+    Given an event the subscriber considers relevant
     And the subscriber's queue is unavailable
-    When the event is routed to subscribers
-    Then the routing attempt reports the failure
-    And the event is not counted among those staged as a job
+    When the event is published
+    Then publishing reports the failure
+    And the event is not counted among the work queued
 
-  # --- Claim-check staging: a matched event's job carries a reference ---
-
-  @unit
-  Scenario: a matched event's heavy payload travels as a claim-check, not inline
-    Given an event the subscriber considers relevant whose payload is large
-    When the event is routed to subscribers
-    Then the staged job carries a reference to the payload, not the payload
-    And the handler completes its work by reading the payload from its canonical store
-    And the reference preserves the identity the scheduler orders and dedups by
+  # --- Waiting work costs a pointer, not a payload ---
 
   @unit
-  Scenario: a reference that cannot be resolved yet retries, never drops
-    Given a relevant event staged as a reference
-    And the referenced payload is not yet readable in its store
-    When the handler processes the job
+  Scenario: relevant work waits in the queue at the cost of a pointer, not of its payload
+    Given a relevant event whose payload is large
+    When the event is published
+    Then the queued work holds only enough to find the payload again
+    And the subscriber still produces exactly the result the whole payload would have produced
+    And a redelivery of that event still collapses to one unit of work
+
+  @unit
+  Scenario: work whose payload is not readable yet retries, never drops
+    Given queued work whose payload has not yet landed where the subscriber reads it
+    When the subscriber processes that work
     Then the attempt fails into the queue's retry
-    And the job completes once the payload becomes readable
+    And the work completes once the payload becomes readable
 
   @unit
-  Scenario: a reference this build cannot read fails loudly, never half-parses
-    Given a staged reference carrying a schema version this build does not know
-    When the handler processes the job
+  Scenario: work a build cannot read fails loudly, never half-processed
+    Given queued work in a shape this build does not recognise
+    When the subscriber processes it
     Then the attempt fails into the queue's retry
-    And the job is never mistaken for another kind of payload
+    And the work is never mistaken for a shape the build does know
 
   @unit
-  Scenario: an event that cannot be referenced stages whole
-    Given a relevant event missing the identity a reference needs
-    When the event is routed to subscribers
-    Then the staged job carries the full event
-    And the handler processes it to the same outcome as before references existed
+  Scenario: an event whose payload cannot be pointed at is still processed
+    Given a relevant event that carries no identity to find its payload by
+    When the event is published
+    Then the queued work carries the event itself
+    And the subscriber reaches the same outcome as it did before payloads waited as pointers
 
-  # The stage hook shares the filter's seam and therefore the filter's sharp
-  # edge: the routing path has no retry, so a throw here loses this
-  # subscriber's job for this event. It is pinned separately because the
-  # tempting failure mode is the quiet one — falling back to staging the
-  # payload whole, which would hide a broken reference behind the very cost
-  # the claim-check exists to avoid.
+  # The tempting failure mode here is the quiet one — queueing the payload
+  # whole when the pointer cannot be built, which would hide the fault behind
+  # exactly the cost the pointer exists to avoid.
   @unit
-  Scenario: a raising claim-check stage is reported as a failure, not as a quiet full stage
-    Given a relevant event whose subscriber's claim-check stage raises
-    When the event is routed to subscribers
-    Then the routing attempt reports the failure
-    And the subscriber's handler never runs for that event
+  Scenario: a failure preparing queued work is reported, never hidden behind the whole payload
+    Given a relevant event the subscriber errors on while preparing its queued work
+    When the event is published
+    Then publishing reports the failure
+    And the subscriber never processes that event
 
   # --- Phases 2-4: the remaining ADR-069 invariants ---
 
   @planned
-  # Not yet implemented as of 2026-07-24 — ADR-069 phase 2: offloaded payloads
+  # Not yet implemented as of 2026-07-28 — ADR-069 phase 2: offloaded payloads
   # stage as small stubs, and byte budgets count the stub, not the payload.
   Scenario: an offloaded payload's reference advertises its true cost
     Given a job whose payload is offloaded to blob storage
@@ -145,7 +150,7 @@ Feature: Payload cost governs the scheduling plane
     And every byte budget the job passes through counts that size, not the size of the reference
 
   @planned
-  # Not yet implemented as of 2026-07-24 — ADR-069 phase 2: only coalesced
+  # Not yet implemented as of 2026-07-28 — ADR-069 phase 2: only coalesced
   # drains are byte-bounded; in-flight dispatch and retry buffers bound by count.
   Scenario: every stage that holds payloads is bounded in bytes
     Given a stream of jobs whose sizes vary by orders of magnitude
@@ -154,7 +159,7 @@ Feature: Payload cost governs the scheduling plane
     And never up to an item count alone
 
   @planned
-  # Not yet implemented as of 2026-07-24 — ADR-069 phase 3: memory grants.
+  # Not yet implemented as of 2026-07-28 — ADR-069 phase 3: memory grants.
   Scenario: a job acquires memory before it hydrates
     Given a bounded per-process memory pool
     And a job whose declared cost exceeds the pool's remaining budget
@@ -163,7 +168,7 @@ Feature: Payload cost governs the scheduling plane
     And it hydrates only once a grant for its declared cost is acquired
 
   @planned
-  # Not yet implemented as of 2026-07-24 — ADR-069 phase 3: overload still
+  # Not yet implemented as of 2026-07-28 — ADR-069 phase 3: overload still
   # presents as allocator pressure before it presents as backlog.
   Scenario: overload presents as queue depth, never as memory pressure
     Given more declared work than the memory pool can grant at once
@@ -172,7 +177,7 @@ Feature: Payload cost governs the scheduling plane
     And the process's memory use stays inside its budget
 
   @planned
-  # Not yet implemented as of 2026-07-24 — ADR-069 phase 4: per-key fairness
+  # Not yet implemented as of 2026-07-28 — ADR-069 phase 4: per-key fairness
   # across groups.
   Scenario: a hot aggregate degrades itself, not the fleet
     Given one aggregate producing work orders of magnitude faster than its peers
@@ -181,7 +186,7 @@ Feature: Payload cost governs the scheduling plane
     And the other aggregates' work keeps draining
 
   @planned
-  # Not yet implemented as of 2026-07-24 — ADR-069 phase 4: bulkheads for the
+  # Not yet implemented as of 2026-07-28 — ADR-069 phase 4: bulkheads for the
   # heavy workload class.
   Scenario: heavy-class overload stays a heavy-class incident
     Given a workload class far heavier than the median
@@ -190,7 +195,7 @@ Feature: Payload cost governs the scheduling plane
     And the rest of the platform's work is unaffected
 
   @planned
-  # Not yet implemented as of 2026-07-24 — ADR-069 phase 4: the shedding
+  # Not yet implemented as of 2026-07-28 — ADR-069 phase 4: the shedding
   # ladder; today the kubelet is the shedding layer.
   Scenario: the system sheds itself before the platform sheds it
     Given sustained overload beyond what waiting can absorb

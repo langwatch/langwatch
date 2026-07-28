@@ -47,7 +47,8 @@ export function createCodingAgentSpanFactsDispatchSubscriber(deps: {
     tenantId: string;
     traceId: string;
     spanId: string;
-    occurredAtMs?: number;
+    /** Required: the store read has no unbounded fallback to widen into. */
+    occurredAtMs: number;
   }) => Promise<NormalizedSpan | null>;
 }): EventSubscriberDefinition<TraceProcessingEvent> {
   const normalization = new SpanNormalizationPipelineService(
@@ -85,9 +86,11 @@ export function createCodingAgentSpanFactsDispatchSubscriber(deps: {
           const { tenantId, aggregateId, spanId } = dedupIdentity(event);
           // aggregateId is the trace id — span ids are only unique WITHIN a
           // trace, so the key needs both or two traces' spans can collide
-          // inside the TTL and silently drop facts. Both staged shapes expose
-          // the RAW wire span id, so the key is identical across the
-          // reference upgrade.
+          // inside the TTL and silently drop facts. When the span carries a
+          // wire id, both staged shapes expose that same RAW id, so the key is
+          // identical across the reference upgrade; when it carries none, the
+          // key falls back to the event id (see `dedupIdentity`), which both
+          // shapes also share.
           return `coding-agent-span-facts:${tenantId}:${aggregateId}:${spanId}`;
         },
         ttlMs: 60_000,
@@ -208,6 +211,22 @@ function liftContribution({
 /**
  * The dedup identity, read from either staged shape with total field picks —
  * `makeId` runs on the staging path, so it must never throw.
+ *
+ * A span with no usable wire id keys on the event's own CORRELATION id — the
+ * envelope KSUID — instead of on an empty string. That case is real, not
+ * theoretical: `makeSpanReferencedEvent` refuses to reference an id-less span
+ * and stages it whole. Keying it on `""` would collapse every id-less
+ * coding-agent span in a trace onto one `…:<tenant>:<trace>:` key, so the
+ * second one inside the TTL would dedup away and its facts would be silently
+ * dropped.
+ *
+ * The correlation id is the right fallback precisely because it is what ties a
+ * claim-check back to the event it was lifted from: `makeSpanReferencedEvent`
+ * copies `event.id` verbatim, so the key stays stable across the reference
+ * upgrade while dedup degrades to per-event — the weakest form that still
+ * loses nothing. The event's `idempotencyKey` is NOT usable here: it is
+ * `<tenant>:<trace>:<spanId>`, which collapses on exactly the same id-less
+ * spans.
  */
 function dedupIdentity(payload: TraceProcessingEvent): {
   tenantId: string;
@@ -221,17 +240,18 @@ function dedupIdentity(payload: TraceProcessingEvent): {
   const data = (payload as { data?: unknown }).data;
   if (typeof data === "object" && data !== null) {
     const direct = (data as { spanId?: unknown }).spanId;
-    if (typeof direct === "string") {
+    if (typeof direct === "string" && direct.length > 0) {
       // span_referenced: the raw wire span id sits on the reference itself.
       return { ...base, spanId: direct };
     }
     const nested = (data as { span?: { spanId?: unknown } }).span?.spanId;
-    if (typeof nested === "string") {
+    if (typeof nested === "string" && nested.length > 0) {
       // span_received: the raw wire span id inside the OTLP payload.
       return { ...base, spanId: nested };
     }
   }
-  return { ...base, spanId: "" };
+  // The `evt:` prefix can never collide with a wire span id, which is hex.
+  return { ...base, spanId: `evt:${String(payload.id)}` };
 }
 
 /** The scalar coding-agent vocabulary off one span's attributes. */

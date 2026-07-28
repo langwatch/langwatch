@@ -151,6 +151,22 @@ export interface OccurredAtHint {
 }
 
 /**
+ * Params for the claim-check resolution read (ADR-069). The partition hint is
+ * REQUIRED here, unlike the optional {@link OccurredAtHint} every other read
+ * takes: this one runs `fallback: "none"`, and a windowed read with no hint has
+ * no narrow window to accept — it runs the unbounded scan the read exists to
+ * avoid. Making the hint part of the contract keeps that promise true for the
+ * next adopter instead of relying on every caller remembering to pass one.
+ */
+export interface NormalizedSpanByIdParams {
+  tenantId: string;
+  traceId: string;
+  spanId: string;
+  /** Centre of the partition window: the SPAN'S OWN start, epoch ms. */
+  occurredAtMs: number;
+}
+
+/**
  * Per-model usage rollup over a recent window, feeds the model cost rule
  * preview ("which models would this regex match, and how much traffic do
  * they carry").
@@ -214,15 +230,11 @@ export interface SpanStorageRepository {
   ): Promise<Span | null>;
   /**
    * Claim-check resolution read (ADR-069): one canonical span by identity,
-   * windowed by the reference's occurredAt hint with no unbounded fallback —
+   * windowed by the reference's partition hint with no unbounded fallback —
    * a miss stays cheap because the caller retries via the queue.
    */
-  getNormalizedSpanById(
-    params: {
-      tenantId: string;
-      traceId: string;
-      spanId: string;
-    } & OccurredAtHint,
+  findNormalizedSpanById(
+    params: NormalizedSpanByIdParams,
   ): Promise<NormalizedSpan | null>;
   /**
    * Trace-level events ({spanId, timestamp, name, attributes}) for the
@@ -348,12 +360,8 @@ export class NullSpanStorageRepository implements SpanStorageRepository {
     return [];
   }
 
-  async getNormalizedSpanById(
-    _params: {
-      tenantId: string;
-      traceId: string;
-      spanId: string;
-    } & OccurredAtHint,
+  async findNormalizedSpanById(
+    _params: NormalizedSpanByIdParams,
   ): Promise<NormalizedSpan | null> {
     return null;
   }

@@ -140,7 +140,7 @@ describe("subscriber enqueue-time contract", () => {
     });
 
     describe("when the filter raises", () => {
-      /** @scenario a raising enqueue filter is reported as a failure, not as a decline */
+      /** @scenario a subscriber that cannot decide relevance is reported, not read as declining */
       it("reports the failure and counts neither outcome, so a raise is never mistaken for a decline", async () => {
         const beforeFiltered = await enqueueOutcomeCount("filtered");
         const beforeStaged = await enqueueOutcomeCount("staged");
@@ -167,7 +167,7 @@ describe("subscriber enqueue-time contract", () => {
         expect(await enqueueOutcomeCount("staged")).toBe(beforeStaged);
       });
 
-      /** @scenario a raising enqueue filter loses only its own subscriber's job */
+      /** @scenario a subscriber that cannot decide relevance loses only its own work */
       it("still fans the event out to the other subscribers and the rest of the batch", async () => {
         const healthy: string[] = [];
         const router = makeRouter(
@@ -202,7 +202,7 @@ describe("subscriber enqueue-time contract", () => {
       // retry, so the reported failure is where it ends. Pinned at the
       // production caller, not just at the router boundary — a router-level
       // `rejects.toThrow()` passes even when storeEvents swallows it.
-      /** @scenario a raising enqueue filter's job is never re-dispatched */
+      /** @scenario a subscriber that cannot decide relevance never fails the write behind it */
       it("is swallowed by storeEvents, so the committed write succeeds and nothing re-dispatches", async () => {
         const eventStore = createMockEventStore<Event>();
         const logger = {
@@ -272,7 +272,7 @@ describe("subscriber enqueue-time contract", () => {
     });
 
     describe("when the subscriber's queue rejects the send", () => {
-      /** @scenario a job that fails to reach the queue is not counted as staged */
+      /** @scenario work that never reaches the queue is not counted as queued */
       it("reports the failure and does not count the event as staged", async () => {
         const before = await enqueueOutcomeCount("staged");
         const queueManager = makeQueueManager();
@@ -306,7 +306,7 @@ describe("subscriber enqueue-time contract", () => {
 
   describe("given a subscriber with a claim-check stage hook", () => {
     describe("when the hook swaps the payload for a reference", () => {
-      /** @scenario a matched event's heavy payload travels as a claim-check, not inline */
+      /** @scenario relevant work waits in the queue at the cost of a pointer, not of its payload */
       it("stages the reference in place of the event and counts it as referenced", async () => {
         const received: unknown[] = [];
         const before = await enqueueOutcomeCount("referenced");
@@ -349,7 +349,7 @@ describe("subscriber enqueue-time contract", () => {
     });
 
     describe("when the hook returns the event unchanged", () => {
-      /** @scenario an event that cannot be referenced stages whole */
+      /** @scenario an event whose payload cannot be pointed at is still processed */
       it("stages the full event and counts it as staged, not referenced", async () => {
         const received: unknown[] = [];
         const beforeStaged = await enqueueOutcomeCount("staged");
@@ -373,7 +373,7 @@ describe("subscriber enqueue-time contract", () => {
     });
 
     describe("when the hook throws", () => {
-      /** @scenario a raising claim-check stage is reported as a failure, not as a quiet full stage */
+      /** @scenario a failure preparing queued work is reported, never hidden behind the whole payload */
       it("fails loudly into the routing retry rather than dropping silently", async () => {
         let handlerRan = false;
         const router = makeRouter({
@@ -391,9 +391,10 @@ describe("subscriber enqueue-time contract", () => {
           },
         });
 
-        await expect(
+        await expectDispatchFailure(
           router.dispatch([makeEvent("evt-stage-throw")], readContext),
-        ).rejects.toThrow();
+          /stage blew up/,
+        );
         expect(handlerRan).toBe(false);
       });
     });
