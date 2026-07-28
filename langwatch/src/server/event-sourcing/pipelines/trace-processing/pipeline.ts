@@ -87,10 +87,16 @@ export interface TraceProcessingPipelineDeps {
     TraceProcessingEvent,
     TraceSummaryData
   >;
-  gatewayBudgetSyncReactor?: ReactorDefinition<
-    TraceProcessingEvent,
-    TraceSummaryData
+  /**
+   * ADR-075 Class C: gateway spend is derived state, so it is a projection and
+   * a replay rebuilds it. Absent when ClickHouse is disabled.
+   */
+  gatewayBudgetDebitsProjection?: MapProjectionDefinition<
+    any,
+    TraceProcessingEvent
   >;
+  /** The best-effort `VirtualKey.lastUsedAt` touch the debit write split from. */
+  virtualKeyLastUsedSubscriber?: EventSubscriberDefinition<TraceProcessingEvent>;
   /**
    * ADR-022: BlobStore injected so RecordSpanCommand can reconstitute oversized
    * commands (fetch from S3 spool) and best-effort delete the spool after
@@ -105,17 +111,14 @@ export interface TraceProcessingPipelineDeps {
    * spanCommandGroupKey.ts.
    */
   spanCommandShardCount?: number;
-  governanceKpisSyncReactor?: ReactorDefinition<
-    TraceProcessingEvent,
-    TraceSummaryData
-  >;
+  governanceKpisProjection?: MapProjectionDefinition<any, TraceProcessingEvent>;
   retentionOrphanSweepReactor?: ReactorDefinition<
     TraceProcessingEvent,
     TraceSummaryData
   >;
-  governanceOcsfEventsSyncReactor?: ReactorDefinition<
-    TraceProcessingEvent,
-    TraceSummaryData
+  governanceOcsfEventsProjection?: MapProjectionDefinition<
+    any,
+    TraceProcessingEvent
   >;
   /** Cross-pipeline dispatchers (e.g. coding-agent span-facts, ADR-056). */
   subscribers?: EventSubscriberDefinition<TraceProcessingEvent>[];
@@ -214,27 +217,31 @@ export function createTraceProcessingPipeline(
     );
   }
 
-  if (deps.gatewayBudgetSyncReactor) {
-    builder = builder.withReactor(
-      "traceSummary",
-      "gatewayBudgetSync",
-      deps.gatewayBudgetSyncReactor,
+  if (deps.gatewayBudgetDebitsProjection) {
+    builder = builder.withMapProjection(
+      "gatewayBudgetDebits",
+      deps.gatewayBudgetDebitsProjection,
     );
   }
 
-  if (deps.governanceKpisSyncReactor) {
-    builder = builder.withReactor(
-      "traceSummary",
-      "governanceKpisSync",
-      deps.governanceKpisSyncReactor,
+  if (deps.virtualKeyLastUsedSubscriber) {
+    builder = builder.withEventSubscriber(
+      "virtualKeyLastUsed",
+      deps.virtualKeyLastUsedSubscriber,
     );
   }
 
-  if (deps.governanceOcsfEventsSyncReactor) {
-    builder = builder.withReactor(
-      "traceSummary",
-      "governanceOcsfEventsSync",
-      deps.governanceOcsfEventsSyncReactor,
+  if (deps.governanceKpisProjection) {
+    builder = builder.withMapProjection(
+      "governanceKpis",
+      deps.governanceKpisProjection,
+    );
+  }
+
+  if (deps.governanceOcsfEventsProjection) {
+    builder = builder.withMapProjection(
+      "governanceOcsfEvents",
+      deps.governanceOcsfEventsProjection,
     );
   }
 

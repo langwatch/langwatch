@@ -2,18 +2,18 @@ import {
   type EnterprisePipelineSetConfig,
   registerEnterprisePipelineSet,
 } from "@ee/event-sourcing/pipelineSet";
+import { GatewayBudgetDebitsMapProjection } from "@ee/governance/projections/gatewayBudgetDebits.mapProjection";
 import {
-  createGatewayBudgetSyncReactor,
-  type GatewayBudgetSyncReactorDeps,
-} from "@ee/governance/reactors/gatewayBudgetSync.reactor";
+  GatewayBudgetDebitsAppendStore,
+  type GatewayBudgetDebitsAppendStoreDeps,
+} from "@ee/governance/projections/gatewayBudgetDebits.store";
+import { createVirtualKeyLastUsedSubscriber } from "@ee/governance/subscribers/virtualKeyLastUsed.subscriber";
 import {
-  createGovernanceKpisSyncReactor,
-  type GovernanceKpisSyncReactorDeps,
-} from "@ee/governance/reactors/governanceKpisSync.reactor";
-import {
-  createGovernanceOcsfEventsSyncReactor,
-  type GovernanceOcsfEventsSyncReactorDeps,
-} from "@ee/governance/reactors/governanceOcsfEventsSync.reactor";
+  createGovernanceKpisProjection,
+  createGovernanceOcsfEventsProjection,
+  type GovernanceKpisProjectionDeps,
+  type GovernanceOcsfEventsProjectionDeps,
+} from "@ee/governance/projections/governanceProjections";
 import { createTraceAlertTriggerMatchHandler } from "@ee/governance/subscribers/traceAlertTriggerMatch.subscriber";
 import type {
   LangyConversationStateData,
@@ -151,7 +151,8 @@ import { createSimulationProcessingPipeline } from "./pipelines/simulation-proce
 import type { SimulationRunStateData } from "./pipelines/simulation-processing/projections/simulationRunState.foldProjection";
 import { createCancellationBroadcastReactor } from "./pipelines/simulation-processing/reactors/cancellationBroadcast.reactor";
 import type { ScenarioExecutionReactorHandle } from "./pipelines/simulation-processing/reactors/scenarioExecution.reactor";
-import { createScenarioExecutionReactor } from "./pipelines/simulation-processing/reactors/scenarioExecution.reactor";
+import { createScenarioExecutionDispatcher } from "../scenarios/execution/execution-dispatcher";
+import { executeScenarioRun } from "../scenarios/scenario.processor";
 import { createSnapshotUpdateBroadcastReactor } from "./pipelines/simulation-processing/reactors/snapshotUpdateBroadcast";
 import { createTraceMetricsSyncReactor } from "./pipelines/simulation-processing/reactors/traceMetricsSync.reactor";
 import type { SimulationRunStateRepository } from "./pipelines/simulation-processing/repositories/simulationRunState.repository";
@@ -325,7 +326,7 @@ export interface PipelineRegistryDeps {
   costRecorder: EvaluationCostRecorder;
   billingCheckpoints: BillingCheckpointService;
   usageReportingService?: UsageReportingService;
-  gatewayBudgetSync?: GatewayBudgetSyncReactorDeps;
+  gatewayBudgetSync?: GatewayBudgetDebitsAppendStoreDeps;
   /**
    * ADR-022: BlobStore for RecordSpanCommand spool reconstitution.
    * When provided, the trace-processing pipeline wires it into RecordSpanCommand
@@ -333,8 +334,8 @@ export interface PipelineRegistryDeps {
    * best-effort DELETEd after event_log INSERT succeeds.
    */
   blobStore?: BlobStore;
-  governanceKpisSync?: GovernanceKpisSyncReactorDeps;
-  governanceOcsfEventsSync?: GovernanceOcsfEventsSyncReactorDeps;
+  governanceKpisSync?: GovernanceKpisProjectionDeps;
+  governanceOcsfEventsSync?: GovernanceOcsfEventsProjectionDeps;
   retentionPolicyResolver?: RetentionPolicyResolver;
 }
 
@@ -906,18 +907,31 @@ export class PipelineRegistry {
       computeRunMetrics: simComputeRunMetrics.fn,
     });
 
-    const gatewayBudgetSyncReactor = this.deps.gatewayBudgetSync
-      ? createGatewayBudgetSyncReactor(this.deps.gatewayBudgetSync)
+    // ADR-075 Class C splits this one. The debit rows are derived state and
+    // become a projection, so a replay rebuilds spend the gateway lost. The
+    // `lastUsedAt` touch is a best-effort side effect on Prisma, not derived
+    // state, so it becomes a subscriber.
+    const gatewayBudgetDebitsProjection = this.deps.gatewayBudgetSync
+      ? new GatewayBudgetDebitsMapProjection({
+          store: new GatewayBudgetDebitsAppendStore(this.deps.gatewayBudgetSync),
+        })
       : undefined;
 
-    const governanceKpisSyncReactor = this.deps.governanceKpisSync
-      ? createGovernanceKpisSyncReactor(this.deps.governanceKpisSync)
+    const virtualKeyLastUsedSubscriber = this.deps.gatewayBudgetSync
+      ? createVirtualKeyLastUsedSubscriber({
+          prisma: this.deps.gatewayBudgetSync.prisma,
+        })
       : undefined;
 
-    const governanceOcsfEventsSyncReactor = this.deps.governanceOcsfEventsSync
-      ? createGovernanceOcsfEventsSyncReactor(
-          this.deps.governanceOcsfEventsSync,
-        )
+    // ADR-075 Class C: both governance streams are projections now, so replay
+    // rebuilds them. They were reactors, which replay never runs — the audit
+    // trail could not be reconstructed from the log it claims to derive from.
+    const governanceKpisProjection = this.deps.governanceKpisSync
+      ? createGovernanceKpisProjection(this.deps.governanceKpisSync)
+      : undefined;
+
+    const governanceOcsfEventsProjection = this.deps.governanceOcsfEventsSync
+      ? createGovernanceOcsfEventsProjection(this.deps.governanceOcsfEventsSync)
       : undefined;
 
     const tracePipeline = this.deps.eventSourcing.register(
@@ -943,7 +957,8 @@ export class PipelineRegistry {
         projectMetadataReactor,
         simulationMetricsSyncReactor,
         spanStorageBroadcastReactor,
-        gatewayBudgetSyncReactor,
+        gatewayBudgetDebitsProjection,
+        virtualKeyLastUsedSubscriber,
         // ADR-022: Wire BlobStore so RecordSpanCommand can reconstitute
         // oversized commands and best-effort delete the transient S3 spool.
         blobStore: this.deps.blobStore,
@@ -953,8 +968,8 @@ export class PipelineRegistry {
         spanCommandShardCount: resolveSpanCommandShardCount(
           process.env.TRACE_SPAN_PROCESSING_SHARDS,
         ),
-        governanceKpisSyncReactor,
-        governanceOcsfEventsSyncReactor,
+        governanceKpisProjection,
+        governanceOcsfEventsProjection,
         subscribers: codingAgentSubscribers,
       }),
     );
@@ -1062,7 +1077,13 @@ export class PipelineRegistry {
       publisher: this.deps.eventSourcing.redisConnection ?? null,
     });
 
-    const scenarioExecutionHandle = createScenarioExecutionReactor();
+    // ADR-073 step 2: dispatch is an outbox intent, not a reactor. The handle
+    // keeps `setPool` so worker startup binds its pool the same way; what
+    // changed is that a dispatch with nothing wired to run it now throws and is
+    // retried, where the reactor logged and dropped it.
+    const scenarioExecutionHandle = createScenarioExecutionDispatcher({
+      run: ({ job, pool }) => executeScenarioRun(job, pool),
+    });
 
     // Deferred dispatchers — resolved after pipeline registration.
     const selfComputeRunMetrics = new Deferred<
@@ -1091,7 +1112,6 @@ export class PipelineRegistry {
         simulationRunStore,
         snapshotUpdateBroadcastReactor,
         cancellationBroadcastReactor,
-        scenarioExecutionReactor: scenarioExecutionHandle.reactor,
         traceMetricsSyncReactor,
         computeRunMetricsCommand,
         // ADR-073: the `scenarioExecution` process writes the terminal state
@@ -1099,6 +1119,20 @@ export class PipelineRegistry {
         // lazily because it dispatches a command on the very pipeline being
         // registered here.
         scenarioExecutionDispatch: {
+          executeRun: (job) => scenarioExecutionHandle.execute(job),
+          // ADR-073 step 2: at-most-once is a property of the WORK, not of the
+          // attempt. `attempts` is bumped only by markDispatched/markFailed —
+          // leasing does not touch it — so a worker hard-killed mid-child is
+          // re-leased at attempt 1 and `maxAttempts` cannot stop a re-run.
+          // Reading the run's own stored status back does, and survives
+          // redelivery, lease lapse and restart alike.
+          readRunStatus: async ({ projectId, scenarioRunId }) =>
+            (
+              await simulationRunStore.get(scenarioRunId, {
+                aggregateId: scenarioRunId,
+                tenantId: createTenantId(projectId),
+              })
+            )?.Status ?? null,
           emitFailure: (params) =>
             ScenarioFailureHandler.create().ensureFailureEventsEmitted(params),
           lookupScenario: ({ projectId, scenarioId }) =>

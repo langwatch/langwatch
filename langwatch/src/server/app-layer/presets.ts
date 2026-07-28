@@ -32,6 +32,7 @@ import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/p
 import { getFeatureFlagStore } from "~/server/featureFlag/featureFlagStore.postgres";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import { GatewayBudgetRepository } from "~/server/gateway/budget.repository";
+import { ChangeEventRepository } from "~/server/gateway/changeEvent.repository";
 import { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
 import { getEdgeSpoolFailOpenCounter } from "~/server/metrics";
 import {
@@ -740,6 +741,10 @@ export function initializeDefaultApp(options?: {
         budgetCHRepository: new GatewayBudgetClickHouseRepository(
           resolveClickHouseClient,
         ),
+        // The debit store emits BUDGET_UPDATED so the Go gateway evicts its
+        // cached bundles. The reactor built this inline; passing the repository
+        // keeps the store's dependencies visible and testable.
+        changeEvents: new ChangeEventRepository(prisma),
       }
     : undefined;
 

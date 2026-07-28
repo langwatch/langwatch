@@ -1,0 +1,137 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
+import { createLogger } from "@langwatch/observability";
+import type { PrismaClient } from "@prisma/client";
+import { CanonicalizeSpanAttributesService } from "~/server/app-layer/traces/canonicalisation";
+import { SpanNormalizationPipelineService } from "~/server/app-layer/traces/span-normalization.service";
+import { SPAN_RECEIVED_EVENT_TYPE } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
+import type {
+  SpanReceivedEvent,
+  TraceProcessingEvent,
+} from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
+import type { EventSubscriberDefinition } from "~/server/event-sourcing/subscribers/eventSubscriber.types";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
+import { GATEWAY_VIRTUAL_KEY_ID_ATTR } from "../projections/gatewayBudgetDebits.mapProjection";
+
+const logger = createLogger(
+  "langwatch:governance:virtual-key-last-used-subscriber",
+);
+
+/**
+ * Don't rewrite `lastUsedAt` more often than this. Admin dashboards answer
+ * "when did this user last use their key" on minute scale; the row does not
+ * need to move on every request. Carried over verbatim from the reactor's EC6
+ * touch, which mirrored the same throttle in `/budget/check`.
+ */
+export const VIRTUAL_KEY_LAST_USED_THROTTLE_MS = 60_000;
+
+export interface VirtualKeyLastUsedSubscriberDeps {
+  prisma: PrismaClient;
+}
+
+/**
+ * Total, non-throwing enqueue predicate: does this raw span carry a virtual
+ * key marker?
+ *
+ * ADR-069 gives the enqueue seam no retry, so a throw here permanently loses
+ * the job rather than reading as "not relevant" — hence array guards and
+ * equality checks only, no decoding and no normalization. It reads the RAW
+ * OTLP attribute list because canonicalisation is neither cheap nor total;
+ * the gateway stamps this key literally, so the raw scan and the handler's
+ * normalized read agree on gateway traffic.
+ *
+ * Without it every span in the product mints a job for a write that concerns
+ * only gateway traffic. With it, an irrelevant event costs nothing.
+ */
+export function spanCarriesVirtualKeyMarker(event: TraceProcessingEvent): boolean {
+  if (event.type !== SPAN_RECEIVED_EVENT_TYPE) return false;
+  const attributes = (event as SpanReceivedEvent).data?.span?.attributes;
+  if (!Array.isArray(attributes)) return false;
+  return attributes.some(
+    (attribute) => attribute?.key === GATEWAY_VIRTUAL_KEY_ID_ATTR,
+  );
+}
+
+const spanNormalizationPipelineService = new SpanNormalizationPipelineService(
+  new CanonicalizeSpanAttributesService(),
+);
+
+/**
+ * ADR-075 Class C (the split half): touch `VirtualKey.lastUsedAt` when a
+ * gateway span lands.
+ *
+ * The reactor this comes from did two unrelated things. Writing the budget
+ * ledger is derived state and became the `gatewayBudgetDebits` map projection,
+ * so replay rebuilds it. This is not derived state — it is a best-effort
+ * mutation of an operational Postgres column, and the reactor's own comment
+ * said so ("Best-effort: a row update failure here doesn't poison the budget
+ * fold below"). Replaying it would be actively wrong: re-deriving a month of
+ * traces would stamp `lastUsedAt = now()` on keys nobody has touched in weeks,
+ * turning "when was this key last used" into "when did an operator last run a
+ * replay". So it is a subscriber, at-most-once, never replayed.
+ *
+ * Why it exists at all: `/budget/check` only fires when the gateway calls it,
+ * which it skips when a key has no budgets to precheck — so keys without
+ * budgets had `lastUsedAt = null` forever and admin oversight was broken on the
+ * most common case.
+ */
+export function createVirtualKeyLastUsedSubscriber(
+  deps: VirtualKeyLastUsedSubscriberDeps,
+): EventSubscriberDefinition<TraceProcessingEvent> {
+  return {
+    name: "virtualKeyLastUsed",
+    eventTypes: [SPAN_RECEIVED_EVENT_TYPE],
+    options: {
+      enqueue: { filter: spanCarriesVirtualKeyMarker },
+    },
+
+    async handle(event, context): Promise<void> {
+      const projectId = context.tenantId;
+
+      try {
+        // A rolling deploy can still deliver jobs staged by a build without the
+        // filter, so the handler re-establishes the gate on its own terms.
+        if (event.type !== SPAN_RECEIVED_EVENT_TYPE) return;
+        const span = spanNormalizationPipelineService.normalizeSpanReceived(
+          event.tenantId,
+          (event as SpanReceivedEvent).data.span,
+          (event as SpanReceivedEvent).data.resource,
+          (event as SpanReceivedEvent).data.instrumentationScope,
+        );
+        const virtualKeyId = span.spanAttributes[GATEWAY_VIRTUAL_KEY_ID_ATTR];
+        if (typeof virtualKeyId !== "string" || virtualKeyId === "") return;
+
+        const vk = await deps.prisma.virtualKey.findUnique({
+          where: { id: virtualKeyId },
+          select: { id: true, lastUsedAt: true },
+        });
+        if (!vk) return;
+
+        const now = new Date();
+        const isStale =
+          !vk.lastUsedAt ||
+          now.getTime() - vk.lastUsedAt.getTime() >
+            VIRTUAL_KEY_LAST_USED_THROTTLE_MS;
+        if (!isStale) return;
+
+        // Post-collapse VirtualKey is org-scoped in SCOPED_MODELS; the dbMTP
+        // guard accepts a row id as tenancy proof for single-row writes, so the
+        // bare id-only where clause is valid.
+        await deps.prisma.virtualKey.update({
+          where: { id: vk.id },
+          data: { lastUsedAt: now },
+        });
+      } catch (error) {
+        // At-most-once by design: never throw back into the queue. A missed
+        // touch costs a stale "last used" reading that the next gateway request
+        // corrects; retrying it buys nothing and a wedged group would stall a
+        // lane that carries nothing else worth retrying.
+        logger.warn(
+          { projectId, error },
+          "failed to touch virtualKey.lastUsedAt — non-fatal",
+        );
+        captureException(toError(error));
+      }
+    },
+  };
+}
