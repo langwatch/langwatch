@@ -14,8 +14,17 @@ import { z } from "zod";
  *   "meta":{"reason":"missing_provider"},
  *   "reasons":[{"type":"unknown","message":"unknown"}]}}
  * ```
+ *
+ * Exported so every reader of an nlpgo error body parses the same shape —
+ * see also the scenario code-agent adapter's `parseErrorEnvelope`.
+ *
+ * Note `fault` is declared optional because the shared `HerrEnvelope` type
+ * carries it, but Go's writer does NOT put it on the wire: `ErrorBody`
+ * (`pkg/herr/http.go`) is `{type,message,meta,trace_id,span_id,reasons}` and
+ * `toErrorBody` never sets a fault. It is a log field in `writeHandlerError`
+ * only. Do not classify on it — it will always be undefined.
  */
-const goErrorEnvelopeSchema = z.object({
+export const goErrorEnvelopeSchema = z.object({
   error: z.object({
     type: z.string(),
     message: z.string().optional(),
