@@ -1281,10 +1281,13 @@ func errFromBifrost(ctx context.Context, berr *bfschemas.BifrostError, respHeade
 		return classifyBifrostError(ctx, berr)
 	}
 	body, _ := extractRawResponseBytes(berr.ExtraFields.RawResponse)
+	errType, errCode := bfErrorTypeCode(berr)
 	return &domain.UpstreamError{
 		StatusCode: status,
 		Body:       body,
 		Message:    bfErrorMsg(berr),
+		ErrorType:  errType,
+		ErrorCode:  errCode,
 		Headers:    forwardableUpstreamHeaders(respHeaders),
 	}
 }
@@ -1358,6 +1361,23 @@ func bfErrorMsg(e *bfschemas.BifrostError) string {
 	return fmt.Sprintf("bifrost error (status %v)", e.StatusCode)
 }
 
+// bfErrorTypeCode lifts the provider's own error discriminants (error.type /
+// error.code as parsed by Bifrost's provider adapter) off a BifrostError.
+// These carry the error's identity (insufficient_quota, overloaded_error,
+// ThrottlingException, ...) on lanes where the native body is not captured.
+func bfErrorTypeCode(e *bfschemas.BifrostError) (errType, errCode string) {
+	if e == nil || e.Error == nil {
+		return "", ""
+	}
+	if e.Error.Type != nil {
+		errType = *e.Error.Type
+	}
+	if e.Error.Code != nil {
+		errCode = *e.Error.Code
+	}
+	return errType, errCode
+}
+
 // upstreamStreamError converts a mid-stream BifrostError chunk into a
 // structured domain.UpstreamError the SSE writer can forward faithfully.
 //
@@ -1375,6 +1395,7 @@ func upstreamStreamError(e *bfschemas.BifrostError) *domain.UpstreamError {
 		ue.Message = "provider stream error"
 		return ue
 	}
+	ue.ErrorType, ue.ErrorCode = bfErrorTypeCode(e)
 	if code := e.StatusCode; code != nil {
 		ue.StatusCode = *code
 	}
