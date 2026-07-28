@@ -2321,6 +2321,22 @@ export class ClickHouseTraceService {
   /**
    * Fetch evaluation rows for a set of trace IDs.
    * Same OOM-resilient pattern as fetchTraceSummaryRows.
+   *
+   * ⚠ Partition-safety of the OOM fallback rests on an invariant the schema
+   * does NOT enforce. The dedup below groups on `(TenantId, EvaluationId)`
+   * while the batching splits on `TraceId`, and `evaluation_runs` is
+   * `ORDER BY (TenantId, EvaluationId)` with `TraceId` merely a nullable
+   * column — so nothing structurally stops two versions of one EvaluationId
+   * from carrying different TraceIds. If that happened and the two landed in
+   * different batches, each would compute its own local `max(UpdatedAt)` and
+   * the concatenation would resurrect the stale version alongside the current
+   * one. (The trace-summary read has no such exposure: it groups on
+   * `(TenantId, TraceId)`, which CONTAINS the split key.)
+   *
+   * This is safe only while TraceId never changes across versions of an
+   * EvaluationId. No writer does that today; bisection multiplies the number
+   * of partitions, so if one ever starts, the damage shows up only on the OOM
+   * path and is effectively unreproducible.
    */
   private async fetchEvaluationRows({
     clickHouseClient,
