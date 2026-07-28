@@ -16,6 +16,7 @@ import {
 } from "../../hooks/useAllModelProvidersList";
 import { useDrawer } from "../../hooks/useDrawer";
 import { useFeatureFlag } from "../../hooks/useFeatureFlag";
+import { useCredentialProbeGate } from "../../hooks/useCredentialProbeGate";
 import { useModelProviderApiKeyValidation } from "../../hooks/useModelProviderApiKeyValidation";
 import { useModelProviderForm } from "../../hooks/useModelProviderForm";
 import { useModelProvidersSettings } from "../../hooks/useModelProvidersSettings";
@@ -320,33 +321,13 @@ export const EditModelProviderForm = ({
     state.scopes,
   );
 
-  // A failed probe is a strong signal, not proof. It runs from our servers, so
-  // a key restricted to the customer's own network, a provider outage, or a
-  // key that has not finished propagating all look exactly like a bad key.
-  // Refusing to save at all leaves those customers with nowhere to go, so the
-  // first refusal explains itself and the next Save goes through unprobed.
-  const credentialsFingerprint = useMemo(
-    () => JSON.stringify(state.customKeys),
-    [state.customKeys],
-  );
-  const [refusedCredentials, setRefusedCredentials] = useState<string | null>(
-    null,
-  );
-
-  // The component instance survives the drawer being reopened on a different
-  // provider row, so the refusal has to be cleared with it — same reason the
-  // advanced draft above is reset on providerId.
-  useEffect(() => {
-    setRefusedCredentials(null);
-  }, [providerId]);
-  // Editing any credential re-arms the probe, so a corrected key is checked
-  // again rather than saved on the strength of the previous refusal.
-  //
-  // Comparing fingerprints rather than holding a boolean is what makes that
-  // safe while a probe is still in flight: the refusal records the credentials
-  // it was actually about, so a key edited mid-probe does not inherit the old
-  // key's verdict and slip through unprobed.
-  const canSaveWithoutProbe = refusedCredentials === credentialsFingerprint;
+  // Shared with onboarding and the Langy model gate, so a refusal is not the
+  // end of the road on one surface and a hard block on the next.
+  const { probeRequired, recordRefusal, clearRefusal, saveLabel } =
+    useCredentialProbeGate({
+      customKeys: state.customKeys,
+      resetKey: providerId,
+    });
 
   const handleSave = useCallback(async () => {
     // Clear previous errors
@@ -416,20 +397,21 @@ export const EditModelProviderForm = ({
       isLlmProvider &&
       !isOAuthDeviceProvider &&
       userEnteredNewApiKey &&
-      !canSaveWithoutProbe
+      probeRequired
     ) {
       const isValid = await validateApiKey();
       if (!isValid) {
-        setRefusedCredentials(credentialsFingerprint);
+        recordRefusal();
         return;
       }
-      setRefusedCredentials(null);
+      clearRefusal();
     }
 
     void actions.submit();
   }, [
-    canSaveWithoutProbe,
-    credentialsFingerprint,
+    probeRequired,
+    recordRefusal,
+    clearRefusal,
     isLlmProvider,
     isOAuthDeviceProvider,
     isUsingEnvVars,
@@ -602,7 +584,7 @@ export const EditModelProviderForm = ({
             }
             onClick={handleSave}
           >
-            {canSaveWithoutProbe ? "Save anyway" : "Save"}
+            {saveLabel}
           </Button>
         </HStack>
       </VStack>

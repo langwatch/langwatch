@@ -673,19 +673,17 @@ describe(
         expect(fetchCalls.length).toBeGreaterThan(0);
       });
 
-      /**
-       * @scenario "An unreachable provider is not recorded as our own failure"
-       *
-       * A host the customer typed being unreachable is not our outage. tRPC
-       * v10 has no code for 502, so the envelope necessarily says
-       * INTERNAL_SERVER_ERROR — the attribution has to survive on the handled
-       * cause instead, which is what `logTrpcCall` reads for the status it
-       * records and what the client reads as `data.error.httpStatus`.
-       *
-       * The sentence asserted above is server-side only — the formatter
-       * replaces it with the code on the wire — so what the customer actually
-       * reads is pinned in the hook's unit test instead.
-       */
+      // A host the customer typed being unreachable is not our outage. tRPC
+      // v10 has no code for 502, so the envelope necessarily says
+      // INTERNAL_SERVER_ERROR — the attribution has to survive on the handled
+      // cause instead, which is what `handleTrpcCallLogging` reads for the
+      // status it records and what the client reads as
+      // `data.error.httpStatus`.
+      //
+      // The sentence asserted above is server-side only — the formatter
+      // replaces it with the code on the wire — so what the customer actually
+      // reads is pinned in the hook's unit test instead.
+      /** @scenario "An unreachable provider is not recorded as our own failure" */
       it("blames the provider rather than us when the host never answers", async () => {
         await expect(
           callerFor(adminUserId).modelProvider.validateApiKey({

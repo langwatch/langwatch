@@ -129,15 +129,12 @@ describe("useModelProviderApiKeyValidation", () => {
         expect(result.current.validationError).toContain("Failed to fetch");
       });
 
-      /**
-       * @scenario An unreachable provider is explained, not named by its code
-       *
-       * The regression this pins is invisible server-side: the sentence the
-       * constructor writes is real there, and only the wire replaces it with
-       * the code. So this drives the genuine error through the genuine
-       * formatter into the genuine hook, and reads what the drawer would
-       * render.
-       */
+      // The regression this pins is invisible server-side: the sentence the
+      // constructor writes is real there, and only the wire replaces it with
+      // the code. So this drives the genuine error through the genuine
+      // formatter into the genuine hook, and reads what the drawer would
+      // render.
+      /** @scenario An unreachable provider is explained, not named by its code */
       it("explains an unreachable provider instead of showing its error code", async () => {
         mockMutateAsync.mockRejectedValue(
           wireErrorFor(

@@ -48,13 +48,10 @@ describe("redactAuditArgs", () => {
         expect(JSON.stringify(redacted)).not.toContain("example.openai");
       });
 
-      /**
-       * @scenario "A credential typed as a header is never persisted either"
-       *
-       * `extraHeaders` rides the same `modelProvider.update` mutation as
-       * `customKeys` and is where an `Authorization: Bearer …` is typed, so
-       * redacting only the latter leaves the secret in the table anyway.
-       */
+      // `extraHeaders` rides the same `modelProvider.update` mutation as
+      // `customKeys` and is where an `Authorization: Bearer …` is typed, so
+      // redacting only the latter leaves the secret in the table anyway.
+      /** @scenario "A credential typed as a header is never persisted either" */
       it("redacts a header's value while keeping its name", () => {
         const redacted = redactAuditArgs({
           extraHeaders: [
