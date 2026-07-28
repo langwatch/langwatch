@@ -149,6 +149,51 @@ export class MissingAnnotatorError extends HandledError {
   }
 }
 
+/**
+ * The `evaluations.state` filter's value is constrained to the canonical
+ * execution-state domain (#4805, #6296) — the one filter field
+ * `filterValueSchema` cannot itself constrain, because that schema is
+ * shared, field-agnostic structural validation reused by every filter field
+ * (see `src/server/filters/types.ts`). Raised at the trigger repository's
+ * create/update seam, which every write path converges on — including the
+ * REST and MCP surfaces, which validate `filters` with a bare
+ * `z.record(z.unknown())` and never see the tRPC schemas' rejection at all.
+ */
+export class InvalidEvaluationStateFilterError extends HandledError {
+  declare readonly code: "invalid_evaluation_state_filter";
+
+  constructor({
+    evaluatorKey,
+    offendingValue,
+    canonicalValues,
+  }: {
+    /** The evaluator id (key inside the evaluations.state map) that held
+     *  the offending value. */
+    evaluatorKey: string;
+    /** The non-canonical value that was rejected. */
+    offendingValue: string;
+    /** The full canonical execution-state domain
+     *  (`EvaluationRunData.status`), so the client can render it as a
+     *  pick-list without hardcoding its own copy. */
+    canonicalValues: readonly string[];
+  }) {
+    super(
+      "invalid_evaluation_state_filter",
+      `evaluations.state.${evaluatorKey} rejected "${offendingValue}": not a canonical evaluation execution state. Valid values: ${canonicalValues.join(", ")}.`,
+      {
+        meta: {
+          field: "evaluations.state",
+          evaluatorKey,
+          offendingValue,
+          canonicalValues,
+        },
+        httpStatus: 422,
+      },
+    );
+    this.name = "InvalidEvaluationStateFilterError";
+  }
+}
+
 export class ProjectNotFoundError extends HandledError {
   declare readonly code: "project_not_found";
 
