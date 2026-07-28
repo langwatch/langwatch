@@ -13,6 +13,7 @@ import {
   incrementEsProjectionTotal,
   incrementEsReactorCollapsedTotal,
   incrementEsReactorTotal,
+  incrementEsSubscriberEnqueueTotal,
   incrementEsSubscriberTotal,
   observeEsFoldProjectionDuration,
   observeEsMapProjectionDuration,
@@ -1192,16 +1193,51 @@ export class ProjectionRouter<
               subscriber.eventTypes.includes(event.type),
             );
 
+      const enqueue = subscriber.options?.enqueue;
+
       for (const event of matching) {
         try {
-          if (queued) {
-            const queue = this.queueManager.getSubscriberQueue(name);
-            if (queue) {
-              await queue.send(event);
-              continue;
-            }
+          // Enqueue-time filter (ADR-069 invariant 4): a declined event never
+          // mints a job. A throw here is deliberately NOT caught as `false` —
+          // it falls through to the catch below, so the failure is reported
+          // rather than silently read as "not relevant". The routing path has
+          // no retry (see EnqueueDispatchOptions), so the hook must be total:
+          // if it throws, this subscriber loses its job for this event.
+          if (enqueue?.filter && !enqueue.filter(event)) {
+            incrementEsSubscriberEnqueueTotal({
+              pipelineName: this.pipelineName,
+              subscriberName: name,
+              outcome: "filtered",
+            });
+            continue;
           }
-          await this.handleSubscriber(subscriber, event);
+
+          // Claim-check staging (ADR-069): the subscriber may swap the staged
+          // payload for a small reference event mirroring the source event's
+          // scheduling identity. Total field-picks only — a throw fails into
+          // the routing retry like the filter's.
+          const staged = enqueue?.stage
+            ? (enqueue.stage(event) as EventType)
+            : event;
+
+          const queue = queued
+            ? this.queueManager.getSubscriberQueue(name)
+            : undefined;
+          if (queue) {
+            await queue.send(staged);
+          } else {
+            await this.handleSubscriber(subscriber, staged);
+          }
+
+          // Counted only once the handoff succeeded. A failed send throws to
+          // the catch below, so a queue outage never inflates `staged` or
+          // `referenced` — the outcome split stays an honest picture of what
+          // the seam did.
+          incrementEsSubscriberEnqueueTotal({
+            pipelineName: this.pipelineName,
+            subscriberName: name,
+            outcome: staged === event ? "staged" : "referenced",
+          });
         } catch (error) {
           this.logger.error(
             {

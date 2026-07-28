@@ -12,6 +12,9 @@ import {
   METRIC_DATA_POINT_CORRELATED_EVENT_TYPE,
   ORIGIN_RESOLVED_EVENT_TYPE,
   SPAN_RECEIVED_EVENT_TYPE,
+  SPAN_REFERENCED_EVENT_TYPE,
+  SPAN_REFERENCED_EVENT_VERSION_LATEST,
+  SPAN_REFERENCED_EVENT_VERSIONS,
   TOPIC_ASSIGNED_EVENT_TYPE,
   TRACE_NAME_CHANGED_EVENT_TYPE,
   TRACE_NAME_MAX_LENGTH,
@@ -61,6 +64,124 @@ export function isSpanReceivedEvent(
   event: TraceProcessingEvent,
 ): event is SpanReceivedEvent {
   return event.type === SPAN_RECEIVED_EVENT_TYPE;
+}
+
+/**
+ * The claim-check twin of `span_received` (ADR-069): the routing seam stages
+ * this in place of the full event for a subscriber that opted in, and the
+ * handler reads the span back from its canonical store. Never appended to the
+ * event log — see the constant's docblock for the versioning contract.
+ */
+export const spanReferencedEventDataSchema = z.object({
+  traceId: z.string(),
+  spanId: z.string(),
+  /** The raw wire span name, mirrored so gates and debugging never need the store. */
+  spanName: z.string(),
+  /**
+   * The span's own start, epoch ms, parsed off the wire `startTimeUnixNano`.
+   * The resolution read centers its partition window here: the stored row's
+   * StartTime IS this value, so the read stays a pruned point-read no matter
+   * how long the span ran or how late it exported — `occurredAt` is ingest
+   * time, which trails a long-lived span's start by the span's whole
+   * duration, and a fixed window around it goes permanently blind past that.
+   * Null when the wire span carried no parseable start; the reader then
+   * falls back to `occurredAt`, matching the store's own fallback stamping.
+   */
+  startTimeUnixMs: z.number().nullable(),
+});
+
+export const spanReferencedEventSchema = EventSchema.extend({
+  type: z.literal(SPAN_REFERENCED_EVENT_TYPE),
+  version: z.enum(SPAN_REFERENCED_EVENT_VERSIONS),
+  data: spanReferencedEventDataSchema,
+});
+
+export type SpanReferencedEventData = z.infer<
+  typeof spanReferencedEventDataSchema
+>;
+export type SpanReferencedEvent = z.infer<typeof spanReferencedEventSchema>;
+
+/**
+ * Discriminate-then-validate read of a staged payload.
+ *
+ * Returns `null` when the payload does not even claim to be a span reference
+ * (the caller falls through to its full-event path). But once the payload
+ * claims the type, a shape or version this build cannot read THROWS into the
+ * queue's retry — falling through would let a mixed-deploy job be mistaken
+ * for another kind of payload and silently no-op.
+ */
+export function parseSpanReferencedEvent(
+  value: unknown,
+): SpanReferencedEvent | null {
+  if (typeof value !== "object" || value === null) return null;
+  if ((value as { type?: unknown }).type !== SPAN_REFERENCED_EVENT_TYPE) {
+    return null;
+  }
+  return spanReferencedEventSchema.parse(value);
+}
+
+/**
+ * Builds the staged reference for a matched `span_received` event, mirroring
+ * the envelope fields the scheduler orders, groups, and dedups by (same id,
+ * aggregate, tenant, occurredAt). An event missing the identity a reference
+ * needs stages the full event unchanged instead — the pre-reference behavior,
+ * never a reference that could not resolve.
+ *
+ * Total at runtime, not merely against the type. This runs as an `enqueue`
+ * hook on the shared routing seam, which has no retry, so a throw here would
+ * permanently lose that subscriber's job (ADR-069). The schema types
+ * `data.span` as present, but the value reaching this function is untrusted
+ * wire data behind a cast, so an absent span is read as "no identity to
+ * reference" rather than trusted into a TypeError.
+ */
+export function makeSpanReferencedEvent(
+  event: SpanReceivedEvent,
+): SpanReferencedEvent | SpanReceivedEvent {
+  const span = event.data.span as
+    | {
+        spanId?: unknown;
+        name?: unknown;
+        startTimeUnixNano?: unknown;
+      }
+    | null
+    | undefined;
+  if (!span || typeof span.spanId !== "string" || span.spanId.length === 0) {
+    return event;
+  }
+  return {
+    id: event.id,
+    version: SPAN_REFERENCED_EVENT_VERSION_LATEST,
+    aggregateId: event.aggregateId,
+    aggregateType: event.aggregateType,
+    tenantId: event.tenantId,
+    createdAt: event.createdAt,
+    occurredAt: event.occurredAt,
+    type: SPAN_REFERENCED_EVENT_TYPE,
+    data: {
+      traceId: String(event.aggregateId),
+      spanId: span.spanId,
+      spanName: typeof span.name === "string" ? span.name : "",
+      startTimeUnixMs: parseStartTimeUnixMs(span.startTimeUnixNano),
+    },
+    metadata: event.metadata,
+  };
+}
+
+/**
+ * ns→ms off the wire `startTimeUnixNano` (string or number), total: null on
+ * anything unparseable or non-positive. Parsing a 19-digit ns string as a
+ * double loses sub-microsecond precision, which is sub-millisecond after the
+ * divide — well inside what partition windowing tolerates.
+ */
+function parseStartTimeUnixMs(value: unknown): number | null {
+  const nano =
+    typeof value === "string" && /^\d+$/.test(value)
+      ? Number(value)
+      : typeof value === "number"
+        ? value
+        : Number.NaN;
+  if (!Number.isFinite(nano) || nano <= 0) return null;
+  return Math.floor(nano / 1e6);
 }
 
 /**
