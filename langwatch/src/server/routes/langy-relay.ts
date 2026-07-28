@@ -14,9 +14,9 @@
  *
  * On instance death the worker reconnects and re-pushes from the stream's last
  * id; redelivered frames are dropped by the dedup set. Never expose publicly —
- * the Helm chart enforces this by default, hard-blocking `/api/internal` at the
- * ingress (`ingress.blockedPaths` in `charts/langwatch/values.yaml`); in-cluster
- * callers reach the app via the internal Service, not the ingress.
+ * the Helm chart
+ * blocks `/api/internal` at the ingress by default, and in-cluster callers reach
+ * the app through its internal Service rather than the ingress.
  */
 import { createServiceApp, internalSecret } from "~/server/api/security";
 import { getApp } from "~/server/app-layer/app";
