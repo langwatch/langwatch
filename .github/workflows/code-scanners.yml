@@ -1,0 +1,165 @@
+name: code-scanners
+
+# The deterministic scanners that were configured but never executed.
+#
+# `.coderabbit.yaml` has enabled gitleaks and pointed semgrep at
+# `.semgrep/langwatch.yml` for a long time, and `coderabbit-config-check.yml`
+# proves that ruleset PARSES — but nothing has ever run either against the
+# repository except CodeRabbit itself, once per PR, as a comment. Same shape as
+# the ast-grep ruleset before it moved to /.ast-grep/.
+#
+# Everything here is DIFF-SCOPED. Measured baselines at the time of writing:
+#
+#   semgrep      347  (290 clickhouse-no-qualified-table, 57 pii-in-logger-call)
+#
+# A full-tree gate at those numbers would be switched off within a day, and
+# `.coderabbit.yaml` already frames these rules as "flag ONLY newly added or
+# modified lines". `--baseline-commit` is semgrep's own implementation of
+# exactly that, so the rule text and the gate finally agree.
+#
+# Versions are pinned to match coderabbit-config-check.yml — rule-matching
+# behaviour is version-sensitive. Bump them together.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  merge_group:
+  workflow_dispatch:
+  schedule:
+    # The dependency scanners below are report-only on a PR because they fail
+    # on upstream advisories nobody in the PR caused. This is where they get
+    # looked at on their own schedule instead.
+    - cron: "17 6 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: code-scanners-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  secrets:
+    name: secrets (gitleaks + trufflehog)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+        with:
+          # Both scanners diff a commit range, which needs the range present.
+          fetch-depth: 0
+          persist-credentials: false
+
+      # A committed credential is never acceptable, so this is blocking from
+      # the start rather than phased. #5708 is the precedent.
+      #
+      # The binary, not gitleaks-action: that action requires a paid
+      # GITLEAKS_LICENSE for organisation-owned repositories and fails without
+      # one. The CLI is Apache-2.0 and unrestricted.
+      - name: gitleaks
+        run: |
+          version=8.30.0
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${version}/gitleaks_${version}_linux_x64.tar.gz" \
+            | tar -xz -C /usr/local/bin gitleaks
+          gitleaks --version
+          gitleaks git --redact --no-banner .
+
+      # gitleaks matches patterns; trufflehog additionally VERIFIES a candidate
+      # against the provider, so it catches live credentials that do not match
+      # a known shape. --only-verified keeps it to secrets proven live, which
+      # is what makes it safe to block on.
+      - name: trufflehog
+        uses: trufflesecurity/trufflehog@6f3c981e7b77f235fd2702dd74af25fc4b72bf11 # v3.96.0
+        with:
+          extra_args: --only-verified --results=verified
+
+  sast:
+    name: semgrep (changed lines)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v5
+        with:
+          python-version: "3.12"
+
+      - name: Install pinned semgrep
+        run: pip install "semgrep==1.164.0"
+
+      # The ruleset must parse before anything else is believable — this is the
+      # check coderabbit-config-check.yml already does, repeated here so this
+      # workflow fails honestly rather than scanning with a broken config.
+      - name: Ruleset validates
+        run: semgrep --validate --config .semgrep/langwatch.yml
+
+      # REPORT-ONLY for now, for two measured reasons — promote to --error
+      # once both are dealt with:
+      #
+      #  1. `pii-in-logger-call` counts `userId` as PII, but logging a raw
+      #     userId is a deliberate decision here (opaque id, and the identity
+      #     link is deleted with the account). 57 of the 347 findings are that
+      #     rule. Drop userId from the rule's field list before this blocks,
+      #     or the gate argues with a policy that already exists.
+      #
+      #  2. --baseline-commit attributes a finding to whoever last touched the
+      #     LINE. This branch reformats the repository, so 4 untouched
+      #     pii-in-logger-call sites read as newly introduced. Any baseline
+      #     diff is unreliable across a format sweep; it becomes reliable again
+      #     once that sweep is on main.
+      - name: Scan (diff-scoped on PRs, full tree elsewhere)
+        continue-on-error: true
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git fetch --no-tags origin "${{ github.base_ref }}"
+            semgrep --config .semgrep/langwatch.yml --quiet \
+              --baseline-commit "$(git merge-base HEAD "origin/${{ github.base_ref }}")" .
+          else
+            semgrep --config .semgrep/langwatch.yml --quiet .
+          fi
+
+  dependencies:
+    name: dependency advisories (report-only)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Report-only by design: these fail when an advisory is published against a
+    # transitive dependency, which has nothing to do with the PR that happens
+    # to be open at the time. Blocking on them means unrelated work stops for a
+    # reason its author cannot fix. The weekly schedule above is where they are
+    # meant to be actioned.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      # Reachability-based: only reports advisories whose vulnerable symbol is
+      # actually called, so its output is worth reading.
+      - name: govulncheck
+        run: |
+          go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 \
+            ./services/... ./pkg/... ./cmd/... ./tools/...
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v5
+        with:
+          python-version: "3.12"
+
+      - name: pip-audit
+        run: |
+          pip install pip-audit==2.9.0
+          found=0
+          for req in $(git ls-files '*requirements*.txt' 'python-sdk/pyproject.toml' 'langevals/pyproject.toml'); do
+            echo "==> $req"
+            pip-audit -r "$req" || found=1
+          done
+          exit $found
