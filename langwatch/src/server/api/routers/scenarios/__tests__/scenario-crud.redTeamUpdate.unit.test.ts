@@ -52,6 +52,13 @@ vi.mock("~/server/license-enforcement", () => ({
   enforceLicenseLimit: vi.fn(),
 }));
 
+// Every mutation goes through trpc's audit-log middleware, which writes a row
+// with the module-level prisma client — not `ctx.prisma`, so a fixture context
+// cannot stand in for it. Unmocked it opens a real Postgres connection, which
+// passes on a machine that happens to run one locally and fails in CI, where
+// nothing is listening. A unit test should not depend on either.
+vi.mock("../../../../auditLog", () => ({ auditLog: vi.fn() }));
+
 function caller() {
   const ctx = createInnerTRPCContext({
     session: { user: { id: "user_1" }, expires: "1" },
