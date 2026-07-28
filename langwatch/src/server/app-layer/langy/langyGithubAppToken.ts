@@ -65,6 +65,24 @@ export interface GithubRepository {
   fullName: string;
 }
 
+/**
+ * Thrown when GitHub confirms (HTTP 404, not a timeout/5xx/permission error)
+ * that an installation no longer exists — it was uninstalled on GitHub's side
+ * but our row was never cleaned up (a missed webhook delivery, or an
+ * installation that predates the webhook being configured). Callers use this
+ * to tell "this installation is gone, stop selecting it" apart from a
+ * transient failure that must NOT delete a possibly-still-live installation.
+ */
+export class GithubInstallationNotFoundError extends Error {
+  public readonly installationId: string;
+
+  constructor(installationId: string) {
+    super(`GitHub installation ${installationId} not found`);
+    this.name = "GithubInstallationNotFoundError";
+    this.installationId = installationId;
+  }
+}
+
 /** The narrow Redis surface this service uses (ioredis-compatible). */
 export interface RedisLike {
   get(key: string): Promise<string | null>;
@@ -277,6 +295,12 @@ export class LangyGithubAppTokenService {
         { status: res.status, installationId: args.installationId },
         "installation token mint failed",
       );
+      // A 404 here is GitHub confirming the installation is gone — distinct
+      // from every other failure (401/403/5xx/network), which may well be
+      // transient and must never be treated as "this installation is dead".
+      if (res.status === 404) {
+        throw new GithubInstallationNotFoundError(args.installationId);
+      }
       throw new Error(`GitHub token mint failed: ${res.status}`);
     }
     const body = (await res.json()) as {

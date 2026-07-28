@@ -15,6 +15,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   computeRepoScopeKey,
+  GithubInstallationNotFoundError,
   LANGY_INSTALLATION_PERMISSIONS,
   LangyGithubAppTokenService,
   type RedisLike,
@@ -194,6 +195,23 @@ describe("mintInstallationToken", () => {
       await expect(
         svc.mintInstallationToken({ installationId: "5" }),
       ).rejects.toThrow();
+      expect(redis.store.size).toBe(0);
+    });
+  });
+
+  describe("when GitHub confirms the installation no longer exists (404)", () => {
+    it("throws GithubInstallationNotFoundError, distinct from other failures", async () => {
+      const redis = fakeRedis();
+      const svc = new LangyGithubAppTokenService("app-1", privateKey, redis);
+      vi.stubGlobal(
+        "fetch",
+        vi.fn<typeof fetch>(
+          async () => new Response("not found", { status: 404 }),
+        ),
+      );
+      await expect(
+        svc.mintInstallationToken({ installationId: "dead-inst" }),
+      ).rejects.toBeInstanceOf(GithubInstallationNotFoundError);
       expect(redis.store.size).toBe(0);
     });
   });

@@ -12,6 +12,7 @@ import { createLogger } from "@langwatch/observability";
 
 import {
   computeRepoScopeKey,
+  GithubInstallationNotFoundError,
   type GithubRepository,
   type LangyGithubAppTokenService,
 } from "./langyGithubAppToken";
@@ -275,6 +276,13 @@ export class LangyGithubInstallationsService {
    * Returns null when GitHub is unconfigured, the org has no (usable)
    * installation, or the mint fails — the caller degrades to the connect card.
    *
+   * Self-heals stale installations: a webhook delivery can be missed (or an
+   * installation can predate the webhook being configured at all), leaving a
+   * `LangyGithubInstallation` row for an installation GitHub has already
+   * forgotten. Rather than let that dead row block every real installation
+   * behind it forever, a confirmed 404 from GitHub on mint removes the row and
+   * moves on to the next candidate.
+   *
    * TODO(JIT narrowing): the plan's delivery option 2 replaces spawn-env
    * with a clone-time credential-helper callback that mints per-clone; the
    * seam is `repoScopeKey`, already threaded into the worker signature.
@@ -293,25 +301,35 @@ export class LangyGithubInstallationsService {
     if (usable.length === 0) return null;
 
     // Explicit repo: pick the installation that can reach it and scope to it.
+    // A candidate that turns out to be a dead installation (self-healed away
+    // by mintScoped) is skipped in favor of the next one that can reach the
+    // same repo, rather than failing the turn outright.
     if (repositoryFullName) {
       for (const inst of usable) {
         const repoId = await this.resolveRepositoryId(inst, repositoryFullName);
-        if (repoId) {
-          return this.mintScoped({
-            installationId: inst.installationId,
-            repositoryIds: [repoId],
-          });
-        }
+        if (!repoId) continue;
+        const outcome = await this.mintScoped({
+          installationId: inst.installationId,
+          repositoryIds: [repoId],
+        });
+        if (outcome.token) return outcome.token;
+        if (!outcome.wasDeadInstallation) return null;
       }
       // The App is not installed on that repo — bounded by the installation.
       return null;
     }
 
-    // No explicit repo: mint against the org's installation scoped to its full
-    // repo set. When an org has multiple installations we take the first usable
-    // one (a repo chip disambiguates in the explicit path above).
-    const inst = usable[0]!;
-    return this.mintScoped({ installationId: inst.installationId });
+    // No explicit repo: mint against the org's installation(s) scoped to the
+    // full repo set, oldest first. An installation GitHub confirms is gone
+    // (404) is removed and the next candidate is tried instead of failing the
+    // whole turn; any other mint failure stops here, same as before — a
+    // transient error must not make us skip past a live installation.
+    for (const inst of usable) {
+      const outcome = await this.mintScoped({ installationId: inst.installationId });
+      if (outcome.token) return outcome.token;
+      if (!outcome.wasDeadInstallation) return null;
+    }
+    return null;
   }
 
   private async mintScoped({
@@ -320,23 +338,34 @@ export class LangyGithubInstallationsService {
   }: {
     installationId: string;
     repositoryIds?: string[];
-  }): Promise<LangyGithubTurnToken | null> {
+  }): Promise<{ token: LangyGithubTurnToken | null; wasDeadInstallation: boolean }> {
     try {
       const minted = await this.appTokens.mintInstallationToken({
         installationId,
         ...(repositoryIds ? { repositoryIds } : {}),
       });
       return {
-        token: minted.token,
-        repoScopeKey: computeRepoScopeKey({ repositoryIds }),
-        installationId,
+        token: {
+          token: minted.token,
+          repoScopeKey: computeRepoScopeKey({ repositoryIds }),
+          installationId,
+        },
+        wasDeadInstallation: false,
       };
     } catch (error) {
+      if (error instanceof GithubInstallationNotFoundError) {
+        logger.warn(
+          { installationId },
+          "github installation no longer exists, removing stale record",
+        );
+        await this.repo.deleteByInstallationId(installationId);
+        return { token: null, wasDeadInstallation: true };
+      }
       logger.warn(
         { error, installationId },
         "failed to mint installation token for turn",
       );
-      return null;
+      return { token: null, wasDeadInstallation: false };
     }
   }
 
