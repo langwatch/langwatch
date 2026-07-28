@@ -1,6 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
 import type { ILicenseEnforcementRepository } from "~/server/license-enforcement/license-enforcement.repository";
+import { USAGE_UNKNOWN, type UsageCount } from "~/server/traces/usage-count";
 import { getApp } from "../../src/server/app-layer/app";
 import {
   PLATFORM_DEFAULT_RETENTION_DAYS,
@@ -27,7 +28,7 @@ const logger = createLogger("langwatch:licensing:licenseHandler");
 export interface ITraceUsageService {
   getCurrentMonthCount(params: {
     organizationId: string;
-  }): Promise<number | "unlimited">;
+  }): Promise<UsageCount | "unlimited">;
 }
 
 interface LicenseHandlerConfig {
@@ -277,11 +278,20 @@ export class LicenseHandler {
     // Get message count via the app-layer UsageService (meter policy selects
     // traces vs events, counted in ClickHouse).
     // Returns 0 if service not provided (e.g., in tests).
-    // "unlimited" is resolved to 0 since license display needs a numeric value.
+    //
+    // Both "unlimited" and "unknown" resolve to 0 because this figure feeds a
+    // numeric license-usage display, but they are not the same claim and the
+    // second one is worth being explicit about: it means the count could not
+    // be taken, and rendering it as 0 understates usage until the counting
+    // store recovers. It does not gate anything on its own — enforcement is
+    // UsageService.checkLimit, which handles unknown deliberately — so this
+    // stays a display value rather than becoming a reason to fail a license.
     const messagesCountPromise = this.traceUsageService
       ? this.traceUsageService
           .getCurrentMonthCount({ organizationId })
-          .then((count) => (count === "unlimited" ? 0 : count))
+          .then((count) =>
+            count === "unlimited" || count === USAGE_UNKNOWN ? 0 : count,
+          )
       : Promise.resolve(0);
 
     const [

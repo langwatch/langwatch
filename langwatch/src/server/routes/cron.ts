@@ -7,9 +7,10 @@ import type { Context } from "hono";
 import { env } from "~/env.mjs";
 import { createServiceApp, internalSecret } from "~/server/api/security";
 import { getApp } from "~/server/app-layer/app";
-import { prisma } from "~/server/db";
-import cleanupOldLambdas from "~/tasks/cleanupOldLambdas";
 import { reapExpiredLangySessionApiKeys } from "~/server/app-layer/langy/langyApiKey";
+import { prisma } from "~/server/db";
+import { USAGE_UNKNOWN } from "~/server/traces/usage-count";
+import cleanupOldLambdas from "~/tasks/cleanupOldLambdas";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import {
   reportHasFailures,
@@ -109,6 +110,20 @@ secured.access(cronPolicy()).get("/cron/trace_analytics", async (c) => {
             logger.debug(
               { organizationId: org.id },
               "organization has unlimited plan, skipping usage check",
+            );
+            continue;
+          }
+
+          if (currentMonthCount === USAGE_UNKNOWN) {
+            // Skipped, not treated as 0. This job decides whether an
+            // organization has crossed a usage threshold; against a fabricated
+            // zero it concludes "comfortably under" for every organization at
+            // once and sends nothing, which is indistinguishable from a quiet
+            // day. Skipping says the same thing honestly and re-checks on the
+            // next tick.
+            logger.warn(
+              { organizationId: org.id },
+              "usage is unknown, skipping usage check for this organization",
             );
             continue;
           }

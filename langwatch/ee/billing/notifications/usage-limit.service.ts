@@ -4,6 +4,7 @@ import type { OrganizationService } from "../../../src/server/app-layer/organiza
 import type { PlanProvider } from "../../../src/server/app-layer/subscription/plan-provider";
 import type { UsageService } from "../../../src/server/app-layer/usage/usage.service";
 import { LIMIT_TYPE_DISPLAY_LABELS } from "../../../src/server/license-enforcement/constants";
+import { USAGE_UNKNOWN } from "../../../src/server/traces/usage-count";
 import { getCurrentMonthStart } from "../../../src/server/utils/dateUtils";
 import { TtlCache } from "../../../src/server/utils/ttlCache";
 import {
@@ -392,6 +393,18 @@ export class UsageLimitService {
       organizationId,
       projectIds,
     });
+    // The per-project breakdown is the substance of this email. Sending it with
+    // every project reading 0 — which is what an unknown count used to become —
+    // tells an admin their usage collapsed, in a message whose entire premise
+    // is that their usage is high. Skip the send; the threshold is still
+    // crossed on the next run, when the numbers are real.
+    if (counts === USAGE_UNKNOWN) {
+      logger.warn(
+        { organizationId, crossedThreshold },
+        "usage is unknown, skipping usage-limit email rather than reporting zeros",
+      );
+      return;
+    }
     const countsMap = new Map(counts.map((c) => [c.projectId, c.count]));
     const projectUsageData = projects.map((p) => ({
       id: p.id,
