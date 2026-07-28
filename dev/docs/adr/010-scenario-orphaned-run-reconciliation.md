@@ -2,7 +2,24 @@
 
 **Date:** 2026-06-23
 
-**Status:** Accepted
+**Status:** Superseded by [ADR-073](073-run-execution-on-process-manager.md)
+
+> **Superseded 2026-07-28.** Both boot-time sweeps this ADR introduced —
+> `scenario-orphan-reconciler.ts` (QUEUED) and
+> `orphaned-run-reconciliation.ts` / `.clickhouse.ts` (IN_PROGRESS) — are
+> deleted. The `scenarioExecution` process manager (ADR-073, step 1) holds the
+> same guarantee continuously instead of at worker boot, so recovery is bounded
+> by a deadline rather than by deploy cadence.
+>
+> The two spec files this ADR referenced
+> (`langwatch/specs/scenarios/orphaned-run-reconciliation.feature` and
+> `queued-run-orphan-recovery.feature`) are removed with the code. The
+> behaviour they protected — a run whose worker dies still reaches a terminal
+> state — is specified in
+> [`specs/scenarios/scenario-execution-process-manager.feature`](../../../specs/scenarios/scenario-execution-process-manager.feature).
+>
+> Retained for the reasoning about disjoint status sweeps and the cross-tenant
+> ClickHouse scan, which informed the process manager's deadline design.
 
 ## Context
 
