@@ -129,6 +129,51 @@ mechanically greppable. Every unsoundness identified below is an instance of it:
 | 5 | **Adapter** | `service.method` → port | Is every line of the form `port: (args) => something.method(args)`? | 3, 4 |
 | 6 | **Pipeline** | Structure | Is every statement a `.with*()` call, or the construction of an argument to one? | 2, 4, 5 |
 
+> **The table is missing a row, and it is the row that matters most.** Applying
+> this to the worst file exposed the gap: `new TraceService(...)` has to happen
+> *somewhere*, and under the table as written that somewhere is illegal at every
+> layer — layer 5 may import 3 and 4, but nothing is permitted to *construct*
+> across them. "Construction belongs at the composition root" is advice with no
+> address, and advice with no address is exactly how the junk drawer formed.
+>
+> Add **layer 0 — Composition root.** It may import from anything. Its
+> membership test: *does it only construct?* `presets.ts` is that layer today
+> and this ADR never named it, which is why an adapter was able to absorb
+> eleven constructions without breaking any stated rule.
+>
+> The naming convention that falls out is `*.composition.ts` beside the services
+> it builds — a file that constructs and never adapts, sibling to `*.adapter.ts`,
+> which adapts and never constructs. Both have a one-line membership test;
+> `*.wiring.ts` had neither, which is the whole diagnosis.
+
+> **Two further corrections from applying this to `automations`:**
+>
+> - **`getProtectionsDeduped` does not belong in `TraceService`,** as §4 said.
+>   `TraceService.getById` *receives* protections as an argument — it does not
+>   own them, so caching them inside it would have a service cache a value it
+>   cannot invalidate. The ADR reached for the nearest named service instead of
+>   asking who owns the data. The right home is a service whose *method
+>   boundary* is the pair of calls.
+> - **§4 over-credits its most quotable finding.** The dedup cache is **14 of
+>   216 lines — 6%**. Moving it alone would have left a 202-line function. What
+>   actually shrank the file was relocating the eleven constructions and
+>   splitting the remainder into named port bundles.
+
+> **An adapter declares two interfaces, not one.** §1 splits `*.adapter.ts`
+> (layer 5) from a `ports.ts` (layer 4) holding the produced ports. But an
+> adapter must also name the *collaborators it consumes*, and that side has no
+> row in the table — despite being the more load-bearing of the two, since it is
+> what makes the composition root's output checkable. Splitting one interface
+> pair across two files buys nothing; keep both with the adapter.
+
+> **§7's port example is not representative, and it resizes the generator plan.**
+> The `AutomationDispatchPorts` sample lists three trivially-nullable ports and
+> omits `settlementDeps`, a **17-member bundle** that is the only member with
+> real surface. Sized against the example, "auto-generate the port half" covers
+> 3 of 20 members — about 15% of this contract, not half of it. The other 17 are
+> exactly the value-returning and object-typed cases §7 already admits cannot be
+> generated soundly.
+
 **Dependency direction is strictly downward for values.** Types may be imported
 in any direction — a type import has no runtime edge — which is what lets layer
 6 name an app-layer type without depending on it. Layer 4 is types-only by
