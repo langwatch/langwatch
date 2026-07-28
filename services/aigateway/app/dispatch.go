@@ -5,6 +5,8 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/tidwall/gjson"
+
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/pkg/retry"
 	"github.com/langwatch/langwatch/services/aigateway/app/pipeline"
@@ -21,14 +23,29 @@ func (a *App) coreDispatch(ctx context.Context, call *pipeline.Call) (*domain.Re
 	}
 	resp, el, err := retry.Walk(ctx, a.retryOpts(call.Bundle), credentialIDs(creds),
 		func(ctx context.Context, slotID string) (*domain.Response, error) {
-			return a.providers.Dispatch(ctx, call.Request, findCredential(creds, slotID))
+			cred := findCredential(creds, slotID)
+			resp, err := a.providers.Dispatch(ctx, call.Request, cred)
+			// Raw-forward lanes hand a provider error back as a success-shaped
+			// Response carrying the upstream's status + native body. Reshape it
+			// into an UpstreamError INSIDE the walk so provider failures behave
+			// the same on every lane: a 429/5xx falls back to the next
+			// credential and drives the circuit breaker's health view, instead
+			// of counting as a success that ends the chain on the first dead
+			// key. The terminal forwarding guarantee is unchanged: the
+			// UpstreamError carries the same verbatim body, status, and
+			// retry-signaling headers to the HTTP writer.
+			if err == nil && resp != nil && resp.StatusCode >= 400 {
+				err = upstreamErrorFromResponse(resp)
+				resp = nil
+			}
+			return resp, stampUpstreamProvider(err, cred)
 		}, classifyProviderError)
 	call.Meta.Update(func(m *pipeline.Meta) { m.FallbackCount = countFallbacks(el) })
 	a.recordDispatch(ctx, call, creds, el)
 	el.Release()
 	resp, err = applyGovernanceMessage(resp, err)
 	if err != nil {
-		return nil, err
+		return nil, translateWalkError(ctx, err)
 	}
 	a.metrics.RecordCacheOutcome(resp.Usage)
 	return resp, nil
@@ -44,15 +61,58 @@ func (a *App) coreDispatchStream(ctx context.Context, call *pipeline.Call) (doma
 	}
 	iter, el, err := retry.Walk(ctx, a.retryOpts(call.Bundle), credentialIDs(creds),
 		func(ctx context.Context, slotID string) (domain.StreamIterator, error) {
-			return a.providers.DispatchStream(ctx, call.Request, findCredential(creds, slotID))
+			cred := findCredential(creds, slotID)
+			iter, err := a.providers.DispatchStream(ctx, call.Request, cred)
+			return iter, stampUpstreamProvider(err, cred)
 		}, classifyProviderError)
 	call.Meta.Update(func(m *pipeline.Meta) { m.FallbackCount = countFallbacks(el) })
 	provider, model := a.recordDispatch(ctx, call, creds, el)
 	el.Release()
 	if _, err = applyGovernanceMessage(nil, err); err != nil {
-		return nil, err
+		return nil, translateWalkError(ctx, err)
 	}
 	return a.metrics.WrapStream(iter, provider, model), nil
+}
+
+// upstreamErrorFromResponse reshapes a raw-forwarded provider error response
+// into the error form of the same information, so the retry walk can classify
+// it. Status, native body, and retry-signaling headers ride along verbatim.
+func upstreamErrorFromResponse(resp *domain.Response) error {
+	return &domain.UpstreamError{
+		StatusCode: resp.StatusCode,
+		Body:       resp.Body,
+		Message:    gjson.GetBytes(resp.Body, "error.message").String(),
+		ErrorType:  gjson.GetBytes(resp.Body, "error.type").String(),
+		ErrorCode:  gjson.GetBytes(resp.Body, "error.code").String(),
+		Headers:    resp.Headers,
+	}
+}
+
+// stampUpstreamProvider names the credential's provider on an upstream error
+// so the surviving error of a multi-provider chain says which account it
+// came from. A no-op for gateway-taxonomy errors and already-stamped ones.
+func stampUpstreamProvider(err error, cred domain.Credential) error {
+	var ue *domain.UpstreamError
+	if errors.As(err, &ue) && ue.Provider == "" {
+		ue.Provider = string(cred.ProviderID)
+	}
+	return err
+}
+
+// translateWalkError maps walk outcomes that carry no upstream error onto the
+// gateway's own taxonomy. A zero-attempt walk (every credential slot skipped
+// by an open circuit breaker) has no provider verdict to forward; letting the
+// bare sentinel escape used to fall through the transport's typed-error
+// branches and surface as a 500 internal_error, right when a provider
+// outage makes an actionable, retryable answer matter most.
+func translateWalkError(ctx context.Context, err error) error {
+	if !errors.Is(err, retry.ErrNoAttempts) {
+		return err
+	}
+	return herr.New(ctx, domain.ErrCircuitOpen, herr.M{
+		"message": "provider temporarily unavailable: repeated upstream failures opened the circuit breaker, retry shortly",
+		"fault":   "provider",
+	})
 }
 
 // recordDispatch turns the retry engine's event log into provider metrics
@@ -175,6 +235,13 @@ func classifyProviderError(err error) retry.Reason {
 		return retry.ReasonRateLimit
 	case herr.IsCode(err, domain.ErrProviderError):
 		return retry.ReasonRetryable5xx
+	case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
+		// A bare context error is the CALLER abandoning the request (client
+		// disconnect, whole-request deadline), not a provider verdict. Real
+		// upstream timeouts arrive as ErrProviderTimeout above. It says
+		// nothing about the credential's health, so it must neither trigger
+		// fallback nor feed the circuit breaker in either direction.
+		return retry.ReasonContextDone
 	default:
 		return retry.ReasonNonRetryable
 	}
