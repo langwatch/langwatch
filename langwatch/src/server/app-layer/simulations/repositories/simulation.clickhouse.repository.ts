@@ -1310,6 +1310,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
         ...mapClickHouseRowToScenarioRunData(row, now),
         scenarioSetId:
           row.ScenarioSetId === "" ? DEFAULT_SET_ID : row.ScenarioSetId,
+        traceIds: row.TraceIds ?? [],
       })),
       nextCursor,
       hasMore,

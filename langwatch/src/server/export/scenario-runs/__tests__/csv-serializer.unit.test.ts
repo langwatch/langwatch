@@ -15,7 +15,7 @@ function buildRun(overrides: Partial<ExportableRun> = {}): ExportableRun {
     batchRunId: "batch_1",
     scenarioSetId: "set_1",
     name: "Refund Request",
-    description: null,
+    description: "Customer wants money back after two weeks",
     metadata: null,
     status: ScenarioRunStatus.SUCCESS,
     results: {
@@ -26,6 +26,7 @@ function buildRun(overrides: Partial<ExportableRun> = {}): ExportableRun {
       error: undefined,
     },
     messages: [],
+    traceIds: [],
     timestamp: 1785177315009,
     updatedAt: 1785177315009,
     durationInMs: 8400,
@@ -161,6 +162,38 @@ describe("scenario run CSV serializers", () => {
       expect(row.target_type).toBe("http");
       expect(row.target_reference_id).toBe("agent_42");
       expect(row.simulation_suite_id).toBe("suite_7");
+    });
+
+    it("carries the scenario description", () => {
+      const csv = serializeRunsToSummaryCsv({
+        runs: [buildRun({ description: "Tests refund policy under pressure" })],
+        includeHeader: true,
+      });
+
+      expect(parse(csv)[0]!.scenario_description).toBe(
+        "Tests refund policy under pressure",
+      );
+    });
+
+    it("unions run-level and per-message trace ids without duplicating", () => {
+      const csv = serializeRunsToSummaryCsv({
+        runs: [
+          buildRun({
+            traceIds: ["trace_a", "trace_b"],
+            messages: [
+              { role: "user", content: "hi", trace_id: "trace_b" },
+              { role: "assistant", content: "yo", trace_id: "trace_c" },
+            ] as unknown as ExportableRun["messages"],
+          }),
+        ],
+        includeHeader: true,
+      });
+
+      expect(JSON.parse(parse(csv)[0]!.trace_ids!)).toEqual([
+        "trace_a",
+        "trace_b",
+        "trace_c",
+      ]);
     });
 
     it("leaves target columns empty when metadata has no langwatch namespace", () => {

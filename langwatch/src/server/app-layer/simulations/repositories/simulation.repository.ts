@@ -7,13 +7,24 @@ import type {
 } from "~/server/scenarios/scenario-event.types";
 
 /**
- * A run carrying the scenario set it belongs to.
+ * A run carrying the two columns the shared mapper drops but an export needs.
  *
- * mapClickHouseRowToScenarioRunData drops ScenarioSetId (the UI resolves it
- * per batch instead), but an "All Runs" export spans sets, so each row has to
- * say which one it came from. The value is already on the ClickHouse row.
+ * `scenarioSetId` — the UI resolves it per batch instead, but an "All Runs"
+ * export spans sets, so each row has to say which one it came from.
+ *
+ * `traceIds` — the run-level TraceIds column, unioned with the per-message
+ * trace ids by the exporter. On a 228-run sample the run-level column was a
+ * strict subset and contributed nothing, but the two are written by
+ * independent code paths and a run can finish with traces recorded and no
+ * message snapshot, so the union is kept as cheap insurance rather than
+ * because it currently adds ids.
+ *
+ * Both values are already on the ClickHouse row.
  */
-export type ExportableRun = ScenarioRunData & { scenarioSetId: string };
+export type ExportableRun = ScenarioRunData & {
+  scenarioSetId: string;
+  traceIds: string[];
+};
 
 export type AllSuitesRunDataResult =
   | { changed: false; lastUpdatedAt: number }

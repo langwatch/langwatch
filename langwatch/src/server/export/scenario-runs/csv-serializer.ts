@@ -30,6 +30,7 @@ const RUN_COLUMNS = [
   "scenario_run_id",
   "scenario_id",
   "scenario_name",
+  "scenario_description",
   "batch_run_id",
   "scenario_set_id",
   "status",
@@ -166,6 +167,7 @@ function buildRunValues(run: ExportableRun): string[] {
     run.scenarioRunId,
     run.scenarioId,
     run.name ?? "",
+    run.description ?? "",
     run.batchRunId,
     run.scenarioSetId,
     run.status,
@@ -212,11 +214,18 @@ function extractTarget(metadata: Record<string, unknown> | null | undefined): {
 }
 
 /**
- * Trace ids are reachable per message; ScenarioRunData does not carry the
- * run-level TraceIds column, so collect the distinct ones from the messages.
+ * Union of the run-level TraceIds column and the per-message trace ids.
+ *
+ * The per-message ids were the strict superset on a 228-run sample, so the
+ * union currently adds nothing; it exists because the two columns are written
+ * by independent code paths and a run can record traces without ever emitting
+ * a message snapshot. Cheap enough to keep rather than rely on that holding.
  */
 function collectTraceIds(run: ExportableRun): string[] {
   const ids = new Set<string>();
+  for (const traceId of run.traceIds ?? []) {
+    if (traceId !== "") ids.add(traceId);
+  }
   for (const message of run.messages ?? []) {
     const traceId = (message as Record<string, unknown>).trace_id;
     if (typeof traceId === "string" && traceId !== "") ids.add(traceId);
