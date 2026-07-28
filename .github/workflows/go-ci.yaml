@@ -32,6 +32,7 @@ jobs:
               - 'pkg/**'
               - 'cmd/**'
               - 'tools/migrationorder/**'
+              - 'tools/thuishaven/**'
               - 'go.mod'
               - 'go.sum'
               - '.golangci.yml'
@@ -49,7 +50,7 @@ jobs:
           go-version-file: go.mod
           cache-dependency-path: go.sum
       - run: go mod verify
-      - run: go build ./cmd/...
+      - run: go build ./cmd/... ./tools/thuishaven/...
 
   test:
     needs: changes
@@ -62,7 +63,7 @@ jobs:
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
-      - run: go test -count=1 -race ./services/aigateway/... ./services/nlpgo/... ./pkg/... ./tools/migrationorder/...
+      - run: go test -count=1 -race ./services/aigateway/... ./services/nlpgo/... ./pkg/... ./tools/migrationorder/... ./tools/thuishaven/...
 
   lint:
     needs: changes
@@ -75,6 +76,19 @@ jobs:
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
+      # tools/thuishaven is deliberately absent here while it is present in the
+      # build, test and vet jobs. Measured at v2.11.4 it carries 231 pre-existing
+      # findings: misspell 75 (US spelling enforced against prose written in
+      # British English), gosec 72 (of which 41 are file modes on a local dev
+      # tool and 23 are G204 on locally-built argv), gocritic 30, noctx 19,
+      # staticcheck 13, and 22 across eight other linters. Each gosec sub-rule
+      # outside .golangci.yml's excludes was reviewed by hand; none is an
+      # exploitable defect in a single-user local CLI.
+      # Clearing them is a judgement-heavy sweep that belongs in its own change,
+      # not bundled into unrelated work — but building, testing and vetting it
+      # costs nothing and is worth having now. That sweep should also decide
+      # whether adapters/dashboard's gosec G203/G704 hits are false positives
+      # and record it, since this exclusion currently silences them too.
       - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
           version: v2.11.4
@@ -91,4 +105,4 @@ jobs:
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
-      - run: go vet ./services/aigateway/... ./services/nlpgo/... ./pkg/... ./cmd/... ./tools/migrationorder/...
+      - run: go vet ./services/aigateway/... ./services/nlpgo/... ./pkg/... ./cmd/... ./tools/migrationorder/... ./tools/thuishaven/...

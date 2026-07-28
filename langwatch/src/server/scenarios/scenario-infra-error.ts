@@ -119,7 +119,7 @@ const CLASSIFICATION_RULES: ClassificationRule[] = [
       code: ScenarioInfraErrorCode.UntrustedCertificate,
       message:
         "Couldn't establish a secure connection while running the simulation — the certificate presented by the server isn't trusted.",
-      hint: "This is common in local development with self-signed certificates. Trust your local certificate authority (run `make haven setup`), or point NODE_EXTRA_CA_CERTS at your CA bundle so the simulation runner trusts it.",
+      hint: "This is common in local development with self-signed certificates. Trust your local certificate authority (run `haven up`, which installs and trusts it), or point NODE_EXTRA_CA_CERTS at your CA bundle so the simulation runner trusts it.",
     }),
   },
   {

@@ -19,7 +19,7 @@ type TryPRParams struct {
 	NoInstall    bool   // skip `pnpm install`
 	Force        bool   // proceed even if the PR is not open
 	DryRun       bool   // resolve + print the plan, create nothing
-	AllowScripts bool   // run install lifecycle scripts even for a fork PR (--trusted)
+	AllowScripts bool   // run install lifecycle scripts even for a fork PR (--allow-scripts)
 	// DiscardLocalChanges overwrites a reused worktree's uncommitted tracked edits
 	// on refresh instead of stashing them first (--discard-local-changes). Off by
 	// default: a refresh autostashes local work so nothing is ever silently lost.
@@ -50,12 +50,12 @@ type prView struct {
 func TryPR(
 	ctx context.Context,
 	p TryPRParams,
-	runUp func(context.Context, string) error,
+	runUp func(ctx context.Context, worktree string, untrustedCheckout bool) error,
 ) error {
 	ref := strings.TrimSpace(p.Ref)
 	if !looksLikePRRef(ref) {
 		return fmt.Errorf(
-			"usage: haven pr <number|github-pr-url> [--no-install] [--force]\n" +
+			"usage: haven pr <number|github-pr-url> [--no-install] [--allow-closed]\n" +
 				"  e.g. haven pr 4913  |  haven pr https://github.com/langwatch/langwatch/pull/4913")
 	}
 	if _, err := exec.LookPath("gh"); err != nil {
@@ -67,7 +67,7 @@ func TryPR(
 		return err
 	}
 	if view.State != "OPEN" && !p.Force {
-		return fmt.Errorf("PR #%d is %s, not open — pass --force to try it anyway",
+		return fmt.Errorf("PR #%d is %s, not open — pass --allow-closed to try it anyway",
 			view.Number, strings.ToLower(view.State))
 	}
 
@@ -101,7 +101,9 @@ func TryPR(
 		}
 	} else {
 		fmt.Printf("→ PR #%d (%s) → %s\n", view.Number, view.HeadRefName, worktree)
-		if err := ensurePRWorktree(ctx, p.RepoRoot, view.Number, branch, worktree); err != nil {
+		// `haven pr` is a real working checkout the developer drives themselves, so
+		// it keeps the hook-copied .env files it has always had.
+		if err := ensurePRWorktree(ctx, p.RepoRoot, view.Number, branch, worktree, true); err != nil {
 			return err
 		}
 	}
@@ -112,14 +114,19 @@ func TryPR(
 		}
 	}
 
+	// `haven up` installs anything still stale, so it has to inherit the same
+	// verdict the install above used. The fork guard is otherwise void: the
+	// sanitised install runs at the worktree root, which the root workspace
+	// deliberately excludes langwatch/ from, so <fork>/langwatch is always
+	// uninstalled and `up` would reinstall it with lifecycle scripts on.
 	fmt.Printf("→ haven up (%s)\n", filepath.Base(worktree))
-	return runUp(ctx, worktree)
+	return runUp(ctx, worktree, sanitizedInstall(view, p.AllowScripts))
 }
 
 // installDeps runs pnpm install in the PR worktree. For a fork (cross-repo) PR it
 // defaults to --ignore-scripts: this repo has a postinstall, and a fork controls
 // package scripts, so a plain install would execute fork-authored code with the
-// developer's local env/credentials the instant they try the PR. --trusted opts
+// developer's local env/credentials the instant they try the PR. --allow-scripts opts
 // back into full lifecycle scripts. (Same-repo PRs are as trusted as the base, so
 // they install normally.) Note: `haven up` still runs the PR's application code —
 // only try PRs you would be willing to run locally.
@@ -128,7 +135,7 @@ func installDeps(ctx context.Context, worktree string, view prView, allowScripts
 	if sanitizedInstall(view, allowScripts) {
 		fmt.Printf("⚠ fork PR (%s): installing with --ignore-scripts so its lifecycle scripts don't run.\n",
 			view.HeadRefName)
-		fmt.Printf("  Pass --trusted to allow them. (haven up still runs the PR's app code.)\n")
+		fmt.Printf("  Pass --allow-scripts to allow them. (haven up still runs the PR's app code.)\n")
 	}
 	fmt.Printf("→ pnpm %s\n", strings.Join(args, " "))
 	if err := runStreaming(ctx, worktree, "pnpm", args...); err != nil {
@@ -281,7 +288,13 @@ func resolvePR(ctx context.Context, repoRoot, ref string) (prView, error) {
 // ensurePRWorktree fetches the PR head into a local branch and adds a worktree on
 // it. `pull/N/head` is exposed on the BASE repo for both same-repo and fork PRs,
 // so this needs no fork remote and works for any PR the user can read.
-func ensurePRWorktree(ctx context.Context, repoRoot string, number int, branch, worktree string) error {
+//
+// inheritEnvFiles decides whether this repo's post-checkout hook may run. That
+// hook copies the developer's untracked .env files into every new worktree, which
+// is what makes `haven pr` usable — and exactly what a play sandbox must never
+// have, since it runs unreviewed code and those files hold live provider keys and
+// auth secrets the stack overlay never supplies.
+func ensurePRWorktree(ctx context.Context, repoRoot string, number int, branch, worktree string, inheritEnvFiles bool) error {
 	fetchSpec := fmt.Sprintf("pull/%d/head:%s", number, branch)
 	if err := runStreaming(ctx, repoRoot, "git", "fetch", "-f", "origin", fetchSpec); err != nil {
 		return fmt.Errorf("git fetch %s: %w", fetchSpec, err)
@@ -289,10 +302,23 @@ func ensurePRWorktree(ctx context.Context, repoRoot string, number int, branch, 
 	if err := os.MkdirAll(filepath.Dir(worktree), 0o755); err != nil {
 		return fmt.Errorf("could not create worktrees dir: %w", err)
 	}
-	if err := runStreaming(ctx, repoRoot, "git", "worktree", "add", worktree, branch); err != nil {
+	if err := runStreaming(ctx, repoRoot, "git", worktreeAddArgs(worktree, branch, inheritEnvFiles)...); err != nil {
 		return fmt.Errorf("git worktree add %s: %w", worktree, err)
 	}
 	return nil
+}
+
+// worktreeAddArgs builds the `git worktree add` argv, disabling this repo's hooks
+// when the new checkout must not inherit the developer's .env files.
+//
+// git fires post-checkout on `worktree add` with the branch flag set to 1, so the
+// hook's own guards ("branch checkouts only", "worktrees only") both pass — it is
+// written for this path. Suppression has to happen at the invocation.
+func worktreeAddArgs(worktree, branch string, inheritEnvFiles bool) []string {
+	if inheritEnvFiles {
+		return []string{"worktree", "add", worktree, branch}
+	}
+	return []string{"-c", "core.hooksPath=/dev/null", "worktree", "add", worktree, branch}
 }
 
 // runStreaming runs a child with the user's own stdio, so git/pnpm progress is

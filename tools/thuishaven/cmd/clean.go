@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/langwatch/langwatch/tools/thuishaven/adapters/procsupervisor"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/prunetui"
 	"github.com/langwatch/langwatch/tools/thuishaven/app"
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
@@ -18,19 +19,35 @@ import (
 // footer and the agent report so the shared/non-shared split is always explicit.
 const sharedResourcesNote = "shared ClickHouse · Postgres · Redis · observability are machine-wide and never removed"
 
-// runPrune is `haven prune`. In a terminal it opens the interactive picker: it
-// scans every worktree concurrently (disk size, databases, idle time), pre-ticks
-// the ones idle past the stale threshold, and deletes exactly what the user
-// confirms — reusing DestroyWorktree, so the primary-checkout / running-from
-// guards and database-drop safety all apply. Agents (and any non-TTY) get the
-// same scan as a read-only report and nothing is deleted. `--artifacts` keeps the
-// original conservative reclaim: regenerable build caches only, no worktree
-// removed, dry-run without `--yes`.
-func runPrune(ctx context.Context, d deps, rest []string) error {
-	if hasFlag(rest, "--artifacts") {
-		return d.orch.Prune(ctx, d.worktree, hasFlag(rest, "--yes"))
+// runClean is `haven clean` — the one cleanup command. In a terminal it opens
+// the interactive worktree picker (concurrent scan: disk size, databases, idle
+// time; stale ones pre-ticked; deletes exactly what the user confirms, with the
+// primary-checkout / running-from guards and database-drop safety of
+// DestroyWorktree), then reclaims the safe categories — regenerable build
+// artifacts of idle worktrees and orphaned dev processes — as part of the same
+// run. `--yes` skips the picker and applies ONLY the safe categories, never a
+// worktree deletion. Agents (and any non-TTY) get the read-only report and
+// delete nothing without `--yes`.
+//
+// "Safe categories" is literal: regenerable build artefacts and orphaned dev
+// processes. It deliberately excludes each worktree's ClickHouse and Postgres
+// databases, which are NOT regenerable — only the interactive picker, which
+// shows the user exactly which databases are in scope, may drop those. Data loss
+// is always explicit (ADR-064), and `--yes` is by definition unattended.
+func runClean(ctx context.Context, d deps, inv invocation) error {
+	if inv.has("--yes") {
+		if err := d.orch.Prune(ctx, d.worktree, app.PruneOptions{
+			ShouldAct: true,
+			// Never on this path — see the note above.
+			ShouldReclaimDatabases: false,
+		}); err != nil {
+			return err
+		}
+		reapOrphanRuntimes(d)
+		reapOrphanPlays(ctx, d)
+		return nil
 	}
-	threshold := pruneStaleThreshold(rest)
+	threshold := pruneStaleThreshold(inv)
 	rows, err := d.orch.PlanPrune(d.worktree, d.worktree)
 	if err != nil {
 		return err
@@ -38,20 +55,46 @@ func runPrune(ctx context.Context, d deps, rest []string) error {
 	if d.isAgent {
 		return printPruneReport(ctx, d, rows, threshold)
 	}
-	return prunetui.Run(ctx, d.pruneActions(rows, threshold))
+	if err := prunetui.Run(ctx, d.pruneActions(rows, threshold)); err != nil {
+		return err
+	}
+	reapOrphanRuntimes(d)
+	reapOrphanPlays(ctx, d)
+	return nil
+}
+
+// reapOrphanPlays finishes the teardown of play sandboxes whose owning process
+// died hard - safe by contract: a play sandbox's data is ephemeral, disclosed
+// as destroyed-on-exit before it was ever created.
+func reapOrphanPlays(ctx context.Context, d deps) {
+	n, err := d.orch.ReapOrphanPlays(ctx)
+	if err != nil {
+		fmt.Printf("play sandbox reaping hit errors (re-run haven clean): %v\n", err)
+	}
+	if n > 0 {
+		fmt.Printf("reaped %d orphaned play sandbox(es)\n", n)
+	}
+}
+
+// reapOrphanRuntimes is the always-safe tail of a clean: kill dev runtimes
+// (tsgo, node, pnpm, uv, python, opencode) that have been orphaned to pid 1 but
+// still reference this worktree.
+func reapOrphanRuntimes(d deps) {
+	procsupervisor.ReapOrphans([]string{d.worktree})
+	fmt.Println("reaped orphaned dev runtimes")
 }
 
 // pruneStaleThreshold resolves the idle age at which a worktree is pre-selected:
 // the built-in default (5 days), overridable by HAVEN_PRUNE_STALE_DAYS and then
 // by an explicit --stale-days N.
-func pruneStaleThreshold(rest []string) time.Duration {
+func pruneStaleThreshold(inv invocation) time.Duration {
 	days := int(app.DefaultStaleThreshold / (24 * time.Hour))
 	if v := os.Getenv("HAVEN_PRUNE_STALE_DAYS"); v != "" {
 		if n, ok := parseNonNegInt(v); ok {
 			days = n
 		}
 	}
-	if v := flagValue(rest, "--stale-days"); v != "" {
+	if v := inv.value("--stale-days"); v != "" {
 		if n, ok := parseNonNegInt(v); ok {
 			days = n
 		}
@@ -121,7 +164,7 @@ func printPruneReport(ctx context.Context, d deps, rows []app.PruneRow, threshol
 	metas := make([]app.PruneMeta, len(rows))
 	d.orch.ScanMeta(ctx, rows, func(i int, meta app.PruneMeta) { metas[i] = meta })
 
-	fmt.Printf("haven prune — %d worktree(s)\n\n", len(rows))
+	fmt.Printf("haven clean — %d worktree(s)\n\n", len(rows))
 	defaults := 0
 	for i, r := range rows {
 		meta := metas[i]
@@ -134,10 +177,18 @@ func printPruneReport(ctx context.Context, d deps, rows []app.PruneRow, threshol
 			mark, truncateCell(domain.SlugOrBase(r.Slug, r.Dir), 26), reportIdle(meta), domain.DBChips(meta.HasCHDB, meta.HasPGDB), reportFlags(r, meta))
 	}
 
+	if orphans := d.orch.OrphanPlays(); len(orphans) > 0 {
+		fmt.Printf("\n%d orphaned play sandbox(es) awaiting teardown:\n", len(orphans))
+		for _, rec := range orphans {
+			fmt.Printf("   pr-%d  %s\n", rec.Number, rec.Checkout)
+		}
+		fmt.Println("Run `haven clean --yes` (or `haven clean` in a terminal) to reap them.")
+	}
+
 	days := int(threshold / (24 * time.Hour))
 	fmt.Printf("\n* = idle ≥ %dd and safe to delete — %d worktree(s).\n", days, defaults)
 	fmt.Println(strings.ToUpper(sharedResourcesNote[:1]) + sharedResourcesNote[1:] + ".")
-	fmt.Println("Run `haven prune` in a terminal to see sizes, sort, and delete; `haven prune --artifacts --yes` reclaims build caches without deleting worktrees.")
+	fmt.Println("Run `haven clean` in a terminal to see sizes, sort, and delete; `haven clean --yes` reclaims build caches and orphan processes without deleting worktrees or databases.")
 	return nil
 }
 
