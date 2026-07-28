@@ -9,30 +9,7 @@ import (
 	"github.com/langwatch/langwatch/tools/herrgen"
 )
 
-// nodeErrorDeclaration is the engine's type, which is what makes a bare
-// `NodeError{...}` in that package the engine's rather than any type anywhere
-// that happens to share the name.
-const nodeErrorDeclaration = `package engine
-
-// NodeError is the structured error attached to a failed node.
-type NodeError struct {
-	NodeID  string
-	Type    string
-	Message string
-}
-`
-
-// engineTree writes the engine package's type declaration alongside the files
-// under test, so the fixture stands for the tree it is modeling.
-func engineTree(t *testing.T, files map[string]string) string {
-	t.Helper()
-	all := map[string]string{"services/nlpgo/app/engine/nodeerror.go": nodeErrorDeclaration}
-	for path, source := range files {
-		all[path] = source
-	}
-	return tree(t, all)
-}
-
+// @scenario "A node failure the engine names is generated"
 func TestParseNodeErrors(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -137,7 +114,7 @@ func blank(id string) *NodeError {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			_, got, err := herrgen.Parse(engineTree(t, test.files), io.Discard)
+			_, got, err := herrgen.Parse(tree(t, test.files), io.Discard)
 			if err != nil {
 				t.Fatalf("Parse() error = %v", err)
 			}
@@ -156,12 +133,13 @@ func blank(id string) *NodeError {
 	}
 }
 
+// @scenario "A node failure named somewhere the generator cannot read stops the run"
 func TestParseReportsAForwardedNodeErrorType(t *testing.T) {
 	// Forwarding an upstream error type puts a code on the wire that no
 	// generated union carries — a customer's Python `ValueError` arriving as if
 	// it were one of our codes. Dropping the site silently is what let that ship
 	// with the drift check green, so the site is named instead.
-	root := engineTree(t, map[string]string{
+	root := tree(t, map[string]string{
 		"services/nlpgo/app/engine/forward.go": `package engine
 
 func forward(res upstream) *NodeError {

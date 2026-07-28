@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 )
 
 // defaultOut is where the control plane reads the codes from.
@@ -34,12 +35,24 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	}
 	// The repository has more than one go.mod, so -root can point somewhere
 	// plausible that holds none of the services. Writing the empty artifact
-	// there and exiting 0 is how a mistyped root deletes every code.
-	if len(entries) == 0 {
+	// there and exiting 0 is how a mistyped root deletes every code — and the
+	// artifact has two halves, so guarding only the Go one let a run that found
+	// no node codes write `nodeErrorCodes = {}` and exit 0. The drift check
+	// would then demand the emptied file be committed.
+	if empty := emptyHalves(entries, nodeCodes); empty != "" {
 		fmt.Fprintf(stderr,
-			"no herr codes found under %s — is -root the repository root?\nIt must be the directory whose go.mod covers the Go services.\n",
-			*root)
+			"no %s found under %s — is -root the repository root?\nIt must be the directory whose go.mod covers the Go services.\n",
+			empty, *root)
 		return 2
+	}
+	// Both halves land in one file and the client presentation registry is
+	// keyed by the code string alone, so a string declared on both sides
+	// renders twice with two doc blocks and shares one presentation entry.
+	// Not fatal — the artifact is still valid TypeScript — but nobody meant it.
+	for _, code := range sharedCodes(entries, nodeCodes) {
+		fmt.Fprintf(stderr,
+			"warning: %q is declared both as a herr code and as a NodeError type; it renders in both halves of %s and shares one presentation entry.\n",
+			code, *out)
 	}
 	generated := append(Render(entries), RenderNodeCodes(nodeCodes)...)
 	target := filepath.Join(*root, *out)
@@ -51,7 +64,7 @@ func Run(args []string, stdout, stderr io.Writer) int {
 			return 1
 		}
 		if bytes.Equal(onDisk, generated) {
-			fmt.Fprintf(stdout, "%s is up to date (%s).\n", *out, codeCount(len(entries)))
+			fmt.Fprintf(stdout, "%s is up to date (%s).\n", *out, codeCounts(len(entries), len(nodeCodes)))
 			return 0
 		}
 		fmt.Fprintf(stderr, "%s is stale — the Go error codes have moved on.\n\n", *out)
@@ -69,8 +82,40 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, err)
 		return 2
 	}
-	fmt.Fprintf(stdout, "Wrote %s to %s.\n", codeCount(len(entries)), *out)
+	fmt.Fprintf(stdout, "Wrote %s to %s.\n", codeCounts(len(entries), len(nodeCodes)), *out)
 	return 0
+}
+
+// emptyHalves names the half (or halves) of the artifact that came back empty,
+// or "" when both hold something. Either one being empty is the same mistake
+// with the same consequence: a generated file that silently drops live codes.
+func emptyHalves(entries []Entry, nodeCodes []NodeCode) string {
+	switch {
+	case len(entries) == 0 && len(nodeCodes) == 0:
+		return "herr codes or workflow node codes"
+	case len(entries) == 0:
+		return "herr codes"
+	case len(nodeCodes) == 0:
+		return "workflow node codes"
+	}
+	return ""
+}
+
+// sharedCodes lists, sorted, every string declared as both a herr code and a
+// workflow NodeError type.
+func sharedCodes(entries []Entry, nodeCodes []NodeCode) []string {
+	goCodes := make(map[string]bool, len(entries))
+	for _, entry := range entries {
+		goCodes[entry.Code] = true
+	}
+	var shared []string
+	for _, node := range nodeCodes {
+		if goCodes[node.Code] {
+			shared = append(shared, node.Code)
+		}
+	}
+	slices.Sort(shared)
+	return slices.Compact(shared)
 }
 
 // writeAtomic replaces target in one step.
@@ -102,9 +147,16 @@ func writeAtomic(target string, data []byte) error {
 	return os.Rename(name, target)
 }
 
-func codeCount(count int) string {
+// codeCounts reports both halves of the artifact. Counting only the Go entries
+// understated what was written by however many node codes the same file
+// carries, which reads as a generator that lost some.
+func codeCounts(entries, nodeCodes int) string {
+	return fmt.Sprintf("%s and %s", plural(entries, "service code"), plural(nodeCodes, "node code"))
+}
+
+func plural(count int, noun string) string {
 	if count == 1 {
-		return "1 code"
+		return "1 " + noun
 	}
-	return fmt.Sprintf("%d codes", count)
+	return fmt.Sprintf("%d %ss", count, noun)
 }

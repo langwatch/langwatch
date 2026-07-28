@@ -9,14 +9,24 @@ import (
 	"github.com/langwatch/langwatch/tools/herrgen"
 )
 
+// nodeErrorLiteral is the node half of the artifact. The CLI refuses to write a
+// file with either half empty, so every fixture that expects a successful run
+// carries one — which is also what makes the node block reachable end to end
+// rather than only through Parse.
+const nodeErrorLiteral = `package engine
+
+var _ = NodeError{Type: "http_error"}
+`
+
 // oneCode is the smallest tree the CLI can generate from. The destination
 // package exists, as it does in the repository: herrgen writes into it and
 // never creates it.
 func oneCode(t *testing.T) string {
 	t.Helper()
 	return tree(t, map[string]string{
-		"packages/handled-error/src/.keep": "",
-		"pkg/herr/herr.go":                 herrPackage,
+		"packages/handled-error/src/.keep":  "",
+		"pkg/herr/herr.go":                  herrPackage,
+		"services/nlpgo/app/engine/http.go": nodeErrorLiteral,
 		"services/nlpgo/domain/errors.go": `package domain
 
 import (
@@ -37,8 +47,11 @@ func RegisterStatuses() {
 
 const out = "packages/handled-error/src/codes.generated.ts"
 
+// @scenario "Pointing the generator at the wrong root stops the run"
+// @scenario "A run that finds only half the codes stops rather than writing"
+// @scenario "CI fails when the generated file is stale"
 func TestRun(t *testing.T) {
-	t.Run("writes the generated file and reports the count", func(t *testing.T) {
+	t.Run("writes both halves of the generated file and counts each", func(t *testing.T) {
 		root := oneCode(t)
 
 		var stdout, stderr strings.Builder
@@ -46,7 +59,9 @@ func TestRun(t *testing.T) {
 		if code != 0 {
 			t.Fatalf("exit code = %d, want 0; stderr: %s", code, stderr.String())
 		}
-		if got, want := stdout.String(), "Wrote 1 code to "+out+".\n"; got != want {
+		// Counting only the service codes understated the file by every node
+		// code in it, which reads as a generator that lost some.
+		if got, want := stdout.String(), "Wrote 1 service code and 1 node code to "+out+".\n"; got != want {
 			t.Errorf("stdout = %q, want %q", got, want)
 		}
 
@@ -54,8 +69,15 @@ func TestRun(t *testing.T) {
 		if err != nil {
 			t.Fatalf("generated file not written: %v", err)
 		}
-		if !strings.Contains(string(written), `not_found: { service: "nlpgo", httpStatus: 404 },`) {
-			t.Errorf("generated file is missing the code:\n%s", written)
+		for _, want := range []string{
+			`not_found: { service: "nlpgo", httpStatus: 404 },`,
+			"export const nodeErrorCodes = {",
+			`  http_error: { service: "nlpgo" },`,
+			"export type NodeErrorCode = keyof typeof nodeErrorCodes;",
+		} {
+			if !strings.Contains(string(written), want) {
+				t.Errorf("generated file is missing %q:\n%s", want, written)
+			}
 		}
 	})
 
@@ -70,7 +92,7 @@ func TestRun(t *testing.T) {
 		if code != 0 {
 			t.Fatalf("exit code = %d, want 0; stderr: %s", code, stderr.String())
 		}
-		if got, want := stdout.String(), out+" is up to date (1 code).\n"; got != want {
+		if got, want := stdout.String(), out+" is up to date (1 service code and 1 node code).\n"; got != want {
 			t.Errorf("stdout = %q, want %q", got, want)
 		}
 	})
@@ -107,6 +129,36 @@ const ErrCircuitOpen = herr.Code("circuit_open")
 		}
 	})
 
+	t.Run("fails -check with a diff when a node code was added without regenerating", func(t *testing.T) {
+		// The node half of the artifact drifts on its own schedule — a new
+		// NodeError type is a code the customer meets with no copy written for
+		// it, exactly like a new herr.Code.
+		root := oneCode(t)
+		if code := herrgen.Run([]string{"-root", root}, &strings.Builder{}, &strings.Builder{}); code != 0 {
+			t.Fatalf("generate exit code = %d, want 0", code)
+		}
+
+		added := filepath.Join(root, "services", "nlpgo", "app", "engine", "dataset.go")
+		source := `package engine
+
+var _ = NodeError{Type: "invalid_dataset"}
+`
+		if err := os.WriteFile(added, []byte(source), 0o600); err != nil {
+			t.Fatal(err)
+		}
+
+		var stdout, stderr strings.Builder
+		code := herrgen.Run([]string{"-root", root, "-check"}, &stdout, &stderr)
+		if code != 1 {
+			t.Fatalf("exit code = %d, want 1; stderr: %s", code, stderr.String())
+		}
+		for _, want := range []string{"is stale", `+  invalid_dataset: { service: "nlpgo" },`, "make herrgen"} {
+			if !strings.Contains(stderr.String(), want) {
+				t.Errorf("stderr is missing %q:\n%s", want, stderr.String())
+			}
+		}
+	})
+
 	t.Run("fails -check when the generated file does not exist yet", func(t *testing.T) {
 		root := oneCode(t)
 
@@ -134,7 +186,7 @@ const ErrCircuitOpen = herr.Code("circuit_open")
 		if code != 2 {
 			t.Fatalf("exit code = %d, want 2; stderr: %s", code, stderr.String())
 		}
-		if !strings.Contains(stderr.String(), "no herr codes found") {
+		if !strings.Contains(stderr.String(), "no herr codes or workflow node codes found") {
 			t.Errorf("stderr = %q, want it to say no codes were found", stderr.String())
 		}
 		if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(out))); !os.IsNotExist(err) {
@@ -142,10 +194,75 @@ const ErrCircuitOpen = herr.Code("circuit_open")
 		}
 	})
 
+	t.Run("exits 2 when the tree holds Go codes but no node codes", func(t *testing.T) {
+		// The artifact has two halves and only one used to be guarded, so a run
+		// that found no node codes wrote `nodeErrorCodes = {}` and exited 0 —
+		// then the drift check demanded the emptied file be committed.
+		root := tree(t, map[string]string{
+			"packages/handled-error/src/.keep": "",
+			"pkg/herr/herr.go":                 herrPackage,
+			"services/nlpgo/domain/errors.go": `package domain
+
+import "example.com/repo/pkg/herr"
+
+const ErrNotFound = herr.Code("not_found")
+`,
+		})
+
+		var stdout, stderr strings.Builder
+		code := herrgen.Run([]string{"-root", root}, &stdout, &stderr)
+		if code != 2 {
+			t.Fatalf("exit code = %d, want 2; stderr: %s", code, stderr.String())
+		}
+		if !strings.Contains(stderr.String(), "no workflow node codes found") {
+			t.Errorf("stderr = %q, want it to name the half that came back empty", stderr.String())
+		}
+		if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(out))); !os.IsNotExist(err) {
+			t.Error("a half-empty generated file was written")
+		}
+	})
+
+	t.Run("warns when one string is declared as both a Go code and a node type", func(t *testing.T) {
+		// Both halves land in one file and the presentation registry is keyed
+		// by the string alone, so the code renders twice with two doc blocks
+		// and shares one entry. Valid TypeScript, but nobody meant it.
+		root := tree(t, map[string]string{
+			"packages/handled-error/src/.keep":  "",
+			"pkg/herr/herr.go":                  herrPackage,
+			"services/nlpgo/app/engine/http.go": nodeErrorLiteral,
+			"services/nlpgo/domain/errors.go": `package domain
+
+import "example.com/repo/pkg/herr"
+
+const ErrHTTP = herr.Code("http_error")
+`,
+		})
+
+		var stdout, stderr strings.Builder
+		if code := herrgen.Run([]string{"-root", root}, &stdout, &stderr); code != 0 {
+			t.Fatalf("exit code = %d, want 0; stderr: %s", code, stderr.String())
+		}
+		if !strings.Contains(stderr.String(), `"http_error"`) {
+			t.Errorf("stderr = %q, want it to name the shared code", stderr.String())
+		}
+	})
+
+	t.Run("exits 2 when a flag cannot be parsed", func(t *testing.T) {
+		var stdout, stderr strings.Builder
+		code := herrgen.Run([]string{"-not-a-flag"}, &stdout, &stderr)
+		if code != 2 {
+			t.Fatalf("exit code = %d, want 2; stderr: %s", code, stderr.String())
+		}
+		if stdout.String() != "" {
+			t.Errorf("stdout = %q, want nothing written on a usage error", stdout.String())
+		}
+	})
+
 	t.Run("exits 2 rather than creating a destination that does not exist", func(t *testing.T) {
 		// A wrong -out used to grow a directory tree and report success.
 		root := tree(t, map[string]string{
-			"pkg/herr/herr.go": herrPackage,
+			"pkg/herr/herr.go":                  herrPackage,
+			"services/nlpgo/app/engine/http.go": nodeErrorLiteral,
 			"services/nlpgo/domain/errors.go": `package domain
 
 import "example.com/repo/pkg/herr"

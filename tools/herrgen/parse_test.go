@@ -10,12 +10,34 @@ import (
 	"github.com/langwatch/langwatch/tools/herrgen"
 )
 
+// nodeErrorDeclaration is the engine's type, which is what makes a bare
+// `NodeError{...}` in that package the engine's rather than any type anywhere
+// that happens to share the name.
+const nodeErrorDeclaration = `package engine
+
+// NodeError is the structured error attached to a failed node.
+type NodeError struct {
+	NodeID  string
+	Type    string
+	Message string
+}
+`
+
 // tree writes a throwaway module whose files are keyed by repository-relative
 // path, so a test reads as the Go it is parsing.
+//
+// The engine package is always seeded, because Parse asserts it was walked —
+// node codes are read from that one directory, so a rename there would empty
+// half the artifact in silence. Seeding the type declaration and nothing else
+// keeps the node half of every fixture at zero codes unless the fixture asks
+// for one.
 func tree(t *testing.T, files map[string]string) string {
 	t.Helper()
 	root := t.TempDir()
-	all := map[string]string{"go.mod": "module example.com/repo\n\ngo 1.26\n"}
+	all := map[string]string{
+		"go.mod":                                 "module example.com/repo\n\ngo 1.26\n",
+		"services/nlpgo/app/engine/nodeerror.go": nodeErrorDeclaration,
+	}
 	for path, source := range files {
 		all[path] = source
 	}
@@ -72,6 +94,10 @@ func entryFor(t *testing.T, entries []herrgen.Entry, code string) herrgen.Entry 
 	return herrgen.Entry{}
 }
 
+// @scenario "A code declared inside a const block is generated"
+// @scenario "A standalone const is generated"
+// @scenario "A code with no registered status omits the status"
+// @scenario "The registered status is resolved through the net/http constant"
 func TestParse(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -352,6 +378,7 @@ const (
 	}
 }
 
+// @scenario "The same code registered with two different statuses fails the run"
 func TestParseRejectsConflictingStatuses(t *testing.T) {
 	// herr's registry is keyed by the code string, so the second registration
 	// silently overwrites the first at init time. Generating either answer would
@@ -405,6 +432,7 @@ func registerErrorStatuses() {
 	}
 }
 
+// @scenario "A code declared in more than one service is generated once"
 func TestParseAcceptsTheSameStatusTwice(t *testing.T) {
 	// Generic codes (not_found, unauthorized, internal_error) legitimately live
 	// in more than one service. Agreeing registrations are not a conflict.
@@ -525,6 +553,7 @@ const (
 	}
 }
 
+// @scenario "A trailing note beside a declaration is not treated as its description"
 func TestParseIgnoresATrailingLineComment(t *testing.T) {
 	// A trailing comment is a note to the next Go reader — usually the status,
 	// or a "// deprecated". Rendering it as the entry's JSDoc turned it into
@@ -604,6 +633,7 @@ const ErrHidden = Code("hidden")
 	}
 }
 
+// @scenario "A documentation snippet that does not parse is skipped with a warning"
 func TestParseSkipsUnparseableSnippetsWithAWarning(t *testing.T) {
 	// The tree carries hand-written Go that is never compiled (documentation
 	// snippets rendered into the product UI). One of those failing to parse must
@@ -633,6 +663,7 @@ const ErrBusy = herr.Code("busy")
 	}
 }
 
+// @scenario "A source file that does not parse stops the run"
 func TestParseFailsOnAnUnparseableServiceFile(t *testing.T) {
 	// A service file failing to parse mid-refactor used to drop every code in it
 	// and exit 0, committing a truncated artifact.
@@ -653,6 +684,97 @@ const ErrBusy = herr.Code( this is not Go
 	}
 }
 
+// @scenario "A source file that does not parse stops the run"
+func TestParseFailsOnAnUnparseableFileOutsideTheSnippets(t *testing.T) {
+	// The tolerance is scoped by path, not by tree: langwatch/ also holds real,
+	// compiled Go, and dropping one of those files drops its codes. Only the
+	// hand-written onboarding snippets under /codegen/snippets/ are exempt.
+	root := tree(t, map[string]string{
+		"pkg/herr/herr.go": herrPackage,
+		"langwatch/src/server/background/probe.go": `package background
+
+func main() { this is not Go
+`,
+		"services/nlpgo/domain/errors.go": `package domain
+
+import "example.com/repo/pkg/herr"
+
+const ErrBusy = herr.Code("busy")
+`,
+	})
+
+	var warnings strings.Builder
+	_, _, err := herrgen.Parse(root, &warnings)
+	if err == nil {
+		t.Fatal("Parse() error = nil, want an unparseable non-snippet file to fail the run")
+	}
+	if !strings.Contains(err.Error(), "langwatch/src/server/background/probe.go") {
+		t.Errorf("Parse() error = %q, want it to name the file", err)
+	}
+	if warnings.String() != "" {
+		t.Errorf("warnings = %q, want the failure reported as an error rather than a skip", warnings.String())
+	}
+}
+
+// @scenario "Moving the package that names node failures stops the run"
+func TestParseFailsWhenTheNodeErrorPackageIsNotWalked(t *testing.T) {
+	// Node codes are kept only when their type resolves to one hardcoded
+	// package path, so moving or renaming the engine package empties that half
+	// of the artifact with nothing to say about it. The Go half is protected by
+	// accident — a moved pkg/herr makes every import lookup miss — and this is
+	// the node half's equivalent.
+	sources := map[string]string{
+		"pkg/herr/herr.go": herrPackage,
+		"services/nlpgo/domain/errors.go": `package domain
+
+import "example.com/repo/pkg/herr"
+
+const ErrBusy = herr.Code("busy")
+`,
+	}
+
+	t.Run("when the directory is gone entirely", func(t *testing.T) {
+		root := tree(t, sources)
+		if err := os.RemoveAll(filepath.Join(root, filepath.FromSlash("services/nlpgo/app"))); err != nil {
+			t.Fatal(err)
+		}
+
+		_, _, err := herrgen.Parse(root, io.Discard)
+		if err == nil {
+			t.Fatal("Parse() error = nil, want the missing engine package to fail the run")
+		}
+		for _, want := range []string{"services/nlpgo/app/engine", "nodeErrorPackageDir"} {
+			if !strings.Contains(err.Error(), want) {
+				t.Errorf("Parse() error = %q, want it to mention %q", err, want)
+			}
+		}
+	})
+
+	t.Run("when the directory holds nothing the walk reads", func(t *testing.T) {
+		root := tree(t, sources)
+		// Only a test file left behind: the walk skips those, so the package
+		// contributes nothing even though the directory is still there.
+		if err := os.Remove(filepath.Join(root, filepath.FromSlash("services/nlpgo/app/engine/nodeerror.go"))); err != nil {
+			t.Fatal(err)
+		}
+		fixture := filepath.Join(root, filepath.FromSlash("services/nlpgo/app/engine/nodeerror_test.go"))
+		if err := os.WriteFile(fixture, []byte(nodeErrorDeclaration), 0o600); err != nil {
+			t.Fatal(err)
+		}
+
+		_, _, err := herrgen.Parse(root, io.Discard)
+		if err == nil {
+			t.Fatal("Parse() error = nil, want the unread engine package to fail the run")
+		}
+		for _, want := range []string{"services/nlpgo/app/engine", "nodeErrorPackageDir"} {
+			if !strings.Contains(err.Error(), want) {
+				t.Errorf("Parse() error = %q, want it to mention %q", err, want)
+			}
+		}
+	})
+}
+
+// @scenario "A code is generated wherever it is written"
 func TestParseReadsCodesOutsideAConstBlock(t *testing.T) {
 	// Every one of these compiles and puts a code on the wire. Missing any of
 	// them leaves a live code with no customer copy and the drift check green.
@@ -772,6 +894,7 @@ const ErrBusy = herr.Code("bu" + "sy")
 	}
 }
 
+// @scenario "A code the generator cannot read stops the run"
 func TestParseRejectsACodeItCannotRead(t *testing.T) {
 	// A code built from a const prefix is the one shape that must never be
 	// passed over: the string exists at runtime, so the customer meets it, and
@@ -844,6 +967,152 @@ func codeFor(kind string) herr.Code {
 	}
 }
 
+// externalMarkerFixture wraps a site under test in a file that also declares one
+// ordinary code, so a test can tell "this site was skipped" apart from "the file
+// was abandoned". The prefix is six lines, so the site block starts at line 7.
+func externalMarkerFixture(site string) string {
+	return `package domain
+
+import "example.com/repo/pkg/herr"
+
+var upstream struct{ Type, Kind string }
+
+` + site + `
+const ErrBusy = herr.Code("busy")
+`
+}
+
+// @scenario "A code relayed from somewhere else is skipped when the site says so"
+// @scenario "One marked site does not excuse the site next to it"
+func TestParseHonorsTheExternalMarker(t *testing.T) {
+	// The marker is the only way to relay a discriminant that is not ours to
+	// enumerate, and it has two failure directions. Suppressing too little
+	// stops a legitimate relay from ever generating. Suppressing too much is
+	// the one that ships: a live code with no customer copy and a green drift
+	// check, which is what the strict default exists to prevent.
+	tests := []struct {
+		name string
+		site string
+		// wantErrorAt is the "path:line" the failure must name, empty when the
+		// site is expected to be skipped without a word.
+		wantErrorAt string
+	}{
+		{
+			name: "a marker on the line above suppresses the site",
+			site: `func relay() herr.Code {
+	// herrgen:external
+	return herr.Code(upstream.Type)
+}`,
+		},
+		{
+			name: "a marker at the end of the explanation above it still counts",
+			site: `func relay() herr.Code {
+	// The provider's own discriminant, not a LangWatch code: an open set of
+	// strings arriving at runtime, so there is no literal to write and no
+	// registry entry could ever be exhaustive over it.
+	// herrgen:external
+	return herr.Code(upstream.Type)
+}`,
+		},
+		{
+			name: "a marker anywhere in the block above counts, not only the last line",
+			site: `func relay() herr.Code {
+	// herrgen:external — the provider's own discriminant, relayed so the
+	// control plane can match the ones it knows. Nothing to enumerate.
+	return herr.Code(upstream.Type)
+}`,
+		},
+		{
+			name: "a marker trailing on the site's own line suppresses it",
+			site: `func relay() herr.Code {
+	return herr.Code(upstream.Type) // herrgen:external
+}`,
+		},
+		{
+			name: "a marker two lines above does not suppress the site",
+			// The blank line detaches the comment from the code, so a marker
+			// left behind by a deleted site must not cover the next one.
+			site: `func relay() herr.Code {
+	// herrgen:external
+
+	return herr.Code(upstream.Type)
+}`,
+			wantErrorAt: "services/nlpgo/domain/errors.go:10",
+		},
+		{
+			name: "an unmarked site below a marked one still fails, and is the one named",
+			// The silent direction: one marker must not cover the block. The
+			// marked site is at :9, the unmarked one at :10.
+			site: `func relay() herr.Code {
+	// herrgen:external
+	_ = herr.Code(upstream.Type)
+	return herr.Code(upstream.Kind)
+}`,
+			wantErrorAt: "services/nlpgo/domain/errors.go:10",
+		},
+		{
+			name: "a marked named declaration is suppressed too",
+			// `read[call]` claims a named declaration before the fold check, so
+			// the sweep that consults the marker never saw one — the escape
+			// hatch was unreachable from the `var X = herr.Code(...)` form.
+			site: `// ErrRelayed carries whatever the provider called it.
+// herrgen:external
+var ErrRelayed = herr.Code(upstream.Type)`,
+		},
+		{
+			name: "a marked typed declaration is suppressed too",
+			site: `// herrgen:external
+var ErrRelayed herr.Code = upstream.Type`,
+		},
+		{
+			name: "an unmarked named declaration still fails",
+			site: `var ErrRelayed = herr.Code(upstream.Type)`,
+			// The named sweep reports the argument's position.
+			wantErrorAt: "services/nlpgo/domain/errors.go:7",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			root := tree(t, map[string]string{
+				"pkg/herr/herr.go":                herrPackage,
+				"services/nlpgo/domain/errors.go": externalMarkerFixture(test.site),
+			})
+
+			entries, _, err := herrgen.Parse(root, io.Discard)
+			if test.wantErrorAt != "" {
+				if err == nil {
+					t.Fatalf("Parse() error = nil, want the unmarked site to fail the run; entries: %+v", entries)
+				}
+				if !strings.Contains(err.Error(), test.wantErrorAt) {
+					t.Errorf("Parse() error = %q, want it to name %s", err, test.wantErrorAt)
+				}
+				if strings.Contains(err.Error(), herrgenExternalMarkerText) {
+					return
+				}
+				t.Errorf("Parse() error = %q, want it to mention the %s escape hatch", err, herrgenExternalMarkerText)
+				return
+			}
+			if err != nil {
+				t.Fatalf("Parse() error = %v, want the marked site to be skipped", err)
+			}
+			// The skip is scoped to the site: the ordinary code in the same
+			// file still generates, and the relayed one does not appear.
+			entryFor(t, entries, "busy")
+			if len(entries) != 1 {
+				t.Errorf("Parse() = %+v, want only the busy entry — the relayed code has nothing to generate", entries)
+			}
+		})
+	}
+}
+
+// herrgenExternalMarkerText is the marker as a reader of the failure message
+// sees it. Spelled out here rather than imported: the generator's copy is what
+// tells an engineer the escape hatch exists, so the test has to pin the words
+// independently of the constant.
+const herrgenExternalMarkerText = "herrgen:external"
+
+// @scenario "A code is generated wherever it is written"
 func TestParseReadsInlineStringCodes(t *testing.T) {
 	// herr.Code is a defined string type, so a bare literal in a constructor
 	// compiles with no conversion in sight and reaches the client identically.
@@ -993,6 +1262,7 @@ func RegisterStatuses() {
 	}
 }
 
+// @scenario "Entries are ordered so the diff stays stable"
 func TestParseIsDeterministicAcrossRuns(t *testing.T) {
 	// The two renderer "stability" tests only feed a pre-sorted slice to a pure
 	// function, so a dropped sort in group or groupNodeCodes would sail past
@@ -1072,10 +1342,60 @@ var (
 		if err != nil {
 			t.Fatalf("Parse() error on run %d = %v", run, err)
 		}
+		// Run-to-run equality alone would hold for any order the map happened
+		// to agree on, so the order itself is asserted too: ascending by code,
+		// which is what makes the artifact's diff readable and its bytes the
+		// same on every machine.
+		assertAscending(t, run, "entries", codesOf(gotEntries))
+		assertAscending(t, run, "node codes", nodeCodesOf(gotNodeCodes))
 		got := string(herrgen.Render(gotEntries)) + string(herrgen.RenderNodeCodes(gotNodeCodes))
+		assertKeysAscendingInOutput(t, run, got, append(codesOf(gotEntries), nodeCodesOf(gotNodeCodes)...))
 		if got != first {
 			t.Fatalf("run %d generated different bytes:\n%s\n\nvs\n\n%s", run, first, got)
 		}
+	}
+}
+
+func codesOf(entries []herrgen.Entry) []string {
+	codes := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		codes = append(codes, entry.Code)
+	}
+	return codes
+}
+
+func nodeCodesOf(nodeCodes []herrgen.NodeCode) []string {
+	codes := make([]string, 0, len(nodeCodes))
+	for _, node := range nodeCodes {
+		codes = append(codes, node.Code)
+	}
+	return codes
+}
+
+func assertAscending(t *testing.T, run int, what string, codes []string) {
+	t.Helper()
+	for i := 1; i < len(codes); i++ {
+		if codes[i-1] >= codes[i] {
+			t.Fatalf("run %d: %s are not sorted by code — %q precedes %q in %v", run, what, codes[i-1], codes[i], codes)
+		}
+	}
+}
+
+// assertKeysAscendingInOutput pins the renderer to the order it was handed, so
+// a sort dropped anywhere between the walk and the bytes shows up as a failure
+// rather than as a diff that reshuffles itself on somebody else's machine.
+func assertKeysAscendingInOutput(t *testing.T, run int, rendered string, codes []string) {
+	t.Helper()
+	previous := -1
+	for _, code := range codes {
+		at := strings.Index(rendered, "\n  "+code+": {")
+		if at < 0 {
+			t.Fatalf("run %d: %q is missing from the rendered output:\n%s", run, code, rendered)
+		}
+		if at <= previous {
+			t.Fatalf("run %d: %q is rendered out of order:\n%s", run, code, rendered)
+		}
+		previous = at
 	}
 }
 

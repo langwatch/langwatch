@@ -94,7 +94,9 @@ func (e Entry) Primary() Declaration {
 //
 // It fails when two consts holding the same code string register different HTTP
 // statuses: herr's registry is keyed by the string, so one of the two would
-// silently win at runtime depending on init order.
+// silently win at runtime depending on init order. It also fails when the walk
+// never reaches the package that declares the engine's NodeError — see
+// assertNodeErrorPackage.
 //
 // A file that does not parse fails the run, except under the hand-written
 // onboarding snippets: those are documentation rendered into the product UI and
@@ -111,6 +113,10 @@ func Parse(root string, warn io.Writer) ([]Entry, []NodeCode, error) {
 		declarations  []Declaration
 		registrations []Registration
 		nodeSites     []nodeErrorSite
+		// sawNodeErrorPackage is how a moved or renamed engine package is
+		// caught. Every node code is filtered on nodeErrorPackageDir, so
+		// without this the whole half of the artifact empties in silence.
+		sawNodeErrorPackage bool
 	)
 	// byConst resolves a RegisterStatus argument (package dir + const name) back
 	// to the code string that const holds.
@@ -140,6 +146,7 @@ func Parse(root string, warn io.Writer) ([]Entry, []NodeCode, error) {
 
 		pkgDir := path.Dir(rel)
 		imports := importsOf(file)
+		sawNodeErrorPackage = sawNodeErrorPackage || underNodeErrorPackage(rel)
 
 		// NodeError literals need no herr import — they are plain composite
 		// literals in the engine package — so they are read from every file,
@@ -175,6 +182,9 @@ func Parse(root string, warn io.Writer) ([]Entry, []NodeCode, error) {
 		registrations = append(registrations, fileRegs...)
 	}
 
+	if err := assertNodeErrorPackage(root, sawNodeErrorPackage); err != nil {
+		return nil, nil, err
+	}
 	statuses, err := resolveStatuses(registrations, byConst)
 	if err != nil {
 		return nil, nil, err

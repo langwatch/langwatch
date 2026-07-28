@@ -402,6 +402,17 @@ func workflowSuccessEvent(req ExecuteRequest, traceID string, state *runState, s
 	}
 }
 
+// workflowErrorEvent builds the workflow-level error frame. nodeErr is
+// REQUIRED: there is no error event without one, and the four call sites either
+// build the literal inline or have already tested the field for nil.
+//
+// The guard used to sit in addNodeErrorCode, which cannot be reached with a nil
+// — while this function dereferenced nodeErr.Message unguarded two lines
+// earlier. Rather than move the check here, the contract is stated: a nil would
+// mean the engine decided a run failed without saying why, and an event
+// carrying no message and no error_type is a worse answer than a panic a test
+// catches, because the customer sees a generic failure and nothing is logged
+// about it.
 func workflowErrorEvent(req ExecuteRequest, traceID string, nodeErr *NodeError, isEval bool) StreamEvent {
 	// `error` is the raw engineer-facing message; `error_type` is the stable
 	// code the control plane maps to customer copy, and `upstream_status`
@@ -442,10 +453,12 @@ func workflowErrorEvent(req ExecuteRequest, traceID string, nodeErr *NodeError, 
 // present) onto an execution-state map. `error_type` is what the control plane
 // maps to customer copy; the `error` string it sits beside is engineer-facing
 // only (it can name a URL or a Go net error) and is never rendered to a user.
+//
+// nodeErr is REQUIRED, on the same terms as workflowErrorEvent's: every caller
+// has already dereferenced it or built it inline, so the nil check this used to
+// open with was unreachable — and its presence implied a nil-tolerance the
+// caller two lines up did not have.
 func addNodeErrorCode(state map[string]any, nodeErr *NodeError) {
-	if nodeErr == nil {
-		return
-	}
 	if nodeErr.Type != "" {
 		state["error_type"] = nodeErr.Type
 	}

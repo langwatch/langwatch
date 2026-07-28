@@ -376,13 +376,6 @@ def execute(**inputs):
     return {"result": result}
 `
 
-// Code-runner error types that the runner itself synthesizes, as opposed to a
-// Python exception class raised by the customer's own code.
-const (
-	codeRunnerTimeoutType = "Timeout"
-	codeRunnerFailureType = "RunnerError"
-)
-
 // nodeErrorFromCodeBlock normalises a code-runner failure onto a NodeError code
 // the client knows.
 //
@@ -395,15 +388,21 @@ const (
 // own, and everything else is the code runner reporting a failure, which is what
 // code_runner_error means. The Python class name is not lost — it leads the
 // message, where it belongs, rather than posing as a code.
+//
+// The two synthesized types are the codeblock package's own consts rather than
+// literals repeated here: the switch has no way to tell a renamed discriminant
+// from a customer exception, so a rename on the producing side used to send the
+// timeout down `default` and reclassify it as code_runner_error, with nothing
+// failing to compile and no test going red.
 func nodeErrorFromCodeBlock(err *codeblock.Error) *NodeError {
 	switch err.Type {
-	case codeRunnerTimeoutType:
+	case codeblock.TimeoutType:
 		return &NodeError{
 			Type:      "code_block_timeout",
 			Message:   "the code block ran past its time limit and was stopped",
 			Traceback: err.Traceback,
 		}
-	case codeRunnerFailureType:
+	case codeblock.RunnerErrorType:
 		return &NodeError{
 			Type:      "code_runner_error",
 			Message:   err.Message,

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
+	"os"
+	"path"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -148,6 +150,44 @@ func nodeErrorTypeField(lit *ast.CompositeLit) (code string, found, readable boo
 		return unquoted, true, true
 	}
 	return "", false, false
+}
+
+// assertNodeErrorPackage fails the run when the walk never reached the package
+// nodeErrorPackageDir names.
+//
+// The Go-code half of the artifact protects itself: move pkg/herr and every
+// import lookup misses, so no file declares anything and the empty-artifact
+// guard in Run trips. The node half had no such backstop — the walk keeps only
+// sites whose package matches this one hardcoded string, so renaming or
+// splitting the engine package would drop every node code with nothing to say
+// about it. Naming the constant here is the difference between a five-minute
+// fix and an afternoon in the parser.
+func assertNodeErrorPackage(root string, visited bool) error {
+	if visited {
+		return nil
+	}
+	dir := filepath.Join(root, filepath.FromSlash(nodeErrorPackageDir))
+	if info, err := os.Stat(dir); err != nil || !info.IsDir() {
+		return fmt.Errorf(
+			"%s does not exist under %s, so no workflow node codes can be read — "+
+				"point nodeErrorPackageDir (tools/herrgen/nodeerrors.go) at the package that declares %s",
+			nodeErrorPackageDir, root, nodeErrorType,
+		)
+	}
+	return fmt.Errorf(
+		"%s holds no Go file herrgen could read, so no workflow node codes can be read — "+
+			"point nodeErrorPackageDir (tools/herrgen/nodeerrors.go) at the package that declares %s",
+		nodeErrorPackageDir, nodeErrorType,
+	)
+}
+
+// underNodeErrorPackage reports whether a repository-relative file sits in the
+// package nodeErrorPackageDir names. Sub-packages do not count: a literal in
+// one of those resolves to its own directory and is filtered out below, so
+// counting it as a visit would leave the guard reporting a package it never
+// actually read.
+func underNodeErrorPackage(rel string) bool {
+	return path.Dir(rel) == nodeErrorPackageDir
 }
 
 // resolveNodeErrorSites keeps the sites whose type resolves to the engine's
