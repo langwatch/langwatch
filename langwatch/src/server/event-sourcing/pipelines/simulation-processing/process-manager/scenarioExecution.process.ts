@@ -18,7 +18,7 @@ import {
 } from "./scenarioExecutionProcess.types";
 
 /**
- * The `scenarioExecution` process (ADR-062): pure state logic only. The
+ * The `scenarioExecution` process (ADR-073): pure state logic only. The
  * pipeline mounts these handlers; the runtime owns the manager, outbox and
  * wake workers.
  *
@@ -37,7 +37,7 @@ import {
  *
  * It does NOT dispatch execution — that still runs through
  * `scenarioExecution.reactor.ts` and the in-process pool. Moving dispatch onto
- * the leased outbox is the second half of ADR-062 and is deliberately separate:
+ * the leased outbox is the second half of ADR-073 and is deliberately separate:
  * this half only adds a safety net and removes the weaker ones it replaces.
  */
 

@@ -1112,7 +1112,7 @@ export class PipelineRegistry {
         scenarioExecutionReactor: scenarioExecutionHandle.reactor,
         traceMetricsSyncReactor,
         computeRunMetricsCommand,
-        // ADR-062: the `scenarioExecution` process writes the terminal state
+        // ADR-073: the `scenarioExecution` process writes the terminal state
         // for a run whose worker died. The failure handler resolves the app
         // lazily because it dispatches a command on the very pipeline being
         // registered here.

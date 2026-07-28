@@ -1,10 +1,10 @@
-# ADR-063: Package topology for the server codebase
+# ADR-074: Package topology for the server codebase
 
 **Date:** 2026-07-22
 
 **Status:** Proposed
 
-**Related:** ADR-061, ADR-062 (both land inside `src/server` and move with it),
+**Related:** ADR-072, ADR-073 (both land inside `src/server` and move with it),
 PR #6018 (the closed first attempt — its head ref is the starting point here).
 
 ## Context
@@ -99,7 +99,7 @@ The 129 reverse edges are the deliverable. Most are expected to be one of
 three shapes, and each has a standard fix:
 
 - reaching for a **service** to do work → invert it: the pipeline declares a
-  port, the composition root supplies the implementation (the pattern ADR-062's
+  port, the composition root supplies the implementation (the pattern ADR-073's
   `scenarioExecutionDispatch` already uses);
 - reaching for a **shared type** → move it down into `@langwatch/domain` or
   `@langwatch/contracts`, where both sides may see it;
@@ -140,7 +140,7 @@ is the expensive part, and a move already forces a review of every import.
   packages are source-only (`main: src/index.ts`), so today they give zero type
   isolation; with `skipLibCheck`, emitting `.d.ts` makes a package's internals
   nearly free for its consumers.
-- ADR-061 and ADR-062 land inside `src/server` and move with it. Sequencing
+- ADR-072 and ADR-073 land inside `src/server` and move with it. Sequencing
   them before Phase 2 keeps them small; doing them during a package move would
   put an execution-path change and a 500-file move in one diff.
 - The root `pnpm-workspace.yaml` deliberately excludes `langwatch/` so

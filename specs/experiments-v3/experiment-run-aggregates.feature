@@ -1,7 +1,7 @@
 Feature: Experiment run totals are derived from its items
   An experiment run records the facts that belong to the run itself — what was
   run, against what, and when it started, stopped or finished. Its counts,
-  costs and scores are computed from the run's items at read time. (ADR-061.)
+  costs and scores are computed from the run's items at read time. (ADR-072.)
 
   Background:
     Given an experiment with a dataset and evaluators

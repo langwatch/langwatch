@@ -1,7 +1,7 @@
 Feature: Experiment runs always reach a terminal state
   An experiment run is watched by a durable process for as long as it is
   producing results. If the work behind it disappears, the run is recorded as
-  failed instead of staying started forever. (ADR-062.)
+  failed instead of staying started forever. (ADR-073.)
 
   Background:
     Given an experiment with a dataset and evaluators

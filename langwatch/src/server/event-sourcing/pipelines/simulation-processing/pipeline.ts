@@ -66,7 +66,7 @@ export interface SimulationProcessingPipelineDeps {
     SimulationProcessingEvent,
     SimulationRunStateData
   >;
-  /** Terminal-write dependencies for the `scenarioExecution` process (ADR-062). */
+  /** Terminal-write dependencies for the `scenarioExecution` process (ADR-073). */
   scenarioExecutionDispatch: ScenarioExecutionDispatchDeps;
 }
 
@@ -75,7 +75,7 @@ export interface SimulationProcessingPipelineDeps {
  * tests can build the exact definition the runtime mounts.
  *
  * Every progress event re-arms the deadline; the terminal events clear it; a
- * fired wake writes the terminal state itself. See ADR-062 and
+ * fired wake writes the terminal state itself. See ADR-073 and
  * `scenarioExecution.process.ts`.
  */
 export function scenarioExecutionPM(

@@ -675,7 +675,7 @@ export async function startScenarioProcessor(
   // The `scenarioExecution` process manager on the simulation pipeline now
   // holds that guarantee continuously. Every progress event re-arms its
   // durable deadline; when one fires, it writes the terminal state itself.
-  // See ADR-062.
+  // See ADR-073.
 
   return {
     close: async () => {

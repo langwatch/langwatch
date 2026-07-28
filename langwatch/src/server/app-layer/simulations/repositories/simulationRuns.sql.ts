@@ -2,7 +2,7 @@
  * Shared SQL fragments for reading `simulation_runs`.
  *
  * `simulation_runs` is the fact table behind both individual scenario runs and
- * every batch-level aggregate derived from them (ADR-061), so the dedup
+ * every batch-level aggregate derived from them (ADR-072), so the dedup
  * predicate has more than one caller and lives here rather than in whichever
  * repository happened to need it first.
  */

@@ -1,4 +1,4 @@
-# ADR-062: Run execution on the process-manager substrate
+# ADR-073: Run execution on the process-manager substrate
 
 **Date:** 2026-07-22
 
@@ -6,7 +6,7 @@
 
 **Related:** ADR-049 (process-manager inbox/state/outbox), ADR-051 (the durable
 revision-fenced wake pattern), ADR-052 (automations on the same substrate),
-ADR-061 (run aggregates as queries — its derived run status depends on the
+ADR-072 (run aggregates as queries — its derived run status depends on the
 liveness guarantee decided here).
 
 ## Context
@@ -191,7 +191,7 @@ is a fact in ClickHouse rather than a function of when someone looked at it.
 
 - Every simulation and experiment run reaches a terminal state within a
   bounded time of going quiet, whatever happened to the worker — which is the
-  precondition ADR-061's derived suite status needs in order to terminate.
+  precondition ADR-072's derived suite status needs in order to terminate.
 - Stuck-run recovery stops depending on a worker restart. The bound becomes
   the deadline, not the deploy cadence.
 - Pending scenario work survives a hard kill: it is a Postgres row, not an
@@ -210,6 +210,6 @@ is a fact in ClickHouse rather than a function of when someone looked at it.
 
 - [`specs/scenarios/scenario-execution-process-manager.feature`](../../../specs/scenarios/scenario-execution-process-manager.feature)
 - [`specs/experiments-v3/experiment-run-liveness.feature`](../../../specs/experiments-v3/experiment-run-liveness.feature)
-- ADR-061 (run aggregates are queries, not pipelines)
+- ADR-072 (run aggregates are queries, not pipelines)
 - `src/server/event-sourcing/pipelines/topic-clustering-processing/process-manager/topicClustering.process.ts`
   (the in-flight-run and stale-bound precedent)

@@ -1,12 +1,12 @@
 /**
- * The batch denominator (ADR-061).
+ * The batch denominator (ADR-072).
  *
  * A batch's expected size travels on each of its simulation runs, so a batch
  * whose fan-out fell short reports the shortfall instead of silently
  * redefining itself as however many runs made it to the queue.
  *
  * @see specs/suites/suite-run-aggregates.feature
- * @see dev/docs/adr/061-run-aggregates-are-queries.md
+ * @see dev/docs/adr/072-run-aggregates-are-queries.md
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";
