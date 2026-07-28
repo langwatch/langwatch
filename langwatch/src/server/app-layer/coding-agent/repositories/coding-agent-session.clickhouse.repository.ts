@@ -1,5 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import { parseClickHouseDateTimeMs } from "~/server/clickhouse/dateTime";
+import { asNumber, asStringArray } from "~/server/clickhouse/recordDecode";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import type {
   CodingAgentSessionMetricSeriesRow,
@@ -539,16 +541,6 @@ export class CodingAgentSessionClickHouseRepository
   }
 }
 
-const asNumber = (value: unknown): number => {
-  const n = Number(value);
-  return Number.isFinite(n) ? n : 0;
-};
-
-const asStringArray = (value: unknown): string[] =>
-  Array.isArray(value)
-    ? value.filter((v): v is string => typeof v === "string")
-    : [];
-
 const asNumberArray = (value: unknown): number[] =>
   Array.isArray(value) ? value.map(asNumber) : [];
 
@@ -587,6 +579,18 @@ const asNumberMap = (value: unknown): Record<string, number> =>
       )
     : {};
 
+/**
+ * Decode one `JSONEachRow` record.
+ *
+ * Every DateTime64(3) goes through `parseClickHouseDateTimeMs`: ClickHouse emits
+ * them without a zone suffix ("2026-07-24 12:00:00.123") and V8 reads a bare
+ * datetime as LOCAL time, so `new Date(str)` skews each one by the host's UTC
+ * offset. `LastEventOccurredAt` makes that load-bearing rather than cosmetic —
+ * `CodingAgentSessionStore` reads it as the "was this row written after
+ * migration 00053" discriminator, and a pre-00053 row's `1970-01-01
+ * 00:00:00.000` decodes POSITIVE anywhere west of UTC, which would let the
+ * store decode exactly the rows its gate exists to reject.
+ */
 function fromRecord(record: Record<string, unknown>): CodingAgentSessionRow {
   const steps = Array.isArray(record.Steps) ? record.Steps : [];
   return {
@@ -594,7 +598,7 @@ function fromRecord(record: Record<string, unknown>): CodingAgentSessionRow {
     sessionId: String(record.SessionId ?? ""),
     sessionKeySource: String(record.SessionKeySource ?? ""),
     version: String(record.Version ?? ""),
-    startedAtMs: new Date(String(record.StartedAt)).getTime(),
+    startedAtMs: parseClickHouseDateTimeMs(String(record.StartedAt ?? "")),
 
     agent: String(record.Agent ?? ""),
     agentVersion: String(record.AgentVersion ?? ""),
@@ -687,8 +691,10 @@ function fromRecord(record: Record<string, unknown>): CodingAgentSessionRow {
     stepStartedAt: asNumberArray(record.StepStartedAt),
     previousCallContextTokens: asNumber(record.PreviousCallContextTokens),
     metricSeries: asMetricSeriesRows(record.MetricSeries),
-    createdAt: new Date(String(record.CreatedAt)).getTime(),
-    updatedAt: new Date(String(record.UpdatedAt)).getTime(),
-    lastEventOccurredAt: new Date(String(record.LastEventOccurredAt)).getTime(),
+    createdAt: parseClickHouseDateTimeMs(String(record.CreatedAt ?? "")),
+    updatedAt: parseClickHouseDateTimeMs(String(record.UpdatedAt ?? "")),
+    lastEventOccurredAt: parseClickHouseDateTimeMs(
+      String(record.LastEventOccurredAt ?? ""),
+    ),
   };
 }

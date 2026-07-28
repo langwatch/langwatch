@@ -474,6 +474,33 @@ export const incrementEsFoldRefoldTotal = (
   outcome: "performed" | "declined" | "unavailable",
 ) => esFoldRefoldTotal.labels(projectionName, outcome).inc();
 
+register.removeSingleMetric("es_fold_refold_on_miss_total");
+const esFoldRefoldOnMissTotal = new Counter({
+  name: "es_fold_refold_on_miss_total",
+  help: "Store-miss re-folds from the event log, by whether the aggregate had any history to replay",
+  labelNames: ["projection_name", "outcome"] as const,
+});
+
+/**
+ * Makes the ADR-066 transitional net observable. `refoldOnStoreMiss` survives on
+ * the three read-back folds ONLY to rebuild aggregates whose committed row
+ * predates their read-back columns, and its deletion condition is "it stopped
+ * firing" — which without this counter is an assumption, not an observation. A
+ * transitional refold and a regression to the pre-ADR-066 steady state (every
+ * cache miss walking `event_log`, the 2026-07-23 `TOO_MANY_PARTS` outage) look
+ * identical from the outside; the difference is only visible as a rate that
+ * decays to nothing versus one that tracks `es_fold_projection_total`.
+ *
+ * `performed` — history was replayed, i.e. the net actually caught something.
+ * `absent` — the history read came back empty, so the aggregate was genuinely
+ * new and the executor fell through to `init()`. Expect a steady floor of these
+ * on high-cardinality folds; they are not transitional debt.
+ */
+export const incrementEsFoldRefoldOnMissTotal = (
+  projectionName: string,
+  outcome: "performed" | "absent",
+) => esFoldRefoldOnMissTotal.labels(projectionName, outcome).inc();
+
 register.removeSingleMetric("es_fold_read_window_fallback_total");
 const esFoldReadWindowFallbackTotal = new Counter({
   name: "es_fold_read_window_fallback_total",

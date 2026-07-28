@@ -458,7 +458,7 @@ describe("CodingAgentSessionFoldProjection", () => {
         state,
         tenantId: "tenant-1",
         sessionId: SESSION_ID,
-        version: "2026-07-21",
+        version: CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST,
       });
 
       expect(row.sessionId).toBe(SESSION_ID);
