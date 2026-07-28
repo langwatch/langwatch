@@ -605,10 +605,12 @@ export const langyRouter = createTRPCRouter({
         userId: ctx.session.user.id,
         title: input.title,
       });
-      // Typed so the client renders its bespoke "Conversation not found — start
-      // a new chat to keep going" card. The bare TRPCError this replaces carried
-      // no code and no message at all, so the explainer fell through to the
-      // generic unknown treatment for a condition it already has copy for.
+      // Belt-and-braces for the declared `ConversationDetail | null`: the
+      // service ALREADY throws this same typed error for both "no such
+      // conversation" and "not yours" (deliberately indistinguishable), so in
+      // practice this branch is unreachable. It stays because the return type
+      // permits null and a silent `undefined` detail would be worse than a
+      // redundant throw.
       if (!detail) throw new LangyConversationNotFoundError(input.conversationId);
       return toDetailDto(detail);
     }),

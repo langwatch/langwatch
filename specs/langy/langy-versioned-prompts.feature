@@ -32,7 +32,7 @@ Feature: Langy's prompts are stored and versioned in the prompt registry
     And the failure is logged, not surfaced to the user
     And the turn is not blocked
 
-  @unimplemented
+  @unit
   Scenario: An empty or blank registry prompt is treated as a miss
     Given a Langy prompt row exists but its prompt text is blank
     When a Langy turn starts
@@ -43,7 +43,7 @@ Feature: Langy's prompts are stored and versioned in the prompt registry
   # ---------------------------------------------------------------------------
 
   Scenario: A production-tagged registry version is used when present
-    Given the Langy agent-definition prompt has a version tagged production
+    Given the Langy turn-override prompt has a version tagged production
     When a Langy turn starts
     Then Langy uses the production-tagged registry text
     And a draft version that is not tagged production is not used

@@ -66,9 +66,17 @@ func readClientHelloRecords(r io.Reader) (raw []byte, handshake []byte, sawHands
 		if herr != nil {
 			return raw, handshake, sawHandshake, herr
 		}
-		// header[0] == 22 (handshake). Anything else: not a TLS ClientHello, so
-		// stop and let the caller treat the tunnel as opaque.
-		if header[0] != 22 {
+		// header[0] == 22 (handshake) AND a plausible legacy record version.
+		//
+		// The version check is not pedantry: byte 0 alone is one byte of
+		// coincidence, and treating any 0x16-prefixed stream as TLS means an
+		// opaque tunnel that merely starts with 0x16 gets held for the whole
+		// peek timeout waiting for records that never come — and then, under an
+		// enforcing policy, denied as unreadable. Requiring 0x03 0x0X (SSL 3.0
+		// through TLS 1.2 legacy_record_version; TLS 1.3 still writes 0x0301 or
+		// 0x0303 here for compatibility) makes the "this is TLS" claim cheap to
+		// falsify, so non-TLS traffic leaves promptly by the branch below.
+		if header[0] != 22 || header[1] != 3 || header[2] > 4 {
 			return raw, handshake, sawHandshake, nil
 		}
 		sawHandshake = true

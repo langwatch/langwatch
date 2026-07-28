@@ -1,0 +1,21 @@
+-- Index the predicate the Langy session-key reaper sweeps on.
+--
+-- The reaper runs hourly (langy_maintenance pipeline) with:
+--   WHERE "name" = 'Langy session' AND "revokedAt" IS NULL AND "expiresAt" <= now
+-- and ApiKey carried indexes only on userId / organizationId / lookupId /
+-- ingestSourceType / ingestionTemplateId. So every tick was a sequential scan
+-- of the whole table — which grows monotonically, because reaped keys are
+-- stamped with revokedAt rather than deleted.
+--
+-- Leftmost-prefix ordering is deliberate: `name` is the equality predicate and
+-- the most selective (session keys are one reserved name among all keys),
+-- `revokedAt` narrows to the un-reaped, and `expiresAt` serves the range.
+--
+-- NOT built CONCURRENTLY: Prisma runs migrations inside a transaction and this
+-- repo has no non-transactional migration setup (see
+-- 20260426150000_drop_redundant_audit_log_org_index, which hit the same wall).
+-- A plain CREATE INDEX takes an ACCESS EXCLUSIVE lock on ApiKey for the build.
+-- On a large deployment, build it by hand with CREATE INDEX CONCURRENTLY first
+-- and this becomes a no-op via IF NOT EXISTS.
+CREATE INDEX IF NOT EXISTS "ApiKey_name_revokedAt_expiresAt_idx"
+  ON "ApiKey"("name", "revokedAt", "expiresAt");

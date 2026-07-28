@@ -20,11 +20,11 @@ export interface LangyMaintenancePipelineDeps {
  * conversation concern nor a queue concern, and mounting a sweep where it does
  * not belong is how ownership blurs.
  *
- * WHY THIS EXISTS AT ALL: the reaper was written, tested and routed at
- * `/api/cron/langy_session_keys_reap`, and then never scheduled — the chart
- * ships `cronjobs.jobs: {}` on purpose, because every first-party sweep moved
- * onto this worker path. So the backstop its own docstring calls "THE
- * GUARANTEE" had no caller. (It also threw on every invocation until the
+ * WHY THIS EXISTS AT ALL: the reaper was written, tested and routed for cron,
+ * and then never scheduled — the chart ships `cronjobs.jobs: {}` on purpose,
+ * because every first-party sweep moved onto this worker path. So the backstop
+ * its own docstring calls "THE GUARANTEE" had no caller. That cron route is now
+ * deleted rather than left as a second way in. (It also threw on every invocation until the
  * tenancy guard learned that a reserved key name is platform-owned; the two
  * defects hid each other, since nothing was calling the endpoint that 500s.)
  *
@@ -55,8 +55,11 @@ export function createLangyMaintenancePipeline(
           langySessionKeyReapSchema,
           runLangySessionKeyReap(deps.sessionKeyReap),
         )
-        // One bounded UPDATE over an indexed predicate — nothing like the blob
-        // sweep's keyspace walk, so the default-ish lease is ample.
+        // One bounded UPDATE over the (name, revokedAt, expiresAt) index added
+        // in 20260728120000 — nothing like the blob sweep's keyspace walk, so
+        // the default-ish lease is ample. NOTE the FIRST tick after deploy also
+        // clears the historical backlog of keys this reaper never reached while
+        // it was rejected by the tenancy guard, so that one runs long.
         .outbox({ leaseDurationMs: 60 * 1000, maxAttempts: 3 }),
     )
     .build();

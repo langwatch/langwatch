@@ -2121,6 +2121,10 @@ model ApiKey {
   @@index([lookupId])
   @@index([ingestSourceType])
   @@index([ingestionTemplateId])
+  // The Langy session-key reaper's sweep predicate
+  // (name = <reserved> AND revokedAt IS NULL AND expiresAt <= now). Without
+  // it the hourly tick sequentially scans a monotonically growing table.
+  @@index([name, revokedAt, expiresAt])
 }
 
 model BillingMeterCheckpoint {

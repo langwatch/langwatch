@@ -74,6 +74,11 @@ const DEFAULT_BATS_TEST_ROOTS: string[] = [
 const DEFAULT_GO_TEST_ROOTS: string[] = [
   "services/nlpgo",
   "services/aigateway",
+  // The Langy worker manager. Its specs (egress enforcement, worker isolation,
+  // shutdown handoff) are satisfied by Go tests and by nothing else, so without
+  // this root those scenarios could only ever be @unimplemented or bound to a
+  // TS stub that proves nothing.
+  "services/langyagent",
   "pkg",
   "tools/thuishaven",
   "tools/herrgen",

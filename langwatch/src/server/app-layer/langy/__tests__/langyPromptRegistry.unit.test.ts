@@ -78,6 +78,7 @@ describe("resolveLangyPrompt", () => {
   });
 
   describe("given a registry row whose prompt is blank", () => {
+    /** @scenario "An empty or blank registry prompt is treated as a miss" */
     it("treats whitespace-only as a miss and falls back", async () => {
       const read = vi.fn().mockResolvedValue({ prompt: "   \n  " });
       const result = await resolveLangyPrompt({

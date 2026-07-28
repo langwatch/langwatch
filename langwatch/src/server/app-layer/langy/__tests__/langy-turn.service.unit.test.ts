@@ -14,6 +14,7 @@ import {
   langyTurnIdentity,
   type StartConversationTurnInput,
 } from "../langy-turn.service";
+import { LANGY_TURN_OVERRIDE_FALLBACK } from "../langyPromptRegistry";
 import type { LangyMessageRow } from "../repositories/langy-message.repository";
 import type { LangyTurnAdmissionClaim } from "../repositories/langy-turn-admission.repository";
 
@@ -1079,7 +1080,10 @@ describe("when the project holding Langy's versioned prompts is configured", () 
     await LangyTurnService.create(deps).startConversationTurn(input());
 
     expect(mocks.dispatch).toHaveBeenCalledOnce();
-    expect(systemOf(mocks.dispatch)).not.toContain("REGISTRY");
+    // Not merely "the registry text is absent" — that also passes for an
+    // EMPTY system block, which is the failure the never-throws-always-falls-
+    // back invariant exists to prevent.
+    expect(systemOf(mocks.dispatch)).toContain(LANGY_TURN_OVERRIDE_FALLBACK);
   });
 });
 

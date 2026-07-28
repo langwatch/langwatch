@@ -173,6 +173,7 @@ Feature: Langy worker egress enforcement — monitor first, enforce last
   # only the first record let a hostile worker push its SNI into record 2, so
   # the cross-check found nothing to compare and waved the tunnel through —
   # the anti-domain-fronting control was opt-out for anyone who wanted out.
+  @unit
   Scenario: A ClientHello split across TLS records still reveals its SNI
     Given a project allow-list that permits "allowed.example"
     And a worker that CONNECTs to "allowed.example" but negotiates TLS for "attacker.example"
@@ -181,6 +182,7 @@ Feature: Langy worker egress enforcement — monitor first, enforce last
     And the connection is refused before the destination is dialed
     And the refusal is flagged as an SNI mismatch
 
+  @unit
   Scenario: An unreadable ClientHello is refused while a policy is enforcing
     Given a project allow-list is in force
     And a worker opens a tunnel whose TLS handshake yields no readable SNI
@@ -189,12 +191,14 @@ Feature: Langy worker egress enforcement — monitor first, enforce last
 
   # Monitor-only blocks nothing by definition, so failing closed there would be
   # a behaviour change for installs that opted into nothing.
+  @unit
   Scenario: An unreadable ClientHello is left alone under monitor-only
     Given no allow-list is set and the floor is not enforced
     And a worker opens a tunnel whose TLS handshake yields no readable SNI
     Then the connection is allowed
     And the flow is still monitored and attributable
 
+  @unit
   Scenario: A tunnel that is not TLS at all is unaffected by the cross-check
     Given a project allow-list is in force
     And a worker opens a tunnel carrying a protocol that is not TLS

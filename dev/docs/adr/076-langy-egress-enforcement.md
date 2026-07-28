@@ -2,14 +2,16 @@
 
 **Date:** 2026-07-10
 
-**Status:** Draft
+**Status:** Accepted (implemented)
 
-> **This is the PR4-of-4 design in the Langy egress-hardening series.** It is
-> deliberately docs-only and **blocked on PR3**: it builds the enforcement rungs
-> on top of the egress instrumentation seam (PR1) and the monitor-only telemetry
-> (PR3). Nothing here should be implemented until PR3's seam is merged and has
-> observed real traffic — the whole thesis is "let monitoring prove what's
-> legitimate before anything blocks."
+> **Implemented.** This was PR4-of-4 in the Langy egress-hardening series and
+> was written docs-only, blocked on PR3's seam. That seam landed and the rungs
+> were built: `services/langyagent/adapters/egress/` (adapter, policy, throttle,
+> SNI cross-check), wired by `cmd/manager.go` and consumed per-worker by
+> `app/workerpool/pool.go`, with the per-project allow-list at
+> `api/routers/langyEgress.ts`. The staging thesis still holds in the DEFAULT:
+> stock posture is monitor-only, and nothing blocks until an operator sets an
+> allow-list or flips `EgressEnforceFloor`.
 
 ## Context
 

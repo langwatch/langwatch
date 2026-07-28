@@ -85,6 +85,7 @@ func TestPeekClientHelloSNI_ReadsAnUnfragmentedHello(t *testing.T) {
 // SNI in record 2, where a single-record peek never looked — so the peek
 // returned "", the caller found no "definite mismatch", and the anti-fronting
 // cross-check was skipped entirely.
+// @scenario "A ClientHello split across TLS records still reveals its SNI"
 func TestPeekClientHelloSNI_ReassemblesAFragmentedHello(t *testing.T) {
 	hello := clientHelloFor(t, "attacker.example")
 	// Split early — right after the handshake header — so the server_name
@@ -178,6 +179,7 @@ func TestPeekClientHelloSNI_BoundsEndlessFragments(t *testing.T) {
 // "saw a handshake byte" left it bypassable by sending NOTHING. The read errors
 // before the 5-byte header completes, so sawHandshake stays false — and if the
 // caller also discards the error, the tunnel is spliced uninspected.
+// @scenario "An unreadable ClientHello is refused while a policy is enforcing"
 func TestSNIUnreadable_TreatsAStalledHelloAsUnreadable(t *testing.T) {
 	// A peer that opens the tunnel and then says nothing: io.ReadFull returns
 	// an error with no complete header, so sawHandshake is false.
@@ -195,6 +197,7 @@ func TestSNIUnreadable_TreatsAStalledHelloAsUnreadable(t *testing.T) {
 	}
 }
 
+// @scenario "A tunnel that is not TLS at all is unaffected by the cross-check"
 func TestSNIUnreadable_LetsACleanlyNonTLSStreamThrough(t *testing.T) {
 	// A complete record header with a non-handshake content type and no error:
 	// an opaque tunnel, governed by require-TLS rather than by this rung.
@@ -209,6 +212,7 @@ func TestSNIUnreadable_LetsACleanlyNonTLSStreamThrough(t *testing.T) {
 	}
 }
 
+// @scenario "An unreadable ClientHello is left alone under monitor-only"
 func TestIsIPLiteral_ExemptsBareAddressesFromTheSNIRequirement(t *testing.T) {
 	// RFC 6066 forbids server_name for an IP literal, so a conforming client
 	// legitimately sends none and must not be failed closed for it.
@@ -220,6 +224,36 @@ func TestIsIPLiteral_ExemptsBareAddressesFromTheSNIRequirement(t *testing.T) {
 	for _, host := range []string{"allowed.example", "github.com", ""} {
 		if isIPLiteral(host) {
 			t.Errorf("%q is a name, not an IP literal", host)
+		}
+	}
+}
+
+// A stream whose first byte happens to be 0x16 but which is not TLS must leave
+// by the not-a-handshake branch, not be held for the peek timeout and then
+// denied as unreadable under an enforcing policy.
+func TestReadClientHelloRecords_RejectsAnImplausibleRecordVersion(t *testing.T) {
+	// 0x16 then a version no TLS record carries.
+	stream := []byte{22, 0xFF, 0xFF, 0x00, 0x05, 1, 2, 3, 4, 5}
+
+	_, _, sawHandshake, err := readClientHelloRecords(bytes.NewReader(stream))
+
+	if sawHandshake {
+		t.Fatal("0x16 alone must not be taken as proof the stream is TLS")
+	}
+	if err != nil {
+		t.Fatalf("a cleanly non-TLS stream is not an error: %v", err)
+	}
+}
+
+func TestReadClientHelloRecords_AcceptsRealRecordVersions(t *testing.T) {
+	// TLS 1.3 still writes a 0x0301/0x0303 legacy_record_version.
+	for _, minor := range []byte{1, 3} {
+		hello := clientHelloFor(t, "example.test")
+		hello[2] = minor
+
+		_, _, sawHandshake, err := readClientHelloRecords(bytes.NewReader(hello))
+		if !sawHandshake || err != nil {
+			t.Errorf("legacy_record_version 3.%d must be accepted (saw=%v err=%v)", minor, sawHandshake, err)
 		}
 	}
 }
