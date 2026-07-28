@@ -1,6 +1,15 @@
+import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
+import {
+  CODING_AGENT_ORIGIN,
+  enrichCodingAgentSpansFromLogs,
+} from "~/server/app-layer/traces/claude-code-log-enrichment";
+import {
+  createDefaultLogRecordStorageService,
+  type LogRecordStorageService,
+} from "~/server/app-layer/traces/log-record-storage.service";
 import type { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import { prisma as defaultPrisma } from "~/server/db";
 import { EvaluationService } from "~/server/evaluations/evaluation.service";
@@ -8,9 +17,9 @@ import { mapTraceEvaluationsToLegacyEvaluations } from "~/server/evaluations/eva
 import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import type { Evaluation, Trace } from "~/server/tracer/types";
 import type { Protections } from "~/server/traces/protections";
-import { createLogger } from "~/utils/logger/server";
 import { ClickHouseTraceService } from "./clickhouse-trace.service";
 import { resolveOffloadedTraces } from "./resolve-offloaded-traces";
+import { resolveOffloadedTracesBatch } from "./resolve-offloaded-traces-batch";
 
 /**
  * Minimum prefix length we will attempt to resolve. Shorter strings fall
@@ -136,6 +145,25 @@ class OffloadedSpanResolver {
         logger: this.logger,
       });
   }
+
+  /**
+   * Returns the bulk-resolution callback compatible with ClickHouseTraceService's
+   * `resolveTraceSpansBatchFn` parameter. Resolves a whole result set in one
+   * bounded-concurrency pass over event_log (#4991 AC6).
+   */
+  toBatchResolverFn(): (
+    projectId: string,
+    spansPerTrace: NormalizedSpan[][],
+  ) => ReturnType<typeof resolveOffloadedTracesBatch> {
+    return (projectId, spansPerTrace) =>
+      resolveOffloadedTracesBatch({
+        projectId,
+        spansPerTrace,
+        blobStore: this.deps.blobStore,
+        ioExtractionService: this.deps.ioExtractionService,
+        logger: this.logger,
+      });
+  }
 }
 
 /**
@@ -154,27 +182,49 @@ export class TraceService {
   private readonly logger = createLogger("langwatch:traces:service");
   private readonly clickHouseService: ClickHouseTraceService;
   private readonly evaluationService: EvaluationService;
+  private readonly injectedLogRecordStorage?: LogRecordStorageService;
+  private cachedLogRecordStorage?: LogRecordStorageService;
   constructor(
     readonly prisma: PrismaClient,
     blobResolutionDeps?: BlobResolutionDeps,
+    logRecordStorage?: LogRecordStorageService,
   ) {
-    // Build the per-trace resolver callback when deps are present.
-    // The callback is passed to ClickHouseTraceService so resolution happens
-    // at the NormalizedSpan level (before mapping to legacy Span), which is
-    // the only level where spanAttributes carry the eventref keys.
-    const resolveTraceSpansFn =
+    // Build the resolver callbacks when deps are present. They are passed to
+    // ClickHouseTraceService so resolution happens at the NormalizedSpan level
+    // (before mapping to legacy Span), the only level where spanAttributes
+    // carry the eventref keys. The per-trace fn serves single-trace detail
+    // reads (#4888); the batch fn serves bulk reads in one bounded pass (#4991).
+    const offloadedSpanResolver =
       blobResolutionDeps !== undefined
-        ? new OffloadedSpanResolver(
-            blobResolutionDeps,
-            this.logger,
-          ).toResolverFn()
+        ? new OffloadedSpanResolver(blobResolutionDeps, this.logger)
         : undefined;
+    const resolveTraceSpansFn = offloadedSpanResolver?.toResolverFn();
+    const resolveTraceSpansBatchFn = offloadedSpanResolver?.toBatchResolverFn();
 
     this.clickHouseService = ClickHouseTraceService.create(
       prisma,
       resolveTraceSpansFn,
+      resolveTraceSpansBatchFn,
     );
     this.evaluationService = EvaluationService.create();
+    // Injected store for the read-time Claude Code content enrichment; the
+    // default comes from the app-layer factory built LAZILY on first use (see
+    // logRecordStorageService), so construction here stays free of ClickHouse
+    // wiring. Non-enriching callers and unit tests that never hit the
+    // coding-agent path pay nothing.
+    this.injectedLogRecordStorage = logRecordStorage;
+  }
+
+  /**
+   * The log-record store for read-time Claude Code content enrichment, built
+   * lazily so a TraceService that never enriches (or a unit test that never
+   * exercises the coding-agent-origin path) never constructs the
+   * ClickHouse-backed default.
+   */
+  private logRecordStorageService(): LogRecordStorageService {
+    if (this.injectedLogRecordStorage) return this.injectedLogRecordStorage;
+    return (this.cachedLogRecordStorage ??=
+      createDefaultLogRecordStorageService());
   }
 
   /**
@@ -182,13 +232,16 @@ export class TraceService {
    *
    * @param prisma - PrismaClient instance
    * @param blobResolutionDeps - Optional blob-offload resolution deps (#4888)
+   * @param logRecordStorage - Optional log-record store for read-time Claude
+   *   Code content enrichment; default-built when omitted.
    * @returns TraceService instance
    */
   static create(
     prisma: PrismaClient = defaultPrisma,
     blobResolutionDeps?: BlobResolutionDeps,
+    logRecordStorage?: LogRecordStorageService,
   ): TraceService {
-    return new TraceService(prisma, blobResolutionDeps);
+    return new TraceService(prisma, blobResolutionDeps, logRecordStorage);
   }
 
   /**
@@ -221,7 +274,7 @@ export class TraceService {
           { resolveBlobs: opts?.full },
         );
         if (traces[0]) {
-          return traces[0];
+          return this.enrichCodingAgentTrace(projectId, traces[0]);
         }
 
         // No exact match. If the input looks like a truncated hex prefix
@@ -262,12 +315,81 @@ export class TraceService {
             undefined,
             { resolveBlobs: opts?.full },
           );
-          return resolved[0];
+          return resolved[0]
+            ? this.enrichCodingAgentTrace(projectId, resolved[0])
+            : undefined;
         }
 
         return undefined;
       },
     );
+  }
+
+  /**
+   * Batch sibling of {@link enrichCodingAgentTrace} for the multi-trace read
+   * paths (evals, export, legacy thread reads). Enriches each coding-agent trace
+   * in the array with its own lazy, time-capped log read (reads run in parallel,
+   * a bounded few at a time); every non-coding-agent trace short-circuits inside
+   * `enrichCodingAgentTrace` and pays nothing. The upfront origin check skips
+   * even the fan-out allocation on the common all-non-coding-agent page, so a
+   * project that never uses a coding assistant never touches the log store.
+   * Best-effort per trace.
+   */
+  private async enrichCodingAgentTraces(
+    projectId: string,
+    traces: Trace[],
+  ): Promise<Trace[]> {
+    const hasCodingAgentTrace = traces.some(
+      (trace) => trace.metadata?.["langwatch.origin"] === CODING_AGENT_ORIGIN,
+    );
+    if (!hasCodingAgentTrace) return traces;
+    // Bounded fan-out: each coding-agent trace's enrichment holds a capped but
+    // heavy log read (raw bodies run to 60 KB a row) in memory, so an
+    // unbounded Promise.all over a big export/eval page multiplies that by the
+    // page size. Five in flight keeps the multi-trace paths at a bounded
+    // memory ceiling; non-coding-agent traces short-circuit inside
+    // `enrichCodingAgentTrace` and cost nothing.
+    const enrichConcurrency = 5;
+    const enriched: Trace[] = [...traces];
+    for (let start = 0; start < traces.length; start += enrichConcurrency) {
+      const chunk = traces.slice(start, start + enrichConcurrency);
+      const results = await Promise.all(
+        chunk.map((trace) => this.enrichCodingAgentTrace(projectId, trace)),
+      );
+      for (let offset = 0; offset < results.length; offset++) {
+        enriched[start + offset] = results[offset]!;
+      }
+    }
+    return enriched;
+  }
+
+  /**
+   * Read-time Claude Code content enrichment for coding-agent-origin traces.
+   * The real `llm_request` spans carry tokens / `request_id` but no message
+   * content and no cost — both live in the trace's OTLP log records. When the
+   * trace is coding-agent origin we do one lazy, time-capped log read and join
+   * capped `input` / `output` + the authoritative `cost` onto the spans so the
+   * legacy trace/span API (REST, export, legacy tRPC, evals) returns whole
+   * spans. Origin-gated so a non-Claude trace pays nothing; idempotent and a
+   * no-op when the trace has no Claude content logs; best-effort (a log-read
+   * failure returns the un-enriched trace rather than failing the read).
+   */
+  private async enrichCodingAgentTrace(
+    projectId: string,
+    trace: Trace,
+  ): Promise<Trace> {
+    if (trace.metadata?.["langwatch.origin"] !== CODING_AGENT_ORIGIN) {
+      return trace;
+    }
+    const spans = await enrichCodingAgentSpansFromLogs({
+      logRecords: this.logRecordStorageService(),
+      tenantId: projectId,
+      traceId: trace.trace_id,
+      spans: trace.spans,
+      occurredAtMs: trace.timestamps.started_at,
+      logger: this.logger,
+    });
+    return spans === trace.spans ? trace : { ...trace, spans };
   }
 
   /**
@@ -297,13 +419,14 @@ export class TraceService {
         attributes: { "tenant.id": projectId, "trace.count": traceIds.length },
       },
       async () => {
-        return this.clickHouseService.getTracesWithSpans(
+        const traces = await this.clickHouseService.getTracesWithSpans(
           projectId,
           traceIds,
           protections,
           occurredAt,
           { resolveBlobs: opts?.full },
         );
+        return this.enrichCodingAgentTraces(projectId, traces);
       },
     );
   }
@@ -314,22 +437,28 @@ export class TraceService {
    * @param projectId - The project ID
    * @param threadId - The thread ID to group by
    * @param protections - Field redaction protections
+   * @param opts.full - When true AND blob-resolution deps are present, resolves
+   *   offloaded eventref pointers so thread-detail IO reads back full (#4991).
+   *   Default (undefined/false) returns the ≤64 KB preview.
    * @returns Array of traces in the thread
    */
   async getTracesByThreadId(
     projectId: string,
     threadId: string,
     protections: Protections,
+    opts?: { full?: boolean },
   ): Promise<Trace[]> {
     return this.tracer.withActiveSpan(
       "TraceService.getTracesByThreadId",
       { attributes: { "tenant.id": projectId, "thread.id": threadId } },
       async () => {
-        return this.clickHouseService.getTracesByThreadId(
+        const traces = await this.clickHouseService.getTracesByThreadId(
           projectId,
           threadId,
           protections,
+          { resolveBlobs: opts?.full },
         );
+        return this.enrichCodingAgentTraces(projectId, traces);
       },
     );
   }
@@ -427,10 +556,11 @@ export class TraceService {
    * @param threadIds - Array of thread IDs
    * @param protections - Field redaction protections
    * @param opts.full - When true AND blob-resolution deps are present, resolves
-   *   offloaded eventref pointers so thread IO reads back full. Used by the
-   *   eval path (which needs full values for thread-mapped evaluators) — the
-   *   eval-path TraceService carries deps. Customer thread views pass nothing
-   *   and carry no deps, so they stay on the ≤64 KB preview (#4888 / ADR-022).
+   *   offloaded eventref pointers so thread IO reads back full (#4991). Opted
+   *   into per call: the eval path (thread-mapped evaluators) and the
+   *   content-consuming thread tRPC both pass `{ full: true }` with deps. A
+   *   caller that omits it — or a deps-free TraceService — stays on the ≤64 KB
+   *   preview and issues zero event_log reads (#4888 / ADR-022).
    * @returns Array of traces
    */
   async getTracesWithSpansByThreadIds(
@@ -448,12 +578,14 @@ export class TraceService {
         },
       },
       async () => {
-        return this.clickHouseService.getTracesWithSpansByThreadIds(
-          projectId,
-          threadIds,
-          protections,
-          { resolveBlobs: opts?.full },
-        );
+        const traces =
+          await this.clickHouseService.getTracesWithSpansByThreadIds(
+            projectId,
+            threadIds,
+            protections,
+            { resolveBlobs: opts?.full },
+          );
+        return this.enrichCodingAgentTraces(projectId, traces);
       },
     );
   }

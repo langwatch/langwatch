@@ -118,7 +118,6 @@ Two **blocks** with a fixed +1000 offset, leaving room for future services witho
 | langevals           | base + 2    | 5562    | services   |
 | ai-gateway (Go)     | base + 3    | 5563    | services   |
 | _reserved_          | base + 4..7 |         | services   |
-| bullboard           | base + 8    | 5568    | services (off by default — `--bullboard`) |
 | _reserved_          | base + 9    |         | services   |
 | postgres            | base + 1000 | 6560    | infra      |
 | redis               | base + 1001 | 6561    | infra      |
@@ -210,14 +209,16 @@ type RuntimeEvent =
   | { type: "starting"; service: string }
   | { type: "healthy"; service: string; durationMs: number }
   | { type: "log"; service: string; stream: "stdout" | "stderr"; line: string }
-  | { type: "crashed"; service: string; code: number };
+  | { type: "restarting"; service: string; code: number; attempt: number; maxAttempts: number; delayMs: number }
+  | { type: "crashed"; service: string; code: number }
+  | { type: "stopped"; service: string };
 ```
 
 The CLI consumes events to render the listr2 status grid and tee log lines to TTY (prefixed + colored). No synchronous coupling between runtime and CLI animation.
 
 `Ctrl+C` triggers `stopAll(handles)`: SIGTERM each handle in reverse start order, 10s grace, then SIGKILL. `~/.langwatch/run/<service>.pid` files are removed on clean exit. The supervisor pidfile (`~/.langwatch/run/langwatch.pid`) doubles as a re-entry guard — second concurrent `npx @langwatch/server` invocations refuse to start with a clear "already running" error.
 
-Crash policy: any non-langwatch service crash emits `{ type: "crashed", code }` and the CLI calls `stopAll(handles)` followed by exit 1. The langwatch app (in-proc workers) is allowed up to 3 restarts in 60s before the same fate.
+Crash policy: a service that dies before its first `healthy` event is a boot failure and fails fast: `{ type: "crashed", code }` is emitted with no retry and the boot error path takes it from there. A service that dies after having been healthy is restarted in place, up to 3 attempts with 1s / 5s / 15s backoff, each announced as `{ type: "restarting", attempt }` on the bus and as a `[supervisor]` line in the service's log file. Staying up for 5 minutes resets the budget. When the budget is exhausted the crash falls through to `{ type: "crashed", code }`, the CLI prints the log-file pointer, calls `stopAll(handles)` and exits 1.
 
 ---
 

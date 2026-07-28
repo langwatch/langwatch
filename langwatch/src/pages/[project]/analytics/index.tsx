@@ -13,6 +13,8 @@ import {
 } from "@chakra-ui/react";
 import { ArrowUpRight, Plus } from "lucide-react";
 import { BarChart2 } from "react-feather";
+import { LangyContextTarget } from "~/features/langy/components/LangyContextTarget";
+import { dashboardContextChip } from "~/features/langy/logic/langyContextChips";
 import {
   DocumentsCountsSummary,
   DocumentsCountsTable,
@@ -46,7 +48,7 @@ function AnalyticsContent() {
               </Text>
               <Link
                 textDecoration="underline"
-                href={`/${project.slug}/messages`}
+                href={`/${project.slug}/traces`}
               >
                 setup
               </Link>
@@ -180,8 +182,16 @@ function CustomReportsSection({ slug }: { slug: string }) {
         gridTemplateColumns="repeat(auto-fill, minmax(250px, 1fr))"
       >
         {dashboards.map((dashboard) => (
-          <Link
+          // Armed, the dashboard can be handed to Langy; the card still opens
+          // the report exactly as before.
+          <LangyContextTarget
             key={dashboard.id}
+            target={dashboardContextChip({
+              dashboardId: dashboard.id,
+              name: dashboard.name,
+            })}
+          >
+          <Link
             href={`/${slug}/analytics/reports?dashboard=${dashboard.id}`}
             _hover={{ textDecoration: "none" }}
           >
@@ -217,6 +227,7 @@ function CustomReportsSection({ slug }: { slug: string }) {
               </Card.Body>
             </Card.Root>
           </Link>
+          </LangyContextTarget>
         ))}
       </Grid>
     </>

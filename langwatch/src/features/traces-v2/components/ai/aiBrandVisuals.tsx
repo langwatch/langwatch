@@ -10,15 +10,15 @@ import { aiBrandPalette } from "./aiBrandPalette";
 // `stroke="url(#langy-sparkle-grad)"`.
 export const SPARKLE_GRADIENT_ID = "langy-sparkle-grad";
 
-// AI accent shadows — purple-leaning so they feel cool, not warm.
-export const AI_SHADOW = "0 6px 18px -4px rgba(168, 85, 247, 0.35)";
-export const AI_SHADOW_SOFT = "0 4px 12px -4px rgba(168, 85, 247, 0.22)";
+// AI accent shadows — warm amber, matching Langy's one accent.
+export const AI_SHADOW = "0 6px 18px -4px rgba(237, 137, 38, 0.30)";
+export const AI_SHADOW_SOFT = "0 4px 12px -4px rgba(237, 137, 38, 0.20)";
 
 // AI brand surface tones. Kept literal because we want the same exact tones
-// across light/dark; semantic purple.subtle from Chakra is too pale.
-export const AI_BG_SUBTLE = "rgba(168, 85, 247, 0.06)";
-export const AI_BG_HOVER = "rgba(168, 85, 247, 0.10)";
-export const AI_BORDER = "rgba(168, 85, 247, 0.24)";
+// across light/dark; the semantic orange.subtle from Chakra is too pale.
+export const AI_BG_SUBTLE = "rgba(237, 137, 38, 0.06)";
+export const AI_BG_HOVER = "rgba(237, 137, 38, 0.11)";
+export const AI_BORDER = "rgba(237, 137, 38, 0.26)";
 
 // Use the emotion `keyframes` helper so the @keyframes rule is actually
 // emitted into the document head — embedding `"@keyframes …"` inside a
@@ -29,8 +29,8 @@ const aiThinkingShimmer = keyframes`
   100% { background-position: -200% 0; }
 `;
 
-// Sweep the three AI brand stops (orange → pink → violet) through the
-// muted body colour so the shimmer reads as the same "AI" gradient the
+// Sweep the three Langy brand stops (blue → purple → amber) through the
+// muted body colour so the shimmer reads as the same Langy gradient the
 // Sparkles icon and Ask AI button use, instead of a single flat accent.
 export const thinkingShimmerStyles = {
   background: `linear-gradient(
@@ -146,7 +146,12 @@ export function MeshGradientLayer({
   );
 }
 
-/** Small rounded tile housing a gradient sparkle — Langy's avatar. */
+/**
+ * Small rounded tile housing a gradient sparkle — Langy's avatar. The tile is
+ * tinted in the LangWatch brand (soft orange fill + orange hairline); the
+ * gradient (blue→purple→amber) survives only on the sparkle icon itself, the
+ * single AI moment. Both are semantic tokens — no raw hex.
+ */
 export function SparkleTile({
   size,
   sparkleSize,
@@ -159,10 +164,10 @@ export function SparkleTile({
       width={`${size}px`}
       height={`${size}px`}
       borderRadius="8px"
-      background={AI_BG_SUBTLE}
+      background="orange.subtle"
       borderWidth="1px"
       borderStyle="solid"
-      borderColor={AI_BORDER}
+      borderColor="orange.emphasized"
       display="grid"
       placeItems="center"
       flexShrink={0}

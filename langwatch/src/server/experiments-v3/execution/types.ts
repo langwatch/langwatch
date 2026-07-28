@@ -8,6 +8,7 @@ import {
   targetConfigSchema,
 } from "~/experiments-v3/types";
 import type { Workflow } from "~/optimization_studio/types/dsl";
+import type { SerializedHandledError } from "@langwatch/handled-error";
 import type { SingleEvaluationResult } from "~/server/evaluations/evaluators";
 
 // ============================================================================
@@ -200,6 +201,10 @@ export type ExecutionSummary = {
   };
 };
 
+export type EvaluationV3EvaluatorResult = SingleEvaluationResult & {
+  domainError?: SerializedHandledError;
+};
+
 /**
  * All SSE events emitted during evaluation execution.
  */
@@ -224,7 +229,7 @@ export type EvaluationV3Event =
       // Display name for evaluators that carry one without a DB record (workflow
       // evaluator nodes). DB-backed evaluators resolve their name at storage time.
       evaluatorName?: string;
-      result: SingleEvaluationResult;
+      result: EvaluationV3EvaluatorResult;
     }
   | { type: "progress"; completed: number; total: number }
   | {
@@ -258,24 +263,22 @@ export type ExecutionCell = {
   /** Existing trace ID to reuse (for evaluator reruns) */
   traceId?: string;
   /**
-   * Pairwise candidates baked into the cell after Phase 1 target execution.
-   * Set ONLY for synthetic pairwise cells; targetId on those cells points
-   * at variantA so the workflow builder has a real TargetConfig to lean on,
-   * but the target step is skipped via `skipTarget`.
+   * Comparison candidates baked into the cell after Phase 1 target execution,
+   * in the order the config lists its variants. Set ONLY for synthetic
+   * comparison cells; `targetId` on those cells points at a real TargetConfig
+   * so the workflow builder has something to lean on, but the target step
+   * itself is skipped via `skipTarget`.
+   *
+   * Two candidates is not a special case — a pairwise comparison is simply a
+   * `candidates` array of length 2.
    */
-  pairwise?: {
-    candidateA: {
+  comparison?: {
+    candidates: Array<{
       id: string;
       output: unknown;
       cost?: number;
       duration?: number;
-    };
-    candidateB: {
-      id: string;
-      output: unknown;
-      cost?: number;
-      duration?: number;
-    };
+    }>;
   };
 };
 

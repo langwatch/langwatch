@@ -20,19 +20,19 @@
  * @scenario Replay produces byte-identical projection state as live ingestion
  */
 
-import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import type { ClickHouseClient } from "@clickhouse/client";
-import {
-  startTestContainers,
-  stopTestContainers,
-  getTestClickHouseClient,
-} from "../../__tests__/integration/testContainers";
-import {
-  generateTestTenantId,
-  generateTestAggregateId,
-} from "../../__tests__/integration/testHelpers";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { leanForProjection } from "~/server/app-layer/traces/lean-for-projection";
 import { SPAN_RECEIVED_EVENT_TYPE } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
+import {
+  getTestClickHouseClient,
+  startTestContainers,
+  stopTestContainers,
+} from "../../__tests__/integration/testContainers";
+import {
+  generateTestAggregateId,
+  generateTestTenantId,
+} from "../../__tests__/integration/testHelpers";
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -57,7 +57,7 @@ vi.mock("langwatch", () => ({
   }),
 }));
 
-vi.mock("~/utils/logger/server", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
     info: vi.fn(),
     warn: vi.fn(),

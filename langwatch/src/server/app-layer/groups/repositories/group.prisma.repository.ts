@@ -28,7 +28,17 @@ export class PrismaGroupRepository implements GroupRepository {
           roleBindings: {
             include: { customRole: { select: { id: true, name: true } } },
           },
-          _count: { select: { members: true } },
+          _count: {
+            select: {
+              members: {
+                where: {
+                  user: {
+                    orgMemberships: { some: { organizationId } },
+                  },
+                },
+              },
+            },
+          },
         },
         orderBy: { name: "asc" },
         skip: (page - 1) * limit,
@@ -53,6 +63,11 @@ export class PrismaGroupRepository implements GroupRepository {
           include: { customRole: { select: { id: true, name: true } } },
         },
         members: {
+          where: {
+            user: {
+              orgMemberships: { some: { organizationId } },
+            },
+          },
           include: {
             user: { select: { id: true, name: true, email: true } },
           },
@@ -210,6 +225,21 @@ export class PrismaGroupRepository implements GroupRepository {
       select: { userId: true },
     });
     return !!member;
+  }
+
+  async areUsersInOrganization({
+    organizationId,
+    userIds,
+  }: {
+    organizationId: string;
+    userIds: string[];
+  }): Promise<boolean> {
+    if (userIds.length === 0) return true;
+
+    const count = await this.prisma.organizationUser.count({
+      where: { organizationId, userId: { in: userIds } },
+    });
+    return count === userIds.length;
   }
 
   async validateScopeInOrganization({

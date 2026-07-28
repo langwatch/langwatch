@@ -10,7 +10,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render } from "@testing-library/react";
 import { Compass } from "lucide-react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
 // FacetSection now calls useFacetSearch (server-side value search) at the top
@@ -21,13 +21,21 @@ vi.mock("../../../hooks/useFacetSearch", () => ({
   useFacetSearch: () => ({ values: [], totalDistinct: 0, isLoading: false }),
 }));
 
+import { useFacetLensStore } from "../../../stores/facetLensStore";
 import { FacetSection } from "../FacetSection";
 import type { FacetItem, FacetValueState } from "../types";
 
-afterEach(() => cleanup());
+beforeEach(() => {
+  // Facets collapse by default now; force ORIGIN open via the lens override
+  // (the real user mechanism) so the value rows render for these assertions.
+  useFacetLensStore.getState().setSectionOpen("origin", true);
+});
+afterEach(() => {
+  cleanup();
+  useFacetLensStore.getState().setSectionOpen("origin", false);
+});
 
-// Three values < AUTO_EXPAND_THRESHOLD (5) so the section auto-expands and the
-// body rows render. Counts are descending so the unfrozen sort order is a,b,c.
+// Counts are descending so the unfrozen sort order is a,b,c.
 const ITEMS: FacetItem[] = [
   { value: "a", label: "Alpha", count: 10 },
   { value: "b", label: "Bravo", count: 5 },

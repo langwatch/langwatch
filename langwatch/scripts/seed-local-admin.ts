@@ -124,9 +124,12 @@ async function main() {
         firstMessage: false,
         integrated: false,
         userLinkTemplate: null,
-        piiRedactionLevel: "ESSENTIAL",
-        capturedInputVisibility: "VISIBLE_TO_ALL",
-        capturedOutputVisibility: "VISIBLE_TO_ALL",
+        // `piiRedactionLevel`, `capturedInputVisibility` and
+        // `capturedOutputVisibility` used to be set here. None of the three
+        // exists on Project any more — not in the schema, not in the database —
+        // so Prisma rejected the whole create with "Unknown argument" and this
+        // script could not seed a fresh install AT ALL. They are removed rather
+        // than reinstated, because the columns they referenced are gone.
       },
     });
     console.log(`Created project ${project.id} (${project.slug})`);
@@ -169,8 +172,14 @@ async function main() {
   });
   console.log("Seeded org + team memberships and RoleBinding rows");
 
+  // The app's own address, not a fixed port: a second checkout runs on
+  // whatever slot was free, and a banner sending people to 5560 lands them on
+  // another checkout (or nothing at all).
+  const appUrl =
+    process.env.BASE_HOST ?? `http://localhost:${process.env.PORT ?? 5560}`;
+
   console.log("\n=== LOGIN CREDENTIALS ===");
-  console.log(`  URL:          http://localhost:5560/auth/signin`);
+  console.log(`  URL:          ${appUrl}/auth/signin`);
   console.log(`  Email:        ${email}`);
   console.log(`  Password:     ${password}`);
   console.log(`  Org slug:     ${org.slug}`);

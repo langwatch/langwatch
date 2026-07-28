@@ -1,7 +1,7 @@
 import { useRouter } from "~/utils/compat/next-router";
 import { useEffect, useMemo } from "react";
 import { useLocalStorage } from "usehooks-ts";
-import { OrganizationUserRole } from "@prisma/client";
+import { OrganizationUserRole, type Project } from "@prisma/client";
 import {
   EXTERNAL_MEMBER_PERMISSIONS,
   hasPermissionWithHierarchy,
@@ -33,6 +33,36 @@ export function isOrgScopedPermission(permission: Permission): boolean {
     permission.startsWith("complianceExport:") ||
     permission.startsWith("activityMonitor:") ||
     permission.startsWith("aiTools:")
+  );
+}
+
+/**
+ * Ambient team for organization-level work, in order of preference: a shared
+ * team that already holds a project, then any shared team, then whatever is
+ * left.
+ *
+ * Personal workspaces sort last because they are a private context — one
+ * project, owned by one person — while everything the app scopes to the
+ * ambient project belongs to the organization. Model provider credentials are
+ * the sharp edge: the settings page writes them against the ambient project,
+ * so a personal workspace winning here files an organization's keys into one
+ * member's private space. A personal team always holds exactly one project,
+ * so a plain "first team with a project" lookup lets it win whenever it
+ * sorts first.
+ *
+ * An organization whose only team is personal still resolves to it, so a solo
+ * user is never left without a context.
+ *
+ * @internal Exported for testing only
+ */
+export function selectAmbientTeam<
+  T extends { isPersonal?: boolean | null; projects: unknown[] },
+>(teams: T[]): T | undefined {
+  return (
+    teams.find((team) => !team.isPersonal && team.projects.length > 0) ??
+    teams.find((team) => !team.isPersonal) ??
+    teams.find((team) => team.projects.length > 0) ??
+    teams[0]
   );
 }
 
@@ -80,18 +110,63 @@ export const useOrganizationTeamProject = (
   const publicEnv = usePublicEnv();
 
   const isPublicRoute = publicRoutes.includes(router.route);
-  const shareId = typeof router.query.id === "string" ? router.query.id : "";
-  const publicShare = api.share.getShared.useQuery(
-    { id: shareId },
-    { enabled: !!shareId && !!isPublicRoute },
-  );
-  const publicShareProject = api.project.publicGetById.useQuery(
+  const shareToken = typeof router.query.id === "string" ? router.query.id : "";
+  // The public share page resolves everything (incl. its project chrome) through
+  // the single `sharedTrace.get` read. Same query key as the page, so React
+  // Query dedupes to one request and one consumed view. See ADR-057.
+  const sharedTrace = api.sharedTrace.get.useQuery(
+    { token: shareToken },
     {
-      id: publicShare.data?.projectId ?? "",
-      shareId: publicShare.data?.id ?? "",
+      enabled: !!shareToken && !!isPublicRoute,
+      staleTime: Infinity,
+      retry: false,
+      refetchOnMount: false,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
     },
-    { enabled: !!publicShare.data?.projectId && !!publicShare.data?.id },
   );
+  const publicShareProjectData: Project | undefined = sharedTrace.data
+    ? {
+        // The share payload deliberately exposes only the chrome fields; take
+        // exactly those off the DTO.
+        id: sharedTrace.data.project.id,
+        name: sharedTrace.data.project.name,
+        slug: sharedTrace.data.project.slug,
+        language: sharedTrace.data.project.language,
+        framework: sharedTrace.data.project.framework,
+        // Everything else is stubbed with inert, non-sensitive defaults so the
+        // object satisfies the full `Project` the app chrome is typed against.
+        // Nothing session-gated runs on public routes, so these are never read
+        // for real decisions; sensitive fields (apiKey, teamId, S3 credentials)
+        // stay empty/null rather than fake. The explicit `Project` annotation
+        // (no `as` cast) makes the compiler flag any new required column, so a
+        // future field can never silently ship unset here. See ADR-057.
+        apiKey: "",
+        teamId: "",
+        kind: "application",
+        firstMessage: true,
+        integrated: false,
+        createdAt: new Date(0),
+        updatedAt: new Date(0),
+        userLinkTemplate: null,
+        traceSharingEnabled: false,
+        presenceEnabled: false,
+        s3Endpoint: null,
+        s3AccessKeyId: null,
+        s3SecretAccessKey: null,
+        s3Bucket: null,
+        archivedAt: null,
+        isPersonal: false,
+        ownerUserId: null,
+        personalFeatures: {},
+        // `null` = no egress allowlist configured, which the Langy credential
+        // service reads as "no custom egress" rather than "allow anything" —
+        // the fail-closed side of ADR-053. A share viewer never runs Langy, so
+        // this is inert either way; null keeps it inert AND safe.
+        langyEgressAllowlist: null,
+        departmentId: null,
+      }
+    : undefined;
 
   const isDemo = Boolean(
     publicEnv.data?.DEMO_PROJECT_SLUG &&
@@ -140,13 +215,22 @@ export const useOrganizationTeamProject = (
     typeof router.query.project == "string" ? router.query.project : undefined;
 
   // TODO: test all this
-  const projectSlug =
+  const projectSlugFromUrl =
     projectQueryParam && !reservedProjectSlugs.includes(projectQueryParam)
       ? projectQueryParam
-      : localStorageProjectSlug;
+      : undefined;
+
+  const projectSlug = projectSlugFromUrl ?? localStorageProjectSlug;
 
   const teamSlug =
     typeof router.query.team == "string" ? router.query.team : undefined;
+
+  // The address bar is what separates "the user is in their personal
+  // workspace" from "the app picked it for them". A personal project or team
+  // named in the URL resolves exactly like any other; the persisted selection
+  // does not, because nothing on an organization-scoped page tells the user
+  // which project it is about to write to.
+  const isAddressedBySlug = !!projectSlugFromUrl || !!teamSlug;
 
   const teamsMatchingSlug = teamSlug
     ? organizations.data?.flatMap((organization) =>
@@ -177,6 +261,16 @@ export const useOrganizationTeamProject = (
       ),
   );
 
+  // The slug that resolved a personal workspace off the persisted selection
+  // rather than off the URL is stickiness, not intent: it survives from the
+  // last visit to /[personal-slug]/* into every organization-scoped page that
+  // carries no project of its own. Drop it there and let the ambient
+  // resolution below pick a shared team, which also re-persists the shared
+  // project so the stale selection heals itself.
+  const slugMatch = projectsTeamsOrganizationsMatchingSlug?.[0];
+  const resolvedSlugMatch =
+    slugMatch?.team.isPersonal && !isAddressedBySlug ? undefined : slugMatch;
+
   // For demo mode, find the organization that contains the demo project
   // (backend returns all user orgs + demo org, so we need to find the one with demo project)
   const organization = isDemo
@@ -189,13 +283,37 @@ export const useOrganizationTeamProject = (
       ) ?? organizations.data?.[0]) // Fallback to first if not found
     : teamsMatchingSlug?.[0]
       ? teamsMatchingSlug?.[0].organization
-      : projectsTeamsOrganizationsMatchingSlug?.[0]
-        ? projectsTeamsOrganizationsMatchingSlug?.[0].organization
+      : resolvedSlugMatch
+        ? resolvedSlugMatch.organization
         : organizations.data
           ? (organizations.data.find(
               (org) => org.id == localStorageOrganizationId,
             ) ?? organizations.data[0])
           : undefined;
+
+  // `/me` and its sub-routes are the one place "no project slug in the URL"
+  // does NOT mean "organization-level work", it means the user's own
+  // personal workspace, the opposite of the ambient/shared team `selectAmbientTeam`
+  // exists to prefer. Checked BEFORE the localStorage-remembered-team lookup,
+  // not just added as a further fallback after it: a member who visited any
+  // organization-scoped page earlier in the session has a non-personal team
+  // id already persisted there, and that stale selection legitimately wins
+  // on THOSE pages (see the stickiness handling above) but must never win on
+  // /me itself, which is unambiguously about the personal workspace and
+  // cannot mean anything else. Left as a fallback-only check, that persisted
+  // selection matched before this was ever reached, and /me resolved to the
+  // shared team's first (or, if it holds no project yet, undefined) project,
+  // which then read every personal-scope feature (Langy chief among them) as
+  // running in a context that either belonged to someone else or did not
+  // exist. Gated on the same `/me` prefix DashboardLayout already uses for
+  // `isPersonalScopeRoute`, so every other caller (settings pages,
+  // project-slug pages, demo mode) is unaffected.
+  const isPersonalScopeRoute = router.pathname.startsWith("/me");
+  const ownPersonalTeam = isPersonalScopeRoute
+    ? organization?.teams.find(
+        (team) => team.isPersonal && team.ownerUserId === session.data?.user.id,
+      )
+    : undefined;
 
   const team = isDemo
     ? (organization?.teams.find((t) =>
@@ -203,15 +321,16 @@ export const useOrganizationTeamProject = (
           (project) => project.slug === publicEnv.data?.DEMO_PROJECT_SLUG,
         ),
       ) ??
-      organization?.teams.find((t) => t.projects.length > 0) ??
-      organization?.teams[0]) // Find team with demo project, or any team with projects
-    : projectsTeamsOrganizationsMatchingSlug?.[0]
-      ? projectsTeamsOrganizationsMatchingSlug?.[0].team
-      : organization
-        ? (organization.teams.find((team) => team.id == localStorageTeamId) ??
-          organization.teams.find((team) => team.projects.length > 0) ??
-          organization.teams[0])
-        : undefined;
+      selectAmbientTeam(organization?.teams ?? [])) // The team holding the demo project, else the ambient one
+    : resolvedSlugMatch
+      ? resolvedSlugMatch.team
+      : ownPersonalTeam
+        ? ownPersonalTeam
+        : organization
+          ? (organization.teams.find(
+              (team) => team.id == localStorageTeamId && !team.isPersonal,
+            ) ?? selectAmbientTeam(organization.teams))
+          : undefined;
 
   // For demo mode, find the project with the demo slug
   const project = isDemo
@@ -219,8 +338,7 @@ export const useOrganizationTeamProject = (
         (p) => p.slug === publicEnv.data?.DEMO_PROJECT_SLUG,
       ) ?? team?.projects[0]) // Find demo project by slug, or fallback to first
     : team
-      ? (projectsTeamsOrganizationsMatchingSlug?.[0]?.project ??
-        team.projects[0])
+      ? (resolvedSlugMatch?.project ?? team.projects[0])
       : undefined;
 
   // Override project slug for demo projects so it matches the URL
@@ -372,7 +490,7 @@ export const useOrganizationTeamProject = (
   if (organizations.isLoading && !organizations.isFetched) {
     return {
       isLoading: true,
-      project: publicShareProject.data,
+      project: publicShareProjectData,
       hasPermission: () => false,
       hasOrgPermission: () => false,
       hasAnyPermission: () => false,
@@ -479,7 +597,7 @@ export const useOrganizationTeamProject = (
     organizations: organizations.data,
     organization,
     team,
-    project: publicShareProject.data ?? finalProject,
+    project: publicShareProjectData ?? finalProject,
     projectId: finalProject?.id,
     hasPermission,
     hasOrgPermission,

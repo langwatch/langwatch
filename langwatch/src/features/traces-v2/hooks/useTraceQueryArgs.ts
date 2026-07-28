@@ -1,5 +1,6 @@
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { LIVE_WINDOW_MS } from "../constants/freshness";
+import { useTraceViewer } from "../context/TraceViewerContext";
 import { isPreviewTraceId } from "../onboarding/data/samplePreviewTraces";
 import { useDrawerStore } from "../stores/drawerStore";
 
@@ -20,7 +21,11 @@ import { useDrawerStore } from "../stores/drawerStore";
  */
 export function useTraceQueryArgs() {
   const { project } = useOrganizationTeamProject();
-  const traceId = useDrawerStore((s) => s.traceId);
+  // The share page injects its trace through context rather than the drawer
+  // store, so the global drawer mount stays inert. See TraceViewerContext.
+  const viewer = useTraceViewer();
+  const storeTraceId = useDrawerStore((s) => s.traceId);
+  const traceId = viewer.traceId ?? storeTraceId;
   const occurredAtMs = useDrawerStore((s) => s.occurredAtMs);
 
   const isLive =

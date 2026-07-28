@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { platformUrl } from "../platform-url";
 
 // vi.mock factories are hoisted above top-level declarations, so the
@@ -18,7 +18,7 @@ describe("platformUrl", () => {
   describe("when BASE_HOST is set", () => {
     it("builds a direct page URL", () => {
       expect(
-        platformUrl({ projectSlug: "my-project", path: "/datasets/ds_123" })
+        platformUrl({ projectSlug: "my-project", path: "/datasets/ds_123" }),
       ).toBe("https://app.langwatch.ai/my-project/datasets/ds_123");
     });
 
@@ -26,18 +26,18 @@ describe("platformUrl", () => {
       expect(
         platformUrl({
           projectSlug: "my-project",
-          path: "/evaluations?drawer.open=onlineEvaluation&drawer.monitorId=mon_123",
-        })
+          path: "/online-evaluations?drawer.open=onlineEvaluation&drawer.monitorId=mon_123",
+        }),
       ).toBe(
-        "https://app.langwatch.ai/my-project/evaluations?drawer.open=onlineEvaluation&drawer.monitorId=mon_123"
+        "https://app.langwatch.ai/my-project/online-evaluations?drawer.open=onlineEvaluation&drawer.monitorId=mon_123",
       );
     });
 
     it("strips trailing slash from BASE_HOST", () => {
       mockEnv.BASE_HOST = "https://app.langwatch.ai/";
-      expect(
-        platformUrl({ projectSlug: "test", path: "/datasets/ds_1" })
-      ).toBe("https://app.langwatch.ai/test/datasets/ds_1");
+      expect(platformUrl({ projectSlug: "test", path: "/datasets/ds_1" })).toBe(
+        "https://app.langwatch.ai/test/datasets/ds_1",
+      );
     });
   });
 
@@ -47,9 +47,9 @@ describe("platformUrl", () => {
     });
 
     it("returns a URL with empty base", () => {
-      expect(
-        platformUrl({ projectSlug: "demo", path: "/agents" })
-      ).toBe("/demo/agents");
+      expect(platformUrl({ projectSlug: "demo", path: "/agents" })).toBe(
+        "/demo/agents",
+      );
     });
   });
 
@@ -60,14 +60,17 @@ describe("platformUrl", () => {
     });
 
     it("generates correct trace page URL", () => {
-      const url = platformUrl({ projectSlug: "p", path: "/messages/trace_abc" });
+      const url = platformUrl({
+        projectSlug: "p",
+        path: "/messages/trace_abc",
+      });
       expect(url).toContain("/p/messages/trace_abc");
     });
 
     it("generates correct monitor drawer URL", () => {
       const url = platformUrl({
         projectSlug: "p",
-        path: "/evaluations?drawer.open=onlineEvaluation&drawer.monitorId=mon_1",
+        path: "/online-evaluations?drawer.open=onlineEvaluation&drawer.monitorId=mon_1",
       });
       expect(url).toContain("drawer.open=onlineEvaluation");
       expect(url).toContain("drawer.monitorId=mon_1");
@@ -118,7 +121,10 @@ describe("platformUrl", () => {
     });
 
     it("generates correct dashboard page URL", () => {
-      const url = platformUrl({ projectSlug: "p", path: "/analytics/custom/dash_1" });
+      const url = platformUrl({
+        projectSlug: "p",
+        path: "/analytics/custom/dash_1",
+      });
       expect(url).toContain("/p/analytics/custom/dash_1");
     });
 

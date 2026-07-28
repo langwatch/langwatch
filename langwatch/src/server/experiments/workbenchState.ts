@@ -102,3 +102,17 @@ export const workbenchStateSchema = z.object({
 });
 
 export type WizardState = z.infer<typeof workbenchStateSchema>;
+
+export const isLegacyOnlineEvaluationWorkbenchState = (
+  workbenchState: unknown,
+): boolean => {
+  if (
+    !workbenchState ||
+    typeof workbenchState !== "object" ||
+    Array.isArray(workbenchState)
+  ) {
+    return false;
+  }
+
+  return (workbenchState as Record<string, unknown>).task === "real_time";
+};

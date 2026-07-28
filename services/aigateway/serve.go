@@ -12,6 +12,7 @@ import (
 	"github.com/langwatch/langwatch/pkg/lifecycle"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/httpapi"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/ottlserver"
+	"github.com/langwatch/langwatch/services/aigateway/adapters/statusprobe"
 	"github.com/langwatch/langwatch/services/aigateway/app"
 )
 
@@ -25,17 +26,27 @@ func Serve(ctx context.Context, application *app.App, deps *Deps, cfg Config) er
 		return fmt.Errorf("ottlserver init: %w", err)
 	}
 
+	// Backs the public GET /health status-page endpoint: probes the
+	// control plane on its own clock so a poll never fans out.
+	statusMon := statusprobe.New(statusprobe.Options{
+		Pinger: deps.ControlPlane,
+		Logger: deps.Logger,
+	})
+
 	info := contexts.MustGetServiceInfo(ctx)
 	handler := httpapi.NewRouter(httpapi.RouterDeps{
 		App:                   application,
 		Logger:                deps.Logger,
 		Health:                deps.Health,
+		Metrics:               deps.Metrics,
 		Version:               info.Version,
 		TraceRegistry:         deps.TraceRegistry,
 		DefaultExportEndpoint: cfg.CustomerTraceBridge.BaseURL + "/api/otel",
 		OTTLServer:            ottlSrv,
 		InternalSecret:        cfg.ControlPlane.InternalSecret,
 		MaxRequestBodyBytes:   cfg.Server.MaxRequestBodyBytes,
+		HeartbeatInterval:     time.Duration(cfg.NonStreamingHeartbeatIntervalSeconds) * time.Second,
+		Status:                statusMon,
 	})
 
 	srv := &http.Server{Handler: handler, Addr: cfg.Server.Addr, ReadHeaderTimeout: 10 * time.Second}
@@ -48,6 +59,7 @@ func Serve(ctx context.Context, application *app.App, deps *Deps, cfg Config) er
 		lifecycle.Closer("otel", deps.OTel.Shutdown),
 		lifecycle.Closer("customer-trace-bridge", deps.TraceBridge.Shutdown),
 		lifecycle.Worker("auth", deps.Auth.Start, deps.Auth.Stop),
+		lifecycle.Worker("statusprobe", statusMon.Start, statusMon.Stop),
 		lifecycle.ListenServer("http", srv),
 	)
 	return g.Run(ctx)

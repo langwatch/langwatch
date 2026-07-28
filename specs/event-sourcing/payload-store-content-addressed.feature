@@ -2,16 +2,16 @@
 Feature: GroupQueue content-addressed tiered payload store
   As the LangWatch event-sourcing queue absorbing fan-out from a single event
   I want one event's shared payload stored once by content hash and referenced
-  by every job it fans out to, across three size tiers, reclaimed eagerly when
-  the last referencing job finishes
+  by every job it fans out to, across three size tiers, protected by renewable
+  time-bounded leases
   So that a dozen-way fan-out costs one payload copy instead of a dozen, the
-  queue survives a weekend outage without accumulating days of dead payloads,
+  queue survives crashes without leaking payloads indefinitely,
   and offload is decided by size alone, not by command-vs-job provenance.
 
   # Builds on ADR-026's GQ1 envelope (specs/event-sourcing/payload-envelope.feature).
   # Supersedes ADR-026's blob-lifecycle scenarios: random blob ids become content
-  # hashes; best-effort-delete + 7-day pure-backstop TTL becomes holder-set eager
-  # reclaim + 3-day refreshed backstop. The GQ1 envelope/header/routing/two-phase
+  # hashes; best-effort-delete + 7-day pure-backstop TTL becomes renewable
+  # per-holder leases + a 4-day refreshed backstop. The GQ1 envelope/header/routing/two-phase
   # rollout decisions carry forward unchanged.
   #
   # TWO mechanisms share the word "dedup" — this spec keeps them apart:
@@ -22,9 +22,7 @@ Feature: GroupQueue content-addressed tiered payload store
   #     staged jobs into one HSET field — owned by
   #     specs/traces/record-span-gq-dedup.feature, configured per
   #     specs/event-sourcing/deduplication-strategy.feature. This feature only
-  #     COMPOSES with it: a squashed slot releases its hold on its blob.
-  #   The holder-set members are the per-slot `stagedJobId`s of
-  #   record-span-gq-dedup.feature.
+  #     COMPOSES with it: a squashed slot releases its lease on its blob.
   #
   # Decision (ADR-029):
   #   - Three tiers by serialized size: inline ≤4 KiB · redis 4 KiB–256 KiB ·
@@ -37,17 +35,23 @@ Feature: GroupQueue content-addressed tiered payload store
   #   - Flat jobs: the fan-out producer hoists the shared component (event, fold
   #     state) out of every job; each job carries refs, not the payload. Decode
   #     resolves refs before the handler, which is unchanged.
-  #   - Holder set {queue}:gq:blobholders:<hash> tracks references by stagedJobId;
-  #     SADD at stage, SREM at every retire edge, atomic with the job-entry write.
-  #     Empties -> eager UNLINK (redis) / reclaim-list sweep (s3).
-  #   - 3-day TTL on blob + holder set, refreshed on access, is the orphan
-  #     backstop only. A missing blob completes the slot without the handler
+  #   - Lease set {queue}:gq:blobleases:<hash> records a deadline per staged job;
+  #     lease-take and renewal set `now + lease TTL`, and terminal retirement
+  #     removes that holder's lease idempotently. Releases never delete blobs.
+  #   - 4-day TTL on Redis blobs and lease deadlines are refreshed on access;
+  #     Redis expiry and the durable-store lifecycle sweep reclaim blobs lazily.
+  #     A missing blob completes the slot without the handler
   #     (recoverable via replay) — a fail-safe, never a wedge.
+  #   - Retiring the LAST lease shortens the blob's expiry to a 1-hour grace
+  #     window rather than leaving the full 4-day backstop (2026-07-22, Track 5).
+  #     Shortening an expiry is not deletion: any later take re-arms the 4-day
+  #     backstop, so the release stays safe against a producer that wrote these
+  #     bytes before the release and stages after it.
   #
   # RESOLVED (ADR-029): the s3/file tier reuses the stored-objects StorageDriver/
   # StorageRegistry/URI minting (specs/features/scenarios/externalize-event-byte-content.feature)
   # — the driver only, NOT StoredObjectsService (whose no-GC lifecycle would
-  # clash with holder-set reclaim). The redis tier stays the queue's own store.
+  # clash with lease/backstop reclaim). The redis tier stays the queue's own store.
   #
   # Related ADRs: 029 (this), 026 (envelope, extended), 022 (event_log SoT — its
   # BlobStore is event_log-centric, NOT reused here), 024 (CH cold-path tiering —
@@ -61,7 +65,8 @@ Feature: GroupQueue content-addressed tiered payload store
     And envelope v2 writes are enabled for the deployment
     And the inline tier ceiling is configured at 4 KiB
     And the S3 tier threshold is configured at 256 KiB
-    And the blob TTL backstop is configured at 3 days
+    And the blob TTL backstop is configured at 4 days
+    And the released-blob grace window is configured at 1 hour
 
   # ===========================================================================
   # Track 1 — content-addressed tiers
@@ -142,7 +147,7 @@ Feature: GroupQueue content-addressed tiered payload store
   # s3://{bucket}/{projectId}/<hash>. Isolation is structural — in the key path —
   # not incidental to content. This also makes a project purge a delete-by-prefix
   # over .../{projectId}/* (driven by the platform's project-delete cascade); the
-  # redis tier needs none, its 3-day TTL clears once the project's jobs drain.
+  # redis tier needs none, its 4-day TTL clears once the project's jobs drain.
   Scenario: Blob keys are namespaced by tenant so tenants never share a blob
     Given two tenants whose jobs carry byte-identical user content
     When each payload is offloaded
@@ -151,80 +156,79 @@ Feature: GroupQueue content-addressed tiered payload store
     And neither tenant's job can resolve the other tenant's blob
 
   # ===========================================================================
-  # Track 3 — holder-set reclaim and TTL backstop
+  # Track 3 — lease lifecycle and TTL backstop
   # ===========================================================================
 
   @integration @track3 @unimplemented
-  Scenario: A shared blob survives until its last referencing job completes
+  Scenario: A shared blob survives while any referencing job renews its lease
     Given a blob referenced by three staged jobs
-    When two of the jobs complete
+    When two jobs stop renewing and their leases expire
     Then the blob is still present
-    When the third job completes
-    Then the blob is reclaimed
-    And its holder set is removed
+    When the third job renews its lease
+    Then the blob remains readable
+    And duplicate lease renewals do not create extra leases
 
   @integration @track3 @unimplemented
-  # Composes the holder set with the dedup-id squash owned by
+  # Composes leases with the dedup-id squash owned by
   # record-span-gq-dedup.feature. SUPERSEDES payload-envelope.feature's GQ1
   # scenario "Offloaded blobs displaced by a dedup squash are reclaimed":
   # under GQ1 every job owned a private random-id blob, so the squash deleted
   # the displaced blob unconditionally. Under v2 the blob may be shared, so the
-  # squashed slot only releases its hold — the blob goes iff no slot still holds it.
-  Scenario: A dedup squash releases its hold without dropping a still-referenced blob
+  # squashed slot only releases its lease and never deletes the blob eagerly.
+  Scenario: A dedup squash releases its lease without dropping a still-referenced blob
     Given two staged jobs referencing the same content-addressed blob
     When a later job with the same dedup id squashes one of them in place
-    Then the squashed slot releases its hold on the blob
-    And the blob remains because the surviving slot still holds it
+    Then the squashed slot releases its lease on the blob
+    And the blob remains because the surviving slot renews its lease
 
   @integration @track3 @unimplemented
   Scenario: A retry re-stage keeps the same content-addressed blob alive
     Given an offloaded job that fails with a retryable error
     When it is re-staged with its attempt counter incremented
-    Then the re-staged slot holds the same content-addressed blob
-    And the retry re-encodes to the same hash, so the hold is never released-then-needed
+    Then the re-staged slot leases the same content-addressed blob
+    And the retry re-encodes to the same hash, so the lease is renewed without a liveness gap
     And the blob is not reclaimed across the retry
 
   @integration @track3 @unimplemented
   # Dispatch HDELs the job value out of the group hash and hands it to the worker
-  # in memory, so the blob must outlive dispatch; the hold releases only when the
-  # slot terminally retires (complete / exhaust / squash / decode-fail).
-  Scenario: A blob survives dispatch and is released only at terminal retirement
+  # in memory, so the blob must outlive dispatch; dispatch renews the lease and
+  # terminal retirement only removes that holder's lease.
+  Scenario: A blob survives dispatch through lease renewal
     Given an offloaded job referencing a blob
     When the job is dispatched to the worker
     Then the blob is still present while the handler runs
-    And the hold is released only when the job terminally retires
+    And the lease is removed only when the job terminally retires
 
   @integration @track3 @unimplemented
-  # The one TOCTOU the holder set alone doesn't close: the release (SREM +
-  # reclaim-if-empty) must be atomic against a concurrent re-stage of the same
-  # content, or the last completion could delete a blob a new job just took.
+  # Release never deletes a blob, so a concurrent re-stage cannot race an eager
+  # last-holder reclaim.
   Scenario: A completion racing a re-stage of the same content does not delete the live blob
-    Given a blob whose last holder is completing
+    Given a blob whose last lease holder is completing
     And a new job referencing the same content is staged concurrently
     When the release runs
-    Then the blob is retained because the new job holds it
+    Then the blob is retained because releases do not reclaim eagerly
     And no job is left referencing a deleted blob
 
   @integration @track3 @unimplemented
-  Scenario: An S3-tier blob is reclaimed through the sweeper when its holders empty
-    Given an S3-tier blob referenced by a single staged job
-    When that last referencing job completes
-    Then the blob's key is enqueued for best-effort sweep deletion
-    And the object-store lifecycle rule reclaims it if the sweep is missed
+  Scenario: An S3-tier blob is reclaimed lazily after its leases expire
+    Given an S3-tier blob whose holders no longer renew their leases
+    When every lease has expired
+    Then no completion path deletes the object eagerly
+    And the object-store lifecycle sweep eventually reclaims it
 
   @integration @track3 @unimplemented
-  Scenario: An access refreshes a blob's TTL so a long-dwell job keeps its payload
+  Scenario: An access refreshes the blob and lease so a long-dwell job keeps its payload
     Given an offloaded job held in a retry-backoff chain
     When the job is dispatched after a delay shorter than the TTL
-    Then the dispatch refreshes the blob's TTL
+    Then the dispatch refreshes the blob's TTL and the holder's lease deadline
     And the blob is still present for the handler
 
   @integration @track3 @unimplemented
   # Crash between the client PUT and the Lua stage leaves a blob with an empty
-  # holder set; nothing eager reclaims it, so the backstop must.
-  Scenario: An orphaned blob with no holders expires via its TTL backstop
+  # lease set; nothing eager reclaims it, so the backstop must.
+  Scenario: An orphaned blob with no leases expires via its TTL backstop
     Given a blob written to Redis whose staging never completed
-    And no job references it
+    And no job leases it
     When the TTL backstop elapses without any access refreshing it
     Then the blob is reclaimed
 
@@ -264,6 +268,145 @@ Feature: GroupQueue content-addressed tiered payload store
     And the work remains recoverable via event replay
 
   # ===========================================================================
+  # Track 5 — bounded dead-blob retention (2026-07-22 amendment)
+  # ===========================================================================
+  # Track 3 removed eager reclaim to stop a completion racing a live sibling into
+  # deleting a shared blob. It left nothing shorter than the 4-day backstop in its
+  # place, so a blob nothing referenced any more still occupied Redis for four
+  # days. Nothing drains a retired blob before it ages out, so retention runs the
+  # full four days deep — a leak whatever its label. These scenarios
+  # bound that retention without restoring the race: the release does not delete
+  # the bytes, it only shortens their deadline, and any subsequent take restores
+  # the full backstop.
+  #
+  # Bound by blobLeases.integration.test.ts ("release grace window") and
+  # scripts.integration.test.ts ("dedup squash grace window").
+
+  @integration @track5
+  Scenario: Retiring the last lease puts a Redis-tier blob on the grace window
+    Given a Redis-tier blob whose only lease holder is retiring
+    When that holder releases its lease
+    Then the blob is still readable
+    And its expiry is shortened to the release grace window
+
+  @integration @track5
+  Scenario: A blob a sibling still leases keeps its full backstop
+    Given a Redis-tier blob leased by two staged jobs
+    When one of them releases its lease
+    Then the blob keeps its four-day backstop
+    And the grace window is withheld while any lease is live
+
+  @integration @track5
+  # This is what makes shortening the expiry safe where deleting the bytes was
+  # not. A producer PUTs content-addressed bytes and stages a round trip later;
+  # if the last lease is retired in that window, the stage re-arms the backstop
+  # rather than finding a hole.
+  Scenario: A job staged after the grace window began restores the full backstop
+    Given a Redis-tier blob placed on the release grace window
+    When a new job referencing the same content is staged
+    Then the blob's four-day backstop is restored
+    And the new job's lease is live
+
+  @integration @track5
+  # Belt and braces for a mixed-version fleet: a holder from a release that
+  # predates leases writes a token into the legacy holder set and no lease
+  # deadline, so an empty lease set alone must not be read as "unreferenced".
+  Scenario: A holder from a pre-lease release withholds the grace window
+    Given a Redis-tier blob whose only lease holder is retiring
+    And a holder token written by a release that predates leases
+    When that holder releases its lease
+    Then the blob keeps its four-day backstop
+
+  @integration @track5
+  Scenario: A dedup squash that retires the last lease puts the displaced blob on the grace window
+    Given a staged job holding the only lease on a Redis-tier blob
+    When a later job with the same dedup id replaces it with different content
+    Then the displaced blob is still readable
+    And its expiry is shortened to the release grace window
+    And the replacement's own blob carries the full four-day backstop
+
+  @integration @track5
+  Scenario: An S3-tier release leaves the object to the durable-store sweep
+    Given an S3-tier blob whose only lease holder is retiring
+    When that holder releases its lease
+    Then no object-store delete is issued
+    And the object remains for the durable-store lifecycle sweep
+
+  # ===========================================================================
+  # Track 6 — active blob reclaim (2026-07-22)
+  # ===========================================================================
+  # Track 5 shortened the deadline on a blob whose LAST lease retired, but it can
+  # only act at the moment of a release. Two things escape it. A holder killed
+  # mid-flight never releases at all, so its blob keeps the full backstop and is
+  # re-armed again on every redelivery. And that holder's mirrored token stays in
+  # the holder set forever, so the next clean release reads the set as "someone I
+  # cannot measure still holds this" and withholds the window from the blob and
+  # every sibling sharing its content. Under fleet-wide worker restarts both
+  # happen constantly, which is how retention kept growing with the grace window
+  # deployed and firing.
+  #
+  # The reclaim runner closes that gap from outside the release path. It walks the
+  # blob keyspace on a schedule and judges each blob on its own lease state rather
+  # than on whether a release happened to run. Two passes, deliberately asymmetric
+  # in what they are allowed to do:
+  #
+  #   - Repair only ever SHORTENS a deadline, so it is safe on the same argument
+  #     Track 5 rests on: the bytes stay readable and any take re-arms them.
+  #     That is what lets it bypass the holder-set guard a release must respect.
+  #   - Reclaim is the only pass that destroys bytes, so it demands proof the
+  #     grace window has already been running for a margin — which a blob written
+  #     but not yet staged can never show.
+  #
+  # Bound by blobSweeper.integration.test.ts.
+
+  @integration @track6
+  Scenario: An unreferenced blob is put on the grace window even though a stale holder token withheld it
+    Given a Redis-tier blob with no live lease
+    And a holder token left behind by a worker that died before releasing
+    When the reclaim runner runs
+    Then the blob is still readable
+    And its expiry is shortened to the release grace window
+
+  @integration @track6
+  Scenario: A blob a live lease still references is left alone
+    Given a Redis-tier blob a staged job still leases
+    When the reclaim runner runs
+    Then the blob keeps its four-day backstop
+    And the runner reports it as still referenced
+
+  @integration @track6
+  # The put-before-stage window is why reclaim demands a margin. A producer writes
+  # content-addressed bytes and stages them a round trip later; for that moment the
+  # blob has no lease and no holder, and it must not be mistaken for abandoned.
+  Scenario: A blob still within its put-before-stage window is not reclaimed
+    Given a Redis-tier blob just written by a producer that has not staged yet
+    When the reclaim runner runs
+    Then the blob is still readable
+    And a producer that stages it later still finds it
+
+  @integration @track6
+  Scenario: A blob whose grace window has been running past the safety margin is destroyed
+    Given a Redis-tier blob with no live lease
+    And its grace window has been running longer than the reclaim safety margin
+    When the reclaim runner runs
+    Then the blob is deleted
+    And it leaves no trace behind
+
+  @integration @track6
+  Scenario: A dry run reports what it would reclaim without deleting anything
+    Given a Redis-tier blob eligible for reclaim
+    When the reclaim runner sweeps in dry-run mode
+    Then the blob is still readable
+    And the runner reports it as eligible for reclaim
+
+  @scheduled @track6
+  Scenario: The runner is driven by the schedule, not by a request
+    Given the reclaim runner is on its cleanup schedule
+    When a cleanup interval comes due
+    Then the sweep runs once for that interval
+    And it does not run again for the same interval
+
+  # ===========================================================================
   # --- AC Coverage Map (ADR-029) ---
   # Track 1 — content-addressed tiers
   #   AC1.1 "Size picks the tier; inline stays inline"
@@ -285,24 +428,24 @@ Feature: GroupQueue content-addressed tiered payload store
   #     -> Blob keys are namespaced by tenant so tenants never share a blob
   #   AC2.5 "Producer-hoist: cross-shape dedup + serialize-once per fan-out"
   #     -> A projection and a reactor for the same event share one stored event
-  # Track 3 — holder-set reclaim and TTL backstop
-  #   AC3.1 "Blob lives until the last referencing job completes"
-  #     -> A shared blob survives until its last referencing job completes
-  #   AC3.2 "Dedup squash releases one hold, not the shared blob" (supersedes GQ1)
-  #     -> A dedup squash releases its hold without dropping a still-referenced blob
+  # Track 3 — lease lifecycle and TTL backstop
+  #   AC3.1 "Blob lives while any referencing job renews its lease"
+  #     -> A shared blob survives while any referencing job renews its lease
+  #   AC3.2 "Dedup squash releases one lease, never the shared blob" (supersedes GQ1)
+  #     -> A dedup squash releases its lease without dropping a still-referenced blob
   #   AC3.3 "Retry keeps the same blob alive"
   #     -> A retry re-stage keeps the same content-addressed blob alive
-  #   AC3.4 "S3-tier reclaim via sweeper + lifecycle backstop"
-  #     -> An S3-tier blob is reclaimed through the sweeper when its holders empty
-  #   AC3.5 "Access refreshes TTL for long-dwell jobs"
-  #     -> An access refreshes a blob's TTL so a long-dwell job keeps its payload
+  #   AC3.4 "S3-tier lazy reclaim via lifecycle sweep"
+  #     -> An S3-tier blob is reclaimed lazily after its leases expire
+  #   AC3.5 "Access refreshes blob TTL and lease for long-dwell jobs"
+  #     -> An access refreshes the blob and lease so a long-dwell job keeps its payload
   #   AC3.6 "Orphaned blob expires via the backstop"
-  #     -> An orphaned blob with no holders expires via its TTL backstop
+  #     -> An orphaned blob with no leases expires via its TTL backstop
   #   AC3.7 "Missing blob is a fail-safe, not a wedge" (carried from ADR-026)
   #     -> A missing blob completes the slot without wedging the group
-  #   AC3.8 "Blob survives dispatch; released only at terminal retirement"
-  #     -> A blob survives dispatch and is released only at terminal retirement
-  #   AC3.9 "Atomic release vs concurrent re-stage (TOCTOU)"
+  #   AC3.8 "Blob survives dispatch through lease renewal"
+  #     -> A blob survives dispatch through lease renewal
+  #   AC3.9 "Release cannot race a concurrent re-stage into eager deletion"
   #     -> A completion racing a re-stage of the same content does not delete the live blob
   # Track 4 — rollout and backward compatibility
   #   AC4.1 "v2 writes gated until the fleet reads v2"
@@ -311,7 +454,34 @@ Feature: GroupQueue content-addressed tiered payload store
   #     -> Legacy GQ1 and bare-JSON jobs staged before the deploy still process
   #   AC4.3 "Old pod drops an unparseable v2 value safely"
   #     -> A pod on the previous release drops a v2 value it cannot parse
+  # Track 5 — bounded dead-blob retention (2026-07-22 amendment)
+  #   AC5.1 "Last release shortens the blob's expiry to the grace window"
+  #     -> Retiring the last lease puts a Redis-tier blob on the grace window
+  #   AC5.2 "A live sibling lease withholds the grace window"
+  #     -> A blob a sibling still leases keeps its full backstop
+  #   AC5.3 "A later take re-arms the backstop" (why shortening is not deleting)
+  #     -> A job staged after the grace window began restores the full backstop
+  #   AC5.4 "A pre-lease holder token withholds the grace window"
+  #     -> A holder from a pre-lease release withholds the grace window
+  #   AC5.5 "The Lua squash release grants the same grace window"
+  #     -> A dedup squash that retires the last lease puts the displaced blob on the grace window
+  #   AC5.6 "The S3 tier is untouched; the durable sweep still owns it"
+  #     -> An S3-tier release leaves the object to the durable-store sweep
+  # Track 6 — active blob reclaim (2026-07-22)
+  #   AC6.1 "Repair grants the window a stale holder token withheld"
+  #     -> An unreferenced blob is put on the grace window even though a stale holder token withheld it
+  #   AC6.2 "A live lease is never touched"
+  #     -> A blob a live lease still references is left alone
+  #   AC6.3 "The put-before-stage window is never destroyed"
+  #     -> A blob written but not yet staged is never destroyed
+  #   AC6.4 "Reclaim destroys only past the safety margin"
+  #     -> A blob whose grace window has been running past the safety margin is destroyed
+  #   AC6.5 "Dry run reports without destroying"
+  #     -> A dry run reports what it would reclaim without deleting anything
+  #   AC6.6 "The sweep is scheduled and singly-executed"
+  #     -> The runner is driven by the schedule, not by a request
   #
-  # Count: 21 behavioral ACs -> 21 scenarios. All @unimplemented pending the
-  # Outside-In TDD pass (integration tests first, then unit, then code).
+  # Count: 21 ADR-029 ACs -> 21 scenarios (@unimplemented pending the Outside-In
+  # TDD pass), plus 6 Track 5 amendment ACs and 6 Track 6 reclaim ACs -> 12
+  # scenarios, all bound.
   # ===========================================================================

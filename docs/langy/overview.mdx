@@ -1,0 +1,43 @@
+---
+title: Langy Overview
+description: Langy is the automated AI engineer inside LangWatch that reads your traces and evals, writes Scenario tests, and opens PRs for the CI to run the evals and validate improvements.
+sidebarTitle: Overview
+keywords:
+  - automated ai engineer
+  - ai engineer agent
+  - langy
+  - ai agent that opens PRs
+---
+
+<Frame caption="The Langy panel open on the LangWatch home. Ask it a question and it starts reading your traces.">
+  ![The Langy home with the chat panel open and suggested prompts](/images/langy/overview/chat-panel-empty.png)
+</Frame>
+
+Langy is a full coding-agent harness running in a sandbox, with access to everything you grant it in your LangWatch account, so it fully understands your agents, evals, and prompts. Being a coding agent, it connects to your GitHub, runs code, experiments with improvements, and contributes them back as pull requests.
+
+With a CI pipeline that reaches your other systems, Langy runs its evals against your real agent pipeline, however complex it is.
+
+Langy uses your own model accounts and API keys. Every turn it takes is itself a traced, costed run in your LangWatch project, so you watch Langy work with the same tools you use to watch your own agents.
+
+## Where to go next
+
+<CardGroup cols={2}>
+  <Card title="Getting started" icon="play" href="/langy/getting-started">
+    Enable Langy, pick a model or sign in with Codex, and review the first pull request.
+  </Card>
+  <Card title="How Langy works" icon="diagram-project" href="/langy/how-langy-works">
+    The mechanism: a gVisor-sandboxed opencode worker whose only interface to LangWatch is the `langwatch` CLI.
+  </Card>
+  <Card title="Ask Langy" icon="comments" href="/langy/chat">
+    The chat panel and the kinds of questions Langy answers, from regressions to cost spikes.
+  </Card>
+  <Card title="Models and Codex" icon="microchip" href="/langy/models">
+    The model picker, bring your own API key, and signing in with your OpenAI account for Codex.
+  </Card>
+  <Card title="Security and the sandbox" icon="shield-halved" href="/langy/security/sandbox">
+    What the sandbox can and cannot reach, and where the boundaries sit.
+  </Card>
+  <Card title="Self-hosting Langy" icon="server" href="/self-hosting/langy/overview">
+    Ships enabled in the Helm chart, sandboxed with gVisor by default.
+  </Card>
+</CardGroup>

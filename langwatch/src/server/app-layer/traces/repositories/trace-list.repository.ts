@@ -18,12 +18,24 @@ export interface TraceListSort {
   direction: "asc" | "desc";
 }
 
+/**
+ * Keyset cursor for the trace list. The sort value is normalized to a finite
+ * number by the repository; TraceId is the unique tie-breaker that turns every
+ * supported sort into a total order.
+ */
+export interface TraceListCursor {
+  sortValue: number;
+  traceId: string;
+}
+
 export interface TraceListQuery {
   tenantId: string;
   timeRange: { from: number; to: number; live?: boolean };
   sort: TraceListSort;
   limit: number;
-  offset: number;
+  /** Cursor takes precedence. Offset remains only for page-one/legacy callers. */
+  cursor?: TraceListCursor;
+  offset?: number;
   /** Raw WHERE clause fragments + params from filter translator (plugged in later) */
   filterWhere?: { sql: string; params: Record<string, unknown> };
 }

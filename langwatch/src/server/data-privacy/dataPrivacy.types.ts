@@ -1,8 +1,8 @@
-import { z } from "zod";
 import {
   REDACTION_MARKER_ENTITIES,
   SECRET_MARKER_ENTITY,
-} from "./redaction/markers";
+} from "@langwatch/redaction";
+import { z } from "zod";
 
 /**
  * The entity names a custom PII policy may select: every redaction-marker

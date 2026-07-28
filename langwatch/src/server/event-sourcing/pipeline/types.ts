@@ -5,9 +5,11 @@ import type { AggregateType } from "../domain/aggregateType";
 import type { Event, Projection } from "../domain/types";
 import type { FoldProjectionDefinition } from "../projections/foldProjection.types";
 import type { MapProjectionDefinition } from "../projections/mapProjection.types";
+import type { StateProjectionDefinition } from "../projections/stateProjection.types";
 import type { ProjectionRegistry } from "../projections/projectionRegistry";
 import type { EventSourcedQueueProcessor } from "../queues";
 import type { ReactorDefinition } from "../reactors/reactor.types";
+import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.types";
 import type { CommandHandlerOptions } from "../services/commands/commandDispatcher";
 import type { EventSourcingService } from "../services/eventSourcingService";
 import type { JobRegistryEntry } from "../services/queues/queueManager";
@@ -30,9 +32,18 @@ export interface PipelineMetadata {
     handlerClassName: string;
     eventTypes?: string[];
   }>;
+  stateProjections?: Array<{
+    name: string;
+    handlerClassName: string;
+    eventTypes?: string[];
+  }>;
   commands: Array<{
     name: string;
     handlerClassName: string;
+  }>;
+  subscribers?: Array<{
+    name: string;
+    eventTypes?: string[];
   }>;
 }
 
@@ -44,9 +55,11 @@ export interface EventSourcingPipelineDefinition<
   aggregateType: AggregateType;
   eventStore: EventStore<EventType>;
   foldProjections?: FoldProjectionDefinition<any, EventType>[];
+  stateProjections?: StateProjectionDefinition<any, EventType>[];
   mapProjections?: MapProjectionDefinition<any, EventType>[];
   reactors?: Array<{ foldName: string; definition: ReactorDefinition<EventType> }>;
   mapReactors?: Array<{ mapName: string; definition: ReactorDefinition<EventType> }>;
+  subscribers?: EventSubscriberDefinition<EventType>[];
   globalQueue?: EventSourcedQueueProcessor<Record<string, unknown>>;
   globalJobRegistry?: Map<string, JobRegistryEntry>;
   featureFlagService?: FeatureFlagServiceInterface;

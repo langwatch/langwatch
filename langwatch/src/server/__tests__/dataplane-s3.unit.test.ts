@@ -6,7 +6,7 @@
  * Env var format: DATAPLANE_S3__<label>__<orgId>=<jsonConfig>
  * JSON: { endpoint, bucket, accessKeyId, secretAccessKey }
  */
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockLogger = {
   info: vi.fn(),
@@ -15,7 +15,7 @@ const mockLogger = {
   debug: vi.fn(),
 };
 
-vi.mock("~/utils/logger/server", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => mockLogger,
 }));
 

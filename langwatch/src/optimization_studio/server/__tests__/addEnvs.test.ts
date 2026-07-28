@@ -24,7 +24,7 @@ import {
   getProjectModelProviders,
   prepareLitellmParams,
 } from "../../../server/api/routers/modelProviders.utils";
-import { addEnvs } from "../addEnvs";
+import { addEnvs, LlmModelNotSetError } from "../addEnvs";
 
 const PROJECT_ID = "project-123";
 const API_KEY = "test-api-key";
@@ -47,7 +47,6 @@ const makeExecuteComponentEvent = ({
         icon: "test",
         description: "test",
         version: "1.0",
-        default_llm: { model: "openai/gpt-4o" },
         nodes,
         edges: [],
       },
@@ -145,6 +144,61 @@ describe("addEnvs", () => {
         where: { projectId: PROJECT_ID },
         select: { name: true, encryptedValue: true },
       });
+    });
+  });
+
+  // Nodes own their LLM config (spec_version 1.5): there is no
+  // workflow-level default to fall back to at dispatch time. See
+  // specs/workflows/workflow-node-owned-llm.feature.
+  describe("when LLM configs are node-owned", () => {
+    beforeEach(() => {
+      vi.mocked(prisma.projectSecret.findMany).mockResolvedValue([]);
+    });
+
+    const llmNode = (llmValue: unknown) => ({
+      id: "llm_call",
+      type: "signature",
+      data: {
+        name: "LLM Call",
+        parameters: [{ identifier: "llm", type: "llm", value: llmValue }],
+      },
+    });
+
+    it("enriches a node-owned llm config with litellm params", async () => {
+      const event = makeExecuteComponentEvent({
+        nodes: [llmNode({ model: "openai/gpt-4o" })],
+      });
+
+      const result = await addEnvs(event, PROJECT_ID);
+
+      const workflow = (result.payload as any).workflow;
+      expect(workflow.nodes[0].data.parameters[0].value).toMatchObject({
+        model: "openai/gpt-4o",
+        litellm_params: { model: "openai/gpt-4o" },
+      });
+    });
+
+    it("rejects an llm parameter with no value, naming the node", async () => {
+      const event = makeExecuteComponentEvent({
+        nodes: [llmNode(undefined)],
+      });
+
+      await expect(addEnvs(event, PROJECT_ID)).rejects.toThrow(
+        LlmModelNotSetError,
+      );
+      await expect(addEnvs(event, PROJECT_ID)).rejects.toThrow(
+        'LLM node "LLM Call" has no model selected',
+      );
+    });
+
+    it("rejects an llm parameter with an empty model, naming the node", async () => {
+      const event = makeExecuteComponentEvent({
+        nodes: [llmNode({ model: "" })],
+      });
+
+      await expect(addEnvs(event, PROJECT_ID)).rejects.toThrow(
+        LlmModelNotSetError,
+      );
     });
   });
 });

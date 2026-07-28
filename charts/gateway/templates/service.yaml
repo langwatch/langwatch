@@ -3,6 +3,9 @@ kind: Service
 metadata:
   name: {{ include "gateway.fullname" . }}
   labels: {{- include "gateway.labels" . | nindent 4 }}
+  {{- with .Values.service.annotations }}
+  annotations: {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
   type: {{ .Values.service.type }}
   ports:
@@ -11,3 +14,19 @@ spec:
       protocol: TCP
       name: http
   selector: {{- include "gateway.selectorLabels" . | nindent 4 }}
+{{- if .Values.service.internal.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "gateway.fullname" . }}-internal
+  labels: {{- include "gateway.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.service.internal.port }}
+      targetPort: {{ .Values.service.targetPort }}
+      protocol: TCP
+      name: http
+  selector: {{- include "gateway.selectorLabels" . | nindent 4 }}
+{{- end }}

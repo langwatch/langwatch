@@ -11,7 +11,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 
-import { FieldInfoTooltip } from "./FieldInfoTooltip";
+import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 
 export type CacheRuleFormState = {
   name: string;

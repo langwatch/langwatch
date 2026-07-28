@@ -1,9 +1,14 @@
 import type { PrismaClient } from "@prisma/client";
-import escapeStringRegexp from "escape-string-regexp";
 import { prisma } from "../db";
 import { resolveScopeChain } from "../scopes/resolveScopeChain";
 import type { ScopeTier } from "../scopes/scope.types";
+import { isCodexModel } from "./codexRestrictions";
 import { llmModels } from "./loadModelCatalog";
+
+// Inlined from escape-string-regexp to preserve the previous escaping behavior.
+function escapeStringRegexp(value: string): string {
+  return value.replace(/[|\\{}()[\]^$+*?.]/g, "\\$&").replace(/-/g, "\\x2d");
+}
 
 const getImportedModelCosts = () => {
   const models = llmModels.models;
@@ -17,18 +22,32 @@ const getImportedModelCosts = () => {
       outputCostPerToken: number;
       cacheReadCostPerToken?: number;
       cacheCreationCostPerToken?: number;
+      inputCostPerCharacter?: number;
+      inputCostPerSecond?: number;
     }
   > = {};
 
   for (const [modelId, model] of Object.entries(models)) {
+    // Codex models bill the user's ChatGPT plan, so the catalog prices them
+    // at zero. A zero-rate entry can never price a span; all it would do is
+    // shadow the identically named `openai/<model>` entry (the generated
+    // regexes make the vendor prefix optional, so both the bare and the
+    // codex-prefixed spellings hit it first). Keeping codex out of the cost
+    // registry lets codex usage price from the underlying OpenAI entry,
+    // which is what the bundled-cost presentation shows.
+    if (isCodexModel(modelId)) continue;
     if (
       model.pricing?.inputCostPerToken != null ||
-      model.pricing?.outputCostPerToken != null
+      model.pricing?.outputCostPerToken != null ||
+      model.pricing?.inputCostPerCharacter != null ||
+      model.pricing?.inputCostPerSecond != null
     ) {
       // Make vendor prefix optional in regex (e.g., both "gpt-4o" and "openai/gpt-4o" should match)
       const hasVendorPrefix = modelId.includes("/");
       const vendorPrefix = hasVendorPrefix ? modelId.split("/")[0] : null;
-      const modelName = hasVendorPrefix ? modelId.split("/").slice(1).join("/") : modelId;
+      const modelName = hasVendorPrefix
+        ? modelId.split("/").slice(1).join("/")
+        : modelId;
 
       const escapedModelName = escapeStringRegexp(modelName)
         // Convert hex-escaped hyphens (\x2d) and escaped hyphens (\-) to literal hyphens
@@ -56,6 +75,8 @@ const getImportedModelCosts = () => {
         outputCostPerToken: model.pricing.outputCostPerToken ?? 0,
         cacheReadCostPerToken: model.pricing.inputCacheReadPerToken,
         cacheCreationCostPerToken: model.pricing.inputCacheWritePerToken,
+        inputCostPerCharacter: model.pricing.inputCostPerCharacter,
+        inputCostPerSecond: model.pricing.inputCostPerSecond,
       };
     }
   }
@@ -79,13 +100,18 @@ const getImportedModelCosts = () => {
         outputCostPerToken: model.outputCostPerToken,
         cacheReadCostPerToken: model.cacheReadCostPerToken,
         cacheCreationCostPerToken: model.cacheCreationCostPerToken,
+        inputCostPerCharacter: model.inputCostPerCharacter,
+        inputCostPerSecond: model.inputCostPerSecond,
       };
     });
 
   // Exclude models with no costs
   const paidModels = mergedModels.filter(
     (model) =>
-      model.inputCostPerToken != null || model.outputCostPerToken != null,
+      model.inputCostPerToken != null ||
+      model.outputCostPerToken != null ||
+      model.inputCostPerCharacter != null ||
+      model.inputCostPerSecond != null,
   );
 
   // Exclude some vendors (openrouter is already excluded as we're using their API)
@@ -114,6 +140,11 @@ export type MaybeStoredLLMModelCost = {
   // cache tokens fall back to the input rate (counted, just not discounted).
   cacheReadCostPerToken?: number;
   cacheCreationCostPerToken?: number;
+  // Audio rates: characters synthesized (TTS) and seconds transcribed
+  // (STT), matched against the gateway's gen_ai.usage.input_chars /
+  // gen_ai.usage.audio_seconds span attributes.
+  inputCostPerCharacter?: number;
+  inputCostPerSecond?: number;
   updatedAt?: Date;
   createdAt?: Date;
 };
@@ -139,6 +170,8 @@ export const getStaticModelCosts = (): MaybeStoredLLMModelCost[] => {
         outputCostPerToken: value.outputCostPerToken,
         cacheReadCostPerToken: value.cacheReadCostPerToken,
         cacheCreationCostPerToken: value.cacheCreationCostPerToken,
+        inputCostPerCharacter: value.inputCostPerCharacter,
+        inputCostPerSecond: value.inputCostPerSecond,
       }))
       // Sort by the matched model suffix, not raw registry key length,
       // because vendor prefixes are optional in the generated regex.
@@ -200,8 +233,8 @@ export const getCustomLLMModelCosts = async ({
     projectId,
   });
 
-  const llmModelCostsCustomData = await prismaClient.customLLMModelCost.findMany(
-    {
+  const llmModelCostsCustomData =
+    await prismaClient.customLLMModelCost.findMany({
       where: {
         organizationId,
         OR: chain.map((scope) => ({
@@ -209,8 +242,7 @@ export const getCustomLLMModelCosts = async ({
           scopeId: scope.scopeId,
         })),
       },
-    },
-  );
+    });
 
   return llmModelCostsCustomData
     .map(

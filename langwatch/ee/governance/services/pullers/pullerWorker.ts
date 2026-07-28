@@ -1,23 +1,19 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 /**
- * BullMQ worker driving the PullerAdapter framework.
+ * One idempotent pull effect driven by the process-manager outbox.
  *
  * Per scheduled tick:
  *   1. Load IngestionSource by id (must be active + in pull mode)
  *   2. Resolve adapter from `pullConfig.adapter` via the registry
- *   3. Read `pollerCursor` from the IngestionSource row
+ *   3. Use the durable cursor supplied by the process state
  *   4. Resolve credentials (placeholder — wired into the existing
  *      ingestion-source secret store; for the framework demo, credentials
  *      flow through `parserConfig.credentials`)
  *   5. Call `adapter.runOnce({ cursor, credentials, context })`
- *   6. Persist new cursor on success, increment errorCount on failure
- *   7. Hand off `events` to the trace store ingest path (TODO: wire
- *      to OCSF event sink — left as a follow-up to keep this slice
- *      focused on the framework + scheduling. The reactor at
- *      governanceOcsfEventsSync.reactor.ts already understands the
- *      payload shape; the adapter's NormalizedPullEvent maps cleanly
- *      onto its input.)
+ *   6. Write the normalized events to the OCSF sink
+ *   7. Return an outcome; completion/failure events and their projection own
+ *      cursor, status, and error state
  *
  * This worker is the source-agnostic dispatcher — it does NOT contain
  * any per-source logic. New sources arrive by registering an adapter
@@ -25,35 +21,15 @@
  *
  * Spec: specs/ai-governance/puller-framework/puller-adapter-contract.feature
  */
-import { Prisma } from "@prisma/client";
-import { type Job, Worker } from "bullmq";
-import { BullMQOtel } from "bullmq-otel";
-
-import { env } from "~/env.mjs";
+import { createLogger } from "@langwatch/observability";
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
-import { makeQueueName } from "~/server/queues/makeQueueName";
-import { withJobContext } from "~/server/queues/withJobContext";
-import { connection } from "~/server/redis";
-import { createLogger } from "~/utils/logger/server";
 import {
   captureException,
   toError,
   withScope,
 } from "~/utils/posthogErrorCapture";
 import { decryptCredentials } from "../activity-monitor/ingestionCredentials";
-
-export type IngestionPullerJob = {
-  /** IngestionSource id this run targets. */
-  ingestionSourceId: string;
-  /** Wall-clock dispatch time (ms since epoch). */
-  scheduledAt: number;
-};
-
-export const PULLER_QUEUE = {
-  NAME: makeQueueName("ingestion_puller"),
-  JOB: "ingestion_puller",
-} as const;
 
 import {
   type GovernanceOcsfEventInput,
@@ -72,31 +48,82 @@ import {
 
 const logger = createLogger("langwatch:workers:ingestionPuller");
 
-// Soft per-job deadline. The scheduled cadence is the primary control
-// — long-running pulls just defer follow-on work to the next tick.
+// Hard per-job deadline. A run cannot execute for longer than this: the
+// adapter is asked to stop cooperatively (deadlineMs), its transport is
+// aborted (signal), and this worker stops awaiting it either way.
+//
+// It has to be hard because the scheduler supersedes a run it considers stale
+// (INGESTION_PULL_STALE_RUN_MS, 30min) and starts a fresh one from the same
+// cursor. If a hung run could outlive that, two pulls would read the same
+// window concurrently and whichever finished last would decide the durable
+// cursor. The gap between the two is deliberate slack, not a coincidence.
 const PER_JOB_DEADLINE_MS = 5 * 60 * 1000;
 
-export async function runIngestionPullerJob(
-  job: Job<IngestionPullerJob, void, string>,
-): Promise<void> {
+/**
+ * Raised when a run is cut off at its deadline.
+ *
+ * Surfaces as a run failure: the cursor is left where it was, so the window
+ * is retried rather than silently skipped.
+ */
+export class IngestionPullDeadlineExceededError extends Error {
+  constructor(deadlineMs: number) {
+    super(`Ingestion pull exceeded its ${deadlineMs}ms deadline`);
+    this.name = "IngestionPullDeadlineExceededError";
+  }
+}
+
+/**
+ * Runs `work` under a deadline that does not depend on `work` cooperating.
+ *
+ * The abort signal is passed in so the adapter can unwind its own transport;
+ * the race is what guarantees this worker stops waiting even if it does not.
+ */
+async function withDeadline<T>(
+  timeoutMs: number,
+  work: (signal: AbortSignal) => Promise<T>,
+): Promise<T> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await Promise.race([
+      work(controller.signal),
+      new Promise<never>((_resolve, reject) => {
+        controller.signal.addEventListener(
+          "abort",
+          () => reject(new IngestionPullDeadlineExceededError(timeoutMs)),
+          { once: true },
+        );
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+    // Unblocks any transport still holding the signal once we have stopped
+    // waiting -- including when `work` lost the race.
+    controller.abort();
+  }
+}
+
+export async function runIngestionPull(params: {
+  sourceId: string;
+  cursor: string | null;
+}): Promise<{ nextCursor: string | null; eventCount: number }> {
   registerBuiltInPullers();
 
-  const { ingestionSourceId } = job.data;
-  logger.info({ jobId: job.id, ingestionSourceId }, "puller job start");
+  const ingestionSourceId = params.sourceId;
+  logger.info({ ingestionSourceId }, "puller run start");
 
   const source = await prisma.ingestionSource.findUnique({
     where: { id: ingestionSourceId },
   });
   if (!source) {
-    logger.warn({ ingestionSourceId }, "IngestionSource not found, skipping");
-    return;
+    throw new Error(`IngestionSource ${ingestionSourceId} not found`);
   }
   if (source.status !== "active" && source.status !== "awaiting_first_event") {
     logger.info(
       { ingestionSourceId, status: source.status },
       "IngestionSource not active, skipping",
     );
-    return;
+    return { nextCursor: params.cursor, eventCount: 0 };
   }
 
   const pullConfig = (source.parserConfig ?? {}) as Record<string, unknown>;
@@ -106,7 +133,7 @@ export async function runIngestionPullerJob(
       { ingestionSourceId },
       "IngestionSource has no pullConfig.adapter; not a pull-mode source",
     );
-    return;
+    throw new Error("IngestionSource has no pullConfig.adapter");
   }
   const adapter = pullerAdapterRegistry.get(adapterId);
   if (!adapter) {
@@ -114,11 +141,7 @@ export async function runIngestionPullerJob(
       { ingestionSourceId, adapterId },
       "Unknown adapter id — refusing to dispatch",
     );
-    await prisma.ingestionSource.update({
-      where: { id: ingestionSourceId },
-      data: { errorCount: { increment: 1 } },
-    });
-    return;
+    throw new Error(`Unknown ingestion pull adapter: ${adapterId}`);
   }
 
   let validatedConfig: unknown;
@@ -129,57 +152,50 @@ export async function runIngestionPullerJob(
       { ingestionSourceId, adapterId, error },
       "pullConfig validation failed",
     );
-    await prisma.ingestionSource.update({
-      where: { id: ingestionSourceId },
-      data: { errorCount: { increment: 1 } },
-    });
-    return;
+    throw error;
   }
 
   const credentials = decryptCredentials(pullConfig.credentials);
 
-  const cursor =
-    typeof source.pollerCursor === "string"
-      ? source.pollerCursor
-      : source.pollerCursor !== null && typeof source.pollerCursor === "object"
-        ? // Some adapters persist structured cursors; for now we serialize.
-          JSON.stringify(source.pollerCursor)
-        : null;
-
   let result: PullResult;
   try {
-    result = await adapter.runOnce(
-      {
-        cursor,
-        credentials,
-        context: {
-          organizationId: source.organizationId,
-          ingestionSourceId: source.id,
+    result = await withDeadline(PER_JOB_DEADLINE_MS, (signal) =>
+      adapter.runOnce(
+        {
+          cursor: params.cursor,
+          credentials,
+          context: {
+            organizationId: source.organizationId,
+            ingestionSourceId: source.id,
+          },
+          deadlineMs: Date.now() + PER_JOB_DEADLINE_MS,
+          signal,
         },
-        deadlineMs: Date.now() + PER_JOB_DEADLINE_MS,
-      },
-      validatedConfig,
+        validatedConfig,
+      ),
     );
   } catch (error) {
     logger.error(
       { ingestionSourceId, adapterId, error },
-      "adapter.runOnce threw — incrementing errorCount + leaving cursor unchanged",
+      "adapter.runOnce threw — leaving the durable cursor unchanged",
     );
     await withScope(async (scope) => {
       scope.setTag?.("worker", "ingestionPuller");
       scope.setExtra?.("ingestionSourceId", ingestionSourceId);
       captureException(toError(error));
     });
-    await prisma.ingestionSource.update({
-      where: { id: ingestionSourceId },
-      data: { errorCount: { increment: 1 } },
-    });
-    return;
+    throw error;
+  }
+
+  if (result.errorCount > 0) {
+    throw new Error(
+      `Ingestion pull adapter reported ${result.errorCount} error(s)`,
+    );
   }
 
   // Hand off events to the governance_ocsf_events sink. Each
   // NormalizedPullEvent → one OCSF row keyed by (TenantId, EventId)
-  // for natural dedup on replay (BullMQ at-least-once + adapter
+  // for natural dedup on replay (outbox at-least-once + adapter
   // at-least-once both collapse via the ReplacingMergeTree). Going
   // direct-to-CH (rather than synthesizing a fake trace) is the right
   // shape for pull-mode: each audit-log entry is a single event, not
@@ -206,70 +222,38 @@ export async function runIngestionPullerJob(
         return client;
       },
     );
-    let inserted = 0;
     for (const evt of result.events) {
-      try {
-        await ocsfRepo.insertEvent(
-          mapToOcsfRow({
-            event: evt,
-            tenantId: govProject.id,
-            ingestionSourceId: source.id,
-            sourceType: source.sourceType,
-          }),
-        );
-        inserted += 1;
-      } catch (error) {
-        // Single-event failures don't tear down the whole batch — log
-        // + capture, leave cursor unchanged so the next run re-pulls
-        // and the failed event gets another shot. ReplacingMergeTree
-        // handles the duplicate from the successful events on retry.
-        logger.error(
-          {
-            ingestionSourceId,
-            sourceEventId: evt.source_event_id,
-            error,
-          },
-          "Failed to insert OCSF event row",
-        );
-      }
+      await ocsfRepo.insertEvent(
+        mapToOcsfRow({
+          event: evt,
+          tenantId: govProject.id,
+          ingestionSourceId: source.id,
+          sourceType: source.sourceType,
+        }),
+      );
     }
     logger.info(
       {
         ingestionSourceId,
         adapterId,
         eventCount: result.events.length,
-        ocsfInserted: inserted,
+        ocsfInserted: result.events.length,
       },
       "puller events written to governance_ocsf_events",
     );
   }
 
-  // Persist the new cursor + reset errorCount on success. JSON columns
-  // need Prisma.JsonNull for SQL NULL, not bare JS null.
-  await prisma.ingestionSource.update({
-    where: { id: ingestionSourceId },
-    data: {
-      pollerCursor: result.cursor === null ? Prisma.JsonNull : result.cursor,
-      errorCount: result.errorCount > 0 ? { increment: 1 } : 0,
-      lastEventAt: result.events.length > 0 ? new Date() : undefined,
-      status:
-        source.status === "awaiting_first_event" && result.events.length > 0
-          ? "active"
-          : source.status,
-    },
-  });
-
   logger.info(
     {
-      jobId: job.id,
       ingestionSourceId,
       adapterId,
       eventCount: result.events.length,
       cursor: result.cursor,
       errorCount: result.errorCount,
     },
-    "puller job done",
+    "puller run done",
   );
+  return { nextCursor: result.cursor, eventCount: result.events.length };
 }
 
 /**
@@ -279,8 +263,7 @@ export async function runIngestionPullerJob(
  * preserved verbatim under metadata.extension.raw_event so SIEM
  * consumers can still drill back to the source-of-truth bytes.
  *
- * EventId is `${sourceType}:${source_event_id}` to keep the (TenantId,
- * EventId) key unique across multiple sources of the same type.
+ * EventId includes the source id so two same-type sources cannot collide.
  *
  * `tenantId` MUST be the hidden internal_governance Project ID for the
  * org — same key the trace-fold reactor and OCSF export service use.
@@ -301,7 +284,7 @@ function mapToOcsfRow({
   const safeEventTime = Number.isFinite(eventTime.getTime())
     ? eventTime
     : new Date();
-  const eventId = `${sourceType}:${event.source_event_id}`;
+  const eventId = `${sourceType}:${ingestionSourceId}:${event.source_event_id}`;
   const occurredAtMs = safeEventTime.getTime();
   const rawOcsfJson = JSON.stringify({
     class_uid: 6003,
@@ -351,23 +334,3 @@ function mapToOcsfRow({
     rawOcsfJson,
   };
 }
-
-export const startIngestionPullerWorker = (): Worker | null => {
-  if (!connection) {
-    logger.info("no redis connection, skipping ingestion puller worker");
-    return null;
-  }
-  const worker = new Worker<IngestionPullerJob, void, string>(
-    PULLER_QUEUE.NAME,
-    withJobContext(runIngestionPullerJob),
-    {
-      connection,
-      concurrency: env.NODE_ENV === "test" ? 1 : 4,
-      telemetry: new BullMQOtel("ingestion_puller"),
-    },
-  );
-  worker.on("error", (error) => {
-    logger.error({ error }, "ingestion puller worker error");
-  });
-  return worker;
-};

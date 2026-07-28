@@ -1,9 +1,11 @@
-import { Avatar, HStack, Separator, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Separator, Text, VStack } from "@chakra-ui/react";
 import { useRouter } from "~/utils/compat/next-router";
 import type { PropsWithChildren } from "react";
 import { Check, Edit, Inbox, Plus, Users } from "react-feather";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { MenuLink } from "~/components/MenuLink";
+import { LangyContextTarget } from "~/features/langy/components/LangyContextTarget";
+import { annotationContextChip } from "~/features/langy/logic/langyContextChips";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useLiteMemberGuard } from "~/hooks/useLiteMemberGuard";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -132,8 +134,23 @@ export default function AnnotationsLayout({
               )}
             </HStack>
             {queueItemsCounts.data?.map((queue) => (
-              <MenuLink
+              // Armed, the queue can be handed to Langy. Keyed on the SLUG,
+              // because that is what `/annotations/<slug>` puts in the URL and
+              // therefore what the route-derived chip uses.
+              <LangyContextTarget
                 key={queue.id}
+                target={annotationContextChip({
+                  annotationId: queue.slug,
+                  name: queue.name,
+                  noun: "annotation queue",
+                })}
+              >
+              {/* A Box, not the MenuLink itself: MenuLink takes a fixed prop
+                  set and would drop the target's className / handlers on the
+                  floor. The Box is width-full and carries the link's own
+                  radius, so the outline lands exactly on the row. */}
+              <Box width="full" borderRadius="lg">
+              <MenuLink
                 href={`/${project?.slug}/annotations/${queue.slug}`}
                 isSelectedAnnotation={
                   router.pathname ===
@@ -148,6 +165,8 @@ export default function AnnotationsLayout({
               >
                 {queue.name}
               </MenuLink>
+              </Box>
+              </LangyContextTarget>
             ))}
           </VStack>
         </VStack>

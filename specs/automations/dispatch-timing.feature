@@ -8,16 +8,17 @@ Feature: Per-trigger dispatch timing — cadence and trace-readiness debounce
       short window is a notification storm, so notify actions may be batched
       into a digest window. Persist actions (dataset, annotation-queue writes)
       always dispatch immediately because every match is the intent.
-    - The trace-readiness debounce decides how long the dispatch pipeline waits
-      after the last span before re-evaluating filters. This stops half-formed
-      dispatches that fire on partial trace state and then walk themselves back
-      on the trace's final span.
+    - The trace-readiness debounce sets the width of deterministic activity
+      windows. The first logical match in a window schedules evaluation after
+      the configured delay; duplicates in that window collapse, while activity
+      in a later window re-arms evaluation against newer trace state.
 
   Both knobs live on the Trigger row. Cadence applies only to notify actions;
-  debounce applies to all action classes (a half-formed dataset row corrupts
-  the customer's eval set just as surely as a half-formed notification).
+  debounce applies to all action classes so persist actions can re-evaluate
+  newer trace state before writing.
 
-  See dev/docs/adr/026-per-trigger-dispatch-timing.md.
+  See dev/docs/adr/026-per-trigger-dispatch-timing.md and
+  dev/docs/adr/052-automations-on-process-manager-substrate.md.
 
   Background:
     Given a project with automations enabled
@@ -132,39 +133,63 @@ Feature: Per-trigger dispatch timing — cadence and trace-readiness debounce
       Then all 10 rows are written to the dataset immediately
       And the email automation sends one digest at the end of the 5-minute window
 
-  Rule: Trace-readiness debounce waits for the trace to settle before evaluating
+  Rule: Trace-readiness debounce evaluates deterministic activity windows
 
     Scenario: Default debounce of 30s applies to every new trigger
       When the user creates any automation
-      Then filter evaluation waits 30 seconds after the last span by default
+      Then the first logical match in an activity window schedules evaluation 30 seconds later
 
     Scenario: Existing triggers also default to 30s after migration
       Given an automation that existed before the debounce feature shipped
-      Then its filter evaluation waits 30 seconds after the last span
+      Then its activity is grouped into 30-second settle windows
       And the operator can flip it to 0 to restore eager evaluation
 
-    Scenario: The debounce window resets on every new span
+    Scenario: Continuing activity re-arms settlement in later windows
       Given a trigger with a 30-second debounce
-      When spans for a matching trace arrive every 5 seconds
-      Then no filter evaluation runs while the spans keep arriving
+      When spans for a matching trace continue into later settle windows
+      Then each later window moves the pending evaluation round forward
+      And no filter evaluation runs while later windows keep re-arming it
 
-    Scenario: Filter evaluation runs after the trace settles
+    Scenario: Duplicate activity in one settle window records one evaluation round
       Given a trigger with a 30-second debounce
-      When the trace receives no further spans for 30 seconds
-      Then the dispatch pipeline re-reads the now-settled fold once
-      And runs filters against the final state
+      When the same trace activity is delivered twice in one settle window
+      Then one trigger-match event is recorded for that window
+      And the process manager evaluates the trace once
+
+    Scenario: Later activity re-arms evaluation after a settle round completes
+      Given a trigger and trace whose settle round has completed
+      When the trace receives more activity in a later settle window
+      Then a second trigger-match event is recorded for the later window
+      And the process manager evaluates the trace again
+
+    Scenario: A notification remains at-most-once across settle windows
+      Given a notify trigger already sent for a matching trace
+      When later activity re-arms evaluation in a new settle window
+      Then the existing send claim suppresses another notification
+
+    Scenario: A persist action can pass filters in a later settle window
+      Given a persist trigger whose trace fails its filters in the first settle round
+      When later trace activity makes the filters pass in a new settle window
+      Then the process manager evaluates the trace again
+      And the persist action runs once using the later trace state
+
+    Scenario: Filter evaluation reads the latest state when the round is due
+      Given a trigger with a 30-second debounce
+      When the pending evaluation round reaches its scheduled wake
+      Then the dispatch pipeline re-reads the latest available fold once
+      And runs filters against that state
 
     Scenario: Two triggers on the same trace settle independently
       Given two triggers on the same trace, each with a different debounce window
       When spans for the trace arrive
-      Then each (trigger, trace) pair tracks its own debounce TTL
-      And the longer-debounced trigger waits longer before evaluating
+      Then each (trigger, trace) pair tracks its own window width and scheduled wake
+      And the longer-debounced trigger schedules evaluation later
 
     Scenario: Debounce applies to persist actions too
       Given an add-to-dataset trigger with a non-zero debounce
       When spans for a matching trace arrive
-      Then the dataset row is captured only after the trace settles
-      And the captured row reflects the trace's final state
+      Then the dataset row is captured only when an evaluation round passes filters
+      And a later activity window can re-evaluate newer trace state
 
     Scenario: Setting debounce to 0 restores eager evaluation
       Given a trigger configured with traceDebounceMs of 0
@@ -175,6 +200,6 @@ Feature: Per-trigger dispatch timing — cadence and trace-readiness debounce
 
     Scenario: Combined debounce + digest waits for both windows
       Given a trigger with a 60-second debounce and a 5-minute digest cadence
-      When a matching trace settles after 60 seconds
+      When a matching activity round becomes due after 60 seconds
       Then the matched dispatch is held for the next 5-minute digest boundary
       And the customer sees the notification at most ~6 minutes after the trace started

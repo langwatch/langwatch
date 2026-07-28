@@ -4,7 +4,7 @@
  * PullerAdapter — universal contract for pull-mode IngestionSources.
  *
  * Inspired by Singer Tap, Airbyte CDK, Apache Camel, and Kafka Connect.
- * Every adapter implements the same lifecycle so the BullMQ worker that
+ * Every adapter implements the same lifecycle so the process-outbox effect that
  * drives them is source-agnostic — it doesn't care whether the events
  * came from an HTTP audit-log API, an S3 NDJSON drop, or a Microsoft
  * Graph endpoint.
@@ -15,11 +15,11 @@
  *   2. `validateConfig(config)` runs at create time — bad config is
  *      rejected BEFORE the row lands in PG, so the admin sees the
  *      error inline rather than silently failing later
- *   3. BullMQ schedules `runOnce({ cursor })` per the configured cron
+ *   3. The durable process wake schedules `runOnce({ cursor })`
  *   4. Adapter pulls events, maps them to NormalizedEvent, returns
  *      `{ events, cursor, errorCount }`
- *   5. Worker persists `cursor` → `IngestionSource.pollerCursor` so the
- *      next run resumes from the last known position
+ *   5. A completion event advances the durable process cursor; its projection
+ *      mirrors the cursor to `IngestionSource.pollerCursor` for compatibility
  *
  * Cursor semantics:
  *   - `null` cursor = drained (no more events to fetch this cycle)
@@ -31,10 +31,9 @@
  *     at-least-once)
  *
  * Error handling:
- *   - Adapter throws → worker logs + captureException + increments
- *     `IngestionSource.errorCount` + leaves cursor untouched
- *   - Worker remains alive for other puller jobs (one bad source
- *     doesn't poison the entire fleet)
+ *   - Adapter throws or reports errors → the outbox retries the same intent
+ *     from the same durable cursor
+ *   - After retry exhaustion, a failure event increments projected error state
  *
  * Spec: specs/ai-governance/puller-framework/puller-adapter-contract.feature
  */
@@ -112,13 +111,28 @@ export interface PullRunOptions {
     ingestionSourceId: string;
   };
   /**
-   * Optional overall deadline (ms since epoch). Adapters that paginate
-   * SHOULD short-circuit when Date.now() > deadlineMs and return the
-   * cursor at the last successful page so the next run resumes
-   * promptly. Set by the worker per per-run job timeout. Soft hint;
-   * adapters that miss the deadline by a small amount are fine.
+   * Overall deadline (ms since epoch). Adapters that paginate SHOULD
+   * short-circuit when Date.now() > deadlineMs and return the cursor at the
+   * last successful page, so the next run resumes promptly and the work
+   * already done is not thrown away.
+   *
+   * This is the cooperative half of the deadline. It is NOT the only
+   * enforcement: `signal` aborts at the same instant, and the worker stops
+   * waiting regardless. Honouring `deadlineMs` is how an adapter exits
+   * *cleanly* instead of being cut off.
    */
   deadlineMs?: number;
+  /**
+   * Aborted when the run's deadline expires. Adapters MUST forward this to
+   * every outbound transport call (fetch `signal`, AWS SDK `abortSignal`,
+   * stream reads) so an unresponsive source cannot keep a run alive.
+   *
+   * This is what makes one-run-at-a-time real. The scheduler supersedes a run
+   * once it looks stale and starts a fresh one from the same cursor; if the
+   * original could still be in flight, both would pull the same window and
+   * their completion order would decide the durable cursor.
+   */
+  signal?: AbortSignal;
 }
 
 /**

@@ -1,7 +1,15 @@
 import type { TenantId } from "../domain/tenantId";
 import type { FoldProjectionDefinition } from "../projections/foldProjection.types";
-import type { MapProjectionDefinition } from "../projections/mapProjection.types";
+import type {
+  BulkAppendContext,
+  MapProjectionDefinition,
+} from "../projections/mapProjection.types";
 import type { ProjectionStoreContext } from "../projections/projectionStoreContext";
+import type {
+  StateProjectionDefinition,
+  StoredProjection,
+} from "../projections/stateProjection.types";
+import { applyStateEvent } from "../projections/stateProjectionExecutor";
 import type { ReplayEvent } from "./replayEventLoader";
 import type { Event } from "../domain/types";
 import { leanForProjection } from "~/server/app-layer/traces/lean-for-projection";
@@ -151,15 +159,22 @@ export class FoldAccumulator {
   }
 }
 
+interface BufferedMapRecord {
+  record: unknown;
+  context: ProjectionStoreContext;
+}
+
 /**
  * Accumulates map projection records as events are fed in one at a time.
  *
  * Unlike FoldAccumulator (which merges state per aggregate), MapAccumulator
  * buffers one output record per event along with the originating event's
  * `ProjectionStoreContext`. Records are grouped by tenantId and flushed in
- * bulk via `store.bulkAppend()` (or sequential `store.append()` as fallback);
- * the per-event context is preserved on the fallback path so stores keying
- * off `context.aggregateId` behave the same as the non-optimized replay.
+ * per-tenant chunks via `store.bulkAppend()` (tenant-scoped context, records
+ * from many aggregates per call) or via sequential `store.append()` as a
+ * fallback; the per-event context is preserved on the fallback path so stores
+ * keying off `context.aggregateId` behave the same as the non-optimized
+ * replay.
  *
  * Map records are append-only and need no cross-page state, so `apply`
  * flushes incrementally: once the buffer reaches `writeBatchSize` the
@@ -167,11 +182,6 @@ export class FoldAccumulator {
  * to the final `flush()`. Memory is therefore bounded by `writeBatchSize`,
  * not by the number of events in an aggregate batch.
  */
-interface BufferedMapRecord {
-  record: any;
-  context: ProjectionStoreContext;
-}
-
 export class MapAccumulator {
   private byTenant = new Map<string, BufferedMapRecord[]>();
   private bufferedCount = 0;
@@ -250,27 +260,19 @@ export class MapAccumulator {
       const retentionPolicy = await this.resolveRetention(tenantId);
 
       if (store.bulkAppend) {
-        // Group by aggregateId so each `bulkAppend` call gets a real
-        // per-aggregate context. Stores that key off `context.aggregateId`
-        // (rather than reading it from the record) then see the same value
-        // they would on the non-optimized `append()` path.
-        const byAggregate = new Map<string, BufferedMapRecord[]>();
-        for (const entry of entries) {
-          const key = entry.context.aggregateId;
-          let list = byAggregate.get(key);
-          if (!list) {
-            list = [];
-            byAggregate.set(key, list);
-          }
-          list.push(entry);
-        }
-
-        for (const aggregateEntries of byAggregate.values()) {
-          const groupContext = { ...aggregateEntries[0]!.context, retentionPolicy };
-          for (let i = 0; i < aggregateEntries.length; i += writeBatchSize) {
-            const chunk = aggregateEntries.slice(i, i + writeBatchSize).map((e) => e.record);
-            await store.bulkAppend(chunk, groupContext);
-          }
+        // One bulk write per TENANT chunk — never per aggregate. For
+        // spanStorage-style projections the aggregate is a single trace, so
+        // per-aggregate grouping degenerated into one awaited ClickHouse
+        // INSERT per trace (~200ms each, sequential) and dominated replay
+        // time. `bulkAppend` takes a tenant-scoped BulkAppendContext; records
+        // carry everything stores need per row.
+        const context: BulkAppendContext = {
+          tenantId: tenantId as TenantId,
+          retentionPolicy,
+        };
+        for (let i = 0; i < entries.length; i += writeBatchSize) {
+          const chunk = entries.slice(i, i + writeBatchSize).map((e) => e.record);
+          await store.bulkAppend(chunk, context);
         }
       } else {
         // Sequential fallback: pass each record's original per-event context
@@ -279,6 +281,122 @@ export class MapAccumulator {
           await store.append(entry.record, { ...entry.context, retentionPolicy });
         }
       }
+    }
+  }
+}
+
+interface StateEntry {
+  /** The running projection folded from `init()` — never a loaded row. */
+  latest: StoredProjection<any>;
+  aggregateId: string;
+  tenantId: string;
+  projectionKey: string;
+}
+
+/**
+ * Accumulates a `.withProjection()` operational state projection for a
+ * canonical rebuild.
+ *
+ * Unlike {@link FoldAccumulator}, the write is ONE {@link StoredProjection} per
+ * `(tenant, projection key)` — grouped by `projection.key?.(event) ??
+ * aggregateId`, never per raw aggregate — and every fold starts from
+ * `projection.init()`: `store.load` is never called, so the rebuild replaces
+ * the selected operational row rather than merging with stale state.
+ *
+ * Each event is folded via {@link applyStateEvent}, the SAME per-event step the
+ * live `StateProjectionExecutor` uses, so a rebuilt row is byte-identical to
+ * the live-folded one — deterministic `occurredAt`/`createdAt`/`updatedAt`,
+ * `version`, and a cursor of `(AcceptedAt=createdAt, EventId)`. Feed events in
+ * canonical `(createdAt, EventId)` order (the event-log read order); the cursor
+ * guard only drops duplicate / stale redeliveries.
+ *
+ * Memory is bounded by the number of distinct projection keys in the events
+ * fed before `flush()` (one folded row per key, not the raw events) — the same
+ * profile as FoldAccumulator, sized to the low-cardinality operational
+ * projections this path targets (ADR-049).
+ */
+export class StateAccumulator {
+  private entries = new Map<string, StateEntry>();
+  private _processed = 0;
+  private readonly eventTypeSet: Set<string>;
+  private readonly resolveRetention: ReplayRetentionResolver;
+
+  constructor(
+    private readonly projection: StateProjectionDefinition<any, any>,
+    opts?: { retentionResolver?: RetentionPolicyResolver },
+  ) {
+    this.eventTypeSet = new Set(projection.eventTypes);
+    this.resolveRetention = makeRetentionResolver(opts?.retentionResolver);
+  }
+
+  get processed(): number {
+    return this._processed;
+  }
+
+  apply(event: ReplayEvent): void {
+    // Drop events this projection does not declare — an accumulator may be fed
+    // the union of event types when it shares a load with sibling projections.
+    if (this.eventTypeSet.size > 0 && !this.eventTypeSet.has(event.type)) return;
+
+    // ADR-022: lean before the reducer, exactly as live dispatch and the fold
+    // accumulator do, so a rebuilt row matches the live-folded one.
+    const leanedEvent = leanForProjection(
+      event as unknown as Event,
+    ) as unknown as ReplayEvent;
+
+    const domainEvent = leanedEvent as unknown as Event;
+    const projectionKey = this.projection.key?.(domainEvent) ?? event.aggregateId;
+    const scopedKey = tenantScopedKey(event.tenantId, projectionKey);
+
+    const existing = this.entries.get(scopedKey);
+    const next = applyStateEvent({
+      projection: this.projection,
+      latest: existing?.latest ?? null,
+      event: domainEvent,
+    });
+    // `applyStateEvent` returns the same reference on a type-miss or a
+    // non-advancing cursor — treat that as "nothing applied".
+    if (!next || next === existing?.latest) return;
+
+    this.entries.set(scopedKey, {
+      latest: next,
+      aggregateId: event.aggregateId,
+      tenantId: event.tenantId,
+      projectionKey,
+    });
+    this._processed++;
+  }
+
+  /**
+   * Write one StoredProjection per accumulated key via `store.store` — the
+   * direct rebuild boundary. Never calls `store.load`. Idempotent: re-running
+   * a replay overwrites with the same deterministic row.
+   */
+  async flush(): Promise<void> {
+    if (this.entries.size === 0) return;
+
+    const store = this.projection.store;
+    // Snapshot + reset so a concurrent `apply` never double-writes an entry.
+    const entries = this.entries;
+    this.entries = new Map();
+
+    const retentionByTenant = new Map<string, ResolvedRetention | null>();
+
+    for (const entry of entries.values()) {
+      let retentionPolicy = retentionByTenant.get(entry.tenantId);
+      if (retentionPolicy === undefined) {
+        retentionPolicy = await this.resolveRetention(entry.tenantId);
+        retentionByTenant.set(entry.tenantId, retentionPolicy);
+      }
+
+      const context: ProjectionStoreContext = {
+        aggregateId: entry.aggregateId,
+        tenantId: entry.tenantId as TenantId,
+        key: entry.projectionKey,
+        occurredAtMs: entry.latest.occurredAt,
+        retentionPolicy,
+      };
+      await store.store(entry.latest, context);
     }
   }
 }

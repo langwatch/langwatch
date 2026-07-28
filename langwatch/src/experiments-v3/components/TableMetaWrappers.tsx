@@ -6,7 +6,8 @@ import { Checkbox } from "@chakra-ui/react";
 import type { HeaderContext } from "@tanstack/react-table";
 
 import type { TableMeta, TableRowData } from "../types";
-import { PairwiseCompareCell } from "./PairwiseCompareCell";
+import { toComparisonConfig } from "../utils/normalizeComparison";
+import { ComparisonCell } from "./ComparisonCell";
 import { TargetCellContent } from "./TargetSection/TargetCell";
 import { TargetHeader } from "./TargetSection/TargetHeader";
 
@@ -131,15 +132,25 @@ export const TargetCellFromMeta = ({
 
   if (!target) return null;
 
-  if (target.pairwise) {
-    const variantATarget = tableMeta?.targetsMap.get(target.pairwise.variantA);
-    const variantBTarget = tableMeta?.targetsMap.get(target.pairwise.variantB);
+  // Column-style comparison targets render their verdict in place of an
+  // output. A legacy pairwise column normalizes to two variants here.
+  const comparison = toComparisonConfig(target);
+  if (comparison) {
+    const variantTargets = comparison.variants.map((id) =>
+      tableMeta?.targetsMap.get(id),
+    );
     return (
-      <PairwiseCompareCell
+      <ComparisonCell
         result={data?.evaluators?.[target.id]}
-        isLoading={data?.isLoading}
-        variantATarget={variantATarget}
-        variantBTarget={variantBTarget}
+        isLoading={
+          tableMeta?.isCellExecuting?.(rowIndex, targetId) ?? data?.isLoading
+        }
+        variantTargets={variantTargets}
+        onRun={
+          tableMeta?.handleRunCell
+            ? () => tableMeta.handleRunCell?.(rowIndex, targetId)
+            : undefined
+        }
       />
     );
   }
@@ -181,9 +192,7 @@ export const TargetCellFromMeta = ({
               tableMeta.handleRunEvaluatorOnAllRows?.(targetId, evaluatorId)
           : undefined
       }
-      hasAnyTargetOutputs={
-        tableMeta?.hasAnyTargetOutputs?.(targetId) ?? false
-      }
+      hasAnyTargetOutputs={tableMeta?.hasAnyTargetOutputs?.(targetId) ?? false}
     />
   );
 };

@@ -1,4 +1,5 @@
 import { type LangwatchApiClient } from "@/internal/api/client";
+import { isLangWatchHandledError } from "@/internal/api/errors";
 import { type Logger } from "@/logger";
 import {
   type Dataset,
@@ -73,6 +74,19 @@ export class DatasetService {
 
     const errorMessage = this.extractErrorMessage(error, status);
 
+    // NO handled-error throw here, deliberately.
+    //
+    // Datasets is the one service that already HAS a typed error taxonomy —
+    // `DatasetNotFoundError`, `DatasetPlanLimitError`, and a `DatasetApiError`
+    // that carries the status — and all three are public API that callers catch
+    // by class. Raising a `LangWatchHandledError` in their place would be a
+    // breaking change dressed up as an improvement (a 409 would stop being a
+    // `DatasetApiError`), so this service keeps its own classes and the
+    // transport's throw is folded back into them by `asResponseEnvelope` above.
+    //
+    // Nothing is lost at the surface that matters: `DatasetApiError` keeps the
+    // raw body on `originalError`, so the CLI still reads the platform's `kind`
+    // back off it and still prints a typed `--format json` document.
     throw new DatasetApiError(
       `Failed to ${operation}: ${errorMessage}`,
       status,
@@ -92,12 +106,44 @@ export class DatasetService {
    * Wrapper for API calls to endpoints not yet in the generated OpenAPI types.
    * Quarantines `as any` casts to a single location.
    */
-  private untypedRequest<M extends 'GET' | 'POST' | 'PATCH' | 'DELETE'>(
+  private async untypedRequest<M extends 'GET' | 'POST' | 'PATCH' | 'DELETE'>(
     method: M,
     path: string,
     options?: Record<string, unknown>,
   ) {
-    return (this.config.langwatchApiClient[method] as any)(path, options);
+    return this.asResponseEnvelope(
+      (this.config.langwatchApiClient[method] as any)(path, options),
+    );
+  }
+
+  /**
+   * Puts a transport-thrown domain error back into the `{ error, response }`
+   * envelope this service reads.
+   *
+   * The HTTP client now THROWS a typed domain error on a named failure, before
+   * any service sees the response. Datasets is the one service that must not
+   * receive it: it maps failures onto error classes of its own —
+   * `DatasetNotFoundError`, `DatasetPlanLimitError`, `DatasetApiError` — and all
+   * three are public API that callers catch by class. A typed throw arriving
+   * first would silently take their place, which is a breaking change however
+   * good the intention.
+   *
+   * So the throw is caught here and handed back as the envelope it would have
+   * been, `unwrapResponse` runs exactly as it always has, and every dataset
+   * error class survives untouched. This service is deliberately EXACTLY as it
+   * was; the transport change is invisible to it.
+   */
+  private async asResponseEnvelope(
+    request: Promise<{ data?: unknown; error?: unknown; response: { status: number } }>,
+  ): Promise<{ data?: unknown; error?: unknown; response: { status: number } }> {
+    try {
+      return await request;
+    } catch (error) {
+      if (isLangWatchHandledError(error)) {
+        return { error: error.body, response: { status: error.httpStatus } };
+      }
+      throw error;
+    }
   }
 
   /**
@@ -128,15 +174,14 @@ export class DatasetService {
   ): Promise<Dataset<T>> {
     this.config.logger.debug(`Fetching dataset: ${slugOrId}`);
 
-    const response = await this.config.langwatchApiClient.GET(
-      "/api/dataset/{slugOrId}",
-      {
+    const response = await this.asResponseEnvelope(
+      this.config.langwatchApiClient.GET("/api/dataset/{slugOrId}", {
         params: {
           path: {
             slugOrId,
           },
         },
-      }
+      }) as Promise<{ data?: unknown; error?: unknown; response: { status: number } }>,
     );
 
     const data = this.unwrapResponse<GetDatasetApiResponse>(

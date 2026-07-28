@@ -20,7 +20,7 @@ Tracking: https://github.com/langwatch/langwatch/issues/3458
 
 Concentrations:
 - `scenario-deletion.feature` — 23/25 already covered (`scenario-archive.integration.test.ts`, `ScenarioTable.integration.test.tsx`, `useScenarioSelection.integration.test.ts`).
-- `simulation-runner.feature` — most scenarios duplicated by `simulation-runner.router.unit.test.ts`, `scenario.processor.*.integration.test.ts`, `orchestrator.unit.test.ts`.
+- `simulation-runner.feature` — most scenarios duplicated by `simulation-runner.router.unit.test.ts`, `scenario.processor.*.integration.test.ts`, `orchestrator.unit.test.ts`. The `SimulationRunnerService` class itself has since been deleted (nothing imported it); the behaviour lives in `src/server/scenarios/execution/`.
 - `internal-set-namespace.feature` & `stalled-scenario-runs.feature` — heavy DUPLICATE overlap with `internal-set-id.unit.test.ts`, `stall-detection*.test.ts`, `stalled-status-display.integration.test.ts`.
 
 ## Notable individual findings
@@ -93,9 +93,9 @@ Concentrations:
 | specs/scenarios/ai-create-modal.feature | "AICreateModal shows warning state when hasModelProviders is false" | DUPLICATE | Covered by AICreateModal.test.tsx:609-727 (warning, no textarea, no generate, no pills, no skip) |
 | specs/scenarios/ai-create-modal.feature | "AICreateModal shows normal UI when hasModelProviders is true" | DUPLICATE | Covered by AICreateModal.test.tsx:730-808 (no warning, textarea, generate button, pills) |
 | specs/scenarios/simulation-runner.feature | "Load scenario and prompt for execution" | KEEP | SimulationRunnerService.execute calls scenarioService.getById + uses PromptConfigAdapter; no unit test for this orchestration in simulation-runner.unit.test.ts (which is KSUID tests) |
-| specs/scenarios/simulation-runner.feature | "Load scenario and HTTP agent for execution" | KEEP | resolveAdapter dispatches HttpAgentAdapter.create (simulation-runner.service.ts:198-202); no unit test covering full load+resolve flow |
-| specs/scenarios/simulation-runner.feature | "Pass situation to SDK" | KEEP | scenario.situation passed as description (simulation-runner.service.ts:141); no test asserts SDK arg shape |
-| specs/scenarios/simulation-runner.feature | "Pass criteria to SDK for judgment" | KEEP | scenario.criteria passed to judgeAgent (simulation-runner.service.ts:128-129); no test asserting criteria propagation |
+| specs/scenarios/simulation-runner.feature | "Load scenario and HTTP agent for execution" | KEEP | createAdapter dispatches the HTTP agent adapter (execution/serialized-adapter.registry.ts:63, execution/serialized-adapters/); no unit test covering full load+resolve flow |
+| specs/scenarios/simulation-runner.feature | "Pass situation to SDK" | KEEP | scenario.situation passed through on load (execution/data-prefetcher.ts:362-368); no test asserts SDK arg shape |
+| specs/scenarios/simulation-runner.feature | "Pass criteria to SDK for judgment" | KEEP | scenario.criteria passed through on load (execution/data-prefetcher.ts:362-369); no test asserting criteria propagation |
 | specs/scenarios/simulation-runner.feature | "Pass labels to SDK for tracing" | UPDATE | Labels are passed via OTEL_RESOURCE_ATTRIBUTES env (scenario.processor.otel-isolation.integration.test.ts:153), NOT as SDK metadata; spec wording outdated |
 | specs/scenarios/simulation-runner.feature | "HTTP adapter sends request to endpoint" | DUPLICATE | Covered by adapters/__tests__/http-agent.adapter.test.ts:101-214 (bearer/api_key/basic/none auth + endpoint) |
 | specs/scenarios/simulation-runner.feature | "Prompt adapter uses prompt configuration" | DUPLICATE | Covered by adapters/__tests__/prompt-config.adapter.test.ts:51-176 (system prompt, messages, temperature, maxTokens) |

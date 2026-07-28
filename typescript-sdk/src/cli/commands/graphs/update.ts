@@ -1,28 +1,33 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
+import { commandValidationError, reportCommandError } from "../../utils/errorOutput";
 import { buildAuthHeaders } from "@/internal/api/auth";
+import type { CommandResult } from "../../utils/output";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+/**
+ * Returns the updated graph rather than printing it: the output port renders it
+ * in whatever format the caller asked for (utils/output.ts).
+ */
 export const updateGraphCommand = async (
   id: string,
   options: {
     name?: string;
     graph?: string;
     filters?: string;
-    format?: string;
   }
-): Promise<void> => {
+): Promise<CommandResult | void> => {
   checkApiKey();
 
   if (!options.name && !options.graph && !options.filters) {
-    console.error(
-      chalk.red(
-        "Error: At least one of --name, --graph, or --filters is required"
-      )
-    );
+    reportCommandError({
+      error: commandValidationError(
+        "At least one of --name, --graph, or --filters is required",
+      ),
+    });
     process.exit(1);
   }
 
@@ -30,7 +35,7 @@ export const updateGraphCommand = async (
   const endpoint =
     resolveControlPlaneUrl();
 
-  const spinner = ora(`Updating graph "${id}"...`).start();
+  const spinner = createSpinner(`Updating graph "${id}"...`).start();
 
   try {
     const body: Record<string, unknown> = {};
@@ -53,7 +58,7 @@ export const updateGraphCommand = async (
 
     if (!response.ok) {
       const message = await formatFetchError(response);
-      spinner.fail(`Failed to update graph: ${message}`);
+      failSpinner({ spinner, error: new Error(message), action: "update graph" });
       process.exit(1);
     }
 
@@ -63,21 +68,26 @@ export const updateGraphCommand = async (
     };
     spinner.succeed(`Graph "${graph.name}" updated`);
 
-    if (options.format === "json") {
-      console.log(JSON.stringify(graph, null, 2));
-      return;
-    }
-
-    console.log();
-    console.log(`  ${chalk.gray("ID:")}   ${chalk.green(graph.id)}`);
-    console.log(`  ${chalk.gray("Name:")} ${chalk.cyan(graph.name)}`);
-    console.log();
+    return {
+      data: graph,
+      table: () => {
+        console.log();
+        console.log(`  ${chalk.gray("ID:")}   ${chalk.green(graph.id)}`);
+        console.log(`  ${chalk.gray("Name:")} ${chalk.cyan(graph.name)}`);
+        console.log();
+      },
+    };
   } catch (error) {
-    if (error instanceof SyntaxError) {
-      spinner.fail(chalk.red("--graph and --filters must be valid JSON"));
-    } else {
-      failSpinner({ spinner, error, action: "update graph" });
-    }
+    // Route BOTH failure kinds through failSpinner: a direct spinner.fail()
+    // prints nothing in --json/--jq/agent mode (spinners are silent there).
+    failSpinner({
+      spinner,
+      error:
+        error instanceof SyntaxError
+          ? commandValidationError("--graph and --filters must be valid JSON")
+          : error,
+      action: "update graph",
+    });
     process.exit(1);
   }
 };

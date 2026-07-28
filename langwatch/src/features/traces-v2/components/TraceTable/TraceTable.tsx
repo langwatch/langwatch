@@ -12,7 +12,15 @@ import { TraceLensBody } from "./TraceLensBody";
 import { TraceTableLayout } from "./TraceTableLayout";
 
 export const TraceTable: React.FC = () => {
-  const { data: traces, totalHits, isLoading, isFetching, isPreviousData, newIds } = useTraceList();
+  const {
+    data: traces,
+    totalHits,
+    nextCursor,
+    isLoading,
+    isFetching,
+    isPreviousData,
+    newIds,
+  } = useTraceList();
   const activeLens = useViewStore(getEffectiveLens);
 
   if (!activeLens) return <EmptyFilterState />;
@@ -20,12 +28,20 @@ export const TraceTable: React.FC = () => {
   // in flight and the data is settled (not showing previous-key stale rows).
   // This prevents flashing EmptyFilterState during transitional fetches where
   // `keepPreviousData` may hold the empty result from a prior key.
-  if (!isFetching && !isPreviousData && traces.length === 0) return <EmptyFilterState />;
+  if (!isFetching && !isPreviousData && traces.length === 0 && totalHits === 0)
+    return <EmptyFilterState />;
 
   const rowKind = rowKindForGrouping(activeLens.grouping);
 
   return (
-    <TraceTableLayout totalHits={totalHits} isLoading={isLoading} isEmpty={traces.length === 0}>
+    <TraceTableLayout
+      totalHits={totalHits}
+      nextCursor={nextCursor}
+      visibleCount={traces.length}
+      isLoading={isLoading}
+      isTransitioning={isPreviousData}
+      isEmpty={traces.length === 0}
+    >
       {rowKind === "conversation" && (
         <ConversationLensBody
           traces={traces}

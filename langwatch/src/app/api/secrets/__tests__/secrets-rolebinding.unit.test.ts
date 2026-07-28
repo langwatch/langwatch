@@ -25,7 +25,7 @@ vi.mock("~/utils/extend-zod-openapi", () => ({
   patchZodOpenapi: vi.fn(),
 }));
 
-vi.mock("~/utils/logger/server", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
     info: vi.fn(),
     error: vi.fn(),

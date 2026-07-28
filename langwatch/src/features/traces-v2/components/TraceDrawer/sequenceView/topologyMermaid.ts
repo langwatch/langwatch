@@ -1,5 +1,5 @@
 import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
-import { abbreviateModel, formatDuration } from "../../../utils/formatters";
+import { formatDuration } from "../../../utils/formatters";
 import {
   buildSpanTree,
   type SpanWithChildren,
@@ -56,7 +56,7 @@ function getNode(span: SpanTreeNode): NodeInfo | null {
   if (type === "llm" && span.model) {
     return {
       id: sanitiseMermaidId(`llm_${span.model}`),
-      display: abbreviateModel(span.model),
+      display: (span.model),
       kind: "llm",
     };
   }

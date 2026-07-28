@@ -1,10 +1,15 @@
+import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
 import {
   extractAssistantTextFromResponseBody,
   isConversationalQuerySource,
 } from "~/server/app-layer/traces/canonicalisation/extractors/claudeCode";
-import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
 import type { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import {
+  RESERVED_INPUT_MEDIA_REFS,
+  RESERVED_OUTPUT_MEDIA_REFS,
+  serializeMediaRefs,
+} from "~/shared/traces/media-refs";
 import type { LogRecordReceivedEventData } from "../../schemas/events";
 import type { NormalizedSpan } from "../../schemas/spans";
 
@@ -127,6 +132,26 @@ export function extractIOFromLogRecord(data: LogRecordReceivedEventData): {
         return { input: null, output: responseText };
       }
     }
+    // LIGHT path: without OTEL_LOG_RAW_API_BODIES the reply text rides an
+    // `assistant_response` event (attribute `response`) and no
+    // api_response_body exists in the session — the two events are
+    // per-session alternatives carrying the same reply text, so accepting
+    // both at the same rank cannot double-lift. Same conversational gate as
+    // above: utility replies (autosuggest, session titles) must not clobber
+    // the headline output.
+    if (
+      data.attributes["event.name"] === "assistant_response" &&
+      isConversationalQuerySource(
+        typeof data.attributes.query_source === "string"
+          ? data.attributes.query_source
+          : null,
+      )
+    ) {
+      const response = data.attributes.response;
+      if (typeof response === "string" && response.length > 0) {
+        return { input: null, output: response };
+      }
+    }
   }
 
   // Codex emits the user's text on a separate codex.user_prompt event.
@@ -148,7 +173,6 @@ export function extractIOFromLogRecord(data: LogRecordReceivedEventData): {
 
   return { input: null, output: null };
 }
-
 
 /**
  * Accumulates computed input/output across spans using priority rules:
@@ -174,6 +198,9 @@ export class TraceIOAccumulationService {
     blockedByGuardrail: boolean;
     inputIsFallback: boolean;
     outputIsFallback: boolean;
+    /** Compact JSON media refs for the winning input/output, or null. */
+    inputMediaRefs: string | null;
+    outputMediaRefs: string | null;
   } {
     const spanType = span.spanAttributes[ATTR_KEYS.SPAN_TYPE];
     const currentOutputSource =
@@ -192,6 +219,13 @@ export class TraceIOAccumulationService {
     let blockedByGuardrail = state.blockedByGuardrail;
     let inputIsFallback = currentInputIsFallback;
     let outputIsFallback = currentOutputIsFallback;
+    // Media refs follow the same winner as the computed text: whenever a
+    // span's IO becomes the trace's headline input/output, its media parts
+    // (already externalized to /api/files references) become the trace-level
+    // media refs — ComputedInput is flattened text, so this is the only place
+    // the list and drawer summary can learn about the trace's media.
+    let inputMediaRefs = state.attributes[RESERVED_INPUT_MEDIA_REFS] ?? null;
+    let outputMediaRefs = state.attributes[RESERVED_OUTPUT_MEDIA_REFS] ?? null;
 
     if (spanType === "guardrail") {
       const rawOutput = span.spanAttributes[ATTR_KEYS.LANGWATCH_OUTPUT];
@@ -237,13 +271,17 @@ export class TraceIOAccumulationService {
         blockedByGuardrail,
         inputIsFallback,
         outputIsFallback,
+        inputMediaRefs,
+        outputMediaRefs,
       };
     }
 
     const isRoot = span.parentSpanId === null;
 
-    const inputResult =
-      this.traceIOExtractionService.extractRichIOFromSpan(span, "input");
+    const inputResult = this.traceIOExtractionService.extractRichIOFromSpan(
+      span,
+      "input",
+    );
     if (
       inputResult &&
       (isRoot || computedInput === null || currentInputIsFallback)
@@ -257,6 +295,7 @@ export class TraceIOAccumulationService {
       // instead of the actual text.
       computedInput = preferText(inputResult.text, inputResult.raw);
       inputIsFallback = false;
+      inputMediaRefs = serializeMediaRefs(inputResult.raw);
     } else if (!inputResult && computedInput === null) {
       // Semantic heuristics didn't find anything. Fall back to the
       // service's `text` (best-effort stringification of the wrapper)
@@ -267,11 +306,14 @@ export class TraceIOAccumulationService {
       if (inputFallback) {
         computedInput = preferText(inputFallback.text, inputFallback.raw);
         inputIsFallback = true;
+        inputMediaRefs = serializeMediaRefs(inputFallback.raw);
       }
     }
 
-    const outputResult =
-      this.traceIOExtractionService.extractRichIOFromSpan(span, "output");
+    const outputResult = this.traceIOExtractionService.extractRichIOFromSpan(
+      span,
+      "output",
+    );
     if (outputResult) {
       const isExplicit = outputResult.source === "langwatch";
       // Semantic output must always override a prior fallback, regardless of
@@ -299,6 +341,7 @@ export class TraceIOAccumulationService {
           ? OUTPUT_SOURCE.EXPLICIT
           : OUTPUT_SOURCE.INFERRED;
         outputIsFallback = false;
+        outputMediaRefs = serializeMediaRefs(outputResult.raw);
       }
     } else if (computedOutput === null) {
       // No semantic match on any span so far. A stringified-payload fallback
@@ -307,14 +350,12 @@ export class TraceIOAccumulationService {
       // regardless of span end-time ordering. outputFromRootSpan stays unset
       // so the next semantic root-span match still wins.
       const outputFallback =
-        this.traceIOExtractionService.extractFallbackIOFromSpan(
-          span,
-          "output",
-        );
+        this.traceIOExtractionService.extractFallbackIOFromSpan(span, "output");
       if (outputFallback) {
         computedOutput = preferText(outputFallback.text, outputFallback.raw);
         outputSpanEndTimeMs = span.endTimeUnixMs;
         outputIsFallback = true;
+        outputMediaRefs = serializeMediaRefs(outputFallback.raw);
       }
     }
 
@@ -327,6 +368,8 @@ export class TraceIOAccumulationService {
       blockedByGuardrail,
       inputIsFallback,
       outputIsFallback,
+      inputMediaRefs,
+      outputMediaRefs,
     };
   }
 }

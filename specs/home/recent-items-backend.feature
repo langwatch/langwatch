@@ -206,7 +206,7 @@ Feature: Recent Items Backend
       | checkId | monitor-123 |
     And a monitor exists with id "monitor-123" and name "My Evaluation" and slug "my-evaluation"
     When I request recent items with limit 12
-    Then the item should have href "/project-456/evaluations"
+    Then the item should have href "/project-456/online-evaluations"
 
   @unimplemented
   Scenario: Returns correct deep link URL for annotation queues

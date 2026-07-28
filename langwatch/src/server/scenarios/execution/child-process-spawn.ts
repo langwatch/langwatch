@@ -8,9 +8,9 @@
  * @see specs/scenarios/pre-compiled-child-process.feature
  */
 
+import { createLogger } from "@langwatch/observability";
 import fs from "fs";
 import path from "path";
-import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:scenarios:child-process-spawn");
 

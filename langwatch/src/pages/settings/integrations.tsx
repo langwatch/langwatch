@@ -1,12 +1,13 @@
 /**
- * Settings → Integrations. v0 surfaces the Langy ↔ GitHub connection only;
- * future integrations slot in here as additional cards.
+ * Settings → Integrations. v0 surfaces the Langy ↔ GitHub App installation:
+ * install the app, see which GitHub accounts and repositories Langy can reach,
+ * and open GitHub to change or remove the installation. Future integrations
+ * slot in here as additional cards.
  *
- * The same OAuth endpoint serves the in-chat popup flow; this page uses the
- * redirect-mode variant so a user landing here from a "Connect GitHub in
- * settings" link gets a normal full-page round-trip.
+ * The same install endpoint serves the in-chat popup flow; this page uses the
+ * redirect-mode variant so a full-page round-trip lands back here.
  *
- * Spec: specs/langy/langy-github-prs.feature. Issue: #4747.
+ * Spec: specs/langy/langy-github-install.feature. Issue: #4747.
  */
 import {
   Badge,
@@ -15,9 +16,11 @@ import {
   Card,
   Heading,
   HStack,
+  Link,
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { useState } from "react";
 import { GitHub } from "react-feather";
 
 import SettingsLayout from "../../components/SettingsLayout";
@@ -36,20 +39,17 @@ export default withPermissionGuard("organization:manage", {
 })(IntegrationsSettings);
 
 function IntegrationsContent({ organizationId }: { organizationId: string }) {
-  const connection = api.langyGithub.getConnection.useQuery({ organizationId });
-  const utils = api.useUtils();
-  const disconnect = api.langyGithub.disconnect.useMutation({
-    onSuccess: () => {
-      void utils.langyGithub.getConnection.invalidate({ organizationId });
-    },
-  });
+  const status = api.langyGithub.getInstallStatus.useQuery({ organizationId });
 
-  const onConnect = () => {
+  const onInstall = () => {
     const ret = encodeURIComponent("/settings/integrations#github");
-    window.location.href = `/api/github-langy/connect?mode=redirect&organizationId=${encodeURIComponent(
+    window.location.href = `/api/github-langy/install?mode=redirect&organizationId=${encodeURIComponent(
       organizationId,
     )}&return=${ret}`;
   };
+
+  const configured = status.data?.configured ?? true;
+  const installations = status.data?.installations ?? [];
 
   return (
     <SettingsLayout>
@@ -61,48 +61,146 @@ function IntegrationsContent({ organizationId }: { organizationId: string }) {
               <HStack gap={2}>
                 <GitHub size={18} />
                 <Heading size="sm">GitHub</Heading>
-                {connection.data ? (
+                {installations.length > 0 ? (
                   <Badge colorPalette="green" variant="subtle">
-                    Connected
+                    Installed
                   </Badge>
                 ) : null}
               </HStack>
-              <Text fontSize="sm" color="gray.600">
-                Lets Langy open pull requests on your behalf. PRs are authored
-                by your GitHub user; LangWatch only stores a short-lived,
-                rotating refresh token (encrypted at rest) and never your
-                password.
+              <Text fontSize="sm" color="fg.muted">
+                Lets Langy open pull requests on the repositories you choose.
+                Pull requests are made by the LangWatch app and credit you as
+                the requester.
               </Text>
-              {connection.data ? (
-                <Box>
-                  <HStack gap={3}>
-                    <Text fontSize="sm">
-                      Connected as{" "}
-                      <strong>@{connection.data.githubLogin}</strong>
-                    </Text>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => disconnect.mutate({ organizationId })}
-                      loading={disconnect.isPending}
-                    >
-                      Disconnect
-                    </Button>
-                  </HStack>
-                </Box>
-              ) : (
+
+              {!configured ? (
+                <Text fontSize="sm" color="fg.muted">
+                  The GitHub integration is not available on this instance.
+                </Text>
+              ) : installations.length === 0 ? (
                 <Button
                   variant="solid"
-                  onClick={onConnect}
+                  onClick={onInstall}
                   alignSelf="flex-start"
                 >
-                  Connect GitHub
+                  Install the LangWatch GitHub App
                 </Button>
+              ) : (
+                <VStack align="stretch" gap={3}>
+                  {installations.map((inst) => (
+                    <InstallationRow
+                      key={inst.installationId}
+                      organizationId={organizationId}
+                      installation={inst}
+                      onChanged={() => void status.refetch()}
+                    />
+                  ))}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={onInstall}
+                    alignSelf="flex-start"
+                  >
+                    Add another account
+                  </Button>
+                </VStack>
               )}
             </VStack>
           </Card.Body>
         </Card.Root>
       </VStack>
     </SettingsLayout>
+  );
+}
+
+type Installation = {
+  installationId: string;
+  accountLogin: string;
+  accountType: string;
+  repositorySelection: string;
+  repositoryCount: number | null;
+  suspended: boolean;
+  uninstallUrl: string;
+};
+
+function InstallationRow({
+  organizationId,
+  installation,
+  onChanged,
+}: {
+  organizationId: string;
+  installation: Installation;
+  onChanged: () => void;
+}) {
+  // Uninstalling finishes on GitHub, and this row keeps saying "Installed"
+  // until GitHub's confirmation lands — without a hint, that reads as the
+  // Disconnect button doing nothing.
+  const [uninstallStarted, setUninstallStarted] = useState(false);
+  const disconnect = api.langyGithub.disconnect.useMutation({
+    onSuccess: (data) => {
+      // We can't uninstall via the API — open GitHub's uninstall page. The
+      // webhook removes the local record once GitHub confirms.
+      window.open(data.uninstallUrl, "_blank", "noopener,noreferrer");
+      setUninstallStarted(true);
+      onChanged();
+    },
+  });
+
+  const repoSummary =
+    installation.repositorySelection === "all"
+      ? "All repositories"
+      : `${installation.repositoryCount ?? 0} selected ${
+          installation.repositoryCount === 1 ? "repository" : "repositories"
+        }`;
+
+  return (
+    <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" padding={3}>
+      <HStack justify="space-between" gap={3}>
+        <VStack align="stretch" gap={0}>
+          <HStack gap={2}>
+            <Text fontSize="sm" fontWeight="600">
+              @{installation.accountLogin}
+            </Text>
+            {installation.suspended ? (
+              <Badge colorPalette="orange" variant="subtle">
+                Suspended
+              </Badge>
+            ) : null}
+          </HStack>
+          <Text fontSize="xs" color="fg.muted">
+            {repoSummary}
+          </Text>
+          {uninstallStarted ? (
+            <Text fontSize="xs" color="fg.muted">
+              Finish uninstalling on GitHub — this updates once GitHub
+              confirms.
+            </Text>
+          ) : null}
+        </VStack>
+        <HStack gap={2}>
+          <Link
+            href={installation.uninstallUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            fontSize="sm"
+          >
+            Configure
+          </Link>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() =>
+              disconnect.mutate({
+                organizationId,
+                installationId: installation.installationId,
+              })
+            }
+            loading={disconnect.isPending}
+          >
+            Disconnect
+          </Button>
+        </HStack>
+      </HStack>
+    </Box>
   );
 }

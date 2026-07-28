@@ -14,3 +14,4 @@ export { SpringAIExtractor } from "./springAI";
 export { StrandsExtractor } from "./strands";
 export { TraceloopExtractor } from "./traceloop";
 export { VercelExtractor } from "./vercel";
+export { VertexAdkExtractor } from "./vertexAdk";

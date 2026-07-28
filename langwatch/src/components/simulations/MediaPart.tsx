@@ -7,37 +7,16 @@
  *  - Missing: when the URL returns a 404/missing status, renders a placeholder badge.
  *
  * Uses native HTML5 <audio>, <img>, <video> — no third-party player library.
+ * Non-media binary parts (documents) render as an attachment chip that opens
+ * the stored file in a new tab.
  */
-import { Badge, Box, Text, VStack } from "@chakra-ui/react";
+import { Badge, Box, Icon, Text, VStack } from "@chakra-ui/react";
+import { ExternalLink, File, FileText } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { resolveRawPcmFormat, wrapRawPcmToWav } from "~/shared/audio/pcmToWav";
+import { isSafeMediaUrl, type MediaPartData } from "~/shared/traces/mediaParts";
 import { api } from "~/utils/api";
 import type { AudioPlaybackProps } from "./useSequentialAudioPlayback";
-
-// ---------------------------------------------------------------------------
-// Public types
-// ---------------------------------------------------------------------------
-
-/**
- * A single AG-UI media content part, as produced after content-extraction.
- * This matches the subset of InputContentPart shapes we render.
- */
-export type MediaPartData =
-  | {
-      type: "image" | "audio" | "video";
-      source: { type: "url"; value: string; mimeType?: string };
-    }
-  | {
-      type: "image" | "audio" | "video";
-      source: { type: "data"; value: string; mimeType: string };
-    }
-  | {
-      type: "binary";
-      mimeType: string;
-      id?: string;
-      url?: string;
-      data?: string;
-      filename?: string;
-    };
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -99,11 +78,7 @@ interface MediaPartProps {
  * Renders a single AG-UI media content part as a native HTML5 media element,
  * a data: URI, or a missing-badge placeholder.
  */
-export function MediaPart({
-  part,
-  projectId,
-  audioPlayback,
-}: MediaPartProps) {
+export function MediaPart({ part, projectId, audioPlayback }: MediaPartProps) {
   // Resolve src and category from the part shape
   let src: string;
   let mimeType: string | undefined;
@@ -135,7 +110,16 @@ export function MediaPart({
     !src.startsWith("data:") &&
     (part.type === "binary" ? !!part.url : part.source.type === "url");
 
-  const [status, setStatus] = useState<LoadStatus>(isUrlBased ? "loading" : "ok");
+  // Part URLs come from span content, which is attacker-controllable by
+  // anyone who can send traces. A src outside the allowlist (`javascript:`,
+  // `blob:`, protocol-relative, ...) must never reach an element src or
+  // anchor href — it renders as the error badge instead, after the hooks
+  // below (which all no-op on it).
+  const unsafeSrc = src !== "" && !isSafeMediaUrl(src);
+
+  const [status, setStatus] = useState<LoadStatus>(
+    isUrlBased ? "loading" : "ok",
+  );
 
   // Probe at most once per <src>: a single failed audio/video element can fire
   // `error` repeatedly while the browser retries decoders, and a long scenario
@@ -194,8 +178,69 @@ export function MediaPart({
     setProbeEnabled(true);
   }
 
+  // Legacy raw-PCM references: objects stored before store-time WAV wrapping
+  // carry header-less pcm16 / G.711 bytes under a raw mime type — a bare
+  // <audio src> cannot decode those. Fetch the bytes once, wrap them in a
+  // WAV container client-side, and play from a blob URL. New objects are
+  // wrapped at store time and never take this path. Gated on
+  // `storedObjectId`: only our own stored objects can BE legacy raw-PCM
+  // refs, and an eager fetch of an arbitrary external URL would beacon the
+  // viewer to whoever controls the part.
+  const rawUrlFormat =
+    storedObjectId && category === "audio"
+      ? resolveRawPcmFormat(undefined, mimeType)
+      : null;
+  const [wrappedSrc, setWrappedSrc] = useState<string | null>(null);
+  useEffect(() => {
+    if (!rawUrlFormat) {
+      setWrappedSrc(null);
+      return;
+    }
+    let cancelled = false;
+    let objectUrl: string | null = null;
+    const controller = new AbortController();
+    void (async () => {
+      try {
+        const response = await fetch(src, {
+          credentials: "same-origin",
+          signal: controller.signal,
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const bytes = new Uint8Array(await response.arrayBuffer());
+        const wav = wrapRawPcmToWav(bytes, rawUrlFormat);
+        if (!wav) throw new Error("empty audio payload");
+        const url = URL.createObjectURL(
+          new Blob([wav as BlobPart], { type: "audio/wav" }),
+        );
+        // The cleanup may already have run while the bytes were in flight;
+        // a URL minted after that point would leak forever, so revoke it
+        // here instead of publishing it.
+        if (cancelled) {
+          URL.revokeObjectURL(url);
+          return;
+        }
+        objectUrl = url;
+        setWrappedSrc(url);
+      } catch {
+        if (!cancelled) handleError();
+      }
+    })();
+    return () => {
+      cancelled = true;
+      controller.abort();
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      // Also drop the published state: a rapid src swap would otherwise
+      // briefly point the <audio> at the just-revoked URL and fire a
+      // spurious error before the new wrap resolves.
+      setWrappedSrc(null);
+    };
+    // handleError is a stable-in-practice component function; src/format are
+    // the real inputs of this effect.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [src, rawUrlFormat]);
+
   // Missing or error placeholder
-  if (status === "missing" || (status === "error" && src === "")) {
+  if (unsafeSrc || status === "missing" || (status === "error" && src === "")) {
     return (
       <Box
         data-testid="media-part-missing"
@@ -251,7 +296,10 @@ export function MediaPart({
         <audio
           data-testid="media-part-audio"
           controls
-          src={src}
+          // Legacy raw-PCM URLs wait for the client-side WAV wrap; an <audio>
+          // without src renders a disabled shell instead of firing a decode
+          // error for bytes the browser can never play.
+          src={rawUrlFormat ? (wrappedSrc ?? undefined) : src}
           // `onLoad` does not fire on <audio>/<video>; the right hook is
           // `onLoadedData` (metadata + first frame ready) — fires only
           // after the browser has actually decoded enough to play, so
@@ -276,7 +324,14 @@ export function MediaPart({
         alt={mimeType ?? "image"}
         onLoad={handleLoad}
         onError={handleError}
-        style={{ maxHeight: "200px", borderRadius: "6px" }}
+        // maxWidth caps upscaling in stretch layouts: without it a tiny
+        // image (an 8x8 icon) inflates to container width.
+        style={{
+          maxHeight: "200px",
+          maxWidth: "min(100%, 400px)",
+          width: "auto",
+          borderRadius: "6px",
+        }}
       />
     );
   }
@@ -298,11 +353,62 @@ export function MediaPart({
     );
   }
 
-  // binary fallback — link to download
+  // binary fallback — attachment chip. Stored-object URLs open in a new tab
+  // (the /api/files read route serves Content-Disposition: inline, so PDFs
+  // render in the browser's viewer); legacy inline base64 falls back to a
+  // download, since browsers block top-frame navigation to data: URIs.
+  // Stored objects are content-addressed and carry no filename of their own,
+  // so pass the message-level one along — downloads from the opened viewer
+  // then keep the original name instead of the object id.
+  const filename = part.type === "binary" ? part.filename : undefined;
+  const chipHref =
+    filename && storedObjectId
+      ? `${src}?filename=${encodeURIComponent(filename)}`
+      : src;
+  const isDocumentLike =
+    mimeType === "application/pdf" || (mimeType?.startsWith("text/") ?? false);
   return (
-    <Box data-testid="media-part-binary">
-      <a href={src} download={part.type === "binary" ? part.filename : undefined}>
-        {part.type === "binary" && part.filename ? part.filename : mimeType ?? "file"}
+    <Box asChild data-testid="media-part-binary">
+      <a
+        href={chipHref}
+        {...(isUrlBased
+          ? { target: "_blank", rel: "noopener noreferrer" }
+          : { download: filename ?? "" })}
+        aria-label={
+          isUrlBased
+            ? `Open ${filename ?? "attachment"} in a new tab`
+            : `Download ${filename ?? "attachment"}`
+        }
+      >
+        <Box
+          display="inline-flex"
+          alignItems="center"
+          gap={2}
+          paddingX={3}
+          paddingY={2}
+          borderRadius="md"
+          bg="bg.subtle"
+          border="1px solid"
+          borderColor="border"
+          _hover={{ bg: "bg.muted" }}
+        >
+          <Icon
+            as={isDocumentLike ? FileText : File}
+            boxSize={4}
+            color="fg.muted"
+          />
+          <Text fontSize="sm" fontWeight="medium">
+            {filename ?? mimeType ?? "file"}
+          </Text>
+          {isUrlBased && (
+            <Icon
+              as={ExternalLink}
+              boxSize={3}
+              color="fg.subtle"
+              data-testid="media-part-binary-open"
+            />
+          )}
+        </Box>
       </a>
     </Box>
   );

@@ -1,0 +1,274 @@
+Feature: Handled errors — the handled-error boundary
+
+  Every error that crosses an API boundary is exactly one of two things, and the
+  contract turns on the difference:
+
+    - HANDLED — we understand it and the caller can act on it (not found,
+      forbidden, not-owned, timeout, validation, conflict, rate-limited). It is a
+      `HandledError` in TypeScript / an `herr.E` in Go, with a stable `code`
+      (Go: `Code`), user-relevant `message`, structured `meta`, `traceId`/`spanId`,
+      an `httpStatus`, and a `reasons` cause chain.
+    - UNHANDLED — anything we did not anticipate (a database crash, a nil deref,
+      an infra timeout, a bug). It is a plain `Error` / plain `error`. It has no
+      user-relevant meaning and MUST NOT be dressed up as a handled error.
+
+  The rule: only handled errors cross the boundary with meaning. An unhandled
+  error is reported to the client as a single generic "unknown", its detail
+  logged server-side against the trace id — never presented as an actionable API
+  error. The presence of a serialised domain payload IS the signal of "handled".
+
+  This contract is the same in both languages and applies everywhere. See
+  ADR-045. The machinery lives in the shared `packages/handled-error` package
+  (consumed directly by the app, MCP server, CLI and SDKs; the app wires its
+  Grafana trace links via `src/server/handled-error-wiring.ts`), wired into
+  tRPC's `errorFormatter` and Hono's `onError`; these scenarios pin its
+  intended behaviour and its reach.
+
+  Background:
+    Given the HandledError base and its serialisation are available in the app layer
+    And tRPC attaches a serialised handled error to `data.error`
+    And Hono's `onError` normalises a HandledError to `{ code, message: code, ...meta }`
+
+  # ==========================================================================
+  # Handled: known, user-relevant failures cross the boundary with meaning
+  # ==========================================================================
+
+  @bdd @domain-errors
+  Scenario: A known failure is serialised as a handled error over tRPC
+    Given a procedure throws a NotFoundError of code "evaluation_not_found" with meta { id }
+    When the client calls that procedure
+    Then the tRPC error carries `data.error`
+    And the handled error has code "evaluation_not_found"
+    And its meta contains the requested id
+    And its httpStatus is 404
+
+  @bdd @domain-errors
+  Scenario: A handled error's free-text message never crosses the tRPC boundary
+    Given a procedure throws a HandledError whose message names server configuration
+    When the client calls that procedure
+    Then the tRPC wire message is the error's stable code, not the free-text message
+    And no part of the response contains the free-text message
+    And `data.error` (code, meta, tips, docsUrl) is the entire client contract
+    So client copy comes from the code-keyed explainers, never from server-authored strings
+
+  @bdd @domain-errors
+  Scenario: A known failure is normalised by Hono to a client-safe body
+    Given a service route throws a HandledError of code "conversation_not_owned" with httpStatus 403
+    When the client calls that route
+    Then the HTTP status is 403
+    And the response body carries code "conversation_not_owned" with its meta
+    And the body's message is that code, not the error's own free text
+    And no stack trace or internal detail is present
+
+  @bdd @domain-errors
+  Scenario: Validation failures travel the one handled-error channel
+    Given a request fails input validation
+    When the error is serialised for any transport
+    Then it is a handled error of code "validation_error"
+    And the failing fields ride in its meta, not a separate zodError field
+    So clients read validation detail exactly where they read every other fact
+
+  # --------------------------------------------------------------------------
+  # Request validation — the REST boundary's own schema failures
+  #
+  # `@hono/zod-validator` answers a schema failure itself, with a 400 carrying
+  # zod's whole safeParse output. That body names no code, so no consumer can
+  # read it: the CLI falls through to its status-derived reading and reports
+  # `request_failed` — or `network_error` when the status is lost on the way —
+  # and an agent told "network_error" retries the identical broken request. The
+  # shared validator wrapper closes that hole by throwing instead, so a schema
+  # failure reaches `onError` and becomes a handled error like everything else.
+  # --------------------------------------------------------------------------
+
+  @bdd @domain-errors
+  Scenario: A schema failure is a handled error, not the validator's own reply
+    Given a request body parses as JSON but does not satisfy the route's schema
+    When the route's validator rejects it
+    Then the response is a handled error of code "validation_error"
+    And the HTTP status is 422
+    And the body names the code, so a consumer never has to guess from the status
+
+  @bdd @domain-errors
+  Scenario: Every failing field is reported, not just the first
+    Given a request violates the schema in more than one place
+    Then the response carries one reason per violation
+    And each reason has code "schema_failure" with meta.field, meta.type and meta.message
+    And meta.fields on the error lists every offending path
+    So a caller fixes the whole request in one round trip
+
+  @bdd @domain-errors
+  Scenario: The expected values are structured data, not prose
+    Given a field fails because its value is outside a permitted set
+    Then the permitted values ride in that reason's meta.expected
+    And the message stays one short sentence naming the target, not the constraint
+    So the actionable part survives truncation on its way to an agent
+
+  @bdd @domain-errors
+  Scenario: A body that never parsed is a different failure from one that did
+    Given a request body is not well-formed at all
+    Then the response is a handled error of code "malformed_request"
+    And the HTTP status is 400, not 422
+    And it carries no field reasons, because no document existed to have fields
+    So a caller can tell "fix these fields" apart from "resend the request"
+
+  @bdd @domain-errors
+  Scenario: A route's own validation hook still wins
+    Given a route passes its own hook to the validator
+    When that hook answers the request itself
+    Then its response is used unchanged
+    So the shared behaviour is a default, never an override
+
+  @bdd @domain-errors
+  Scenario: Producers emit both names for the discriminant
+    Given a handled error is serialised by Go or by the REST layer
+    Then the body carries "type" and "code" with the same value
+    And readers resolve the discriminant as code, then kind, then type
+    So an OpenAI-compatible consumer and a LangWatch one both read it natively
+
+  @bdd @domain-errors
+  Scenario: A displayed message prefers copy that was authored to be shown
+    Given a client needs one line to show a user
+    Then it reads meta.message, then message, then code
+    And meta.message is the only channel carrying server-authored prose
+    And a handled error's own message stays server-side and is never a source
+
+  @bdd @domain-errors
+  Scenario: An external contract wins over cross-transport symmetry
+    Given published SDKs read the REST body's `error` field as a string
+    Then that body stays flat at the root rather than nesting under `error`
+    So consistency is pursued only where no caller contract forbids it
+
+  @bdd @domain-errors
+  Scenario: httpStatus follows the failure class
+    Given a NotFoundError, a ValidationError, a conflict, and a rate-limit handled error
+    Then their httpStatus values are 404, 422, 409, and 429 respectively
+
+  @bdd @domain-errors
+  Scenario: Telemetry is captured from the active span
+    Given a HandledError is constructed inside an active OTel span
+    Then it carries that span's traceId and spanId
+    And the client can link the error to its trace
+
+  # ==========================================================================
+  # Unhandled: internal failures degrade to "unknown"
+  # ==========================================================================
+
+  @bdd @domain-errors
+  Scenario: A database crash is reported to the client as unknown
+    Given a procedure throws a plain Error because the database connection dropped
+    When the client calls that procedure
+    Then `data.error` is null
+    And the caller sees a generic "unknown" / internal error, not the raw message
+    And the underlying error is logged server-side with the trace id
+
+  @bdd @domain-errors
+  Scenario: An unhandled reason inside a handled error is masked, not leaked
+    Given an EvaluationNotFoundError is thrown with a plain database Error in its reasons
+    When it is serialised
+    Then the top-level code is "evaluation_not_found"
+    And the database Error appears in reasons only as { code: "unknown" }
+    And no database detail reaches the client
+
+  @bdd @domain-errors
+  Scenario: We never invent a handled error for an unknown cause
+    Given a failure we cannot name (an unexpected bug)
+    Then the code throws a plain Error, not a HandledError subclass
+    And it correctly degrades to "unknown" at the boundary
+
+  # ==========================================================================
+  # Cross-language: handled-ness survives the Go ↔ TS boundary
+  # ==========================================================================
+
+  @bdd @domain-errors
+  Scenario: A Go herr proxied by the control plane arrives as a handled error
+    Given a Go service returns an herr.E with Code "github_unreachable" and a trace id
+    When the control plane proxies that failure to the client
+    Then it is adapted into a HandledError (Code → code, meta→meta, trace_id/span_id→traceId/spanId)
+    And the client receives code "github_unreachable" with its meta and trace link
+
+  @bdd @domain-errors
+  Scenario: A plain Go error proxied by the control plane becomes unknown
+    Given a Go service returns a plain error (not an herr.E)
+    When the control plane proxies that failure to the client
+    Then no domain payload is produced
+    And the client sees the generic "unknown" treatment
+
+  # ==========================================================================
+  # Non-tRPC transports carry the same shape
+  # ==========================================================================
+
+  @bdd @domain-errors
+  Scenario: A streamed response carries the serialised handled error on its error event
+    Given a streamed endpoint (e.g. the Langy chat stream) hits a known failure mid-stream
+    Then its error event carries the SerializedHandledError, not a plain string
+    And the frame's message is the error's code, never its free text
+    And the client applies the same handled/unknown logic as for a tRPC error
+
+  # ==========================================================================
+  # Client presentation is decided in one place, keyed on code
+  # ==========================================================================
+
+  @bdd @domain-errors
+  Scenario: The client renders a handled error usefully and an unknown one generically
+    Given a client receives a handled error of a known code
+    Then a code-keyed explainer maps it to user-facing copy and an optional action
+    And when the error has no domain payload
+    Then the client shows a single generic "something went wrong" plus a trace id
+
+  @bdd @domain-errors
+  Scenario: code is the discriminant across process and serialisation boundaries
+    Given a serialised handled error crosses a worker or process boundary
+    Then consumers branch on `error.code`, not `instanceof`
+    And identity survives the boundary intact
+
+  # ==========================================================================
+  # Remediation channel: tips/docsUrl/fault travel with the error (ADR-045,
+  # 2026-07-18 amendment)
+  # ==========================================================================
+
+  @bdd @domain-errors
+  Scenario: A handled error carries remediation for agent consumers
+    Given a QueryMemoryExceededError is thrown with tips and no docsUrl
+    When it is serialised
+    Then the payload carries its tips verbatim
+    And the payload carries fault "customer"
+    And consumers without a client-side explainer (CLI, API, MCP) can self-diagnose
+
+  @bdd @domain-errors
+  Scenario: Remediation fields are additive and optional
+    Given a HandledError without tips or docsUrl (e.g. an older error class)
+    When it is serialised
+    Then no tips or docsUrl keys are emitted
+    And older clients and the Python SDK keep working unchanged
+
+  @bdd @domain-errors
+  Scenario: Remediation survives the Go herr wire
+    Given a Go service returns an herr.E with Meta tips/docs_url/fault
+    When the envelope crosses to TypeScript
+    Then the adapted HandledError carries tips, docsUrl and fault
+    And a Body/FromBody round-trip preserves them losslessly
+
+  @bdd @domain-errors
+  Scenario: Log level follows fault attribution, not handled-ness
+    Given a handled error with fault "customer" and httpStatus 500
+    Then it logs at warn, with handledErrorCode available for spike alerts
+    And a handled error with fault "platform" or "provider" logs at error
+    And only unhandled errors are captured as exceptions
+
+  # ==========================================================================
+  # Transition: `kind` → `code` rename stays non-breaking during rollout
+  # ==========================================================================
+
+  @bdd @domain-errors
+  Scenario: A serialised handled error carries `code` and a deprecated `kind` alias
+    Given a HandledError is serialised for the wire
+    Then the payload carries the discriminant as `code`
+    And it also carries the same value as a deprecated `kind` alias
+    And nested reasons carry the same `code`/`kind` pair
+    So an older client still reading `kind` keeps working through the rollout
+
+  @bdd @domain-errors
+  Scenario: A client resolves a handled error from either discriminant field
+    Given a client reads the discriminant off `data.error`
+    When the payload carries only the deprecated `kind` (an older server)
+    Then the client resolves the same handled error as if it had read `code`

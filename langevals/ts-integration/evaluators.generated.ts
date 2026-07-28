@@ -876,6 +876,48 @@ export const evaluatorsSchema = z.object({
         .default([]),
     }),
   }),
+  "langevals/select_best_compare": z.object({
+    settings: z.object({
+      model: z
+        .string()
+        .describe("The model to use for evaluation")
+        .default("openai/gpt-5-mini"),
+      max_tokens: z
+        .number()
+        .describe("Max tokens allowed for evaluation")
+        .default(128000),
+      prompt: z
+        .string()
+        .describe(
+          "Judge prompt template. Placeholders: {input}, {golden}, {candidates} (a pre-rendered bulleted list with slot labels and optional per-candidate metrics).",
+        )
+        .default(
+          'Pick the best of N candidate replies to the task.\n\nTask:       {input}\nReference:  {golden}\n\nCandidates:\n{candidates}\n\nLook across the candidates and decide which one is the best reply.\nBriefly explain WHY it\'s better than the others, then pick the winning\nslot label. Use "tie" only when no candidate is clearly better.\n',
+        ),
+      has_golden_answer: z
+        .boolean()
+        .describe(
+          "Compare each candidate against a reference answer. Turn off to have the judge compare the candidates directly on their own merits, with no reference answer involved.",
+        )
+        .default(false),
+      randomize_order: z
+        .boolean()
+        .describe(
+          "Shuffle candidate order per row (deterministically, seeded by row_index) before presenting them to the judge. Reduces position bias when the judge is called once per row.",
+        )
+        .default(true),
+      allow_tie: z
+        .boolean()
+        .describe(
+          "Allow the judge to return 'tie' when candidates are equivalent",
+        )
+        .default(true),
+      include_metrics: z
+        .array(z.union([z.literal("cost"), z.literal("duration")]))
+        .describe("Per-candidate metrics to inject into the judge prompt")
+        .default([]),
+    }),
+  }),
   "langevals/query_resolution": z.object({
     settings: z.object({
       model: z
@@ -2232,11 +2274,10 @@ This evaluator checks if the user message is concerning one of the allowed topic
     },
   },
   "langevals/pairwise_compare": {
-    name: `Pairwise Compare`,
+    name: `Pairwise Compare (deprecated)`,
     description: `
-Native pairwise LLM-as-judge evaluator. Compare two candidate
-outputs against a golden reference, with optional swap-and-confirm
-position-bias mitigation.
+Compare two candidate outputs against a reference answer and pick the
+better one. Superseded by Comparison, which judges two or more candidates.
 `,
     category: "quality",
     docsUrl: "",
@@ -2297,6 +2338,65 @@ position-bias mitigation.
       label: {
         description:
           "Winner identifier: candidate_a_id, candidate_b_id, or 'tie'. Programmatic consumers can read this directly without dereferencing the evaluator's candidate slot mapping.",
+      },
+    },
+  },
+  "langevals/select_best_compare": {
+    name: `Comparison`,
+    description: `
+Compare two or more candidate outputs and pick the best one, optionally
+against a reference answer. The judge sees every candidate at once and
+explains why the winner is better. Candidate order is shuffled so that a
+candidate's position never sways the verdict.
+`,
+    category: "quality",
+    docsUrl: "",
+    isGuardrail: false,
+    requiredFields: ["candidates"],
+    optionalFields: ["input", "golden", "row_index"],
+    settings: {
+      model: {
+        description: "The model to use for evaluation",
+        default: "openai/gpt-5-mini",
+      },
+      max_tokens: {
+        description: "Max tokens allowed for evaluation",
+        default: 128000,
+      },
+      prompt: {
+        description:
+          "Judge prompt template. Placeholders: {input}, {golden}, {candidates} (a pre-rendered bulleted list with slot labels and optional per-candidate metrics).",
+        default:
+          'Pick the best of N candidate replies to the task.\n\nTask:       {input}\nReference:  {golden}\n\nCandidates:\n{candidates}\n\nLook across the candidates and decide which one is the best reply.\nBriefly explain WHY it\'s better than the others, then pick the winning\nslot label. Use "tie" only when no candidate is clearly better.\n',
+      },
+      has_golden_answer: {
+        description:
+          "Compare each candidate against a reference answer. Turn off to have the judge compare the candidates directly on their own merits, with no reference answer involved.",
+        default: false,
+      },
+      randomize_order: {
+        description:
+          "Shuffle candidate order per row (deterministically, seeded by row_index) before presenting them to the judge. Reduces position bias when the judge is called once per row.",
+        default: true,
+      },
+      allow_tie: {
+        description:
+          "Allow the judge to return 'tie' when candidates are equivalent",
+        default: true,
+      },
+      include_metrics: {
+        description: "Per-candidate metrics to inject into the judge prompt",
+        default: [],
+      },
+    },
+    envVars: [],
+    result: {
+      score: {
+        description: "1.0 when a winner was picked, 0.5 for tie",
+      },
+      label: {
+        description:
+          "The winning candidate id (matches the id supplied in entry.candidates), or 'tie'.",
       },
     },
   },

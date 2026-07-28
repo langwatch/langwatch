@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import {
   ExperimentsApiService,
   type ExperimentRunSummaryEntry,
@@ -7,10 +7,10 @@ import {
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import { formatTable } from "../../utils/formatting";
+import type { CommandResult } from "../../utils/output";
 
 export interface ListRunsOptions {
   experiment?: string;
-  format?: string;
   limit?: string;
 }
 
@@ -54,7 +54,7 @@ const runStatus = (run: ExperimentRunSummaryEntry): string => {
 
 export const experimentListRunsCommand = async (
   options: ListRunsOptions = {},
-): Promise<void> => {
+): Promise<CommandResult | void> => {
   checkApiKey();
 
   const experimentSlug = options.experiment?.trim();
@@ -67,7 +67,6 @@ export const experimentListRunsCommand = async (
     process.exit(1);
   }
 
-  const format = options.format === "json" ? "json" : "table";
   const limit = (() => {
     const parsed = options.limit ? parseInt(options.limit, 10) : DEFAULT_LIMIT;
     if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_LIMIT;
@@ -75,7 +74,7 @@ export const experimentListRunsCommand = async (
   })();
 
   const service = new ExperimentsApiService();
-  const spinner = ora(
+  const spinner = createSpinner(
     `Fetching runs for "${experimentSlug}"...`,
   ).start();
 
@@ -89,54 +88,54 @@ export const experimentListRunsCommand = async (
       `Found ${result.pagination.totalHits} run${result.pagination.totalHits === 1 ? "" : "s"} for ${chalk.cyan(experimentSlug)}`,
     );
 
-    if (format === "json") {
-      console.log(JSON.stringify(result, null, 2));
-      return;
-    }
+    return {
+      data: result,
+      table: () => {
+        if (result.runs.length === 0) {
+          console.log();
+          console.log(chalk.gray("No runs found for this experiment yet."));
+          return;
+        }
 
-    if (result.runs.length === 0) {
-      console.log();
-      console.log(chalk.gray("No runs found for this experiment yet."));
-      return;
-    }
+        console.log();
 
-    console.log();
+        const tableData = result.runs.map((run) => ({
+          "Run ID": run.runId,
+          Status: runStatus(run),
+          Progress:
+            typeof run.progress === "number" && typeof run.total === "number"
+              ? `${run.progress}/${run.total}`
+              : chalk.gray("—"),
+          Started: formatTimestamp(run.timestamps.createdAt),
+          Finished: formatTimestamp(run.timestamps.finishedAt),
+          Result: summarizePassRate(run.summary?.evaluations ?? {}),
+        }));
 
-    const tableData = result.runs.map((run) => ({
-      "Run ID": run.runId,
-      Status: runStatus(run),
-      Progress:
-        typeof run.progress === "number" && typeof run.total === "number"
-          ? `${run.progress}/${run.total}`
-          : chalk.gray("—"),
-      Started: formatTimestamp(run.timestamps.createdAt),
-      Finished: formatTimestamp(run.timestamps.finishedAt),
-      Result: summarizePassRate(run.summary?.evaluations ?? {}),
-    }));
+        formatTable({
+          data: tableData,
+          headers: ["Run ID", "Status", "Progress", "Started", "Finished", "Result"],
+          colorMap: {
+            "Run ID": chalk.cyan,
+          },
+        });
 
-    formatTable({
-      data: tableData,
-      headers: ["Run ID", "Status", "Progress", "Started", "Finished", "Result"],
-      colorMap: {
-        "Run ID": chalk.cyan,
+        if (result.pagination.hasMore) {
+          console.log();
+          console.log(
+            chalk.gray(
+              `Showing ${result.runs.length} of ${result.pagination.totalHits}. Increase with --limit or use --format json for full data.`,
+            ),
+          );
+        }
+
+        console.log();
+        console.log(
+          chalk.gray(
+            `Use ${chalk.cyan("langwatch experiment status <runId>")} or ${chalk.cyan("langwatch experiment results <runId>")} to drill into a run.`,
+          ),
+        );
       },
-    });
-
-    if (result.pagination.hasMore) {
-      console.log();
-      console.log(
-        chalk.gray(
-          `Showing ${result.runs.length} of ${result.pagination.totalHits}. Increase with --limit or use --format json for full data.`,
-        ),
-      );
-    }
-
-    console.log();
-    console.log(
-      chalk.gray(
-        `Use ${chalk.cyan("langwatch experiment status <runId>")} or ${chalk.cyan("langwatch experiment results <runId>")} to drill into a run.`,
-      ),
-    );
+    };
   } catch (error) {
     failSpinner({ spinner, error, action: "list experiment runs" });
     process.exit(1);

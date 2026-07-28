@@ -132,18 +132,29 @@ class PairwiseCompareResult(EvaluationResult):
     )
 
 
+# Deprecated by #5101, which folded this evaluator into `select_best_compare`
+# ("Comparison") — one judge for two candidates or ten. It is hidden from the
+# Add Evaluator picker but stays fully runnable so experiments and monitors
+# created before the merge keep working, and is never written again.
+#
+# It is the only judge with swap-and-confirm (two judge calls, A/B swapped);
+# `select_best_compare` mitigates position bias with one call and deterministic
+# candidate shuffling instead. That trade is why this file still runs rather
+# than delegating.
+#
+# The class docstring is emitted verbatim as the evaluator's `description`, so
+# it stays customer-facing. The deprecation story lives here, in the comment.
 class PairwiseCompareEvaluator(
     BaseEvaluator[
         PairwiseCompareEntry, PairwiseCompareSettings, PairwiseCompareResult
     ]
 ):
     """
-    Native pairwise LLM-as-judge evaluator. Compare two candidate
-    outputs against a golden reference, with optional swap-and-confirm
-    position-bias mitigation.
+    Compare two candidate outputs against a reference answer and pick the
+    better one. Superseded by Comparison, which judges two or more candidates.
     """
 
-    name = "Pairwise Compare"
+    name = "Pairwise Compare (deprecated)"
     category = "quality"
     env_vars = []
     default_settings = PairwiseCompareSettings()

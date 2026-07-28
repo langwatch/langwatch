@@ -34,10 +34,12 @@ import { app as suitesApp } from "../app/api/suites/[[...route]]/app";
 import { app as teamsApp } from "../app/api/teams/[[...route]]/app";
 import { app as tracesApp } from "../app/api/traces/[[...route]]/app";
 import { app as triggersApp } from "../app/api/triggers/[[...route]]/app";
+import { app as userAvatarApp } from "../app/api/user-avatar/[[...route]]/app";
 import { app as workflowsCrudApp } from "../app/api/workflows/[[...route]]/app";
 import { app as annotationsApp } from "./routes/annotations";
 import { app as authApp } from "./routes/auth";
 import { app as authCliApp } from "./routes/auth-cli";
+import { app as bugReportsApp } from "./routes/bug-reports";
 import { app as collectorApp } from "./routes/collector";
 import { app as cronApp } from "./routes/cron";
 import { app as datasetGenerateApp } from "./routes/dataset-generate";
@@ -51,11 +53,13 @@ import { app as githubLangyApp } from "./routes/github-langy";
 import { app as healthApp } from "./routes/health";
 import { app as healthChecksApp } from "./routes/health-checks";
 import { app as ingestionRoutesApp } from "./routes/ingest/ingestionRoutes";
-import { app as langyApp } from "./routes/langy";
+import { app as langyInternalApp } from "./routes/langy-internal";
+import { app as langyRelayApp } from "./routes/langy-relay";
 import { app as miscApp } from "./routes/misc";
 import { app as opsApp } from "./routes/ops";
 import { app as otelApp } from "./routes/otel";
 import { app as playgroundApp } from "./routes/playground";
+import { app as rumApp } from "./routes/rum";
 import { app as scenarioGenerateApp } from "./routes/scenario-generate";
 import { app as scimApp } from "./routes/scim";
 import { app as sseApp } from "./routes/sse";
@@ -139,18 +143,22 @@ export function createApiRouter() {
   api.route("/", teamsApp);
   api.route("/", tracesApp);
   api.route("/", triggersApp);
+  api.route("/", userAvatarApp); // /api/user-avatar/:projectId/:id — user avatars
   api.route("/", workflowsCrudApp); // CRUD — complements workflowsApp (code-completion, post_event)
 
   api.route("/", gatewayInternalApp);
   api.route("/", otelApp);
+  api.route("/", rumApp); // /api/rum/v1/traces — browser telemetry proxy
   api.route("/", playgroundApp);
-  api.route("/", langyApp);
+  api.route("/", langyInternalApp);
+  api.route("/", langyRelayApp);
   api.route("/", githubLangyApp);
   api.route("/", scenarioGenerateApp);
   api.route("/", scimApp);
   api.route("/", webhooksApp);
 
   api.route("/", adminApp);
+  api.route("/", bugReportsApp); // /api/bug-reports — public issue-report intake
   api.route("/", annotationsApp);
   // ORDERING: authCliApp MUST be registered BEFORE authApp.
   // authApp owns the BetterAuth catch-all (`/auth/*`), which would

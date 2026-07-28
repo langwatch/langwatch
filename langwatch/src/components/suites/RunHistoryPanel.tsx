@@ -6,41 +6,52 @@
  * Both paths use cursor-based pagination with Load More.
  */
 
-import { Box, Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
-import { toaster } from "~/components/ui/toaster";
-import { useRouter } from "~/utils/compat/next-router";
+import {
+  Box,
+  Button,
+  EmptyState,
+  HStack,
+  Skeleton,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
+import { FlaskConical, RefreshCw, TriangleAlert } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
-import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
-import { useTargetNameMap } from "~/hooks/useTargetNameMap";
-import { useDrawer } from "~/hooks/useDrawer";
-import { useSimulationUpdateListener } from "~/hooks/useSimulationUpdateListener";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { api } from "~/utils/api";
 import type { Period } from "~/components/PeriodSelector";
+import { SetupWithAgentButton } from "~/components/SetupWithAgentButton";
+import { ShadowDivider } from "~/components/ui/ShadowDivider";
+import { toaster } from "~/components/ui/toaster";
+import { useDrawer } from "~/hooks/useDrawer";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useSimulationUpdateListener } from "~/hooks/useSimulationUpdateListener";
+import { useTargetNameMap } from "~/hooks/useTargetNameMap";
+import { isOnPlatformSet } from "~/server/scenarios/internal-set-id";
+import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
+import { isSuiteSetId } from "~/server/suites/suite-set-id";
+import { api } from "~/utils/api";
+import { useRouter } from "~/utils/compat/next-router";
+import { GroupRow } from "./GroupRow";
 import {
   RunHistoryFilters,
   type RunHistoryFilterValues,
 } from "./RunHistoryFilters";
+import { RunHistorySkeleton } from "./RunHistorySkeleton";
 import { RunRow } from "./RunRow";
-import { GroupRow } from "./GroupRow";
-import { ShadowDivider } from "~/components/ui/ShadowDivider";
 import { RunSummaryCounts } from "./RunSummaryCounts";
-import { useRunHistoryStore } from "./useRunHistoryStore";
-import { useRunHistoryPagination } from "./useRunHistoryPagination";
-import { useAutoExpansion } from "./useAutoExpansion";
-import { useCancelScenarioRun } from "./useCancelScenarioRun";
 import {
   computeBatchRunSummary,
   computeGroupSummary,
   computeRunHistoryTotals,
-  resolveOriginLabel,
   groupRunsByBatchId,
   groupRunsByScenarioId,
   groupRunsByTarget,
+  resolveOriginLabel,
 } from "./run-history-transforms";
-import { isOnPlatformSet } from "~/server/scenarios/internal-set-id";
-import { isSuiteSetId } from "~/server/suites/suite-set-id";
+import { useAutoExpansion } from "./useAutoExpansion";
+import { useCancelScenarioRun } from "./useCancelScenarioRun";
+import { useRunHistoryPagination } from "./useRunHistoryPagination";
+import { useRunHistoryStore } from "./useRunHistoryStore";
 import { useScrollToBatch } from "./useScrollToBatch";
 
 export type RunHistoryStats = {
@@ -110,6 +121,15 @@ export function RunHistoryPanel({
     }
   }, [groupBy, filters, syncToUrl, router]);
 
+  // Live updates: SSE invalidates getSuiteRunData directly (no refetch
+  // callback needed). Its connection state disables fallback polling.
+  const { isConnected: sseConnected } = useSimulationUpdateListener({
+    projectId: project?.id ?? "",
+    enabled: !!project?.id,
+    debounceMs: 500,
+    filter: scenarioSetId ? { scenarioSetId } : undefined,
+  });
+
   // Pagination
   const startDateMs = period.startDate.getTime();
   const {
@@ -120,15 +140,7 @@ export function RunHistoryPanel({
     isLoading,
     error,
     refetch,
-  } = useRunHistoryPagination({ scenarioSetId, startDateMs });
-
-  useSimulationUpdateListener({
-    projectId: project?.id ?? "",
-    refetch,
-    enabled: !!project?.id,
-    debounceMs: 500,
-    filter: scenarioSetId ? { scenarioSetId } : undefined,
-  });
+  } = useRunHistoryPagination({ scenarioSetId, startDateMs, sseConnected });
 
   // Fetch scenarios for filter options
   const { data: scenarios } = api.scenarios.getAll.useQuery(
@@ -156,36 +168,38 @@ export function RunHistoryPanel({
   // Track the specific job ID currently being cancelled for per-button loading state
   const [cancellingJobId, setCancellingJobId] = useState<string | null>(null);
 
-  const { cancelJob, cancelBatchRun, isCancellingBatch } = useCancelScenarioRun({
-    onCancelJobSuccess: () => {
-      setCancellingJobId(null);
-      void refetch();
-      toaster.create({
-        title: "Cancellation requested",
-        type: "info",
-      });
+  const { cancelJob, cancelBatchRun, isCancellingBatch } = useCancelScenarioRun(
+    {
+      onCancelJobSuccess: () => {
+        setCancellingJobId(null);
+        void refetch();
+        toaster.create({
+          title: "Cancellation requested",
+          type: "info",
+        });
+      },
+      onCancelJobError: (error) => {
+        setCancellingJobId(null);
+        void refetch();
+        toaster.create({
+          title: "Failed to cancel job",
+          description: error.message,
+          type: "error",
+        });
+      },
+      onCancelBatchSuccess: () => {
+        void refetch();
+        toaster.create({ title: "Jobs cancelled", type: "success" });
+      },
+      onCancelBatchError: (error) => {
+        toaster.create({
+          title: "Failed to cancel jobs",
+          description: error.message,
+          type: "error",
+        });
+      },
     },
-    onCancelJobError: (error) => {
-      setCancellingJobId(null);
-      void refetch();
-      toaster.create({
-        title: "Failed to cancel job",
-        description: error.message,
-        type: "error",
-      });
-    },
-    onCancelBatchSuccess: () => {
-      void refetch();
-      toaster.create({ title: "Jobs cancelled", type: "success" });
-    },
-    onCancelBatchError: (error) => {
-      toaster.create({
-        title: "Failed to cancel jobs",
-        description: error.message,
-        type: "error",
-      });
-    },
-  });
+  );
 
   // Apply filters to raw runs
   const filteredRuns = useMemo(() => {
@@ -286,7 +300,11 @@ export function RunHistoryPanel({
   const handleCancelAll = useCallback(
     (batchRunId: string, batchRunScenarioSetId: string) => {
       if (!project?.id) return;
-      cancelBatchRun({ projectId: project.id, scenarioSetId: batchRunScenarioSetId, batchRunId });
+      cancelBatchRun({
+        projectId: project.id,
+        scenarioSetId: batchRunScenarioSetId,
+        batchRunId,
+      });
     },
     [project?.id, cancelBatchRun],
   );
@@ -318,17 +336,20 @@ export function RunHistoryPanel({
 
   if (error) {
     return (
-      <Box padding={6}>
-        <Text color="red.fg">Error loading runs: {error.message}</Text>
-      </Box>
-    );
-  }
-
-  if (isLoading) {
-    return (
-      <Box padding={6} display="flex" justifyContent="center">
-        <Spinner size="lg" data-testid="loading-spinner" />
-      </Box>
+      <EmptyState.Root paddingY={12}>
+        <EmptyState.Content>
+          <EmptyState.Indicator color="red.fg">
+            <TriangleAlert size={28} />
+          </EmptyState.Indicator>
+          <EmptyState.Title>Couldn&apos;t load runs</EmptyState.Title>
+          <EmptyState.Description maxWidth="360px" textAlign="center">
+            {error.message}
+          </EmptyState.Description>
+          <Button size="sm" variant="outline" onClick={() => void refetch()}>
+            <RefreshCw size={14} /> Try again
+          </Button>
+        </EmptyState.Content>
+      </EmptyState.Root>
     );
   }
 
@@ -338,47 +359,55 @@ export function RunHistoryPanel({
 
   return (
     <VStack align="stretch" gap={0} height="100%">
-      {/* Header: only shown in all-runs view */}
+      {/* Header: only shown in all-runs view. Rendered during loading too
+          (with a totals placeholder) so the skeleton doesn't shift layout. */}
       {!isSingleSuiteView && (
         <Box paddingX={6} paddingY={4}>
           <Text fontSize="xl" fontWeight="semibold">
             All Runs
           </Text>
-          <HStack gap={2} data-testid="all-runs-header-totals">
-            <Text fontSize="sm" color="fg.muted">
-              {groupBy === "none"
-                ? `${batchRuns.length} ${batchRuns.length === 1 ? "execution" : "executions"} · `
-                : `${groups.length} ${groups.length === 1 ? "group" : "groups"} · `}
-              {totals.runCount} {totals.runCount === 1 ? "run" : "runs"}
-            </Text>
-            <RunSummaryCounts
-              summary={{
-                passedCount: totals.passedCount,
-                failedCount: totals.failedCount,
-                stalledCount: 0,
-                cancelledCount: 0,
-                completedCount: totals.passedCount + totals.failedCount,
-                inProgressCount: totals.pendingCount,
-                queuedCount: 0,
-                passRate: 0,
-                totalCount: totals.runCount,
-                totalCost: null,
-                averageAgentLatencyMs: null,
-                totalDurationMs: null,
-                agentLatencyStats: null,
-                agentCostStats: null,
-                averageAgentCost: null,
-              }}
-            />
-          </HStack>
+          {isLoading ? (
+            <Skeleton height="20px" width="220px" marginTop={0.5} />
+          ) : (
+            <HStack gap={2} data-testid="all-runs-header-totals">
+              <Text fontSize="sm" color="fg.muted">
+                {groupBy === "none"
+                  ? `${batchRuns.length} ${batchRuns.length === 1 ? "execution" : "executions"} · `
+                  : `${groups.length} ${groups.length === 1 ? "group" : "groups"} · `}
+                {totals.runCount} {totals.runCount === 1 ? "run" : "runs"}
+              </Text>
+              <RunSummaryCounts
+                summary={{
+                  passedCount: totals.passedCount,
+                  failedCount: totals.failedCount,
+                  stalledCount: 0,
+                  cancelledCount: 0,
+                  completedCount: totals.passedCount + totals.failedCount,
+                  inProgressCount: totals.pendingCount,
+                  queuedCount: 0,
+                  passRate: 0,
+                  totalCount: totals.runCount,
+                  totalCost: null,
+                  averageAgentLatencyMs: null,
+                  totalDurationMs: null,
+                  agentLatencyStats: null,
+                  agentCostStats: null,
+                  averageAgentCost: null,
+                }}
+              />
+            </HStack>
+          )}
         </Box>
       )}
 
-      {/* Filters — fixed above the scrollable run list */}
+      {/* Filters — fixed above the scrollable run list. position=relative
+          anchors the _after divider; without it the pseudo resolves against
+          the document and adds phantom scroll height to the page container. */}
       <Box
         paddingX={6}
         paddingY={4}
         bg="bg"
+        position="relative"
         _after={{
           content: '""',
           position: "absolute",
@@ -387,7 +416,8 @@ export function RunHistoryPanel({
           right: 0,
           height: "5px",
           borderTop: "1px solid var(--chakra-colors-border-muted)",
-          background: "linear-gradient(to bottom, color-mix(in srgb, var(--chakra-colors-border-muted) 40%, transparent), transparent)",
+          background:
+            "linear-gradient(to bottom, color-mix(in srgb, var(--chakra-colors-border-muted) 40%, transparent), transparent)",
           pointerEvents: "none",
         }}
       >
@@ -404,22 +434,45 @@ export function RunHistoryPanel({
 
       <ShadowDivider scrollRef={runListRef} />
 
-      {/* Run list — own scroll container so RunRow sticky headers don't clash with filters */}
-      {itemCount === 0 && !showInitPlaceholder ? (
-        <Box paddingX={6} paddingY={8} textAlign="center">
-          <Text color="fg.muted">
-            {hasFiltersApplied
-              ? "No runs match the selected filters."
-              : isSingleSuiteView
-                ? "Run this suite to see results here."
-                : "No runs yet. Execute a suite to see results here."}
-          </Text>
-        </Box>
+      {/* Run list — own scroll container so RunRow sticky headers don't clash with filters.
+          Skeleton renders in the list slot only while nothing has been fetched
+          yet (the hook's isLoading is gated on zero fetched pages), keeping
+          the header and filter bar in place so nothing shifts when data lands. */}
+      {isLoading ? (
+        <RunHistorySkeleton />
+      ) : itemCount === 0 && !showInitPlaceholder ? (
+        <EmptyState.Root paddingY={12}>
+          <EmptyState.Content>
+            <EmptyState.Indicator>
+              <FlaskConical size={28} />
+            </EmptyState.Indicator>
+            <EmptyState.Title>
+              {hasFiltersApplied ? "No matching runs" : "No runs yet"}
+            </EmptyState.Title>
+            <EmptyState.Description>
+              {hasFiltersApplied
+                ? "No runs match the selected filters."
+                : isSingleSuiteView
+                  ? "Run this suite to see results here."
+                  : "Execute a suite to see results here."}
+            </EmptyState.Description>
+            {/* Only when the project truly has nothing to run yet — a
+                filtered-empty list is a search miss, not a setup gap. */}
+            {!hasFiltersApplied ? (
+              <SetupWithAgentButton surface="simulationRuns" />
+            ) : null}
+          </EmptyState.Content>
+        </EmptyState.Root>
       ) : (
-        <VStack ref={runListRef} align="stretch" gap={0} flex={1} minH={0} overflow="auto">
-          {showInitPlaceholder && (
-            <RunRow loading />
-          )}
+        <VStack
+          ref={runListRef}
+          align="stretch"
+          gap={0}
+          flex={1}
+          minH={0}
+          overflow="auto"
+        >
+          {showInitPlaceholder && <RunRow loading />}
           {groupBy === "none"
             ? batchRuns.map((batchRun) => {
                 const summary = computeBatchRunSummary({ batchRun });
@@ -445,8 +498,22 @@ export function RunHistoryPanel({
                     expectedJobCount={expectedJobCount}
                     suiteName={suiteName}
                     viewMode={viewMode}
-                    onCancelRun={isPlatformManaged(batchRun.scenarioSetId ?? scenarioSetId) ? createCancelRunHandler(batchRun.scenarioSetId ?? scenarioSetId ?? "") : undefined}
-                    onCancelAll={isPlatformManaged(batchRun.scenarioSetId ?? scenarioSetId) ? () => handleCancelAll(batchRun.batchRunId, batchRun.scenarioSetId ?? scenarioSetId ?? "") : undefined}
+                    onCancelRun={
+                      isPlatformManaged(batchRun.scenarioSetId ?? scenarioSetId)
+                        ? createCancelRunHandler(
+                            batchRun.scenarioSetId ?? scenarioSetId ?? "",
+                          )
+                        : undefined
+                    }
+                    onCancelAll={
+                      isPlatformManaged(batchRun.scenarioSetId ?? scenarioSetId)
+                        ? () =>
+                            handleCancelAll(
+                              batchRun.batchRunId,
+                              batchRun.scenarioSetId ?? scenarioSetId ?? "",
+                            )
+                        : undefined
+                    }
                     isCancellingBatch={isCancellingBatch}
                     cancellingJobId={cancellingJobId}
                     isHighlighted={highlightedBatchId === batchRun.batchRunId}
@@ -465,7 +532,11 @@ export function RunHistoryPanel({
                     onScenarioRunClick={handleScenarioRunClick}
                     resolveTargetName={resolveTargetName}
                     viewMode={viewMode}
-                    onCancelRun={isPlatformManaged(scenarioSetId) ? createCancelRunHandler(scenarioSetId ?? "") : undefined}
+                    onCancelRun={
+                      isPlatformManaged(scenarioSetId)
+                        ? createCancelRunHandler(scenarioSetId ?? "")
+                        : undefined
+                    }
                     cancellingJobId={cancellingJobId}
                   />
                 );
@@ -489,4 +560,3 @@ export function RunHistoryPanel({
     </VStack>
   );
 }
-

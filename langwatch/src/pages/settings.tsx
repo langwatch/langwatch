@@ -46,6 +46,7 @@ type OrganizationFormData = {
   s3SecretAccessKey: string;
   s3Bucket: string;
   presenceEnabled: boolean;
+  traceSharingEnabled: boolean;
   supportContact: string;
   primaryIntent: "" | OrganizationIntent;
 };
@@ -104,8 +105,8 @@ function SettingsForm({
   const { hasPermission } = useOrganizationTeamProject();
   const { isLiteMember } = useLiteMemberGuard();
   const { openDrawer } = useDrawer();
-  // ADR-038 ships dark: the Primary use setting only exists where the
-  // governance surface it routes to is reachable.
+  // ADR-038: the Primary use setting only exists where the governance
+  // surface it routes to is reachable (flag on, which is the default).
   const { enabled: governanceEnabled } = useFeatureFlag(
     "release_ui_ai_governance_enabled",
     { organizationId: organization.id },
@@ -117,6 +118,7 @@ function SettingsForm({
     s3SecretAccessKey: organization.s3SecretAccessKey ?? "",
     s3Bucket: organization.s3Bucket ?? "",
     presenceEnabled: organization.presenceEnabled,
+    traceSharingEnabled: organization.traceSharingEnabled,
     supportContact:
       (organization as { supportContact?: string | null }).supportContact ?? "",
     primaryIntent: organization.primaryIntent ?? "",
@@ -147,6 +149,7 @@ function SettingsForm({
         s3SecretAccessKey: data.s3SecretAccessKey,
         s3Bucket: data.s3Bucket,
         presenceEnabled: data.presenceEnabled,
+        traceSharingEnabled: data.traceSharingEnabled,
         supportContact: data.supportContact.trim() || null,
         primaryIntent: data.primaryIntent === "" ? null : data.primaryIntent,
       },
@@ -377,7 +380,37 @@ function SettingsForm({
                   render={({ field }) => (
                     <Switch
                       checked={field.value}
-                      onChange={(e) => field.onChange(e.target.checked)}
+                      onCheckedChange={({ checked }) => field.onChange(checked)}
+                      disabled={!hasPermission("organization:manage")}
+                    />
+                  )}
+                />
+              </HorizontalFormControl>
+
+              <HorizontalFormControl
+                label="Trace Sharing"
+                helper={
+                  <VStack align="start" gap={1}>
+                    <Text>
+                      Lets members create share links to traces. Disable to turn
+                      sharing off across every project in this organization and
+                      revoke all existing links.
+                    </Text>
+                    {!hasPermission("organization:manage") && (
+                      <AdminOnlyBadge />
+                    )}
+                  </VStack>
+                }
+              >
+                <Controller
+                  control={control}
+                  name="traceSharingEnabled"
+                  render={({ field }) => (
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={({ checked }) =>
+                        field.onChange(checked)
+                      }
                       disabled={!hasPermission("organization:manage")}
                     />
                   )}
@@ -744,7 +777,7 @@ function ProjectSettingsForm({ project }: { project: Project }) {
                   checked={
                     field.value && (organization?.presenceEnabled ?? true)
                   }
-                  onChange={(e) => field.onChange(e.target.checked)}
+                  onCheckedChange={({ checked }) => field.onChange(checked)}
                   disabled={
                     !userIsAdmin || !(organization?.presenceEnabled ?? true)
                   }
@@ -757,7 +790,12 @@ function ProjectSettingsForm({ project }: { project: Project }) {
             label="Trace Sharing"
             helper={
               <VStack align="start" gap={1}>
-                <Text>Allow users to share traces with public links</Text>
+                <Text>
+                  Allow users to share traces with public links.{" "}
+                  {!organization?.traceSharingEnabled
+                    ? "Disabled at the organization level - turn it on there first."
+                    : "Disable to turn sharing off for this project only."}
+                </Text>
                 {!userIsAdmin && (
                   <AdminOnlyBadge />
                 )}
@@ -770,9 +808,15 @@ function ProjectSettingsForm({ project }: { project: Project }) {
               name="traceSharingEnabled"
               render={({ field }) => (
                 <Switch
-                  checked={field.value}
-                  onChange={(e) => handleTraceSharingChange(e.target.checked)}
-                  disabled={!userIsAdmin}
+                  checked={
+                    field.value && (organization?.traceSharingEnabled ?? true)
+                  }
+                  onCheckedChange={({ checked }) =>
+                    handleTraceSharingChange(checked)
+                  }
+                  disabled={
+                    !userIsAdmin || !(organization?.traceSharingEnabled ?? true)
+                  }
                 />
               )}
             />

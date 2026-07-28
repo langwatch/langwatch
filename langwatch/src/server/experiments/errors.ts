@@ -1,7 +1,7 @@
-import { NotFoundError } from "../app-layer/domain-error";
+import { NotFoundError } from "@langwatch/handled-error";
 
 export class ExperimentNotFoundError extends NotFoundError {
-  declare readonly kind: "experiment_not_found";
+  declare readonly code: "experiment_not_found";
 
   constructor(
     experimentId: string,

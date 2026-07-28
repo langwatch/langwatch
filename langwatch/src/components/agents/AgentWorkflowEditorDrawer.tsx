@@ -5,16 +5,16 @@ import {
   Heading,
   HStack,
   Input,
-  Link as ChakraLink,
   Spinner,
   Text,
   VStack,
 } from "@chakra-ui/react";
-import NextLink from "~/utils/compat/next-link";
+import { ExternalLink } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { LuArrowLeft, LuExternalLink } from "react-icons/lu";
+import { LuArrowLeft } from "react-icons/lu";
 
 import { Drawer } from "~/components/ui/drawer";
+import { Link } from "~/components/ui/link";
 import { toaster } from "~/components/ui/toaster";
 import {
   ScenarioInputMappingSection,
@@ -32,6 +32,7 @@ import type {
   Field as DSLField,
   Workflow,
 } from "~/optimization_studio/types/dsl";
+import { WorkflowCardDisplay } from "~/optimization_studio/components/workflow/WorkflowCard";
 import type {
   AgentComponentConfig,
   TypedAgent,
@@ -358,44 +359,50 @@ export function AgentWorkflowEditorDrawer(
               </Field.Root>
 
               {/* Linked workflow */}
-              <Box>
+              {workflowQuery.data && (
                 <Field.Root>
                   <Field.Label>Linked Workflow</Field.Label>
-                  <HStack
-                    gap={2}
-                    paddingX={3}
-                    paddingY={2}
-                    borderWidth="1px"
-                    borderColor="border"
-                    borderRadius="md"
-                    align="center"
-                  >
-                    <Text fontSize="sm" flex={1}>
-                      {workflowQuery.data?.name ?? "(workflow not found)"}
-                    </Text>
-                    {editorHref && (
-                      <ChakraLink
-                        asChild
-                        fontSize="sm"
-                        color="blue.fg"
-                        data-testid="open-workflow-editor-link"
-                      >
-                        <NextLink href={editorHref} target="_blank">
-                          <HStack gap={1} align="center">
-                            <Text>Open editor</Text>
-                            <LuExternalLink size={14} />
-                          </HStack>
-                        </NextLink>
-                      </ChakraLink>
-                    )}
-                  </HStack>
+                  {editorHref ? (
+                    // isExternal renders a plain anchor directly, not
+                    // composed through the app router's client-side Link:
+                    // target="_blank" is always a hard navigation into a
+                    // new tab regardless, and composing through NextLink
+                    // previously swallowed data-testid — Chakra's asChild
+                    // slot only forwards style-related props to the
+                    // composed child, not arbitrary data attributes.
+                    <Link
+                      href={editorHref}
+                      isExternal
+                      data-testid="open-workflow-editor-link"
+                    >
+                      <WorkflowCardDisplay
+                        name={workflowQuery.data.name}
+                        icon={workflowQuery.data.icon}
+                        updatedAt={workflowQuery.data.updatedAt}
+                        action={
+                          <ExternalLink
+                            size={16}
+                            color="var(--chakra-colors-fg-muted)"
+                          />
+                        }
+                        width="300px"
+                      />
+                    </Link>
+                  ) : (
+                    <WorkflowCardDisplay
+                      name={workflowQuery.data.name}
+                      icon={workflowQuery.data.icon}
+                      updatedAt={workflowQuery.data.updatedAt}
+                      width="300px"
+                    />
+                  )}
                   <Text fontSize="xs" color="fg.muted" marginTop={1}>
                     Edit the workflow&apos;s nodes and logic in the studio. The
                     mappings below control how scenario data flows into its
                     entry inputs and which end output is returned.
                   </Text>
                 </Field.Root>
-              </Box>
+              )}
 
               {workflowInputs.length === 0 && (
                 <Text fontSize="xs" color="fg.error">

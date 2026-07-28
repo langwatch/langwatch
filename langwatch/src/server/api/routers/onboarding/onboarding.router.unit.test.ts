@@ -11,9 +11,11 @@ const {
   mockTrackEvent,
   mockGroupUser,
   mockBatch,
+  mockEnsurePersonalWorkspace,
 } = vi.hoisted(() => ({
   mockCreateAndAssign: vi.fn(),
   mockCreateProject: vi.fn(),
+  mockEnsurePersonalWorkspace: vi.fn(),
   mockCaptureException: vi.fn(),
   mockSendSlackSignupEvent: vi.fn(),
   mockSendHubspotSignupForm: vi.fn(),
@@ -47,6 +49,18 @@ vi.mock("../project", () => ({
     createCaller: vi.fn(() => ({
       create: mockCreateProject,
     })),
+  },
+}));
+
+// The real service opens its own Prisma transaction, which a unit test has no
+// business reaching. Its behaviour is covered end to end in
+// onboarding.personal-workspace.integration.test.ts; here only the call and
+// its arguments matter. The specifier must match the router's import so
+// vi.mock hooks the same module.
+vi.mock("@ee/governance/services/personalWorkspace.service", () => ({
+  PersonalWorkspaceService: class {
+    constructor(_prisma: unknown) {}
+    ensure = mockEnsurePersonalWorkspace;
   },
 }));
 
@@ -90,6 +104,11 @@ describe("onboarding.initializeOrganization", () => {
     mockCreateProject.mockResolvedValue({
       success: true,
       projectSlug: "acme-project",
+    });
+    mockEnsurePersonalWorkspace.mockResolvedValue({
+      team: { id: "personal_team_1" },
+      project: { id: "personal_project_1" },
+      created: true,
     });
   });
 
@@ -190,7 +209,7 @@ describe("onboarding.initializeOrganization", () => {
       });
     });
 
-    /** @scenario "Governance signup creates organization and team, but no project" */
+    /** @scenario "Governance signup creates organization and team, but no shared project" */
     it("skips project creation and returns a null projectSlug", async () => {
       const caller = createCaller();
 
@@ -218,6 +237,50 @@ describe("onboarding.initializeOrganization", () => {
 
       expect(mockCreateProject).toHaveBeenCalledOnce();
       expect(result.projectSlug).toBe("acme-project");
+    });
+
+    /** @scenario "Governance signup provisions the personal workspace" */
+    it("provisions the signer's personal workspace in the new organization", async () => {
+      const caller = createCaller();
+
+      await caller.initializeOrganization({
+        orgName: "Acme Corp",
+        primaryIntent: "AGENT_GOVERNANCE",
+      });
+
+      expect(mockEnsurePersonalWorkspace).toHaveBeenCalledWith({
+        userId: "user_1",
+        organizationId: "org_1",
+        displayName: "Jane Doe",
+        displayEmail: "jane@example.com",
+      });
+    });
+
+    /** @scenario "LLMOps signup provisions no personal workspace" */
+    it("provisions no personal workspace for LLMOps signups", async () => {
+      const caller = createCaller();
+
+      await caller.initializeOrganization({
+        orgName: "Acme Corp",
+        primaryIntent: "LLM_OPS",
+      });
+
+      expect(mockEnsurePersonalWorkspace).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Failing to provision the workspace does not cost the user their organization" */
+    it("still completes onboarding when the workspace cannot be provisioned", async () => {
+      mockEnsurePersonalWorkspace.mockRejectedValue(new Error("db down"));
+      const caller = createCaller();
+
+      const result = await caller.initializeOrganization({
+        orgName: "Acme Corp",
+        primaryIntent: "AGENT_GOVERNANCE",
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.organizationId).toBe("org_1");
+      expect(mockCaptureException).toHaveBeenCalled();
     });
 
     it("still creates a project when no intent is given (legacy callers)", async () => {

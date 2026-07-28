@@ -1,11 +1,20 @@
-import { execa } from "execa";
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
-import { appRoot } from "./app-dir.ts";
-import type { EventBus } from "./event-bus.ts";
+import {
+	existsSync,
+	lstatSync,
+	mkdirSync,
+	readdirSync,
+	readFileSync,
+	symlinkSync,
+	unlinkSync,
+	writeFileSync,
+} from "node:fs";
+import { basename, dirname, join, relative, sep } from "node:path";
+import { execa } from "execa";
 import type { LangwatchPaths } from "../shared/paths.ts";
 import { execAndPipe } from "./_pipe-to-bus.ts";
+import { appRoot } from "./app-dir.ts";
+import type { EventBus } from "./event-bus.ts";
 
 /**
  * Ensure langwatch/node_modules exists + start:prepare:files has run, both of
@@ -14,127 +23,338 @@ import { execAndPipe } from "./_pipe-to-bus.ts";
  * Runs INSIDE the relocated app tree (LANGWATCH_HOME/app/langwatch/) — see
  * services/app-dir.ts for why we relocate out of node_modules.
  */
-export async function ensureLangwatchDeps(ctx: { paths: LangwatchPaths }, bus: EventBus): Promise<void> {
-  const langwatchDir = locateLangwatchDir();
-  if (!langwatchDir) throw new Error("langwatch app dir not found");
+export async function ensureLangwatchDeps(
+	ctx: { paths: LangwatchPaths },
+	bus: EventBus,
+): Promise<void> {
+	const langwatchDir = locateLangwatchDir();
+	if (!langwatchDir) throw new Error("langwatch app dir not found");
 
-  const nodeModulesPath = join(langwatchDir, "node_modules");
-  const distPath = join(langwatchDir, "dist");
-  const prismaClientPath = join(nodeModulesPath, ".prisma", "client", "index.js");
-  const lockfilePath = join(langwatchDir, "pnpm-lock.yaml");
-  const hashFile = join(nodeModulesPath, ".install-hash");
+	const nodeModulesPath = join(langwatchDir, "node_modules");
+	const distPath = join(langwatchDir, "dist");
+	const lockfilePath = join(langwatchDir, "pnpm-lock.yaml");
+	const hashFile = join(nodeModulesPath, ".install-hash");
 
-  const distAlreadyBuilt = existsSync(join(distPath, "client"));
-  // Hash key combines the lockfile + package.json — either changing means
-  // we need to re-run install. Use sha256 (not just mtime) because rsync
-  // during ensureAppDir resets mtimes.
-  const installKey = computeInstallKey(lockfilePath, join(langwatchDir, "package.json"));
+	const distAlreadyBuilt = existsSync(join(distPath, "client"));
+	// Hash key combines the lockfile + package.json — either changing means
+	// we need to re-run install. Use sha256 (not just mtime) because rsync
+	// during ensureAppDir resets mtimes. The sequence tag versions the whole
+	// install recipe: bumping it re-runs the cycle on existing installs, which
+	// is how trees installed before the prod-prune step existed get pruned.
+	// seq3: re-run on installs whose tree predates the tarball shipping the
+	// workspace packages (3.6.0) — their pnpm links dangled and the member
+	// packages' own dependencies were never installed.
+	const installKey = `${computeInstallKey(lockfilePath, join(langwatchDir, "package.json"))}|seq3-workspace-packages`;
 
-  // Top-level symlinks are the strongest "install completed" signal:
-  // pnpm creates `.bin/` and direct package entries LAST after populating
-  // `.pnpm/`. If a previous install was interrupted between those two
-  // phases (CTRL-C, OOM, fs flush mid-write), `.pnpm/` looks fine but
-  // `.bin/prisma` is missing — and `pnpm prisma migrate deploy` then
-  // dies with `Command "prisma" not found`. Including this in the
-  // skip-gate keeps that whole class of bug from re-armoring.
-  const topLevelLinksOk = existsSync(join(nodeModulesPath, ".bin", "prisma"));
-  const cachedHash = existsSync(hashFile) ? readFileSync(hashFile, "utf8").trim() : null;
-  const installFresh = topLevelLinksOk && cachedHash === installKey;
+	// Top-level symlinks are the strongest "install completed" signal:
+	// pnpm creates `.bin/` and direct package entries LAST after populating
+	// `.pnpm/`. If a previous install was interrupted between those two
+	// phases (CTRL-C, OOM, fs flush mid-write), `.pnpm/` looks fine but
+	// `.bin/prisma` is missing — and `pnpm prisma migrate deploy` then
+	// dies with `Command "prisma" not found`. Including this in the
+	// skip-gate keeps that whole class of bug from re-armoring.
+	const topLevelLinksOk = existsSync(join(nodeModulesPath, ".bin", "prisma"));
+	const cachedHash = existsSync(hashFile)
+		? readFileSync(hashFile, "utf8").trim()
+		: null;
+	const installFresh = topLevelLinksOk && cachedHash === installKey;
 
-  if (installFresh && existsSync(prismaClientPath) && distAlreadyBuilt) {
-    return;
-  }
+	if (
+		installFresh &&
+		prismaClientGenerated(nodeModulesPath) &&
+		distAlreadyBuilt
+	) {
+		return;
+	}
 
-  bus.emit({ type: "starting", service: "prepare:langwatch" as never });
-  const start = Date.now();
+	bus.emit({ type: "starting", service: "prepare:langwatch" as never });
+	const start = Date.now();
 
-  // We use `pnpm -C <dir>` instead of `cwd: langwatchDir` because pnpm's
-  // workspace-aware mode resolves the workspace ROOT package.json when
-  // invoked through corepack (or sometimes plain pnpm too) — leading to
-  // "Missing script: build. Did you mean pnpm run build:cli?" because
-  // build:cli is on root. `-C` is the official "change to package dir
-  // and only that dir" flag.
-  //
-  // For the binary, prefer `pnpm` directly on PATH when present (CI via
-  // pnpm/action-setup, end users via corepack-shimmed PATH) and fall back
-  // to `corepack pnpm`. corepack is *not* the primary because `corepack
-  // pnpm -C <dir>` swallows the `-C` flag in some cases and pnpm
-  // re-resolves cwd to its own dir, defeating the workspace-isolation
-  // intent above. See resolvePnpm() below.
-  const pnpm = await resolvePnpm(ctx.paths);
+	// We use `pnpm -C <dir>` instead of `cwd: langwatchDir` because pnpm's
+	// workspace-aware mode resolves the workspace ROOT package.json when
+	// invoked through corepack (or sometimes plain pnpm too) — leading to
+	// "Missing script: build. Did you mean pnpm run build:cli?" because
+	// build:cli is on root. `-C` is the official "change to package dir
+	// and only that dir" flag.
+	//
+	// For the binary, prefer `pnpm` directly on PATH when present (CI via
+	// pnpm/action-setup, end users via corepack-shimmed PATH) and fall back
+	// to `corepack pnpm`. corepack is *not* the primary because `corepack
+	// pnpm -C <dir>` swallows the `-C` flag in some cases and pnpm
+	// re-resolves cwd to its own dir, defeating the workspace-isolation
+	// intent above. See resolvePnpm() below.
+	const pnpm = await resolvePnpm(ctx.paths);
 
-  if (!installFresh) {
-    // Always install with `--prod=false`. We tried `--prod` for the
-    // prebuilt-dist path to save ~50 devDependencies (vite, esbuild,
-    // vitest, playwright, etc.), but it turned up two real-world
-    // breakages on dogfood:
-    //   1. .prisma/client/ never materialized → langwatch app crashed
-    //      on `Cannot find module '.prisma/client/index'`.
-    //   2. tsx's --tsconfig path-alias resolver failed to map `~/...`
-    //      imports inside src/tasks/* → `Cannot find module '~/server/...'`.
-    // The transitive deps that tsx + prisma + workers need at runtime
-    // overlap unpredictably with langwatch's devDependencies, and
-    // chasing each is a losing game. Disk hit is acceptable; reliability
-    // wins.
-    await execAndPipe(
-      bus,
-      "prepare:langwatch",
-      pnpm.command,
-      [...pnpm.args, "-C", langwatchDir, "install", "--prod=false", "--frozen-lockfile"],
-    );
-    writeFileSync(hashFile, installKey);
-  }
+	// npm pack unconditionally drops .npmrc from published artifacts (it often
+	// carries auth tokens), so the repo's langwatch/.npmrc never reaches an
+	// npx install. Recreate it before the first install: without these hoists
+	// OpenTelemetry's ESM loader shims land deep in the virtual store and its
+	// instrumentation cannot patch them.
+	const npmrcPath = join(langwatchDir, ".npmrc");
+	if (!existsSync(npmrcPath)) {
+		writeFileSync(
+			npmrcPath,
+			[
+				"# Recreated by @langwatch/server (npm pack always strips .npmrc).",
+				"# Mirrors the repo's langwatch/.npmrc.",
+				"public-hoist-pattern[]=*import-in-the-middle*",
+				"public-hoist-pattern[]=*require-in-the-middle*",
+				"",
+			].join("\n"),
+		);
+	}
 
-  // pnpm install does NOT auto-generate the prisma client. Run it whenever
-  // the generated client is missing. The full-build path below (when
-  // !distAlreadyBuilt) ALSO covers this via start:prepare:files →
-  // prisma:generate:typescript, so we only need the explicit call on the
-  // prebuilt-dist path.
-  if (distAlreadyBuilt && !existsSync(prismaClientPath)) {
-    await execAndPipe(
-      bus,
-      "prepare:langwatch",
-      pnpm.command,
-      [...pnpm.args, "-C", langwatchDir, "exec", "prisma", "generate"],
-    );
-  }
+	if (!installFresh) {
+		// Install everything, dev dependencies included, because the steps that
+		// follow genuinely need them: prisma generate needs the prisma CLI's
+		// build tooling and the full build needs vite. Installing with `--prod`
+		// up front was tried once and broke exactly those two steps. The dev
+		// dependencies come OUT again below (prune --prod, after the build),
+		// which is the same order the production Dockerfile uses — the pruned
+		// tree it produces is what every helm and docker deployment runs.
+		await execAndPipe(bus, "prepare:langwatch", pnpm.command, [
+			...pnpm.args,
+			"-C",
+			langwatchDir,
+			"install",
+			"--prod=false",
+			"--frozen-lockfile",
+		]);
+	}
 
-  // Skip the build step entirely when dist/client/ is already present.
-  // Published npm tarballs ship dist/ pre-built (see
-  // .github/workflows/npx-server-publish.yml), so end users hit `pnpm install`
-  // + `prisma generate` and nothing else. The build only runs for
-  // `pnpm pack`-driven local dogfood and dev checkouts where dist/
-  // doesn't exist yet.
-  if (!distAlreadyBuilt) {
-    // Full prod build: start:prepare:files → build:scenario-child-process → vite build.
-    // start:prepare:files generates Prisma client, Zod types, SDK versions,
-    // langevals types (from the source committed in langevals/ts-integration/),
-    // and the mcp-server bundle. vite build emits dist/client/ for static serving.
-    // Without dist/client/, every UI route returns 404 and only /api/* works.
-    await execAndPipe(
-      bus,
-      "prepare:langwatch",
-      pnpm.command,
-      [...pnpm.args, "-C", langwatchDir, "run", "build"],
-      {
-        env: {
-          ...process.env,
-          NODE_ENV: "production",
-        },
-      },
-    );
-  }
+	// Skip the build step entirely when dist/client/ is already present.
+	// Published npm tarballs ship dist/ pre-built (see
+	// .github/workflows/npx-server-publish.yml), so end users hit `pnpm install`
+	// + `prisma generate` and nothing else. The build only runs for
+	// `pnpm pack`-driven local dogfood and dev checkouts where dist/
+	// doesn't exist yet.
+	if (!distAlreadyBuilt) {
+		// Full prod build: start:prepare:files → build:scenario-child-process → vite build.
+		// start:prepare:files generates Prisma client, Zod types, SDK versions,
+		// langevals types (from the source committed in langevals/ts-integration/),
+		// and the mcp-server bundle. vite build emits dist/client/ for static serving.
+		// Without dist/client/, every UI route returns 404 and only /api/* works.
+		await execAndPipe(
+			bus,
+			"prepare:langwatch",
+			pnpm.command,
+			[...pnpm.args, "-C", langwatchDir, "run", "build"],
+			{
+				env: {
+					...process.env,
+					NODE_ENV: "production",
+				},
+			},
+		);
+	}
 
-  bus.emit({ type: "healthy", service: "prepare:langwatch" as never, durationMs: Date.now() - start });
+	// Take the dev dependencies back out, the way the production Dockerfile
+	// does after ITS build (install → build → prune --prod → prisma generate).
+	// This is what drops vite, vitest, playwright, biome and the rest of the
+	// build tooling from the tree the server actually runs — on the order of a
+	// gigabyte — while tsx and prisma stay, because they are runtime
+	// dependencies here (the server boots through tsx, migrations run through
+	// the prisma CLI) and are declared as such.
+	//
+	// ONLY on the relocated copy under LANGWATCH_HOME. A dev checkout runs the
+	// CLI against its own working tree, and pruning that would strip the
+	// developer's test and build tooling out from under them.
+	if (shouldPruneToProd(langwatchDir, ctx.paths)) {
+		await execAndPipe(
+			bus,
+			"prepare:langwatch",
+			pnpm.command,
+			[...pnpm.args, "-C", langwatchDir, "prune", "--prod"],
+			{ env: { ...process.env, CI: "true" } },
+		);
+	}
+
+	// pnpm install does not auto-generate the prisma client, and prune removes
+	// a generated one (it is not a declared dependency, so prune sees it as
+	// extraneous — the Dockerfile regenerates after pruning for the same
+	// reason). One post-prune generate covers every path that needs it.
+	if (!prismaClientGenerated(nodeModulesPath)) {
+		await execAndPipe(bus, "prepare:langwatch", pnpm.command, [
+			...pnpm.args,
+			"-C",
+			langwatchDir,
+			"exec",
+			"prisma",
+			"generate",
+		]);
+	}
+
+	// Workspace members living OUTSIDE langwatch/ (mcp-server, packages/*)
+	// cannot reach langwatch/node_modules by walking up, so their declared
+	// peerDependencies resolve nowhere in the relocated tree. Materialize
+	// each peer as a member-local link to the app's resolved instance —
+	// the "consumer provides the peer" contract made explicit on disk.
+	// Only on the relocated copy: a dev checkout resolves these through its
+	// own root-workspace install.
+	if (shouldPruneToProd(langwatchDir, ctx.paths)) {
+		linkExternalMemberPeers(appRoot());
+	}
+
+	// pnpm quietly tolerates a workspace member listed in the lockfile whose
+	// directory is absent: install exits 0 and leaves dangling @langwatch/*
+	// links, and the first runtime import dies minutes later inside a
+	// migration. Turn that into an install-time failure that names the
+	// packaging gap. (Exactly how 3.6.0 shipped: both .npmignore files still
+	// excluded langwatch/packages/ after runtime packages moved in.)
+	assertWorkspaceLinksResolve(nodeModulesPath);
+
+	// Written LAST so an interrupted run never records success: any of the
+	// steps above dying leaves the old key (or none) and the next boot redoes
+	// the cycle.
+	writeFileSync(hashFile, installKey);
+
+	bus.emit({
+		type: "healthy",
+		service: "prepare:langwatch" as never,
+		durationMs: Date.now() - start,
+	});
+}
+
+/**
+ * For every app-workspace member outside langwatch/, link its declared
+ * peerDependencies to the app's own resolved instances. Runtime imports in
+ * those members (zod in @langwatch/langy, @opentelemetry/api in
+ * @langwatch/handled-error) are peers on purpose: both packages must share
+ * the CONSUMER's instance — a second copy of either breaks it (zod schemas
+ * from two majors cannot merge; a second otel api loses the global
+ * registrations). The links make the relocated tree resolve them the way
+ * every other deployment already does. Idempotent; skips peers the app
+ * doesn't carry. Exported for tests.
+ */
+export function linkExternalMemberPeers(appRootDir: string): string[] {
+	const appNodeModules = join(appRootDir, "langwatch", "node_modules");
+	const memberDirs = [
+		join(appRootDir, "mcp-server"),
+		...listDirs(join(appRootDir, "packages")),
+	];
+	const linked: string[] = [];
+	for (const memberDir of memberDirs) {
+		const pkgPath = join(memberDir, "package.json");
+		if (!existsSync(pkgPath)) continue;
+		let peers: string[] = [];
+		try {
+			const pkg = JSON.parse(readFileSync(pkgPath, "utf8")) as {
+				peerDependencies?: Record<string, string>;
+			};
+			peers = Object.keys(pkg.peerDependencies ?? {});
+		} catch {
+			continue;
+		}
+		for (const name of peers) {
+			const target = join(appNodeModules, ...name.split("/"));
+			if (!existsSync(target)) continue;
+			const linkPath = join(memberDir, "node_modules", ...name.split("/"));
+			// existsSync follows symlinks, so it says false for a dangling link
+			// whose directory entry is still there — and symlinkSync would then
+			// die with EEXIST. lstat sees the entry itself: keep it when it
+			// resolves, replace it when it dangles (a re-install after an app
+			// tree wipe leaves exactly that).
+			if (lstatSafely(linkPath)) {
+				if (existsSync(linkPath)) continue;
+				// unlinkSync, not rmSync: rm stats the TARGET, and on a dangling
+				// link it silently does nothing — unlink removes the entry itself.
+				unlinkSync(linkPath);
+			}
+			mkdirSync(dirname(linkPath), { recursive: true });
+			symlinkSync(relative(dirname(linkPath), target), linkPath);
+			linked.push(`${basename(memberDir)}:${name}`);
+		}
+	}
+	return linked;
+}
+
+function listDirs(dir: string): string[] {
+	if (!existsSync(dir)) return [];
+	return readdirSync(dir)
+		.map((entry) => join(dir, entry))
+		.filter((p) => existsSync(join(p, "package.json")));
+}
+
+function lstatSafely(path: string): boolean {
+	try {
+		lstatSync(path);
+		return true;
+	} catch {
+		return false;
+	}
+}
+
+/**
+ * Every @langwatch/* entry in node_modules must resolve to a real directory.
+ * A dangling link means the app tree is missing a workspace package the
+ * lockfile promised — a packaging bug in the published artifact, not
+ * something a retry can fix. Exported for tests.
+ */
+export function assertWorkspaceLinksResolve(nodeModulesPath: string): void {
+	const scopeDir = join(nodeModulesPath, "@langwatch");
+	if (!existsSync(scopeDir)) return;
+	const dangling: string[] = [];
+	for (const entry of readdirSync(scopeDir)) {
+		// existsSync follows symlinks: false for a link whose target is gone.
+		if (!existsSync(join(scopeDir, entry, "package.json"))) {
+			dangling.push(`@langwatch/${entry}`);
+		}
+	}
+	if (dangling.length > 0) {
+		throw new Error(
+			`app tree is missing workspace packages: ${dangling.join(", ")}. ` +
+				`The published artifact did not ship them — this is a packaging bug in @langwatch/server; ` +
+				`please report it at https://github.com/langwatch/langwatch/issues`,
+		);
+	}
+}
+
+/**
+ * Whether `prisma generate` has produced a client in this tree. Under pnpm
+ * the generated files live inside the virtual store
+ * (node_modules/.pnpm/@prisma+client@<ver>/node_modules/.prisma/client/), NOT
+ * the top-level node_modules/.prisma/ that npm and yarn use. The old
+ * top-level-only check could never pass on a pnpm tree, so every single boot
+ * re-ran the entire prepare step — install, build, generate — for minutes,
+ * believing the client was missing. Exported for tests.
+ */
+export function prismaClientGenerated(nodeModulesPath: string): boolean {
+	if (existsSync(join(nodeModulesPath, ".prisma", "client", "index.js"))) {
+		return true;
+	}
+	const pnpmDir = join(nodeModulesPath, ".pnpm");
+	if (!existsSync(pnpmDir)) return false;
+	for (const entry of readdirSync(pnpmDir)) {
+		if (!entry.startsWith("@prisma+client@")) continue;
+		if (
+			existsSync(
+				join(pnpmDir, entry, "node_modules", ".prisma", "client", "index.js"),
+			)
+		) {
+			return true;
+		}
+	}
+	return false;
+}
+
+/**
+ * Prune is for the relocated install under LANGWATCH_HOME only. Exported for
+ * tests; the path comparison is the entire decision.
+ */
+export function shouldPruneToProd(
+	langwatchDir: string,
+	paths: Pick<LangwatchPaths, "app">,
+): boolean {
+	return langwatchDir === paths.app || langwatchDir.startsWith(paths.app + sep);
 }
 
 function computeInstallKey(...files: string[]): string {
-  const h = createHash("sha256");
-  for (const f of files) {
-    if (existsSync(f)) h.update(readFileSync(f));
-    h.update("\n--\n");
-  }
-  return h.digest("hex");
+	const h = createHash("sha256");
+	for (const f of files) {
+		if (existsSync(f)) h.update(readFileSync(f));
+		h.update("\n--\n");
+	}
+	return h.digest("hex");
 }
 
 /**
@@ -160,21 +380,25 @@ function computeInstallKey(...files: string[]): string {
  * Pass `paths` from any caller that has runtime context; callers who
  * don't (legacy ensureLangwatchDeps before predeps run) skip step 1.
  */
-export async function resolvePnpm(paths?: LangwatchPaths): Promise<{ command: string; args: string[] }> {
-  if (paths) {
-    const bundled = join(paths.bin, "pnpm");
-    if (existsSync(bundled)) return { command: bundled, args: [] };
-  }
-  const direct = await execa("pnpm", ["--version"], { reject: false });
-  if (direct.exitCode === 0) return { command: "pnpm", args: [] };
-  const { exitCode } = await execa("corepack", ["--version"], { reject: false });
-  if (exitCode === 0) return { command: "corepack", args: ["pnpm"] };
-  throw new Error("pnpm not found in <bin>/pnpm, on PATH, or via corepack");
+export async function resolvePnpm(
+	paths?: LangwatchPaths,
+): Promise<{ command: string; args: string[] }> {
+	if (paths) {
+		const bundled = join(paths.bin, "pnpm");
+		if (existsSync(bundled)) return { command: bundled, args: [] };
+	}
+	const direct = await execa("pnpm", ["--version"], { reject: false });
+	if (direct.exitCode === 0) return { command: "pnpm", args: [] };
+	const { exitCode } = await execa("corepack", ["--version"], {
+		reject: false,
+	});
+	if (exitCode === 0) return { command: "corepack", args: ["pnpm"] };
+	throw new Error("pnpm not found in <bin>/pnpm, on PATH, or via corepack");
 }
 
 export function locateLangwatchDir(): string | null {
-  // appRoot() returns the relocated tree (LANGWATCH_HOME/app) once
-  // ensureAppDir has run, or the dev workspace fallback otherwise.
-  const dir = join(appRoot(), "langwatch");
-  return existsSync(join(dir, "package.json")) ? dir : null;
+	// appRoot() returns the relocated tree (LANGWATCH_HOME/app) once
+	// ensureAppDir has run, or the dev workspace fallback otherwise.
+	const dir = join(appRoot(), "langwatch");
+	return existsSync(join(dir, "package.json")) ? dir : null;
 }

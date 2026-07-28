@@ -21,4 +21,7 @@ spec:
     {{- with .Values.autoscaling.customMetrics }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
+  {{- with .Values.autoscaling.behavior }}
+  behavior: {{- toYaml . | nindent 4 }}
+  {{- end }}
 {{- end }}

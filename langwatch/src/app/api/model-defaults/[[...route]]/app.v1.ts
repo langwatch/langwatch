@@ -1,13 +1,15 @@
+import { createLogger } from "@langwatch/observability";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { describeRoute } from "hono-openapi";
-import { resolver, validator as zValidator } from "hono-openapi/zod";
+import { resolver } from "hono-openapi/zod";
 import { z } from "zod";
 import {
   anyAuthenticated,
   requires,
   type SecuredApp,
 } from "~/server/api/security";
+import { validator as zValidator } from "~/server/api/validation";
 import type { Session } from "~/server/auth";
 import { prisma } from "~/server/db";
 import { getDefaultModelsSnapshot } from "~/server/modelProviders/modelDefaults.read";
@@ -19,7 +21,6 @@ import {
   updateConfig,
 } from "~/server/modelProviders/modelDefaults.service";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
-import { createLogger } from "~/utils/logger/server";
 
 import type { AuthMiddlewareVariables } from "../../middleware/auth";
 import { baseResponses } from "../../shared/base-responses";
@@ -116,7 +117,7 @@ export function registerModelDefaultsRoutes(
     "/",
     describeRoute({
       description:
-        "Create a default-model config attached to one or more scopes. JSON keys may be roles (DEFAULT, FAST, EMBEDDINGS) or registered feature keys; missing keys inherit from a higher scope.",
+        "Create a default-model config attached to one or more scopes. JSON keys may be roles (DEFAULT, FAST, LANGY, EMBEDDINGS) or registered feature keys; missing keys inherit from a higher scope.",
       responses: {
         ...baseResponses,
         200: {

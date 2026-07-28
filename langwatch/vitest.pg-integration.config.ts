@@ -13,8 +13,16 @@ export default defineConfig({
     include: ["**/*.integration.{test,spec}.?(c|m)[jt]s?(x)"],
     exclude: [
       ...configDefaults.exclude,
-      // Exclude tests that need ClickHouse / Redis containers
-      "src/server/event-sourcing/**",
+      // Exclude event-sourcing suites that need ClickHouse / Redis containers.
+      // The durable process-manager store is Postgres-only and intentionally
+      // remains in this config's test surface.
+      "src/server/event-sourcing/__tests__/**",
+      "src/server/event-sourcing/outbox/**",
+      "src/server/event-sourcing/pipelines/**",
+      "src/server/event-sourcing/projections/**",
+      "src/server/event-sourcing/queues/**",
+      "src/server/event-sourcing/replay/**",
+      "src/server/event-sourcing/stores/**",
       ".next/**/*",
       ".next-saas/**/*",
       "saas-src/**/*",

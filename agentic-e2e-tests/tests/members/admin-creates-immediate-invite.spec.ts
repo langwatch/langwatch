@@ -8,6 +8,7 @@ import {
   thenISeeSentInviteFor,
   thenISeeSuccessToast,
   generateUniqueEmail,
+  withEnterpriseLicense,
 } from "./steps";
 
 /**
@@ -17,8 +18,12 @@ import {
  * Scenario: Admin creates an immediate invite (lines 19-24)
  */
 test.describe("Invitation Approval - Admin Creates Immediate Invite", () => {
-  // fixme(#1811): flaky — fails consistently in CI environment
-  test.fixme();
+  // Member-invitation requires an org plan with maxMembers>=2. A no-license
+  // self-hosted org resolves to FREE_PLAN (maxMembers=1), so createInviteRequest
+  // 403s. withEnterpriseLicense() activates a test ENTERPRISE license
+  // (maxMembers=100) before each test and removes it after, scoping the raised
+  // cap to this suite. See tests/license.fixture.ts. (#1802)
+  withEnterpriseLicense();
   /**
    * Scenario: Admin creates an immediate invite
    * Source: update-pending-invitation.feature lines 19-24

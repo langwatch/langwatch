@@ -1,4 +1,4 @@
-import { useEffect, useState, type RefObject } from "react";
+import { type RefObject, useEffect, useState } from "react";
 import { useDrawerStore } from "../../../stores/drawerStore";
 
 export type DrawerLayout = "vertical" | "horizontal";
@@ -46,9 +46,8 @@ export function usePaneLayout(
     return widthPx > availableHeight ? "horizontal" : "vertical";
   })();
 
-  const [observedLayout, setObservedLayout] = useState<DrawerLayout>(
-    widthDrivenLayout,
-  );
+  const [observedLayout, setObservedLayout] =
+    useState<DrawerLayout>(widthDrivenLayout);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -67,8 +66,7 @@ export function usePaneLayout(
 
   // Either signal can flip us to horizontal — drag should never have
   // to wait on the ResizeObserver tick.
-  return widthDrivenLayout === "horizontal" ||
-    observedLayout === "horizontal"
+  return widthDrivenLayout === "horizontal" || observedLayout === "horizontal"
     ? "horizontal"
     : "vertical";
 }

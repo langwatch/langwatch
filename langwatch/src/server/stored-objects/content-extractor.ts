@@ -29,14 +29,19 @@
  * The walker is deliberately narrow: it only touches the fields it understands
  * and leaves everything else untouched ("degraded, not broken").
  */
+
+import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-import { createLogger } from "~/utils/logger/server";
+import { resolveRawPcmFormat, wrapRawPcmToWav } from "~/shared/audio/pcmToWav";
+import {
+  parseBase64DataUri,
+  visitContentPartAsync,
+} from "~/shared/content-parts/visit-content-part";
 import { binaryInputPartSchema } from "./binary-part";
 import { coerceContentToArray } from "./coerce-content-to-array";
 import { isReadbackSafe } from "./safe-media-types";
 import type { StoredObjectsService } from "./stored-objects.service";
-import { visitContentPartAsync } from "./visit-content-part";
 
 const tracer = getLangWatchTracer("langwatch.stored-objects.content-extractor");
 
@@ -62,36 +67,16 @@ export interface ExtractedRef {
 // ---------------------------------------------------------------------------
 
 /**
- * Parse a `data:` URI into its mime type + base64 payload. Returns null when
- * the input isn't a `data:<mime>;base64,<...>` shape; non-base64 data URIs
- * (`data:<mime>,<urlencoded>`) are out of scope — extraction is for binary
- * payloads only, not for short URL-encoded text data.
- *
- * Spec: RFC 2397, but only the `base64` form. Examples we accept:
- *   data:image/png;base64,iVBORw0KGgo...
- *   data:audio/wav;base64,UklGR...
- */
-function parseBase64DataUri(
-  uri: string,
-): { mimeType: string; base64: string } | null {
-  if (!uri.startsWith("data:")) return null;
-  const commaIdx = uri.indexOf(",");
-  if (commaIdx === -1) return null;
-  const header = uri.slice(5, commaIdx); // strip "data:"
-  const payload = uri.slice(commaIdx + 1);
-  if (!header.endsWith(";base64")) return null;
-  const mimeType = header.slice(0, -7); // strip ";base64"
-  if (!mimeType) return null;
-  return { mimeType, base64: payload };
-}
-
-/**
  * Rewrites a single content part, storing any inline bytes via the service.
  * Returns the (possibly new) part and an optional ref. `part` is unknown
  * because the upstream walker no longer pre-validates against a single
  * schema — the visitor's shape-dispatch handles each variant directly.
+ *
+ * Exported for the generic value walker (`value-media-extractor.ts`), which
+ * finds media parts in arbitrary JSON values (trace span attributes) rather
+ * than the scenario event's message/messages envelope.
  */
-async function processContentPart({
+export async function processContentPart({
   part,
   projectId,
   purpose,
@@ -118,6 +103,12 @@ async function processContentPart({
       if (mediaPart.source.type !== "data") return noOp;
 
       const { value: base64, mimeType } = mediaPart.source;
+      // The dispatcher casts `source` from wire data without validating the
+      // payload type — a non-string `value` (arbitrary object walked by the
+      // generic value extractor) is not an inline media part.
+      if (typeof base64 !== "string" || typeof mimeType !== "string") {
+        return noOp;
+      }
 
       // For document parts, reject MIME types the read path can't faithfully
       // serve. The /api/files route downgrades anything outside the allowlist to
@@ -163,6 +154,12 @@ async function processContentPart({
     },
 
     async binary(binPart) {
+      // Unlike the media/document handler above, this path deliberately has
+      // no isReadbackSafe gate: binary parts render as a download chip, not
+      // inline, so a non-allowlisted type (text/csv, application/json, ...)
+      // coming back as application/octet-stream still round-trips the exact
+      // bytes — and the chip carries the original filename for the save.
+      //
       // Enforce exactly-one-of(data, url, id) at the boundary before touching.
       // AG-UI's InputContentSchema permits the ambiguous cases; rejecting them
       // here matches the runtime invariant the extractor depends on.
@@ -203,11 +200,14 @@ async function processContentPart({
       };
 
       const original = part as Record<string, unknown>;
-      // AI-SDK file shape (`type:"file", mediaType, data`) is dispatched here
-      // by the visitor when mimeType is not audio/*. Normalise to a clean
+      // File shapes (AI-SDK `{type:"file", mediaType, data}` and OpenAI
+      // `{type:"file", file:{file_data, filename}}`) are dispatched here by
+      // the visitor when the mime type is not audio/*. Normalise to a clean
       // `binary` shape (the same canonical form the inputAudio handler
       // produces for the audio path) so the rewrite is not a chimera of
-      // `type:"file"` + binary externalised fields.
+      // `type:"file"` + binary externalised fields. The filename comes from
+      // the dispatched part — the visitor already resolved it from whichever
+      // nesting the wire shape used.
       const isFileShape = original.type === "file";
       const rewrittenPart = isFileShape
         ? {
@@ -216,8 +216,8 @@ async function processContentPart({
             id: stored.id,
             url: `/api/files/${projectId}/${stored.id}`,
             data: undefined,
-            ...(typeof original.filename === "string"
-              ? { filename: original.filename }
+            ...(typeof binPart.filename === "string"
+              ? { filename: binPart.filename }
               : {}),
           }
         : {
@@ -286,7 +286,7 @@ async function processContentPart({
       if (!audioPart.data) return noOp;
 
       const format = audioPart.format?.toLowerCase();
-      const mimeType =
+      let mimeType =
         audioPart.mimeType ??
         (format === "wav"
           ? "audio/wav"
@@ -300,7 +300,23 @@ async function processContentPart({
                   ? "audio/webm"
                   : "application/octet-stream");
 
-      const bytes = Buffer.from(audioPart.data, "base64");
+      let bytes = Buffer.from(audioPart.data, "base64");
+
+      // Raw, header-less realtime formats (pcm16, G.711) are unplayable when
+      // served back as-is — no container, so <audio> rejects them. Wrap them
+      // into a WAV container AT STORE TIME so the externalized reference is
+      // plain playable audio/wav everywhere. Applies identically on the
+      // scenario and trace extraction paths, so the same recording still
+      // hashes to one stored object.
+      const rawFormat = resolveRawPcmFormat(format, mimeType);
+      if (rawFormat) {
+        const wrapped = wrapRawPcmToWav(new Uint8Array(bytes), rawFormat);
+        if (wrapped) {
+          bytes = Buffer.from(wrapped);
+          mimeType = "audio/wav";
+        }
+      }
+
       const stored = await service.storeFromBytes({
         projectId,
         purpose,
@@ -321,7 +337,8 @@ async function processContentPart({
       const original = part as Record<string, unknown>;
       const isFileShape = original.type === "file";
       const originalInputAudio =
-        typeof original.input_audio === "object" && original.input_audio !== null
+        typeof original.input_audio === "object" &&
+        original.input_audio !== null
           ? (original.input_audio as Record<string, unknown>)
           : {};
 

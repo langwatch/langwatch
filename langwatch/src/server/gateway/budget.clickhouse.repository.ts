@@ -18,6 +18,8 @@
  * See: migration 00017_create_gateway_budget_ledger.sql
  * See: specs/ai-gateway/_shared/contract.md §4.5
  */
+
+import { createLogger } from "@langwatch/observability";
 import type {
   GatewayBudget,
   GatewayBudgetLedgerStatus,
@@ -25,7 +27,6 @@ import type {
   GatewayBudgetWindow,
 } from "@prisma/client";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
-import { createLogger } from "~/utils/logger/server";
 
 const EVENTS_TABLE = "gateway_budget_ledger_events" as const;
 const TOTALS_TABLE = "gateway_budget_scope_totals" as const;
@@ -556,13 +557,30 @@ function windowToClickHouse(window: GatewayBudgetWindow): string {
 }
 
 /**
- * Start-of-period (UTC) for the current window. Matches the multiIf()
- * branches in the MV (00017_create_gateway_budget_ledger.sql:115-119).
- * Windows smaller than DAY are not yet persisted in the rollup — callers
- * should use the events table directly for sub-day granularity.
+ * Start-of-period (UTC) for the current window.
+ *
+ * This is one half of a contract: the rollup only ever returns a row when
+ * this lands on exactly the PeriodStart the materialised view bucketed the
+ * debit into. The other half is the multiIf() in
+ * 00055_gateway_budget_scope_totals_period_start.sql, and the two are pinned
+ * together by budget.clickhouse.repository.periodStart.integration.test.ts.
+ * Change one without the other and the affected window stops accruing
+ * entirely: spend is written, every read returns 0, and budgets on that
+ * window silently stop enforcing.
  */
-function currentPeriodStart(window: GatewayBudgetWindow, now: Date): Date {
+export function currentPeriodStart(
+  window: GatewayBudgetWindow,
+  now: Date,
+): Date {
   const d = new Date(now.getTime());
+  if (window === "MINUTE") {
+    d.setUTCSeconds(0, 0);
+    return d;
+  }
+  if (window === "HOUR") {
+    d.setUTCMinutes(0, 0, 0);
+    return d;
+  }
   if (window === "DAY") {
     d.setUTCHours(0, 0, 0, 0);
     return d;
@@ -570,7 +588,7 @@ function currentPeriodStart(window: GatewayBudgetWindow, now: Date): Date {
   if (window === "WEEK") {
     d.setUTCHours(0, 0, 0, 0);
     const day = d.getUTCDay();
-    // ISO week start (Monday). Matches ClickHouse toStartOfWeek mode 1.
+    // ISO week start (Monday). Matches ClickHouse toStartOfWeek(t, 1).
     const delta = day === 0 ? 6 : day - 1;
     d.setUTCDate(d.getUTCDate() - delta);
     return d;
@@ -578,7 +596,6 @@ function currentPeriodStart(window: GatewayBudgetWindow, now: Date): Date {
   if (window === "MONTH") {
     return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1));
   }
-  // TOTAL / MINUTE / HOUR — the MV doesn't aggregate these. Return epoch
-  // so matching queries find no rows and callers fall back to events-scan.
+  // TOTAL: one lifetime bucket, keyed by the epoch sentinel.
   return new Date(0);
 }

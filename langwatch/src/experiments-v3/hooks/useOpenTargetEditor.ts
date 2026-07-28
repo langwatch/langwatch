@@ -24,10 +24,15 @@ import { api } from "~/utils/api";
 import { DRAWER_WIDTH } from "../constants";
 import type { FieldMapping, TargetConfig } from "../types";
 import {
+  COMPARISON_EVALUATOR_TYPE,
+  LEGACY_PAIRWISE_EVALUATOR_TYPE,
+} from "../types";
+import {
   convertFromUIMapping,
   convertToUIMapping,
 } from "../utils/fieldMappingConverters";
 import { createEvaluatorEditorCallbacks } from "../utils/evaluatorEditorCallbacks";
+import { toComparisonConfig } from "../utils/normalizeComparison";
 import { createPromptEditorCallbacks } from "../utils/promptEditorCallbacks";
 import { useEvaluationsV3Store } from "./useEvaluationsV3Store";
 
@@ -103,7 +108,7 @@ export const useOpenTargetEditor = () => {
     activeDatasetId,
     targets,
     updateTarget,
-    updateTargetPairwise,
+    updateTargetComparison,
     setTargetMapping,
     removeTargetMapping,
   } = useEvaluationsV3Store(
@@ -112,7 +117,7 @@ export const useOpenTargetEditor = () => {
       activeDatasetId: state.activeDatasetId,
       targets: state.targets,
       updateTarget: state.updateTarget,
-      updateTargetPairwise: state.updateTargetPairwise,
+      updateTargetComparison: state.updateTargetComparison,
       setTargetMapping: state.setTargetMapping,
       removeTargetMapping: state.removeTargetMapping,
     })),
@@ -203,13 +208,52 @@ export const useOpenTargetEditor = () => {
           });
 
           if (agent?.type === "workflow") {
-            // Open workflow in new tab
-            const config = agent.config as Record<string, unknown>;
-            const workflowId = config.workflowId as string | undefined;
-            if (workflowId) {
-              const workflowUrl = `/${project?.slug}/studio/${workflowId}`;
-              window.open(workflowUrl, "_blank");
-            }
+            // A workflow-type agent has no code of its own to edit inline —
+            // it's a pointer to a Studio graph, which can't be edited
+            // meaningfully inside a narrow sidebar. The drawer shows the
+            // linked workflow as a card with a link to open the real editor
+            // in a new tab, plus the same input-mapping UI every other
+            // agent target type gets.
+            const availableSources = buildAvailableSources();
+            const uiMappings = buildUIMappings(target, activeDatasetId);
+
+            setFlowCallbacks("agentWorkflowTargetEditor", {
+              // Capture activeDatasetId (and isDatasetSource, which already
+              // derives from this render's datasets) rather than re-reading
+              // the store live at edit time — this drawer isn't modal, so
+              // the user can switch the active dataset while it's still
+              // open, and a live read would then write the mapping into the
+              // wrong dataset's bucket instead of the one this drawer opened
+              // against.
+              onInputMappingsChange: (
+                identifier: string,
+                mapping: UIFieldMapping | undefined,
+              ) => {
+                if (mapping) {
+                  setTargetMapping(
+                    target.id,
+                    activeDatasetId,
+                    identifier,
+                    convertFromUIMapping(mapping, isDatasetSource),
+                  );
+                } else {
+                  removeTargetMapping(target.id, activeDatasetId, identifier);
+                }
+              },
+            });
+
+            openDrawer("agentWorkflowTargetEditor", {
+              availableSources,
+              inputMappings: uiMappings,
+              urlParams: {
+                targetId: target.id,
+                agentId: target.dbAgentId ?? "",
+              },
+            });
+
+            requestAnimationFrame(() => {
+              scrollToTargetColumn(target.id);
+            });
           } else if (agent?.type === "http") {
             // HTTP agent - open HTTP editor drawer
             const availableSources = buildAvailableSources();
@@ -217,30 +261,22 @@ export const useOpenTargetEditor = () => {
 
             // Set flow callbacks for the HTTP editor
             setFlowCallbacks("agentHttpEditor", {
+              // See the workflow-agent branch above for why this captures
+              // activeDatasetId/isDatasetSource instead of reading the store
+              // live: this drawer isn't modal either.
               onInputMappingsChange: (
                 identifier: string,
                 mapping: UIFieldMapping | undefined,
               ) => {
-                const currentActiveDatasetId =
-                  useEvaluationsV3Store.getState().activeDatasetId;
-                const currentDatasets =
-                  useEvaluationsV3Store.getState().datasets;
-                const checkIsDatasetSource = (sourceId: string) =>
-                  currentDatasets.some((d) => d.id === sourceId);
-
                 if (mapping) {
                   setTargetMapping(
                     target.id,
-                    currentActiveDatasetId,
+                    activeDatasetId,
                     identifier,
-                    convertFromUIMapping(mapping, checkIsDatasetSource),
+                    convertFromUIMapping(mapping, isDatasetSource),
                   );
                 } else {
-                  removeTargetMapping(
-                    target.id,
-                    currentActiveDatasetId,
-                    identifier,
-                  );
+                  removeTargetMapping(target.id, activeDatasetId, identifier);
                 }
               },
             });
@@ -263,32 +299,24 @@ export const useOpenTargetEditor = () => {
             const availableSources = buildAvailableSources();
             const uiMappings = buildUIMappings(target, activeDatasetId);
 
-            // Set flow callbacks for the code editor
+            // Set flow callbacks for the code editor. See the workflow-agent
+            // branch above for why this captures
+            // activeDatasetId/isDatasetSource instead of reading the store
+            // live: this drawer isn't modal either.
             setFlowCallbacks("agentCodeEditor", {
               onInputMappingsChange: (
                 identifier: string,
                 mapping: UIFieldMapping | undefined,
               ) => {
-                const currentActiveDatasetId =
-                  useEvaluationsV3Store.getState().activeDatasetId;
-                const currentDatasets =
-                  useEvaluationsV3Store.getState().datasets;
-                const checkIsDatasetSource = (sourceId: string) =>
-                  currentDatasets.some((d) => d.id === sourceId);
-
                 if (mapping) {
                   setTargetMapping(
                     target.id,
-                    currentActiveDatasetId,
+                    activeDatasetId,
                     identifier,
-                    convertFromUIMapping(mapping, checkIsDatasetSource),
+                    convertFromUIMapping(mapping, isDatasetSource),
                   );
                 } else {
-                  removeTargetMapping(
-                    target.id,
-                    currentActiveDatasetId,
-                    identifier,
-                  );
+                  removeTargetMapping(target.id, activeDatasetId, identifier);
                 }
               },
             });
@@ -312,12 +340,13 @@ export const useOpenTargetEditor = () => {
         }
       } else if (target.type === "evaluator" && target.targetEvaluatorId) {
         // Pairwise column-target (#5100): when the target carries a `pairwise`
-        // config, render the clean PairwiseConfigForm (Variant A / Variant B /
+        // config, render the clean ComparisonConfigForm (Variant A / Variant B /
         // Golden) instead of the per-row mappings UI. Derived field mappings
         // are written into target.mappings on every change so the orchestrator
         // sees a normal mapped target at run time. Strictly additive: every
         // other evaluator-target falls through to the original branch below.
-        if (target.pairwise) {
+        const targetComparison = toComparisonConfig(target);
+        if (targetComparison) {
           const activeDataset = datasets.find((d) => d.id === activeDatasetId);
           const datasetColumns =
             activeDataset?.columns.map((c) => ({ id: c.id, name: c.name })) ??
@@ -331,8 +360,8 @@ export const useOpenTargetEditor = () => {
             createEvaluatorEditorCallbacks({
               targetId: target.id,
               updateTarget,
-              onPairwiseChange: (next) => {
-                updateTargetPairwise(target.id, next);
+              onComparisonChange: (next) => {
+                updateTargetComparison(target.id, next);
               },
             }),
           );
@@ -341,12 +370,18 @@ export const useOpenTargetEditor = () => {
 
           openDrawer("evaluatorEditor", {
             evaluatorId: target.targetEvaluatorId,
-            evaluatorType: "langevals/pairwise_compare",
+            // A legacy pairwise column-target keeps its own evaluatorType so
+            // the drawer loads that DB row's settings; the form it renders is
+            // the same one either way.
+            evaluatorType: target.comparison
+              ? COMPARISON_EVALUATOR_TYPE
+              : LEGACY_PAIRWISE_EVALUATOR_TYPE,
             initialLocalConfig,
-            pairwiseContext: {
-              initialPairwise: target.pairwise,
+            comparisonContext: {
+              initialComparison: targetComparison,
               targets: variantOptions,
               datasetColumns,
+              datasetName: activeDataset?.name,
             },
             urlParams: { targetId: target.id },
           });
@@ -361,29 +396,22 @@ export const useOpenTargetEditor = () => {
         const availableSources = buildAvailableSources();
         const uiMappings = buildUIMappings(target, activeDatasetId);
 
+        // See the workflow-agent branch above for why this captures
+        // activeDatasetId/isDatasetSource instead of reading the store live:
+        // this drawer isn't modal either.
         const handleMappingChange = (
           identifier: string,
           mapping: UIFieldMapping | undefined,
         ) => {
-          const currentActiveDatasetId =
-            useEvaluationsV3Store.getState().activeDatasetId;
-          const currentDatasets = useEvaluationsV3Store.getState().datasets;
-          const checkIsDatasetSource = (sourceId: string) =>
-            currentDatasets.some((d) => d.id === sourceId);
-
           if (mapping) {
             setTargetMapping(
               target.id,
-              currentActiveDatasetId,
+              activeDatasetId,
               identifier,
-              convertFromUIMapping(mapping, checkIsDatasetSource),
+              convertFromUIMapping(mapping, isDatasetSource),
             );
           } else {
-            removeTargetMapping(
-              target.id,
-              currentActiveDatasetId,
-              identifier,
-            );
+            removeTargetMapping(target.id, activeDatasetId, identifier);
           }
         };
 
@@ -427,7 +455,7 @@ export const useOpenTargetEditor = () => {
       datasets,
       targets,
       updateTarget,
-      updateTargetPairwise,
+      updateTargetComparison,
       setTargetMapping,
       removeTargetMapping,
       openDrawer,

@@ -28,7 +28,13 @@ import {
   firstEligibleDefaultModel,
   type OrgModelProvider,
 } from "./eligibleModelProviders";
-import { FieldInfoTooltip } from "./FieldInfoTooltip";
+import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
+import {
+  parseTagsCsv,
+  TAGS_CSV_MAX_LENGTH,
+  tagsBeyondLimitsNotice,
+  VK_TAGS_FIELD_DESCRIPTION,
+} from "./virtualKeyTagsField";
 import {
   VirtualKeyScopePicker,
   type VirtualKeyScopeEntry,
@@ -132,10 +138,7 @@ export function VirtualKeyCreateDrawer({
       return;
     }
     try {
-      const tags = tagsCsv
-        .split(",")
-        .map((t) => t.trim())
-        .filter((t) => t.length > 0);
+      const tags = parseTagsCsv(tagsCsv);
       const result = await createMutation.mutateAsync({
         organizationId,
         name,
@@ -168,6 +171,7 @@ export function VirtualKeyCreateDrawer({
 
   const providers = orgProvidersQuery.data?.providers ?? [];
   const policies = policiesQuery.data ?? [];
+  const tagsNotice = tagsBeyondLimitsNotice(tagsCsv);
 
   const cannotIssueReason = (() => {
     if (!name) return "Name is required.";
@@ -217,19 +221,22 @@ export function VirtualKeyCreateDrawer({
               <Field.Label>
                 Tags
                 <FieldInfoTooltip
-                  description="Comma-separated tags attached to this VK. Cache-control rules match VKs on tags using AND-subset semantics — a rule matcher of ['tier=enterprise'] fires for any VK carrying that tag."
+                  description={VK_TAGS_FIELD_DESCRIPTION}
                   docHref="/ai-gateway/cache-control#cache-rules"
+                  testId="vk-tags-info"
                 />
               </Field.Label>
               <Input
                 value={tagsCsv}
                 onChange={(e) => setTagsCsv(e.target.value)}
                 placeholder="e.g. tier=enterprise, team=ml"
+                maxLength={TAGS_CSV_MAX_LENGTH}
               />
-              <Field.HelperText>
-                Comma-separated. Cache-control rules match VKs on tags as
-                AND-subset.
-              </Field.HelperText>
+              {tagsNotice && (
+                <Field.HelperText color="orange.600">
+                  {tagsNotice}
+                </Field.HelperText>
+              )}
             </Field.Root>
             <Separator />
 

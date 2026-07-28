@@ -13,8 +13,12 @@ import type { ExpressionCategoricalDef } from "../facet-registry";
  * matches the user's mental model and the search-bar suggestions in
  * `FIELD_VALUES.spanStatus`.
  */
+// `StatusCode` is Nullable(UInt8), and a comparison against NULL yields NULL —
+// not the `'unset'` fallback — so a NULL-status span would drop out of the
+// filter entirely instead of reading as unset. Coalesce before comparing, so
+// this agrees with `spanStatusRead` and with the doc above.
 const STATUS_EXPRESSION =
-  "if(StatusCode = 2, 'error', if(StatusCode = 1, 'ok', 'unset'))";
+  "if(ifNull(StatusCode, 0) = 2, 'error', if(ifNull(StatusCode, 0) = 1, 'ok', 'unset'))";
 
 /**
  * Span Status facet: surfaces the OTel status of any span on the trace.

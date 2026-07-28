@@ -13,7 +13,6 @@ import { useDrawer, useDrawerParams } from "~/hooks/useDrawer";
 import { useOpenTraceDrawer } from "../../../../../hooks/useOpenTraceDrawer";
 import type { TraceListItem } from "../../../../../types/trace";
 import {
-  abbreviateModel,
   formatDuration,
 } from "../../../../../utils/formatters";
 import { SystemPromptBanner } from "../../../../TraceDrawer/conversationView/SystemPromptBanner";
@@ -243,7 +242,7 @@ const AssistantBubble: React.FC<{
 }> = ({ trace, isSelected, onOpen }) => {
   if (trace.output) {
     const label = trace.models[0]
-      ? abbreviateModel(trace.models[0])
+      ? (trace.models[0])
       : "Assistant";
     return (
       <Bubble

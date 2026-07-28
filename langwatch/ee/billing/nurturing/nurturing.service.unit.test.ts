@@ -1,9 +1,9 @@
-import { beforeEach, describe, it, expect, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NurturingService } from "./nurturing.service";
 import type { CioBatchCall } from "./types";
 
 // Suppress logger output and captureException in tests
-vi.mock("../../../src/utils/logger/server", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
     info: vi.fn(),
     warn: vi.fn(),

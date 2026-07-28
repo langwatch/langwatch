@@ -342,16 +342,22 @@ describe("ttlReconciler", () => {
         "dspy_steps",
         "evaluation_runs",
         "event_log",
+        "langy_analytics_events",
         "experiment_run_items",
         "experiment_runs",
         "simulation_runs",
         "stored_log_records",
+        "log_records",
         "suite_runs",
-        "stored_metric_records",
+        "metric_data_points",
+        "metric_series",
+        "metric_time_rollups",
         "stored_spans",
         "trace_summaries",
         "trace_analytics",
         "trace_analytics_rollup",
+        "evaluation_analytics",
+        "evaluation_analytics_rollup",
       ]);
     });
 

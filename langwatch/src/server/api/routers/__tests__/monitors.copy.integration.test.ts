@@ -23,6 +23,7 @@ vi.mock("../../../license-enforcement", async (importOriginal) => {
 describe("monitors.copy", () => {
   const sourceProjectId = "test-project-id";
   const targetProjectId = "test-project-id-monitor-copy-target";
+  const workflowNoVersionId = "workflow_no_version_qatest";
   let caller: ReturnType<typeof appRouter.createCaller>;
 
   beforeAll(async () => {
@@ -83,6 +84,9 @@ describe("monitors.copy", () => {
     });
     await prisma.evaluator.deleteMany({
       where: { projectId: sourceProjectId },
+    });
+    await prisma.workflow.deleteMany({
+      where: { id: workflowNoVersionId, projectId: sourceProjectId },
     });
   });
 
@@ -175,12 +179,23 @@ describe("monitors.copy", () => {
         // workflow has no saved version, copying would leave an evaluator with no
         // workflow, so the copy is refused. (The happy workflow-copy path is
         // covered by workflows.copyWorkflowWithDatasets.integration.test.ts.)
+        await prisma.workflow.create({
+          data: {
+            id: workflowNoVersionId,
+            projectId: sourceProjectId,
+            name: "Workflow With No Version",
+            icon: "",
+            description: "",
+            isEvaluator: true,
+          },
+        });
+
         const evaluator = await caller.evaluators.create({
           projectId: sourceProjectId,
           name: "Workflow Evaluator No Version",
           type: "workflow",
           config: {},
-          workflowId: "workflow_no_version_qatest",
+          workflowId: workflowNoVersionId,
         });
 
         const source = await caller.monitors.create({

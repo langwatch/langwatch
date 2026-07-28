@@ -1,5 +1,5 @@
+import { createLogger } from "@langwatch/observability";
 import { TiktokenClient } from "~/server/app-layer/clients/tokenizer/tiktoken.client";
-import { createLogger } from "../../../utils/logger/server";
 import { compileSafeRegex } from "../../../utils/safeRegex";
 import {
   getLLMModelCosts,
@@ -16,6 +16,8 @@ export function estimateCost({
   outputTokens,
   cacheReadTokens,
   cacheCreationTokens,
+  inputCharacters,
+  audioSeconds,
 }: {
   llmModelCost: MaybeStoredLLMModelCost;
   inputTokens?: number;
@@ -28,9 +30,18 @@ export function estimateCost({
   // is never costed as free.
   cacheReadTokens?: number;
   cacheCreationTokens?: number;
+  // Audio usage: characters synthesized by TTS and seconds transcribed by
+  // STT, billed at their own per-character / per-second rates. Sourced
+  // from the gateway's gen_ai.usage.input_chars / gen_ai.usage.audio_seconds
+  // span attributes.
+  inputCharacters?: number;
+  audioSeconds?: number;
 }): number | undefined {
   const hasAnyRate =
-    !!llmModelCost?.inputCostPerToken || !!llmModelCost?.outputCostPerToken;
+    !!llmModelCost?.inputCostPerToken ||
+    !!llmModelCost?.outputCostPerToken ||
+    !!llmModelCost?.inputCostPerCharacter ||
+    !!llmModelCost?.inputCostPerSecond;
   if (!hasAnyRate) return undefined;
 
   const inputRate = llmModelCost.inputCostPerToken ?? 0;
@@ -41,7 +52,9 @@ export function estimateCost({
     (inputTokens ?? 0) * inputRate +
     (outputTokens ?? 0) * (llmModelCost.outputCostPerToken ?? 0) +
     (cacheReadTokens ?? 0) * cacheReadRate +
-    (cacheCreationTokens ?? 0) * cacheCreationRate
+    (cacheCreationTokens ?? 0) * cacheCreationRate +
+    (inputCharacters ?? 0) * (llmModelCost.inputCostPerCharacter ?? 0) +
+    (audioSeconds ?? 0) * (llmModelCost.inputCostPerSecond ?? 0)
   );
 }
 

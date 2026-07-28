@@ -1,7 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../utils/spinner";
 import * as yaml from "js-yaml";
 import { PromptConverter } from "@/cli/utils/promptConverter";
 import { responseFormatToOutputs } from "@/cli/utils/responseFormat";
@@ -105,7 +105,7 @@ export const pushPrompts = async ({
   );
 
   if (localFileRefs.length > 0) {
-    const pushSpinner = ora(
+    const pushSpinner = createSpinner(
       `Pushing ${localFileRefs.length} local prompts...`
     ).start();
 

@@ -13,29 +13,31 @@ import { LuArrowLeft } from "react-icons/lu";
 
 import { Drawer } from "~/components/ui/drawer";
 import type {
-  PairwiseEvaluatorConfig,
+  ComparisonEvaluatorConfig,
   TargetConfig,
   TargetType,
 } from "~/experiments-v3/types";
+import { COMPARISON_EVALUATOR_TYPE } from "~/experiments-v3/types";
 import { getComplexProps, useDrawer } from "~/hooks/useDrawer";
 
 // Re-export for backward compatibility
 export type { TargetType };
 
-// Card identifiers shown in the picker. "pairwise" is a UI-only shortcut that
-// creates an evaluator-target pre-configured for langevals/pairwise_compare —
+// Card identifiers shown in the picker. "comparison" is a UI-only shortcut
+// that creates an evaluator-target pre-configured for the comparison judge —
 // the underlying TargetConfig is still type: "evaluator".
-type TargetCardKey = TargetType | "pairwise";
+type TargetCardKey = TargetType | "comparison";
 
 export type TargetTypeSelectorDrawerProps = {
   open?: boolean;
   onClose?: () => void;
   onSelect?: (type: TargetType) => void;
-  /** Passed through to evaluatorEditor when "Pairwise Compare" is selected. */
-  pairwiseContext?: {
-    initialPairwise?: PairwiseEvaluatorConfig;
+  /** Passed through to evaluatorEditor when "Comparison" is selected. */
+  comparisonContext?: {
+    initialComparison?: ComparisonEvaluatorConfig;
     targets: TargetConfig[];
     datasetColumns: { id: string; name: string }[];
+    datasetName?: string;
   };
 };
 
@@ -58,11 +60,12 @@ const targetTypes: Array<{
     description: "Integrate with your existing agent or create a workflow",
   },
   {
-    type: "pairwise",
+    type: "comparison",
+    // Swords identifies "a comparison between columns". A Trophy is reserved
+    // for declaring the winner of one.
     icon: Swords,
-    title: "Pairwise Compare",
-    description:
-      "Judge two prior columns head-to-head against a golden reference",
+    title: "Comparison",
+    description: "Pairwise or multi-candidate preference judging",
   },
   {
     type: "evaluator",
@@ -87,23 +90,36 @@ export function TargetTypeSelectorDrawer(props: TargetTypeSelectorDrawerProps) {
   const isOpen = props.open !== false && props.open !== undefined;
 
   const handleSelectType = (type: TargetCardKey) => {
-    // Pairwise is a UI shortcut: skip the category/type picker and jump
-    // straight into the pairwise_compare evaluator config. The save flow
-    // (set up by handleAddTarget) creates the column as an evaluator-target.
-    // Forward pairwiseContext from handleAddTarget so the creation form shows
-    // Variant A / Variant B / Golden field immediately (matching edit-mode UX).
-    if (type === "pairwise") {
-      openDrawer(
-        "evaluatorEditor",
-        {
-          evaluatorType: "langevals/pairwise_compare",
-          category: "llm_judge",
-          pairwiseContext: (complexProps.pairwiseContext ??
-            props.pairwiseContext) as TargetTypeSelectorDrawerProps["pairwiseContext"],
-          saveButtonText: "Add Comparison",
-        },
-        { replace: true },
-      );
+    // A comparison is a saved evaluator, so it gets the same list-then-create
+    // flow as Prompt, Agent and Evaluator: pick one you already have, or make a
+    // new one. The list is EvaluatorListDrawer narrowed to comparison
+    // evaluators — same component, same cards, same empty state.
+    //
+    // The save flow (set up by handleAddTarget) creates the column as an
+    // evaluator-target either way. comparisonContext is forwarded from
+    // handleAddTarget so the creation form shows the variant picker and Golden
+    // field immediately, matching edit-mode UX.
+    if (type === "comparison") {
+      const comparisonContext = (complexProps.comparisonContext ??
+        props.comparisonContext) as TargetTypeSelectorDrawerProps["comparisonContext"];
+
+      // NOT `replace: true` — we want the back button in the list and the
+      // editor to return to this Add-to-Evaluation picker instead of
+      // dead-ending. A `replace` here drops navigation history and the
+      // header hides its arrow (canGoBack=false).
+      openDrawer("evaluatorList", {
+        filterEvaluatorType: COMPARISON_EVALUATOR_TYPE,
+        title: "Choose Comparison",
+        createLabel: "New Comparison",
+        itemLabel: "comparison",
+        onCreateNew: () =>
+          openDrawer("evaluatorEditor", {
+            evaluatorType: COMPARISON_EVALUATOR_TYPE,
+            category: "llm_judge",
+            comparisonContext,
+            saveButtonText: "Add Comparison",
+          }),
+      });
       return;
     }
 
@@ -207,7 +223,7 @@ function TargetTypeCard({
       ? "green"
       : type === "evaluator"
         ? "green"
-        : type === "pairwise"
+        : type === "comparison"
           ? "purple"
           : "blue";
   const iconBg =
@@ -215,13 +231,13 @@ function TargetTypeCard({
       ? "green.subtle"
       : type === "evaluator"
         ? "green.subtle"
-        : type === "pairwise"
+        : type === "comparison"
           ? "purple.subtle"
           : "blue.subtle";
 
   return (
     <VStack align="start">
-      {type === "pairwise" && (
+      {type === "comparison" && (
         <Text fontSize="13px" color="fg.muted">
           Compare existing columns:
         </Text>
@@ -260,7 +276,7 @@ function TargetTypeCard({
           <VStack align="start" gap={1} flex={1}>
             <HStack gap={2}>
               <Text fontWeight="medium">{title}</Text>
-              {type === "pairwise" && (
+              {type === "comparison" && (
                 <Badge colorPalette="purple" variant="surface" size="sm">
                   New
                 </Badge>

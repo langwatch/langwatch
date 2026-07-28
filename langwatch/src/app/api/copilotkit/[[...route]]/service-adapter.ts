@@ -4,13 +4,11 @@ import type {
   CopilotServiceAdapter,
 } from "@copilotkit/runtime";
 import { randomUUID } from "@copilotkit/shared";
+import { createLogger } from "@langwatch/observability";
 import type z from "zod";
 import { addEnvs } from "~/optimization_studio/server/addEnvs";
 import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
-import type {
-  LlmPromptConfigComponent,
-  Workflow,
-} from "~/optimization_studio/types/dsl";
+import { LATEST_SPEC_VERSION, type LlmPromptConfigComponent, type Workflow } from "~/optimization_studio/types/dsl";
 import type {
   StudioClientEvent,
   StudioServerEvent,
@@ -22,7 +20,6 @@ import type { PromptConfigFormValues } from "~/prompts/types";
 import { buildLLMConfig } from "~/server/prompt-config/llmConfigBuilder";
 import type { ChatMessage } from "~/server/tracer/types";
 import { parseLLMError } from "~/utils/formatLLMError";
-import { createLogger } from "~/utils/logger/server";
 import { generateOtelTraceId } from "~/utils/trace";
 import { studioBackendPostEvent } from "../../workflows/post_event/post-event";
 import { extractStreamableOutput, type OutputConfig } from "./output-formatter";
@@ -381,17 +378,12 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
     });
 
     return {
-      spec_version: "1.4",
+      spec_version: LATEST_SPEC_VERSION,
       workflow_id: workflowId,
       name: "Prompt Execution",
       icon: "",
       description: "",
       version: "1.0",
-      default_llm: {
-        model: formValues.version.configData.llm.model,
-        temperature: formValues.version.configData.llm.temperature,
-        max_tokens: formValues.version.configData.llm.maxTokens,
-      },
       template_adapter: "default",
       enable_tracing: true,
       nodes: [

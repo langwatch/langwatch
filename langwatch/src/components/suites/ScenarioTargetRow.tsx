@@ -13,11 +13,14 @@ import { Box, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { Square, X } from "lucide-react";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import { SCENARIO_RUN_STATUS_CONFIG } from "~/components/simulations/scenario-run-status-config";
+import { LangyContextTarget } from "~/features/langy/components/LangyContextTarget";
+import { scenarioContextChip } from "~/features/langy/logic/langyContextChips";
 import { buildDisplayTitle } from "./run-history-transforms";
 import { formatRunStatusLabel } from "./format-run-status-label";
 import { formatCost, formatLatency } from "~/components/shared/formatters";
 import { Tooltip } from "~/components/ui/tooltip";
 import { isCancellableStatus } from "./useCancelScenarioRun";
+import { usePrefetchRunState } from "./usePrefetchRunState";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 
 type ScenarioTargetRowProps = {
@@ -143,11 +146,22 @@ export function ScenarioTargetRow({
 
   const hasCancelButton = onCancel && isCancellableStatus(scenarioRun.status);
   const hasMetrics = scenarioRun.durationInMs > 0 || scenarioRun.totalCost != null;
+  const prefetchRunState = usePrefetchRunState();
+  const handlePrefetch = () => prefetchRunState(scenarioRun.scenarioRunId);
 
   return (
+    // Armed, the run can be handed to Langy. Same chip id the run drawer
+    // derives, so the row and the drawer opened from it are one chip.
+    <LangyContextTarget
+      target={scenarioContextChip({
+        scenarioId: scenarioRun.scenarioRunId,
+        name: displayName,
+      })}
+    >
     <Box
       position="relative"
       className="group"
+      borderRadius="lg"
       borderBottom="1px solid"
       _last={{ border: "none" }}
       borderColor="border.subtle"
@@ -163,6 +177,8 @@ export function ScenarioTargetRow({
         borderRadius="lg"
         cursor="pointer"
         onClick={onClick}
+        onMouseEnter={handlePrefetch}
+        onFocus={handlePrefetch}
         tabIndex={0}
         aria-label={`View details for ${displayName}`}
       >
@@ -241,5 +257,6 @@ export function ScenarioTargetRow({
         )}
       </HStack>
     </Box>
+    </LangyContextTarget>
   );
 }

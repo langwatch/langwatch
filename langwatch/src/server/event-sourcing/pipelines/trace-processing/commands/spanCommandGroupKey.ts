@@ -23,20 +23,14 @@
  * hot trace cannot starve its neighbours (see specs/event-sourcing/tenant-soft-cap.feature).
  */
 
+import { clampShardCount, shardIndexFor } from "./commandShardKey";
+
 /**
  * Upper bound on the shard count. A hot trace never needs more parallelism than
  * this, and keeping it small bounds the number of GroupQueue groups (and parked
  * entries under the tenant soft-cap) a single trace can create.
  */
 export const MAX_SPAN_SHARD_COUNT = 128 as const;
-
-// FNV-1a (32-bit) constants. A span's bucket must be deterministic across
-// processes and restarts — a span's retries and its dedup squash window must
-// keep landing in the same group — and this is bucket placement, not security,
-// so a fast non-crypto rolling hash is the right tool and avoids a crypto digest
-// on the span-ingest hot path.
-const FNV_OFFSET_BASIS = 2166136261;
-const FNV_PRIME = 16777619;
 
 /**
  * Deterministic bucket in `[0, shardCount)` for a span id. Callers must pass
@@ -49,14 +43,7 @@ export function spanShardIndex({
   spanId: string;
   shardCount: number;
 }): number {
-  let hash = FNV_OFFSET_BASIS;
-  for (let i = 0; i < spanId.length; i++) {
-    hash ^= spanId.charCodeAt(i);
-    hash = Math.imul(hash, FNV_PRIME);
-  }
-  // `>>> 0` folds the signed 32-bit imul result to an unsigned int before the
-  // modulo, so the bucket is always non-negative.
-  return (hash >>> 0) % shardCount;
+  return shardIndexFor(spanId, shardCount);
 }
 
 /**
@@ -91,8 +78,7 @@ export function spanCommandGroupKey({
  * a future composition root) can't explode the number of GroupQueue groups.
  */
 export function clampSpanShardCount(shardCount: number): number {
-  if (!Number.isInteger(shardCount) || shardCount < 1) return 1;
-  return Math.min(shardCount, MAX_SPAN_SHARD_COUNT);
+  return clampShardCount(shardCount, MAX_SPAN_SHARD_COUNT);
 }
 
 /**

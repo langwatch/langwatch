@@ -10,6 +10,9 @@
  * Maps feature/entity keys to Chakra UI color tokens.
  */
 export const iconColors: Record<string, string> = {
+  // Langy activation — brand orange, so the "Ask Langy" row reads as the door
+  // into the assistant.
+  "ask-langy": "orange.400",
   // Main navigation pages
   home: "orange.400",
   analytics: "blue.400",
@@ -59,7 +62,6 @@ export const iconColors: Record<string, string> = {
   scenario: "purple.300",
   experiment: "teal.300",
   trigger: "orange.300",
-  "sdk-radar": "orange.400",
   // Support and help
   "open-chat": "blue.400",
   docs: "cyan.400",
@@ -79,6 +81,12 @@ export const iconColors: Record<string, string> = {
  * Displayed randomly in the command bar footer.
  */
 export const HINTS = [
+  // Langy
+  "Ask Langy! Type a question, pick “Ask Langy”, and it reads your project to answer.",
+  "One Cmd+K Away! “Ask Langy” hands your question straight to the assistant.",
+  "Morning Briefing! Langy reads your project on the home page and flags what needs a look.",
+  "Plain English! Describe what's wrong and let Langy dig through traces, evals and runs.",
+
   // Useful tips
   "Quick Jump! Paste a trace ID to teleport directly to that trace.",
   "Auto Grader! Use Evaluations to automatically score your LLM outputs.",

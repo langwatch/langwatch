@@ -1,0 +1,250 @@
+import { describe, expect, it } from "vitest";
+import {
+  deriveFollowUpChips,
+  MAX_FOLLOW_UP_CHIPS,
+  type SettledCall,
+} from "../components/capabilities/followUpChips";
+
+/**
+ * A settled trace search exactly as the live transport hands it to the panel:
+ * opencode ran the CLI through `bash`, and the envelope retyped the call to
+ * `langwatch.trace.search` while keeping the shell payload as its input.
+ */
+const traceSearch = (over: Partial<SettledCall> = {}): SettledCall => ({
+  name: "langwatch.trace.search",
+  state: "output-available",
+  input: {
+    command: "langwatch trace search --query 'checkout failed' --limit 25",
+  },
+  output: JSON.stringify({
+    traces: [{ trace_id: "trace_1" }],
+    pagination: { totalHits: 1 },
+  }),
+  ...over,
+});
+
+const CARRIED_ALERT = {
+  id: "traces:triggers",
+  label: "Alert me on this",
+  href: "/demo/traces?drawer.open=automation&drawer.initialSource=trace&drawer.initialFilterQuery=%22checkout+failed%22#all-traces?q=%22checkout+failed%22",
+  carried: true,
+};
+
+describe("deriveFollowUpChips", () => {
+  describe("given a trace search that found traces", () => {
+    describe("when the search carried free text", () => {
+      it("offers to alert on the search, carrying the text as the alert's subject", () => {
+        const chips = deriveFollowUpChips({
+          call: traceSearch(),
+          projectSlug: "demo",
+        });
+
+        expect(chips).toContainEqual(CARRIED_ALERT);
+      });
+
+      it("keeps the graph offer honest — analytics cannot hold the text, so it only opens the surface", () => {
+        const chips = deriveFollowUpChips({
+          call: traceSearch(),
+          projectSlug: "demo",
+        });
+
+        expect(chips).toContainEqual({
+          id: "traces:observability.analytics",
+          label: "Open in Analytics",
+          href: "/demo/analytics",
+          carried: false,
+        });
+      });
+
+      it("puts the chip that carries the search before the ones that only navigate", () => {
+        const chips = deriveFollowUpChips({
+          call: traceSearch(),
+          projectSlug: "demo",
+        });
+
+        const firstPlain = chips.findIndex((chip) => !chip.carried);
+        const lastCarried = chips.map((c) => c.carried).lastIndexOf(true);
+        expect(lastCarried).toBe(0);
+        if (firstPlain !== -1) expect(lastCarried).toBeLessThan(firstPlain);
+      });
+
+      it("keeps the row a next step, not a menu", () => {
+        const chips = deriveFollowUpChips({
+          call: traceSearch(),
+          projectSlug: "demo",
+        });
+
+        expect(chips.length).toBeLessThanOrEqual(MAX_FOLLOW_UP_CHIPS);
+      });
+    });
+
+    describe("when the search had no query to carry", () => {
+      /**
+       * A bare `langwatch trace search` is "everything in the window" — there
+       * is no subject to alert on, so no offer may claim to carry one. The
+       * offers still resolve, as plain navigation to real surfaces.
+       */
+      it("offers the surfaces as plain chips with real destinations", () => {
+        const chips = deriveFollowUpChips({
+          call: traceSearch({
+            input: { command: "langwatch trace search --limit 25" },
+          }),
+          projectSlug: "demo",
+        });
+
+        expect(chips).toEqual([
+          {
+            id: "traces:observability.analytics",
+            label: "Open in Analytics",
+            href: "/demo/analytics",
+            carried: false,
+          },
+          {
+            id: "traces:observability.annotations",
+            label: "Open in Annotations",
+            href: "/demo/annotations",
+            carried: false,
+          },
+          {
+            id: "traces:library.datasets",
+            label: "Open in Datasets",
+            href: "/demo/datasets",
+            carried: false,
+          },
+        ]);
+      });
+    });
+
+    describe("when the search arrived in the retired transport's structured shape", () => {
+      it("still carries a free-text query — the reader accepts both dialects", () => {
+        const chips = deriveFollowUpChips({
+          call: traceSearch({ input: { query: "refund policy" } }),
+          projectSlug: "demo",
+        });
+
+        expect(chips).toContainEqual({
+          id: "traces:triggers",
+          label: "Alert me on this",
+          href: "/demo/traces?drawer.open=automation&drawer.initialSource=trace&drawer.initialFilterQuery=%22refund+policy%22#all-traces?q=%22refund+policy%22",
+          carried: true,
+        });
+      });
+
+      it("resolves a field-filtered search plain — nothing reads those filters any more", () => {
+        // The retired MCP transport could express field filters; no live
+        // destination consumes them, so the offers fall back to honest
+        // navigation instead of a carried label pointing at a filter that
+        // did not travel.
+        const chips = deriveFollowUpChips({
+          call: traceSearch({
+            input: { filters: { "traces.error": ["true"] }, startDate: "24h" },
+          }),
+          projectSlug: "demo",
+        });
+
+        expect(chips.length).toBeGreaterThan(0);
+        expect(chips.every((chip) => !chip.carried)).toBe(true);
+        expect(chips.every((chip) => chip.label.startsWith("Open in "))).toBe(
+          true,
+        );
+      });
+    });
+
+    describe("when there is no project to build a link from", () => {
+      it("offers nothing rather than a dead link", () => {
+        const chips = deriveFollowUpChips({
+          call: traceSearch(),
+          projectSlug: null,
+        });
+
+        expect(chips).toEqual([]);
+      });
+    });
+  });
+
+  describe("given a search that matched nothing", () => {
+    it("offers nothing — there is no 'these' to act on", () => {
+      const chips = deriveFollowUpChips({
+        call: traceSearch({
+          output: JSON.stringify({ traces: [], pagination: { totalHits: 0 } }),
+        }),
+        projectSlug: "demo",
+      });
+
+      expect(chips).toEqual([]);
+    });
+  });
+
+  describe("given a call that has not settled successfully", () => {
+    it("offers nothing while the call is still running", () => {
+      expect(
+        deriveFollowUpChips({
+          call: traceSearch({ state: "input-available" }),
+          projectSlug: "demo",
+        }),
+      ).toEqual([]);
+    });
+
+    it("offers nothing on a failed call", () => {
+      expect(
+        deriveFollowUpChips({
+          call: traceSearch({ state: "output-error", output: "not found" }),
+          projectSlug: "demo",
+        }),
+      ).toEqual([]);
+    });
+  });
+
+  describe("given an evaluator result", () => {
+    const evaluatorCreate: SettledCall = {
+      name: "langwatch.evaluator.create",
+      state: "output-available",
+      input: { command: "langwatch evaluator create --name Faithfulness" },
+      output: JSON.stringify({ id: "eval_1", name: "Faithfulness" }),
+    };
+
+    describe("when its consumers cannot carry the evaluator across", () => {
+      it("withholds the plain Experiments / Online Evaluations chips — those pages cannot show the evaluator", () => {
+        const chips = deriveFollowUpChips({
+          call: evaluatorCreate,
+          projectSlug: "demo",
+        });
+
+        expect(chips.map((chip) => chip.label)).not.toContain(
+          "Open in Experiments",
+        );
+        expect(chips.map((chip) => chip.label)).not.toContain(
+          "Open in Online Evaluations",
+        );
+      });
+    });
+  });
+
+  describe("given a result that is not a trace search", () => {
+    /**
+     * The regression this exists to prevent. `deriveFollowUpChips` used to bail
+     * unless the input parsed as a TRACE query, so an analytics answer — the
+     * single most likely thing a user asks a follow-up about — earned no
+     * guidance whatsoever, even though the feature map had already derived the
+     * offer.
+     */
+    it("still guides the user somewhere, rather than offering nothing at all", () => {
+      const chips = deriveFollowUpChips({
+        call: {
+          name: "langwatch.analytics.query",
+          state: "output-available",
+          input: {},
+          output: JSON.stringify({
+            data: [{ metric: "trace_count", value: 9 }],
+          }),
+        },
+        projectSlug: "demo",
+      });
+
+      expect(chips.length).toBeGreaterThan(0);
+      // Nothing was recompiled, so nothing may claim to have been.
+      expect(chips.every((chip) => !chip.carried)).toBe(true);
+      expect(chips.every((chip) => chip.href.startsWith("/demo/"))).toBe(true);
+    });
+  });
+});

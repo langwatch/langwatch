@@ -1,15 +1,16 @@
 "use client";
-import cloneDeep from "lodash.clonedeep";
+import { createLogger } from "@langwatch/observability";
+import { current } from "immer";
+import { cloneDeep } from "lodash-es";
 import type { DeepPartial } from "react-hook-form";
 import { z } from "zod";
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
 import type { PersistStorage, StorageValue } from "zustand/middleware";
+import { persist } from "zustand/middleware";
 import { immer } from "zustand/middleware/immer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { PromptConfigFormValues } from "~/prompts/types";
 import { chatMessageSchema } from "~/server/tracer/types";
-import { createLogger } from "~/utils/logger";
 import { createTabId, createWindowId } from "./utils/id-generators";
 
 const logger = createLogger("DraggableTabsBrowserStore");
@@ -522,7 +523,12 @@ function createDraggableTabsBrowserStore(projectId: string) {
               tabs: [
                 {
                   id: newTabId,
-                  data: cloneDeep(sourceTab.data),
+                  // sourceTab is an immer draft. current() takes a plain
+                  // snapshot so no draft proxy can escape into state, and
+                  // cloneDeep detaches that snapshot: current() structurally
+                  // shares untouched subtrees with the base state, so the
+                  // clone is what makes the split tab own its data outright.
+                  data: cloneDeep(current(sourceTab).data),
                 },
               ],
               activeTabId: newTabId,

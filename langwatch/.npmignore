@@ -6,8 +6,7 @@
 # explicitly. The .gitignore would otherwise drop:
 #   - /dist               (we ship the prebuilt vite client + scenario bundle)
 #   - *.generated.ts      (start:prepare:files outputs, imported at runtime)
-#   - src/server/sdk-radar/sdk-versions.json (same)
-# All three are required for `pnpm run start:app` to boot.
+# Both are required for `pnpm run start:app` to boot.
 
 # Heavy non-runtime trees.
 node_modules/
@@ -18,10 +17,10 @@ node_modules/
 .turbo/
 .vercel/
 
-# Internal dev tooling — used only during langwatch development, never at
-# runtime by `npx @langwatch/server`. Keeping these out matters; deja-view
-# alone is ~1MB.
-packages/
+# packages/ is intentionally INCLUDED: these are runtime workspace
+# dependencies of the app (@langwatch/observability and friends), declared
+# `workspace:*` in package.json. Excluding them leaves dangling node_modules
+# links in the shipped tree and the app dies at its first import.
 
 # Test artifacts.
 coverage/

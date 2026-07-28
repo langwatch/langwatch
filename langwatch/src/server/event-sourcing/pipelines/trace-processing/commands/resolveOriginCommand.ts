@@ -1,10 +1,10 @@
+import { createLogger } from "@langwatch/observability";
 import type { Command, CommandHandler } from "../../../";
 import {
   createTenantId,
   defineCommandSchema,
   EventUtils,
 } from "../../../";
-import { createLogger } from "../../../../../utils/logger/server";
 import type { ResolveOriginCommandData } from "../schemas/commands";
 import { resolveOriginCommandDataSchema } from "../schemas/commands";
 import {

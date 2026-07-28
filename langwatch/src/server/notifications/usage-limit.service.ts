@@ -1,9 +1,9 @@
+import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
 import { env } from "../../env.mjs";
-import { createLogger } from "../../utils/logger/server";
-import { sendUsageLimitEmail } from "../mailer/usageLimitEmail";
 import { getApp } from "../app-layer/app";
 import type { UsageService } from "../app-layer/usage/usage.service";
+import { sendUsageLimitEmail } from "../mailer/usageLimitEmail";
 import { getCurrentMonthStart } from "../utils/dateUtils";
 import { NotificationRepository } from "./repositories/notification.repository";
 import { NOTIFICATION_TYPES } from "./types";

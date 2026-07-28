@@ -35,6 +35,7 @@ import { trackEvent } from "../../utils/tracking";
 import { useGetDatasetData } from "../hooks/useGetDatasetData";
 import { useModelProviderKeys } from "../hooks/useModelProviderKeys";
 import { useOptimizationExecution } from "../hooks/useOptimizationExecution";
+import { DEFAULT_MODEL } from "../../utils/constants";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import type { Entry } from "../types/dsl";
 import { OPTIMIZERS } from "../types/optimizers";
@@ -134,7 +135,6 @@ export function OptimizeModalContent({
     optimizationState,
     deselectAllNodes,
     setOpenResultsPanelRequest,
-    default_llm,
     setLastCommittedWorkflow,
     setCurrentVersionId,
     currentVersionId,
@@ -147,7 +147,6 @@ export function OptimizeModalContent({
       state,
       deselectAllNodes,
       setOpenResultsPanelRequest,
-      default_llm,
       setLastCommittedWorkflow,
       setCurrentVersionId,
       currentVersionId,
@@ -159,7 +158,6 @@ export function OptimizeModalContent({
       optimizationState: state.optimization,
       deselectAllNodes,
       setOpenResultsPanelRequest,
-      default_llm,
       setLastCommittedWorkflow,
       setCurrentVersionId,
       currentVersionId,
@@ -328,8 +326,8 @@ export function OptimizeModalContent({
     useModelProviderKeys({
       workflow: getWorkflow(),
       extra_llms:
-        "llm" in optimizer.params && "llm" in params
-          ? [params.llm ?? default_llm]
+        "llm" in optimizer.params && "llm" in params && params.llm
+          ? [params.llm]
           : undefined,
     });
 
@@ -408,7 +406,7 @@ export function OptimizeModalContent({
                 render={({ field }) => (
                   <OptimizationStudioLLMConfigField
                     showProviderKeyMessage={false}
-                    llmConfig={llmConfig ?? default_llm}
+                    llmConfig={llmConfig ?? { model: DEFAULT_MODEL }}
                     onChange={(llmConfig) => {
                       field.onChange(llmConfig);
                     }}

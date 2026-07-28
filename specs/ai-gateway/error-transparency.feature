@@ -75,6 +75,37 @@ Feature: AI Gateway — transparent upstream error forwarding
     And both response bodies match the upstream error body
 
   # ==========================================================================
+  # Mid-stream provider error EVENTS survive with their payload
+  # ==========================================================================
+  # An upstream can fail AFTER the stream is 200-established by emitting an
+  # in-stream error event (OpenAI Responses: `event: error` with
+  # `data: {"type":"error","error":{"type","code","message","param"}}`).
+  # The message lives inside that nested `error` OBJECT. A bug surfaced where
+  # the streaming pipeline read only the legacy flat fields (`message`,
+  # `code`, `param`) off the event, so a mid-stream quota error reached the
+  # client as `data: {"error":"stream error: "}`, an empty message in a
+  # shape no OpenAI SDK recognises, crashing the client with a parse error
+  # instead of showing the provider's actionable message.
+
+  @bdd @error-transparency @integration
+  Scenario: Mid-stream Responses error event is forwarded with its nested payload
+    Given the upstream provider opens a 200 SSE stream on the Responses surface
+    And mid-stream it emits an error event whose message sits in the nested error object
+    When the client reads the gateway stream with "vk-demo"
+    Then the client receives a terminal `event: error`
+    And the data payload preserves the upstream error object verbatim (type, code, message)
+    And the provider's own message is present, not an empty string
+    And the payload is a JSON error object, never a bare string under an "error" key
+
+  @bdd @error-transparency @integration
+  Scenario: Gateway-origin stream failures use the standard error-event object
+    Given the upstream connection drops mid-stream with no provider error body
+    When the client reads the gateway stream with "vk-demo"
+    Then the client receives a terminal `event: error`
+    And the data payload has the shape {"type":"error","error":{"type":"provider_error","message":...}}
+    And the message states the failure, never an empty string
+
+  # ==========================================================================
   # End-to-end: the real wrapper must fail fast, not retry-loop
   # ==========================================================================
 

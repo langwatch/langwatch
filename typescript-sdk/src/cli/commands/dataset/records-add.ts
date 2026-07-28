@@ -1,7 +1,12 @@
 import chalk from "chalk";
 import fs from "fs";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { checkApiKey } from "../../utils/apiKey";
+import {
+  commandValidationError,
+  reportCommandError,
+} from "../../utils/errorOutput";
+import type { CommandResult } from "../../utils/output";
 import { createDatasetService } from "./service-factory";
 import { handleDatasetCommandError } from "./error-handler";
 
@@ -46,13 +51,15 @@ export const parseRecordsJson = (jsonStr: string): Record<string, unknown>[] => 
 export const recordsAddCommand = async (
   slugOrId: string,
   options: { json?: string; file?: string; stdin?: boolean },
-): Promise<void> => {
+): Promise<CommandResult | void> => {
   checkApiKey();
 
   if (!options.json && !options.file && !options.stdin) {
-    console.error(
-      chalk.red("Error: One of --json, --file, or --stdin is required."),
-    );
+    reportCommandError({
+      error: commandValidationError(
+        "One of --json, --file, or --stdin is required.",
+      ),
+    });
     process.exit(1);
   }
 
@@ -61,7 +68,9 @@ export const recordsAddCommand = async (
     let jsonStr: string;
     if (options.file) {
       if (!fs.existsSync(options.file)) {
-        console.error(chalk.red(`Error: File not found: ${options.file}`));
+        reportCommandError({
+          error: commandValidationError(`File not found: ${options.file}`),
+        });
         process.exit(1);
       }
       jsonStr = fs.readFileSync(options.file, "utf-8");
@@ -72,19 +81,25 @@ export const recordsAddCommand = async (
     }
     entries = parseRecordsJson(jsonStr);
   } catch (error) {
-    console.error(
-      chalk.red(error instanceof Error ? error.message : "Invalid JSON input"),
-    );
+    reportCommandError({
+      error: commandValidationError(
+        error instanceof Error ? error.message : "Invalid JSON input",
+      ),
+    });
     process.exit(1);
   }
 
   if (entries.length === 0) {
-    console.error(chalk.red("Error: No records provided. The JSON array is empty."));
+    reportCommandError({
+      error: commandValidationError(
+        "No records provided. The JSON array is empty.",
+      ),
+    });
     process.exit(1);
   }
 
   const service = createDatasetService();
-  const spinner = ora(`Adding ${entries.length} record${entries.length !== 1 ? "s" : ""} to "${slugOrId}"...`).start();
+  const spinner = createSpinner(`Adding ${entries.length} record${entries.length !== 1 ? "s" : ""} to "${slugOrId}"...`).start();
 
   try {
     const result = await service.createRecords(slugOrId, entries);
@@ -93,10 +108,16 @@ export const recordsAddCommand = async (
     spinner.succeed(
       `Added ${created.length} record${created.length !== 1 ? "s" : ""} to "${chalk.cyan(slugOrId)}"`,
     );
-    console.log();
-    created.forEach((record) => {
-      console.log(`  ${chalk.bold("ID:")} ${record.id}`);
-    });
+
+    return {
+      data: result,
+      table: () => {
+        console.log();
+        created.forEach((record) => {
+          console.log(`  ${chalk.bold("ID:")} ${record.id}`);
+        });
+      },
+    };
   } catch (error) {
     handleDatasetCommandError({ spinner, error, context: "add records" });
   }

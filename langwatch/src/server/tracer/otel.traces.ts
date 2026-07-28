@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/observability";
 import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
 import {
   ESpanKind,
@@ -12,7 +13,6 @@ import { getLangWatchTracer } from "langwatch";
 import cloneDeep from "lodash-es/cloneDeep";
 import Long from "long";
 import { z } from "zod";
-import { createLogger } from "~/utils/logger/server";
 import { toError } from "~/utils/posthogErrorCapture";
 import type { DeepPartial } from "../../utils/types";
 import { openTelemetryToLangWatchMetadataMapping } from "./metadata";

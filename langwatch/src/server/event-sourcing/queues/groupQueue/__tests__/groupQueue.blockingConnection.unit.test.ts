@@ -66,6 +66,7 @@ describe("GroupQueueProcessor blockingConnection selection", () => {
       conn.disconnect();
     }
     vi.restoreAllMocks();
+    vi.useRealTimers();
   });
 
   describe("given consumer mode is enabled", () => {
@@ -148,6 +149,45 @@ describe("GroupQueueProcessor blockingConnection selection", () => {
 
         expect(dupSpy).not.toHaveBeenCalled();
         expect((processor as any).blockingConnection).toBe(conn);
+      });
+    });
+  });
+
+  describe("given an active coalesced batch", () => {
+    describe("when its heartbeat interval elapses", () => {
+      it("renews every participating envelope", async () => {
+        vi.useFakeTimers();
+        const conn = track(
+          new IORedis({ lazyConnect: true, maxRetriesPerRequest: 0 }),
+        );
+        const processor = new GroupQueueProcessor<TestPayload>(
+          makeDefinition(),
+          conn,
+          { consumerEnabled: false },
+        );
+        const refreshActiveKey = vi.fn().mockResolvedValue(undefined);
+        const renewLease = vi.fn().mockResolvedValue(undefined);
+        Object.assign(processor as any, {
+          scripts: { refreshActiveKey },
+          blobLifecycle: { renewLease },
+        });
+
+        const heartbeat = (processor as any).startActiveKeyHeartbeat({
+          groupId: "project/group",
+          stagedJobId: "job-1",
+          jobDataValues: ["primary-envelope", "sibling-envelope"],
+        });
+        await vi.advanceTimersByTimeAsync(100_000);
+        clearInterval(heartbeat);
+
+        expect(refreshActiveKey).toHaveBeenCalledWith({
+          groupId: "project/group",
+          stagedJobId: "job-1",
+          activeTtlSec: 300,
+        });
+        expect(renewLease).toHaveBeenCalledTimes(2);
+        expect(renewLease).toHaveBeenCalledWith("primary-envelope");
+        expect(renewLease).toHaveBeenCalledWith("sibling-envelope");
       });
     });
   });

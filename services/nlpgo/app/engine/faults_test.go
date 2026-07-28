@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -35,14 +36,15 @@ func (e *statusErr) Error() string       { return e.msg }
 func (e *statusErr) HTTPStatusCode() int { return e.status }
 
 func signatureWorkflow() *dsl.Workflow {
-	model := "openai/gpt-5-mini"
 	return &dsl.Workflow{
 		WorkflowID: "wf_faults",
 		APIKey:     "k",
-		DefaultLLM: &dsl.LLMConfig{Model: &model},
 		Nodes: []dsl.Node{
 			{ID: "entry", Type: dsl.ComponentEntry},
 			{ID: "sig", Type: dsl.ComponentSignature, Data: dsl.Component{
+				Parameters: []dsl.Field{
+					{Identifier: "llm", Type: dsl.FieldTypeLLM, Value: json.RawMessage(`{"model":"openai/gpt-5-mini"}`)},
+				},
 				Inputs:  []dsl.Field{{Identifier: "q", Type: "str"}},
 				Outputs: []dsl.Field{{Identifier: "answer", Type: "str"}},
 			}},

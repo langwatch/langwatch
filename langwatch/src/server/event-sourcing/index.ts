@@ -66,10 +66,18 @@ export type {
 // Projections
 export type { FoldProjectionDefinition, FoldProjectionStore } from "./projections/foldProjection.types";
 export type { AppendStore, MapProjectionDefinition } from "./projections/mapProjection.types";
+export type { StateProjectionDefinition } from "./projections/stateProjection.types";
 export type { ProjectionStoreContext } from "./projections/projectionStoreContext";
 export { AbstractMapProjection } from "./projections/abstractMapProjection";
 export type { MapEventHandlers } from "./projections/abstractMapProjection";
 export { RepositoryFoldStore } from "./projections/repositoryFoldStore";
+
+// Event-only subscribers
+export type {
+  EventSubscriberContext,
+  EventSubscriberDefinition,
+  EventSubscriberOptions,
+} from "./subscribers/eventSubscriber.types";
 
 // Queues
 export type { EventSourcedQueueProcessor } from "./queues";

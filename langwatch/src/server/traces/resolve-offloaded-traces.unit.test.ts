@@ -15,7 +15,7 @@ vi.mock("langwatch", () => ({
       _name: string,
       _opts: unknown,
       fn: (span: { setAttributes: () => void }) => unknown,
-    ) => fn({ setAttributes: () => {} }),
+    ) => fn({ setAttributes: () => undefined }),
   }),
 }));
 
@@ -194,6 +194,38 @@ describe("resolveOffloadedTraces()", () => {
         });
 
         expect(result.anyResolved).toBe(true);
+      });
+    });
+  });
+
+  describe("given an eventref already decoded by attribute deserialization", () => {
+    describe("when resolved", () => {
+      it("restores the full value and removes the reserved attribute", async () => {
+        const span = makeSpan({
+          spanAttributes: {
+            "langwatch.output": "preview",
+            [`${EVENTREF_ATTR_PREFIX}langwatch.output`]: {
+              field: "langwatch.output",
+              eventId: "evt-decoded",
+            },
+          },
+        });
+        const result = await resolveOffloadedTraces({
+          projectId: "proj-1",
+          normalizedSpans: [span],
+          blobStore: fakeBlobStore({ "langwatch.output": "full output" }),
+          ioExtractionService: realIOService,
+          logger: createMockLogger(),
+        });
+
+        expect(result.resolvedSpans[0]!.spanAttributes).toMatchObject({
+          "langwatch.output": "full output",
+        });
+        expect(
+          result.resolvedSpans[0]!.spanAttributes[
+            `${EVENTREF_ATTR_PREFIX}langwatch.output`
+          ],
+        ).toBeUndefined();
       });
     });
   });

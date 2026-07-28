@@ -1,19 +1,23 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { PromptsApiService } from "@/client-sdk/services/prompts";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatTable } from "../../utils/formatting";
 import { failSpinner } from "../../utils/spinnerError";
+import type { CommandResult } from "../../utils/output";
 
+/**
+ * Returns the versions rather than printing them: the output port renders them
+ * in whatever format the caller asked for (utils/output.ts).
+ */
 export const promptVersionsCommand = async (
   handle: string,
-  options?: { format?: string }
-): Promise<void> => {
+): Promise<CommandResult | void> => {
   checkApiKey();
 
   const service = new PromptsApiService();
 
-  const spinner = ora(`Fetching versions for "${handle}"...`).start();
+  const spinner = createSpinner(`Fetching versions for "${handle}"...`).start();
 
   try {
     const versions = await service.getVersions(handle);
@@ -22,47 +26,47 @@ export const promptVersionsCommand = async (
       `Found ${versions.length} version${versions.length !== 1 ? "s" : ""} for "${handle}"`
     );
 
-    if (options?.format === "json") {
-      console.log(JSON.stringify(versions, null, 2));
-      return;
-    }
+    return {
+      data: versions,
+      table: () => {
+        if (versions.length === 0) {
+          console.log();
+          console.log(chalk.gray("No versions found."));
+          return;
+        }
 
-    if (versions.length === 0) {
-      console.log();
-      console.log(chalk.gray("No versions found."));
-      return;
-    }
+        console.log();
 
-    console.log();
+        const tableData = versions.map((v) => ({
+          Version: `v${v.version}`,
+          ID: v.versionId,
+          Tags:
+            v.tags && v.tags.length > 0
+              ? v.tags.map((t) => t.name).join(", ")
+              : chalk.gray("—"),
+          Message: v.commitMessage ?? chalk.gray("—"),
+          Created: new Date(v.createdAt).toLocaleString(),
+        }));
 
-    const tableData = versions.map((v) => ({
-      Version: `v${v.version}`,
-      ID: v.versionId,
-      Tags:
-        v.tags && v.tags.length > 0
-          ? v.tags.map((t) => t.name).join(", ")
-          : chalk.gray("—"),
-      Message: v.commitMessage ?? chalk.gray("—"),
-      Created: new Date(v.createdAt).toLocaleString(),
-    }));
+        formatTable({
+          data: tableData,
+          headers: ["Version", "ID", "Tags", "Message", "Created"],
+          colorMap: {
+            Version: chalk.cyan,
+            ID: chalk.green,
+            Tags: chalk.magenta,
+          },
+        });
 
-    formatTable({
-      data: tableData,
-      headers: ["Version", "ID", "Tags", "Message", "Created"],
-      colorMap: {
-        Version: chalk.cyan,
-        ID: chalk.green,
-        Tags: chalk.magenta,
+        console.log();
+        console.log(
+          chalk.gray(
+            `  Tip: Restore a version with: langwatch prompt restore ${handle} <versionId>`
+          )
+        );
+        console.log();
       },
-    });
-
-    console.log();
-    console.log(
-      chalk.gray(
-        `  Tip: Restore a version with: langwatch prompt restore ${handle} <versionId>`
-      )
-    );
-    console.log();
+    };
   } catch (error) {
     failSpinner({ spinner, error, action: "fetch prompt versions" });
     process.exit(1);

@@ -1,3 +1,5 @@
+import type { TraceMediaRef } from "~/shared/traces/media-refs";
+
 export type TraceStatus = "ok" | "error" | "warning";
 
 /**
@@ -78,6 +80,13 @@ export interface TraceListItem {
   sizeBytes: number;
   input: string | null;
   output: string | null;
+  /**
+   * Compact media references derived at fold time from the winning span IO
+   * (thumbnail/player indicators for the table without span payloads).
+   * Absent on media-free traces and summaries folded before the field existed.
+   */
+  inputMediaRefs?: TraceMediaRef[];
+  outputMediaRefs?: TraceMediaRef[];
   /**
    * Set when a restrict privacy rule hides the content from this viewer (the
    * server nulled `input`/`output`). Lets the Input/Output cells render a

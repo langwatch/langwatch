@@ -1,13 +1,15 @@
 import { Center, Spinner } from "@chakra-ui/react";
 import { OrganizationUserRole } from "@prisma/client";
 import qs from "qs";
-import { Suspense, useEffect, useMemo } from "react";
+import { Suspense, useEffect, useMemo, useSyncExternalStore } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { useRouter } from "~/utils/compat/next-router";
 import {
   type DrawerType,
   getComplexProps,
+  getDrawerPropsVersion,
   getFlowCallbacks,
+  subscribeDrawerProps,
 } from "../hooks/useDrawer";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { useUpgradeModalStore } from "../stores/upgradeModalStore";
@@ -29,6 +31,18 @@ type DrawerProps = {
 
 export function CurrentDrawer({ marginTop }: { marginTop?: number }) {
   const router = useRouter();
+  // Re-render when complexProps changes without a URL change (e.g. reload
+  // re-hydration of a comparison editor's context) so the getComplexProps()
+  // read below picks the new value up. Only setComplexProps notifies this
+  // subscription — setFlowCallbacks deliberately does not (see its own
+  // comment) — but callers pair a setFlowCallbacks with a following
+  // setComplexProps on the same re-hydration path, so the getFlowCallbacks()
+  // read below still picks up fresh callbacks on the render that triggers.
+  useSyncExternalStore(
+    subscribeDrawerProps,
+    getDrawerPropsVersion,
+    getDrawerPropsVersion,
+  );
   const { organizationRole } = useOrganizationTeamProject();
   const queryString = router.asPath.split("?")[1] ?? "";
   // qs.parse + the `drawer.*` slice is recomputed on every render otherwise,

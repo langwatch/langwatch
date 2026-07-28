@@ -1,7 +1,8 @@
+import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
 import { generateText } from "ai";
 import { z } from "zod";
-import { createLogger } from "~/utils/logger/server";
+import { TRANSLATE_TEXT_MAX_CHARS } from "~/utils/constants";
 import { wrapAiCall } from "../../modelProviders/aiCallFailedError";
 import { featureByKey } from "../../modelProviders/featureRegistry";
 import { getVercelAIModel } from "../../modelProviders/utils";
@@ -17,10 +18,13 @@ export const translateRouter = createTRPCRouter({
     .input(
       z.object({
         projectId: z.string(),
-        textToTranslate: z.string(),
+        textToTranslate: z.string().max(TRANSLATE_TEXT_MAX_CHARS),
       }),
     )
-    .use(checkProjectPermission("triggers:view"))
+    // Translation reads content the caller can already see — gate on the
+    // same permission that grants viewing the trace, so read-only members
+    // (VIEWER, demo/public view) aren't shown an action that then 403s.
+    .use(checkProjectPermission("traces:view"))
     .mutation(async ({ input }) => {
       const feature = featureByKey(TRANSLATE_FEATURE_KEY);
       if (!feature) {
@@ -36,7 +40,7 @@ export const translateRouter = createTRPCRouter({
       // cascade resolver (resolveModelForFeature) throws the typed
       // ModelNotConfiguredError when nothing is set and
       // ModelProviderDisabledError when the resolved FAST model's provider
-      // is disabled, and both must reach domainErrorMiddleware untouched to
+      // is disabled, and both must reach handledErrorMiddleware untouched to
       // open their own toasts. wrapAiCall only passes ModelNotConfiguredError
       // through, so resolving inside it would mis-tag a disabled provider as
       // an AI_CALL_FAILED.

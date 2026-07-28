@@ -24,7 +24,13 @@ import {
   EligibleModelProvidersPreview,
   EligibleModelProvidersSummary,
 } from "./EligibleModelProvidersPreview";
-import { FieldInfoTooltip } from "./FieldInfoTooltip";
+import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
+import {
+  parseTagsCsv,
+  TAGS_CSV_MAX_LENGTH,
+  tagsBeyondLimitsNotice,
+  VK_TAGS_FIELD_DESCRIPTION,
+} from "./virtualKeyTagsField";
 import {
   type VirtualKeyScopeEntry,
   VirtualKeyScopePicker,
@@ -129,6 +135,8 @@ export function VirtualKeyEditDrawer({
     },
   });
 
+  const tagsNotice = tagsBeyondLimitsNotice(tagsCsv);
+
   const close = () => {
     if (updateMutation.isPending) return;
     onOpenChange(false);
@@ -158,10 +166,7 @@ export function VirtualKeyEditDrawer({
             rpd: rpd ? Number.parseInt(rpd, 10) : null,
           },
           metadata: {
-            tags: tagsCsv
-              .split(",")
-              .map((t) => t.trim())
-              .filter((t) => t.length > 0),
+            tags: parseTagsCsv(tagsCsv),
           },
         },
       });
@@ -217,21 +222,22 @@ export function VirtualKeyEditDrawer({
               <Field.Label>
                 Tags
                 <FieldInfoTooltip
-                  description="Comma-separated tags attached to this VK. Cache-control rules match VKs on tags using AND-subset semantics — a rule matcher of ['tier=enterprise'] fires for any VK carrying that tag."
+                  description={VK_TAGS_FIELD_DESCRIPTION}
                   docHref="/ai-gateway/cache-control#cache-rules"
+                  testId="vk-tags-info"
                 />
               </Field.Label>
               <Input
                 value={tagsCsv}
                 onChange={(e) => setTagsCsv(e.target.value)}
                 placeholder="e.g. tier=enterprise, team=ml"
+                maxLength={TAGS_CSV_MAX_LENGTH}
               />
-              <Field.HelperText>
-                Comma-separated. Cache-control rules can match on{" "}
-                <code>vk_tags</code> as AND-subset, so rule matchers of{" "}
-                <code>["tier=enterprise"]</code> fire for any VK carrying that
-                tag.
-              </Field.HelperText>
+              {tagsNotice && (
+                <Field.HelperText color="orange.600">
+                  {tagsNotice}
+                </Field.HelperText>
+              )}
             </Field.Root>
 
             <Separator />

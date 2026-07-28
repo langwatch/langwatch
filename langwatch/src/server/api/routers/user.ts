@@ -4,6 +4,7 @@ import { PersonalUsageService } from "@ee/governance/services/personalUsage.serv
 import { PersonalVirtualKeyService } from "@ee/governance/services/personalVirtualKey.service";
 import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
 import { RoutingPolicyService } from "@ee/governance/services/routingPolicy.service";
+import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
 import { compare, hash } from "bcrypt";
 import { z } from "zod";
@@ -22,9 +23,13 @@ import { sendBudgetIncreaseRequestEmail } from "~/server/mailer/budgetIncreaseRe
 import { resolveOrgAdminEmail } from "~/server/organizations/resolveOrgAdminEmail";
 import { resolveSupportContact } from "~/server/organizations/resolveSupportContact";
 import { rateLimit } from "~/server/rateLimit";
+import {
+  AVATAR_MAX_DATA_URL_LENGTH,
+  AvatarValidationError,
+} from "~/server/user-avatar/avatar";
+import { UserAvatarService } from "~/server/user-avatar/avatar.service";
 import { UserService } from "~/server/users/user.service";
 import { getClientIp } from "~/utils/getClientIp";
-import { createLogger } from "~/utils/logger/server";
 import { isAdmin as checkIsAdmin } from "../../../../ee/admin/isAdmin";
 import { env } from "../../../env.mjs";
 import { checkOrganizationPermission, skipPermissionCheck } from "../rbac";
@@ -33,6 +38,37 @@ import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 const logger = createLogger("langwatch:user-router");
 
 export const userRouter = createTRPCRouter({
+  getTraceExplorerTourPreference: protectedProcedure
+    .input(z.object({}))
+    .use(skipPermissionCheck)
+    .query(async ({ ctx }) => {
+      const userId = ctx.session.user.impersonator?.id ?? ctx.session.user.id;
+      const user = await ctx.prisma.user.findUniqueOrThrow({
+        where: { id: userId },
+        select: { tracesExplorerTourDismissedAt: true },
+      });
+
+      return {
+        dismissed: user.tracesExplorerTourDismissedAt !== null,
+        dismissedAt: user.tracesExplorerTourDismissedAt,
+      };
+    }),
+  dismissTraceExplorerTour: protectedProcedure
+    .input(z.object({}))
+    .use(skipPermissionCheck)
+    .mutation(async ({ ctx }) => {
+      const userId = ctx.session.user.impersonator?.id ?? ctx.session.user.id;
+      const user = await ctx.prisma.user.update({
+        where: { id: userId },
+        data: { tracesExplorerTourDismissedAt: new Date() },
+        select: { tracesExplorerTourDismissedAt: true },
+      });
+
+      return {
+        dismissed: true as const,
+        dismissedAt: user.tracesExplorerTourDismissedAt,
+      };
+    }),
   /**
    * Whether the current user is a platform admin (email listed in ADMIN_EMAILS).
    * Exposed so the client can decide whether to render admin-only UI surfaces
@@ -424,6 +460,14 @@ export const userRouter = createTRPCRouter({
     .input(z.object({ userId: z.string() }))
     .use(skipPermissionCheck)
     .mutation(async ({ ctx, input }) => {
+      const user = ctx.session.user.impersonator ?? ctx.session.user;
+      if (
+        input.userId !== ctx.session.user.id &&
+        !checkIsAdmin({ email: user.email })
+      ) {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+
       // UserService.deactivate also force-revokes all the user's sessions
       // (Redis cache + DB) — see iter-24 progress notes for why.
       await UserService.create(ctx.prisma).deactivate({ id: input.userId });
@@ -433,7 +477,80 @@ export const userRouter = createTRPCRouter({
     .input(z.object({ userId: z.string() }))
     .use(skipPermissionCheck)
     .mutation(async ({ ctx, input }) => {
+      const user = ctx.session.user.impersonator ?? ctx.session.user;
+      if (!checkIsAdmin({ email: user.email })) {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+
       await UserService.create(ctx.prisma).reactivate({ id: input.userId });
+      return { success: true };
+    }),
+
+  /**
+   * Uploads and sets the caller's own avatar photo. The image is stored in the
+   * S3-backed object store (owned by the user, under their personal workspace)
+   * and its serve URL is written to `User.image`, the field every avatar
+   * surface resolves through. `organizationId` scopes the personal-workspace
+   * resolution and is membership-checked below.
+   *
+   * Spec: specs/settings/user-avatar.feature
+   */
+  setAvatar: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string(),
+        // A base64 image data URL (`data:image/...;base64,...`) produced by the
+        // client crop/resize step. Bounded here as first-line defense so an
+        // oversized payload is rejected before UserAvatarService decodes it;
+        // validated + decoded there.
+        imageDataUrl: z.string().min(1).max(AVATAR_MAX_DATA_URL_LENGTH),
+      }),
+    )
+    .use(checkOrganizationPermission("organization:view"))
+    .mutation(async ({ ctx, input }) => {
+      // Throttle uploads per user — each writes bytes to object storage and
+      // updates the row; mirrors the changePassword budget shape.
+      const limit = await rateLimit({
+        key: `user.setAvatar:${ctx.session.user.id}`,
+        windowSeconds: 60,
+        max: 10,
+      });
+      if (!limit.allowed) {
+        throw new TRPCError({
+          code: "TOO_MANY_REQUESTS",
+          message: "Too many avatar updates. Please try again shortly.",
+        });
+      }
+
+      try {
+        return await new UserAvatarService(ctx.prisma).setAvatar({
+          userId: ctx.session.user.id,
+          organizationId: input.organizationId,
+          imageDataUrl: input.imageDataUrl,
+          displayName: ctx.session.user.name,
+          displayEmail: ctx.session.user.email,
+        });
+      } catch (err) {
+        if (err instanceof AvatarValidationError) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: err.message });
+        }
+        throw err;
+      }
+    }),
+
+  /**
+   * Clears the caller's uploaded avatar so surfaces fall back to their SSO
+   * photo (if any) and then their initials.
+   *
+   * Spec: specs/settings/user-avatar.feature
+   */
+  removeAvatar: protectedProcedure
+    .input(z.object({}))
+    .use(skipPermissionCheck)
+    .mutation(async ({ ctx }) => {
+      await new UserAvatarService(ctx.prisma).removeAvatar({
+        userId: ctx.session.user.id,
+      });
       return { success: true };
     }),
 

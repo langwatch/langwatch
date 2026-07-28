@@ -104,10 +104,11 @@ export abstract class AbstractFoldProjection<
   CK extends string = "CreatedAt",
   UK extends string = "UpdatedAt",
   LEOAK extends string = "LastEventOccurredAt",
+  Store = FoldProjectionStore<State>,
 > {
   abstract readonly name: string;
   abstract readonly version: string;
-  abstract readonly store: FoldProjectionStore<State>;
+  abstract readonly store: Store;
 
   readonly createdAtKey: CK;
   readonly updatedAtKey: UK;

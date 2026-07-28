@@ -1,8 +1,9 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
+import type { CommandResult } from "../../utils/output";
 import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
@@ -55,14 +56,14 @@ function renderContent(raw: unknown): string {
 
 export const getSimulationRunCommand = async (
   runId: string,
-  options?: { format?: string; full?: boolean },
-): Promise<void> => {
+  options?: { full?: boolean },
+): Promise<CommandResult | void> => {
   checkApiKey();
 
   const apiKey = process.env.LANGWATCH_API_KEY ?? "";
   const endpoint = resolveControlPlaneUrl();
 
-  const spinner = ora(`Fetching simulation run "${runId}"...`).start();
+  const spinner = createSpinner(`Fetching simulation run "${runId}"...`).start();
 
   try {
     const response = await fetch(
@@ -75,7 +76,7 @@ export const getSimulationRunCommand = async (
 
     if (!response.ok) {
       const message = await formatFetchError(response);
-      spinner.fail(`Failed to fetch simulation run: ${message}`);
+      failSpinner({ spinner, error: new Error(message), action: "fetch simulation run" });
       process.exit(1);
     }
 
@@ -102,68 +103,68 @@ export const getSimulationRunCommand = async (
 
     spinner.succeed(`Found simulation run "${run.name ?? run.scenarioRunId}"`);
 
-    if (options?.format === "json") {
-      console.log(JSON.stringify(run, null, 2));
-      return;
-    }
+    return {
+      data: run,
+      table: () => {
+        const statusColor = run.status === "SUCCESS" ? chalk.green
+          : run.status === "FAILED" ? chalk.red
+          : run.status === "ERROR" ? chalk.red
+          : chalk.yellow;
 
-    const statusColor = run.status === "SUCCESS" ? chalk.green
-      : run.status === "FAILED" ? chalk.red
-      : run.status === "ERROR" ? chalk.red
-      : chalk.yellow;
-
-    console.log();
-    console.log(chalk.bold("  Simulation Run Details:"));
-    console.log(`    ${chalk.gray("Run ID:")}      ${chalk.green(run.scenarioRunId)}`);
-    console.log(`    ${chalk.gray("Scenario ID:")} ${run.scenarioId}`);
-    console.log(`    ${chalk.gray("Batch ID:")}    ${run.batchRunId}`);
-    console.log(`    ${chalk.gray("Name:")}        ${run.name ?? chalk.gray("—")}`);
-    console.log(`    ${chalk.gray("Status:")}      ${statusColor(run.status)}`);
-    console.log(`    ${chalk.gray("Duration:")}    ${run.durationInMs > 0 ? `${(run.durationInMs / 1000).toFixed(1)}s` : "—"}`);
-    if (run.totalCost) {
-      console.log(`    ${chalk.gray("Cost:")}        $${run.totalCost.toFixed(4)}`);
-    }
-    console.log(`    ${chalk.gray("Started:")}     ${new Date(run.timestamp).toLocaleString()}`);
-
-    if (run.results) {
-      console.log();
-      console.log(chalk.bold("  Results:"));
-      if (run.results.verdict) {
-        const verdictColor = run.results.verdict === "passed" ? chalk.green : chalk.red;
-        console.log(`    ${chalk.gray("Verdict:")}    ${verdictColor(run.results.verdict)}`);
-      }
-      if (run.results.reasoning) {
-        console.log(`    ${chalk.gray("Reasoning:")}  ${run.results.reasoning}`);
-      }
-      if (run.results.metCriteria && run.results.metCriteria.length > 0) {
-        console.log(`    ${chalk.gray("Met:")}        ${chalk.green(run.results.metCriteria.join(", "))}`);
-      }
-      if (run.results.unmetCriteria && run.results.unmetCriteria.length > 0) {
-        console.log(`    ${chalk.gray("Unmet:")}      ${chalk.red(run.results.unmetCriteria.join(", "))}`);
-      }
-      if (run.results.error) {
-        console.log(`    ${chalk.gray("Error:")}      ${chalk.red(run.results.error)}`);
-      }
-    }
-
-    if (run.messages && run.messages.length > 0) {
-      console.log();
-      console.log(chalk.bold("  Conversation:"));
-      const truncate = !options?.full;
-      for (const msg of run.messages) {
-        const roleColor = msg.role === "user" ? chalk.blue
-          : msg.role === "assistant" ? chalk.green
-          : chalk.gray;
-        let content = renderContent(msg.content);
-        if (!content) continue;
-        if (truncate && content.length > 400) {
-          content = content.slice(0, 400) + chalk.gray("… (--full to see all)");
+        console.log();
+        console.log(chalk.bold("  Simulation Run Details:"));
+        console.log(`    ${chalk.gray("Run ID:")}      ${chalk.green(run.scenarioRunId)}`);
+        console.log(`    ${chalk.gray("Scenario ID:")} ${run.scenarioId}`);
+        console.log(`    ${chalk.gray("Batch ID:")}    ${run.batchRunId}`);
+        console.log(`    ${chalk.gray("Name:")}        ${run.name ?? chalk.gray("—")}`);
+        console.log(`    ${chalk.gray("Status:")}      ${statusColor(run.status)}`);
+        console.log(`    ${chalk.gray("Duration:")}    ${run.durationInMs > 0 ? `${(run.durationInMs / 1000).toFixed(1)}s` : "—"}`);
+        if (run.totalCost) {
+          console.log(`    ${chalk.gray("Cost:")}        $${run.totalCost.toFixed(4)}`);
         }
-        console.log(`    ${roleColor(`[${msg.role}]`)} ${content}`);
-      }
-    }
+        console.log(`    ${chalk.gray("Started:")}     ${new Date(run.timestamp).toLocaleString()}`);
 
-    console.log();
+        if (run.results) {
+          console.log();
+          console.log(chalk.bold("  Results:"));
+          if (run.results.verdict) {
+            const verdictColor = run.results.verdict === "passed" ? chalk.green : chalk.red;
+            console.log(`    ${chalk.gray("Verdict:")}    ${verdictColor(run.results.verdict)}`);
+          }
+          if (run.results.reasoning) {
+            console.log(`    ${chalk.gray("Reasoning:")}  ${run.results.reasoning}`);
+          }
+          if (run.results.metCriteria && run.results.metCriteria.length > 0) {
+            console.log(`    ${chalk.gray("Met:")}        ${chalk.green(run.results.metCriteria.join(", "))}`);
+          }
+          if (run.results.unmetCriteria && run.results.unmetCriteria.length > 0) {
+            console.log(`    ${chalk.gray("Unmet:")}      ${chalk.red(run.results.unmetCriteria.join(", "))}`);
+          }
+          if (run.results.error) {
+            console.log(`    ${chalk.gray("Error:")}      ${chalk.red(run.results.error)}`);
+          }
+        }
+
+        if (run.messages && run.messages.length > 0) {
+          console.log();
+          console.log(chalk.bold("  Conversation:"));
+          const truncate = !options?.full;
+          for (const msg of run.messages) {
+            const roleColor = msg.role === "user" ? chalk.blue
+              : msg.role === "assistant" ? chalk.green
+              : chalk.gray;
+            let content = renderContent(msg.content);
+            if (!content) continue;
+            if (truncate && content.length > 400) {
+              content = content.slice(0, 400) + chalk.gray("… (--full to see all)");
+            }
+            console.log(`    ${roleColor(`[${msg.role}]`)} ${content}`);
+          }
+        }
+
+        console.log();
+      },
+    };
   } catch (error) {
     failSpinner({ spinner, error, action: "fetch simulation run" });
     process.exit(1);

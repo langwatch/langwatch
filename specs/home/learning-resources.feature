@@ -1,55 +1,34 @@
 @unit
 Feature: Learning Resources
   As a user
-  I want access to learning resources
-  So that I can learn how to use the platform effectively
+  I want pointers to documentation and tutorials from the home page
+  So that I can learn the platform when I need to — without the pointers
+  competing with my own project's data
 
-  # All scenarios describe LearningResources component rendering
-  # (documentation link, video card, click navigation). Need a JSDOM
-  # render of the component — no test fixture exists yet.
+  The section is a quiet footer row of text links under a hairline rule,
+  not banner cards: the home page belongs to the returning user's live
+  signal, and learning material is reference, not a destination.
 
   Background:
     Given I am on the home page
 
-  # Card display
-  @unimplemented
   Scenario: Displays documentation link
-    When I view the learning resources section
-    Then I should see a "View documentation" link or button
+    When I view the resources footer
+    Then I should see a "View documentation" link
+    And its href should contain "docs.langwatch.ai"
 
-  @unimplemented
   Scenario: Displays video link
-    When I view the learning resources section
-    Then I should see a "Watch videos" or "Play video" link or button
+    When I view the resources footer
+    Then I should see a "Watch videos" link
+    And its href should contain "youtube.com/@LangWatch"
 
-  # Link targets
-  @unimplemented
-  Scenario: Documentation link points to docs site
-    When I view the documentation link
-    Then the href should contain "docs.langwatch.ai"
+  Scenario: Displays the demo ask
+    When I view the resources footer
+    Then I should see a "Request a demo" link
+    And its href should contain "langwatch.ai/get-a-demo"
 
-  @unimplemented
-  Scenario: Video link points to YouTube
-    When I view the video link
-    Then the href should contain "youtube.com/@LangWatch"
-
-  # Tracking
-  @unimplemented
-  Scenario: Documentation click is tracked
-    When I click on the documentation link
-    Then a tracking event should be sent for "documentation_click"
-
-  @unimplemented
-  Scenario: Video click is tracked
-    When I click on the video link
-    Then a tracking event should be sent for "video_click"
-
-  @visual @unimplemented
-  Scenario: Section has descriptive title
-    When I view the learning resources section
-    Then I should see a section title
-
-  @visual @unimplemented
-  Scenario: Card has appropriate styling
-    When I view the learning resources section
-    Then the card should be visually distinct
+  @visual
+  Scenario: The footer stays quiet
+    When I view the resources footer
+    Then it renders as a single row of text links under a hairline rule
+    And it contains no cards and no animated backgrounds

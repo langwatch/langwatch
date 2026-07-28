@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/observability";
 import {
   OrganizationUserRole,
   type PrismaClient,
@@ -25,7 +26,6 @@ import {
 import { getDataPrivacyPolicyService } from "~/server/data-privacy/dataPrivacyPolicy.service";
 import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
 import { TtlCache } from "~/server/utils/ttlCache";
-import { createLogger } from "~/utils/logger/server";
 import { FREE_VISIBILITY_DAYS } from "../../../ee/licensing/constants";
 import type { CategoryVisibility, Protections } from "../traces/protections";
 import { hasProjectPermission, isDemoProject } from "./rbac";
@@ -219,11 +219,12 @@ export async function getUserProtectionsForProject(
   },
   { projectId }: { projectId: string } & Record<string, unknown>,
 ): Promise<Protections> {
-  // TODO(afr): Should we show cost if public? I would assume the opposite.
-  const canSeeCosts =
-    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-    ctx.publiclyShared ||
-    (await hasProjectPermission(ctx, projectId, "cost:view"));
+  // Cost visibility follows the caller's own permission, never the fact that a
+  // share link was presented. An anonymous viewer of a public link sees no
+  // costs; a member resolving an org/project-scoped link sees them only if they
+  // hold `cost:view` in-app. Sharing a trace must not disclose spend. See
+  // ADR-057.
+  const canSeeCosts = await hasProjectPermission(ctx, projectId, "cost:view");
 
   // The plan-based visibility window applies to every user-facing read,
   // including public shares — sharing must not be the bypass.
@@ -263,6 +264,15 @@ export async function getUserProtectionsForProject(
         capturedInputVisibleTo: null,
         capturedOutputVisibleTo: null,
         contentCategories: uniformContentCategories(false),
+        // Fail closed for attributes too: with the policy unresolved we cannot
+        // know WHICH custom attributes are restricted, so hide ALL of them. An
+        // empty `hiddenAttributes` would redact NOTHING (the redact helpers
+        // no-op on an empty list), leaking resource/span attributes an outage
+        // must never expose — so use a catch-all `*` pattern, the most
+        // restrictive value, which matches every attribute key.
+        hiddenAttributes: [
+          { pattern: "*", visibleTo: "members of this project" },
+        ],
         visibilityCutoffMs,
       };
     }

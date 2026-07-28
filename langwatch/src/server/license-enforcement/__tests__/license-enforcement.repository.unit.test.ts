@@ -47,6 +47,7 @@ const createMockPrisma = () => ({
   },
   team: {
     findMany: vi.fn().mockResolvedValue([]),
+    count: vi.fn().mockResolvedValue(0),
   },
   teamUser: {
     findMany: vi.fn().mockResolvedValue([]),
@@ -184,13 +185,18 @@ describe("LicenseEnforcementRepository", () => {
   describe("getProjectCount", () => {
     /** @scenario Counts projects across all teams */
     /** @scenario Counts only non-archived projects toward limit */
-    it("queries non-archived projects with organization filter that traverses every team", async () => {
+    /** @scenario Personal projects do not count toward the project limit */
+    it("queries non-archived, non-personal projects with organization filter that traverses every team", async () => {
       mockPrisma.project.count.mockResolvedValue(4);
 
       const result = await repository.getProjectCount(organizationId);
 
       expect(mockPrisma.project.count).toHaveBeenCalledWith({
-        where: { team: { organizationId }, archivedAt: null },
+        where: {
+          team: { organizationId },
+          archivedAt: null,
+          isPersonal: false,
+        },
       });
       expect(result).toBe(4);
     });
@@ -199,6 +205,28 @@ describe("LicenseEnforcementRepository", () => {
       mockPrisma.project.count.mockResolvedValue(0);
 
       const result = await repository.getProjectCount(organizationId);
+
+      expect(result).toBe(0);
+    });
+  });
+
+  describe("getTeamCount", () => {
+    /** @scenario Personal teams do not count toward the team limit */
+    it("queries non-personal teams in the organization", async () => {
+      mockPrisma.team.count.mockResolvedValue(3);
+
+      const result = await repository.getTeamCount(organizationId);
+
+      expect(mockPrisma.team.count).toHaveBeenCalledWith({
+        where: { organizationId, isPersonal: false },
+      });
+      expect(result).toBe(3);
+    });
+
+    it("returns zero when no teams exist", async () => {
+      mockPrisma.team.count.mockResolvedValue(0);
+
+      const result = await repository.getTeamCount(organizationId);
 
       expect(result).toBe(0);
     });

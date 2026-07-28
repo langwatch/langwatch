@@ -70,13 +70,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
-      - name: Setup Node.js
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+      # Shared pnpm + Node setup with pnpm-store caching, so this job stops
+      # re-downloading the full langwatch + skills dependency trees on every run.
+      - name: Setup pnpm + Node
+        uses: ./.github/actions/setup-pnpm-node
         with:
-          node-version: "24"
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+          cache-dependency-path: |
+            langwatch/pnpm-lock.yaml
+            skills/pnpm-lock.yaml
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -93,7 +94,7 @@ jobs:
         run: pnpm install --frozen-lockfile --ignore-workspace
         working-directory: skills
 
-      - name: Regenerate prompts-data.jsx
+      - name: Regenerate docs/skills pages
         run: bash docs/scripts/sync-prompts.sh
 
       - name: Regenerate llms.txt
@@ -101,7 +102,7 @@ jobs:
 
       - name: Check for stale generated files
         run: |
-          if ! git diff --exit-code docs/snippets/prompts-data.jsx docs/llms.txt docs/llms-full.txt; then
+          if ! git diff --exit-code docs/skills/directory.mdx docs/skills/pms-and-domain-experts.mdx docs/llms.txt docs/llms-full.txt; then
             echo ""
             echo "ERROR: Generated files are stale. Please run:"
             echo "  bash docs/scripts/sync-prompts.sh"

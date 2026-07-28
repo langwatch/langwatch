@@ -1,6 +1,6 @@
 import { createClient } from "@clickhouse/client";
 
-import { createLogger } from "../../utils/logger/server";
+import { createLogger } from "@langwatch/observability";
 import { RETENTION_MANAGED_TABLES } from "../data-retention/retentionPolicy.schema";
 import { parseConnectionUrl } from "./goose";
 
@@ -69,6 +69,13 @@ export const TABLE_TTL_CONFIG: readonly TableTTLEntry[] = [
     hardcodedDefault: 49,
   },
   {
+    table: "langy_analytics_events",
+    ttlColumn: "OccurredAt",
+    retentionTTLColumn: "OccurredAt",
+    envVar: "CLICKHOUSE_COLD_STORAGE_LANGY_ANALYTICS_EVENTS_TTL_DAYS",
+    hardcodedDefault: 49,
+  },
+  {
     table: "experiment_run_items",
     ttlColumn: "OccurredAt",
     retentionTTLColumn: "OccurredAt",
@@ -97,6 +104,13 @@ export const TABLE_TTL_CONFIG: readonly TableTTLEntry[] = [
     hardcodedDefault: 49,
   },
   {
+    table: "log_records",
+    ttlColumn: "TimeUnixMs",
+    retentionTTLColumn: "TimeUnixMs",
+    envVar: "CLICKHOUSE_COLD_STORAGE_CANONICAL_LOG_RECORDS_TTL_DAYS",
+    hardcodedDefault: 49,
+  },
+  {
     table: "suite_runs",
     ttlColumn: "StartedAt",
     retentionTTLColumn: "StartedAt",
@@ -104,10 +118,24 @@ export const TABLE_TTL_CONFIG: readonly TableTTLEntry[] = [
     hardcodedDefault: 49,
   },
   {
-    table: "stored_metric_records",
+    table: "metric_data_points",
     ttlColumn: "TimeUnixMs",
     retentionTTLColumn: "TimeUnixMs",
-    envVar: "CLICKHOUSE_COLD_STORAGE_METRIC_RECORDS_TTL_DAYS",
+    envVar: "CLICKHOUSE_COLD_STORAGE_METRIC_DATA_POINTS_TTL_DAYS",
+    hardcodedDefault: 49,
+  },
+  {
+    table: "metric_series",
+    ttlColumn: "LastSeenAt",
+    retentionTTLColumn: "LastSeenAt",
+    envVar: "CLICKHOUSE_COLD_STORAGE_METRIC_SERIES_TTL_DAYS",
+    hardcodedDefault: 49,
+  },
+  {
+    table: "metric_time_rollups",
+    ttlColumn: "BucketStart",
+    retentionTTLColumn: "BucketStart",
+    envVar: "CLICKHOUSE_COLD_STORAGE_METRIC_ROLLUPS_TTL_DAYS",
     hardcodedDefault: 49,
   },
   {
@@ -143,6 +171,27 @@ export const TABLE_TTL_CONFIG: readonly TableTTLEntry[] = [
     retentionTTLColumn: "BucketStart",
     retentionTTLColumnExpression: "toDateTime(BucketStart)",
     envVar: "CLICKHOUSE_COLD_STORAGE_TRACE_ANALYTICS_ROLLUP_TTL_DAYS",
+    hardcodedDefault: 49,
+  },
+  // ADR-034 Phase 6: slim per-evaluation analytics table. Same TTL anchor +
+  // cadence as evaluation_runs so the slim row ages identically.
+  {
+    table: "evaluation_analytics",
+    ttlColumn: "OccurredAt",
+    retentionTTLColumn: "OccurredAt",
+    envVar: "CLICKHOUSE_COLD_STORAGE_EVALUATION_ANALYTICS_TTL_DAYS",
+    hardcodedDefault: 49,
+  },
+  // ADR-034 Phase 6: per-evaluation rollup. Anchor on BucketStart (its sort +
+  // partition leaf). BucketStart is DateTime64(3), so the ttlColumnExpression
+  // wraps in toDateTime — CH rejects DateTime64 directly in TTL arithmetic.
+  {
+    table: "evaluation_analytics_rollup",
+    ttlColumn: "BucketStart",
+    ttlColumnExpression: "toDateTime(BucketStart)",
+    retentionTTLColumn: "BucketStart",
+    retentionTTLColumnExpression: "toDateTime(BucketStart)",
+    envVar: "CLICKHOUSE_COLD_STORAGE_EVALUATION_ANALYTICS_ROLLUP_TTL_DAYS",
     hardcodedDefault: 49,
   },
 ] as const;

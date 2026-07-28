@@ -18,10 +18,7 @@ const SECRET = "integration-internal-secret";
 const CRON_ROUTES: { method: "GET" | "POST"; path: string }[] = [
   { method: "POST", path: "/api/cron/old_lambdas_cleanup" },
   { method: "GET", path: "/api/cron/old_lambdas_cleanup" },
-  { method: "POST", path: "/api/cron/schedule_topic_clustering" },
-  { method: "GET", path: "/api/cron/schedule_topic_clustering" },
   { method: "GET", path: "/api/cron/trace_analytics" },
-  { method: "GET", path: "/api/cron/triggers" },
   { method: "POST", path: "/api/cron/seed_demo" },
   { method: "GET", path: "/api/cron/seed_demo" },
 ];

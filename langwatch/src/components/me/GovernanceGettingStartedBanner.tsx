@@ -17,21 +17,26 @@ import { useColorModeValue } from "../ui/color-mode";
 
 // Amber → orange → violet palette so the governance hero visually rhymes with
 // the home announcements (same MeshGradient + glass-card shape as
-// `VoiceAgentsHomeBanner` / `TracesV2HomeBanner`) without reusing their teal.
+// `VoiceAgentsHomeBanner`) without reusing its teal.
 const MESH_COLORS_LIGHT = ["#b45309", "#ea580c", "#7c3aed", "#fff7ed"];
 const MESH_COLORS_DARK = ["#78350f", "#7c2d12", "#4c1d95", "#1a1206"];
 
 /**
- * Admin empty-state hero for the AI tools portal. Shown when the org has
- * published no tools yet and the viewer can manage the catalog. Reuses the
- * home-banner glass-card visual to make "set up governance" feel like a
- * first-class call to action rather than a bare empty list, and points
- * straight at the tool catalog where the starter pack lives.
+ * Admin empty-state hero for the AI tools portal. Shown when the catalog
+ * has zero enabled tiles and the viewer can manage it. Fresh orgs are
+ * auto-provisioned with the standard catalog, so this only renders for a
+ * catalog curated down to no enabled tools, whether by archiving,
+ * disabling, or deleting entries (the curated-empty fallback). Reuses
+ * the home-banner glass-card visual to make "set up
+ * governance" feel like a first-class call to action rather than a bare
+ * empty list, and points straight at the tool catalog where the starter
+ * pack lives.
  *
  * Not dismissible: it disappears on its own the moment the first tool is
  * published (the portal switches to the tile grid).
  *
- * Spec: specs/ai-governance/personal-portal/portal-empty-state.feature
+ * Spec: specs/ai-governance/personal-portal/portal-grid.feature
+ *       specs/ai-governance/personal-portal/default-catalog.feature
  */
 export function GovernanceGettingStartedBanner() {
   const reduceMotion = useReducedMotion();

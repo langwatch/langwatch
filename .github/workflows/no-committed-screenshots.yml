@@ -1,0 +1,46 @@
+name: no-committed-screenshots
+
+# Fails a PR that adds image files outside the directories where images belong.
+#
+# PR-body and browser-QA screenshots belong in the github.com/langwatch/pr-screenshots
+# repo, linked from the PR body by raw URL — not committed to the product tree,
+# where they are dead weight the moment the PR merges.
+#
+# Runs the script from the PR head, so the trigger stays `pull_request` — never
+# `pull_request_target`, whose writable token would make that a pwn request. The
+# script only reads the diff and needs no token at all.
+#
+# Spec: specs/ci/no-committed-screenshots.feature
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: no-committed-screenshots-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  no-committed-screenshots:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Fetch base branch
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: git fetch --no-tags origin "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"
+
+      - name: Check for committed screenshots
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: ./.github/scripts/check-added-images.sh "origin/${BASE_REF}"

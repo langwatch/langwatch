@@ -1,12 +1,14 @@
-Feature: BullMQ Redis Cluster Compatibility
+Feature: Queue Redis Cluster Compatibility
   As a LangWatch operator deploying with Redis Cluster
-  I want all BullMQ queues to use Redis hash tags
+  I want all Redis-backed queues to use Redis hash tags
   So that queue operations do not fail with CROSSSLOT errors
 
   # Redis Cluster distributes keys across slots by hashing the key name.
-  # BullMQ uses multiple keys per queue (e.g., bull:<name>:wait, bull:<name>:active).
-  # Without hash tags, those keys may land on different slots, causing CROSSSLOT
-  # errors from Lua scripts that touch multiple keys atomically.
+  # A queue uses multiple keys per name; without hash tags those keys may land
+  # on different slots, causing CROSSSLOT errors from Lua scripts that touch
+  # multiple keys atomically. BullMQ itself is gone (every queue migrated to
+  # the event-sourcing process substrate), but the custom GroupQueue keeps the
+  # same multi-key shape, so the requirement stands.
   #
   # Wrapping queue names in {braces} forces Redis to hash only the braced
   # portion, guaranteeing all keys for a queue land on the same slot.
@@ -15,8 +17,8 @@ Feature: BullMQ Redis Cluster Compatibility
   # background/__tests__/redis-cluster.integration.test.ts (a testcontainers
   # 6-node cluster), which was deleted with the background stack in the
   # Elasticsearch/background removal. They remain valid requirements for the
-  # surviving BullMQ queues (topic clustering, ingestion puller, scenarios)
-  # but are unbound until a cluster testbed is wired up again. The @unit
+  # surviving Redis-backed queue (the event-sourcing GroupQueue) but are
+  # unbound until a cluster testbed is wired up again. The @unit
   # scenario at the bottom is live — see
   # src/server/queues/__tests__/makeQueueName.unit.test.ts.
 

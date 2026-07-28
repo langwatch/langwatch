@@ -79,11 +79,13 @@ function createEvent(
 
 function createContext(
   foldState: TraceSummaryData,
+  overrides: Partial<ReactorContext<TraceSummaryData>> = {},
 ): ReactorContext<TraceSummaryData> {
   return {
     tenantId: "tenant-1",
     aggregateId: "trace-1",
     foldState,
+    ...overrides,
   };
 }
 
@@ -169,6 +171,21 @@ describe("originGate reactor", () => {
         tenantId: "tenant-1",
         traceId: "trace-1",
       });
+    });
+  });
+
+  describe("when the trace aggregate has an empty id", () => {
+    it("skips without scheduling", async () => {
+      const deps = createDeps();
+      const reactor = createOriginGateReactor(deps);
+      const state = createFoldState({ attributes: {} });
+
+      await reactor.handle(
+        createEvent({ aggregateId: "" }),
+        createContext(state, { aggregateId: "" }),
+      );
+
+      expect(deps.scheduleDeferred).not.toHaveBeenCalled();
     });
   });
 

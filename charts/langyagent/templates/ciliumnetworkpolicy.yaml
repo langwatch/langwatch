@@ -1,0 +1,52 @@
+{{- if .Values.egress.cilium.enabled }}
+# Optional bypass-proof FQDN egress (ADR-043 rung 3, "Where FQDN enforcement
+# lives"). The per-worker L7 egress adapter is authoritative for COOPERATING
+# clients but, within one pod netns, a prompt-injected worker can ignore
+# HTTPS_PROXY and connect() straight to an external IP:443 — the adapter cannot
+# force traffic through itself, and under gVisor there is no iptables REDIRECT
+# to make it mandatory. Where the operator runs the Cilium CNI, this
+# CiliumNetworkPolicy enforces the SAME FQDN floor at the datapath, which a
+# worker cannot bypass. The adapter and this policy enforce the same set: the
+# adapter is the CNI-agnostic default; this is the mandatory-enforcement upgrade.
+# The non-Cilium equivalent is the ADR-033 Fix B per-worker netns.
+#
+# NOTE: this enforces the OPERATOR FLOOR only. Per-project customer allow-lists
+# are L7 policy resolved per request (Project.langyEgressAllowlist) and are not
+# expressible as a static CNI policy — they remain adapter-enforced.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: {{ include "langyagent.fullname" . }}-egress-fqdn
+  labels: {{- include "langyagent.labels" . | nindent 4 }}
+spec:
+  endpointSelector:
+    matchLabels: {{- include "langyagent.selectorLabels" . | nindent 6 }}
+  egress:
+    # DNS must be allowed AND visible to Cilium so toFQDNs can learn the
+    # IP↔FQDN mapping it enforces on. Without this rule the FQDN match never
+    # populates and all external egress is dropped.
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+            k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+            - port: "53"
+              protocol: TCP
+          rules:
+            dns:
+              - matchPattern: "*"
+    # The operator FQDN floor: only these hosts may be reached on :443. Kept in
+    # sync with egress.fqdnFloor (the adapter's floor) so both layers enforce
+    # the same set.
+    - toFQDNs:
+        {{- range .Values.egress.fqdnFloor }}
+        - matchName: {{ . | quote }}
+        {{- end }}
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+{{- end }}

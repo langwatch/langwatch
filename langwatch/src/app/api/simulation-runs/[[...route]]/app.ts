@@ -1,13 +1,14 @@
+import { createLogger } from "@langwatch/observability";
 import { describeRoute } from "hono-openapi";
-import { resolver, validator as zValidator } from "hono-openapi/zod";
+import { resolver } from "hono-openapi/zod";
+import { validator as zValidator } from "~/server/api/validation";
 import { z } from "zod";
 import { badRequestSchema } from "~/app/api/shared/schemas";
 import { createProjectApp, requires } from "~/server/api/security";
 import { getApp } from "~/server/app-layer/app";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
-import { createLogger } from "~/utils/logger/server";
 import { baseResponses } from "../../shared/base-responses";
-import { platformUrl } from "../../shared/platform-url";
+import { scenarioRunPlatformUrl } from "../scenario-run-platform-url";
 
 patchZodOpenapi();
 
@@ -125,9 +126,9 @@ secured.access(requires("scenarios:view")).get(
       return c.json({
         runs: runs.map((r) => ({
           ...r,
-          platformUrl: platformUrl({
+          platformUrl: scenarioRunPlatformUrl({
             projectSlug: project.slug,
-            path: `/simulations`,
+            scenarioRunId: r.scenarioRunId,
           }),
         })),
         hasMore: false,
@@ -146,9 +147,9 @@ secured.access(requires("scenarios:view")).get(
       return c.json({
         runs: result.runs.map((r) => ({
           ...r,
-          platformUrl: platformUrl({
+          platformUrl: scenarioRunPlatformUrl({
             projectSlug: project.slug,
-            path: `/simulations`,
+            scenarioRunId: r.scenarioRunId,
           }),
         })),
         hasMore: result.hasMore,
@@ -170,9 +171,9 @@ secured.access(requires("scenarios:view")).get(
     return c.json({
       runs: result.runs.map((r) => ({
         ...r,
-        platformUrl: platformUrl({
+        platformUrl: scenarioRunPlatformUrl({
           projectSlug: project.slug,
-          path: `/simulations`,
+          scenarioRunId: r.scenarioRunId,
         }),
       })),
       hasMore: result.hasMore,
@@ -224,9 +225,9 @@ secured.access(requires("scenarios:view")).get(
 
     return c.json({
       ...run,
-      platformUrl: platformUrl({
+      platformUrl: scenarioRunPlatformUrl({
         projectSlug: project.slug,
-        path: `/simulations`,
+        scenarioRunId: run.scenarioRunId,
       }),
     });
   },

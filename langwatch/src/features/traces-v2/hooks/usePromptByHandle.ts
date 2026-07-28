@@ -1,5 +1,6 @@
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { useIsReadOnlyTrace } from "../context/TraceViewerContext";
 
 /**
  * Live lookup of a prompt's *current* version by id-or-handle.
@@ -10,13 +11,14 @@ import { api } from "~/utils/api";
  */
 export function usePromptByHandle(handle: string | null | undefined) {
   const { project } = useOrganizationTeamProject();
+  const isReadOnly = useIsReadOnlyTrace();
   const lookup = api.prompts.getByIdOrHandle.useQuery(
     {
       idOrHandle: handle ?? "",
       projectId: project?.id ?? "",
     },
     {
-      enabled: !!project?.id && !!handle,
+      enabled: !!project?.id && !!handle && !isReadOnly,
       staleTime: 60_000,
       retry: false,
     },

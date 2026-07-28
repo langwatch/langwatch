@@ -6,7 +6,7 @@
 
 ## Context
 
-Today's `sendSlackWebhook` (`src/server/triggers/sendSlackWebhook.ts`) wraps `webhook.send(...)` in `try { ... } catch (err) { captureException(err); }` and **never rethrows**. Errors are logged and surfaced to PostHog, but the calling reactor sees no signal — control flow continues as if dispatch succeeded.
+Today's `sendSlackWebhook` (`src/server/app-layer/automations/delivery/sendSlackWebhook.ts`) wraps `webhook.send(...)` in `try { ... } catch (err) { captureException(err); }` and **never rethrows**. Errors are logged and surfaced to PostHog, but the calling reactor sees no signal — control flow continues as if dispatch succeeded.
 
 This is fine for today's in-line reactor model (we accept silent failures as the operational baseline). It becomes broken when [ADR-030](./030-transactional-outbox-for-stake-sensitive-dispatch.md)'s outbox worker enters the picture, because the worker decides what to do with a row based on **whether dispatch threw**:
 
@@ -130,5 +130,5 @@ In all cases the **enforcement** lives in the outbox state machine, not the prov
 ## References
 
 - [ADR-030](./030-transactional-outbox-for-stake-sensitive-dispatch.md) — outbox worker that consumes this contract; `dispatch` handler signature
-- `src/server/triggers/sendSlackWebhook.ts` — endpoint to refactor first
+- `src/server/app-layer/automations/delivery/sendSlackWebhook.ts` — endpoint to refactor first
 - `src/server/mailer/triggerEmail.ts` — endpoint to refactor second

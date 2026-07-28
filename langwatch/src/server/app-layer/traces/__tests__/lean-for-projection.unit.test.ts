@@ -9,24 +9,25 @@
  * No "should" in it() names (project convention).
  */
 
-import { describe, it, expect } from "vitest";
-import {
-  leanForProjection,
-  IO_PREVIEW_BYTES,
-  IO_ATTR_KEYS,
-  EVENTREF_ATTR_PREFIX,
-} from "../lean-for-projection";
-import { DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES } from "~/server/event-sourcing/pipelines/trace-processing/utils/capOversizedAttributes";
+import { describe, expect, it } from "vitest";
 import type { Event } from "~/server/event-sourcing";
 import { createTenantId } from "~/server/event-sourcing";
 import {
-  SPAN_RECEIVED_EVENT_TYPE,
-  SPAN_RECEIVED_EVENT_VERSION_LATEST,
-  LOG_RECORD_RECEIVED_EVENT_TYPE,
-  LOG_RECORD_RECEIVED_EVENT_VERSION_LATEST,
   ANNOTATION_ADDED_EVENT_TYPE,
   ANNOTATION_ADDED_EVENT_VERSION_LATEST,
+  LOG_RECORD_RECEIVED_EVENT_TYPE,
+  LOG_RECORD_RECEIVED_EVENT_VERSION_LATEST,
+  SPAN_RECEIVED_EVENT_TYPE,
+  SPAN_RECEIVED_EVENT_VERSION_LATEST,
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
+import { DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES } from "~/server/event-sourcing/pipelines/trace-processing/utils/capOversizedAttributes";
+import {
+  EVENTREF_ATTR_PREFIX,
+  IO_ATTR_KEYS,
+  IO_PREVIEW_BYTES,
+  leanForProjection,
+  structuredIoPreview,
+} from "../lean-for-projection";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -90,7 +91,16 @@ function makeSpanReceivedEvent({
 function makeSpanReceivedEventWithRawAttrs({
   attributes,
 }: {
-  attributes: Array<{ key: string; value: { stringValue?: string; arrayValue?: { values: Array<{ stringValue?: string }> }; kvlistValue?: { values: Array<{ key: string; value: { stringValue?: string } }> } } }>;
+  attributes: Array<{
+    key: string;
+    value: {
+      stringValue?: string;
+      arrayValue?: { values: Array<{ stringValue?: string }> };
+      kvlistValue?: {
+        values: Array<{ key: string; value: { stringValue?: string } }>;
+      };
+    };
+  }>;
 }): Event {
   return {
     ...BASE_EVENT_FIELDS,
@@ -156,7 +166,11 @@ function makeAnnotationAddedEvent(): Event {
 
 /** Extract span attributes as a Record from a SpanReceived event returned by leanForProjection. */
 function extractSpanAttributes(event: Event): Record<string, string> {
-  const data = event.data as { span: { attributes?: Array<{ key: string; value: { stringValue?: string } }> } };
+  const data = event.data as {
+    span: {
+      attributes?: Array<{ key: string; value: { stringValue?: string } }>;
+    };
+  };
   const result: Record<string, string> = {};
   for (const attr of data.span.attributes ?? []) {
     if (typeof attr.value.stringValue === "string") {
@@ -189,9 +203,9 @@ describe("given a SpanReceived event with a 100 KB langwatch.output", () => {
       const leaned = leanForProjection(event);
       const attrs = extractSpanAttributes(leaned);
 
-      expect(Buffer.byteLength(attrs["langwatch.output"] ?? "", "utf-8")).toBeLessThanOrEqual(
-        IO_PREVIEW_BYTES + 4,
-      );
+      expect(
+        Buffer.byteLength(attrs["langwatch.output"] ?? "", "utf-8"),
+      ).toBeLessThanOrEqual(IO_PREVIEW_BYTES + 4);
     });
 
     it("attaches a langwatch.reserved.eventref.langwatch.output attr containing { field: 'langwatch.output' }", () => {
@@ -259,7 +273,9 @@ describe("given a LogRecordReceived event with a 100 KB body", () => {
         IO_PREVIEW_BYTES + 4,
       );
       // eventref.body is stored in the event data attributes
-      expect(data.attributes?.["langwatch.reserved.eventref.body"]).toBeDefined();
+      expect(
+        data.attributes?.["langwatch.reserved.eventref.body"],
+      ).toBeDefined();
       const ref = JSON.parse(
         data.attributes!["langwatch.reserved.eventref.body"]!,
       ) as { field: string };
@@ -294,12 +310,12 @@ describe("given a SpanReceived event with both langwatch.input and langwatch.out
       const attrs = extractSpanAttributes(leaned);
 
       // Both previews are within budget
-      expect(Buffer.byteLength(attrs["langwatch.input"] ?? "", "utf-8")).toBeLessThanOrEqual(
-        IO_PREVIEW_BYTES + 4,
-      );
-      expect(Buffer.byteLength(attrs["langwatch.output"] ?? "", "utf-8")).toBeLessThanOrEqual(
-        IO_PREVIEW_BYTES + 4,
-      );
+      expect(
+        Buffer.byteLength(attrs["langwatch.input"] ?? "", "utf-8"),
+      ).toBeLessThanOrEqual(IO_PREVIEW_BYTES + 4);
+      expect(
+        Buffer.byteLength(attrs["langwatch.output"] ?? "", "utf-8"),
+      ).toBeLessThanOrEqual(IO_PREVIEW_BYTES + 4);
 
       // Each gets its own eventref
       expect(attrs[`${EVENTREF_ATTR_PREFIX}langwatch.input`]).toBeDefined();
@@ -331,13 +347,123 @@ describe("given a SpanReceived event with gen_ai.input.messages exceeding IO_PRE
       const leaned = leanForProjection(event);
       const attrs = extractSpanAttributes(leaned);
 
-      expect(Buffer.byteLength(attrs["gen_ai.input.messages"] ?? "", "utf-8")).toBeLessThanOrEqual(
-        IO_PREVIEW_BYTES + 4,
-      );
+      expect(
+        Buffer.byteLength(attrs["gen_ai.input.messages"] ?? "", "utf-8"),
+      ).toBeLessThanOrEqual(IO_PREVIEW_BYTES + 4);
       const eventrefKey = `${EVENTREF_ATTR_PREFIX}gen_ai.input.messages`;
       expect(attrs[eventrefKey]).toBeDefined();
       const ref = JSON.parse(attrs[eventrefKey]!) as { field: string };
       expect(ref.field).toBe("gen_ai.input.messages");
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Structure-preserving preview for JSON chat payloads
+// ---------------------------------------------------------------------------
+
+/**
+ * The real Langy/opencode shape: a chat array whose FIRST message is a huge
+ * developer-role system prompt (alone over the 64 KB budget) and whose LAST
+ * message is the user's short text. A blind byte cut kept only unparseable
+ * developer-prompt JSON — the user's "hi" lives past the cut.
+ */
+function chatPayloadWithHugeDeveloperPrompt(): string {
+  return JSON.stringify([
+    {
+      role: "developer",
+      content: "You are OpenCode. " + "x".repeat(80 * 1024),
+    },
+    { role: "assistant", content: "Earlier reply for context." },
+    { role: "user", content: [{ type: "input_text", text: "hi" }] },
+  ]);
+}
+
+describe("given a gen_ai.input.messages chat payload whose developer prompt alone exceeds the budget", () => {
+  describe("when leanForProjection is applied", () => {
+    /** @scenario The preview of an over-budget chat payload stays structured and extractable */
+    it("keeps the preview VALID JSON with the developer role and the last user message intact", () => {
+      const event = makeSpanReceivedEvent({
+        attributes: {
+          "gen_ai.input.messages": chatPayloadWithHugeDeveloperPrompt(),
+        },
+      });
+
+      const leaned = leanForProjection(event);
+      const attrs = extractSpanAttributes(leaned);
+      const preview = attrs["gen_ai.input.messages"]!;
+
+      expect(Buffer.byteLength(preview, "utf-8")).toBeLessThanOrEqual(
+        IO_PREVIEW_BYTES,
+      );
+      const messages = JSON.parse(preview) as Array<{
+        role: string;
+        content: unknown;
+      }>;
+      expect(messages[0]!.role).toBe("developer");
+      const last = messages[messages.length - 1]!;
+      expect(last.role).toBe("user");
+      expect(last.content).toEqual([{ type: "input_text", text: "hi" }]);
+      // The eventref to the FULL value still rides alongside the preview.
+      const ref = JSON.parse(
+        attrs[`${EVENTREF_ATTR_PREFIX}gen_ai.input.messages`]!,
+      ) as { field: string };
+      expect(ref.field).toBe("gen_ai.input.messages");
+    });
+  });
+});
+
+describe("structuredIoPreview", () => {
+  describe("when the payload is a chat array larger than the budget only because of one long message", () => {
+    it("clamps the long content and keeps every message", () => {
+      const payload = JSON.stringify([
+        { role: "developer", content: "y".repeat(100 * 1024) },
+        { role: "user", content: "hi" },
+      ]);
+
+      const preview = structuredIoPreview(payload, IO_PREVIEW_BYTES);
+
+      expect(preview).not.toBeNull();
+      const messages = JSON.parse(preview!) as Array<{ role: string }>;
+      expect(messages.map((m) => m.role)).toEqual(["developer", "user"]);
+    });
+  });
+
+  describe("when even clamped messages exceed the budget", () => {
+    it("keeps the first message and the newest tail, dropping the middle", () => {
+      const filler = (i: number) => ({
+        role: "assistant",
+        content: `reply ${i}: ` + "z".repeat(7 * 1024),
+      });
+      const payload = JSON.stringify([
+        { role: "developer", content: "d".repeat(20 * 1024) },
+        ...Array.from({ length: 30 }, (_, i) => filler(i)),
+        { role: "user", content: "what do you mean?" },
+      ]);
+
+      const preview = structuredIoPreview(payload, 32 * 1024);
+
+      expect(preview).not.toBeNull();
+      expect(Buffer.byteLength(preview!, "utf-8")).toBeLessThanOrEqual(
+        32 * 1024,
+      );
+      const messages = JSON.parse(preview!) as Array<{
+        role: string;
+        content: string | unknown;
+      }>;
+      expect(messages[0]!.role).toBe("developer");
+      expect(messages[messages.length - 1]).toEqual({
+        role: "user",
+        content: "what do you mean?",
+      });
+      // Middle dropped, not the ends.
+      expect(messages.length).toBeLessThan(32);
+    });
+  });
+
+  describe("when the value is not JSON", () => {
+    it("reports null so the caller falls back to the byte cut", () => {
+      expect(structuredIoPreview("plain prose ".repeat(10), 1024)).toBeNull();
     });
   });
 });
@@ -366,9 +492,9 @@ describe("given a SpanReceived event with a non-IO attribute (langwatch.params) 
       const attrs = extractSpanAttributes(leaned);
 
       // The capped value must be a truncation placeholder, far shorter than the original
-      expect(Buffer.byteLength(attrs["langwatch.params"] ?? "", "utf-8")).toBeLessThan(
-        DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES,
-      );
+      expect(
+        Buffer.byteLength(attrs["langwatch.params"] ?? "", "utf-8"),
+      ).toBeLessThan(DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES);
       expect(attrs["langwatch.params"]).toMatch(/\[truncated:/);
     });
 
@@ -376,7 +502,11 @@ describe("given a SpanReceived event with a non-IO attribute (langwatch.params) 
       const event = makeSpanReceivedEvent({
         attributes: { "langwatch.params": NON_IO_OVER_256KB },
       });
-      const originalData = event.data as { span: { attributes: Array<{ key: string; value: { stringValue?: string } }> } };
+      const originalData = event.data as {
+        span: {
+          attributes: Array<{ key: string; value: { stringValue?: string } }>;
+        };
+      };
       const originalValue = originalData.span.attributes.find(
         (a) => a.key === "langwatch.params",
       )?.value.stringValue;
@@ -455,9 +585,7 @@ describe("given a SpanReceived event with a >256KB blob nested inside an arrayVa
             key: "langwatch.params",
             value: {
               arrayValue: {
-                values: [
-                  { stringValue: NON_IO_OVER_256KB },
-                ],
+                values: [{ stringValue: NON_IO_OVER_256KB }],
               },
             },
           },
@@ -474,15 +602,15 @@ describe("given a SpanReceived event with a >256KB blob nested inside an arrayVa
           }>;
         };
       };
-      const originalNestedValue = originalData.span.attributes
-        .find((a) => a.key === "langwatch.params")
-        ?.value.arrayValue?.values[0]?.stringValue;
+      const originalNestedValue = originalData.span.attributes.find(
+        (a) => a.key === "langwatch.params",
+      )?.value.arrayValue?.values[0]?.stringValue;
 
       leanForProjection(event);
 
-      const valueAfter = originalData.span.attributes
-        .find((a) => a.key === "langwatch.params")
-        ?.value.arrayValue?.values[0]?.stringValue;
+      const valueAfter = originalData.span.attributes.find(
+        (a) => a.key === "langwatch.params",
+      )?.value.arrayValue?.values[0]?.stringValue;
 
       expect(valueAfter).toBe(originalNestedValue);
       expect(valueAfter).toHaveLength(300 * 1024);
@@ -504,9 +632,9 @@ describe("given a SpanReceived event with gen_ai.input.messages exceeding IO_PRE
       const leaned = leanForProjection(event);
       const attrs = extractSpanAttributes(leaned);
 
-      expect(Buffer.byteLength(attrs["gen_ai.input.messages"] ?? "", "utf-8")).toBeLessThanOrEqual(
-        IO_PREVIEW_BYTES + 4,
-      );
+      expect(
+        Buffer.byteLength(attrs["gen_ai.input.messages"] ?? "", "utf-8"),
+      ).toBeLessThanOrEqual(IO_PREVIEW_BYTES + 4);
       const eventrefKey = `${EVENTREF_ATTR_PREFIX}gen_ai.input.messages`;
       expect(attrs[eventrefKey]).toBeDefined();
       const ref = JSON.parse(attrs[eventrefKey]!) as { field: string };
@@ -517,7 +645,11 @@ describe("given a SpanReceived event with gen_ai.input.messages exceeding IO_PRE
       const event = makeSpanReceivedEvent({
         attributes: { "gen_ai.input.messages": NON_IO_OVER_256KB },
       });
-      const originalData = event.data as { span: { attributes: Array<{ key: string; value: { stringValue?: string } }> } };
+      const originalData = event.data as {
+        span: {
+          attributes: Array<{ key: string; value: { stringValue?: string } }>;
+        };
+      };
       const originalValue = originalData.span.attributes.find(
         (a) => a.key === "gen_ai.input.messages",
       )?.value.stringValue;
@@ -577,15 +709,16 @@ function makeSpanReceivedEventWithOversizedEventAttr(): Event {
         startTimeUnixNano: "1700000000000000000",
         endTimeUnixNano: "1700000001000000000",
         // No oversized value at span top-level — only inside an event attribute
-        attributes: [
-          { key: "custom.small", value: { stringValue: "normal" } },
-        ],
+        attributes: [{ key: "custom.small", value: { stringValue: "normal" } }],
         events: [
           {
             timeUnixNano: "1700000000500000000",
             name: "exception",
             attributes: [
-              { key: "exception.message", value: { stringValue: oversizedValue } },
+              {
+                key: "exception.message",
+                value: { stringValue: oversizedValue },
+              },
             ],
           },
         ],
@@ -622,9 +755,7 @@ function makeSpanReceivedEventWithOversizedResourceAttr(): Event {
         startTimeUnixNano: "1700000000000000000",
         endTimeUnixNano: "1700000001000000000",
         // No oversized value at span top-level
-        attributes: [
-          { key: "custom.small", value: { stringValue: "normal" } },
-        ],
+        attributes: [{ key: "custom.small", value: { stringValue: "normal" } }],
         events: [],
         links: [],
         status: { code: 1, message: null },
@@ -695,7 +826,9 @@ describe("given a SpanReceived event with a >256KB value only in span.events[0].
         (a) => a.key === "exception.message",
       )?.value.stringValue;
       expect(valueAfter).toBe(originalValue);
-      expect(valueAfter?.length).toBeGreaterThan(DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES);
+      expect(valueAfter?.length).toBeGreaterThan(
+        DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES,
+      );
     });
 
     it("does not attach an eventref for the event attribute (cap, not IO preview)", () => {
@@ -703,7 +836,9 @@ describe("given a SpanReceived event with a >256KB value only in span.events[0].
 
       const leaned = leanForProjection(event);
       const leanedData = leaned.data as {
-        span: { attributes: Array<{ key: string; value: { stringValue?: string } }> };
+        span: {
+          attributes: Array<{ key: string; value: { stringValue?: string } }>;
+        };
       };
       const eventrefKeys = leanedData.span.attributes.filter((a) =>
         a.key.startsWith(EVENTREF_ATTR_PREFIX),
@@ -754,7 +889,9 @@ describe("given a SpanReceived event with a >256KB value only in resource.attrib
         (a) => a.key === "service.name",
       )?.value.stringValue;
       expect(valueAfter).toBe(originalValue);
-      expect(valueAfter?.length).toBeGreaterThan(DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES);
+      expect(valueAfter?.length).toBeGreaterThan(
+        DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES,
+      );
     });
   });
 });
@@ -800,10 +937,7 @@ describe("given a span with a small structured non-IO attribute", () => {
             key: "custom.tags",
             value: {
               arrayValue: {
-                values: [
-                  { stringValue: "production" },
-                  { stringValue: "v2" },
-                ],
+                values: [{ stringValue: "production" }, { stringValue: "v2" }],
               },
             },
           },
@@ -843,7 +977,9 @@ describe("given a span with a small structured non-IO attribute", () => {
           attributes: Array<{
             key: string;
             value: {
-              kvlistValue?: { values: Array<{ key: string; value: { stringValue?: string } }> };
+              kvlistValue?: {
+                values: Array<{ key: string; value: { stringValue?: string } }>;
+              };
             };
           }>;
         };

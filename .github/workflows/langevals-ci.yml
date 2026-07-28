@@ -28,6 +28,9 @@ jobs:
       - uses: ./.github/actions/detect-changes
         id: detect
         with:
+          # push-strategy diff: the test job spends real LLM money, so it
+          # must not run on pushes that touched nothing under langevals/.
+          push-strategy: diff
           filters: |
             relevant:
               - 'langevals/**'

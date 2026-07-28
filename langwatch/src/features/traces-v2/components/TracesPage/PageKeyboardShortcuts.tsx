@@ -1,10 +1,15 @@
+import { useMemo } from "react";
+import { LuSearch } from "react-icons/lu";
 import { useUIStore } from "../../stores/uiStore";
+import { useAskLangyFromSearch } from "../SearchBar/useAskLangyFromSearch";
 import {
   KeyboardShortcutsHelp,
   type ShortcutGroup,
 } from "../TraceDrawer/KeyboardShortcutsHelp";
 
-const PAGE_GROUPS: ShortcutGroup[] = [
+// ⌘I fires the search bar's ask affordance, which belongs to Langy when
+// Langy is available — so the dialog names whoever will actually answer.
+const pageGroups = (askShortcutLabel: string): ShortcutGroup[] => [
   {
     title: "Navigation",
     items: [
@@ -12,6 +17,29 @@ const PAGE_GROUPS: ShortcutGroup[] = [
       { keys: ["/"], label: "Focus search" },
       { keys: ["⌘ / Ctrl", "F"], label: "Find in loaded traces" },
       { keys: ["?"], label: "Show this help" },
+    ],
+  },
+  {
+    // Was a separate lightbulb popover next to the search bar; folded in
+    // here so search tips live with every other shortcut.
+    title: "Search",
+    icon: LuSearch,
+    accent: "purple",
+    items: [
+      {
+        keys: ["⌘ / Ctrl", "I"],
+        label: askShortcutLabel,
+        detail: "Describe what you want in plain English",
+      },
+      {
+        keys: ["Shift", "click"],
+        label: "Add a facet to the query with OR instead of AND",
+        detail: "⌘ / Ctrl + click a facet does the same",
+      },
+      {
+        keys: ["AND / OR"],
+        label: "Click an operator in the query to flip it in place",
+      },
     ],
   },
   {
@@ -28,7 +56,6 @@ const PAGE_GROUPS: ShortcutGroup[] = [
     title: "Filter sidebar",
     items: [
       { keys: ["C"], label: "Configure which facets show" },
-      { keys: ["F"], label: "Find a facet" },
       { keys: ["E"], label: "Expand or collapse all sections" },
       { keys: ["X"], label: "Clear all filters" },
       { keys: ["R"], label: "Reset to the current lens" },
@@ -54,12 +81,20 @@ const PAGE_GROUPS: ShortcutGroup[] = [
 export const PageKeyboardShortcuts: React.FC = () => {
   const open = useUIStore((s) => s.shortcutsHelpOpen);
   const setOpen = useUIStore((s) => s.setShortcutsHelpOpen);
+  const { langyRoutesAsk } = useAskLangyFromSearch();
+  const groups = useMemo(
+    () =>
+      pageGroups(
+        langyRoutesAsk ? "Ask Langy about these traces" : "Ask AI to build a query",
+      ),
+    [langyRoutesAsk],
+  );
 
   return (
     <KeyboardShortcutsHelp
       open={open}
       onClose={() => setOpen(false)}
-      groups={PAGE_GROUPS}
+      groups={groups}
     />
   );
 };

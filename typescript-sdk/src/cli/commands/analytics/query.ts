@@ -1,8 +1,10 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { AnalyticsApiService } from "@/client-sdk/services/analytics/analytics-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
+import type { CommandResult } from "../../utils/output";
+import { toTimeseriesShape } from "./timeseriesShape";
 
 const METRIC_PRESETS: Record<string, { metric: string; aggregation: string }> = {
   "trace-count": { metric: "metadata.trace_id", aggregation: "cardinality" },
@@ -15,6 +17,26 @@ const METRIC_PRESETS: Record<string, { metric: string; aggregation: string }> = 
   "eval-pass-rate": { metric: "evaluations.evaluation_pass_rate", aggregation: "avg" },
 };
 
+// Natural-language requests often arrive as `--metric latency` or `--metric
+// errors`. Keep those useful aliases at the CLI boundary instead of forwarding
+// them as invalid backend enum values and turning a good request into a generic
+// validation error.
+const METRIC_ALIASES: Record<string, keyof typeof METRIC_PRESETS> = {
+  latency: "avg-latency",
+  "average-latency": "avg-latency",
+  cost: "total-cost",
+  traces: "trace-count",
+  "trace-counts": "trace-count",
+  "pass-rate": "eval-pass-rate",
+};
+
+/**
+ * Returns the timeseries rather than printing it: the output port renders it
+ * in whatever format the caller asked for (utils/output.ts). `data` keeps the
+ * shape the previous `--format json` branch established — the raw result with
+ * the RESOLVED `metric`/`aggregation` attached, so Langy and other consumers
+ * can label a result without guessing from the numeric keys.
+ */
 export const queryAnalyticsCommand = async (options: {
   metric?: string;
   aggregation?: string;
@@ -22,8 +44,7 @@ export const queryAnalyticsCommand = async (options: {
   endDate?: string;
   groupBy?: string;
   timeScale?: string;
-  format?: string;
-}): Promise<void> => {
+}): Promise<CommandResult | void> => {
   checkApiKey();
 
   const service = new AnalyticsApiService();
@@ -32,8 +53,13 @@ export const queryAnalyticsCommand = async (options: {
   let metric: string;
   let aggregation: string;
 
-  if (options.metric && options.metric in METRIC_PRESETS) {
-    const preset = METRIC_PRESETS[options.metric]!;
+  const requestedMetric = options.metric?.trim().toLowerCase();
+  const presetName = requestedMetric
+    ? (METRIC_ALIASES[requestedMetric] ?? requestedMetric)
+    : undefined;
+
+  if (presetName && presetName in METRIC_PRESETS) {
+    const preset = METRIC_PRESETS[presetName]!;
     metric = preset.metric;
     aggregation = options.aggregation ?? preset.aggregation;
   } else {
@@ -51,7 +77,7 @@ export const queryAnalyticsCommand = async (options: {
     ? new Date(options.endDate).getTime()
     : now;
 
-  const spinner = ora(`Querying ${metric} (${aggregation})...`).start();
+  const spinner = createSpinner(`Querying ${metric} (${aggregation})...`).start();
 
   try {
     const result = await service.timeseries({
@@ -70,63 +96,76 @@ export const queryAnalyticsCommand = async (options: {
 
     spinner.succeed("Analytics query complete");
 
-    if (options.format === "json") {
-      console.log(JSON.stringify(result, null, 2));
-      return;
-    }
+    return {
+      // The raw result, plus the card-shaped view of it. The raw arrays stay
+      // exactly as they were for anything already reading them; `series` is
+      // what makes this a chart instead of a table of numbers (see
+      // `timeseriesShape.ts`, and `CARD_PROBES` for how it is picked up).
+      data: {
+        ...result,
+        metric,
+        aggregation,
+        ...(toTimeseriesShape({
+          currentPeriod: result.currentPeriod,
+          previousPeriod: result.previousPeriod,
+          metric,
+        }) ?? {}),
+      },
+      table: () => {
+        console.log();
+        console.log(chalk.bold("Current Period:"));
 
-    console.log();
-    console.log(chalk.bold("Current Period:"));
-
-    if (result.currentPeriod.length === 0) {
-      console.log(chalk.gray("  No data for the current period."));
-    } else {
-      for (const dataPoint of result.currentPeriod) {
-        const entries = Object.entries(dataPoint).filter(
-          ([key]) => key !== "date",
-        );
-        const dateStr = dataPoint.date
-          ? new Date(dataPoint.date as number).toLocaleDateString()
-          : "—";
-
-        if (entries.length === 0) {
-          console.log(`  ${chalk.gray(dateStr)}: ${chalk.gray("no data")}`);
+        if (result.currentPeriod.length === 0) {
+          console.log(chalk.gray("  No data for the current period."));
         } else {
-          const values = entries
-            .map(([key, value]) => `${chalk.cyan(key)}: ${formatValue(value)}`)
-            .join(", ");
-          console.log(`  ${chalk.gray(dateStr)}: ${values}`);
-        }
-      }
-    }
+          for (const dataPoint of result.currentPeriod) {
+            const entries = Object.entries(dataPoint).filter(
+              ([key]) => key !== "date",
+            );
+            const dateStr = dataPoint.date
+              ? new Date(dataPoint.date as number).toLocaleDateString()
+              : "—";
 
-    if (result.previousPeriod.length > 0) {
-      console.log();
-      console.log(chalk.bold("Previous Period:"));
-      for (const dataPoint of result.previousPeriod) {
-        const entries = Object.entries(dataPoint).filter(
-          ([key]) => key !== "date",
+            if (entries.length === 0) {
+              console.log(`  ${chalk.gray(dateStr)}: ${chalk.gray("no data")}`);
+            } else {
+              const values = entries
+                .map(([key, value]) => `${chalk.cyan(key)}: ${formatValue(value)}`)
+                .join(", ");
+              console.log(`  ${chalk.gray(dateStr)}: ${values}`);
+            }
+          }
+        }
+
+        if (result.previousPeriod.length > 0) {
+          console.log();
+          console.log(chalk.bold("Previous Period:"));
+          for (const dataPoint of result.previousPeriod) {
+            const entries = Object.entries(dataPoint).filter(
+              ([key]) => key !== "date",
+            );
+            const dateStr = dataPoint.date
+              ? new Date(dataPoint.date as number).toLocaleDateString()
+              : "—";
+
+            if (entries.length > 0) {
+              const values = entries
+                .map(([key, value]) => `${chalk.cyan(key)}: ${formatValue(value)}`)
+                .join(", ");
+              console.log(`  ${chalk.gray(dateStr)}: ${values}`);
+            }
+          }
+        }
+
+        console.log();
+        console.log(chalk.gray("Available presets: " + Object.keys(METRIC_PRESETS).join(", ")));
+        console.log(
+          chalk.gray(
+            `Use ${chalk.cyan("langwatch analytics query --metric <preset> -f json")} for raw data`,
+          ),
         );
-        const dateStr = dataPoint.date
-          ? new Date(dataPoint.date as number).toLocaleDateString()
-          : "—";
-
-        if (entries.length > 0) {
-          const values = entries
-            .map(([key, value]) => `${chalk.cyan(key)}: ${formatValue(value)}`)
-            .join(", ");
-          console.log(`  ${chalk.gray(dateStr)}: ${values}`);
-        }
-      }
-    }
-
-    console.log();
-    console.log(chalk.gray("Available presets: " + Object.keys(METRIC_PRESETS).join(", ")));
-    console.log(
-      chalk.gray(
-        `Use ${chalk.cyan("langwatch analytics query --metric <preset> -f json")} for raw data`,
-      ),
-    );
+      },
+    };
   } catch (error) {
     failSpinner({ spinner, error, action: "query analytics" });
     process.exit(1);

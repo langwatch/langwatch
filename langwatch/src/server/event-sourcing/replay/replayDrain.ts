@@ -28,22 +28,25 @@ function foldGroupActiveKey({
 }
 
 /**
- * Map groupIds end in the projection's `groupKeyFn(event)` output (e.g.
- * `span:${event.id}`), which cannot be reconstructed from discovered
- * aggregates. Drain maps by scanning for ANY active group under the
- * `${tenantId}/map/${projectionName}/` prefix instead.
+ * Map and state groupIds may end in a projection-defined key, which cannot be
+ * reconstructed from discovered aggregates. Drain those lanes by scanning for
+ * any active group below their job-path prefix. Fold groups use the exact-key
+ * path above and intentionally never enter this scan.
  */
-async function hasActiveMapGroups({
+async function hasActiveGroups({
   redis,
   tenantIds,
   projectionName,
+  scannedGroupPath,
 }: {
   redis: IORedis;
   tenantIds: Iterable<string>;
   projectionName: string;
+  /** Fold groups are checked directly; only these custom-key lanes need a scan. */
+  scannedGroupPath: "map" | "state";
 }): Promise<boolean> {
   for (const tenantId of tenantIds) {
-    const pattern = `${GQ_KEY_PREFIX}group:${tenantId}/map/${projectionName}/*:active`;
+    const pattern = `${GQ_KEY_PREFIX}group:${tenantId}/${scannedGroupPath}/${projectionName}/*:active`;
     let cursor = "0";
     do {
       const [nextCursor, keys] = await redis.scan(
@@ -117,8 +120,14 @@ export async function waitForActiveJobs({
 
   while (Date.now() - start < maxWaitMs) {
     let allDrained: boolean;
-    if (kind === "map") {
-      allDrained = !(await hasActiveMapGroups({ redis, tenantIds, projectionName }));
+    if (kind === "map" || kind === "state") {
+      const jobPath = kind === "map" ? "map" : "state";
+      allDrained = !(await hasActiveGroups({
+        redis,
+        tenantIds,
+        projectionName,
+        scannedGroupPath: jobPath,
+      }));
     } else {
       const pipeline = redis.pipeline();
       for (const agg of aggregates) {
@@ -210,10 +219,11 @@ export async function waitForAllActiveJobs({
     let mapsDrained = true;
     for (const proj of mapProjections) {
       if (
-        await hasActiveMapGroups({
+        await hasActiveGroups({
           redis,
           tenantIds,
           projectionName: proj.projectionName,
+          scannedGroupPath: "map",
         })
       ) {
         mapsDrained = false;

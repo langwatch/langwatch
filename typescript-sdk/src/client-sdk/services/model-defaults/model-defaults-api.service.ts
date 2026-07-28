@@ -1,6 +1,7 @@
 import { DEFAULT_ENDPOINT } from "@/internal/constants";
 import { buildAuthHeaders } from "@/internal/api/auth";
 import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
+import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
 
 export type ModelDefaultScopeType = "ORGANIZATION" | "TEAM" | "PROJECT";
 
@@ -93,6 +94,12 @@ export class ModelDefaultsApiService {
       const message = formatApiErrorMessage({
         error: parsed,
         options: { status: response.status },
+      });
+      throwIfHandledError({
+        operation: options?.method ?? "GET",
+        error: parsed,
+        status: response.status,
+        message: `HTTP ${response.status}: ${message}`,
       });
       throw new ModelDefaultsApiError(
         `HTTP ${response.status}: ${message}`,

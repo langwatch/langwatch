@@ -10,6 +10,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { groupBy } from "lodash-es";
+import { getDisplayHandle } from "~/prompts/utils/promptHandle";
 import { ChevronRight, FileText, FolderOpen, Plus, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import { LuArrowLeft } from "react-icons/lu";
@@ -35,15 +36,6 @@ export type PromptListDrawerProps = {
     outputs?: Array<{ identifier: string; type: string }>;
   }) => void;
   onCreateNew?: () => void;
-};
-
-/**
- * Get display name from a prompt handle.
- * Handles folder-prefixed names like "shared/my-prompt" -> "my-prompt"
- */
-const getDisplayHandle = (handle?: string | null): string => {
-  if (!handle) return "New Prompt";
-  return handle.includes("/") ? handle.split("/")[1]! : handle;
 };
 
 /**

@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { ClickHouseClient } from "@clickhouse/client";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const promClientMocks = vi.hoisted(() => ({
   constructedGaugeNames: [] as string[],
@@ -12,7 +12,7 @@ const loggerMocks = vi.hoisted(() => ({
   error: vi.fn(),
 }));
 
-vi.mock("~/utils/logger/server", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => loggerMocks,
 }));
 
@@ -224,6 +224,13 @@ describe("ClickHouse metrics", () => {
     });
 
     describe("given backup status collection", () => {
+      beforeEach(() => {
+        process.env.CLICKHOUSE_BACKUP_METRICS_ENABLED = "true";
+      });
+      afterEach(() => {
+        delete process.env.CLICKHOUSE_BACKUP_METRICS_ENABLED;
+      });
+
       describe("when system.backup_log returns data", () => {
         it("queries system.backup_log for backup status", async () => {
           const partsResult = {
@@ -432,42 +439,68 @@ describe("ClickHouse metrics", () => {
         return typeof arg === "string" && arg.includes(needle);
       }).length;
 
-    describe("when system.backup_log fails repeatedly", () => {
-      it("emits exactly one warn for repeated failures until recovery", async () => {
-        const client = buildMockClient(() => true);
+    describe("when backup metrics are enabled", () => {
+      beforeEach(() => {
+        process.env.CLICKHOUSE_BACKUP_METRICS_ENABLED = "true";
+      });
+      afterEach(() => {
+        delete process.env.CLICKHOUSE_BACKUP_METRICS_ENABLED;
+      });
 
-        await metrics.collectStorageStats(client);
-        await metrics.collectStorageStats(client);
-        await metrics.collectStorageStats(client);
+      describe("when system.backup_log fails repeatedly", () => {
+        it("emits exactly one warn for repeated failures until recovery", async () => {
+          const client = buildMockClient(() => true);
 
-        // logger.warn signature is (obj, msg). First failure warns;
-        // subsequent failures fall through to debug.
-        expect(
-          countCallsMatching(loggerMocks.warn.mock.calls, 1, "system.backup_log"),
-        ).toBe(1);
+          await metrics.collectStorageStats(client);
+          await metrics.collectStorageStats(client);
+          await metrics.collectStorageStats(client);
+
+          // logger.warn signature is (obj, msg). First failure warns;
+          // subsequent failures fall through to debug.
+          expect(
+            countCallsMatching(loggerMocks.warn.mock.calls, 1, "system.backup_log"),
+          ).toBe(1);
+        });
+      });
+
+      describe("when system.backup_log recovers then fails again", () => {
+        it("warns again on a fresh failure after recovering", async () => {
+          let shouldFail = true;
+          const client = buildMockClient(() => shouldFail);
+
+          await metrics.collectStorageStats(client); // fail → warn (#1)
+          await metrics.collectStorageStats(client); // fail → debug (suppressed)
+          shouldFail = false;
+          await metrics.collectStorageStats(client); // recover → info
+          shouldFail = true;
+          await metrics.collectStorageStats(client); // fail → warn (#2)
+
+          expect(
+            countCallsMatching(loggerMocks.warn.mock.calls, 1, "system.backup_log"),
+          ).toBe(2);
+          // logger.info("ClickHouse backup stats collection recovered ...")
+          // is called with the message as the first arg.
+          expect(
+            countCallsMatching(loggerMocks.info.mock.calls, 0, "recovered"),
+          ).toBe(1);
+        });
       });
     });
 
-    describe("when system.backup_log recovers then fails again", () => {
-      it("warns again on a fresh failure after recovering", async () => {
-        let shouldFail = true;
-        const client = buildMockClient(() => shouldFail);
+    describe("when backup metrics are not enabled (the default)", () => {
+      // system.backup_log only exists where backups are configured, so anywhere
+      // that hasn't opted in the collector must skip it entirely, leaving only
+      // parts + disks.
+      it("skips the system.backup_log query entirely", async () => {
+        const client = buildMockClient(() => false);
 
-        await metrics.collectStorageStats(client); // fail → warn (#1)
-        await metrics.collectStorageStats(client); // fail → debug (suppressed)
-        shouldFail = false;
-        await metrics.collectStorageStats(client); // recover → info
-        shouldFail = true;
-        await metrics.collectStorageStats(client); // fail → warn (#2)
+        await metrics.collectStorageStats(client);
 
-        expect(
-          countCallsMatching(loggerMocks.warn.mock.calls, 1, "system.backup_log"),
-        ).toBe(2);
-        // logger.info("ClickHouse backup stats collection recovered ...")
-        // is called with the message as the first arg.
-        expect(
-          countCallsMatching(loggerMocks.info.mock.calls, 0, "recovered"),
-        ).toBe(1);
+        expect(client.query).not.toHaveBeenCalledWith(
+          expect.objectContaining({
+            query: expect.stringContaining("system.backup_log"),
+          }),
+        );
       });
     });
   });

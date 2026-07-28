@@ -19,7 +19,7 @@ Feature: getProjectLambdaArn — per-project ARN cache + single-flight
   # cluster. On 2026-05-11 at 11:46 AMS a single project's burst triggered
   # cluster-wide CallerRateLimitExceeded (HTTP 429), each retry burning
   # 4-12s of worker budget before failing, which stalled unrelated
-  # event-sourcing fold groups (e.g. projectDailySdkUsage/<date>:other:)
+  # event-sourcing fold groups (e.g. traceSummary/<date>:other:)
   # because workers were saturated on retry sleeps.
   #
   # The fix has two layers:

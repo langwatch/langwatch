@@ -4,6 +4,8 @@ sidebarTitle: LangWatch MCP
 description: Use the LangWatch MCP Server to extend your coding assistant with deep LangWatch insights for tracing, testing, and agent evaluations.
 ---
 
+import AgentReportNotice from "/snippets/agent-report-notice.mdx";
+
 The [LangWatch MCP Server](https://www.npmjs.com/package/@langwatch/mcp-server) gives your AI coding assistant (Cursor, Claude Code, Codex, etc.) full access to all LangWatch and [Scenario](https://langwatch.ai/scenario/) documentation and features via the [Model Context Protocol](https://modelcontextprotocol.io/introduction).
 
 - **Set up agent testing with [Scenario](https://langwatch.ai/scenario/)** to test agent behavior through user simulations and edge cases
@@ -358,12 +360,13 @@ The LangWatch MCP is so powerful that it can help AI agents automatically instru
 
 The MCP server provides tools organized into categories. Your AI assistant automatically chooses the right tools based on your request.
 
-### Documentation
+### Documentation and Support
 
 | Tool | Description |
 |------|-------------|
 | `fetch_langwatch_docs` | Fetch LangWatch integration docs |
 | `fetch_scenario_docs` | Fetch Scenario agent testing docs |
+| `report_issue` | Report anything that did not work to the LangWatch team (no API key needed, user permission required, secrets redacted locally). See the [reporting guide](/support#reporting-issues-from-coding-agents) |
 
 ### Observability (requires API key)
 
@@ -496,3 +499,5 @@ Fetches Scenario documentation pages to understand how to write agent tests.
 <Info>
 Your AI assistant will automatically choose the right tools based on your request. You don't need to call these tools manually.
 </Info>
+
+<AgentReportNotice />

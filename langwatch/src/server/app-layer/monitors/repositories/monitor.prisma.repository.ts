@@ -1,4 +1,8 @@
-import { EvaluationExecutionMode, type PrismaClient } from "@prisma/client";
+import {
+  EvaluationExecutionMode,
+  type Monitor,
+  type PrismaClient,
+} from "@prisma/client";
 import type { MonitorRepository, MonitorSummary, MonitorWithEvaluator } from "./monitor.repository";
 
 export class PrismaMonitorRepository implements MonitorRepository {
@@ -39,6 +43,21 @@ export class PrismaMonitorRepository implements MonitorRepository {
             workflowId: true,
           },
         },
+      },
+    });
+  }
+
+  async findAllByIds({
+    monitorIds,
+    projectId,
+  }: {
+    monitorIds: string[];
+    projectId: string;
+  }): Promise<Monitor[]> {
+    return this.prisma.monitor.findMany({
+      where: {
+        id: { in: monitorIds },
+        projectId,
       },
     });
   }

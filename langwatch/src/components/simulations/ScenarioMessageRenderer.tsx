@@ -1,15 +1,16 @@
 import { Box, HStack, Image, Text, VStack } from "@chakra-ui/react";
 import { useEffect, useMemo, useRef } from "react";
 import { Settings } from "react-feather";
+import { getDisplayRoleVisuals } from "~/features/traces-v2/components/TraceDrawer/scenarioRoles";
+import { Bubble } from "~/features/traces-v2/components/TraceTable/registry/addons/conversation/Bubble";
 import type { StreamingMessage } from "~/hooks/useSimulationStreamingState";
 import type { ScenarioMessageSnapshotEvent } from "~/server/scenarios/scenario-event.types";
 import { coerceContentToArray } from "~/server/stored-objects/coerce-content-to-array";
-import { visitContentPart } from "~/server/stored-objects/visit-content-part";
-import { TraceMessage } from "../copilot-kit/TraceMessage";
-import { Markdown } from "../Markdown";
+import { visitContentPart } from "~/shared/content-parts/visit-content-part";
+import type { MediaPartData } from "~/shared/traces/mediaParts";
 import { RenderInputOutput } from "../traces/RenderInputOutput";
-import type { MediaPartData } from "./MediaPart";
 import { MediaPart } from "./MediaPart";
+import { RunTurnSeparator } from "./RunTurnSeparator";
 import { useSequentialAudioPlayback } from "./useSequentialAudioPlayback";
 import { safeJsonParseOrStringFallback } from "./utils/safe-json-parse-or-string-fallback";
 
@@ -72,6 +73,10 @@ export function ScenarioMessageRenderer({
     [messages, streamingMessages],
   );
 
+  // Drawer variant groups consecutive items that share a trace into turns,
+  // each headed by a Traces V2-style separator line that opens the trace.
+  const turns = useMemo(() => groupIntoTurns(items), [items]);
+
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [items]);
@@ -97,205 +102,182 @@ export function ScenarioMessageRenderer({
     orderedIds: orderedAudioIds,
   });
 
+  const renderItem = (item: DisplayItem) => {
+    switch (item.kind) {
+      case "text": {
+        // Scenario role mapping shared with the Traces V2 drawer: the
+        // agent under test renders as the conversation's "user" side
+        // (left/blue), the simulated user as the "assistant" side
+        // (right/purple, flask icon).
+        const visuals = getDisplayRoleVisuals(
+          item.role === "assistant" ? "assistant" : "user",
+          { isScenario: true },
+        );
+        const RoleIcon = visuals.Icon;
+        return (
+          <VStack
+            key={item.id}
+            align={alignForRole(item.role)}
+            data-align={alignForRole(item.role)}
+            gap={1}
+            width="100%"
+          >
+            <Bubble
+              side={visuals.displayRole === "user" ? "left" : "right"}
+              tone={visuals.displayRole}
+              label={visuals.bubbleLabel}
+              icon={<RoleIcon />}
+              text={item.content}
+              size={smallerView ? "compact" : "regular"}
+              maxChars={smallerView ? 320 : 800}
+            />
+          </VStack>
+        );
+      }
+
+      case "image":
+        return (
+          <VStack
+            key={item.id}
+            align={alignForRole(item.role)}
+            data-align={alignForRole(item.role)}
+          >
+            <Image src={item.src} maxH="200px" borderRadius="md" />
+          </VStack>
+        );
+
+      case "media": {
+        // Audio/video players stretch to the container width; attachment
+        // chips hug the message side like a bubble would (user sent it →
+        // right, agent → left). Mirrored into data-media-align because
+        // jsdom cannot read the compiled flex styles.
+        const innerAlign =
+          item.part.type === "binary"
+            ? alignForRole(item.role)
+            : ("stretch" as const);
+        return (
+          <VStack
+            key={item.id}
+            align={alignForRole(item.role)}
+            data-align={alignForRole(item.role)}
+            width="100%"
+          >
+            <VStack
+              align={innerAlign}
+              data-media-align={innerAlign}
+              gap={1}
+              width={{ base: "100%", md: "min(420px, 95%)" }}
+            >
+              <MediaPart
+                part={item.part}
+                projectId={projectId}
+                audioPlayback={
+                  item.part.type === "audio"
+                    ? getAudioProps(item.id)
+                    : undefined
+                }
+              />
+              {item.transcript && (
+                <Text
+                  fontSize="xs"
+                  color="fg.muted"
+                  fontStyle="italic"
+                  paddingX={2}
+                  textAlign={textAlignForRole(item.role)}
+                >
+                  {item.transcript}
+                </Text>
+              )}
+            </VStack>
+          </VStack>
+        );
+      }
+
+      case "tool_call":
+        return (
+          <VStack key={item.id} align="flex-start" gap={1.5} width="100%">
+            <HStack gap={1.5} color="orange.fg">
+              <Settings size={12} />
+              <Text
+                textStyle="2xs"
+                fontWeight="600"
+                textTransform="uppercase"
+                letterSpacing="0.06em"
+              >
+                {item.name}
+              </Text>
+            </HStack>
+            <Box
+              w="full"
+              maxW="85%"
+              bg="bg.muted/60"
+              borderWidth="1px"
+              borderColor="border.muted"
+              borderRadius="lg"
+              padding={3}
+            >
+              <RenderInputOutput value={item.arguments as string} />
+            </Box>
+          </VStack>
+        );
+
+      case "tool_result":
+        return (
+          <VStack key={item.id} align="flex-start" gap={1.5} width="100%">
+            <HStack gap={1.5} color="fg.muted">
+              <Settings size={12} />
+              <Text
+                textStyle="2xs"
+                fontWeight="600"
+                textTransform="uppercase"
+                letterSpacing="0.06em"
+              >
+                Tool result
+              </Text>
+            </HStack>
+            <Box
+              w="full"
+              maxW="85%"
+              bg="bg.muted/60"
+              borderWidth="1px"
+              borderColor="border.muted"
+              borderRadius="lg"
+              padding={3}
+            >
+              <RenderInputOutput value={item.result as string} />
+            </Box>
+          </VStack>
+        );
+
+      default:
+        return null;
+    }
+  };
+
   return (
     <VStack
       align="stretch"
       gap={smallerView ? 2 : 4}
-      padding={smallerView ? 2 : 4}
+      // Drawer variant: the section content already pads — avoid doubling.
+      padding={smallerView ? 2 : 0}
       fontSize={smallerView ? "xs" : "sm"}
       width="100%"
       height="100%"
       overflowY="auto"
     >
-      {items.map((item) => {
-        switch (item.kind) {
-          case "text":
-            return (
-              <VStack
-                key={item.id}
-                align={alignForRole(item.role)}
-                data-align={alignForRole(item.role)}
-                gap={1}
-              >
-                {item.role === "assistant" ? (
-                  <Box
-                    bg="bg.panel"
-                    border="1px solid"
-                    borderColor="border"
-                    borderRadius="lg"
-                    paddingX={4}
-                    paddingY={3}
-                    maxW="95%"
-                    fontSize="sm"
-                    css={{
-                      "& h1": { fontSize: "lg", fontWeight: "bold" },
-                      "& h2": { fontSize: "md", fontWeight: "bold" },
-                      "& h3": { fontSize: "sm", fontWeight: "semibold" },
-                      "& > .markdown > *:last-child": { marginBottom: 0 },
-                    }}
-                  >
-                    <Markdown>{item.content}</Markdown>
-                  </Box>
-                ) : (
-                  <Box
-                    bg="bg.subtle"
-                    border="1px solid"
-                    borderColor="border"
-                    borderRadius="lg"
-                    paddingX={3}
-                    paddingY={2}
-                    maxW="85%"
-                    maxH={smallerView ? undefined : "150px"}
-                    overflowY="auto"
-                    fontSize="sm"
-                    color="fg.muted"
-                    whiteSpace="pre-wrap"
-                  >
-                    {item.content}
-                  </Box>
-                )}
-                {!smallerView && item.traceId && item.role === "assistant" && (
-                  <TraceMessage traceId={item.traceId} />
-                )}
-              </VStack>
-            );
-
-          case "image":
-            return (
-              <VStack
-                key={item.id}
-                align={alignForRole(item.role)}
-                data-align={alignForRole(item.role)}
-              >
-                <Image src={item.src} maxH="200px" borderRadius="md" />
-              </VStack>
-            );
-
-          case "media": {
-            return (
-              <VStack
-                key={item.id}
-                align={alignForRole(item.role)}
-                data-align={alignForRole(item.role)}
-                width="100%"
-              >
-                <VStack
-                  align="stretch"
-                  gap={1}
-                  width={{ base: "100%", md: "min(420px, 95%)" }}
-                >
-                  <MediaPart
-                    part={item.part}
-                    projectId={projectId}
-                    audioPlayback={
-                      item.part.type === "audio"
-                        ? getAudioProps(item.id)
-                        : undefined
-                    }
-                  />
-                  {item.transcript && (
-                    <Text
-                      fontSize="xs"
-                      color="fg.muted"
-                      fontStyle="italic"
-                      paddingX={2}
-                      textAlign={textAlignForRole(item.role)}
-                    >
-                      {item.transcript}
-                    </Text>
-                  )}
-                </VStack>
-                {!smallerView && item.traceId && item.role === "assistant" && (
-                  <TraceMessage traceId={item.traceId} />
-                )}
-              </VStack>
-            );
-          }
-
-          case "tool_call":
-            return (
-              <VStack key={item.id} align="flex-start" gap={2}>
-                <HStack gap={2}>
-                  <Box color="orange.fg">
-                    <Settings size={12} />
-                  </Box>
-                  <Text fontSize="xs" color="orange.fg" fontWeight="medium">
-                    {item.name}
-                  </Text>
-                </HStack>
-                <Box
-                  w="full"
-                  maxW="80%"
-                  bg="bg.subtle"
-                  border="1px solid"
-                  borderColor="border"
-                  borderRadius="lg"
-                  p={3}
-                >
-                  <Text
-                    fontSize="xs"
-                    fontWeight="semibold"
-                    color="fg.muted"
-                    mb={2}
-                  >
-                    Tool arguments
-                  </Text>
-                  <Box
-                    bg="bg.panel"
-                    border="1px solid"
-                    borderColor="border"
-                    borderRadius="md"
-                    p={2}
-                  >
-                    <RenderInputOutput value={item.arguments as string} />
-                  </Box>
-                </Box>
-                {!smallerView && item.traceId && (
-                  <TraceMessage traceId={item.traceId} />
-                )}
-              </VStack>
-            );
-
-          case "tool_result":
-            return (
-              <VStack key={item.id} align="flex-start" gap={2}>
-                <Box
-                  w="full"
-                  maxW="80%"
-                  bg="bg.subtle"
-                  border="1px solid"
-                  borderColor="border"
-                  borderRadius="lg"
-                  p={3}
-                >
-                  <Text
-                    fontSize="xs"
-                    fontWeight="semibold"
-                    color="fg.muted"
-                    mb={2}
-                  >
-                    Tool result
-                  </Text>
-                  <Box
-                    bg="bg.panel"
-                    border="1px solid"
-                    borderColor="border"
-                    borderRadius="md"
-                    p={2}
-                  >
-                    <RenderInputOutput value={item.result as string} />
-                  </Box>
-                </Box>
-                {!smallerView && item.traceId && (
-                  <TraceMessage traceId={item.traceId} />
-                )}
-              </VStack>
-            );
-
-          default:
-            return null;
-        }
-      })}
+      {smallerView
+        ? items.map(renderItem)
+        : turns.map((turn) => (
+            <VStack key={turn.key} align="stretch" gap={4} width="100%">
+              {turn.traceId && turn.turnNumber != null && (
+                <RunTurnSeparator
+                  index={turn.turnNumber}
+                  traceId={turn.traceId}
+                />
+              )}
+              {turn.items.map(renderItem)}
+            </VStack>
+          ))}
       <div ref={endRef} />
     </VStack>
   );
@@ -364,7 +346,6 @@ function flattenMessages(
     }
   }
 
-  deduplicateTraceIds(items);
   return items;
 }
 
@@ -515,12 +496,33 @@ function flattenMixed(content: unknown[], msg: RawMessage): DisplayItem[] {
   return items;
 }
 
-function deduplicateTraceIds(items: DisplayItem[]): void {
-  const seen = new Set<string>();
-  for (let i = items.length - 1; i >= 0; i--) {
-    const t = items[i]!.traceId;
-    if (!t) continue;
-    if (seen.has(t)) items[i]!.traceId = undefined;
-    seen.add(t);
+/**
+ * Groups consecutive display items that share a trace id into turns.
+ * Items without a trace id (e.g. still-streaming messages) form their own
+ * unnumbered group so they render without a separator.
+ */
+type ConversationTurn = {
+  key: string;
+  traceId?: string;
+  turnNumber?: number;
+  items: DisplayItem[];
+};
+
+function groupIntoTurns(items: DisplayItem[]): ConversationTurn[] {
+  const turns: ConversationTurn[] = [];
+  let turnNumber = 0;
+  for (const item of items) {
+    const last = turns[turns.length - 1];
+    if (last && (last.traceId ?? "") === (item.traceId ?? "")) {
+      last.items.push(item);
+      continue;
+    }
+    turns.push({
+      key: item.id,
+      traceId: item.traceId,
+      turnNumber: item.traceId ? ++turnNumber : undefined,
+      items: [item],
+    });
   }
+  return turns;
 }

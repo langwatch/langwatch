@@ -3,19 +3,23 @@ import * as path from "path";
 import chalk from "chalk";
 import { FileManager } from "../utils/fileManager";
 import { checkApiKey } from "../utils/apiKey";
+import {
+  commandValidationError,
+  reportCommandError,
+} from "../utils/errorOutput";
 import { ensureProjectInitialized } from "../utils/init";
 import { DEFAULT_PROMPT_MODEL } from "../constants";
-
-type CreateOptions = Record<string, unknown>;
+import type { CommandResult } from "../utils/output";
 
 export const createCommand = async (
   name: string,
-  _options: CreateOptions,
-): Promise<void> => {
+): Promise<CommandResult | void> => {
   try {
     // Validate prompt name
     if (!name || name.trim() === "") {
-      console.error(chalk.red("Error: Prompt name cannot be empty"));
+      reportCommandError({
+        error: commandValidationError("Prompt name cannot be empty"),
+      });
       process.exit(1);
     }
 
@@ -33,9 +37,11 @@ export const createCommand = async (
     );
 
     if (fs.existsSync(promptPath)) {
-      console.error(
-        chalk.red(`Error: Prompt file already exists at ${promptPath}`),
-      );
+      reportCommandError({
+        error: commandValidationError(
+          `Prompt file already exists at ${promptPath}`,
+        ),
+      });
       process.exit(1);
     }
 
@@ -78,16 +84,19 @@ messages:
     FileManager.savePromptsLock(lock);
 
     const displayPath = `./${relativePath}`;
-    console.log(
-      chalk.green(`✓ Created prompt file: ${chalk.cyan(displayPath)}`),
-    );
-    console.log(chalk.gray(`  Edit this file and then run:`));
-    console.log(chalk.cyan(`  langwatch prompt sync`));
+
+    return {
+      data: { name, path: relativePath, dependency: `file:${relativePath}` },
+      table: () => {
+        console.log(
+          chalk.green(`✓ Created prompt file: ${chalk.cyan(displayPath)}`),
+        );
+        console.log(chalk.gray(`  Edit this file and then run:`));
+        console.log(chalk.cyan(`  langwatch prompt sync`));
+      },
+    };
   } catch (error) {
-    console.error(
-      chalk.red("Unexpected error:"),
-      error instanceof Error ? error.message : error,
-    );
+    reportCommandError({ error });
     process.exit(1);
   }
 };

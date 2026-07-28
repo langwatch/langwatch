@@ -48,6 +48,36 @@ Feature: Group-coalesced fold projections
     Then the fold state is loaded and stored once
     And that reactor is dispatched once per event, in occurredAt order
 
+  @unit @coalescing @reactors
+  Scenario: Reactors keyed on the aggregate are dispatched once per coalesced batch
+    Given a coalesced batch of five events for one aggregate
+    And a reactor whose deduplication id is the same for every event in the batch
+    When the batch is folded
+    Then the reactor is dispatched once
+    And it receives the last event in occurredAt order
+
+  @unit @coalescing @reactors
+  Scenario: Reactors keyed per event are still dispatched for every event
+    Given a coalesced batch of five events for one aggregate
+    And a reactor whose deduplication id includes the event id
+    When the batch is folded
+    Then the reactor is dispatched five times
+
+  @unit @coalescing @reactors
+  Scenario: Reactors without a deduplication id are dispatched for every event
+    Given a coalesced batch of five events for one aggregate
+    And a reactor with no deduplication id
+    When the batch is folded
+    Then the reactor is dispatched five times
+
+  @unit @coalescing @reactors
+  Scenario: The relevance check still filters events before collapsing
+    Given a coalesced batch of five events for one aggregate
+    And an aggregate-keyed reactor that finds only two of them relevant
+    When the batch is folded
+    Then the reactor is dispatched once
+    And it receives the last relevant event
+
   # A reactor whose deduplication id varies per event (per-span embedded-eval
   # sync) — or which declares none at all — must see every event, so it is
   # dispatched per event as above. A reactor keyed on the aggregate would be
@@ -73,6 +103,12 @@ Feature: Group-coalesced fold projections
     When trace data is derived again after the fold advances with newer spans
     Then the stored spans are read again rather than serving the earlier result
 
+  # The drain that coalesces a backed-up group is bounded by BOTH a count and a
+  # byte budget — one shared mechanism in the GroupQueue (ADR-066, pillar 2).
+  # Folds here are bounded by count (their events are small and uniform); the
+  # byte bound matters for producer-side command coalescing, whose behaviour
+  # (stop at the byte budget, a single oversized item on its own) is specced in
+  # producer-append-coalescing.feature rather than duplicated here.
   @integration @coalescing @queue
   Scenario: A backed-up group is folded in a single batch call
     Given a group with ten queued events

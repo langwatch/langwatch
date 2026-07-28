@@ -241,7 +241,6 @@ GIT_BIN="${GIT_BIN:-git}"
 BOXD_FORK_PORTS=(
   "_default:5560"      # langwatch app (compose mode)
   "aigw:5563"          # AI gateway (Go data plane)
-  "bullboard:6380"
   "ai-server:3456"
   "next:3000"          # Next.js standalone `pnpm dev` mode
 )

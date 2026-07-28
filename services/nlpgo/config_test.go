@@ -38,3 +38,23 @@ func TestEngineDefaults(t *testing.T) {
 			cfg.Engine.StreamHeartbeatSeconds)
 	}
 }
+
+func TestGatewayEgressPolicyUsesGlobalEnvironmentNames(t *testing.T) {
+	t.Setenv("BLOCK_LOCAL_HTTP_CALLS", "true")
+	t.Setenv("REQUIRE_HTTPS_CUSTOM_ENDPOINTS", "true")
+	t.Setenv("ALLOWED_PROXY_HOSTS", "llm.internal,10.0.0.5")
+
+	cfg, err := LoadConfig(t.Context())
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	if !cfg.BlockLocalHTTPCalls {
+		t.Error("BlockLocalHTTPCalls = false, want true")
+	}
+	if !cfg.RequireHTTPSCustomerEndpoints {
+		t.Error("RequireHTTPSCustomerEndpoints = false, want true")
+	}
+	if cfg.AllowedProxyHosts != "llm.internal,10.0.0.5" {
+		t.Errorf("AllowedProxyHosts = %q, want global ALLOWED_PROXY_HOSTS value", cfg.AllowedProxyHosts)
+	}
+}

@@ -6,8 +6,10 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
-import { FormProvider, useForm } from "react-hook-form";
+import { useForm, useFormContext } from "react-hook-form";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { getMaxTokenLimit } from "~/components/llmPromptConfigs/utils/tokenUtils";
+import type { ModelMetadataForFrontend } from "~/hooks/useModelProvidersSettings";
 
 // All mocks need to be set up before any imports
 const mockCloseDrawer = vi.fn();
@@ -71,15 +73,21 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   }),
 }));
 
+const mockModelMetadata = {
+  "openai/gpt-4o": {
+    name: "gpt-4o",
+    // Real ModelMetadataForFrontend field names — getMaxTokenLimit reads
+    // these two specifically. Wrong names here would make the backfill
+    // test silently pass via FALLBACK_MAX_TOKENS instead of exercising
+    // the actual extraction path.
+    contextLength: 128000,
+    maxCompletionTokens: 16384,
+  },
+};
+
 vi.mock("~/hooks/useModelProvidersSettings", () => ({
   useModelProvidersSettings: () => ({
-    modelMetadata: {
-      "openai/gpt-4o": {
-        name: "gpt-4o",
-        max_tokens: 128000,
-        max_output_tokens: 16384,
-      },
-    },
+    modelMetadata: mockModelMetadata,
     isLoading: false,
   }),
 }));
@@ -179,6 +187,7 @@ const mockPromptDataWithMessages = {
 };
 
 const mockGetByIdOrHandle = vi.fn();
+const mockGetResolvedDefault = vi.fn();
 const mockCreate = vi.fn();
 const mockUpdate = vi.fn();
 
@@ -194,10 +203,7 @@ vi.mock("~/utils/api", () => ({
     },
     modelProvider: {
       getResolvedDefault: {
-        useQuery: () => ({
-          data: { model: "openai/gpt-4", source: "test", scope: "PROJECT" },
-          isLoading: false,
-        }),
+        useQuery: () => mockGetResolvedDefault(),
       },
     },
     prompts: {
@@ -239,11 +245,17 @@ vi.mock("~/components/ui/toaster", () => ({
   toaster: { create: vi.fn() },
 }));
 
-// Mock the form components since they're complex
+// Mock the form components since they're complex. Reads the live model
+// value via useFormContext (not mocked) rather than a hardcoded string, so
+// tests can assert on rendered output instead of only inspecting captured
+// form methods directly.
 vi.mock("~/prompts/forms/fields/ModelSelectFieldMini", () => ({
-  ModelSelectFieldMini: () => (
-    <button data-testid="model-select">gpt-4o</button>
-  ),
+  ModelSelectFieldMini: () => {
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    const { watch } = useFormContext();
+    const model = watch("version.configData.llm.model");
+    return <button data-testid="model-select">{model || "(no model)"}</button>;
+  },
 }));
 
 vi.mock(
@@ -350,6 +362,10 @@ describe("PromptEditorDrawer", () => {
     capturedInitialConfigValues.length = 0;
     capturedFormMethods.length = 0;
     mockGetByIdOrHandle.mockReturnValue({ data: undefined, isLoading: false });
+    mockGetResolvedDefault.mockReturnValue({
+      data: { model: "openai/gpt-4", source: "test", scope: "PROJECT" },
+      isLoading: false,
+    });
     // Default: form values equal saved values (no changes)
     mockAreFormValuesEqual.mockReturnValue(true);
     // Reset drawer params
@@ -520,6 +536,170 @@ describe("PromptEditorDrawer", () => {
     it("Save button is disabled when no handle entered", () => {
       renderWithProviders(<PromptEditorDrawer open={true} />);
       expect(screen.getByTestId("save-prompt-button")).toBeDisabled();
+    });
+  });
+
+  describe("given a project with zero enabled providers", () => {
+    describe("when getResolvedDefault resolves after the drawer already opened (#5827 continuation)", () => {
+      /**
+       * @scenario The drawer's init effect runs once and locks in
+       * model: "" when getResolvedDefault has nothing to resolve yet. A
+       * provider gets added in another tab; the cross-tab BroadcastChannel
+       * fix (#5827) refreshes getResolvedDefault here too — but the init
+       * effect is one-shot and never re-fires, so without a dedicated
+       * backfill the form stayed stuck on a blank model forever, showing
+       * an empty selector even though isEmpty had already flipped false.
+       */
+      it("adopts the model in the rendered selector once getResolvedDefault resolves", async () => {
+        mockGetResolvedDefault.mockReturnValue({
+          data: undefined,
+          isLoading: false,
+        });
+
+        const { rerender } = renderWithProviders(
+          <PromptEditorDrawer open={true} />,
+        );
+
+        await waitFor(() => {
+          expect(screen.getByTestId("model-select")).toHaveTextContent(
+            "(no model)",
+          );
+        });
+
+        // A provider was added in another tab; getResolvedDefault now
+        // resolves on refetch (simulated here via a re-render with new
+        // mock data, since the query itself is mocked out).
+        mockGetResolvedDefault.mockReturnValue({
+          data: {
+            model: "openai/gpt-4o",
+            source: "provider",
+            scope: "PROJECT",
+          },
+          isLoading: false,
+        });
+        rerender(
+          <ChakraProvider value={defaultSystem}>
+            <PromptEditorDrawer open={true} />
+          </ChakraProvider>,
+        );
+
+        await waitFor(() => {
+          expect(screen.getByTestId("model-select")).toHaveTextContent(
+            "openai/gpt-4o",
+          );
+        });
+        // The maxTokens write is paired with the model write — assert it
+        // too, so removing just the maxTokens half of the backfill (while
+        // leaving the model half intact) still fails this test.
+        const methods = capturedFormMethods[capturedFormMethods.length - 1]!;
+        expect(methods.getValues("version.configData.llm.maxTokens")).toBe(
+          getMaxTokenLimit(
+            mockModelMetadata["openai/gpt-4o"] as unknown as ModelMetadataForFrontend,
+          ),
+        );
+      });
+
+      it("does not clobber a model the user already picked in the rendered selector", async () => {
+        mockGetResolvedDefault.mockReturnValue({
+          data: undefined,
+          isLoading: false,
+        });
+
+        const { rerender } = renderWithProviders(
+          <PromptEditorDrawer open={true} />,
+        );
+
+        await waitFor(() => {
+          expect(screen.getByTestId("model-select")).toHaveTextContent(
+            "(no model)",
+          );
+        });
+
+        // User manually picks a model before any provider resolves.
+        const methodsBeforeBackfill =
+          capturedFormMethods[capturedFormMethods.length - 1]!;
+        methodsBeforeBackfill.setValue(
+          "version.configData.llm.model",
+          "anthropic/claude-3-5-sonnet",
+        );
+        await waitFor(() => {
+          expect(screen.getByTestId("model-select")).toHaveTextContent(
+            "anthropic/claude-3-5-sonnet",
+          );
+        });
+
+        mockGetResolvedDefault.mockReturnValue({
+          data: {
+            model: "openai/gpt-4o",
+            source: "provider",
+            scope: "PROJECT",
+          },
+          isLoading: false,
+        });
+        rerender(
+          <ChakraProvider value={defaultSystem}>
+            <PromptEditorDrawer open={true} />
+          </ChakraProvider>,
+        );
+
+        // The backfill only fills a genuinely empty model — it must never
+        // overwrite a real (even if not yet saved) user selection.
+        expect(screen.getByTestId("model-select")).toHaveTextContent(
+          "anthropic/claude-3-5-sonnet",
+        );
+      });
+
+      it("does not clobber a maxTokens value the user already edited", async () => {
+        mockGetResolvedDefault.mockReturnValue({
+          data: undefined,
+          isLoading: false,
+        });
+
+        const { rerender } = renderWithProviders(
+          <PromptEditorDrawer open={true} />,
+        );
+
+        await waitFor(() => {
+          expect(screen.getByTestId("model-select")).toHaveTextContent(
+            "(no model)",
+          );
+        });
+
+        // User edits the token limit before any provider resolves.
+        const methodsBeforeBackfill =
+          capturedFormMethods[capturedFormMethods.length - 1]!;
+        methodsBeforeBackfill.setValue(
+          "version.configData.llm.maxTokens",
+          777,
+          { shouldDirty: true },
+        );
+
+        mockGetResolvedDefault.mockReturnValue({
+          data: {
+            model: "openai/gpt-4o",
+            source: "provider",
+            scope: "PROJECT",
+          },
+          isLoading: false,
+        });
+        rerender(
+          <ChakraProvider value={defaultSystem}>
+            <PromptEditorDrawer open={true} />
+          </ChakraProvider>,
+        );
+
+        // The model still backfills (it was never dirtied)...
+        await waitFor(() => {
+          expect(screen.getByTestId("model-select")).toHaveTextContent(
+            "openai/gpt-4o",
+          );
+        });
+        // ...but the user's manually-edited token limit survives.
+        const methods = capturedFormMethods[capturedFormMethods.length - 1]!;
+        expect(methods.getValues("version.configData.llm.maxTokens")).toBe(
+          777,
+        );
+      });
     });
   });
 

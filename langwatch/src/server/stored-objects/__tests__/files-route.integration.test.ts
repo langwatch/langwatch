@@ -86,7 +86,7 @@ vi.mock("~/server/rateLimit", () => ({
 }));
 
 // Suppress logger noise
-vi.mock("~/utils/logger/server", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
     info: vi.fn(),
     warn: vi.fn(),
@@ -490,6 +490,75 @@ describe("GET /api/files/:projectId/:id (project-scoped — #4947)", () => {
         projectId: projectAId,
         id: fileId,
       });
+    });
+  });
+
+  describe("when the caller passes a filename query param (attachment chip)", () => {
+    /** @scenario "A document attachment renders as a labeled chip that opens the file in a new tab" */
+    it("uses the requested filename in Content-Disposition so viewer downloads keep the original name", async () => {
+      const fileId = `stored-${nanoid(8)}`;
+      const content = "%PDF-1.4 fake pdf bytes";
+      const row = makeStoredObjectRow({
+        id: fileId,
+        project_id: projectAId,
+        media_type: "application/pdf",
+        size_bytes: Buffer.from(content).length,
+      });
+      mockGetById.mockResolvedValueOnce({
+        row,
+        stream: makeReadableStream(content),
+      });
+
+      const res = await app.request(
+        `/api/files/${projectAId}/${fileId}?filename=document.pdf`,
+        { headers: { "X-Auth-Token": projectAKey } },
+      );
+
+      expect(res.status).toBe(200);
+      expect(res.headers.get("Content-Disposition")).toBe(
+        'inline; filename="document.pdf"',
+      );
+    });
+
+    it("sanitizes header-hostile filenames and falls back to the object id when nothing survives", async () => {
+      const fileId = `stored-${nanoid(8)}`;
+      const content = "bytes";
+      const row = makeStoredObjectRow({
+        id: fileId,
+        project_id: projectAId,
+        media_type: "application/pdf",
+        size_bytes: Buffer.from(content).length,
+      });
+      mockGetById
+        .mockResolvedValueOnce({ row, stream: makeReadableStream(content) })
+        .mockResolvedValueOnce({ row, stream: makeReadableStream(content) });
+
+      // CRLF + quote injection attempt — every hostile byte is replaced.
+      const hostile = encodeURIComponent('a"\r\nSet-Cookie: pwn=1;.pdf');
+      const res = await app.request(
+        `/api/files/${projectAId}/${fileId}?filename=${hostile}`,
+        { headers: { "X-Auth-Token": projectAKey } },
+      );
+      expect(res.status).toBe(200);
+      const disposition = res.headers.get("Content-Disposition") ?? "";
+      expect(disposition).not.toContain("\r");
+      expect(disposition).not.toContain("\n");
+      expect(disposition).not.toContain('a"');
+      expect(res.headers.get("Set-Cookie")).toBeNull();
+
+      // Hostile bytes are replaced (not stripped) — the header stays quoted
+      // ASCII with underscores standing in for every rejected character.
+      expect(disposition).toMatch(/^inline; filename="[A-Za-z0-9._-]+"$/);
+
+      // An empty filename param falls back to the object id.
+      const res2 = await app.request(
+        `/api/files/${projectAId}/${fileId}?filename=`,
+        { headers: { "X-Auth-Token": projectAKey } },
+      );
+      expect(res2.status).toBe(200);
+      expect(res2.headers.get("Content-Disposition")).toBe(
+        `inline; filename="${fileId}"`,
+      );
     });
   });
 

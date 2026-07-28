@@ -10,7 +10,7 @@ import {
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { generate } from "@langwatch/ksuid";
-import { NotFoundError, ValidationError } from "~/server/app-layer/domain-error";
+import { NotFoundError, ValidationError } from "@langwatch/handled-error";
 import { GROWTH_SEAT_PLAN_TYPES } from "../../../../../ee/billing/utils/growthSeatEvent";
 import { encrypt } from "~/utils/encryption";
 import { KSUID_RESOURCES } from "~/utils/constants";
@@ -457,6 +457,9 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         s3Bucket: input.s3Bucket,
         ...(input.presenceEnabled !== undefined
           ? { presenceEnabled: input.presenceEnabled }
+          : {}),
+        ...(input.traceSharingEnabled !== undefined
+          ? { traceSharingEnabled: input.traceSharingEnabled }
           : {}),
         ...(input.supportContact !== undefined
           ? { supportContact: input.supportContact?.trim() || null }

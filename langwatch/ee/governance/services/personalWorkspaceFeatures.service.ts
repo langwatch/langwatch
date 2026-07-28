@@ -5,7 +5,7 @@
  * bundle on personal projects.
  *
  * Personal workspaces ship minimal-by-default: Traces / My Usage /
- * Sessions / Settings only. The four "library" features (Evaluations
+ * Devices / Settings only. The four "library" features (Evaluations
  * / Datasets / Annotations / Automations) are hidden behind a single
  * checkbox in `/me/configure → Workspace features` (or unlocked
  * progressively via the click-to-enable modal in the Traces Explorer).

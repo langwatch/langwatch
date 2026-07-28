@@ -1,6 +1,5 @@
 import { Box, HStack, Skeleton, VStack } from "@chakra-ui/react";
-import cloneDeep from "lodash.clonedeep";
-import debounce from "lodash.debounce";
+import { cloneDeep, debounce } from "lodash-es";
 import {
   createContext,
   useCallback,

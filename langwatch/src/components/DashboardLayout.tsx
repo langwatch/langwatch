@@ -1,6 +1,5 @@
 import {
   Alert,
-  Avatar,
   Box,
   Button,
   HStack,
@@ -23,13 +22,21 @@ import {
   ChevronRight,
   Info,
   KeyRound,
+  Monitor,
   Plus,
 } from "lucide-react";
 import numeral from "numeral";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useLayoutEffect, useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { useLocalStorage } from "usehooks-ts";
 import { NotFoundScene } from "~/components/NotFoundScene";
+import {
+  APP_HEADER_HEIGHT,
+  LANGY_DOCK_GAP,
+  LANGY_DOCKED_OFFSET,
+  LANGY_TRANSITION,
+} from "~/features/langy/logic/langyPanelLayout";
+import { useLangyStore } from "~/features/langy/stores/langyStore";
 import Head from "~/utils/compat/next-head";
 import { useRouter } from "~/utils/compat/next-router";
 import { ImpersonationBanner } from "../../ee/admin/ImpersonationBanner";
@@ -47,6 +54,10 @@ import { usePublicEnv } from "../hooks/usePublicEnv";
 import { useRequiredSession } from "../hooks/useRequiredSession";
 import { SavedViewsProvider } from "../hooks/useSavedViews";
 import type { FullyLoadedOrganization } from "../server/app-layer/organizations/repositories/organization.repository";
+import {
+  type GraphicsQualityOverride,
+  useGraphicsQualityOverrideStore,
+} from "../stores/graphicsQualityOverrideStore";
 import { api } from "../utils/api";
 import {
   buildProjectSwitchHref,
@@ -65,7 +76,7 @@ import { MainMenu, MENU_WIDTH_COMPACT, MENU_WIDTH_EXPANDED } from "./MainMenu";
 import { SavedViewsBar } from "./messages/SavedViewsBar";
 import { PersonalSidebar } from "./PersonalSidebar";
 import { ProjectAvatar } from "./ProjectAvatar";
-import { SdkRadarBanner } from "./SdkRadarBanner";
+import { UserAvatar } from "./UserAvatar";
 import { PresenceMenuItem } from "./sidebar/PresenceMenuItem";
 import { GlobalUpgradeModal } from "./UpgradeModal";
 import { Link } from "./ui/link";
@@ -73,6 +84,12 @@ import { Menu } from "./ui/menu";
 import { PageErrorFallback } from "./ui/PageErrorFallback";
 import { useWorkspaceData } from "./useWorkspaceData";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
+
+const GRAPHICS_OVERRIDE_LABELS: Record<GraphicsQualityOverride, string> = {
+  auto: "Auto",
+  on: "On",
+  off: "Off",
+};
 
 const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
   // No redirects from the breadcrumb path - it only reads `project` for the
@@ -463,11 +480,35 @@ export const DashboardLayout = ({
     { organizationId: organization?.id, enabled: !!organization?.id },
   );
 
+  const graphicsQualityOverride = useGraphicsQualityOverrideStore(
+    (s) => s.override,
+  );
+  const setGraphicsQualityOverride = useGraphicsQualityOverrideStore(
+    (s) => s.setOverride,
+  );
+
   usePostHogIdentify({
     session: session ?? null,
     organization,
     planType: usage.data?.activePlan?.type,
   });
+
+  // Langy's docked panel joins this shell as a second content card. Claim the
+  // dock while the shell is mounted so the page-level wrapper stands down
+  // (LangyShiftedRoot), then reserve the panel's room inside the content row
+  // only, the header keeps the full viewport width above both cards. The
+  // reservation truth (`dockShifted`) is computed by the wrapper, which owns
+  // Langy's visibility gate. Spec: specs/langy/langy-panel-layout.feature
+  const langyDockShifted = useLangyStore((s) => s.dockShifted);
+  const claimDockShell = useLangyStore((s) => s.claimDockShell);
+  const releaseDockShell = useLangyStore((s) => s.releaseDockShell);
+  useLayoutEffect(() => {
+    claimDockShell();
+    return releaseDockShell;
+  }, [claimDockShell, releaseDockShell]);
+  const langyDockInset = langyDockShifted
+    ? LANGY_DOCKED_OFFSET + LANGY_DOCK_GAP
+    : 0;
 
   if (typeof router.query.project === "string" && !isLoading && !project) {
     return <NotFoundScene />;
@@ -560,7 +601,13 @@ export const DashboardLayout = ({
 
   const user = session?.user;
   const currentRoute = findCurrentRoute(router.pathname);
-  const isDemoProject = publicEnv.data?.DEMO_PROJECT_SLUG === project?.slug;
+  // Requires BOTH sides present: an install with no demo project configured
+  // leaves DEMO_PROJECT_SLUG undefined, and `===` against an equally-undefined
+  // `project?.slug` would otherwise read as a match on any route that hasn't
+  // resolved a project yet.
+  const isDemoProject =
+    !!publicEnv.data?.DEMO_PROJECT_SLUG &&
+    publicEnv.data.DEMO_PROJECT_SLUG === project?.slug;
   const userIsPartOfTeam =
     publicPage ||
     // Personal-scope routes (/me/* and the caller's own Personal Workspace
@@ -609,10 +656,14 @@ export const DashboardLayout = ({
         </title>
       </Head>
 
-      {/* Header bar - spans full width with gray background */}
+      {/* Header bar - spans full width with gray background. Pinned to the
+          shared APP_HEADER_HEIGHT: the viewport math below and the docked
+          Langy card's top edge both derive from it, so the cards start exactly
+          where the header ends. */}
       <HStack
         position="relative"
         width="full"
+        height={`${APP_HEADER_HEIGHT}px`}
         paddingX={4}
         paddingY={3}
         background="bg.page"
@@ -747,6 +798,13 @@ export const DashboardLayout = ({
                 minWidth="auto"
                 height="auto"
                 borderRadius="full"
+                aria-label={
+                  publicPage
+                    ? "Sign in"
+                    : user?.name
+                      ? `Open user menu for ${user.name}`
+                      : "Open user menu"
+                }
                 {...(publicPage
                   ? {
                       // On a public share page, clicking the avatar offers
@@ -766,18 +824,15 @@ export const DashboardLayout = ({
                     }
                   : {})}
               >
-                <Avatar.Root
+                <UserAvatar
+                  name={user?.name ?? undefined}
+                  image={user?.image ?? undefined}
                   size="xs"
                   backgroundColor="orange.400"
                   color="white"
                   width="28px"
                   height="28px"
-                >
-                  <Avatar.Fallback
-                    name={user?.name ?? undefined}
-                    fontSize="11px"
-                  />
-                </Avatar.Root>
+                />
               </Button>
             </Menu.Trigger>
             {session && (
@@ -800,6 +855,33 @@ export const DashboardLayout = ({
                     <Menu.Item value="settings" asChild>
                       <Link href="/settings">Settings</Link>
                     </Menu.Item>
+                    <Menu.Root positioning={{ placement: "right-start", gutter: 2 }}>
+                      <Menu.TriggerItem value="reduced-graphics">
+                        <Monitor size={14} />
+                        Reduced graphics (
+                        {GRAPHICS_OVERRIDE_LABELS[graphicsQualityOverride]})
+                      </Menu.TriggerItem>
+                      <Menu.Content>
+                        <Menu.RadioItemGroup
+                          value={graphicsQualityOverride}
+                          onValueChange={(e) =>
+                            setGraphicsQualityOverride(
+                              e.value as GraphicsQualityOverride,
+                            )
+                          }
+                        >
+                          <Menu.RadioItem value="auto">
+                            Auto — adapts to this device on its own
+                          </Menu.RadioItem>
+                          <Menu.RadioItem value="on">
+                            On — always keep things responsive
+                          </Menu.RadioItem>
+                          <Menu.RadioItem value="off">
+                            Off — always show full decorative effects
+                          </Menu.RadioItem>
+                        </Menu.RadioItemGroup>
+                      </Menu.Content>
+                    </Menu.Root>
                     {showPresenceMenuItem && <PresenceMenuItem />}
                     <Menu.Item value="logout" asChild>
                       <a href="/api/auth/logout">Logout</a>
@@ -817,7 +899,7 @@ export const DashboardLayout = ({
         width="full"
         alignItems="stretch"
         gap={0}
-        minHeight="calc(100vh - 56px)"
+        minHeight={`calc(100vh - ${APP_HEADER_HEIGHT}px)`}
       >
         {isPersonalScopeRoute ? (
           <PersonalSidebar isCompact={compactMenu} />
@@ -829,19 +911,40 @@ export const DashboardLayout = ({
           width="full"
           height="full"
           background="bg.page"
-          minHeight="calc(100vh - 56px)"
-          maxHeight="calc(100vh - 56px)"
+          minHeight={`calc(100vh - ${APP_HEADER_HEIGHT}px)`}
+          maxHeight={`calc(100vh - ${APP_HEADER_HEIGHT}px)`}
           maxWidth={`calc(100vw - ${menuWidth})`}
+          // While Langy is docked, this gray ground keeps the viewport edge and
+          // the content card pulls in: the reserved strip is where the docked
+          // panel sits as a second card, with a gap of page ground between the
+          // two. Spec: specs/langy/langy-panel-layout.feature
+          paddingRight={`${langyDockInset}px`}
+          transition={`padding-right ${LANGY_TRANSITION}`}
         >
           <Box
             width="full"
             height="full"
             background="bg.surface"
             borderTopLeftRadius="xl"
+            // The Langy panel's edge, on the card that holds the whole app —
+            // one notch quieter than the panel's own: the muted hairline on
+            // the two edges that meet the page chrome, and (dark) a fainter
+            // cut of the panel's inset lit top rim, so the surface reads as
+            // a raised card catching light rather than a flat cut-out.
+            borderTopWidth="1px"
+            borderLeftWidth="1px"
+            borderStyle="solid"
+            borderColor="border.muted"
+            // With Langy docked the card no longer meets the viewport edge, so
+            // its right side joins the page-chrome language too: the same
+            // radius and muted hairline as its top-left corner.
+            borderTopRightRadius={langyDockInset > 0 ? "xl" : 0}
+            borderRightWidth={langyDockInset > 0 ? "1px" : 0}
+            _dark={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.07)" }}
             overflow="auto"
             display="flex"
-            minHeight="calc(100vh - 56px)"
-            maxHeight="calc(100vh - 56px)"
+            minHeight={`calc(100vh - ${APP_HEADER_HEIGHT}px)`}
+            maxHeight={`calc(100vh - ${APP_HEADER_HEIGHT}px)`}
             position="relative"
           >
             <VStack width="full" gap={0} {...props}>
@@ -956,7 +1059,6 @@ export const DashboardLayout = ({
                 )}
 
               <AnnouncementBanner />
-              <SdkRadarBanner />
 
               {adminViewingAs && (
                 <AdminViewingAsBanner workspaceLabel={adminViewingAs.label} />

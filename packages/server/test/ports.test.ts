@@ -11,11 +11,11 @@ describe("port allocation", () => {
         nlp: 5561,
         langevals: 5562,
         aigateway: 5563,
+        langyagent: 5564,
         postgres: 6560,
         redis: 6561,
         clickhouseHttp: 6562,
         clickhouseNative: 6563,
-        bullboard: 6564,
       });
     });
   });
@@ -26,12 +26,11 @@ describe("port allocation", () => {
       expect(a.langwatch).toBe(5570);
       expect(a.postgres).toBe(6570);
       expect(a.redis).toBe(6571);
-      expect(a.bullboard).toBe(6574);
     });
   });
 
   describe("portsToCheck", () => {
-    it("returns one entry per always-on service (bullboard is opt-in)", () => {
+    it("returns one entry per service", () => {
       const a = allocatePorts(5560);
       const checks = portsToCheck(a);
       expect(checks.map((c) => c.label)).toEqual([
@@ -39,12 +38,13 @@ describe("port allocation", () => {
         "nlpgo",
         "langevals",
         "ai gateway",
+        "langy agent",
         "postgres",
         "redis",
         "clickhouse http",
         "clickhouse native",
       ]);
-      expect(new Set(checks.map((c) => c.port)).size).toBe(8);
+      expect(new Set(checks.map((c) => c.port)).size).toBe(9);
     });
   });
 });

@@ -8,6 +8,7 @@ import {
 } from "@chakra-ui/react";
 import { Search } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
+import { modelDisplayLabel } from "../../server/modelProviders/customModelDisplayNames";
 import { modelProviderIcons } from "../../server/modelProviders/iconsMap";
 import {
   isLatestAlias,
@@ -62,6 +63,7 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
   size = "full",
   disabled = false,
   inheritOption,
+  displayNames,
 }: {
   model: string;
   options: string[];
@@ -74,6 +76,9 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
     /** Short label shown above the model, e.g. "Inherit (from organization)" or "Suggested from openai". */
     label: string;
   };
+  /** Configured custom-model display names, keyed by `<provider>/<modelId>`.
+   *  Falls back to the id-derived label for any model without an entry. */
+  displayNames?: Record<string, string>;
 }) {
   const [modelSearch, setModelSearch] = useState("");
 
@@ -101,13 +106,13 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
           };
         }
         return {
-          label: modelValue.split("/").slice(1).join("/"),
+          label: modelDisplayLabel({ fullModelId: modelValue, displayNames }),
           value: modelValue,
           icon,
           subtitle: "",
         };
       }),
-    [options],
+    [options, displayNames],
   );
 
   // Group models by provider
@@ -200,7 +205,7 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
         lineClamp={1}
         wordBreak="break-all"
       >
-        {inheritOption.model.split("/").slice(1).join("/")}
+        {modelDisplayLabel({ fullModelId: inheritOption.model, displayNames })}
       </Box>
     </HStack>
   ) : (
@@ -217,7 +222,7 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
         wordBreak="break-all"
         color={isUnknown ? "gray.500" : undefined}
       >
-        {selectedItem?.label ?? model.split("/").slice(1).join("/")}
+        {selectedItem?.label ?? modelDisplayLabel({ fullModelId: model, displayNames })}
       </Box>
     </HStack>
   );
@@ -333,7 +338,7 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
                   fontFamily="mono"
                   lineClamp={1}
                 >
-                  {inheritOption.model.split("/").slice(1).join("/")}
+                  {modelDisplayLabel({ fullModelId: inheritOption.model, displayNames })}
                 </Text>
               </Box>
             </HStack>

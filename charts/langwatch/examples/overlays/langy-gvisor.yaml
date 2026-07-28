@@ -1,0 +1,27 @@
+# langy-gvisor.yaml: harden Langy with a pod-to-host sandbox.
+#
+# The chart default runs the agent on the node's normal runtime, which works on
+# any cluster. This overlay pins it to a sandboxed RuntimeClass instead, so a
+# worker that escapes its container faces gVisor's user-space kernel rather than
+# the node's.
+#
+# Your cluster must already define the class, and that differs by cloud:
+#   GKE  ships it managed (GKE Sandbox)
+#   AKS  offers Kata VM isolation, so set runtimeClassName to your Kata class
+#        (kata-mshv-vm-isolation) rather than using this file as-is
+#   EKS  has no managed option; install gVisor on a node group first
+#
+# Without the class, the pod is rejected at admission and never appears. The
+# full recipe, including the installer DaemonSet for EKS:
+#   https://docs.langwatch.ai/self-hosting/langy/setup#hardening-a-sandboxed-runtime
+#
+# Usage:
+#   helm install lw . \
+#     -f examples/overlays/langy-gvisor.yaml \
+#     --set autogen.enabled=true
+
+langyagent:
+  runtimeClassName: "gvisor"
+  # Withdraw the acceptance so the chart refuses to render if the class is ever
+  # blanked: a cluster that has hardened cannot silently lose its sandbox.
+  acceptUnsandboxedRuntime: false

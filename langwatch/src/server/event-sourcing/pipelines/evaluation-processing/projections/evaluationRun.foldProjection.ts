@@ -49,17 +49,28 @@ const evaluationRunEvents = [
  * - EvaluationReportedEvent -> sets all fields in one shot (evaluator identity + results)
  */
 export class EvaluationRunFoldProjection
-  extends AbstractFoldProjection<EvaluationRunData, typeof evaluationRunEvents, "createdAt", "updatedAt", "LastEventOccurredAt">
+  extends AbstractFoldProjection<
+    EvaluationRunData,
+    typeof evaluationRunEvents,
+    "createdAt",
+    "updatedAt",
+    "LastEventOccurredAt"
+  >
   implements FoldEventHandlers<typeof evaluationRunEvents, EvaluationRunData>
 {
   readonly name = "evaluationRun";
   readonly version = EVALUATION_PROJECTION_VERSIONS.STATE;
   readonly store: FoldProjectionStore<EvaluationRunData>;
+  readonly options = { eventOrdering: "acceptedAt" } as const;
 
   protected readonly events = evaluationRunEvents;
 
   constructor(deps: { store: FoldProjectionStore<EvaluationRunData> }) {
-    super({ createdAtKey: "createdAt", updatedAtKey: "updatedAt", LastEventOccurredAtKey: "LastEventOccurredAt" });
+    super({
+      createdAtKey: "createdAt",
+      updatedAtKey: "updatedAt",
+      LastEventOccurredAtKey: "LastEventOccurredAt",
+    });
     this.store = deps.store;
   }
 
@@ -113,8 +124,8 @@ export class EvaluationRunFoldProjection
       evaluationId: state.evaluationId || event.data.evaluationId,
       evaluatorId: state.evaluatorId || event.data.evaluatorId,
       evaluatorType: state.evaluatorType || event.data.evaluatorType,
-      evaluatorName: state.evaluatorName ?? (event.data.evaluatorName ?? null),
-      traceId: state.traceId ?? (event.data.traceId ?? null),
+      evaluatorName: state.evaluatorName ?? event.data.evaluatorName ?? null,
+      traceId: state.traceId ?? event.data.traceId ?? null,
       isGuardrail: event.data.isGuardrail ?? state.isGuardrail,
       status: "in_progress",
       startedAt: event.occurredAt,
@@ -129,7 +140,7 @@ export class EvaluationRunFoldProjection
       ...state,
       evaluationId: state.evaluationId || event.data.evaluationId,
       status: event.data.status,
-      score: typeof event.data.score === 'number' ? event.data.score : null,
+      score: typeof event.data.score === "number" ? event.data.score : null,
       passed: event.data.passed ?? null,
       label: event.data.label ?? null,
       details: event.data.details ?? null,

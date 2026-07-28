@@ -11,8 +11,9 @@ import { ReplayService } from "../replayService";
 import type { RegisteredFoldProjection, RegisteredMapProjection } from "../types";
 import type { FoldProjectionDefinition } from "../../projections/foldProjection.types";
 import type { MapProjectionDefinition } from "../../projections/mapProjection.types";
-import { CUTOFF_KEY_PREFIX, COMPLETED_KEY_PREFIX } from "../replayConstants";
+import { CUTOFF_KEY_PREFIX, COMPLETED_KEY_PREFIX, doneMarkerKey } from "../replayConstants";
 import { aggregateKey } from "../replayMarkers";
+import { RedisReplayMarkerChecker } from "../../projections/replayMarkerCheck";
 
 describe("ReplayService tenant-specific ClickHouse", () => {
   let tenantA: string;
@@ -329,17 +330,17 @@ describe("ReplayService tenant-specific ClickHouse", () => {
       expect(result.aggregatesReplayed).toBe(2);
       expect(result.totalEvents).toBe(2);
 
-      // Records flushed via bulkAppend grouped by aggregate (one call per agg).
-      expect(bulkAppend).toHaveBeenCalledTimes(2);
+      // Records flushed via ONE tenant-scoped bulkAppend covering both
+      // aggregates — never one awaited call per aggregate (that per-trace
+      // grouping is what made span-storage replays take weeks).
+      expect(bulkAppend).toHaveBeenCalledTimes(1);
       const appendedRecords = bulkAppend.mock.calls.flatMap(([records]) => records as any[]);
       expect(appendedRecords.map((r) => r.src).sort()).toEqual(["trace-a1", "trace-a2"]);
       expect(appendedRecords.map((r) => r.doubled).sort((a, b) => a - b)).toEqual([2, 4]);
 
-      // Each bulkAppend call must carry the per-aggregate context (not a
-      // shared/generic context), so the store can route records correctly.
-      for (const [records, ctx] of bulkAppend.mock.calls as Array<[any[], any]>) {
+      // The bulk call carries the tenant-scoped context.
+      for (const [, ctx] of bulkAppend.mock.calls as Array<[any[], any]>) {
         expect(ctx.tenantId).toBe(tenantA);
-        expect(records.every((r) => r.src === ctx.aggregateId)).toBe(true);
       }
 
       // Pause was held active while records were being written.
@@ -491,13 +492,14 @@ describe("ReplayService tenant-specific ClickHouse", () => {
         .sort();
       expect(foldedAggregates).toEqual(["trace-a1", "trace-a2"]);
 
-      // Map bulk-appended both aggregates, grouped per aggregate (preserving
-      // per-aggregate context is the bugfix this PR introduced — see
-      // 44d05f65f "preserve per-aggregate context on map projection bulkAppend").
-      expect(bulkAppend).toHaveBeenCalledTimes(2);
+      // Map bulk-appended both aggregates in a single tenant-scoped call.
+      expect(bulkAppend).toHaveBeenCalledTimes(1);
       for (const [records, ctx] of bulkAppend.mock.calls as Array<[any[], any]>) {
         expect(ctx.tenantId).toBe(tenantA);
-        expect(records.every((r) => r.src === ctx.aggregateId)).toBe(true);
+        expect((records as { src: string }[]).map((r) => r.src).sort()).toEqual([
+          "trace-a1",
+          "trace-a2",
+        ]);
       }
 
       // Fold projection was paused while its own WRITE phase ran. The map's
@@ -532,7 +534,12 @@ describe("ReplayService tenant-specific ClickHouse", () => {
       const foldPauseKey = `test_pipeline/projection/${foldName}`;
       const mapPauseKey = `test_pipeline/handler/${mapName}`;
 
+      // Capture the cutoff hash mid-write so the `toEqual({})` assertion at
+      // the end can't pass vacuously — the markers must exist BEFORE the
+      // failure and be cleared BY the failure path, not never written at all.
+      let foldCutoffsAtFailure: Record<string, string> | null = null;
       const foldStore = vi.fn(async (_state: { count: number }, _ctx: any) => {
+        foldCutoffsAtFailure = await redis.hgetall(`${CUTOFF_KEY_PREFIX}${foldName}`);
         throw new Error("fold store boom");
       });
 
@@ -603,6 +610,63 @@ describe("ReplayService tenant-specific ClickHouse", () => {
 
       // Fold projection was unpaused by the error path in `replayProjection`.
       expect(await redis.sismember(pausedSetKey, foldPauseKey)).toBe(0);
+
+      // The cutoff markers were live at the moment the write failed...
+      expect(foldCutoffsAtFailure).not.toBeNull();
+      expect(Object.keys(foldCutoffsAtFailure!)).not.toHaveLength(0);
+
+      // ...and the failed batch's pending/cutoff markers were cleared too —
+      // live events for its aggregates process normally right away instead of
+      // deferring until the marker TTL lapses.
+      expect(await redis.hgetall(`${CUTOFF_KEY_PREFIX}${foldName}`)).toEqual({});
+    });
+
+    it("clears the failed batch's markers and unpauses when a map projection batch fails", async () => {
+      const redis = getTestRedisConnection()!;
+      const projectionName = `mapReplayFail_${Date.now()}`;
+      const pausedSetKey = "{event-sourcing/jobs}:gq:paused-jobs";
+      const mapPauseKey = `test_pipeline/handler/${projectionName}`;
+
+      // Capture the cutoff hash mid-write so the `toEqual({})` assertion at
+      // the end can't pass vacuously — the markers must exist BEFORE the
+      // failure and be cleared BY the failure path, not never written at all.
+      let cutoffsAtFailure: Record<string, string> | null = null;
+      const bulkAppend = vi.fn(async (_records: any[], _ctx: any) => {
+        cutoffsAtFailure = await redis.hgetall(`${CUTOFF_KEY_PREFIX}${projectionName}`);
+        throw new Error("bulk write boom");
+      });
+
+      const projection = createMapProjection({ name: projectionName, bulkAppend });
+      const service = createServiceWithResolver();
+
+      const result = await service.replay({
+        projections: [],
+        mapProjections: [projection],
+        tenantIds: [tenantA],
+        since: "2023-11-01",
+      });
+
+      // The map batch surfaced the write error instead of throwing.
+      expect(result.batchErrors).toBeGreaterThan(0);
+      expect(result.firstError).toMatch(/bulk write boom/);
+
+      // Both aggregates carried live cutoff markers at the moment the
+      // write failed...
+      expect(cutoffsAtFailure).not.toBeNull();
+      const expectedAggKeys = ["trace-a1", "trace-a2"].map((id) =>
+        aggregateKey({ tenantId: tenantA, aggregateType: "trace", aggregateId: id }),
+      );
+      expect(Object.keys(cutoffsAtFailure!).sort()).toEqual(expectedAggKeys.sort());
+
+      // ...and the failure path cleared them, so live events for the failed
+      // batch's aggregates process normally right away instead of deferring
+      // until the marker TTL lapses.
+      expect(await redis.hgetall(`${CUTOFF_KEY_PREFIX}${projectionName}`)).toEqual({});
+
+      // The catch unpauses BEFORE its final emit — the pause-set entry (a
+      // no-TTL set member) must be gone so live processing is never left
+      // frozen by a failed batch.
+      expect(await redis.sismember(pausedSetKey, mapPauseKey)).toBe(0);
     });
 
     it("skips aggregates already in the completed set on resume", async () => {
@@ -824,6 +888,520 @@ describe("ReplayService tenant-specific ClickHouse", () => {
       expect(bulkAppend).toHaveBeenCalled();
       expect(batchKinds).toEqual(["map"]);
       expect([...progressKinds]).toEqual(["map"]);
+    });
+  });
+
+  describe("replayOptimized batch pause windows and failed-batch marker cleanup", () => {
+    const pausedSetKey = "{event-sourcing/jobs}:gq:paused-jobs";
+
+    function createTrackedMapProjection({
+      name,
+      bulkAppend,
+    }: {
+      name: string;
+      bulkAppend: any;
+    }): RegisteredMapProjection {
+      return {
+        projectionName: name,
+        pipelineName: "test_pipeline",
+        aggregateType: "trace",
+        source: "pipeline",
+        pauseKey: `test_pipeline/handler/${name}`,
+        kind: "map",
+        definition: {
+          name,
+          eventTypes: ["trace.upserted"],
+          map: (event: any) => ({ src: event.aggregateId }),
+          store: { append: async () => undefined, bulkAppend },
+        },
+      };
+    }
+
+    describe("when a replay spans multiple batches", () => {
+      it("pauses only while a batch is replayed and resumes between batches", async () => {
+        const redis = getTestRedisConnection()!;
+        const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+        const mapName = `optBatchPause_${suffix}`;
+        const mapPauseKey = `test_pipeline/handler/${mapName}`;
+
+        const pausedDuringWrite: number[] = [];
+        const bulkAppend = vi.fn(async (_records: any[], _ctx: any) => {
+          pausedDuringWrite.push(await redis.sismember(pausedSetKey, mapPauseKey));
+        });
+        const projection = createTrackedMapProjection({ name: mapName, bulkAppend });
+        const service = createServiceWithResolver();
+
+        const pausedAtBatchComplete: number[] = [];
+        const pendingChecks: Promise<void>[] = [];
+
+        // aggregateBatchSize 1 with tenant A's two trace aggregates → 2 batches.
+        const result = await service.replayOptimized(
+          {
+            projections: [],
+            mapProjections: [projection],
+            tenantIds: [tenantA],
+            since: "2023-11-01",
+            aggregateBatchSize: 1,
+          },
+          {
+            onBatchComplete: () => {
+              // The sismember is issued synchronously here (same Redis
+              // connection, ordered before the next batch's re-pause) but
+              // resolves async — collect it so assertions wait for it.
+              pendingChecks.push(
+                redis.sismember(pausedSetKey, mapPauseKey).then((paused) => {
+                  pausedAtBatchComplete.push(paused);
+                }),
+              );
+            },
+          },
+        );
+        await Promise.all(pendingChecks);
+
+        expect(result.batchErrors).toBe(0);
+        expect(result.aggregatesReplayed).toBe(2);
+
+        // One flush per batch — pause held while each batch's records land.
+        expect(bulkAppend).toHaveBeenCalledTimes(2);
+        expect(pausedDuringWrite).toEqual([1, 1]);
+
+        // Between batches (onBatchComplete fires after the batch's finally
+        // unpauses), live processing is running again — the freeze is
+        // per-batch, never for the whole run.
+        expect(pausedAtBatchComplete).toEqual([0, 0]);
+
+        // Unpaused at the end too.
+        expect(await redis.sismember(pausedSetKey, mapPauseKey)).toBe(0);
+      });
+    });
+
+    describe("when a batch fails", () => {
+      it("unpauses the projections instead of leaving live processing frozen", async () => {
+        const redis = getTestRedisConnection()!;
+        const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+        const mapName = `optBatchFail_${suffix}`;
+        const mapPauseKey = `test_pipeline/handler/${mapName}`;
+
+        const bulkAppend = vi.fn(async () => {
+          throw new Error("bulk write boom");
+        });
+        const projection = createTrackedMapProjection({ name: mapName, bulkAppend });
+        const service = createServiceWithResolver();
+
+        const result = await service.replayOptimized({
+          projections: [],
+          mapProjections: [projection],
+          tenantIds: [tenantA],
+          since: "2023-11-01",
+        });
+
+        expect(result.batchErrors).toBeGreaterThan(0);
+        expect(result.firstError).toMatch(/bulk write boom/);
+
+        // The per-batch finally unpaused despite the failure.
+        expect(await redis.sismember(pausedSetKey, mapPauseKey)).toBe(0);
+      });
+
+      it("clears the failed batch's replay markers so live events process normally right away", async () => {
+        const redis = getTestRedisConnection()!;
+        const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+        const mapName = `optBatchFailMarkers_${suffix}`;
+
+        // Capture the cutoff hash mid-write so the `toEqual({})` assertion
+        // below can't pass vacuously — the markers must exist BEFORE the
+        // failure and be cleared BY the failure path.
+        let cutoffsAtFailure: Record<string, string> | null = null;
+        const bulkAppend = vi.fn(async () => {
+          cutoffsAtFailure = await redis.hgetall(`${CUTOFF_KEY_PREFIX}${mapName}`);
+          throw new Error("bulk write boom");
+        });
+        const projection = createTrackedMapProjection({ name: mapName, bulkAppend });
+        const service = createServiceWithResolver();
+
+        const result = await service.replayOptimized({
+          projections: [],
+          mapProjections: [projection],
+          tenantIds: [tenantA],
+          since: "2023-11-01",
+        });
+
+        expect(result.batchErrors).toBeGreaterThan(0);
+
+        // The markers were live at the moment the write failed...
+        expect(cutoffsAtFailure).not.toBeNull();
+        expect(Object.keys(cutoffsAtFailure!)).not.toHaveLength(0);
+
+        // ...but the failed batch's aggregates were never replayed — their
+        // pending/cutoff markers must not linger for the 7-day marker TTL.
+        const cutoffMarkers = await redis.hgetall(`${CUTOFF_KEY_PREFIX}${mapName}`);
+        expect(cutoffMarkers).toEqual({});
+
+        // The live marker checker lets the failed batch's aggregates process
+        // normally — no ReplayDeferralError, no skip.
+        const checker = new RedisReplayMarkerChecker(redis);
+        for (const aggregateId of ["trace-a1", "trace-a2"]) {
+          const decision = await checker.check(mapName, {
+            tenantId: tenantA,
+            aggregateType: "trace",
+            aggregateId,
+            id: "evt-live-after-failure",
+            createdAt: Date.now(),
+          } as any);
+          expect(decision).toBe("process");
+        }
+      });
+
+      it("keeps completed batches' done markers so a re-run skips their aggregates", async () => {
+        const redis = getTestRedisConnection()!;
+        const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+        const mapName = `optMidRunFail_${suffix}`;
+
+        // First batch flushes fine; the second batch's write fails, aborting
+        // the run midway (aggregateBatchSize 1 → one aggregate per batch).
+        // The failing call captures the cutoff hash first, so the marker
+        // assertions below can't pass vacuously.
+        let flushCalls = 0;
+        let cutoffsAtFailure: Record<string, string> | null = null;
+        const bulkAppend = vi.fn(async (_records: any[], _ctx: any) => {
+          flushCalls++;
+          if (flushCalls === 1) return;
+          cutoffsAtFailure = await redis.hgetall(`${CUTOFF_KEY_PREFIX}${mapName}`);
+          throw new Error("bulk write boom");
+        });
+        const projection = createTrackedMapProjection({ name: mapName, bulkAppend });
+        const service = createServiceWithResolver();
+
+        const result = await service.replayOptimized({
+          projections: [],
+          mapProjections: [projection],
+          tenantIds: [tenantA],
+          since: "2023-11-01",
+          aggregateBatchSize: 1,
+        });
+
+        expect(result.batchErrors).toBe(1);
+        expect(bulkAppend).toHaveBeenCalledTimes(2);
+
+        // Which aggregate completed first depends on discovery order — derive
+        // it from the successful first flush.
+        const completedId = (bulkAppend.mock.calls[0]![0] as Array<{ src: string }>)[0]!.src;
+        const failedId = ["trace-a1", "trace-a2"].find((id) => id !== completedId)!;
+        const completedAggKey = aggregateKey({
+          tenantId: tenantA,
+          aggregateType: "trace",
+          aggregateId: completedId,
+        });
+        const failedAggKey = aggregateKey({
+          tenantId: tenantA,
+          aggregateType: "trace",
+          aggregateId: failedId,
+        });
+
+        // The failed aggregate's cutoff marker was live at the moment its
+        // write failed (the completed one had already moved to a done marker)...
+        expect(cutoffsAtFailure).not.toBeNull();
+        expect(Object.keys(cutoffsAtFailure!)).toEqual([failedAggKey]);
+
+        // ...but afterwards it holds no marker of any kind — it is back to
+        // unconditional live processing.
+        const cutoffMarkers = await redis.hgetall(`${CUTOFF_KEY_PREFIX}${mapName}`);
+        expect(cutoffMarkers).toEqual({});
+        expect(await redis.exists(doneMarkerKey(mapName, failedAggKey))).toBe(0);
+
+        // ... while the completed batch keeps its done marker and its
+        // completed-set entry, so an operator re-run resumes past it.
+        expect(await redis.exists(doneMarkerKey(mapName, completedAggKey))).toBe(1);
+        expect(await redis.smembers(`${COMPLETED_KEY_PREFIX}${mapName}`)).toEqual([
+          completedAggKey,
+        ]);
+      });
+    });
+
+    describe("when cancellation throws from onProgress mid-batch", () => {
+      it("clears the batch's markers before the rethrowing emit and unpauses", async () => {
+        const redis = getTestRedisConnection()!;
+        const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+        const mapName = `optCancelled_${suffix}`;
+        const mapPauseKey = `test_pipeline/handler/${mapName}`;
+
+        const bulkAppend = vi.fn().mockResolvedValue(undefined);
+        const projection = createTrackedMapProjection({ name: mapName, bulkAppend });
+        const service = createServiceWithResolver();
+
+        // Snapshot the cutoff hash at cancellation time. onProgress is sync,
+        // so the hgetall can't be awaited inside it — but it is ISSUED on the
+        // shared connection before the catch's cleanup pipeline, so it
+        // observes the pre-cleanup marker state (same ordering trick as the
+        // batch-pause test above). `??=` keeps the first (in-try) snapshot;
+        // the catch's re-emit fires a second, post-cleanup one.
+        const pendingChecks: Promise<void>[] = [];
+        let cutoffsAtCancel: Record<string, string> | null = null;
+
+        // The WRITE phase is a deterministic trigger: it is emitted exactly
+        // once per batch inside the try (right before the flush), and once
+        // more by the catch's final emit.
+        const cancellingOnProgress = (progress: { batchPhase: string }) => {
+          if (progress.batchPhase !== "write") return;
+          pendingChecks.push(
+            redis.hgetall(`${CUTOFF_KEY_PREFIX}${mapName}`).then((markers) => {
+              cutoffsAtCancel ??= markers;
+            }),
+          );
+          throw new Error("replay cancelled by operator");
+        };
+
+        // The catch's final emit re-throws the cancellation — the optimized
+        // run rejects instead of returning a result...
+        await expect(
+          service.replayOptimized(
+            {
+              projections: [],
+              mapProjections: [projection],
+              tenantIds: [tenantA],
+              since: "2023-11-01",
+            },
+            { onProgress: cancellingOnProgress },
+          ),
+        ).rejects.toThrow(/replay cancelled by operator/);
+        await Promise.all(pendingChecks);
+
+        // ...before the batch's records were ever flushed.
+        expect(bulkAppend).not.toHaveBeenCalled();
+
+        // Markers were live at cancellation time and cleared BEFORE the
+        // rethrowing emit — an emit-first order would skip the cleanup and
+        // leave them lingering for the marker TTL.
+        expect(cutoffsAtCancel).not.toBeNull();
+        expect(Object.keys(cutoffsAtCancel!)).not.toHaveLength(0);
+        expect(await redis.hgetall(`${CUTOFF_KEY_PREFIX}${mapName}`)).toEqual({});
+
+        // The per-batch finally unpaused despite the rethrow — live
+        // processing is never left frozen by a cancelled run.
+        expect(await redis.sismember(pausedSetKey, mapPauseKey)).toBe(0);
+      });
+    });
+
+    describe("when a map write fails in a batch that also carries a fold projection", () => {
+      it("keeps the fold's done markers and completed set from finished batches while clearing both cutoff hashes", async () => {
+        const redis = getTestRedisConnection()!;
+        const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+        const foldName = `optMixedFold_${suffix}`;
+        const mapName = `optMixedMapFail_${suffix}`;
+
+        const foldStore = vi.fn(async (_state: { count: number }, _ctx: any) => undefined);
+        const foldDefinition: FoldProjectionDefinition<{ count: number }, any> = {
+          name: foldName,
+          version: "v1",
+          eventTypes: ["trace.upserted"],
+          LastEventOccurredAtKey: "LastEventOccurredAt",
+          init: () => ({ count: 0 }),
+          apply: (state) => ({ count: state.count + 1 }),
+          store: {
+            store: foldStore,
+            get: vi.fn().mockResolvedValue(null),
+          },
+        };
+        const foldProjection: RegisteredFoldProjection = {
+          projectionName: foldName,
+          pipelineName: "test_pipeline",
+          aggregateType: "trace",
+          source: "pipeline",
+          pauseKey: `test_pipeline/projection/${foldName}`,
+          kind: "fold",
+          definition: foldDefinition,
+        };
+
+        // First batch's map flush succeeds; the second one captures the live
+        // cutoff markers (so the emptiness assertions below can't pass
+        // vacuously) and then fails — AFTER the same batch's fold flush
+        // already succeeded (fold accumulators flush before map ones).
+        let mapFlushes = 0;
+        let mapCutoffsAtFailure: Record<string, string> | null = null;
+        const bulkAppend = vi.fn(async (_records: any[], _ctx: any) => {
+          mapFlushes++;
+          if (mapFlushes === 1) return;
+          mapCutoffsAtFailure = await redis.hgetall(`${CUTOFF_KEY_PREFIX}${mapName}`);
+          throw new Error("bulk write boom");
+        });
+        const mapProjection = createTrackedMapProjection({ name: mapName, bulkAppend });
+
+        const service = createServiceWithResolver();
+
+        const result = await service.replayOptimized({
+          projections: [foldProjection],
+          mapProjections: [mapProjection],
+          tenantIds: [tenantA],
+          since: "2023-11-01",
+          aggregateBatchSize: 1,
+        });
+
+        expect(result.batchErrors).toBe(1);
+        // The fold flushed in BOTH batches — including the one whose map
+        // write aborted.
+        expect(foldStore).toHaveBeenCalledTimes(2);
+        expect(bulkAppend).toHaveBeenCalledTimes(2);
+
+        // Which aggregate completed first depends on discovery order — derive
+        // it from the successful first flush.
+        const completedId = (bulkAppend.mock.calls[0]![0] as Array<{ src: string }>)[0]!.src;
+        const failedId = ["trace-a1", "trace-a2"].find((id) => id !== completedId)!;
+        const completedAggKey = aggregateKey({
+          tenantId: tenantA,
+          aggregateType: "trace",
+          aggregateId: completedId,
+        });
+        const failedAggKey = aggregateKey({
+          tenantId: tenantA,
+          aggregateType: "trace",
+          aggregateId: failedId,
+        });
+
+        // The failed aggregate's map cutoff marker was live at failure time.
+        expect(mapCutoffsAtFailure).not.toBeNull();
+        expect(Object.keys(mapCutoffsAtFailure!)).toEqual([failedAggKey]);
+
+        // clearFailedBatchMarkers HDELs the failed batch's aggKeys across ALL
+        // projections — including the fold, whose write had already
+        // succeeded. Both cutoff hashes end empty.
+        expect(await redis.hgetall(`${CUTOFF_KEY_PREFIX}${foldName}`)).toEqual({});
+        expect(await redis.hgetall(`${CUTOFF_KEY_PREFIX}${mapName}`)).toEqual({});
+
+        // ...but those extra HDELs are no-ops for done markers: the completed
+        // batch keeps its done marker and completed-set entry for BOTH
+        // projections, so an operator re-run resumes past it.
+        expect(await redis.exists(doneMarkerKey(foldName, completedAggKey))).toBe(1);
+        expect(await redis.smembers(`${COMPLETED_KEY_PREFIX}${foldName}`)).toEqual([
+          completedAggKey,
+        ]);
+        expect(await redis.exists(doneMarkerKey(mapName, completedAggKey))).toBe(1);
+
+        // The failed batch's aggregate holds no terminal marker for either
+        // projection — it is back to unconditional live processing.
+        expect(await redis.exists(doneMarkerKey(foldName, failedAggKey))).toBe(0);
+        expect(await redis.exists(doneMarkerKey(mapName, failedAggKey))).toBe(0);
+      });
+    });
+  });
+
+  describe("replayOptimized multi-tenant batches", () => {
+    describe("when a batch spans multiple tenants", () => {
+      it("routes each tenant's records to its own tenant-scoped bulkAppend call", async () => {
+        const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+        const mapName = `optMultiTenant_${suffix}`;
+        // A unique event type keeps discovery scoped to exactly the aggregates
+        // seeded below, independent of data earlier tests inserted.
+        const eventType = `trace.multitenant_${suffix}`;
+        const aggA1 = `trace-mt-a1-${suffix}`;
+        const aggA2 = `trace-mt-a2-${suffix}`;
+        const aggB1 = `trace-mt-b1-${suffix}`;
+
+        await client.insert({
+          table: "event_log",
+          values: [
+            {
+              TenantId: tenantA,
+              AggregateType: "trace",
+              AggregateId: aggA1,
+              EventId: `evt-mt-a-001-${suffix}`,
+              EventType: eventType,
+              EventTimestamp: 1700000005000,
+              EventOccurredAt: 1700000005000,
+              EventVersion: "2025-01-01",
+              EventPayload: JSON.stringify({ value: 1 }),
+              _retention_days: 0,
+            },
+            {
+              TenantId: tenantA,
+              AggregateType: "trace",
+              AggregateId: aggA2,
+              EventId: `evt-mt-a-002-${suffix}`,
+              EventType: eventType,
+              EventTimestamp: 1700000006000,
+              EventOccurredAt: 1700000006000,
+              EventVersion: "2025-01-01",
+              EventPayload: JSON.stringify({ value: 2 }),
+              _retention_days: 0,
+            },
+            {
+              TenantId: tenantB,
+              AggregateType: "trace",
+              AggregateId: aggB1,
+              EventId: `evt-mt-b-001-${suffix}`,
+              EventType: eventType,
+              EventTimestamp: 1700000007000,
+              EventOccurredAt: 1700000007000,
+              EventVersion: "2025-01-01",
+              EventPayload: JSON.stringify({ value: 3 }),
+              _retention_days: 0,
+            },
+          ],
+          format: "JSONEachRow",
+        });
+
+        // Discovery must see all three freshly inserted events — poll until
+        // ClickHouse reports them visible (insert visibility is not
+        // synchronous on CI).
+        for (let attempt = 0; attempt < 50; attempt++) {
+          const visible = await client.query({
+            query: `SELECT count() AS c FROM event_log WHERE TenantId IN ({tenantA:String}, {tenantB:String}) AND EventType = {eventType:String}`,
+            query_params: { tenantA, tenantB, eventType },
+            format: "JSONEachRow",
+          });
+          const [row] = (await visible.json()) as Array<{ c: string }>;
+          if (Number(row?.c) >= 3) break;
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+
+        const bulkAppend = vi.fn().mockResolvedValue(undefined);
+        const projection: RegisteredMapProjection = {
+          projectionName: mapName,
+          pipelineName: "test_pipeline",
+          aggregateType: "trace",
+          source: "pipeline",
+          pauseKey: `test_pipeline/handler/${mapName}`,
+          kind: "map",
+          definition: {
+            name: mapName,
+            eventTypes: [eventType],
+            map: (event: any) => ({ src: event.aggregateId }),
+            store: { append: async () => undefined, bulkAppend },
+          },
+        };
+
+        const service = createServiceWithResolver();
+
+        const result = await service.replayOptimized({
+          projections: [],
+          mapProjections: [projection],
+          tenantIds: [tenantA, tenantB],
+          since: "2023-11-01",
+        });
+
+        expect(result.batchErrors).toBe(0);
+        // 2 aggregates for tenant A + 1 for tenant B, one event each.
+        expect(result.aggregatesReplayed).toBe(3);
+        expect(result.totalEvents).toBe(3);
+
+        // The per-tenant cutoff/load fan-out resolved a client for each tenant.
+        expect(resolverCalls).toContain(tenantA);
+        expect(resolverCalls).toContain(tenantB);
+
+        // Records flush in per-tenant chunks: exactly one tenant-scoped
+        // bulkAppend per tenant, each carrying ONLY that tenant's aggregates.
+        // A boundsByTenant keying bug or cross-tenant mixup in the parallel
+        // cutoff/load path would drop or mix records across these calls.
+        expect(bulkAppend).toHaveBeenCalledTimes(2);
+        const recordsByTenant = new Map<string, string[]>();
+        for (const [records, ctx] of bulkAppend.mock.calls as Array<[Array<{ src: string }>, any]>) {
+          expect(recordsByTenant.has(ctx.tenantId)).toBe(false);
+          recordsByTenant.set(
+            ctx.tenantId,
+            records.map((r) => r.src).sort(),
+          );
+        }
+        expect(recordsByTenant.get(tenantA)).toEqual([aggA1, aggA2]);
+        expect(recordsByTenant.get(tenantB)).toEqual([aggB1]);
+      });
     });
   });
 });

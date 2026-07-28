@@ -2,7 +2,7 @@
 
 The in-house queue that backs every event-sourcing pipeline: per-aggregate FIFO, cross-aggregate parallelism, tiered payload storage, content-addressed dedup across fan-outs. Built on Redis primitives + Lua, no BullMQ.
 
-For the technical overview (how the staging Lua, the dispatcher, the tiered storage, and the holder refcount actually work), see [ARCHITECTURE.md](./ARCHITECTURE.md).
+For the technical overview (how the staging Lua, the dispatcher, the tiered storage, and renewable blob leases actually work), see [ARCHITECTURE.md](./ARCHITECTURE.md).
 
 ---
 
@@ -149,7 +149,7 @@ For pipelines where multiple jobs in the same group can be processed together (e
 }
 ```
 
-The drain happens atomically inside `DISPATCH_LUA`. If `processBatch` throws, every job in the batch is re-staged (preserving FIFO order at the head of the group).
+The drain happens atomically inside `DISPATCH_BATCH_LUA`. If `processBatch` throws, every job in the batch is re-staged (preserving FIFO order at the head of the group).
 
 ---
 
@@ -161,11 +161,11 @@ Payloads of different sizes land in different places, picked at encode time. You
 |---|---|---|
 | **≤ 1 KiB** | Inline raw JSON in the staged value | nothing — the cheap path |
 | **1 KiB to ≤ 4 KiB** | Inline gzip+base64 (if smaller than raw) | nothing |
-| **4 KiB to ≤ 256 KiB** | Standalone Redis key, ref in envelope. Reclaimed on job completion via the holder set, 3-day TTL backstop. | Redis memory growth in the `{queue}:gq:blob:*` keyspace — usually a runaway-fan-out signal |
-| **> 256 KiB, ≤ 50 MiB** | Object store (S3 / file / azure-blob — projectId-scoped to the BYOC bucket) | Object-store request rate; bucket lifecycle policy as backstop for missed reclaims |
+| **4 KiB to ≤ 256 KiB** | Standalone Redis key, ref in envelope. Reads refresh a 4-day TTL; expiry reclaims it lazily. | Redis memory growth in the `{queue}:gq:blob:*` keyspace — usually a runaway-fan-out signal |
+| **> 256 KiB, ≤ 50 MiB** | Object store (S3 / file / azure-blob — projectId-scoped to the BYOC bucket) | Object-store request rate and lifecycle-sweep health |
 | **> 50 MiB** | Rejected at encode — `PayloadTooLargeError` | Hit by a product bug or a runaway loop — fix upstream rather than raise the cap |
 
-**Content-addressed sharing** means the storage cost of a payload is paid **once** per `(projectId, content-hash)`, regardless of how many jobs reference it. A 30-reactor fan-out of the same event stages 30 envelopes — 30 hold tokens on the same holder set, one stored blob. When all 30 complete (or all retry to the same content), the blob is reclaimed atomically.
+**Content-addressed sharing** means the storage cost of a payload is paid **once** per `(projectId, content-hash)`, regardless of how many jobs reference it. A 30-reactor fan-out of the same event stages 30 envelopes — 30 renewable lease members in one sorted set, one stored blob. Completion drops a member but never deletes the shared blob; Redis expiry or the durable-store lifecycle sweep reclaims it lazily.
 
 ### Configuring writes
 
@@ -177,10 +177,10 @@ GQ2 (content-addressed) writes are gated behind `GROUP_QUEUE_ENVELOPE_WRITES_ENA
 
 - **Queue name must be hash-tagged.** A non-`{...}` name passes the type checker but fails at runtime in Redis Cluster mode (CROSSSLOT). The `hasRedisHashTag` guard catches this on construction.
 - **The `__*` namespace is reserved.** User payloads must not carry `__custom` or similar — they'll be rejected at `send`-time. The three caller-set routing fields (`__pipelineName`, `__jobType`, `__jobName`) are the only `__*` keys the queue accepts from outside; everything else is queue-internal machinery.
-- **Holders TTL is a backstop, not the primary reclaim.** The happy path reclaims a blob the moment its last holder drops, atomically inside the release Lua. The 3-day TTL is for genuinely-orphaned blobs (mid-completion crash leaves a holder leaked). Don't tune the TTL down without understanding which path is doing the work in your traffic.
-- **Cluster mode requires same-slot keys.** Holder Lua touches multiple keys; the hash tag is what makes that safe. If you add new keys to the staging layer, they MUST share the queue's hash tag.
+- **Leases expire unless touched.** Stage publishes the value and lease atomically; decode, every active batch member's heartbeat, and retry/transfer renew a holder's 3-day deadline. Redis-tier renewal slides the blob's 4-day backstop in the same eval. A crashed job stops renewing and ages out; release is idempotent and never eagerly deletes shared data.
+- **Cluster mode requires same-slot keys.** Lease Lua touches multiple keys; the hash tag is what makes that safe. If you add new keys to the staging layer, they MUST share the queue's hash tag.
 - **Memory queue is for tests / dev.** It processes jobs in-process with no Lua, no Redis, no tiered storage. Don't reach for it in production code paths; it exists so unit tests don't need a docker-compose dependency.
-- **Holders are per-queue, blobs are per-tenant.** Two queues that stage byte-identical content for the same project will reference the SAME stored blob (at the s3 tier), each with their own holder set. The blob is reclaimed only when both holder sets are empty.
+- **Leases are per queue and tenant.** Every staged occupancy has its own holder identity, renewed during dispatch and the active-job heartbeat, while identical payloads within that namespace share one content-addressed blob.
 - **An assertion error in `send` doesn't roll back upstream work.** The reserved-namespace check throws synchronously; callers must treat `send`/`sendBatch` as fallible from this PR forward (it always was, but rejected for fewer reasons).
 
 ---
@@ -208,12 +208,12 @@ import {
 
 Require a Redis testcontainer. The existing suites are good templates:
 
-- [`blobHolders.integration.test.ts`](./__tests__/blobHolders.integration.test.ts) — pure holder-set Lua semantics
-- [`envelopeBlobLifecycle.integration.test.ts`](./__tests__/envelopeBlobLifecycle.integration.test.ts) — encode/decode + acquire/release/transfer + cross-tenant guards
-- [`groupQueue.gq2.integration.test.ts`](./__tests__/groupQueue.gq2.integration.test.ts) — end-to-end through the GroupQueueProcessor (offload → dispatch → reclaim)
+- [`blobLeases.integration.test.ts`](./__tests__/blobLeases.integration.test.ts) — pure lease Lua semantics and rolling-deploy guard
+- [`envelopeBlobLifecycle.integration.test.ts`](./__tests__/envelopeBlobLifecycle.integration.test.ts) — encode/decode + take/release/transfer + cross-tenant guards
+- [`groupQueue.gq2.integration.test.ts`](./__tests__/groupQueue.gq2.integration.test.ts) — end-to-end through the GroupQueueProcessor (offload → dispatch → lazy lifecycle)
 - [`groupQueue.integration.test.ts`](./__tests__/groupQueue.integration.test.ts) — broader staging + retries + dedup
 
-Each suite uses a hash-tagged namespace prefix (`{test/holders}`, `{test/lifecycle/...}`) and scopes its `afterEach` cleanup to that prefix — no `redis.flushall()`, so suites can run in parallel against the same Redis without clobbering each other.
+Each suite uses a hash-tagged namespace prefix (`{test/leases}`, `{test/lifecycle/...}`) and scopes its `afterEach` cleanup to that prefix — no `redis.flushall()`, so suites can run in parallel against the same Redis without clobbering each other.
 
 ---
 
@@ -229,8 +229,6 @@ The queue emits a full set of Prometheus metrics (see [`metrics.ts`](./metrics.t
 - Group state: `gqGroupsBlockedTotal`
 
 OpenTelemetry spans wrap dispatch and processing. `__context` carries OTel trace context through the envelope so a span dispatched on the web tier continues on the worker.
-
-For ad-hoc inspection during development, the `bullboard` service in the dev stack (`make quickstart full-local`) shows queue state via Redis directly — it doesn't depend on BullMQ.
 
 ---
 

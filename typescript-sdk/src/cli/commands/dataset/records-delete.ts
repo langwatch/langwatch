@@ -1,6 +1,11 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { checkApiKey } from "../../utils/apiKey";
+import {
+  commandValidationError,
+  reportCommandError,
+} from "../../utils/errorOutput";
+import type { CommandResult } from "../../utils/output";
 import { createDatasetService } from "./service-factory";
 import { handleDatasetCommandError } from "./error-handler";
 
@@ -10,16 +15,18 @@ import { handleDatasetCommandError } from "./error-handler";
 export const recordsDeleteCommand = async (
   slugOrId: string,
   recordIds: string[],
-): Promise<void> => {
+): Promise<CommandResult | void> => {
   checkApiKey();
 
   if (recordIds.length === 0) {
-    console.error(chalk.red("Error: At least one record ID is required."));
+    reportCommandError({
+      error: commandValidationError("At least one record ID is required."),
+    });
     process.exit(1);
   }
 
   const service = createDatasetService();
-  const spinner = ora(
+  const spinner = createSpinner(
     `Deleting ${recordIds.length} record${recordIds.length !== 1 ? "s" : ""} from "${slugOrId}"...`,
   ).start();
 
@@ -29,6 +36,14 @@ export const recordsDeleteCommand = async (
     spinner.succeed(
       `Deleted ${result.deletedCount} record${result.deletedCount !== 1 ? "s" : ""} from "${chalk.cyan(slugOrId)}"`,
     );
+
+    return {
+      data: result,
+      table: () => {
+        // Nothing further to print: the spinner line above was the whole
+        // human output before the migration, and stays so.
+      },
+    };
   } catch (error) {
     handleDatasetCommandError({ spinner, error, context: "delete records" });
   }

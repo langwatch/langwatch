@@ -2017,33 +2017,26 @@ func TestPattern015_ThreadIDPropagatesToOutboundHeaders(t *testing.T) {
 	}
 }
 
-// TestPattern014_SignatureFallsBackToWorkflowDefaultLLM is the
-// integration-level pin for langwatch_nlp regression 6d3d8a823 ("defaults
-// for gpt-5 and default model deleting during execution"). A workflow
-// that sets `default_llm` at the top level and has signature nodes
-// WITHOUT a `llm` parameter must dispatch using that default. Pre-fix
-// (Python) the parser blanked default_llm because the `node.type ==
-// "llm"` check never matched any real node — the Go engine pre-fix
-// mirrored the bug by ignoring workflow.DefaultLLM entirely (parsed
-// but never consumed).
-//
-// Asserts: the LLM client receives a request whose model + provider
-// come from workflow.default_llm, and the signature node completes
-// successfully end-to-end through the HTTP server boundary.
-func TestPattern014_SignatureFallsBackToWorkflowDefaultLLM(t *testing.T) {
+// TestPattern014_SignatureWithoutModelFailsClearly pins the node-owned
+// LLM config contract (DSL spec_version 1.5): the engine no longer
+// falls back to the legacy workflow-level `default_llm` (tolerated in
+// the payload as an unknown field, never consumed). The app layer
+// materializes a model on every llm parameter at save time and
+// migrates legacy DSLs on read, so a signature node reaching the
+// engine without a model is stale client state — it must fail with
+// the typed llm_model_not_set error rather than dispatching an empty
+// model for the gateway to 400 on.
+func TestPattern014_SignatureWithoutModelFailsClearly(t *testing.T) {
 	llm := &fakeLLMClient{
 		respond: func(_ app.LLMRequest) (*app.LLMResponse, error) {
-			return &app.LLMResponse{Content: "fallback ok", Cost: 0.00007}, nil
+			return &app.LLMResponse{Content: "must not be reached", Cost: 0.00007}, nil
 		},
 	}
 	url, _ := setupPatternStack(t, llm, func(http.ResponseWriter, *http.Request) {})
 
-	// Note the signature node has NO `llm` parameter — only `instructions`.
-	// The workflow-level `default_llm` is the only LLM config in the
-	// workflow. Pre-fix this would dispatch with empty model and the
-	// gateway would 400 (or, on the Python path, the parser would
-	// blank default_llm during normalization and the same crash would
-	// happen).
+	// The signature node has NO `llm` parameter — only `instructions` —
+	// and the legacy workflow-level `default_llm` is present, exactly
+	// the shape an old client could still send.
 	body := `{
 	  "type":"execute_flow",
 	  "payload": {
@@ -2083,28 +2076,13 @@ func TestPattern014_SignatureFallsBackToWorkflowDefaultLLM(t *testing.T) {
 	}`
 
 	res := postSync(t, &stack{url: url}, body)
-	require.Equal(t, "success", res.Status, "engine error: %+v", res.Error)
-	assert.Equal(t, "pattern-014", res.TraceID)
-
-	// (1) The fake LLM saw exactly one Execute call carrying the
-	// workflow-level default model and provider — proves the
-	// fallback reached the dispatch boundary.
-	llmReq := llm.lastRequest(t)
-	assert.Equal(t, "openai", llmReq.Provider, "default_llm provider must reach dispatch")
-	assert.Equal(t, "gpt-5-mini", llmReq.Model, "default_llm model must reach dispatch")
-
-	// (2) Per-node accounting: every node successful, signature node
-	// in particular (the load-bearing claim).
-	require.NotNil(t, res.Nodes)
-	for _, id := range []string{"entry", "answer", "end"} {
-		node, ok := res.Nodes[id].(map[string]any)
-		require.True(t, ok, "missing node %q in result.nodes", id)
-		assert.Equal(t, "success", node["status"], "node %q expected success", id)
-	}
-
-	// (3) The signature output reached the end node verbatim.
-	require.NotNil(t, res.Result)
-	assert.Equal(t, "fallback ok", res.Result["answer"])
+	require.Equal(t, "error", res.Status,
+		"a modelless signature node must fail clearly, not silently dispatch an empty model")
+	require.NotNil(t, res.Error)
+	assert.Equal(t, "llm_model_not_set", res.Error.Type,
+		"typed sentinel so the app can render a specific, fixable error")
+	assert.Contains(t, res.Error.Message, "no model selected",
+		"error message must tell the user what to fix")
 }
 
 // TestPattern016_CustomNodeKindRoutesToWorkflowRunner pins that a

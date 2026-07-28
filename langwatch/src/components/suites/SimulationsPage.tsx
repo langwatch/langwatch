@@ -11,12 +11,12 @@
  * Layout: sidebar (search, +New Run Plan, All Runs, suite list) + main panel.
  */
 
-import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, EmptyState, HStack, VStack } from "@chakra-ui/react";
 import { subDays } from "date-fns";
-import { Plus } from "lucide-react";
+import { Plus, TriangleAlert } from "lucide-react";
 import type { SimulationSuite } from "@prisma/client";
 import { useRouter } from "~/utils/compat/next-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { PeriodSelector, usePeriodSelector, type Period } from "~/components/PeriodSelector";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
@@ -39,7 +39,9 @@ import {
   useSuiteRouting,
 } from "~/components/suites/useSuiteRouting";
 import { toaster } from "~/components/ui/toaster";
+import { useScenarioTabFollow } from "~/hooks/useScenarioTabFollow";
 import { useSimulationUpdateListener } from "~/hooks/useSimulationUpdateListener";
+import type { ScenarioTabNavigatePayload } from "~/server/scenarios/browser-tab/scenario-tab-events";
 import { useDrawer } from "~/hooks/useDrawer";
 import { NowProvider } from "./NowProvider";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -120,6 +122,30 @@ export default function SimulationsPage() {
   // Connect the sidebar-level query to SSE events so new runs appear without
   // waiting for the 30s poll interval. Without this, the SSE listener only
   // lives inside RunHistoryPanel, leaving the sidebar query unreachable.
+  // When the SDK opened this tab, later runs from the same machine are steered
+  // here instead of spawning yet another browser tab.
+  const scenarioTab = useScenarioTabFollow();
+  const lastFollowedRef = useRef<string | null>(null);
+
+  const followRun = useCallback(
+    (payload: ScenarioTabNavigatePayload) => {
+      const target = new URL(payload.url);
+      if (target.origin !== window.location.origin) return;
+      if (target.pathname === window.location.pathname) return;
+      // A handoff is parked as well as broadcast, so a tab that took the live
+      // one and then re-subscribed is offered the same run again. Without this
+      // it would be yanked back to a run the user had already moved on from.
+      if (lastFollowedRef.current === payload.url) return;
+      lastFollowedRef.current = payload.url;
+
+      // Silently: the user started the run themselves, the page moving to it
+      // is the expected outcome, not news. The connected badge in the set
+      // header is the only marker that this tab behaves this way.
+      void router.push(target.pathname + target.search);
+    },
+    [router]
+  );
+
   useSimulationUpdateListener({
     projectId: project?.id ?? "",
     refetch: () => {
@@ -128,6 +154,9 @@ export default function SimulationsPage() {
     },
     enabled: !!project?.id,
     debounceMs: 500,
+    tabKey: scenarioTab.tabKey,
+    tabId: scenarioTab.tabId,
+    onTabNavigate: followRun,
   });
 
   const runSummaries = useMemo(() => {
@@ -227,13 +256,14 @@ export default function SimulationsPage() {
   });
 
   const { requestRun, isPending: isRunPending, pendingBatchRunId, dialogProps: runDialogProps } = useRunSuite({
-    onRunScheduled: (suiteId) => {
+    onRunScheduled: () => {
       void utils.suites.getSummaries.invalidate();
-      // Navigate to the suite so the user sees the run starting
+    },
+    // Quick Run stays in place (issue #3363); the success toast's "View run"
+    // action is the opt-in path to the run plan detail page.
+    onViewRun: (suiteId) => {
       const suite = suites?.find((s) => s.id === suiteId);
-      if (suite && selectedSuiteSlug !== suite.slug) {
-        navigateToSuite(suite.slug);
-      }
+      if (suite) navigateToSuite(suite.slug);
     },
   });
 
@@ -344,6 +374,7 @@ export default function SimulationsPage() {
             onSelectSuite={navigateToSuite}
             onRunSuite={handleRunSuite}
             onContextMenu={handleContextMenu}
+            onNewSuite={handleNewSuite}
             isLoading={isLoading || isExternalSetsLoading}
           />
 
@@ -379,6 +410,7 @@ export default function SimulationsPage() {
                 period={period}
                 suiteNameMap={suiteNameMap}
                 highlightBatchId={highlightBatchId}
+                connectedToLocalRun={!!scenarioTab.tabKey}
               />
             </Box>
           </Box>
@@ -428,6 +460,7 @@ function MainPanel({
   period,
   suiteNameMap,
   highlightBatchId,
+  connectedToLocalRun,
 }: {
   error: { message: string } | null;
   selectedSuiteSlug: string | typeof ALL_RUNS_ID | null;
@@ -442,15 +475,21 @@ function MainPanel({
   period: Period;
   suiteNameMap: Map<string, string>;
   highlightBatchId: string | null;
+  connectedToLocalRun: boolean;
 }) {
   if (error) {
     return (
-      <VStack gap={4} align="center" py={8}>
-        <Text color="red.500">Error loading simulations</Text>
-        <Text fontSize="sm" color="fg.muted">
-          {error.message}
-        </Text>
-      </VStack>
+      <EmptyState.Root paddingY={12}>
+        <EmptyState.Content>
+          <EmptyState.Indicator color="red.fg">
+            <TriangleAlert size={28} />
+          </EmptyState.Indicator>
+          <EmptyState.Title>Couldn&apos;t load simulations</EmptyState.Title>
+          <EmptyState.Description maxWidth="360px" textAlign="center">
+            {error.message}
+          </EmptyState.Description>
+        </EmptyState.Content>
+      </EmptyState.Root>
     );
   }
 
@@ -459,7 +498,7 @@ function MainPanel({
   }
 
   if (selectedExternalSetId) {
-    return <ExternalSetDetailPanel scenarioSetId={selectedExternalSetId} period={period} highlightBatchId={highlightBatchId} />;
+    return <ExternalSetDetailPanel scenarioSetId={selectedExternalSetId} period={period} highlightBatchId={highlightBatchId} connectedToLocalRun={connectedToLocalRun} />;
   }
 
   if (selectedSuiteSlug === ALL_RUNS_ID) {

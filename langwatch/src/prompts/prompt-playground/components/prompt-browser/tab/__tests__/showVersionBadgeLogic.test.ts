@@ -2,31 +2,7 @@
  * @vitest-environment jsdom
  */
 import { describe, expect, it } from "vitest";
-
-/**
- * Pure logic for determining whether to show version badge.
- * Extracted for testing without React hooks complexity.
- */
-const shouldShowVersionBadge = (params: {
-  isOutdated: boolean;
-  configId: string | undefined;
-  allTabsData: Array<{ configId?: string; versionNumber?: number }>;
-}) => {
-  const { isOutdated, configId, allTabsData } = params;
-
-  // If outdated, always show
-  if (isOutdated) return true;
-
-  // If no configId, don't show
-  if (!configId) return false;
-
-  // Check for duplicate tabs with different versions
-  const samePromptTabs = allTabsData.filter((t) => t.configId === configId);
-  if (samePromptTabs.length <= 1) return false;
-
-  const versions = new Set(samePromptTabs.map((t) => t.versionNumber));
-  return versions.size > 1;
-};
+import { shouldShowVersionBadge } from "../shouldShowVersionBadge";
 
 describe("showVersionBadge logic", () => {
   describe("when prompt is outdated (behind DB version)", () => {

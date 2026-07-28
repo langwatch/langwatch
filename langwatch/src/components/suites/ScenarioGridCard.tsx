@@ -10,9 +10,12 @@
 import { Box, HStack, Spinner, Text } from "@chakra-ui/react";
 import { Square } from "lucide-react";
 import { SimulationCard } from "~/components/simulations/SimulationCard";
+import { LangyContextTarget } from "~/features/langy/components/LangyContextTarget";
+import { scenarioContextChip } from "~/features/langy/logic/langyContextChips";
 import { MessagePreview } from "./MessagePreview";
 import { buildDisplayTitle } from "./run-history-transforms";
 import { isCancellableStatus } from "./useCancelScenarioRun";
+import { usePrefetchRunState } from "./usePrefetchRunState";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 
 type ScenarioGridCardProps = {
@@ -34,12 +37,26 @@ export function ScenarioGridCard({
 }: ScenarioGridCardProps) {
   const scenarioName = scenarioRun.name ?? scenarioRun.scenarioId;
   const title = buildDisplayTitle({ scenarioName, targetName, iteration });
+  const prefetchRunState = usePrefetchRunState();
+  const handlePrefetch = () => prefetchRunState(scenarioRun.scenarioRunId);
 
   return (
-    <Box position="relative">
+    // Armed, the run can be handed to Langy. Keyed on the run id — the same key
+    // the `scenarioRunDetail` drawer derives — so pointing at a card and then
+    // opening it is one chip. `borderRadius` matches the card inside it, since
+    // Langy's outline follows the element's own radius.
+    <LangyContextTarget
+      target={scenarioContextChip({
+        scenarioId: scenarioRun.scenarioRunId,
+        name: title,
+      })}
+    >
+    <Box position="relative" borderRadius="lg">
       <Box
         as="button"
         onClick={onClick}
+        onMouseEnter={handlePrefetch}
+        onFocus={handlePrefetch}
         cursor="pointer"
         height="200px"
         textAlign="left"
@@ -91,5 +108,6 @@ export function ScenarioGridCard({
         </HStack>
       )}
     </Box>
+    </LangyContextTarget>
   );
 }

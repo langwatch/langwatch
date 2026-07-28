@@ -12,6 +12,11 @@ import {
   type StartedRedisContainer,
 } from "@testcontainers/redis";
 import { migrateUp } from "~/server/clickhouse/goose";
+import {
+  nativeClickHouseBaseUrl,
+  TEST_CLICKHOUSE_IMAGE,
+} from "~/test-utils/clickhouseTestEndpoints";
+import { shardSawFailure } from "~/test-utils/shardFailureReporter";
 
 const TEST_DATABASE = "test_langwatch";
 
@@ -133,8 +138,7 @@ type LocalServiceUrls = {
  * touch dev data. Never active in CI.
  */
 function localServiceUrls(): LocalServiceUrls | null {
-  if (process.env.CI) return null;
-  const clickHouseBaseUrl = process.env.LANGWATCH_TEST_CLICKHOUSE_URL;
+  const clickHouseBaseUrl = nativeClickHouseBaseUrl();
   const redisUrl = process.env.LANGWATCH_TEST_REDIS_URL;
   if (!clickHouseBaseUrl || !redisUrl) return null;
   return {
@@ -249,29 +253,26 @@ export async function setup(): Promise<void> {
   // handles open, then vitest main process sits idle for the full job
   // timeout cap. The wedge appears to be in vitest's own shard / reporter
   // finalize path and we cannot fix it from inside a test. Schedule a hard
-  // process.exit(0) so the step at least completes and the rest of the
+  // process.exit so the step at least completes and the rest of the
   // langwatch-app-complete required check unblocks. Unref'd so a healthy
   // shard exits immediately on its own; the timer only fires on the wedge.
+  //
+  // The exit code preserves failures: the wedge also fires after a shard
+  // prints red results, and a bare exit(0) there stamps a green job over
+  // failing tests. ShardFailureReporter (wired via --reporter in the CI
+  // step) flags any failed result on globalThis as results stream, so the
+  // floor knows.
   if (process.env.CI) {
     const HARD_FLOOR_MS = 20 * 60 * 1000;
     const timer = setTimeout(() => {
+      const failed = shardSawFailure();
       // eslint-disable-next-line no-console
       console.log(
-        `[globalSetup] hard floor reached at ${HARD_FLOOR_MS / 60_000} min after start — forcing process.exit(0) to release the CI step from a vitest finalize wedge`,
+        `[globalSetup] hard floor reached at ${HARD_FLOOR_MS / 60_000} min after start — forcing process.exit(${failed ? 1 : 0}) to release the CI step from a vitest finalize wedge${failed ? " (failures were reported before the wedge)" : ""}`,
       );
-      process.exit(0);
+      process.exit(failed ? 1 : 0);
     }, HARD_FLOOR_MS);
     timer.unref();
-  }
-
-  // Generate sdk-versions.json (normally done by start:prepare:files)
-  const sdkVersionsPath = path.join(
-    __dirname,
-    "../../../../server/sdk-radar/sdk-versions.json",
-  );
-  if (!fs.existsSync(sdkVersionsPath)) {
-    console.log("[globalSetup] Generating sdk-versions.json...");
-    execSync("pnpm run generate:sdk-versions", { stdio: "inherit" });
   }
 
   // Skip if using CI service containers
@@ -296,9 +297,7 @@ export async function setup(): Promise<void> {
   // Start ClickHouse container (reusable to speed up subsequent test runs)
   const storagePolicyConfigPath = createStoragePolicyConfigFile();
 
-  clickHouseContainer = await new ClickHouseContainer(
-    "clickhouse/clickhouse-server:25.10.2.65",
-  )
+  clickHouseContainer = await new ClickHouseContainer(TEST_CLICKHOUSE_IMAGE)
     .withLabels(CONTAINER_LABELS)
     .withReuse()
     .withCopyFilesToContainer([

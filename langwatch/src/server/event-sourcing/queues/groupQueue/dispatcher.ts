@@ -1,7 +1,7 @@
 import type fastq from "fastq";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
-import type { Logger } from "pino";
+import type { Logger } from "@langwatch/observability";
 import { gqJobsDispatchedTotal } from "./metrics";
 import type { DispatchResult, GroupStagingScripts } from "./scripts";
 
@@ -88,10 +88,6 @@ export class GroupQueueDispatcher {
 
   requestShutdown(): void {
     this.shutdownRequested = true;
-  }
-
-  isRunning(): boolean {
-    return this.running;
   }
 
   async waitUntilStopped(): Promise<void> {

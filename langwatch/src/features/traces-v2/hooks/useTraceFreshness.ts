@@ -15,6 +15,14 @@ import { useVisibleTraceIds } from "./useVisibleTraceIds";
 // doesn't keep the sidebar permanently refetching.
 const DISCOVER_INVALIDATE_DEBOUNCE_MS = 30_000;
 
+// A busy coding-agent trace fires `trace_summary_updated` on nearly every
+// span (its summary/metrics change each time), which otherwise refetches
+// `newCount` every couple of seconds for a pill that didn't actually change
+// count. Coalesce into a shorter window than discover's — the pill still
+// needs to feel live — but long enough that a stream of span updates to
+// EXISTING traces doesn't keep re-querying it.
+const NEWCOUNT_INVALIDATE_DEBOUNCE_MS = 10_000;
+
 /**
  * Coordinator hook that bridges SSE trace events into TanStack Query
  * cache invalidation. Mounted once in TracesPage.
@@ -22,8 +30,11 @@ const DISCOVER_INVALIDATE_DEBOUNCE_MS = 30_000;
  * On trace_summary_updated:
  *   - Visible rows: pulse in-place via rowPulseStore; no list invalidation.
  *   - New trace on page 1: cancel + invalidate list.
- *   - Off-screen / wrong page: cancel + invalidate newCount only.
- *   - In all cases: invalidate newCount so the pill stays accurate.
+ *   - Off-screen / wrong page: no list invalidation.
+ *   - In all cases: invalidate newCount so the pill stays accurate — coalesced
+ *     into a short window (see NEWCOUNT_INVALIDATE_DEBOUNCE_MS) rather than
+ *     re-queried on every event, since most events are span updates to a trace
+ *     already counted, not a new row.
  *
  * If the drawer is open for an affected trace, also invalidates
  * header, spanSummary, and evals.
@@ -42,6 +53,9 @@ export function useTraceFreshness() {
   const discoverInvalidateTimer = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
+  const newCountInvalidateTimer = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
   const pulse = useRowPulseStore((s) => s.pulse);
   const visibleTraceIds = useVisibleTraceIds();
 
@@ -49,6 +63,9 @@ export function useTraceFreshness() {
     return () => {
       if (discoverInvalidateTimer.current) {
         clearTimeout(discoverInvalidateTimer.current);
+      }
+      if (newCountInvalidateTimer.current) {
+        clearTimeout(newCountInvalidateTimer.current);
       }
     };
   }, []);
@@ -58,10 +75,18 @@ export function useTraceFreshness() {
       const mode = useSseStatusStore.getState().liveUpdatesMode;
 
       // newCount is always kept current so the "(N new)" pill stays in
-      // sync across all modes (live, ask, paused). Cancel before
-      // invalidate so in-flight stale responses don't race a fresh one.
-      void trpcUtils.tracesV2.newCount.cancel();
-      void trpcUtils.tracesV2.newCount.invalidate();
+      // sync across all modes (live, ask, paused) — but coalesced the same
+      // way discover is: a busy coding-agent trace fires this handler on
+      // nearly every span, and re-querying the pill's count on each one is
+      // pure waste when the count usually hasn't even changed (an existing
+      // trace being updated doesn't add a new row to count).
+      if (!newCountInvalidateTimer.current) {
+        newCountInvalidateTimer.current = setTimeout(() => {
+          newCountInvalidateTimer.current = null;
+          void trpcUtils.tracesV2.newCount.cancel();
+          void trpcUtils.tracesV2.newCount.invalidate();
+        }, NEWCOUNT_INVALIDATE_DEBOUNCE_MS);
+      }
 
       // Partition incoming trace IDs into three buckets:
       //   1. visible  — already rendered in the current page → pulse only
@@ -153,8 +178,17 @@ export function useTraceFreshness() {
       // refetchInterval can stay off while SSE is connected. The key
       // is scoped to `projectId` + `traceId` so only the open trace
       // is invalidated, not the entire CSR cache.
+      //
+      // The span tree is refreshed through `spanTreeDelta`, NOT by
+      // invalidating `spanTree` itself: the tree is assembled by walking
+      // `spanTreePaginated`, so invalidating it re-runs `ceil(N/500)`
+      // sequential page requests — ~200 on a 100k-span trace, which cannot
+      // finish inside the 2s debounce window, and `invalidateQueries`
+      // defaults to `cancelRefetch: true` so the next batch would abort and
+      // restart it before it ever landed. `useSpanTree` merges the delta into
+      // the same cache entry in place.
       const key = { projectId, traceId: openTraceId };
-      void trpcUtils.tracesV2.spanTree.invalidate(key);
+      void trpcUtils.tracesV2.spanTreeDelta.invalidate(key);
       void trpcUtils.tracesV2.spanDetail.invalidate(key);
       void trpcUtils.tracesV2.spanLangwatchSignals.invalidate(key);
       void trpcUtils.tracesV2.traceEvents.invalidate(key);

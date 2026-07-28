@@ -80,8 +80,18 @@ describe("useViewSwitchingDim", () => {
     describe("when density changes while isFetching is true", () => {
       it("sets isReplacingData to true even when isPreviousData is false", async () => {
         const { rerender } = renderHook(
-          ({ isFetching, isPreviousData }: { isFetching: boolean; isPreviousData: boolean }) =>
-            useViewSwitchingDim({ isFetching, isFetched: true, isPreviousData }),
+          ({
+            isFetching,
+            isPreviousData,
+          }: {
+            isFetching: boolean;
+            isPreviousData: boolean;
+          }) =>
+            useViewSwitchingDim({
+              isFetching,
+              isFetched: true,
+              isPreviousData,
+            }),
           { initialProps: { isFetching: false, isPreviousData: false } },
         );
 
@@ -99,8 +109,18 @@ describe("useViewSwitchingDim", () => {
     describe("when density changes and isFetching and isPreviousData are both false", () => {
       it("does not dim because there is no fetch in flight", async () => {
         const { rerender } = renderHook(
-          ({ isFetching, isPreviousData }: { isFetching: boolean; isPreviousData: boolean }) =>
-            useViewSwitchingDim({ isFetching, isFetched: true, isPreviousData }),
+          ({
+            isFetching,
+            isPreviousData,
+          }: {
+            isFetching: boolean;
+            isPreviousData: boolean;
+          }) =>
+            useViewSwitchingDim({
+              isFetching,
+              isFetched: true,
+              isPreviousData,
+            }),
           { initialProps: { isFetching: false, isPreviousData: false } },
         );
 
@@ -120,8 +140,18 @@ describe("useViewSwitchingDim", () => {
     describe("when the view switches and data is still from the prior key", () => {
       it("sets isReplacingData to true", async () => {
         const { rerender } = renderHook(
-          ({ isFetching, isPreviousData }: { isFetching: boolean; isPreviousData: boolean }) =>
-            useViewSwitchingDim({ isFetching, isFetched: true, isPreviousData }),
+          ({
+            isFetching,
+            isPreviousData,
+          }: {
+            isFetching: boolean;
+            isPreviousData: boolean;
+          }) =>
+            useViewSwitchingDim({
+              isFetching,
+              isFetched: true,
+              isPreviousData,
+            }),
           { initialProps: { isFetching: true, isPreviousData: true } },
         );
 
@@ -140,20 +170,41 @@ describe("useViewSwitchingDim", () => {
     describe("when isFetching becomes false and isFetched becomes true", () => {
       it("clears isReplacingData", async () => {
         const { rerender } = renderHook(
-          ({ isFetching, isFetched, isPreviousData }: { isFetching: boolean; isFetched: boolean; isPreviousData: boolean }) =>
-            useViewSwitchingDim({ isFetching, isFetched, isPreviousData }),
-          { initialProps: { isFetching: true, isFetched: false, isPreviousData: false } },
+          ({
+            isFetching,
+            isFetched,
+            isPreviousData,
+          }: {
+            isFetching: boolean;
+            isFetched: boolean;
+            isPreviousData: boolean;
+          }) => useViewSwitchingDim({ isFetching, isFetched, isPreviousData }),
+          {
+            initialProps: {
+              isFetching: true,
+              isFetched: false,
+              isPreviousData: false,
+            },
+          },
         );
 
         // Trigger a view switch
         mockQueryText = "error";
         await act(async () => {
-          rerender({ isFetching: true, isFetched: false, isPreviousData: false });
+          rerender({
+            isFetching: true,
+            isFetched: false,
+            isPreviousData: false,
+          });
         });
 
         // Fetch completes
         await act(async () => {
-          rerender({ isFetching: false, isFetched: true, isPreviousData: false });
+          rerender({
+            isFetching: false,
+            isFetched: true,
+            isPreviousData: false,
+          });
         });
 
         expect(mockSetReplacingData).toHaveBeenCalledWith(false);

@@ -5,6 +5,7 @@
  * Uses the Repository pattern consistent with ScenarioRepository.
  */
 
+import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
 import type {
   Prisma,
@@ -14,7 +15,6 @@ import type {
 import { getLangWatchTracer } from "langwatch";
 import { nanoid } from "nanoid";
 import { ARCHIVED_SLUG_SUFFIX } from "./constants";
-import { createLogger } from "~/utils/logger/server";
 
 const tracer = getLangWatchTracer("langwatch.suites.repository");
 const logger = createLogger("langwatch:suites:repository");

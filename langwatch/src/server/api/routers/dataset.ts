@@ -5,6 +5,7 @@ import { slugify } from "~/utils/slugify";
 import { DatasetService } from "../../datasets/dataset.service";
 import { datasetErrorHandler } from "../../datasets/middleware";
 import {
+  datasetColumnsSchema,
   datasetRecordFormSchema,
   datasetRecordInputSchema,
 } from "../../datasets/types";
@@ -114,7 +115,15 @@ export const datasetRouter = createTRPCRouter({
         },
       });
 
-      return datasets;
+      return datasets.map((dataset) => ({
+        ...dataset,
+        // columnTypes is a JSON column. Keep malformed legacy rows visible so
+        // they can be deleted/repaired, but never leak a non-array into every
+        // dataset consumer and crash the page during render.
+        columnTypes: datasetColumnsSchema.safeParse(dataset.columnTypes).success
+          ? dataset.columnTypes
+          : [],
+      }));
     }),
 
   /**
@@ -130,7 +139,13 @@ export const datasetRouter = createTRPCRouter({
         where: { id: datasetId, projectId, archivedAt: null },
       });
 
-      return dataset;
+      if (!dataset) return dataset;
+      return {
+        ...dataset,
+        columnTypes: datasetColumnsSchema.safeParse(dataset.columnTypes).success
+          ? dataset.columnTypes
+          : [],
+      };
     }),
   deleteById: protectedProcedure
     .input(

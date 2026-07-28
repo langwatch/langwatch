@@ -28,7 +28,7 @@ import {
 import { useMemo, useState } from "react";
 
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
-import { FieldInfoTooltip } from "~/components/gateway/FieldInfoTooltip";
+import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
 import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { ProviderScopeChips } from "~/components/settings/ProviderScopeChips";

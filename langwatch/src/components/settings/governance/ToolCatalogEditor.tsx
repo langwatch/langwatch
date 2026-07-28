@@ -164,6 +164,11 @@ export function ToolCatalogEditor({
   // A slug is selected unless the admin explicitly unchecks it, so the
   // checklist defaults to the full pack without waiting on the query.
   const [unchecked, setUnchecked] = useState<Record<string, boolean>>({});
+  // The import card is always reachable: open by default while the catalog
+  // is empty, behind a small toggle once tiles exist. The service skips
+  // tiles the org already has (archived ones included), so re-import only
+  // ever adds starter tiles the catalog never had.
+  const [showImport, setShowImport] = useState(false);
   const starterTiles = starterPackQuery.data ?? [];
   const selectedSlugs = starterTiles
     .filter((t) => !unchecked[t.slug])
@@ -238,7 +243,18 @@ export function ToolCatalogEditor({
 
   return (
     <VStack align="stretch" gap={6} width="full">
-      {isCatalogEmpty && (
+      {!isCatalogEmpty && (
+        <HStack justifyContent="flex-end">
+          <Button
+            size="xs"
+            variant="outline"
+            onClick={() => setShowImport((v) => !v)}
+          >
+            <PackageOpen size={14} /> Import starter pack
+          </Button>
+        </HStack>
+      )}
+      {(isCatalogEmpty || showImport) && (
         <Box
           borderWidth="1px"
           borderColor="orange.300"
@@ -252,13 +268,18 @@ export function ToolCatalogEditor({
             </Box>
             <VStack align="start" gap={2} flex={1} minWidth={0}>
               <Text fontSize="sm" fontWeight="semibold">
-                Publish a starter pack to get going
+                {isCatalogEmpty
+                  ? "Publish a starter pack to get going"
+                  : "Import starter pack"}
               </Text>
               <Text fontSize="xs" color="fg.muted">
-                Pick the tools to publish at org scope so every member sees
-                them on /me. You can rename, reorder, disable, or remove
-                individual tiles afterwards. Re-running is safe; only new
-                slugs get added.
+                {isCatalogEmpty
+                  ? "Pick the tools to publish at org scope so every member " +
+                    "sees them on /me. You can rename, reorder, disable, or " +
+                    "remove individual tiles afterwards. Re-running is safe; " +
+                    "only new slugs get added."
+                  : "Adds starter tiles the catalog never had. Tiles already " +
+                    "present, archived ones included, are skipped."}
               </Text>
               <VStack align="start" gap={2} paddingTop={1} width="full">
                 {SECTION_ORDER.map((type) => {
@@ -295,10 +316,10 @@ export function ToolCatalogEditor({
                   loading={importStarterPackMutation.isPending}
                   disabled={selectedSlugs.length === 0}
                   onClick={() =>
-                    importStarterPackMutation.mutate({
-                      organizationId,
-                      slugs: selectedSlugs,
-                    })
+                    importStarterPackMutation.mutate(
+                      { organizationId, slugs: selectedSlugs },
+                      { onSuccess: () => setShowImport(false) },
+                    )
                   }
                 >
                   <PackageOpen size={14} /> Import selected (

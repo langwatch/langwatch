@@ -22,6 +22,16 @@ const (
 	// headroom over a 10M-token request. Deployments that send multi-hundred-MB
 	// media or run tighter memory should override MAX_REQUEST_BODY_BYTES.
 	DefaultMaxRequestBodyBytes = 128 * 1024 * 1024
+	// DefaultNonStreamingHeartbeatInterval bounds how long a non-streaming
+	// response can go completely silent while a large-context completion
+	// is still in flight. Edge proxies in front of the gateway (Cloudflare's
+	// default is ~100s) kill a connection that receives zero response bytes
+	// within their idle window, even though the origin is healthy and still
+	// working — see https://github.com/langwatch/langwatch/issues/4806.
+	// 45s leaves better than 2x margin under Cloudflare's default while
+	// leaving fast requests (the overwhelming majority) completely
+	// unaffected: only a dispatch slower than this ever emits a heartbeat.
+	DefaultNonStreamingHeartbeatInterval = 45 * time.Second
 )
 
 // Server configures HTTP listen address, graceful shutdown, and request body cap.

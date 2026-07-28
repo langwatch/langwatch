@@ -92,13 +92,13 @@ jobs:
             platform: linux/arm64/v8
             runner: ubuntu-24.04-arm
             arch: arm64
-          - image: langy-agent
-            dockerfile: Dockerfile.langy_agent
+          - image: langyagent
+            dockerfile: Dockerfile.langyagent
             platform: linux/amd64
             runner: ubuntu-latest
             arch: amd64
-          - image: langy-agent
-            dockerfile: Dockerfile.langy_agent
+          - image: langyagent
+            dockerfile: Dockerfile.langyagent
             platform: linux/arm64/v8
             runner: ubuntu-24.04-arm
             arch: arm64
@@ -143,7 +143,7 @@ jobs:
       - name: Create multi-arch manifests (short hash)
         run: |
           HASH="${{ needs.extract-version.outputs.short_hash }}"
-          for IMAGE in langwatch langwatch_nlp langevals ai-gateway langy-agent; do
+          for IMAGE in langwatch langwatch_nlp langevals ai-gateway langyagent; do
             docker buildx imagetools create -t langwatch/${IMAGE}:${HASH} \
               langwatch/${IMAGE}:${HASH}-amd64 \
               langwatch/${IMAGE}:${HASH}-arm64
@@ -155,7 +155,7 @@ jobs:
           TAG: ${{ inputs.tag || 'next' }}
           HASH: ${{ needs.extract-version.outputs.short_hash }}
         run: |
-          for IMAGE in langwatch langwatch_nlp langevals ai-gateway langy-agent; do
+          for IMAGE in langwatch langwatch_nlp langevals ai-gateway langyagent; do
             docker buildx imagetools create -t langwatch/${IMAGE}:${TAG} \
               langwatch/${IMAGE}:${HASH}-amd64 \
               langwatch/${IMAGE}:${HASH}-arm64
@@ -167,7 +167,7 @@ jobs:
           VERSION="${{ needs.extract-version.outputs.version }}"
           HASH="${{ needs.extract-version.outputs.short_hash }}"
 
-          for IMAGE in langwatch langwatch_nlp langevals ai-gateway langy-agent; do
+          for IMAGE in langwatch langwatch_nlp langevals ai-gateway langyagent; do
             # Version tag
             docker buildx imagetools create -t langwatch/${IMAGE}:${VERSION} \
               langwatch/${IMAGE}:${HASH}-amd64 \
@@ -188,7 +188,7 @@ jobs:
             https://hub.docker.com/v2/users/login/ | jq -r .token)
 
           HASH="${{ needs.extract-version.outputs.short_hash }}"
-          for IMAGE in langwatch langwatch_nlp langevals ai-gateway langy-agent; do
+          for IMAGE in langwatch langwatch_nlp langevals ai-gateway langyagent; do
             for ARCH in amd64 arm64; do
               curl -s -X DELETE \
                 -H "Authorization: JWT ${TOKEN}" \
@@ -246,7 +246,7 @@ jobs:
               EXTRA_TAGS="${EXTRA_TAGS} latest"
             fi
           fi
-          for IMAGE in langwatch langwatch_nlp langevals ai-gateway langy-agent; do
+          for IMAGE in langwatch langwatch_nlp langevals ai-gateway langyagent; do
             REPO="langwatch/${IMAGE}" \
             IMAGE_NAME="${IMAGE}" \
             INSPECT_TAG="${HASH}" \

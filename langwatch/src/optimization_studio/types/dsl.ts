@@ -326,20 +326,25 @@ export const workflowJsonSchema = z
       ),
     nodes: z.array(z.any()),
     edges: z.array(z.any()),
-    default_llm: llmConfigSchema,
+    // Legacy field from spec_version <= 1.4: every LLM node now owns its
+    // config. Still accepted on input for old clients and old persisted
+    // versions; migrateDSLVersion folds it into node llm parameters and
+    // drops it. Never read at execution time.
+    default_llm: llmConfigSchema.nullish(),
     workflow_type: z.enum(WORKFLOW_TYPES).optional(),
   })
   .passthrough();
 
+export const LATEST_SPEC_VERSION = "1.5" as const;
+
 export type Workflow = {
-  spec_version: "1.4";
+  spec_version: typeof LATEST_SPEC_VERSION;
   workflow_id?: string;
   experiment_id?: string;
   name: string;
   icon: string;
   description: string;
   version: string;
-  default_llm: LLMConfig;
   nodes: Node<Component>[];
   edges: Edge[];
   data?: Record<string, any>;

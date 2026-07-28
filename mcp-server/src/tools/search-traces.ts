@@ -1,5 +1,6 @@
 import { searchTraces as apiSearchTraces } from "../langwatch-api.js";
 import { parseRelativeDate } from "../utils/date-parsing.js";
+import { formatEvaluationLines } from "../utils/format-evaluations.js";
 
 /**
  * Handles the search_traces MCP tool invocation.
@@ -73,6 +74,9 @@ export async function handleSearchTraces(params: {
     }
     if (trace.error) {
       lines.push(`- **Error**: ${JSON.stringify(trace.error)}`);
+    }
+    if (trace.evaluations && trace.evaluations.length > 0) {
+      lines.push(...formatEvaluationLines(trace.evaluations));
     }
     lines.push("");
   }

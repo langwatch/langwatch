@@ -1,6 +1,6 @@
 import { Text, VStack } from "@chakra-ui/react";
-import { CommandItem } from "./CommandItem";
 import { getItemKey, type ListItem } from "../getIconInfo";
+import { CommandItem } from "./CommandItem";
 
 interface CommandGroupProps {
   label: string;
@@ -30,8 +30,8 @@ export function CommandGroup({
         fontSize="12px"
         fontWeight="normal"
         color="fg.muted"
-        px={4}
-        paddingTop={3}
+        px={{ base: 4, md: 5 }}
+        paddingTop={3.5}
         paddingBottom={1.5}
       >
         {label}

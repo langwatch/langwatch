@@ -29,7 +29,7 @@ Pick Anthropic as a primary or fallback on any VK. When a VK uses Anthropic as i
 | `POST /v1/embeddings` | ❌ not supported | Anthropic has no embeddings endpoint. |
 | `POST /v1/messages` with `stream: true` | `POST /v1/messages` streaming | SSE pass-through byte-for-byte (tool-call deltas preserved). |
 
-## `cache_control` passthrough, the 90% discount
+## `cache_control` passthrough, the 90-percent discount
 
 Anthropic supports prompt caching via `cache_control` blocks on content. Ephemeral (5-min TTL) and persistent (1-hour TTL) caches are both honoured.
 

@@ -30,6 +30,12 @@ for dir in "${env_dirs[@]}"; do
 
   for f in "${src}"/.env*; do
     [ -f "$f" ] || continue
+    filename=$(basename "$f")
+    # Skip tracked files (e.g. .env.example) — copying them would dirty the
+    # worktree and leak local edits into PR diffs (orchardist#703).
+    if git -C "$worktree_root" ls-files --error-unmatch "${dir}/${filename}" >/dev/null 2>&1; then
+      continue
+    fi
     cp "$f" "${dest}/"
     copied=$((copied + 1))
   done

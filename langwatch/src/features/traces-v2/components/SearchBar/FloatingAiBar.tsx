@@ -4,8 +4,10 @@ import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { useFilterStore } from "../../stores/filterStore";
 import { AiQueryComposer } from "./AiQueryComposer";
 import { AiShaderBackdrop } from "./AiShaderBackdrop";
+import { FloatingAiErrorRow } from "./FloatingAiErrorRow";
 import type { FloatRect } from "./useFloatRect";
 
 interface FloatingAiBarProps {
@@ -46,6 +48,9 @@ export const FloatingAiBar: React.FC<FloatingAiBarProps> = ({
 }) => {
   const [pending, setPending] = useState(false);
   const tip = useCyclingTip(!pending);
+  // The floating bar covers the docked search bar's unified error banner,
+  // so failures must render here — the tip row swaps to an error row.
+  const aiError = useFilterStore((s) => s.aiError);
   if (typeof document === "undefined" || !rect) return null;
   return createPortal(
     <>
@@ -59,7 +64,7 @@ export const FloatingAiBar: React.FC<FloatingAiBarProps> = ({
           minHeight: "38px",
           borderTopLeftRadius: "var(--chakra-radii-lg)",
           boxShadow:
-            "0 4px 12px rgba(168,85,247,0.12), 0 2px 6px rgba(0,0,0,0.06)",
+            "0 4px 12px rgba(237,137,38,0.12), 0 2px 6px rgba(0,0,0,0.06)",
         }}
         initial={{ opacity: 0, filter: "blur(10px)" }}
         animate={{ opacity: 1, filter: "blur(0px)" }}
@@ -100,6 +105,10 @@ export const FloatingAiBar: React.FC<FloatingAiBarProps> = ({
           left: `${rect.left}px`,
           width: `${rect.width}px`,
           zIndex: 31,
+          // The strip spans the whole search-bar width; keep it
+          // click-transparent so it never blocks the UI underneath. The
+          // error row (settings link, details expander, dismiss) opts its
+          // own box back in with pointerEvents="auto".
           pointerEvents: "none",
         }}
         initial={{ opacity: 0 }}
@@ -108,34 +117,38 @@ export const FloatingAiBar: React.FC<FloatingAiBarProps> = ({
         transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1], delay: 0.08 }}
       >
         <Box paddingX={3} display="flex" justifyContent="flex-start">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={tip}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.28 }}
-            >
-              <HStack
-                gap={1.5}
-                align="center"
-                bg="bg.panel"
-                borderWidth="1px"
-                borderColor="border.subtle"
-                borderRadius="md"
-                paddingX={2}
-                paddingY={1}
-                boxShadow="0 2px 6px rgba(0,0,0,0.1)"
+          {aiError && !pending ? (
+            <FloatingAiErrorRow error={aiError} />
+          ) : (
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={tip}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.28 }}
               >
-                <Icon color="yellow.fg" boxSize="11px" flexShrink={0}>
-                  <Lightbulb />
-                </Icon>
-                <Text textStyle="2xs" color="fg.muted" lineHeight="1.3">
-                  {tip}
-                </Text>
-              </HStack>
-            </motion.div>
-          </AnimatePresence>
+                <HStack
+                  gap={1.5}
+                  align="center"
+                  bg="bg.panel"
+                  borderWidth="1px"
+                  borderColor="border.subtle"
+                  borderRadius="md"
+                  paddingX={2}
+                  paddingY={1}
+                  boxShadow="0 2px 6px rgba(0,0,0,0.1)"
+                >
+                  <Icon color="yellow.fg" boxSize="11px" flexShrink={0}>
+                    <Lightbulb />
+                  </Icon>
+                  <Text textStyle="2xs" color="fg.muted" lineHeight="1.3">
+                    {tip}
+                  </Text>
+                </HStack>
+              </motion.div>
+            </AnimatePresence>
+          )}
         </Box>
       </motion.div>
     </>,

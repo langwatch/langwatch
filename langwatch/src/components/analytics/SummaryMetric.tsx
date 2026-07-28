@@ -128,9 +128,12 @@ export function SummaryMetricValue({
     );
   }
 
+  // A delta needs a real baseline: against a zero/absent previous period any
+  // percentage is meaningless (it used to render as "+999%+ / 0 previous"),
+  // so the value stands alone until there is something to compare with.
   const change =
-    typeof current === "number" && typeof previous === "number"
-      ? Math.round(((current - previous) / (previous || 1)) * 100) / 100
+    typeof current === "number" && typeof previous === "number" && previous > 0
+      ? Math.round(((current - previous) / previous) * 100) / 100
       : undefined;
   const increaseReversal =
     increaseIs == "neutral" ? 0 : increaseIs === "bad" ? -1 : 1;

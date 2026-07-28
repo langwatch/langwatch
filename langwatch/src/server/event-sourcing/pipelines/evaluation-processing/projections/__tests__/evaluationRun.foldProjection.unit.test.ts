@@ -1,5 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
+import { createTenantId } from "../../../../domain/tenantId";
+import { FoldProjectionExecutor } from "../../../../projections/foldProjectionExecutor";
 import type { FoldProjectionStore } from "../../../../projections/foldProjection.types";
 import type {
   EvaluationCompletedEvent,
@@ -263,6 +265,99 @@ describe("evaluationRun foldProjection", () => {
         );
 
         expect(afterCompleted.inputs).toEqual(inputs);
+      });
+    });
+  });
+
+  describe("canonical accepted ordering", () => {
+    it("applies a coalesced lifecycle batch by createdAt and event id, not occurredAt", async () => {
+      let persisted: EvaluationRunData | null = null;
+      const store: FoldProjectionStore<EvaluationRunData> = {
+        get: async () => null,
+        store: async (state) => {
+          persisted = state;
+        },
+      };
+      const projection = new EvaluationRunFoldProjection({ store });
+
+      const started = createStartedEvent({
+        id: "evt-a",
+        createdAt: 1_000,
+        occurredAt: 2_000,
+      });
+      const completed = createCompletedEvent({
+        id: "evt-b",
+        createdAt: 2_000,
+        occurredAt: 1_000,
+      });
+
+      const state = await new FoldProjectionExecutor().executeBatch(
+        projection,
+        [completed, started],
+        { aggregateId: "eval-1", tenantId: createTenantId("tenant-1") },
+      );
+
+      expect(state.status).toBe("processed");
+      expect(persisted).toEqual(state);
+      expect(state.startedAt).toBe(2_000);
+      expect(state.completedAt).toBe(1_000);
+    });
+
+    it("uses event id as the canonical tiebreaker when accepted timestamps match", async () => {
+      const projection = new EvaluationRunFoldProjection({
+        store: {
+          get: async () => null,
+          store: async () => {},
+        },
+      });
+      const started = createStartedEvent({
+        id: "evt-a",
+        createdAt: 1_000,
+        occurredAt: 2_000,
+      });
+      const completed = createCompletedEvent({
+        id: "evt-b",
+        createdAt: 1_000,
+        occurredAt: 1_000,
+      });
+
+      const state = await new FoldProjectionExecutor().executeBatch(
+        projection,
+        [completed, started],
+        { aggregateId: "eval-1", tenantId: createTenantId("tenant-1") },
+      );
+
+      expect(state.status).toBe("processed");
+    });
+
+    describe("given a later-accepted event has an older business timestamp", () => {
+      it("does not re-fold it into occurredAt order", async () => {
+        const CHECKPOINT_MS = 9_000;
+        const stored: EvaluationRunData = {
+          ...createInitState(),
+          LastEventOccurredAt: CHECKPOINT_MS,
+        };
+        const store: FoldProjectionStore<EvaluationRunData> = {
+          get: async () => stored,
+          store: async () => {},
+        } as unknown as FoldProjectionStore<EvaluationRunData>;
+
+        const projection = new EvaluationRunFoldProjection({ store });
+        const eventLoader = vi.fn().mockResolvedValue([]);
+        projection.eventLoader = eventLoader;
+
+        const state = await new FoldProjectionExecutor().execute(
+          projection,
+          createStartedEvent({
+            id: "evt-later-accepted",
+            createdAt: 10_000,
+            occurredAt: 1_000,
+          }),
+          { aggregateId: "eval-1", tenantId: createTenantId("tenant-1") },
+        );
+
+        expect(eventLoader).not.toHaveBeenCalled();
+        expect(state.status).toBe("in_progress");
       });
     });
   });

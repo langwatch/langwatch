@@ -108,12 +108,7 @@ export const EmptyResultsPane: React.FC = React.memo(() => {
             reason — overflow:auto creates a hit-testable scroll
             container. The hero composition Flex inside has its own
             overflow:auto for the rare tall-hero case. */}
-        <Box
-          position="absolute"
-          inset={0}
-          zIndex={1}
-          pointerEvents="none"
-        >
+        <Box position="absolute" inset={0} zIndex={1} pointerEvents="none">
           <EmptyStateOverlay />
         </Box>
       </Box>

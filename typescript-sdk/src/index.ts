@@ -13,6 +13,41 @@ export {
 export { LangWatchExporter } from "./observability-sdk/exporters";
 export { LangWatch, FetchPolicy, type GetPromptOptions } from "./client-sdk";
 
+/**
+ * Typed API failures.
+ *
+ * When the platform DECLINES a request it says why, in a structure: a `code`
+ * you can switch on, the `meta` that makes it actionable, and the trace id to
+ * quote at support. Narrow with `isLangWatchHandledError` and match the `code`
+ * rather than the message — the message is written for humans and may change;
+ * the code is the contract.
+ *
+ * ```ts
+ * try {
+ *   await langwatch.prompts.get("nope");
+ * } catch (error) {
+ *   if (isLangWatchHandledError(error) && error.code === "prompt_not_found") {
+ *     // ...
+ *   }
+ *   throw error;
+ * }
+ * ```
+ *
+ * Failures the platform did NOT name — a 5xx, a dead socket, a proxy's HTML —
+ * still arrive as the generic errors they always did. A domain error means the
+ * platform understood you and said no; anything else means it fell over, and
+ * the two must not look alike.
+ */
+export {
+  LangWatchHandledError,
+  isLangWatchHandledError,
+  LangWatchApiError,
+} from "./internal/api/errors";
+export type {
+  CliHandledError as LangWatchHandledErrorShape,
+  CliHandledErrorReason as LangWatchHandledErrorReason,
+} from "@langwatch/langy/cards/handled-error";
+
 // Experiments API exports
 export {
   Experiment,

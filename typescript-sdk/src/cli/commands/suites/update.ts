@@ -1,11 +1,12 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import {
   SuitesApiService,
   type SuiteTarget,
 } from "@/client-sdk/services/suites";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
+import type { CommandResult } from "../../utils/output";
 
 function parseTargets(targetStrings: string[]): SuiteTarget[] {
   return targetStrings.map((t) => {
@@ -24,6 +25,10 @@ function parseTargets(targetStrings: string[]): SuiteTarget[] {
   });
 }
 
+/**
+ * Returns the updated suite rather than printing it: the output port renders it
+ * in whatever format the caller asked for (utils/output.ts).
+ */
 export const updateSuiteCommand = async (
   id: string,
   options: {
@@ -33,13 +38,12 @@ export const updateSuiteCommand = async (
     repeatCount?: string;
     labels?: string;
     description?: string;
-    format?: string;
   },
-): Promise<void> => {
+): Promise<CommandResult | void> => {
   checkApiKey();
 
   const service = new SuitesApiService();
-  const spinner = ora(`Updating suite "${id}"...`).start();
+  const spinner = createSpinner(`Updating suite "${id}"...`).start();
 
   try {
     const updateData: Record<string, unknown> = {};
@@ -54,19 +58,19 @@ export const updateSuiteCommand = async (
 
     spinner.succeed(`Suite "${suite.name}" updated`);
 
-    if (options.format === "json") {
-      console.log(JSON.stringify(suite, null, 2));
-      return;
-    }
-
-    console.log();
-    console.log(`  ${chalk.gray("ID:")}        ${chalk.green(suite.id)}`);
-    console.log(`  ${chalk.gray("Name:")}      ${chalk.cyan(suite.name)}`);
-    console.log(`  ${chalk.gray("Slug:")}      ${chalk.yellow(suite.slug)}`);
-    console.log(`  ${chalk.gray("Scenarios:")} ${suite.scenarioIds.length}`);
-    console.log(`  ${chalk.gray("Targets:")}   ${suite.targets.length}`);
-    console.log(`  ${chalk.gray("Repeat:")}    ${suite.repeatCount}`);
-    console.log();
+    return {
+      data: suite,
+      table: () => {
+        console.log();
+        console.log(`  ${chalk.gray("ID:")}        ${chalk.green(suite.id)}`);
+        console.log(`  ${chalk.gray("Name:")}      ${chalk.cyan(suite.name)}`);
+        console.log(`  ${chalk.gray("Slug:")}      ${chalk.yellow(suite.slug)}`);
+        console.log(`  ${chalk.gray("Scenarios:")} ${suite.scenarioIds.length}`);
+        console.log(`  ${chalk.gray("Targets:")}   ${suite.targets.length}`);
+        console.log(`  ${chalk.gray("Repeat:")}    ${suite.repeatCount}`);
+        console.log();
+      },
+    };
   } catch (error) {
     failSpinner({ spinner, error, action: "update suite" });
     process.exit(1);

@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -11,6 +12,7 @@ import {
 } from "../onboarding/data/samplePreviewTraces";
 import { useDrawerStore } from "../stores/drawerStore";
 import type { TraceListItem } from "../types/trace";
+import { spanTreeQueryFn, spanTreeQueryKey } from "./spanTreePagedQuery";
 
 function listItemToHeader(item: TraceListItem): TraceHeader {
   return {
@@ -58,6 +60,7 @@ export function useOpenTraceDrawer() {
   const { openDrawer } = useDrawer();
   const { project } = useOrganizationTeamProject();
   const utils = api.useContext();
+  const queryClient = useQueryClient();
 
   return useCallback(
     (trace: TraceListItem) => {
@@ -224,7 +227,13 @@ export function useOpenTraceDrawer() {
         // fetch the cache tokens never appear until a hard refresh. staleTime:0
         // pulls the full header (with attributes) immediately, behind the seed.
         void utils.tracesV2.header.prefetch(input, { staleTime: 0 });
-        void utils.tracesV2.spanTree.prefetch(input, opts);
+        // Same key + queryFn as `useSpanTree`, so the drawer's mount joins
+        // this in-flight paged fetch instead of firing a second one.
+        void queryClient.prefetchQuery({
+          queryKey: spanTreeQueryKey(input),
+          queryFn: spanTreeQueryFn({ utils, queryClient, input }),
+          ...opts,
+        });
         void utils.tracesV2.spanLangwatchSignals.prefetch(input, opts);
         void utils.tracesV2.traceEvents.prefetch(input, opts);
         void utils.tracesV2.resourceInfo.prefetch(input, opts);
@@ -254,6 +263,6 @@ export function useOpenTraceDrawer() {
         t: String(trace.timestamp),
       });
     },
-    [openDrawer, project?.id, utils],
+    [openDrawer, project?.id, utils, queryClient],
   );
 }

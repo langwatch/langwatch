@@ -1,4 +1,11 @@
 packages:
   - .
+  # The card/domain-error contract, shared with the app. The CLI takes it
+  # through the `@langwatch/langy/cards` subpath — the package root also
+  # carries Langy's conversation-projection contract, which the CLI has no use
+  # for. Source-only and bundled into dist by tsup (see `noExternal`), so the
+  # published `langwatch` tarball carries the schemas inline and has no
+  # dependency to resolve.
+  - ../packages/langy
 
 minimumReleaseAge: 10080

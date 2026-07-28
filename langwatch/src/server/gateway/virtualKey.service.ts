@@ -39,6 +39,23 @@ import {
 
 const ROTATION_GRACE_MS = 24 * 60 * 60 * 1000;
 
+/**
+ * Keys the product provisions and owns rather than the customer — today only
+ * the Langy VK (`purpose: LANGY`). They remain addressable internally (the
+ * gateway authenticates against them by hashed secret; Langy re-reads its own
+ * config by column) but are absent from every customer-facing read and refuse
+ * every customer-facing mutation.
+ *
+ * Refusing the mutations is the load-bearing part. `rotate` on a Langy VK
+ * would hand the caller a fresh plaintext secret AND break Langy, because the
+ * gateway keeps authenticating against the secret Langy still holds; `revoke`
+ * and `update` are the same class of foot-gun. The settings UI already badges
+ * and locks these rows, but that is presentation — this is the boundary.
+ */
+function isProductManaged(vk: Pick<VirtualKey, "purpose">): boolean {
+  return vk.purpose !== "USER";
+}
+
 export type CreateVirtualKeyInput = {
   organizationId: string;
   name: string;
@@ -60,8 +77,9 @@ export type CreateVirtualKeyInput = {
   config?: Partial<VirtualKeyConfig>;
   /**
    * USER (default) for keys created via the gateway UI / API; LANGY when
-   * auto-provisioned by the Langy services. Threaded straight to the row
-   * column — no behaviour branches in the service itself.
+   * auto-provisioned by the Langy services. Anything other than USER marks the
+   * key product-managed, which hides it from customer-facing reads and makes
+   * it refuse customer-facing mutations (see `isProductManaged`).
    */
   purpose?: "USER" | "LANGY";
 };
@@ -129,11 +147,18 @@ export class VirtualKeyService {
     return this.repository.findAllForScope(scope);
   }
 
+  /**
+   * Customer-facing single read. A product-managed key reports as absent
+   * rather than forbidden — the caller has no legitimate use for one, and a
+   * distinct error would confirm the id exists.
+   */
   async getById(
     id: string,
     organizationId: string,
   ): Promise<VirtualKeyWithScopes | null> {
-    return this.repository.findById(id, organizationId);
+    const vk = await this.repository.findById(id, organizationId);
+    if (!vk || isProductManaged(vk)) return null;
+    return vk;
   }
 
   /** Used by the `/resolve-key` hot path — do not expose on public tRPC. */
@@ -418,12 +443,17 @@ export class VirtualKeyService {
     await this.repository.recordUsage(id, new Date());
   }
 
+  /**
+   * Loads a key for mutation. Product-managed keys are rejected here rather
+   * than in each caller, so `update` / `rotate` / `revoke` cannot drift apart
+   * — NOT_FOUND for the same reason `getById` returns null.
+   */
   private async requireOwn(
     id: string,
     organizationId: string,
   ): Promise<VirtualKeyWithScopes> {
     const existing = await this.repository.findById(id, organizationId);
-    if (!existing) {
+    if (!existing || isProductManaged(existing)) {
       throw new TRPCError({
         code: "NOT_FOUND",
         message: "Virtual key not found",

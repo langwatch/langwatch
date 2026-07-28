@@ -47,6 +47,12 @@ export interface EventStoreReadContext<_EventType extends Event = Event> {
    * Use with caution - should not bypass security or validation.
    */
   raw?: Record<string, unknown>;
+  /**
+   * Which delivery of the job carrying this read is being processed: 1 for a
+   * fresh delivery, higher for a retry of a chain that has not acked. Absent
+   * outside the queue, e.g. during replay.
+   */
+  deliveryAttempt?: number;
 }
 
 /**
@@ -86,6 +92,26 @@ export interface ReadOnlyEventStore<EventType extends Event = Event> {
   ): Promise<readonly EventType[]>;
 
   /**
+   * Retrieves events with an EXPLICIT occurred-at lower bound (ms), applied
+   * verbatim for ANY aggregate type — unlike `getEvents`, whose anchor is
+   * gated to time-local aggregate types.
+   *
+   * For reads that hold a provable bound of their own, e.g. a cursor tail
+   * catch-up that only wants events accepted after its cursor. The caller
+   * owns the safety margin: the bound MUST sit far enough below the wanted
+   * range that no delayed or replayed event's occurred-at can fall under it.
+   *
+   * **Security:** Implementations MUST validate tenantId exactly as for
+   * `getEvents`.
+   */
+  getEventsOccurredSince(
+    aggregateId: string,
+    context: EventStoreReadContext<EventType>,
+    aggregateType: AggregateType,
+    occurredAtFromMs: number,
+  ): Promise<readonly EventType[]>;
+
+  /**
    * Retrieves events for a given aggregate up to and including a specific event.
    * Returns all events that come before or equal to the specified event in chronological order.
    *
@@ -105,6 +131,28 @@ export interface ReadOnlyEventStore<EventType extends Event = Event> {
     aggregateType: AggregateType,
     upToEvent: EventType,
   ): Promise<readonly EventType[]>;
+
+  /**
+   * Cursor-paginated variant of {@link getEventsUpTo}: returns at most `limit`
+   * events ordered by (timestamp ASC, eventId ASC), strictly after the `after`
+   * cursor (or from the start when `after` is undefined). Lets a re-fold stream
+   * a huge aggregate's history page-by-page instead of materialising every
+   * event and payload at once — the difference between a bounded working set
+   * and OOMing on a 100k-event trace. Optional: callers must check for this
+   * method's presence and fall back to {@link getEventsUpTo} themselves —
+   * `AbstractEventStore.getEventsUpToPaged` throws if the underlying
+   * repository lacks paging support rather than silently degrading.
+   *
+   * **Security:** Implementations MUST call validateTenantId(context, ...).
+   */
+  getEventsUpToPaged?(request: {
+    aggregateId: string;
+    context: EventStoreReadContext<EventType>;
+    aggregateType: AggregateType;
+    upToEvent: EventType;
+    after: { timestamp: number; eventId: string } | undefined;
+    limit: number;
+  }): Promise<readonly EventType[]>;
 
   /**
    * Counts events that come before a given event in chronological order.

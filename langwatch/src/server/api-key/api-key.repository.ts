@@ -5,6 +5,7 @@ import type {
   RoleBinding,
 } from "@prisma/client";
 import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
+import { HIDDEN_SYSTEM_KEY_NAMES } from "./reserved-names";
 
 export type ApiKeyWithBindings = ApiKey & {
   roleBindings: RoleBinding[];
@@ -171,10 +172,14 @@ export class ApiKeyRepository {
     // ingestion keys are org-owned (userId = null) but must NOT leak their
     // source/template/activity metadata to non-admins, so they are excluded
     // here; admins reach them via the admin-gated company-wide list.
+    //
+    // Hidden system keys (ephemeral per-Langy-session keys) are excluded so a
+    // user's own key list isn't flooded with one row per chat session.
     return this.prisma.apiKey.findMany({
       where: {
         organizationId,
         revokedAt: null,
+        name: { notIn: HIDDEN_SYSTEM_KEY_NAMES },
         OR: [{ userId }, { userId: null, ingestSourceType: null }],
       },
       include: {
@@ -191,8 +196,16 @@ export class ApiKeyRepository {
   }: {
     organizationId: string;
   }): Promise<ApiKeyWithBindings[]> {
+    // Admins see every human-managed key in the org, but NOT the ephemeral
+    // per-Langy-session keys — there is one per chat session per user, which
+    // would swamp the admin list. They remain auth-functional (verify/revoke go
+    // by id, not this query).
     return this.prisma.apiKey.findMany({
-      where: { organizationId, revokedAt: null },
+      where: {
+        organizationId,
+        revokedAt: null,
+        name: { notIn: HIDDEN_SYSTEM_KEY_NAMES },
+      },
       include: {
         roleBindings: {
           include: { customRole: { select: { id: true, name: true } } },

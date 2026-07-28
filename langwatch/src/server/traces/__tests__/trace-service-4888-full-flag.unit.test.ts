@@ -32,13 +32,13 @@
  * No "should" in test names.
  */
 
+import { createLogger } from "@langwatch/observability";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import { BlobNotFoundError } from "~/server/app-layer/traces/blob-store.service";
 import { EVENTREF_ATTR_PREFIX } from "~/server/app-layer/traces/lean-for-projection";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import type { Protections } from "~/server/traces/protections";
-import { createLogger } from "~/utils/logger/server";
 import { ClickHouseTraceService } from "../clickhouse-trace.service";
 import { resolveOffloadedTraces } from "../resolve-offloaded-traces";
 import { TraceService } from "../trace.service";

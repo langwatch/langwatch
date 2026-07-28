@@ -5,6 +5,7 @@
  * for both the execute route (UI) and the run route (CI/CD API).
  */
 
+import { createLogger } from "@langwatch/observability";
 import type { Evaluator } from "@prisma/client";
 import type { Workflow } from "~/optimization_studio/types/dsl";
 import { transposeColumnsFirstToRowsFirstWithId } from "~/optimization_studio/utils/datasetUtils";
@@ -17,7 +18,6 @@ import {
   PromptService,
   type VersionedPrompt,
 } from "~/server/prompt-config/prompt.service";
-import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:experiments-v3:dataLoader");
 
@@ -445,44 +445,78 @@ export const loadExecutionData = async (
 
   // Load studio workflows for workflow targets (the committed DSL run per row)
   const loadedWorkflows = new Map<string, LoadedWorkflow>();
-  for (const target of targets) {
-    if (target.type !== "workflow" || !target.workflowId) continue;
-    if (loadedWorkflows.has(workflowLoadKey(target))) continue;
 
+  const loadPublishedWorkflow = async ({
+    workflowId,
+    workflowVersionId,
+  }: {
+    workflowId: string;
+    workflowVersionId?: string;
+  }): Promise<LoadedWorkflow | { error: string; status: number }> => {
     const workflow = await prisma.workflow.findUnique({
-      where: { id: target.workflowId, projectId },
+      where: { id: workflowId, projectId },
     });
     if (!workflow) {
-      return {
-        error: `Workflow "${target.workflowId}" not found`,
-        status: 404,
-      };
+      return { error: `Workflow "${workflowId}" not found`, status: 404 };
     }
 
-    const versionId = target.workflowVersionId ?? workflow.publishedId;
+    const versionId = workflowVersionId ?? workflow.publishedId;
     if (!versionId) {
       return {
-        error: `Workflow "${target.workflowId}" has no committed version to evaluate`,
+        error: `Workflow "${workflowId}" has no committed version to evaluate`,
         status: 400,
       };
     }
 
     const version = await prisma.workflowVersion.findUnique({
-      where: { id: versionId, projectId, workflowId: target.workflowId },
+      where: { id: versionId, projectId, workflowId },
     });
     if (!version) {
-      return {
-        error: `Workflow version "${versionId}" not found`,
-        status: 404,
-      };
+      return { error: `Workflow version "${versionId}" not found`, status: 404 };
     }
 
-    loadedWorkflows.set(workflowLoadKey(target), {
+    return {
       id: workflow.id,
       name: workflow.name,
       versionId,
       dsl: version.dsl as unknown as Workflow,
+    };
+  };
+
+  for (const target of targets) {
+    if (target.type !== "workflow" || !target.workflowId) continue;
+    if (loadedWorkflows.has(workflowLoadKey(target))) continue;
+
+    const result = await loadPublishedWorkflow({
+      workflowId: target.workflowId,
+      workflowVersionId: target.workflowVersionId,
     });
+    if ("error" in result) return result;
+    loadedWorkflows.set(workflowLoadKey(target), result);
+  }
+
+  // An agent target can itself wrap a Studio workflow (agent.type ===
+  // "workflow", created via Agent -> New Agent -> Workflow). That agent has no
+  // code of its own — just a pointer to the linked workflow — so it must run
+  // the whole workflow the same way a direct workflow target does, not the
+  // agent's (nonexistent) code. Resolve and cache that linked workflow here so
+  // the orchestrator can dispatch it to executeWorkflowCell.
+  for (const target of targets) {
+    if (target.type !== "agent" || !target.dbAgentId) continue;
+    const agent = loadedAgents.get(target.dbAgentId);
+    if (!agent || agent.type !== "workflow") continue;
+
+    const linkedWorkflowId =
+      agent.workflowId ??
+      (agent.config as { workflow_id?: string }).workflow_id;
+    if (!linkedWorkflowId) continue;
+
+    const key = workflowLoadKey({ workflowId: linkedWorkflowId });
+    if (loadedWorkflows.has(key)) continue;
+
+    const result = await loadPublishedWorkflow({ workflowId: linkedWorkflowId });
+    if ("error" in result) return result;
+    loadedWorkflows.set(key, result);
   }
 
   // Load evaluators from DB (for both evaluator configs AND evaluator targets)

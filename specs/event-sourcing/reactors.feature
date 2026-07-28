@@ -51,3 +51,27 @@ Feature: Reactors
     Given a reactor that does not declare a relevance check
     When the fold projection successfully applies and stores the event
     Then the reactor is dispatched for every event
+
+  # The evaluation trigger's `shouldReact` predicate is a relevance check
+  # (guards enqueue, not the handler) evaluated before the event is
+  # dispatched — the same "guards run before enqueue" contract as above.
+  Scenario: The origin guard filters a non-message event before enqueue
+    Given a topic-assigned event on a trace with a resolved origin
+    Then the origin-guarded reactor declines to react
+
+  Scenario: The origin guard filters a trace with no resolved origin before enqueue
+    Given a span event on a trace whose origin is unresolved
+    Then the origin-guarded reactor declines to react
+
+  Scenario: The origin guard admits a genuine message event before enqueue
+    Given a recent span event on a recent trace with a resolved origin
+    Then the origin-guarded reactor agrees to react
+
+  Scenario: The evaluation trigger dispatches nothing past the span processing cap
+    Given a span event on a trace whose span count has passed the span processing cap
+    When the evaluation trigger runs
+    Then no evaluation is dispatched
+
+  Scenario: The evaluation trigger declines a synthetic span before enqueue
+    Given a synthetic span event on a trace with a resolved origin
+    Then the evaluation trigger declines to react

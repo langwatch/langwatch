@@ -1,4 +1,4 @@
-import cloneDeep from "lodash.clonedeep";
+import { cloneDeep } from "lodash-es";
 import { useCallback } from "react";
 import { useFormContext } from "react-hook-form";
 import { toaster } from "~/components/ui/toaster";

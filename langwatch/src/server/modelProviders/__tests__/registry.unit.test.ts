@@ -521,3 +521,34 @@ describe("Parameter Constraints", () => {
     });
   });
 });
+
+describe("anthropic credential validation", () => {
+  const schema = modelProviders.anthropic.keysSchema;
+
+  describe("when a base URL is set and the API key is empty", () => {
+    it("accepts the keys (unauthenticated self-hosted Anthropic-compatible server)", () => {
+      const result = schema.safeParse({
+        ANTHROPIC_API_KEY: "",
+        ANTHROPIC_BASE_URL: "http://vllm:8000",
+      });
+      expect(result.success).toBe(true);
+    });
+  });
+
+  describe("when only the API key is set", () => {
+    it("accepts the keys (stock api.anthropic.com)", () => {
+      const result = schema.safeParse({ ANTHROPIC_API_KEY: "sk-ant-test" });
+      expect(result.success).toBe(true);
+    });
+  });
+
+  describe("when neither the API key nor a base URL is set", () => {
+    it("rejects the keys", () => {
+      const result = schema.safeParse({
+        ANTHROPIC_API_KEY: "",
+        ANTHROPIC_BASE_URL: "",
+      });
+      expect(result.success).toBe(false);
+    });
+  });
+});

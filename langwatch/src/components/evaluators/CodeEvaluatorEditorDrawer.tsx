@@ -37,6 +37,7 @@ import {
 import { api } from "~/utils/api";
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
 
+import { codeEvaluatorDisabledReason } from "./codeEvaluatorValidation";
 import type { EvaluatorMappingsConfig } from "./EvaluatorEditorShared";
 
 const FIELD_TYPES = ["str", "float", "bool", "list[str]", "dict"] as const;
@@ -233,6 +234,19 @@ function useCodeEvaluatorForm(props: CodeEvaluatorEditorDrawerProps) {
     !isPending &&
     !isLoadingEvaluator;
 
+  // Why the button is disabled, so it explains itself instead of being a
+  // silent dead button. Suppressed while saving/loading (those are transient
+  // and the button shows its own loading state).
+  const disabledReason =
+    isPending || isLoadingEvaluator
+      ? null
+      : codeEvaluatorDisabledReason({
+          hasName: !!name.trim(),
+          hasCode: code.trim() !== "",
+          hasInput: validFields(inputs).length > 0,
+          isEditing,
+        });
+
   return {
     name,
     setName,
@@ -249,6 +263,7 @@ function useCodeEvaluatorForm(props: CodeEvaluatorEditorDrawerProps) {
     isLoadingEvaluator,
     handleSave,
     canSave,
+    disabledReason,
     isPending,
   };
 }
@@ -298,15 +313,28 @@ export function CodeEvaluatorEditorDrawer(
           )}
         </Drawer.Body>
         <Drawer.Footer borderTopWidth="1px" borderColor="border">
-          <Button
-            colorPalette="blue"
-            onClick={form.handleSave}
-            disabled={!form.canSave}
-            loading={form.isPending}
-            data-testid="save-code-evaluator"
-          >
-            {form.isEditing ? "Save changes" : "Create evaluator"}
-          </Button>
+          <HStack width="full" justify="space-between" gap={3}>
+            {form.disabledReason ? (
+              <Text
+                fontSize="sm"
+                color="fg.muted"
+                data-testid="code-evaluator-disabled-reason"
+              >
+                {form.disabledReason}
+              </Text>
+            ) : (
+              <Box />
+            )}
+            <Button
+              colorPalette="blue"
+              onClick={form.handleSave}
+              disabled={!form.canSave}
+              loading={form.isPending}
+              data-testid="save-code-evaluator"
+            >
+              {form.isEditing ? "Save changes" : "Create evaluator"}
+            </Button>
+          </HStack>
         </Drawer.Footer>
       </Drawer.Content>
     </Drawer.Root>

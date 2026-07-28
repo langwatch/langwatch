@@ -4,11 +4,12 @@
  * `codex.conversation_starts`), and the gemini / gen_ai.* defensive lift.
  *
  * The claude_code model-call triplet (api_request / api_request_body /
- * api_response_body) is trapped at ingest and converted into a gen_ai span
- * (see claude-code-log-to-span.unit.test.ts) — it NO LONGER lifts model /
- * cost / tokens / output through the log fold. The "does NOT lift a converted
- * api_request" case below pins that: even if one ever reached the log path it
- * must be a no-op so cost/tokens can never be double-counted.
+ * api_response_body) does NOT lift model / cost / tokens / output through the
+ * log fold: Claude Code's own SDK spans carry that (computeSpanCost +
+ * accumulateTokens on the SPAN fold), and the coding-agent session pipeline
+ * owns the session-grain totals (ADR-056). The "does NOT lift an api_request"
+ * case below pins that the log fold stays a no-op for these, so cost/tokens
+ * can never be double-counted from the log path.
  *
  * The top-level column mirror (langwatch.* lift -> Models /
  * TotalPromptTokenCount / TotalCompletionTokenCount) stays live for the
@@ -22,10 +23,15 @@ import { describe, expect, it } from "vitest";
 import { createTenantId } from "~/server/event-sourcing";
 
 import {
+  LOG_CONTRIBUTED_EVENT_TYPE,
+  LOG_CONTRIBUTED_EVENT_VERSION_LATEST,
   LOG_RECORD_RECEIVED_EVENT_TYPE,
   LOG_RECORD_RECEIVED_EVENT_VERSION_LATEST,
 } from "../../schemas/constants";
-import type { LogRecordReceivedEvent } from "../../schemas/events";
+import type {
+  LogContributedEvent,
+  LogRecordReceivedEvent,
+} from "../../schemas/events";
 import { TraceSummaryFoldProjection } from "../traceSummary.foldProjection";
 import { createInitState } from "./fixtures/trace-summary-test.fixtures";
 
@@ -64,6 +70,60 @@ function makeLogEvent(
     metadata: {},
   };
 }
+
+function makeContribution(): LogContributedEvent {
+  return {
+    id: "evt-contribution",
+    type: LOG_CONTRIBUTED_EVENT_TYPE,
+    version: LOG_CONTRIBUTED_EVENT_VERSION_LATEST,
+    aggregateType: "trace",
+    aggregateId: "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6",
+    tenantId: createTenantId("tenant-1"),
+    createdAt: 1700000000000,
+    occurredAt: 1700000000000,
+    data: {
+      recordId: "d".repeat(64),
+      traceId: "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6",
+      spanId: "1122334455667788",
+      timeUnixMs: 1700000000000,
+      severityNumber: 9,
+      severityText: "INFO",
+      providerKind: "codex",
+      scopeName: "codex",
+      correlationSource: "codex_synthesized",
+      input: "prompt",
+      output: "answer",
+      liftedAttributes: {
+        "langwatch.model": "gpt-5",
+        "langwatch.cost.usd": 0.25,
+        "langwatch.input_tokens": 10,
+        "langwatch.output_tokens": 20,
+      },
+      nonBillable: true,
+      piiRedactionLevel: "ESSENTIAL",
+    },
+    metadata: {},
+  };
+}
+
+describe("TraceSummaryFoldProjection compact log contribution", () => {
+  it("preserves trace I/O and additive usage without the raw log payload", () => {
+    const after = makeProjection().handleTraceLogContributed(
+      makeContribution(),
+      createInitState(),
+    );
+    expect(after).toMatchObject({
+      computedInput: "prompt",
+      computedOutput: "answer",
+      models: ["gpt-5"],
+      totalCost: 0.25,
+      nonBilledCost: 0.25,
+      totalPromptTokenCount: 10,
+      totalCompletionTokenCount: 20,
+    });
+    expect(after.attributes["langwatch.reserved.log_record_count"]).toBe("1");
+  });
+});
 
 describe("TraceSummaryFoldProjection — log-path lift", () => {
   describe("when the record is a claude_code user_prompt", () => {
@@ -205,7 +265,9 @@ describe("TraceSummaryFoldProjection — log-path lift", () => {
         ),
         state,
       );
-      expect(after.attributes["langwatch.cache_creation_tokens"]).toBeUndefined();
+      expect(
+        after.attributes["langwatch.cache_creation_tokens"],
+      ).toBeUndefined();
     });
   });
 

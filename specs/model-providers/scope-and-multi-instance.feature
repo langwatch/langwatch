@@ -155,6 +155,68 @@ Feature: Model Provider Scope and Multi-Instance
     # Previously the menu hid providers that already had a row — we now allow
     # multiple rows per provider type.
 
+  @regression @integration
+  Scenario: Editing a row shows its own saved credential, not another row's
+    Given the org "acme" already has a ModelProvider named "OpenAI" scoped to project "web-app"
+    And the org "acme" also has a ModelProvider named "OpenAI" scoped to organization "acme"
+    When I open the edit drawer for the organization-scoped "OpenAI" row
+    Then the API key field shows that row's saved credential (masked)
+    And the field is not blank
+    # A row's credential must resolve by its own id. Collapsing same-type
+    # rows down to "one per provider type" for other views (e.g. the
+    # settings list) must never leak into which row an edit drawer
+    # actually opens.
+
+  @regression @integration
+  Scenario: Saving an edited row updates it in place, not as a duplicate
+    Given the org "acme" already has a ModelProvider named "OpenAI" scoped to project "web-app"
+    And the org "acme" also has a ModelProvider named "OpenAI" scoped to organization "acme"
+    When I open the edit drawer for the organization-scoped "OpenAI" row
+    And I re-enter the API key
+    And I click "Save"
+    Then the organization-scoped row is updated with the new key
+    And exactly two "OpenAI" ModelProvider rows still exist for "acme"
+
+  @regression @integration
+  Scenario: Editing a provider that was deleted in another session shows it no longer exists
+    Given the org "acme" already has a ModelProvider named "OpenAI" scoped to project "web-app"
+    And a second "OpenAI" scoped to organization "acme" was deleted from another session
+    When I open the edit drawer for that organization-scoped "OpenAI" row
+    Then the drawer tells me this provider configuration no longer exists
+    And "Save" is unavailable
+    And no new provider is created
+
+  @regression @integration
+  Scenario: A stale edit link still blocks save when the organization has no providers at all
+    Given the org "acme" has no model providers configured
+    When I open a stale edit link for an "OpenAI" row that no longer exists
+    Then the drawer tells me this provider configuration no longer exists
+    And "Save" is unavailable
+    And no new provider is created
+
+  @regression @integration
+  Scenario: While the provider list is still loading the drawer does not claim the provider is missing
+    Given my model providers are still loading
+    When I open the edit drawer for an "OpenAI" row
+    Then the drawer does not yet say the provider no longer exists
+    And "Save" stays unavailable until the row is resolved
+
+  # An edit that targets a specific row must resolve THAT row or surface a
+  # clear "no longer exists" miss — it must never silently fall back to the
+  # create path. That fallback is exactly what wrote the duplicate rows in
+  # #5380: a stale or unresolved id sailed through as an id-less save, which
+  # the server upserts as a brand-new provider instead of updating in place.
+  # The empty-organization case is called out on its own because the first
+  # attempt proxied "list has loaded" as "list is non-empty", so a legitimately
+  # empty org read as "still loading" and the miss never fired.
+
+  @regression @integration
+  Scenario: Adding a new provider does not wipe the credentials I am typing
+    When I open the Create Model Provider drawer for "openai"
+    And I enter an OPENAI_API_KEY
+    Then the field keeps the value I entered while I keep working in the drawer
+    And my key is not silently cleared
+
   # ────────────────────────────────────────────────────────────────────────────
   # Model Providers page becomes org-level
   # ────────────────────────────────────────────────────────────────────────────
@@ -360,3 +422,80 @@ Feature: Model Provider Scope and Multi-Instance
   #
   # The old (scopeType, scopeId) columns on ModelProvider are dropped in
   # this same migration — no dual-write window, no follow-up cleanup.
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # Runtime provider-row selection follows the model
+  # ────────────────────────────────────────────────────────────────────────────
+  #
+  # With multi-instance providers, the same provider key can exist at several
+  # scopes with different credentials AND different model catalogs. A default
+  # model is picked from the union catalog in the settings UI, so the runtime
+  # must execute it against a row that actually serves that model — not
+  # blindly against the narrowest-scope row of the provider key. Otherwise an
+  # org-catalog model runs with a stale project row's credentials and the
+  # provider 404s ("Resource not found" on Azure).
+
+  @integration
+  Scenario: Model served only by a wider-scope row uses that row's credentials
+    Given an ORGANIZATION-scoped "azure" row whose catalog lists "gpt-5.4-mini"
+    And a PROJECT-scoped "azure" row for "web-app" whose catalog lists only "gpt-4o"
+    And both rows are enabled
+    When the runtime prepares a call for model "azure/gpt-5.4-mini" in project "web-app"
+    Then the call uses the ORGANIZATION row's credentials and deployment mapping
+
+  @integration
+  Scenario: Model served by several rows uses the narrowest scope
+    Given an ORGANIZATION-scoped "azure" row whose catalog lists "gpt-4o"
+    And a PROJECT-scoped "azure" row for "web-app" whose catalog also lists "gpt-4o"
+    And both rows are enabled
+    When the runtime prepares a call for model "azure/gpt-4o" in project "web-app"
+    Then the call uses the PROJECT row's credentials
+
+  @integration
+  Scenario: Model served by no row keeps the collapse winner
+    Given an ORGANIZATION-scoped "openai" row with no custom catalog
+    And a PROJECT-scoped "openai" row for "web-app" with no custom catalog
+    And both rows are enabled
+    When the runtime prepares a call for model "openai/gpt-5-mini" in project "web-app"
+    Then the call uses the PROJECT row's credentials (narrowest enabled row)
+
+  @integration
+  Scenario: A wider row listing a registry model custom does not steal it
+    Given a PROJECT-scoped "openai" row for "web-app" with the project's own key and no custom catalog
+    And an ORGANIZATION-scoped "openai" row whose custom catalog also lists a registry model
+    And both rows are enabled
+    When the runtime prepares a call for that registry model in project "web-app"
+    Then the call uses the PROJECT row's credentials
+    # Every row of a provider serves its registry models, so the collapse
+    # winner is already correct — only custom-catalog models may swap rows.
+
+  @integration
+  Scenario: Disabled rows never serve a model even when their catalog lists it
+    Given an ORGANIZATION-scoped "azure" row whose catalog lists "gpt-5.4-mini" but is disabled
+    And a PROJECT-scoped enabled "azure" row for "web-app" whose catalog lists only "gpt-4o"
+    When the runtime prepares a call for model "azure/gpt-5.4-mini" in project "web-app"
+    Then the call uses the PROJECT row's credentials (no swap to a disabled row)
+
+  @integration
+  Scenario: Embeddings models follow the same row-selection rule
+    Given an ORGANIZATION-scoped "azure" row whose embeddings catalog lists "text-embedding-3-small"
+    And a PROJECT-scoped enabled "azure" row for "web-app" whose embeddings catalog lists only "text-embedding-ada-002"
+    When the runtime prepares a call for model "azure/text-embedding-3-small" in project "web-app"
+    Then the call uses the ORGANIZATION row's credentials
+
+  @integration
+  Scenario: Evaluations accept a model served only by a wider-scope row
+    Given a PROJECT-scoped "gemini" row for "web-app" with no custom catalog
+    And an ORGANIZATION-scoped "gemini" row whose custom catalog lists "my-tuned-model"
+    And both rows are enabled
+    When an evaluation validates model "gemini/my-tuned-model" for project "web-app"
+    Then the evaluator env is built with the ORGANIZATION row's credentials
+    And a model no accessible row serves is still rejected
+
+  @integration
+  Scenario: A row's unrelated project scope does not inflate its specificity
+    Given a shared "azure" row scoped to organization "acme" AND to project "other-app", whose catalog lists "gpt-5.4-mini"
+    And a TEAM-scoped enabled "azure" row for "web-app"'s team whose catalog also lists "gpt-5.4-mini"
+    When the runtime prepares a call for model "azure/gpt-5.4-mini" in project "web-app"
+    Then the call uses the TEAM row's credentials
+    And the shared row ranks at ORGANIZATION tier for "web-app" (its "other-app" attachment grants nothing here)

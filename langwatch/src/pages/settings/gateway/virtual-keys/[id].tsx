@@ -36,7 +36,7 @@ import {
   firstEligibleDefaultModel,
   type OrgModelProvider,
 } from "~/components/gateway/eligibleModelProviders";
-import { FieldInfoTooltip } from "~/components/gateway/FieldInfoTooltip";
+import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import { GuardrailAttachmentsSection } from "~/components/gateway/GuardrailAttachmentsSection";
 import { VirtualKeyEditDrawer } from "~/components/gateway/VirtualKeyEditDrawer";
 import { VirtualKeySecretReveal } from "~/components/gateway/VirtualKeySecretReveal";

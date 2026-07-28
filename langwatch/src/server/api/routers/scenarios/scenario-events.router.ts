@@ -1,13 +1,14 @@
 import { on } from "node:events";
+import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
+import { startScenarioTabPresence } from "~/server/scenarios/browser-tab/scenario-tab-presence";
 import type {
   BatchRunDataResult,
   ScenarioRunData,
 } from "~/server/scenarios/scenario-event.types";
-import { createLogger } from "~/utils/logger/server";
 import { checkProjectPermission } from "../../rbac";
 
 const logger = createLogger("langwatch:api:scenarios:events");
@@ -155,6 +156,28 @@ export const scenarioEventsRouter = createTRPCRouter({
       });
     }),
 
+  // Cheap freshness probe for the run history views: returns only the latest
+  // UpdatedAt across the project's runs in the window. Clients poll this tiny
+  // response and invalidate getSuiteRunData only when the value advances,
+  // instead of re-downloading run payloads on a timer.
+  getSuiteRunFreshness: protectedProcedure
+    .input(
+      projectSchema
+        .extend({ scenarioSetId: z.string().optional() })
+        .extend(dateRangeFields),
+    )
+    .use(checkProjectPermission("scenarios:view"))
+    .query(async ({ input, ctx }) => {
+      const service = getApp().simulations.runs;
+      const dates = resolveDateRange(input);
+      const lastUpdatedAt = await service.getLastUpdatedAt({
+        projectId: input.projectId,
+        scenarioSetId: input.scenarioSetId,
+        ...dates,
+      });
+      return { lastUpdatedAt };
+    }),
+
   // Get all run data for a scenario set (paginated, no BullMQ merge)
   getScenarioSetRunData: protectedProcedure
     .input(
@@ -265,29 +288,6 @@ export const scenarioEventsRouter = createTRPCRouter({
         ...dates,
       });
       return { count };
-    }),
-
-  // Get scenario run data by scenario id
-  getRunDataByScenarioId: protectedProcedure
-    .input(
-      projectSchema.extend({
-        scenarioId: z.string(),
-      }),
-    )
-    .use(checkProjectPermission("scenarios:view"))
-    .query(async ({ input, ctx }) => {
-      logger.debug(
-        { projectId: input.projectId, scenarioId: input.scenarioId },
-        "Fetching run data by scenario id",
-      );
-      const service = getApp().simulations.runs;
-      // Point lookup by scenario id — no date window, so a scenario's full run
-      // history stays reachable.
-      const data = await service.getScenarioRunDataByScenarioId({
-        projectId: input.projectId,
-        scenarioId: input.scenarioId,
-      });
-      return { data };
     }),
 
   // Get pre-aggregated batch history for the sidebar (no full messages)
@@ -404,23 +404,62 @@ export const scenarioEventsRouter = createTRPCRouter({
     }),
 
   onSimulationUpdate: protectedProcedure
-    .input(z.object({ projectId: z.string() }))
+    .input(
+      z.object({
+        projectId: z.string(),
+        // Present only on a tab the SDK opened. While the subscription lives,
+        // that tab is offered runs started on the same machine instead of the
+        // SDK opening yet another browser tab.
+        tabKey: z.string().min(1).max(200).optional(),
+        tabId: z.string().min(1).max(200).optional(),
+      }),
+    )
     .use(checkProjectPermission("scenarios:view"))
     .subscription(async function* (opts) {
-      const { projectId } = opts.input;
+      const { projectId, tabKey, tabId } = opts.input;
       const emitter = getApp().broadcast.getTenantEmitter(projectId);
 
       logger.info({ projectId }, "Simulation SSE subscription started");
 
-      for await (const eventArgs of on(emitter, "simulation_updated", {
-        // @ts-expect-error - signal is not typed
-        signal: opts.signal,
-      })) {
-        logger.debug(
-          { projectId, event: eventArgs[0] },
-          "Simulation SSE event received",
-        );
-        yield eventArgs[0];
+      const presence =
+        tabKey && tabId
+          ? await startScenarioTabPresence({ projectId, tabKey, tabId })
+          : null;
+
+      if (presence?.parkedNavigate) {
+        // Same envelope the broadcast path emits, so the client has one shape
+        // to parse.
+        yield {
+          event: JSON.stringify(presence.parkedNavigate),
+          timestamp: Date.now(),
+        };
+      }
+
+      // tRPC v10 callers leave `opts.signal` undefined, so the request's own
+      // signal rides in on the context. Without it a disconnected client keeps
+      // this generator suspended, its emitter listener attached, and its tab
+      // registered forever.
+      const signal =
+        opts.ctx.signal ??
+        // @ts-expect-error - tRPC v10 does not type `signal` on procedure opts
+        (opts.signal as AbortSignal | undefined);
+
+      try {
+        for await (const eventArgs of on(emitter, "simulation_updated", {
+          signal,
+        })) {
+          logger.debug(
+            { projectId, event: eventArgs[0] },
+            "Simulation SSE event received",
+          );
+          yield eventArgs[0];
+        }
+      } catch (error) {
+        // A disconnect aborts the wait; that is the normal end of a
+        // subscription, not something to surface as a stream error.
+        if ((error as { name?: string })?.name !== "AbortError") throw error;
+      } finally {
+        await presence?.stop();
       }
     }),
 });

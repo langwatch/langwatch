@@ -1,5 +1,5 @@
 import { describeRoute } from "hono-openapi";
-import { validator as zValidator } from "hono-openapi/zod";
+import { validator as zValidator } from "~/server/api/validation";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import {
@@ -18,7 +18,10 @@ import { platformUrl } from "../../shared/platform-url";
 
 function agentPlatformUrl({ projectSlug, agentId, agentType }: { projectSlug: string; agentId: string; agentType: string }): string {
   const drawer = agentType === "http" ? "agentHttpEditor" : "agentCodeEditor";
-  return platformUrl({ projectSlug, path: `/agents?drawer.open=${drawer}&drawer.agentId=${agentId}` });
+  return platformUrl({
+    projectSlug,
+    path: `/agents?drawer.open=${drawer}&drawer.agentId=${encodeURIComponent(agentId)}`,
+  });
 }
 import { ZodError } from "zod";
 import { handleAgentError } from "./error-handler";
@@ -45,27 +48,6 @@ const updateAgentSchema = z.object({
   config: z.record(z.unknown()).optional(),
   workflowId: z.string().nullable().optional(),
 });
-
-/**
- * Validation hook that returns 422 instead of the default 400 for Zod validation errors.
- */
-function validationHook(
-  result: { success: boolean; error?: { issues: Array<{ message?: string; path?: (string | number)[] }> } },
-  c: { json: (body: unknown, status: number) => Response },
-): Response | undefined {
-  if (!result.success) {
-    const issue = result.error?.issues?.[0];
-    return c.json(
-      {
-        error: "Unprocessable Entity",
-        message: issue?.message ?? "Validation failed",
-        path: issue?.path,
-      },
-      422,
-    );
-  }
-  return undefined;
-}
 
 /**
  * Maps AgentNotFoundError from the service layer to the HTTP NotFoundError.
@@ -134,7 +116,7 @@ secured.access(requires("project:update")).post(
     description: "Create a new agent",
   }),
   resourceLimitMiddleware("agents"),
-  zValidator("json", createAgentSchema, validationHook),
+  zValidator("json", createAgentSchema),
   async (c) => {
       const project = c.get("project");
       const { name, type, config, workflowId } = c.req.valid("json");
@@ -198,9 +180,10 @@ secured.access(requires("project:view")).get(
         config: agent.config,
         createdAt: agent.createdAt,
         updatedAt: agent.updatedAt,
-        platformUrl: platformUrl({
+        platformUrl: agentPlatformUrl({
           projectSlug: project.slug,
-          path: `/agents`,
+          agentId: agent.id,
+          agentType: agent.type,
         }),
       });
     },
@@ -213,7 +196,7 @@ secured.access(requires("project:update")).patch(
   describeRoute({
     description: "Update an agent by its id",
   }),
-  zValidator("json", updateAgentSchema, validationHook),
+  zValidator("json", updateAgentSchema),
   async (c) => {
       const { id } = c.req.param();
       const project = c.get("project");
@@ -248,9 +231,10 @@ secured.access(requires("project:update")).patch(
         config: agent.config,
         createdAt: agent.createdAt,
         updatedAt: agent.updatedAt,
-        platformUrl: platformUrl({
+        platformUrl: agentPlatformUrl({
           projectSlug: project.slug,
-          path: `/agents`,
+          agentId: agent.id,
+          agentType: agent.type,
         }),
       });
     },

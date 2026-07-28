@@ -267,7 +267,7 @@ describe("aggregation-builder", () => {
         aggregation: "p90",
         alias: "trace_time_to_first_token_ms",
         rawColumn: "TimeToFirstTokenMs",
-        outerAggregation: /\bquantileExact\(0\.9\)\s*\(\s*trace_time_to_first_token_ms\s*\)/,
+        outerAggregation: /\bquantileTDigest\(0\.9\)\s*\(\s*trace_time_to_first_token_ms\s*\)/,
       },
     ])(
       "routes $metric through the CTE alias in arrayJoin groupBy path",
@@ -807,6 +807,28 @@ describe("aggregation-builder", () => {
         // When handlesUnknown=true the column expression itself handles unknown values,
         // so no outer if(... IS NULL, 'unknown', toString(...)) wrapper is added.
         expect(result.sql).not.toContain("IS NULL, 'unknown'");
+      });
+
+      it("buckets score-only evaluator rows as 'unknown' under groupByKey instead of dropping them (issue #2674)", () => {
+        const input = {
+          ...baseInput,
+          timeScale: "full" as const,
+          groupBy: "evaluations.evaluation_passed" as const,
+          groupByKey: "my-evaluator",
+          series: [
+            {
+              metric: "metadata.trace_id" as FlattenAnalyticsMetricsEnum,
+              aggregation: "cardinality" as const,
+            },
+          ],
+        };
+        const result = buildTimeseriesQuery(input);
+
+        expect(result.sql).toMatch(
+          /EvaluatorId = \{groupByKey:String\} AND \w+\.Status = 'processed' AND \w+\.Passed IS NULL THEN 'unknown'/,
+        );
+        // Foreign-evaluator isolation sentinel is preserved — other evaluators still hit ELSE NULL
+        expect(result.sql).toContain("ELSE NULL");
       });
     });
 

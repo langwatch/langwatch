@@ -1,5 +1,5 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
-import { DomainError, NotFoundError } from "~/server/app-layer/domain-error";
+import { HandledError, NotFoundError } from "@langwatch/handled-error";
 import { isAdmin } from "./isAdmin";
 
 /** Impersonation window handed to the UI once a start call succeeds. */
@@ -11,7 +11,7 @@ const IMPERSONATION_TTL_MS = 1000 * 60 * 60; // 1 hour
  * admin to re-enter them would defeat the revocation. Maps to HTTP 400
  * because the request itself is well-formed; only the target state is wrong.
  */
-export class CannotImpersonateDeactivatedUserError extends DomainError {
+export class CannotImpersonateDeactivatedUserError extends HandledError {
   constructor(userId: string) {
     super(
       "cannot_impersonate_deactivated_user",
@@ -29,7 +29,7 @@ export class CannotImpersonateDeactivatedUserError extends DomainError {
  * deliberately denied, not a system failure — clients should render an
  * "impersonation not permitted" message, not retry.
  */
-export class CannotImpersonateAdminError extends DomainError {
+export class CannotImpersonateAdminError extends HandledError {
   constructor(userId: string) {
     super(
       "cannot_impersonate_admin",

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiKeyService } from "../api-key.service";
 
 vi.mock("../api-key-token.utils", () => ({
@@ -27,7 +27,7 @@ vi.mock("~/server/rbac/custom-role-permissions", async (importOriginal) => {
   };
 });
 
-vi.mock("~/utils/logger/server", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
     debug: vi.fn(),
     warn: vi.fn(),

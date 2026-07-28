@@ -76,3 +76,39 @@ Feature: Project Limit Enforcement with License
     And team "team-789" has 1 project
     When I create a project named "New Project"
     Then the request fails with FORBIDDEN
+
+  # ============================================================================
+  # Personal Workspaces
+  # ============================================================================
+  #
+  # Everyone on the free plan should be able to track their own coding-agent
+  # usage, which needs a personal workspace. A personal workspace must not
+  # spend any of the projects the customer gets for real work.
+  #
+  # The same count backs enforcement, the usage page, and the license status
+  # panel, so a personal project is invisible to all three or to none of them.
+
+  Scenario: Personal projects do not count toward the project limit
+    Given the organization has a license with maxProjects 2
+    And the organization has 2 personal projects
+    When I create a project named "New Project"
+    Then the project is created successfully
+
+  Scenario: Real projects still reach the limit alongside personal projects
+    Given the organization has a license with maxProjects 2
+    And the organization has 2 projects
+    And the organization has 1 personal project
+    When I create a project named "New Project"
+    Then the request fails with FORBIDDEN
+
+  Scenario: A free organization keeps its full project allowance after provisioning a personal workspace
+    Given the organization is on the free plan allowing 2 projects
+    And every member has a personal workspace
+    When I create a project for real work
+    Then the project is created successfully
+
+  Scenario: The reported project usage excludes personal projects
+    Given the organization has 2 projects
+    And the organization has 1 personal project
+    When I view the organization usage
+    Then the reported project count is 2

@@ -1,7 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../utils/spinner";
 import { FileManager } from "../utils/fileManager";
 import { PromptsError } from "@/client-sdk/services/prompts";
 import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
@@ -30,7 +30,7 @@ export const removeCommand = async (name: string): Promise<void> => {
     const isLocalPrompt = (typeof dependency === "string" && dependency.startsWith("file:")) ||
                          (typeof dependency === "object" && dependency.file);
 
-    const spinner = ora(`Removing ${chalk.cyan(name)}...`).start();
+    const spinner = createSpinner(`Removing ${chalk.cyan(name)}...`).start();
 
     try {
       // Handle local prompts

@@ -1,7 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { getApp } from "~/server/app-layer/app";
-import { InvalidUnsubscribeTokenError } from "~/server/app-layer/triggers/emailSuppression.service";
+import { InvalidUnsubscribeTokenError } from "~/server/app-layer/automations/emailSuppression.service";
 import { getClientIp } from "~/utils/getClientIp";
 import { auditLog } from "../../auditLog";
 import { rateLimit } from "../../rateLimit";

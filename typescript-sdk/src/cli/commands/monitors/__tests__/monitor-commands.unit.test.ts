@@ -77,16 +77,21 @@ describe("listMonitorsCommand()", () => {
     );
   });
 
-  it("outputs JSON when format is json", async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: async () => [makeMonitor()],
-    });
+  describe("when a machine format is requested", () => {
+    it("returns the raw monitor list as the payload instead of printing", async () => {
+      const monitors = [makeMonitor()];
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => monitors,
+      });
 
-    await listMonitorsCommand({ format: "json" });
-    expect(console.log).toHaveBeenCalledWith(
-      expect.stringContaining("Toxicity Check")
-    );
+      const result = await listMonitorsCommand();
+
+      // The command no longer decides the format — it hands the payload to
+      // the output port, which renders json/yaml/agents/--jq from this value.
+      expect(result?.data).toEqual(monitors);
+      expect(console.log).not.toHaveBeenCalled();
+    });
   });
 
   it("exits on API error", async () => {

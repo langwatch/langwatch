@@ -40,16 +40,30 @@ const (
 	ErrBudgetExceeded   = herr.Code("budget_exceeded")
 	ErrRateLimited      = herr.Code("rate_limited")
 	ErrGuardrailBlocked = herr.Code("guardrail_blocked")
-	ErrPolicyViolation  = herr.Code("policy_violation")
-	ErrModelNotAllowed  = herr.Code("model_not_allowed")
-	ErrProviderError    = herr.Code("provider_error")
-	ErrPayloadTooLarge  = herr.Code("payload_too_large")
-	ErrBadRequest       = herr.Code("bad_request")
-	ErrNotFound         = herr.Code("not_found")
-	ErrInternal         = herr.Code("internal_error")
-	ErrChainExhausted   = herr.Code("chain_exhausted")
-	ErrCircuitOpen      = herr.Code("circuit_open")
-	ErrProviderTimeout  = herr.Code("provider_timeout")
-	ErrKeyRevoked       = herr.Code("virtual_key_revoked")
-	ErrAuthUpstream     = herr.Code("auth_upstream_unavailable")
+	// ErrGuardrailUpstreamUnavailable means the guardrail could not be
+	// evaluated at all. Fail-closed keys stop here rather than proceeding as
+	// though the guardrail had passed. Contract 5.
+	ErrGuardrailUpstreamUnavailable = herr.Code("guardrail_upstream_unavailable")
+	ErrPolicyViolation              = herr.Code("policy_violation")
+	ErrModelNotAllowed              = herr.Code("model_not_allowed")
+	ErrProviderError                = herr.Code("provider_error")
+	ErrPayloadTooLarge              = herr.Code("payload_too_large")
+	ErrBadRequest                   = herr.Code("bad_request")
+	ErrNotFound                     = herr.Code("not_found")
+	ErrInternal                     = herr.Code("internal_error")
+	ErrChainExhausted               = herr.Code("chain_exhausted")
+	ErrCircuitOpen                  = herr.Code("circuit_open")
+	ErrProviderTimeout              = herr.Code("provider_timeout")
+	ErrKeyRevoked                   = herr.Code("virtual_key_revoked")
+	ErrAuthUpstream                 = herr.Code("auth_upstream_unavailable")
+	// ErrNoProviderConfigured means the virtual key's bundle carries zero
+	// provider credentials — the organization has no ModelProvider configured.
+	// Without this guard the dispatcher would hand Bifrost a zero-value
+	// Credential and the caller would see an opaque "provider is required".
+	ErrNoProviderConfigured = herr.Code("no_provider_configured")
+	// ErrCodexSessionExpired means the codex provider's OAuth session is
+	// dead (refresh rejected) — the user must sign in with OpenAI again.
+	// Clients receive it as a 401 with this code so Langy can render the
+	// re-authenticate card instead of a generic provider error.
+	ErrCodexSessionExpired = herr.Code("codex_session_expired")
 )

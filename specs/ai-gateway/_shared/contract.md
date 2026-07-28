@@ -403,6 +403,19 @@ Response:
 
 Gateway applies modifications **before** dispatch (request direction) or **before** returning to client (response/stream_chunk).
 
+### 4.7 `GET /api/internal/gateway/health`
+
+Connectivity probe backing the gateway's public `GET /health` status-page endpoint (`specs/ai-gateway/gateway-health.feature`). The gateway's statusprobe monitor calls this on its own clock (default every 15s per gateway node) and serves the cached verdict to public polls, so status-page traffic never reaches the control plane.
+
+Riding the signed channel is the point: a 200 proves DNS/TCP/TLS, the app being up, and the shared HMAC secret matching. The gateway only reads the status code.
+
+Response (200):
+```json
+{ "status": "ok" }
+```
+
+Any non-200 (including 401 on a secret mismatch) marks the probe failed.
+
 ---
 
 ## 5. Error envelope

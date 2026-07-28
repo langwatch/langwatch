@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
+import { BLOB_BACKSTOP_TTL_SECONDS } from "../blobConstants";
 import {
   type BlobRef,
   contentHash,
@@ -47,6 +48,34 @@ describe("TieredBlobStore", () => {
 
         expect(await store.get(ref)).toEqual(data);
       });
+
+      /**
+       * Regression: TieredBlobStore wrote through RedisJobBlobStore's default
+       * (GQ1's 7-day staged-residence backstop) instead of the leased GQ2
+       * orphan backstop the spec configures ("the blob TTL backstop is
+       * configured at 4 days"), so every leaked blob lived days longer than
+       * designed (2026-07-09 Redis memory investigation).
+       */
+      it("writes and refreshes with the 4-day GQ2 backstop, not GQ1's 7-day default", async () => {
+        const { store, redisBlobs } = makeStore();
+        const data = Buffer.from("ttl pinning payload");
+
+        const ref = await store.put({ projectId: PROJECT, data });
+        await store.get(ref);
+
+        expect(redisBlobs.putTtls).toEqual([BLOB_BACKSTOP_TTL_SECONDS]);
+        expect(redisBlobs.getTtls).toEqual([BLOB_BACKSTOP_TTL_SECONDS]);
+      });
+
+      it("peeks without refreshing any TTL", async () => {
+        const { store, redisBlobs } = makeStore();
+        const data = Buffer.from("peek me");
+
+        const ref = await store.put({ projectId: PROJECT, data });
+        await store.peek(ref);
+
+        expect(redisBlobs.getTtls).toEqual([]);
+      });
     });
   });
 
@@ -75,6 +104,39 @@ describe("TieredBlobStore", () => {
 
         expect(await store.get(ref)).toEqual(data);
       });
+    });
+  });
+
+  describe("given a payload over the S3 threshold and an azure destination", () => {
+    /**
+     * Covers the groupQueue-blob-store HALF of this scenario; the
+     * defaultMintStorageUri half lives in stored-objects.service.unit.test.ts.
+     */
+    /** @scenario "defaultMintStorageUri and the groupQueue blob store mint azure-blob URIs for an azure destination" */
+    it("mints an azure-blob uri under the durable tier and round-trips the bytes", async () => {
+      const redisBlobs = new InMemoryJobBlobStore();
+      const objectStore = new InMemoryObjectStore();
+      const store = new TieredBlobStore({
+        redisBlobs,
+        objectStoreFor: () => objectStore,
+        resolveDestination: async () => ({
+          kind: "azure",
+          accountName: "lwacct",
+          container: "lw-container",
+        }),
+        s3ThresholdBytes: 8,
+      });
+      const data = Buffer.from("this comfortably exceeds the threshold");
+
+      const ref = await store.put({ projectId: PROJECT, data });
+
+      // The "s3" tier label means "durable object store, any scheme" —
+      // azure-blob rides under it unchanged (BlobRef has no separate
+      // "azure" tier).
+      expect(ref.tier).toBe("s3");
+      const expectedUri = `azure-blob://lwacct/lw-container/${PROJECT}/${contentHash(data)}`;
+      expect([...objectStore.store.keys()]).toEqual([expectedUri]);
+      expect(await store.get(ref)).toEqual(data);
     });
   });
 

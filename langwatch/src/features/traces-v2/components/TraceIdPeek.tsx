@@ -16,7 +16,6 @@ import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import {
-  abbreviateModel,
   formatCost,
   formatDuration,
   formatTokens,
@@ -219,7 +218,7 @@ function PeekPopoverContent({
         {trace.models.length > 0 && (
           <PopoverMetric
             label="Model"
-            value={abbreviateModel(trace.models[0]!)}
+            value={(trace.models[0]!)}
           />
         )}
         <PopoverMetric label="Spans" value={String(trace.spanCount)} />

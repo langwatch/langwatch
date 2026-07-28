@@ -155,3 +155,60 @@ Feature: SSE streaming — exact byte preservation post-first-chunk
       Then the OTel span attached to the trace has gen_ai.usage.input_tokens > 0
       And gen_ai.usage.output_tokens > 0
       And the gateway does NOT emit the success_no_usage soft warning for this request
+
+  Rule: Chat completion streams open with a role-carrying delta, matching OpenAI's contract
+
+    # api.openai.com opens every streamed choice with
+    # "delta":{"role":"assistant","content":""} before any content arrives.
+    # The gateway's stream engine consumes that opening chunk internally and
+    # re-emits starting from the first content delta, so clients that key
+    # their accumulator off the opening role delta index a message that was
+    # never created (our own python-sdk streaming tracer crashed with
+    # KeyError: 0 on every streamed chat completion through the gateway).
+    # The gateway therefore guarantees the role on the first delta it emits
+    # per choice, whatever the upstream engine swallowed.
+
+    @unit
+    Scenario: the first emitted delta of a chat completion stream carries the assistant role
+      Given a chat completion stream that would otherwise reach the client with no role on any delta
+      When the gateway emits the stream
+      Then the first delta of the stream carries "role":"assistant"
+      And every later chunk of the stream is emitted unchanged
+
+    @unit
+    Scenario: a turn that opens with a tool call still carries the role
+      Given a chat completion stream whose first delta carries tool calls and no content
+      When the gateway emits the stream
+      Then that first delta carries "role":"assistant" alongside its tool calls
+
+    @unit
+    Scenario: every choice of a multi-choice stream opens with its own role delta
+      Given a chat completion request with n greater than 1
+      When the gateway emits the stream
+      Then the first delta of each choice index carries "role":"assistant"
+
+    @unit
+    Scenario: a provider that sends its own role delta passes through untouched
+      Given a chat completion stream whose upstream already opens with a role-carrying delta
+      When the gateway emits the stream
+      Then the stream is emitted unchanged
+      And no chunk gains a second role
+
+    @unit
+    Scenario: terminal chunks are not reshaped by the role repair
+      Given a chat completion stream that ends with a usage-only chunk and the [DONE] sentinel
+      When the gateway emits the stream
+      Then the usage-only chunk passes through with no choices invented
+      And the [DONE] sentinel is unchanged
+
+    @unit
+    Scenario: a choice with no delta is not given one
+      Given a chat completion chunk whose choice carries a finish reason and no delta
+      When the gateway emits the stream
+      Then the chunk passes through without a delta object being invented
+
+    @unit
+    Scenario: OpenAI-compatible providers inherit the role repair
+      Given a chat completion stream served through a self-hosted OpenAI-compatible endpoint
+      When the gateway emits the stream
+      Then the first delta of the stream carries "role":"assistant"

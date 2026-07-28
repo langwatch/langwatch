@@ -20,6 +20,10 @@ import { ScenarioTargetRow } from "../ScenarioTargetRow";
 import { RunRow } from "../RunRow";
 import { makeScenarioRunData, makeBatchRun, makeSummary } from "./test-helpers";
 
+vi.mock("../usePrefetchRunState", () => ({
+  usePrefetchRunState: () => vi.fn(),
+}));
+
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
