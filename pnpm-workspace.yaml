@@ -1,19 +1,199 @@
+# The single pnpm workspace for every JavaScript project in the repo.
+# See dev/docs/adr/076-single-pnpm-workspace.md.
+#
+# This used to be six independent install roots with six lockfiles: the repo
+# root, langwatch/, typescript-sdk/, mcp-server/, skills/ and
+# agentic-e2e-tests/. mcp-server was BOTH its own root and a member of
+# langwatch/'s workspace, so CI installed it twice on every app build; skills/
+# and agentic-e2e-tests/ needed `--ignore-workspace` to escape a workspace they
+# were never members of; and each root carried its own `overrides` block, so a
+# security pin applied in one could be silently absent from another.
+#
+# One install from the repo root now covers all of it.
 packages:
-  - packages/*
-  # The langwatch/ next.js app keeps its own pnpm-workspace.yaml for its
-  # internal sub-packages (saas-src, langwatch/packages/*, mcp-server). We do
-  # NOT include it here — the @langwatch/server tarball ships langwatch/'s
-  # pre-built dist + a copy of the source so a fresh `pnpm install` runs at
-  # ~/.langwatch/app on first boot. Treating it as a peer workspace would
-  # double-install React/Next/etc. across the dev environment.
+  - "langwatch"
+  - "langwatch/packages/*"
+  - "packages/*"
+  - "mcp-server"
+  - "typescript-sdk"
+  - "skills"
+  - "agentic-e2e-tests"
 
+# pnpm 10 already defaults this to false. It is stated explicitly because the
+# merge is what made it load-bearing: typescript-sdk/ is the package `langwatch`
+# and langwatch/ (now @langwatch/web) depends on `langwatch@1.0.0`, meaning the
+# PUBLISHED SDK. With the two in one workspace, flipping this to true silently
+# switches the app — and everything built from it, including the production
+# image — onto the SDK working copy. Linking the working copy is a deliberate
+# change (`"langwatch": "workspace:*"`), not something to acquire by accident.
+linkWorkspacePackages: false
+
+# Supply-chain age gate. Previously set only on langwatch/'s root, so five of
+# the six projects had no gate at all. Repo-wide now.
+minimumReleaseAge: 10080
+# Adding workspace packages forces a re-resolve; these shipped fresh releases
+# inside the age gate with no older version satisfying the requested ranges.
+# Version-pinned so only the pinned release bypasses the gate; drop each entry
+# once that version ages past it.
+minimumReleaseAgeExclude:
+  - langwatch@1.0.0
+  - ws@8.21.1
+  - "@browserbasehq/sdk@2.16.0"
+  - postcss@8.5.19
+
+# The union of what the six roots each pinned separately. Overrides are
+# workspace-root-only in pnpm, which is precisely why the old split let these
+# lists drift: `langsmith` was pinned in langwatch/ and skills/ but not at the
+# root, `esbuild` at the root and in skills/ but not in langwatch/, and hono /
+# uuid / ip-address / qs / form-data / js-yaml only in skills/.
+# NOTE ON UNCONDITIONAL PINS. Three of these lists lived in a member's
+# `pnpm.overrides` (langwatch/, typescript-sdk/, skills/) where they applied to
+# that project ALONE. Merged here they apply to everything, so an unconditional
+# `pkg: version` that was fine for one project can break another. Three were
+# deliberately NOT carried up, because each is a DIRECT dependency of the
+# project that pinned it and its own declaration governs it just as well:
+#
+#   zod: ^4.0.14                   (typescript-sdk) — the app is on zod ^3.25.76
+#                                  and @langwatch/langy compiles against it via
+#                                  the `zod/v4` subpath. Global would force the
+#                                  app to zod 4 and break that arrangement.
+#   @opentelemetry/api-logs: 0.205.0   (typescript-sdk) — older than the app's
+#   @opentelemetry/sdk-logs: 0.205.0   otel stack; global would downgrade it.
+#
+# Anything expressed as a RANGE (`pkg@<x`) is safe to share and all of them are
+# merged below: a range pin only bites the versions it names.
 overrides:
-  # Security: shell-quote quote() newline escaping (CRITICAL)
-  shell-quote@<1.8.4: '>=1.8.4'
-  # Security: esbuild Deno binary integrity RCE + dev-server file read (GHSA-gv7w-rqvm-qjhr / GHSA-g7r4-m6w7-qqqr)
-  esbuild@<0.28.1: '>=0.28.1'
-  # Security: vite dev-server file read / middleware path bypass
-  vite@<6.4.3: '>=6.4.3'
+  # --- Version alignment (not security) ---
+  pino: ^10.3.1
+  pino-pretty: ^13.1.3
+  thread-stream: ^4.0.0
+  prettier: ^3.8.1
+  ai: ^6.0.161
+  react: ^19.2.7
+  react-dom: ^19.2.7
+  react-is: ^19.2.7
+  kysely: 0.28.17
+  postcss: ^8.5.13
+  lodash: ^4.18.1
+  glob: ^11.1.0
+  picomatch: ">=4.0.4"
+  # Intersection of langwatch/'s `>=10.6 <11` and skills//mcp-server's `>=10.26.0`.
+  liquidjs: ">=10.26.0 <11"
+  # `-` removes the dependency outright: the app talks to neither engine and
+  # both arrive only as unused transitive baggage.
+  "@elastic/elasticsearch": "-"
+  "@opensearch-project/opensearch": "-"
+  # Path-scoped, so they touch only these two dependents.
+  "@aws-sdk/xml-builder>fast-xml-parser": ^5.7.0
+  "@langchain/community>fast-xml-parser": ^5.7.0
 
+  # --- Security ---
+  # shell-quote quote() newline escaping (CRITICAL)
+  "shell-quote@<1.8.4": ">=1.8.4"
+  # esbuild Deno binary integrity RCE + dev-server file read
+  # (GHSA-gv7w-rqvm-qjhr / GHSA-g7r4-m6w7-qqqr)
+  "esbuild@<0.28.1": ">=0.28.1"
+  # minimatch ReDoS (CVE #464/#476/#477/#478/#479)
+  "minimatch@<3.1.4": "3.1.4"
+  "minimatch@>=5.0.0 <5.1.8": "5.1.8"
+  "minimatch@>=9.0.0 <9.0.7": "9.0.7"
+  # fast-xml-parser DoS (CVE #494/#495/#402)
+  "fast-xml-parser@>=4.1.3 <4.5.4": "4.5.4"
+  "fast-xml-parser@>=5.0.0 <5.3.6": "5.3.6"
+  # @modelcontextprotocol/sdk cross-client data leak (#246)
+  "@modelcontextprotocol/sdk@>=1.10.0 <=1.25.3": "1.26.0"
+  # langchain serialization injection (#223)
+  "langchain@<0.3.37": "0.3.37"
+  "@langchain/core@<0.3.80": "0.3.80"
+  # langsmith SDK floor (from mcp-server and skills)
+  "langsmith@<0.6.0": "0.6.0"
+  # merge prototype pollution (#194) via exec-sh
+  "merge@<2.1.1": "2.1.1"
+  braces: ^3.0.3
+  cross-spawn: ^7.0.6
+  "exec-sh": ^0.4.0
+  tmp: ">=0.2.6"
+  # @hono/node-server request smuggling
+  "@hono/node-server@<1.19.13": ">=1.19.13"
+  # undici DoS / request smuggling
+  "undici@>=6.0.0 <6.27.0": ">=6.27.0 <7"
+  "undici@>=7.0.0 <7.28.0": ">=7.28.0 <8"
+  # vitest advisory floor
+  "vitest@<4.1.0": ">=4.1.0"
+  "brace-expansion@>=4.0.0 <5.0.6": ">=5.0.6"
+  "file-type@>=13.0.0 <21.3.1": ">=21.3.1 <22"
+  "prismjs@<1.30.0": ">=1.30.0"
+  "@grpc/grpc-js@<1.14.4": ">=1.14.4"
+  "js-yaml@>=3.0.0 <3.15.0": ">=3.15.0 <4"
+  "dompurify@<3.4.11": ">=3.4.11 <4"
+  # validator incomplete filtering (#216) via class-validator
+  "validator@<13.15.22": "13.15.22"
+  # express-rate-limit DoS (from mcp-server)
+  "express-rate-limit@>=8.2.0 <8.2.2": "8.2.2"
+  # glob ReDoS (from mcp-server) is covered by the unconditional `glob: ^11.1.0`
+  # above, which langwatch/ carried and is the stricter of the two.
+  # Next.js DoS with Server Components (#872). next is an unused optional peer
+  # dep of better-auth (the app is a Vite app).
+  "next@>=13.0.0 <15.5.15": "15.5.15"
+  # axios prototype pollution gadgets, header injection, loopback bypass
+  # (#982/#984/#987/#988)
+  "axios@>=1.0.0 <1.16.0": "1.16.0"
+  # fast-xml-builder attribute value quote bypass (#1028)
+  "fast-xml-builder@<1.1.7": "1.1.7"
+  # fast-uri path traversal + host confusion (#1031-#1042)
+  "fast-uri@<3.1.2": "3.1.2"
+  # protobufjs code execution, prototype pollution, DoS, Any-expansion DoS and
+  # property shadowing (GHSA-xq3m-2v4x-88gg, GHSA-66ff-xgx4-vchm,
+  # GHSA-75px-5xx7-5xc7, GHSA-jvwf-75h9-cwgg, GHSA-685m-2w69-288q,
+  # GHSA-wcpc-wj8m-hjx6, GHSA-f38q-mgvj-vph7 / CVE-2026-44289/44290/44291/44293).
+  #
+  # The three roots disagreed on the 8.x floor: langwatch/ required >=8.0.2,
+  # skills/ >=8.0.2, mcp-server/ >=8.6.0. Taking the strictest — a package
+  # patched in one project was, until now, left vulnerable in the others, which
+  # is the whole reason these lists are merged.
+  "protobufjs@<7.5.6": "7.5.6"
+  "protobufjs@>=8.0.0 <8.6.0": "8.6.0"
+  # OpenTelemetry Prometheus exporter crash via malformed HTTP (CVE-2026-44902)
+  "@opentelemetry/exporter-prometheus@<0.217.0": "0.217.0"
+  "@opentelemetry/sdk-node@<0.217.0": "0.217.0"
+  # From skills/ (liquidjs is in the alignment block above, intersected with
+  # langwatch/'s narrower `>=10.6 <11`)
+  "hono@<4.12.25": ">=4.12.25"
+  "uuid@<11.1.1": ">=11.1.1 <12"
+  "ip-address@<=10.1.0": ">=10.1.1"
+  "qs@>=6.11.1 <=6.15.1": ">=6.15.2"
+  "form-data@<4.0.6": ">=4.0.6"
+  "js-yaml@>=4.0.0 <4.2.0": ">=4.2.0 <5"
+
+  # --- vite ---
+  # langwatch/pnpm-workspace.yaml carried an unconditional `vite: 8.0.10`, but
+  # langwatch/package.json's `pnpm.overrides` carried these two ranges as well
+  # and they are what the old lockfile actually resolved to (8.0.16, never
+  # 8.0.10). Keeping the ranges preserves the resolution the app already
+  # shipped; skills/'s 7.x line is left alone by both.
+  "vite@<7.3.2": "8.0.16"
+  "vite@>=7.0.0 <7.3.5": ">=7.3.5 <8"
+  "vite@>=8.0.0 <8.0.16": ">=8.0.16"
+
+packageExtensions:
+  "@google-cloud/dlp":
+    dependencies:
+      protobufjs: "^7.5.4"
+
+# Union of the three roots' allowlists. node-pty is skills/ and mcp-server's;
+# the rest came from langwatch/.
 onlyBuiltDependencies:
+  - "@prisma/client"
+  - "@prisma/engines"
+  - "@scarf/scarf"
+  - bcrypt
+  - bufferutil
+  - core-js
+  - cpu-features
   - esbuild
+  - msgpackr-extract
+  - node-pty
+  - prisma
+  - protobufjs
+  - sharp
+  - ssh2

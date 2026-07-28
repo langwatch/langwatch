@@ -168,14 +168,14 @@ jobs:
       # this, end users see vite chunder past at startup on first run —
       # exactly the bureaucracy we're trying to eliminate.
       #
-      # langwatch/ is its own pnpm workspace (not in the root pnpm-workspace
-      # `packages/*` glob), so we install + build it explicitly here.
-      # node_modules/ is excluded from the tarball by langwatch/.npmignore,
-      # so end users still run `pnpm install` once on first start (which
-      # generates the platform-specific Prisma client via prisma's
-      # postinstall hook).
+      # Since ADR-076 langwatch/ is a member of the single root workspace, so
+      # the app's dependencies come from the root install filtered down to it.
+      # node_modules/ is excluded from the tarball by langwatch/.npmignore, so
+      # end users still run `pnpm install` once on first start (which generates
+      # the platform-specific Prisma client via prisma's postinstall hook) —
+      # see packages/server/src/services/node-deps.ts for that path.
       - name: Install langwatch app deps
-        run: pnpm -C langwatch install --frozen-lockfile --prod=false
+        run: pnpm install --frozen-lockfile --prod=false --filter "@langwatch/web..."
 
       - name: Build langwatch app (vite + scenario + mcp + generated types)
         run: pnpm -C langwatch run build

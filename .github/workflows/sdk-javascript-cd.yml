@@ -27,12 +27,10 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
-          cache-dependency-path: "typescript-sdk/pnpm-lock.yaml"
-          registry-url: "https://registry.npmjs.org"
+                    registry-url: "https://registry.npmjs.org"
 
       - name: Install dependencies
-        working-directory: typescript-sdk
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --filter "langwatch..."
 
       - name: Build
         working-directory: ./typescript-sdk

@@ -45,7 +45,7 @@ jobs:
         # installed on ubuntu-latest by default). Publish only needs to run
         # `pnpm sync` (TS transformer over MDX), which doesn't touch any of
         # the native deps node-pty pulls in.
-        run: pnpm install --frozen-lockfile --ignore-scripts
+        run: pnpm install --frozen-lockfile --ignore-scripts --filter "@langwatch/skills..."
 
       - name: Sync skills
         working-directory: skills

@@ -163,11 +163,10 @@ jobs:
         with:
           node-version: '24'
           cache: 'pnpm'
-          cache-dependency-path: langwatch/pnpm-lock.yaml
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: Install langwatch deps
-        working-directory: langwatch
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --filter "@langwatch/web..."
 
       - name: Apply DB migrations
         working-directory: langwatch
