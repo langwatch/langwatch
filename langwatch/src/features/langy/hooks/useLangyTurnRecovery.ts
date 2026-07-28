@@ -108,6 +108,17 @@ export function useLangyTurnRecovery({
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onRetryRef = useRef(onRetry);
   onRetryRef.current = onRetry;
+  // An ARMING-TIME input, deliberately kept out of the effect's dep array.
+  //
+  // The caller derives it from the engine's messages (`turnHadSideEffects`), and
+  // those are replaced wholesale whenever the 3s `langy.messages` poll lands —
+  // well inside this hook's 1500/4000ms waits. As a dep it therefore re-ran the
+  // effect mid-wait for the SAME failure, and the effect has nothing to do on
+  // that re-run: whether this failure may auto-retry was already decided when
+  // the timer was armed. Read it off a ref so a mid-flight history poll cannot
+  // disturb a retry that is already scheduled.
+  const sideEffectsObservedRef = useRef(sideEffectsObserved);
+  sideEffectsObservedRef.current = sideEffectsObserved;
 
   const [pending, setPending] = useState<{
     kind: string;
@@ -143,7 +154,11 @@ export function useLangyTurnRecovery({
 
     const attemptsUsed = attemptsUsedRef.current;
     if (
-      !canAutoRecover({ kind: errorKind, attemptsUsed, sideEffectsObserved })
+      !canAutoRecover({
+        kind: errorKind,
+        attemptsUsed,
+        sideEffectsObserved: sideEffectsObservedRef.current,
+      })
     ) {
       // Terminal kind, exhausted budget, or a turn that already changed
       // something: the caller falls through to the error card.
@@ -166,8 +181,20 @@ export function useLangyTurnRecovery({
       onRetryRef.current();
     }, policy.delayMs(attempt));
 
-    return clearTimer;
-  }, [errorKind, errorId, sideEffectsObserved, enabled, clearTimer]);
+    // NO CLEANUP, on purpose. An armed timer belongs to the FAILURE (identified
+    // by `errorId`), not to this effect instance, and every way a retry can
+    // legitimately be cancelled already clears it by hand: the failure clearing
+    // or the hook being disabled (the first branch), a NEW failure arriving or
+    // one that turns out to be terminal (both above), `reset()` when the
+    // conversation changes, and the unmount effect below.
+    //
+    // Returning `clearTimer` here instead is what wedged the panel: React runs
+    // the previous cleanup on ANY dep change, so a re-render killed the pending
+    // timer and then hit the same-failure short-circuit above, which re-arms
+    // nothing. `pending` stayed set forever — `isRecovering` permanently true,
+    // the retry never fired, and the error card stayed suppressed behind a
+    // recovering line that could only be escaped by sending a new message.
+  }, [errorKind, errorId, enabled, clearTimer]);
 
   // Unmount must never leave a timer holding a stale `regenerate`.
   useEffect(() => clearTimer, [clearTimer]);

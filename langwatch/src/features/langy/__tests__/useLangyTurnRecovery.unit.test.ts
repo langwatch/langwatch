@@ -121,6 +121,45 @@ describe("useLangyTurnRecovery", () => {
     });
   });
 
+  describe("when the history poll lands while a retry is already armed", () => {
+    // The wedge. `sideEffectsObserved` is derived from the engine's messages,
+    // and the 3s `langy.messages` poll replaces those wholesale — well inside
+    // the 1500/4000ms waits. Cancelling the armed timer on that churn and then
+    // short-circuiting on "same failure" left `pending` set forever: the
+    // recovering line stayed up, the retry never fired, and the error card was
+    // suppressed behind it. The only escape was sending a new message.
+    it("still fires the retry it armed", () => {
+      const errorId = { id: 1 };
+      const { result, rerender, onRetry } = setup({ errorId });
+      expect(result.current.isRecovering).toBe(true);
+
+      // Same failure, new message list: the flip that used to kill the timer.
+      rerender({ errorKind: RESTARTING, errorId, sideEffectsObserved: true });
+
+      act(() => {
+        vi.advanceTimersByTime(langyRecoveryPolicy(RESTARTING).delayMs(1));
+      });
+
+      expect(onRetry).toHaveBeenCalledTimes(1);
+      expect(result.current.isRecovering).toBe(false);
+    });
+
+    it("never leaves the panel stuck on the recovering line", () => {
+      const errorId = { id: 1 };
+      const { result, rerender } = setup({ errorId });
+
+      rerender({ errorKind: RESTARTING, errorId, sideEffectsObserved: true });
+      act(() => {
+        vi.advanceTimersByTime(60_000);
+      });
+
+      // Whichever way it resolves — retried, or fallen through to the card —
+      // it must not still be claiming to recover a minute later.
+      expect(result.current.isRecovering).toBe(false);
+      expect(result.current.message).toBeNull();
+    });
+  });
+
   describe("when the failed turn already changed something", () => {
     it("refuses to auto-retry — the replay is the user's call", () => {
       const { result, onRetry } = setup({ sideEffectsObserved: true });

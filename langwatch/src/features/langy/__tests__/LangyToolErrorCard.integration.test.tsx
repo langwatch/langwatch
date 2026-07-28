@@ -242,6 +242,22 @@ describe("Langy tool failure card", () => {
     expect([...transcript.children][0]?.contains(alert)).toBe(true);
   });
 
+  it("names the transcript to assistive tech as a running log", () => {
+    // `getByLabelText` resolves `aria-label` on ANY element, so it passed
+    // happily while the label sat on a plain div — where `aria-label` is
+    // prohibited (implicit role `generic`) and is therefore dropped. Screen
+    // readers got neither the region's name nor its updates, so the running
+    // indicator and the red failure card below were both silent. Asking BY ROLE
+    // is the only query that can tell the difference.
+    render(
+      <ChakraProvider value={defaultSystem}>
+        <LangyToolActivity message={message(structuredFailureNewCli())} />
+      </ChakraProvider>,
+    );
+
+    expect(screen.getByRole("log", { name: "Langy activity" })).toBeTruthy();
+  });
+
   // A step that WORKED must never be reported as broken. The failure markers
   // used to be matched anywhere in the payload, so a successful `bash` whose
   // stdout merely quoted one — a grep for the phrase, a tailed log, a test

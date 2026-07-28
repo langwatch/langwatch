@@ -97,6 +97,7 @@ import { langyChoicesTimeline } from "../logic/langyChoicesTimeline";
 import { mergeContextChips } from "../logic/langyContextChips";
 import {
   explainLangyError,
+  isStaleLangyHistoryRead,
   readLangyStreamError,
   readLangyTrpcError,
   resolveLiveTurnError,
@@ -453,7 +454,6 @@ function LangyPanel({
   const organizationId = organization?.id;
   const utils = api.useUtils();
   const router = useRouter();
-
 
   // ── Client/UI state (single store) ────────────────────────────────────────
   const isOpen = useLangyStore((s) => s.isOpen);
@@ -1193,9 +1193,18 @@ function LangyPanel({
    * A turn in flight counts as content of its own: between send and a terminal
    * state the column owes the reader a working line, never a card claiming the
    * conversation is gone.
+   *
+   * WHICH failure arrived decides this as much as whether anything is on screen.
+   * A conversation deleted in another tab answers `langy_conversation_not_found`
+   * on every poll from then on, and the engine still holds its messages — so
+   * "there is content, stay quiet" left the reader with a transcript that no
+   * longer exists, no retry and no next step, permanently. Terminal kinds keep
+   * the column (see `isStaleLangyHistoryRead`).
    */
-  const isHistoryStale =
-    !!historyErrorPresentation && (!isEmpty || isBusy || turnActive);
+  const isHistoryStale = isStaleLangyHistoryRead({
+    presentation: historyErrorPresentation,
+    hasContentOnScreen: !isEmpty || isBusy || turnActive,
+  });
   /** The failure that really does own the column: nothing else can be shown. */
   const blockingHistoryError = isHistoryStale ? null : historyErrorPresentation;
 
@@ -2494,7 +2503,7 @@ function LangyPanel({
                           paddingTop={floating ? "19px" : "14px"}
                         >
                           <Text textStyle="2xs" color="fg.subtle">
-                            Showing the messages we last loaded — this
+                            Showing the messages we last loaded. This
                             conversation couldn&apos;t be refreshed.
                           </Text>
                         </Box>

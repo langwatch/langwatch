@@ -36,6 +36,11 @@ const historyState = {
   hasMessages: true,
   /** Does the fold say a turn is running for this conversation? */
   turnInFlight: false,
+  /**
+   * The handled domain code the read fails with, or null for a bare
+   * infrastructure failure (no `data.error`, so no domain code at all).
+   */
+  errorCode: null as string | null,
 };
 const historyListeners = new Set<() => void>();
 const setHistory = (next: Partial<typeof historyState>) =>
@@ -44,6 +49,30 @@ const setHistory = (next: Partial<typeof historyState>) =>
     historyState.version++;
     historyListeners.forEach((notify) => notify());
   });
+
+/**
+ * What the failed read hands the panel.
+ *
+ * A bare infrastructure failure carries no `data.error`, so the panel falls
+ * back to its own generic "this conversation isn't loading" copy. A HANDLED
+ * failure carries the domain code the server serialized, which is what
+ * `readLangyTrpcError` reads and `explainLangyError` turns into a card — and
+ * which of those two it is decides whether the failure may be demoted to the
+ * quiet stale line at all.
+ */
+function historyReadError(): unknown {
+  const code = historyState.errorCode;
+  if (!code) return new Error("clickhouse unavailable");
+  return Object.assign(new Error(code), {
+    data: {
+      error: {
+        code,
+        httpStatus: code === "langy_conversation_not_owned" ? 403 : 404,
+        meta: {},
+      },
+    },
+  });
+}
 
 /**
  * The chat engine, modelled as real state: the panel hydrates the durable
@@ -172,7 +201,7 @@ vi.mock("~/utils/api", async () => {
       isFetched: true,
       isSuccess: enabled && !historyState.errored && !!data,
       isError: enabled && historyState.errored,
-      error: historyState.errored ? new Error("clickhouse unavailable") : null,
+      error: historyState.errored ? historyReadError() : null,
       refetch: () => Promise.resolve(),
     };
   };
@@ -336,6 +365,7 @@ describe("a failed read of an open conversation's history", () => {
     historyState.errored = false;
     historyState.hasMessages = true;
     historyState.turnInFlight = false;
+    historyState.errorCode = null;
     engine.messages = [];
     engine.version = 0;
     useLangyStore.setState({ scopeAnnounced: false });
@@ -415,6 +445,51 @@ describe("a failed read of an open conversation's history", () => {
 
         await waitFor(() => expect(staleNote()).toBeTruthy());
         expect(failureCard()).toBeNull();
+      });
+    });
+  });
+
+  describe("given the conversation was deleted from another tab", () => {
+    describe("when the poll behind the open transcript answers not-found", () => {
+      it("hands the column to the card that says what to do next", async () => {
+        // The failure that never self-heals. Every poll from here on answers
+        // the same thing, and the engine still holds the messages — so a rule
+        // that only asks "is there content on screen?" demoted this to a
+        // one-line footnote and left the reader working through a transcript
+        // that no longer exists, with no retry and no way forward.
+        renderOpenPanel();
+        await waitFor(() =>
+          expect(document.body.textContent).toContain(QUESTION),
+        );
+
+        setHistory({ errored: true, errorCode: "langy_conversation_not_found" });
+
+        await waitFor(() =>
+          expect(
+            screen.queryByText(/this conversation is no longer available/i),
+          ).toBeTruthy(),
+        );
+        expect(staleNote()).toBeNull();
+      });
+    });
+  });
+
+  describe("given the open conversation belongs to someone else", () => {
+    describe("when the poll answers not-owned", () => {
+      it("hands the column to the card, not the stale line", async () => {
+        renderOpenPanel();
+        await waitFor(() =>
+          expect(document.body.textContent).toContain(QUESTION),
+        );
+
+        setHistory({ errored: true, errorCode: "langy_conversation_not_owned" });
+
+        await waitFor(() =>
+          expect(
+            screen.queryByText(/only the owner can continue them/i),
+          ).toBeTruthy(),
+        );
+        expect(staleNote()).toBeNull();
       });
     });
   });

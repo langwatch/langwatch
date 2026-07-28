@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   explainLangyError,
+  isStaleLangyHistoryRead,
   KNOWN_LANGY_ERROR_KINDS,
   type LangyDomainError,
   readLangyStreamError,
@@ -448,6 +449,94 @@ describe("explainLangyError", () => {
       expect(presentation.title).toBe("Something went wrong");
       expect(presentation.traceId).toBe("abc123");
       expect(presentation.action?.kind).toBe("retry");
+      expect(presentation.description).toContain("share the id below");
+    });
+
+    it("never prints `unknown` as if it were a domain code", () => {
+      // The card renders `code` ungated, so setting it here put the literal
+      // word "unknown" under the message — a mono line that names nothing,
+      // offered to the reader as the thing to quote to support.
+      const presentation = explainLangyError(domain({ code: "unknown" }));
+
+      expect(presentation.code).toBeUndefined();
+    });
+
+    describe("when the failure carries no trace id", () => {
+      it("stops at 'Try again' instead of promising details it has none of", () => {
+        // An untyped browser failure (`Error("Failed to fetch")`) resolves to
+        // `unknown` with no trace id, so there is nothing below the message at
+        // all — and the card was still telling the reader to share it.
+        const presentation = explainLangyError(domain({ code: "unknown" }));
+
+        expect(presentation.description).not.toContain("below");
+        expect(presentation.description).toContain("Try again.");
+      });
+    });
+  });
+});
+
+describe("isStaleLangyHistoryRead", () => {
+  /**
+   * The panel demotes a failed history read to a one-line footnote whenever
+   * there is content on screen, so a 3s poll blip mid-turn cannot wipe an
+   * answer that is still streaming. That rule asked only whether anything was
+   * visible, never which failure had arrived.
+   */
+  const readFailedWith = (code: string) =>
+    explainLangyError(domain({ code, httpStatus: 404 }));
+
+  describe("given the transcript is still on screen", () => {
+    it("demotes a failure that the next poll might clear", () => {
+      expect(
+        isStaleLangyHistoryRead({
+          presentation: readFailedWith("clickhouse_unavailable"),
+          hasContentOnScreen: true,
+        }),
+      ).toBe(true);
+    });
+
+    it("refuses to demote a conversation that is gone", () => {
+      // Deleted from another tab: every poll from here on answers the same
+      // thing, and the engine still holds the messages. Demoted, the reader
+      // goes on reading a conversation that no longer exists, with no retry
+      // and no next step, forever.
+      expect(
+        isStaleLangyHistoryRead({
+          presentation: readFailedWith("langy_conversation_not_found"),
+          hasContentOnScreen: true,
+        }),
+      ).toBe(false);
+    });
+
+    it("refuses to demote a conversation that is someone else's", () => {
+      expect(
+        isStaleLangyHistoryRead({
+          presentation: readFailedWith("langy_conversation_not_owned"),
+          hasContentOnScreen: true,
+        }),
+      ).toBe(false);
+    });
+  });
+
+  describe("given nothing is on screen to protect", () => {
+    it("lets even a transient failure own the column", () => {
+      expect(
+        isStaleLangyHistoryRead({
+          presentation: readFailedWith("clickhouse_unavailable"),
+          hasContentOnScreen: false,
+        }),
+      ).toBe(false);
+    });
+  });
+
+  describe("given the read succeeded", () => {
+    it("has nothing to say", () => {
+      expect(
+        isStaleLangyHistoryRead({
+          presentation: null,
+          hasContentOnScreen: true,
+        }),
+      ).toBe(false);
     });
   });
 });

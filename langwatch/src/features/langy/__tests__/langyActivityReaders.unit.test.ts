@@ -118,6 +118,52 @@ describe("langy activity readers", () => {
     });
   });
 
+  describe("given a tailed log whose own lines START with a failure phrase", () => {
+    // Anchoring the markers to the head of a line narrowed the old substring
+    // match but did not close it: a log file prints its own lines at the head
+    // of a line too. `tail` exited 0, the stdout is not JSON, and the server
+    // passes a non-LangWatch shell command through the CLI envelope untouched
+    // — so there is no `{kind:"text"}` document, and the raw stdout belongs to
+    // whatever the command happened to print. Reading it drew a red error card
+    // for a command that worked and deleted the step from the receipt.
+    const parts = [
+      bashCall({
+        command: "tail -n 20 /var/log/app.log",
+        output: [
+          "failed to connect to redis, retrying in 2s",
+          "recovered after 1 retry",
+        ].join("\n"),
+      }),
+    ];
+
+    describe("when the readers classify the call", () => {
+      it("reads it as the successful command it was", () => {
+        expect(toFailedToolCalls({ parts })).toHaveLength(0);
+      });
+
+      it("keeps the step in the completed receipt", () => {
+        const [group] = toActivityGroups({ parts });
+        expect(group?.done).toBe(true);
+      });
+    });
+  });
+
+  describe("given a shell call whose output is a bare `✖` line", () => {
+    // The sharpest form of the same thing: a build tool's own failure glyph in
+    // stdout, from a command the agent ran on purpose and which exited 0.
+    const parts = [
+      bashCall({
+        command: "pnpm lint --reporter compact",
+        output: "✖ 3 problems (3 warnings, 0 errors)",
+      }),
+    ];
+
+    it("does not promote the console line to the call's verdict", () => {
+      expect(toFailedToolCalls({ parts })).toHaveLength(0);
+      expect(toActivityGroups({ parts })).toHaveLength(1);
+    });
+  });
+
   describe("given the CLI announced its own failure", () => {
     describe("when the marker heads a line of the output", () => {
       it("still reads the call as failed", () => {

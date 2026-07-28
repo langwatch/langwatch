@@ -226,6 +226,10 @@ function partToCall(part: ToolPartLike, name: string): CapabilityToolCall {
  * card AND was dropped from the activity groups, so a step that worked was
  * reported broken and never appeared in the completed receipt. The CLI prints
  * its own failures at the head of a line; a line that only QUOTES one does not.
+ *
+ * Anchoring narrowed that; it did not close it, because a tailed log prints its
+ * own lines at the head of a line too. So this only ever runs against the CLI's
+ * own console — see {@link cliConsoleTextOf}.
  */
 const CLI_FAILURE_LINE =
   /^[\s>]*(?:✖|failed to\b|request failed\b|self_signed_cert_in_chain\b)/im;
@@ -241,31 +245,48 @@ function outputText(output: unknown): string | undefined {
 }
 
 /**
- * The CONSOLE text behind a settled output — the `{ kind: "text", text }`
- * result unwrapped from the JSON string it travels as. Unwrapping first is what
- * makes line anchoring mean anything: inside that JSON string every newline is
- * an escaped `\n`, so the whole console reads as one line and no marker is ever
- * at the start of it.
+ * The CONSOLE of a call that came through the CLI ENVELOPE — the
+ * `{ kind: "text", text }` result, unwrapped from the JSON string it travels
+ * as. `null` for anything else, and that is the whole point of the function.
+ *
+ * Unwrapping is what makes line anchoring mean anything: inside that JSON
+ * string every newline is an escaped `\n`, so the whole console reads as one
+ * line and no marker is ever at the start of it.
+ *
+ * Returning `null` rather than the raw string is what keeps prose sniffing off
+ * an ordinary shell call. `bash("tail -n 20 /var/log/app.log")` exits 0, its
+ * stdout is not JSON, and the server's envelope passes a non-LangWatch command
+ * through untouched (`langy-cli-envelope.service.ts` — it only wraps output as
+ * `{kind:"text"}` for a parsed `langwatch …` invocation). So the only thing
+ * behind that call is a wall of somebody else's log lines, and "failed to
+ * connect to redis, retrying" in it is a fact ABOUT the log, never a report
+ * about the command. Reading it drew a red error card for a step that worked
+ * and dropped that step from the completed receipt.
  */
-function consoleTextOf(document: unknown, fallback: string): string {
+function cliConsoleTextOf(part: ToolPartLike): string | null {
+  const raw = part.output;
+  const document = typeof raw === "string" ? parseCliJson(raw) : raw;
   if (!document || typeof document !== "object" || Array.isArray(document)) {
-    return fallback;
+    return null;
   }
   const envelope = document as { kind?: unknown; text?: unknown };
   return envelope.kind === "text" && typeof envelope.text === "string"
     ? envelope.text
-    : fallback;
+    : null;
 }
 
 /**
- * Some CLI adapters finish a shell call with `output-available` even when the
- * command itself reported a handled failure. Treat the rendered CLI failure as
- * the source of truth: it must never receive the green capability receipt.
+ * Some CLI adapters finish a call with `output-available` even when the command
+ * itself reported a handled failure. Treat the rendered CLI failure as the
+ * source of truth: it must never receive the green capability receipt.
  *
- * Structure first, prose second. `ok: false` is the CLI contract's own
- * discriminant (see `readCliErrorDocument`), so a handled failure document
- * settles the question whatever the console noise around it says; only when
- * there is no document at all do we read the console, and then a line at a time.
+ * Structure first, prose second, and prose ONLY inside the CLI envelope.
+ * `ok: false` is the CLI contract's own discriminant (see
+ * `readCliErrorDocument`), so a handled failure document settles the question
+ * whatever the console noise around it says. When there is no such document we
+ * read the console a line at a time — but only for a call whose console the CLI
+ * actually wrote (see {@link cliConsoleTextOf}); a bare shell call's stdout
+ * belongs to whatever it ran, and gets no vote on whether it succeeded.
  */
 function renderedToolFailure(part: ToolPartLike): boolean {
   if (FAILED_STATES.has(part.state ?? "")) return true;
@@ -273,9 +294,10 @@ function renderedToolFailure(part: ToolPartLike): boolean {
   const text = outputText(part.output);
   const document = text !== undefined ? parseCliJson(text) : part.output;
   if (readCliErrorDocument(document)) return true;
-  if (text === undefined) return false;
 
-  return CLI_FAILURE_LINE.test(consoleTextOf(document, text));
+  const consoleText = cliConsoleTextOf(part);
+  if (consoleText === null) return false;
+  return CLI_FAILURE_LINE.test(consoleText);
 }
 
 /**
@@ -696,7 +718,16 @@ export function LangyActivityParts({
   ].sort((left, right) => left.order - right.order);
 
   return (
-    <VStack align="stretch" gap={2} aria-label="Langy activity">
+    // `role="log"` is what makes the rest of this readable to assistive tech.
+    // A VStack is a plain div, whose implicit role is `generic` — and
+    // `aria-label` is prohibited there, so without a role the name is dropped
+    // and the whole transcript is anonymous and silent: neither the running
+    // indicator nor the red `role="alert"` failure card announces itself, and
+    // the reader has to go looking. `log` (polite by default) is the right one
+    // for a running record where new entries are appended at the end, which is
+    // exactly what a turn's activity is. Every sibling line in the column
+    // already carries `role="status" aria-live="polite"` for the same reason.
+    <VStack align="stretch" gap={2} role="log" aria-label="Langy activity">
       {rows.map((row) => (
         <Fragment key={row.key}>{row.node}</Fragment>
       ))}

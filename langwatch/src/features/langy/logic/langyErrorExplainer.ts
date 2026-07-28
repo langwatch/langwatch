@@ -370,6 +370,60 @@ function registryCopy(domain: LangyDomainError) {
   });
 }
 
+/**
+ * A failed history read that will NEVER succeed on its own.
+ *
+ * The conversation is gone, or it was never this reader's to continue. Nothing
+ * about it self-heals: the 3s poll returns the same answer forever, and the only
+ * way forward is the card's own instruction (start a new chat).
+ *
+ * The panel demotes a failed read to a quiet "showing the messages we last
+ * loaded" line whenever the transcript is still on screen, which is right for a
+ * blip and wrong for these: the reader would go on reading a conversation that
+ * no longer exists, with no retry offered and no next step, indefinitely. So
+ * these keep the column.
+ *
+ * The set is a DENYLIST, and deliberately: everything unrecognised is treated as
+ * transient. Getting that polarity wrong the other way is the more expensive
+ * mistake — an infrastructure code we have no bespoke copy for would replace a
+ * streaming answer with a red card, which is exactly the regression the stale
+ * path exists to prevent (see `LangyHistoryStaleRead.integration.test.tsx`).
+ */
+const TERMINAL_LANGY_HISTORY_READ_KINDS = new Set([
+  "langy_conversation_not_found",
+  "langy_conversation_not_owned",
+]);
+
+/** @see TERMINAL_LANGY_HISTORY_READ_KINDS */
+function isTransientLangyHistoryReadFailure(kind: string): boolean {
+  return !TERMINAL_LANGY_HISTORY_READ_KINDS.has(kind);
+}
+
+/**
+ * May this failed history read be demoted to the panel's quiet "showing the
+ * messages we last loaded" line, rather than owning the message column?
+ *
+ * Two conditions, and the second is the one that was missing. There has to be
+ * something on screen worth protecting — a transcript, or a turn in flight,
+ * which is content of its own — AND the failure has to be one that might go
+ * away. A failure that never will is not a stale read; it is the answer.
+ *
+ * @see TERMINAL_LANGY_HISTORY_READ_KINDS
+ */
+export function isStaleLangyHistoryRead({
+  presentation,
+  hasContentOnScreen,
+}: {
+  presentation: LangyErrorPresentation | null;
+  hasContentOnScreen: boolean;
+}): boolean {
+  return (
+    !!presentation &&
+    hasContentOnScreen &&
+    isTransientLangyHistoryReadFailure(presentation.kind)
+  );
+}
+
 export function explainLangyError(
   received: LangyDomainError,
 ): LangyErrorPresentation {
@@ -517,24 +571,38 @@ export function explainLangyError(
         kind: domain.code,
         title: "You're sending messages too quickly",
         description:
-          "Slow down a moment and send this again in a few seconds — your draft is still in the composer.",
+          "Send this again in a few seconds. Your message is still in the box.",
         render: "composer-notice",
         ...debug,
       };
 
     case "unknown":
-      // The shared module owns this state's words (ADR-045) — a third Langy
+      // NO `code`. `unknown` is the explainer's own "this was never a handled
+      // error" discriminant, not a domain code, so printing it under the message
+      // gives support and the reader the literal word "unknown" and nothing
+      // else.
+      //
+      // The TITLE comes from the shared module (ADR-045) — a third Langy
       // wording of "something went wrong" would drift from the toast and the
       // inline alert, which is exactly the drift this file's docblock is about.
-      // Only the render, the retry and the trace id are Langy's.
+      //
+      // The DESCRIPTION deliberately does NOT. The shared copy is
+      // "We've been notified. Try again in a moment." — a different promise
+      // from a trace-id handoff, and it is unconditional. Here the second
+      // sentence has to be conditional: an untyped browser failure
+      // (`Error("Failed to fetch")`) carries no trace id, and a card must not
+      // promise details it is about to render nothing for. That behaviour is
+      // pinned by `langyErrorExplainer.unit.test.ts`. If the shared module ever
+      // grows a trace-id-aware description, collapse this back onto it.
       return {
         kind: "unknown",
         title: UNKNOWN_ERROR_PRESENTATION.title,
-        description: UNKNOWN_ERROR_PRESENTATION.description,
+        description: domain.traceId
+          ? "Langy hit an unexpected error. Try again, and if it keeps happening, share the id below with support."
+          : "Langy hit an unexpected error. Try again.",
         render: "card",
         action: retry,
         traceId: domain.traceId,
-        code: domain.code,
         ...debug,
       };
 
