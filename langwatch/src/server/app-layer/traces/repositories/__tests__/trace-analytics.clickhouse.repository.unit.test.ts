@@ -20,106 +20,25 @@
 process.env.TZ = "Asia/Kolkata";
 
 import type { ClickHouseClient } from "@clickhouse/client";
-import { register } from "prom-client";
 import { describe, expect, it } from "vitest";
+import {
+  clientReturning,
+  orderingClient,
+  windowedReadCount,
+} from "../../../analytics/__tests__/clickhouse-repository-test-helpers";
 import { TraceAnalyticsClickHouseRepository } from "../trace-analytics.clickhouse.repository";
 
 const TENANT_ID = "project_analyticsreadbackunit";
 const TRACE_ID = "trace-tz";
 const TABLE = "trace_analytics";
 
-interface CapturedQuery {
-  query: string;
-  query_params?: Record<string, unknown>;
-}
-
-/** The wire shape ClickHouse returns for JSONEachRow: DateTime64 as strings. */
 function makeRepositoryReturning(record: Record<string, unknown>) {
-  const client = {
-    query: async () => ({
-      json: async () => [record],
-    }),
-  } as unknown as ClickHouseClient;
-  return new TraceAnalyticsClickHouseRepository(async () => client);
+  return new TraceAnalyticsClickHouseRepository(async () => clientReturning(record));
 }
 
-/**
- * A ClickHouse stand-in that actually applies the ORDER BY the repository sent,
- * over rows handed to it in a deliberately adverse order. A repository that
- * dropped its tiebreak — or pointed it at the wrong column or direction — then
- * returns the stale version and the test fails, instead of passing on the
- * fixture's insertion order the way a plain passthrough mock would.
- *
- * Understands only the grammar the repository emits: comma-separated
- * `<column> ASC|DESC` and `length(<column>) DESC` keys, then LIMIT 1.
- */
 function makeOrderingRepository(rows: Array<Record<string, unknown>>) {
-  const seen: CapturedQuery[] = [];
-  const client = {
-    query: async (params: CapturedQuery) => {
-      seen.push(params);
-      return { json: async () => applyOrderBy(rows, params.query).slice(0, 1) };
-    },
-  } as unknown as ClickHouseClient;
-  return {
-    repository: new TraceAnalyticsClickHouseRepository(async () => client),
-    seen,
-  };
-}
-
-function applyOrderBy(
-  rows: Array<Record<string, unknown>>,
-  query: string,
-): Array<Record<string, unknown>> {
-  const clause = /ORDER BY([\s\S]*?)LIMIT/i.exec(query)?.[1];
-  if (clause === undefined) return [...rows];
-
-  const keys = clause
-    .split(",")
-    .map((key) => key.trim())
-    .filter((key) => key.length > 0)
-    .map((key) => {
-      const descending = /\bDESC\b/i.test(key);
-      const expression = key.replace(/\b(ASC|DESC)\b/i, "").trim();
-      const arrayLength = /^length\((.+)\)$/i.exec(expression);
-      return {
-        column: arrayLength ? arrayLength[1]!.trim() : expression,
-        descending,
-        byLength: arrayLength !== null,
-      };
-    });
-
-  return [...rows].sort((left, right) => {
-    for (const { column, descending, byLength } of keys) {
-      const a = sortValue(left[column], byLength);
-      const b = sortValue(right[column], byLength);
-      if (a === b) continue;
-      return (a < b ? -1 : 1) * (descending ? -1 : 1);
-    }
-    return 0;
-  });
-}
-
-/** UInt64 columns arrive as strings on the wire; DateTime64 sorts lexically. */
-function sortValue(raw: unknown, byLength: boolean): number | string {
-  if (byLength) return Array.isArray(raw) ? raw.length : 0;
-  if (typeof raw === "number") return raw;
-  const asString = String(raw);
-  return asString !== "" && !Number.isNaN(Number(asString))
-    ? Number(asString)
-    : asString;
-}
-
-async function windowedReadCount(outcome: string): Promise<number> {
-  const metric = register.getSingleMetric("clickhouse_windowed_read_total");
-  if (!metric) return 0;
-  const snapshot = await metric.get();
-  return (
-    snapshot.values.find(
-      (value) =>
-        value.labels.table === TABLE && value.labels.outcome === outcome,
-    )?.value ?? 0
-  );
+  const { client, seen } = orderingClient(rows);
+  return { repository: new TraceAnalyticsClickHouseRepository(async () => client), seen };
 }
 
 /** A committed version of one trace, with the fold-progress columns spelled out. */
@@ -252,7 +171,7 @@ describe("TraceAnalyticsClickHouseRepository windowed read", () => {
   describe("given a caller-supplied window", () => {
     describe("when the read runs", () => {
       it("counts the read on the windowed-read metric as a window hit", async () => {
-        const before = await windowedReadCount("hit");
+        const before = await windowedReadCount({ table: TABLE, outcome: "hit" });
         const { repository } = makeOrderingRepository([]);
 
         await repository.findByTraceIdWithApplied({
@@ -261,7 +180,7 @@ describe("TraceAnalyticsClickHouseRepository windowed read", () => {
           window: { fromMs: 1_750_000_000_000, toMs: 1_750_000_345_679 },
         });
 
-        expect(await windowedReadCount("hit")).toBe(before + 1);
+        expect(await windowedReadCount({ table: TABLE, outcome: "hit" })).toBe(before + 1);
       });
 
       it("passes the caller's bounds through to ClickHouse unchanged", async () => {
@@ -309,7 +228,7 @@ describe("TraceAnalyticsClickHouseRepository windowed read", () => {
   describe("given no window", () => {
     describe("when the read runs", () => {
       it("counts the read on the windowed-read metric as unwindowed", async () => {
-        const before = await windowedReadCount("unwindowed");
+        const before = await windowedReadCount({ table: TABLE, outcome: "unwindowed" });
         const { repository, seen } = makeOrderingRepository([]);
 
         await repository.findByTraceIdWithApplied({
@@ -317,7 +236,7 @@ describe("TraceAnalyticsClickHouseRepository windowed read", () => {
           traceId: TRACE_ID,
         });
 
-        expect(await windowedReadCount("unwindowed")).toBe(before + 1);
+        expect(await windowedReadCount({ table: TABLE, outcome: "unwindowed" })).toBe(before + 1);
         expect(seen[0]?.query).not.toContain("fromUnixTimestamp64Milli");
       });
     });

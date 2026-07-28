@@ -459,31 +459,31 @@ describe("traceAnalytics fold-equivalence across the read-back boundary", () => 
   });
 
   /**
-   * KNOWN FAILURE — a real read-back divergence this property found, left red on
-   * purpose.
+   * The regression this property found, and the reason the trim now carries an
+   * explicit accumulator set.
    *
    * `langwatch.prompt_ids` is a THIRD read-modify-write accumulator on the
    * attribute map (TraceAttributeAccumulationService unions each span's
    * `langwatch.prompt.id` into it), alongside the hoisted dimensions and the
-   * `langwatch.reserved.*` sums. But it is neither:
+   * `langwatch.reserved.*` sums — but it carried neither the reserved prefix nor
+   * a typed column. So the trim treated it as an arbitrary key and dropped it
+   * once the JSON passed the 256-char cap, around the eighth prompt-bearing span
+   * in one trace, and `fromRow` could not re-inject it the way it re-injects
+   * `langwatch.labels` from `Labels`. A trace resuming from its committed row
+   * restarted the union from empty.
    *
-   *   - it has no `langwatch.reserved.` prefix, so the trim treats it as an
-   *     arbitrary key and DROPS it once the JSON array passes 256 chars — around
-   *     the eighth prompt-bearing span in one trace; and
-   *   - it has no typed column, so `fromRow` cannot re-inject it the way it
-   *     re-injects `langwatch.labels` from `Labels`.
+   * Before read-back that was invisible: the trim only shrank the stored row,
+   * and a store miss re-folded from `event_log`. Once the trimmed map became the
+   * fold's next state, the same drop silently reset the accumulator.
    *
-   * So a trace that resumes from its committed row restarts the union from
-   * empty, and the next prompt-bearing span writes a one-element list where the
-   * uninterrupted fold has the (over-cap, therefore absent) full one. This is
-   * exactly the case `traceAnalyticsStateFromRow`'s docblock rules out when it
-   * says the fold "only ever reads the hoisted dimension keys and the
-   * `langwatch.reserved.*` accumulators from `state.attributes`".
-   *
-   * Two ways out, both cheap — the fold owns this key, so it can move under the
-   * reserved prefix (which the trim keeps up to 4096 chars), or the row can gain
-   * a typed column and `fromRow` can re-inject it like Labels. Until one lands,
-   * this stays failing.
+   * Fixed in `analytics-attribute-trim.service.ts` by keeping the named
+   * FOLD_ACCUMULATOR_KEYS under the metadata cap rather than the arbitrary one,
+   * which is why this fixture now passes. Nine spans is deliberately just past
+   * the OLD 256-char boundary (~300 chars of JSON): it is the case that used to
+   * fail, so it stays here as the regression guard. It does NOT exercise the
+   * 4096-char metadata cap — past that, truncation still breaks the JSON and
+   * resets the union, and the durable fix is a typed column with an element cap
+   * as `AnnotationIds` has.
    */
   describe("given a trace whose accumulated prompt ids outgrow the attribute cap", () => {
     const promptSpans = Array.from({ length: 9 }, (_, index) =>
