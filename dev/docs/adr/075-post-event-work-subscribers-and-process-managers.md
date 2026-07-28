@@ -334,14 +334,46 @@ enqueue filter narrows on `eventTypes` alone.
   rebuilt on replay, so a replay over a governance window will re-derive the
   OCSF and KPI streams. Each repository must therefore be idempotent on its own
   natural event key **before** conversion — this is a precondition, not a
-  consequence. The keys already exist and differ per stream, so no new one is
-  invented here: the budget ledger collapses on
-  `(TenantId, BudgetId, GatewayRequestId)` via `ReplacingMergeTree`
-  (`specs/ai-gateway/budgets.feature`), and OCSF rows carry the span id or
-  log-record id as `event_id` (`folds.feature`). `governance_kpis` is the one
-  that needs work: it is an incrementing aggregate per
-  `(org, source, hour_bucket)`, so re-deriving it means recomputing the bucket
-  rather than re-applying a delta.
+  consequence. OCSF rows carry the span id or log-record id as `event_id`
+  (`folds.feature`). `governance_kpis` needs work: it is an incrementing
+  aggregate per `(org, source, hour_bucket)`, so re-deriving means recomputing
+  the bucket rather than re-applying a delta.
+
+- **Do not delete the budget ledger's insert probe.** An earlier draft of this
+  ADR said the ledger "collapses on `(TenantId, BudgetId, GatewayRequestId)`
+  via `ReplacingMergeTree`", implying the table engine makes replay safe. It
+  does not, and acting on that sentence would inflate every budget. The engine
+  is right for the ledger table (`00017_create_gateway_budget_ledger.sql`), but
+  budgets are **enforced on `gateway_budget_scope_totals`** — an
+  `AggregatingMergeTree` fed by a materialised view that `sumState`s at INSERT
+  time. A materialised view fires per insert, so a duplicate ledger insert adds
+  a second contribution to the sum, and collapsing the ledger row afterwards
+  does not retract it. The inflation is immediate and permanent.
+
+  What actually keeps spend honest is application code: `insertDebit` probes
+  `SELECT 1 … WHERE TenantId AND GatewayRequestId LIMIT 1` before inserting, and
+  skips on a hit. Any Class C conversion must preserve that probe, and it is the
+  kind of code someone deletes as redundant precisely *because* the table says
+  `ReplacingMergeTree`.
+
+  The probe is also weaker than it looks: it keys on `gateway_request_id` alone,
+  not `(budget, request)`. A request whose debit landed for two of three budgets
+  finds a row, skips, and keeps the gap forever — so replay repairs a *wholly*
+  missing debit and not a partial one. `budgets.feature`'s "any debit missing
+  from the ledger is reported" is therefore not satisfied by conversion alone.
+  Widening the probe is a one-line `WHERE` change and should ship with it.
+
+- **Map projections have no enqueue filter, and Class C needs one.** ADR-069
+  phase 1 put `EnqueueDispatchOptions` on the *subscriber* contract only;
+  `MapProjectionDefinition` has no equivalent. So a Class C conversion that
+  lands as a map projection mints a job for every `span_received` event — on the
+  busiest path in the product — even when the derivation returns `null` for all
+  but gateway spans. The subscriber half of the same conversion gets a filter
+  and costs nothing; the projection half cannot. Giving `MapProjectionDefinition`
+  the same seam, applied in `dispatchToMapProjections`, should land **before**
+  the remaining Class C conversions rather than after them. It is a router
+  change affecting all 15 map-projection registrations, which is why it is
+  called out here rather than folded into a class.
 
 ## References
 
