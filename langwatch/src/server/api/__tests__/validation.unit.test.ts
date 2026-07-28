@@ -37,6 +37,7 @@ const post = (body: unknown, app = appWith()) =>
 
 describe("the REST boundary's request validator", () => {
   describe("given a body that parses but fails the schema", () => {
+    /** @scenario "A schema failure is a handled error, not the validator's own reply" */
     it("answers 422 with the handled-error code, not the validator's own 400", async () => {
       const res = await post({ name: "", metric: "latency" });
 
@@ -45,6 +46,7 @@ describe("the REST boundary's request validator", () => {
       expect(body.error).toBe("validation_error");
     });
 
+    /** @scenario "The expected values are structured data, not prose" */
     it("keeps the message to one sentence naming the target", async () => {
       const res = await post({ name: "", metric: "latency" });
 
@@ -55,6 +57,7 @@ describe("the REST boundary's request validator", () => {
       expect(body.target).toBe("json");
     });
 
+    /** @scenario "Every failing field is reported, not just the first" */
     it("reports every violation, not just the first", async () => {
       const res = await post({ name: "", metric: "nope", limit: 500 });
 
@@ -65,6 +68,7 @@ describe("the REST boundary's request validator", () => {
       expect(body.fields).toEqual(["name", "metric", "limit"]);
     });
 
+    /** @scenario "Every failing field is reported, not just the first" */
     it("names each reason schema_failure and locates it", async () => {
       const res = await post({ name: "ok", metric: "nope" });
 
@@ -75,6 +79,7 @@ describe("the REST boundary's request validator", () => {
       expect(reason.meta.type).toBe("invalid_enum_value");
     });
 
+    /** @scenario "The expected values are structured data, not prose" */
     it("carries the permitted values as data rather than inlining them in prose", async () => {
       // The failure this guards: the permitted values used to be concatenated
       // into the message, which is what made it long enough to be truncated
@@ -158,6 +163,7 @@ describe("the REST boundary's request validator", () => {
   });
 
   describe("given a body that never parsed at all", () => {
+    /** @scenario "A body that never parsed is a different failure from one that did" */
     it("answers 400 with malformed_request, a different failure from a schema one", async () => {
       const res = await post("{ not json");
 
@@ -166,6 +172,7 @@ describe("the REST boundary's request validator", () => {
       expect(body.error).toBe("malformed_request");
     });
 
+    /** @scenario "A body that never parsed is a different failure from one that did" */
     it("reports no field reasons, because there was no document to have fields", async () => {
       const res = await post("{ not json");
 
@@ -175,6 +182,7 @@ describe("the REST boundary's request validator", () => {
   });
 
   describe("given the route supplies its own hook", () => {
+    /** @scenario "A route's own validation hook still wins" */
     it("uses the hook's response unchanged", async () => {
       const app = appWith(((_result: unknown, c: { json: Function }) =>
         c.json({ mine: true }, 418)) as never);

@@ -12,26 +12,54 @@ import {
   type HandledErrorOptions,
 } from "@langwatch/handled-error";
 
+import type { AppErrorCode } from "~/features/errors/logic/codes";
+
 /**
  * Base class for suite domain errors.
  *
- * Defaults to `suite_not_found`/404, which is what a bare `SuiteDomainError`
- * is raised for. Anything that is not "missing" declares its own code — a
+ * `code` and `httpStatus` are REQUIRED, and both for the same reason: a
  * catch-all default whose copy asserts a specific cause is how a name clash
- * ends up telling the user "Run plan not found".
+ * ends up telling the user "Run plan not found". This class used to default to
+ * `suite_not_found`/404, so `new SuiteDomainError("…")` for any new failure
+ * silently became a 404 claiming the suite was missing. There is nothing this
+ * base class knows about an unspecified failure, so it refuses to guess —
+ * "missing" is now {@link SuiteNotFoundError}, which says so in its name.
+ *
+ * `code` is narrowed to `AppErrorCode` rather than left as `string`: an
+ * unconstrained code is one the presentation registry is not exhaustive over,
+ * which is a customer reading a raw slug with no copy behind it.
  */
 export class SuiteDomainError extends HandledError {
   constructor(
     message: string,
-    options: HandledErrorOptions & { code?: string; httpStatus?: number } = {},
+    options: HandledErrorOptions & {
+      code: AppErrorCode;
+      httpStatus: number;
+    },
   ) {
-    const { code = "suite_not_found", httpStatus = 404, ...rest } = options;
+    const { code, httpStatus, ...rest } = options;
     super(code, message, { ...rest, httpStatus });
     this.name = "SuiteDomainError";
   }
 }
 
-/** Thrown when a suite references scenarios that do not exist */
+/** Thrown when the requested suite does not exist in the project */
+export class SuiteNotFoundError extends SuiteDomainError {
+  declare readonly code: "suite_not_found";
+
+  constructor(message = "Suite not found") {
+    super(message, { code: "suite_not_found", httpStatus: 404 });
+    this.name = "SuiteNotFoundError";
+  }
+}
+
+/**
+ * Thrown when a suite references scenarios that do not exist.
+ *
+ * The offending ids are in the message (for the log line) and nowhere else:
+ * `meta` is a client contract, and no component or agent reads these back, so
+ * carrying them there would be debug context masquerading as one.
+ */
 export class InvalidScenarioReferencesError extends SuiteDomainError {
   declare readonly code: "suite_invalid_scenario_references";
   readonly invalidIds: string[];
@@ -40,14 +68,13 @@ export class InvalidScenarioReferencesError extends SuiteDomainError {
     super(`Invalid scenario references: ${invalidIds.join(", ")}`, {
       code: "suite_invalid_scenario_references",
       httpStatus: 422,
-      meta: { invalidIds },
     });
     this.name = "InvalidScenarioReferencesError";
     this.invalidIds = invalidIds;
   }
 }
 
-/** Thrown when a suite references targets that do not exist */
+/** Thrown when a suite references targets that do not exist. See above re `meta`. */
 export class InvalidTargetReferencesError extends SuiteDomainError {
   declare readonly code: "suite_invalid_target_references";
   readonly invalidIds: string[];
@@ -56,7 +83,6 @@ export class InvalidTargetReferencesError extends SuiteDomainError {
     super(`Invalid target references: ${invalidIds.join(", ")}`, {
       code: "suite_invalid_target_references",
       httpStatus: 422,
-      meta: { invalidIds },
     });
     this.name = "InvalidTargetReferencesError";
     this.invalidIds = invalidIds;

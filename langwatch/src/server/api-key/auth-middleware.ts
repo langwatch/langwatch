@@ -1,6 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import type { Organization, PrismaClient, Project } from "@prisma/client";
 import type { MiddlewareHandler } from "hono";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { Permission } from "~/server/api/rbac";
 import { HandledError } from "@langwatch/handled-error";
 import { handledErrorResponseBody } from "~/app/api/middleware/error-handler";
@@ -377,14 +378,32 @@ export async function enforceApiKeyCeiling({
 }
 
 /**
- * Converts an API key permission denial into a Hono-style JSON response.
- * Re-throws anything that isn't an `ApiKeyPermissionDeniedError`.
+ * Converts an API key permission denial into the status + JSON body a route
+ * should answer with. Re-throws anything that isn't an
+ * `ApiKeyPermissionDeniedError`.
+ *
+ * `body` is the SAME body `onError → handleError` produces, and the same one
+ * `requireApiKeyPermission` below already answers with — the two paths through
+ * this ceiling had drifted, and only one of them was migrated. The hand-built
+ * `{ error: "Forbidden", message }` this replaced threw away everything a
+ * caller can act on: the `api_key_permission_denied` code, the permission in
+ * `meta`, and the tips/docsUrl the remediation channel exists to deliver
+ * (ADR-045). A CLI was left with a sentence and no code to branch on.
+ *
+ * `message` is kept alongside for callers that only render a sentence; it is
+ * the same string `body.message` carries.
  */
-export function apiKeyCeilingDenialResponse(
-  error: unknown,
-): { error: string; message: string; status: 403 } {
-  if (HandledError.isHandled(error) && error.code === "api_key_permission_denied") {
-    return { error: "Forbidden", message: error.message, status: 403 };
+export function apiKeyCeilingDenialResponse(error: unknown): {
+  status: ContentfulStatusCode;
+  body: object;
+  message: string;
+} {
+  if (
+    HandledError.isHandled(error) &&
+    error.code === "api_key_permission_denied"
+  ) {
+    const { statusCode, body } = handledErrorResponseBody(error);
+    return { status: statusCode, body, message: error.message };
   }
   throw error;
 }

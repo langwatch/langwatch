@@ -12,25 +12,53 @@ export class DatasetNotFoundError extends Error {
 }
 
 /**
- * A column-type change was requested on an s3_jsonl dataset, where rewriting
- * every chunk's keys is a later rung (Decision 6 defers s3_jsonl column
- * migration). It's a user-actionable precondition, not a server fault — typed so
- * the router maps it to a 4xx with the message intact instead of letting a plain
- * `Error` collapse into a generic 500.
+ * A column-type change was requested on a dataset whose storage format cannot
+ * rewrite every chunk's keys yet (Decision 6 defers that migration). It's a
+ * user-actionable precondition, not a server fault, and there is a way to get
+ * where the caller was going (add a column of the type you need and move the
+ * values across) — so it crosses the boundary as a stable code the client keys
+ * its copy off, under `dataset_column_type_change_unsupported`.
  */
-export class ColumnTypeChangeNotSupportedError extends Error {
-  constructor(
-    message = "Changing column types is not yet supported for large (S3) datasets",
-  ) {
-    super(message);
+export class ColumnTypeChangeNotSupportedError extends HandledError {
+  declare readonly code: "dataset_column_type_change_unsupported";
+
+  constructor() {
+    super(
+      "dataset_column_type_change_unsupported",
+      // Customer-safe by construction: no storage backend, no bucket, no
+      // internal format name. Which format we cannot rewrite yet is a log
+      // line's business, not the customer's.
+      "Changing column types is not yet supported for large datasets",
+      { httpStatus: 400, fault: "customer" },
+    );
     this.name = "ColumnTypeChangeNotSupportedError";
   }
 }
 
+/**
+ * Which conflict a `DatasetConflictError` is. Both are 409s from PostgreSQL's
+ * point of view, but they are different failures to a person: one is fixed by
+ * choosing another name, the other by reloading the editor. Mapping both to
+ * "that name is taken" handed the second one advice that cannot resolve it.
+ *
+ * A discriminant rather than a second class on purpose: the REST layer
+ * dispatches dataset domain errors by `error.name`
+ * (`app/api/dataset/[[...route]]/error-handler.ts`), so a distinct class would
+ * silently drop out of the 409 mapping at every route that never learned about
+ * it. One class, one name, one HTTP status; the tRPC boundary reads `reason`.
+ */
+export type DatasetConflictReason = "name_taken" | "stale_columns";
+
 export class DatasetConflictError extends Error {
-  constructor(message = "A dataset with this name already exists") {
+  readonly reason: DatasetConflictReason;
+
+  constructor(
+    message = "A dataset with this name already exists",
+    options: { reason?: DatasetConflictReason } = {},
+  ) {
     super(message);
     this.name = "DatasetConflictError";
+    this.reason = options.reason ?? "name_taken";
   }
 }
 
@@ -52,6 +80,29 @@ export class DatasetNameTakenError extends HandledError {
       fault: "customer",
     });
     this.name = "DatasetNameTakenError";
+  }
+}
+
+/**
+ * The editor's view of the dataset's columns is behind the stored one — a
+ * concurrent column edit already rewrote the chunks — so the write is refused
+ * before anything is written (optimistic concurrency, no partial rewrite).
+ *
+ * Its own code rather than sharing `dataset_name_taken`: the remedy is to
+ * reload and redo the change, and telling this person to pick a different name
+ * is advice that cannot resolve their failure. Raised from the same
+ * `DatasetConflictError` the name clash uses, discriminated by `reason`.
+ */
+export class DatasetStaleColumnsError extends HandledError {
+  declare readonly code: "dataset_stale_columns";
+
+  constructor() {
+    super(
+      "dataset_stale_columns",
+      "This dataset's columns changed since the editor was opened",
+      { httpStatus: 409, fault: "customer" },
+    );
+    this.name = "DatasetStaleColumnsError";
   }
 }
 
@@ -161,12 +212,17 @@ export class StagedUploadNotFoundError extends Error {
  * Thrown when a read consumer tries to read a dataset that is not yet `ready`
  * (still `uploading`/`processing`, or `failed`). ADR-032 Decision 6 / I-READY:
  * every read consumer gates on `status='ready'` so a half-normalized or failed
- * dataset is never served as if empty. Carries the current `status` (+ optional
- * `statusError`) so the router/REST layer can surface a clear, actionable error.
- * The route maps it to 425 Too Early (a not-ready dataset is retryable once
- * preparation finishes).
+ * dataset is never served as if empty.
+ *
+ * Handled (`dataset_not_ready`, 425 Too Early): waiting is a real action, so
+ * this is a failure the caller can act on, and the lifecycle `status` rides in
+ * `meta` where a client decides between "poll" (`processing`) and "stop"
+ * (`failed`). `statusError` stays a field rather than `meta` — it is the
+ * normalizer's own diagnostic, for the log line, not the customer.
  */
-export class DatasetNotReadyError extends Error {
+export class DatasetNotReadyError extends HandledError {
+  declare readonly code: "dataset_not_ready";
+
   readonly status: string;
   readonly statusError: string | null;
 
@@ -177,7 +233,11 @@ export class DatasetNotReadyError extends Error {
     status: string;
     statusError?: string | null;
   }) {
-    super(`Dataset is not ready (status: ${status})`);
+    super("dataset_not_ready", `Dataset is not ready (status: ${status})`, {
+      meta: { status },
+      httpStatus: 425,
+      fault: "customer",
+    });
     this.name = "DatasetNotReadyError";
     this.status = status;
     this.statusError = statusError;

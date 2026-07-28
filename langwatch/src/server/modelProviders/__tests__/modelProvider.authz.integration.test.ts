@@ -18,11 +18,11 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "@prisma/client";
-import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { prisma } from "../../db";
+import { ModelProviderScopeForbiddenError } from "../errors";
 import { ModelProviderService } from "../modelProvider.service";
 
 const isTestcontainersOnly = !!process.env.TEST_CLICKHOUSE_URL;
@@ -293,8 +293,8 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
               ctxFor(teamAAdminUserId),
             ),
           ).rejects.toMatchObject({
-            code: "FORBIDDEN",
-            message: expect.stringContaining("organization:manage"),
+            code: "model_provider_scope_forbidden",
+            meta: { requiredPermission: "organization:manage" },
           });
           const after = await prisma.modelProvider.count({
             where: { projectId: projectAId, provider: "anthropic" },
@@ -316,7 +316,7 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
               },
               ctxFor(teamAMemberUserId),
             ),
-          ).rejects.toBeInstanceOf(TRPCError);
+          ).rejects.toBeInstanceOf(ModelProviderScopeForbiddenError);
         });
       });
     });
@@ -362,7 +362,7 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
               },
               ctxFor(teamAAdminUserId),
             ),
-          ).rejects.toMatchObject({ code: "FORBIDDEN" });
+          ).rejects.toMatchObject({ code: "model_provider_scope_forbidden" });
         });
       });
     });
@@ -392,7 +392,7 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
               },
               ctxFor(teamAAdminUserId),
             ),
-          ).rejects.toMatchObject({ code: "FORBIDDEN" });
+          ).rejects.toMatchObject({ code: "model_provider_scope_forbidden" });
 
           const after = await prisma.modelProvider.count({
             where: { projectId: projectAId, provider: "deepseek" },
@@ -528,8 +528,8 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
               ctxFor(teamAAdminUserId),
             ),
           ).rejects.toMatchObject({
-            code: "FORBIDDEN",
-            message: expect.stringContaining("organization:manage"),
+            code: "model_provider_scope_forbidden",
+            meta: { requiredPermission: "organization:manage" },
           });
 
           const after = await prisma.modelProvider.findFirst({
@@ -589,7 +589,10 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
               },
               ctxFor(orgAdminUserId),
             ),
-          ).rejects.toMatchObject({ code: "NOT_FOUND" });
+            // The service is framework-agnostic, so it raises its own handled
+            // code rather than a transport one. Asserting `code` (not the
+            // class) is what keeps this honest across the tRPC boundary.
+          ).rejects.toMatchObject({ code: "model_provider_not_found" });
           const afterCount = await prisma.modelProvider.count({
             where: { projectId: projectAId, provider: "groq" },
           });
@@ -619,7 +622,7 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
 
           await expect(
             service().getById(mp.id, projectAId, ctxFor(unrelatedUserId)),
-          ).rejects.toMatchObject({ code: "NOT_FOUND" });
+          ).rejects.toMatchObject({ code: "model_provider_not_found" });
         });
       });
 
@@ -725,7 +728,7 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
                 { id: mp.id, projectId: projectAId, provider: "azure_safety" },
                 ctxFor(teamBAdmin.id),
               ),
-            ).rejects.toMatchObject({ code: "FORBIDDEN" });
+            ).rejects.toMatchObject({ code: "model_provider_scope_forbidden" });
 
             // Row still present
             const stillThere = await prisma.modelProvider.findFirst({

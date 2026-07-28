@@ -164,6 +164,7 @@ describe("handleTrpcCallLogging", () => {
         }
       }
 
+      /** @scenario "Log level follows fault attribution, not handled-ness" */
       it("logs customer-fault errors at warn, even for 5xx, and does not capture", () => {
         const log = createMockLog();
         const capture = vi.fn();
@@ -193,6 +194,7 @@ describe("handleTrpcCallLogging", () => {
         expect(capture).not.toHaveBeenCalled();
       });
 
+      /** @scenario "Log level follows fault attribution, not handled-ness" */
       it("logs platform-fault errors at error but still does not capture", () => {
         const log = createMockLog();
         const capture = vi.fn();

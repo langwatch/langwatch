@@ -1,10 +1,13 @@
 /**
- * Unit coverage for `summarizeProviderError` — the curation step that
- * turns raw SDK/provider exceptions into the operator-actionable error
- * the Ask AI composer renders. Regression anchor: Azure's bare
- * "Resource not found" used to produce `details: {}` and a message that
- * named neither the model nor the status, leaving the operator with
- * nothing to act on.
+ * Unit coverage for `summarizeProviderError` — the curation step that turns
+ * raw SDK/provider exceptions into the operator-actionable detail rows the Ask
+ * AI composer shows behind "View details". Regression anchor: Azure's bare
+ * "Resource not found" used to produce `{}`, leaving the operator with nothing
+ * to act on.
+ *
+ * It deliberately produces no headline. The words a customer reads come from
+ * the `ai_query_provider_error` entry in the presentation registry — a
+ * provider's own sentence is diagnostic detail, never our copy.
  */
 import { describe, expect, it } from "vitest";
 
@@ -26,9 +29,7 @@ describe("summarizeProviderError", () => {
       const err = new FakeApiCallError("Resource not found", 404, "");
       const out = summarizeProviderError(err, { model: "azure/gpt-5.4-mini" });
 
-      expect(out.code).toBe("provider_error");
-      expect(out.message).toBe("Provider returned 404 for azure/gpt-5.4-mini");
-      expect(out.details).toMatchObject({
+      expect(out).toMatchObject({
         httpStatus: 404,
         model: "azure/gpt-5.4-mini",
         provider: "azure",
@@ -43,10 +44,7 @@ describe("summarizeProviderError", () => {
       );
       const out = summarizeProviderError(err, { model: "azure/gpt-5.4-mini" });
 
-      expect(out.message).toBe(
-        "Provider returned 404 for azure/gpt-5.4-mini: The API deployment for this resource does not exist",
-      );
-      expect(out.details?.reason).toBe(
+      expect(out.reason).toBe(
         "The API deployment for this resource does not exist",
       );
     });
@@ -58,8 +56,8 @@ describe("summarizeProviderError", () => {
         model: "azure/gpt-5.4-mini",
       });
 
-      expect(out.message).toBe("Resource not found for azure/gpt-5.4-mini");
-      expect(out.details?.model).toBe("azure/gpt-5.4-mini");
+      expect(out.model).toBe("azure/gpt-5.4-mini");
+      expect(out.reason).toBe("Resource not found");
     });
 
     it("keeps litellm-style extraction working without model context", () => {
@@ -69,18 +67,15 @@ describe("summarizeProviderError", () => {
         ),
       );
 
-      expect(out.details?.provider).toBe("openai");
-      expect(out.details?.httpStatus).toBe(401);
-      expect(out.message).toContain("Incorrect API key provided");
+      expect(out.provider).toBe("openai");
+      expect(out.httpStatus).toBe(401);
+      expect(out.reason).toContain("Incorrect API key provided");
     });
   });
 
   describe("when nothing is parseable", () => {
-    it("falls back to a generic message without throwing", () => {
-      const out = summarizeProviderError(null);
-      expect(out.code).toBe("provider_error");
-      expect(out.message).toBe("Couldn't reach the model provider");
-      expect(out.details).toEqual({});
+    it("returns no details rather than throwing", () => {
+      expect(summarizeProviderError(null)).toEqual({});
     });
   });
 });

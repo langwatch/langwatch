@@ -78,7 +78,8 @@ export default async function handler(
     });
   } catch (error) {
     const denial = apiKeyCeilingDenialResponse(error);
-    return res.status(denial.status).json({ message: denial.message });
+    // The full handled body — code, permission, tips — not just a sentence.
+    return res.status(denial.status).json(denial.body);
   }
 
   const project = resolved.project;

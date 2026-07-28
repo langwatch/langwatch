@@ -1,10 +1,47 @@
 import { useEffect, useRef, useState } from "react";
-import { explainAnyError } from "~/features/errors";
+import { readHandledError } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { AiActionError } from "~/server/app-layer/traces/ai-query";
+import type {
+  AiActionError,
+  AiActionErrorDetails,
+} from "~/server/app-layer/traces/ai-query";
 import { api } from "~/utils/api";
 import { useFilterStore } from "../../stores/filterStore";
 import { useViewStore } from "../../stores/viewStore";
+
+/**
+ * Lifts the composer's detail rows out of a handled error's `meta`.
+ *
+ * `meta` is a per-code contract, and this is the reader end of the one
+ * `ai_query_provider_error` declares — provider, model, status, the provider's
+ * own reason and the query the model last produced. Nothing here is copy: it
+ * fills the "View details" disclosure an operator opens when the registry's
+ * remediation wasn't enough. Untrusted, so every field is checked.
+ */
+function readAiErrorDetails(
+  meta: Record<string, unknown> | undefined,
+): AiActionErrorDetails | undefined {
+  if (!meta) return undefined;
+  const text = (key: string): string | undefined => {
+    const value = meta[key];
+    return typeof value === "string" && value.length > 0 ? value : undefined;
+  };
+  const status = meta.httpStatus;
+
+  const provider = text("provider");
+  const model = text("model");
+  const reason = text("reason");
+  const lastQuery = text("lastQuery");
+
+  const details: AiActionErrorDetails = {
+    ...(provider ? { provider } : {}),
+    ...(model ? { model } : {}),
+    ...(typeof status === "number" ? { httpStatus: status } : {}),
+    ...(reason ? { reason } : {}),
+    ...(lastQuery ? { lastQuery } : {}),
+  };
+  return Object.keys(details).length > 0 ? details : undefined;
+}
 
 export type AiTraceActionMode =
   /** Filter-only: applies a query, never creates a lens. */
@@ -79,10 +116,6 @@ export function useAiTraceAction({
   const aiAction = api.tracesV2.aiAction.useMutation({
     onSuccess: (result) => {
       if (cancelledRef.current) return;
-      if (!result.ok) {
-        setError(result.error);
-        return;
-      }
       // Apply the query first so the resulting view is filtered (also so
       // that lens creation captures the right snapshot).
       applyQueryText(result.query);
@@ -110,20 +143,22 @@ export function useAiTraceAction({
     },
     onError: (e) => {
       if (cancelledRef.current) return;
-      // tRPC-layer failures (network blip, ModelNotConfiguredError, a
-      // permission rejection) arrive here without the server's structured
-      // `AiActionError`, and their wire message is the error code — so the
-      // words come from `explainAnyError`, which covers all three shapes.
-      // Reading only the handled payload dropped the middle one: `aiAction`
-      // is permission-guarded and throws a cause-free `TRPCError` whose
-      // message is copy meant to be read, and it was being replaced with
-      // "we've been notified".
-      const explanation = explainAnyError(e);
+      // Every failure arrives here now — the AI-search failure itself
+      // (`ai_query_provider_error`), a `model_not_configured`, a permission
+      // rejection, a network blip. Keep the handled code when there is one:
+      // it is documented as the branching + telemetry key, and forcing
+      // `"unknown"` meant the composer could never act on a cause it had been
+      // handed (no "Review model providers" link on a provider failure, no
+      // way to tell "pick a model" apart from "the model misbehaved").
+      //
+      // The error itself rides along as `cause` so the renderer resolves its
+      // words through `explainAnyError` — which covers the handled payload,
+      // a procedure's authored message, and the generic unknown state alike.
+      const handled = readHandledError(e);
       setError({
-        code: "unknown",
-        message: explanation.description
-          ? `${explanation.title}. ${explanation.description}`
-          : explanation.title,
+        code: handled?.code ?? "unknown",
+        cause: e,
+        details: readAiErrorDetails(handled?.meta),
       });
     },
   });

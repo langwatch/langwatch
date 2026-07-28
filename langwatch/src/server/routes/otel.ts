@@ -96,11 +96,9 @@ async function authenticate(
         ? "Authentication failed: X-Auth-Token sent but empty"
         : "Authentication failed: no auth header present",
     );
-    return {
-      error:
-        "Authentication token is required. Use X-Auth-Token header or Authorization: Bearer token.",
-      status: 401 as const,
-    };
+    const message =
+      "Authentication token is required. Use X-Auth-Token header or Authorization: Bearer token.";
+    return { error: message, status: 401 as const, body: { message } };
   }
 
   let resolved;
@@ -111,7 +109,8 @@ async function authenticate(
     });
   } catch (error) {
     logger.error({ ...diag, error }, "Database error during authentication");
-    return { error: "Authentication service error.", status: 500 as const };
+    const message = "Authentication service error.";
+    return { error: message, status: 500 as const, body: { message } };
   }
 
   if (!resolved) {
@@ -124,7 +123,8 @@ async function authenticate(
       },
       "Authentication failed: invalid credentials",
     );
-    return { error: "Invalid auth token.", status: 401 as const };
+    const message = "Invalid auth token.";
+    return { error: message, status: 401 as const, body: { message } };
   }
 
   // Enforce API-key ceiling (legacy tokens bypass). `traces:create` gates write
@@ -146,7 +146,11 @@ async function authenticate(
       },
       "API key permission denied for traces:create",
     );
-    return { error: denial.message, status: denial.status };
+    return {
+      error: denial.message,
+      status: denial.status,
+      body: denial.body,
+    };
   }
 
   return { project: resolved.project, resolved };
@@ -283,10 +287,7 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post("/traces", async (c) => {
           code: SpanStatusCode.ERROR,
           message: authResult.error,
         });
-        return c.json(
-          { message: authResult.error },
-          { status: authResult.status },
-        );
+        return c.json(authResult.body, { status: authResult.status });
       }
 
       const { project, resolved } = authResult;
@@ -431,10 +432,7 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post("/logs", async (c) => {
           code: SpanStatusCode.ERROR,
           message: authResult.error,
         });
-        return c.json(
-          { message: authResult.error },
-          { status: authResult.status },
-        );
+        return c.json(authResult.body, { status: authResult.status });
       }
 
       const { project, resolved } = authResult;
@@ -554,10 +552,7 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post("/metrics", async (c) => {
           code: SpanStatusCode.ERROR,
           message: authResult.error,
         });
-        return c.json(
-          { message: authResult.error },
-          { status: authResult.status },
-        );
+        return c.json(authResult.body, { status: authResult.status });
       }
 
       const { project, resolved } = authResult;

@@ -1,3 +1,4 @@
+import { HandledError } from "@langwatch/handled-error";
 import { Prisma } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -308,16 +309,28 @@ describe("LangyCredentialService", () => {
     });
   });
 
+  // Our own deployment being misconfigured is not a failure the customer can
+  // act on, so it must NOT arrive as a handled error: `langy_credential_
+  // resolution` tells them to sign out and back in, which could never fix it.
+  // A plain Error degrades to the generic unknown plus a trace id (ADR-045),
+  // and the variable name goes to the log line, never to the wire.
   describe("given env config is incomplete", () => {
     describe("when LW_GATEWAY_BASE_URL is unset", () => {
-      it("throws LangyCredentialResolutionError before any provisioning", async () => {
+      it("fails as an unhandled error before any provisioning", async () => {
         delete process.env.LW_GATEWAY_BASE_URL;
         const prisma = makePrisma();
         const svc = new LangyCredentialService(prisma);
 
-        await expect(
-          svc.getOrProvision({ projectId: "p1", session: SESSION }),
-        ).rejects.toThrow(/LW_GATEWAY_BASE_URL/);
+        const failure = await svc
+          .getOrProvision({ projectId: "p1", session: SESSION })
+          .then(
+            () => null,
+            (error: unknown) => error,
+          );
+
+        expect(failure).toBeInstanceOf(Error);
+        expect(HandledError.isHandled(failure)).toBe(false);
+        expect((failure as Error).message).not.toContain("LW_GATEWAY_BASE_URL");
         expect(vkCreate).not.toHaveBeenCalled();
       });
     });

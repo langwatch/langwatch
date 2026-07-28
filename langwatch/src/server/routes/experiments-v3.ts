@@ -40,10 +40,7 @@ import {
   requestAbort,
   runOrchestrator,
 } from "~/server/experiments-v3/execution/orchestrator";
-import {
-  mapThrownErrorEvent,
-  toClientEvent,
-} from "~/server/experiments-v3/execution/resultMapper";
+import { mapThrownErrorEvent } from "~/server/experiments-v3/execution/resultMapper";
 import { runStateManager } from "~/server/experiments-v3/execution/runStateManager";
 import {
   type EvaluationV3Event,
@@ -115,7 +112,14 @@ const authenticateRequest = async (
     await enforceApiKeyCeiling({ prisma, resolved, permission });
   } catch (error) {
     const denial = apiKeyCeilingDenialResponse(error);
-    return { error: denial.message, status: denial.status };
+    // `body` carries the full handled payload (code, permission, tips) for
+    // routes that answer with it; `error` stays the sentence for the ones that
+    // still render `{ error }`.
+    return {
+      error: denial.message,
+      status: denial.status,
+      body: denial.body,
+    };
   }
 
   const markUsed = () => {
@@ -248,10 +252,7 @@ secured
 
         for await (const event of orchestrator) {
           await stream.writeSSE({
-            // `toClientEvent`, never the raw event: an error frame carries the
-            // failure's own message for our ClickHouse row, and that field
-            // stops here.
-            data: JSON.stringify(toClientEvent(event)),
+            data: JSON.stringify(event),
           });
 
           if (event.type === "done" || event.type === "stopped") {
@@ -286,7 +287,7 @@ secured
         // No `rowIndex`: the orchestrator itself threw, so the whole run is
         // gone and the mapper says so, rather than blaming one row.
         await stream.writeSSE({
-          data: JSON.stringify(toClientEvent(mapThrownErrorEvent({ error }))),
+          data: JSON.stringify(mapThrownErrorEvent({ error })),
         });
       }
     });
@@ -366,7 +367,12 @@ secured.access(apiKeyAuth).post("/:slug/run", async (c) => {
 
   const authResult = await authenticateRequest(c, "evaluations:manage");
   if ("error" in authResult) {
-    return c.json({ error: authResult.error }, { status: authResult.status });
+    // `authResult.body` carries the handled payload (code, permission, tips)
+    // when the denial came from a handled error; `{ error }` is the fallback
+    // for the failures that have none.
+    return c.json(authResult.body ?? { error: authResult.error }, {
+      status: authResult.status,
+    });
   }
   const { project, markUsed } = authResult;
 
@@ -484,10 +490,7 @@ secured.access(apiKeyAuth).post("/:slug/run", async (c) => {
 
         for await (const event of orchestrator) {
           await stream.writeSSE({
-            // `toClientEvent`, never the raw event: an error frame carries the
-            // failure's own message for our ClickHouse row, and that field
-            // stops here.
-            data: JSON.stringify(toClientEvent(event)),
+            data: JSON.stringify(event),
           });
 
           if (event.type === "done" || event.type === "stopped") {
@@ -513,7 +516,7 @@ secured.access(apiKeyAuth).post("/:slug/run", async (c) => {
         // No `rowIndex`: the orchestrator itself threw, so the whole run is
         // gone and the mapper says so, rather than blaming one row.
         await stream.writeSSE({
-          data: JSON.stringify(toClientEvent(mapThrownErrorEvent({ error }))),
+          data: JSON.stringify(mapThrownErrorEvent({ error })),
         });
       }
     });
@@ -542,7 +545,12 @@ secured.access(apiKeyAuth).post("/:slug/run", async (c) => {
 secured.access(apiKeyAuth).get("/runs", async (c) => {
   const authResult = await authenticateRequest(c, "evaluations:view");
   if ("error" in authResult) {
-    return c.json({ error: authResult.error }, { status: authResult.status });
+    // `authResult.body` carries the handled payload (code, permission, tips)
+    // when the denial came from a handled error; `{ error }` is the fallback
+    // for the failures that have none.
+    return c.json(authResult.body ?? { error: authResult.error }, {
+      status: authResult.status,
+    });
   }
   const { project } = authResult;
 
@@ -604,7 +612,12 @@ secured.access(apiKeyAuth).get("/runs/:runId", async (c) => {
 
   const authResult = await authenticateRequest(c, "evaluations:view");
   if ("error" in authResult) {
-    return c.json({ error: authResult.error }, { status: authResult.status });
+    // `authResult.body` carries the handled payload (code, permission, tips)
+    // when the denial came from a handled error; `{ error }` is the fallback
+    // for the failures that have none.
+    return c.json(authResult.body ?? { error: authResult.error }, {
+      status: authResult.status,
+    });
   }
   const { project, markUsed } = authResult;
 
@@ -665,7 +678,13 @@ secured.access(apiKeyAuth).get("/runs/:runId", async (c) => {
       total: runState.total,
       startedAt: runState.startedAt,
       finishedAt: runState.finishedAt,
+      // The code, never the thrown message — an API consumer gets the same
+      // contract the stream gives a browser: something stable to branch on,
+      // plus the handled payload when the failure had one, plus the trace id
+      // for the failures we could not name (ADR-045).
       error: runState.error,
+      ...(runState.domainError ? { domainError: runState.domainError } : {}),
+      ...(runState.traceId ? { traceId: runState.traceId } : {}),
     });
   }
 
@@ -686,7 +705,12 @@ secured.access(apiKeyAuth).get("/runs/:runId/results", async (c) => {
 
   const authResult = await authenticateRequest(c, "evaluations:view");
   if ("error" in authResult) {
-    return c.json({ error: authResult.error }, { status: authResult.status });
+    // `authResult.body` carries the handled payload (code, permission, tips)
+    // when the denial came from a handled error; `{ error }` is the fallback
+    // for the failures that have none.
+    return c.json(authResult.body ?? { error: authResult.error }, {
+      status: authResult.status,
+    });
   }
   const { project, markUsed } = authResult;
 

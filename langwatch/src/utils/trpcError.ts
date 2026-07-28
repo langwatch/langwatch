@@ -13,6 +13,14 @@ export const isNotFound = (error: TRPCClientErrorLike<AppRouter> | null) => {
   return false;
 };
 
+/**
+ * Every error any global interceptor in `utils/api.tsx` has already surfaced —
+ * as a modal, or as its own bespoke toast. `isHandledByGlobalHandler` reads
+ * ONLY this set, so a new `markAsHandledBy…` cannot forget to enrol itself in
+ * a hand-maintained OR the way the first version did.
+ */
+const handledGlobally = new WeakSet<Error>();
+
 // Track handled errors without mutating them
 const handledLicenseErrors = new WeakSet<Error>();
 
@@ -22,6 +30,7 @@ const handledLicenseErrors = new WeakSet<Error>();
  */
 export function markAsHandledByLicenseHandler(error: Error): void {
   handledLicenseErrors.add(error);
+  handledGlobally.add(error);
 }
 
 /**
@@ -49,15 +58,12 @@ export interface LimitExceededInfo {
   max: number;
 }
 
-/**
- * Extracts limit exceeded info from a TRPC error.
- * Returns the info if the error is a FORBIDDEN error with limit data, null otherwise.
- */
 // --- Lite member restriction dedup ---
 const handledLiteMemberErrors = new WeakSet<Error>();
 
 export function markAsHandledByLiteMemberHandler(error: Error): void {
   handledLiteMemberErrors.add(error);
+  handledGlobally.add(error);
 }
 
 export function isHandledByLiteMemberHandler(error: unknown): boolean {
@@ -69,11 +75,13 @@ export function isHandledByLiteMemberHandler(error: unknown): boolean {
  * surface it as a modal or a bespoke toast — so reporting it again would
  * duplicate it.
  *
- * ALL FOUR interceptors in `utils/api.tsx` count. The first version listed
- * only two, so a missing-model failure (which opens its own sticky toast
- * naming the feature and linking to model settings) also drew a second,
- * vaguer toast next to it — the exact duplication this guard exists to stop.
- * Anything that calls `markAsHandledBy…` belongs here.
+ * Every interceptor in `utils/api.tsx` counts. This used to be a hand-written
+ * OR over the individual sets, and the first version listed only two of them,
+ * so a missing-model failure (which opens its own sticky toast naming the
+ * feature and linking to model settings) also drew a second, vaguer toast next
+ * to it — the exact duplication this guard exists to stop. It now reads the one
+ * `handledGlobally` set that every `markAsHandledBy…` writes to, so adding an
+ * interceptor cannot leave this stale.
  *
  * You rarely need to call this: `showErrorToast` and `<HandledErrorAlert>`
  * already do, which is why the ~137 copies of this guard in `onError`
@@ -88,12 +96,7 @@ export function isHandledByLiteMemberHandler(error: unknown): boolean {
  * ```
  */
 export function isHandledByGlobalHandler(error: unknown): boolean {
-  return (
-    isHandledByGlobalLicenseHandler(error) ||
-    isHandledByLiteMemberHandler(error) ||
-    isHandledByMissingModelHandler(error) ||
-    isHandledByProviderDisabledHandler(error)
-  );
+  return error instanceof Error && handledGlobally.has(error);
 }
 
 // --- Lite member restriction extractor ---
@@ -119,6 +122,10 @@ export function extractLiteMemberRestrictionInfo(
   return { resource: handledError?.meta?.resource };
 }
 
+/**
+ * Extracts limit exceeded info from a TRPC error.
+ * Returns the info if the error is a FORBIDDEN error with limit data, null otherwise.
+ */
 export function extractLimitExceededInfo(
   error: unknown,
 ): LimitExceededInfo | null {
@@ -143,6 +150,7 @@ const handledMissingModelErrors = new WeakSet<Error>();
 
 export function markAsHandledByMissingModelHandler(error: Error): void {
   handledMissingModelErrors.add(error);
+  handledGlobally.add(error);
 }
 
 export function isHandledByMissingModelHandler(error: unknown): boolean {
@@ -206,6 +214,7 @@ const handledProviderDisabledErrors = new WeakSet<Error>();
 
 export function markAsHandledByProviderDisabledHandler(error: Error): void {
   handledProviderDisabledErrors.add(error);
+  handledGlobally.add(error);
 }
 
 export function isHandledByProviderDisabledHandler(error: unknown): boolean {
@@ -311,8 +320,6 @@ export interface AiCallFailedExtracted {
   featureKey: string;
   featureDisplayName: string;
   role: "DEFAULT" | "FAST" | "LANGY" | "EMBEDDINGS";
-  /** Best-effort short message from the provider/SDK. */
-  errorMessage?: string;
 }
 
 export function extractAiCallFailedInfo(
@@ -325,7 +332,6 @@ export function extractAiCallFailedInfo(
         featureKey?: string;
         featureDisplayName?: string;
         role?: string;
-        errorMessage?: string;
       }
     | undefined;
 
@@ -345,6 +351,5 @@ export function extractAiCallFailedInfo(
     featureKey: cause.featureKey,
     featureDisplayName: cause.featureDisplayName ?? cause.featureKey,
     role,
-    errorMessage: cause.errorMessage,
   };
 }

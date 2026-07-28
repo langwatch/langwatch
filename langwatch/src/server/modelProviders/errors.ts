@@ -51,7 +51,13 @@ export class ModelProviderAnchorRequiredError extends HandledError {
   constructor(requires: ModelProviderAnchorRequirement) {
     super(
       "model_provider_anchor_required",
-      `Model provider call is missing its tenant anchor (requires: ${requires})`,
+      // One fixed sentence, because a REST caller is shown it verbatim. Which
+      // handle would satisfy the call is a fact, not copy: it rides in
+      // `meta.requires`, where the client's presentation registry reads it and
+      // picks between "a project" and "a project or an organization". Naming
+      // the requirement inline printed the raw enum value at the customer
+      // ("requires: project_or_organization") and duplicated the registry.
+      "Say which project or organization this model provider applies to.",
       { meta: { requires }, httpStatus: 400, fault: "customer" },
     );
     this.name = "ModelProviderAnchorRequiredError";
@@ -73,5 +79,46 @@ export class ModelProviderScopesRequiredError extends HandledError {
       { httpStatus: 400, fault: "customer" },
     );
     this.name = "ModelProviderScopesRequiredError";
+  }
+}
+
+/**
+ * The caller cannot manage one of the scopes a write would touch.
+ *
+ * A create / update / delete can affect several scope entries at once, and the
+ * check is fail-closed: the first entry the caller cannot manage rejects the
+ * whole call, so a team admin can never quietly rewrite an org-level row.
+ *
+ * Handled rather than the `TRPCError({ code: "FORBIDDEN" })` this replaced: the
+ * cause is known and the caller can act on it (ask someone who holds the
+ * permission), which is the ADR-045 test. It also keeps the de-tRPC'd service
+ * layer free of a transport's error type — every write path routes through
+ * here, so a `TRPCError` in this module put one back on every create, update
+ * and delete.
+ *
+ * `scopeType` and `requiredPermission` ride in `meta` rather than in the
+ * sentence: the client's presentation registry decides the words, and the
+ * permission slug is a fact an API/CLI caller reads, not prose.
+ */
+export class ModelProviderScopeForbiddenError extends HandledError {
+  declare readonly code: "model_provider_scope_forbidden";
+
+  constructor({
+    scopeType,
+    requiredPermission,
+  }: {
+    scopeType: string;
+    requiredPermission: string;
+  }) {
+    super(
+      "model_provider_scope_forbidden",
+      "You don't have permission to manage model providers here.",
+      {
+        meta: { scopeType, requiredPermission },
+        httpStatus: 403,
+        fault: "customer",
+      },
+    );
+    this.name = "ModelProviderScopeForbiddenError";
   }
 }

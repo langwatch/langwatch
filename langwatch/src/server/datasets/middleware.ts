@@ -1,15 +1,21 @@
 import { TRPCError } from "@trpc/server";
 import {
-  ColumnTypeChangeNotSupportedError,
   DatasetConflictError,
   DatasetNameTakenError,
   DatasetNotFoundError,
-  DatasetNotReadyError,
+  DatasetStaleColumnsError,
 } from "./errors";
 
 /**
- * Middleware function that catches domain errors and maps them to tRPC errors.
- * Can be used as a wrapper function or as tRPC middleware.
+ * Catches the dataset domain errors that still need translating at the tRPC
+ * boundary and re-raises them as the error the client contract expects.
+ *
+ * Most of the family needs nothing here: `DatasetNotReadyError` and
+ * `ColumnTypeChangeNotSupportedError` are `HandledError`s in their own right,
+ * so they carry their code, status and meta across the boundary untouched.
+ * What is left is the ambiguous one — a `DatasetConflictError` is two different
+ * failures wearing one class — plus the not-found case that has no handled form
+ * yet.
  */
 export async function withDatasetErrorHandling<T>(
   operation: () => Promise<T>,
@@ -24,33 +30,16 @@ export async function withDatasetErrorHandling<T>(
       });
     }
 
-    // A name clash is knowable and the caller can act on it, so it crosses the
-    // boundary as a handled code rather than prose the client has to match on
-    // (ADR-045). `message` here is server copy; the customer-facing words live
-    // in the client's presentation registry under `dataset_name_taken`.
+    // Both conflicts are knowable and both are actionable, but not by the same
+    // action — a name clash is fixed by renaming, a stale editor by reloading.
+    // Collapsing them onto one code told the second caller to pick a different
+    // name, which could never resolve their failure (ADR-045). `message` here
+    // is server copy; the customer-facing words live in the client's
+    // presentation registry, keyed by these codes.
     if (error instanceof DatasetConflictError) {
-      throw new DatasetNameTakenError();
-    }
-
-    // A column-type change on an s3_jsonl dataset is a user-actionable
-    // precondition (deferred feature), not a server fault — surface a 4xx with
-    // the message instead of a generic 500.
-    if (error instanceof ColumnTypeChangeNotSupportedError) {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message: error.message,
-        cause: error,
-      });
-    }
-
-    // Editing a not-yet-ready dataset (defense-in-depth ready-gate) — same code
-    // the record routes use for DatasetNotReadyError.
-    if (error instanceof DatasetNotReadyError) {
-      throw new TRPCError({
-        code: "PRECONDITION_FAILED",
-        message: error.message,
-        cause: error,
-      });
+      throw error.reason === "stale_columns"
+        ? new DatasetStaleColumnsError()
+        : new DatasetNameTakenError();
     }
 
     // Re-throw unknown errors
@@ -59,8 +48,8 @@ export async function withDatasetErrorHandling<T>(
 }
 
 /**
- * tRPC middleware that wraps handler execution to catch and map dataset domain errors.
- * Usage: procedure.use(datasetErrorHandler)
+ * tRPC middleware that wraps handler execution to catch and translate dataset
+ * domain errors. Usage: procedure.use(datasetErrorHandler)
  */
 export const datasetErrorHandler = async <T>({
   next,

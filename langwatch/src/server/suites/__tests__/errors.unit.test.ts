@@ -14,27 +14,23 @@ import {
   AllTargetsArchivedError,
   InvalidScenarioReferencesError,
   InvalidTargetReferencesError,
-  SuiteDomainError,
   SuiteNameTakenError,
+  SuiteNotFoundError,
 } from "../errors";
 
-describe("SuiteDomainError", () => {
+describe("SuiteNotFoundError", () => {
   it("is recognised as handled across a module boundary", () => {
-    expect(HandledError.isHandled(new SuiteDomainError("no such suite"))).toBe(
-      true,
-    );
+    expect(HandledError.isHandled(new SuiteNotFoundError())).toBe(true);
   });
 
-  describe("when raised without an explicit code", () => {
-    it("reports the suite as missing", () => {
-      const error = new SuiteDomainError("no such suite");
-      expect(error.code).toBe("suite_not_found");
-      expect(error.httpStatus).toBe(404);
-    });
+  it("reports the suite as missing", () => {
+    const error = new SuiteNotFoundError();
+    expect(error.code).toBe("suite_not_found");
+    expect(error.httpStatus).toBe(404);
   });
 
   it("attributes the failure to the caller", () => {
-    expect(new SuiteDomainError("no such suite").fault).toBe("customer");
+    expect(new SuiteNotFoundError().fault).toBe("customer");
   });
 });
 
@@ -48,20 +44,22 @@ describe("InvalidScenarioReferencesError", () => {
       expect(error.httpStatus).toBe(422);
     });
 
-    it("carries the offending ids where the client reads them", () => {
+    it("keeps the offending ids server-side, off the client contract", () => {
       const error = new InvalidScenarioReferencesError({
         invalidIds: ["scen_1", "scen_2"],
       });
-      expect(error.meta).toEqual({ invalidIds: ["scen_1", "scen_2"] });
       expect(error.invalidIds).toEqual(["scen_1", "scen_2"]);
+      // `meta` is what the client is promised, and nothing renders these ids.
+      // They stay on the instance (and in the message) for the log line.
+      expect(error.meta).toEqual({});
     });
 
-    it("survives serialisation with its code and ids intact", () => {
+    it("survives serialisation with its code intact", () => {
       const serialized = new InvalidScenarioReferencesError({
         invalidIds: ["scen_1"],
       }).serialize();
       expect(serialized.code).toBe("suite_invalid_scenario_references");
-      expect(serialized.meta).toEqual({ invalidIds: ["scen_1"] });
+      expect(serialized.meta).toEqual({});
     });
   });
 });
@@ -76,12 +74,12 @@ describe("InvalidTargetReferencesError", () => {
       expect(error.httpStatus).toBe(422);
     });
 
-    it("carries the offending ids where the client reads them", () => {
+    it("keeps the offending ids server-side, off the client contract", () => {
       const error = new InvalidTargetReferencesError({
         invalidIds: ["t_1", "t_2"],
       });
-      expect(error.meta).toEqual({ invalidIds: ["t_1", "t_2"] });
       expect(error.invalidIds).toEqual(["t_1", "t_2"]);
+      expect(error.meta).toEqual({});
     });
   });
 });
@@ -105,8 +103,8 @@ describe("AllTargetsArchivedError", () => {
 describe("SuiteNameTakenError", () => {
   /**
    * A name clash is a conflict, and the middleware derives the response status
-   * from `httpStatus` alone. Left at the base class's 404 this would tell a
-   * user creating a suite that their suite does not exist.
+   * from `httpStatus` alone. Answered with a 404 this would tell a user
+   * creating a suite that their suite does not exist.
    */
   it("is a conflict", () => {
     const error = new SuiteNameTakenError();
@@ -121,10 +119,13 @@ describe("SuiteNameTakenError", () => {
 
 describe("every suite error", () => {
   /**
-   * The base class defaults to `suite_not_found`, so a subclass that forgets
-   * its own code silently inherits copy asserting a specific, wrong cause.
+   * `suite_not_found` is the one code with copy asserting the suite is gone,
+   * and it belongs to exactly one class. A second error wearing it would tell
+   * the user their suite does not exist when the real problem was something
+   * else entirely — which is why the base class no longer supplies it as a
+   * default at all.
    */
-  it("declares a code of its own rather than inheriting not-found", () => {
+  it("declares a code of its own rather than reusing not-found", () => {
     const errors = [
       new InvalidScenarioReferencesError({ invalidIds: ["x"] }),
       new InvalidTargetReferencesError({ invalidIds: ["x"] }),

@@ -31,8 +31,10 @@ const secured = createServiceApp({ basePath: "/api" });
 /**
  * Authenticates via the unified API-key + legacy-key path and enforces the given
  * permission ceiling. Returns either a `{ project, markUsed }` context or an
- * error descriptor the caller surfaces via c.json(...). `markUsed` is
- * fire-and-forget and a no-op for legacy keys.
+ * error descriptor whose `body` the caller surfaces via c.json(...) — a bare
+ * sentence for an unauthenticated call, and the full handled payload (code,
+ * permission, tips) for a permission denial. `markUsed` is fire-and-forget and
+ * a no-op for legacy keys.
  */
 async function authenticateRequest(
   c: Context,
@@ -40,11 +42,9 @@ async function authenticateRequest(
 ) {
   const credentials = extractCredentials((name) => c.req.header(name));
   if (!credentials) {
-    return {
-      error:
-        "Authentication token is required. Use X-Auth-Token header, Authorization: Bearer token, or Authorization: Basic base64(projectId:token).",
-      status: 401 as const,
-    };
+    const message =
+      "Authentication token is required. Use X-Auth-Token header, Authorization: Bearer token, or Authorization: Basic base64(projectId:token).";
+    return { error: message, status: 401 as const, body: { message } };
   }
 
   const resolved = await tokenResolver.resolve({
@@ -52,14 +52,19 @@ async function authenticateRequest(
     projectId: credentials.projectId,
   });
   if (!resolved) {
-    return { error: "Invalid auth token.", status: 401 as const };
+    const message = "Invalid auth token.";
+    return { error: message, status: 401 as const, body: { message } };
   }
 
   try {
     await enforceApiKeyCeiling({ prisma, resolved, permission });
   } catch (error) {
     const denial = apiKeyCeilingDenialResponse(error);
-    return { error: denial.message, status: denial.status };
+    return {
+      error: denial.message,
+      status: denial.status,
+      body: denial.body,
+    };
   }
 
   const markUsed = () => {
@@ -75,7 +80,7 @@ async function authenticateRequest(
 secured.access(handlerManagedAuth(AUTH_REASON)).get("/annotations", async (c) => {
   const auth = await authenticateRequest(c, "annotations:view");
   if ("error" in auth) {
-    return c.json({ message: auth.error }, auth.status);
+    return c.json(auth.body, auth.status);
   }
   const { project, markUsed } = auth;
 
@@ -105,7 +110,7 @@ secured.access(handlerManagedAuth(AUTH_REASON)).get("/annotations", async (c) =>
 secured.access(handlerManagedAuth(AUTH_REASON)).get("/annotations/:id", async (c) => {
   const auth = await authenticateRequest(c, "annotations:view");
   if ("error" in auth) {
-    return c.json({ message: auth.error }, auth.status);
+    return c.json(auth.body, auth.status);
   }
   const { project, markUsed } = auth;
 
@@ -140,7 +145,7 @@ secured.access(handlerManagedAuth(AUTH_REASON)).get("/annotations/:id", async (c
 secured.access(handlerManagedAuth(AUTH_REASON)).delete("/annotations/:id", async (c) => {
   const auth = await authenticateRequest(c, "annotations:manage");
   if ("error" in auth) {
-    return c.json({ message: auth.error }, auth.status);
+    return c.json(auth.body, auth.status);
   }
   const { project, markUsed } = auth;
 
@@ -169,7 +174,7 @@ secured.access(handlerManagedAuth(AUTH_REASON)).delete("/annotations/:id", async
 secured.access(handlerManagedAuth(AUTH_REASON)).patch("/annotations/:id", async (c) => {
   const auth = await authenticateRequest(c, "annotations:manage");
   if ("error" in auth) {
-    return c.json({ message: auth.error }, auth.status);
+    return c.json(auth.body, auth.status);
   }
   const { project, markUsed } = auth;
 
@@ -231,7 +236,7 @@ secured.access(handlerManagedAuth(AUTH_REASON)).patch("/annotations/:id", async 
 secured.access(handlerManagedAuth(AUTH_REASON)).get("/annotations/trace/:trace", async (c) => {
   const auth = await authenticateRequest(c, "annotations:view");
   if ("error" in auth) {
-    return c.json({ message: auth.error }, auth.status);
+    return c.json(auth.body, auth.status);
   }
   const { project, markUsed } = auth;
 
@@ -265,7 +270,7 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post("/annotations/trace/:trace"
   // correctly stay on :manage.
   const auth = await authenticateRequest(c, "annotations:create");
   if ("error" in auth) {
-    return c.json({ message: auth.error }, auth.status);
+    return c.json(auth.body, auth.status);
   }
   const { project, markUsed } = auth;
 

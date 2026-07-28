@@ -22,8 +22,8 @@ import {
   AllTargetsArchivedError,
   InvalidScenarioReferencesError,
   InvalidTargetReferencesError,
-  SuiteDomainError,
   SuiteNameTakenError,
+  SuiteNotFoundError,
 } from "./errors";
 import {
   type CreateSuiteInput,
@@ -208,7 +208,7 @@ export class SuiteService {
         );
         const original = await this.repository.findById(params);
         if (!original) {
-          throw new SuiteDomainError("Suite not found");
+          throw new SuiteNotFoundError();
         }
         const newName = `${original.name} (copy)`;
         const slug = slugify(newName);

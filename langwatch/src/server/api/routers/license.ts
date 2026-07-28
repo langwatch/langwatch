@@ -1,15 +1,15 @@
+import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { checkOrganizationPermission } from "../rbac";
-import {
-  type LicenseStatus,
-  OrganizationNotFoundError,
-  getPlanTemplate,
-} from "../../../../ee/licensing";
+import { type LicenseStatus, getPlanTemplate } from "../../../../ee/licensing";
+import { licenseValidationError } from "../../../../ee/licensing/errors";
 import type { LicenseData } from "../../../../ee/licensing";
 import { signLicense, encodeLicenseKey, generateLicenseId } from "../../../../ee/licensing/signing";
 import { getLicenseHandler } from "~/server/subscriptionHandler";
+
+const logger = createLogger("langwatch:api:licenseRouter");
 
 /** Schema for plan limits input */
 const planLimitsSchema = z.object({
@@ -50,14 +50,10 @@ export const licenseRouter = createTRPCRouter({
     )
     .use(checkOrganizationPermission("organization:view"))
     .query(async ({ input }): Promise<LicenseStatus> => {
-      try {
-        return await getLicenseHandler().getLicenseStatus(input.organizationId);
-      } catch (error) {
-        if (error instanceof OrganizationNotFoundError) {
-          throw new TRPCError({ code: "NOT_FOUND", message: error.message });
-        }
-        throw error;
-      }
+      // No catch: `OrganizationNotFoundError` is a `HandledError`, so the
+      // shared middleware maps it to NOT_FOUND and keeps it as the cause.
+      // Re-wrapping it here threw away the code and the trace id.
+      return await getLicenseHandler().getLicenseStatus(input.organizationId);
     }),
 
   /**
@@ -72,29 +68,22 @@ export const licenseRouter = createTRPCRouter({
     )
     .use(checkOrganizationPermission("organization:manage"))
     .mutation(async ({ input }) => {
-      try {
-        const result = await getLicenseHandler().validateAndStoreLicense(
-          input.organizationId,
-          input.licenseKey
-        );
+      const result = await getLicenseHandler().validateAndStoreLicense(
+        input.organizationId,
+        input.licenseKey
+      );
 
-        if (!result.success) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: result.error,
-          });
-        }
-
-        return {
-          success: true,
-          planInfo: result.planInfo,
-        };
-      } catch (error) {
-        if (error instanceof OrganizationNotFoundError) {
-          throw new TRPCError({ code: "NOT_FOUND", message: error.message });
-        }
-        throw error;
+      if (!result.success) {
+        // The handler reports its verdict as a `LICENSE_ERRORS` literal, which
+        // is a server discriminant and not copy. Map it to the code the
+        // presentation registry writes customer copy against.
+        throw licenseValidationError(result.error);
       }
+
+      return {
+        success: true,
+        planInfo: result.planInfo,
+      };
     }),
 
   /**
@@ -108,19 +97,12 @@ export const licenseRouter = createTRPCRouter({
     )
     .use(checkOrganizationPermission("organization:manage"))
     .mutation(async ({ input }) => {
-      try {
-        const result = await getLicenseHandler().removeLicense(input.organizationId);
+      const result = await getLicenseHandler().removeLicense(input.organizationId);
 
-        return {
-          success: true,
-          removed: result.removed,
-        };
-      } catch (error) {
-        if (error instanceof OrganizationNotFoundError) {
-          throw new TRPCError({ code: "NOT_FOUND", message: error.message });
-        }
-        throw error;
-      }
+      return {
+        success: true,
+        removed: result.removed,
+      };
     }),
 
   /**
@@ -187,9 +169,17 @@ export const licenseRouter = createTRPCRouter({
 
         return { licenseKey };
       } catch (error) {
+        // Real copy on a 4xx, so the authored-prose channel renders it as-is;
+        // the cause rides along for the logs rather than being discarded, and
+        // is never shown (its message would be a crypto diagnostic).
+        logger.error(
+          { organizationId: input.organizationId, error },
+          "[license] Failed to sign license",
+        );
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: "Failed to sign license. Please check your private key.",
+          cause: error,
         });
       }
     }),
