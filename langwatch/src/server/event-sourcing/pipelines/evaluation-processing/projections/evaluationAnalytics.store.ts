@@ -128,19 +128,23 @@ export class EvaluationAnalyticsStore
   ): Promise<{
     state: EvaluationAnalyticsData | null;
     appliedEventIds: string[];
+    miss?: "absent" | "undecodable";
   }> {
     const found = await this.repo.findByEvaluationIdWithApplied({
       tenantId: String(context.tenantId),
       evaluationId: aggregateId,
       window: context.readWindow,
     });
-    if (!found) return { state: null, appliedEventIds: [] };
+    if (!found) return { state: null, appliedEventIds: [], miss: "absent" };
     // Stale schema snapshot: the read-back columns did not exist when this row
-    // was written, so decoding it would fabricate state. Answer exactly as for
-    // "no row" — the watermark is dropped too, because a watermark without the
-    // state it belongs to would suppress the very events the re-fold needs.
+    // was written, so decoding it would fabricate state. Answer as for "no row"
+    // — the watermark is dropped too, because a watermark without the state it
+    // belongs to would suppress the very events the re-fold needs — but report
+    // it as `undecodable`, not `absent`: the row was FOUND and refused, so the
+    // executor must not answer with an unwindowed re-read that can only find
+    // the same row again.
     if (found.row.version !== EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST) {
-      return { state: null, appliedEventIds: [] };
+      return { state: null, appliedEventIds: [], miss: "undecodable" };
     }
     return {
       state: evaluationAnalyticsStateFromRow(found.row),

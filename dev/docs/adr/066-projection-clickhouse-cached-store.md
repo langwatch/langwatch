@@ -212,6 +212,45 @@ Recorded here so the application-side and server-side levers are visible togethe
 - Redelivery dedup travels with the state (applied-event-id set, reset on each fresh delivery, bounded to the in-flight batch) — and, for read-back folds, persists durably next to the state row (migration 00054), so it survives cache loss.
 - **High-fan-in `event_log` producers coalesce their appends** — a batched multi-row insert per drained batch, not one insert per item. A producer where a single aggregate can mint events faster than they drain, and does not coalesce, is a part-buildup regression. Any cap on coalescing coverage is logged, not silent.
 
+## Deploying an adopter: the migration must land before the workers
+
+**A read-back adopter's schema migration is a deploy-order dependency, and the
+chart does not express it.** `clickhouse:migrate` runs from `start:prepare:db`,
+which is on the **app** pod's entrypoint only; the workers Deployment overrides
+its command to `start:workers` and never migrates. The two Deployments roll
+concurrently, so new worker code folds against the old schema for the length of
+the rollout.
+
+Both halves then fail, deliberately:
+
+- **reads** order by columns the migration adds, so the query throws
+  `UNKNOWN_IDENTIFIER`;
+- **writes** carry `input_format_skip_unknown_fields: 0`, so the insert is
+  rejected rather than silently dropping the new columns.
+
+Failing loudly is the correct behaviour and must not be softened. The
+alternative — letting ClickHouse drop unknown columns — writes a row stamped at
+the *current* projection version with the new columns defaulted, which then
+passes the version gate and decodes as real state. That corruption launders
+itself past the very gate that exists to reject it, and nothing later rebuilds
+it. A retry storm is recoverable; that is not.
+
+So the ordering is a **release procedure**, not something the code can absorb:
+
+1. Apply the migration out of band **before** rolling the workers, and confirm
+   `SKIP_CLICKHOUSE_MIGRATE` is unset.
+2. Watch `es_fold_projection_total{status="failed"}` through the window.
+
+The failure is self-limiting if the order is missed — jobs retry on the shared
+platform budget (25 attempts, ≈2h27m) and recover the moment the app pod
+migrates — but a migration that has not landed within that budget exhausts the
+jobs and blocks their groups. Promoting the migration to a `pre-upgrade` Helm
+hook Job would make the dependency structural rather than procedural (the
+pattern exists in `charts/clickhouse-serverless/templates/preflight-secrets-job.yaml`);
+it is deliberately **not** taken here, because it makes a failed migration fail
+the whole release, and that is a deployment-policy decision rather than an
+engineering one.
+
 ## References
 
 - **Behavioural contract:** [specs/event-sourcing/fold-read-back-store.feature](../../../specs/event-sourcing/fold-read-back-store.feature) (pillar 1), [specs/event-sourcing/producer-append-coalescing.feature](../../../specs/event-sourcing/producer-append-coalescing.feature) (pillar 2), [specs/event-sourcing/fold-coalescing.feature](../../../specs/event-sourcing/fold-coalescing.feature) (the shared count+byte-bounded drain both sides ride)

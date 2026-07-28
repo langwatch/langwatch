@@ -255,5 +255,28 @@ export interface FoldProjectionStore<State> {
   getWithApplied?(
     aggregateId: string,
     context: ProjectionStoreContext,
-  ): Promise<{ state: State | null; appliedEventIds: string[] }>;
+  ): Promise<{
+    state: State | null;
+    appliedEventIds: string[];
+    /**
+     * Why `state` is null, for stores that can tell them apart.
+     *
+     * `absent` — no row for this aggregate in the scope that was read.
+     * `undecodable` — a row IS there and the store refused it, which for an
+     * ADR-066 adopter means its version gate rejected an older shape.
+     *
+     * The distinction is load-bearing on both sides. The executor answers a
+     * windowed miss by re-reading UNWINDOWED, which is right for `absent` (the
+     * row may sit outside the window) and pure waste for `undecodable` (the row
+     * was found and refused; a wider scope finds the same row and refuses it
+     * again) — and that wasted read is deliberately unpruned. It also keeps the
+     * read-window metric honest: counting a version rejection as `absent` reads
+     * as "the window missed a live aggregate", which is a different operator
+     * action than "these rows need rebuilding".
+     *
+     * Omit when the store cannot distinguish; the executor then assumes
+     * `absent`, which is the safe direction.
+     */
+    miss?: "absent" | "undecodable";
+  }>;
 }

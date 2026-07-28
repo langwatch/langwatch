@@ -239,6 +239,28 @@ describe("FoldProjectionExecutor declared read window", () => {
         expect(fallbackMetric).toHaveBeenCalledWith("windowed", "recovered");
       });
     });
+
+    describe("when the store found a row but refused it as undecodable", () => {
+      it("does not re-read unwindowed, because a wider scope finds the same row", async () => {
+        const { fold, store } = makeFold({ readWindow: { widthMs: WIDTH_MS } });
+        const getWithApplied = vi.fn().mockResolvedValue({
+          state: null,
+          appliedEventIds: [],
+          miss: "undecodable",
+        });
+        store.getWithApplied = getWithApplied;
+
+        await executor.execute(fold, eventAt(OCCURRED_AT), context);
+
+        // The retry exists to find a row OUTSIDE the window. This row was found
+        // and rejected on its version, so re-reading unpruned only pays for the
+        // same refusal.
+        expect(getWithApplied).toHaveBeenCalledTimes(1);
+        // And the window's own health signal stays about the window: a version
+        // rejection counted as `absent` reads as "widen readWindow.widthMs".
+        expect(fallbackMetric).not.toHaveBeenCalled();
+      });
+    });
   });
 
   describe("given the fold declares no read window", () => {

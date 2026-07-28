@@ -196,4 +196,56 @@ describe("traceAnalytics fold projection — slim row derivation", () => {
       expect(row.origin).toBe("");
     });
   });
+
+  describe("given a trace whose only signal is a log record", () => {
+    const logAtMs = new Date("2026-07-24T12:00:00.000Z").getTime();
+
+    const foldLogRecord = (state: TraceAnalyticsData) =>
+      slimProjection.handleTraceLogRecordReceived(
+        {
+          occurredAt: logAtMs,
+          data: {
+            traceId: "trace-log-only",
+            spanId: "span-1",
+            body: "hello",
+            attributes: {},
+            resourceAttributes: {},
+          },
+        } as never,
+        state,
+      );
+
+    it("anchors OccurredAt on the log's own time, not on the epoch", () => {
+      // OccurredAt is the partition key AND the TTL anchor. Left at 0 the row
+      // lands in partition 197001 with a deadline of 1970 + retention — expired
+      // before it is written — so it is reaped and the read-back can never hit
+      // for log-only traces.
+      const state = foldLogRecord(createInitSlimState());
+
+      expect(state.occurredAt).toBe(logAtMs);
+      expect(projectFromState(state).occurredAtMs).toBe(logAtMs);
+    });
+
+    it("does not walk the anchor backwards as later logs arrive", () => {
+      // First-observed, not min(): a storage anchor that keeps moving is the
+      // defect ADR-071 records, and this is the one place logs could introduce
+      // it. A late span still refines it through the span path.
+      const first = foldLogRecord(createInitSlimState());
+      const earlier = slimProjection.handleTraceLogRecordReceived(
+        {
+          occurredAt: logAtMs - 60_000,
+          data: {
+            traceId: "trace-log-only",
+            spanId: "span-2",
+            body: "earlier",
+            attributes: {},
+            resourceAttributes: {},
+          },
+        } as never,
+        first,
+      );
+
+      expect(earlier.occurredAt).toBe(logAtMs);
+    });
+  });
 });

@@ -750,6 +750,11 @@ interface LogContribution {
   traceId: string;
   liftedAttributes: Record<string, unknown>;
   nonBillable: boolean;
+  /**
+   * The contributing record's own time, used as the storage anchor for a trace
+   * that has no spans to supply one.
+   */
+  occurredAtMs: number;
 }
 
 /**
@@ -811,6 +816,20 @@ function applyLogContribution({
   return {
     ...state,
     traceId: state.traceId || contribution.traceId,
+    // `OccurredAt` is this table's partition key AND its TTL anchor (00039).
+    // Only spans used to set it, so a log-only trace — Claude Code Path B,
+    // Codex Path B, which `hasPersistableSignal` deliberately persists —
+    // committed its row at OccurredAt 0: partition 197001, and a TTL deadline
+    // of `1970 + retention`, i.e. expired before it was written. The row was
+    // reaped on the next TTL merge, so the read-back never hit for that whole
+    // traffic class and every delivery refolded from `event_log` instead.
+    //
+    // FIRST-observed, not min(): this is a storage anchor, and ADR-071's rule
+    // is that an anchor must not move. A span arriving later still refines it
+    // downwards through the span path — that is the pre-existing behaviour this
+    // does not change — but logs alone will not walk it backwards.
+    occurredAt:
+      state.occurredAt === 0 ? contribution.occurredAtMs : state.occurredAt,
     attributes: mergedAttributes,
     models,
     totalCost,
@@ -983,6 +1002,7 @@ export class TraceAnalyticsFoldProjection
         liftedAttributes: liftCanonicalAttributesFromLogRecord(event.data),
         nonBillable:
           event.data.resourceAttributes?.[NON_BILLABLE_ATTR] === "true",
+        occurredAtMs: event.occurredAt,
       },
     });
   }
@@ -997,6 +1017,7 @@ export class TraceAnalyticsFoldProjection
         traceId: event.data.traceId,
         liftedAttributes: event.data.liftedAttributes,
         nonBillable: event.data.nonBillable,
+        occurredAtMs: event.occurredAt,
       },
     });
   }

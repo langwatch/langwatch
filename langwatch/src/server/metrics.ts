@@ -1258,7 +1258,14 @@ const codingAgentSessionListReadDuration = new Histogram({
   name: "coding_agent_session_list_read_duration_milliseconds",
   help: "Duration of the coding-agent session list read, whose dedup scope scans the tenant unpruned, by table and outcome",
   labelNames: ["table", "outcome"] as const,
-  buckets: [1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000],
+  // Runs to 30s deliberately. This metric's job is to catch the unpruned scan
+  // becoming expensive enough to promote ADR-071's writer freeze from "next" to
+  // "now", and a top bucket at 5s would put exactly that degradation into
+  // `+Inf`, where a p99 cannot be resolved — the histogram would go blind at
+  // the moment it was supposed to speak.
+  buckets: [
+    1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10_000, 30_000,
+  ],
 });
 
 /**

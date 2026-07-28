@@ -176,10 +176,18 @@ export class FoldProjectionExecutor {
     store: FoldProjectionStore<State>;
     key: string;
     context: ProjectionStoreContext;
-  }): Promise<{ state: State | null; appliedEventIds: string[] }> {
+  }): Promise<{
+    state: State | null;
+    appliedEventIds: string[];
+    miss?: "absent" | "undecodable";
+  }> {
     const read = async (
       readContext: ProjectionStoreContext,
-    ): Promise<{ state: State | null; appliedEventIds: string[] }> => {
+    ): Promise<{
+      state: State | null;
+      appliedEventIds: string[];
+      miss?: "absent" | "undecodable";
+    }> => {
       if (store.getWithApplied) {
         return await store.getWithApplied(key, readContext);
       }
@@ -191,6 +199,14 @@ export class FoldProjectionExecutor {
 
     const windowed = await read(context);
     if (windowed.state !== null || context.readWindow === undefined) {
+      return windowed;
+    }
+    // An undecodable row was FOUND and refused, so widening the scope re-reads
+    // the same row to refuse it again. Skipping the retry saves an unpruned
+    // scan per event per stale aggregate, and keeps the fallback counter
+    // meaning "the window missed a live aggregate" rather than absorbing a
+    // schema condition that has nothing to do with the window.
+    if (windowed.miss === "undecodable") {
       return windowed;
     }
 
