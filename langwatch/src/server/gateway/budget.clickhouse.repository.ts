@@ -239,6 +239,95 @@ export class GatewayBudgetClickHouseRepository {
   }
 
   /**
+   * Multi-request sibling of insertDebit for the per-request debit grain:
+   * one reactor fire can now carry rows for SEVERAL gateway_request_ids
+   * (one per gateway span on the trace). One probe covers every id in the
+   * batch, and only rows for ids the ledger has never seen are inserted,
+   * for the same MV-double-count reason insertDebit documents.
+   */
+  async insertDebits(rows: BudgetDebitRow[]): Promise<void> {
+    if (rows.length === 0) return;
+    const tenantId = rows[0]!.tenantId;
+    if (rows.some((r) => r.tenantId !== tenantId)) {
+      throw new Error(
+        "GatewayBudgetClickHouseRepository.insertDebits: rows span multiple tenants",
+      );
+    }
+
+    const requestIds = [...new Set(rows.map((r) => r.gatewayRequestId))];
+    const client = await this.resolveClient(tenantId);
+    const probe = await client.query({
+      query: `SELECT DISTINCT GatewayRequestId FROM ${EVENTS_TABLE} WHERE TenantId = {tenantId:String} AND GatewayRequestId IN {requestIds:Array(String)}`,
+      query_params: { tenantId, requestIds },
+      format: "JSONEachRow",
+    });
+    const seen = new Set(
+      ((await probe.json()) as Array<{ GatewayRequestId: string }>).map(
+        (r) => r.GatewayRequestId,
+      ),
+    );
+    const fresh = rows.filter((r) => !seen.has(r.gatewayRequestId));
+    if (fresh.length === 0) {
+      logger.debug(
+        { tenantId, requestIds: requestIds.length },
+        "skipping replay — every gateway_request_id already in ledger",
+      );
+      return;
+    }
+
+    for (const requestId of [
+      ...new Set(fresh.map((r) => r.gatewayRequestId)),
+    ]) {
+      await this.insertDebitUnchecked(
+        fresh.filter((r) => r.gatewayRequestId === requestId),
+      );
+    }
+  }
+
+  /** Insert rows for one gateway_request_id without the existence probe. */
+  private async insertDebitUnchecked(rows: BudgetDebitRow[]): Promise<void> {
+    if (rows.length === 0) return;
+    const tenantId = rows[0]!.tenantId;
+    const client = await this.resolveClient(tenantId);
+    const records = rows.map((r) => ({
+      TenantId: r.tenantId,
+      BudgetId: r.budgetId,
+      Scope: scopeToClickHouse(r.scope),
+      ScopeId: r.scopeId,
+      Window: windowToClickHouse(r.window),
+      VirtualKeyId: r.virtualKeyId,
+      ProviderCredentialId: r.providerCredentialId ?? "",
+      ProviderKey: r.providerKey ?? "",
+      GatewayRequestId: r.gatewayRequestId,
+      AmountUSD: r.amountUsd,
+      TokensInput: r.tokensInput,
+      TokensOutput: r.tokensOutput,
+      TokensCacheRead: r.tokensCacheRead,
+      TokensCacheWrite: r.tokensCacheWrite,
+      Model: r.model,
+      ProviderSlot: r.providerSlot ?? "",
+      DurationMS: r.durationMs ?? 0,
+      Status: r.status.toLowerCase(),
+      OccurredAt: r.occurredAt.getTime(),
+      EventTimestamp: Date.now(),
+    }));
+    try {
+      await client.insert({
+        table: EVENTS_TABLE,
+        values: records,
+        format: "JSONEachRow",
+        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+      });
+    } catch (error) {
+      logger.error(
+        { tenantId, count: rows.length, error },
+        "failed to insert gateway budget ledger events",
+      );
+      throw error;
+    }
+  }
+
+  /**
    * Read current-period spend for a set of budgets from the materialised
    * view. Returns one ScopeSpend per budget requested; missing budgets
    * are reported with spentUsd = "0".

@@ -7,6 +7,10 @@ import {
   type GatewayBudgetSyncReactorDeps,
 } from "@ee/governance/reactors/gatewayBudgetSync.reactor";
 import {
+  type BillingExportReactorDeps,
+  createBillingExportReactor,
+} from "@ee/billing/reactors/billingExport.reactor";
+import {
   createGovernanceKpisSyncReactor,
   type GovernanceKpisSyncReactorDeps,
 } from "@ee/governance/reactors/governanceKpisSync.reactor";
@@ -333,6 +337,7 @@ export interface PipelineRegistryDeps {
   billingCheckpoints: BillingCheckpointService;
   usageReportingService?: UsageReportingService;
   gatewayBudgetSync?: GatewayBudgetSyncReactorDeps;
+  billingExport?: BillingExportReactorDeps;
   /**
    * ADR-022: BlobStore for RecordSpanCommand spool reconstitution.
    * When provided, the trace-processing pipeline wires it into RecordSpanCommand
@@ -956,6 +961,10 @@ export class PipelineRegistry {
       ? createGatewayBudgetSyncReactor(this.deps.gatewayBudgetSync)
       : undefined;
 
+    const billingExportReactor = this.deps.billingExport
+      ? createBillingExportReactor(this.deps.billingExport)
+      : undefined;
+
     const governanceKpisSyncReactor = this.deps.governanceKpisSync
       ? createGovernanceKpisSyncReactor(this.deps.governanceKpisSync)
       : undefined;
@@ -991,6 +1000,7 @@ export class PipelineRegistry {
         experimentMetricsSyncReactor,
         spanStorageBroadcastReactor,
         gatewayBudgetSyncReactor,
+        billingExportReactor,
         // ADR-022: Wire BlobStore so RecordSpanCommand can reconstitute
         // oversized commands and best-effort delete the transient S3 spool.
         blobStore: this.deps.blobStore,

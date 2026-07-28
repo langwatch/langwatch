@@ -95,6 +95,10 @@ export interface TraceProcessingPipelineDeps {
     TraceProcessingEvent,
     TraceSummaryData
   >;
+  billingExportReactor?: ReactorDefinition<
+    TraceProcessingEvent,
+    TraceSummaryData
+  >;
   /**
    * ADR-022: BlobStore injected so RecordSpanCommand can reconstitute oversized
    * commands (fetch from S3 spool) and best-effort delete the spool after
@@ -228,6 +232,14 @@ export function createTraceProcessingPipeline(
       "traceSummary",
       "gatewayBudgetSync",
       deps.gatewayBudgetSyncReactor,
+    );
+  }
+
+  if (deps.billingExportReactor) {
+    builder = builder.withReactor(
+      "traceSummary",
+      "billingExport",
+      deps.billingExportReactor,
     );
   }
 

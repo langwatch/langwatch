@@ -31,6 +31,7 @@ import { prisma as globalPrisma } from "~/server/db";
 import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
 import { getFeatureFlagStore } from "~/server/featureFlag/featureFlagStore.postgres";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
+import { GatewaySpendEventsRepository } from "~/server/gateway/spendEvents.clickhouse.repository";
 import { GatewayBudgetRepository } from "~/server/gateway/budget.repository";
 import { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
 import { getEdgeSpoolFailOpenCounter } from "~/server/metrics";
@@ -749,6 +750,18 @@ export function initializeDefaultApp(options?: {
       }
     : undefined;
 
+  // Billing spend export shares the ClickHouse gate with the budget sync:
+  // the spend table IS the billing record and has no PG fallback (a mutable
+  // counter is the failure mode this table exists to replace).
+  const billingExport = clickhouseEnabled
+    ? {
+        prisma,
+        spendEventsRepository: new GatewaySpendEventsRepository(
+          resolveClickHouseClient,
+        ),
+      }
+    : undefined;
+
   const governanceKpisSync = clickhouseEnabled
     ? {
         governanceKpisRepository: new GovernanceKpisClickHouseRepository(
@@ -974,6 +987,7 @@ export function initializeDefaultApp(options?: {
     billingCheckpoints: new PrismaBillingCheckpointService(prisma),
     usageReportingService,
     gatewayBudgetSync,
+    billingExport,
     // ADR-022: Inject BlobStore into the pipeline registry so RecordSpanCommand
     // can reconstitute oversized commands (fetch from transient S3 spool) and
     // best-effort delete the spool after event_log INSERT succeeds.
