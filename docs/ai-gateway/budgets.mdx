@@ -73,6 +73,10 @@ If **any** budget hard-blocks, the request is rejected. If **any** warn-threshol
 
 Save. The budget is in force immediately; the next request counts against it.
 
+<Frame caption="The budget drawer targets any dimension, with the provider filter as an orthogonal choice.">
+  ![New budget drawer](/images/ai-gateway/budget-create-drawer.png)
+</Frame>
+
 ## Multiple tiers on the same scope
 
 A single scope can carry multiple budgets with different `on_breach` values. Common pattern:
@@ -132,6 +136,10 @@ Cache reads, writes are priced **separately** per provider, Anthropic cache read
 
 ## Viewing budget spend (UI)
 
+<Frame caption="The budgets list: one row per budget across every dimension, each with its utilization bar and reset.">
+  ![Budgets list](/images/ai-gateway/budgets-page.png)
+</Frame>
+
 The **/gateway/budgets** list shows every budget with a utilization bar, hard cap, and remaining amount:
 
 - **Spent/Limit column** carries a colored progress bar and a matching %-badge (green ≤ 50%, orange 50-80%, red ≥ 80%/100%) so scanning "which budgets are hot" is a one-glance read.
@@ -147,7 +155,15 @@ Clicking a row opens **/gateway/budgets/[id]**: a detail page mirroring the VK d
 - **Resolved scope target**: same resolution as the list Scope column, plus a full-width link card to the target resource.
 - **Recent 20 debits**: each row shows When (humanised relative + hover-for-exact), Amount (smart-decimals, e.g. `$0.0183`, not `$0.02`), Model, originating VK (deep-linked to the VK detail page), and the `gateway_request_id` for trace search.
 
-Paired with **/gateway/usage**, which shows a byDay sparkline between the stat tiles and "Top virtual keys". The sparkline is gated on ≥ 2 data buckets so the 24-hour preset doesn't render a single-point chart. Top-VK rows link to each VK's detail page for drill-down.
+<Frame caption="A breached budget's detail page: full utilization, the enforcement mode, and the debits that consumed it.">
+  ![Breached budget detail](/images/ai-gateway/budget-breached-detail.png)
+</Frame>
+
+Paired with **/gateway/usage**, which shows a byDay sparkline between the stat tiles and "Top virtual keys". The sparkline is gated on ≥ 2 data buckets so the 24-hour preset doesn't render a single-point chart. Top-VK rows link to each VK's detail page for drill-down. The **This month** preset covers the same UTC month-to-date window the keys list's spend column reports, which is where that column's click-through lands.
+
+<Frame caption="Usage on the This month preset, filtered to one key: the same window and the same figures as the spend column that linked here.">
+  ![Usage this month](/images/ai-gateway/usage-this-month.png)
+</Frame>
 
 Programmatic equivalent:
 

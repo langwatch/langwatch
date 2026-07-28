@@ -39,6 +39,10 @@ Server-side, the secret is stored as `hex(hmac_sha256(server_pepper, secret))`. 
 
 Under **AI Gateway → Virtual Keys** click **New virtual key**. The drawer walks four decisions, top to bottom: where the key lives, what it may spend, which providers it may reach, and whether it fails over.
 
+<Frame caption="The create drawer: ownership with the trace destination stated inline, the budget field with the budgets the draft already inherits, provider access and routing below.">
+  ![New virtual key drawer](/images/ai-gateway/vk-create-drawer.png)
+</Frame>
+
 ### Ownership
 
 Who can see and manage the key, and where its traces and costs land:
@@ -65,6 +69,10 @@ A checkbox list of every provider the key's ownership can reach, each with a chi
 - An explicit selection stays exactly as picked: a provider added later is not reachable until someone edits the key. At least one provider must stay selected.
 - Expanding a provider row shows its models; checking models restricts the key to exactly those. The restriction is per **vendor**, not per provider row: two providers of the same vendor (say, two Anthropic accounts) share one model list, and the drawer mirrors a change made under either row in both. A per-row restriction for same-vendor providers is not supported yet.
 
+<Frame caption="Provider access with a model accordion expanded: every provider carries a chip naming where it is configured, and the routing decision sits directly below.">
+  ![Provider access section](/images/ai-gateway/vk-provider-access.png)
+</Frame>
+
 ### Routing
 
 What happens when the provider serving a request fails:
@@ -76,6 +84,10 @@ What happens when the provider serving a request fails:
 Click **Create**. The full secret is revealed exactly once with a **Copy** button and a confirmation checkbox that must be checked before dismissing. After dismiss, the secret is gone for good.
 
 The keys list shows a **Spent this month** column for every key, read from the same cost data the Usage tab reports. Clicking it opens Usage on its **This month** preset, pre-filtered to that key: the same UTC month-to-date window the column is computed over, so the number you click and the page you land on agree.
+
+<Frame caption="Spent this month on the keys list. The figures come from the cost path, so uncapped keys report real spend too.">
+  ![Spend column](/images/ai-gateway/vk-spend-column.png)
+</Frame>
 
 ## VK detail page
 
