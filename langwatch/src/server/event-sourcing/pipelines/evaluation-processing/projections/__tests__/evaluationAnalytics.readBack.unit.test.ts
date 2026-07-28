@@ -213,7 +213,7 @@ describe("EvaluationAnalyticsStore read-back version gate", () => {
     it("reports a store miss so the fold refolds instead of trusting it", async () => {
       const { store } = storeOver(staleRow());
 
-      const { state, appliedEventIds } = await store.getWithApplied(
+      const { state, appliedEventIds, miss } = await store.getWithApplied(
         "eval-rb",
         context,
       );
@@ -222,6 +222,11 @@ describe("EvaluationAnalyticsStore read-back version gate", () => {
       // The watermark goes with the state: keeping it would suppress the very
       // events the re-fold needs to see.
       expect(appliedEventIds).toEqual([]);
+      // Asserted on the REAL store. The executor skips its unwindowed
+      // re-read on `undecodable`; without this the only test naming the
+      // value fabricated it from a mock, so deleting the discriminator
+      // here left the suite green.
+      expect(miss).toBe("undecodable");
     });
 
     it("misses through get() too, so both read paths agree", async () => {

@@ -750,11 +750,6 @@ interface LogContribution {
   traceId: string;
   liftedAttributes: Record<string, unknown>;
   nonBillable: boolean;
-  /**
-   * The contributing record's own time, used as the storage anchor for a trace
-   * that has no spans to supply one.
-   */
-  occurredAtMs: number;
 }
 
 /**
@@ -816,20 +811,34 @@ function applyLogContribution({
   return {
     ...state,
     traceId: state.traceId || contribution.traceId,
-    // `OccurredAt` is this table's partition key AND its TTL anchor (00039).
-    // Only spans used to set it, so a log-only trace — Claude Code Path B,
-    // Codex Path B, which `hasPersistableSignal` deliberately persists —
-    // committed its row at OccurredAt 0: partition 197001, and a TTL deadline
-    // of `1970 + retention`, i.e. expired before it was written. The row was
-    // reaped on the next TTL merge, so the read-back never hit for that whole
-    // traffic class and every delivery refolded from `event_log` instead.
+    // KNOWN DEFECT, deliberately NOT fixed here — do not "fix" it by anchoring
+    // `occurredAt` from the log.
     //
-    // FIRST-observed, not min(): this is a storage anchor, and ADR-071's rule
-    // is that an anchor must not move. A span arriving later still refines it
-    // downwards through the span path — that is the pre-existing behaviour this
-    // does not change — but logs alone will not walk it backwards.
-    occurredAt:
-      state.occurredAt === 0 ? contribution.occurredAtMs : state.occurredAt,
+    // `OccurredAt` is this table's partition key AND its TTL anchor (00039), and
+    // only spans set it. A log-only trace — Claude Code Path B, Codex Path B,
+    // which `hasPersistableSignal` deliberately persists — therefore commits its
+    // row at OccurredAt 0: partition 197001, with a TTL deadline of
+    // `1970 + retention`, i.e. expired before it was written.
+    //
+    // The obvious fix (`state.occurredAt === 0 ? contribution.occurredAtMs : …`)
+    // is WRONG, and was reverted after review. `occurredAt` is not only the
+    // storage anchor: `SpanTimingService.accumulateTiming` uses `occurredAt > 0`
+    // as its "a span has seeded the timing baseline" sentinel, and computes
+    // `currentEnd = occurredAt + totalDurationMs`. Seeding it from a log — whose
+    // time is the platform ACCEPT time, not producer business time — inflates
+    // `TotalDurationMs` by the whole ingest lag, and `SpanCostService` divides
+    // completion tokens by that same value, so `TokensPerSecond` goes with it.
+    // Worse, the result depends on whether the log or the span folds first, so
+    // one trace can report two different latencies.
+    //
+    // Nor can the sentinel simply move to `spanCount`: a synthetic span
+    // increments the count without seeding timing, so `spanCount > 0` breaks the
+    // synthetic-then-real ordering, and `spanCount > 0 && occurredAt > 0` breaks
+    // log-then-synthetic-then-real.
+    //
+    // The real fix is a storage anchor that is separate from the timing
+    // baseline — a distinct state field, persisted or derived on read-back —
+    // which is ADR-071 step 3's stated target and needs its own change.
     attributes: mergedAttributes,
     models,
     totalCost,
@@ -1002,7 +1011,6 @@ export class TraceAnalyticsFoldProjection
         liftedAttributes: liftCanonicalAttributesFromLogRecord(event.data),
         nonBillable:
           event.data.resourceAttributes?.[NON_BILLABLE_ATTR] === "true",
-        occurredAtMs: event.occurredAt,
       },
     });
   }
@@ -1017,7 +1025,6 @@ export class TraceAnalyticsFoldProjection
         traceId: event.data.traceId,
         liftedAttributes: event.data.liftedAttributes,
         nonBillable: event.data.nonBillable,
-        occurredAtMs: event.occurredAt,
       },
     });
   }

@@ -162,9 +162,13 @@ export class CodingAgentSessionStore
    *
    * `context.readWindow` — computed by the executor from the fold's declared
    * `options.readWindow` — prunes the read to a window of partitions around the
-   * event being folded; it is passed through verbatim. On a windowed miss the
-   * EXECUTOR retries without the window, so a row outside it is still found;
-   * this store neither widens the window nor implements a fallback itself.
+   * event being folded; it is passed through verbatim. On an ABSENT windowed
+   * miss the EXECUTOR retries without the window, so a row outside it is still
+   * found; this store neither widens the window nor implements a fallback
+   * itself. A row that was FOUND and refused by the version gate is reported as
+   * `miss: "undecodable"`, and the executor deliberately does not retry it — a
+   * wider scope only finds the same row and refuses it again, so the retry was
+   * an unpruned scan per event per stale aggregate that could never succeed.
    */
   async getWithApplied(
     aggregateId: string,

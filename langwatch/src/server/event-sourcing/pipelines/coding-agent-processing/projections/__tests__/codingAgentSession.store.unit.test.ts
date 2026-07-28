@@ -308,7 +308,7 @@ describe("CodingAgentSessionStore read-back gate", () => {
         };
         const store = new CodingAgentSessionStore(repo);
 
-        const { state, appliedEventIds } = await store.getWithApplied(
+        const { state, appliedEventIds, miss } = await store.getWithApplied(
           "session-1",
           context(),
         );
@@ -317,6 +317,11 @@ describe("CodingAgentSessionStore read-back gate", () => {
         // The watermark goes with the state: keeping it would suppress the very
         // events the re-fold needs to see.
         expect(appliedEventIds).toEqual([]);
+        // Asserted on the REAL store. The executor skips its unwindowed
+        // re-read on `undecodable`; without this the only test naming the
+        // value fabricated it from a mock, so deleting the discriminator
+        // here left the suite green.
+        expect(miss).toBe("undecodable");
       });
 
       it("misses through get() too, so both read paths agree", async () => {

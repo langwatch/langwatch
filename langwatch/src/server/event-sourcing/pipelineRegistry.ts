@@ -1486,7 +1486,7 @@ export function getProcessManagerMetadata(): ProcessManagerMetadata[] {
 export interface KillSwitchDescriptor {
   key: string;
   aggregateType: string;
-  componentType: "projection" | "mapProjection" | "command";
+  componentType: "projection" | "mapProjection" | "command" | "subscriber";
   componentName: string;
   pipelineName: string;
 }
@@ -1519,6 +1519,28 @@ export function getKillSwitchDescriptors(): KillSwitchDescriptor[] {
         aggregateType,
         componentType: "command",
         componentName: cmd.name,
+        pipelineName,
+      });
+    }
+    // Subscribers belong here MORE than the others do, not less: the enqueue
+    // seam decides relevance and DISCARDS what it judges irrelevant, and
+    // subscriber fan-out is never replayed (ADR-069), so a bad filter loses
+    // those events for good. `ops.setFeatureFlag` rejects any key that is
+    // neither a registry entry nor a live descriptor, so a switch missing from
+    // this list is not merely unlisted — it is unsettable, leaving a revert as
+    // the only way to stop the seam it guards.
+    //
+    // A subscriber may override its key via `options.killSwitch.customKey`;
+    // emit the key the router will actually read, or the page would offer one
+    // nothing consults.
+    for (const definition of def.eventSubscribers.values()) {
+      out.push({
+        key:
+          definition.options?.killSwitch?.customKey ??
+          `es-${aggregateType}-subscriber-${definition.name}-killswitch`,
+        aggregateType,
+        componentType: "subscriber",
+        componentName: definition.name,
         pipelineName,
       });
     }

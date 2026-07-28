@@ -215,37 +215,73 @@ describe("traceAnalytics fold projection — slim row derivation", () => {
         state,
       );
 
-    it("anchors OccurredAt on the log's own time, not on the epoch", () => {
-      // OccurredAt is the partition key AND the TTL anchor. Left at 0 the row
-      // lands in partition 197001 with a deadline of 1970 + retention — expired
-      // before it is written — so it is reaped and the read-back can never hit
-      // for log-only traces.
+    it("leaves the storage anchor at the epoch, the known 197001 defect", () => {
+      // Pins CURRENT behaviour, which is wrong-but-deliberate. OccurredAt is the
+      // partition key AND the TTL anchor, so a log-only trace commits into
+      // partition 197001 with a deadline of 1970 + retention. The fix is a
+      // storage anchor held separately from the timing baseline (ADR-071 step
+      // 3); anchoring `occurredAt` from the log instead breaks the trace's
+      // duration, which the next test pins.
       const state = foldLogRecord(createInitSlimState());
 
-      expect(state.occurredAt).toBe(logAtMs);
-      expect(projectFromState(state).occurredAtMs).toBe(logAtMs);
+      expect(state.occurredAt).toBe(0);
+      expect(projectFromState(state).occurredAtMs).toBe(0);
     });
 
-    it("does not walk the anchor backwards as later logs arrive", () => {
-      // First-observed, not min(): a storage anchor that keeps moving is the
-      // defect ADR-071 records, and this is the one place logs could introduce
-      // it. A late span still refines it through the span path.
-      const first = foldLogRecord(createInitSlimState());
-      const earlier = slimProjection.handleTraceLogRecordReceived(
-        {
-          occurredAt: logAtMs - 60_000,
-          data: {
-            traceId: "trace-log-only",
-            spanId: "span-2",
-            body: "earlier",
-            attributes: {},
-            resourceAttributes: {},
-          },
-        } as never,
-        first,
-      );
+    describe("when a span arrives after the log", () => {
+      it("reports the span's own duration, not the gap since the log", () => {
+        // REGRESSION GUARD. `SpanTimingService` treats `occurredAt > 0` as "a
+        // span has seeded the timing baseline" and computes
+        // `currentEnd = occurredAt + totalDurationMs`. Seeding `occurredAt` from
+        // a log — whose time is the platform ACCEPT time, not producer business
+        // time — makes the first span measure from the log instead of from
+        // itself, inflating TotalDurationMs by the whole ingest lag and taking
+        // TokensPerSecond (completion tokens / duration) with it.
+        //
+        // The span here completes 1s BEFORE the log is accepted, which is the
+        // ordinary case: a producer emits its log after the work finishes.
+        const spanStart = logAtMs - 5_000;
+        const spanEnd = logAtMs - 1_000;
 
-      expect(earlier.occurredAt).toBe(logAtMs);
+        const state = applySpanToAnalytics({
+          state: foldLogRecord(createInitSlimState()),
+          span: createTestSpan({
+            spanId: "s-after-log",
+            parentSpanId: null,
+            startTimeUnixMs: spanStart,
+            endTimeUnixMs: spanEnd,
+            durationMs: spanEnd - spanStart,
+          }),
+        });
+
+        expect(state.totalDurationMs).toBe(spanEnd - spanStart);
+        expect(state.occurredAt).toBe(spanStart);
+      });
+
+      it("reaches the same duration whichever of the two folds first", () => {
+        // The inflation was also order-dependent, so one trace could report two
+        // different latencies depending on delivery order.
+        const spanStart = logAtMs - 5_000;
+        const spanEnd = logAtMs - 1_000;
+        const span = createTestSpan({
+          spanId: "s-order",
+          parentSpanId: null,
+          startTimeUnixMs: spanStart,
+          endTimeUnixMs: spanEnd,
+          durationMs: spanEnd - spanStart,
+        });
+
+        const logFirst = applySpanToAnalytics({
+          state: foldLogRecord(createInitSlimState()),
+          span,
+        });
+        const spanFirst = foldLogRecord(
+          applySpanToAnalytics({ state: createInitSlimState(), span }),
+        );
+
+        expect(logFirst.totalDurationMs).toBe(spanFirst.totalDurationMs);
+        expect(logFirst.occurredAt).toBe(spanFirst.occurredAt);
+      });
     });
   });
 });

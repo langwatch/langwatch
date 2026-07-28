@@ -1195,23 +1195,47 @@ export class ProjectionRouter<
 
       const enqueue = subscriber.options?.enqueue;
 
+      // Kill switch, resolved BEFORE the enqueue hooks so a killed subscriber
+      // does no work at all. Every other dispatch path has one; without it the
+      // enqueue filter — which DROPS events irreversibly, since subscriber
+      // fan-out is never replayed — could only be stopped by shipping a revert.
+      //
+      // Resolved once per distinct tenant in the batch rather than once per
+      // event. `isComponentDisabled` is a cache lookup wrapped in a span, and
+      // the highest-volume subscribers match every span_received, so a per-event
+      // resolution put a lookup on the hottest path in the product to answer a
+      // question whose answer cannot change within one batch — the opposite of
+      // the "an irrelevant event costs nothing" doctrine this seam exists for.
+      const killedByTenant = new Map<string, boolean>();
+      const isKilledFor = async (tenantId: string): Promise<boolean> => {
+        const cached = killedByTenant.get(tenantId);
+        if (cached !== undefined) return cached;
+        const disabled = await isComponentDisabled({
+          featureFlagService: this.featureFlagService,
+          aggregateType: this.aggregateType,
+          componentType: "subscriber",
+          componentName: name,
+          tenantId,
+          customKey: subscriber.options?.killSwitch?.customKey,
+          logger: this.logger,
+        });
+        killedByTenant.set(tenantId, disabled);
+        return disabled;
+      };
+
       for (const event of matching) {
         try {
-          // Kill switch, checked BEFORE the enqueue hooks so a killed
-          // subscriber does no work at all. Every other dispatch path has one;
-          // without it the enqueue filter — which DROPS events irreversibly,
-          // since subscriber fan-out is never replayed — could only be stopped
-          // by shipping a revert.
-          const disabled = await isComponentDisabled({
-            featureFlagService: this.featureFlagService,
-            aggregateType: this.aggregateType,
-            componentType: "subscriber",
-            componentName: name,
-            tenantId: event.tenantId,
-            customKey: subscriber.options?.killSwitch?.customKey,
-            logger: this.logger,
-          });
-          if (disabled) continue;
+          if (await isKilledFor(event.tenantId)) {
+            // Counted, not skipped silently. A kill is permanent data loss for
+            // this subscriber, and an operator has to be able to tell it apart
+            // from a quiet subscriber — precisely when they are looking.
+            incrementEsSubscriberEnqueueTotal({
+              pipelineName: this.pipelineName,
+              subscriberName: name,
+              outcome: "killed",
+            });
+            continue;
+          }
 
           // Enqueue-time filter (ADR-069 invariant 4): a declined event never
           // mints a job. A throw here is deliberately NOT caught as `false` —
@@ -1230,8 +1254,11 @@ export class ProjectionRouter<
 
           // Claim-check staging (ADR-069): the subscriber may swap the staged
           // payload for a small reference event mirroring the source event's
-          // scheduling identity. Total field-picks only — a throw fails into
-          // the routing retry like the filter's.
+          // scheduling identity. Total field-picks only — like the filter's, a
+          // throw here is reported and counted `failed`, and permanently loses
+          // this subscriber's job for this event. There is no routing retry:
+          // eventSourcingService catches and logs the dispatch AggregateError
+          // without rethrowing.
           const staged = enqueue?.stage
             ? (enqueue.stage(event) as EventType)
             : event;

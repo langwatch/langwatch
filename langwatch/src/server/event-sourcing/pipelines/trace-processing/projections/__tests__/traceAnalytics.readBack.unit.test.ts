@@ -206,7 +206,7 @@ describe("TraceAnalyticsStore read-back version gate", () => {
     it("reports a store miss so the fold refolds instead of trusting it", async () => {
       const { store } = storeOver(staleRow());
 
-      const { state, appliedEventIds } = await store.getWithApplied(
+      const { state, appliedEventIds, miss } = await store.getWithApplied(
         "trace-rb",
         context,
       );
@@ -215,6 +215,27 @@ describe("TraceAnalyticsStore read-back version gate", () => {
       // The watermark goes with the state: keeping it would suppress the very
       // events the re-fold needs to see.
       expect(appliedEventIds).toEqual([]);
+      // Asserted on the REAL store, not a mock. The executor skips its
+      // unwindowed re-read on `undecodable`, and until this was pinned here the
+      // only test naming the value fabricated it from a `vi.fn()` — so deleting
+      // the discriminator from this store left the suite green while the
+      // executor silently went back to an unpruned scan per event.
+      expect(miss).toBe("undecodable");
+    });
+
+    it("tells an absent row apart from a refused one", async () => {
+      // The two miss kinds mean opposite things to an operator: `absent` says
+      // "widen readWindow.widthMs", `undecodable` says "a stale shape is being
+      // rebuilt". Reporting a version rejection as `absent` spent the
+      // window-fallback signal on a schema condition.
+      const store = new TraceAnalyticsStore({
+        findByTraceIdWithApplied: vi.fn().mockResolvedValue(null),
+      } as unknown as ConstructorParameters<typeof TraceAnalyticsStore>[0]);
+
+      const { state, miss } = await store.getWithApplied("trace-rb", context);
+
+      expect(state).toBeNull();
+      expect(miss).toBe("absent");
     });
 
     it("misses through get() too, so both read paths agree", async () => {

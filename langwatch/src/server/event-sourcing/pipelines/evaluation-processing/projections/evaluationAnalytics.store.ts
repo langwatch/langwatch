@@ -119,8 +119,11 @@ export class EvaluationAnalyticsStore
    * aggregate is rewritten, and for the population as a whole once retention has
    * aged the pre-00056 rows out.
    *
-   * `context.readWindow` is passed through verbatim; on a windowed miss the
-   * EXECUTOR retries without the window, so a row outside it is still found.
+   * `context.readWindow` is passed through verbatim; on an ABSENT windowed miss
+   * the EXECUTOR retries without the window, so a row outside it is still
+   * found. A row FOUND and refused by the version gate is reported as
+   * `miss: "undecodable"` and deliberately not retried — a wider scope finds
+   * the same row and refuses it again.
    */
   async getWithApplied(
     aggregateId: string,
