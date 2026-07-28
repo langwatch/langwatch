@@ -73,9 +73,7 @@ export type CustomModelsInput = z.infer<typeof customModelUpdateInputSchema>;
  *
  * @returns true if the value is a legacy string array
  */
-export function isLegacyCustomModels(
-  value: unknown,
-): value is string[] {
+export function isLegacyCustomModels(value: unknown): value is string[] {
   if (!Array.isArray(value)) return false;
   // Empty array is considered legacy (no elements to distinguish)
   if (value.length === 0) return true;

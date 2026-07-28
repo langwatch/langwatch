@@ -24,7 +24,7 @@ export function useSearchParams(): URLSearchParams {
 }
 
 export function useParams<
-  T extends Record<string, string | string[]> = Record<string, string>
+  T extends Record<string, string | string[]> = Record<string, string>,
 >(): T {
   return useRRParams() as unknown as T;
 }

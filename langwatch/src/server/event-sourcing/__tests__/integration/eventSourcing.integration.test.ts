@@ -1,14 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { type AggregateType, EventUtils } from "../../";
 import {
-	cleanupTestDataForTenant,
-	closePipelineGracefully,
-	createTestPipeline,
-	createTestTenantId,
-	generateTestAggregateId,
-	getTenantIdString,
-	waitForEventHandler,
-	waitForProjection,
+  cleanupTestDataForTenant,
+  closePipelineGracefully,
+  createTestPipeline,
+  createTestTenantId,
+  generateTestAggregateId,
+  getTenantIdString,
+  waitForEventHandler,
+  waitForProjection,
 } from "./testHelpers";
 import type { TestEvent, TestProjection } from "./testPipelines";
 
@@ -231,7 +231,14 @@ describe.skip("Event Sourcing", () => {
 
         await Promise.all(
           ids.map((id) =>
-            waitForProjection(pipeline, "testProjection", id, tenantId, 1, 10000),
+            waitForProjection(
+              pipeline,
+              "testProjection",
+              id,
+              tenantId,
+              1,
+              10000,
+            ),
           ),
         );
 

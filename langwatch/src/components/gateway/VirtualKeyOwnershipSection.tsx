@@ -1,9 +1,8 @@
 import { Button, HStack, Text, VStack, Wrap } from "@chakra-ui/react";
 import { Building2, Folder, UserLock, Users } from "lucide-react";
 import { useMemo } from "react";
-
-import { SmallLabel } from "../SmallLabel";
 import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
+import { SmallLabel } from "../SmallLabel";
 import { ProviderScopeChips } from "../settings/ProviderScopeChips";
 import {
   ScopeChipPicker,
@@ -171,10 +170,7 @@ export function VirtualKeyOwnershipSection({
   const kinds = useMemo(
     () =>
       KIND_OPTIONS.filter(
-        (o) =>
-          canCreateShared ||
-          o.kind === "PROJECT" ||
-          o.kind === "PERSONAL",
+        (o) => canCreateShared || o.kind === "PROJECT" || o.kind === "PERSONAL",
       ),
     [canCreateShared],
   );
@@ -328,7 +324,7 @@ export function VirtualKeyOwnershipReadOnly({
         ? ctx.organizationName
         : s.scopeType === "TEAM"
           ? ctx.availableTeams.find((t) => t.id === s.scopeId)?.name
-          : projectName(s.scopeId, ctx) ?? undefined,
+          : (projectName(s.scopeId, ctx) ?? undefined),
   }));
   const projectScopes = scopes.filter((s) => s.scopeType === "PROJECT");
   const destination =

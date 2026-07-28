@@ -82,9 +82,7 @@ vi.mock("../../../utils/api", () => ({
           onSuccess?: (data: { projectSlug: string }) => void;
           onError?: (error: Error) => void;
         }) => ({
-          mutate: (
-            params: NonNullable<typeof createProjectMutateCall>,
-          ) => {
+          mutate: (params: NonNullable<typeof createProjectMutateCall>) => {
             createProjectMutateCall = params;
             callbacks?.onSuccess?.({ projectSlug: "new-project" });
           },
@@ -147,10 +145,9 @@ describe("<CreateProjectDrawer/>", () => {
 
       // Render with explicit organizationId prop (Org B),
       // while context returns Org A
-      render(
-        <CreateProjectDrawer organizationId={TARGET_ORG_ID} />,
-        { wrapper: Wrapper }
-      );
+      render(<CreateProjectDrawer organizationId={TARGET_ORG_ID} />, {
+        wrapper: Wrapper,
+      });
 
       // Fill in the project name
       const projectNameInput = screen.getByPlaceholderText("AI Project");
@@ -175,10 +172,7 @@ describe("<CreateProjectDrawer/>", () => {
       const user = userEvent.setup();
 
       // Render without organizationId prop - should use context
-      render(
-        <CreateProjectDrawer />,
-        { wrapper: Wrapper }
-      );
+      render(<CreateProjectDrawer />, { wrapper: Wrapper });
 
       // Fill in the project name
       const projectNameInput = screen.getByPlaceholderText("AI Project");

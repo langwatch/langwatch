@@ -1,11 +1,15 @@
-import { describe, it, expect, vi } from "vitest";
-import { replayEvents, FoldAccumulator, MapAccumulator } from "../replayExecutor";
+import { describe, expect, it, vi } from "vitest";
+import type { ResolvedRetention } from "../../../data-retention/retentionPolicy.schema";
+import type { RetentionPolicyResolver } from "../../../data-retention/retentionPolicyResolver";
+import { SPAN_RECEIVED_EVENT_TYPE } from "../../pipelines/trace-processing/schemas/constants";
 import type { FoldProjectionDefinition } from "../../projections/foldProjection.types";
 import type { MapProjectionDefinition } from "../../projections/mapProjection.types";
 import type { ReplayEvent } from "../replayEventLoader";
-import { SPAN_RECEIVED_EVENT_TYPE } from "../../pipelines/trace-processing/schemas/constants";
-import type { RetentionPolicyResolver } from "../../../data-retention/retentionPolicyResolver";
-import type { ResolvedRetention } from "../../../data-retention/retentionPolicy.schema";
+import {
+  FoldAccumulator,
+  MapAccumulator,
+  replayEvents,
+} from "../replayExecutor";
 
 /**
  * Helper: create a simple test fold projection with a spy store.
@@ -276,14 +280,28 @@ describe("FoldAccumulator", () => {
     const accumulator = new FoldAccumulator(projection);
 
     // Simulate interleaved events from two tenants (like streaming from CH)
-    accumulator.apply(makeEvent({ tenantId: "t-A", aggregateId: "agg-1", data: { value: 10 } }));
-    accumulator.apply(makeEvent({ tenantId: "t-B", aggregateId: "agg-1", data: { value: 100 } }));
-    accumulator.apply(makeEvent({ tenantId: "t-A", aggregateId: "agg-1", data: { value: 20 } }));
+    accumulator.apply(
+      makeEvent({ tenantId: "t-A", aggregateId: "agg-1", data: { value: 10 } }),
+    );
+    accumulator.apply(
+      makeEvent({
+        tenantId: "t-B",
+        aggregateId: "agg-1",
+        data: { value: 100 },
+      }),
+    );
+    accumulator.apply(
+      makeEvent({ tenantId: "t-A", aggregateId: "agg-1", data: { value: 20 } }),
+    );
 
     await accumulator.flush();
 
     const allEntries = storeBatchSpy.mock.calls.flatMap(
-      (call: unknown[]) => call[0] as Array<{ state: { total: number }; context: { tenantId: string } }>,
+      (call: unknown[]) =>
+        call[0] as Array<{
+          state: { total: number };
+          context: { tenantId: string };
+        }>,
     );
     expect(allEntries).toHaveLength(2);
 
@@ -316,7 +334,9 @@ describe("FoldAccumulator", () => {
       const accumulator = new FoldAccumulator(projection);
 
       accumulator.apply(makeEvent({ type: "test.event", data: { value: 10 } }));
-      accumulator.apply(makeEvent({ type: "unrelated.event", data: { value: 999 } }));
+      accumulator.apply(
+        makeEvent({ type: "unrelated.event", data: { value: 999 } }),
+      );
       accumulator.apply(makeEvent({ type: "test.event", data: { value: 20 } }));
 
       expect(accumulator.processed).toBe(2);
@@ -363,8 +383,14 @@ describe("MapAccumulator", () => {
     await acc.flush();
 
     expect(bulkAppendSpy).toHaveBeenCalledOnce();
-    const records = bulkAppendSpy.mock.calls[0]![0] as Array<{ doubled: number }>;
-    expect(records).toEqual([{ doubled: 10 }, { doubled: 20 }, { doubled: 30 }]);
+    const records = bulkAppendSpy.mock.calls[0]![0] as Array<{
+      doubled: number;
+    }>;
+    expect(records).toEqual([
+      { doubled: 10 },
+      { doubled: 20 },
+      { doubled: 30 },
+    ]);
   });
 
   describe("when event type does not match", () => {
@@ -381,7 +407,9 @@ describe("MapAccumulator", () => {
 
       await acc.flush();
 
-      const records = bulkAppendSpy.mock.calls[0]![0] as Array<{ doubled: number }>;
+      const records = bulkAppendSpy.mock.calls[0]![0] as Array<{
+        doubled: number;
+      }>;
       expect(records).toEqual([{ doubled: 10 }]);
     });
   });
@@ -393,8 +421,13 @@ describe("MapAccumulator", () => {
         name: "nullMap",
         eventTypes: ["test.event"],
         map: (event: any) =>
-          (event.data?.value ?? 0) > 10 ? { doubled: (event.data?.value ?? 0) * 2 } : null,
-        store: { append: appendSpy, bulkAppend: vi.fn().mockResolvedValue(undefined) },
+          (event.data?.value ?? 0) > 10
+            ? { doubled: (event.data?.value ?? 0) * 2 }
+            : null,
+        store: {
+          append: appendSpy,
+          bulkAppend: vi.fn().mockResolvedValue(undefined),
+        },
       };
       const acc = new MapAccumulator(projection);
 
@@ -486,8 +519,12 @@ describe("MapAccumulator", () => {
       // Each append fallback call must carry the originating event's
       // aggregateId — stores keying off context.aggregateId would diverge
       // from the non-optimized replay path otherwise.
-      expect(appendSpy.mock.calls[0]![1]).toMatchObject({ aggregateId: "agg-A" });
-      expect(appendSpy.mock.calls[1]![1]).toMatchObject({ aggregateId: "agg-B" });
+      expect(appendSpy.mock.calls[0]![1]).toMatchObject({
+        aggregateId: "agg-A",
+      });
+      expect(appendSpy.mock.calls[1]![1]).toMatchObject({
+        aggregateId: "agg-B",
+      });
     });
   });
 
@@ -566,7 +603,8 @@ describe("MapAccumulator", () => {
 
   describe("when no events are applied", () => {
     it("skips store on flush", async () => {
-      const { projection, bulkAppendSpy, appendSpy } = createTestMapProjection();
+      const { projection, bulkAppendSpy, appendSpy } =
+        createTestMapProjection();
       const acc = new MapAccumulator(projection);
 
       await acc.flush();
@@ -642,7 +680,9 @@ describe("retention policy on replay write contexts", () => {
         store: { append: vi.fn(), bulkAppend: bulkAppendSpy },
       };
       const resolver = makeResolver();
-      const acc = new MapAccumulator(projection, { retentionResolver: resolver });
+      const acc = new MapAccumulator(projection, {
+        retentionResolver: resolver,
+      });
 
       await acc.apply(makeEvent({ tenantId: "t-A", data: { value: 5 } }));
       await acc.apply(makeEvent({ tenantId: "t-A", data: { value: 6 } }));
@@ -681,7 +721,9 @@ describe("retention policy on replay write contexts", () => {
     it("stamps the resolved retention policy on the storeBatch context", async () => {
       const { projection, storeBatchSpy } = createTestProjection();
       const resolver = makeResolver();
-      const acc = new FoldAccumulator(projection, { retentionResolver: resolver });
+      const acc = new FoldAccumulator(projection, {
+        retentionResolver: resolver,
+      });
 
       await acc.apply(makeEvent({ tenantId: "t-A", data: { value: 10 } }));
       await acc.flush();

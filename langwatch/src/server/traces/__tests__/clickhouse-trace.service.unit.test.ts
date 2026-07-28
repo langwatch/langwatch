@@ -1006,9 +1006,7 @@ describe("ClickHouseTraceService", () => {
           summaryCall.query.match(/OccurredAt <= fromUnixTimestamp64Milli/g) ??
             [],
         ).toHaveLength(2);
-        expect(summaryCall.query_params.fromMs).toBe(
-          1_000_000 - TWO_DAYS_MS,
-        );
+        expect(summaryCall.query_params.fromMs).toBe(1_000_000 - TWO_DAYS_MS);
         expect(summaryCall.query_params.toMs).toBe(2_000_000 + TWO_DAYS_MS);
       });
     });
@@ -1045,9 +1043,7 @@ describe("ClickHouseTraceService", () => {
           summaryCall.query.match(/OccurredAt >= fromUnixTimestamp64Milli/g) ??
             [],
         ).toHaveLength(2);
-        expect(summaryCall.query_params.fromMs).toBe(
-          1_000_000 - TWO_DAYS_MS,
-        );
+        expect(summaryCall.query_params.fromMs).toBe(1_000_000 - TWO_DAYS_MS);
         expect(summaryCall.query_params.toMs).toBe(2_000_000 + TWO_DAYS_MS);
       });
 
@@ -1134,7 +1130,9 @@ describe("isClickHouseMemoryLimitError", () => {
     );
 
     const wrapped = new ClickHouseUnavailableError({
-      reasons: [new Error("Code: 241. DB::Exception: ... (MEMORY_LIMIT_EXCEEDED)")],
+      reasons: [
+        new Error("Code: 241. DB::Exception: ... (MEMORY_LIMIT_EXCEEDED)"),
+      ],
     });
     expect(isClickHouseMemoryLimitError(wrapped)).toBe(true);
   });

@@ -8,8 +8,8 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
 import type { UIMessage } from "ai";
+import { describe, expect, it, vi } from "vitest";
 
 // The capability renderer (reached via the collapsed-receipt scenario) reads
 // the project off this hook, which is tRPC-backed, mock the boundary, as the

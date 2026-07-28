@@ -131,7 +131,8 @@ describe("ProjectionRouter reactor dispatch over a coalesced batch", () => {
       const reactor: ReactorDefinition<Event> = {
         name: "customEvaluationSync",
         options: {
-          makeJobId: ({ event }) => `custom-eval:${event.aggregateId}:${event.id}`,
+          makeJobId: ({ event }) =>
+            `custom-eval:${event.aggregateId}:${event.id}`,
         },
         handle: vi.fn().mockResolvedValue(undefined),
       };

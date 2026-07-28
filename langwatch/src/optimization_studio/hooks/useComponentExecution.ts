@@ -110,7 +110,10 @@ export const useComponentExecution = () => {
       }
 
       const trace_id = generateOtelTraceId();
-      logger.info({ nodeId: node.id, trace_id }, "component execution starting");
+      logger.info(
+        { nodeId: node.id, trace_id },
+        "component execution starting",
+      );
 
       setComponentExecutionState(node.id, {
         status: "waiting",
@@ -170,7 +173,10 @@ export const useComponentExecution = () => {
         return;
       }
 
-      logger.info({ nodeId: node_id, trace_id }, "component execution stopping");
+      logger.info(
+        { nodeId: node_id, trace_id },
+        "component execution stopping",
+      );
 
       if (current_state?.status === "waiting") {
         setComponentExecutionState(node_id, {

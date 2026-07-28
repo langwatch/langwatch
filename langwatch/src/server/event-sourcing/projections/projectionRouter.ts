@@ -45,10 +45,10 @@ import type { FoldProjectionDefinition } from "./foldProjection.types";
 import { FoldProjectionExecutor } from "./foldProjectionExecutor";
 import type { MapProjectionDefinition } from "./mapProjection.types";
 import { MapProjectionExecutor } from "./mapProjectionExecutor";
-import type { StateProjectionDefinition } from "./stateProjection.types";
-import { StateProjectionExecutor } from "./stateProjectionExecutor";
 import type { ProjectionStoreContext } from "./projectionStoreContext";
 import type { ReplayMarkerChecker } from "./replayMarkerCheck";
+import type { StateProjectionDefinition } from "./stateProjection.types";
+import { StateProjectionExecutor } from "./stateProjectionExecutor";
 
 /**
  * Default cap on how many same-aggregate fold events are coalesced into one

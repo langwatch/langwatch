@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
 import { SpanStorageClickHouseRepository } from "~/server/app-layer/traces/repositories/span-storage.clickhouse.repository";
-import { TraceSummaryService } from "~/server/app-layer/traces/trace-summary.service";
 import { TraceSummaryClickHouseRepository } from "~/server/app-layer/traces/repositories/trace-summary.clickhouse.repository";
+import { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
+import { TraceSummaryService } from "~/server/app-layer/traces/trace-summary.service";
 import type { AggregateType } from "../../../";
 import { definePipeline } from "../../../";
 import {
@@ -21,12 +21,12 @@ import { EventRepositoryClickHouse } from "../../../stores/repositories/eventRep
 import { AssignTopicCommand } from "../commands/assignTopicCommand";
 import { RecordSpanCommand } from "../commands/recordSpanCommand";
 import { SpanStorageMapProjection } from "../projections/spanStorage.mapProjection";
+import { SpanAppendStore } from "../projections/spanStorage.store";
 import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
 import { TraceSummaryFoldProjection } from "../projections/traceSummary.foldProjection";
+import { TraceSummaryStore } from "../projections/traceSummary.store";
 import type { TraceProcessingEvent } from "../schemas/events";
 import type { OtlpSpan } from "../schemas/otlp";
-import { SpanAppendStore } from "../projections/spanStorage.store";
-import { TraceSummaryStore } from "../projections/traceSummary.store";
 
 function generateTestTraceId(): string {
   return `trace-${Date.now()}-${Math.random().toString(36).substring(7)}`;
@@ -60,7 +60,15 @@ function buildTestSpan({
   startTimeMs?: number;
   durationMs?: number;
   parentSpanId?: string;
-  attributes?: Array<{ key: string; value: { stringValue?: string; intValue?: number; doubleValue?: number; boolValue?: boolean } }>;
+  attributes?: Array<{
+    key: string;
+    value: {
+      stringValue?: string;
+      intValue?: number;
+      doubleValue?: number;
+      boolValue?: boolean;
+    };
+  }>;
   statusCode?: number;
   statusMessage?: string;
 }): OtlpSpan {
@@ -105,10 +113,14 @@ function createTraceTestPipeline(): PipelineWithCommandHandlers<
   const redisConnection = getTestRedisConnection();
 
   if (!clickHouseClient) {
-    throw new Error("ClickHouse client not available. Ensure testcontainers are started.");
+    throw new Error(
+      "ClickHouse client not available. Ensure testcontainers are started.",
+    );
   }
   if (!redisConnection) {
-    throw new Error("Redis connection not available. Ensure testcontainers are started.");
+    throw new Error(
+      "Redis connection not available. Ensure testcontainers are started.",
+    );
   }
 
   const eventStore = new EventStoreClickHouse(
@@ -122,14 +134,28 @@ function createTraceTestPipeline(): PipelineWithCommandHandlers<
     processRole: "worker",
   });
 
-  const spanAppendStore = new SpanAppendStore(new SpanStorageService(new SpanStorageClickHouseRepository(async () => clickHouseClient)).repository);
-  const traceSummaryStore = new TraceSummaryStore(new TraceSummaryService(new TraceSummaryClickHouseRepository(async () => clickHouseClient)).repository);
+  const spanAppendStore = new SpanAppendStore(
+    new SpanStorageService(
+      new SpanStorageClickHouseRepository(async () => clickHouseClient),
+    ).repository,
+  );
+  const traceSummaryStore = new TraceSummaryStore(
+    new TraceSummaryService(
+      new TraceSummaryClickHouseRepository(async () => clickHouseClient),
+    ).repository,
+  );
 
   const pipelineDefinition = definePipeline<TraceProcessingEvent>()
     .withName(pipelineName)
     .withAggregateType("trace" as AggregateType)
-    .withFoldProjection("traceSummary", new TraceSummaryFoldProjection({ store: traceSummaryStore }) as any)
-    .withMapProjection("spanStorage", new SpanStorageMapProjection({ store: spanAppendStore }) as any)
+    .withFoldProjection(
+      "traceSummary",
+      new TraceSummaryFoldProjection({ store: traceSummaryStore }) as any,
+    )
+    .withMapProjection(
+      "spanStorage",
+      new SpanStorageMapProjection({ store: spanAppendStore }) as any,
+    )
     .withCommand("recordSpan", RecordSpanCommand as any)
     .withCommand("assignTopic", AssignTopicCommand as any)
     .build();
@@ -174,7 +200,12 @@ async function waitForTraceSummary(
     }
 
     const elapsed = Date.now() - startTime;
-    const currentInterval = elapsed < 500 ? pollIntervalMs : elapsed < 1500 ? pollIntervalMs * 2 : 300;
+    const currentInterval =
+      elapsed < 500
+        ? pollIntervalMs
+        : elapsed < 1500
+          ? pollIntervalMs * 2
+          : 300;
     await new Promise((resolve) => setTimeout(resolve, currentInterval));
   }
 
@@ -189,7 +220,9 @@ async function waitForTraceSummary(
     if (data && data.spanCount >= expectedSpanCount) {
       return;
     }
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 
   throw new Error(
     `Timeout waiting for trace summary. Expected SpanCount >= ${expectedSpanCount} for trace ${traceId}`,
@@ -225,7 +258,12 @@ async function waitForTopicAssignment(
     }
 
     const elapsed = Date.now() - startTime;
-    const currentInterval = elapsed < 500 ? pollIntervalMs : elapsed < 1500 ? pollIntervalMs * 2 : 300;
+    const currentInterval =
+      elapsed < 500
+        ? pollIntervalMs
+        : elapsed < 1500
+          ? pollIntervalMs * 2
+          : 300;
     await new Promise((resolve) => setTimeout(resolve, currentInterval));
   }
 
@@ -240,7 +278,9 @@ async function waitForTopicAssignment(
     if (data && data.topicId === expectedTopicId) {
       return;
     }
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 
   throw new Error(
     `Timeout waiting for topic assignment. Expected TopicId "${expectedTopicId}" for trace ${traceId}`,
@@ -297,7 +337,9 @@ async function waitForStoredSpans(
     const rows = await result.json<{ count: number | string }>();
     const count = Number(rows[0]?.count ?? 0);
     if (count >= expectedCount) return count;
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 
   throw new Error(
     `Timeout waiting for stored spans. Expected ${expectedCount} for trace ${traceId}`,
@@ -307,7 +349,9 @@ async function waitForStoredSpans(
 const CLICKHOUSE_CONSISTENCY_DELAY_MS = 200;
 
 async function waitForClickHouseConsistency(): Promise<void> {
-  await new Promise((resolve) => setTimeout(resolve, CLICKHOUSE_CONSISTENCY_DELAY_MS));
+  await new Promise((resolve) =>
+    setTimeout(resolve, CLICKHOUSE_CONSISTENCY_DELAY_MS),
+  );
 }
 
 const hasTestcontainers = !!(
@@ -494,7 +538,10 @@ describe.skipIf(!hasTestcontainers)(
             attributes: [
               { key: "gen_ai.usage.input_tokens", value: { intValue: 150 } },
               { key: "gen_ai.usage.output_tokens", value: { intValue: 80 } },
-              { key: "gen_ai.response.model", value: { stringValue: "gpt-4o" } },
+              {
+                key: "gen_ai.response.model",
+                value: { stringValue: "gpt-4o" },
+              },
             ],
           }),
           resource: null,
@@ -581,8 +628,14 @@ describe.skipIf(!hasTestcontainers)(
           }),
           resource: {
             attributes: [
-              { key: "telemetry.sdk.name", value: { stringValue: "opentelemetry" } },
-              { key: "telemetry.sdk.language", value: { stringValue: "python" } },
+              {
+                key: "telemetry.sdk.name",
+                value: { stringValue: "opentelemetry" },
+              },
+              {
+                key: "telemetry.sdk.language",
+                value: { stringValue: "python" },
+              },
               { key: "service.name", value: { stringValue: "my-agent" } },
             ],
           },

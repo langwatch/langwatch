@@ -28,12 +28,12 @@ export const ModelCell: CellDef<ConversationGroup> = {
   label: "Model",
   render: ({ row }) => (
     <MonoCell truncate whiteSpace={undefined}>
-      {row.primaryModel ? (row.primaryModel) : dash}
+      {row.primaryModel ? row.primaryModel : dash}
     </MonoCell>
   ),
   renderComfortable: ({ row }) => (
     <Text textStyle="xs" color="fg.muted" truncate>
-      {row.primaryModel ? (row.primaryModel) : dash}
+      {row.primaryModel ? row.primaryModel : dash}
     </Text>
   ),
 };

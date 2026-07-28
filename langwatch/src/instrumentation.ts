@@ -11,7 +11,9 @@ export async function register() {
     } catch (error) {
       // Surface the real error clearly — Next.js wraps this in a generic
       // "An error occurred while loading instrumentation hook" message that hides the cause.
-      console.error(error instanceof Error ? error.stack ?? error.message : error);
+      console.error(
+        error instanceof Error ? (error.stack ?? error.message) : error,
+      );
       throw error;
     }
   }

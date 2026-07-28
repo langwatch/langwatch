@@ -634,7 +634,10 @@ export class QueueManager<EventType extends Event = Event> {
         processBatch:
           coalesceMaxBatch && coalesceMaxBatch > 1
             ? async (payloads: any[]) => {
-                await processCommandBatch({ ...commandProcessParams, payloads });
+                await processCommandBatch({
+                  ...commandProcessParams,
+                  payloads,
+                });
               }
             : undefined,
         coalesceMaxBatch,

@@ -33,7 +33,9 @@ function expressionFacet(
   const def = FACET_BY_KEY.get(key);
   if (!def) throw new Error(`facet '${key}' is missing from FACET_REGISTRY`);
   if (!("expression" in def)) {
-    throw new Error(`facet '${key}' has no expression to derive a handler from`);
+    throw new Error(
+      `facet '${key}' has no expression to derive a handler from`,
+    );
   }
   return def;
 }

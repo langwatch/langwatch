@@ -1,10 +1,10 @@
-import { createLogger } from "@langwatch/observability";
 import { HandledError } from "@langwatch/handled-error";
+import { createLogger } from "@langwatch/observability";
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
+import { handleError } from "../../middleware/error-handler";
 import { HttpError, InternalServerError } from "../../shared/errors";
 import { errorSchema } from "../../shared/schemas";
-import { handleError } from "../../middleware/error-handler";
 
 const logger = createLogger("langwatch:api:groups:errors");
 

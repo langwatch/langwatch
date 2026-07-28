@@ -1,11 +1,11 @@
 /**
  * @vitest-environment jsdom
  */
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  type GeneratedScenario,
   generateScenarioWithAI,
   ScenarioGenerationError,
-  type GeneratedScenario,
 } from "../scenarioGeneration";
 
 describe("generateScenarioWithAI()", () => {
@@ -33,7 +33,7 @@ describe("generateScenarioWithAI()", () => {
       const result = await generateScenarioWithAI(
         "test prompt",
         "project-123",
-        null
+        null,
       );
 
       expect(result).toEqual(mockScenario);
@@ -73,7 +73,7 @@ describe("generateScenarioWithAI()", () => {
       await generateScenarioWithAI(
         "refine this",
         "project-123",
-        currentScenario
+        currentScenario,
       );
 
       expect(global.fetch).toHaveBeenCalledWith("/api/scenario/generate", {
@@ -107,7 +107,7 @@ describe("generateScenarioWithAI()", () => {
           status: 502,
           statusText: "Bad Gateway",
           headers: { "content-type": "text/html" },
-        })
+        }),
       );
     });
 
@@ -115,12 +115,12 @@ describe("generateScenarioWithAI()", () => {
       const error = await generateScenarioWithAI(
         "test prompt",
         "project-123",
-        null
+        null,
       ).catch((e: unknown) => e);
 
       expect(error).toBeInstanceOf(Error);
       expect((error as Error).message).not.toMatch(
-        /Unexpected token|is not valid JSON|DOCTYPE/i
+        /Unexpected token|is not valid JSON|DOCTYPE/i,
       );
     });
 
@@ -128,7 +128,7 @@ describe("generateScenarioWithAI()", () => {
       const error = await generateScenarioWithAI(
         "test prompt",
         "project-123",
-        null
+        null,
       ).catch((e: unknown) => e);
 
       expect((error as Error).message).toContain("502");
@@ -143,7 +143,7 @@ describe("generateScenarioWithAI()", () => {
       });
 
       await expect(
-        generateScenarioWithAI("test prompt", "project-123", null)
+        generateScenarioWithAI("test prompt", "project-123", null),
       ).rejects.toThrow("Custom error message");
     });
 
@@ -154,7 +154,7 @@ describe("generateScenarioWithAI()", () => {
       });
 
       await expect(
-        generateScenarioWithAI("test prompt", "project-123", null)
+        generateScenarioWithAI("test prompt", "project-123", null),
       ).rejects.toThrow("Failed to generate scenario");
     });
   });
@@ -177,7 +177,7 @@ describe("generateScenarioWithAI()", () => {
       const error = await generateScenarioWithAI(
         "test prompt",
         "project-123",
-        null
+        null,
       ).catch((e: unknown) => e);
 
       expect(error).toBeInstanceOf(ScenarioGenerationError);
@@ -196,7 +196,7 @@ describe("generateScenarioWithAI()", () => {
       });
 
       await expect(
-        generateScenarioWithAI("test prompt", "project-123", null)
+        generateScenarioWithAI("test prompt", "project-123", null),
       ).rejects.toThrow("Invalid response: missing scenario data");
     });
 
@@ -216,7 +216,7 @@ describe("generateScenarioWithAI()", () => {
       });
 
       await expect(
-        generateScenarioWithAI("test prompt", "project-123", null)
+        generateScenarioWithAI("test prompt", "project-123", null),
       ).rejects.toThrow("Invalid scenario data");
     });
 
@@ -232,7 +232,7 @@ describe("generateScenarioWithAI()", () => {
       });
 
       await expect(
-        generateScenarioWithAI("test prompt", "project-123", null)
+        generateScenarioWithAI("test prompt", "project-123", null),
       ).rejects.toThrow("Invalid scenario data");
     });
   });

@@ -1,3 +1,4 @@
+import { generate } from "@langwatch/ksuid";
 import {
   type CustomRole,
   type Prisma,
@@ -5,7 +6,6 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "@prisma/client";
-import { generate } from "@langwatch/ksuid";
 import { KSUID_RESOURCES } from "~/utils/constants";
 
 export const CUSTOM_ROLE_KIND = {
@@ -246,7 +246,9 @@ export class RoleRepository {
 
   private requireFullClient(): PrismaClient {
     if (!("$transaction" in this.prisma)) {
-      throw new Error("assignToUser/removeFromUser require PrismaClient, not a TransactionClient");
+      throw new Error(
+        "assignToUser/removeFromUser require PrismaClient, not a TransactionClient",
+      );
     }
     return this.prisma as PrismaClient;
   }
@@ -260,7 +262,12 @@ export class RoleRepository {
 
     await prisma.$transaction(async (tx) => {
       await tx.roleBinding.deleteMany({
-        where: { organizationId: team.organizationId, userId, scopeType: RoleBindingScopeType.TEAM, scopeId: teamId },
+        where: {
+          organizationId: team.organizationId,
+          userId,
+          scopeType: RoleBindingScopeType.TEAM,
+          scopeId: teamId,
+        },
       });
       await tx.roleBinding.create({
         data: {
@@ -285,7 +292,12 @@ export class RoleRepository {
 
     await prisma.$transaction(async (tx) => {
       await tx.roleBinding.deleteMany({
-        where: { organizationId: team.organizationId, userId, scopeType: RoleBindingScopeType.TEAM, scopeId: teamId },
+        where: {
+          organizationId: team.organizationId,
+          userId,
+          scopeType: RoleBindingScopeType.TEAM,
+          scopeId: teamId,
+        },
       });
       await tx.roleBinding.create({
         data: {

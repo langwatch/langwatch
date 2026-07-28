@@ -2,7 +2,7 @@
  * @vitest-environment node
  */
 
-import { AgentRole, type AgentInput } from "@langwatch/scenario";
+import { type AgentInput, AgentRole } from "@langwatch/scenario";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { WorkflowAgentData } from "../../types";
 import { SerializedWorkflowAgentAdapter } from "../workflow-agent.adapter";
@@ -342,9 +342,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
 
       const callBody = JSON.parse(mockFetch.mock.calls[0]![1].body);
       const inputsRecord = callBody.payload.inputs[0];
-      expect(inputsRecord.history).toBe(
-        JSON.stringify(defaultInput.messages),
-      );
+      expect(inputsRecord.history).toBe(JSON.stringify(defaultInput.messages));
     });
 
     it("ignores mappings for inputs that do not exist on the agent", async () => {

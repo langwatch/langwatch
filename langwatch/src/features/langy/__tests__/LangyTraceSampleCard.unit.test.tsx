@@ -9,9 +9,9 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import type { CliResultDigest } from "@langwatch/langy";
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { CapabilityData } from "../hooks/useCapabilityData";
-import { LangyTraceSampleCard } from "../components/capabilities/LangyTraceSampleCard";
 import { resolveCapability } from "../components/capabilities/capabilityRegistry";
+import { LangyTraceSampleCard } from "../components/capabilities/LangyTraceSampleCard";
+import type { CapabilityData } from "../hooks/useCapabilityData";
 
 // The hydration seam is mocked: these tests pin the card's RENDERING of each
 // hydration state (fresh rows, skeletons, gone, fallback), not the fetching —
@@ -195,9 +195,7 @@ describe("LangyTraceSampleCard", () => {
         const row = screen
           .getByText("question trace_a")
           .closest("a") as HTMLAnchorElement;
-        expect(row.getAttribute("href")).toContain(
-          "drawer.traceId=trace_a",
-        );
+        expect(row.getAttribute("href")).toContain("drawer.traceId=trace_a");
       });
     });
 

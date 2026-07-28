@@ -10,10 +10,10 @@ import { slugify } from "~/utils/slugify";
 import type {
   PaginatedResult,
   PresenceConfig,
-  TraceSharingConfig,
   ProjectRepository,
   ProjectWithTeam,
   SearchProjectsResult,
+  TraceSharingConfig,
   UpdateProjectInput,
   UpdateProjectMetadataInput,
 } from "./repositories/project.repository";

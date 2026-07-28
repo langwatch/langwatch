@@ -184,9 +184,7 @@ export function MessageCard({
                 />
               ) : (
                 <Text lineClamp={1} wordBreak="break-all" lineHeight="2.1em">
-                  <Markdown>
-                    {getExtractedInput(trace)}
-                  </Markdown>
+                  <Markdown>{getExtractedInput(trace)}</Markdown>
                 </Text>
               )}
             </RedactedField>
@@ -223,9 +221,7 @@ export function MessageCard({
                     value={stringifyIfObject(trace.output.value)}
                   />
                 ) : trace.output?.value ? (
-                  <Markdown>
-                    {getSlicedOutput(trace)}
-                  </Markdown>
+                  <Markdown>{getSlicedOutput(trace)}</Markdown>
                 ) : trace.lastGuardrail ? (
                   <HStack
                     align="start"

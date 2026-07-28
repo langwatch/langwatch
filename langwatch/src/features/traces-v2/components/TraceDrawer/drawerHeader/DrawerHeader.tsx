@@ -1188,17 +1188,12 @@ export const DrawerHeader = memo(function DrawerHeader({
               <Box display="inline-flex">
                 <MetricPill
                   label="Models"
-                  value={`${(trace.models[0]!)}  +${
-                    trace.models.length - 1
-                  }`}
+                  value={`${trace.models[0]!}  +${trace.models.length - 1}`}
                 />
               </Box>
             </ModelsTooltip>
           ) : (
-            <MetricPill
-              label="Model"
-              value={(trace.models[0]!)}
-            />
+            <MetricPill label="Model" value={trace.models[0]!} />
           ))}
         {reasoningEffort && (
           <MetricPill label="Reasoning effort" value={reasoningEffort} />

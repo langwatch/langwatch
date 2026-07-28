@@ -15,9 +15,9 @@ import {
   MessageSquare,
 } from "lucide-react";
 import { forwardRef, useState } from "react";
-import { UserAvatar } from "~/components/UserAvatar";
 import { PersonalFeatureGateDialog } from "~/components/me/PersonalFeatureGateDialog";
 import { usePersonalFeatureGate } from "~/components/me/usePersonalFeatureGate";
+import { UserAvatar } from "~/components/UserAvatar";
 import { Popover } from "~/components/ui/popover";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useDrawer } from "~/hooks/useDrawer";

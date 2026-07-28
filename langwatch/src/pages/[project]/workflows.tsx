@@ -14,8 +14,8 @@ import { PageLayout } from "../../components/ui/layouts/PageLayout";
 import { Link } from "../../components/ui/link";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { WorkflowCard } from "../../optimization_studio/components/workflow/WorkflowCard";
 import { NewWorkflowModal } from "../../optimization_studio/components/workflow/NewWorkflowModal";
+import { WorkflowCard } from "../../optimization_studio/components/workflow/WorkflowCard";
 import { api } from "../../utils/api";
 
 function Workflows() {
@@ -78,29 +78,29 @@ function Workflows() {
                   name: workflow.name,
                 })}
               >
-              <Link
-                href={`/${project?.slug}/studio/${workflow.id}`}
-                display="block"
-                asChild
-              >
-                <WorkflowCard
-                  workflowId={workflow.id}
-                  query={workflows}
-                  name={workflow.name}
-                  icon={workflow.icon}
-                  onClick={(e) => {
-                    let target = e.target as HTMLElement;
-                    while (target.parentElement) {
-                      if (target.classList.contains("js-inner-menu")) {
-                        e.stopPropagation();
-                        e.preventDefault();
-                        return false;
+                <Link
+                  href={`/${project?.slug}/studio/${workflow.id}`}
+                  display="block"
+                  asChild
+                >
+                  <WorkflowCard
+                    workflowId={workflow.id}
+                    query={workflows}
+                    name={workflow.name}
+                    icon={workflow.icon}
+                    onClick={(e) => {
+                      let target = e.target as HTMLElement;
+                      while (target.parentElement) {
+                        if (target.classList.contains("js-inner-menu")) {
+                          e.stopPropagation();
+                          e.preventDefault();
+                          return false;
+                        }
+                        target = target.parentElement;
                       }
-                      target = target.parentElement;
-                    }
-                  }}
-                />
-              </Link>
+                    }}
+                  />
+                </Link>
               </LangyContextTarget>
             ))}
           </Grid>

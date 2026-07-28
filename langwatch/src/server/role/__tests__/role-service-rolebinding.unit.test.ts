@@ -1,7 +1,7 @@
 import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { RoleService } from "../role.service";
 import { UserNotTeamMemberError } from "../errors";
+import { RoleService } from "../role.service";
 
 const mockTx = {
   roleBinding: {
@@ -57,7 +57,7 @@ describe("RoleService.assignRoleToUser", () => {
 
     it("allows role assignment via RoleBinding membership check", async () => {
       await expect(
-        service.assignRoleToUser("user-rolebinding-only", "team-1", "role-1")
+        service.assignRoleToUser("user-rolebinding-only", "team-1", "role-1"),
       ).resolves.toEqual({ success: true });
     });
 
@@ -65,7 +65,7 @@ describe("RoleService.assignRoleToUser", () => {
       await service.assignRoleToUser(
         "user-rolebinding-only",
         "team-1",
-        "role-1"
+        "role-1",
       );
 
       expect(mockPrisma.roleBinding.findFirst).toHaveBeenCalledWith({
@@ -94,7 +94,7 @@ describe("RoleService.assignRoleToUser", () => {
 
     it("throws UserNotTeamMemberError", async () => {
       await expect(
-        service.assignRoleToUser("user-nobody", "team-1", "role-1")
+        service.assignRoleToUser("user-nobody", "team-1", "role-1"),
       ).rejects.toThrow(UserNotTeamMemberError);
     });
   });

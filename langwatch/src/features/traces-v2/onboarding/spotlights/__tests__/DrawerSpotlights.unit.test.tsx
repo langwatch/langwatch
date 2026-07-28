@@ -241,5 +241,4 @@ describe("<DrawerSpotlights />", () => {
       });
     });
   });
-
 });

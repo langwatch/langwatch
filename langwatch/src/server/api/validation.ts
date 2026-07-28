@@ -248,25 +248,24 @@ function build(
   schema: ZodSchema,
   hook?: (result: unknown, c: unknown) => unknown,
 ): MiddlewareHandler {
-  const validate = openApiValidator(
-    target,
-    schema,
-    (async (result: ValidationResult, c: unknown) => {
-      // A caller-supplied hook still runs first and still wins if it answers;
-      // this only supplies the behaviour for the case nobody handled.
-      if (hook) {
-        const answered = await hook(result, c);
-        if (answered) return answered;
-      }
-      if (!result.success) {
-        throw new RequestValidationError({
-          target,
-          violations: (result.error?.issues ?? []).map(violationOf),
-        });
-      }
-      return undefined;
-    }) as never,
-  );
+  const validate = openApiValidator(target, schema, (async (
+    result: ValidationResult,
+    c: unknown,
+  ) => {
+    // A caller-supplied hook still runs first and still wins if it answers;
+    // this only supplies the behaviour for the case nobody handled.
+    if (hook) {
+      const answered = await hook(result, c);
+      if (answered) return answered;
+    }
+    if (!result.success) {
+      throw new RequestValidationError({
+        target,
+        violations: (result.error?.issues ?? []).map(violationOf),
+      });
+    }
+    return undefined;
+  }) as never);
 
   const guarded: MiddlewareHandler = async (c, next) => {
     // A failure raised before the route ran is the validator's; anything after

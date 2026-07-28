@@ -4,15 +4,24 @@
  * Integration tests for onboarding.initializeOrganization.
  * Tests the real router flow with Prisma and App singleton wiring.
  */
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+
 import { nanoid } from "nanoid";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
+import { FREE_PLAN } from "../../../../../ee/licensing/constants";
+import { globalForApp, resetApp } from "../../../app-layer/app";
+import { createTestApp } from "../../../app-layer/presets";
+import { PlanProviderService } from "../../../app-layer/subscription/plan-provider";
 import { prisma } from "../../../db";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
-import { createTestApp } from "../../../app-layer/presets";
-import { globalForApp, resetApp } from "../../../app-layer/app";
-import { PlanProviderService } from "../../../app-layer/subscription/plan-provider";
-import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 
 const { mockSendSlackSignupEvent, mockGetActivePlan } = vi.hoisted(() => ({
   mockSendSlackSignupEvent: vi.fn(),
@@ -24,8 +33,7 @@ vi.mock("../../../auditLog", () => ({
 }));
 
 vi.mock("../../../../env.mjs", async (importOriginal) => {
-  const original =
-    await importOriginal<typeof import("../../../../env.mjs")>();
+  const original = await importOriginal<typeof import("../../../../env.mjs")>();
 
   return {
     ...original,

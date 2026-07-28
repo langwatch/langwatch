@@ -20,6 +20,7 @@ import {
   formatDuration,
   formatRelativeTimeAgo,
 } from "../../../utils/formatters";
+import { isTerminalOrigin } from "../../../utils/terminalOrigin";
 import {
   Bubble,
   type BubbleSide,
@@ -30,7 +31,6 @@ import { getDisplayRoleVisuals, useIsScenarioRole } from "../scenarioRoles";
 import { getRolePalette, ReasoningBlock } from "../transcript";
 import { useConversationExpand } from "./expandContext";
 import { MessageExpandToggle } from "./MessageExpandToggle";
-import { isTerminalOrigin } from "../../../utils/terminalOrigin";
 import { TurnActionRow, TurnAnnotationBadges } from "./TurnAnnotations";
 import { TurnSteps } from "./TurnSteps";
 import type { TurnLayout } from "./types";
@@ -189,12 +189,12 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
         // TurnSteps parses Claude Code's span names only — for any other
         // agent the strip would announce steps and then find none.
         (turn.serviceName ?? "").toLowerCase().includes("claude") && (
-        <TurnSteps
-          traceId={turn.traceId}
-          occurredAtMs={turn.timestamp}
-          spanCount={turn.spanCount}
-        />
-      )}
+          <TurnSteps
+            traceId={turn.traceId}
+            occurredAtMs={turn.timestamp}
+            spanCount={turn.spanCount}
+          />
+        )}
 
       {assistantText ? (
         <TurnMessage

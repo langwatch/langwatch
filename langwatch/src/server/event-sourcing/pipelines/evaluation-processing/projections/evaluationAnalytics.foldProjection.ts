@@ -374,9 +374,8 @@ export function evaluationAnalyticsStateFromRow(
 }
 
 /** The valid `status` union values, for the read-back guard. */
-const EVALUATION_STATUS_VALUES: ReadonlySet<
-  EvaluationAnalyticsData["status"]
-> = new Set(["scheduled", "in_progress", "processed", "error", "skipped"]);
+const EVALUATION_STATUS_VALUES: ReadonlySet<EvaluationAnalyticsData["status"]> =
+  new Set(["scheduled", "in_progress", "processed", "error", "skipped"]);
 
 /**
  * Merge a passthrough event metadata bag into the slim attributes map.

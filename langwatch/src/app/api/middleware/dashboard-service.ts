@@ -1,7 +1,6 @@
 import type { MiddlewareHandler } from "hono";
-
-import { prisma } from "~/server/db";
 import { DashboardService } from "~/server/dashboards/dashboard.service";
+import { prisma } from "~/server/db";
 
 export type DashboardServiceMiddlewareVariables = {
   dashboardService: DashboardService;

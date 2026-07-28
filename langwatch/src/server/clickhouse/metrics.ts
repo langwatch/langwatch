@@ -204,10 +204,8 @@ const ensureBackupStatusTotal = (): Gauge<"status"> => {
   return clickhouseBackupStatusTotal;
 };
 
-export const setClickHouseBackupStatusCount = (
-  status: string,
-  count: number,
-) => ensureBackupStatusTotal().labels(status).set(count);
+export const setClickHouseBackupStatusCount = (status: string, count: number) =>
+  ensureBackupStatusTotal().labels(status).set(count);
 
 // Edge-triggered: collectStorageStats runs every 15s, so we'd otherwise
 // produce 5,760 identical warns/day if system.backups is unavailable.

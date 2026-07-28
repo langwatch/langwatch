@@ -25,7 +25,11 @@ import { CascadeArchiveDialog } from "~/components/CascadeArchiveDialog";
 import { Drawer } from "~/components/ui/drawer";
 import { Menu } from "~/components/ui/menu";
 import { toaster } from "~/components/ui/toaster";
-import { getComplexProps, getFlowCallbacks, useDrawer } from "~/hooks/useDrawer";
+import {
+  getComplexProps,
+  getFlowCallbacks,
+  useDrawer,
+} from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import { api } from "~/utils/api";
@@ -55,8 +59,7 @@ export function AgentListDrawer(props: AgentListDrawerProps) {
   // Get flow callbacks for this drawer (set by parent flows like useAgentPickerFlow)
   const flowCallbacks = getFlowCallbacks("agentList");
 
-  const onClose =
-    props.onClose ?? flowCallbacks?.onClose ?? closeDrawer;
+  const onClose = props.onClose ?? flowCallbacks?.onClose ?? closeDrawer;
   const onSelect =
     props.onSelect ??
     flowCallbacks?.onSelect ??

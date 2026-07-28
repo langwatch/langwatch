@@ -93,7 +93,11 @@ export default function GraphsLayout({
             )}
           </VStack>
         </VStack>
-        <Container maxWidth={showFilters ? "1612" : "1200"} padding={4} paddingBottom={16}>
+        <Container
+          maxWidth={showFilters ? "1612" : "1200"}
+          padding={4}
+          paddingBottom={16}
+        >
           {children}
         </Container>
       </HStack>

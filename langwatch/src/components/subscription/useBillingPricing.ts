@@ -1,10 +1,10 @@
-import {
-  type Currency,
-  type BillingInterval,
-  getGrowthSeatPriceCents,
-  formatPrice,
-} from "./billing-plans";
 import type { MemberType } from "~/server/license-enforcement/member-classification";
+import {
+  type BillingInterval,
+  type Currency,
+  formatPrice,
+  getGrowthSeatPriceCents,
+} from "./billing-plans";
 import { countFullMembers } from "./subscription-types";
 
 interface HasMemberType {
@@ -29,7 +29,8 @@ export function useBillingPricing({
       : priceCents[currency].monthly;
   const periodSuffix = billingPeriod === "annual" ? "/yr" : "/mo";
 
-  const totalFullMembers = countFullMembers(users) + countFullMembers(plannedUsers);
+  const totalFullMembers =
+    countFullMembers(users) + countFullMembers(plannedUsers);
 
   return {
     seatPricePerPeriodCents: seatCents,

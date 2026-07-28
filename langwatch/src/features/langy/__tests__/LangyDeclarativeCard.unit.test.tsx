@@ -403,9 +403,7 @@ describe("given a body widget the catalog names", () => {
     return render(
       <ChakraProvider value={defaultSystem}>
         <LangyDeclarativeCard
-          descriptor={
-            { ...descriptor, body } as unknown as typeof descriptor
-          }
+          descriptor={{ ...descriptor, body } as unknown as typeof descriptor}
           input={{}}
           output={output}
           projectSlug="acme"

@@ -34,10 +34,10 @@ import {
 
 import type { LangyMessageDto } from "../data/langy.dtos";
 import {
+  type LangyDevLogRecord,
   replayTurnProjection,
   streamRecords,
   tapeUpTo,
-  type LangyDevLogRecord,
 } from "../stores/langyDevLog";
 
 /** The minimal structural message the panel's renderer needs. */

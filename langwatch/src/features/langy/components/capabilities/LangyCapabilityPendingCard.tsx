@@ -20,18 +20,18 @@
  */
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
-import type { CapabilitySurface } from "./capabilityCatalog";
-import { CapabilityRow, LangyCapabilityCard } from "./LangyCapabilityCard";
-import { langyThinkingShimmerStyles } from "../langyShimmer";
-import { useCapabilityData } from "../../hooks/useCapabilityData";
-import type { CapabilityCommand } from "../../logic/langyCapabilityDigest";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
-import type { LangyProgressSample } from "../../stores/langyStore";
-import { useProjectedProgress } from "../StreamingStatusLine";
+import { useCapabilityData } from "../../hooks/useCapabilityData";
 import {
   formatLangyPreviewCount,
   formatLangyProgressCount,
 } from "../../logic/langyActivityOwnership";
+import type { CapabilityCommand } from "../../logic/langyCapabilityDigest";
+import type { LangyProgressSample } from "../../stores/langyStore";
+import { langyThinkingShimmerStyles } from "../langyShimmer";
+import { useProjectedProgress } from "../StreamingStatusLine";
+import type { CapabilitySurface } from "./capabilityCatalog";
+import { CapabilityRow, LangyCapabilityCard } from "./LangyCapabilityCard";
 
 const rowAppear = keyframes`
   from { opacity: 0; }

@@ -35,15 +35,15 @@ import type {
   HttpHeader,
   HttpMethod,
 } from "~/optimization_studio/types/dsl";
+import {
+  buildCodeConfig,
+  DEFAULT_CODE,
+  getCodeFromConfig,
+} from "~/optimization_studio/utils/codeAgentConfig";
 import type { AgentComponentConfig } from "~/server/agents/agent.repository";
 import { api } from "~/utils/api";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
 import type { AgentComponent, Field as DslField } from "../../types/dsl";
-import {
-  DEFAULT_CODE,
-  buildCodeConfig,
-  getCodeFromConfig,
-} from "~/optimization_studio/utils/codeAgentConfig";
 import {
   buildAgentNodeData,
   nodeMatchesAgent,
@@ -100,7 +100,6 @@ function buildHttpConfig(
     auth: auth?.type === "none" ? undefined : auth,
   };
 }
-
 
 // ---------------------------------------------------------------------------
 // Entry component

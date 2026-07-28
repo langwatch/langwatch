@@ -9,10 +9,25 @@ describe("debug SQL", () => {
       endDate: new Date("2024-01-03T00:00:00Z"),
       previousPeriodStartDate: new Date("2024-01-01T00:00:00Z"),
       series: [
-        { metric: "metadata.thread_id" as const, aggregation: "cardinality" as const },
-        { metric: "metadata.thread_id" as const, aggregation: "cardinality" as const, pipeline: { field: "user_id" as const, aggregation: "avg" as const } },
-        { metric: "threads.average_duration_per_thread" as const, aggregation: "avg" as const, pipeline: { field: "user_id" as const, aggregation: "avg" as const } },
-        { metric: "metadata.trace_id" as const, aggregation: "cardinality" as const, pipeline: { field: "user_id" as const, aggregation: "avg" as const } },
+        {
+          metric: "metadata.thread_id" as const,
+          aggregation: "cardinality" as const,
+        },
+        {
+          metric: "metadata.thread_id" as const,
+          aggregation: "cardinality" as const,
+          pipeline: { field: "user_id" as const, aggregation: "avg" as const },
+        },
+        {
+          metric: "threads.average_duration_per_thread" as const,
+          aggregation: "avg" as const,
+          pipeline: { field: "user_id" as const, aggregation: "avg" as const },
+        },
+        {
+          metric: "metadata.trace_id" as const,
+          aggregation: "cardinality" as const,
+          pipeline: { field: "user_id" as const, aggregation: "avg" as const },
+        },
       ],
       timeScale: "full" as const,
     };

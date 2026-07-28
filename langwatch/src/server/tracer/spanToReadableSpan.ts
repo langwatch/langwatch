@@ -64,12 +64,20 @@ function flattenParams({
 
     const fullKey = prefix ? `${prefix}.${key}` : key;
 
-    if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    if (
+      typeof value === "string" ||
+      typeof value === "number" ||
+      typeof value === "boolean"
+    ) {
       attrs[fullKey] = value;
     } else if (Array.isArray(value)) {
       attrs[fullKey] = JSON.stringify(value);
     } else if (typeof value === "object") {
-      flattenParams({ params: value as Record<string, unknown>, prefix: fullKey, attrs });
+      flattenParams({
+        params: value as Record<string, unknown>,
+        prefix: fullKey,
+        attrs,
+      });
     }
   }
 }

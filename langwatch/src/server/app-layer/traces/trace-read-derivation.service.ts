@@ -1,10 +1,10 @@
-import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
-import { SpanCostService } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/span-cost.service";
 import {
   deriveScenarioRoleMetricsFromSpans,
   type ScenarioRoleMetrics,
 } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/scenario-role-metrics.derivation";
+import { SpanCostService } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/span-cost.service";
 import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
+import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 
 /** Minimal span reader this service needs (satisfied by SpanStorageService). */
 export interface NormalizedSpanReader {
@@ -78,7 +78,10 @@ export class TraceReadDerivationService {
     string,
     MemoEntry<ScenarioRoleMetrics>
   >();
-  private readonly eventsMemo = new Map<string, MemoEntry<DerivedTraceEvent[]>>();
+  private readonly eventsMemo = new Map<
+    string,
+    MemoEntry<DerivedTraceEvent[]>
+  >();
 
   constructor(private readonly spans: NormalizedSpanReader) {}
 

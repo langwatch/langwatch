@@ -18,10 +18,7 @@ export interface SubscriptionRepository {
     status: string;
   }): Promise<Subscription | null>;
 
-  updatePlan(input: {
-    id: string;
-    plan: string;
-  }): Promise<Subscription | null>;
+  updatePlan(input: { id: string; plan: string }): Promise<Subscription | null>;
 
   // --- Webhook handler methods ---
 

@@ -2,7 +2,7 @@
  * @vitest-environment node
  */
 
-import { AgentRole, type AgentInput } from "@langwatch/scenario";
+import { type AgentInput, AgentRole } from "@langwatch/scenario";
 import { describe, expect, it } from "vitest";
 import {
   computeBestMatchMappings,
@@ -10,9 +10,7 @@ import {
 } from "../resolve-field-mappings";
 import type { FieldMapping } from "../types";
 
-const makeAgentInput = (
-  overrides: Partial<AgentInput> = {},
-): AgentInput => ({
+const makeAgentInput = (overrides: Partial<AgentInput> = {}): AgentInput => ({
   threadId: "thread-1",
   messages: [{ role: "user", content: "Hello world" }],
   newMessages: [{ role: "user", content: "Hello world" }],
@@ -138,7 +136,11 @@ describe("resolveFieldMappings", () => {
   describe("when mapping type is source with an unknown path", () => {
     it("returns empty string for an unrecognized source path", () => {
       const fieldMappings: Record<string, FieldMapping> = {
-        query: { type: "source", sourceId: "scenario", path: ["unknown_field"] },
+        query: {
+          type: "source",
+          sourceId: "scenario",
+          path: ["unknown_field"],
+        },
       };
       const agentInput = makeAgentInput();
 
@@ -233,7 +235,11 @@ describe("computeBestMatchMappings", () => {
 
       expect(result).toEqual({
         message: { type: "source", sourceId: "scenario", path: ["input"] },
-        session_id: { type: "source", sourceId: "scenario", path: ["threadId"] },
+        session_id: {
+          type: "source",
+          sourceId: "scenario",
+          path: ["threadId"],
+        },
       });
     });
   });

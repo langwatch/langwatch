@@ -57,13 +57,7 @@ export const MISSING_OUTPUT_KEY = "langwatch.missing-output-key";
 export const MIXED_INDENT = "langwatch.mixed-indent";
 export const OUTPUT_TYPE_MISMATCH = "langwatch.output-type-mismatch";
 
-export type LiteralKind =
-  | "str"
-  | "number"
-  | "bool"
-  | "list"
-  | "dict"
-  | "none";
+export type LiteralKind = "str" | "number" | "bool" | "list" | "dict" | "none";
 
 /**
  * What literal kind would a value of this declared type look like, if the
@@ -96,11 +90,7 @@ export function literalKindOf(expr: string): LiteralKind | null {
   if (v === "None") return "none";
   if (v === "True" || v === "False") return "bool";
   if (/^-?\d+(\.\d+)?([eE][+-]?\d+)?$/.test(v)) return "number";
-  if (
-    /^(?:[rfubRFUB]{1,2})?["']/.test(v) &&
-    /["']\s*$/.test(v)
-  )
-    return "str";
+  if (/^(?:[rfubRFUB]{1,2})?["']/.test(v) && /["']\s*$/.test(v)) return "str";
   if (v.startsWith("[") && v.endsWith("]")) return "list";
   if (v.startsWith("{") && v.endsWith("}")) return "dict";
   return null;

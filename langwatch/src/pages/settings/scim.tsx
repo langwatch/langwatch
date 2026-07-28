@@ -9,8 +9,8 @@ import {
   Spacer,
   Table,
   Text,
-  VStack,
   useDisclosure,
+  VStack,
 } from "@chakra-ui/react";
 import { Key, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
@@ -34,11 +34,7 @@ export default withPermissionGuard("organization:manage", {
   layoutComponent: SettingsLayout,
 })(ScimSettings);
 
-function ScimSettingsContent({
-  organizationId,
-}: {
-  organizationId: string;
-}) {
+function ScimSettingsContent({ organizationId }: { organizationId: string }) {
   const tokens = api.scimToken.list.useQuery({ organizationId });
   const generateMutation = api.scimToken.generate.useMutation();
   const revokeMutation = api.scimToken.revoke.useMutation();
@@ -271,9 +267,7 @@ function ScimSettingsContent({
               <Text color="orange.500" fontWeight="600">
                 Copy this token now. You won&apos;t be able to see it again.
               </Text>
-              {newToken && (
-                <CopyInput value={newToken} label="SCIM Token" />
-              )}
+              {newToken && <CopyInput value={newToken} label="SCIM Token" />}
             </VStack>
           </Dialog.Body>
         </Dialog.Content>
@@ -321,4 +315,3 @@ function ScimSettingsContent({
     </SettingsLayout>
   );
 }
-

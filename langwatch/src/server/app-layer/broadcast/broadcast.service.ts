@@ -73,10 +73,16 @@ export class BroadcastService {
     const channels = ALL_EVENT_TYPES.map(redisChannel);
     this.subscriber.subscribe(...channels, (err, count) => {
       if (err) {
-        this.logger.error({ error: err }, "Failed to subscribe to SSE channels");
+        this.logger.error(
+          { error: err },
+          "Failed to subscribe to SSE channels",
+        );
         return;
       }
-      this.logger.debug({ subscriberCount: count, channels }, "Subscribed to SSE channels");
+      this.logger.debug(
+        { subscriberCount: count, channels },
+        "Subscribed to SSE channels",
+      );
     });
 
     this.subscriber.on("message", (channel, message) => {
@@ -295,7 +301,9 @@ export class BroadcastService {
     this.active = false;
 
     // Allow in-flight Redis publishes to drain
-    await new Promise((resolve) => setTimeout(resolve, BroadcastService.DRAIN_DELAY_MS));
+    await new Promise((resolve) =>
+      setTimeout(resolve, BroadcastService.DRAIN_DELAY_MS),
+    );
 
     if (!this.subscriber) return;
 

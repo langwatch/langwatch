@@ -312,8 +312,9 @@ describe.skipIf(!hasTestcontainers)(
           // Park the claim AFTER its strike lands in Redis but BEFORE
           // processWithRetries adds the group to the in-flight set, so close()'s
           // sweep snapshot runs against a set that does not yet hold the group.
-          const realRecordStrike =
-            internals.scripts.recordClaimStrike.bind(internals.scripts);
+          const realRecordStrike = internals.scripts.recordClaimStrike.bind(
+            internals.scripts,
+          );
           let gatedOnce = false;
           vi.spyOn(internals.scripts, "recordClaimStrike").mockImplementation(
             async (groupId: string) => {
@@ -484,7 +485,9 @@ describe.skipIf(!hasTestcontainers)(
           );
           await vi.waitFor(
             async () => {
-              expect(await redis.get(failStreakKey(name, "group-a"))).toBeNull();
+              expect(
+                await redis.get(failStreakKey(name, "group-a")),
+              ).toBeNull();
             },
             { timeout: 5000, interval: 50 },
           );

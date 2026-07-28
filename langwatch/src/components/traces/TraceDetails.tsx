@@ -7,14 +7,14 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import { useRouter } from "~/utils/compat/next-router";
 import qs from "qs";
 import { useCallback, useEffect, useState } from "react";
 import { Maximize2, Minimize2 } from "react-feather";
 import { useDrawer } from "~/hooks/useDrawer";
+import { useRouter } from "~/utils/compat/next-router";
 import { useAnnotationCommentStore } from "../../hooks/useAnnotationCommentStore";
-import { useLiteMemberGuard } from "../../hooks/useLiteMemberGuard";
 import { useDejaViewLink } from "../../hooks/useDejaViewLink";
+import { useLiteMemberGuard } from "../../hooks/useLiteMemberGuard";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
 import { api } from "../../utils/api";
@@ -32,8 +32,8 @@ import {
   Guardrails,
 } from "./Evaluations";
 import { Events } from "./Events";
-import { SequenceDiagramContainer } from "./SequenceDiagram";
 import { PinButton } from "./PinButton";
+import { SequenceDiagramContainer } from "./SequenceDiagram";
 import { SpanTree } from "./SpanTree";
 import { TraceSummary } from "./Summary";
 
@@ -103,7 +103,11 @@ export function TraceDetails(props: {
     } else {
       setEvaluationsCheckInterval(undefined);
     }
-  }, [evaluations.data, evaluationsPollingStart, trace.data?.timestamps.inserted_at]);
+  }, [
+    evaluations.data,
+    evaluationsPollingStart,
+    trace.data?.timestamps.inserted_at,
+  ]);
 
   const anyGuardrails = !!evaluations.data?.some((x) => x.is_guardrail);
 
@@ -127,19 +131,19 @@ export function TraceDetails(props: {
       setTimeout(() => {
         void router.replace(
           "?" +
-          qs.stringify(
-            {
-              ...Object.fromEntries(
-                Object.entries(router.query).filter(
-                  ([key]) => !key.startsWith("drawer.selectedTab"),
+            qs.stringify(
+              {
+                ...Object.fromEntries(
+                  Object.entries(router.query).filter(
+                    ([key]) => !key.startsWith("drawer.selectedTab"),
+                  ),
                 ),
-              ),
-              drawer: {
-                selectedTab: tab,
+                drawer: {
+                  selectedTab: tab,
+                },
               },
-            },
-            { allowDots: true },
-          ),
+              { allowDots: true },
+            ),
         );
       }, 100);
     },

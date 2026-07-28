@@ -27,12 +27,12 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { prisma } from "../../../db";
-import { appRouter } from "../../root";
-import { createInnerTRPCContext } from "../../trpc";
 import {
   startTestContainers,
   stopTestContainers,
 } from "../../../event-sourcing/__tests__/integration/testContainers";
+import { appRouter } from "../../root";
+import { createInnerTRPCContext } from "../../trpc";
 
 describe("user.personalBudget integration", () => {
   const ns = `pbudget-${nanoid(8)}`;

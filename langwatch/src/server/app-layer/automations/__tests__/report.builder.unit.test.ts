@@ -3,13 +3,17 @@ import { describe, expect, it } from "vitest";
 import {
   buildReportTriggerData,
   extractReportFromTriggerRow,
+  type ReportActionParams,
   reportScheduleSchema,
   reportSourceSchema,
-  type ReportActionParams,
 } from "../report.builder";
 
 const traceQueryParams: ReportActionParams = {
-  source: { kind: "traceQuery", filters: { "traces.error": ["true"] }, topN: 5 },
+  source: {
+    kind: "traceQuery",
+    filters: { "traces.error": ["true"] },
+    topN: 5,
+  },
   schedule: { cron: "0 9 * * 1", timezone: "Europe/Amsterdam" },
   compareToPrevious: false,
 };
@@ -32,12 +36,12 @@ describe("buildReportTriggerData", () => {
       expect(data.name).toBe("Weekly errors");
       expect(data.filters).toEqual({});
       expect(data.active).toBe(true);
-      expect((data.actionParams as { source: { kind: string } }).source.kind).toBe(
-        "traceQuery",
-      );
       expect(
-        (data.actionParams as { slackWebhook: string }).slackWebhook,
-      ).toBe("https://hooks.slack.com/services/x");
+        (data.actionParams as { source: { kind: string } }).source.kind,
+      ).toBe("traceQuery");
+      expect((data.actionParams as { slackWebhook: string }).slackWebhook).toBe(
+        "https://hooks.slack.com/services/x",
+      );
     });
   });
 });
@@ -111,9 +115,9 @@ describe("reportSourceSchema", () => {
           customGraphId: "g1",
         }).success,
       ).toBe(true);
-      expect(
-        reportSourceSchema.safeParse({ kind: "traceQuery" }).success,
-      ).toBe(true); // filters/topN default
+      expect(reportSourceSchema.safeParse({ kind: "traceQuery" }).success).toBe(
+        true,
+      ); // filters/topN default
       expect(
         reportSourceSchema.safeParse({ kind: "spreadsheet" }).success,
       ).toBe(false);

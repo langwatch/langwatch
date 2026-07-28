@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { parsePromptReference } from "../parsePromptReference";
 
 describe("parsePromptReference()", () => {
@@ -452,9 +452,7 @@ describe("parsePromptReference()", () => {
           type: "json",
           value: {
             example: "foobar",
-            messages: [
-              { role: "user", content: "{{input}}" },
-            ],
+            messages: [{ role: "user", content: "{{input}}" }],
             metadata: { project: "acme" },
           },
         }),

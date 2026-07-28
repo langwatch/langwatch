@@ -1,13 +1,23 @@
-import { Button, Card, Heading, HStack, Separator, Skeleton, Text, VStack } from "@chakra-ui/react";
+import {
+  Button,
+  Card,
+  Heading,
+  HStack,
+  Separator,
+  Skeleton,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import type { TeamUserRole } from "@prisma/client";
 import { TRPCClientError } from "@trpc/client";
 import isEqual from "lodash-es/isEqual";
-import { useRouter } from "~/utils/compat/next-router";
 import { useCallback, useEffect, useState } from "react";
 import { type SubmitHandler, useForm, useWatch } from "react-hook-form";
 import { useDebouncedCallback } from "use-debounce";
 import { PermissionAlert } from "~/components/PermissionAlert";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import { useRouter } from "~/utils/compat/next-router";
+import { ConfirmDialog } from "../../../components/gateway/ConfirmDialog";
 import SettingsLayout from "../../../components/SettingsLayout";
 import {
   TeamForm,
@@ -17,7 +27,6 @@ import {
   type RoleOption,
   teamRolesOptions,
 } from "../../../components/settings/TeamUserRoleField";
-import { ConfirmDialog } from "../../../components/gateway/ConfirmDialog";
 import { toaster } from "../../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import type { TeamWithProjectsAndMembersAndUsers } from "../../../server/app-layer/organizations/repositories/organization.repository";
@@ -274,14 +283,17 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembersAndUsers }) {
         />
         <Separator />
         <VStack align="start" gap={3} width="full">
-          <Heading size="sm" color="red.500">Danger Zone</Heading>
+          <Heading size="sm" color="red.500">
+            Danger Zone
+          </Heading>
           <Card.Root width="full" borderColor="red.200">
             <Card.Body>
               <HStack justify="space-between">
                 <VStack align="start" gap={0}>
                   <Text fontWeight="medium">Archive this team</Text>
                   <Text fontSize="sm" color="fg.muted">
-                    Hides the team and all its projects. Contact LangWatch support to restore it.
+                    Hides the team and all its projects. Contact LangWatch
+                    support to restore it.
                   </Text>
                 </VStack>
                 <Button

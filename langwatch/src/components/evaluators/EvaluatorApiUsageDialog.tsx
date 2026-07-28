@@ -155,7 +155,9 @@ export function EvaluatorApiUsageDialog({
     "output": "output content"`;
     }
 
-    return allFields.map((field) => `"${field}": "your ${field}"`).join(",\n    ");
+    return allFields
+      .map((field) => `"${field}": "your ${field}"`)
+      .join(",\n    ");
   };
 
   // ============================================================================

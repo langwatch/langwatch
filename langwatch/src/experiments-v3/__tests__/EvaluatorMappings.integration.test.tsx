@@ -412,9 +412,9 @@ describe("Evaluator Mappings", () => {
 
       // Wait for the table to render
       await waitFor(() => {
-        expect(screen.getAllByText("Ragas Answer Correctness").length).toBeGreaterThan(
-          0,
-        );
+        expect(
+          screen.getAllByText("Ragas Answer Correctness").length,
+        ).toBeGreaterThan(0);
       });
 
       // Alert icon should NOT be present (optional field missing is OK)

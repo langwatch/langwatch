@@ -11,8 +11,8 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
   glowRectFor,
-  midpointRect,
   type MorphRect,
+  midpointRect,
   PANEL_ROOT_ATTR,
   readRectAtRest,
 } from "../logic/composerMorphGeometry";

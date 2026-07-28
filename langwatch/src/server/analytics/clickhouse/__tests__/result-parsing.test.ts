@@ -452,13 +452,13 @@ describe("result-parsing", () => {
       ] as Record<string, Record<string, number>>;
 
       // cat_a gets its value under the series name key
-      expect(
-        currentGroupData.cat_a!["0/metadata.trace_id/cardinality"],
-      ).toBe(150);
+      expect(currentGroupData.cat_a!["0/metadata.trace_id/cardinality"]).toBe(
+        150,
+      );
       // cat_b gets its value under the series name key
-      expect(
-        currentGroupData.cat_b!["0/metadata.trace_id/cardinality"],
-      ).toBe(160);
+      expect(currentGroupData.cat_b!["0/metadata.trace_id/cardinality"]).toBe(
+        160,
+      );
 
       // Verify nested structure exists for previous period
       expect(previousPeriod).toHaveLength(1);
@@ -467,12 +467,12 @@ describe("result-parsing", () => {
         "evaluations.evaluation_label"
       ] as Record<string, Record<string, number>>;
 
-      expect(
-        previousGroupData.cat_a!["0/metadata.trace_id/cardinality"],
-      ).toBe(100);
-      expect(
-        previousGroupData.cat_b!["0/metadata.trace_id/cardinality"],
-      ).toBe(110);
+      expect(previousGroupData.cat_a!["0/metadata.trace_id/cardinality"]).toBe(
+        100,
+      );
+      expect(previousGroupData.cat_b!["0/metadata.trace_id/cardinality"]).toBe(
+        110,
+      );
     });
 
     it("produces flat structure when no groupBy for summary rows", () => {

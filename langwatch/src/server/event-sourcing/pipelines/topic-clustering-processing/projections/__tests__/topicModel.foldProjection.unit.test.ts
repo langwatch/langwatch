@@ -114,7 +114,11 @@ describe("TopicModelFoldProjection", () => {
       );
       // Clustering delta merges on top.
       state = projection.handleTopicClusteringTopicsRecorded(
-        recorded({ mode: "merge", topics: [entry("delta-1")], occurredAt: 101 }),
+        recorded({
+          mode: "merge",
+          topics: [entry("delta-1")],
+          occurredAt: 101,
+        }),
         state,
       );
       // The racing boot seed, appended later, carries only the legacy rows.

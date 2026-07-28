@@ -691,7 +691,9 @@ describe("phantom empty rows", () => {
     it("still renders a dataset cell on the phantom row (click-to-add affordance)", async () => {
       seedTwoPopulatedRowsAndOneTarget();
 
-      render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
+      render(<EvaluationsV3Table disableVirtualization />, {
+        wrapper: Wrapper,
+      });
 
       await waitFor(() => {
         expect(screen.getByTestId("cell-0-input")).toBeInTheDocument();
@@ -705,7 +707,9 @@ describe("phantom empty rows", () => {
     it("renders target cell content only for populated rows, not the phantom row", async () => {
       seedTwoPopulatedRowsAndOneTarget();
 
-      render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
+      render(<EvaluationsV3Table disableVirtualization />, {
+        wrapper: Wrapper,
+      });
 
       await waitFor(() => {
         expect(screen.getByTestId("cell-0-input")).toBeInTheDocument();

@@ -1,4 +1,12 @@
-import { Button, Container, Heading, Html, Img, Section, Text } from "@react-email/components";
+import {
+  Button,
+  Container,
+  Heading,
+  Html,
+  Img,
+  Section,
+  Text,
+} from "@react-email/components";
 import { render } from "@react-email/render";
 import React from "react";
 import { sendEmail } from "./emailSender";

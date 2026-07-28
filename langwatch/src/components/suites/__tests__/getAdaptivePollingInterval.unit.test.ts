@@ -1,6 +1,6 @@
-import { describe, it, expect } from "vitest";
-import { getAdaptivePollingInterval } from "../getAdaptivePollingInterval";
+import { describe, expect, it } from "vitest";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+import { getAdaptivePollingInterval } from "../getAdaptivePollingInterval";
 import { makeScenarioRunData } from "./test-helpers";
 
 describe("getAdaptivePollingInterval()", () => {
@@ -23,9 +23,7 @@ describe("getAdaptivePollingInterval()", () => {
     });
 
     it("returns fast interval for PENDING status", () => {
-      const runs = [
-        makeScenarioRunData({ status: ScenarioRunStatus.PENDING }),
-      ];
+      const runs = [makeScenarioRunData({ status: ScenarioRunStatus.PENDING })];
 
       const interval = getAdaptivePollingInterval({ runs });
 

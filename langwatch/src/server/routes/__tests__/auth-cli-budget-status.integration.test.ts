@@ -24,11 +24,11 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { prisma } from "~/server/db";
-import { connection as redisConnection } from "~/server/redis";
 import {
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
+import { connection as redisConnection } from "~/server/redis";
 
 import { app } from "../auth-cli";
 
@@ -53,7 +53,11 @@ describe("GET /api/auth/cli/budget/status", () => {
     await startTestContainers();
 
     await prisma.organization.create({
-      data: { id: ORG_ID, name: `Budget Org ${suffix}`, slug: `budget-${suffix}` },
+      data: {
+        id: ORG_ID,
+        name: `Budget Org ${suffix}`,
+        slug: `budget-${suffix}`,
+      },
     });
     await prisma.user.create({
       data: {

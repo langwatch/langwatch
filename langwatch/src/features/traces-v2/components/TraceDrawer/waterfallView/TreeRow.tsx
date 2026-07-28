@@ -13,10 +13,7 @@ import { Tooltip } from "~/components/ui/tooltip";
 import type { LangwatchSignalBucket } from "~/server/api/routers/tracesV2.schemas";
 import { useSpanHoverStore } from "../../../stores/spanHoverStore";
 import { useSpanPulseStore } from "../../../stores/spanPulseStore";
-import {
-  formatCost,
-  formatDuration,
-} from "../../../utils/formatters";
+import { formatCost, formatDuration } from "../../../utils/formatters";
 import { LangwatchSignalBadges } from "../LangwatchSignalBadges";
 import { isSkillSpan } from "../transcript/skillInvocation";
 import { TipCell } from "./TipCell";
@@ -470,7 +467,7 @@ export const TreeRow = memo(function TreeRow({
                   maxWidth="100%"
                   bg="bg.subtle"
                 >
-                  {isLlm ? (span.model!) : span.toolName}
+                  {isLlm ? span.model! : span.toolName}
                 </Text>
               </HStack>
             )}

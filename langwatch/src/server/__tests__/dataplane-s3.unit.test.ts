@@ -59,9 +59,7 @@ describe("dataplane-s3", () => {
       it("parses a single org config", async () => {
         process.env.DATAPLANE_S3__acme__org123 = VALID_CONFIG;
 
-        const { getS3ConfigForOrganization } = await import(
-          "../dataplane-s3"
-        );
+        const { getS3ConfigForOrganization } = await import("../dataplane-s3");
 
         const config = getS3ConfigForOrganization("org123");
         expect(config).toEqual({
@@ -76,9 +74,7 @@ describe("dataplane-s3", () => {
         process.env.DATAPLANE_S3__acme__org123 = VALID_CONFIG;
         process.env.DATAPLANE_S3__beta__org456 = VALID_CONFIG_2;
 
-        const { getS3ConfigForOrganization } = await import(
-          "../dataplane-s3"
-        );
+        const { getS3ConfigForOrganization } = await import("../dataplane-s3");
 
         const config1 = getS3ConfigForOrganization("org123");
         expect(config1).toEqual({
@@ -100,9 +96,7 @@ describe("dataplane-s3", () => {
       it("ignores the label portion of the env var name", async () => {
         process.env["DATAPLANE_S3__any-label-here__org123"] = VALID_CONFIG;
 
-        const { getS3ConfigForOrganization } = await import(
-          "../dataplane-s3"
-        );
+        const { getS3ConfigForOrganization } = await import("../dataplane-s3");
 
         const config = getS3ConfigForOrganization("org123");
         expect(config).not.toBeNull();
@@ -126,9 +120,7 @@ describe("dataplane-s3", () => {
       it("skips the invalid entry and logs a warning", async () => {
         process.env.DATAPLANE_S3__bad__org999 = "not-json";
 
-        const { getS3ConfigForOrganization } = await import(
-          "../dataplane-s3"
-        );
+        const { getS3ConfigForOrganization } = await import("../dataplane-s3");
 
         const config = getS3ConfigForOrganization("org999");
         expect(config).toBeNull();
@@ -146,9 +138,7 @@ describe("dataplane-s3", () => {
           // missing bucket, accessKeyId, secretAccessKey
         });
 
-        const { getS3ConfigForOrganization } = await import(
-          "../dataplane-s3"
-        );
+        const { getS3ConfigForOrganization } = await import("../dataplane-s3");
 
         const config = getS3ConfigForOrganization("org888");
         expect(config).toBeNull();
@@ -158,9 +148,7 @@ describe("dataplane-s3", () => {
 
     describe("when no DATAPLANE_S3 env vars are set", () => {
       it("returns null for any org", async () => {
-        const { getS3ConfigForOrganization } = await import(
-          "../dataplane-s3"
-        );
+        const { getS3ConfigForOrganization } = await import("../dataplane-s3");
 
         const config = getS3ConfigForOrganization("org-unknown");
         expect(config).toBeNull();
@@ -174,24 +162,18 @@ describe("dataplane-s3", () => {
       it("returns the private config", async () => {
         process.env.DATAPLANE_S3__acme__org123 = VALID_CONFIG;
 
-        const { getS3ConfigForOrganization } = await import(
-          "../dataplane-s3"
-        );
+        const { getS3ConfigForOrganization } = await import("../dataplane-s3");
 
         const config = getS3ConfigForOrganization("org123");
         expect(config).not.toBeNull();
-        expect(config!.endpoint).toBe(
-          "https://s3.eu-central-1.amazonaws.com",
-        );
+        expect(config!.endpoint).toBe("https://s3.eu-central-1.amazonaws.com");
       });
     });
 
     describe("when org has no private S3 configured", () => {
       /** @scenario Org without private S3 gets shared config */
       it("returns null", async () => {
-        const { getS3ConfigForOrganization } = await import(
-          "../dataplane-s3"
-        );
+        const { getS3ConfigForOrganization } = await import("../dataplane-s3");
 
         const config = getS3ConfigForOrganization("org-nonexistent");
         expect(config).toBeNull();

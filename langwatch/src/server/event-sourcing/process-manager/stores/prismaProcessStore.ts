@@ -72,9 +72,7 @@ function toMessage(row: ProcessManagerOutbox): OutboxMessageRecord {
   };
 }
 
-function toLeasedMessage(
-  row: ProcessManagerOutbox,
-): LeasedOutboxMessageRecord {
+function toLeasedMessage(row: ProcessManagerOutbox): LeasedOutboxMessageRecord {
   const message = toMessage(row);
   if (message.leaseToken === null) {
     throw new Error(`Leased outbox message ${row.id} has no lease token`);

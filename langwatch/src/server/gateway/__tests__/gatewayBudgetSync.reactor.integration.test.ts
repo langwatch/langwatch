@@ -21,20 +21,21 @@
  * pipeline. The pipeline itself is covered by its own integration suite;
  * this test proves only the reactor+CH+service triangle.
  */
+
+import { createGatewayBudgetSyncReactor } from "@ee/governance/reactors/gatewayBudgetSync.reactor";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { prisma } from "~/server/db";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import { GatewayBudgetClickHouseRepository } from "../budget.clickhouse.repository";
-import { GatewayBudgetRepository } from "../budget.repository";
-import { GatewayBudgetService } from "../budget.service";
+import { prisma } from "~/server/db";
 import {
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
-import { createGatewayBudgetSyncReactor } from "@ee/governance/reactors/gatewayBudgetSync.reactor";
-import type { ReactorContext } from "~/server/event-sourcing/reactors/reactor.types";
 import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
+import type { ReactorContext } from "~/server/event-sourcing/reactors/reactor.types";
+import { GatewayBudgetClickHouseRepository } from "../budget.clickhouse.repository";
+import { GatewayBudgetRepository } from "../budget.repository";
+import { GatewayBudgetService } from "../budget.service";
 
 const suffix = nanoid(8);
 const ORG_ID = `org-${suffix}`;
@@ -195,19 +196,17 @@ describe("gatewayBudgetSync reactor — real PG + real CH", () => {
   }, 60_000);
 
   it("folds a gateway trace into CH and /budget/check reflects the spend", async () => {
-    const chRepo = new GatewayBudgetClickHouseRepository(
-      async (_tenantId) => {
-        // testContainers resolver — single shared client in test environment
-        const { getTestClickHouseClient } = await import(
-          "~/server/event-sourcing/__tests__/integration/testContainers"
-        );
-        const client = getTestClickHouseClient();
-        if (!client) {
-          throw new Error("Test CH client not initialised");
-        }
-        return client;
-      },
-    );
+    const chRepo = new GatewayBudgetClickHouseRepository(async (_tenantId) => {
+      // testContainers resolver — single shared client in test environment
+      const { getTestClickHouseClient } = await import(
+        "~/server/event-sourcing/__tests__/integration/testContainers"
+      );
+      const client = getTestClickHouseClient();
+      if (!client) {
+        throw new Error("Test CH client not initialised");
+      }
+      return client;
+    });
     const pgRepo = new GatewayBudgetRepository(prisma);
     const reactor = createGatewayBudgetSyncReactor({
       prisma,

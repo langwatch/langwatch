@@ -12,8 +12,13 @@ const logger = createLogger(
 );
 
 export interface ExperimentMetricsSyncReactorDeps {
-  computeExperimentRunMetrics: (data: ComputeExperimentRunMetricsCommandData) => Promise<void>;
-  lookupExperimentId: (tenantId: string, runId: string) => Promise<string | null>;
+  computeExperimentRunMetrics: (
+    data: ComputeExperimentRunMetricsCommandData,
+  ) => Promise<void>;
+  lookupExperimentId: (
+    tenantId: string,
+    runId: string,
+  ) => Promise<string | null>;
 }
 
 /**
@@ -75,7 +80,13 @@ export function createExperimentMetricsSyncReactor(
       }
 
       logger.debug(
-        { traceId, tenantId, runId, experimentId, totalCost: foldState.totalCost },
+        {
+          traceId,
+          tenantId,
+          runId,
+          experimentId,
+          totalCost: foldState.totalCost,
+        },
         "Publishing trace metrics to experiment run (ECST)",
       );
 

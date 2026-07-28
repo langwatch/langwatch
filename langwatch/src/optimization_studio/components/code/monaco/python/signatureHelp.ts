@@ -72,9 +72,7 @@ export function registerSignatureHelp(monaco: Monaco): IDisposable {
         .map((p) => p.trim())
         .filter((p) => p.length > 0)
         .map((p) => ({ label: p }));
-      const activeArgIdx = lineBefore
-        .slice(openIdx + 1)
-        .split(",").length - 1;
+      const activeArgIdx = lineBefore.slice(openIdx + 1).split(",").length - 1;
 
       return {
         value: {
@@ -86,7 +84,10 @@ export function registerSignatureHelp(monaco: Monaco): IDisposable {
             },
           ],
           activeSignature: 0,
-          activeParameter: Math.min(activeArgIdx, Math.max(0, params.length - 1)),
+          activeParameter: Math.min(
+            activeArgIdx,
+            Math.max(0, params.length - 1),
+          ),
         },
         dispose: () => undefined,
       };

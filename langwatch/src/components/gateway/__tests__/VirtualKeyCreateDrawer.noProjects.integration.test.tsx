@@ -99,8 +99,6 @@ describe("given an organization with no projects", () => {
     // Create stays disabled: with nothing typed the first unmet
     // requirement is the name, and even a named draft would still lack a
     // project for its traces to land in.
-    expect(
-      screen.getByRole("button", { name: "Create" }),
-    ).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Create" })).toBeDisabled();
   });
 });

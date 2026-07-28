@@ -31,15 +31,17 @@ import {
   OnlineEvaluationDrawer,
 } from "../OnlineEvaluationDrawer";
 import {
-  state,
   mockEvaluators,
-  Wrapper,
   resetState,
+  state,
+  Wrapper,
 } from "./OnlineEvaluationDrawer.test-helpers.tsx";
 
 // vi.mock() factories are hoisted above imports, so we use async + dynamic import
 vi.mock("~/utils/compat/next-router", async () =>
-  (await import("./OnlineEvaluationDrawer.test-helpers.tsx")).createRouterMock(),
+  (
+    await import("./OnlineEvaluationDrawer.test-helpers.tsx")
+  ).createRouterMock(),
 );
 vi.mock("~/utils/api", async () =>
   (await import("./OnlineEvaluationDrawer.test-helpers.tsx")).createApiMock(),
@@ -48,10 +50,14 @@ vi.mock("~/hooks/useOrganizationTeamProject", async () =>
   (await import("./OnlineEvaluationDrawer.test-helpers.tsx")).createOrgMock(),
 );
 vi.mock("~/stores/upgradeModalStore", async () =>
-  (await import("./OnlineEvaluationDrawer.test-helpers.tsx")).createUpgradeModalMock(),
+  (
+    await import("./OnlineEvaluationDrawer.test-helpers.tsx")
+  ).createUpgradeModalMock(),
 );
 vi.mock("~/hooks/useLicenseEnforcement", async () =>
-  (await import("./OnlineEvaluationDrawer.test-helpers.tsx")).createLicenseEnforcementMock(),
+  (
+    await import("./OnlineEvaluationDrawer.test-helpers.tsx")
+  ).createLicenseEnforcementMock(),
 );
 
 // Mock scrollIntoView which jsdom doesn't support

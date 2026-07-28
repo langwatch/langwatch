@@ -31,11 +31,11 @@ describe("Overlay z-index stacking", () => {
           </Popover.Trigger>
           <Popover.Content>Popover content</Popover.Content>
         </Popover.Root>,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       const positioner = document.querySelector<HTMLElement>(
-        "[data-part='positioner']"
+        "[data-part='positioner']",
       );
       expect(positioner).not.toBeNull();
       expect(positioner!.style.zIndex).toBe("2010");
@@ -66,12 +66,12 @@ describe("Overlay z-index stacking", () => {
             </Dialog.Body>
           </Dialog.Content>
         </Dialog.Root>,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       // Collect all positioner z-indexes set by our ref callbacks
       const positioners = document.querySelectorAll<HTMLElement>(
-        "[data-part='positioner']"
+        "[data-part='positioner']",
       );
       const overlayZIndexes = Array.from(positioners)
         .map((el) => el.style.zIndex)

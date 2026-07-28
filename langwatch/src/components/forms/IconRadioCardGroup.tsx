@@ -1,4 +1,12 @@
-import { Button, Circle, Grid, HStack, Icon, Stack, Text } from "@chakra-ui/react";
+import {
+  Button,
+  Circle,
+  Grid,
+  HStack,
+  Icon,
+  Stack,
+  Text,
+} from "@chakra-ui/react";
 import type React from "react";
 import { useCallback, useRef } from "react";
 
@@ -44,10 +52,9 @@ export const IconRadioCardGroup = <T extends string = string>({
         const nextItem = items[nextIndex];
         if (nextItem) {
           onChange(nextItem.value);
-          const radios =
-            groupRef.current?.querySelectorAll<HTMLElement>(
-              '[role="radio"] button, button[role="radio"]',
-            );
+          const radios = groupRef.current?.querySelectorAll<HTMLElement>(
+            '[role="radio"] button, button[role="radio"]',
+          );
           radios?.[nextIndex]?.focus();
         }
       }
@@ -57,8 +64,7 @@ export const IconRadioCardGroup = <T extends string = string>({
 
   const renderItem = (item: IconListItem<T>, index: number) => {
     const isSelected = value === item.value;
-    const isTabbable =
-      isSelected || (value === undefined && index === 0);
+    const isTabbable = isSelected || (value === undefined && index === 0);
 
     return (
       <Button
@@ -81,9 +87,7 @@ export const IconRadioCardGroup = <T extends string = string>({
         _hover={{
           borderColor: isSelected ? "orange.emphasized" : "border.emphasized",
           bg: isSelected ? "orange.subtle" : "bg.muted",
-          boxShadow: isSelected
-            ? "0 0 0 1px var(--colors-orange-muted)"
-            : "sm",
+          boxShadow: isSelected ? "0 0 0 1px var(--colors-orange-muted)" : "sm",
           transform: "translateY(-1px)",
           zIndex: 1,
         }}

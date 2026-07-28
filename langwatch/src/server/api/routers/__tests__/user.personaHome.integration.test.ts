@@ -19,19 +19,18 @@ import {
 } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-
-import { prisma } from "../../../db";
-import { appRouter } from "../../root";
-import { createInnerTRPCContext } from "../../trpc";
-import { createTestApp } from "../../../app-layer/presets";
-import { globalForApp, resetApp } from "../../../app-layer/app";
-import { PlanProviderService } from "../../../app-layer/subscription/plan-provider";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import type { PlanInfo } from "../../../../../ee/licensing/planInfo";
+import { globalForApp, resetApp } from "../../../app-layer/app";
+import { createTestApp } from "../../../app-layer/presets";
+import { PlanProviderService } from "../../../app-layer/subscription/plan-provider";
+import { prisma } from "../../../db";
 import {
   startTestContainers,
   stopTestContainers,
 } from "../../../event-sourcing/__tests__/integration/testContainers";
+import { appRouter } from "../../root";
+import { createInnerTRPCContext } from "../../trpc";
 
 describe("user.persona-home customization integration", () => {
   const ns = `phome-${nanoid(8)}`;

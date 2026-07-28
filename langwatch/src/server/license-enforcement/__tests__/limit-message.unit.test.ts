@@ -17,10 +17,7 @@ vi.mock("@langwatch/observability", () => ({
 }));
 
 import { env } from "~/env.mjs";
-import {
-  buildMessagePrefix,
-  buildUpgradeAction,
-} from "../limit-message";
+import { buildMessagePrefix, buildUpgradeAction } from "../limit-message";
 
 describe("buildMessagePrefix", () => {
   it("returns 'Free plan' for free planSource", () => {

@@ -1,8 +1,8 @@
 import { Box, Text, VStack } from "@chakra-ui/react";
-import { useRouter } from "~/utils/compat/next-router";
 import type { CustomGraphInput } from "~/components/analytics/CustomGraph";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { useRouter } from "~/utils/compat/next-router";
 import AnalyticsCustomGraph, { type CustomGraphFormData } from "./index";
 
 export default function EditCustomAnalyticsPage() {
@@ -37,8 +37,8 @@ export default function EditCustomAnalyticsPage() {
           Graph not found
         </Text>
         <Text color="gray.600">
-          The graph you are looking for does not exist or you do not have
-          access to it.
+          The graph you are looking for does not exist or you do not have access
+          to it.
         </Text>
       </VStack>
     );

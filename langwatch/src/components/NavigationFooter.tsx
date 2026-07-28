@@ -3,8 +3,8 @@ import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
 import { ChevronLeft, ChevronRight } from "lucide-react"; // Changed from react-feather
-import { useRouter } from "~/utils/compat/next-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "~/utils/compat/next-router";
 import type { AppRouter } from "../server/api/root";
 
 // Constants
@@ -165,7 +165,14 @@ export const useMessagesNavigationFooter = () => {
         );
       }
     },
-    [router, pageOffset, pageSize, useCursorPagination, urlScrollId, buildPaginationQuery],
+    [
+      router,
+      pageOffset,
+      pageSize,
+      useCursorPagination,
+      urlScrollId,
+      buildPaginationQuery,
+    ],
   );
 
   /**

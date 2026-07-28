@@ -8,7 +8,7 @@ describe("extractLiquidVariables()", () => {
   describe("when text contains variables inside Liquid tags", () => {
     it("finds variables in both tag conditions and variable expressions", () => {
       const result = extractLiquidVariables(
-        "{% if tone %}{{ name }}{% endif %}"
+        "{% if tone %}{{ name }}{% endif %}",
       );
 
       expect(result.inputVariables).toContain("tone");
@@ -19,7 +19,7 @@ describe("extractLiquidVariables()", () => {
   describe("when text contains for loops", () => {
     it("extracts the collection as an input variable", () => {
       const result = extractLiquidVariables(
-        "{% for item in items %}{{ item }}{% endfor %}"
+        "{% for item in items %}{{ item }}{% endfor %}",
       );
 
       expect(result.inputVariables).toContain("items");
@@ -27,7 +27,7 @@ describe("extractLiquidVariables()", () => {
 
     it("identifies loop iterators as loop variables, not input variables", () => {
       const result = extractLiquidVariables(
-        "{% for item in items %}{{ item }}{% endfor %}"
+        "{% for item in items %}{{ item }}{% endfor %}",
       );
 
       expect(result.loopVariables).toContain("item");
@@ -36,7 +36,7 @@ describe("extractLiquidVariables()", () => {
 
     it("does not extract Liquid keywords as variables", () => {
       const result = extractLiquidVariables(
-        "{% for item in items %}{{ item }}{% endfor %}"
+        "{% for item in items %}{{ item }}{% endfor %}",
       );
 
       expect(result.inputVariables).not.toContain("for");
@@ -51,7 +51,7 @@ describe("extractLiquidVariables()", () => {
   describe("when text contains filters", () => {
     it("extracts only the variable name, not filter names", () => {
       const result = extractLiquidVariables(
-        "{{ name | upcase | truncate: 20 }}"
+        "{{ name | upcase | truncate: 20 }}",
       );
 
       expect(result.inputVariables).toContain("name");
@@ -63,7 +63,7 @@ describe("extractLiquidVariables()", () => {
   describe("when text contains assign tags", () => {
     it("extracts non-assigned variables as input variables", () => {
       const result = extractLiquidVariables(
-        "{% assign greeting = 'Hello' %}{{ greeting }}, {{ name }}"
+        "{% assign greeting = 'Hello' %}{{ greeting }}, {{ name }}",
       );
 
       expect(result.inputVariables).toContain("name");
@@ -71,7 +71,7 @@ describe("extractLiquidVariables()", () => {
 
     it("recognizes assigned names as locally assigned, not input variables", () => {
       const result = extractLiquidVariables(
-        "{% assign greeting = 'Hello' %}{{ greeting }}, {{ name }}"
+        "{% assign greeting = 'Hello' %}{{ greeting }}, {{ name }}",
       );
 
       expect(result.assignedVariables).toContain("greeting");
@@ -82,7 +82,7 @@ describe("extractLiquidVariables()", () => {
   describe("when text contains for loops with range literals", () => {
     it("does not treat range literals like (1..5) as variables", () => {
       const result = extractLiquidVariables(
-        "{% for i in (1..5) %}{{ i }}{% endfor %}"
+        "{% for i in (1..5) %}{{ i }}{% endfor %}",
       );
 
       expect(result.loopVariables).toContain("i");
@@ -96,7 +96,7 @@ describe("extractLiquidVariables()", () => {
   describe("when text contains nested Liquid structures", () => {
     it("extracts the collection as input variable and loop iterator as loop variable", () => {
       const result = extractLiquidVariables(
-        "{% for item in items %}{% if item.active %}{{ item.name }}{% endif %}{% endfor %}"
+        "{% for item in items %}{% if item.active %}{{ item.name }}{% endif %}{% endfor %}",
       );
 
       expect(result.inputVariables).toContain("items");
@@ -108,7 +108,7 @@ describe("extractLiquidVariables()", () => {
   describe("when text contains simple mustache variables only", () => {
     it("extracts them as input variables (backward compatible)", () => {
       const result = extractLiquidVariables(
-        "Hello {{ question }}, context: {{ context }}"
+        "Hello {{ question }}, context: {{ context }}",
       );
 
       expect(result.inputVariables).toContain("question");
@@ -119,7 +119,7 @@ describe("extractLiquidVariables()", () => {
   describe("when text contains if/elsif/else conditions", () => {
     it("extracts condition variables as input variables", () => {
       const result = extractLiquidVariables(
-        "{% if x %}A{% elsif y %}B{% else %}C{% endif %}"
+        "{% if x %}A{% elsif y %}B{% else %}C{% endif %}",
       );
 
       expect(result.inputVariables).toContain("x");
@@ -128,7 +128,7 @@ describe("extractLiquidVariables()", () => {
 
     it("does not extract if/elsif/else/endif as variables", () => {
       const result = extractLiquidVariables(
-        "{% if x %}A{% elsif y %}B{% else %}C{% endif %}"
+        "{% if x %}A{% elsif y %}B{% else %}C{% endif %}",
       );
 
       expect(result.inputVariables).not.toContain("if");

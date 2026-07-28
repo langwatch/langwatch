@@ -19,7 +19,9 @@ describe("deriveSeriesIdentifier", () => {
 
   describe("given a series entry with an empty key and a metric", () => {
     const graph = {
-      series: [{ key: "", metric: "performance.total_cost", aggregation: "sum" }],
+      series: [
+        { key: "", metric: "performance.total_cost", aggregation: "sum" },
+      ],
     };
 
     describe("when deriving the identifier", () => {

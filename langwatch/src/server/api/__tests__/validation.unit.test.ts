@@ -190,8 +190,7 @@ describe("the REST boundary's request validator", () => {
       const app = appWith(((
         _result: unknown,
         c: { json: (body: unknown, status?: number) => unknown },
-      ) =>
-        c.json({ mine: true }, 418)) as never);
+      ) => c.json({ mine: true }, 418)) as never);
 
       const res = await post({ name: "", metric: "latency" }, app);
 

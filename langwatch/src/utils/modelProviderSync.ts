@@ -16,7 +16,8 @@ import type { api } from "./api";
  * refresh (#5827). Posting here on save lets every other open tab
  * invalidate immediately, focus or no focus.
  */
-const MODEL_PROVIDER_SYNC_CHANNEL = "langwatch:model-providers-updated" as const;
+const MODEL_PROVIDER_SYNC_CHANNEL =
+  "langwatch:model-providers-updated" as const;
 
 function getChannel(): BroadcastChannel | null {
   if (

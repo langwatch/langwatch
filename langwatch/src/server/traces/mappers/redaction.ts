@@ -299,8 +299,10 @@ export function applyDerivedTraceEventProtections(
     return {
       ...event,
       attributes:
-        redactHiddenAttributes(event.attributes, protections.hiddenAttributes) ??
-        event.attributes,
+        redactHiddenAttributes(
+          event.attributes,
+          protections.hiddenAttributes,
+        ) ?? event.attributes,
     };
   });
 }

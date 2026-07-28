@@ -214,7 +214,9 @@ describe("virtual key spend (real PG + real CH)", () => {
         query_params: { tenantId: PROJECT_ID },
       });
     }
-    await prisma.gatewayBudget.deleteMany({ where: { organizationId: ORG_ID } });
+    await prisma.gatewayBudget.deleteMany({
+      where: { organizationId: ORG_ID },
+    });
     await prisma.virtualKey.deleteMany({
       where: { id: { in: [VK_UNBUDGETED_ID, VK_BUDGETED_ID] } },
     });

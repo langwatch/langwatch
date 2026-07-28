@@ -1,3 +1,4 @@
+import type { ReportChart } from "@langwatch/automations/templating/templateContext";
 import type { CustomGraph } from "@prisma/client";
 import type { CustomGraphInput } from "~/components/analytics/CustomGraph";
 import type {
@@ -12,7 +13,6 @@ import {
   extractSeriesPoints,
 } from "~/server/app-layer/analytics/series-points";
 import type { ReportSource } from "~/server/app-layer/automations/report.builder";
-import type { ReportChart } from "@langwatch/automations/templating/templateContext";
 
 /**
  * Turn a report's chart source — one custom graph, or every panel on a
@@ -40,7 +40,9 @@ export interface ReportChartDeps {
 
 /** Slack renders four chart types; a graph can be any of eleven. Map onto the
  *  nearest one so a stacked bar still arrives as a bar rather than nothing. */
-function chartTypeOf(graphType: CustomGraphInput["graphType"]): ReportChart["type"] {
+function chartTypeOf(
+  graphType: CustomGraphInput["graphType"],
+): ReportChart["type"] {
   switch (graphType) {
     case "pie":
     case "donnut":
@@ -283,7 +285,9 @@ async function buildChart({
     categories,
     series,
     total,
-    isEmpty: series.every((one) => one.data.every((point) => point.value === 0)),
+    isEmpty: series.every((one) =>
+      one.data.every((point) => point.value === 0),
+    ),
   };
 }
 

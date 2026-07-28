@@ -6,8 +6,8 @@ import { RecordMetricDataPointCommand } from "./commands/recordMetricDataPointCo
 import { MetricDataPointStorageMapProjection } from "./projections/metricDataPointStorage.mapProjection";
 import { MetricSeriesCatalogMapProjection } from "./projections/metricSeriesCatalog.mapProjection";
 import { MetricTimeRollupMapProjection } from "./projections/metricTimeRollup.mapProjection";
-import type { CanonicalMetricDataPoint } from "./schemas/metricDataPoint";
 import type { MetricProcessingEvent } from "./schemas/events";
+import type { CanonicalMetricDataPoint } from "./schemas/metricDataPoint";
 
 export interface MetricProcessingPipelineDeps {
   metricDataPointAppendStore: AppendStore<CanonicalMetricDataPoint>;

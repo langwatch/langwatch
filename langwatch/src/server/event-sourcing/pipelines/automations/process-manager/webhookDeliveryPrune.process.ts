@@ -41,10 +41,7 @@ type PruneIntents = {
 export const webhookDeliveryPruneWake: WakeHandler<
   WebhookDeliveryPruneState,
   PruneIntents
-> = (
-  _state,
-  ctx,
-) => ({
+> = (_state, ctx) => ({
   state: { lastPruneAt: ctx.at },
   intents: [ctx.intents.prune(`prune:${ctx.at}`, { scheduledFor: ctx.at })],
 });

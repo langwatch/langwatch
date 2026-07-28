@@ -1,9 +1,9 @@
 import { TriggerAction } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 import { buildIntentFactories } from "~/server/event-sourcing/pipeline/processManagerDefinition";
-import { automationProcessDefinition } from "../../__tests__/pipelineTestHarness";
 import { TRIGGER_MATCH_RECORDED_EVENT_TYPE } from "~/server/event-sourcing/pipelines/automations/schemas/constants";
 import type { TriggerMatchRecordedEventData } from "~/server/event-sourcing/pipelines/automations/schemas/events";
+import { automationProcessDefinition } from "../../__tests__/pipelineTestHarness";
 import {
   addPending,
   drainDue,
@@ -214,7 +214,8 @@ describe("trigger settlement process", () => {
             {
               settleDueAt: index,
               dispatchDueAt: index === 0 ? 1_000 : index,
-              actionClass: index === 0 ? ("persist" as const) : ("notify" as const),
+              actionClass:
+                index === 0 ? ("persist" as const) : ("notify" as const),
               settleWindowBucket: "30000-0",
             },
           ]),

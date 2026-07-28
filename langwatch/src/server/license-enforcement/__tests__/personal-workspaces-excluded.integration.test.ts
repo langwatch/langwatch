@@ -31,17 +31,17 @@ import {
   it,
   vi,
 } from "vitest";
-import { prisma } from "../../db";
 import { FREE_PLAN } from "../../../../ee/licensing/constants";
 import type { PlanInfo } from "../../../../ee/licensing/planInfo";
+import { appRouter } from "../../api/root";
+import { createInnerTRPCContext } from "../../api/trpc";
 import { globalForApp, resetApp } from "../../app-layer/app";
 import { createTestApp } from "../../app-layer/presets";
 import {
   type PlanProvider,
   PlanProviderService,
 } from "../../app-layer/subscription/plan-provider";
-import { appRouter } from "../../api/root";
-import { createInnerTRPCContext } from "../../api/trpc";
+import { prisma } from "../../db";
 import { LicenseEnforcementRepository } from "../license-enforcement.repository";
 import { LicenseEnforcementService } from "../license-enforcement.service";
 import {
@@ -235,7 +235,9 @@ describe("given an organization with both personal and real workspaces", () => {
       .catch(() => {});
     await prisma.teamUser
       .deleteMany({
-        where: { team: { slug: { startsWith: `--test-team-${testNamespace}` } } },
+        where: {
+          team: { slug: { startsWith: `--test-team-${testNamespace}` } },
+        },
       })
       .catch(() => {});
     await prisma.team

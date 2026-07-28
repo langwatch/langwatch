@@ -11,13 +11,13 @@ import {
   llmPromptConfigFactory,
 } from "~/factories/llm-config.factory";
 import { projectFactory } from "~/factories/project.factory";
-import { prisma } from "~/server/db";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import {
-  PlanProviderService,
   type PlanProvider,
+  PlanProviderService,
 } from "~/server/app-layer/subscription/plan-provider";
+import { prisma } from "~/server/db";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import { app } from "../[[...route]]/app";
 import { createHandle } from "./helpers";
@@ -917,7 +917,9 @@ describe("Prompts API", () => {
     describe("when a prompt was previously created and then archived", () => {
       /** @scenario "A user can reuse the handle of an archived prompt for a new prompt" */
       it("allows creating a new prompt with the same handle", async () => {
-        const handle = `reuse-handle-${nanoid(6).toLowerCase().replace(/[^a-z0-9_-]/g, "x")}`;
+        const handle = `reuse-handle-${nanoid(6)
+          .toLowerCase()
+          .replace(/[^a-z0-9_-]/g, "x")}`;
 
         // 1) Create the original prompt with this handle.
         const createRes = await helpers.api.post("/api/prompts", {
@@ -949,7 +951,9 @@ describe("Prompts API", () => {
 
       /** @scenario "A user can sync a fresh prompt from the CLI after the previous one was archived" */
       it("allows the CLI sync flow to recreate a prompt with the same handle", async () => {
-        const handle = `sync-reuse-${nanoid(6).toLowerCase().replace(/[^a-z0-9_-]/g, "x")}`;
+        const handle = `sync-reuse-${nanoid(6)
+          .toLowerCase()
+          .replace(/[^a-z0-9_-]/g, "x")}`;
 
         // 1) Sync creates the prompt.
         const initialSync = await helpers.api.post(
@@ -975,18 +979,15 @@ describe("Prompts API", () => {
         expect(deleteRes.status).toBe(200);
 
         // 3) Sync again with the same handle — should create a new prompt.
-        const reSync = await helpers.api.post(
-          `/api/prompts/${handle}/sync`,
-          {
-            configData: {
-              prompt: "v2",
-              messages: [],
-              inputs: [{ identifier: "input", type: "str" }],
-              outputs: [{ identifier: "output", type: "str" }],
-              model: "openai/gpt-5-mini",
-            },
+        const reSync = await helpers.api.post(`/api/prompts/${handle}/sync`, {
+          configData: {
+            prompt: "v2",
+            messages: [],
+            inputs: [{ identifier: "input", type: "str" }],
+            outputs: [{ identifier: "output", type: "str" }],
+            model: "openai/gpt-5-mini",
           },
-        );
+        });
         expect(reSync.status).toBe(200);
         const reBody = await reSync.json();
         expect(reBody.action).toBe("created");
@@ -996,7 +997,9 @@ describe("Prompts API", () => {
 
     describe("when a prompt with the handle is still active", () => {
       it("returns a 409 with a descriptive message on POST /api/prompts", async () => {
-        const handle = `active-conflict-${nanoid(6).toLowerCase().replace(/[^a-z0-9_-]/g, "x")}`;
+        const handle = `active-conflict-${nanoid(6)
+          .toLowerCase()
+          .replace(/[^a-z0-9_-]/g, "x")}`;
 
         const firstRes = await helpers.api.post("/api/prompts", {
           handle,

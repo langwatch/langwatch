@@ -133,11 +133,15 @@ function toClickHouseRecord(
 
     SpanCount: Math.max(0, Math.round(row.spanCount)),
     AnnotationIds: row.annotationIds,
-    RootSpanStartTimeMs: String(Math.max(0, Math.round(row.rootSpanStartTimeMs))),
+    RootSpanStartTimeMs: String(
+      Math.max(0, Math.round(row.rootSpanStartTimeMs)),
+    ),
     TraceNameFromFallback: row.traceNameFromFallback,
     RootMetadataFromFallback: row.rootMetadataFromFallback,
     TraceNameUserOverridden: row.traceNameUserOverridden,
-    LastEventOccurredAt: String(Math.max(0, Math.round(row.lastEventOccurredAt))),
+    LastEventOccurredAt: String(
+      Math.max(0, Math.round(row.lastEventOccurredAt)),
+    ),
     EarliestSpanStartMs: String(
       Math.max(0, Math.round(row.earliestSpanStartMs)),
     ),

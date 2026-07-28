@@ -21,7 +21,9 @@ import type {
 import type { LiteLLMParams, ScenarioConfig } from "../execution/types";
 
 // Test doubles that record state for verification
-function createTestDeps(overrides?: Partial<OrchestratorDependencies>): OrchestratorDependencies {
+function createTestDeps(
+  overrides?: Partial<OrchestratorDependencies>,
+): OrchestratorDependencies {
   const defaultScenario: ScenarioConfig = {
     id: "scen_123",
     name: "Test Scenario",
@@ -39,7 +41,6 @@ function createTestDeps(overrides?: Partial<OrchestratorDependencies>): Orchestr
     model: "openai/gpt-4o-mini",
   };
 
-
   return {
     scenarioRepository: {
       getById: async () => defaultScenario,
@@ -56,7 +57,11 @@ function createTestDeps(overrides?: Partial<OrchestratorDependencies>): Orchestr
     adapterFactory: {
       create: async () => ({
         success: true as const,
-        adapter: { name: "TestAdapter", role: "Agent", call: async () => "response" } as any,
+        adapter: {
+          name: "TestAdapter",
+          role: "Agent",
+          call: async () => "response",
+        } as any,
       }),
     },
     tracerFactory: {
@@ -187,7 +192,10 @@ describe("ScenarioExecutionOrchestrator", () => {
         it("returns failure with adapter error message", async () => {
           const deps = createTestDeps({
             adapterFactory: {
-              create: async () => ({ success: false as const, error: "Prompt not found" }),
+              create: async () => ({
+                success: false as const,
+                error: "Prompt not found",
+              }),
             },
           });
           const orchestrator = new ScenarioExecutionOrchestrator(deps);
@@ -205,7 +213,9 @@ describe("ScenarioExecutionOrchestrator", () => {
         it("returns failure with error message", async () => {
           const deps = createTestDeps({
             scenarioExecutor: {
-              run: async () => { throw new Error("SDK crashed"); },
+              run: async () => {
+                throw new Error("SDK crashed");
+              },
             },
           });
           const orchestrator = new ScenarioExecutionOrchestrator(deps);
@@ -221,11 +231,15 @@ describe("ScenarioExecutionOrchestrator", () => {
           const deps = createTestDeps({
             tracerFactory: {
               create: () => ({
-                shutdown: async () => { tracerShutdownCalled = true; },
+                shutdown: async () => {
+                  tracerShutdownCalled = true;
+                },
               }),
             },
             scenarioExecutor: {
-              run: async () => { throw new Error("Execution failed"); },
+              run: async () => {
+                throw new Error("Execution failed");
+              },
             },
           });
           const orchestrator = new ScenarioExecutionOrchestrator(deps);
@@ -243,7 +257,9 @@ describe("ScenarioExecutionOrchestrator", () => {
           const deps = createTestDeps({
             tracerFactory: {
               create: () => ({
-                shutdown: async () => { throw new Error("Shutdown failed"); },
+                shutdown: async () => {
+                  throw new Error("Shutdown failed");
+                },
               }),
             },
           });

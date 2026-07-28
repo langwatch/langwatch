@@ -245,7 +245,9 @@ describe("transformBatchEvaluationData", () => {
       expect(result.targetColumns[0]?.name).toBe("Output");
       expect(result.rows).toHaveLength(1);
       expect(result.rows[0]?.datasetEntry).toEqual({ input: "test" });
-      expect(result.rows[0]?.targets._default?.error).toBe("Connection timeout");
+      expect(result.rows[0]?.targets._default?.error).toBe(
+        "Connection timeout",
+      );
     });
   });
 
@@ -620,9 +622,9 @@ describe("transformBatchEvaluationData", () => {
       expect(result.rows[0]?.targets[targetId]?.evaluatorResults).toHaveLength(
         1,
       );
-      expect(result.rows[0]?.targets[targetId]?.evaluatorResults[0]?.score).toBe(
-        0.95,
-      );
+      expect(
+        result.rows[0]?.targets[targetId]?.evaluatorResults[0]?.score,
+      ).toBe(0.95);
     });
 
     it("extracts output from various evaluator input field names", () => {
@@ -699,20 +701,19 @@ describe("transformBatchEvaluationData", () => {
       expect(result.targetColumns[1]?.name).toBe("Sample Metric 2");
 
       // Each target should have its own output from evaluator inputs
-      expect(
-        result.rows[0]?.targets._eval_sample_metric?.output,
-      ).toEqual({ output: "The answer is 4" });
-      expect(
-        result.rows[0]?.targets._eval_sample_metric2?.output,
-      ).toEqual({ output: "Another response" });
+      expect(result.rows[0]?.targets._eval_sample_metric?.output).toEqual({
+        output: "The answer is 4",
+      });
+      expect(result.rows[0]?.targets._eval_sample_metric2?.output).toEqual({
+        output: "Another response",
+      });
 
       // Each target should have only its own evaluator result
       expect(
         result.rows[0]?.targets._eval_sample_metric?.evaluatorResults,
       ).toHaveLength(1);
       expect(
-        result.rows[0]?.targets._eval_sample_metric?.evaluatorResults[0]
-          ?.score,
+        result.rows[0]?.targets._eval_sample_metric?.evaluatorResults[0]?.score,
       ).toBe(0.95);
       expect(
         result.rows[0]?.targets._eval_sample_metric2?.evaluatorResults,
@@ -749,9 +750,10 @@ describe("transformBatchEvaluationData", () => {
 
       // Output should be the full inputs object (not wrapped in {output: ...})
       // This will be displayed as JSON in the UI
-      expect(
-        result.rows[0]?.targets._eval_sample_metric?.output,
-      ).toEqual({ foo: "bar", bar: "baz" });
+      expect(result.rows[0]?.targets._eval_sample_metric?.output).toEqual({
+        foo: "bar",
+        bar: "baz",
+      });
     });
 
     it("does not derive target when dataset already has predicted values", () => {
@@ -803,7 +805,10 @@ describe("transformBatchEvaluationData", () => {
           },
           {
             index: 1,
-            entry: { question: "What is the capital of France?", expected: "Paris" },
+            entry: {
+              question: "What is the capital of France?",
+              expected: "Paris",
+            },
             cost: null,
             duration: 3,
             error: "Not implemented",

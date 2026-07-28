@@ -7,8 +7,8 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { UserAvatar } from "~/components/UserAvatar";
 import { Edit, MessageCircle, ThumbsDown, ThumbsUp } from "react-feather";
+import { UserAvatar } from "~/components/UserAvatar";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "~/hooks/useRequiredSession";

@@ -11,11 +11,11 @@
  * - RoleBinding is authoritative: TeamUser is ignored even when both exist
  */
 import {
-  RoleBindingScopeType,
-  TeamUserRole,
   type Organization,
   type Project,
+  RoleBindingScopeType,
   type Team,
+  TeamUserRole,
   type User,
 } from "@prisma/client";
 import { nanoid } from "nanoid";

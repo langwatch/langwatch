@@ -242,9 +242,9 @@ describe("given the edit drawer for an existing key", () => {
         expect(screen.getByTestId("vk-budget-limit")).toHaveValue("5");
       });
       expect(screen.getByTestId("vk-budget-window")).toHaveValue("DAY");
-      expect(
-        screen.getByTestId("vk-budget-annotation").textContent,
-      ).toBe("Max $5/day, resets 00:00 UTC");
+      expect(screen.getByTestId("vk-budget-annotation").textContent).toBe(
+        "Max $5/day, resets 00:00 UTC",
+      );
     });
 
     it("does not list the key's own budget under already-applies", async () => {
@@ -277,9 +277,9 @@ describe("given the edit drawer for an existing key", () => {
         expect(screen.getByTestId("vk-budget-limit")).toHaveValue("5");
       });
       await userEvent.clear(screen.getByTestId("vk-budget-limit"));
-      expect(
-        screen.getByTestId("vk-budget-annotation").textContent,
-      ).toContain("No max spending for this key");
+      expect(screen.getByTestId("vk-budget-annotation").textContent).toContain(
+        "No max spending for this key",
+      );
 
       await save();
       expect(lastUpdateInput().budget).toBeNull();
@@ -321,9 +321,10 @@ describe("given the edit drawer for an existing key", () => {
 
       await userEvent.click(screen.getByTestId("vk-provider-mp-anthropic"));
       await save();
-      expect(
-        [...lastUpdateInput().config.providersAllowed].sort(),
-      ).toEqual(["mp-anthropic", "mp-openai"]);
+      expect([...lastUpdateInput().config.providersAllowed].sort()).toEqual([
+        "mp-anthropic",
+        "mp-openai",
+      ]);
     });
   });
 

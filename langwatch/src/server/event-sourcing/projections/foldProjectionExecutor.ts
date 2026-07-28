@@ -562,8 +562,7 @@ export class FoldProjectionExecutor {
       (loadedState as Record<string, unknown>)[
         projection.LastEventOccurredAtKey
       ] ?? 0;
-    const earliestOccurredAt = (fresh[0] as Record<string, unknown>)
-      .occurredAt;
+    const earliestOccurredAt = (fresh[0] as Record<string, unknown>).occurredAt;
 
     // Out-of-order vs the persisted checkpoint: the batch starts earlier than
     // what we've already folded. Re-fold from scratch when we can load the full

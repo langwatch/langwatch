@@ -10,12 +10,16 @@ vi.mock("../../../utils/encryption", () => ({
   }),
 }));
 
-import type { ModelProvider, ModelProviderScope, PrismaClient } from "@prisma/client";
+import type {
+  ModelProvider,
+  ModelProviderScope,
+  PrismaClient,
+} from "@prisma/client";
+import { decrypt, encrypt } from "../../../utils/encryption";
 import {
   ModelProviderRepository,
   type ModelProviderWithScopes,
 } from "../modelProvider.repository";
-import { encrypt, decrypt } from "../../../utils/encryption";
 
 function createMockPrisma() {
   return {
@@ -165,7 +169,10 @@ describe("ModelProviderRepository", () => {
   describe("decryptCustomKeys", () => {
     describe("when given an encrypted string", () => {
       it("round-trips correctly with encryptCustomKeys", () => {
-        const original = { OPENAI_API_KEY: "sk-secret123", BASE_URL: "https://api.openai.com" };
+        const original = {
+          OPENAI_API_KEY: "sk-secret123",
+          BASE_URL: "https://api.openai.com",
+        };
         const encrypted = (repository as any).encryptCustomKeys(original);
         const decrypted = (repository as any).decryptCustomKeys(encrypted);
 
@@ -417,9 +424,8 @@ describe("ModelProviderRepository", () => {
       it("returns an empty array without querying modelProvider", async () => {
         (prisma.project.findUnique as any).mockResolvedValue(null);
 
-        const results = await repository.findAllAccessibleForProject(
-          "proj_missing",
-        );
+        const results =
+          await repository.findAllAccessibleForProject("proj_missing");
 
         expect(results).toEqual([]);
         expect(prisma.modelProvider.findMany).not.toHaveBeenCalled();
@@ -503,7 +509,8 @@ describe("ModelProviderRepository", () => {
           scopes: [{ scopeType: "PROJECT", scopeId: "proj_test" }],
         });
 
-        const createCall = (prisma.modelProvider.create as any).mock.calls[0][0];
+        const createCall = (prisma.modelProvider.create as any).mock
+          .calls[0][0];
         const storedCustomKeys = createCall.data.customKeys;
 
         // The stored value must be an encrypted string, not the original object
@@ -526,7 +533,8 @@ describe("ModelProviderRepository", () => {
           scopes: [{ scopeType: "PROJECT", scopeId: "proj_test" }],
         });
 
-        const createCall = (prisma.modelProvider.create as any).mock.calls[0][0];
+        const createCall = (prisma.modelProvider.create as any).mock
+          .calls[0][0];
         // null or undefined should pass through
         expect(createCall.data.customKeys).toBeUndefined();
       });
@@ -578,7 +586,8 @@ describe("ModelProviderRepository", () => {
           customKeys: keys,
         });
 
-        const updateCall = (prisma.modelProvider.update as any).mock.calls[0][0];
+        const updateCall = (prisma.modelProvider.update as any).mock
+          .calls[0][0];
         const storedCustomKeys = updateCall.data.customKeys;
 
         expect(typeof storedCustomKeys).toBe("string");
@@ -596,7 +605,8 @@ describe("ModelProviderRepository", () => {
           enabled: false,
         });
 
-        const updateCall = (prisma.modelProvider.update as any).mock.calls[0][0];
+        const updateCall = (prisma.modelProvider.update as any).mock
+          .calls[0][0];
         expect(updateCall.data.customKeys).toBeUndefined();
       });
     });
@@ -612,8 +622,12 @@ describe("ModelProviderRepository", () => {
             scopes: [{ scopeType: "ORGANIZATION", scopeId: "org_other" }],
           }),
         ).rejects.toThrow(/organization/);
-        expect(prisma.modelProviderScope.deleteMany as any).not.toHaveBeenCalled();
-        expect(prisma.modelProviderScope.createMany as any).not.toHaveBeenCalled();
+        expect(
+          prisma.modelProviderScope.deleteMany as any,
+        ).not.toHaveBeenCalled();
+        expect(
+          prisma.modelProviderScope.createMany as any,
+        ).not.toHaveBeenCalled();
       });
     });
 
@@ -630,8 +644,12 @@ describe("ModelProviderRepository", () => {
           scopes: [{ scopeType: "ORGANIZATION", scopeId: "org_existing" }],
         });
 
-        expect(prisma.modelProviderScope.deleteMany as any).toHaveBeenCalledTimes(1);
-        expect(prisma.modelProviderScope.createMany as any).toHaveBeenCalledTimes(1);
+        expect(
+          prisma.modelProviderScope.deleteMany as any,
+        ).toHaveBeenCalledTimes(1);
+        expect(
+          prisma.modelProviderScope.createMany as any,
+        ).toHaveBeenCalledTimes(1);
       });
     });
   });

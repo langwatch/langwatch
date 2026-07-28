@@ -23,8 +23,8 @@
 import { Box, VStack } from "@chakra-ui/react";
 import {
   feedLangyDerivedCardPreview,
-  splitLangyCardFences,
   type LangyDerivedCardPreview,
+  splitLangyCardFences,
 } from "@langwatch/langy";
 import { useMemo, useRef } from "react";
 

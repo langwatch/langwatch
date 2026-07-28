@@ -1,7 +1,7 @@
 import type { ProcessManagerDefinition } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import {
-  createAutomationsPipeline,
   type AutomationsPipelineDeps,
+  createAutomationsPipeline,
 } from "../pipeline";
 
 /** Pull one process-manager definition out of the real automations pipeline

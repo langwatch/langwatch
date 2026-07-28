@@ -10,13 +10,8 @@ import type { z } from "zod";
 // ---------------------------------------------------------------------------
 
 /** Extract the literal event type string from a Zod schema's output type. */
-export type EventTypeOf<S> = S extends z.ZodType<
-  { type: infer T extends string },
-  any,
-  any
->
-  ? T
-  : never;
+export type EventTypeOf<S> =
+  S extends z.ZodType<{ type: infer T extends string }, any, any> ? T : never;
 
 // ---------------------------------------------------------------------------
 // Type-level string transforms
@@ -45,7 +40,9 @@ export type DotSnakeToPascal<S extends string> =
 // ---------------------------------------------------------------------------
 
 export type UnionToIntersection<U> = (
-  U extends unknown ? (k: U) => void : never
+  U extends unknown
+    ? (k: U) => void
+    : never
 ) extends (k: infer I) => void
   ? I
   : never;

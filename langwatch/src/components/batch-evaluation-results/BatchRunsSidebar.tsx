@@ -208,8 +208,8 @@ export function BatchRunsSidebar({
         <Text fontSize="sm" fontWeight="semibold" color="fg">
           Experiment Runs
         </Text>
-        {onToggleCompareMode && (
-          compareMode ? (
+        {onToggleCompareMode &&
+          (compareMode ? (
             <Button
               size="xs"
               variant="outline"
@@ -239,8 +239,7 @@ export function BatchRunsSidebar({
                 Compare
               </Button>
             </Tooltip>
-          )
-        )}
+          ))}
       </HStack>
 
       {/* Loading state */}

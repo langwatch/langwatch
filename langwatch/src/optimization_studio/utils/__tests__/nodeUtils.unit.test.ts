@@ -1,10 +1,11 @@
 /**
  * @vitest-environment node
  */
-import { describe, it, expect } from "vitest";
+
 import type { Edge, Node } from "@xyflow/react";
-import { getMappingSurfaceInputs, getInputsOutputs } from "../nodeUtils";
+import { describe, expect, it } from "vitest";
 import type { Field } from "../../types/dsl";
+import { getInputsOutputs, getMappingSurfaceInputs } from "../nodeUtils";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -26,7 +27,11 @@ interface BuildWorkflowOptions {
   edges?: Edge[];
 }
 
-function buildWorkflow({ entryOutputs, endInputs = [], edges = [] }: BuildWorkflowOptions): {
+function buildWorkflow({
+  entryOutputs,
+  endInputs = [],
+  edges = [],
+}: BuildWorkflowOptions): {
   nodes: Node[];
   edges: Edge[];
 } {
@@ -66,7 +71,11 @@ function buildWorkflow({ entryOutputs, endInputs = [], edges = [] }: BuildWorkfl
   return { nodes, edges };
 }
 
-function makeEdge(identifier: string, targetNodeId: string, edgeIndex: number): Edge {
+function makeEdge(
+  identifier: string,
+  targetNodeId: string,
+  edgeIndex: number,
+): Edge {
   return {
     id: `edge-${edgeIndex}`,
     source: "entry",
@@ -108,7 +117,10 @@ describe("getMappingSurfaceInputs", () => {
       const inputs = getMappingSurfaceInputs(edges, nodes);
 
       expect(inputs).toHaveLength(1);
-      expect(inputs[0]).toMatchObject({ identifier: "eval_only", optional: true });
+      expect(inputs[0]).toMatchObject({
+        identifier: "eval_only",
+        optional: true,
+      });
     });
   });
 
@@ -162,7 +174,6 @@ describe("getMappingSurfaceInputs", () => {
       expect(inputs[0]).not.toHaveProperty("optional");
     });
   });
-
 });
 
 // ---------------------------------------------------------------------------

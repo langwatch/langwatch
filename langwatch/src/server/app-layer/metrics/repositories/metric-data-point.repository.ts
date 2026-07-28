@@ -52,7 +52,9 @@ export interface MetricDataPointRepository {
   }): Promise<SeriesTotalByPointAttribute[]>;
 }
 
-export class NullMetricDataPointRepository implements MetricDataPointRepository {
+export class NullMetricDataPointRepository
+  implements MetricDataPointRepository
+{
   async ensureDataPoint(_args: MetricDataPointWrite): Promise<void> {}
 
   async ensureDataPoints(_args: MetricDataPointBulkWrite): Promise<void> {}

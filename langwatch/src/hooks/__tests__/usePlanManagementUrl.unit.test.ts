@@ -1,9 +1,9 @@
 import { PricingModel } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 import {
-  getPlanManagementUrl,
-  getPlanManagementButtonLabel,
   getPlanActionLabel,
+  getPlanManagementButtonLabel,
+  getPlanManagementUrl,
   shouldShowPlanLimits,
 } from "../usePlanManagementUrl";
 
@@ -37,19 +37,34 @@ describe("getPlanActionLabel", () => {
   describe("when in SaaS mode", () => {
     it("returns 'Upgrade Plan' for free tier", () => {
       expect(
-        getPlanActionLabel({ isSaaS: true, isFree: true, isEnterprise: false, hasValidLicense: false })
+        getPlanActionLabel({
+          isSaaS: true,
+          isFree: true,
+          isEnterprise: false,
+          hasValidLicense: false,
+        }),
       ).toBe("Upgrade Plan");
     });
 
     it("returns 'Manage Subscription' for paid non-enterprise plan", () => {
       expect(
-        getPlanActionLabel({ isSaaS: true, isFree: false, isEnterprise: false, hasValidLicense: false })
+        getPlanActionLabel({
+          isSaaS: true,
+          isFree: false,
+          isEnterprise: false,
+          hasValidLicense: false,
+        }),
       ).toBe("Manage Subscription");
     });
 
     it("returns 'Manage Subscription' for enterprise plan", () => {
       expect(
-        getPlanActionLabel({ isSaaS: true, isFree: false, isEnterprise: true, hasValidLicense: false })
+        getPlanActionLabel({
+          isSaaS: true,
+          isFree: false,
+          isEnterprise: true,
+          hasValidLicense: false,
+        }),
       ).toBe("Manage Subscription");
     });
   });
@@ -57,13 +72,23 @@ describe("getPlanActionLabel", () => {
   describe("when self-hosted", () => {
     it("returns 'Manage License' with a valid license", () => {
       expect(
-        getPlanActionLabel({ isSaaS: false, isFree: false, isEnterprise: false, hasValidLicense: true })
+        getPlanActionLabel({
+          isSaaS: false,
+          isFree: false,
+          isEnterprise: false,
+          hasValidLicense: true,
+        }),
       ).toBe("Manage License");
     });
 
     it("returns 'Upgrade License' without a valid license", () => {
       expect(
-        getPlanActionLabel({ isSaaS: false, isFree: false, isEnterprise: false, hasValidLicense: false })
+        getPlanActionLabel({
+          isSaaS: false,
+          isFree: false,
+          isEnterprise: false,
+          hasValidLicense: false,
+        }),
       ).toBe("Upgrade License");
     });
   });
@@ -77,7 +102,7 @@ describe("shouldShowPlanLimits()", () => {
           isFree: true,
           isEnterprise: false,
           pricingModel: PricingModel.SEAT_EVENT,
-        })
+        }),
       ).toBe(true);
     });
 
@@ -87,7 +112,7 @@ describe("shouldShowPlanLimits()", () => {
           isFree: true,
           isEnterprise: false,
           pricingModel: PricingModel.TIERED,
-        })
+        }),
       ).toBe(true);
     });
   });
@@ -100,7 +125,7 @@ describe("shouldShowPlanLimits()", () => {
             isFree: false,
             isEnterprise: false,
             pricingModel: PricingModel.TIERED,
-          })
+          }),
         ).toBe(true);
       });
     });
@@ -112,7 +137,7 @@ describe("shouldShowPlanLimits()", () => {
             isFree: false,
             isEnterprise: false,
             pricingModel: PricingModel.SEAT_EVENT,
-          })
+          }),
         ).toBe(false);
       });
     });
@@ -124,7 +149,7 @@ describe("shouldShowPlanLimits()", () => {
             isFree: false,
             isEnterprise: false,
             pricingModel: undefined,
-          })
+          }),
         ).toBe(true);
       });
     });
@@ -136,7 +161,7 @@ describe("shouldShowPlanLimits()", () => {
             isFree: false,
             isEnterprise: false,
             pricingModel: null,
-          })
+          }),
         ).toBe(true);
       });
     });
@@ -149,7 +174,7 @@ describe("shouldShowPlanLimits()", () => {
           isFree: false,
           isEnterprise: true,
           pricingModel: PricingModel.TIERED,
-        })
+        }),
       ).toBe(false);
     });
 
@@ -159,7 +184,7 @@ describe("shouldShowPlanLimits()", () => {
           isFree: false,
           isEnterprise: true,
           pricingModel: PricingModel.SEAT_EVENT,
-        })
+        }),
       ).toBe(false);
     });
   });

@@ -144,7 +144,9 @@ export function BudgetEditDrawer({
                 {budget?.scopeType === "GROUP"
                   ? "group"
                   : budget?.scopeType.toLowerCase().replace("_", " ")}
-                {budget?.scopeTarget?.name ? `, ${budget.scopeTarget.name}` : ""}
+                {budget?.scopeTarget?.name
+                  ? `, ${budget.scopeTarget.name}`
+                  : ""}
                 {budget?.providerLabel ? `, ${budget.providerLabel} only` : ""}{" "}
                 (immutable after create)
               </Text>
@@ -198,9 +200,7 @@ export function BudgetEditDrawer({
                     setOnBreach((e.target.value as "BLOCK" | "WARN") ?? "BLOCK")
                   }
                 >
-                  <option value="BLOCK">
-                    Block: reject requests at limit
-                  </option>
+                  <option value="BLOCK">Block: reject requests at limit</option>
                   <option value="WARN">
                     Warn: tag responses, keep serving
                   </option>

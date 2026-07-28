@@ -16,9 +16,9 @@ import {
 } from "@chakra-ui/react";
 import { AlertTriangle, Plus, X } from "lucide-react";
 import { Checkbox } from "../ui/checkbox";
-import { Tooltip } from "../ui/tooltip";
 import { SearchInput } from "../ui/SearchInput";
 import { TagList } from "../ui/TagList";
+import { Tooltip } from "../ui/tooltip";
 
 interface Scenario {
   id: string;
@@ -123,9 +123,7 @@ export function ScenarioPicker({
               cursor="pointer"
               variant={activeLabelFilter === label ? "solid" : "outline"}
               onClick={() =>
-                onLabelFilterChange(
-                  activeLabelFilter === label ? null : label,
-                )
+                onLabelFilterChange(activeLabelFilter === label ? null : label)
               }
             >
               {label}
@@ -174,7 +172,8 @@ export function ScenarioPicker({
           <HStack gap={2}>
             <AlertTriangle size={14} color="var(--chakra-colors-orange-500)" />
             <Text fontSize="xs" color="orange.fg">
-              {archivedIds.length} archived scenario{archivedIds.length > 1 ? "s" : ""} linked:
+              {archivedIds.length} archived scenario
+              {archivedIds.length > 1 ? "s" : ""} linked:
             </Text>
           </HStack>
           {archivedIds.map((item) => (

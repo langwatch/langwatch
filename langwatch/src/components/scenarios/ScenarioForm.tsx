@@ -152,7 +152,6 @@ export function ScenarioForm({ defaultValues, formRef }: ScenarioFormProps) {
           )}
         />
       </VStack>
-
     </VStack>
   );
 }

@@ -14,14 +14,22 @@
  * - Adapter records the propagated trace ID for later ES query
  */
 
+import { type AgentInput, AgentRole } from "@langwatch/scenario";
 import { context, trace } from "@opentelemetry/api";
 import {
   InMemorySpanExporter,
   SimpleSpanProcessor,
 } from "@opentelemetry/sdk-trace-base";
 import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
-import { AgentRole, type AgentInput } from "@langwatch/scenario";
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import type { HttpAgentData } from "../types";
 import { createOtelEchoServer } from "./otel-echo-server";
 
@@ -37,8 +45,7 @@ const { SerializedHttpAgentAdapter } = await import(
   "../serialized-adapters/http-agent.adapter"
 );
 
-const W3C_TRACEPARENT_REGEX =
-  /^00-([a-f0-9]{32})-([a-f0-9]{16})-([0-9]{2})$/;
+const W3C_TRACEPARENT_REGEX = /^00-([a-f0-9]{32})-([a-f0-9]{16})-([0-9]{2})$/;
 
 describe("HTTP trace context propagation", () => {
   let provider: NodeTracerProvider;
@@ -151,28 +158,34 @@ describe("HTTP trace context propagation", () => {
             const adapter = new SerializedHttpAgentAdapter(createConfig());
 
             // Simulate 3 turns
-            await adapter.call(createInput({
-              messages: [{ role: "user", content: "Turn 1" }],
-              newMessages: [{ role: "user", content: "Turn 1" }],
-            }));
-            await adapter.call(createInput({
-              messages: [
-                { role: "user", content: "Turn 1" },
-                { role: "assistant", content: "I can help with that." },
-                { role: "user", content: "Turn 2" },
-              ],
-              newMessages: [{ role: "user", content: "Turn 2" }],
-            }));
-            await adapter.call(createInput({
-              messages: [
-                { role: "user", content: "Turn 1" },
-                { role: "assistant", content: "I can help with that." },
-                { role: "user", content: "Turn 2" },
-                { role: "assistant", content: "I can help with that." },
-                { role: "user", content: "Turn 3" },
-              ],
-              newMessages: [{ role: "user", content: "Turn 3" }],
-            }));
+            await adapter.call(
+              createInput({
+                messages: [{ role: "user", content: "Turn 1" }],
+                newMessages: [{ role: "user", content: "Turn 1" }],
+              }),
+            );
+            await adapter.call(
+              createInput({
+                messages: [
+                  { role: "user", content: "Turn 1" },
+                  { role: "assistant", content: "I can help with that." },
+                  { role: "user", content: "Turn 2" },
+                ],
+                newMessages: [{ role: "user", content: "Turn 2" }],
+              }),
+            );
+            await adapter.call(
+              createInput({
+                messages: [
+                  { role: "user", content: "Turn 1" },
+                  { role: "assistant", content: "I can help with that." },
+                  { role: "user", content: "Turn 2" },
+                  { role: "assistant", content: "I can help with that." },
+                  { role: "user", content: "Turn 3" },
+                ],
+                newMessages: [{ role: "user", content: "Turn 3" }],
+              }),
+            );
           });
         } finally {
           span.end();

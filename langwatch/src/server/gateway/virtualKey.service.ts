@@ -259,10 +259,18 @@ export class VirtualKeyService {
         tx,
       );
       await this.assertTraceProjectResolvable(vk, tx);
-      await this.assertProvidersAllowedReachable(vk, config.providersAllowed, tx);
+      await this.assertProvidersAllowedReachable(
+        vk,
+        config.providersAllowed,
+        tx,
+      );
       if (input.budget) {
         await this.upsertKeyBudget(
-          { virtualKey: vk, budget: input.budget, actorUserId: input.actorUserId },
+          {
+            virtualKey: vk,
+            budget: input.budget,
+            actorUserId: input.actorUserId,
+          },
           tx,
         );
       }
@@ -332,8 +340,7 @@ export class VirtualKeyService {
             null
           : existing.routingPolicyId;
     const routingMode =
-      input.routingMode !== undefined ||
-      input.routingPolicyId !== undefined
+      input.routingMode !== undefined || input.routingPolicyId !== undefined
         ? resolveRoutingMode(
             input.routingMode ?? existing.routingMode,
             nextRoutingPolicyId,
@@ -645,9 +652,7 @@ export class VirtualKeyService {
         organizationId: vk.organizationId,
         projectId: null,
         actorUserId,
-        action: existing
-          ? "gateway.budget.updated"
-          : "gateway.budget.created",
+        action: existing ? "gateway.budget.updated" : "gateway.budget.created",
         targetKind: "budget",
         targetId: row.id,
         ...(existing ? { before: serializeRowForAudit(existing) } : {}),
@@ -806,7 +811,8 @@ function resolveRoutingMode(
   if (mode === "POLICY" && !routingPolicyId) {
     throw new TRPCError({
       code: "BAD_REQUEST",
-      message: "routing_policy_required: routingMode POLICY needs a routingPolicyId",
+      message:
+        "routing_policy_required: routingMode POLICY needs a routingPolicyId",
     });
   }
   if (mode !== "POLICY" && routingPolicyId) {

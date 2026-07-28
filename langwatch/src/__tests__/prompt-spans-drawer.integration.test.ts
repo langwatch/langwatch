@@ -14,7 +14,8 @@
 
 import { describe, it } from "vitest";
 
-const PENDING = "pending: nlpgo prompt-span emission + sdk-go/prompts wiring in this PR";
+const PENDING =
+  "pending: nlpgo prompt-span emission + sdk-go/prompts wiring in this PR";
 
 describe("prompt-spans trace-UI consumer parity", () => {
   /** @scenario 'trace drawer surfaces "Open in Prompts" with the exact handle and version' */
@@ -29,7 +30,7 @@ describe("prompt-spans trace-UI consumer parity", () => {
   });
 
   /** @scenario 'trace drawer surfaces the draft state on the "Open in Prompts" affordance' */
-  it.skip("renders \"Open <handle>:<version> (unsaved edits)\" when langwatch.prompt.draft=true", () => {
+  it.skip('renders "Open <handle>:<version> (unsaved edits)" when langwatch.prompt.draft=true', () => {
     void PENDING;
   });
 });

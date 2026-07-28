@@ -103,7 +103,11 @@ describe("no-truncation regression — issue #2487", () => {
     it("current code passes the end key through intact", () => {
       // Simulate what the current log_results.ts does: no transformation
       const result = { ...predicted };
-      expect(result.end).toEqual({ score: 0.95, passed: true, details: "All criteria met" });
+      expect(result.end).toEqual({
+        score: 0.95,
+        passed: true,
+        details: "All criteria met",
+      });
     });
 
     it("current code preserves all node keys", () => {

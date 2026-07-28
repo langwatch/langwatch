@@ -11,10 +11,10 @@
 import { describe, expect, it } from "vitest";
 import {
   isHandledByGlobalHandler,
-  isHandledByLiteMemberHandler,
   isHandledByGlobalLicenseHandler,
-  markAsHandledByLiteMemberHandler,
+  isHandledByLiteMemberHandler,
   markAsHandledByLicenseHandler,
+  markAsHandledByLiteMemberHandler,
 } from "../trpcError";
 
 describe("isHandledByGlobalHandler()", () => {

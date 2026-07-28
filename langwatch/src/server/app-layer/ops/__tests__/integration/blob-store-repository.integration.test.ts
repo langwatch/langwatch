@@ -1,18 +1,17 @@
 import type { Redis } from "ioredis";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-
-import { createTenantId } from "../../../../event-sourcing/domain/tenantId";
 import {
+  getTestRedisConnection,
   startTestContainers,
   stopTestContainers,
-  getTestRedisConnection,
 } from "../../../../event-sourcing/__tests__/integration/testContainers";
+import { createTenantId } from "../../../../event-sourcing/domain/tenantId";
+import { LEGACY_HOLDER_LEASE_GUARD } from "../../../../event-sourcing/queues/groupQueue/blobConstants";
 import {
   blobHolderSetKey,
   blobLeaseSetKey,
   redisBlobKey,
 } from "../../../../event-sourcing/queues/groupQueue/blobKeys";
-import { LEGACY_HOLDER_LEASE_GUARD } from "../../../../event-sourcing/queues/groupQueue/blobConstants";
 import { BlobStoreRedisRepository } from "../../repositories/blob-store.redis.repository";
 
 const hasTestcontainers = !!(process.env.REDIS_URL || process.env.CI_REDIS_URL);

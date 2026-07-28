@@ -1,14 +1,14 @@
 import { useCallback, useRef } from "react";
 import { createEvaluatorEditorCallbacks } from "~/experiments-v3/utils/evaluatorEditorCallbacks";
 import { setFlowCallbacks, useDrawer } from "~/hooks/useDrawer";
-import type { Component, Field } from "../types/dsl";
-import type { NodeWithOptionalPosition } from "~/types";
-import { useWorkflowStore } from "./useWorkflowStore";
-import type { EvaluatorWithFields } from "~/server/evaluators/evaluator.service";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
 } from "~/server/evaluations/evaluators";
+import type { EvaluatorWithFields } from "~/server/evaluators/evaluator.service";
+import type { NodeWithOptionalPosition } from "~/types";
+import type { Component, Field } from "../types/dsl";
+import { useWorkflowStore } from "./useWorkflowStore";
 
 const FIELD_TYPE_MAP: Record<string, string> = {
   contexts: "list",
@@ -92,10 +92,12 @@ export function useEvaluatorPickerFlow() {
               type: f.type as Field["type"],
               ...(f.optional ? { optional: true } : {}),
             }));
-            const outputs: Field[] = (evaluator.outputFields ?? []).map((f) => ({
-              identifier: f.identifier,
-              type: f.type as Field["type"],
-            }));
+            const outputs: Field[] = (evaluator.outputFields ?? []).map(
+              (f) => ({
+                identifier: f.identifier,
+                type: f.type as Field["type"],
+              }),
+            );
 
             setNode({
               id: pendingEvaluatorRef.current,
@@ -124,7 +126,9 @@ export function useEvaluatorPickerFlow() {
                 ? computeFieldsFromEvaluatorType(saved.evaluatorType)
                 : {
                     inputs: [] as Field[],
-                    outputs: [{ identifier: "passed", type: "bool" as const }] as Field[],
+                    outputs: [
+                      { identifier: "passed", type: "bool" as const },
+                    ] as Field[],
                   };
 
               setNode({
@@ -148,7 +152,9 @@ export function useEvaluatorPickerFlow() {
             "evaluatorEditor",
             createEvaluatorEditorCallbacks({ onSave: onEvaluatorSaved }),
           );
-          setFlowCallbacks("workflowSelectorForEvaluator", { onSave: onEvaluatorSaved });
+          setFlowCallbacks("workflowSelectorForEvaluator", {
+            onSave: onEvaluatorSaved,
+          });
           openDrawer("evaluatorCategorySelector");
         },
         onClose: () => {

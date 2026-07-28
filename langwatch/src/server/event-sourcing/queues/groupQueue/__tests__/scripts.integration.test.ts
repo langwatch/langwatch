@@ -852,9 +852,9 @@ describe("GroupStagingScripts", () => {
           });
 
           // B is still staged and still leases the blob — the bytes must live.
-          expect(await redis.zrange(leaseKey({ hash: SHARED }), 0, -1)).toEqual([
-            "t-b",
-          ]);
+          expect(await redis.zrange(leaseKey({ hash: SHARED }), 0, -1)).toEqual(
+            ["t-b"],
+          );
           expect(await redis.exists(blobKey({ hash: SHARED }))).toBe(1);
           expect(await redis.get(blobKey({ hash: SHARED }))).toBe(
             "gzipped-bytes",
@@ -892,9 +892,9 @@ describe("GroupStagingScripts", () => {
             [],
           );
           expect(await redis.exists(blobKey({ hash: SHARED }))).toBe(1);
-          expect(await redis.ttl(blobKey({ hash: SHARED }))).toBeLessThanOrEqual(
-            BLOB_RELEASE_GRACE_TTL_SECONDS,
-          );
+          expect(
+            await redis.ttl(blobKey({ hash: SHARED })),
+          ).toBeLessThanOrEqual(BLOB_RELEASE_GRACE_TTL_SECONDS);
         });
       });
 
@@ -1011,9 +1011,9 @@ describe("GroupStagingScripts", () => {
             );
 
             expect(await redis.exists(blobKey({ hash: "h-grace" }))).toBe(1);
-            expect(await redis.ttl(blobKey({ hash: "h-grace" }))).toBeLessThanOrEqual(
-              BLOB_RELEASE_GRACE_TTL_SECONDS,
-            );
+            expect(
+              await redis.ttl(blobKey({ hash: "h-grace" })),
+            ).toBeLessThanOrEqual(BLOB_RELEASE_GRACE_TTL_SECONDS);
             expect(
               await redis.ttl(blobKey({ hash: "h-grace-new" })),
             ).toBeGreaterThan(BLOB_RELEASE_GRACE_TTL_SECONDS);
@@ -3449,12 +3449,20 @@ describe("GroupStagingScripts", () => {
       /** @scenario Counter is conserved when the same staged-job id is re-sent */
       it("counts the job once in total-pending", async () => {
         await scripts.stage(
-          makeJob({ stagedJobId: "j-dup", groupId: "g-dup", dispatchAfterMs: 100 }),
+          makeJob({
+            stagedJobId: "j-dup",
+            groupId: "g-dup",
+            dispatchAfterMs: 100,
+          }),
         );
         // Re-delivery of the same event id: the ZADD updates the member in
         // place, so the counter must not INCR a second time.
         await scripts.stage(
-          makeJob({ stagedJobId: "j-dup", groupId: "g-dup", dispatchAfterMs: 150 }),
+          makeJob({
+            stagedJobId: "j-dup",
+            groupId: "g-dup",
+            dispatchAfterMs: 150,
+          }),
         );
 
         expect(await redis.zcard(`${keyPrefix()}group:g-dup:jobs`)).toBe(1);
@@ -3473,7 +3481,9 @@ describe("GroupStagingScripts", () => {
         ]);
 
         expect(newStagedCount).toBe(1);
-        expect(await redis.zcard(`${keyPrefix()}group:g-dup-batch:jobs`)).toBe(1);
+        expect(await redis.zcard(`${keyPrefix()}group:g-dup-batch:jobs`)).toBe(
+          1,
+        );
         expect(await inspectTotalPending()).toBe(1);
       });
     });

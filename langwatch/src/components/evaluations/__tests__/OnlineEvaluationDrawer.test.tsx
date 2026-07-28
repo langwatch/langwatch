@@ -31,20 +31,22 @@ import {
 } from "~/hooks/useDrawer";
 import {
   clearOnlineEvaluationDrawerState,
-  setOnlineEvaluationDrawerState,
   OnlineEvaluationDrawer,
+  setOnlineEvaluationDrawerState,
 } from "../OnlineEvaluationDrawer";
 import {
-  state,
-  mockPush,
   mockEvaluators,
-  Wrapper,
+  mockPush,
   resetState,
+  state,
+  Wrapper,
 } from "./OnlineEvaluationDrawer.test-helpers.tsx";
 
 // vi.mock() factories are hoisted above imports, so we use async + dynamic import
 vi.mock("~/utils/compat/next-router", async () =>
-  (await import("./OnlineEvaluationDrawer.test-helpers.tsx")).createRouterMock(),
+  (
+    await import("./OnlineEvaluationDrawer.test-helpers.tsx")
+  ).createRouterMock(),
 );
 vi.mock("~/utils/api", async () =>
   (await import("./OnlineEvaluationDrawer.test-helpers.tsx")).createApiMock(),
@@ -53,10 +55,14 @@ vi.mock("~/hooks/useOrganizationTeamProject", async () =>
   (await import("./OnlineEvaluationDrawer.test-helpers.tsx")).createOrgMock(),
 );
 vi.mock("~/stores/upgradeModalStore", async () =>
-  (await import("./OnlineEvaluationDrawer.test-helpers.tsx")).createUpgradeModalMock(),
+  (
+    await import("./OnlineEvaluationDrawer.test-helpers.tsx")
+  ).createUpgradeModalMock(),
 );
 vi.mock("~/hooks/useLicenseEnforcement", async () =>
-  (await import("./OnlineEvaluationDrawer.test-helpers.tsx")).createLicenseEnforcementMock(),
+  (
+    await import("./OnlineEvaluationDrawer.test-helpers.tsx")
+  ).createLicenseEnforcementMock(),
 );
 
 // Mock scrollIntoView which jsdom doesn't support
@@ -91,7 +97,9 @@ describe.skip("OnlineEvaluationDrawer + EvaluatorListDrawer Integration", () => 
   ) => {
     const levelName = level === "trace" ? /Trace Level/i : /Thread Level/i;
     await waitFor(() => {
-      expect(screen.getByRole("radio", { name: levelName })).toBeInTheDocument();
+      expect(
+        screen.getByRole("radio", { name: levelName }),
+      ).toBeInTheDocument();
     });
     const radio = screen.getByRole("radio", { name: levelName });
     await user.click(radio.closest("label") ?? radio);
@@ -252,7 +260,9 @@ describe.skip("OnlineEvaluationDrawer", () => {
   ) => {
     const levelName = level === "trace" ? /Trace Level/i : /Thread Level/i;
     await waitFor(() => {
-      expect(screen.getByRole("radio", { name: levelName })).toBeInTheDocument();
+      expect(
+        screen.getByRole("radio", { name: levelName }),
+      ).toBeInTheDocument();
     });
     const radio = screen.getByRole("radio", { name: levelName });
     await user.click(radio.closest("label") ?? radio);
@@ -265,8 +275,12 @@ describe.skip("OnlineEvaluationDrawer", () => {
 
       await waitFor(() => {
         expect(screen.getByText("Evaluation Level")).toBeInTheDocument();
-        expect(screen.getByRole("radio", { name: /Trace Level/i })).toBeInTheDocument();
-        expect(screen.getByRole("radio", { name: /Thread Level/i })).toBeInTheDocument();
+        expect(
+          screen.getByRole("radio", { name: /Trace Level/i }),
+        ).toBeInTheDocument();
+        expect(
+          screen.getByRole("radio", { name: /Thread Level/i }),
+        ).toBeInTheDocument();
       });
 
       // Evaluator section should NOT be visible yet

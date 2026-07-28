@@ -413,8 +413,7 @@ function AnalyticsCustomGraphContent({
                             cursor="pointer"
                             onClick={() =>
                               openDrawer("automation", {
-                                automationId:
-                                  form.getValues("alert.triggerId"),
+                                automationId: form.getValues("alert.triggerId"),
                                 prefilledGraphId: customId,
                                 prefilledSeriesName: deriveSeriesIdentifier(
                                   graph,

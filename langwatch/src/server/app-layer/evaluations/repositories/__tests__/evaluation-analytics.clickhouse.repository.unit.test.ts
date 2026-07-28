@@ -33,12 +33,17 @@ const EVALUATION_ID = "eval-tz";
 const TABLE = "evaluation_analytics";
 
 function makeRepositoryReturning(record: Record<string, unknown>) {
-  return new EvaluationAnalyticsClickHouseRepository(async () => clientReturning(record));
+  return new EvaluationAnalyticsClickHouseRepository(async () =>
+    clientReturning(record),
+  );
 }
 
 function makeOrderingRepository(rows: Array<Record<string, unknown>>) {
   const { client, seen } = orderingClient(rows);
-  return { repository: new EvaluationAnalyticsClickHouseRepository(async () => client), seen };
+  return {
+    repository: new EvaluationAnalyticsClickHouseRepository(async () => client),
+    seen,
+  };
 }
 
 /**
@@ -94,9 +99,13 @@ describe("EvaluationAnalyticsClickHouseRepository DateTime64 decode", () => {
           evaluationId: EVALUATION_ID,
         });
 
-        expect(read?.row.occurredAtMs).toBe(Date.UTC(2026, 6, 24, 12, 0, 0, 123));
+        expect(read?.row.occurredAtMs).toBe(
+          Date.UTC(2026, 6, 24, 12, 0, 0, 123),
+        );
         expect(read?.row.createdAtMs).toBe(Date.UTC(2026, 6, 24, 12, 0, 1, 0));
-        expect(read?.row.updatedAtMs).toBe(Date.UTC(2026, 6, 24, 12, 0, 2, 500));
+        expect(read?.row.updatedAtMs).toBe(
+          Date.UTC(2026, 6, 24, 12, 0, 2, 500),
+        );
       });
     });
   });
@@ -208,7 +217,10 @@ describe("EvaluationAnalyticsClickHouseRepository windowed read", () => {
   describe("given a caller-supplied window", () => {
     describe("when the read runs", () => {
       it("counts the read on the windowed-read metric as a window hit", async () => {
-        const before = await windowedReadCount({ table: TABLE, outcome: "hit" });
+        const before = await windowedReadCount({
+          table: TABLE,
+          outcome: "hit",
+        });
         const { repository } = makeOrderingRepository([]);
 
         await repository.findByEvaluationIdWithApplied({
@@ -217,7 +229,9 @@ describe("EvaluationAnalyticsClickHouseRepository windowed read", () => {
           window: { fromMs: 1_750_000_000_000, toMs: 1_750_000_345_679 },
         });
 
-        expect(await windowedReadCount({ table: TABLE, outcome: "hit" })).toBe(before + 1);
+        expect(await windowedReadCount({ table: TABLE, outcome: "hit" })).toBe(
+          before + 1,
+        );
       });
 
       it("passes the caller's bounds through to ClickHouse unchanged", async () => {
@@ -265,7 +279,10 @@ describe("EvaluationAnalyticsClickHouseRepository windowed read", () => {
   describe("given no window", () => {
     describe("when the read runs", () => {
       it("counts the read on the windowed-read metric as unwindowed", async () => {
-        const before = await windowedReadCount({ table: TABLE, outcome: "unwindowed" });
+        const before = await windowedReadCount({
+          table: TABLE,
+          outcome: "unwindowed",
+        });
         const { repository, seen } = makeOrderingRepository([]);
 
         await repository.findByEvaluationIdWithApplied({
@@ -273,7 +290,9 @@ describe("EvaluationAnalyticsClickHouseRepository windowed read", () => {
           evaluationId: EVALUATION_ID,
         });
 
-        expect(await windowedReadCount({ table: TABLE, outcome: "unwindowed" })).toBe(before + 1);
+        expect(
+          await windowedReadCount({ table: TABLE, outcome: "unwindowed" }),
+        ).toBe(before + 1);
         expect(seen[0]?.query).not.toContain("fromUnixTimestamp64Milli");
       });
     });

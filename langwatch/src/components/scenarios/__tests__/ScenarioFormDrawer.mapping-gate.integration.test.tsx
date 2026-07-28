@@ -12,10 +12,11 @@
  *
  * @see specs/features/scenarios/workflow-agent-mapping-layer.feature
  */
-import * as React from "react";
+
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import * as React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock heavy sub-components
@@ -102,7 +103,10 @@ vi.mock("~/utils/api", () => ({
           onError?: (error: Error) => void;
         }) => ({
           mutateAsync: vi.fn(async (input: unknown) => {
-            const result = { id: "new-id", ...((input as Record<string, unknown>) ?? {}) };
+            const result = {
+              id: "new-id",
+              ...((input as Record<string, unknown>) ?? {}),
+            };
             onSuccess?.(result);
             return result;
           }),
@@ -264,10 +268,9 @@ function renderWithTarget(target: { type: string; id: string }) {
     labels: [],
   });
 
-  return render(
-    <ScenarioFormDrawer open={true} scenarioId="scenario-1" />,
-    { wrapper: Wrapper },
-  );
+  return render(<ScenarioFormDrawer open={true} scenarioId="scenario-1" />, {
+    wrapper: Wrapper,
+  });
 }
 
 describe("<ScenarioFormDrawer /> mapping gate", () => {

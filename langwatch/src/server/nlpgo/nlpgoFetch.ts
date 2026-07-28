@@ -1,5 +1,5 @@
-import { lambdaFetch } from "../../utils/lambdaFetch";
 import { getProjectLambdaArn } from "../../optimization_studio/server/lambda";
+import { lambdaFetch } from "../../utils/lambdaFetch";
 
 /**
  * Origin tag for the X-LangWatch-Origin header. Set at the request

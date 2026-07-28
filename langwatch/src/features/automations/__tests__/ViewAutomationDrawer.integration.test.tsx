@@ -245,13 +245,9 @@ describe("ViewAutomationDrawer", () => {
       it("renders the response body and headers as literal text, not markup", async () => {
         renderDrawer();
 
-        await userEvent.click(
-          screen.getByRole("button", { name: /HTTP 500/ }),
-        );
+        await userEvent.click(screen.getByRole("button", { name: /HTTP 500/ }));
 
-        expect(
-          screen.getByText("<script>alert('xss')</script>"),
-        ).toBeDefined();
+        expect(screen.getByText("<script>alert('xss')</script>")).toBeDefined();
         expect(document.querySelector("script")).toBeNull();
         expect(
           screen.getByText("X-Debug: <img src=x onerror=alert(1)>"),

@@ -45,10 +45,7 @@ type SweepIntents = {
 export const graphAlertSweepWake: WakeHandler<
   GraphAlertSweepState,
   SweepIntents
-> = (
-  _state,
-  ctx,
-) => ({
+> = (_state, ctx) => ({
   state: { lastSweepAt: ctx.at },
   intents: [
     ctx.intents.evaluateGraph(`sweep:${ctx.at}`, { scheduledFor: ctx.at }),

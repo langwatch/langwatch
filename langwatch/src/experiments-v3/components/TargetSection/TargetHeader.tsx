@@ -38,7 +38,6 @@ import { useEvaluationsV3Store } from "../../hooks/useEvaluationsV3Store";
 import { useTargetName, useTargetNames } from "../../hooks/useTargetName";
 import type { TargetConfig } from "../../types";
 import { isComparisonEvaluator } from "../../types";
-import { toComparisonConfig } from "../../utils/normalizeComparison";
 import {
   computeComparisonColumnTargetAggregate,
   computeComparisonTargetAggregate,
@@ -47,6 +46,7 @@ import {
 import { isRowEmpty } from "../../utils/emptyRowDetection";
 import { countCellsForTarget } from "../../utils/executionScope";
 import { targetHasMissingMappings } from "../../utils/mappingValidation";
+import { toComparisonConfig } from "../../utils/normalizeComparison";
 import { disambiguateNames } from "../../utils/variantDisambiguation";
 import { ComparisonScoreboard } from "./ComparisonScoreboard";
 import { TargetSummary } from "./TargetSummary";

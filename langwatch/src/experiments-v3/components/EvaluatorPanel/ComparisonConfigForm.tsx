@@ -75,7 +75,9 @@ export function pickDefaultJudgePrompt({
   if (hasGolden) {
     return hasInput ? JUDGE_PROMPT_GOLDEN_INPUT : JUDGE_PROMPT_GOLDEN_NO_INPUT;
   }
-  return hasInput ? JUDGE_PROMPT_NO_GOLDEN_INPUT : JUDGE_PROMPT_NO_GOLDEN_NO_INPUT;
+  return hasInput
+    ? JUDGE_PROMPT_NO_GOLDEN_INPUT
+    : JUDGE_PROMPT_NO_GOLDEN_NO_INPUT;
 }
 
 /**
@@ -416,7 +418,8 @@ function VariantCard({
                 onPathChange([]);
                 return;
               }
-              const key = next.type === "source" ? next.path.at(-1) : next.value;
+              const key =
+                next.type === "source" ? next.path.at(-1) : next.value;
               const matched = outputOptions.find(
                 (option) => option.label === key,
               );

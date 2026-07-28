@@ -22,11 +22,18 @@ export class EvaluationRunStore
       : { ...state, evaluationId: String(context.aggregateId) };
     const retentionDays =
       context.retentionPolicy?.traces ?? PLATFORM_DEFAULT_RETENTION_DAYS;
-    await this.repo.upsert(stateWithId, String(context.tenantId), retentionDays);
+    await this.repo.upsert(
+      stateWithId,
+      String(context.tenantId),
+      retentionDays,
+    );
   }
 
   async storeBatch(
-    entries: Array<{ state: EvaluationRunData; context: ProjectionStoreContext }>,
+    entries: Array<{
+      state: EvaluationRunData;
+      context: ProjectionStoreContext;
+    }>,
   ): Promise<void> {
     if (entries.length === 0) return;
 

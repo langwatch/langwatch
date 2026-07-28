@@ -17,11 +17,11 @@ import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 
 import {
+  EXTERNAL_MEMBER_PERMISSIONS,
   hasPermissionWithHierarchy,
   organizationRoleHasPermission,
   type Permission,
   teamRoleHasPermission,
-  EXTERNAL_MEMBER_PERMISSIONS,
 } from "~/server/api/rbac";
 import { allRegisteredRoutes } from "../route-registry";
 
@@ -145,7 +145,12 @@ describe("API router endpoint authorization guarantee", () => {
     const permissionRoutes = () =>
       allRegisteredRoutes().flatMap((r) =>
         r.policy.kind === "permission" || r.policy.kind === "apiKeyPermission"
-          ? [{ route: `${r.method} ${r.path}`, permission: r.policy.permission }]
+          ? [
+              {
+                route: `${r.method} ${r.path}`,
+                permission: r.policy.permission,
+              },
+            ]
           : [],
       );
 
@@ -211,7 +216,10 @@ describe("API router endpoint authorization guarantee", () => {
       await loadRouter();
       const unreachable = permissionRoutes().filter(
         ({ permission }) =>
-          !teamRoleHasPermission(TeamUserRole.ADMIN, permission as Permission) &&
+          !teamRoleHasPermission(
+            TeamUserRole.ADMIN,
+            permission as Permission,
+          ) &&
           !organizationRoleHasPermission(
             OrganizationUserRole.ADMIN,
             permission as Permission,
@@ -242,7 +250,10 @@ describe("API router endpoint authorization guarantee", () => {
       const run = declared.get("POST /api/suites/:id/run");
       const archive = declared.get("DELETE /api/suites/:id");
       expect(run, "the suite run route must be registered").toBeDefined();
-      expect(archive, "the suite archive route must be registered").toBeDefined();
+      expect(
+        archive,
+        "the suite archive route must be registered",
+      ).toBeDefined();
 
       expect(hasPermissionWithHierarchy(readAndWrite, run!)).toBe(true);
       expect(hasPermissionWithHierarchy(readAndWrite, archive!)).toBe(false);

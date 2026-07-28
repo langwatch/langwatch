@@ -11,8 +11,8 @@ import type {
 import { SecurityError } from "~/server/event-sourcing/services/errorHandling";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import {
-  observeCodingAgentSessionListReadDuration,
   type CodingAgentSessionListReadOutcome,
+  observeCodingAgentSessionListReadDuration,
 } from "~/server/metrics";
 import type { CodingAgentSessionRepository } from "./coding-agent-session.repository";
 
@@ -492,7 +492,10 @@ export class CodingAgentSessionClickHouseRepository
     tenantId: string;
     sessionId: string;
     window?: { fromMs: number; toMs: number };
-  }): Promise<{ row: CodingAgentSessionRow; appliedEventIds: string[] } | null> {
+  }): Promise<{
+    row: CodingAgentSessionRow;
+    appliedEventIds: string[];
+  } | null> {
     const record = await this.findLatestRecord(params);
     if (!record) return null;
     return {

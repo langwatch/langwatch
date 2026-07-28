@@ -5,9 +5,9 @@ import { isInternalHref } from "../spaLink";
 describe("isInternalHref", () => {
   describe("given a same-app relative path", () => {
     it("treats a single-slash path as internal", () => {
-      expect(isInternalHref("/demo/simulations/set_1/batch_1?openRun=run_1")).toBe(
-        true,
-      );
+      expect(
+        isInternalHref("/demo/simulations/set_1/batch_1?openRun=run_1"),
+      ).toBe(true);
     });
   });
 

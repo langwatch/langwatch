@@ -41,15 +41,12 @@ type ApplicableBudget = {
   managedByVirtualKeyId: string | null;
 };
 
-const {
-  createMutateAsync,
-  applicableBudgetsData,
-  capturedApplicableInputs,
-} = vi.hoisted(() => ({
-  createMutateAsync: vi.fn(),
-  applicableBudgetsData: { rows: [] as ApplicableBudget[] },
-  capturedApplicableInputs: [] as unknown[],
-}));
+const { createMutateAsync, applicableBudgetsData, capturedApplicableInputs } =
+  vi.hoisted(() => ({
+    createMutateAsync: vi.fn(),
+    applicableBudgetsData: { rows: [] as ApplicableBudget[] },
+    capturedApplicableInputs: [] as unknown[],
+  }));
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
@@ -221,9 +218,9 @@ describe("given the new-virtual-key drawer", () => {
     it("says there is no maximum spend and creates no budget", async () => {
       renderDrawer();
 
-      expect(
-        screen.getByTestId("vk-budget-annotation").textContent,
-      ).toContain("No max spending for this key");
+      expect(screen.getByTestId("vk-budget-annotation").textContent).toContain(
+        "No max spending for this key",
+      );
 
       await userEvent.type(screen.getByPlaceholderText("e.g. codex-prod"), "k");
       await submit();
@@ -240,9 +237,9 @@ describe("given the new-virtual-key drawer", () => {
 
       await userEvent.type(screen.getByTestId("vk-budget-limit"), "30");
 
-      expect(
-        screen.getByTestId("vk-budget-annotation").textContent,
-      ).toBe("Max $30/day, resets 00:00 UTC");
+      expect(screen.getByTestId("vk-budget-annotation").textContent).toBe(
+        "Max $30/day, resets 00:00 UTC",
+      );
     });
 
     it("offers no timezone choice, because resets are computed in UTC only", async () => {
@@ -411,12 +408,10 @@ describe("given the new-virtual-key drawer", () => {
       await userEvent.click(screen.getByTestId("vk-provider-mp-anthropic"));
       await userEvent.type(screen.getByPlaceholderText("e.g. codex-prod"), "k");
 
-      expect(
-        screen.getByTestId("vk-providers-invalid").textContent,
-      ).toContain("Select at least one provider, or allow all providers.");
-      expect(
-        screen.getByRole("button", { name: "Create" }),
-      ).toBeDisabled();
+      expect(screen.getByTestId("vk-providers-invalid").textContent).toContain(
+        "Select at least one provider, or allow all providers.",
+      );
+      expect(screen.getByRole("button", { name: "Create" })).toBeDisabled();
       expect(createMutateAsync).not.toHaveBeenCalled();
     });
   });
@@ -506,9 +501,7 @@ describe("given the new-virtual-key drawer", () => {
     it("persists POLICY with the policy id", async () => {
       renderDrawer();
 
-      await userEvent.click(
-        screen.getByTestId("vk-routing-policy-policy-eu"),
-      );
+      await userEvent.click(screen.getByTestId("vk-routing-policy-policy-eu"));
       await userEvent.type(screen.getByPlaceholderText("e.g. codex-prod"), "k");
       await submit();
 

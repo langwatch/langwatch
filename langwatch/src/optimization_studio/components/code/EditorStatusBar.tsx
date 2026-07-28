@@ -113,7 +113,15 @@ export function EditorStatusBar({
         {selection > 0 ? ` (${selection} selected)` : ""}
       </Text>
       <Separator />
-      <Text color={errorCount > 0 ? "red.500" : warningCount > 0 ? "orange.500" : undefined}>
+      <Text
+        color={
+          errorCount > 0
+            ? "red.500"
+            : warningCount > 0
+              ? "orange.500"
+              : undefined
+        }
+      >
         {problemsLabel}
       </Text>
       <HStack flex={1} justify="flex-end" gap={3}>

@@ -33,8 +33,6 @@ describe("modelProviderHelpers", () => {
     });
   });
 
-
-
   describe("getSchemaShape()", () => {
     it("returns shape from schema with shape property", () => {
       const schema = {
@@ -277,23 +275,23 @@ describe("modelProviderHelpers", () => {
   describe("shouldAutoEnableAsDefault()", () => {
     describe("when enabledProvidersCount is 0 or 1", () => {
       it("returns true for the first-provider case (0)", () => {
-        expect(
-          shouldAutoEnableAsDefault({ enabledProvidersCount: 0 }),
-        ).toBe(true);
+        expect(shouldAutoEnableAsDefault({ enabledProvidersCount: 0 })).toBe(
+          true,
+        );
       });
 
       it("returns true when there is exactly one provider", () => {
-        expect(
-          shouldAutoEnableAsDefault({ enabledProvidersCount: 1 }),
-        ).toBe(true);
+        expect(shouldAutoEnableAsDefault({ enabledProvidersCount: 1 })).toBe(
+          true,
+        );
       });
     });
 
     describe("when enabledProvidersCount is greater than 1", () => {
       it("returns false; the user must opt in explicitly", () => {
-        expect(
-          shouldAutoEnableAsDefault({ enabledProvidersCount: 2 }),
-        ).toBe(false);
+        expect(shouldAutoEnableAsDefault({ enabledProvidersCount: 2 })).toBe(
+          false,
+        );
       });
     });
   });

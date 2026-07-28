@@ -1,8 +1,11 @@
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import type { NormalizedSpan } from "../../schemas/spans";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
+import type { NormalizedSpan } from "../../schemas/spans";
 import { applySpanToSummary } from "../traceSummary.foldProjection";
-import { createInitState, createTestSpan } from "./fixtures/trace-summary-test.fixtures";
+import {
+  createInitState,
+  createTestSpan,
+} from "./fixtures/trace-summary-test.fixtures";
 
 describe("applySpanToSummary I/O logic", () => {
   let extractSpy: ReturnType<typeof vi.spyOn>;
@@ -30,12 +33,20 @@ describe("applySpanToSummary I/O logic", () => {
 
       extractSpy.mockImplementation(
         (_span: NormalizedSpan, direction: "input" | "output") => {
-          if (direction === "output") return { raw: "child output", text: "child output", source: "gen_ai" };
+          if (direction === "output")
+            return {
+              raw: "child output",
+              text: "child output",
+              source: "gen_ai",
+            };
           return null;
         },
       );
 
-      let state = applySpanToSummary({ state: createInitState(), span: childSpan });
+      let state = applySpanToSummary({
+        state: createInitState(),
+        span: childSpan,
+      });
       expect(state.computedOutput).toBe("child output");
       expect(state.outputFromRootSpan).toBe(false);
 
@@ -49,7 +60,12 @@ describe("applySpanToSummary I/O logic", () => {
 
       extractSpy.mockImplementation(
         (_span: NormalizedSpan, direction: "input" | "output") => {
-          if (direction === "output") return { raw: "root output", text: "root output", source: "gen_ai" };
+          if (direction === "output")
+            return {
+              raw: "root output",
+              text: "root output",
+              source: "gen_ai",
+            };
           return null;
         },
       );
@@ -72,12 +88,20 @@ describe("applySpanToSummary I/O logic", () => {
 
       extractSpy.mockImplementation(
         (_span: NormalizedSpan, direction: "input" | "output") => {
-          if (direction === "output") return { raw: "root output", text: "root output", source: "gen_ai" };
+          if (direction === "output")
+            return {
+              raw: "root output",
+              text: "root output",
+              source: "gen_ai",
+            };
           return null;
         },
       );
 
-      let state = applySpanToSummary({ state: createInitState(), span: rootSpan });
+      let state = applySpanToSummary({
+        state: createInitState(),
+        span: rootSpan,
+      });
       expect(state.computedOutput).toBe("root output");
       expect(state.outputFromRootSpan).toBe(true);
 
@@ -91,7 +115,12 @@ describe("applySpanToSummary I/O logic", () => {
 
       extractSpy.mockImplementation(
         (_span: NormalizedSpan, direction: "input" | "output") => {
-          if (direction === "output") return { raw: "child output", text: "child output", source: "gen_ai" };
+          if (direction === "output")
+            return {
+              raw: "child output",
+              text: "child output",
+              source: "gen_ai",
+            };
           return null;
         },
       );
@@ -116,7 +145,10 @@ describe("applySpanToSummary I/O logic", () => {
         source: "langwatch",
       });
 
-      const state = applySpanToSummary({ state: createInitState(), span: evalSpan });
+      const state = applySpanToSummary({
+        state: createInitState(),
+        span: evalSpan,
+      });
       expect(state.computedOutput).toBeNull();
       expect(state.computedInput).toBeNull();
       expect(extractSpy).not.toHaveBeenCalled();
@@ -135,7 +167,10 @@ describe("applySpanToSummary I/O logic", () => {
         source: "langwatch",
       });
 
-      const state = applySpanToSummary({ state: createInitState(), span: guardrailSpan });
+      const state = applySpanToSummary({
+        state: createInitState(),
+        span: guardrailSpan,
+      });
       expect(state.computedOutput).toBeNull();
       expect(state.computedInput).toBeNull();
       expect(extractSpy).not.toHaveBeenCalled();
@@ -154,7 +189,12 @@ describe("applySpanToSummary I/O logic", () => {
 
       extractSpy.mockImplementation(
         (_span: NormalizedSpan, direction: "input" | "output") => {
-          if (direction === "output") return { raw: "first output", text: "first output", source: "gen_ai" };
+          if (direction === "output")
+            return {
+              raw: "first output",
+              text: "first output",
+              source: "gen_ai",
+            };
           return null;
         },
       );
@@ -173,7 +213,12 @@ describe("applySpanToSummary I/O logic", () => {
 
       extractSpy.mockImplementation(
         (_span: NormalizedSpan, direction: "input" | "output") => {
-          if (direction === "output") return { raw: "second output", text: "second output", source: "gen_ai" };
+          if (direction === "output")
+            return {
+              raw: "second output",
+              text: "second output",
+              source: "gen_ai",
+            };
           return null;
         },
       );
@@ -192,7 +237,12 @@ describe("applySpanToSummary I/O logic", () => {
 
       extractSpy.mockImplementation(
         (_span: NormalizedSpan, direction: "input" | "output") => {
-          if (direction === "output") return { raw: "third output", text: "third output", source: "gen_ai" };
+          if (direction === "output")
+            return {
+              raw: "third output",
+              text: "third output",
+              source: "gen_ai",
+            };
           return null;
         },
       );
@@ -215,12 +265,20 @@ describe("applySpanToSummary I/O logic", () => {
 
       extractSpy.mockImplementation(
         (_span: NormalizedSpan, direction: "input" | "output") => {
-          if (direction === "output") return { raw: "inferred output", text: "inferred output", source: "gen_ai" };
+          if (direction === "output")
+            return {
+              raw: "inferred output",
+              text: "inferred output",
+              source: "gen_ai",
+            };
           return null;
         },
       );
 
-      let state = applySpanToSummary({ state: createInitState(), span: inferredSpan });
+      let state = applySpanToSummary({
+        state: createInitState(),
+        span: inferredSpan,
+      });
       expect(state.computedOutput).toBe("inferred output");
 
       // Second: explicit (langwatch) output at earlier endTime 1500
@@ -233,7 +291,12 @@ describe("applySpanToSummary I/O logic", () => {
 
       extractSpy.mockImplementation(
         (_span: NormalizedSpan, direction: "input" | "output") => {
-          if (direction === "output") return { raw: "explicit output", text: "explicit output", source: "langwatch" };
+          if (direction === "output")
+            return {
+              raw: "explicit output",
+              text: "explicit output",
+              source: "langwatch",
+            };
           return null;
         },
       );
@@ -253,12 +316,20 @@ describe("applySpanToSummary I/O logic", () => {
 
       extractSpy.mockImplementation(
         (_span: NormalizedSpan, direction: "input" | "output") => {
-          if (direction === "output") return { raw: "explicit output", text: "explicit output", source: "langwatch" };
+          if (direction === "output")
+            return {
+              raw: "explicit output",
+              text: "explicit output",
+              source: "langwatch",
+            };
           return null;
         },
       );
 
-      let state = applySpanToSummary({ state: createInitState(), span: explicitSpan });
+      let state = applySpanToSummary({
+        state: createInitState(),
+        span: explicitSpan,
+      });
       expect(state.computedOutput).toBe("explicit output");
 
       // Second: inferred (gen_ai) output at later endTime 3000
@@ -271,7 +342,12 @@ describe("applySpanToSummary I/O logic", () => {
 
       extractSpy.mockImplementation(
         (_span: NormalizedSpan, direction: "input" | "output") => {
-          if (direction === "output") return { raw: "inferred output", text: "inferred output", source: "gen_ai" };
+          if (direction === "output")
+            return {
+              raw: "inferred output",
+              text: "inferred output",
+              source: "gen_ai",
+            };
           return null;
         },
       );
@@ -291,7 +367,12 @@ describe("applySpanToSummary I/O logic", () => {
 
       extractSpy.mockImplementation(
         (_span: NormalizedSpan, direction: "input" | "output") => {
-          if (direction === "output") return { raw: "step 1 output", text: "step 1 output", source: "langwatch" };
+          if (direction === "output")
+            return {
+              raw: "step 1 output",
+              text: "step 1 output",
+              source: "langwatch",
+            };
           return null;
         },
       );
@@ -309,7 +390,12 @@ describe("applySpanToSummary I/O logic", () => {
 
       extractSpy.mockImplementation(
         (_span: NormalizedSpan, direction: "input" | "output") => {
-          if (direction === "output") return { raw: "step 2 output", text: "step 2 output", source: "langwatch" };
+          if (direction === "output")
+            return {
+              raw: "step 2 output",
+              text: "step 2 output",
+              source: "langwatch",
+            };
           return null;
         },
       );
@@ -454,12 +540,20 @@ describe("applySpanToSummary I/O logic", () => {
 
       extractSpy.mockImplementation(
         (_span: NormalizedSpan, direction: "input" | "output") => {
-          if (direction === "output") return { raw: "step 1 thinking", text: "step 1 thinking", source: "langwatch" };
+          if (direction === "output")
+            return {
+              raw: "step 1 thinking",
+              text: "step 1 thinking",
+              source: "langwatch",
+            };
           return null;
         },
       );
 
-      let state = applySpanToSummary({ state: createInitState(), span: modelStep1 });
+      let state = applySpanToSummary({
+        state: createInitState(),
+        span: modelStep1,
+      });
 
       // model_step 2: explicit output, endTime 35994
       const modelStep2 = createTestSpan({
@@ -471,7 +565,12 @@ describe("applySpanToSummary I/O logic", () => {
 
       extractSpy.mockImplementation(
         (_span: NormalizedSpan, direction: "input" | "output") => {
-          if (direction === "output") return { raw: "final answer", text: "final answer", source: "langwatch" };
+          if (direction === "output")
+            return {
+              raw: "final answer",
+              text: "final answer",
+              source: "langwatch",
+            };
           return null;
         },
       );
@@ -489,7 +588,12 @@ describe("applySpanToSummary I/O logic", () => {
 
       extractSpy.mockImplementation(
         (_span: NormalizedSpan, direction: "input" | "output") => {
-          if (direction === "output") return { raw: "concatenated text", text: "concatenated text", source: "gen_ai" };
+          if (direction === "output")
+            return {
+              raw: "concatenated text",
+              text: "concatenated text",
+              source: "gen_ai",
+            };
           return null;
         },
       );

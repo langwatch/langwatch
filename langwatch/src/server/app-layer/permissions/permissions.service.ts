@@ -55,7 +55,9 @@ export class PermissionsService {
 
     if (!permitted) {
       if (organizationRole === OrganizationUserRole.EXTERNAL) {
-        throw new LiteMemberRestrictedError(permission.split(":")[0] ?? "unknown");
+        throw new LiteMemberRestrictedError(
+          permission.split(":")[0] ?? "unknown",
+        );
       }
       throw new ProjectPermissionDeniedError(permission);
     }

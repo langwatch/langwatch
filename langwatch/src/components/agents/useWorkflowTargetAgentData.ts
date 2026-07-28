@@ -1,7 +1,10 @@
 import { useMemo } from "react";
 import type { Variable } from "~/components/variables";
+import type {
+  Field as DSLField,
+  Workflow,
+} from "~/optimization_studio/types/dsl";
 import { getMappingSurfaceInputs } from "~/optimization_studio/utils/nodeUtils";
-import type { Field as DSLField, Workflow } from "~/optimization_studio/types/dsl";
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import { api } from "~/utils/api";
 
@@ -80,9 +83,18 @@ export function useWorkflowTargetAgentData({
       : [{ identifier: "input", type: "str" }];
 
   const editorHref =
-    projectSlug && workflowId ? `/${projectSlug}/studio/${workflowId}` : undefined;
+    projectSlug && workflowId
+      ? `/${projectSlug}/studio/${workflowId}`
+      : undefined;
 
-  const isLoading = !!agentId && (agentQuery.isLoading || workflowQuery.isLoading);
+  const isLoading =
+    !!agentId && (agentQuery.isLoading || workflowQuery.isLoading);
 
-  return { workflowQuery, variablesForUI, editorHref, isLoading, hasLookupFailed };
+  return {
+    workflowQuery,
+    variablesForUI,
+    editorHref,
+    isLoading,
+    hasLookupFailed,
+  };
 }

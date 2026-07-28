@@ -144,8 +144,7 @@ export class TraceNameResolutionService {
     // The fallback is supposed to be the *trace's* working name, not
     // a placeholder of nothing. If the candidate span itself has no
     // name (empty string) and we already have a name, keep the name.
-    const candidateNameIsBetter =
-      state.traceName === "" || span.name !== "";
+    const candidateNameIsBetter = state.traceName === "" || span.name !== "";
     if (!candidateNameIsBetter) return unchanged;
 
     return {

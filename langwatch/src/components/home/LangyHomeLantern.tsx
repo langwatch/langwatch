@@ -1,8 +1,8 @@
 import { Box, chakra, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import { useEffect, useRef } from "react";
 import { LuArrowRight } from "react-icons/lu";
-import { ComposerMorphGhost } from "~/features/langy/components/ComposerMorphGhost";
 import { Composer } from "~/features/langy/components/Composer";
+import { ComposerMorphGhost } from "~/features/langy/components/ComposerMorphGhost";
 import { LangyMark } from "~/features/langy/components/LangyMark";
 import { useCanAskLangy } from "~/features/langy/hooks/useCanAskLangy";
 import { useComposerMorph } from "~/features/langy/hooks/useComposerMorph";
@@ -47,7 +47,8 @@ export function LangyHomeLantern() {
   // months of runs (then swapping them out a beat later) is worse than a beat
   // of nothing: the reader reaches for a chip that moves. A pinned dev state
   // is an answer, so it skips the wait.
-  const reachKnown = devState === "empty" || devState === "populated" || !reach.isLoading;
+  const reachKnown =
+    devState === "empty" || devState === "populated" || !reach.isLoading;
   // Only once the answer is actually known. Leading with "send your first
   // trace" at a project that already has thousands is the product not knowing
   // its own customer, and `isNewProject` reads false while the check is still
@@ -93,7 +94,8 @@ export function LangyHomeLantern() {
   const conversationOpen =
     devState === "after-turn" ||
     devState === "stalled" ||
-    (!!pendingPrompt || (isOpen && !!activeConversationId));
+    !!pendingPrompt ||
+    (isOpen && !!activeConversationId);
 
   const stalled = devState === "stalled";
 
@@ -177,40 +179,43 @@ export function LangyHomeLantern() {
           {leadWithOnboarding ? (
             <OnboardAgentPill prominent onAskLangy={canAsk ? ask : undefined} />
           ) : null}
-          {canAsk ? (
-            suggestions.map((suggestion) => (
-              <chakra.button
-                key={suggestion.label}
-                type="button"
-                onClick={() => ask(suggestion.prompt)}
-                // Hidden in place, never unmounted: the row keeps its exact
-                // height (wrapped lines included) when a conversation opens,
-                // so the lantern doesn't breathe every time the panel does.
-                // visibility also drops them from pointer + a11y trees.
-                visibility={conversationOpen ? "hidden" : "visible"}
-                display="inline-flex"
-                alignItems="center"
-                gap={1.5}
-                fontFamily="mono"
-                fontSize="11px"
-                color="fg.muted"
-                background="bg.panel/70"
-                backdropFilter="blur(6px)"
-                borderWidth="1px"
-                borderColor="border.muted"
-                borderRadius="full"
-                paddingX={2.5}
-                paddingY="4px"
-                cursor="pointer"
-                whiteSpace="nowrap"
-                transition="color 130ms ease, border-color 130ms ease"
-                _hover={{ color: "orange.fg", borderColor: "orange.emphasized" }}
-              >
-                <suggestion.icon size={12} />
-                {suggestion.label}
-              </chakra.button>
-            ))
-          ) : null}
+          {canAsk
+            ? suggestions.map((suggestion) => (
+                <chakra.button
+                  key={suggestion.label}
+                  type="button"
+                  onClick={() => ask(suggestion.prompt)}
+                  // Hidden in place, never unmounted: the row keeps its exact
+                  // height (wrapped lines included) when a conversation opens,
+                  // so the lantern doesn't breathe every time the panel does.
+                  // visibility also drops them from pointer + a11y trees.
+                  visibility={conversationOpen ? "hidden" : "visible"}
+                  display="inline-flex"
+                  alignItems="center"
+                  gap={1.5}
+                  fontFamily="mono"
+                  fontSize="11px"
+                  color="fg.muted"
+                  background="bg.panel/70"
+                  backdropFilter="blur(6px)"
+                  borderWidth="1px"
+                  borderColor="border.muted"
+                  borderRadius="full"
+                  paddingX={2.5}
+                  paddingY="4px"
+                  cursor="pointer"
+                  whiteSpace="nowrap"
+                  transition="color 130ms ease, border-color 130ms ease"
+                  _hover={{
+                    color: "orange.fg",
+                    borderColor: "orange.emphasized",
+                  }}
+                >
+                  <suggestion.icon size={12} />
+                  {suggestion.label}
+                </chakra.button>
+              ))
+            : null}
           <Spacer />
           {!leadWithOnboarding ? (
             <OnboardAgentPill onAskLangy={canAsk ? ask : undefined} />

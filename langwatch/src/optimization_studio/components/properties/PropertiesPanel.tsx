@@ -23,17 +23,14 @@ import { PromptingTechniquePropertiesPanel } from "./PromptingTechniquePropertie
 import { RetrievePropertiesPanel } from "./RetrievePropertiesPanel";
 
 export function PropertiesPanel() {
-  const {
-    selectedNode,
-    propertiesExpanded,
-    setPropertiesExpanded,
-  } = useWorkflowStore(
-    useShallow((state) => ({
-      selectedNode: state.nodes.find((n) => n.selected),
-      propertiesExpanded: state.propertiesExpanded,
-      setPropertiesExpanded: state.setPropertiesExpanded,
-    })),
-  );
+  const { selectedNode, propertiesExpanded, setPropertiesExpanded } =
+    useWorkflowStore(
+      useShallow((state) => ({
+        selectedNode: state.nodes.find((n) => n.selected),
+        propertiesExpanded: state.propertiesExpanded,
+        setPropertiesExpanded: state.setPropertiesExpanded,
+      })),
+    );
 
   const ComponentPropertiesPanelMap: Record<
     ComponentType,

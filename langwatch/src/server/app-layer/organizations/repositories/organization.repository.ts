@@ -262,9 +262,7 @@ export interface OrganizationRepository {
 
   // --- New methods for router delegation ---
 
-  createAndAssign(
-    input: CreateAndAssignInput,
-  ): Promise<CreateAndAssignResult>;
+  createAndAssign(input: CreateAndAssignInput): Promise<CreateAndAssignResult>;
 
   getAllForUser(params: {
     userId: string;

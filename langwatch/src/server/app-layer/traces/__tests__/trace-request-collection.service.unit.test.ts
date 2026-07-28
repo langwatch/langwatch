@@ -32,8 +32,9 @@ function makeOtlpSpan(overrides: Partial<OtlpSpan> = {}): OtlpSpan {
 }
 
 function makeService(opts: { dedupAcquire?: boolean | null } = {}) {
-  const recordSpan =
-    vi.fn<(data: RecordSpanCommandData) => Promise<void>>(() => Promise.resolve());
+  const recordSpan = vi.fn<(data: RecordSpanCommandData) => Promise<void>>(() =>
+    Promise.resolve(),
+  );
 
   const tryAcquireProcessingLock = vi.fn<
     SpanDedupService["tryAcquireProcessingLock"]

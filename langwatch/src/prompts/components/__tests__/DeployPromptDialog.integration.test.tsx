@@ -2,7 +2,13 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DeployPromptDialog } from "../DeployPromptDialog";
 
@@ -18,10 +24,12 @@ vi.mock("~/utils/api", () => ({
   api: {
     prompts: {
       getAllVersionsForPrompt: {
-        useQuery: (...args: unknown[]) => mockUseQuery("getAllVersionsForPrompt", ...args),
+        useQuery: (...args: unknown[]) =>
+          mockUseQuery("getAllVersionsForPrompt", ...args),
       },
       getTagsForConfig: {
-        useQuery: (...args: unknown[]) => mockUseQuery("getTagsForConfig", ...args),
+        useQuery: (...args: unknown[]) =>
+          mockUseQuery("getTagsForConfig", ...args),
       },
       assignTag: {
         useMutation: () => ({
@@ -99,15 +107,20 @@ vi.mock("~/components/ui/select", () => {
     ...rest
   }: {
     children: React.ReactNode;
-    collection: { items: Array<{ label: string; value: string; version: number; commitMessage: string }> };
+    collection: {
+      items: Array<{
+        label: string;
+        value: string;
+        version: number;
+        commitMessage: string;
+      }>;
+    };
     value: string[];
     onValueChange: (details: { value: string[] }) => void;
     "aria-label"?: string;
     [key: string]: unknown;
   }) => (
-    <div
-      data-testid="select-root"
-    >
+    <div data-testid="select-root">
       <select
         aria-label={rest["aria-label"] as string}
         value={value[0] ?? ""}
@@ -115,7 +128,12 @@ vi.mock("~/components/ui/select", () => {
       >
         <option value="">Select version</option>
         {collection.items.map(
-          (item: { label: string; value: string; version: number; commitMessage: string }) => (
+          (item: {
+            label: string;
+            value: string;
+            version: number;
+            commitMessage: string;
+          }) => (
             <option key={item.value} value={item.value}>
               {item.label}
             </option>
@@ -156,7 +174,11 @@ const defaultProps = {
 
 function setupQueries({
   versions = mockVersions,
-  tags = [] as Array<{ tagId: string; promptTag: { name: string }; versionId: string }>,
+  tags = [] as Array<{
+    tagId: string;
+    promptTag: { name: string };
+    versionId: string;
+  }>,
 } = {}) {
   mockUseQuery.mockImplementation((queryName: string) => {
     if (queryName === "getAllVersionsForPrompt") {
@@ -284,7 +306,9 @@ describe.skip("Feature: Deploy Prompt Dialog", () => {
         renderDialog();
 
         await waitFor(() => {
-          expect(screen.getByLabelText("Production version")).toBeInTheDocument();
+          expect(
+            screen.getByLabelText("Production version"),
+          ).toBeInTheDocument();
         });
 
         const prodSelect = screen.getByLabelText("Production version");
@@ -305,15 +329,25 @@ describe.skip("Feature: Deploy Prompt Dialog", () => {
       it("initializes dropdowns from current tag assignments", async () => {
         setupQueries({
           tags: [
-            { tagId: "production-id", promptTag: { name: "production" }, versionId: "v2-id" },
-            { tagId: "staging-id", promptTag: { name: "staging" }, versionId: "v3-id" },
+            {
+              tagId: "production-id",
+              promptTag: { name: "production" },
+              versionId: "v2-id",
+            },
+            {
+              tagId: "staging-id",
+              promptTag: { name: "staging" },
+              versionId: "v3-id",
+            },
           ],
         });
 
         renderDialog();
 
         await waitFor(() => {
-          const prodSelect = screen.getByLabelText("Production version") as HTMLSelectElement;
+          const prodSelect = screen.getByLabelText(
+            "Production version",
+          ) as HTMLSelectElement;
           expect(prodSelect.value).toBe("v2-id");
         });
 
@@ -360,7 +394,9 @@ describe.skip("Feature: Deploy Prompt Dialog", () => {
         renderDialog();
 
         await waitFor(() => {
-          expect(screen.getByLabelText("Production version")).toBeInTheDocument();
+          expect(
+            screen.getByLabelText("Production version"),
+          ).toBeInTheDocument();
         });
 
         const prodSelect = screen.getByLabelText("Production version");
@@ -422,7 +458,9 @@ describe.skip("Feature: Deploy Prompt Dialog", () => {
         renderDialog();
 
         await waitFor(() => {
-          expect(screen.getByLabelText("Production version")).toBeInTheDocument();
+          expect(
+            screen.getByLabelText("Production version"),
+          ).toBeInTheDocument();
         });
 
         fireEvent.change(screen.getByLabelText("Production version"), {
@@ -437,10 +475,10 @@ describe.skip("Feature: Deploy Prompt Dialog", () => {
         await waitFor(() => {
           expect(mockMutateAsync).toHaveBeenCalledTimes(2);
           expect(mockMutateAsync).toHaveBeenCalledWith(
-            expect.objectContaining({ tag:"production", versionId: "v4-id" }),
+            expect.objectContaining({ tag: "production", versionId: "v4-id" }),
           );
           expect(mockMutateAsync).toHaveBeenCalledWith(
-            expect.objectContaining({ tag:"staging", versionId: "v1-id" }),
+            expect.objectContaining({ tag: "staging", versionId: "v1-id" }),
           );
         });
       });
@@ -451,7 +489,13 @@ describe.skip("Feature: Deploy Prompt Dialog", () => {
         const onClose = vi.fn();
         mockMutateAsync.mockClear();
         setupQueries({
-          tags: [{ tagId: "production-id", promptTag: { name: "production" }, versionId: "v2-id" }],
+          tags: [
+            {
+              tagId: "production-id",
+              promptTag: { name: "production" },
+              versionId: "v2-id",
+            },
+          ],
         });
         renderDialog({ onClose });
 
@@ -469,8 +513,16 @@ describe.skip("Feature: Deploy Prompt Dialog", () => {
         setupPromptTags([{ name: "canary", id: "canary-id" }]);
         setupQueries({
           tags: [
-            { tagId: "production-id", promptTag: { name: "production" }, versionId: "v1-id" },
-            { tagId: "canary-id", promptTag: { name: "canary" }, versionId: "v2-id" },
+            {
+              tagId: "production-id",
+              promptTag: { name: "production" },
+              versionId: "v1-id",
+            },
+            {
+              tagId: "canary-id",
+              promptTag: { name: "canary" },
+              versionId: "v2-id",
+            },
           ],
         });
 
@@ -491,7 +543,9 @@ describe.skip("Feature: Deploy Prompt Dialog", () => {
         renderDialog();
 
         await waitFor(() => {
-          expect(screen.getByLabelText("Production version")).toBeInTheDocument();
+          expect(
+            screen.getByLabelText("Production version"),
+          ).toBeInTheDocument();
           expect(screen.getByLabelText("Staging version")).toBeInTheDocument();
           expect(screen.getByLabelText("Canary version")).toBeInTheDocument();
         });
@@ -556,7 +610,9 @@ describe.skip("Feature: Deploy Prompt Dialog", () => {
           expect(screen.getByText("latest")).toBeInTheDocument();
           expect(screen.getByText("production")).toBeInTheDocument();
           expect(screen.getByText("staging")).toBeInTheDocument();
-          expect(screen.getByRole("button", { name: /\+ add tag/i })).toBeInTheDocument();
+          expect(
+            screen.getByRole("button", { name: /\+ add tag/i }),
+          ).toBeInTheDocument();
         });
       });
     });
@@ -572,7 +628,10 @@ describe.skip("Feature: Deploy Prompt Dialog", () => {
           { name: "staging", id: "staging-id" },
           { name: "canary", id: "canary-id" },
         ];
-        mockCreateTagMutateAsync.mockResolvedValue({ name: "canary", id: "canary-id" });
+        mockCreateTagMutateAsync.mockResolvedValue({
+          name: "canary",
+          id: "canary-id",
+        });
         mockPromptTagsQuery.mockReturnValueOnce({
           data: [
             { name: "production", id: "production-id" },
@@ -594,7 +653,9 @@ describe.skip("Feature: Deploy Prompt Dialog", () => {
 
         // Wait for initial render
         await waitFor(() => {
-          expect(screen.getByRole("button", { name: /\+ add tag/i })).toBeInTheDocument();
+          expect(
+            screen.getByRole("button", { name: /\+ add tag/i }),
+          ).toBeInTheDocument();
         });
 
         fireEvent.click(screen.getByRole("button", { name: /\+ add tag/i }));
@@ -612,13 +673,17 @@ describe.skip("Feature: Deploy Prompt Dialog", () => {
     describe("Scenario: Deploy dialog rejects duplicate custom tag name", () => {
       it("shows an error when trying to add an existing tag name", async () => {
         setupPromptTags([{ name: "canary", id: "canary-id" }]);
-        mockCreateTagMutateAsync.mockRejectedValue(new Error("canary already exists"));
+        mockCreateTagMutateAsync.mockRejectedValue(
+          new Error("canary already exists"),
+        );
         setupQueries();
 
         renderDialog();
 
         await waitFor(() => {
-          expect(screen.getByRole("button", { name: /\+ add tag/i })).toBeInTheDocument();
+          expect(
+            screen.getByRole("button", { name: /\+ add tag/i }),
+          ).toBeInTheDocument();
         });
 
         fireEvent.click(screen.getByRole("button", { name: /\+ add tag/i }));
@@ -665,15 +730,22 @@ describe.skip("Feature: Deploy Prompt Dialog", () => {
           expect(screen.getByText("canary")).toBeInTheDocument();
         });
 
-        fireEvent.click(screen.getByRole("button", { name: /delete tag canary/i }));
+        fireEvent.click(
+          screen.getByRole("button", { name: /delete tag canary/i }),
+        );
 
         // Type "delete" in the confirmation input and confirm
         await waitFor(() => {
-          expect(screen.getByPlaceholderText(/type 'delete' to confirm/i)).toBeInTheDocument();
+          expect(
+            screen.getByPlaceholderText(/type 'delete' to confirm/i),
+          ).toBeInTheDocument();
         });
-        fireEvent.change(screen.getByPlaceholderText(/type 'delete' to confirm/i), {
-          target: { value: "delete" },
-        });
+        fireEvent.change(
+          screen.getByPlaceholderText(/type 'delete' to confirm/i),
+          {
+            target: { value: "delete" },
+          },
+        );
         fireEvent.click(screen.getByRole("button", { name: /^delete$/i }));
 
         await waitFor(() => {
@@ -691,11 +763,15 @@ describe.skip("Feature: Deploy Prompt Dialog", () => {
           expect(screen.getByText("canary")).toBeInTheDocument();
         });
 
-        fireEvent.click(screen.getByRole("button", { name: /delete tag canary/i }));
+        fireEvent.click(
+          screen.getByRole("button", { name: /delete tag canary/i }),
+        );
 
         await waitFor(() => {
           expect(
-            screen.getByText(/SDK and API callers using this tag will no longer be able to resolve it/i),
+            screen.getByText(
+              /SDK and API callers using this tag will no longer be able to resolve it/i,
+            ),
           ).toBeInTheDocument();
         });
       });

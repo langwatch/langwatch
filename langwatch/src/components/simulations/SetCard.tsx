@@ -1,10 +1,10 @@
 import { Box, Card, HStack, Text, VStack } from "@chakra-ui/react";
 import { Settings } from "lucide-react";
-import type { ScenarioSetData } from "~/server/scenarios/scenario-event.types";
 import {
   isOnPlatformSet,
   ON_PLATFORM_DISPLAY_NAME,
 } from "~/server/scenarios/internal-set-id";
+import type { ScenarioSetData } from "~/server/scenarios/scenario-event.types";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 
 export interface SetCardProps extends ScenarioSetData {

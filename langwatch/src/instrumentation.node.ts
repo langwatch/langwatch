@@ -187,7 +187,8 @@ if (explicitEndpoint && isEnvTrue(process.env.OTEL_METRICS_ENABLED)) {
   // The graceful-shutdown path (start.ts / workers.ts) calls process.exit(0)
   // without waiting on this provider, so the last periodic export can be
   // dropped. Race a best-effort flush against that exit.
-  const flushMetricsOnExit = () => void meterProvider.forceFlush().catch(() => {});
+  const flushMetricsOnExit = () =>
+    void meterProvider.forceFlush().catch(() => {});
   process.on("SIGTERM", flushMetricsOnExit);
   process.on("SIGINT", flushMetricsOnExit);
 }

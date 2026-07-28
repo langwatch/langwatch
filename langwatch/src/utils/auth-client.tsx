@@ -1,7 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState, type ReactElement, type ReactNode } from "react";
 import { createAuthClient } from "better-auth/react";
+import {
+  type ReactElement,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useState,
+} from "react";
 
 /**
  * Client-side auth wrapper exposing a NextAuth-compatible API surface over
@@ -139,7 +145,9 @@ export const useSession = (
       });
     }
 
-    return () => { _subscribers.delete(handler); };
+    return () => {
+      _subscribers.delete(handler);
+    };
   }, []);
 
   const status: SessionStatus = isPending
@@ -181,8 +189,7 @@ export const signIn = async (
     redirect?: boolean;
   },
 ): Promise<
-  | { error?: string; code?: string; status?: number; ok?: boolean }
-  | undefined
+  { error?: string; code?: string; status?: number; ok?: boolean } | undefined
 > => {
   // Same-origin guard on the post-login redirect target.
   const callbackURL = options?.callbackUrl
@@ -241,7 +248,12 @@ export const signIn = async (
   }
   // For providers where BetterAuth returned a redirect URL but didn't
   // auto-navigate (some fetch modes), follow it ourselves.
-  if (shouldRedirect && result.data && typeof result.data === "object" && "url" in result.data) {
+  if (
+    shouldRedirect &&
+    result.data &&
+    typeof result.data === "object" &&
+    "url" in result.data
+  ) {
     const url = (result.data as { url?: string }).url;
     if (url) {
       navigate(url);

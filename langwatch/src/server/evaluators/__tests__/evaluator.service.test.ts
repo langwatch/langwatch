@@ -5,14 +5,15 @@
  * - Built-in evaluators (from AVAILABLE_EVALUATORS)
  * - Workflow evaluators (from workflow DSL)
  */
-import { describe, expect, it, vi, beforeEach } from "vitest";
+
 import type { Evaluator, PrismaClient } from "@prisma/client";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { EvaluatorRepository } from "../evaluator.repository";
 import {
+  type EvaluatorField,
   EvaluatorService,
   STANDARD_EVALUATOR_OUTPUT_FIELDS,
-  type EvaluatorField,
 } from "../evaluator.service";
-import type { EvaluatorRepository } from "../evaluator.repository";
 
 // Mock AVAILABLE_EVALUATORS
 vi.mock("~/server/evaluations/evaluators", () => ({

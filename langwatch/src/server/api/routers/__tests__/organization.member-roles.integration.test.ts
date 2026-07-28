@@ -1,11 +1,15 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { OrganizationUserRole, TeamUserRole, type PrismaClient } from "@prisma/client";
-import { organizationRouter } from "../organization";
-import { LITE_MEMBER_VIEWER_ONLY_ERROR } from "~/server/app-layer/organizations/compute-effective-team-role-updates";
-import { createInnerTRPCContext } from "../../trpc";
-import { createTestApp } from "~/server/app-layer/presets";
+import {
+  OrganizationUserRole,
+  type PrismaClient,
+  TeamUserRole,
+} from "@prisma/client";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { LITE_MEMBER_VIEWER_ONLY_ERROR } from "~/server/app-layer/organizations/compute-effective-team-role-updates";
+import { createTestApp } from "~/server/app-layer/presets";
 import { PlanProviderService } from "~/server/app-layer/subscription/plan-provider";
+import { createInnerTRPCContext } from "../../trpc";
+import { organizationRouter } from "../organization";
 
 vi.mock("../../../auditLog", () => ({
   auditLog: vi.fn(() => Promise.resolve()),
@@ -34,33 +38,51 @@ vi.mock("../../rbac", async (importOriginal) => {
   };
 });
 
-vi.mock("../../../license-enforcement/license-enforcement.repository", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../../license-enforcement/license-enforcement.repository")>();
-  return {
-    ...actual,
-    LicenseEnforcementRepository: class {
-      constructor() {
-        // no-op stub
-      }
-    },
-  };
-});
+vi.mock(
+  "../../../license-enforcement/license-enforcement.repository",
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import("../../../license-enforcement/license-enforcement.repository")
+      >();
+    return {
+      ...actual,
+      LicenseEnforcementRepository: class {
+        constructor() {
+          // no-op stub
+        }
+      },
+    };
+  },
+);
 
-vi.mock("../../../license-enforcement/license-limit-guard", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../../license-enforcement/license-limit-guard")>();
-  return {
-    ...actual,
-    assertMemberTypeLimitNotExceeded: vi.fn().mockResolvedValue(undefined),
-  };
-});
+vi.mock(
+  "../../../license-enforcement/license-limit-guard",
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import("../../../license-enforcement/license-limit-guard")
+      >();
+    return {
+      ...actual,
+      assertMemberTypeLimitNotExceeded: vi.fn().mockResolvedValue(undefined),
+    };
+  },
+);
 
-vi.mock("../../../license-enforcement/member-classification", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../../license-enforcement/member-classification")>();
-  return {
-    ...actual,
-    getRoleChangeType: vi.fn().mockReturnValue("no-change"),
-  };
-});
+vi.mock(
+  "../../../license-enforcement/member-classification",
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import("../../../license-enforcement/member-classification")
+      >();
+    return {
+      ...actual,
+      getRoleChangeType: vi.fn().mockReturnValue("no-change"),
+    };
+  },
+);
 
 // Skipped: app-layer init regression on main (#2508) — see langwatch/langwatch#3240.
 describe.skip("organizationRouter member role validation", () => {
@@ -91,7 +113,9 @@ describe.skip("organizationRouter member role validation", () => {
         findUnique: vi.fn().mockResolvedValue({ organizationId: "org-1" }),
       },
       organizationUser: {
-        findUnique: vi.fn().mockResolvedValue({ role: OrganizationUserRole.EXTERNAL }),
+        findUnique: vi
+          .fn()
+          .mockResolvedValue({ role: OrganizationUserRole.EXTERNAL }),
       },
       customRole: {
         findUnique: vi.fn().mockResolvedValue({

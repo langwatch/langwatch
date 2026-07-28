@@ -6,9 +6,9 @@
  */
 import { ExperimentType } from "@prisma/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { getTestUser } from "../../../../utils/testUtils";
 import { globalForApp, resetApp } from "../../../app-layer/app";
 import { createTestApp } from "../../../app-layer/presets";
-import { getTestUser } from "../../../../utils/testUtils";
 import { prisma } from "../../../db";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";

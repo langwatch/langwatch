@@ -236,9 +236,7 @@ export class SpanStorageService {
     return this.repository.findSpanSummariesPage(params);
   }
 
-  async getSpanSummariesSince(
-    params: SinceUpdated,
-  ): Promise<SpanSummaryRow[]> {
+  async getSpanSummariesSince(params: SinceUpdated): Promise<SpanSummaryRow[]> {
     return this.repository.findSpanSummariesSince(params);
   }
 

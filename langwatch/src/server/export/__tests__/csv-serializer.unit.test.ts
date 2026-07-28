@@ -5,14 +5,20 @@
  * Pure function tests — no mocking needed.
  */
 
-import { describe, expect, it } from "vitest";
 import Parse from "papaparse";
-import type { Trace, Evaluation, Span, LLMSpan, RAGSpan } from "~/server/tracer/types";
-import {
-  serializeTracesToSummaryCsv,
-  serializeTracesToFullCsv,
-} from "../serializers/csv-serializer";
+import { describe, expect, it } from "vitest";
+import type {
+  Evaluation,
+  LLMSpan,
+  RAGSpan,
+  Span,
+  Trace,
+} from "~/server/tracer/types";
 import { stripCsvHeader } from "../export.service";
+import {
+  serializeTracesToFullCsv,
+  serializeTracesToSummaryCsv,
+} from "../serializers/csv-serializer";
 
 // ---------------------------------------------------------------------------
 // Test data builders
@@ -72,9 +78,7 @@ function buildLLMSpan(overrides?: Partial<LLMSpan>): LLMSpan {
     vendor: "openai",
     input: {
       type: "chat_messages",
-      value: [
-        { role: "user", content: "Hello" },
-      ],
+      value: [{ role: "user", content: "Hello" }],
     },
     output: { type: "text", value: "Hi there" },
     timestamps: {
@@ -171,8 +175,19 @@ describe("serializeTracesToSummaryCsv()", () => {
     it("includes per-evaluator score, passed, label, and details columns", () => {
       const trace = buildTrace({
         evaluations: [
-          buildEvaluation({ name: "Faithfulness", score: 0.95, passed: true, details: "All good" }),
-          buildEvaluation({ name: "Relevance", score: 0.8, passed: false, label: "low", details: "Needs work" }),
+          buildEvaluation({
+            name: "Faithfulness",
+            score: 0.95,
+            passed: true,
+            details: "All good",
+          }),
+          buildEvaluation({
+            name: "Relevance",
+            score: 0.8,
+            passed: false,
+            label: "low",
+            details: "Needs work",
+          }),
         ],
       });
 
@@ -295,11 +310,7 @@ describe("serializeTracesToFullCsv()", () => {
   describe("when trace has LLM and RAG spans", () => {
     it("creates one row per span with trace fields repeated", () => {
       const trace = buildTrace({
-        spans: [
-          buildBaseSpan(),
-          buildLLMSpan(),
-          buildRAGSpan(),
-        ],
+        spans: [buildBaseSpan(), buildLLMSpan(), buildRAGSpan()],
       });
 
       const csv = serializeTracesToFullCsv({
@@ -443,7 +454,12 @@ describe("serializeTracesToFullCsv()", () => {
       const trace = buildTrace({
         spans: [buildLLMSpan()],
         evaluations: [
-          buildEvaluation({ name: "Toxicity", score: 0.95, passed: true, details: "No toxic content detected" }),
+          buildEvaluation({
+            name: "Toxicity",
+            score: 0.95,
+            passed: true,
+            details: "No toxic content detected",
+          }),
         ],
       });
 
@@ -482,7 +498,11 @@ describe("serializeTracesToFullCsv()", () => {
   describe("when span has an error", () => {
     it("includes span_error with the error message", () => {
       const span = buildBaseSpan({
-        error: { has_error: true, message: "Something broke", stacktrace: ["line1"] },
+        error: {
+          has_error: true,
+          message: "Something broke",
+          stacktrace: ["line1"],
+        },
       });
       const trace = buildTrace({ spans: [span] });
 

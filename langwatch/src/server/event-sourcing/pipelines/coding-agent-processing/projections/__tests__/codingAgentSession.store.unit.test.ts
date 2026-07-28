@@ -2,14 +2,14 @@ import { describe, expect, it } from "vitest";
 import type { CodingAgentSessionRepository } from "~/server/app-layer/coding-agent/repositories/coding-agent-session.repository";
 import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
 import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
+import { createInitCodingAgentSession } from "../../services/coding-agent-session.derivation";
 import {
+  CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST,
   type CodingAgentSessionRow,
   type CodingAgentSessionState,
-  CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST,
   projectCodingAgentSessionToRow,
 } from "../codingAgentSession.foldProjection";
 import { CodingAgentSessionStore } from "../codingAgentSession.store";
-import { createInitCodingAgentSession } from "../../services/coding-agent-session.derivation";
 
 /**
  * The store adapter's half of the durable dedup watermark (ADR-066): it threads
@@ -56,8 +56,10 @@ class FakeRepo implements CodingAgentSessionRepository {
     retentionDays?: number;
     appliedEventIds?: readonly string[];
   }> = [];
-  withApplied: { row: CodingAgentSessionRow; appliedEventIds: string[] } | null =
-    null;
+  withApplied: {
+    row: CodingAgentSessionRow;
+    appliedEventIds: string[];
+  } | null = null;
   lastFindParams:
     | {
         tenantId: string;
@@ -92,7 +94,10 @@ class FakeRepo implements CodingAgentSessionRepository {
     tenantId: string;
     sessionId: string;
     window?: { fromMs: number; toMs: number };
-  }): Promise<{ row: CodingAgentSessionRow; appliedEventIds: string[] } | null> {
+  }): Promise<{
+    row: CodingAgentSessionRow;
+    appliedEventIds: string[];
+  } | null> {
     this.lastFindParams = params;
     return this.withApplied;
   }
@@ -102,7 +107,9 @@ class FakeRepo implements CodingAgentSessionRepository {
   }
 }
 
-const context = (over: Partial<ProjectionStoreContext> = {}): ProjectionStoreContext => ({
+const context = (
+  over: Partial<ProjectionStoreContext> = {},
+): ProjectionStoreContext => ({
   aggregateId: "session-1",
   tenantId,
   ...over,
@@ -171,7 +178,10 @@ describe("CodingAgentSessionStore durable dedup", () => {
       it("maps the row to state and returns the persisted watermark", async () => {
         const repo = new FakeRepo();
         const state = makeState({ modelCalls: 3 });
-        repo.withApplied = { row: makeRow(state), appliedEventIds: ["e1", "e2"] };
+        repo.withApplied = {
+          row: makeRow(state),
+          appliedEventIds: ["e1", "e2"],
+        };
         const store = new CodingAgentSessionStore(repo);
 
         const result = await store.getWithApplied(

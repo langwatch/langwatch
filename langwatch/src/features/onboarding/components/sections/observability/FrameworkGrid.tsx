@@ -1,12 +1,12 @@
 import { HStack, Text, VStack } from "@chakra-ui/react";
 import type React from "react";
-import type { IconData } from "../../../regions/shared/types";
 import {
   type FrameworkKey,
   LARGE_FRAMEWORK_ICON_KEYS,
   type PlatformKey,
 } from "../../../regions/observability/types";
 import { FRAMEWORKS_BY_PLATFORM } from "../../../regions/observability/ui-options";
+import type { IconData } from "../../../regions/shared/types";
 import { SelectableIconCard } from "../shared/SelectableIconCard";
 
 type FrameworksByPlatform = Record<

@@ -349,9 +349,9 @@ describe("anchor settle predicates", () => {
 
     describe("given the anchor moved since the last frame", () => {
       it("is not settled (still riding in)", () => {
-        expect(isAnchorSettled(rect({ left: 200 }), rect({ left: 260 }), VW, 0)).toBe(
-          false,
-        );
+        expect(
+          isAnchorSettled(rect({ left: 200 }), rect({ left: 260 }), VW, 0),
+        ).toBe(false);
       });
     });
 

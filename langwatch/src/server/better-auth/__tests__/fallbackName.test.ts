@@ -33,9 +33,9 @@ describe("fallbackName", () => {
     });
 
     it("prefers name over nickname", () => {
-      expect(
-        fallbackName({ name: "Alice Smith", nickname: "alice" }),
-      ).toBe("Alice Smith");
+      expect(fallbackName({ name: "Alice Smith", nickname: "alice" })).toBe(
+        "Alice Smith",
+      );
     });
 
     it("trims whitespace from name", () => {
@@ -59,9 +59,9 @@ describe("fallbackName", () => {
 
   describe("when name is null but displayName is set (Azure fallback)", () => {
     it("returns displayName", () => {
-      expect(
-        fallbackName({ name: null, displayName: "Alice at Corp" }),
-      ).toBe("Alice at Corp");
+      expect(fallbackName({ name: null, displayName: "Alice at Corp" })).toBe(
+        "Alice at Corp",
+      );
     });
   });
 
@@ -81,9 +81,9 @@ describe("fallbackName", () => {
 
   describe("when name is null but preferred_username is set (OIDC)", () => {
     it("returns preferred_username", () => {
-      expect(
-        fallbackName({ name: null, preferred_username: "alice" }),
-      ).toBe("alice");
+      expect(fallbackName({ name: null, preferred_username: "alice" })).toBe(
+        "alice",
+      );
     });
   });
 

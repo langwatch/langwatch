@@ -8,12 +8,12 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { ArrowLeft, ArrowRight, LogOut } from "lucide-react";
-import { Link } from "~/components/ui/link";
 import { AnimatePresence, motion } from "motion/react";
-import { signOut } from "~/utils/auth-client";
 import { useAnalytics } from "react-contextual-analytics";
 import { FullLogo } from "~/components/icons/FullLogo";
+import { Link } from "~/components/ui/link";
 import { Tooltip } from "~/components/ui/tooltip";
+import { signOut } from "~/utils/auth-client";
 import { OnboardingMeshBackground } from "../OnboardingMeshBackground";
 import SpookyScarySkeleton from "../SpookyScarySkeleton";
 
@@ -89,7 +89,14 @@ export const OnboardingContainer: React.FC<OnboardingContainerProps> = ({
     // "stable both-edges" keeps the reserved scrollbar gutter symmetric so
     // the logo/card column stays visually centered even with always-visible
     // scrollbars (one-edge "stable" shifted everything left).
-    <Box w="full" minH="100dvh" bg="bg.page" position="relative" style={{ scrollbarGutter: "stable both-edges" }} overflowY="auto">
+    <Box
+      w="full"
+      minH="100dvh"
+      bg="bg.page"
+      position="relative"
+      style={{ scrollbarGutter: "stable both-edges" }}
+      overflowY="auto"
+    >
       <OnboardingMeshBackground />
 
       {showBackButton && onBack && (

@@ -10,9 +10,9 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import { BatchSection } from "../BatchSection";
 import { makeBatchRun, makeScenarioRunData } from "./test-helpers";
-import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 
 vi.mock("../SummaryStatusIcon", () => ({
   SummaryStatusIcon: () => <span data-testid="summary-status-icon" />,
@@ -63,8 +63,14 @@ describe("<BatchSection/>", () => {
     it("displays passed/failed status with scenario count", () => {
       const batch = makeBatchRun({
         scenarioRuns: [
-          makeScenarioRunData({ scenarioRunId: "run_1", status: ScenarioRunStatus.SUCCESS }),
-          makeScenarioRunData({ scenarioRunId: "run_2", status: ScenarioRunStatus.SUCCESS }),
+          makeScenarioRunData({
+            scenarioRunId: "run_1",
+            status: ScenarioRunStatus.SUCCESS,
+          }),
+          makeScenarioRunData({
+            scenarioRunId: "run_2",
+            status: ScenarioRunStatus.SUCCESS,
+          }),
         ],
       });
 

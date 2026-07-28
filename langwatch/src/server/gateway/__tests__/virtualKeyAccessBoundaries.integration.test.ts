@@ -26,7 +26,9 @@ import { prisma } from "~/server/db";
 import { startTestContainers } from "~/server/event-sourcing/__tests__/integration/testContainers";
 import { resolveTraceProject } from "../scopeResolver";
 
-const suffix = nanoid(8).toLowerCase().replace(/[^a-z0-9]/g, "x");
+const suffix = nanoid(8)
+  .toLowerCase()
+  .replace(/[^a-z0-9]/g, "x");
 const ORG_ID = `org-vkab-${suffix}`;
 const TEAM_OWNER_ID = `team-vkab-owner-${suffix}`;
 const TEAM_OTHER_ID = `team-vkab-other-${suffix}`;
@@ -125,7 +127,9 @@ describe("virtual key access boundaries (real PG)", () => {
   }, 120_000);
 
   afterAll(async () => {
-    await prisma.gatewayBudget.deleteMany({ where: { organizationId: ORG_ID } });
+    await prisma.gatewayBudget.deleteMany({
+      where: { organizationId: ORG_ID },
+    });
     await prisma.gatewayChangeEvent.deleteMany({
       where: { organizationId: ORG_ID },
     });
@@ -228,12 +232,12 @@ describe("virtual key access boundaries (real PG)", () => {
     });
 
     it("answers a draft for a caller who could create at those scopes", async () => {
-      const rows = await callerFor(TRACE_ADMIN_ID).virtualKeys.applicableBudgets(
-        {
-          organizationId: ORG_ID,
-          scopes: [{ scopeType: "TEAM", scopeId: TEAM_OWNER_ID }],
-        },
-      );
+      const rows = await callerFor(
+        TRACE_ADMIN_ID,
+      ).virtualKeys.applicableBudgets({
+        organizationId: ORG_ID,
+        scopes: [{ scopeType: "TEAM", scopeId: TEAM_OWNER_ID }],
+      });
       expect(Array.isArray(rows)).toBe(true);
     });
 

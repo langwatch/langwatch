@@ -9,13 +9,12 @@
  * the envelope carries domain branding that has no business in a client
  * bundle, so the composition happens here and only here.
  */
-import { z } from "zod";
-import { EventSchema } from "../../../domain/types";
+
 import {
   LANGY_CONVERSATION_EVENT_TYPES,
   LANGY_CONVERSATION_EVENT_VERSIONS,
-  langyAgentResponseFailedEventDataSchema,
   langyAgentRespondedEventDataSchema,
+  langyAgentResponseFailedEventDataSchema,
   langyAgentTurnAcceptedEventDataSchema,
   langyConversationArchivedEventDataSchema,
   langyConversationForkedEventDataSchema,
@@ -31,6 +30,8 @@ import {
   langyToolCallInitiatedEventDataSchema,
   langyToolCallSucceededEventDataSchema,
 } from "@langwatch/langy";
+import { z } from "zod";
+import { EventSchema } from "../../../domain/types";
 
 export const LangyConversationStartedEventSchema = EventSchema.extend({
   type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_STARTED),
@@ -206,18 +207,18 @@ export type LangyConversationProcessingEvent =
   | LangyConversationTitleGeneratedEvent;
 
 export {
-  isLangyConversationStartedEvent,
-  isLangyMessageRecordedEvent,
+  isLangyAgentRespondedEvent,
+  isLangyAgentResponseFailedEvent,
   isLangyAgentTurnAcceptedEvent,
+  isLangyConversationArchivedEvent,
+  isLangyConversationHandoffConsumedEvent,
+  isLangyConversationHandoffPendingEvent,
+  isLangyConversationMetadataUpdatedEvent,
+  isLangyConversationStartedEvent,
+  isLangyConversationTitleGeneratedEvent,
+  isLangyMessageRecordedEvent,
+  isLangyPlanUpdatedEvent,
+  isLangyToolCallFailedEvent,
   isLangyToolCallInitiatedEvent,
   isLangyToolCallSucceededEvent,
-  isLangyToolCallFailedEvent,
-  isLangyPlanUpdatedEvent,
-  isLangyAgentResponseFailedEvent,
-  isLangyAgentRespondedEvent,
-  isLangyConversationArchivedEvent,
-  isLangyConversationMetadataUpdatedEvent,
-  isLangyConversationHandoffPendingEvent,
-  isLangyConversationHandoffConsumedEvent,
-  isLangyConversationTitleGeneratedEvent,
 } from "./typeGuards";

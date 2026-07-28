@@ -6,9 +6,10 @@
  * a 404 because the backend required exact matches. This exercises the
  * git-style prefix lookup that unblocks that workflow.
  */
+
+import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import type { ClickHouseClient } from "@clickhouse/client";
 import {
   startTestContainers,
   stopTestContainers,

@@ -23,9 +23,7 @@ const STORAGE_KEY =
   "langwatch:simulations-voice-callout-dismissed:v1:project-1";
 
 function renderWithProviders(ui: React.ReactElement) {
-  return render(
-    <ChakraProvider value={defaultSystem}>{ui}</ChakraProvider>,
-  );
+  return render(<ChakraProvider value={defaultSystem}>{ui}</ChakraProvider>);
 }
 
 describe("<VoiceAgentsCallout />", () => {

@@ -3,7 +3,6 @@
  */
 
 import { describe, expect, it } from "vitest";
-import type { LiteLLMParams, TargetAdapterData } from "../types";
 import {
   createAdapter,
   SERIALIZED_ADAPTER_FACTORIES,
@@ -13,6 +12,7 @@ import {
   SerializedHttpAgentAdapter,
   SerializedPromptConfigAdapter,
 } from "../serialized-adapters";
+import type { LiteLLMParams, TargetAdapterData } from "../types";
 
 describe("createAdapter", () => {
   const defaultModelParams: LiteLLMParams = {

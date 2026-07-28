@@ -1,5 +1,5 @@
-import { useRouter } from "~/utils/compat/next-router";
 import { useSession } from "~/utils/auth-client";
+import { useRouter } from "~/utils/compat/next-router";
 
 export const publicRoutes = [
   "/share/[id]",

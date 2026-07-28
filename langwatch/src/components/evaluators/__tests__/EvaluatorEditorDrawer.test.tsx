@@ -335,13 +335,9 @@ describe("EvaluatorEditorDrawer — name update regression (#3442)", () => {
         copiedFromEvaluatorId: null,
       };
 
-      render(
-        <EvaluatorEditorDrawer
-          open={true}
-          evaluatorId="eval-wf-1"
-        />,
-        { wrapper: Wrapper },
-      );
+      render(<EvaluatorEditorDrawer open={true} evaluatorId="eval-wf-1" />, {
+        wrapper: Wrapper,
+      });
 
       await waitFor(() => {
         expect(screen.getByTestId("evaluator-name-input")).toBeInTheDocument();
@@ -382,13 +378,9 @@ describe("EvaluatorEditorDrawer — name update regression (#3442)", () => {
         copiedFromEvaluatorId: null,
       };
 
-      render(
-        <EvaluatorEditorDrawer
-          open={true}
-          evaluatorId="eval-wf-2"
-        />,
-        { wrapper: Wrapper },
-      );
+      render(<EvaluatorEditorDrawer open={true} evaluatorId="eval-wf-2" />, {
+        wrapper: Wrapper,
+      });
 
       await waitFor(() => {
         expect(screen.getByTestId("evaluator-name-input")).toBeInTheDocument();

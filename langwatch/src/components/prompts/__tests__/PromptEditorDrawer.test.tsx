@@ -594,7 +594,9 @@ describe("PromptEditorDrawer", () => {
         const methods = capturedFormMethods[capturedFormMethods.length - 1]!;
         expect(methods.getValues("version.configData.llm.maxTokens")).toBe(
           getMaxTokenLimit(
-            mockModelMetadata["openai/gpt-4o"] as unknown as ModelMetadataForFrontend,
+            mockModelMetadata[
+              "openai/gpt-4o"
+            ] as unknown as ModelMetadataForFrontend,
           ),
         );
       });
@@ -696,9 +698,7 @@ describe("PromptEditorDrawer", () => {
         });
         // ...but the user's manually-edited token limit survives.
         const methods = capturedFormMethods[capturedFormMethods.length - 1]!;
-        expect(methods.getValues("version.configData.llm.maxTokens")).toBe(
-          777,
-        );
+        expect(methods.getValues("version.configData.llm.maxTokens")).toBe(777);
       });
     });
   });

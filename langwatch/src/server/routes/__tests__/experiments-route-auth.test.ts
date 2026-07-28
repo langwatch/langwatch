@@ -40,7 +40,12 @@ const SESSION_GUARD_MESSAGE = "You must be logged in to access this endpoint.";
 const validExecuteBody = {
   projectId: "project_test",
   name: "regression-test",
-  dataset: { id: "dataset-1", name: "ds", type: "inline" as const, columns: [] },
+  dataset: {
+    id: "dataset-1",
+    name: "ds",
+    type: "inline" as const,
+    columns: [],
+  },
   targets: [],
   evaluators: [],
   scope: { type: "full" as const },

@@ -11,9 +11,6 @@ import { makeQueueName } from "~/server/queues/makeQueueName";
 import { resolveProjectStorageDestination } from "../stored-objects/project-storage-destination";
 import { createStorageRegistry } from "../stored-objects/stored-objects-factory";
 import { DisabledPipeline } from "./disabledPipeline";
-import { InMemoryProcessStore } from "./process-manager/stores/inMemoryProcessStore";
-import { ProcessRuntime } from "./process-manager/processRuntime";
-import type { ProcessStore } from "./process-manager/stores/processStore.types";
 import type { Event, Projection } from "./domain/types";
 import type {
   NoCommands,
@@ -25,6 +22,9 @@ import type {
   RegisteredPipeline,
 } from "./pipeline/types";
 import { BILLING_REPORTING_PIPELINE_NAME } from "./pipelines/billing-reporting/pipeline";
+import { ProcessRuntime } from "./process-manager/processRuntime";
+import { InMemoryProcessStore } from "./process-manager/stores/inMemoryProcessStore";
+import type { ProcessStore } from "./process-manager/stores/processStore.types";
 import { createBillingMeterDispatchReactor } from "./projections/global/billingMeterDispatch.reactor";
 import { orgBillableEventsMeterProjection } from "./projections/global/orgBillableEventsMeter.mapProjection";
 import { ProjectionRegistry } from "./projections/projectionRegistry";

@@ -42,9 +42,8 @@ export function resolveWelcomeRedirect({
 
   const slug =
     currentProjectSlug ??
-    organizations
-      ?.flatMap((o) => sharedTeams(o))
-      .flatMap((t) => t.projects)[0]?.slug;
+    organizations?.flatMap((o) => sharedTeams(o)).flatMap((t) => t.projects)[0]
+      ?.slug;
 
   return slug ? { kind: "project", slug } : { kind: "onboard" };
 }

@@ -14,10 +14,7 @@
 
 import type { AgentInput } from "@langwatch/scenario";
 import { Liquid } from "liquidjs";
-import {
-  resolveFieldMappings,
-  sourceFieldOf,
-} from "./resolve-field-mappings";
+import { resolveFieldMappings, sourceFieldOf } from "./resolve-field-mappings";
 import type { FieldMapping } from "./types";
 
 /**

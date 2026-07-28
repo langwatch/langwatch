@@ -236,7 +236,7 @@ function turnCellContent({
     case "model":
       return (
         <MonoCell truncate whiteSpace={undefined}>
-          {trace.models[0] ? (trace.models[0]) : dash}
+          {trace.models[0] ? trace.models[0] : dash}
         </MonoCell>
       );
     case "service":

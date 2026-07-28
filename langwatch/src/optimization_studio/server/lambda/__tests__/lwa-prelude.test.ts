@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
-  LWA_PRELUDE_SEPARATOR_LEN,
   concatBytes,
   findLWAPreludeSeparator,
+  LWA_PRELUDE_SEPARATOR_LEN,
 } from "../index";
 
 const enc = new TextEncoder();
@@ -188,11 +188,9 @@ describe("LWA prelude-strip end-to-end behavior", () => {
   it("preserves multi-chunk body bytes verbatim once the prelude is stripped (no \\n\\n re-splitting)", () => {
     // After the strip, downstream re-merges chunks itself. Make sure
     // we hand off bytes as-is including any trailing partial frame.
-    const full = buildLWAResponse(PRELUDE, "data: {\"a\":1}\n\n");
-    const tail = enc.encode("data: {\"b\":2}\n\n");
+    const full = buildLWAResponse(PRELUDE, 'data: {"a":1}\n\n');
+    const tail = enc.encode('data: {"b":2}\n\n');
     const body = stripPrelude([full, tail]);
-    expect(dec.decode(body)).toBe(
-      'data: {"a":1}\n\ndata: {"b":2}\n\n',
-    );
+    expect(dec.decode(body)).toBe('data: {"a":1}\n\ndata: {"b":2}\n\n');
   });
 });

@@ -4,12 +4,12 @@ import type { CommandType } from "../domain/commandType";
 import type { EventType } from "../domain/eventType";
 import { createTenantId } from "../domain/tenantId";
 import type { Event } from "../domain/types";
-import type { Command, CommandHandler, CommandHandlerResult } from "./command";
-import type { CommandHandlerClass } from "./commandHandlerClass";
-import { withCommandEnvelope, stripEnvelope } from "./commandEnvelope";
-import type { CommandEnvelope } from "./commandEnvelope";
-import { defineCommandSchema } from "./commandSchema";
 import { EventUtils } from "../utils/event.utils";
+import type { Command, CommandHandler, CommandHandlerResult } from "./command";
+import type { CommandEnvelope } from "./commandEnvelope";
+import { stripEnvelope, withCommandEnvelope } from "./commandEnvelope";
+import type { CommandHandlerClass } from "./commandHandlerClass";
+import { defineCommandSchema } from "./commandSchema";
 
 /**
  * Return type of defineCommand() — extends CommandHandlerClass with optional makeJobId.
@@ -70,17 +70,16 @@ export function defineCommand<
   aggregateId: (data: z.infer<TEventDataSchema> & CommandEnvelope) => string;
   idempotencyKey: (data: z.infer<TEventDataSchema> & CommandEnvelope) => string;
   groupKey?: (data: z.infer<TEventDataSchema> & CommandEnvelope) => string;
-  spanAttributes?: (data: z.infer<TEventDataSchema> & CommandEnvelope) => Record<string, string | number | boolean>;
+  spanAttributes?: (
+    data: z.infer<TEventDataSchema> & CommandEnvelope,
+  ) => Record<string, string | number | boolean>;
   makeJobId?: (data: z.infer<TEventDataSchema> & CommandEnvelope) => string;
 }): DefinedCommandClass<z.infer<TEventDataSchema> & CommandEnvelope, TCmdType> {
   type CommandData = z.infer<TEventDataSchema> & CommandEnvelope;
 
   const commandDataSchema = withCommandEnvelope(schema);
 
-  const cmdSchema = defineCommandSchema(
-    commandType,
-    commandDataSchema,
-  );
+  const cmdSchema = defineCommandSchema(commandType, commandDataSchema);
 
   class DefinedCommand implements CommandHandler<Command<CommandData>, Event> {
     static readonly schema = cmdSchema;
@@ -92,8 +91,9 @@ export function defineCommand<
     static getGroupKey: ((payload: CommandData) => string) | undefined =
       groupKey;
 
-    static getSpanAttributes: ((payload: CommandData) => Record<string, string | number | boolean>) | undefined =
-      spanAttributes;
+    static getSpanAttributes:
+      | ((payload: CommandData) => Record<string, string | number | boolean>)
+      | undefined = spanAttributes;
 
     static makeJobId: ((payload: CommandData) => string) | undefined =
       makeJobId;
@@ -124,5 +124,8 @@ export function defineCommand<
   // The inner class structurally satisfies DefinedCommandClass but TS needs the
   // intermediate `unknown` to bridge the nominal gap between class literals and
   // intersection constructor types.
-  return DefinedCommand as unknown as DefinedCommandClass<CommandData, TCmdType>;
+  return DefinedCommand as unknown as DefinedCommandClass<
+    CommandData,
+    TCmdType
+  >;
 }

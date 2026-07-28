@@ -145,7 +145,10 @@ export const TemplateLogicMenu = ({
                   e.preventDefault();
                   setIsKeyboardNav(true);
                   onHighlightChange(
-                    Math.min(highlightedIndex + 1, filteredConstructs.length - 1),
+                    Math.min(
+                      highlightedIndex + 1,
+                      filteredConstructs.length - 1,
+                    ),
                   );
                 } else if (e.key === "ArrowUp") {
                   e.preventDefault();

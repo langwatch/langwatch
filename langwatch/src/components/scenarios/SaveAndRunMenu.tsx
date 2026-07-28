@@ -1,15 +1,20 @@
 import { Box, Button, HStack, Input, Portal, Text } from "@chakra-ui/react";
-import { BookText, ChevronDown, Code, Globe, Play, Plus, Save } from "lucide-react";
+import {
+  BookText,
+  ChevronDown,
+  Code,
+  Globe,
+  Play,
+  Plus,
+  Save,
+} from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useAllPromptsForProject } from "../../prompts/hooks/useAllPromptsForProject";
 import { api } from "../../utils/api";
 import { Popover } from "../ui/popover";
 import type { TargetValue } from "./TargetSelector";
-import {
-  isAgentTarget,
-  useFilteredAgents,
-} from "./useFilteredScenarioTargets";
+import { isAgentTarget, useFilteredAgents } from "./useFilteredScenarioTargets";
 
 interface SaveAndRunMenuProps {
   selectedTarget: TargetValue;

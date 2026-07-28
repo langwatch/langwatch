@@ -908,7 +908,9 @@ export const VariableMappingInput = ({
                           gap={2}
                           cursor="pointer"
                           borderRadius="4px"
-                          background={isHighlighted ? "blue.subtle" : "transparent"}
+                          background={
+                            isHighlighted ? "blue.subtle" : "transparent"
+                          }
                           onMouseMove={() => {
                             if (
                               isKeyboardNav ||
@@ -935,7 +937,10 @@ export const VariableMappingInput = ({
                             {(() => {
                               const label = field.label ?? field.name ?? "";
                               // Render "* (description)" with gray parenthesis part
-                              if (label.startsWith("* (") && label.endsWith(")")) {
+                              if (
+                                label.startsWith("* (") &&
+                                label.endsWith(")")
+                              ) {
                                 const parenContent = label.slice(2); // "(description)"
                                 return (
                                   <>

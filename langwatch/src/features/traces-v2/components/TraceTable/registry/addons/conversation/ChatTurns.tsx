@@ -12,9 +12,7 @@ import type React from "react";
 import { useDrawer, useDrawerParams } from "~/hooks/useDrawer";
 import { useOpenTraceDrawer } from "../../../../../hooks/useOpenTraceDrawer";
 import type { TraceListItem } from "../../../../../types/trace";
-import {
-  formatDuration,
-} from "../../../../../utils/formatters";
+import { formatDuration } from "../../../../../utils/formatters";
 import { SystemPromptBanner } from "../../../../TraceDrawer/conversationView/SystemPromptBanner";
 import { TraceIdPeek } from "../../../../TraceIdPeek";
 import { findMessageContent, parseSystemPrompt } from "../../../chatContent";
@@ -241,9 +239,7 @@ const AssistantBubble: React.FC<{
   onOpen: () => void;
 }> = ({ trace, isSelected, onOpen }) => {
   if (trace.output) {
-    const label = trace.models[0]
-      ? (trace.models[0])
-      : "Assistant";
+    const label = trace.models[0] ? trace.models[0] : "Assistant";
     return (
       <Bubble
         side="right"

@@ -1,5 +1,8 @@
+import {
+  getClickHouseClientForProject,
+  isClickHouseEnabled,
+} from "~/server/clickhouse/clickhouseClient";
 import type { Span } from "~/server/tracer/types";
-import { isClickHouseEnabled, getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import {
   SpanStorageClickHouseRepository,
   type SpanStorageRepository,
@@ -8,7 +11,10 @@ import {
 export class SpanStorageService {
   private readonly useClickHouse: boolean;
 
-  constructor(private readonly repository: SpanStorageRepository | null, clickHouseAvailable: boolean) {
+  constructor(
+    private readonly repository: SpanStorageRepository | null,
+    clickHouseAvailable: boolean,
+  ) {
     this.useClickHouse = clickHouseAvailable;
   }
 

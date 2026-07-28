@@ -24,7 +24,6 @@ export { getAllForProjectInput };
 
 const logger = createLogger("langwatch:traces:sse-subscription");
 
-
 export const tracesRouter = createTRPCRouter({
   getAllForProject: protectedProcedure
     .input(getAllForProjectInput)
@@ -207,9 +206,14 @@ export const tracesRouter = createTRPCRouter({
         buildTraceBlobResolutionDeps(),
       );
 
-      return traceService.getTracesByThreadId(projectId, threadId, protections, {
-        full: true,
-      });
+      return traceService.getTracesByThreadId(
+        projectId,
+        threadId,
+        protections,
+        {
+          full: true,
+        },
+      );
     }),
 
   getTracesWithSpans: protectedProcedure

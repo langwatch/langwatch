@@ -166,7 +166,10 @@ export class ReplayService {
 
       const cancelledBeforeStart = await this.repo.isCancelled();
       if (cancelledBeforeStart) {
-        await this.finalizeCancelled({ runId: params.runId, historyCtx: params });
+        await this.finalizeCancelled({
+          runId: params.runId,
+          historyCtx: params,
+        });
         return;
       }
 
@@ -229,32 +232,29 @@ export class ReplayService {
           aggregateIds: params.aggregateIds,
         };
         const replayCallbacks = {
-            onProgress: (progress: ReplayProgress) => {
-              this.updateProgress({ runId: params.runId, progress }).catch(
-                (err) => {
-                  logger.warn(
-                    { error: err },
-                    "Failed to update replay progress",
-                  );
-                },
-              );
+          onProgress: (progress: ReplayProgress) => {
+            this.updateProgress({ runId: params.runId, progress }).catch(
+              (err) => {
+                logger.warn({ error: err }, "Failed to update replay progress");
+              },
+            );
 
-              const now = Date.now();
-              if (now - lastCancelCheck > CANCEL_CHECK_INTERVAL_MS) {
-                lastCancelCheck = now;
-                this.repo
-                  .isCancelled()
-                  .then((cancelled) => {
-                    if (cancelled) cancelledFlag = true;
-                  })
-                  .catch(() => {});
-              }
+            const now = Date.now();
+            if (now - lastCancelCheck > CANCEL_CHECK_INTERVAL_MS) {
+              lastCancelCheck = now;
+              this.repo
+                .isCancelled()
+                .then((cancelled) => {
+                  if (cancelled) cancelledFlag = true;
+                })
+                .catch(() => {});
+            }
 
-              if (cancelledFlag) {
-                throw new ReplayCancelledError();
-              }
-            },
-          };
+            if (cancelledFlag) {
+              throw new ReplayCancelledError();
+            }
+          },
+        };
         result =
           selectedStateProjections.length > 0
             ? await runtime.service.replay(replayConfig, replayCallbacks)
@@ -325,8 +325,7 @@ export class ReplayService {
       } else {
         await this.finalizeWithError({
           runId: params.runId,
-          errorMessage:
-            err instanceof Error ? err.message : String(err),
+          errorMessage: err instanceof Error ? err.message : String(err),
           historyCtx: params,
         });
       }
@@ -344,8 +343,7 @@ export class ReplayService {
     if (lockHolder !== params.runId) return;
 
     const current = await this.repo.getStatus();
-    if (current.state !== "running" || current.runId !== params.runId)
-      return;
+    if (current.state !== "running" || current.runId !== params.runId) return;
 
     await this.repo.writeStatus({
       status: {

@@ -154,7 +154,9 @@ export function useLangyContextTarget(
   const isRevealed = useLangyContextTargetStore((state) =>
     isActive && id ? state.revealedIds.has(id) : false,
   );
-  const isArmed = useLangyContextTargetStore((state) => state.armSource !== null);
+  const isArmed = useLangyContextTargetStore(
+    (state) => state.armSource !== null,
+  );
   const isHovered = useLangyContextTargetStore((state) =>
     isActive && id ? state.hoveredId === id : false,
   );
@@ -227,7 +229,15 @@ export function useLangyContextTarget(
       onDragStart,
       onClickCapture,
     };
-  }, [isActive, id, isOffered, isAdded, isHovered, onDragStart, onClickCapture]);
+  }, [
+    isActive,
+    id,
+    isOffered,
+    isAdded,
+    isHovered,
+    onDragStart,
+    onClickCapture,
+  ]);
 
   return { targetProps, isActive, isAdded, toggle };
 }

@@ -13,6 +13,7 @@ import type {
   FoldProjectionStore,
 } from "~/server/event-sourcing/projections/foldProjection.types";
 import { SYNTHETIC_SPAN_NAMES } from "~/server/tracer/constants";
+import { METRIC_EXEMPLAR_CORRELATION_COUNT_ATTRIBUTE } from "../schemas/constants";
 import type {
   AnnotationAddedEvent,
   AnnotationRemovedEvent,
@@ -37,7 +38,6 @@ import {
   topicAssignedEventSchema,
   traceNameChangedEventSchema,
 } from "../schemas/events";
-import { METRIC_EXEMPLAR_CORRELATION_COUNT_ATTRIBUTE } from "../schemas/constants";
 import type { NormalizedSpan } from "../schemas/spans";
 import {
   liftCanonicalAttributesFromLogRecord,

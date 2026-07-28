@@ -13,12 +13,12 @@
 import { ExperimentType } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { getTestUser } from "../../../../utils/testUtils";
 import { getApp, globalForApp } from "../../../app-layer/app";
 import { createTestApp } from "../../../app-layer/presets";
-import { getTestUser } from "../../../../utils/testUtils";
+import { prisma } from "../../../db";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
-import { prisma } from "../../../db";
 
 // Skipped: app-layer init regression on main after es-migration refactor
 // — see langwatch/langwatch#3240. createTestApp() throws at module load

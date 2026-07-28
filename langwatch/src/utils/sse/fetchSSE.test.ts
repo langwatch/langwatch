@@ -254,9 +254,8 @@ describe("fetchSSE", () => {
 
         // Attach the rejection handler BEFORE advancing timers
         // to avoid unhandled rejection warnings
-        const rejectionPromise = expect(ssePromise).rejects.toThrow(
-          FetchSSETimeoutError,
-        );
+        const rejectionPromise =
+          expect(ssePromise).rejects.toThrow(FetchSSETimeoutError);
 
         await vi.advanceTimersByTimeAsync(101);
         await rejectionPromise;

@@ -10,14 +10,16 @@
  *
  * @see specs/analytics/posthog-cost-control.feature
  */
+
+import { act, cleanup, render } from "@testing-library/react";
 import React, { useEffect } from "react";
-import { render, act, cleanup } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes, useNavigate } from "react-router";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.unmock("~/utils/compat/next-router");
-vi.mock("~/utils/compat/next-router", async () =>
-  await vi.importActual<object>("~/utils/compat/next-router"),
+vi.mock(
+  "~/utils/compat/next-router",
+  async () => await vi.importActual<object>("~/utils/compat/next-router"),
 );
 
 import Router, {

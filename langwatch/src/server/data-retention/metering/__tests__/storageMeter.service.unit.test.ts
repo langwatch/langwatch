@@ -1,7 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-  PRODUCTION_STORAGE_METER_TABLES,
-} from "../../retentionPolicy.schema";
+import { PRODUCTION_STORAGE_METER_TABLES } from "../../retentionPolicy.schema";
 import { StorageMeterService } from "../storageMeter.service";
 
 /**
@@ -314,7 +312,9 @@ describe("StorageMeterService memory guard", () => {
         expect(query).toHaveBeenCalledTimes(
           1 + PRODUCTION_STORAGE_METER_TABLES.length,
         );
-        const queries = query.mock.calls.map((call) => call[0].query).join("\n");
+        const queries = query.mock.calls
+          .map((call) => call[0].query)
+          .join("\n");
         expect(queries).not.toContain("metric_data_points");
         expect(queries).not.toContain("metric_series");
         expect(queries).not.toContain("metric_time_rollups");

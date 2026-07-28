@@ -42,8 +42,9 @@ describe("metric command lanes", () => {
         ?.definition.options?.groupKeyFn;
       const catalog = pipeline.mapProjections.get("metricSeriesCatalog")
         ?.definition.options?.groupKeyFn;
-      const rollup = pipeline.mapProjections.get("metricTimeRollup")?.definition
-        .options?.groupKeyFn;
+      const rollup =
+        pipeline.mapProjections.get("metricTimeRollup")?.definition.options
+          ?.groupKeyFn;
 
       expect(storage?.(event)).toBe(
         metricMapGroupKey({ identity: "a".repeat(64), shardCount: 8 }),

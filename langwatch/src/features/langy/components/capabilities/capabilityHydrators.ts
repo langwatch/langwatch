@@ -23,9 +23,10 @@
  * absent from `rows`, and the card reads the gap against the digest's counts
  * ("no longer available") rather than inventing anything.
  */
-import { asFreeTextTerm } from "../../logic/traceExplorerLink";
-import { truncateRowText, traceMetaLine } from "./rowFormat";
+
 import type { api } from "~/utils/api";
+import { asFreeTextTerm } from "../../logic/traceExplorerLink";
+import { traceMetaLine, truncateRowText } from "./rowFormat";
 
 /** The tRPC utils proxy (`api.useContext()`), for imperative `.fetch` calls. */
 export type CapabilityTrpcUtils = ReturnType<typeof api.useContext>;
@@ -214,10 +215,7 @@ async function datasetByIds({
   const rows: CapabilityHydratedRow[] = [];
   for (const id of ids) {
     const dataset = datasets.find((candidate) =>
-      matchesId(candidate, id, [
-        "id",
-        "slug",
-      ]),
+      matchesId(candidate, id, ["id", "slug"]),
     );
     if (!dataset) continue;
     const records = dataset._count.datasetRecords;
@@ -245,10 +243,7 @@ async function promptByIds({
   const rows: CapabilityHydratedRow[] = [];
   for (const id of ids) {
     const prompt = prompts.find((candidate) =>
-      matchesId(candidate, id, [
-        "id",
-        "handle",
-      ]),
+      matchesId(candidate, id, ["id", "handle"]),
     );
     if (!prompt) continue;
     rows.push({
@@ -277,10 +272,7 @@ async function experimentByIds({
   const rows: CapabilityHydratedRow[] = [];
   for (const id of ids) {
     const experiment = experiments.find((candidate) =>
-      matchesId(candidate, id, [
-        "slug",
-        "id",
-      ]),
+      matchesId(candidate, id, ["slug", "id"]),
     );
     if (!experiment) continue;
     rows.push({

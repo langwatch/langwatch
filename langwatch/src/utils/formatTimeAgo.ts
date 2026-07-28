@@ -1,10 +1,10 @@
 import {
+  differenceInDays,
+  differenceInHours,
+  differenceInMinutes,
+  differenceInWeeks,
   format,
   formatDistanceToNow,
-  differenceInMinutes,
-  differenceInHours,
-  differenceInDays,
-  differenceInWeeks,
 } from "date-fns";
 
 export const formatTimeAgo = (
@@ -28,7 +28,10 @@ export const formatTimeAgo = (
  * Format a timestamp as a compact relative time string (e.g., "2m ago", "1h ago").
  * Used for space-constrained UI like command bar recent items.
  */
-export function formatTimeAgoCompact(timestamp: number, nowMs?: number): string {
+export function formatTimeAgoCompact(
+  timestamp: number,
+  nowMs?: number,
+): string {
   const date = new Date(timestamp);
   const now = nowMs ? new Date(nowMs) : new Date();
 

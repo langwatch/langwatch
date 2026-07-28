@@ -56,7 +56,7 @@ function getNode(span: SpanTreeNode): NodeInfo | null {
   if (type === "llm" && span.model) {
     return {
       id: sanitiseMermaidId(`llm_${span.model}`),
-      display: (span.model),
+      display: span.model,
       kind: "llm",
     };
   }

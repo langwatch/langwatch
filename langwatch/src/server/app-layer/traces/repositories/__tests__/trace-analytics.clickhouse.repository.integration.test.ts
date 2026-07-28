@@ -123,10 +123,7 @@ describe("trace_analytics round-trip (migrations 00039 + 00056 + 00061)", () => 
       expect(read!.row.attributes["metadata.team"]).toBe("platform");
       // Read-back columns (00056) — exact integer / array / bool round-trip.
       expect(read!.row.spanCount).toBe(7);
-      expect(read!.row.annotationIds).toEqual([
-        `${tag}-ann-a`,
-        `${tag}-ann-b`,
-      ]);
+      expect(read!.row.annotationIds).toEqual([`${tag}-ann-a`, `${tag}-ann-b`]);
       expect(read!.row.rootSpanStartTimeMs).toBe(baseMs - 5);
       expect(read!.row.traceNameUserOverridden).toBe(true);
       expect(read!.row.traceNameFromFallback).toBe(false);
@@ -149,7 +146,12 @@ describe("trace_analytics round-trip (migrations 00039 + 00056 + 00061)", () => 
       // (the repo stamps UpdatedAt from row.updatedAtMs, not now()).
       await repo.upsertBatch([
         {
-          row: { ...row, totalCost: 2, spanCount: 9, updatedAtMs: baseMs + 1000 },
+          row: {
+            ...row,
+            totalCost: 2,
+            spanCount: 9,
+            updatedAtMs: baseMs + 1000,
+          },
           retentionDays: 30,
         },
       ]);

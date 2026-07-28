@@ -14,8 +14,8 @@ import {
   type EvaluationsV3Store,
   type EvaluatorConfig,
   type FieldMapping,
-  type OverlayType,
   isComparisonEvaluator,
+  type OverlayType,
   type TargetConfig,
 } from "../types";
 import {
@@ -741,7 +741,12 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
         targets: state.targets.map((t) =>
           t.id === targetId
             ? // Drop the legacy shape as we write the canonical one.
-              { ...t, pairwise: undefined, comparison, mappings: newDatasetMappings }
+              {
+                ...t,
+                pairwise: undefined,
+                comparison,
+                mappings: newDatasetMappings,
+              }
             : t,
         ),
       };
@@ -1009,10 +1014,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
         const currentDataset = currentState.datasets.find(
           (d) => d.id === datasetId,
         );
-        if (
-          currentDataset?.type !== "inline" ||
-          !currentDataset.inline
-        ) {
+        if (currentDataset?.type !== "inline" || !currentDataset.inline) {
           return currentState;
         }
 
@@ -1063,10 +1065,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
         const currentDataset = currentState.datasets.find(
           (d) => d.id === datasetId,
         );
-        if (
-          currentDataset?.type !== "saved" ||
-          !currentDataset.savedRecords
-        ) {
+        if (currentDataset?.type !== "saved" || !currentDataset.savedRecords) {
           return currentState;
         }
 
@@ -1298,8 +1297,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
         // folded into the canonical `comparison` shape — everything
         // downstream, including what gets saved back, sees only `comparison`.
         evaluators: normalizeEvaluators(
-          (state.evaluators as typeof current.evaluators) ??
-            current.evaluators,
+          (state.evaluators as typeof current.evaluators) ?? current.evaluators,
         ),
         // Support loading old state format (agents) and new format (targets)
         targets: normalizeTargets(

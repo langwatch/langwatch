@@ -1,3 +1,5 @@
+import type { Redis } from "ioredis";
+import { register } from "prom-client";
 import {
   afterAll,
   afterEach,
@@ -8,17 +10,17 @@ import {
   it,
   vi,
 } from "vitest";
-import type { Redis } from "ioredis";
-import { register } from "prom-client";
 import {
+  getTestRedisConnection,
   startTestContainers,
   stopTestContainers,
-  getTestRedisConnection,
 } from "../../../__tests__/integration/testContainers";
-import { GroupQueueProcessor } from "../groupQueue";
 import type { EventSourcedQueueDefinition } from "../../queue.types";
+import { GroupQueueProcessor } from "../groupQueue";
 
-async function foreignSiblingsRestagedCount(queueName: string): Promise<number> {
+async function foreignSiblingsRestagedCount(
+  queueName: string,
+): Promise<number> {
   const metric = await register
     .getSingleMetric("gq_foreign_siblings_restaged_total")
     ?.get();
@@ -70,9 +72,7 @@ describe.skipIf(!hasTestcontainers)(
 
     afterEach(async () => {
       // Close all queues created during the test
-      await Promise.all(
-        queues.map((q) => q.close().catch(() => {})),
-      );
+      await Promise.all(queues.map((q) => q.close().catch(() => {})));
       await redis.flushall();
     });
 
@@ -343,9 +343,9 @@ describe.skipIf(!hasTestcontainers)(
               { timeout: 5000, interval: 50 },
             );
             // Staging holds exactly the one squashed job, referencing the new blob.
-            expect(
-              await redis.hlen(`${queueName}:gq:group:group-a:data`),
-            ).toBe(1);
+            expect(await redis.hlen(`${queueName}:gq:group:group-a:data`)).toBe(
+              1,
+            );
           } finally {
             vi.unstubAllEnvs();
           }
@@ -383,9 +383,9 @@ describe.skipIf(!hasTestcontainers)(
               },
               { timeout: 5000, interval: 50 },
             );
-            expect(
-              await redis.hlen(`${queueName}:gq:group:group-a:data`),
-            ).toBe(1);
+            expect(await redis.hlen(`${queueName}:gq:group:group-a:data`)).toBe(
+              1,
+            );
           } finally {
             vi.unstubAllEnvs();
           }
@@ -626,7 +626,8 @@ describe.skipIf(!hasTestcontainers)(
 
           await vi.waitFor(
             () => {
-              const total = batches.reduce((n, b) => n + b.length, 0) + singles.length;
+              const total =
+                batches.reduce((n, b) => n + b.length, 0) + singles.length;
               expect(total).toBe(10);
             },
             { timeout: 30000, interval: 50 },
@@ -653,7 +654,11 @@ describe.skipIf(!hasTestcontainers)(
 
           // Send shuffled; the queue must still fold them in score order.
           await queue.sendBatch(
-            [4, 2, 0, 3, 1].map((n) => ({ id: `j${n}`, groupId: "group-a", value: String(n) })),
+            [4, 2, 0, 3, 1].map((n) => ({
+              id: `j${n}`,
+              groupId: "group-a",
+              value: String(n),
+            })),
           );
 
           await vi.waitFor(
@@ -684,12 +689,17 @@ describe.skipIf(!hasTestcontainers)(
           await queue.waitUntilReady();
 
           await queue.sendBatch(
-            Array.from({ length: 9 }, (_, i) => ({ id: `j${i}`, groupId: "group-a", value: String(i) })),
+            Array.from({ length: 9 }, (_, i) => ({
+              id: `j${i}`,
+              groupId: "group-a",
+              value: String(i),
+            })),
           );
 
           await vi.waitFor(
             () => {
-              const total = batches.reduce((n, b) => n + b.length, 0) + singles.length;
+              const total =
+                batches.reduce((n, b) => n + b.length, 0) + singles.length;
               expect(total).toBe(9);
             },
             { timeout: 30000, interval: 50 },
@@ -723,7 +733,11 @@ describe.skipIf(!hasTestcontainers)(
           await queue.waitUntilReady();
 
           await queue.sendBatch(
-            Array.from({ length: 5 }, (_, i) => ({ id: `j${i}`, groupId: "group-a", value: String(i) })),
+            Array.from({ length: 5 }, (_, i) => ({
+              id: `j${i}`,
+              groupId: "group-a",
+              value: String(i),
+            })),
           );
 
           await vi.waitFor(
@@ -760,7 +774,11 @@ describe.skipIf(!hasTestcontainers)(
           await queue.waitUntilReady();
 
           await queue.sendBatch(
-            Array.from({ length: 4 }, (_, i) => ({ id: `j${i}`, groupId: "group-a", value: String(i) })),
+            Array.from({ length: 4 }, (_, i) => ({
+              id: `j${i}`,
+              groupId: "group-a",
+              value: String(i),
+            })),
           );
 
           // Despite the first batch throwing, every event is eventually
@@ -824,9 +842,7 @@ describe.skipIf(!hasTestcontainers)(
           // The byte bound bit: the whole burst never collapsed into one batch,
           // even though the count bound alone (50) would have folded all six.
           const maxBatch =
-            batches.length > 0
-              ? Math.max(...batches.map((b) => b.length))
-              : 0;
+            batches.length > 0 ? Math.max(...batches.map((b) => b.length)) : 0;
           expect(maxBatch).toBeLessThan(6);
           // ...but a coalesced batch DID form — without this floor the assertion
           // above passes vacuously when nothing coalesces (maxBatch 0), leaving

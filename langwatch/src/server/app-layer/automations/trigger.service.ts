@@ -1,4 +1,4 @@
-import { TriggerKind, type Prisma, type Trigger } from "@prisma/client";
+import { type Prisma, type Trigger, TriggerKind } from "@prisma/client";
 import type { Cluster, Redis } from "ioredis";
 import { computeNextRunAt } from "~/server/app-layer/scheduler/nextRunAt";
 import { SchedulerService } from "~/server/app-layer/scheduler/scheduler.service";

@@ -8,8 +8,8 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import { api } from "~/utils/api";
 import { useLangyFeedback } from "../data/useLangyFeedback";
-import { useLangyStore } from "../stores/langyStore";
 import type { LangyFeedbackSentiment } from "../logic/langyFeedbackDirective";
+import { useLangyStore } from "../stores/langyStore";
 
 /** What the backend feedback capture accepts as the coarse rating + tone. */
 type FeedbackRating = "up" | "down";

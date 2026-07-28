@@ -9,8 +9,8 @@
 import { describe, expect, it } from "vitest";
 import type { ElasticSearchEvaluation } from "../../../server/tracer/types";
 import {
-  groupEvaluationsByEvaluator,
   type EvaluationGroup,
+  groupEvaluationsByEvaluator,
 } from "../groupEvaluations";
 
 function makeEvaluation(
@@ -295,7 +295,11 @@ describe("groupEvaluationsByEvaluator()", () => {
           evaluation_id: "eval_2",
           evaluator_id: "toxicity",
           status: "error",
-          error: { has_error: true as const, message: "Timeout", stacktrace: [] },
+          error: {
+            has_error: true as const,
+            message: "Timeout",
+            stacktrace: [],
+          },
           timestamps: { finished_at: 2000 },
         }),
       ];

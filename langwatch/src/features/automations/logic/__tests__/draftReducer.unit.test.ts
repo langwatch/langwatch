@@ -1,7 +1,7 @@
 import { AlertType, TriggerAction } from "@prisma/client";
 import { describe, expect, it } from "vitest";
-import { CLIENT_PROVIDERS } from "~/features/automations/providers/registry";
 import type { EmailSlice } from "~/features/automations/providers/email/client";
+import { CLIENT_PROVIDERS } from "~/features/automations/providers/registry";
 import {
   type AutomationDraft,
   buildTestFirePayload,
@@ -14,11 +14,11 @@ import {
   INITIAL_DRAFT,
   INITIAL_GRAPH_ALERT_DRAFT,
   INITIAL_REPORT_DRAFT,
-  presetLabels,
-  reportInputFromDraft,
   isNotifyAction,
   notifyChannel,
+  presetLabels,
   reducer,
+  reportInputFromDraft,
   subjectIsSet,
   templatesFromDraft,
 } from "../draftReducer";
@@ -562,7 +562,6 @@ describe("buildTestFirePayload sends the graph-alert discriminator", () => {
   });
 });
 
-
 describe("report source", () => {
   describe("SET_SOURCE report", () => {
     it("switches to report, clears trace filters + graph id, keeps a notify action", () => {
@@ -620,7 +619,11 @@ describe("report source", () => {
       const d: AutomationDraft = {
         ...SAMPLE,
         source: "report",
-        report: { ...INITIAL_REPORT_DRAFT, sourceKind: "customGraph", customGraphId: null },
+        report: {
+          ...INITIAL_REPORT_DRAFT,
+          sourceKind: "customGraph",
+          customGraphId: null,
+        },
       };
       expect(conditionsAreSet(d)).toBe(false);
     });

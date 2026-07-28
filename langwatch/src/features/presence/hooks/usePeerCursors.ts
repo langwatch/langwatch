@@ -40,11 +40,14 @@ export function usePeerCursors({
     enabled && projectId && anchor && sessionId,
   );
 
-  useSSESubscription<PresenceCursorEvent, {
-    projectId: string;
-    anchor: string;
-    sessionId: string;
-  }>(
+  useSSESubscription<
+    PresenceCursorEvent,
+    {
+      projectId: string;
+      anchor: string;
+      sessionId: string;
+    }
+  >(
     // @ts-expect-error - tRPC subscription type mismatch with hook signature
     api.presence.onPresenceCursor,
     {

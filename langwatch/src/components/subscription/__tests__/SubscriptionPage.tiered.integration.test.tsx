@@ -5,12 +5,19 @@
  * models, enterprise TIERED exclusion, and upgrade-from-TIERED flow.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import {
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SubscriptionPage } from "../SubscriptionPage";
 import {
   createMockPlan,
+  mockAddTeamMemberOrEvents,
   mockCreateInvites,
   mockCreateInvitesMutate,
   mockCreateSubscription,
@@ -18,13 +25,12 @@ import {
   mockGetActivePlan,
   mockGetOrganizationWithMembers,
   mockGetPendingInvites,
-  mockAddTeamMemberOrEvents,
   mockListInvoices,
   mockManageSubscription,
   mockOpenSeats,
+  mockOrganizationMembers,
   mockUpdateUsers,
   mockUpgradeWithInvites,
-  mockOrganizationMembers,
   resetMocks,
   setMockOrganization,
 } from "./subscription-test-setup";
@@ -64,8 +70,9 @@ vi.mock("~/components/ui/toaster", () => ({
 vi.mock("../../../stores/upgradeModalStore", async () => {
   const setup = await import("./subscription-test-setup");
   return {
-    useUpgradeModalStore: (selector: (state: { openSeats: typeof setup.mockOpenSeats }) => unknown) =>
-      selector({ openSeats: setup.mockOpenSeats }),
+    useUpgradeModalStore: (
+      selector: (state: { openSeats: typeof setup.mockOpenSeats }) => unknown,
+    ) => selector({ openSeats: setup.mockOpenSeats }),
   };
 });
 
@@ -83,7 +90,10 @@ vi.mock("~/utils/api", async () => {
           useQuery: () => setup.mockGetOrganizationWithMembers(),
         },
         getOrganizationPendingInvites: {
-          useQuery: () => ({ ...setup.mockGetPendingInvites(), refetch: vi.fn() }),
+          useQuery: () => ({
+            ...setup.mockGetPendingInvites(),
+            refetch: vi.fn(),
+          }),
         },
         createInvites: {
           useMutation: () => setup.mockCreateInvites(),
@@ -91,7 +101,10 @@ vi.mock("~/utils/api", async () => {
       },
       currency: {
         detectCurrency: {
-          useQuery: (_input: Record<string, never>, opts: { enabled: boolean }) =>
+          useQuery: (
+            _input: Record<string, never>,
+            opts: { enabled: boolean },
+          ) =>
             opts.enabled ? setup.mockDetectCurrency() : { data: undefined },
         },
       },
@@ -158,7 +171,9 @@ describe("<SubscriptionPage/>", () => {
         renderSubscriptionPage();
 
         await waitFor(() => {
-          expect(screen.getByRole("heading", { name: "Billing" })).toBeInTheDocument();
+          expect(
+            screen.getByRole("heading", { name: "Billing" }),
+          ).toBeInTheDocument();
           expect(screen.getByTestId("current-plan-block")).toBeInTheDocument();
           expect(screen.getByTestId("contact-sales-block")).toBeInTheDocument();
         });
@@ -181,7 +196,9 @@ describe("<SubscriptionPage/>", () => {
           expect(screen.getByTestId("current-plan-block")).toBeInTheDocument();
         });
 
-        expect(screen.queryByTestId("tiered-pricing-alert")).not.toBeInTheDocument();
+        expect(
+          screen.queryByTestId("tiered-pricing-alert"),
+        ).not.toBeInTheDocument();
       });
 
       // Skipped: Code bug in SubscriptionPage.tsx — `isUpgradePlanRequired` has a
@@ -195,7 +212,9 @@ describe("<SubscriptionPage/>", () => {
           expect(screen.getByTestId("current-plan-block")).toBeInTheDocument();
         });
 
-        expect(screen.queryByTestId("upgrade-plan-block")).not.toBeInTheDocument();
+        expect(
+          screen.queryByTestId("upgrade-plan-block"),
+        ).not.toBeInTheDocument();
       });
 
       it("shows legacy paid plan name as current plan title", async () => {
@@ -216,7 +235,9 @@ describe("<SubscriptionPage/>", () => {
 
         await waitFor(() => {
           const currentBlock = screen.getByTestId("current-plan-block");
-          expect(within(currentBlock).getByText("Accelerate")).toBeInTheDocument();
+          expect(
+            within(currentBlock).getByText("Accelerate"),
+          ).toBeInTheDocument();
         });
       });
 
@@ -245,7 +266,9 @@ describe("<SubscriptionPage/>", () => {
           expect(screen.getByTestId("current-plan-block")).toBeInTheDocument();
         });
 
-        expect(screen.queryByTestId("update-seats-block")).not.toBeInTheDocument();
+        expect(
+          screen.queryByTestId("update-seats-block"),
+        ).not.toBeInTheDocument();
       });
     });
   });
@@ -279,7 +302,9 @@ describe("<SubscriptionPage/>", () => {
       renderSubscriptionPage();
 
       await waitFor(() => {
-        expect(screen.getByTestId("tiered-deprecated-notice")).toBeInTheDocument();
+        expect(
+          screen.getByTestId("tiered-deprecated-notice"),
+        ).toBeInTheDocument();
       });
     });
 
@@ -288,8 +313,12 @@ describe("<SubscriptionPage/>", () => {
 
       await waitFor(() => {
         const currentBlock = screen.getByTestId("current-plan-block");
-        expect(within(currentBlock).getByText("Up to 5 core users")).toBeInTheDocument();
-        expect(within(currentBlock).getByText("20,000 events included")).toBeInTheDocument();
+        expect(
+          within(currentBlock).getByText("Up to 5 core users"),
+        ).toBeInTheDocument();
+        expect(
+          within(currentBlock).getByText("20,000 events included"),
+        ).toBeInTheDocument();
       });
     });
 
@@ -298,7 +327,9 @@ describe("<SubscriptionPage/>", () => {
 
       await waitFor(() => {
         const upgradeBlock = screen.getByTestId("upgrade-plan-block");
-        expect(within(upgradeBlock).getByRole("button", { name: /Upgrade now/i })).toBeInTheDocument();
+        expect(
+          within(upgradeBlock).getByRole("button", { name: /Upgrade now/i }),
+        ).toBeInTheDocument();
       });
     });
 
@@ -365,7 +396,9 @@ describe("<SubscriptionPage/>", () => {
         expect(screen.getByTestId("current-plan-block")).toBeInTheDocument();
       });
 
-      expect(screen.queryByTestId("tiered-deprecated-notice")).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("tiered-deprecated-notice"),
+      ).not.toBeInTheDocument();
     });
 
     it("does not display upgrade plan block", async () => {
@@ -375,7 +408,9 @@ describe("<SubscriptionPage/>", () => {
         expect(screen.getByTestId("current-plan-block")).toBeInTheDocument();
       });
 
-      expect(screen.queryByTestId("upgrade-plan-block")).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("upgrade-plan-block"),
+      ).not.toBeInTheDocument();
     });
   });
 });

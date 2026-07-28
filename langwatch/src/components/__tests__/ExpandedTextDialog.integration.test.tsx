@@ -1,9 +1,10 @@
 /**
  * @vitest-environment jsdom
  */
-import { describe, expect, it, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 import { ExpandedTextDialog } from "../HoverableBigText";
 
 vi.mock("@microlink/react-json-view", () => ({
@@ -34,13 +35,7 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
 
-function renderDialog({
-  text,
-  open = true,
-}: {
-  text: string;
-  open?: boolean;
-}) {
+function renderDialog({ text, open = true }: { text: string; open?: boolean }) {
   return render(
     <ExpandedTextDialog
       open={open}

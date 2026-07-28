@@ -11,9 +11,7 @@ import {
   isSimulationRunStartedEvent,
 } from "../schemas/typeGuards";
 
-const logger = createLogger(
-  "langwatch:simulation-processing:suite-run-sync",
-);
+const logger = createLogger("langwatch:simulation-processing:suite-run-sync");
 
 export interface SuiteRunSyncReactorDeps {
   recordSuiteRunItemStarted: (data: {

@@ -102,7 +102,7 @@ describe("createResilientClickHouseClient()", () => {
           operation: "insert",
           attempt: 1,
         }),
-        expect.any(String)
+        expect.any(String),
       );
     });
   });
@@ -121,7 +121,7 @@ describe("createResilientClickHouseClient()", () => {
       });
 
       await expect(
-        client.insert({ table: "test", values: [], format: "JSONEachRow" })
+        client.insert({ table: "test", values: [], format: "JSONEachRow" }),
       ).rejects.toThrow("Table does_not_exist doesn't exist");
       expect(mock.insert).toHaveBeenCalledTimes(1);
     });
@@ -140,7 +140,7 @@ describe("createResilientClickHouseClient()", () => {
       });
 
       await expect(
-        client.insert({ table: "test", values: [], format: "JSONEachRow" })
+        client.insert({ table: "test", values: [], format: "JSONEachRow" }),
       ).rejects.toThrow("MEMORY_LIMIT_EXCEEDED");
       expect(mock.insert).toHaveBeenCalledTimes(3);
     });
@@ -180,7 +180,7 @@ describe("createResilientClickHouseClient()", () => {
           source: "clickhouse",
           operation: "query",
         }),
-        expect.any(String)
+        expect.any(String),
       );
     });
   });
@@ -197,9 +197,9 @@ describe("createResilientClickHouseClient()", () => {
         maxRetries: 3,
       });
 
-      await expect(
-        client.query({ query: "SELECT 1" })
-      ).rejects.toThrow("Syntax error in query");
+      await expect(client.query({ query: "SELECT 1" })).rejects.toThrow(
+        "Syntax error in query",
+      );
       expect(mock.query).toHaveBeenCalledTimes(1);
     });
 
@@ -214,16 +214,16 @@ describe("createResilientClickHouseClient()", () => {
         maxRetries: 3,
       });
 
-      await expect(
-        client.query({ query: "SELECT 1" })
-      ).rejects.toThrow("Syntax error in query");
+      await expect(client.query({ query: "SELECT 1" })).rejects.toThrow(
+        "Syntax error in query",
+      );
 
       expect(mockQueryLogger.error).toHaveBeenCalledWith(
         expect.objectContaining({
           source: "clickhouse",
           operation: "query",
         }),
-        expect.any(String)
+        expect.any(String),
       );
     });
 
@@ -237,9 +237,9 @@ describe("createResilientClickHouseClient()", () => {
         maxRetries: 3,
       });
 
-      await expect(
-        client.query({ query: "SELECT 1" })
-      ).rejects.toThrow("Syntax error in query");
+      await expect(client.query({ query: "SELECT 1" })).rejects.toThrow(
+        "Syntax error in query",
+      );
 
       const loggedObj = mockQueryLogger.error.mock.calls[0]![0] as Record<
         string,
@@ -333,9 +333,9 @@ describe("createResilientClickHouseClient()", () => {
         maxRetries: 3,
       });
 
-      await expect(
-        client.query({ query: "SELECT 1" })
-      ).rejects.toThrow("Syntax error in query");
+      await expect(client.query({ query: "SELECT 1" })).rejects.toThrow(
+        "Syntax error in query",
+      );
     });
   });
 
@@ -399,7 +399,8 @@ describe("createResilientClickHouseClient()", () => {
       const client = createResilientClickHouseClient({ client: mock });
 
       await client.query({
-        query: "SELECT SpanId FROM stored_spans WHERE TenantId = {tenantId:String}",
+        query:
+          "SELECT SpanId FROM stored_spans WHERE TenantId = {tenantId:String}",
       });
 
       expect(mockQueryLogger.warn).toHaveBeenCalledWith(
@@ -409,7 +410,7 @@ describe("createResilientClickHouseClient()", () => {
           coldScan: true,
           coldScanTable: "stored_spans",
         }),
-        expect.stringContaining("cold scan of stored_spans")
+        expect.stringContaining("cold scan of stored_spans"),
       );
       expect(mockQueryLogger.debug).not.toHaveBeenCalled();
     });
@@ -470,9 +471,7 @@ describe("query error translation after retries are exhausted", () => {
     const { QueryMemoryExceededError } = await import(
       "~/server/app-layer/traces/errors"
     );
-    const rejection = await client
-      .query({ query: "SELECT 1" })
-      .catch((e) => e);
+    const rejection = await client.query({ query: "SELECT 1" }).catch((e) => e);
 
     expect(rejection).toBeInstanceOf(QueryMemoryExceededError);
     expect(rejection.reasons).toEqual([raw]);
@@ -491,9 +490,7 @@ describe("query error translation after retries are exhausted", () => {
       baseDelayMs: 1,
     });
 
-    const rejection = await client
-      .query({ query: "SELECT 1" })
-      .catch((e) => e);
+    const rejection = await client.query({ query: "SELECT 1" }).catch((e) => e);
 
     expect(rejection).toBe(raw);
   });

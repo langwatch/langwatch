@@ -2,9 +2,9 @@
  * @vitest-environment node
  */
 
+import type { PrismaClient } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
 import { autoComputeAgentMappings } from "../auto-compute-agent-mappings";
-import type { PrismaClient } from "@prisma/client";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -16,13 +16,7 @@ import type { PrismaClient } from "@prisma/client";
  * Each entry edge has sourceHandle "outputs.<identifier>", which is the shape
  * that getInputsOutputs / getEntryInputs expect.
  */
-function buildDSL({
-  inputs,
-  output,
-}: {
-  inputs: string[];
-  output: string;
-}) {
+function buildDSL({ inputs, output }: { inputs: string[]; output: string }) {
   const edges = inputs.map((identifier, i) => ({
     id: `e-entry-${i}`,
     source: "entry",
@@ -61,19 +55,21 @@ function buildPrismaMock({
   const prisma = {
     agent: {
       findMany: vi.fn().mockResolvedValue(agents),
-      update: vi.fn().mockImplementation(
-        async ({
-          where,
-          data,
-        }: {
-          where: { id: string; projectId?: string };
-          data: { config: Record<string, unknown> };
-        }) => {
-          expect(where.projectId).toBeDefined();
-          updatedConfigs[where.id] = data.config as Record<string, unknown>;
-          return { id: where.id, config: data.config };
-        },
-      ),
+      update: vi
+        .fn()
+        .mockImplementation(
+          async ({
+            where,
+            data,
+          }: {
+            where: { id: string; projectId?: string };
+            data: { config: Record<string, unknown> };
+          }) => {
+            expect(where.projectId).toBeDefined();
+            updatedConfigs[where.id] = data.config as Record<string, unknown>;
+            return { id: where.id, config: data.config };
+          },
+        ),
     },
   } as unknown as PrismaClient;
 
@@ -147,7 +143,10 @@ describe("autoComputeAgentMappings", () => {
   describe("when a workflow agent has no scenarioMappings and conventional inputs", () => {
     /** @scenario Auto-computes mappings when workflow with conventional inputs is saved */
     it("maps query to scenario input field", async () => {
-      const dsl = buildDSL({ inputs: ["query", "history"], output: "response" });
+      const dsl = buildDSL({
+        inputs: ["query", "history"],
+        output: "response",
+      });
       const { prisma, updatedConfigs } = buildPrismaMock({
         agents: [{ id: "agent-1", config: { type: "workflow" } }],
       });
@@ -173,7 +172,10 @@ describe("autoComputeAgentMappings", () => {
     });
 
     it("maps history to scenario messages field", async () => {
-      const dsl = buildDSL({ inputs: ["query", "history"], output: "response" });
+      const dsl = buildDSL({
+        inputs: ["query", "history"],
+        output: "response",
+      });
       const { prisma, updatedConfigs } = buildPrismaMock({
         agents: [{ id: "agent-1", config: { type: "workflow" } }],
       });
@@ -199,7 +201,10 @@ describe("autoComputeAgentMappings", () => {
     });
 
     it("sets scenarioOutputField to the first workflow output", async () => {
-      const dsl = buildDSL({ inputs: ["query", "history"], output: "response" });
+      const dsl = buildDSL({
+        inputs: ["query", "history"],
+        output: "response",
+      });
       const { prisma, updatedConfigs } = buildPrismaMock({
         agents: [{ id: "agent-1", config: { type: "workflow" } }],
       });
@@ -431,7 +436,11 @@ describe("autoComputeAgentMappings", () => {
             config: {
               type: "workflow",
               scenarioMappings: {
-                query: { type: "source", sourceId: "scenario", path: ["input"] },
+                query: {
+                  type: "source",
+                  sourceId: "scenario",
+                  path: ["input"],
+                },
               },
               scenarioOutputField: "response",
             },

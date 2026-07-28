@@ -111,7 +111,9 @@ describe("traceRequest.utils", () => {
         expect(result["llm.model"]).toBe("gpt-4");
         expect(result["other.key"]).toBe(69);
         expect(result).toHaveProperty("llm.messages");
-        expect(result["llm.messages"]).toEqual([{ content: "Hello", role: "user" }]);
+        expect(result["llm.messages"]).toEqual([
+          { content: "Hello", role: "user" },
+        ]);
       });
     });
 
@@ -291,10 +293,7 @@ describe("traceRequest.utils", () => {
             key: "langwatch.labels",
             value: {
               arrayValue: {
-                values: [
-                  { stringValue: "label1" },
-                  { stringValue: "label2" },
-                ],
+                values: [{ stringValue: "label1" }, { stringValue: "label2" }],
               },
             },
           },
@@ -808,7 +807,11 @@ describe("traceRequest.utils", () => {
         // unflattenObject then splits the remainder by "." and creates nested objects.
         expect(result).toHaveProperty("choices");
         expect(result.choices).toEqual([
-          { tool_calls: { "0": { name: "get_weather", args: '{"city":"NYC"}' } } },
+          {
+            tool_calls: {
+              "0": { name: "get_weather", args: '{"city":"NYC"}' },
+            },
+          },
           { tool_calls: { "0": { name: "get_time", args: '{"tz":"EST"}' } } },
         ]);
       });
@@ -893,9 +896,9 @@ describe("traceRequest.utils", () => {
         expect(result["llm.output_messages.0.message.content"]).toBe(
           "Let me check.",
         );
-        expect(result["llm.output_messages.0.message.tool_calls"]).toEqual(
-          [{ function: { name: "search" } }],
-        );
+        expect(result["llm.output_messages.0.message.tool_calls"]).toEqual([
+          { function: { name: "search" } },
+        ]);
         expect(result["llm.output_messages.1.message.role"]).toBe("tool");
         expect(result["llm.output_messages.1.message.content"]).toBe(
           "Result: 69",
@@ -957,9 +960,11 @@ describe("traceRequest.utils", () => {
 
         const result = TraceRequestUtils.normalizeOtlpAttributes(attributes);
 
-        expect(result["langwatch.labels"]).toEqual(
-          ["production", "v2", "critical"],
-        );
+        expect(result["langwatch.labels"]).toEqual([
+          "production",
+          "v2",
+          "critical",
+        ]);
       });
     });
 

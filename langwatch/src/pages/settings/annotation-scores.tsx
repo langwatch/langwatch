@@ -156,124 +156,128 @@ function AnnotationScorePage() {
           />
         ) : (
           <Box width="full" overflowX="auto">
-          <Table.Root variant="line" width="full">
-            <Table.Header>
-              <Table.Row>
-                <Table.ColumnHeader>Name</Table.ColumnHeader>
-                <Table.ColumnHeader>Description</Table.ColumnHeader>
-                <Table.ColumnHeader>Score Type</Table.ColumnHeader>
-                <Table.ColumnHeader>Score Options</Table.ColumnHeader>
-                <Table.ColumnHeader>Enabled</Table.ColumnHeader>
-                {canManage && (
-                  <Table.ColumnHeader>Actions</Table.ColumnHeader>
-                )}
-              </Table.Row>
-            </Table.Header>
-            <Table.Body>
-              {getAllAnnotationScores.isLoading ? (
-                <>
-                  <Table.Row>
-                    <Table.Cell colSpan={canManage ? 6 : 5}>
-                      <Skeleton height="20px" />
-                    </Table.Cell>
-                  </Table.Row>
-                  <Table.Row>
-                    <Table.Cell colSpan={canManage ? 6 : 5}>
-                      <Skeleton height="20px" />
-                    </Table.Cell>
-                  </Table.Row>
-                  <Table.Row>
-                    <Table.Cell colSpan={canManage ? 6 : 5}>
-                      <Skeleton height="20px" />
-                    </Table.Cell>
-                  </Table.Row>
-                </>
-              ) : (
-                getAllAnnotationScores.data?.map((score) => {
-                  return (
-                    <Table.Row key={score.id}>
-                      <Table.Cell>{score.name}</Table.Cell>
-                      <Table.Cell>{score.description}</Table.Cell>
-                      <Table.Cell width="20%">
-                        <Text lineClamp={1}>
-                          {score.dataType === AnnotationScoreDataType.CHECKBOX
-                            ? "Checkbox"
-                            : "Multiple choice"}
-                        </Text>
+            <Table.Root variant="line" width="full">
+              <Table.Header>
+                <Table.Row>
+                  <Table.ColumnHeader>Name</Table.ColumnHeader>
+                  <Table.ColumnHeader>Description</Table.ColumnHeader>
+                  <Table.ColumnHeader>Score Type</Table.ColumnHeader>
+                  <Table.ColumnHeader>Score Options</Table.ColumnHeader>
+                  <Table.ColumnHeader>Enabled</Table.ColumnHeader>
+                  {canManage && (
+                    <Table.ColumnHeader>Actions</Table.ColumnHeader>
+                  )}
+                </Table.Row>
+              </Table.Header>
+              <Table.Body>
+                {getAllAnnotationScores.isLoading ? (
+                  <>
+                    <Table.Row>
+                      <Table.Cell colSpan={canManage ? 6 : 5}>
+                        <Skeleton height="20px" />
                       </Table.Cell>
-                      <Table.Cell>
-                        <ScoreOptions
-                          options={
-                            Array.isArray(score.options)
-                              ? (score.options as {
-                                  label: string;
-                                  value: number;
-                                }[])
-                              : []
-                          }
-                          dataType={score.dataType ?? ""}
-                        />
-                      </Table.Cell>
-                      <Table.Cell textAlign="center">
-                        <Switch
-                          checked={score.active}
-                          disabled={!canManage}
-                          onCheckedChange={() => {
-                            handleToggleScore(score.id, !score.active);
-                          }}
-                        />
-                      </Table.Cell>
-                      {canManage && (
-                        <Table.Cell>
-                          <Menu.Root>
-                            <Menu.Trigger asChild>
-                              <Button variant={"ghost"}>
-                                <MoreVertical />
-                              </Button>
-                            </Menu.Trigger>
-                            <Menu.Content>
-                              <Menu.Item
-                                value="edit"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  openDrawer("addOrEditAnnotationScore", {
-                                    annotationScoreId: score.id,
-                                    onClose: () => closeDrawer(),
-                                  });
-                                }}
-                              >
-                                <Box display="flex" alignItems="center" gap={2}>
-                                  <Edit size={14} />
-                                  Edit
-                                </Box>
-                              </Menu.Item>
-                              <Menu.Item
-                                value="delete"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  handleDeleteScore(score.id);
-                                }}
-                              >
-                                <Box
-                                  display="flex"
-                                  alignItems="center"
-                                  gap={2}
-                                  color="red.600"
-                                >
-                                  <Trash size={14} />
-                                  Delete
-                                </Box>
-                              </Menu.Item>
-                            </Menu.Content>
-                          </Menu.Root>
-                        </Table.Cell>
-                      )}
                     </Table.Row>
-                  );
-                })
-              )}
-            </Table.Body>
-          </Table.Root>
+                    <Table.Row>
+                      <Table.Cell colSpan={canManage ? 6 : 5}>
+                        <Skeleton height="20px" />
+                      </Table.Cell>
+                    </Table.Row>
+                    <Table.Row>
+                      <Table.Cell colSpan={canManage ? 6 : 5}>
+                        <Skeleton height="20px" />
+                      </Table.Cell>
+                    </Table.Row>
+                  </>
+                ) : (
+                  getAllAnnotationScores.data?.map((score) => {
+                    return (
+                      <Table.Row key={score.id}>
+                        <Table.Cell>{score.name}</Table.Cell>
+                        <Table.Cell>{score.description}</Table.Cell>
+                        <Table.Cell width="20%">
+                          <Text lineClamp={1}>
+                            {score.dataType === AnnotationScoreDataType.CHECKBOX
+                              ? "Checkbox"
+                              : "Multiple choice"}
+                          </Text>
+                        </Table.Cell>
+                        <Table.Cell>
+                          <ScoreOptions
+                            options={
+                              Array.isArray(score.options)
+                                ? (score.options as {
+                                    label: string;
+                                    value: number;
+                                  }[])
+                                : []
+                            }
+                            dataType={score.dataType ?? ""}
+                          />
+                        </Table.Cell>
+                        <Table.Cell textAlign="center">
+                          <Switch
+                            checked={score.active}
+                            disabled={!canManage}
+                            onCheckedChange={() => {
+                              handleToggleScore(score.id, !score.active);
+                            }}
+                          />
+                        </Table.Cell>
+                        {canManage && (
+                          <Table.Cell>
+                            <Menu.Root>
+                              <Menu.Trigger asChild>
+                                <Button variant={"ghost"}>
+                                  <MoreVertical />
+                                </Button>
+                              </Menu.Trigger>
+                              <Menu.Content>
+                                <Menu.Item
+                                  value="edit"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    openDrawer("addOrEditAnnotationScore", {
+                                      annotationScoreId: score.id,
+                                      onClose: () => closeDrawer(),
+                                    });
+                                  }}
+                                >
+                                  <Box
+                                    display="flex"
+                                    alignItems="center"
+                                    gap={2}
+                                  >
+                                    <Edit size={14} />
+                                    Edit
+                                  </Box>
+                                </Menu.Item>
+                                <Menu.Item
+                                  value="delete"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    handleDeleteScore(score.id);
+                                  }}
+                                >
+                                  <Box
+                                    display="flex"
+                                    alignItems="center"
+                                    gap={2}
+                                    color="red.600"
+                                  >
+                                    <Trash size={14} />
+                                    Delete
+                                  </Box>
+                                </Menu.Item>
+                              </Menu.Content>
+                            </Menu.Root>
+                          </Table.Cell>
+                        )}
+                      </Table.Row>
+                    );
+                  })
+                )}
+              </Table.Body>
+            </Table.Root>
           </Box>
         )}
       </VStack>

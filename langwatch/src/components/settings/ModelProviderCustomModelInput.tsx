@@ -9,16 +9,16 @@ import {
 } from "@chakra-ui/react";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
-import type { CustomModelEntry } from "../../server/modelProviders/customModel.schema";
 import type {
   UseModelProviderFormActions,
   UseModelProviderFormState,
 } from "../../hooks/useModelProviderForm";
+import type { CustomModelEntry } from "../../server/modelProviders/customModel.schema";
 import type { MaybeStoredModelProvider } from "../../server/modelProviders/registry";
 import { SmallLabel } from "../SmallLabel";
 import { Menu } from "../ui/menu";
-import { AddCustomModelDialog } from "./AddCustomModelDialog";
 import { AddCustomEmbeddingsModelDialog } from "./AddCustomEmbeddingsModelDialog";
+import { AddCustomModelDialog } from "./AddCustomModelDialog";
 import { RegistryModelsModal } from "./RegistryModelsModal";
 
 /**
@@ -48,7 +48,9 @@ export const CustomModelInputSection = ({
   const [addModelDialogOpen, setAddModelDialogOpen] = useState(false);
   const [addEmbeddingsDialogOpen, setAddEmbeddingsDialogOpen] = useState(false);
   const [registryModalOpen, setRegistryModalOpen] = useState(false);
-  const [editingModel, setEditingModel] = useState<CustomModelEntry | undefined>();
+  const [editingModel, setEditingModel] = useState<
+    CustomModelEntry | undefined
+  >();
 
   const allCustomModels: CustomModelEntry[] = useMemo(
     () => [...state.customModels, ...state.customEmbeddingsModels],
@@ -136,12 +138,7 @@ export const CustomModelInputSection = ({
       </HStack>
 
       {allCustomModels.length === 0 ? (
-        <Box
-          borderWidth="1px"
-          borderRadius="md"
-          padding={4}
-          textAlign="center"
-        >
+        <Box borderWidth="1px" borderRadius="md" padding={4} textAlign="center">
           <Text fontSize="sm" color="fg.muted">
             No custom models added
           </Text>
@@ -226,7 +223,9 @@ export const CustomModelInputSection = ({
         open={addEmbeddingsDialogOpen}
         onClose={handleCloseEmbeddingsDialog}
         onSubmit={handleAddEmbeddingsModel}
-        initialValues={editingModel?.mode === "embedding" ? editingModel : undefined}
+        initialValues={
+          editingModel?.mode === "embedding" ? editingModel : undefined
+        }
         dialogBackground={dialogBackground}
       />
 

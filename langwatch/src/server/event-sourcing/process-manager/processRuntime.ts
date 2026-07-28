@@ -7,8 +7,8 @@ import {
 } from "../pipeline/processManagerDefinition";
 import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.types";
 import {
-  OutboxDispatcherService,
   type IntentHandler,
+  OutboxDispatcherService,
 } from "./outbox/outboxDispatcherService";
 import { ProcessOutboxWorker } from "./outbox/processOutboxWorker";
 import type {

@@ -33,10 +33,7 @@ import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
 import { useOverflowVisibility } from "../../hooks/useOverflowVisibility";
 import { usePrefetchSpanDetail } from "../../hooks/usePrefetchSpanDetail";
 import { type DrawerTab, useDrawerStore } from "../../stores/drawerStore";
-import {
-  formatDuration,
-  SPAN_TYPE_COLORS,
-} from "../../utils/formatters";
+import { formatDuration, SPAN_TYPE_COLORS } from "../../utils/formatters";
 import { OverflowMenu } from "../shared/OverflowMenu";
 
 /**
@@ -538,7 +535,7 @@ function SpanTab({
 
         {span.type === "llm" && span.model != null && (
           <Text textStyle="2xs" color="fg.subtle">
-            {(span.model)}
+            {span.model}
           </Text>
         )}
 

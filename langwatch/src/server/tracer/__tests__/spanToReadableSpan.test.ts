@@ -1,13 +1,7 @@
-import { describe, expect, it } from "vitest";
 import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
+import { describe, expect, it } from "vitest";
 import { langwatchSpanToReadableSpan } from "../spanToReadableSpan";
-import type {
-  BaseSpan,
-  LLMSpan,
-  RAGSpan,
-  Span,
-  SpanTypes,
-} from "../types";
+import type { BaseSpan, LLMSpan, RAGSpan, Span, SpanTypes } from "../types";
 
 function makeBaseSpan(overrides: Partial<BaseSpan> = {}): BaseSpan {
   return {
@@ -177,7 +171,9 @@ describe("langwatchSpanToReadableSpan", () => {
       ["unknown", SpanKind.INTERNAL],
     ];
 
-    it.each(testCases)("maps type '%s' to SpanKind %s", (type, expectedKind) => {
+    it.each(
+      testCases,
+    )("maps type '%s' to SpanKind %s", (type, expectedKind) => {
       const span = makeBaseSpan({ type });
       const result = langwatchSpanToReadableSpan(span);
       expect(result.kind).toBe(expectedKind);

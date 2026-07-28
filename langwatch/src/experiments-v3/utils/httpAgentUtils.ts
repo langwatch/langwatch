@@ -6,9 +6,11 @@
  * - Building target configs from HTTP agent data
  */
 
-import type { Field } from "~/optimization_studio/types/dsl";
-import type { HttpComponentConfig } from "~/optimization_studio/types/dsl";
-import type { TargetConfig, HttpConfig } from "../types";
+import type {
+  Field,
+  HttpComponentConfig,
+} from "~/optimization_studio/types/dsl";
+import type { HttpConfig, TargetConfig } from "../types";
 
 // ============================================================================
 // Body Template Variable Extraction

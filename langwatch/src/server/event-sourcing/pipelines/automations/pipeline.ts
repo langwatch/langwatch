@@ -33,11 +33,11 @@ import {
   TRIGGER_SETTLEMENT_INTENT_TYPES,
 } from "./process-manager/triggerSettlementProcess.types";
 import {
+  pruneSchema,
   runWebhookDeliveryPrune,
   WEBHOOK_DELIVERY_PRUNE_INTERVAL_MS,
   type WebhookDeliveryPruneDeps,
   type WebhookDeliveryPruneState,
-  pruneSchema,
   webhookDeliveryPruneWake,
 } from "./process-manager/webhookDeliveryPrune.process";
 import {

@@ -1,8 +1,9 @@
 /**
  * @vitest-environment jsdom
  */
-import { describe, it, expect, beforeEach } from "vitest";
-import { renderHook, act } from "@testing-library/react";
+
+import { act, renderHook } from "@testing-library/react";
+import { beforeEach, describe, expect, it } from "vitest";
 import { useRecentItems } from "../useRecentItems";
 
 describe("useRecentItems", () => {

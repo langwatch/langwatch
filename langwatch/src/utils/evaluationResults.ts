@@ -1,5 +1,5 @@
-import { z } from "zod";
 import type { SerializedHandledError } from "@langwatch/handled-error";
+import { z } from "zod";
 
 /**
  * Parsed evaluation result with status information.

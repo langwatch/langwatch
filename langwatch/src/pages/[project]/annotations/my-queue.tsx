@@ -8,13 +8,13 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type { AnnotationQueueItem } from "@prisma/client";
-import { useRouter } from "~/utils/compat/next-router";
 import { useEffect, useMemo, useState } from "react";
 import { Check, ChevronLeft, ChevronRight } from "react-feather";
 import AnnotationsLayout from "~/components/AnnotationsLayout";
 import { useAnnotationQueues } from "~/hooks/useAnnotationQueues";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { useRouter } from "~/utils/compat/next-router";
 import { DashboardLayout } from "../../../components/DashboardLayout";
 import { TasksDone } from "../../../components/icons/TasksDone";
 import { Conversation } from "../../../components/messages/Conversation";
@@ -201,12 +201,7 @@ const AnnotationQueuePicker = ({
   };
 
   return (
-    <Box
-      shadow="md"
-      padding={5}
-      width="full"
-      position="relative"
-    >
+    <Box shadow="md" padding={5} width="full" position="relative">
       {isNavigating && (
         <Box
           position="absolute"

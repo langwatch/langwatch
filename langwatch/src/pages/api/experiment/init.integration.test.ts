@@ -1,7 +1,7 @@
 import type { Project } from "@prisma/client";
-import type { NextApiRequest, NextApiResponse } from "~/types/next-stubs";
 import { createMocks } from "node-mocks-http";
 import { beforeAll, describe, expect, test } from "vitest";
+import type { NextApiRequest, NextApiResponse } from "~/types/next-stubs";
 import { prisma } from "../../../server/db";
 import { getTestProject } from "../../../utils/testUtils";
 import handler from "./init";
