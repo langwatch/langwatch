@@ -108,7 +108,8 @@ const normalizeCodeConfig = (
 const validateConfigForWrite = (
   type: AgentType,
   config: unknown,
-): AgentComponentConfig => normalizeCodeConfig(type, validateConfig(type, config));
+): AgentComponentConfig =>
+  normalizeCodeConfig(type, validateConfig(type, config));
 
 /**
  * Typed agent with parsed config matching DSL node data types.

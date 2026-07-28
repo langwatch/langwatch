@@ -246,9 +246,10 @@ function DbAgentPanel({
   // Outer updates: apply the library record into the editor and the
   // node's DSL snapshot only when the record content actually changed
   // (edited elsewhere) and there are no unsaved local edits. A Save
-  // records its own submitted signature, so the post-save state never
-  // re-applies; node writes only happen on a real content difference,
-  // so this cannot loop with the node-to-editor derivation above.
+  // records the signature of the record the server returned, so the
+  // post-save state never re-applies; node writes only happen on a real
+  // content difference, so this cannot loop with the node-to-editor
+  // derivation above.
   const appliedAgentSignature = useRef<string | null>(null);
   const agentSignature = agentData
     ? JSON.stringify({ name: agentData.name, config: agentData.config })
@@ -517,17 +518,19 @@ function DbAgentPanel({
         ...(config ? { config } : {}),
       },
       {
-        onSuccess: () => {
-          // Write the submitted values through everywhere at once: the
-          // query cache (so the library baseline matches without a
-          // refetch), the node's DSL snapshot (so the next run executes
-          // the save), and the cleared draft. The editor keeps showing
-          // exactly what was submitted, so nothing can revert on screen.
-          const updatedAgent = {
-            ...agentData,
-            name: trimmedName,
-            ...(config ? { config } : {}),
-          } as typeof agentData;
+        onSuccess: (savedAgent) => {
+          // Write the SAVED record through everywhere at once: the query
+          // cache (so the library baseline matches without a refetch), the
+          // node's DSL snapshot (so the next run executes what was stored),
+          // and the cleared draft.
+          //
+          // The response, not the submit, is the source of truth: the server
+          // normalizes code-agent indentation on write, so the stored record
+          // can legitimately differ from what was sent. Seeding from the
+          // submit would leave the signature disagreeing with the next real
+          // fetch, which then rewrites the editor under the user and leaves
+          // the DSL snapshot carrying different code than the database.
+          const updatedAgent = savedAgent as typeof agentData;
           appliedAgentSignature.current = JSON.stringify({
             name: updatedAgent.name,
             config: updatedAgent.config,

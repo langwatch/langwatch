@@ -1,5 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
-import { AgentRepository, type AgentComponentConfig } from "../agent.repository";
+import {
+  type AgentComponentConfig,
+  AgentRepository,
+} from "../agent.repository";
 import type { PrismaClient } from "@prisma/client";
 
 function makeMockPrisma(findFirstResult: unknown = null) {
@@ -29,8 +32,9 @@ const codeConfigWith = (value: string): AgentComponentConfig =>
   }) as AgentComponentConfig;
 
 const codeValueOf = (config: unknown): string | undefined => {
-  const parameters = (config as { parameters?: { identifier: string; value?: unknown }[] })
-    .parameters;
+  const parameters = (
+    config as { parameters?: { identifier: string; value?: unknown }[] }
+  ).parameters;
   const parameter = parameters?.find((p) => p.identifier === "code");
   return typeof parameter?.value === "string" ? parameter.value : undefined;
 };
@@ -201,7 +205,7 @@ describe("AgentRepository", () => {
     describe("given non-uniformly-indented Python source", () => {
       describe("when creating a code agent", () => {
         it("leaves the source untouched", async () => {
-          const nonUniform = 'if True:\n        x = 1\n  y = 2\n';
+          const nonUniform = "if True:\n        x = 1\n  y = 2\n";
           const { prisma, create } = makeWriteMockPrisma();
           const repository = new AgentRepository(prisma);
 

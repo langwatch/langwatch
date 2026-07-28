@@ -42,7 +42,6 @@ const getConfigInputSchema = (type: AgentType) => {
   }
 };
 
-
 /**
  * Agent Router - Manages agent CRUD operations
  *
