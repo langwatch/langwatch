@@ -1,5 +1,6 @@
 import {
   Accordion,
+  Box,
   Button,
   Field,
   HStack,
@@ -10,7 +11,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ShieldAlert } from "lucide-react";
+import { HelpCircle, ShieldAlert } from "lucide-react";
 import { useEffect, useRef } from "react";
 import {
   Controller,
@@ -94,6 +95,9 @@ type ScenarioFormProps = {
  * has its own. A paragraph here would make the tooltip the thing you have to
  * read to pick, which is the opposite of what a tooltip is for.
  */
+const TYPE_HELP =
+  "Standard sends a cooperative user who is trying to get something done. Red team sends an attacker trying to make the agent break the criteria you set — only use it on agents you own or have permission to test.";
+
 const TYPES = [
   {
     redTeam: false,
@@ -120,7 +124,22 @@ function ScenarioTypeSelector({
 }) {
   return (
     <VStack align="stretch" gap={2}>
-      <SectionHeader>Type</SectionHeader>
+      {/* An (i) on the header, matching Attack below: the difference between
+          the two modes should be reachable without discovering that the
+          buttons are hoverable. */}
+      <HStack gap={1.5} align="center">
+        <SectionHeader>Type</SectionHeader>
+        <Tooltip content={TYPE_HELP}>
+          <Box
+            color="fg.muted"
+            display="flex"
+            cursor="pointer"
+            paddingBottom="2px"
+          >
+            <HelpCircle size={13} />
+          </Box>
+        </Tooltip>
+      </HStack>
       <HStack gap={2}>
         {TYPES.map((type) => {
           const selected = type.redTeam === isRedTeam;
