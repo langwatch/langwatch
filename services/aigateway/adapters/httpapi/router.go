@@ -1079,14 +1079,19 @@ func writeUpstreamError(w http.ResponseWriter, ue *domain.UpstreamError) {
 	}
 	// Forward the upstream's retry-signaling headers (Retry-After,
 	// x-should-retry) so the client can honor the provider's backoff and
-	// terminal-vs-retryable hint, not just the status code.
+	// terminal-vs-retryable hint, not just the status code. Passthrough
+	// lanes forward the upstream's headers wholesale, including its exact
+	// Content-Type (e.g. Google's "application/json; charset=UTF-8"), so
+	// only default the Content-Type when the upstream did not provide one.
 	for k, v := range ue.Headers {
 		w.Header().Set(k, v)
 	}
 	if ue.Provider != "" {
 		w.Header().Set("X-LangWatch-Provider", ue.Provider)
 	}
-	w.Header().Set("Content-Type", "application/json")
+	if w.Header().Get("Content-Type") == "" {
+		w.Header().Set("Content-Type", "application/json")
+	}
 	w.WriteHeader(status)
 	if len(ue.Body) > 0 {
 		_, _ = w.Write(ue.Body)
