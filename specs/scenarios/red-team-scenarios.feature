@@ -49,10 +49,37 @@ Feature: Red Team Scenarios
   # Persistence and passthrough
   # ============================================================================
 
-  @unit @unimplemented
-  Scenario: Creating a scenario accepts red-team configuration
-    When a scenario is created with a strategy, objective, and turn count
+  # Every way in has to persist the configuration, not just the one someone
+  # happened to test. The REST route shipped validating these fields and never
+  # sending them: it answered 201 with them echoed back as null and stored a
+  # standard scenario, so a caller got a cooperative user simulator where they
+  # asked for an attack — and the run still returned a verdict, which reads as
+  # the agent holding up. Hence a scenario per surface rather than one that
+  # says "a scenario is created".
+
+  @unit
+  Scenario Outline: Configuring an attack persists it, whichever way it was created
+    When a scenario is created through <surface> with a strategy, objective, and turn count
     Then those values are stored on the scenario
+    And reading the scenario back reports the same attack
+
+    Examples:
+      | surface        |
+      | the editor     |
+      | the REST API   |
+      | the CLI        |
+
+  @unit
+  Scenario: Clearing the attack turns the scenario back into a standard one
+    Given a red-team scenario exists
+    When the attack is cleared
+    Then the scenario has no strategy, objective, turn count, or tuning
+
+  @unit
+  Scenario: An objective of only whitespace is refused
+    When a scenario is created with an objective of only spaces
+    Then the request is rejected
+    And no scenario is stored
 
   @unit @unimplemented
   Scenario: Red-team configuration reaches the run
