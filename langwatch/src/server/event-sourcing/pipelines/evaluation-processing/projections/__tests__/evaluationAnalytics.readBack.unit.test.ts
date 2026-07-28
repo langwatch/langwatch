@@ -1,5 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
+import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
 import type { EvaluationCompletedEvent } from "../../schemas/events";
+import { EvaluationAnalyticsStore } from "../evaluationAnalytics.store";
 import {
   EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST,
   type EvaluationAnalyticsData,
@@ -142,7 +145,7 @@ describe("evaluationAnalytics read-back (fromRow)", () => {
   });
 
   describe("given a pre-migration row whose read-back columns are absent", () => {
-    it("decodes with null lifecycle timestamps instead of refolding", () => {
+    it("stays total, decoding the lifecycle timestamps as null", () => {
       const row = project(committedState());
       const legacyRow: EvaluationAnalyticsRow = {
         ...row,
@@ -154,8 +157,75 @@ describe("evaluationAnalytics read-back (fromRow)", () => {
 
       expect(decoded.status).toBe("processed");
       expect(decoded.score).toBe(0.87);
+      // Indistinguishable from an evaluation that genuinely never started —
+      // which is why the STORE, not this decoder, decides whether such a row may
+      // be read back at all. See the version-gate tests below.
       expect(decoded.startedAt).toBeNull();
       expect(decoded.completedAt).toBeNull();
+    });
+  });
+});
+
+describe("EvaluationAnalyticsStore read-back version gate", () => {
+  const context = {
+    aggregateId: "eval-rb",
+    tenantId: createTenantId(TENANT),
+  } as unknown as ProjectionStoreContext;
+
+  function storeOver(row: EvaluationAnalyticsRow) {
+    const findByEvaluationIdWithApplied = vi
+      .fn()
+      .mockResolvedValue({ row, appliedEventIds: ["evt-1"] });
+    const store = new EvaluationAnalyticsStore({
+      findByEvaluationIdWithApplied,
+    } as unknown as ConstructorParameters<typeof EvaluationAnalyticsStore>[0]);
+    return { store, findByEvaluationIdWithApplied };
+  }
+
+  describe("given a row stamped with the current projection version", () => {
+    it("reads the state and the durable watermark back", async () => {
+      const { store } = storeOver(project(committedState()));
+
+      const { state, appliedEventIds } = await store.getWithApplied(
+        "eval-rb",
+        context,
+      );
+
+      expect(state?.startedAt).toBe(BASE_MS - 1000);
+      expect(state?.status).toBe("processed");
+      expect(appliedEventIds).toEqual(["evt-1"]);
+    });
+  });
+
+  describe("given a row stamped with an older projection version", () => {
+    // Such a row predates the lifecycle columns: its null StartedAt is
+    // indistinguishable from an evaluation that never started, so a `completed`
+    // event folded onto it would compute a zero duration over a real one.
+    const staleRow = (): EvaluationAnalyticsRow => ({
+      ...project(committedState()),
+      version: "2026-06-20",
+      startedAtMs: null,
+      completedAtMs: null,
+    });
+
+    it("reports a store miss so the fold refolds instead of trusting it", async () => {
+      const { store } = storeOver(staleRow());
+
+      const { state, appliedEventIds } = await store.getWithApplied(
+        "eval-rb",
+        context,
+      );
+
+      expect(state).toBeNull();
+      // The watermark goes with the state: keeping it would suppress the very
+      // events the re-fold needs to see.
+      expect(appliedEventIds).toEqual([]);
+    });
+
+    it("misses through get() too, so both read paths agree", async () => {
+      const { store } = storeOver(staleRow());
+
+      expect(await store.get("eval-rb", context)).toBeNull();
     });
   });
 });

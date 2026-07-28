@@ -80,10 +80,12 @@ function retentionDaysFrom(
  * retire: a null read-back forced continuity to come from the fold's
  * `refoldOnStoreMiss` option, i.e. an unbounded `event_log` re-fold on every
  * cache miss — the cold-scan behaviour behind the 2026-07-23 TOO_MANY_PARTS
- * outage. `refoldOnStoreMiss` now has no adopters and is itself scheduled for
- * deletion, so a new store must persist enough typed state to reconstruct its
- * own working state (see `TraceAnalyticsStore` / `EvaluationAnalyticsStore`)
- * rather than re-enabling that flag.
+ * outage. `refoldOnStoreMiss` survives only as a version-gated transitional net
+ * on the two slim analytics folds, where it fires once per aggregate still
+ * carrying a row written before its read-back columns existed. A new store must
+ * persist enough typed state to reconstruct its own working state (see
+ * `TraceAnalyticsStore` / `EvaluationAnalyticsStore`) rather than re-enabling
+ * that flag as a steady-state mechanism.
  */
 export abstract class BaseAnalyticsFoldStore<TState, TRow>
   implements FoldProjectionStore<TState>

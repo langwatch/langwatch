@@ -28,9 +28,10 @@ import {
  * keys never reach the wire.
  *
  * Read-back (ADR-066): `get`/`getWithApplied` decode the last committed row
- * (typed read-back columns, migration 00056) so the delivery path never refolds
- * from `event_log`; the applied-event-id watermark rides next to the row so a
- * cold-cache retry still dedups a redelivered batch.
+ * (typed read-back columns, migration 00056) so the delivery path does not
+ * refold from `event_log`; the applied-event-id watermark rides next to the row
+ * so a cold-cache retry still dedups a redelivered batch. Decoding is gated on
+ * the row's projection version — see `getWithApplied`.
  */
 export class EvaluationAnalyticsStore
   implements FoldProjectionStore<EvaluationAnalyticsData>
@@ -106,6 +107,18 @@ export class EvaluationAnalyticsStore
    * row round-trip the lifecycle operands DurationMs is derived from, without
    * replaying `event_log`.
    *
+   * Those columns are only trustworthy on a row this build wrote, so the row's
+   * projection version is the discriminator: an older stamp means the row
+   * predates the read-back columns, and its null StartedAt/CompletedAt are
+   * indistinguishable from a genuinely unstarted evaluation — a `completed`
+   * event folded onto them would compute a zero duration over a real one. So a
+   * stale-version row is reported as a MISS (null state, empty watermark — the
+   * same answer as "no row"), which the fold's `refoldOnStoreMiss` rebuilds from
+   * `event_log` once; the rewrite carries the current version and every later
+   * read hits. Transitional by construction: it stops firing as soon as the
+   * aggregate is rewritten, and for the population as a whole once retention has
+   * aged the pre-00056 rows out.
+   *
    * `context.readWindow` is passed through verbatim; on a windowed miss the
    * EXECUTOR retries without the window, so a row outside it is still found.
    */
@@ -122,6 +135,13 @@ export class EvaluationAnalyticsStore
       window: context.readWindow,
     });
     if (!found) return { state: null, appliedEventIds: [] };
+    // Stale schema snapshot: the read-back columns did not exist when this row
+    // was written, so decoding it would fabricate state. Answer exactly as for
+    // "no row" — the watermark is dropped too, because a watermark without the
+    // state it belongs to would suppress the very events the re-fold needs.
+    if (found.row.version !== EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST) {
+      return { state: null, appliedEventIds: [] };
+    }
     return {
       state: evaluationAnalyticsStateFromRow(found.row),
       appliedEventIds: found.appliedEventIds,

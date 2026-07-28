@@ -1,4 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
+import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
 import {
   projectAnalyticsStateToRow,
   TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
@@ -7,6 +9,7 @@ import {
   type TraceAnalyticsRow,
   traceAnalyticsStateFromRow,
 } from "../traceAnalytics.foldProjection";
+import { TraceAnalyticsStore } from "../traceAnalytics.store";
 
 /**
  * Read-back round-trip for the slim trace fold (ADR-066). `fromRow` is the
@@ -117,7 +120,7 @@ describe("traceAnalytics read-back (fromRow)", () => {
   });
 
   describe("given a pre-migration row whose read-back columns are absent", () => {
-    it("decodes with documented defaults instead of refolding", () => {
+    it("stays total, mapping the absent columns to their state defaults", () => {
       const row = project(committedState());
       // A row written before migration 00056 supplies the column defaults.
       const legacyRow: TraceAnalyticsRow = {
@@ -136,12 +139,82 @@ describe("traceAnalytics read-back (fromRow)", () => {
       // The real analytics columns still round-trip.
       expect(decoded.traceName).toBe("My Trace");
       expect(decoded.totalCost).toBe(0.42);
-      // The absent read-back columns map to their state defaults — no throw,
-      // no refold. 0 root time reads back as "no root claimed yet".
+      // The absent read-back columns map to their state defaults — the decoder
+      // never throws. 0 root time reads back as "no root claimed yet". Whether
+      // such a row may be decoded AT ALL is the store's call, not this
+      // function's — see the version-gate tests below.
       expect(decoded.rootSpanStartTimeMs).toBeUndefined();
       expect(decoded.annotationIds).toEqual([]);
       expect(decoded.spanCount).toBe(0);
       expect(decoded.LastEventOccurredAt).toBe(0);
+    });
+  });
+});
+
+describe("TraceAnalyticsStore read-back version gate", () => {
+  const context = {
+    aggregateId: "trace-rb",
+    tenantId: createTenantId(TENANT),
+  } as unknown as ProjectionStoreContext;
+
+  function storeOver(row: TraceAnalyticsRow) {
+    const findByTraceIdWithApplied = vi
+      .fn()
+      .mockResolvedValue({ row, appliedEventIds: ["evt-1", "evt-2"] });
+    const store = new TraceAnalyticsStore({
+      findByTraceIdWithApplied,
+    } as unknown as ConstructorParameters<typeof TraceAnalyticsStore>[0]);
+    return { store, findByTraceIdWithApplied };
+  }
+
+  describe("given a row stamped with the current projection version", () => {
+    it("reads the state and the durable watermark back", async () => {
+      const { store } = storeOver(project(committedState()));
+
+      const { state, appliedEventIds } = await store.getWithApplied(
+        "trace-rb",
+        context,
+      );
+
+      expect(state?.spanCount).toBe(7);
+      expect(state?.traceNameUserOverridden).toBe(true);
+      expect(appliedEventIds).toEqual(["evt-1", "evt-2"]);
+    });
+  });
+
+  describe("given a row stamped with an older projection version", () => {
+    // Such a row predates the read-back columns, so every one of them decodes
+    // as a ClickHouse default indistinguishable from a real value — spanCount 0
+    // would re-add committed cost past the span cap, and a false
+    // traceNameUserOverridden would let a late span overwrite a user's rename.
+    const staleRow = (): TraceAnalyticsRow => ({
+      ...project(committedState()),
+      version: "2026-06-20",
+      spanCount: 0,
+      annotationIds: [],
+      rootSpanStartTimeMs: 0,
+      traceNameUserOverridden: false,
+      lastEventOccurredAt: 0,
+    });
+
+    it("reports a store miss so the fold refolds instead of trusting it", async () => {
+      const { store } = storeOver(staleRow());
+
+      const { state, appliedEventIds } = await store.getWithApplied(
+        "trace-rb",
+        context,
+      );
+
+      expect(state).toBeNull();
+      // The watermark goes with the state: keeping it would suppress the very
+      // events the re-fold needs to see.
+      expect(appliedEventIds).toEqual([]);
+    });
+
+    it("misses through get() too, so both read paths agree", async () => {
+      const { store } = storeOver(staleRow());
+
+      expect(await store.get("trace-rb", context)).toBeNull();
     });
   });
 });

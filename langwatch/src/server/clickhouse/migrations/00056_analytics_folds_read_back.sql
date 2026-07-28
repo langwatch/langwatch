@@ -12,7 +12,9 @@
 -- refold pattern that drove the 2026-07-23 TOO_MANY_PARTS outage on
 -- codingAgentSession (migrations 00053/00054). ADR-066 makes each fold read back
 -- its own last committed state instead; these columns close the round-trip gap
--- so store.get() reconstructs working state WITHOUT ever reading event_log.
+-- so store.get() reconstructs working state without reading event_log — for
+-- every row written at the current projection version, which after one event per
+-- aggregate is all of them (see the version gate at the end of this header).
 --
 -- Typed columns only (no JSON blob, no new table) — same shape as 00053. Each
 -- ALTER is its own statement block: ClickHouse does not support multi-statement
@@ -62,21 +64,40 @@
 -- still recognises a batch it already committed (mirrors 00054). Bounded to the
 -- in-flight batch.
 --
--- Mixed deploy: a row written before this migration omits every column here, so
--- ClickHouse supplies the column default (0 / empty array / false) and the
--- decoder maps those to documented state defaults — it never refolds. Old builds
--- ignore the new columns entirely (additive schema).
+-- Old rows are NOT read back — the projection version is the discriminator.
 --
--- Caveat — latched booleans (pre-00056 rows only): HasAnnotation and a
--- user-overridden TraceName were persisted before their backing columns
--- (AnnotationIds / TraceNameUserOverridden) existed. On read-back the new columns
--- supply their empty/false default, so the boolean is re-derived from that
--- default, not from the still-present old value. A pre-00056 annotated (or
--- user-renamed) trace that takes a non-annotation (resp. non-rename) event after
--- a cache miss therefore downgrades the flag and does NOT self-heal — read-back
--- never replays event_log. Narrow blast radius (pre-00056 row x late event x
--- cache miss); an annotation add/remove re-derives the flag correctly. Accepted,
--- not worked around with a synthetic id.
+-- A row written before this migration omits every column above, so ClickHouse
+-- supplies the column default (0 / empty array / false / null). Those defaults
+-- are indistinguishable from real values, and decoding them into fold state
+-- would be actively wrong, not merely lossy:
+--
+--   * TraceNameUserOverridden false lets ONE late non-root span overwrite a name
+--     the user typed — the resolution service no longer returns early.
+--   * TraceNameFromFallback false freezes a fallback-named trace: a real root
+--     span arriving later can never upgrade the name.
+--   * SpanCount 0 resets the MAX_PROCESSED_SPANS cap, so spans whose cost and
+--     tokens are already committed are added to the totals a second time.
+--   * AnnotationIds empty re-derives HasAnnotation from nothing, downgrading an
+--     annotated trace on its next non-annotation event.
+--   * StartedAt / CompletedAt null make a `completed` event compute a zero
+--     duration over a real one.
+--
+-- So both folds' version stamps were bumped to 2026-07-27 alongside these
+-- columns — the stamp records the projected row SHAPE (ADR-021/022), which is
+-- exactly what changed — and each store decodes a row ONLY at that version. Any
+-- other stamp is reported as a store MISS, which the folds' restored
+-- refoldOnStoreMiss rebuilds from event_log once. The rebuild is written back at
+-- the current version, so the row hits from then on: the population self-heals
+-- per aggregate on its next event, with no backfill migration, and the
+-- transitional net expires on its own once retention has aged the last
+-- pre-00056 row out. Steady state is untouched — every row carries the current
+-- version, every get() hits, nothing refolds.
+--
+-- Old builds ignore the new columns entirely (additive schema). During a rolling
+-- deploy the gate is symmetric — an old node likewise declines a row a new node
+-- stamped — so an aggregate touched by both may refold once per side until the
+-- rollout completes. Bounded by the deploy window, and the safe direction:
+-- neither build decodes a row shape it does not know.
 -- ============================================================================
 
 -- ── trace_analytics ─────────────────────────────────────────────────────────

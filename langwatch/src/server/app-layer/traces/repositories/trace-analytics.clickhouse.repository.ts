@@ -12,6 +12,7 @@ import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retenti
 import type { TraceAnalyticsRow } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceAnalytics.foldProjection";
 import { SecurityError } from "~/server/event-sourcing/services/errorHandling";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
+import { queryWindowed } from "../../clients/clickhouse/windowed-read";
 import type { TraceAnalyticsRepository } from "./trace-analytics.repository";
 
 const TABLE_NAME = "trace_analytics" as const;
@@ -236,20 +237,25 @@ export class TraceAnalyticsClickHouseRepository
    * The trace's last committed slim row plus its applied-event-id watermark
    * (ADR-066, migration 00056) — the CH-fallthrough behind a Redis cache miss.
    *
-   * Dedups with the IN-tuple pattern (max(UpdatedAt) per key), never FINAL: the
-   * ReplacingMergeTree only physically collapses rows sharing the full sort key
-   * `(TenantId, OccurredAt, TraceId)`, and OccurredAt shifts when an
-   * earlier-starting span arrives late, so superseded versions persist until
-   * TTL. The inner dedup subquery reads only sort-key columns — no heavy
-   * Attributes map — so it stays a cheap keyed seek.
+   * Mapped onto `queryWindowed` with `fallback: "none"` purely so the read lands
+   * on `clickhouse_windowed_read_total{table="trace_analytics"}` exactly once
+   * (ADR-068): windowed calls count as `hit`, the executor's unwindowed retry as
+   * `unwindowed`, a throw as `error`. Their ratio is this path's window-fit
+   * signal and the baseline for the planned rate-derived limiter. `"none"` is
+   * the only correct fallback here — the fold executor owns the miss retry (see
+   * the unwindowed-inner note on {@link queryLatestVersion}), so a second
+   * recovery ladder inside the repository would re-run a read the executor is
+   * about to re-issue anyway. Same shape as the trace_summaries read-back arm.
    *
-   * `window` bounds OccurredAt on the OUTER read only, keeping it a
-   * partition-pruned point read. The inner dedup is deliberately UNWINDOWED so
-   * it resolves the TRUE latest version: windowing it too would let a trace
-   * whose latest version's OccurredAt drifted outside the window read back as a
-   * stale older version (a non-null result no fallback catches). Unwindowed, the
-   * same case yields an empty outer read, which the executor's unwindowed retry
-   * recovers.
+   * The centre/half-width round-trip is exact: fromMs/toMs are integers, so
+   * their mean and half-difference are exactly representable in float64 and
+   * reconstruct the caller's bounds verbatim.
+   *
+   * `sqlFor` is deliberately NOT used. Its docstring tells adopters to render
+   * the same predicate into the inner and outer scopes of a dedup subquery;
+   * this read must not do that (again, see {@link queryLatestVersion}), so the
+   * bound is threaded through as plain fromMs/toMs and rendered by the query
+   * builder into the OUTER scope alone.
    */
   async findByTraceIdWithApplied({
     tenantId,
@@ -264,6 +270,85 @@ export class TraceAnalyticsClickHouseRepository
       { tenantId },
       "TraceAnalyticsClickHouseRepository.findByTraceIdWithApplied",
     );
+
+    return await queryWindowed<{
+      row: TraceAnalyticsRow;
+      appliedEventIds: string[];
+    } | null>({
+      table: TABLE_NAME,
+      hintMs: window !== undefined ? (window.fromMs + window.toMs) / 2 : null,
+      ...(window !== undefined
+        ? { windowMs: (window.toMs - window.fromMs) / 2 }
+        : {}),
+      fallback: "none",
+      isEmpty: (result) => result === null,
+      run: async (fragment) =>
+        await this.queryLatestVersion({
+          tenantId,
+          traceId,
+          window: fragment
+            ? { fromMs: fragment.fromMs, toMs: fragment.toMs }
+            : undefined,
+        }),
+    });
+  }
+
+  /**
+   * One ClickHouse attempt for {@link findByTraceIdWithApplied}.
+   *
+   * Dedups with the IN-tuple pattern (max(UpdatedAt) per key), never FINAL: the
+   * ReplacingMergeTree only physically collapses rows sharing the full sort key
+   * `(TenantId, OccurredAt, TraceId)`, and OccurredAt shifts when an
+   * earlier-starting span arrives late, so superseded versions persist until
+   * TTL. The inner dedup subquery reads only sort-key columns — no heavy
+   * Attributes map — so it stays a cheap keyed seek.
+   *
+   * `window` bounds OccurredAt on the OUTER read only, keeping it a
+   * partition-pruned point read. The inner dedup is deliberately UNWINDOWED so
+   * it resolves the TRUE latest version: windowing it too would let a trace
+   * whose latest version's OccurredAt drifted outside the window read back as a
+   * stale older version (a non-null result no fallback catches). Unwindowed, the
+   * same case yields an empty outer read, which the executor's unwindowed retry
+   * recovers.
+   *
+   * ORDER BY breaks UpdatedAt ties, and is NOT the
+   * `ORDER BY <version> DESC LIMIT 1` anti-pattern in
+   * dev/docs/best_practices/clickhouse-queries.md: the IN-tuple has already cut
+   * the input to the rows sharing max(UpdatedAt) — normally one, occasionally
+   * two — so the sort reads no column `SELECT *` was not already materialising
+   * for those same rows, rather than every unmerged version of the trace.
+   *
+   * The tie is reachable despite that doc's "no ties possible" claim.
+   * `AbstractFoldProjection` stamps `max(Date.now(), prev + 1)`, which is
+   * monotonic only WITHIN one state chain; two writers that resumed from the
+   * same committed version can land on the same ms. Both rows then satisfy the
+   * IN-tuple and a bare LIMIT 1 picks arbitrarily — handing the fold stale
+   * state it resumes from and rewrites, silently dropping the other version's
+   * contributions and its applied-id watermark.
+   *
+   * The tiebreak orders by how far each version's fold actually got:
+   *   1. `LastEventOccurredAt DESC` — the fold's own progress watermark
+   *      (`max(prev, event.occurredAt)`, so non-decreasing): the version that
+   *      applied the latest event wins.
+   *   2. `SpanCount DESC` — folds only ever increment it, so among versions
+   *      that saw the same latest event time, more spans folded = more complete.
+   *   3. `length(AppliedEventIds) DESC` — more deliveries absorbed. Last of the
+   *      three because the watermark is a bounded ring, so it saturates.
+   *   4. `OccurredAt ASC` — a total order for the fully-tied case, and the
+   *      correct direction: OccurredAt is min(span start) and only ever
+   *      DECREASES as earlier spans land late, so the smallest is the
+   *      best-informed. Reading the array length costs only its offsets column,
+   *      and every other key is a scalar already in the row.
+   */
+  private async queryLatestVersion({
+    tenantId,
+    traceId,
+    window,
+  }: {
+    tenantId: string;
+    traceId: string;
+    window?: { fromMs: number; toMs: number };
+  }): Promise<{ row: TraceAnalyticsRow; appliedEventIds: string[] } | null> {
     const client = await this.resolveClient(tenantId);
 
     const partitionFilter =
@@ -285,6 +370,11 @@ export class TraceAnalyticsClickHouseRepository
               AND TraceId = {traceId:String}
             GROUP BY TenantId, TraceId
           )
+        ORDER BY
+          LastEventOccurredAt DESC,
+          SpanCount DESC,
+          length(AppliedEventIds) DESC,
+          OccurredAt ASC
         LIMIT 1
       `,
       query_params: {

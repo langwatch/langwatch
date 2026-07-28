@@ -24,9 +24,10 @@ import {
  * function so payload-shaped keys never reach the wire.
  *
  * Read-back (ADR-066): `get`/`getWithApplied` decode the last committed row
- * (typed read-back columns, migration 00056) so the delivery path never refolds
- * from `event_log`; the applied-event-id watermark rides next to the row so a
- * cold-cache retry still dedups a redelivered batch.
+ * (typed read-back columns, migration 00056) so the delivery path does not
+ * refold from `event_log`; the applied-event-id watermark rides next to the row
+ * so a cold-cache retry still dedups a redelivered batch. Decoding is gated on
+ * the row's projection version — see `getWithApplied`.
  */
 export class TraceAnalyticsStore
   implements FoldProjectionStore<TraceAnalyticsData>
@@ -105,6 +106,21 @@ export class TraceAnalyticsStore
    * set, name-resolution bookkeeping, the checkpoint — without replaying
    * `event_log`.
    *
+   * Those columns are only trustworthy on a row this build wrote, so the row's
+   * projection version is the discriminator: an older stamp means the row
+   * predates the read-back columns and every one of them would decode as a
+   * ClickHouse default indistinguishable from a real value — spanCount 0 resets
+   * the MAX_PROCESSED_SPANS cap and re-adds committed cost/tokens,
+   * `traceNameUserOverridden` false lets one late non-root span overwrite a
+   * user-renamed trace, and `traceNameFromFallback` false freezes a
+   * fallback-named trace against a real root that arrives later. So a
+   * stale-version row is reported as a MISS (null state, empty watermark — the
+   * same answer as "no row"), which the fold's `refoldOnStoreMiss` rebuilds from
+   * `event_log` once; the rewrite carries the current version and every later
+   * read hits. Transitional by construction: it stops firing as soon as the
+   * aggregate is rewritten, and for the population as a whole once retention has
+   * aged the pre-00056 rows out.
+   *
    * `context.readWindow` — computed by the executor from the fold's declared
    * `options.readWindow` — prunes the read to a window of partitions around the
    * event being folded; it is passed through verbatim. On a windowed miss the
@@ -124,6 +140,13 @@ export class TraceAnalyticsStore
       window: context.readWindow,
     });
     if (!found) return { state: null, appliedEventIds: [] };
+    // Stale schema snapshot: the read-back columns did not exist when this row
+    // was written, so decoding it would fabricate state. Answer exactly as for
+    // "no row" — the watermark is dropped too, because a watermark without the
+    // state it belongs to would suppress the very events the re-fold needs.
+    if (found.row.version !== TRACE_ANALYTICS_PROJECTION_VERSION_LATEST) {
+      return { state: null, appliedEventIds: [] };
+    }
     return {
       state: traceAnalyticsStateFromRow(found.row),
       appliedEventIds: found.appliedEventIds,
@@ -140,18 +163,20 @@ export class TraceAnalyticsStore
 }
 
 /**
- * Same persistable-signal predicate the trace-summary store uses, plus one
- * read-back allowance. Spans-only gating is too strict for log-only emitters
- * (Claude Code Path B, Codex Path B); the trace-summary fold counts log records
- * via langwatch.reserved.log_record_count and we mirror its acceptance.
+ * Same persistable-signal predicate the trace-summary store uses. Spans-only
+ * gating is too strict for log-only emitters (Claude Code Path B, Codex Path B);
+ * the trace-summary fold counts log records via
+ * langwatch.reserved.log_record_count and we mirror its acceptance.
  *
- * `occurredAt > 0` additionally covers a read-back of a PRE-migration row: such
- * a row has real data but its SpanCount column defaults to 0 (the column did
- * not exist when it was written), so a later dimension-only event (topic /
- * annotation) folded onto it would otherwise be dropped by a spanCount-only
- * gate. A positive occurredAt only ever comes from a real folded span, so this
- * admits exactly that read-back case and never a phantom init state (occurredAt
- * stays 0 until a span lands).
+ * `occurredAt > 0` is the second door onto the same signal: only a folded span
+ * ever sets it (never a phantom init state), so it admits a state whose real
+ * timing survived even if the span counter did not.
+ *
+ * A state carrying ONLY dimension signal (topic / annotation / name, no span or
+ * log record) still writes nothing — and that is now SAFE rather than lossy: no
+ * row means `get()` misses, and the fold's `refoldOnStoreMiss` rebuilds the
+ * dimension from `event_log`. Before the version gate restored that net, such a
+ * state lived in Redis alone and its signal was lost for good on eviction.
  */
 function hasPersistableSignal(state: TraceAnalyticsData): boolean {
   if (state.spanCount > 0) return true;

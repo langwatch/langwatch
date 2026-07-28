@@ -112,8 +112,11 @@ import {
  * State continuity (ADR-066): the store reads its own last committed row back
  * (`get` → `findByTraceIdWithApplied` → `traceAnalyticsStateFromRow`). The
  * typed read-back columns (migration 00056) close the round-trip gap the
- * trimmed row otherwise left, so the delivery path never re-folds from the
+ * trimmed row otherwise left, so the delivery path does not re-fold from the
  * event log. Redis fronts the read; a miss is one windowed ClickHouse row.
+ * Read-back applies only to rows stamped with the current projection version —
+ * a row written before those columns existed is reported as a miss and refolded
+ * once, then rewritten at the current version (see `options` below).
  */
 
 const traceAnalyticsEvents = [
@@ -131,8 +134,16 @@ const traceAnalyticsEvents = [
 
 /** Schema-snapshot version (calendar date). Bump when the slim fold's
  *  derivation rules or trim service contract change so older versions can
- *  be replaced via re-fold. */
-export const TRACE_ANALYTICS_PROJECTION_VERSION_LATEST = "2026-06-20" as const;
+ *  be replaced via re-fold.
+ *
+ *  2026-07-27 — the read-back columns of migration 00056 (span count,
+ *  annotation ids, the four name-resolution fields, the checkpoint) joined the
+ *  projected row shape. That shape change is exactly what this stamp records
+ *  (ADR-021/022), and the store's read-back path uses it as the discriminator:
+ *  a row carrying an OLDER version predates those columns, so its defaults
+ *  cannot be told apart from real zeroes and it is treated as a store miss
+ *  (see `TraceAnalyticsStore.getWithApplied`). */
+export const TRACE_ANALYTICS_PROJECTION_VERSION_LATEST = "2026-07-27" as const;
 
 /**
  * How far a trace's OccurredAt (the partition column) may sit from the business
@@ -143,6 +154,25 @@ export const TRACE_ANALYTICS_PROJECTION_VERSION_LATEST = "2026-06-20" as const;
  * unwindowed, so a signal outside the window is still found.
  */
 export const TRACE_ANALYTICS_READ_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * How many same-trace events one load/apply/store cycle may coalesce.
+ *
+ * Lower than the platform default (500) because this fold persists the
+ * applied-event-id watermark INTO its ClickHouse row: on a fresh delivery the
+ * stored set is exactly the batch's ids, so the coalesce ceiling IS the per-row
+ * watermark size. `trace_analytics` is a ReplacingMergeTree that only collapses
+ * rows sharing the full sort key, and a late earlier-starting span shifts
+ * OccurredAt, so superseded row versions — each carrying their own watermark —
+ * survive until TTL. 128 ids is a few KB per version instead of ~15-20 KB, and
+ * still drains a backed-up hot trace in 128-event bites: the O(n²) → O(n)
+ * collapse comes from coalescing at all, not from the size of the ceiling.
+ *
+ * Must stay below MAX_APPLIED_EVENT_IDS (the Redis cache trims the set at that
+ * cap; a batch at or above it would break redelivery dedup — the projection
+ * router rejects such a config at registration).
+ */
+export const TRACE_ANALYTICS_COALESCE_MAX_BATCH = 128;
 
 /**
  * The slim row that lands in `trace_analytics`. Field names align with the
@@ -394,19 +424,14 @@ export function projectAnalyticsStateToRow({
  * a long value was trimmed out of the map. Payload / over-cap keys the trim
  * drops are never read by the fold, so their absence changes no derived value.
  *
- * A pre-migration row (00056 columns absent) decodes with documented defaults —
- * spanCount 0, empty annotation set, no root claimed, checkpoint 0 — and never
- * refolds.
- *
- * Caveat (pre-00056 rows only): `hasAnnotation` and a user-overridden trace name
- * are re-derived at write time from `annotationIds` / `traceNameUserOverridden`,
- * whose columns did not exist before 00056. A pre-00056 row supplies their
- * empty/false default here, so a later NON-annotation (resp. non-rename) event
- * arriving after a cache miss recomputes the flag from that default and
- * downgrades it — it does not self-heal, since read-back never replays
- * `event_log`. The edge is narrow (an annotation add/remove re-derives the flag
- * correctly, and topic/late events on an already-annotated pre-00056 trace are
- * rare); accepted rather than papered over with a synthetic annotation id.
+ * This decoder is TOTAL: handed a row whose read-back columns are absent it
+ * still answers, mapping the ClickHouse column defaults to state defaults
+ * (spanCount 0, empty annotation set, no root claimed, checkpoint 0). Those
+ * defaults are indistinguishable from real zeroes, so deciding WHETHER a row may
+ * be decoded is the store's job, not this function's: `getWithApplied` refuses
+ * any row stamped with an older projection version and reports a store miss, and
+ * the fold's `refoldOnStoreMiss` rebuilds that aggregate from `event_log` once.
+ * A caller that bypasses the version gate gets the defaults above.
  */
 export function traceAnalyticsStateFromRow(
   row: TraceAnalyticsRow,
@@ -445,9 +470,9 @@ export function traceAnalyticsStateFromRow(
     tokensPerSecond: row.tokensPerSecond,
     containsErrorStatus: row.hasError,
 
-    // Pre-00056 rows carried HasAnnotation without this id set, so it reads back
-    // empty and the derived flag can downgrade on a post-miss rewrite — see the
-    // pre-00056 caveat in this function's doc comment.
+    // The id set behind the row's HasAnnotation boolean; a later add/remove
+    // re-derives the boolean from it. Only rows at the current projection
+    // version reach here, so the set is the real one, never a column default.
     annotationIds: row.annotationIds,
     attributes,
 
@@ -824,9 +849,20 @@ export class TraceAnalyticsFoldProjection
    * its hoisted dimensions re-injected. So `store.get()` returns the state and
    * nothing on the delivery path reads `event_log`.
    *
-   * `refoldOnStoreMiss` is gone — there is no null-returning miss to refold. A
-   * cache miss is a one-row ClickHouse read (windowed by `readWindow`, retried
-   * unwindowed by the executor on a miss).
+   * `refoldOnStoreMiss: true` — a version-gated TRANSITIONAL net, not the old
+   * continuity mechanism. The store reads back only rows stamped with the
+   * CURRENT projection version; a row written before the 00056 read-back columns
+   * existed decodes every one of them as a column default it cannot tell apart
+   * from a real zero, so the store reports a miss and this option rebuilds that
+   * aggregate from `event_log` — once. The rebuild is rewritten at the current
+   * version, so the row hits from then on and the whole population self-heals
+   * with no backfill migration. In steady state every row is current-version,
+   * `store.get()` hits, and nothing refolds. Without the gate a stale row would
+   * silently downgrade a user-renamed trace to a late span's name, freeze a
+   * fallback-named trace, and reset the MAX_PROCESSED_SPANS cap so already-
+   * committed cost/tokens were counted twice.
+   *
+   * `coalesceMaxBatch` — see below.
    *
    * `refoldOnOutOfOrder: false` — spans are distributed and arrive in any
    * order, and this fold is order-insensitive (sums / min / max + LWW-by-
@@ -839,8 +875,10 @@ export class TraceAnalyticsFoldProjection
    * specs/event-sourcing/hot-trace-fold-amplification.feature).
    */
   override options: FoldProjectionOptions = {
+    refoldOnStoreMiss: true,
     refoldOnOutOfOrder: false,
     readWindow: { widthMs: TRACE_ANALYTICS_READ_WINDOW_MS },
+    coalesceMaxBatch: TRACE_ANALYTICS_COALESCE_MAX_BATCH,
   };
 
   constructor(deps: { store: FoldProjectionStore<TraceAnalyticsData> }) {

@@ -102,9 +102,25 @@ const nextUpdatedAt = Math.max(Date.now(), prevUpdatedAt + 1);
 ```
 
 This means:
-- **No ties possible** — every fold bumps `UpdatedAt` to at least `prevUpdatedAt + 1`
-- **`max(UpdatedAt)` always identifies exactly one row** per dedup key
-- The IN-tuple pattern is safe without additional tie-breaking
+- **Within one state chain, no ties** — each fold bumps `UpdatedAt` to at least `prevUpdatedAt + 1`, so successive versions written by one writer strictly increase
+
+**It does NOT mean `max(UpdatedAt)` identifies exactly one row.** The bump is
+relative to the `prevUpdatedAt` the writer *loaded*, so two writers that both
+resume from the same committed version compute their next stamp from the same
+predecessor and can land on the same millisecond. Both then satisfy the
+IN-tuple, and a bare `LIMIT 1` picks between them arbitrarily — returning a
+stale version that the fold resumes from and rewrites, silently dropping the
+other version's contributions.
+
+So the IN-tuple narrows the candidates but does not order them. Give the outer
+scope a deterministic `ORDER BY … LIMIT 1` whenever a tie is reachable, ranked
+by whatever monotonically records how far each version's fold actually got
+(a progress watermark, a count that only increments), never by a value that can
+move in both directions. See `trace-analytics.clickhouse.repository.ts` and
+`evaluation-analytics.clickhouse.repository.ts` for worked examples, and note
+that the sort is cheap there precisely because the IN-tuple has already reduced
+the outer scope to one or two rows — it is not the "sort the whole table"
+anti-pattern below.
 
 ## Pagination with Dedup
 

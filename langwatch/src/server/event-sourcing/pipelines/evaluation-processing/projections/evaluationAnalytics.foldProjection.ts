@@ -82,9 +82,17 @@ const evaluationAnalyticsEvents = [
 
 /** Schema-snapshot version (calendar date). Bump when the slim fold's
  *  derivation rules or trim service contract change so older versions can
- *  be replaced via re-fold. */
+ *  be replaced via re-fold.
+ *
+ *  2026-07-27 — the read-back columns of migration 00056 (the StartedAt /
+ *  CompletedAt lifecycle operands) joined the projected row shape. That shape
+ *  change is exactly what this stamp records (ADR-021/022), and the store's
+ *  read-back path uses it as the discriminator: a row carrying an OLDER version
+ *  predates those columns, so its nulls cannot be told apart from a genuinely
+ *  unstarted evaluation and it is treated as a store miss (see
+ *  `EvaluationAnalyticsStore.getWithApplied`). */
 export const EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST =
-  "2026-06-20" as const;
+  "2026-07-27" as const;
 
 /**
  * How far an evaluation's OccurredAt (the partition column) may sit from the
@@ -94,6 +102,25 @@ export const EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST =
  * `context.readWindow` from it and retries a windowed miss unwindowed.
  */
 export const EVALUATION_ANALYTICS_READ_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * How many same-evaluation events one load/apply/store cycle may coalesce.
+ *
+ * Lower than the platform default (500) because this fold persists the
+ * applied-event-id watermark INTO its ClickHouse row: on a fresh delivery the
+ * stored set is exactly the batch's ids, so the coalesce ceiling IS the per-row
+ * watermark size, and `evaluation_analytics` keeps superseded ReplacingMergeTree
+ * versions — each with its own watermark — until TTL. The ceiling is generous
+ * here for a different reason than the trace fold: one evaluation emits a
+ * handful of lifecycle events, so 128 already exceeds any real batch and simply
+ * bounds what a pathological producer can write per row. Matched to the trace
+ * fold so the two slim folds are tuned alike.
+ *
+ * Must stay below MAX_APPLIED_EVENT_IDS (the Redis cache trims the set at that
+ * cap; a batch at or above it would break redelivery dedup — the projection
+ * router rejects such a config at registration).
+ */
+export const EVALUATION_ANALYTICS_COALESCE_MAX_BATCH = 128;
 
 /**
  * The slim row that lands in `evaluation_analytics`. Field names align
@@ -112,7 +139,9 @@ export const EVALUATION_ANALYTICS_READ_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 export interface EvaluationAnalyticsRow {
   tenantId: string;
   evaluationId: string;
-  /** Schema-snapshot version (the LWW dedup key). */
+  /** Schema-snapshot version. NOT the LWW dedup key — `evaluation_analytics` is
+   *  a ReplacingMergeTree(UpdatedAt) (migration 00041). This stamp gates
+   *  read-back instead: the store decodes a row only at the current version. */
   version: string;
   /** The eval's occurred-at (partition column + lead sort key). */
   occurredAtMs: number;
@@ -279,18 +308,24 @@ export function projectEvaluationAnalyticsStateToRow({
  * reconstructs from OccurredAt — for this fold the partition column IS the
  * latest event time (`occurredAtMs: state.LastEventOccurredAt` on write).
  *
- * A pre-migration row (00056 columns absent) decodes with StartedAt/CompletedAt
- * null and an empty applied set — never a refold.
+ * This decoder is TOTAL: handed a row whose read-back columns are absent it
+ * still answers, with StartedAt/CompletedAt null and an empty applied set. Those
+ * nulls are indistinguishable from a genuinely unstarted evaluation, so deciding
+ * WHETHER a row may be decoded is the store's job, not this function's:
+ * `getWithApplied` refuses any row not stamped with the current projection
+ * version and reports a store miss, and the fold's `refoldOnStoreMiss` rebuilds
+ * that aggregate from `event_log` once.
  */
 export function evaluationAnalyticsStateFromRow(
   row: EvaluationAnalyticsRow,
 ): EvaluationAnalyticsData {
-  // Unreachable for a same-version writer, but read-back is explicitly
-  // mixed-deploy safe: a newer node can persist a status this build does not
-  // know yet. Coercing keeps the delivery path total (never throw on a decode),
-  // but the coercion is NOT self-healing — read-back never replays event_log, so
-  // the next fold writes the downgrade over the real terminal state. Log it so
-  // the mixed-deploy window is detectable rather than silent.
+  // A newer node can persist a status this build does not know yet. Via the
+  // store that is now unreachable — such a row carries the newer node's version
+  // stamp, so the version gate refuses it and the aggregate is refolded from
+  // event_log rather than decoded. The coercion stays because this decoder is
+  // total by contract (a direct caller must never make it throw) and because a
+  // status could in principle be retired without a version bump. Log it: this
+  // line firing means something reached the decoder past the gate.
   const isKnownStatus = EVALUATION_STATUS_VALUES.has(
     row.status as EvaluationAnalyticsData["status"],
   );
@@ -408,9 +443,17 @@ export class EvaluationAnalyticsFoldProjection
    * CompletedAt, migration 00056), so `store.get()` returns the state and
    * nothing on the delivery path reads `event_log`.
    *
-   * `refoldOnStoreMiss` is gone — there is no null-returning miss to refold; a
-   * cache miss is a one-row ClickHouse read (windowed by `readWindow`, retried
-   * unwindowed by the executor).
+   * `refoldOnStoreMiss: true` — a version-gated TRANSITIONAL net, not the old
+   * continuity mechanism. The store reads back only rows stamped with the
+   * CURRENT projection version; a row written before the 00056 read-back columns
+   * existed decodes StartedAt/CompletedAt as nulls indistinguishable from a
+   * genuinely unstarted evaluation, so the store reports a miss and this option
+   * rebuilds that aggregate from `event_log` — once. The rebuild is rewritten at
+   * the current version, so the row hits from then on and the population
+   * self-heals with no backfill migration. In steady state every row is
+   * current-version, `store.get()` hits, and nothing refolds.
+   *
+   * `coalesceMaxBatch` — see below.
    *
    * `refoldOnOutOfOrder: false` — the derivation is order-insensitive: identity
    * and terminal fields are last-write-wins, lifecycle timestamps are set once
@@ -421,8 +464,10 @@ export class EvaluationAnalyticsFoldProjection
    */
   override options: FoldProjectionOptions = {
     eventOrdering: "acceptedAt",
+    refoldOnStoreMiss: true,
     refoldOnOutOfOrder: false,
     readWindow: { widthMs: EVALUATION_ANALYTICS_READ_WINDOW_MS },
+    coalesceMaxBatch: EVALUATION_ANALYTICS_COALESCE_MAX_BATCH,
   };
 
   constructor(deps: { store: FoldProjectionStore<EvaluationAnalyticsData> }) {
