@@ -17,13 +17,32 @@ import { getLangWatchTracer } from "langwatch";
 import { LATEST_SPEC_VERSION } from "../../../../optimization_studio/types/dsl";
 import { resolveFieldMappings } from "../resolve-field-mappings";
 import type { CodeAgentData } from "../types";
-import { formatFetchError, formatHttpError } from "./format-execution-error";
+import type { NlpEngineError } from "./format-execution-error";
+import {
+  formatEngineError,
+  formatFetchError,
+  formatHttpError,
+} from "./format-execution-error";
 
 /** Timeout for NLP service requests (2 minutes) */
 const NLP_FETCH_TIMEOUT_MS = 120_000;
 
-/** Categories for adapter failures, surfaced as the `error.kind` span attribute. */
-type AdapterErrorKind = "timeout" | "fetch" | "http";
+/**
+ * Categories for adapter failures, surfaced as the `error.kind` span attribute.
+ *
+ * `execution` is a run the NLP engine accepted and then finalized as failed —
+ * it arrives as a 200, so it is not an `http` failure.
+ */
+type AdapterErrorKind = "timeout" | "fetch" | "http" | "execution";
+
+/** Whether a rejection is the AbortController firing, in either runtime shape. */
+function isAbortError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    (error.name === "AbortError" ||
+      (error as Error & { code?: unknown }).code === "ABORT_ERR")
+  );
+}
 
 /**
  * Failure surfaced by the adapter to the scenario runner.
@@ -35,7 +54,8 @@ type AdapterErrorKind = "timeout" | "fetch" | "http";
  *   a non-2xx response without reading the message string.
  * - `source` (lw#3439): whether the failure came from the user's Python code
  *   vs the NLP service/network, used to render the user-friendly message while
- *   `rawDetail` keeps the original NLP payload for deep debugging.
+ *   `rawDetail` keeps the original NLP payload for deep debugging. Derived
+ *   from the Go engine's own error contract — see `format-execution-error.ts`.
  */
 export class SerializedCodeAgentAdapterError extends Error {
   readonly kind: AdapterErrorKind;
@@ -249,6 +269,15 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
    * carries a `source` + `rawDetail` so worker logs can render a
    * user-friendly message while the original NLP payload stays available
    * for deep debugging (lw#3439).
+   *
+   * Three distinct failure shapes are surfaced, because the engine reports
+   * a failed *run* differently from a rejected *request*:
+   * - a 200 whose `status` is `"error"` — the run was accepted and a node
+   *   failed. For this adapter's one-code-node workflow that is the user's
+   *   Python. Ignoring it is what made a failed run resolve to an empty
+   *   agent reply;
+   * - a non-2xx carrying the herr envelope — the request itself was rejected;
+   * - fetch/abort — the service was never reached, or never answered.
    */
   private async executeOnNlpService(
     workflow: ReturnType<typeof this.buildWorkflow>,
@@ -297,24 +326,10 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
               signal: controller.signal,
             });
           } catch (fetchError) {
-            if (timedOut) {
-              span.setAttribute(
-                "error.kind",
-                "timeout" satisfies AdapterErrorKind,
-              );
-              throw new SerializedCodeAgentAdapterError(
-                formatFetchError({
-                  cause: fetchError,
-                  timedOutAfterMs: NLP_FETCH_TIMEOUT_MS,
-                }),
-                {
-                  kind: "timeout",
-                  source: "timeout",
-                  endpoint,
-                  cause: fetchError,
-                },
-              );
-            }
+            // An abort is classified once, by the outer handler, so a timeout
+            // fired mid-body-read lands in the same place as one fired
+            // mid-connect.
+            if (timedOut || isAbortError(fetchError)) throw fetchError;
             span.setAttribute("error.kind", "fetch" satisfies AdapterErrorKind);
             throw new SerializedCodeAgentAdapterError(
               formatFetchError({ cause: fetchError }),
@@ -324,23 +339,19 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
 
           span.setAttribute("http.status_code", response.status);
 
+          // Read the body exactly once, as text. `response.json()` consumes
+          // the stream, so a json()-then-text() fallback can never recover a
+          // non-JSON payload — it rejects with "Body is unusable" and the
+          // customer is shown an empty body (review lw#3439).
+          const rawBody = await response.text();
+
           if (!response.ok) {
-            let parsedDetail: string | undefined;
-            let rawBody = "";
-            try {
-              const errorBody = (await response.json()) as { detail?: string };
-              parsedDetail = errorBody.detail;
-              rawBody = errorBody.detail ?? JSON.stringify(errorBody);
-            } catch {
-              rawBody = await response.text().catch(() => "");
-            }
             // Classification is single-sourced inside formatHttpError: the
             // returned `source` is derived from the same predicate that chose
             // the message wording, so they can never drift (lw#3439).
-            const { message, source } = formatHttpError({
+            const { message, source, rawDetail } = formatHttpError({
               status: response.status,
               rawBody,
-              parsedDetail,
             });
             span.setAttribute("error.kind", "http" satisfies AdapterErrorKind);
             throw new SerializedCodeAgentAdapterError(message, {
@@ -348,25 +359,110 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
               source,
               endpoint,
               httpStatus: response.status,
-              rawDetail: parsedDetail ?? rawBody,
+              rawDetail,
             });
           }
 
-          const result = (await response.json()) as {
-            trace_id: string;
-            status: string;
-            result: Record<string, unknown> | null;
-          };
-          span.setAttribute("nlp.status", result.status);
+          const result = this.parseExecutionResult({ rawBody, endpoint, span });
+
+          span.setAttribute("nlp.status", result.status ?? "unknown");
           if (result.trace_id) {
             span.setAttribute("nlp.trace_id", result.trace_id);
           }
-          return this.extractOutput(result.result);
+
+          // A failed run comes back 200 with `status: "error"` and no
+          // `result` — for this adapter's single-code-node workflow that is
+          // the user's Python blowing up. Without this branch the run
+          // silently resolves to an empty agent reply (lw#3439).
+          if (result.status === "error") {
+            const { message, source, rawDetail } = formatEngineError({
+              engineError: result.error ?? {},
+            });
+            span.setAttribute(
+              "error.kind",
+              "execution" satisfies AdapterErrorKind,
+            );
+            throw new SerializedCodeAgentAdapterError(message, {
+              kind: "execution",
+              source,
+              endpoint,
+              httpStatus: response.status,
+              rawDetail,
+            });
+          }
+
+          return this.extractOutput(result.result ?? null);
+        } catch (error) {
+          if (error instanceof SerializedCodeAgentAdapterError) throw error;
+          // The abort timer stays armed once headers arrive, so it can fire
+          // while the body is still streaming. That rejection surfaces here,
+          // outside the fetch try — classify it as the timeout it is rather
+          // than letting a bare "The operation was aborted." escape unwrapped
+          // (review lw#3439).
+          if (timedOut || isAbortError(error)) {
+            span.setAttribute(
+              "error.kind",
+              "timeout" satisfies AdapterErrorKind,
+            );
+            throw new SerializedCodeAgentAdapterError(
+              formatFetchError({
+                cause: error,
+                timedOutAfterMs: NLP_FETCH_TIMEOUT_MS,
+              }),
+              { kind: "timeout", source: "timeout", endpoint, cause: error },
+            );
+          }
+          throw error;
         } finally {
           clearTimeout(timeout);
         }
       },
     );
+  }
+
+  /**
+   * Parse a 2xx body into the engine's WorkflowResult.
+   *
+   * A 200 that is not JSON means something is answering on the NLP service's
+   * behalf (a proxy, a captive portal). Surfacing that as a structured infra
+   * failure keeps a raw `SyntaxError` from escaping the adapter unwrapped.
+   */
+  private parseExecutionResult({
+    rawBody,
+    endpoint,
+    span,
+  }: {
+    rawBody: string;
+    endpoint: string;
+    span: { setAttribute: (key: string, value: string | number) => void };
+  }): {
+    trace_id?: string;
+    status?: string;
+    result?: Record<string, unknown> | null;
+    error?: NlpEngineError;
+  } {
+    try {
+      return JSON.parse(rawBody) as ReturnType<
+        typeof this.parseExecutionResult
+      >;
+    } catch (parseError) {
+      span.setAttribute("error.kind", "http" satisfies AdapterErrorKind);
+      throw new SerializedCodeAgentAdapterError(
+        [
+          "SerializedCodeAgentAdapter: NLP service returned a response that is not valid JSON.",
+          "  body:",
+          rawBody.slice(0, 500) || "    (empty)",
+        ].join("\n"),
+        {
+          kind: "http",
+          source: "nlp_service",
+          endpoint,
+          httpStatus: 200,
+          rawDetail: rawBody,
+          cause: parseError,
+        },
+      );
+    }
   }
 
   /**

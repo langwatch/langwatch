@@ -8,9 +8,15 @@ Feature: Serialized adapters surface user-vs-infra failures distinctly
   read operation timed out" with no endpoint, no separation between user code
   and infra errors, and AI SDK / OTEL noise interleaved with the real cause.
 
+  The adapter dials /go/studio/execute_sync, which is served by the Go NLP
+  engine. That engine reports every failure as an error envelope carrying an
+  error type, so the user-vs-infra split is decided by that type — a failure
+  the engine attributes to the customer is a user-code failure, anything else
+  is an infra failure.
+
   @unit
-  Scenario: adapter labels HTTP 500 with detail as a user-code failure
-    Given the NLP service returns HTTP 500 with a Python traceback in `detail`
+  Scenario: adapter labels an engine failure attributed to the customer as a user-code failure
+    Given the NLP engine returns an error envelope whose type it attributes to the customer
     When SerializedCodeAgentAdapter.call rejects
     Then the error is a SerializedCodeAgentAdapterError with source="user_code"
     And the message includes "user code raised"
@@ -19,33 +25,70 @@ Feature: Serialized adapters surface user-vs-infra failures distinctly
     And the error's structured endpoint field still carries the endpoint for operators
 
   @unit
-  Scenario: adapter labels non-500 status as an NLP service failure
-    Given the NLP service returns HTTP 503
+  Scenario: a failed run is surfaced as an error instead of an empty agent reply
+    Given the NLP engine accepts the request and then finalizes the run as failed
+    When SerializedCodeAgentAdapter.call is awaited
+    Then the call rejects with a SerializedCodeAgentAdapterError
+    And it does not resolve with an empty string
+
+  @unit
+  Scenario: adapter labels an engine failure attributed to the platform as an NLP service failure
+    Given the NLP engine returns an error envelope whose type it attributes to the platform
+    When SerializedCodeAgentAdapter.call rejects
+    Then the error has source="nlp_service"
+    And the message says the NLP service failed while running the workflow
+    And the message does not claim user code raised the error
+
+  @unit
+  Scenario: adapter does not blame user code for a rejected API key
+    Given the NLP engine rejects the request because the adapter's own credential is invalid
+    When SerializedCodeAgentAdapter.call rejects
+    Then the error has source="nlp_service"
+    And the message does not claim user code raised the error
+
+  @unit
+  Scenario: adapter still understands the legacy detail-only error envelope
+    Given the NLP service returns HTTP 500 with a Python traceback in `detail`
+    When SerializedCodeAgentAdapter.call rejects
+    Then the error has source="user_code"
+    And the message includes "user code raised"
+
+  @unit
+  Scenario: adapter labels a status it cannot attribute as an NLP service failure
+    Given the NLP service returns HTTP 503 with no recognisable error envelope
     When SerializedCodeAgentAdapter.call rejects
     Then the error has source="nlp_service" and httpStatus=503
     And the message starts with "NLP service returned HTTP 503"
 
   @unit
-  Scenario: adapter labels a 500 with a non-JSON body as an NLP service failure
-    Given the NLP service returns HTTP 500 whose body is not valid JSON
+  Scenario: adapter preserves a non-JSON error body instead of dropping it
+    Given the NLP service returns HTTP 502 whose body is an HTML proxy error page
     When SerializedCodeAgentAdapter.call rejects
     Then the error has source="nlp_service"
-    And the message starts with "NLP service returned HTTP 500"
-    And the message does not claim user code raised the error
+    And the message includes the text of the HTML body
+    And the message does not render the body as empty
+
+  @unit
+  Scenario: adapter does not crash when the error envelope carries a non-string detail
+    Given the NLP service returns HTTP 500 whose `detail` is a list of validation errors
+    When SerializedCodeAgentAdapter.call rejects
+    Then the error is a SerializedCodeAgentAdapterError, not a formatter crash
+    And the message includes the validation error text
 
   @unit
   Scenario: adapter strips AI SDK warnings and OTEL noise from the surfaced message
-    Given the NLP service returns HTTP 500 with a `detail` containing AI SDK warnings and OTEL flush lines
+    Given the NLP engine returns an error message containing AI SDK warnings and OTEL flush lines
     When SerializedCodeAgentAdapter.call rejects
     Then the surfaced message no longer contains those noise lines
     And the rawDetail field on the error preserves the original blob
 
   @unit
   Scenario: adapter truncates long error bodies but preserves them on rawDetail
-    Given the NLP service returns HTTP 500 with a 10000-char `detail`
+    Given the NLP engine returns an error message of 10000 characters
     When SerializedCodeAgentAdapter.call rejects
     Then the rendered message is shorter than the original detail
     And the message ends with a "truncated, original was 10000 chars" marker
+    And the message does not name an internal field the customer cannot reach
     And the rawDetail field on the error preserves the original blob
 
   @unit
@@ -56,8 +99,22 @@ Feature: Serialized adapters surface user-vs-infra failures distinctly
     And the message includes "failed to reach NLP service"
 
   @unit
+  Scenario: a fetch failure does not leak the internal NLP host and port
+    Given fetch rejects with a connection error naming the internal host and port
+    When SerializedCodeAgentAdapter.call rejects
+    Then the message names the connection failure code
+    And the message does not contain the internal host or port
+
+  @unit
   Scenario: adapter labels an aborted fetch as a timeout
     Given the NLP service does not respond within the adapter timeout
+    When SerializedCodeAgentAdapter.call rejects
+    Then the error has source="timeout"
+    And the message includes the configured timeout in milliseconds
+
+  @unit
+  Scenario: a timeout while the response body is still streaming is surfaced as a timeout
+    Given the NLP service sends headers and then stalls while the body is read
     When SerializedCodeAgentAdapter.call rejects
     Then the error has source="timeout"
     And the message includes the configured timeout in milliseconds
