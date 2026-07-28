@@ -20,6 +20,7 @@ process.env.TZ = "Asia/Kolkata";
  */
 import { describe, expect, it, vi } from "vitest";
 import type { ClickHouseClient } from "@clickhouse/client";
+import { register } from "prom-client";
 import { parseClickHouseDateTimeMs } from "~/server/clickhouse/dateTime";
 import type { CodingAgentSessionRow } from "~/server/event-sourcing/pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
 import { CodingAgentSessionClickHouseRepository } from "../coding-agent-session.clickhouse.repository";
@@ -329,81 +330,91 @@ const read = (client: ClickHouseClient) =>
 
 describe("CodingAgentSessionClickHouseRepository point-read tiebreak", () => {
   describe("given two versions of one session tied on UpdatedAt", () => {
-    describe("when one applied a later event than the other", () => {
-      it("returns the version with the higher progress watermark", async () => {
-        const result = await read(
-          tiedVersions(
-            { LastEventOccurredAt: "2026-07-24 11:00:00.000", Commits: 1 },
-            { LastEventOccurredAt: "2026-07-24 11:45:00.000", Commits: 9 },
-          ),
-        );
+    describe("given one applied a later event than the other", () => {
+      describe("when the session is point-read", () => {
+        it("returns the version with the higher progress watermark", async () => {
+          const result = await read(
+            tiedVersions(
+              { LastEventOccurredAt: "2026-07-24 11:00:00.000", Commits: 1 },
+              { LastEventOccurredAt: "2026-07-24 11:45:00.000", Commits: 9 },
+            ),
+          );
 
-        expect(result?.row.commits).toBe(9);
+          expect(result?.row.commits).toBe(9);
+        });
       });
     });
 
-    describe("when they share a watermark but folded different amounts of span and log work", () => {
-      it("returns the version that absorbed more contributions in total, not the one leading on any single counter", async () => {
-        const result = await read(
-          tiedVersions(
-            { ModelCalls: 9, ToolCalls: 1, Prompts: 0, Commits: 1 },
-            { ModelCalls: 2, ToolCalls: 8, Prompts: 3, Commits: 9 },
-          ),
-        );
+    describe("given they share a watermark but folded different amounts of span and log work", () => {
+      describe("when the session is point-read", () => {
+        it("returns the version that absorbed more contributions in total, not the one leading on any single counter", async () => {
+          const result = await read(
+            tiedVersions(
+              { ModelCalls: 9, ToolCalls: 1, Prompts: 0, Commits: 1 },
+              { ModelCalls: 2, ToolCalls: 8, Prompts: 3, Commits: 9 },
+            ),
+          );
 
-        expect(result?.row.commits).toBe(9);
+          expect(result?.row.commits).toBe(9);
+        });
       });
     });
 
-    describe("when the session is metric-only, so every span and log counter stays zero", () => {
-      it("returns the version holding more converged metric units", async () => {
-        const result = await read(
-          tiedVersions(
-            { MetricSeries: [["s1", "cost", "", "", "", 1]], Commits: 1 },
-            {
-              MetricSeries: [
-                ["s1", "cost", "", "", "", 1],
-                ["s2", "commits", "", "", "", 9],
-              ],
-              Commits: 9,
-            },
-          ),
-        );
+    describe("given a metric-only session, so every span and log counter stays zero", () => {
+      describe("when the session is point-read", () => {
+        it("returns the version holding more converged metric units", async () => {
+          const result = await read(
+            tiedVersions(
+              { MetricSeries: [["s1", "cost", "", "", "", 1]], Commits: 1 },
+              {
+                MetricSeries: [
+                  ["s1", "cost", "", "", "", 1],
+                  ["s2", "commits", "", "", "", 9],
+                ],
+                Commits: 9,
+              },
+            ),
+          );
 
-        expect(result?.row.commits).toBe(9);
+          expect(result?.row.commits).toBe(9);
+        });
       });
     });
 
-    describe("when they folded equal work but absorbed different numbers of deliveries", () => {
-      it("returns the version with more applied events", async () => {
-        const result = await read(
-          tiedVersions(
-            { AppliedEventIds: ["e1"], Commits: 1 },
-            { AppliedEventIds: ["e1", "e2"], Commits: 9 },
-          ),
-        );
+    describe("given they folded equal work but absorbed different numbers of deliveries", () => {
+      describe("when the session is point-read", () => {
+        it("returns the version with more applied events", async () => {
+          const result = await read(
+            tiedVersions(
+              { AppliedEventIds: ["e1"], Commits: 1 },
+              { AppliedEventIds: ["e1", "e2"], Commits: 9 },
+            ),
+          );
 
-        expect(result?.row.commits).toBe(9);
+          expect(result?.row.commits).toBe(9);
+        });
       });
     });
 
-    describe("when every progress signal is identical and only the start time differs", () => {
-      it("resolves the fully-tied case the same way whichever order the rows arrive in", async () => {
-        // StartedAt is the last-resort key that makes the ordering TOTAL, and
-        // nothing more. WHICH of the two it lands on carries no meaning:
-        // StartedAt can be re-stamped FORWARDS when a read-back miss re-runs
-        // init() (ADR-071), so its direction is not a progress signal. What is
-        // pinned here is that the pick is deterministic — ASC, and identical
-        // under the opposite insertion order rather than whatever the scan
-        // happened to emit first.
-        const later = { StartedAt: "2026-07-24 11:30:00.000", Commits: 1 };
-        const earlier = { StartedAt: "2026-07-24 09:00:00.000", Commits: 9 };
+    describe("given every progress signal is identical and only the start time differs", () => {
+      describe("when the session is point-read", () => {
+        it("resolves the fully-tied case the same way whichever order the rows arrive in", async () => {
+          // StartedAt is the last-resort key that makes the ordering TOTAL, and
+          // nothing more. WHICH of the two it lands on carries no meaning:
+          // StartedAt can be re-stamped FORWARDS when a read-back miss re-runs
+          // init() (ADR-071), so its direction is not a progress signal. What is
+          // pinned here is that the pick is deterministic — ASC, and identical
+          // under the opposite insertion order rather than whatever the scan
+          // happened to emit first.
+          const later = { StartedAt: "2026-07-24 11:30:00.000", Commits: 1 };
+          const earlier = { StartedAt: "2026-07-24 09:00:00.000", Commits: 9 };
 
-        const result = await read(tiedVersions(later, earlier));
-        const reversed = await read(tiedVersions(earlier, later));
+          const result = await read(tiedVersions(later, earlier));
+          const reversed = await read(tiedVersions(earlier, later));
 
-        expect(result?.row.commits).toBe(9);
-        expect(reversed?.row.commits).toBe(9);
+          expect(result?.row.commits).toBe(9);
+          expect(reversed?.row.commits).toBe(9);
+        });
       });
     });
   });
@@ -632,57 +643,149 @@ describe("CodingAgentSessionClickHouseRepository list-read dedup scope", () => {
   });
 
   describe("given a session whose true latest version is inside the window", () => {
-    describe("when an older version of it sits outside the window", () => {
-      it("returns the latest version's totals, not the out-of-window one's", async () => {
-        // The mirror case: a read-back miss re-ran init() and re-stamped
-        // StartedAt FORWARD, into the window. The unwindowed dedup must still
-        // resolve v2, and the outer scope must still admit it.
-        const { client } = listClient([
-          version({
-            sessionId: "readmitted",
-            startedAtMs: WINDOW_FROM - DAY_MS,
-            updatedAtMs: WINDOW_FROM + 10 * 60_000,
-            costUsd: 1,
-          }),
-          version({
-            sessionId: "readmitted",
-            startedAtMs: WINDOW_FROM + 30 * 60_000,
-            updatedAtMs: WINDOW_FROM + 40 * 60_000,
-            costUsd: 5,
-          }),
-        ]);
+    describe("given an older version of it sits outside the window", () => {
+      describe("when the window is listed", () => {
+        it("returns the latest version's totals, not the out-of-window one's", async () => {
+          // The mirror case: a read-back miss re-ran init() and re-stamped
+          // StartedAt FORWARD, into the window. The unwindowed dedup must still
+          // resolve v2, and the outer scope must still admit it.
+          const { client } = listClient([
+            version({
+              sessionId: "readmitted",
+              startedAtMs: WINDOW_FROM - DAY_MS,
+              updatedAtMs: WINDOW_FROM + 10 * 60_000,
+              costUsd: 1,
+            }),
+            version({
+              sessionId: "readmitted",
+              startedAtMs: WINDOW_FROM + 30 * 60_000,
+              updatedAtMs: WINDOW_FROM + 40 * 60_000,
+              costUsd: 5,
+            }),
+          ]);
 
-        const listed = await listRecent(client);
+          const listed = await listRecent(client);
 
-        expect(listed).toHaveLength(1);
-        expect(listed[0]!.costUsd).toBeCloseTo(5);
+          expect(listed).toHaveLength(1);
+          expect(listed[0]!.costUsd).toBeCloseTo(5);
+        });
       });
     });
   });
 
   describe("given a session listed under a user narrowing", () => {
-    describe("when another user's session drifted into the same window", () => {
-      it("still lists only the requesting user's sessions", async () => {
+    describe("given another user's session sits in the same window", () => {
+      describe("when the window is listed", () => {
+        it("still lists only the requesting user's sessions", async () => {
+          const { client } = listClient([
+            version({
+              sessionId: "mine",
+              startedAtMs: WINDOW_FROM + 10 * 60_000,
+              updatedAtMs: WINDOW_FROM + 10 * 60_000,
+              costUsd: 3,
+              userId: "user-1",
+            }),
+            version({
+              sessionId: "theirs",
+              startedAtMs: WINDOW_FROM + 20 * 60_000,
+              updatedAtMs: WINDOW_FROM + 20 * 60_000,
+              costUsd: 4,
+              userId: "user-2",
+            }),
+          ]);
+
+          const listed = await listRecent(client, "user-1");
+
+          expect(listed.map((row) => row.sessionId)).toEqual(["mine"]);
+        });
+      });
+    });
+  });
+});
+
+/**
+ * Reads the list-read duration histogram's sample count straight off the prom
+ * registry, for this table — a spy on a destructured copy would intercept
+ * nothing and pass regardless. Deltas, never absolutes: the registry is
+ * process-wide, so every earlier suite in this file that lists a window has
+ * already moved these counters.
+ */
+async function listReadObservations(outcome: string): Promise<number> {
+  const metric = await register
+    .getSingleMetric("coding_agent_session_list_read_duration_milliseconds")
+    ?.get();
+  return (
+    metric?.values.find(
+      (value) =>
+        value.metricName ===
+          "coding_agent_session_list_read_duration_milliseconds_count" &&
+        value.labels.table === "coding_agent_sessions" &&
+        value.labels.outcome === outcome,
+    )?.value ?? 0
+  );
+}
+
+/**
+ * ADR-071 sequencing step 2 traded partition pruning on the dedup scope for a
+ * correct answer, and step 3's freeze — the thing that buys the pruning back —
+ * is deferred on the claim that the unpruned scan stays cheap. These pin the
+ * only evidence that claim will ever have.
+ */
+describe("CodingAgentSessionClickHouseRepository list-read cost signal", () => {
+  describe("given a window holding a session", () => {
+    describe("when the window is listed", () => {
+      it("times the read under the hit outcome", async () => {
+        const beforeHit = await listReadObservations("hit");
+        const beforeEmpty = await listReadObservations("empty");
         const { client } = listClient([
           version({
-            sessionId: "mine",
+            sessionId: "listed",
             startedAtMs: WINDOW_FROM + 10 * 60_000,
             updatedAtMs: WINDOW_FROM + 10 * 60_000,
-            costUsd: 3,
-            userId: "user-1",
-          }),
-          version({
-            sessionId: "theirs",
-            startedAtMs: WINDOW_FROM + 20 * 60_000,
-            updatedAtMs: WINDOW_FROM + 20 * 60_000,
-            costUsd: 4,
-            userId: "user-2",
+            costUsd: 2,
           }),
         ]);
 
-        const listed = await listRecent(client, "user-1");
+        await listRecent(client);
 
-        expect(listed.map((row) => row.sessionId)).toEqual(["mine"]);
+        expect(await listReadObservations("hit")).toBe(beforeHit + 1);
+        expect(await listReadObservations("empty")).toBe(beforeEmpty);
+      });
+    });
+  });
+
+  describe("given a window holding no sessions", () => {
+    describe("when the window is listed", () => {
+      it("times the read under the empty outcome, which is where the unpruned scan shows up alone", async () => {
+        const beforeEmpty = await listReadObservations("empty");
+        const beforeHit = await listReadObservations("hit");
+        const { client } = listClient([]);
+
+        await listRecent(client);
+
+        expect(await listReadObservations("empty")).toBe(beforeEmpty + 1);
+        expect(await listReadObservations("hit")).toBe(beforeHit);
+      });
+    });
+  });
+
+  describe("given a read that fails", () => {
+    describe("when the window is listed", () => {
+      it("times the failure under the error outcome and still raises it", async () => {
+        const beforeError = await listReadObservations("error");
+        const beforeHit = await listReadObservations("hit");
+        const failing = {
+          query: async () => {
+            throw new Error("clickhouse unavailable");
+          },
+        } as unknown as ClickHouseClient;
+
+        await expect(listRecent(failing)).rejects.toThrow(
+          "clickhouse unavailable",
+        );
+
+        expect(await listReadObservations("error")).toBe(beforeError + 1);
+        expect(await listReadObservations("hit")).toBe(beforeHit);
       });
     });
   });

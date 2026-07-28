@@ -1,3 +1,4 @@
+import { performance } from "node:perf_hooks";
 import { createLogger } from "@langwatch/observability";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { parseClickHouseDateTimeMs } from "~/server/clickhouse/dateTime";
@@ -9,6 +10,10 @@ import type {
 } from "~/server/event-sourcing/pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
 import { SecurityError } from "~/server/event-sourcing/services/errorHandling";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
+import {
+  observeCodingAgentSessionListReadDuration,
+  type CodingAgentSessionListReadOutcome,
+} from "~/server/metrics";
 import type { CodingAgentSessionRepository } from "./coding-agent-session.repository";
 
 const TABLE_NAME = "coding_agent_sessions" as const;
@@ -514,6 +519,13 @@ export class CodingAgentSessionClickHouseRepository
    * prunes. ADR-071's sequenced "freeze the writer" step makes `StartedAt`
    * immutable and lets the pruning bound come back here safely.
    *
+   * That cost is MEASURED, not asserted:
+   * `coding_agent_session_list_read_duration_milliseconds{table,outcome}` times
+   * this read, so "the compact scan is acceptable" and "the freeze can keep
+   * waiting" are observations rather than assumptions (ADR-071 sequencing steps
+   * 2-3). Duration only — the query result exposes no rows-scanned counter; see
+   * the metric's docblock in `~/server/metrics`.
+   *
    * `userId`, when given, narrows to the agent-reported identity — folded
    * into BOTH scopes so the two agree on which rows are in scope. Unlike the
    * range filter it is safe there: it is a stable column, so it cannot move a
@@ -542,34 +554,53 @@ export class CodingAgentSessionClickHouseRepository
     const userFilter =
       userId !== undefined ? "AND UserId = {userId:String}" : "";
 
-    const result = await client.query({
-      query: `
-        SELECT *
-        FROM ${TABLE_NAME}
-        WHERE TenantId = {tenantId:String}
-          ${userFilter}
-          AND StartedAt BETWEEN fromUnixTimestamp64Milli({from:Int64}) AND fromUnixTimestamp64Milli({to:Int64})
-          AND (TenantId, SessionId, UpdatedAt) IN (
-            SELECT TenantId, SessionId, max(UpdatedAt)
-            FROM ${TABLE_NAME}
-            WHERE TenantId = {tenantId:String}
-              ${userFilter}
-            GROUP BY TenantId, SessionId
-          )
-        ORDER BY StartedAt DESC
-        LIMIT {limit:UInt32}
-      `,
-      query_params: {
-        tenantId,
-        from: fromMs,
-        to: toMs,
-        limit,
-        ...(userId !== undefined ? { userId } : {}),
-      },
-      format: "JSONEachRow",
-    });
+    const startedAt = performance.now();
+    const observe = (outcome: CodingAgentSessionListReadOutcome) =>
+      observeCodingAgentSessionListReadDuration({
+        table: TABLE_NAME,
+        outcome,
+        durationMs: performance.now() - startedAt,
+      });
 
-    const rows = await result.json<Record<string, unknown>>();
+    let rows: Record<string, unknown>[];
+    try {
+      const result = await client.query({
+        query: `
+          SELECT *
+          FROM ${TABLE_NAME}
+          WHERE TenantId = {tenantId:String}
+            ${userFilter}
+            AND StartedAt BETWEEN fromUnixTimestamp64Milli({from:Int64}) AND fromUnixTimestamp64Milli({to:Int64})
+            AND (TenantId, SessionId, UpdatedAt) IN (
+              SELECT TenantId, SessionId, max(UpdatedAt)
+              FROM ${TABLE_NAME}
+              WHERE TenantId = {tenantId:String}
+                ${userFilter}
+              GROUP BY TenantId, SessionId
+            )
+          ORDER BY StartedAt DESC
+          LIMIT {limit:UInt32}
+        `,
+        query_params: {
+          tenantId,
+          from: fromMs,
+          to: toMs,
+          limit,
+          ...(userId !== undefined ? { userId } : {}),
+        },
+        format: "JSONEachRow",
+      });
+
+      rows = await result.json<Record<string, unknown>>();
+    } catch (error) {
+      observe("error");
+      throw error;
+    }
+    // Timed around the read alone: decoding ~90 columns per row is the caller's
+    // cost, not the dedup scan's, and mixing it in would move the distribution
+    // with page size rather than with scan width.
+    observe(rows.length > 0 ? "hit" : "empty");
+
     return rows.map(fromRecord);
   }
 

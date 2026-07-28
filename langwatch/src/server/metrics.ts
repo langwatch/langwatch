@@ -1195,6 +1195,70 @@ export const getStoredObjectSizeBytesHistogram = (purpose: string) =>
   storedObjectSizeBytesHistogram.labels(purpose);
 
 // ============================================================================
+// Coding-agent session reads
+// ============================================================================
+
+/**
+ * `hit` — the window returned rows. `empty` — it returned none, which still
+ * paid the full dedup scan. `error` — the read threw, so its duration is a
+ * failure time and must not sit in the same distribution as the successes.
+ */
+export type CodingAgentSessionListReadOutcome = "hit" | "empty" | "error";
+
+register.removeSingleMetric(
+  "coding_agent_session_list_read_duration_milliseconds",
+);
+const codingAgentSessionListReadDuration = new Histogram({
+  name: "coding_agent_session_list_read_duration_milliseconds",
+  help: "Duration of the coding-agent session list read, whose dedup scope scans the tenant unpruned, by table and outcome",
+  labelNames: ["table", "outcome"] as const,
+  buckets: [1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000],
+});
+
+/**
+ * Prices ADR-071 sequencing step 2. `findManyRecent`'s inner `max(UpdatedAt)`
+ * subquery dropped its `StartedAt` bound, because a bound on a moving column
+ * inside a dedup scope returns a stale version. The scope therefore no longer
+ * prunes partitions and scans this tenant's sessions rather than the window's
+ * weeks — compact (sort-key columns plus `UpdatedAt`, one group row per
+ * session), but a real increase the ADR states rather than measures.
+ *
+ * Without this the ADR's own exit conditions are unfalsifiable: "the compact
+ * scan is acceptable" and "step 3's freeze can keep waiting" are both claims
+ * about this read's cost, and nothing else observes it. A rising p99 here is
+ * what promotes the freeze from deferred to due, and a flat one is what earns
+ * the deferral.
+ *
+ * `empty` is not noise. An empty window still runs the whole unwindowed dedup
+ * scan and materialises nothing in the outer `SELECT *`, so it isolates the
+ * scan's own floor from the cost of rendering rows.
+ *
+ * Duration only, deliberately. `client.query()` resolves a `ResultSet`, which
+ * carries `response_headers` but no parsed summary — the client parses
+ * `X-ClickHouse-Summary` (`read_rows`, `read_bytes`) for `insert`/`command`/
+ * `exec` alone, and for a streaming `SELECT` those counters are complete only
+ * under `wait_end_of_query=1`. Rows *returned* is capped by the caller's limit
+ * and so says nothing about the scan, which is why it is not recorded as a
+ * stand-in.
+ *
+ * `table` and `outcome` only: per-tenant attribution belongs in the structured
+ * log lines, never as a label (the cardinality doctrine above). This table is
+ * one row per session, so a tenant label would track the customer count.
+ */
+export const observeCodingAgentSessionListReadDuration = ({
+  table,
+  outcome,
+  durationMs,
+}: {
+  table: string;
+  outcome: CodingAgentSessionListReadOutcome;
+  durationMs: number;
+}) =>
+  codingAgentSessionListReadDuration
+    .labels(table, outcome)
+    .observe(durationMs);
+
+// ============================================================================
 // withMetrics utility
 // ============================================================================
 
