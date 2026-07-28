@@ -115,13 +115,36 @@ and
 
 ## Decision
 
-**The reactor is retired as a concept.** Post-event work is expressed as an
-event subscriber or a process manager, and nothing else. `ReactorDefinition`,
+**The reactor is retired as a concept.** Post-event work is expressed as a
+subscriber or a process manager, and nothing else. `ReactorDefinition`,
 `ReactorContext`, `ReactorOptions`, `withReactor` and the router's reactor
 dispatch path are deleted once the last call site moves.
 
-The choice between the two is decided by one question — *if this work is lost,
-does anything need to be able to tell?*
+**There are two kinds of subscriber, and the distinction is load-bearing.**
+An earlier draft of this ADR described a subscriber as event-only, with no fold
+state — that is true of one of them and not the other, and the omission
+actively misled the first two conversions, which each invented a way to fetch
+committed state that the framework already provides:
+
+- **`withEventSubscriber(name, def)`** takes an `EventSubscriberDefinition`.
+  It sees the event and nothing else (`EventSubscriberContext` is `tenantId` +
+  `aggregateId`), and is dispatched from the routing seam independent of any
+  projection.
+- **`withSubscriber(name, { fold: "...", handler })`** takes a `SubscriberSpec`
+  and stages the handler *after that projection commits the event*, with the
+  committed state in `ctx.state: TriggerContext<FoldState>`. Its own docblock
+  calls it "the best-effort reaction primitive (ADR-052)". This is the direct
+  replacement for a reactor: same after-the-fold ordering, same fold state, and
+  it is what the automations migration already used.
+
+**Pick the fold-bound form whenever the handler reads `context.foldState`
+today.** It preserves both the state and the ordering, which the event-only
+form silently drops — a reactor fires after its projection commits, an event
+subscriber fires on delivery. Reach for `withEventSubscriber` only where the
+handler genuinely needs nothing but the event.
+
+Given that, the choice is decided by one question — *if this work is lost, does
+anything need to be able to tell?*
 
 | If the work… | Substrate | Guarantee |
 | --- | --- | --- |
@@ -131,23 +154,72 @@ does anything need to be able to tell?*
 | dispatches work that costs money or must happen | **process manager** | leased outbox, retried up to the process's own `maxAttempts` |
 | happens *later* rather than *now* | **process manager** | `nextWakeAt`, a durable deadline |
 
-A projection is not a third substrate — it is the existing fold/map projection
+A projection is not a further substrate — it is the existing fold/map projection
 machinery, which replay already rebuilds. The point of the row is that derived
 state must go through it rather than through a handler beside it.
 
-### The seventeen call sites
+### The eighteen call sites
 
-**Class A — transient fan-out → subscriber (3).** `cancellationBroadcast`,
-`spanStorageBroadcast`, `traceUpdateBroadcast`. These push to websocket/SSE
-clients. Making them durable would be *wrong*: an outbox redelivering a push to
-a browser that closed an hour ago is not a fix, it is a leak. They become
-subscribers with at-most-once semantics stated in the spec rather than implied
-by a `ttl`.
+Counted by live `.withReactor(...)` registration, which is the only honest way
+to count them: an earlier draft of this ADR said seventeen, because it searched
+for `*.reactor.ts` and `snapshotUpdateBroadcast.ts` does not carry the suffix.
+There are **19 registrations, 18 of them real** — see `retentionOrphanSweep`
+under "What is deleted".
+
+**Class A — transient fan-out → subscriber (4).** `cancellationBroadcast`,
+`spanStorageBroadcast`, `traceUpdateBroadcast`, `snapshotUpdateBroadcast`.
+These push to websocket/SSE clients. Making them durable would be *wrong*: an
+outbox redelivering a push to a browser that closed an hour ago is not a fix,
+it is a leak. They become subscribers with at-most-once semantics stated in the
+spec rather than implied by a `ttl`.
+
+Class A looked mechanical and is not, for a reason that generalises across
+every class: **most of these handlers read `context.foldState`.**
+`cancellationBroadcast` labels its message with `BatchRunId`, which the
+`cancel_requested` event does not carry — it only ever enters the fold from
+`queued`/`started`. `snapshotUpdateBroadcast` has the same dependency four times
+over (`ScenarioRunId`, `BatchRunId`, `ScenarioSetId`, `Status`).
+
+**The answer is the fold-bound subscriber**, `withSubscriber({ fold, handler })`,
+which hands the committed state to the handler in `ctx.state` and preserves the
+after-the-fold ordering. No injected store, no read-back port, no new event
+field. Two independent conversion attempts each reached for a workaround here
+before the ADR named the right seam; that was the ADR's fault, not theirs.
+
+Where a field turns out to have no reader at all, delete it instead of carrying
+it across — `CancellationMessage.batchRunId` and `.projectId` have no consumer
+(`scenario.processor.ts` reads only `scenarioRunId`). A field nobody reads is
+not a migration problem, it is dead weight the conversion happens to expose.
+
+**Ordering is the other reason to prefer the fold-bound form.** A reactor fires
+after its parent projection applies *and stores*; `withEventSubscriber` is
+dispatched from the routing seam, independent of any projection. Converting to
+the event-only form silently changes `spanStorageBroadcast` from "the span is in
+ClickHouse" to "something happened on this trace". That happens to be tolerable
+where the client refetches rather than trusting the push — but it is a semantic
+change to check per site, never to assume, and `withSubscriber({ fold })` avoids
+the question entirely.
 
 **Class B — external CRM sync → subscriber (3).** `customerIoEvaluationSync`,
 `customerIoSimulationSync`, `customerIoTraceSync`, all on
 `CIO_REACTOR_DEBOUNCE_TTL_MS`. Marketing nurture counts, lossy by contract.
-Subscribers, keeping the debounce as a deduplication strategy.
+Subscribers, keeping the debounce as a deduplication strategy — and the two
+that read fold state (`customerIoTraceSync` needs the trace's accumulated sdk
+attributes and its business `occurredAt`; `customerIoEvaluationSync` needs
+`evaluatorType`, which only the `reported` event carries) take the fold-bound
+form.
+
+**None of the three is registered.** `createCustomerIo*Reactor` has no call
+site outside its own file and its own unit test, and `pipelineRegistry.ts`
+carries a TODO saying the counting strategy has to be settled before enabling
+them. The `evaluationCountFn` / `simulationCountFn` they depend on do not exist
+anywhere in the repo. So Class B is not live code with a migration problem — it
+is **three unwired reactors and a missing feature**. Converting them is cheap
+and keeps the retirement total, but it does not remove anything from production,
+and the honest sequencing choice is either to finish the counting work or to
+delete all three. That decision belongs to whoever owns nurture, not to this
+ADR; what this ADR insists on is that they must not be left as a fourth kind of
+post-event handler.
 
 **Class C — derived durable state → projection (3).** `gatewayBudgetSync`,
 `governanceKpisSync`, `governanceOcsfEventsSync`. All three write derived rows
@@ -193,8 +265,15 @@ requires a big-bang cutover, and no step depends on a later one.
 router's reactor dispatch path, `LIVE_DISPATCH_IS_REPLAY` and the vestigial
 `isReplay` plumbing, and `specs/event-sourcing/reactors.feature` (superseded by
 `post-event-work.feature`). ADR-026 is superseded: `shouldReact`'s successor is
-`EnqueueDispatchOptions.filter` on the subscriber contract (ADR-069 phase 1),
-plus the process manager's trigger predicate.
+`EnqueueDispatchOptions.filter` on the event-only subscriber contract (ADR-069
+phase 1) or the fold-bound subscriber's trigger predicate, plus the process
+manager's.
+
+**`retentionOrphanSweep` goes with them, and is not migrated.** It is declared
+as an optional dep in `trace-processing/pipeline.ts` and registered when
+supplied — but nothing in `langwatch/src` or `langwatch/ee` ever supplies it. It
+is dead wiring, which is why the registration count is 19 while the live call
+sites are 18. Delete the dep and its `if` block rather than finding it a class.
 
 ### The one migration hazard: `shouldReact` fails open, `filter` does not
 
