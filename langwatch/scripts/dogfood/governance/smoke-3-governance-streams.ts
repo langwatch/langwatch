@@ -1,10 +1,11 @@
 /**
- * 3-reactor smoke evidence script.
+ * Governance derived-stream smoke evidence script.
  *
- * Brings up ALL THREE governance reactors end-to-end:
- *   - gatewayBudgetSync.reactor → gateway_budget_ledger_events
- *   - governanceKpisSync.reactor → governance_kpis
- *   - governanceOcsfEventsSync.reactor → governance_ocsf_events
+ * Brings up ALL THREE governance write paths end-to-end. They were reactors;
+ * ADR-075 Class C made them projections, so a replay now rebuilds them:
+ *   - gatewayBudgetDebits.mapProjection → gateway_budget_ledger_events
+ *   - governanceKpis.mapProjection      → governance_kpis
+ *   - governanceOcsfEvents.mapProjection → governance_ocsf_events
  *
  * Strategy: bypass the live LLM call (which adds Bifrost provider-resolution
  * complexity that's tangential to reactor evidence) and instead POST a
@@ -26,7 +27,7 @@
  *
  * Usage (host-side):
  *   docker exec wise-mixing-zebra-app-1 sh -c \
- *     'cd /app && pnpm tsx scripts/dogfood/governance/smoke-3-reactors.ts'
+ *     'cd /app && pnpm tsx scripts/dogfood/governance/smoke-3-governance-streams.ts'
  *
  * Exit code:
  *   0 — all 3 reactors landed at least one row tied to the synthetic trace

@@ -46,12 +46,21 @@
 -- WHY THE TWO ACTIONS ARE ONE STATEMENT
 -- -------------------------------------
 -- ClickHouse only permits MODIFY ORDER BY to extend the sorting key with a
--- column ADDed in the SAME ALTER query, with its default unmodified — that
--- is what guarantees existing parts are still correctly sorted under the
--- new key (every pre-existing row holds the same '' default, so appending
--- the column to the sort expression cannot reorder them). Splitting this
--- into two statements does not work; it is one ALTER with two actions, not
--- two ALTERs sharing a block.
+-- column ADDed in the SAME ALTER query. Splitting this into two statements
+-- does not work; it is one ALTER with two actions, not two ALTERs sharing a
+-- block.
+--
+-- The column carries NO DEFAULT clause, and that is load-bearing rather than
+-- an omission. ClickHouse rejects folding a column with a default EXPRESSION
+-- into the sorting key outright:
+--
+--   "Newly added column EventId has a default expression, so adding
+--    expressions that use it to the sorting key is forbidden"
+--
+-- An earlier draft wrote `DEFAULT ''` and was rejected on every fresh
+-- ClickHouse, including CI's. String's implicit default is '' anyway, so
+-- pre-existing rows materialise exactly what the explicit default would have
+-- given them — the clause bought nothing and cost provisioning.
 --
 -- The primary key is unchanged (it stays the pre-existing sorting-key
 -- prefix), so this is a metadata-only change with no part rewrite.
@@ -74,7 +83,7 @@
 
 -- +goose StatementBegin
 ALTER TABLE ${CLICKHOUSE_DATABASE}.governance_kpis
-    ADD COLUMN EventId String DEFAULT '' CODEC(ZSTD(1)) AFTER TraceId,
+    ADD COLUMN EventId String CODEC(ZSTD(1)) AFTER TraceId,
     MODIFY ORDER BY (TenantId, SourceId, HourBucket, TraceId, EventId);
 -- +goose StatementEnd
 
