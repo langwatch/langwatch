@@ -126,8 +126,7 @@ jobs:
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          cache-dependency-path: "langwatch/pnpm-lock.yaml"
-          install-dir: langwatch
+          install: "@langwatch/web..."
 
       - name: Prepare files
         working-directory: langwatch
@@ -144,9 +143,9 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: langwatch/node_modules/.cache/tsbuildinfo
-          key: ${{ runner.os }}-tsbuildinfo-${{ hashFiles('langwatch/pnpm-lock.yaml', 'langwatch/tsconfig.tsgo.json', 'langwatch/tsconfig.tsgo.tests.json') }}-${{ github.sha }}
+          key: ${{ runner.os }}-tsbuildinfo-${{ hashFiles('pnpm-lock.yaml', 'langwatch/tsconfig.tsgo.json', 'langwatch/tsconfig.tsgo.tests.json') }}-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-tsbuildinfo-${{ hashFiles('langwatch/pnpm-lock.yaml', 'langwatch/tsconfig.tsgo.json', 'langwatch/tsconfig.tsgo.tests.json') }}-
+            ${{ runner.os }}-tsbuildinfo-${{ hashFiles('pnpm-lock.yaml', 'langwatch/tsconfig.tsgo.json', 'langwatch/tsconfig.tsgo.tests.json') }}-
             ${{ runner.os }}-tsbuildinfo-
 
       - name: Run typecheck
@@ -192,8 +191,7 @@ jobs:
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          cache-dependency-path: "langwatch/pnpm-lock.yaml"
-          install-dir: langwatch
+          install: "@langwatch/web..."
 
       - name: Prepare files
         working-directory: langwatch
@@ -339,8 +337,7 @@ jobs:
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          cache-dependency-path: "langwatch/pnpm-lock.yaml"
-          install-dir: langwatch
+          install: "@langwatch/web..."
 
       - name: Prepare files
         working-directory: langwatch
@@ -686,8 +683,7 @@ jobs:
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          cache-dependency-path: "langwatch/pnpm-lock.yaml"
-          install-dir: langwatch
+          install: "@langwatch/web..."
 
       - name: Check feature-file parity
         working-directory: langwatch
@@ -759,7 +755,7 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('langwatch/pnpm-lock.yaml') }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-pnpm-store-
 
@@ -776,9 +772,9 @@ jobs:
         with:
           path: |
             langwatch/node_modules/.vite
-          key: ${{ runner.os }}-vite-${{ hashFiles('langwatch/pnpm-lock.yaml') }}-${{ hashFiles('langwatch/src/**/*', 'langwatch/vite.config.ts') }}
+          key: ${{ runner.os }}-vite-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('langwatch/src/**/*', 'langwatch/vite.config.ts') }}
           restore-keys: |
-            ${{ runner.os }}-vite-${{ hashFiles('langwatch/pnpm-lock.yaml') }}-
+            ${{ runner.os }}-vite-${{ hashFiles('pnpm-lock.yaml') }}-
             ${{ runner.os }}-vite-
 
       # node-pty@1.1.0 only ships prebuilds for darwin/win32, so on Linux
@@ -789,13 +785,14 @@ jobs:
       - name: Install node-gyp (for node-pty postinstall)
         run: npm install -g node-gyp@12.3.0
 
-      - name: Build mcp-server
-        working-directory: mcp-server
-        run: pnpm install --frozen-lockfile && pnpm run build
-
+      # One install. mcp-server is a workspace dependency of the app, so the
+      # trailing `...` pulls it in — it used to be installed separately here
+      # from its own lockfile, i.e. twice per run. See ADR-076.
       - name: Install dependencies
-        working-directory: langwatch
-        run: CI=true pnpm install --frozen-lockfile
+        run: CI=true pnpm install --frozen-lockfile --filter "@langwatch/web..."
+
+      - name: Build mcp-server
+        run: pnpm --filter @langwatch/mcp-server run build
 
       - name: Build
         working-directory: langwatch
@@ -852,8 +849,7 @@ jobs:
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          cache-dependency-path: "langwatch/pnpm-lock.yaml"
-          install-dir: langwatch
+          install: "@langwatch/web..."
 
       - name: Stage canary fixture inside vitest root
         working-directory: langwatch

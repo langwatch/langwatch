@@ -57,8 +57,7 @@ jobs:
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          cache-dependency-path: "mcp-server/pnpm-lock.yaml"
-          install-dir: mcp-server
+          install: "@langwatch/mcp-server..."
 
       - name: Run typecheck
         working-directory: mcp-server
@@ -79,8 +78,7 @@ jobs:
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          cache-dependency-path: "mcp-server/pnpm-lock.yaml"
-          install-dir: mcp-server
+          install: "@langwatch/mcp-server..."
 
       - name: Build
         working-directory: mcp-server

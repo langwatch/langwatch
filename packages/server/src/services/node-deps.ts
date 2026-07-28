@@ -17,6 +17,15 @@ import { appRoot } from "./app-dir.ts";
 import type { EventBus } from "./event-bus.ts";
 
 /**
+ * The workspace name of the langwatch app, as declared in
+ * langwatch/package.json. Used to filter the install down to the app and its
+ * dependencies. It was plain `langwatch` until ADR-076 — the same name the
+ * published TypeScript SDK uses, which is exactly why it had to change before
+ * the two could live in one workspace.
+ */
+const APP_PACKAGE_NAME = "@langwatch/web";
+
+/**
  * Ensure langwatch/node_modules exists + start:prepare:files has run, both of
  * which are prerequisites for `pnpm run prisma:migrate` and `pnpm run start:app`.
  *
@@ -30,21 +39,33 @@ export async function ensureLangwatchDeps(
 	const langwatchDir = locateLangwatchDir();
 	if (!langwatchDir) throw new Error("langwatch app dir not found");
 
+	// The install now runs from the tarball ROOT, not from langwatch/. Since
+	// ADR-076 the repo is a single pnpm workspace, so the lockfile and the
+	// workspace definition live at the root and langwatch/ is one member of it.
+	// The tree pnpm produces is unchanged — langwatch/node_modules is still
+	// where the app resolves from — only the directory we invoke pnpm in moved.
+	const rootDir = appRoot();
 	const nodeModulesPath = join(langwatchDir, "node_modules");
 	const distPath = join(langwatchDir, "dist");
-	const lockfilePath = join(langwatchDir, "pnpm-lock.yaml");
+	const lockfilePath = join(rootDir, "pnpm-lock.yaml");
+	const workspacePath = join(rootDir, "pnpm-workspace.yaml");
 	const hashFile = join(nodeModulesPath, ".install-hash");
 
 	const distAlreadyBuilt = existsSync(join(distPath, "client"));
-	// Hash key combines the lockfile + package.json — either changing means
-	// we need to re-run install. Use sha256 (not just mtime) because rsync
-	// during ensureAppDir resets mtimes. The sequence tag versions the whole
-	// install recipe: bumping it re-runs the cycle on existing installs, which
-	// is how trees installed before the prod-prune step existed get pruned.
+	// Hash key combines the lockfile + workspace definition + package.json —
+	// any of them changing means we need to re-run install. Use sha256 (not
+	// just mtime) because rsync during ensureAppDir resets mtimes. The sequence
+	// tag versions the whole install recipe: bumping it re-runs the cycle on
+	// existing installs, which is how trees installed before the prod-prune
+	// step existed get pruned.
 	// seq3: re-run on installs whose tree predates the tarball shipping the
 	// workspace packages (3.6.0) — their pnpm links dangled and the member
 	// packages' own dependencies were never installed.
-	const installKey = `${computeInstallKey(lockfilePath, join(langwatchDir, "package.json"))}|seq3-workspace-packages`;
+	// seq4: re-run on installs made against the old per-app lockfile. Those
+	// trees have no root-level workspace at all, so the filtered install below
+	// would otherwise be skipped as fresh and leave the app on a layout the
+	// rest of this function no longer expects.
+	const installKey = `${computeInstallKey(lockfilePath, workspacePath, join(langwatchDir, "package.json"))}|seq4-single-workspace`;
 
 	// Top-level symlinks are the strongest "install completed" signal:
 	// pnpm creates `.bin/` and direct package entries LAST after populating
@@ -86,17 +107,21 @@ export async function ensureLangwatchDeps(
 	const pnpm = await resolvePnpm(ctx.paths);
 
 	// npm pack unconditionally drops .npmrc from published artifacts (it often
-	// carries auth tokens), so the repo's langwatch/.npmrc never reaches an
-	// npx install. Recreate it before the first install: without these hoists
-	// OpenTelemetry's ESM loader shims land deep in the virtual store and its
-	// instrumentation cannot patch them.
-	const npmrcPath = join(langwatchDir, ".npmrc");
+	// carries auth tokens), so the repo's .npmrc never reaches an npx install.
+	// Recreate it before the first install: without these hoists OpenTelemetry's
+	// ESM loader shims land deep in the virtual store and its instrumentation
+	// cannot patch them.
+	//
+	// At the ROOT, not in langwatch/: hoisting is a property of the install
+	// root, and since ADR-076 that is the tarball root. A copy written into
+	// langwatch/ would be read for nothing.
+	const npmrcPath = join(rootDir, ".npmrc");
 	if (!existsSync(npmrcPath)) {
 		writeFileSync(
 			npmrcPath,
 			[
 				"# Recreated by @langwatch/server (npm pack always strips .npmrc).",
-				"# Mirrors the repo's langwatch/.npmrc.",
+				"# Mirrors the repo's root .npmrc.",
 				"public-hoist-pattern[]=*import-in-the-middle*",
 				"public-hoist-pattern[]=*require-in-the-middle*",
 				"",
@@ -109,16 +134,25 @@ export async function ensureLangwatchDeps(
 		// follow genuinely need them: prisma generate needs the prisma CLI's
 		// build tooling and the full build needs vite. Installing with `--prod`
 		// up front was tried once and broke exactly those two steps. The dev
-		// dependencies come OUT again below (prune --prod, after the build),
+		// dependencies come OUT again below (the --prod pass, after the build),
 		// which is the same order the production Dockerfile uses — the pruned
 		// tree it produces is what every helm and docker deployment runs.
+		//
+		// `--filter` is what keeps an end user's install to the app: the tarball
+		// ships the whole workspace definition, so an unfiltered install would
+		// also pull the TypeScript SDK, the skills compiler and the e2e suites,
+		// none of which the server ever runs. The trailing `...` selects the
+		// app AND everything it depends on, which is how the workspace members
+		// under packages/ and mcp-server/ still get installed.
 		await execAndPipe(bus, "prepare:langwatch", pnpm.command, [
 			...pnpm.args,
 			"-C",
-			langwatchDir,
+			rootDir,
 			"install",
 			"--prod=false",
 			"--frozen-lockfile",
+			"--filter",
+			`${APP_PACKAGE_NAME}...`,
 		]);
 	}
 
@@ -149,12 +183,17 @@ export async function ensureLangwatchDeps(
 	}
 
 	// Take the dev dependencies back out, the way the production Dockerfile
-	// does after ITS build (install → build → prune --prod → prisma generate).
+	// does after ITS build (install → build → prod-only pass → prisma generate).
 	// This is what drops vite, vitest, playwright, biome and the rest of the
 	// build tooling from the tree the server actually runs — on the order of a
 	// gigabyte — while tsx and prisma stay, because they are runtime
 	// dependencies here (the server boots through tsx, migrations run through
 	// the prisma CLI) and are declared as such.
+	//
+	// A re-install with `--prod` rather than `pnpm prune --prod`: prune has no
+	// `--filter`, so in a workspace it reasons about every project rather than
+	// the one subtree we installed. A filtered `--prod` install converges on
+	// the same prod-only tree and stays scoped to the app.
 	//
 	// ONLY on the relocated copy under LANGWATCH_HOME. A dev checkout runs the
 	// CLI against its own working tree, and pruning that would strip the
@@ -164,7 +203,16 @@ export async function ensureLangwatchDeps(
 			bus,
 			"prepare:langwatch",
 			pnpm.command,
-			[...pnpm.args, "-C", langwatchDir, "prune", "--prod"],
+			[
+				...pnpm.args,
+				"-C",
+				rootDir,
+				"install",
+				"--prod",
+				"--frozen-lockfile",
+				"--filter",
+				`${APP_PACKAGE_NAME}...`,
+			],
 			{ env: { ...process.env, CI: "true" } },
 		);
 	}
