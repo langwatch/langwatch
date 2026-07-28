@@ -1233,7 +1233,6 @@ export class SimulationClickHouseRepository implements SimulationRepository {
          AND t.ArchivedAt IS NULL
          ${qualifiedDedupPredicate(`TenantId = {tenantId:String} ${unqualify(whereClause)}`)}`,
       { tenantId: projectId, ...params },
-      { expectedMaxDurationMs: 10000, expectedMaxReadBytes: 20_000_000 },
     );
 
     return Number(rows[0]?.Total ?? "0");
@@ -1315,7 +1314,6 @@ export class SimulationClickHouseRepository implements SimulationRepository {
           : {}),
         fetchLimit: String(validatedLimit + 1),
       },
-      { expectedMaxDurationMs: 15000, expectedMaxReadBytes: 50_000_000 },
     );
 
     const hasMore = rows.length > validatedLimit;
