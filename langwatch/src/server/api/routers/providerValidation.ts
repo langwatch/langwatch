@@ -1,6 +1,9 @@
 import type { PrismaClient } from "@prisma/client";
 import { HandledError } from "@langwatch/handled-error";
-import { providerDefaultBaseUrls } from "../../../features/onboarding/regions/model-providers/registry";
+import {
+  providerApiRoots,
+  providerDefaultBaseUrls,
+} from "../../../features/onboarding/regions/model-providers/registry";
 import { MASKED_KEY_PLACEHOLDER } from "../../../utils/constants";
 import { ModelProviderRepository } from "../../modelProviders/modelProvider.repository";
 import { modelProviders } from "../../modelProviders/registry";
@@ -342,11 +345,14 @@ function buildProbeCandidates({
   apiKey,
   baseUrl,
   defaultBaseUrl,
+  apiRoot,
 }: {
   strategy: AuthStrategy;
   apiKey: string;
   baseUrl: string;
   defaultBaseUrl: string;
+  /** The provider's version-less root, when it serves more than one path. */
+  apiRoot?: string;
 }): ProbeRequest[] {
   const url = buildModelsEndpointUrl(baseUrl, defaultBaseUrl);
   const headers: Record<string, string> = {
@@ -368,12 +374,18 @@ function buildProbeCandidates({
     case "elevenlabs":
       return [{ url, headers: { ...headers, "xi-api-key": apiKey } }];
     case "gemini": {
-      // The registry pins one API version; the others live beside it on the
-      // same host, so derive the root rather than hardcoding a second URL.
-      const root = (baseUrl || defaultBaseUrl)
-        .replace(/\/$/, "")
-        .replace(/\/v1(beta)?(\/models)?$/, "");
       const key = encodeURIComponent(apiKey);
+
+      // Which paths a provider serves is provider knowledge, so the root
+      // comes from the registry rather than being recovered from
+      // `defaultBaseUrl` by parsing a URL for its own structure. With no root
+      // stated — or a base URL the customer set themselves, whose layout we
+      // cannot assume — only the documented shape is probed.
+      if (!apiRoot || baseUrl) {
+        return [{ url: `${url}?key=${key}`, headers }];
+      }
+
+      const root = apiRoot.replace(/\/$/, "");
 
       return [
         { url: `${root}/v1/models?key=${key}`, headers },
@@ -657,6 +669,7 @@ export async function validateProviderApiKey(
       apiKey,
       baseUrl,
       defaultBaseUrl,
+      apiRoot: providerApiRoots[provider],
     }),
     context: {
       provider,
