@@ -8,8 +8,9 @@
   Langy, topic clustering, caches, and observability are outside this
   decision."*
 - Builds on: ADR-030 (best-effort vs stake-sensitive), ADR-035 (persist-class
-  debounce), ADR-052 (automations on the process-manager substrate), ADR-072,
-  ADR-073
+  debounce), ADR-052 (automations on the process-manager substrate), ADR-069
+  (payload cost — which shipped the enqueue seam every conversion here lands
+  on), ADR-072, ADR-073
 
 ## Context
 
@@ -191,9 +192,39 @@ requires a big-bang cutover, and no step depends on a later one.
 `ReactorDefinition`, `ReactorContext`, `ReactorOptions`, `withReactor`, the
 router's reactor dispatch path, `LIVE_DISPATCH_IS_REPLAY` and the vestigial
 `isReplay` plumbing, and `specs/event-sourcing/reactors.feature` (superseded by
-`post-event-work.feature`). ADR-026 is superseded: `shouldReact` becomes the
-subscriber's `eventTypes` filter and the process manager's trigger predicate,
-both of which already exist.
+`post-event-work.feature`). ADR-026 is superseded: `shouldReact`'s successor is
+`EnqueueDispatchOptions.filter` on the subscriber contract (ADR-069 phase 1),
+plus the process manager's trigger predicate.
+
+### The one migration hazard: `shouldReact` fails open, `filter` does not
+
+These two predicates look interchangeable and are not. The difference is what
+a *throw* means, and it is inverted:
+
+| | on throw |
+| --- | --- |
+| `shouldReact` (reactor) | caught, logged, **treated as `true`** — "fail open — never drops a side effect" |
+| `enqueue.filter` (subscriber, ADR-069) | reported as a dispatch failure and **the job is permanently lost** — routing has no retry |
+
+ADR-069 chose that deliberately: the enqueue seam runs in the routing worker
+with no retry behind it, so it "takes only cheap, total predicates" and a throw
+must be loud rather than silently indistinguishable from "not relevant".
+`reactors.feature` pins the opposite property — *"A failing relevance check
+never drops a side effect"*.
+
+So a literal `shouldReact` → `filter` port converts *fail-open* into
+*fail-lost*. For Classes A and B that is acceptable; those are at-most-once by
+design. For Class D it is not, and `evaluationTrigger` is the sharp case: its
+guard is 393 lines of monitor matching, and losing its job silently is exactly
+the failure `specs/monitors/evaluation-dispatch-durability.feature` says must
+not happen.
+
+**The rule for Class C, D and E conversions:** only the total, non-throwing
+part of a `shouldReact` predicate may move to `enqueue.filter` — a set lookup,
+a `typeof` check, a field comparison. Anything data-dependent or fallible stays
+in the handler, where a failure retries that job instead of dropping it. Where
+a guard cannot be split that way, it moves wholesale into the handler and the
+enqueue filter narrows on `eventTypes` alone.
 
 ## Consequences
 
@@ -245,6 +276,15 @@ both of which already exist.
   were durable process state
 - ADR-052 (automations on the process-manager substrate) — the inbox/outbox
   precedent, and the decision that deferred this one
+- ADR-069 (payload cost is a scheduling input) — phase 1 shipped
+  `EnqueueDispatchOptions` on the subscriber contract, so every conversion here
+  inherits its enqueue seam *and* its fail-lost throw semantics. Its doctrine
+  ("an irrelevant event costs nothing, a relevant one waits at the cost of a
+  pointer") is also the general form of the `toPayload` narrowing ADR-073's
+  `scenarioExecution` process does by hand
+- [`specs/event-sourcing/payload-cost.feature`](../../../specs/event-sourcing/payload-cost.feature)
+  — the enqueue seam's own contract; `post-event-work.feature` deliberately
+  does not restate it and covers the substrate choice instead
 - ADR-072 (run aggregates are queries, not pipelines) — the `suite_runs` failure
 - ADR-073 (run execution on the process-manager substrate) — Class D's
   `scenarioExecution` is its step 2
