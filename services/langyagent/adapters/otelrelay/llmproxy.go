@@ -382,6 +382,9 @@ func decodeProviderErrorBody(peeked []byte) herr.E {
 	e := herr.E{Code: llmUpstreamErrorCode, Meta: herr.M{}}
 	if t := gjson.GetBytes(peeked, "error.type"); t.Type == gjson.String &&
 		t.Str != "" && len(t.Str) <= maxProviderTypeBytes {
+		// herrgen:external — the provider's own discriminant, relayed as a
+		// reason so the client can branch on it. Not ours to enumerate, so
+		// it never belongs in the generated code list.
 		e.Reasons = []error{herr.E{Code: herr.Code(t.Str)}}
 	}
 	return e

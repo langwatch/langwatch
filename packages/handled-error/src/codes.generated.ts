@@ -66,7 +66,7 @@ export const goErrorCodes = {
    *
    * @source services/aigateway/domain/errors.go
    */
-  circuit_open: { service: "aigateway" },
+  circuit_open: { service: "aigateway", httpStatus: 503 },
   /**
    * ErrCodeBlockTimeout — signals the user code subprocess exceeded
    * NLP_CODE_BLOCK_TIMEOUT_SECONDS and was killed.
