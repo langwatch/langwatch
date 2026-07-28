@@ -193,6 +193,7 @@ afterAll(async () => {
 describe("ClickHouse OOM bisection (integration)", () => {
   describe("getAllTracesForProject()", () => {
     describe("given a real MEMORY_LIMIT_EXCEEDED on the full-list summary read", () => {
+      /** @scenario A page still loads when the database runs out of memory */
       it("recovers the whole page by bisecting until the batches fit", async () => {
         // Tight for anything over 12 ids, generous below — so the full list of
         // 30 OOMs, the 25-id batch OOMs, and the bisected halves succeed.
@@ -221,6 +222,7 @@ describe("ClickHouse OOM bisection (integration)", () => {
         expect(batchSizes.some((n) => n <= 12 && n > 0)).toBe(true);
       }, 120_000);
 
+      /** @scenario A page recovered from a memory limit matches an unaffected read */
       it("returns rows identical to the same read without any memory pressure", async () => {
         const unpressured = await service.getAllTracesForProject(
           makeQueryInput(),
@@ -254,6 +256,7 @@ describe("ClickHouse OOM bisection (integration)", () => {
     });
 
     describe("given every batch size still OOMs", () => {
+      /** @scenario A trace that cannot be read alone fails the page instead of retrying forever */
       it("gives up instead of grinding, and surfaces the memory error", async () => {
         // A ceiling nothing can satisfy: the descent reaches a single id,
         // which cannot be split further, so the error propagates.

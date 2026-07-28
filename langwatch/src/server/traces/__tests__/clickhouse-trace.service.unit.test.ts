@@ -762,6 +762,7 @@ describe("ClickHouseTraceService", () => {
         ).rejects.toThrow("SYNTAX_ERROR");
       });
 
+      /** @scenario A batch that still exceeds the memory limit is split and retried */
       it("bisects a 25-ID batch that still OOMs and resolves both halves", async () => {
         const traceIds = Array.from({ length: 30 }, (_, i) => `trace-${i}`);
         const summaryRows = traceIds.map((id, i) => ({
@@ -855,6 +856,7 @@ describe("ClickHouseTraceService", () => {
         expect(mockClickHouseQuery).toHaveBeenCalledTimes(5);
       });
 
+      /** @scenario Splitting continues until a batch holds a single trace */
       it("descends all the way to single ids when every larger chunk OOMs", async () => {
         const traceIds = Array.from({ length: 30 }, (_, i) => `trace-${i}`);
 
@@ -908,6 +910,7 @@ describe("ClickHouseTraceService", () => {
         expect(chunkSizes).toContain(3);
       });
 
+      /** @scenario Recovery stops once its work budget is spent */
       it("stops bisecting once the work budget is spent instead of grinding every chunk", async () => {
         // The regime the budget exists for: server-wide memory pressure, where
         // a chunk fails at 25 but succeeds once small. Nothing aborts early, so
@@ -959,6 +962,7 @@ describe("ClickHouseTraceService", () => {
         );
       });
 
+      /** @scenario Retries of a split batch run one at a time */
       it("runs the two halves sequentially so a retry never doubles memory pressure", async () => {
         const traceIds = Array.from({ length: 25 }, (_, i) => `trace-${i}`);
         let inFlight = 0;
@@ -1009,6 +1013,7 @@ describe("ClickHouseTraceService", () => {
         expect(maxInFlight).toBe(1);
       });
 
+      /** @scenario A failure unrelated to memory is surfaced immediately */
       it("re-throws a non-OOM error raised inside the bisection, without descending further", async () => {
         const traceIds = Array.from({ length: 25 }, (_, i) => `trace-${i}`);
 
@@ -1471,6 +1476,7 @@ describe("ClickHouseTraceService", () => {
         }
       });
 
+      /** @scenario Splitting a batch does not narrow the span search window */
       it("keeps the span scan window identical across every bisected chunk", async () => {
         const TWO_DAYS_MS = 2 * 24 * 60 * 60 * 1000;
         // Deliberately far from the summary rows' own OccurredAt (Date.now()):
