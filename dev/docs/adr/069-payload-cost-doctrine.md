@@ -152,7 +152,9 @@ visible.
    coding-agent span stops riding whole: with the event carrying a cost-honest
    claim-check, the subscriber reads the slice from the reference instead of the
    full payload — the slice-on-the-wire win phase 1 deferred, landed on the
-   right substrate instead of on the routing-dispatch seam.
+   right substrate instead of on the routing-dispatch seam. (The claim-check
+   half of this clause shipped early for `codingAgentSpanFactsDispatch`; the
+   cost-honesty half did not — see the 2026-07 amendment below.)
 3. **Phase 3 — invariant 3.** The per-process memory grant pool.
    **Precondition: phase 2** — a grant is taken against a declared cost, so
    costs must be honest before a pool can budget them.
@@ -191,7 +193,8 @@ visible.
   for refolds: not "tuned smaller", but "no configuration surface on which to
   recur". Matched spans still travel as full payloads until phase 2 replaces
   them with claim-checks; that residual is bounded by real coding-agent volume,
-  not by all-project span volume.
+  not by all-project span volume. (Superseded for this one subscriber — see the
+  2026-07 amendment below.)
 - **The platform gains a cost vocabulary.** "How many bytes is this job, and
   who granted them?" becomes an answerable question, which is what phases 2–4
   are built on — and what alerting can finally be written against, instead of
@@ -218,6 +221,47 @@ visible.
   phase 3, memory is still discovered rather than granted. The sequencing
   section exists so this gap is a tracked plan, not an ambient hope — the
   ADR-066 scope-table deferral is the cautionary precedent.
+
+## Amendment: the claim-check half of phase 2, shipped early for one subscriber (2026-07, #6117)
+
+`codingAgentSpanFactsDispatch` no longer stages the matched span whole. The
+enqueue seam grew a second total hook (`stage`) beside `filter`, and a matched
+`span_received` is swapped for a small versioned `span_referenced` event
+carrying the span's identity — tenant, trace, span id, and the span's own
+`startTimeUnixMs` — while the payload stays in the span store. The handler
+resolves it back through `spanStorage` and lifts the facts from that canonical
+row. This is the "matched coding-agent span stops riding whole" clause of phase
+2 above, landed ahead of its phase.
+
+Read the sequencing accordingly: **the claim-check half is shipped for this one
+subscriber; the cost-honesty half is not.** `span_referenced` declares no byte
+size, so invariant 1 is still unmet and the phase-2 work it gates — byte-bounded
+in-flight and retry stages (invariant 2), and the grant pool behind it (phase 3)
+— is untouched. The remaining `@planned` scenarios in the spec are the honest
+statement of what is left. A future phase-2 implementer should read this as "the
+reference mechanism exists and has one adopter", not as "phase 2 is underway".
+
+Two consequences worth naming rather than discovering:
+
+- **Span-facts delivery is now store-dependent.** The subscriber was previously
+  self-contained: everything it needed was in the job. It now depends on the
+  spanStorage projection having landed the row and on the ClickHouse read
+  succeeding. A miss is thrown deliberately (retry, never a silent drop) and the
+  2s stage delay debounces the ordinary race against the sibling write — but a
+  genuine store outage now delays these facts, where before it could not touch
+  them.
+- **The recovery path is the shared one, on purpose.** Store misses retry on the
+  platform-wide `JOB_RETRY_CONFIG` (25 attempts, ≈2h27m cumulative), which is
+  sized for exactly this failure — riding out a ClickHouse rolling restart or
+  ZooKeeper session recovery without parking the group. An outage outliving that
+  budget exhausts the job and blocks the per-trace group; the staged references
+  are preserved in Redis, so recovery is an operator unblock (delayed delivery
+  and toil, never loss). A store-miss-specific backoff or per-error-class
+  attempt budget was considered and **not** taken: the budget is one shared
+  platform policy, and carving out a per-subscriber knob is a change to the
+  queue contract with its own blast radius, not a line in this PR. If this class
+  of blocked group is observed in practice, that knob is the follow-up — with
+  the retry metrics to size it, per ADR-068's measure-before-you-limit rule.
 
 ## References
 
