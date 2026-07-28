@@ -25,8 +25,11 @@ import { APP_ERROR_CODES } from "../codes";
 const PACKAGE_ROOT = fileURLToPath(new URL("../../../../../", import.meta.url));
 
 /**
- * Every tree that raises a handled error, the same three the raw-toast guard
- * walks (`noRawErrorToasts.unit.test.ts`).
+ * Every tree that raises a handled error.
+ *
+ * One root more than the raw-toast guard walks: `noRawErrorToasts.unit.test.ts`
+ * covers `src` and `ee` only, because it is looking for *renders* and the
+ * workspace packages have no UI. Codes are declared in all three.
  *
  * `src` alone was a hole with no symptom: `ee/admin/impersonation.service.ts`
  * declares three codes and `packages/api` another, so none of the four entered
@@ -44,6 +47,42 @@ const ROOTS = ["src", "ee", "packages"].map((dir) => join(PACKAGE_ROOT, dir));
 const PACKAGE_OWNED_CODES = new Set(["validation_error"]);
 
 /**
+ * Codes MINTED at a relay boundary rather than declared by a subclass.
+ *
+ * `src/server/nlpgo/goHandledError.ts` promotes a relayed Go error's
+ * `meta.reason` to the code when there is one, so a value written as `meta` in
+ * Go (`{"reason": "missing_provider"}` in
+ * `services/nlpgo/adapters/httpapi/playground_proxy.go`) arrives in the browser
+ * as a first-class code. Nothing in these trees declares it, so no scan will
+ * ever find it — but a customer reads it, so it still needs copy, and the
+ * orphan check below must not call that copy dead.
+ *
+ * Keep this set small and each entry traceable to the `meta.reason` that mints
+ * it. A code that only exists because of this promotion is a code no `herr.Code`
+ * declares, which means `cmd/herrgen` cannot generate it either.
+ */
+const RELAYED_META_CODES = new Set(["missing_provider"]);
+
+/**
+ * Codes MINTED IN THE BROWSER, by narrowing a code we were already given.
+ *
+ * `promoteCodexAgentError` (`src/features/langy/logic/langyErrorExplainer.ts`)
+ * takes the gateway's own code and re-keys it so Langy can say something the
+ * generic entry cannot — a plan limit hit *through Langy* wants "start a new
+ * conversation", where the gateway's version wants "upgrade". The server never
+ * throws this code, so there is no `super("…")` to find; the declaration is a
+ * spread on the client (`{ ...domain, code: "…" }`).
+ *
+ * It still reaches a customer and it still needs copy, so the orphan check must
+ * not call that copy dead. The bar for adding one: the customer reads it, and
+ * the narrowing genuinely changes the remediation. If the copy would be the
+ * same as the code you narrowed from, alias it in `REGISTRY_CODE_ALIASES`
+ * instead and do not enumerate it — which is exactly why the sibling
+ * `langy_codex_session_expired` is absent from `APP_ERROR_CODES`.
+ */
+const CLIENT_MINTED_CODES = new Set(["langy_codex_plan_limit"]);
+
+/**
  * A path typo turns this whole guard into a no-op, and it reports that as a
  * pass. The exact number is noise, but "we read thousands of files" and "we
  * read none" are worlds apart, and only one of them is a working guard.
@@ -51,22 +90,67 @@ const PACKAGE_OWNED_CODES = new Set(["validation_error"]);
 const MINIMUM_SCANNED_FILES = 500;
 
 /**
- * The four shapes a code is declared in:
+ * The shapes a code is declared in, and the one this scanner CANNOT see.
+ *
  *   `super("some_code", …)`                    — the common case
  *   `declare readonly code: "some_code"`        — subclass narrowing
+ *   `code: "some_code"`                         — an options-object property
  *   `const { code = "some_code" } = options`    — a base class's default
  *   `new HandledError("some_code", …)`          — a one-off with no subclass
+ *   `new NotFoundError("some_code", …)`         — the same, for the 404 base
  *
- * The last is worth scanning even though subclasses are the norm: a single
- * permission denial doesn't earn a class, and a shape the scanner can't see is
- * a code that reaches a customer with no copy written for it.
+ * The last two are worth scanning even though subclasses are the norm: a
+ * single permission denial doesn't earn a class, and a shape the scanner can't
+ * see is a code that reaches a customer with no copy written for it. Adding
+ * the `NotFoundError` shape found six live codes at once — `team_not_found`,
+ * `workflow_not_found` and four more — none of which had any copy.
+ *
+ * **What it still cannot see: a code passed as a constructor PARAMETER.** A
+ * class whose caller supplies the code (`new SomeError(code, …)`, or a factory
+ * taking one) declares nothing this file can match, because there is no string
+ * literal at the declaration at all. Those codes enter `APP_ERROR_CODES` only
+ * by hand, and nothing here will notice if they don't. Prefer a subclass with
+ * a literal, precisely so this guard can see it.
+ *
+ * `code: "…"` is a superset of the `declare readonly code:` pattern above; the
+ * narrower one is kept because it names the shape a reader is looking for.
  */
 const CODE_PATTERNS = [
   /super\(\s*"([a-z][a-z0-9_]*)"/g,
   /declare\s+(?:readonly\s+)?code:\s*"([a-z][a-z0-9_]*)"/g,
+  /\bcode:\s*"([a-z][a-z0-9_]*)"/g,
   /\bcode\s*=\s*"([a-z][a-z0-9_]*)"/g,
   /new\s+HandledError\(\s*"([a-z][a-z0-9_]*)"/g,
+  /new\s+NotFoundError\(\s*"([a-z][a-z0-9_]*)"/g,
 ];
+
+/**
+ * Strings that match a pattern above without being a raisable code.
+ *
+ * `unknown` is the sentinel a MASKED reason serialises as — `{ code:
+ * "unknown" }` is how a non-handled link in the cause chain crosses the wire
+ * (ADR-045). It is the absence of a code, so there is nothing to write copy
+ * for and nothing to list.
+ */
+const NON_CODE_LITERALS = new Set(["unknown"]);
+
+/**
+ * One code per declaration shape, each chosen because the pattern for that
+ * shape is the ONLY one that finds it.
+ *
+ * Without this, the "raised but not listed" assertion below gets *easier* to
+ * pass as the patterns rot: a typo in one regex simply finds fewer codes, and
+ * an empty `missing` list reads as a pass. These fail loudly instead.
+ *
+ * `declare readonly code:` has no witness of its own — every code written that
+ * way is also found by the plain `code: "…"` pattern, so breaking the narrow
+ * one cannot be detected from the outside.
+ */
+const SHAPE_WITNESSES: Record<string, string> = {
+  'super("…", …)': "agent_report_rate_limited",
+  'code = "…" (base-class default)': "suite_not_found",
+  'new NotFoundError("…", …)': "team_not_found",
+};
 
 function isTestFile(path: string): boolean {
   return path.includes("__tests__") || /\.test\.tsx?$/.test(path);
@@ -98,7 +182,7 @@ function declaredCodes(): Set<string> {
     if (!source.includes("@langwatch/handled-error")) continue;
     for (const pattern of CODE_PATTERNS) {
       for (const match of source.matchAll(pattern)) {
-        if (match[1]) found.add(match[1]);
+        if (match[1] && !NON_CODE_LITERALS.has(match[1])) found.add(match[1]);
       }
     }
   }
@@ -117,6 +201,19 @@ describe("APP_ERROR_CODES", () => {
   });
 
   describe("given the codes the source actually declares", () => {
+    it.each(
+      Object.entries(SHAPE_WITNESSES),
+    )("still sees a code declared as %s", (_shape, witness) => {
+      expect(
+        [...declaredCodes()],
+        `The scanner stopped finding "${witness}", which is declared in a ` +
+          `shape only one CODE_PATTERNS entry matches. That pattern is ` +
+          `broken, and every assertion below just got easier to pass.`,
+      ).toContain(witness);
+    });
+
+    /** @scenario "A new app code is caught by the suite first, then by the compiler" */
+    /** @scenario "The list of app codes cannot drift from the code that raises them" */
     it("lists every code a HandledError subclass raises", () => {
       const listed = new Set<string>(APP_ERROR_CODES);
       const missing = [...declaredCodes()].filter((code) => !listed.has(code));
@@ -129,10 +226,15 @@ describe("APP_ERROR_CODES", () => {
       ).toEqual([]);
     });
 
+    /** @scenario "The list of app codes cannot drift from the code that raises them" */
     it("lists no code that nothing raises", () => {
       const declared = declaredCodes();
       const orphans = APP_ERROR_CODES.filter(
-        (code) => !declared.has(code) && !PACKAGE_OWNED_CODES.has(code),
+        (code) =>
+          !declared.has(code) &&
+          !PACKAGE_OWNED_CODES.has(code) &&
+          !RELAYED_META_CODES.has(code) &&
+          !CLIENT_MINTED_CODES.has(code),
       );
 
       expect(

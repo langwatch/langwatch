@@ -42,6 +42,7 @@ const apply = (error: unknown, form: FormStub, hasFormErrorSlot = false) =>
 
 describe("applyHandledErrorToForm", () => {
   describe("given a validation error naming fields the form owns", () => {
+    /** @scenario "A rejected submission lands on the fields that caused it" */
     it("marks each field with its message", () => {
       const form = formWithFields("name", "slug");
 
@@ -65,6 +66,7 @@ describe("applyHandledErrorToForm", () => {
       );
     });
 
+    /** @scenario "A rejected submission lands on the fields that caused it" */
     it("focuses only the first, so the page doesn't fight itself", () => {
       const form = formWithFields("a", "b", "c");
 
@@ -83,6 +85,7 @@ describe("applyHandledErrorToForm", () => {
   });
 
   describe("given form-level errors and a form that renders the root slot", () => {
+    /** @scenario "A form-level complaint is only claimed by a form that can show it" */
     it("puts them on the form root and claims the error", () => {
       const form = formWithFields("name");
 
@@ -108,6 +111,7 @@ describe("applyHandledErrorToForm", () => {
      * suppressed the caller's toast and the user got no feedback at all from
      * pressing Save. Every call site was in this state until now.
      */
+    /** @scenario "A form with no error slot never swallows the rejection" */
     it("declines it so the caller still reports the failure", () => {
       const form = formWithFields("name");
 
@@ -266,6 +270,7 @@ describe("applyHandledErrorToForm", () => {
   });
 
   describe("given a validation error about fields this form does not have", () => {
+    /** @scenario "A validation error the form does not own is not swallowed" */
     it("declines it, so it falls through to a toast instead of vanishing", () => {
       const form = formWithFields("name");
 

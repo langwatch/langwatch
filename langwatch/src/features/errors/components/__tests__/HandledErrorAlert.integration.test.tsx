@@ -52,6 +52,7 @@ const renderAlert = (props: Parameters<typeof HandledErrorAlert>[0]) =>
 
 describe("<HandledErrorAlert />", () => {
   describe("given a code the registry has copy for", () => {
+    /** @scenario "A caller's generic headline loses to specific copy" */
     it("shows that copy rather than the caller's generic headline", () => {
       renderAlert({
         error: handledError({ code: "query_timeout" }),
@@ -64,6 +65,7 @@ describe("<HandledErrorAlert />", () => {
       ).not.toBeInTheDocument();
     });
 
+    /** @scenario "A recognised code is described by the registry, never by the wire" */
     it("never puts the code slug on screen", () => {
       const { container } = renderAlert({
         error: handledError({ code: "validation_error" }),
@@ -74,6 +76,7 @@ describe("<HandledErrorAlert />", () => {
   });
 
   describe("given a code this client has no copy for", () => {
+    /** @scenario "A caller's generic headline loses to specific copy" */
     it("falls back to the caller's headline", () => {
       renderAlert({
         error: handledError({ code: "a_code_from_a_newer_deploy" }),
@@ -85,6 +88,7 @@ describe("<HandledErrorAlert />", () => {
       ).toBeInTheDocument();
     });
 
+    /** @scenario "Remediation reaches the customer when we have nothing better" */
     it("shows the server's tips, which are all the remediation there is", () => {
       renderAlert({
         error: handledError({
@@ -100,6 +104,7 @@ describe("<HandledErrorAlert />", () => {
   });
 
   describe("given a code the registry describes AND server tips", () => {
+    /** @scenario "A tip that repeats our copy is dropped, one that adds to it is kept" */
     it("shows only the registry copy, so the alert doesn't say it twice", () => {
       renderAlert({
         error: handledError({
@@ -120,6 +125,7 @@ describe("<HandledErrorAlert />", () => {
   });
 
   describe("given a docs link", () => {
+    /** @scenario "Remediation reaches the customer when we have nothing better" */
     it("offers an https one", () => {
       renderAlert({
         error: handledError({
@@ -231,6 +237,7 @@ describe("<HandledErrorAlert />", () => {
   });
 
   describe("given an error with nothing handled about it", () => {
+    /** @scenario "An unhandled failure says nothing, but stays traceable" */
     it("says something calm and offers the id support can correlate on", async () => {
       vi.stubGlobal("navigator", {
         ...navigator,
@@ -255,6 +262,7 @@ describe("<HandledErrorAlert />", () => {
      * support. Falling back to plain text is the difference between a
      * reportable error and an unreportable one.
      */
+    /** @scenario "An error id stays readable where it cannot be copied" */
     it("shows the id as text when there is no clipboard to copy it to", () => {
       vi.stubGlobal("navigator", { ...navigator, clipboard: undefined });
 

@@ -38,6 +38,7 @@ beforeEach(() => {
 
 describe("showErrorToast", () => {
   describe("given a code the registry knows", () => {
+    /** @scenario "A caller's generic headline loses to specific copy" */
     it("shows the registry copy, not the caller's generic headline", () => {
       showErrorToast({
         error: handledError({ code: "query_timeout", httpStatus: 504 }),
@@ -69,22 +70,46 @@ describe("showErrorToast", () => {
       );
     });
 
-    it("prefers its own copy over the server's tips, rather than saying both", () => {
+    /**
+     * Tips used to be dropped wholesale the moment the registry had any
+     * description, which threw away the escalation path on nearly every
+     * error — `clickhouse_unavailable`'s "check the status page or contact
+     * support" never once reached a customer. Only the tip that REPEATS the
+     * description is the duplicate.
+     */
+    /** @scenario "A tip that repeats our copy is dropped, one that adds to it is kept" */
+    it("drops the tip that repeats its copy and keeps the one that adds to it", () => {
       showErrorToast({
         error: handledError({
-          code: "trace_not_found",
-          httpStatus: 404,
-          tips: ["Check the trace id", "Retry in a few seconds"],
+          code: "query_timeout",
+          httpStatus: 504,
+          tips: ["Narrow the time range", "Check the LangWatch status page"],
         }),
       });
 
-      const { description } = create.mock.calls[0]![0];
-      expect(description).toContain("may have been deleted");
-      expect(description).not.toContain("Check the trace id");
+      expect(create.mock.calls[0]![0].description).toBe(
+        "Narrow the time range or add a filter, then try again. Check the LangWatch status page",
+      );
+    });
+
+    /** @scenario "A tip that repeats our copy is dropped, one that adds to it is kept" */
+    it("says it once when every tip repeats the description", () => {
+      showErrorToast({
+        error: handledError({
+          code: "query_timeout",
+          httpStatus: 504,
+          tips: ["Narrow the time range or add a filter"],
+        }),
+      });
+
+      expect(create.mock.calls[0]![0].description).toBe(
+        "Narrow the time range or add a filter, then try again.",
+      );
     });
   });
 
   describe("given a code with no copy but server tips", () => {
+    /** @scenario "Remediation reaches the customer when we have nothing better" */
     it("falls back to the most actionable tip", () => {
       showErrorToast({
         error: handledError({
@@ -100,6 +125,7 @@ describe("showErrorToast", () => {
   });
 
   describe("given a code the registry has never seen", () => {
+    /** @scenario "A caller's generic headline loses to specific copy" */
     it("uses the caller's headline, so the user knows what failed", () => {
       showErrorToast({
         error: handledError({ code: "some_future_code", httpStatus: 400 }),
@@ -117,6 +143,7 @@ describe("showErrorToast", () => {
      * wrong" would be the same sentence for every unrecognised code there will
      * ever be.
      */
+    /** @scenario "An unrecognised code degrades to the code itself, not to a guess at the fault" */
     it("shows the code itself when the caller named no action", () => {
       showErrorToast({
         error: handledError({
@@ -130,6 +157,7 @@ describe("showErrorToast", () => {
   });
 
   describe("given an unhandled failure", () => {
+    /** @scenario "An unhandled failure says nothing, but stays traceable" */
     it("says nothing about what broke, but keeps the trace id", () => {
       showErrorToast({
         error: handledError(null, "4bf92f"),
@@ -158,6 +186,7 @@ describe("showErrorToast", () => {
     });
   });
 
+  /** @scenario "A recognised code is described by the registry, never by the wire" */
   it("renders the registry's copy as the title, not the code slug", () => {
     showErrorToast({
       error: handledError({ code: "validation_error", httpStatus: 422 }),
@@ -177,6 +206,7 @@ describe("showErrorToast", () => {
      * it with "we've been notified" tells the user to wait for something that
      * will never change. This is the branch that keeps that promise.
      */
+    /** @scenario "A plain 4xx keeps the sentence its procedure authored" */
     it("shows the authored sentence", () => {
       showErrorToast({
         error: {
@@ -192,6 +222,7 @@ describe("showErrorToast", () => {
       expect(toast.description).toBe("You've already used this invite.");
     });
 
+    /** @scenario "A machine's diagnostic is not mistaken for authored copy" */
     it("refuses a message a driver wrote rather than a person", () => {
       showErrorToast({
         error: {
@@ -222,6 +253,7 @@ describe("showErrorToast", () => {
   });
 
   describe("given a 4xx the boundary did not mark authored", () => {
+    /** @scenario "Only the boundary decides what counts as authored copy" */
     it("degrades to the generic state rather than reciting it", () => {
       showErrorToast({
         // `new TRPCError({ code: "NOT_FOUND" })` — tRPC defaults the message

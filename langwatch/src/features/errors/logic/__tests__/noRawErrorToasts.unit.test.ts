@@ -20,7 +20,13 @@
  *  - rename the catch binding (`catch (problem)`, `const { error: saveError }`)
  *    and a closed `error|err|e|…` alternation can never match it;
  *  - write it as a JSX attribute (`fallbackTitle={error.message}`) and a
- *    pattern anchored on `key:` never sees it.
+ *    pattern anchored on `key:` never sees it;
+ *  - destructure it (`const { message } = error`) and the declaration reader,
+ *    which anchors on an identifier straight after `const`, has nothing to
+ *    bind;
+ *  - put it in the children (`<Alert.Description>{error.message}</…>`) and
+ *    every attribute-anchored pattern walks past it, because children are not
+ *    attributes.
  *
  * So this file reads the file the way a reader does: it tracks which locals
  * hold an error, which identifiers were *bound* to one (catch clauses,
@@ -51,11 +57,17 @@ const ROOTS = ["src", "ee"].map((dir) => join(PACKAGE_ROOT, dir));
  * error.message })` renders the code slug with nothing between it and the
  * customer — and such a file need never mention `toaster`.
  *
+ * The bare `Alert.Description` / `Toast.Description` spellings are here for the
+ * same reason: a component that renders `{error.message}` as a *child* of a
+ * Chakra alert need mention none of the other four, so widening the detector to
+ * read JSX children without widening this would have been inert.
+ *
  * This prefilter is also the guard's single largest failure mode, which is why
  * {@link SCANNED_FILE_FLOOR} exists: rename the toaster module and this matches
  * nothing, the scan reports no offenders, and the guard stays green forever.
  */
-const WORTH_SCANNING = /toaster|showErrorToast|HandledErrorAlert|setError/;
+const WORTH_SCANNING =
+  /toaster|showErrorToast|HandledErrorAlert|setError|(?:Alert|Toast)\.(?:Description|Title)/;
 
 /**
  * Below this many scanned files, assume the prefilter has stopped matching
@@ -99,8 +111,19 @@ const BARE_SET_ERROR = /(?:^|[^\w$.])setError$/;
 const USES_REACT_HOOK_FORM =
   /FORM_SERVER_ERROR|\buseForm\b|UseFormReturn|react-hook-form/;
 
-/** JSX elements that present an error and take the same copy props. */
-const ERROR_COMPONENT = /(?:^|\.)(?:HandledErrorAlert|ErrorAlert|ErrorCard)$/;
+/**
+ * JSX elements that present an error, whether the copy arrives as a prop or as
+ * children.
+ *
+ * `Toast.Description` and `Alert.Description` are here because Chakra's
+ * compositional spelling puts the copy in the children:
+ * `<Alert.Description>{error.message}</Alert.Description>` reads the same slug
+ * to the same customer as `description: error.message` does, and every
+ * attribute-anchored pattern — in this file and in the Biome plugin — walked
+ * straight past it.
+ */
+const ERROR_COMPONENT =
+  /(?:^|\.)(?:HandledErrorAlert|ErrorAlert|ErrorCard)$|^(?:Toast|Alert)\.(?:Title|Description)$/;
 
 /**
  * Receivers whose `.message` is customer *data* we render on purpose.
@@ -112,6 +135,19 @@ const ERROR_COMPONENT = /(?:^|\.)(?:HandledErrorAlert|ErrorAlert|ErrorCard)$/;
  * this guard is about.
  */
 const SAFE_MESSAGE_RECEIVERS = new Set(["trace", "span"]);
+
+/**
+ * The form bridge's *output* side.
+ *
+ * `applyHandledErrorToForm` writes registry copy into react-hook-form's
+ * `errors.root.serverError`, and `FormServerError` reads it straight back out
+ * to render it — that is the whole point of the bridge. So a read of
+ * `errors.root….message` is the correct thing, not a leak, and without this
+ * the guard flags the one component in the repo whose job is to show that
+ * copy. The *write* side (`form.setError(FORM_SERVER_ERROR, { message })`) is
+ * still guarded; that is where a raw message would get in.
+ */
+const FORM_ERROR_TREE = /\berrors\s*\??\s*\.\s*root\b/;
 
 /**
  * Names that mean "this holds an error", written open rather than closed.
@@ -301,6 +337,27 @@ function suppressedLines(raw: string): Set<number> {
   return lines;
 }
 
+/**
+ * Is the marker anywhere in the slot's own lines — key through end of value?
+ *
+ * Checking only the key's line made the opt-out depend on where the formatter
+ * happened to break the line. `description: err.message, // marker` was not
+ * suppressed, and the only spelling that worked was pushing the value onto its
+ * own line so the comment could sit above it — which is exactly how two of the
+ * three suppressions in this repo came to be written. The marker belongs
+ * wherever the leak is legible.
+ */
+function markerCovers(
+  suppressed: Set<number>,
+  firstLine: number,
+  lastLine: number,
+): boolean {
+  for (let line = firstLine; line <= lastLine; line++) {
+    if (suppressed.has(line)) return true;
+  }
+  return false;
+}
+
 /* ------------------------------------------------------------------ */
 /* Expression reading                                                  */
 /* ------------------------------------------------------------------ */
@@ -376,6 +433,7 @@ function isErrorExpression(path: string, facts: FileFacts): boolean {
   const root = rootOf(path);
   if (!root) return false;
   if (SAFE_MESSAGE_RECEIVERS.has(root)) return false;
+  if (FORM_ERROR_TREE.test(path)) return false;
   if (/[.?]\s*(?:error|cause|reason)\b/.test(path)) return true;
   if (facts.errorBindings.has(root)) return true;
   if (facts.tainted.has(root)) return true;
@@ -448,6 +506,20 @@ const DECLARATION =
   /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*(?::[^=;\n]*?)?\s*=(?!=)\s*/g;
 
 /**
+ * `const { message } = error` — the same leak, written as a destructure.
+ *
+ * {@link DECLARATION} anchors on an identifier directly after `const`, so this
+ * shape had no reader at all: the initialiser never contains `.message`, and
+ * the bound name is a bare `message` that reads as innocent at the toast. Two
+ * lines, neither of which any signal in this file could see.
+ */
+const DESTRUCTURED_DECLARATION =
+  /\b(?:const|let|var)\s*\{([^{}]*)\}\s*(?::[^=;\n]*?)?\s*=(?!=)\s*/g;
+
+/** `message` or `message: alias` inside a destructuring pattern. */
+const MESSAGE_BINDING = /\bmessage\b\s*(?::\s*([A-Za-z_$][\w$]*))?/;
+
+/**
  * Locals holding an error's message.
  *
  * This is the shape the guard missed most often, and the one people reach for
@@ -472,6 +544,19 @@ function collectTaint(source: string, facts: FileFacts): Set<string> {
       const value = readValue(source, match.index + match[0].length);
       if (valueLeaks(value, facts)) tainted.add(name);
     }
+    for (const match of source.matchAll(DESTRUCTURED_DECLARATION)) {
+      const binding = MESSAGE_BINDING.exec(match[1]!);
+      if (!binding) continue;
+      // `const { message: reason } = err` binds `reason`; `const { message }`
+      // binds `message`.
+      const name = binding[1] ?? "message";
+      if (tainted.has(name)) continue;
+      // The initialiser is the error itself, not an expression that leaks —
+      // `valueLeaks` would never fire on it, because the `.message` is on the
+      // left of the `=`.
+      const value = readValue(source, match.index + match[0].length);
+      if (isErrorExpression(value, facts)) tainted.add(name);
+    }
     if (tainted.size === before) break;
   }
 
@@ -483,7 +568,12 @@ function collectTaint(source: string, facts: FileFacts): Set<string> {
 /* ------------------------------------------------------------------ */
 
 interface Frame {
-  kind: "call" | "group" | "jsx";
+  /**
+   * `jsxChildren` is the span between an element's `>` and its closing tag.
+   * It is a separate kind from `jsx` because the two hold different things:
+   * `jsx` holds attributes, `jsxChildren` holds copy.
+   */
+  kind: "call" | "group" | "jsx" | "jsxChildren";
   name: string;
 }
 
@@ -599,6 +689,20 @@ function scanSlots(source: string): Slot[] {
       stack.push({ kind: "call", name: calleeBefore(source, at) });
       continue;
     }
+    // `<Alert.Description>{error.message}</Alert.Description>` — an expression
+    // child of an element that presents an error. There is no key to anchor
+    // on, so the `{` itself is the slot; the value is read to its matching `}`
+    // exactly as a property value would be.
+    const openChild = char === "{" ? stack.at(-1) : undefined;
+    if (openChild?.kind === "jsxChildren") {
+      slots.push({
+        key: "children",
+        keyAt: at,
+        valueAt: at + 1,
+        shorthand: false,
+        frame: openChild,
+      });
+    }
     if (char === "[" || char === "{") {
       stack.push({ kind: "group", name: "" });
       continue;
@@ -607,14 +711,33 @@ function scanSlots(source: string): Slot[] {
       stack.pop();
       continue;
     }
+    if (char === "<" && source[at + 1] === "/") {
+      // A closing tag ends the children it belongs to. Matched by name so a
+      // nested `</b>` inside a description — and `</>`, whose opening `<>`
+      // never pushed anything — can't unbalance the stack.
+      const tag = /[\w$.]+/.exec(source.slice(at + 2))?.[0] ?? "";
+      const open = stack.at(-1);
+      if (open?.kind === "jsxChildren" && open.name === tag) stack.pop();
+      continue;
+    }
     if (char === "<" && isJsxOpen(source, at)) {
       const tag = /[\w$.]+/.exec(source.slice(at + 1))?.[0] ?? "";
       stack.push({ kind: "jsx", name: tag });
       continue;
     }
     if (char === ">" && stack.at(-1)?.kind === "jsx") {
-      // Attributes end at the tag's `>`; children are not attributes.
-      stack.pop();
+      // Attributes end at the tag's `>`. For an element that presents an
+      // error the children are copy too, so hand the frame over rather than
+      // dropping it — but only for those elements, because pushing a children
+      // frame for every tag in the tree is how a fragment or an unclosed
+      // element desynchronises the whole stack.
+      const frame = stack.pop()!;
+      let prev = at - 1;
+      while (prev > 0 && /\s/.test(source[prev]!)) prev--;
+      const selfClosing = source[prev] === "/";
+      if (!selfClosing && ERROR_COMPONENT.test(frame.name)) {
+        stack.push({ kind: "jsxChildren", name: frame.name });
+      }
     }
   }
 
@@ -627,6 +750,12 @@ function slotIsCopy(slot: Slot, facts: FileFacts): boolean {
   if (!frame) return false;
   if (frame.kind === "jsx") {
     return ERROR_COMPONENT.test(frame.name) && COPY_KEYS.has(slot.key);
+  }
+  // Only `scanSlots` mints a `children` slot, and only inside one of these
+  // elements, so the key check just keeps a literal `description:` written in
+  // JSX *text* from being read as a property.
+  if (frame.kind === "jsxChildren") {
+    return slot.key === "children" && ERROR_COMPONENT.test(frame.name);
   }
   if (TOAST_CALL.test(frame.name)) return COPY_KEYS.has(slot.key);
   // `FormServerError` renders `errors.root.serverError.message` verbatim, so
@@ -657,7 +786,8 @@ function findLeaks(raw: string): number[] {
     const value = slot.shorthand ? slot.key : readValue(source, slot.valueAt);
     if (!valueLeaks(value, facts)) continue;
     const line = lineOf(source, slot.keyAt);
-    if (suppressed.has(line)) continue;
+    const lastLine = lineOf(source, slot.valueAt + value.length);
+    if (markerCovers(suppressed, line, lastLine)) continue;
     lines.push(line);
   }
   return lines;
@@ -734,6 +864,18 @@ describe("the raw-message detector", () => {
         `const description = error.message;\ntoaster.create({ description })`,
       ],
       [
+        "destructured off the error",
+        `const { message } = error;\ntoaster.create({ description: message })`,
+      ],
+      [
+        "destructured under a different name",
+        `const { message: reason } = saveError;\ntoaster.create({ description: reason })`,
+      ],
+      [
+        "destructured and then laundered through a local",
+        `const { message } = err;\nconst shown = message;\ntoaster.create({ description: shown })`,
+      ],
+      [
         "JSON.stringified",
         `toaster.create({ description: JSON.stringify(err) })`,
       ],
@@ -770,6 +912,22 @@ describe("the raw-message detector", () => {
       [
         "a JSX attribute on an error component",
         `<HandledErrorAlert error={error} fallbackTitle={error.message} />`,
+      ],
+      [
+        "a JSX text child of a toast description",
+        `<Toast.Description>{error.message}</Toast.Description>`,
+      ],
+      [
+        "a JSX text child of an alert description",
+        `<Alert.Description>{error.message}</Alert.Description>`,
+      ],
+      [
+        "a JSX text child interpolated into a template",
+        "<Alert.Title>{`Couldn't save: ${error.message}`}</Alert.Title>",
+      ],
+      [
+        "a JSX text child alongside other children",
+        `<Alert.Description>\n  {error.message}\n  {renderAction(error.type)}\n</Alert.Description>`,
       ],
       [
         "a quoted key",
@@ -835,6 +993,14 @@ describe("the raw-message detector", () => {
         "an ingested trace's error, which is customer data",
         `toaster.create({ description: trace.error.message })`,
       ],
+      [
+        "a destructure off something that isn't an error",
+        `const { message } = notification;\ntoaster.create({ description: message })`,
+      ],
+      [
+        "an alert description rendering a payload's own message",
+        `<Alert.Description>{data.message}</Alert.Description>`,
+      ],
     ])("stays quiet about %s", (_shape, source) => {
       expect(leaksIn(source)).toBe(false);
     });
@@ -849,6 +1015,14 @@ describe("the raw-message detector", () => {
       [
         "a JSX attribute on an ordinary component",
         `<Tooltip title={error.message} />`,
+      ],
+      [
+        "a JSX text child of an ordinary component",
+        `<Box>{error.message}</Box>`,
+      ],
+      [
+        "an attribute after a description that closed over nested markup",
+        `<Alert.Description><b>Saved</b></Alert.Description>\n<Tooltip title={error.message} />`,
       ],
       [
         "an interface declaring the same property names",
@@ -872,6 +1046,27 @@ describe("the raw-message detector", () => {
 
       expect(findLeaks(source)).toEqual([2]);
     });
+
+    it("accepts the marker on the value's line, not just the key's", () => {
+      const source = [
+        `toaster.create({`,
+        `  description:`,
+        `    err instanceof Error ? err.message : "x", // ${SUPPRESSION_MARKER}`,
+        `});`,
+      ].join("\n");
+
+      expect(findLeaks(source)).toEqual([]);
+    });
+
+    it("still reports a leak whose marker sits outside the slot", () => {
+      const source = [
+        `// ${SUPPRESSION_MARKER}`,
+        ``,
+        `toaster.create({ description: error.message });`,
+      ].join("\n");
+
+      expect(findLeaks(source)).toEqual([3]);
+    });
   });
 
   describe("when the same file leaks more than once", () => {
@@ -887,6 +1082,7 @@ describe("the raw-message detector", () => {
 });
 
 describe("error toasts", () => {
+  /** @scenario "The raw-message habit cannot grow back" */
   it("never render an error's raw message", () => {
     const offenders: string[] = [];
     let scanned = 0;

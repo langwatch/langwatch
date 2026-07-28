@@ -1,12 +1,23 @@
 import type { FieldValues, Path, UseFormReturn } from "react-hook-form";
 
-import { readHandledError } from "./readHandledError";
+import { readHandledError, safeProse } from "./readHandledError";
+
+/**
+ * The key under `errors.root` this module writes form-level complaints to.
+ *
+ * Exported alongside the dotted path because `<FormServerError>` has to READ
+ * it (`errors.root?.[key]`) where this module WRITES it (`setError("root.x")`)
+ * — and rebuilding one from the other by splitting the string at render time
+ * both re-derives what the constant already knows and asserts a tuple type the
+ * compiler cannot check.
+ */
+export const FORM_SERVER_ERROR_KEY = "serverError";
 
 /**
  * The root error key react-hook-form reserves for form-level (non-field)
  * errors. Rendered by `<FormServerError>`.
  */
-export const FORM_SERVER_ERROR = "root.serverError";
+export const FORM_SERVER_ERROR = `root.${FORM_SERVER_ERROR_KEY}`;
 
 /**
  * Puts a rejected submission back on the form that caused it.
@@ -66,7 +77,15 @@ export function applyHandledErrorToForm<TFieldValues extends FieldValues>({
 
   // Only the errors this form can actually put on screen count towards
   // claiming it. See `hasFormErrorSlot`.
-  const showableFormErrors = hasFormErrorSlot ? formErrors : [];
+  //
+  // Capped the same way tips are: `meta` on a relayed error is forwarded
+  // verbatim from an upstream body, so the number of complaints is not ours to
+  // trust. Falling short of the full set makes `claimsEverything` false below,
+  // which is the safe direction — the caller still toasts, so nothing the form
+  // declined to render is lost.
+  const showableFormErrors = hasFormErrorSlot
+    ? formErrors.slice(0, MAX_FORM_ERRORS)
+    : [];
 
   // Whether the form can show the WHOLE rejection. When it can't, the caller
   // still toasts, so the parts this form can't display aren't lost.
@@ -79,7 +98,10 @@ export function applyHandledErrorToForm<TFieldValues extends FieldValues>({
   applicable.forEach(([field, messages], index) => {
     form.setError(
       field as Path<TFieldValues>,
-      { type: "server", message: messages[0] },
+      // Clamped, like every other sentence in this feature that we did not
+      // author: these arrive on `meta`, and a relayed handled error's meta is
+      // forwarded verbatim from an upstream response body.
+      { type: "server", message: safeProse(messages[0] ?? "") },
       // Focus the first one so a rejection below the fold still lands — but
       // only when the form is the sole report. On a partial match a toast is
       // coming too, and yanking focus into a field while a toast explains a
@@ -91,7 +113,7 @@ export function applyHandledErrorToForm<TFieldValues extends FieldValues>({
   if (showableFormErrors.length > 0) {
     form.setError(FORM_SERVER_ERROR as Path<TFieldValues>, {
       type: "server",
-      message: showableFormErrors.join(" "),
+      message: safeProse(showableFormErrors.join(" ")),
     });
   }
 
@@ -99,6 +121,9 @@ export function applyHandledErrorToForm<TFieldValues extends FieldValues>({
   // on shouldn't stop them seeing that `name` is the field that's wrong.
   return claimsEverything;
 }
+
+/** More than this above a form is a document, not a rejection. */
+const MAX_FORM_ERRORS = 4;
 
 /**
  * Whether an input is actually on screen for this key.

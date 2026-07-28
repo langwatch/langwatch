@@ -2,7 +2,7 @@ import { Alert } from "@chakra-ui/react";
 import type { FieldValues, UseFormReturn } from "react-hook-form";
 import { useFormState } from "react-hook-form";
 
-import { FORM_SERVER_ERROR } from "../logic/applyHandledErrorToForm";
+import { FORM_SERVER_ERROR_KEY } from "../logic/applyHandledErrorToForm";
 
 export interface FormServerErrorProps<TFieldValues extends FieldValues> {
   form: UseFormReturn<TFieldValues>;
@@ -27,14 +27,17 @@ export function FormServerError<TFieldValues extends FieldValues>({
   const { errors } = useFormState({ control: form.control });
   // Read through the same constant `applyHandledErrorToForm` writes to, so
   // the two can never drift apart silently.
-  const [root, key] = FORM_SERVER_ERROR.split(".") as ["root", string];
   const message = (
-    errors[root] as Record<string, { message?: string }> | undefined
-  )?.[key]?.message;
+    errors.root as Record<string, { message?: string }> | undefined
+  )?.[FORM_SERVER_ERROR_KEY]?.message;
   if (!message) return null;
 
   return (
-    <Alert.Root status="error" size="sm">
+    // Chakra v3's `Alert.Root` is a plain div, so without this a rejected Save
+    // is announced to nobody: the submit button stays put, the page doesn't
+    // move, and a screen-reader user gets silence. `<HandledErrorAlert>` sets
+    // the same role for the same reason.
+    <Alert.Root role="alert" status="error" size="sm">
       <Alert.Indicator />
       <Alert.Content>
         <Alert.Description>{message}</Alert.Description>

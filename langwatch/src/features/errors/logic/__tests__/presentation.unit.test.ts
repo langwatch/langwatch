@@ -35,8 +35,29 @@ const shape = (
   ...overrides,
 });
 
+describe("ALL_CODES", () => {
+  /**
+   * `codes.generated.ts` is written by `cmd/herrgen`. A regeneration that
+   * emitted an empty object would leave every cross-cutting loop below
+   * iterating nothing and reporting a pass — the exhaustive `satisfies` in
+   * `presentation.ts` would go quiet at the same time, since a `Record` over
+   * `never` is satisfied by anything.
+   */
+  it("covers the generated code sets, not just the hand-written one", () => {
+    expect(
+      Object.keys(goErrorCodes).length,
+      "goErrorCodes is empty — codes.generated.ts looks stale or truncated. Run `make herrgen`.",
+    ).toBeGreaterThan(0);
+    expect(
+      Object.keys(nodeErrorCodes).length,
+      "nodeErrorCodes is empty — codes.generated.ts looks stale or truncated. Run `make herrgen`.",
+    ).toBeGreaterThan(0);
+  });
+});
+
 describe("explainHandledError", () => {
   describe("given a code the registry knows", () => {
+    /** @scenario "A recognised code is described by the registry, never by the wire" */
     it("uses the registry copy rather than anything off the wire", () => {
       const { title, description } = explainHandledError(
         shape({ code: "query_timeout" }),
@@ -46,6 +67,7 @@ describe("explainHandledError", () => {
       expect(description).toContain("Narrow the time range");
     });
 
+    /** @scenario "meta is read only where the client knows its shape" */
     it("reads meta only where the registry declares the shape", () => {
       const { description } = explainHandledError(
         shape({
@@ -57,6 +79,7 @@ describe("explainHandledError", () => {
       expect(description).toBe('There\'s no field called "trace.durationn".');
     });
 
+    /** @scenario "meta is read only where the client knows its shape" */
     it("falls back cleanly when the declared meta is absent", () => {
       const { title, description } = explainHandledError(
         shape({ code: "filter_field_unknown", meta: {} }),
@@ -66,6 +89,7 @@ describe("explainHandledError", () => {
       expect(description).toBe("");
     });
 
+    /** @scenario "meta is read only where the client knows its shape" */
     it("ignores meta of the wrong type rather than rendering it", () => {
       const { description } = explainHandledError(
         shape({ code: "filter_field_unknown", meta: { field: { nope: 1 } } }),
@@ -84,6 +108,7 @@ describe("explainHandledError", () => {
      * didn't respond" about their own Python error. The code is the one thing
      * we actually know, and a customer can quote it to support.
      */
+    /** @scenario "An unrecognised code degrades to the code itself, not to a guess at the fault" */
     it("degrades to the code itself rather than a guess at whose fault it is", () => {
       const { title, isRegistered } = explainHandledError(
         shape({ code: "dataset_import_stalled" }),
@@ -93,6 +118,7 @@ describe("explainHandledError", () => {
       expect(isRegistered).toBe(false);
     });
 
+    /** @scenario "An unrecognised code degrades to the code itself, not to a guess at the fault" */
     it("says the same thing whatever the fault claims", () => {
       const titleFor = (fault: HandledErrorShape["fault"] | undefined) =>
         explainHandledError(
@@ -107,6 +133,7 @@ describe("explainHandledError", () => {
       expect(titleFor(undefined)).toBe("Dataset import stalled");
     });
 
+    /** @scenario "Server-authored prose travels only in the explicit channel" */
     it("renders server prose only from the explicit meta.message channel", () => {
       const { description } = explainHandledError(
         shape({
@@ -120,6 +147,7 @@ describe("explainHandledError", () => {
   });
 
   describe("given a failure with no code at all", () => {
+    /** @scenario "An unrecognised code degrades to the code itself, not to a guess at the fault" */
     it("falls back on fault, which is then the only thing known about it", () => {
       const { title, isRegistered } = explainHandledError(
         shape({ code: "", fault: "platform" }),
@@ -147,6 +175,47 @@ describe("explainHandledError", () => {
       expect(description).not.toContain("projectId");
       expect(description).not.toContain("checkId");
       expect(description).toBe("Some of the values aren't valid.");
+    });
+
+    /**
+     * `fieldErrors` keys come off the wire, so they reach a bare index lookup
+     * as untrusted input. `constructor` resolved to `Object` — truthy, so it
+     * passed the label filter — and the customer read "There's a problem with
+     * function Object() { [native code] }".
+     */
+    it.each([
+      "constructor",
+      "toString",
+      "__proto__",
+      "hasOwnProperty",
+    ])("declines %s as a field name rather than resolving it on the prototype", (field) => {
+      const { description } = explainHandledError(
+        shape({
+          code: "validation_error",
+          httpStatus: 422,
+          meta: { fieldErrors: { [field]: ["Required"] } },
+        }),
+      );
+
+      expect(description).toBe("Some of the values aren't valid.");
+    });
+
+    it("declines a prototype key on the single-field code too", () => {
+      const { description } = explainHandledError(
+        shape({ code: "schema_failure", meta: { field: "constructor" } }),
+      );
+
+      expect(description).toBe("Some of the values aren't valid.");
+    });
+
+    it("declines a prototype key where the evaluator names its field", () => {
+      const { description } = explainHandledError(
+        shape({ code: "evaluator_missing_field", meta: { field: "toString" } }),
+      );
+
+      expect(description).toBe(
+        "Map all of its required fields before running it.",
+      );
     });
 
     it("names them the way the screen does, not the way the schema does", () => {
@@ -229,6 +298,7 @@ describe("explainHandledError", () => {
   });
 
   describe("given a coded failure serialised on an event payload", () => {
+    /** @scenario "A workflow node failure reaches the customer as a code, not a Go string" */
     it("explains it from the registry, not from its raw message", () => {
       // A target_result.domainError, as the engine's http_error arrives.
       const { title } = explainSerializedError({
@@ -257,6 +327,7 @@ describe("explainHandledError", () => {
       }
     });
 
+    /** @scenario "Technical detail stops at the trace id" */
     it("never renders a value the server put in meta", () => {
       // The leak this module exists to stop can re-enter through `meta` just
       // as easily as through `message`: a machine sub-classifier
@@ -370,6 +441,7 @@ describe("explainHandledError", () => {
 });
 
 describe("UNKNOWN_ERROR_PRESENTATION", () => {
+  /** @scenario "An unhandled failure says nothing, but stays traceable" */
   it("says nothing about what actually failed", () => {
     expect(UNKNOWN_ERROR_PRESENTATION.title).toBe("Something went wrong");
     expect(UNKNOWN_ERROR_PRESENTATION.description).not.toMatch(

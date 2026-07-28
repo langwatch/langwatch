@@ -1,8 +1,7 @@
 import { toaster } from "~/components/ui/toaster";
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
 
-import { explainAnyError } from "./presentation";
-import { readErrorTraceId, readHandledError } from "./readHandledError";
+import { resolveErrorCopy } from "./resolveErrorCopy";
 
 export interface ShowErrorToastOptions {
   /**
@@ -51,19 +50,12 @@ export function showErrorToast({
   // in `utils/api.tsx` — a second toast would be a duplicate report.
   if (isHandledByGlobalHandler(error)) return;
 
-  const handled = readHandledError(error);
-  const explanation = explainAnyError(error);
-
-  // A code the registry recognises has copy written for this exact failure, so
-  // it wins over the caller's generic "couldn't do the thing". Everything else
-  // — an unhandled error, or a code newer than this client — takes the
-  // caller's headline, which at least names what the user was trying to do.
-  const isRecognised = handled !== null && explanation.isRegistered;
-  const title =
-    options.title ??
-    (isRecognised
-      ? explanation.title
-      : (options.fallbackTitle ?? explanation.title));
+  // One parse, one set of rules — the same ones the inline alert renders.
+  const copy = resolveErrorCopy({
+    error,
+    title: options.title,
+    fallbackTitle: options.fallbackTitle,
+  });
 
   toaster.create({
     ...(options.id ? { id: options.id } : {}),
@@ -71,34 +63,43 @@ export function showErrorToast({
     // decide, and click "Copy error ID" or "Read the docs". It stays
     // dismissable — `closable` is set below.
     duration: 12000,
-    title,
-    description: bodyCopy(explanation.description, handled?.tips),
+    title: copy.title,
+    description: bodyCopy(copy),
     type: "error",
     meta: {
       closable: true,
       // Consumed by the Toaster's error rendering — the docs link and the
       // copyable error id, which is all a customer gets of the technical
       // detail (raw meta and the reason chain stay server-side).
-      docsUrl: handled?.docsUrl,
-      traceId: readErrorTraceId(error),
+      docsUrl: copy.docsUrl,
+      traceId: copy.traceId,
     },
   });
 }
 
 /**
- * Picks the body copy: the registry's description, or the first server tip.
+ * The toast's single body line: the registry's description, plus the one
+ * remaining server tip that adds something to it.
  *
- * Never both. The two are competing authorings of the same remediation — the
- * registry entry for `query_timeout` says "Narrow the time range or add a
- * filter", and so does its first tip — so showing both makes the toast repeat
- * itself. The registry wins because it is written for this surface; tips are
- * written for agents driving the API/CLI/MCP, which have no registry to read
- * (ADR-045). They still earn their place when the code is one this client
- * doesn't recognise and has no copy for.
+ * `resolveErrorCopy` has already dropped any tip that merely restates the
+ * description, so what is left is remediation the registry never said. Folding
+ * one in is the difference between "We're on it. Try again in a moment." and
+ * that plus "check the LangWatch status page or contact support" — the second
+ * half being the only escalation path a customer is ever offered. A toast has
+ * room for one, so the alert is where the rest live.
  */
-function bodyCopy(
-  description: string,
-  tips: readonly string[] | undefined,
-): string {
-  return description || (tips?.[0] ?? "");
+function bodyCopy({
+  description,
+  tips,
+}: {
+  description: string;
+  tips: readonly string[];
+}): string {
+  const tip = tips[0];
+  if (!description) return tip ?? "";
+  if (!tip) return description;
+
+  return /[.!?]$/.test(description)
+    ? `${description} ${tip}`
+    : `${description}. ${tip}`;
 }

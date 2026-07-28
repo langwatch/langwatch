@@ -169,6 +169,18 @@ export function readErrorTraceId(err: unknown): string | undefined {
   const handled = readHandledError(err);
   if (handled?.traceId) return handled.traceId;
 
+  return readEnvelopeTraceId(err);
+}
+
+/**
+ * The trace id each boundary attaches OUTSIDE the handled payload.
+ *
+ * Split out of {@link readErrorTraceId} so a caller that has already parsed
+ * the handled payload can finish the lookup without parsing it a second time.
+ * `resolveErrorCopy` does exactly that — reading title, description, tips,
+ * docs link and trace id used to cost four separate parses of the same error.
+ */
+export function readEnvelopeTraceId(err: unknown): string | undefined {
   const traceId = (err as { data?: { traceId?: unknown } })?.data?.traceId;
   if (typeof traceId === "string") return traceId;
 
@@ -237,6 +249,66 @@ export function safeProse(value: string): string {
 }
 
 const MAX_PROSE_LENGTH = 200;
+
+/**
+ * Relayed prose — a third party's sentence, shown because it is the whole
+ * answer — with anything credential-shaped masked before it is clamped.
+ *
+ * Use this, never {@link safeProse}, for text that originated outside
+ * LangWatch. Copy authored in the presentation registry needs neither.
+ */
+export function safeRelayedProse(value: string): string {
+  return safeProse(redactSecrets(value));
+}
+
+/**
+ * Masks credential-shaped tokens in text we are about to show a customer.
+ *
+ * Providers put key material in their own error bodies: an OpenAI 401 answers
+ * `Incorrect API key provided: sk-proj-…`, and that body is relayed verbatim
+ * onto `meta.message` for `llm_upstream_error`. When the call went through a
+ * LangWatch-MANAGED provider, the key in that sentence is OURS, not the
+ * customer's — so the relayed sentence would print a platform credential in a
+ * toast, and again in whatever the customer pastes into a support thread.
+ *
+ * Deliberately shape-based rather than a list of known vendors: a prefix we
+ * have not enumerated is exactly the one that leaks. The final two patterns
+ * are the catch-all — a 20-character unbroken run of key-alphabet characters
+ * is a token, not a word.
+ *
+ * Redaction happens BEFORE truncation, so a key that would have sat past the
+ * 200-character clamp is still masked rather than merely cropped out of this
+ * particular surface.
+ */
+export function redactSecrets(text: string): string {
+  return text.replace(SECRET_SHAPES, REDACTED);
+}
+
+const REDACTED = "[redacted]";
+
+const SECRET_SHAPES = new RegExp(
+  [
+    // `Authorization: Bearer <token>`, echoed back by upstreams that quote the
+    // request they refused.
+    "\\bBearer\\s+[A-Za-z0-9._~+/=-]{8,}",
+    // `api_key=…`, `apiKey: "…"`, `api-key = …`. The separator class is
+    // required, so the English words "API key" (with a space) are left alone —
+    // they are usually the sentence that names the problem.
+    "\\bapi[-_]?key[\"'\\s:=]+\\S+",
+    // OpenAI / Anthropic / OpenRouter and anything else using the same shape.
+    "\\bsk-(?:proj-|ant-|or-v1-|live-|test-)?[A-Za-z0-9_-]{8,}",
+    // Slack bot, user, app and legacy tokens.
+    "\\bxox[abpsre]-[A-Za-z0-9-]{8,}",
+    // GitHub personal access tokens, old and new.
+    "\\b(?:gh[pousr]_|github_pat_)[A-Za-z0-9_]{16,}",
+    // AWS access key ids (long-lived and STS).
+    "\\b(?:AKIA|ASIA)[A-Z0-9]{12,}",
+    // The catch-all: a base64url or hex run long enough that no one typed it.
+    "\\b[A-Za-z0-9+/_-]{20,}={0,2}",
+    "\\b[0-9a-f]{20,}\\b",
+  ].join("|"),
+  "gi",
+);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
@@ -361,6 +433,20 @@ const SLUG_SHAPED = /^[a-z0-9]+(_[a-z0-9]+)*$/;
 export function readAuthoredMessage(err: unknown): string | undefined {
   if (readHandledError(err)) return undefined;
 
+  return readAuthoredMessageOfUnhandled(err);
+}
+
+/**
+ * {@link readAuthoredMessage} minus its handled-error guard.
+ *
+ * Only for a caller that has ALREADY established `readHandledError` returned
+ * `null` for this error — a handled error's copy comes from the registry, and
+ * skipping the guard without that fact would let its wire message (the code
+ * slug) through. It exists so the render path parses each error once.
+ */
+export function readAuthoredMessageOfUnhandled(
+  err: unknown,
+): string | undefined {
   const data = (err as { data?: { httpStatus?: unknown; authored?: unknown } })
     ?.data;
 

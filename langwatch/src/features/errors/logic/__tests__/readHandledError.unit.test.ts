@@ -11,6 +11,8 @@ import {
   readAuthoredMessage,
   readErrorTraceId,
   readHandledError,
+  redactSecrets,
+  safeProse,
 } from "../readHandledError";
 
 const trpcError = (error: unknown, traceId?: string) => ({
@@ -45,6 +47,7 @@ describe("readHandledError", () => {
   });
 
   describe("given a payload from an older server", () => {
+    /** @scenario "A client resolves a handled error from either discriminant field" */
     it("resolves the discriminant from the deprecated kind alias", () => {
       const result = readHandledError(
         trpcError({ kind: "project_not_found", httpStatus: 404 }),
@@ -71,6 +74,22 @@ describe("readHandledError", () => {
       ["no httpStatus", trpcError({ code: "trace_not_found" })],
       ["a non-numeric httpStatus", trpcError({ code: "x", httpStatus: "404" })],
     ])("returns null for %s", (_label, error) => {
+      expect(readHandledError(error)).toBeNull();
+    });
+
+    /**
+     * Not every rejection is an object. `throw "boom"` and a rejected promise
+     * with no value both reach a render path, and reading `.data` off them is
+     * the difference between a generic error state and a blank page.
+     */
+    it.each([
+      ["null", null],
+      ["undefined", undefined],
+      ["a bare string", "boom"],
+      ["a number", 42],
+      ["an array", [1, 2, 3]],
+      ["a boolean", false],
+    ])("returns null for %s at the top level", (_label, error) => {
       expect(readHandledError(error)).toBeNull();
     });
 
@@ -123,7 +142,10 @@ describe("readHandledError", () => {
         }),
       );
 
-      expect(result?.tips.length).toBeLessThanOrEqual(4);
+      // The exact array, not a length bound: `toBeLessThanOrEqual(4)` also
+      // passes for zero, so "the cap works" and "every tip was thrown away"
+      // were the same result.
+      expect(result?.tips).toEqual(["one", "two", "three", "four"]);
     });
 
     it("clamps a tip that runs to a paragraph", () => {
@@ -298,6 +320,187 @@ describe("handledShapeFromSerialized", () => {
       expect(shape.meta).toEqual({});
     });
   });
+
+  /**
+   * This path skips `readHandledError` entirely, so it needs the same
+   * narrowing rather than inheriting it by luck: a relayed Go error's
+   * `docs_url` is parsed off an upstream body with a bare `z.string()`, and
+   * `ErrorActions` turns it into the href behind "Read the docs".
+   */
+  describe("given a docs link on an event payload", () => {
+    const serializedWith = (docsUrl: string) =>
+      handledShapeFromSerialized({
+        code: "provider_error",
+        kind: "provider_error",
+        httpStatus: 502,
+        fault: "provider",
+        docsUrl,
+        traceId: undefined,
+        spanId: undefined,
+        reasons: [],
+      } as never);
+
+    it.each([
+      ["another origin entirely", "https://docs.evil.example/x"],
+      ["a javascript: url", "javascript:alert(1)"],
+    ])("refuses %s here too", (_label, docsUrl) => {
+      expect(serializedWith(docsUrl).docsUrl).toBeUndefined();
+    });
+
+    it("keeps one on our own docs origin", () => {
+      expect(
+        serializedWith("https://docs.langwatch.ai/errors/provider-error")
+          .docsUrl,
+      ).toBe("https://docs.langwatch.ai/errors/provider-error");
+    });
+
+    it("caps the tips an upstream can put on screen", () => {
+      const shape = handledShapeFromSerialized({
+        code: "provider_error",
+        kind: "provider_error",
+        httpStatus: 502,
+        fault: "provider",
+        tips: ["one", "two", "three", "four", "five", "six"],
+        traceId: undefined,
+        spanId: undefined,
+        reasons: [],
+      } as never);
+
+      expect(shape.tips).toEqual(["one", "two", "three", "four"]);
+    });
+  });
+});
+
+describe("safeProse", () => {
+  it("collapses the whitespace an upstream laid its body out with", () => {
+    expect(safeProse("  Your credit\n\n  balance is\ttoo low.  ")).toBe(
+      "Your credit balance is too low.",
+    );
+  });
+
+  it("passes a sentence under the cap through unchanged", () => {
+    expect(safeProse("Your credit balance is too low.")).toBe(
+      "Your credit balance is too low.",
+    );
+  });
+
+  it("returns nothing for a string that was only whitespace", () => {
+    expect(safeProse("   \n\t ")).toBe("");
+  });
+
+  it("truncates past the cap", () => {
+    const clamped = safeProse("x".repeat(5000));
+
+    expect(clamped.length).toBeLessThan(250);
+    expect(clamped.endsWith("…")).toBe(true);
+  });
+
+  /**
+   * By code POINT, not code unit. Slicing an astral emoji in half leaves a
+   * lone surrogate, which renders as a replacement character right before the
+   * ellipsis — an upstream can put one at the boundary on purpose.
+   */
+  it("truncates an astral emoji without leaving half of one behind", () => {
+    const clamped = safeProse("🎉".repeat(300));
+
+    expect(clamped.endsWith("…")).toBe(true);
+    expect(clamped).not.toMatch(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/);
+    expect(clamped).not.toMatch(/(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/);
+    expect(clamped).not.toContain("�");
+  });
+});
+
+describe("redactSecrets", () => {
+  /**
+   * Providers put key material in their own error bodies, and those bodies are
+   * relayed verbatim onto `meta.message` for `llm_upstream_error`. When the
+   * call used a LangWatch-MANAGED provider, the key in the sentence is OURS —
+   * so an unredacted relay prints a platform credential in a toast, and again
+   * in whatever the customer pastes into a support thread.
+   */
+
+  /**
+   * Assembled at runtime, not written as a literal: a whole Slack bot token
+   * spelled out in the source trips GitHub's push protection, which blocks the
+   * push rather than the commit — so a fixture for the redactor becomes the one
+   * thing that stops the redactor shipping. Keep it in pieces. The value the
+   * assertion sees is identical; only the bytes on disk differ.
+   */
+  const slackBotToken = ["xoxb", "1234567890", "0987654321", "AbCdEfGhIjKlMnOp"].join("-");
+
+  it.each([
+    [
+      "an OpenAI 401",
+      "Incorrect API key provided: sk-proj-Ab3xQ9zLmNoPqRsTuVwXyZ01. You can find your API key at https://platform.openai.com/account/api-keys.",
+      "sk-proj-Ab3xQ9zLmNoPqRsTuVwXyZ01",
+    ],
+    [
+      "an older OpenAI key",
+      "Incorrect API key provided: sk-Ab3xQ9zLmNoPqRsTuVwXyZ01234567890.",
+      "sk-Ab3xQ9zLmNoPqRsTuVwXyZ01234567890",
+    ],
+    [
+      "an Anthropic key",
+      "authentication_error: invalid x-api-key sk-ant-api03-KJh2f8Ljs9dKJHs8fkjhSDF8",
+      "sk-ant-api03-KJh2f8Ljs9dKJHs8fkjhSDF8",
+    ],
+    [
+      "a Slack bot token",
+      `invalid_auth for token ${slackBotToken}`,
+      slackBotToken,
+    ],
+    [
+      "a GitHub token",
+      "Bad credentials for ghp_16C7e42F292c6912E7710c838347Ae178B4a",
+      "ghp_16C7e42F292c6912E7710c838347Ae178B4a",
+    ],
+    [
+      "an AWS access key id",
+      "The security token included in the request is invalid: AKIAIOSFODNN7EXAMPLE",
+      "AKIAIOSFODNN7EXAMPLE",
+    ],
+    [
+      "an Authorization header echoed back",
+      "Rejected request with Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9",
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9",
+    ],
+    [
+      "a key spelled as a parameter",
+      "Unrecognised request argument api_key=9f8e7d6c5b4a39281706f5e4d3c2b1a0",
+      "9f8e7d6c5b4a39281706f5e4d3c2b1a0",
+    ],
+  ])("masks the credential in %s", (_label, body, secret) => {
+    const redacted = redactSecrets(body);
+
+    expect(redacted).not.toContain(secret);
+    expect(redacted).toContain("[redacted]");
+  });
+
+  it("leaves the sentence around it readable, which is why we relay it", () => {
+    expect(
+      redactSecrets(
+        "Your credit balance is too low to access the Claude API. Please go to Plans & Billing to upgrade or purchase credits.",
+      ),
+    ).toBe(
+      "Your credit balance is too low to access the Claude API. Please go to Plans & Billing to upgrade or purchase credits.",
+    );
+  });
+
+  it("does not mistake the words 'API key' for a key", () => {
+    expect(
+      redactSecrets("Your API key does not have access to this model."),
+    ).toBe("Your API key does not have access to this model.");
+  });
+
+  it("masks before the clamp, so a key past the cap is still masked", () => {
+    const clamped = safeProse(
+      redactSecrets(
+        `${"filler word ".repeat(30)}sk-proj-Ab3xQ9zLmNoPqRsTuVwXyZ01`,
+      ),
+    );
+
+    expect(clamped).not.toContain("sk-proj-");
+  });
 });
 
 describe("readAuthoredMessage", () => {
@@ -316,6 +519,7 @@ describe("readAuthoredMessage", () => {
   });
 
   describe("given a plain non-5xx TRPCError", () => {
+    /** @scenario "A plain 4xx keeps the sentence its procedure authored" */
     it("returns the prose the procedure authored", () => {
       // These are real: user.register throws them, and #5984 deliberately
       // left non-5xx messages alone.
@@ -377,6 +581,7 @@ describe("readAuthoredMessage", () => {
      * The two accidents the flag exists to exclude. Both used to reach a
      * customer through this channel.
      */
+    /** @scenario "Only the boundary decides what counts as authored copy" */
     it("declines a message tRPC defaulted to the code NAME", () => {
       // `new TRPCError({ code: "NOT_FOUND" })` with no message: tRPC uses the
       // code name, so the customer read "NOT_FOUND".
@@ -385,6 +590,7 @@ describe("readAuthoredMessage", () => {
       ).toBeUndefined();
     });
 
+    /** @scenario "Only the boundary decides what counts as authored copy" */
     it("declines a message inherited from a wrapped cause", () => {
       // `new TRPCError({ code: "BAD_REQUEST", cause: err })` inherits the
       // caught error's message — a driver string, presented as our own copy.
@@ -417,6 +623,7 @@ describe("readAuthoredMessage", () => {
       expect(readAuthoredMessage(trpcError(400, message))).toBe(message);
     });
 
+    /** @scenario "A machine's diagnostic is not mistaken for authored copy" */
     it.each([
       ["a driver diagnostic", "Invalid `prisma.user.create()` invocation"],
       ["a socket errno", "connect ECONNREFUSED 10.0.0.4:5432"],

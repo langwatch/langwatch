@@ -80,8 +80,15 @@ export function ErrorActions({ docsUrl, traceId }: ErrorActionsProps) {
         http), or a browser that withholds it. The id is the only handle a
         customer has to give support, so it is shown as text rather than
         withheld along with the button that would have copied it.
+
+        `hasFailed` is the same predicament arrived at the other way: the API
+        exists, so the button rendered, but the write was refused (an unfocused
+        document, a denied permission). `hasFailed` only clears on a later
+        success, so without this the button reads "Couldn't copy" for good and
+        the id is unobtainable — worst on the anonymous share page, where it is
+        the viewer's only handle to quote.
       */}
-      {traceId && !canCopy && (
+      {traceId && (!canCopy || hasFailed) && (
         <chakra.span userSelect="all">Error ID: {traceId}</chakra.span>
       )}
       {traceId && canCopy && (
@@ -94,13 +101,10 @@ export function ErrorActions({ docsUrl, traceId }: ErrorActionsProps) {
           cursor="pointer"
           transition="color .12s ease"
           _hover={{ color: "fg.muted" }}
-          aria-label={
-            hasFailed
-              ? "Couldn't copy the error ID"
-              : isCopied
-                ? "Error ID copied"
-                : "Copy error ID"
-          }
+          // No `aria-label`: the visible text already names the action, and an
+          // override that says something ELSE ("Error ID copied" over a button
+          // reading "Copied") breaks voice control, which targets what the user
+          // can see. Label and text must agree, so there is only one of them.
         >
           {isCopied ? (
             <CheckIcon width={10} height={10} />

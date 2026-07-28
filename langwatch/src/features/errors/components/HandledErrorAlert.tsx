@@ -3,8 +3,7 @@ import { AlertCircle } from "lucide-react";
 
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
 
-import { explainAnyError } from "../logic/presentation";
-import { readErrorTraceId, readHandledError } from "../logic/readHandledError";
+import { resolveErrorCopy } from "../logic/resolveErrorCopy";
 
 import { ErrorActions } from "./ErrorActions";
 
@@ -61,24 +60,10 @@ export function HandledErrorAlert({
   // it properly.
   if (isHandledByGlobalHandler(error)) return null;
 
-  const handled = readHandledError(error);
-  const explanation = explainAnyError(error);
-
-  // The registry description and the server's tips are competing authorings of
-  // the same remediation — "Narrow the time range or add a filter" is both the
-  // `query_timeout` description and its first tip — so rendering both makes
-  // the alert repeat itself. Tips are written for agents with no registry to
-  // read (ADR-045); they show here only when this client has no copy of its
-  // own for the code.
-  const tips = explanation.description ? [] : (handled?.tips ?? []);
-
-  // Registry copy describes this exact failure, so it beats the caller's
-  // generic headline. See `showErrorToast` for the same rule.
-  const heading =
-    title ??
-    (explanation.isRegistered
-      ? explanation.title
-      : (fallbackTitle ?? explanation.title));
+  // One parse, and the same two rules the toast renders — whose headline
+  // wins, and which tips add to the description rather than repeating it.
+  const copy = resolveErrorCopy({ error, title, fallbackTitle });
+  const { tips } = copy;
 
   return (
     <Box
@@ -103,11 +88,11 @@ export function HandledErrorAlert({
             lineHeight="1.35"
             letterSpacing="-0.005em"
           >
-            {heading}
+            {copy.title}
           </Text>
-          {explanation.description && (
+          {copy.description && (
             <Text fontSize="13px" lineHeight="1.5" color="fg.muted">
-              {explanation.description}
+              {copy.description}
             </Text>
           )}
 
@@ -132,10 +117,7 @@ export function HandledErrorAlert({
             </Text>
           )}
 
-          <ErrorActions
-            docsUrl={handled?.docsUrl}
-            traceId={readErrorTraceId(error)}
-          />
+          <ErrorActions docsUrl={copy.docsUrl} traceId={copy.traceId} />
         </Stack>
       </HStack>
     </Box>
