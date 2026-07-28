@@ -147,8 +147,20 @@ export function computeBTLeaderboard({
 
   // Smoothing keeps MM finite when at least one variant is degenerate. A
   // shared Beta(eps, eps) prior across every pair is the standard fix
-  // (Hunter §4) — it shrinks the leaderboard slightly without changing
-  // ordering on healthy data.
+  // (Hunter §4).
+  //
+  // It is NOT order-preserving, and an earlier comment here claimed it was.
+  // The prior adds the same pseudo-count to every pair regardless of how many
+  // real games that pair played, so a pair with two games is dragged most of
+  // the way to 50/50 while a pair with thirty barely moves. On unequal sample
+  // sizes that reorders healthy variants: measured 545 flips across 4000 such
+  // matrices between eps=1e-4 and the eps=0.5 used here. The trigger is a
+  // degenerate variant elsewhere in the field, which is why the reordering can
+  // involve two variants that have nothing to do with it.
+  //
+  // Kept because the alternative — no finite fit at all — is worse, and
+  // because the degenerate variant that triggers it is excluded from the
+  // ranking anyway. Callers are told via the trust panel.
   const smooth = hasDegenerate ? 0.5 : 0;
   const { strength, converged } = fitBT({
     W,

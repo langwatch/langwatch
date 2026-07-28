@@ -68,6 +68,68 @@ Feature: Comparison leaderboard (Bradley-Terry ranking on the results page)
     When I open the expanded leaderboard
     Then I see a warning that the ranking may be unstable at this sample size
 
+  # ── Claims the run is not entitled to make ─────────────────────────────
+  #
+  # Bradley-Terry has a unique answer only when the win graph is strongly
+  # connected (Ford 1957). The per-variant check — did anyone sweep or get
+  # swept — is necessary and not sufficient, and the gap is ordinary rather
+  # than exotic: it is any field the run failed to knit together.
+
+  Scenario: A field that splits into tiers is not presented as one scale
+    Given the top variants beat the bottom ones every time they met
+    And every variant won at least once and lost at least once
+    When I open the expanded leaderboard
+    Then I am told the run did not connect all the variants onto one scale
+    And I am told the size of a gap that spans the split is not measured
+    # Without this the likelihood has no maximum, and the score is a readout
+    # of the solver's iteration cap: 702 at five hundred iterations, 1302 at
+    # a million, with a confidence interval that tightens around it as more
+    # rows arrive.
+
+  Scenario: Variants that never met are not ordered against each other
+    Given two variants were compared only with each other
+    And two more were compared only with each other
+    When I open the expanded leaderboard
+    Then I am told the run splits into groups it never connected
+    # Reachable in the ordinary way: the Comparison evaluator drops a
+    # candidate that produced no output for a row.
+
+  Scenario: A ranking that cannot settle does not claim it has
+    Given the run's variants do not all sit on one scale
+    When I open the expanded leaderboard
+    Then the ranking is not reported as having converged on a stable answer
+
+  Scenario: The last variant standing is not crowned by default
+    Given one variant beat every other every time
+    And one variant lost to every other every time
+    And only one variant remains that can be scored
+    When I read the headline
+    Then it does not name a variant to ship
+    # Both the sweeper and the swept are unscoreable, so the field collapses
+    # to the one in the middle — which lost every match it played against the
+    # sweeper shown at a 100% win rate two rows above.
+
+  Scenario: Variants the run separated are never called interchangeable
+    Given the leader cannot be separated from two other variants
+    But those two can be separated from each other
+    When I read the headline
+    Then it does not describe all three as too close to separate
+    And the variants it does group agree with the separated-pair count
+
+  Scenario: A cheaper recommendation is measured against what I would ship
+    Given the top-ranked variant is not the most expensive of the tied set
+    And a cheaper variant is tied with it
+    When I read the headline
+    Then the saving is measured against the top-ranked variant
+    # Measuring against the dearest tied variant instead inflates it: a field
+    # of leader $0.002, other $0.010, cheapest $0.0018 reads as an 82% saving
+    # when switching from the leader actually saves 10%.
+
+  Scenario: A cost averaged over too few rows does not drive the headline
+    Given only one row recorded a cost for each variant
+    When I read the headline
+    Then it does not recommend a variant on price
+
   Scenario: A variant that always wins is flagged, not left to break the math
     Given one variant has won every matchup it has been in
     When I open the expanded leaderboard

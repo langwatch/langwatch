@@ -128,12 +128,23 @@ export const buildTrustChecks = ({
     // rather than a measurement. Ford (1957) is the sufficient condition, so
     // it gets its own check rather than riding on the sweep one.
     buildComparabilityCheck(leaderboard),
+    // `didConverge` alone would overstate this. The solver stops when
+    // consecutive iterates stop moving much, which cannot distinguish settling
+    // on an answer from creeping toward one that does not exist — on a field
+    // that fails the Ford condition it reports success while the scores march
+    // off with the iteration cap. So the claim is only made when there was an
+    // answer to converge to.
     {
       label: "Ranking settled",
-      tone: leaderboard.didConverge ? "ok" : "warn",
-      detail: leaderboard.didConverge
-        ? "The ranking converged on a stable answer."
-        : "The ranking did not fully settle, so treat the order as approximate.",
+      tone:
+        leaderboard.didConverge && leaderboard.comparability.identifiable
+          ? "ok"
+          : "warn",
+      detail: !leaderboard.comparability.identifiable
+        ? "The ranking cannot settle across groups the run never connected, so treat gaps that span them as unmeasured."
+        : leaderboard.didConverge
+          ? "The ranking converged on a stable answer."
+          : "The ranking did not fully settle, so treat the order as approximate.",
     },
   ];
 

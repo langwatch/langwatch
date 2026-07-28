@@ -29,9 +29,8 @@ import {
 
 import { disambiguateNames } from "~/experiments-v3/utils/variantDisambiguation";
 import { useDrawer } from "~/hooks/useDrawer";
-import { buildPairwiseComparisons } from "./buildPairwiseComparisons";
 import { axisLabelProps, buildAxisLabels } from "./chartAxisLabels";
-import { computeBTLeaderboard } from "./computeBTLeaderboard";
+import { useBTLeaderboard } from "./useBTLeaderboard";
 import {
   computeLeaderboardVerdict,
   findCheaperTiedAlternative,
@@ -113,14 +112,10 @@ export function ComparisonLeaderboardChart({
     [column.variants],
   );
 
-  const leaderboard = useMemo(
-    () =>
-      computeBTLeaderboard({
-        comparisons: buildPairwiseComparisons(column),
-        variantIds,
-      }),
-    [column, variantIds],
-  );
+  // Shared across the card and the drawer — see useBTLeaderboard. Both need
+  // the same fit for the same column, and it is expensive enough that doing
+  // it twice was a visible pause when the drawer opened.
+  const leaderboard = useBTLeaderboard({ column, variantIds });
 
   const nameById = new Map(column.variants.map((v) => [v.id, v.name]));
   const axis = axisLabelProps(

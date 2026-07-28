@@ -17,8 +17,7 @@
 import { Box, Separator, Text, VStack } from "@chakra-ui/react";
 import { useMemo, useState } from "react";
 
-import { buildPairwiseComparisons } from "./batch-evaluation-results/buildPairwiseComparisons";
-import { computeBTLeaderboard } from "./batch-evaluation-results/computeBTLeaderboard";
+import { useBTLeaderboard } from "./batch-evaluation-results/useBTLeaderboard";
 import {
   computeJudgeIndependence,
   computeVerbosityProfile,
@@ -78,14 +77,10 @@ export function ComparisonLeaderboardDrawer({
     [column.variants],
   );
 
-  const leaderboard = useMemo(
-    () =>
-      computeBTLeaderboard({
-        comparisons: buildPairwiseComparisons(column),
-        variantIds,
-      }),
-    [column, variantIds],
-  );
+  // Shared across the card and the drawer — see useBTLeaderboard. Both need
+  // the same fit for the same column, and it is expensive enough that doing
+  // it twice was a visible pause when the drawer opened.
+  const leaderboard = useBTLeaderboard({ column, variantIds });
   const variantMetrics = useMemo(
     () =>
       computeVariantMetrics({
