@@ -274,7 +274,7 @@ Feature: /me credentials just work - CLI credential resolution after device logi
 
       Create an API key at <endpoint>/authorize
       """
-    And <endpoint> is the resolved endpoint, https://app.langwatch.ai by default or the self-hosted LANGWATCH_ENDPOINT, never a literal placeholder
+    And the authorize address shown is the server this CLI actually talks to, cloud or self-hosted, never a literal placeholder
 
   @bdd @cli-onboarding @error @unit
   Scenario: machine callers get the structured missing_api_key document with the same message

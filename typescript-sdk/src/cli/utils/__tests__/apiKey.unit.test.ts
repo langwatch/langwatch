@@ -386,7 +386,6 @@ describe("resolveCredentials()", () => {
         expect(exitSpy).toHaveBeenCalledWith(1);
       });
 
-      /** @scenario no login and no env var yields the not-logged-in error */
       it("interpolates a self-hosted LANGWATCH_ENDPOINT into the authorize URL", async () => {
         process.env.LANGWATCH_ENDPOINT = "https://langwatch.acme.internal";
         setOutputFormat(undefined);
