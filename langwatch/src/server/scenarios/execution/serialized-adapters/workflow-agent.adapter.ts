@@ -39,13 +39,27 @@ type NlpErrorBody = {
 };
 
 /**
+ * First non-empty candidate. Deliberately not `??`/`||` chains: `??` passes
+ * `""` straight through, which would leave a thrown message ending in a bare
+ * colon, and `||` would also swallow a legitimate `"0"`.
+ */
+function firstNonEmpty(
+  ...candidates: (string | undefined)[]
+): string | undefined {
+  return candidates.find((c) => typeof c === "string" && c.length > 0);
+}
+
+/**
  * Best available human-readable reason from an engine error envelope. The
  * type is the fallback because it is still actionable ("missing_end_node"
  * beats "unknown"), and the literal last resort keeps the thrown message
  * well-formed if the engine ever sends `status: "error"` with nothing else.
  */
 function engineErrorMessage(body: NlpErrorBody): string {
-  return body.error?.message ?? body.error?.type ?? "unknown engine error";
+  return (
+    firstNonEmpty(body.error?.message, body.error?.type) ??
+    "unknown engine error"
+  );
 }
 
 /**
@@ -189,7 +203,11 @@ export class SerializedWorkflowAgentAdapter extends AgentAdapter {
             // service used. Read both, then fall back to the raw body so a
             // proxy or gateway error is never swallowed either.
             errorMessage =
-              errorBody.detail ?? errorBody.error?.message ?? bodyStr;
+              firstNonEmpty(
+                errorBody.detail,
+                errorBody.error?.message,
+                errorBody.error?.type,
+              ) ?? bodyStr;
           } catch {
             errorMessage = bodyStr;
           }

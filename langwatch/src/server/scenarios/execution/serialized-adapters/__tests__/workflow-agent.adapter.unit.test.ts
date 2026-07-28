@@ -576,6 +576,40 @@ describe("SerializedWorkflowAgentAdapter", () => {
           "Workflow execution failed: unknown engine error",
         );
       });
+
+      // `??` passes "" straight through, so an empty-string message would
+      // leave the thrown text ending in a bare colon with nothing after it.
+      it("skips an empty message rather than throwing a reasonless error", async () => {
+        mockFetch.mockResolvedValue(
+          engineErrorResponse({ type: "missing_end_node", message: "" }),
+        );
+
+        const adapter = new SerializedWorkflowAgentAdapter(
+          defaultConfig,
+          nlpServiceUrl,
+          apiKey,
+        );
+
+        await expect(adapter.call(defaultInput)).rejects.toThrow(
+          "Workflow execution failed: missing_end_node",
+        );
+      });
+
+      it("falls back to the literal when every field is empty", async () => {
+        mockFetch.mockResolvedValue(
+          engineErrorResponse({ type: "", message: "" }),
+        );
+
+        const adapter = new SerializedWorkflowAgentAdapter(
+          defaultConfig,
+          nlpServiceUrl,
+          apiKey,
+        );
+
+        await expect(adapter.call(defaultInput)).rejects.toThrow(
+          "Workflow execution failed: unknown engine error",
+        );
+      });
     });
 
     /**
