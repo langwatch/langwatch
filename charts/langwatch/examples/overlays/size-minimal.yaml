@@ -5,6 +5,11 @@
 # via tsx, and below that V8 can't size its heap and the pod OOMs at boot.
 # ClickHouse auto-tunes to its limit, so give it >=1Gi.
 #
+# Budget accordingly: this totals roughly 3.7Gi of memory requests and ~2 CPU
+# across the release, which is more than a single 2-vCPU node can schedule once
+# control-plane reservations are counted. "Minimal" here means the smallest
+# that actually boots, not something that fits anywhere.
+#
 # Usage:
 #   helm install lw . \
 #     -f examples/overlays/size-minimal.yaml \
@@ -20,6 +25,10 @@ app:
     limits:   { cpu: 1, memory: 2Gi }
 
 workers:
+  # Pinned true rather than inherited: an overlay has to be self-contained, or
+  # stacking it after a base values file that disables workers silently drops
+  # them (tests/values-e2e.yaml does exactly that).
+  enabled: true
   replicaCount: 1
   resources:
     requests: { cpu: 250m, memory: 768Mi }

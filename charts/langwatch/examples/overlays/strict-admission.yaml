@@ -1,10 +1,18 @@
 # strict-admission.yaml - for clusters that enforce Pod Security Admission
 # "restricted" or an equivalent OPA Gatekeeper / Kyverno bundle.
 #
-# The hardened pod defaults (read-only root, non-root, dropped capabilities,
-# RuntimeDefault seccomp, no automounted token, resource requests+limits) are
-# already on by default, so this overlay only flips the three features that
-# need a token or an external API and would otherwise be rejected.
+# LangWatch's own pods (app, workers, nlp, langevals, gateway) and the bundled
+# datastores (PostgreSQL, Redis, ClickHouse, Keeper) already ship hardened:
+# read-only root, non-root, dropped capabilities, RuntimeDefault seccomp, no
+# automounted token, resource requests+limits. This overlay turns off the two
+# components that CANNOT comply, because their compliance is not a matter of
+# configuration:
+#
+#   - the bundled Prometheus, an upstream subchart we do not control;
+#   - the Langy agent, which must run as root by design (see below).
+#
+# It also drops the gateway HPA, which needs a custom metrics API rather than
+# an admission exemption.
 #
 # Usage (stack on a size + access overlay):
 #   helm install lw . \
@@ -19,13 +27,29 @@
 #   -f examples/overlays/redis-external.yaml
 #   -f examples/overlays/clickhouse-external.yaml
 
-# Preflight runs kubectl to check Secret keys, so it needs an SA token.
-# Disable it where token automounting is denied.
-preflight:
-  enabled: false
-
 # Bundled Prometheus is an upstream subchart we don't harden; bring your own.
 prometheus:
+  chartManaged: false
+
+# The Langy assistant's manager process runs as UID 0 with CHOWN, DAC_OVERRIDE,
+# FOWNER, SETUID and SETGID, and carries no seccomp profile. That is deliberate
+# and load-bearing, NOT an oversight: the manager hands every opencode worker a
+# distinct UID via child_process.spawn({uid,gid}), which needs those exact
+# capabilities from a root-effective-uid process. Without them, sibling workers
+# share a UID and can read each other's project API keys and GitHub tokens off
+# disk (ADR-033; specs/langy/langy-deploy-hardening.feature).
+#
+# So on a restricted cluster the answer is to NOT deploy the agent, never to
+# "fix" it by forcing runAsNonRoot — that silently re-opens cross-worker
+# credential theft. Opting the whole pod out needs no acceptance value: with
+# nothing deployed there is no workload to sandbox.
+#
+# LangWatch runs fine without it; you lose the in-product assistant only.
+# Pinned here rather than deferred to examples/overlays/langy-disabled.yaml
+# (which sets the same key) so this overlay is self-contained: an operator who
+# applies only strict-admission.yaml must not silently keep a pod their cluster
+# will reject.
+langyagent:
   chartManaged: false
 
 # The gateway's default HPA needs prometheus-adapter for its custom metric.
