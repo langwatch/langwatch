@@ -3,6 +3,7 @@ package providers
 import (
 	"bytes"
 	"context"
+	"strings"
 	"testing"
 
 	bfschemas "github.com/maximhq/bifrost/core/schemas"
@@ -82,10 +83,10 @@ func TestBuildChatRequest_MalformedMaxTokensRejected(t *testing.T) {
 		"decimal": []byte(`{"model":"m","messages":[],"max_tokens":5.7}`),
 		"object":  []byte(`{"model":"m","messages":[],"max_tokens":{}}`),
 		// Deliberate: a malformed alias is rejected even when a valid
-		// max_completion_tokens would win. OpenAI validates every provided
-		// field before applying precedence, so the raw-forward lanes 400
-		// on this body too; accepting it here would make the translated
-		// lanes more lenient than the reference behavior.
+		// max_completion_tokens would win. OpenAI's API documents that
+		// every provided field is validated before precedence applies, so
+		// accepting this body on the translated lanes would make them more
+		// lenient than the reference behavior they translate.
 		"string_with_valid_winner": []byte(`{"model":"m","messages":[],"max_tokens":"five","max_completion_tokens":9}`),
 	} {
 		req := &domain.Request{Type: domain.RequestTypeChat, Body: body}
@@ -115,6 +116,9 @@ func TestDispatch_MalformedChatBodyClassifiedBadRequest(t *testing.T) {
 	if !herr.IsCode(err, domain.ErrBadRequest) {
 		t.Fatalf("Dispatch error = %v, want bad_request classification", err)
 	}
+	if !strings.Contains(err.Error(), "max_tokens must be an integer") {
+		t.Fatalf("Dispatch error = %v, want the parse reason preserved so the client sees what to fix", err)
+	}
 
 	_, err = router.DispatchStream(context.Background(), req, cred)
 	if err == nil {
@@ -122,6 +126,9 @@ func TestDispatch_MalformedChatBodyClassifiedBadRequest(t *testing.T) {
 	}
 	if !herr.IsCode(err, domain.ErrBadRequest) {
 		t.Fatalf("DispatchStream error = %v, want bad_request classification", err)
+	}
+	if !strings.Contains(err.Error(), "max_tokens must be an integer") {
+		t.Fatalf("DispatchStream error = %v, want the parse reason preserved so the client sees what to fix", err)
 	}
 }
 
