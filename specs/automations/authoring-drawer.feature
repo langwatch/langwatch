@@ -96,7 +96,7 @@ Feature: Staged automation authoring drawer
 
     Scenario: The app cannot see private channels
       Given the user is configuring a Slack notification
-      And the Slack app was installed without permission to read private channels
+      And the Slack app cannot see the workspace's private channels
       Then the public channels are still offered
       And the author is told private channels are missing and which permission adds them
 

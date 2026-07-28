@@ -210,9 +210,9 @@ describe("listSlackChannels", () => {
 
     // Slack returns "fewer than the requested number of items ... even if the
     // end of the list hasn't been reached", so a workspace exhausts the page
-    // budget long before it exhausts its channels. Reproduced against a
-    // stand-in Slack serving 40 per page: 400 of 601 channels came back with
-    // nothing to say the other 201 existed.
+    // budget long before it exhausts its channels. This mock takes that to its
+    // extreme — one channel per page, a cursor that never ends — so the cap is
+    // the only thing that can stop the walk.
     it("stops at the page cap rather than spinning on an endless cursor", async () => {
       mockedSend.mockResolvedValue({
         responseHeaders: {},
