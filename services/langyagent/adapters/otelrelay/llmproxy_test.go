@@ -16,6 +16,7 @@ import (
 )
 
 func TestLLMProxy(t *testing.T) {
+	// @scenario "The manager injects the virtual key and the turn's trace context"
 	t.Run("when a worker makes an LLM call during a turn", func(t *testing.T) {
 		var gotAuth, gotTraceparent, gotPath, gotQuery string
 		gateway := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -156,6 +157,7 @@ func TestLLMProxy(t *testing.T) {
 		})
 	})
 
+	// @scenario "Streaming LLM responses pass through unbuffered"
 	t.Run("when the response is a server-sent event stream", func(t *testing.T) {
 		// The gateway writes one event, then BLOCKS until the client has observed
 		// it, then writes the second. This only completes if the relay flushes

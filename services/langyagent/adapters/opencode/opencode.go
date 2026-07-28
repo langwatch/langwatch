@@ -467,7 +467,7 @@ const progressInterval = 5 * time.Second
 // current
 // `message.part.delta` (properties.field=="text", properties.delta) and the
 // legacy `type=="text"` (part.text). Reads the typed sseEvent so Stream B rides
-// the SAME single decode as session routing — no per-event map alloc (ADR-044
+// the SAME single decode as session routing — no per-event map alloc (ADR-077
 // perf). Pure — no I/O — so it is trivially unit-testable.
 func textDeltaFromEvent(ev *sseEvent) (string, bool) {
 	switch ev.Type {

@@ -43,23 +43,42 @@ import (
 // clog.Go so a panic can never crash the manager, and each SIGCHLD-drain is
 // additionally guarded so a panic in one drain can't silently end zombie-reaping
 // forever.
-func StartOrphanReaper(ctx context.Context) {
-	startOrphanReaper(ctx, os.Getpid())
+//
+// Reports whether the loop actually armed, so the caller can record the outcome
+// — the PID-1 requirement is stated in the Dockerfile as a comment only, and a
+// future `--init`/tini/shell entrypoint or a chart `command:` override would
+// silently demote the manager off init.
+func StartOrphanReaper(ctx context.Context) bool {
+	started, _ := startOrphanReaper(ctx, os.Getpid())
+	return started
 }
 
 // startOrphanReaper is StartOrphanReaper with the PID injected so the gate is
-// testable off init. Returns true when the reaper loop was started.
-func startOrphanReaper(ctx context.Context, pid int) bool {
+// testable off init. It reports whether the reaper loop was started, plus a
+// channel closed once that goroutine has fully stopped — the signal handler is
+// already deregistered by then, so a test can wait on it instead of leaking a
+// live SIGCHLD handler into the next test. done is nil when the reaper declined.
+func startOrphanReaper(ctx context.Context, pid int) (started bool, done <-chan struct{}) {
 	log := clog.Get(ctx)
 	if pid != 1 {
 		// Not init: nothing reparents here, and Wait4(-1) would only steal the
-		// pool's own worker exits from cmd.Wait().
-		log.Debug("orphan reaper not started: manager is not PID 1")
-		return false
+		// pool's own worker exits from cmd.Wait(). Info, not Debug: production
+		// runs at info level, and this line is the ONLY signal that the stated
+		// PID-1 invariant broke. Not Warn — under an init wrapper (tini, docker
+		// --init) that init reaps the orphans itself, so nothing leaks; what is
+		// lost is the guarantee, not the behavior.
+		log.Info("orphan reaper not started: manager is not PID 1, so the stated PID-1 invariant no longer holds",
+			zap.Int("pid", pid),
+		)
+		return false, nil
 	}
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGCHLD)
+	stopped := make(chan struct{})
 	clog.Go(ctx, "orphan-reaper", func() {
+		// LIFO: signal.Stop runs first, so by the time stopped closes this
+		// process is no longer receiving SIGCHLD on our behalf.
+		defer close(stopped)
 		defer signal.Stop(sigs)
 		for {
 			select {
@@ -76,7 +95,7 @@ func startOrphanReaper(ctx context.Context, pid int) bool {
 			}
 		}
 	})
-	return true
+	return true, stopped
 }
 
 // drainOrphans reaps every currently-reapable child in a tight loop — one
