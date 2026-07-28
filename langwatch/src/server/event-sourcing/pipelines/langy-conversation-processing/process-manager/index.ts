@@ -1,7 +1,14 @@
 export {
   buildLangyProcessEventView,
+  handleAgentResponded,
+  handleAgentResponseFailed,
+  handleAgentTurnAccepted,
+  handleArchived,
+  handleHandoffConsumed,
+  handleHandoffPending,
+  handleMetadataUpdated,
+  handleTitleGenerated,
   INITIAL_LANGY_PROCESS_STATE,
-  langyConversationProcess,
 } from "./langyConversationProcess";
 export {
   LANGY_CONVERSATION_PROCESS_NAME,

@@ -1,7 +1,10 @@
+import type { BroadcastService } from "~/server/app-layer/broadcast/broadcast.service";
+import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import type { CancellationPublisher } from "~/server/scenarios/cancellation-channel";
 import { definePipeline } from "../../";
+import type { CommandBus } from "../../commands/commandBus";
 import type { ProcessManagerApplier } from "../../pipeline/processBuilder";
 import type { FoldProjectionStore } from "../../projections/foldProjection.types";
-import type { ReactorDefinition } from "../../reactors/reactor.types";
 import {
   buildProcessEventView,
   handleCancelRequested,
@@ -39,32 +42,61 @@ import {
   TextMessageEndCommand,
   TextMessageStartCommand,
 } from "./commands";
-import { ComputeRunMetricsCommand } from "./commands/computeRunMetrics.command";
+import {
+  ComputeRunMetricsCommand,
+  type ComputeRunMetricsDeps,
+} from "./commands/computeRunMetrics.command";
 import {
   type SimulationRunStateData,
   SimulationRunStateFoldProjection,
 } from "./projections/simulationRunState.foldProjection";
+import { createCancellationBroadcastReactor } from "./reactors/cancellationBroadcast.reactor";
+import { createSnapshotUpdateBroadcastReactor } from "./reactors/snapshotUpdateBroadcast";
+import { createTraceMetricsSyncReactor } from "./reactors/traceMetricsSync.reactor";
 import type { SimulationProcessingEvent } from "./schemas/events";
 
+/**
+ * ADR-077 Rule 1 — nothing here is a value the builder registers. Every
+ * reactor and the one DI'd command are constructed in this file from imported
+ * factories, so the topology is readable without the registry. The members are
+ * wider than they were and all of them are inert: two fold stores, a broadcast
+ * service, a publisher, two function ports, the command bus, and the process's
+ * own dispatch bundle.
+ */
 export interface SimulationProcessingPipelineDeps {
+  /** Redis-cached fold store for `simulationRunState`. */
   simulationRunStore: FoldProjectionStore<SimulationRunStateData>;
-  snapshotUpdateBroadcastReactor: ReactorDefinition<
-    SimulationProcessingEvent,
-    SimulationRunStateData
-  >;
-  cancellationBroadcastReactor: ReactorDefinition<
-    SimulationProcessingEvent,
-    SimulationRunStateData
-  >;
-  traceMetricsSyncReactor: ReactorDefinition<
-    SimulationProcessingEvent,
-    SimulationRunStateData
-  >;
-  computeRunMetricsCommand: ComputeRunMetricsCommand;
-  customerIoSimulationSyncReactor?: ReactorDefinition<
-    SimulationProcessingEvent,
-    SimulationRunStateData
-  >;
+  /**
+   * The trace pipeline's summary fold, read by `computeRunMetrics`' pull path
+   * when a trace's metrics were not carried on the command.
+   */
+  traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
+  /** SSE fan-out for the run drawer. */
+  broadcast: BroadcastService;
+  /** Whether a Redis connection backs the broadcast tier. */
+  hasRedis: boolean;
+  /** Redis pub/sub for cancellation; null when no Redis is configured. */
+  cancellationPublisher: CancellationPublisher | null;
+  /** Per-role cost/latency for a trace, derived from stored spans. */
+  deriveScenarioRoleMetrics: ComputeRunMetricsDeps["deriveScenarioRoleMetrics"];
+  /**
+   * Re-enqueues `computeRunMetrics` after a delay when the trace summary has
+   * not landed yet.
+   *
+   * Late-bound at the composition root: the retry lane is a job on this
+   * pipeline's *runtime* service, which only exists once `register()` has
+   * returned, and the static builder has no job declaration. The command bus
+   * cannot absorb this one — it keys command classes, and this is not a
+   * command.
+   */
+  scheduleComputeRunMetricsRetry: ComputeRunMetricsDeps["scheduleRetry"];
+  /**
+   * ADR-077 §5 — identity-keyed command dispatch. Used here for a *self*
+   * reference: `traceMetricsSync` dispatches `computeRunMetrics`, which this
+   * same pipeline registers. Binding is eager, resolution is not, so the
+   * pipeline being mid-construction carries no meaning.
+   */
+  commands: CommandBus;
   /**
    * Dispatch and terminal-write dependencies for the `scenarioExecution`
    * process (ADR-073).
@@ -140,7 +172,7 @@ export function scenarioExecutionPM(
 export function createSimulationProcessingPipeline(
   deps: SimulationProcessingPipelineDeps,
 ) {
-  let builder = definePipeline<SimulationProcessingEvent>()
+  return definePipeline<SimulationProcessingEvent>()
     .withName("simulation_processing")
     .withAggregateType("simulation_run")
     .withFoldProjection(
@@ -152,28 +184,29 @@ export function createSimulationProcessingPipeline(
     .withReactor(
       "simulationRunState",
       "snapshotUpdateBroadcast",
-      deps.snapshotUpdateBroadcastReactor,
+      createSnapshotUpdateBroadcastReactor({
+        broadcast: deps.broadcast,
+        hasRedis: deps.hasRedis,
+      }),
     )
     .withReactor(
       "simulationRunState",
       "cancellationBroadcast",
-      deps.cancellationBroadcastReactor,
+      createCancellationBroadcastReactor({
+        publisher: deps.cancellationPublisher,
+      }),
     )
+    // Self-dispatch (ADR-077 §5): on RunFinished this reactor sends
+    // `computeRunMetrics`, a command registered a few lines below. The port
+    // binds now and resolves on first dispatch, so a pipeline dispatching into
+    // itself needs no late-binding step from the composition root.
     .withReactor(
       "simulationRunState",
       "traceMetricsSync",
-      deps.traceMetricsSyncReactor,
-    );
-
-  if (deps.customerIoSimulationSyncReactor) {
-    builder = builder.withReactor(
-      "simulationRunState",
-      "customerIoSimulationSync",
-      deps.customerIoSimulationSyncReactor,
-    );
-  }
-
-  return builder
+      createTraceMetricsSyncReactor({
+        computeRunMetrics: deps.commands.port(ComputeRunMetricsCommand),
+      }),
+    )
     .withCommand("queueRun", QueueRunCommand)
     .withCommand("startRun", StartRunCommand)
     .withCommand("messageSnapshot", MessageSnapshotCommand)
@@ -185,7 +218,11 @@ export function createSimulationProcessingPipeline(
     .withCommandInstance(
       "computeRunMetrics",
       ComputeRunMetricsCommand,
-      deps.computeRunMetricsCommand,
+      new ComputeRunMetricsCommand({
+        traceSummaryStore: deps.traceSummaryStore,
+        scheduleRetry: deps.scheduleComputeRunMetricsRetry,
+        deriveScenarioRoleMetrics: deps.deriveScenarioRoleMetrics,
+      }),
       {
         deduplication: {
           makeId: ComputeRunMetricsCommand.makeJobId,

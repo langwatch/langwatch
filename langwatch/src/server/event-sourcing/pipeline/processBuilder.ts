@@ -74,6 +74,10 @@ export interface ProcessManagerIntentStage<
     eventType: Type,
     handle: EventHandler<State, EventData<E, Type>, Intents>,
   ): ProcessManagerHandledStage<E, State, Intents>;
+  /** @see ProcessManagerHandledStage.ignores */
+  ignores<Type extends EventTypeOf<E>>(
+    ...eventTypes: Type[]
+  ): ProcessManagerHandledStage<E, State, Intents>;
   onWake(
     handle: WakeHandler<State, Intents>,
   ): ProcessManagerHandledStage<E, State, Intents>;
@@ -94,6 +98,19 @@ export interface ProcessManagerHandledStage<
   on<Type extends EventTypeOf<E>>(
     eventType: Type,
     handle: EventHandler<State, EventData<E, Type>, Intents>,
+  ): ProcessManagerHandledStage<E, State, Intents>;
+  /**
+   * Subscribe to these events and decide nothing.
+   *
+   * Declared rather than omitted: the runtime derives its subscription from
+   * the declared handlers AND throws on an undeclared event, so leaving one
+   * out both stops delivery and turns any other delivery path into a hard
+   * failure. This is the `default:` arm of a hand-rolled evolve, made explicit
+   * — and it keeps a long list of "nothing to do here" events from burying the
+   * decisions that matter in the pipeline's own topology.
+   */
+  ignores<Type extends EventTypeOf<E>>(
+    ...eventTypes: Type[]
   ): ProcessManagerHandledStage<E, State, Intents>;
   onWake(
     handle: WakeHandler<State, Intents>,
@@ -158,6 +175,13 @@ class ProcessManagerBuilder<E extends Event> {
       );
     }
     this.handlers[eventType] = handle;
+    return this;
+  }
+
+  ignores(...eventTypes: string[]): this {
+    for (const eventType of eventTypes) {
+      this.on(eventType, (state) => ({ state }));
+    }
     return this;
   }
 

@@ -37,6 +37,15 @@ Feature: Cross-pipeline command dispatch keyed on identity
     Then the command is enqueued on the owning pipeline's dispatcher
 
   @unit @command-bus
+  Scenario: A pipeline dispatching into its own command needs no late binding
+    Given a pipeline binds a port for a command it registers itself
+    And the port is bound while the pipeline is still being constructed
+    When the pipeline finishes registering
+    And the port is called
+    Then the command is enqueued on that same pipeline's dispatcher
+    And no resolve step was needed after registration
+
+  @unit @command-bus
   Scenario: Each command class resolves to the pipeline that registered it
     Given two pipelines each register a different command class
     When a command is sent through the bus

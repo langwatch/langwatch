@@ -10,22 +10,17 @@ import {
 } from "~/server/event-sourcing/process-manager";
 import type { EventSubscriberContext } from "~/server/event-sourcing/subscribers/eventSubscriber.types";
 
-import { buildProcessManager } from "~/server/event-sourcing/pipeline/processBuilder";
 import {
   buildIntentHandlers,
   ProcessRuntime,
 } from "~/server/event-sourcing/process-manager/processRuntime";
 import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
 
-import { langyConversationProcess } from "../langyConversationProcess";
 import {
   LANGY_CONVERSATION_PROCESS_NAME,
   type LangyConversationProcessState,
 } from "../langyConversationProcess.types";
-import {
-  createStubLangyEffectPorts,
-  type LangyEffectPorts,
-} from "../langyEffectPorts";
+import { buildLangyProcessManager } from "./helpers/langyProcessHarness";
 import {
   agentRespondedEvent,
   agentTurnAcceptedEvent,
@@ -99,17 +94,9 @@ afterEach(async () => {
   await prisma.processManagerInstance.deleteMany({ where });
 });
 
-function buildLangyManager(ports: LangyEffectPorts) {
-  return buildProcessManager<LangyConversationProcessingEvent>({
-    name: LANGY_CONVERSATION_PROCESS_NAME,
-    applier: langyConversationProcess(ports),
-  });
-}
-
 describe("Langy process manager and outbox with Postgres", () => {
   it("commits each event once and dispatches its durable intents through typed stubs", async () => {
-    const { ports, calls } = createStubLangyEffectPorts();
-    const definition = buildLangyManager(ports);
+    const { definition, calls } = buildLangyProcessManager({ projectId });
     // The real production path: ProcessRuntime generates the
     // `pm:langyConversation` subscriber from the pipeline declaration.
     const runtime = new ProcessRuntime({ store, consumersEnabled: false });
@@ -172,12 +159,7 @@ describe("Langy process manager and outbox with Postgres", () => {
     expect(report.retried).toEqual([]);
     expect(report.dead).toEqual([]);
     expect(calls.dispatchedTurns).toEqual([
-      {
-        projectId,
-        conversationId,
-        turnId,
-        resumeFromTurnId: null,
-      },
+      { projectId, conversationId, turnId },
     ]);
     expect(calls.titleRequests).toEqual([
       { projectId, conversationId, turnId },

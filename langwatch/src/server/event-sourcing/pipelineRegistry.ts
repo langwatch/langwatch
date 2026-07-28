@@ -61,11 +61,6 @@ import type { LangyWorkerPort } from "../app-layer/langy/langyWorker";
 import type { LangyTurnAdmissionRepository } from "../app-layer/langy/repositories/langy-turn-admission.repository";
 import type { LangyTokenBuffer } from "../app-layer/langy/streaming/langyTokenBuffer";
 import type { LangyTurnHandoffStore } from "../app-layer/langy/streaming/langyTurnHandoff";
-import {
-  createAgentTurnLivenessSubscriber,
-  createLangyConversationUpdateBroadcastSubscriber,
-  createLangyTurnAdmissionLifecycleSubscriber,
-} from "../app-layer/langy/subscribers";
 import type { CanonicalLogRecordRepository } from "../app-layer/logs/repositories/canonical-log-record.repository";
 import type { MetricDataPointRepository } from "../app-layer/metrics/repositories/metric-data-point.repository";
 import type { MonitorService } from "../app-layer/monitors/monitor.service";
@@ -83,30 +78,15 @@ import type { RetentionPolicyResolver } from "../data-retention/retentionPolicyR
 import type { AutomationDispatchPorts } from "../event-sourcing/pipelines/automations/automationDispatch.adapter";
 import { createEvaluationAlertTriggerMatchHandler } from "../event-sourcing/pipelines/automations/subscribers/evaluationAlertTriggerMatch.subscriber";
 import { createGraphTriggerActivityHandler } from "../event-sourcing/pipelines/automations/subscribers/graphTriggerActivity.subscriber";
-import { createLangyEffectPorts } from "../event-sourcing/pipelines/langy-conversation-processing/process-manager/langyEffectPorts";
-import type {
-  TopicClusteringOutcomeCommands,
-  TopicClusteringRunPort,
-} from "../event-sourcing/pipelines/topic-clustering-processing/process-manager";
 import { type CommandDispatcher, Deferred } from "./deferred";
 import { createTenantId } from "./domain/tenantId";
 import type { EventSourcing } from "./eventSourcing";
 import { mapCommands } from "./mapCommands";
 import type { StaticPipelineDefinition } from "./pipeline/staticBuilder.types";
 import { createAutomationsPipeline } from "./pipelines/automations/pipeline";
-import { ReportUsageForMonthCommand } from "./pipelines/billing-reporting/commands/reportUsageForMonth.command";
-import {
-  BILLING_REPORTING_PIPELINE_NAME,
-  createBillingReportingPipeline,
-} from "./pipelines/billing-reporting/pipeline";
+import { createBillingReportingPipeline } from "./pipelines/billing-reporting/pipeline";
 import { createBlobMaintenancePipeline } from "./pipelines/blob-maintenance/pipeline";
 import { createCodingAgentProcessingPipeline } from "./pipelines/coding-agent-processing/pipeline";
-import type { CodingAgentSessionState } from "./pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
-import { CodingAgentSessionStore } from "./pipelines/coding-agent-processing/projections/codingAgentSession.store";
-import {
-  CodingAgentTraceSessionAppendStore,
-  SessionMetricSeriesAppendStore,
-} from "./pipelines/coding-agent-processing/projections/stores";
 import { createCodingAgentSpanFactsDispatchSubscriber } from "./pipelines/coding-agent-processing/subscribers/codingAgentSpanFactsDispatch.subscriber";
 import { ExecuteEvaluationCommand } from "./pipelines/evaluation-processing/commands/executeEvaluation.command";
 import {
@@ -119,9 +99,6 @@ import { EvaluationAnalyticsRollupAppendStore } from "./pipelines/evaluation-pro
 import { EvaluationRunStore } from "./pipelines/evaluation-processing/projections/evaluationRun.store";
 import { createExperimentRunProcessingPipeline } from "./pipelines/experiment-run-processing/pipeline";
 import type { ClickHouseExperimentRunResultRecord } from "./pipelines/experiment-run-processing/projections/experimentRunResultStorage.mapProjection";
-import { createExperimentRunItemAppendStore } from "./pipelines/experiment-run-processing/projections/experimentRunResultStorage.store";
-import type { ExperimentRunStateData } from "./pipelines/experiment-run-processing/projections/experimentRunState.foldProjection";
-import { createExperimentRunStateFoldStore } from "./pipelines/experiment-run-processing/projections/experimentRunState.store";
 import type { ExperimentRunStateRepository } from "./pipelines/experiment-run-processing/repositories/experimentRunState.repository";
 import { createLangyConversationProcessingPipeline } from "./pipelines/langy-conversation-processing/pipeline";
 import type { LangyAnalyticsEventProjectionRecord } from "./pipelines/langy-conversation-processing/projections/langyAnalyticsEvent.mapProjection";
@@ -137,14 +114,12 @@ import { ScenarioFailureHandler } from "../scenarios/scenario-failure-handler";
 import { ScenarioService } from "../scenarios/scenario.service";
 import { createSimulationProcessingPipeline } from "./pipelines/simulation-processing/pipeline";
 import type { SimulationRunStateData } from "./pipelines/simulation-processing/projections/simulationRunState.foldProjection";
-import { createCancellationBroadcastReactor } from "./pipelines/simulation-processing/reactors/cancellationBroadcast.reactor";
 import { createScenarioExecutionDispatcher } from "../scenarios/execution/execution-dispatcher";
 import { executeScenarioRun } from "../scenarios/scenario.processor";
-import { createSnapshotUpdateBroadcastReactor } from "./pipelines/simulation-processing/reactors/snapshotUpdateBroadcast";
-import { createTraceMetricsSyncReactor } from "./pipelines/simulation-processing/reactors/traceMetricsSync.reactor";
 import type { SimulationRunStateRepository } from "./pipelines/simulation-processing/repositories/simulationRunState.repository";
 import type { ComputeRunMetricsCommandData } from "./pipelines/simulation-processing/schemas/commands";
 import { SIMULATION_PROJECTION_VERSIONS } from "./pipelines/simulation-processing/schemas/constants";
+import type { TopicClusteringRunPort } from "../event-sourcing/pipelines/topic-clustering-processing/process-manager";
 import { createTopicClusteringProcessingPipeline } from "./pipelines/topic-clustering-processing/pipeline";
 import type { TopicClusteringRunHistoryData } from "./pipelines/topic-clustering-processing/projections/topicClusteringRunHistory.foldProjection";
 import type { TopicClusteringRunStatusData } from "./pipelines/topic-clustering-processing/projections/topicClusteringRunStatus.foldProjection";
@@ -423,7 +398,7 @@ export class PipelineRegistry {
     const codingAgentCommands = mapCommands(codingAgentPipeline.commands);
     const metricPipeline = this.registerMetricPipeline();
     const logPipeline = this.registerLogPipeline();
-    const { pipeline: tracePipeline, simComputeRunMetrics } =
+    const { pipeline: tracePipeline } =
       this.registerTracePipeline({
         evalPipeline,
         traceSummaryStore,
@@ -447,7 +422,6 @@ export class PipelineRegistry {
     const { pipeline: simulationPipeline, scenarioExecutionHandle } =
       this.registerSimulationPipeline({
         traceSummaryStore,
-        simComputeRunMetrics,
       });
 
     const experimentRunPipeline = this.registerExperimentRunPipeline();
@@ -492,13 +466,11 @@ export class PipelineRegistry {
    * manager (ADR-052) — the pipeline declares the whole topology (events,
    * projection, commands, process manager, outbox tuning); the shared
    * ProcessRuntime owns the manager, outbox and wake workers. The registry
-   * only injects executor dependencies and late-binds the outcome commands,
-   * which are this same pipeline's own write surface and exist only after
-   * `.build()`.
+   * only injects the run port and the command bus; the pipeline binds its own
+   * outcome commands through the bus, so nothing here is resolved after
+   * `.build()` (ADR-077 §5).
    */
   private registerTopicClusteringPipeline() {
-    let outcomeCommands: TopicClusteringOutcomeCommands | null = null;
-
     const pipeline = this.deps.eventSourcing.register(
       createTopicClusteringProcessingPipeline({
         topicClusteringRunStatusStore:
@@ -506,29 +478,12 @@ export class PipelineRegistry {
         topicClusteringRunHistoryStore:
           this.deps.repositories.topicClusteringRunHistory,
         topicModelStore: this.deps.repositories.topicModel,
-        dispatch: {
-          runPort: this.deps.topicClustering.runPort,
-          commands: () => {
-            if (!outcomeCommands) {
-              throw new Error(
-                "Topic clustering outcome commands used before the pipeline finished registering",
-              );
-            }
-            return outcomeCommands;
-          },
-        },
+        runPort: this.deps.topicClustering.runPort,
+        commands: this.deps.eventSourcing.commandBus,
       }),
     );
 
     const commands = mapCommands(pipeline.commands);
-    outcomeCommands = {
-      recordClusteringRunStarted: (args) =>
-        commands.recordClusteringRunStarted(args),
-      recordClusteringRunCompleted: (args) =>
-        commands.recordClusteringRunCompleted(args),
-      recordClusteringRunFailed: (args) =>
-        commands.recordClusteringRunFailed(args),
-    };
     // Level-triggered bootstrap: the projectMetadata reactor asks on every
     // real ingest, and this claim keeps that to one commit per project per
     // window. See createRateLimitedBootstrap for why re-asking is safe.
@@ -549,128 +504,43 @@ export class PipelineRegistry {
 
   /** Langy writes its low-latency operational projections directly to Postgres. */
   private registerLangyConversationPipeline() {
-    const conversationStore = this.deps.repositories.langyConversationState;
-    const failTurn = new Deferred<
-      (args: {
-        projectId: string;
-        conversationId: string;
-        turnId: string;
-        error: string;
-      }) => Promise<void>
-    >("langyFailTurn");
-    const saveTitle = new Deferred<
-      (args: {
-        projectId: string;
-        conversationId: string;
-        turnId: string;
-        title: string;
-        model: string;
-      }) => Promise<void>
-    >("langyGenerateTitle");
-
-    const effectPorts = createLangyEffectPorts({
-      handoffStore: this.deps.langy.handoffStore,
-      worker: this.deps.langy.worker,
-      mintSessionKey: ({ userId, projectId, organizationId }) =>
-        mintLangySessionApiKeyForUser({
-          prisma: this.deps.prisma,
-          userId,
-          projectId,
-          organizationId,
-        }),
-      revokeSessionKey: ({ apiKeyId, projectId }) =>
-        revokeLangySessionApiKey({
-          prisma: this.deps.prisma,
-          apiKeyId,
-          projectId,
-        }).then(() => undefined),
-      titleGenerator: this.deps.langy.titleGenerator,
-      saveTitle: (args) => saveTitle.fn(args),
-      failTurn: { failTurn: (args) => failTurn.fn(args) },
-      markError: (args) => this.deps.langy.buffer.markError(args),
-    });
-    const conversationReader = {
-      read: async ({
-        projectId,
-        conversationId,
-      }: {
-        projectId: string;
-        conversationId: string;
-      }) => {
-        const projection = await conversationStore.load(conversationId, {
-          tenantId: createTenantId(projectId),
-          aggregateId: conversationId,
-        });
-        if (!projection) return null;
-        return {
-          cursor: projection.cursor,
-          status: projection.state.Status,
-          currentTurnId: projection.state.CurrentTurnId,
-          lastActivityAtMs: projection.state.LastActivityAt,
-          ownerUserId: projection.state.UserId,
-          isShared: projection.state.IsShared,
-        };
-      },
-    };
-
-    const livenessSubscriber = createAgentTurnLivenessSubscriber({
-      buffer: this.deps.langy.buffer,
-      conversations: conversationReader,
-      failTurn: { failTurn: (args) => failTurn.fn(args) },
-      worker: this.deps.langy.worker,
-      handoffStore: this.deps.langy.handoffStore,
-    });
-    const broadcastSubscriber =
-      createLangyConversationUpdateBroadcastSubscriber({
-        broadcast: this.deps.broadcast,
-        conversations: conversationReader,
-      });
-    const admissionLifecycleSubscriber =
-      createLangyTurnAdmissionLifecycleSubscriber({
-        admissions: this.deps.repositories.langyTurnAdmission,
-      });
-
     const pipeline = this.deps.eventSourcing.register(
       createLangyConversationProcessingPipeline({
-        langyConversationProjectionStore: conversationStore,
+        langyConversationProjectionStore:
+          this.deps.repositories.langyConversationState,
         langyConversationTurnProjectionStore:
           this.deps.repositories.langyConversationTurnState,
         langyMessageProjectionStore: this.deps.repositories.langyMessageStorage,
         langyAnalyticsEventProjectionStore:
           this.deps.repositories.langyAnalyticsEventStorage,
-        langyProcessPorts: effectPorts,
-        subscribers: [
-          livenessSubscriber,
-          broadcastSubscriber,
-          admissionLifecycleSubscriber,
-        ],
+        langyTurnAdmissionRepository: this.deps.repositories.langyTurnAdmission,
+        tokenBuffer: this.deps.langy.buffer,
+        handoffStore: this.deps.langy.handoffStore,
+        worker: this.deps.langy.worker,
+        titleGenerator: this.deps.langy.titleGenerator,
+        broadcast: this.deps.broadcast,
+        mintSessionKey: ({ userId, projectId, organizationId }) =>
+          mintLangySessionApiKeyForUser({
+            prisma: this.deps.prisma,
+            userId,
+            projectId,
+            organizationId,
+          }),
+        revokeSessionKey: ({ apiKeyId, projectId }) =>
+          revokeLangySessionApiKey({
+            prisma: this.deps.prisma,
+            apiKeyId,
+            projectId,
+          }).then(() => undefined),
+        commands: this.deps.eventSourcing.commandBus,
       }),
     );
 
-    const commands = mapCommands(pipeline.commands);
-    failTurn.resolve((args) =>
-      commands.failAgentResponse({
-        tenantId: args.projectId,
-        occurredAt: Date.now(),
-        conversationId: args.conversationId,
-        turnId: args.turnId,
-        error: args.error,
-      }),
-    );
-    saveTitle.resolve((args) =>
-      commands.generateConversationTitle({
-        tenantId: args.projectId,
-        occurredAt: Date.now(),
-        conversationId: args.conversationId,
-        turnId: args.turnId,
-        title: args.title,
-        source: "auto",
-        model: args.model,
-      }),
-    );
     // The outbox worker, dispatcher and process service are owned by
     // ProcessRuntime now that the process is declared on the pipeline; the
-    // registry no longer constructs or starts them.
+    // registry no longer constructs or starts them. The two self-dispatch
+    // `Deferred`s are gone too: the pipeline binds `failAgentResponse` and
+    // `generateConversationTitle` through the command bus (ADR-077 §5).
     return { pipeline };
   }
 
@@ -698,22 +568,13 @@ export class PipelineRegistry {
   private registerCodingAgentPipeline() {
     return this.deps.eventSourcing.register(
       createCodingAgentProcessingPipeline({
-        // Read-through store (ADR-066): Redis is the warm read tier; on a miss
-        // the store reads its own last committed state back from
-        // coding_agent_sessions (store.get() → findBySessionId → decode row).
-        // The delivery path never reads event_log. Same wiring as trace_summaries.
-        codingAgentSessionStore: new CachedFoldStore<CodingAgentSessionState>(
-          new CodingAgentSessionStore(this.deps.repositories.codingAgentSession),
-          this.deps.foldCacheClient,
-          { keyPrefix: "coding_agent_sessions" },
-        ),
-        codingAgentTraceSessionAppendStore:
-          new CodingAgentTraceSessionAppendStore(
-            this.deps.repositories.codingAgentTraceSession,
-          ),
-        sessionMetricSeriesAppendStore: new SessionMetricSeriesAppendStore(
+        codingAgentSessionRepository:
+          this.deps.repositories.codingAgentSession,
+        codingAgentTraceSessionRepository:
+          this.deps.repositories.codingAgentTraceSession,
+        sessionMetricSeriesRepository:
           this.deps.repositories.sessionMetricSeries,
-        ),
+        foldCacheClient: this.deps.foldCacheClient,
       }),
     );
   }
@@ -834,9 +695,6 @@ export class PipelineRegistry {
     const scheduleDeferred = new Deferred<
       (payload: DeferredOriginPayload) => Promise<void>
     >("scheduleDeferred");
-    const simComputeRunMetrics = new Deferred<
-      CommandDispatcher<ComputeRunMetricsCommandData>
-    >("simComputeRunMetrics");
 
     const originGateReactor = createOriginGateReactor({
       scheduleDeferred: scheduleDeferred.fn,
@@ -867,8 +725,12 @@ export class PipelineRegistry {
         this.bootstrapTopicClustering.fn(projectId),
     });
 
+    // Cross-pipeline dispatch (ADR-077 §5): trace → simulation. The port binds
+    // now and resolves on first dispatch, so the simulation pipeline
+    // registering after this one carries no meaning.
     const simulationMetricsSyncReactor = createSimulationMetricsSyncReactor({
-      computeRunMetrics: simComputeRunMetrics.fn,
+      computeRunMetrics:
+        this.deps.eventSourcing.commandBus.port(ComputeRunMetricsCommand),
     });
 
     // ADR-075 Class C splits this one. The debit rows are derived state and
@@ -1010,19 +872,13 @@ export class PipelineRegistry {
     return {
       pipeline: tracePipeline,
       traceSummaryStore,
-      /** Cross-pipeline deferred — resolved by registerSimulationPipeline. */
-      simComputeRunMetrics,
     };
   }
 
   private registerSimulationPipeline({
     traceSummaryStore,
-    simComputeRunMetrics,
   }: {
     traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
-    simComputeRunMetrics: Deferred<
-      CommandDispatcher<ComputeRunMetricsCommandData>
-    >;
   }) {
     const simulationRunStore = new CachedFoldStore<SimulationRunStateData>(
       new RepositoryFoldStore<SimulationRunStateData>(
@@ -1032,16 +888,6 @@ export class PipelineRegistry {
       this.deps.foldCacheClient,
       { keyPrefix: "simulation_runs" },
     );
-    const snapshotUpdateBroadcastReactor = createSnapshotUpdateBroadcastReactor(
-      {
-        broadcast: this.deps.broadcast,
-        hasRedis: !!this.deps.eventSourcing.redisConnection,
-      },
-    );
-
-    const cancellationBroadcastReactor = createCancellationBroadcastReactor({
-      publisher: this.deps.eventSourcing.redisConnection ?? null,
-    });
 
     // ADR-073 step 2: dispatch is an outbox intent, not a reactor. The handle
     // keeps `setPool` so worker startup binds its pool the same way; what
@@ -1051,10 +897,11 @@ export class PipelineRegistry {
       run: ({ job, pool }) => executeScenarioRun(job, pool),
     });
 
-    // Deferred dispatchers — resolved after pipeline registration.
-    const selfComputeRunMetrics = new Deferred<
-      CommandDispatcher<ComputeRunMetricsCommandData>
-    >("selfComputeRunMetrics");
+    // The one late binding the command bus cannot absorb: the retry lane is a
+    // *job* on this pipeline's runtime service, registered below because it
+    // does not exist until `register()` has returned. `Deferred` stays for its
+    // named error — a bare thunk would report a missing lane as `undefined is
+    // not a function`.
     const scheduleRetry = new Deferred<
       (payload: ComputeRunMetricsCommandData) => Promise<void>
     >("scheduleRetry");
@@ -1062,24 +909,18 @@ export class PipelineRegistry {
     const traceReadDerivation = new TraceReadDerivationService(
       this.deps.traces.spans,
     );
-    const computeRunMetricsCommand = new ComputeRunMetricsCommand({
-      traceSummaryStore,
-      scheduleRetry: scheduleRetry.fn,
-      deriveScenarioRoleMetrics: (params) =>
-        traceReadDerivation.deriveScenarioRoleMetrics(params),
-    });
-
-    const traceMetricsSyncReactor = createTraceMetricsSyncReactor({
-      computeRunMetrics: selfComputeRunMetrics.fn,
-    });
 
     const simulationPipeline = this.deps.eventSourcing.register(
       createSimulationProcessingPipeline({
         simulationRunStore,
-        snapshotUpdateBroadcastReactor,
-        cancellationBroadcastReactor,
-        traceMetricsSyncReactor,
-        computeRunMetricsCommand,
+        traceSummaryStore,
+        broadcast: this.deps.broadcast,
+        hasRedis: !!this.deps.eventSourcing.redisConnection,
+        cancellationPublisher: this.deps.eventSourcing.redisConnection ?? null,
+        deriveScenarioRoleMetrics: (params) =>
+          traceReadDerivation.deriveScenarioRoleMetrics(params),
+        scheduleComputeRunMetricsRetry: scheduleRetry.fn,
+        commands: this.deps.eventSourcing.commandBus,
         // ADR-073: the `scenarioExecution` process writes the terminal state
         // for a run whose worker died. The failure handler resolves the app
         // lazily because it dispatches a command on the very pipeline being
@@ -1110,12 +951,7 @@ export class PipelineRegistry {
       }),
     );
 
-    // Resolve self-referencing command
     const simCommands = mapCommands(simulationPipeline.commands);
-    selfComputeRunMetrics.resolve(simCommands.computeRunMetrics);
-
-    // Resolve cross-pipeline deferred (trace → simulation)
-    simComputeRunMetrics.resolve(simCommands.computeRunMetrics);
 
     // Resolve deferred retry job
     const retryJobId = (payload: ComputeRunMetricsCommandData) =>
@@ -1163,40 +999,29 @@ export class PipelineRegistry {
   }
 
   private registerBillingReportingPipeline() {
-    const reportUsageForMonthCommand = new ReportUsageForMonthCommand({
-      organizations: this.deps.organizations,
-      billingCheckpoints: this.deps.billingCheckpoints,
-      getUsageReportingService: () => this.deps.usageReportingService,
-      queryBillableEventsTotal,
-      selfDispatch: (data) => {
-        const pipeline = this.deps.eventSourcing.getPipeline(
-          BILLING_REPORTING_PIPELINE_NAME,
-        );
-        return pipeline.commands.reportUsageForMonth.send(data);
-      },
-    });
-
     return this.deps.eventSourcing.register(
       createBillingReportingPipeline({
-        reportUsageForMonthCommand,
+        organizations: this.deps.organizations,
+        billingCheckpoints: this.deps.billingCheckpoints,
+        getUsageReportingService: () => this.deps.usageReportingService,
+        queryBillableEventsTotal,
+        commands: this.deps.eventSourcing.commandBus,
       }),
     );
   }
 
   private registerExperimentRunPipeline() {
-    const experimentRunStore = new CachedFoldStore<ExperimentRunStateData>(
-      createExperimentRunStateFoldStore(
-        this.deps.repositories.experimentRunState,
-      ),
-      this.deps.foldCacheClient,
-      { keyPrefix: "experiment_runs" },
-    );
-
     return this.deps.eventSourcing.register(
       createExperimentRunProcessingPipeline({
-        experimentRunStateFoldStore: experimentRunStore,
+        experimentRunStateRepository:
+          this.deps.repositories.experimentRunState,
         experimentRunItemAppendStore:
           this.deps.repositories.experimentRunItemStorage,
+        foldCacheClient: this.deps.foldCacheClient,
+        // ADR-073's run reaper has never been wired: nothing has ever supplied
+        // this, so the `experimentRunExecution` process manager is not mounted
+        // in production. Stated rather than omitted (ADR-077 §6 hole 1).
+        experimentRunExecutionDispatch: null,
       }),
     );
   }

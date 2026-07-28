@@ -10,6 +10,7 @@ import { buildIntentHandlers, buildProcessDefinition } from "~/server/event-sour
 import { topicClusteringPM } from "~/server/event-sourcing/pipelines/topic-clustering-processing/pipeline";
 import type { TopicClusteringProcessingEvent } from "~/server/event-sourcing/pipelines/topic-clustering-processing/schemas/events";
 
+import { outcomeCommandsThatMustNotRun } from "./helpers/outcomeCommands";
 import { buildProcessEventView } from "../topicClustering.process";
 import type { TopicClusteringOutcomeCommands } from "../topicClusteringIntentHandlers";
 import { TOPIC_CLUSTERING_PROCESS_NAME } from "../topicClusteringProcess.types";
@@ -72,10 +73,9 @@ function harness(options?: {
         ({
           runClusteringPage: () => Promise.reject(new Error("unused")),
         } as Parameters<typeof topicClusteringPM>[0]["runPort"]),
-      commands: () => {
-        if (!options?.commands) throw new Error("commands unused in this test");
-        return options.commands;
-      },
+      commands:
+        options?.commands ??
+        outcomeCommandsThatMustNotRun("commands unused in this test"),
       clock: () => 999_999,
     }),
   });

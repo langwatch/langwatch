@@ -85,12 +85,12 @@ export interface TopicClusteringOutcomeCommands {
 export interface TopicClusteringDispatchDeps {
   runPort: TopicClusteringRunPort;
   /**
-   * Late-bound on purpose: the executor is declared while the pipeline is
-   * being built, and these are the SAME pipeline's commands — they only
-   * exist after `.build()`. The registry supplies a getter it resolves
-   * post-build; dispatch happens long after that.
+   * This same pipeline's write surface. No longer late-bound: the pipeline
+   * builds these from command-bus ports (ADR-077 §5), which resolve by class
+   * identity at send time, so an executor declared mid-`.build()` can name
+   * commands the builder has not registered yet.
    */
-  commands: () => TopicClusteringOutcomeCommands;
+  commands: TopicClusteringOutcomeCommands;
   maxAttempts?: number;
   clock?: () => number;
 }
@@ -271,7 +271,7 @@ export function createTopicClusteringRunHandler(
     payload: TopicClusteringRunIntent,
     intentContext: IntentContext,
   ) => {
-    const commands = deps.commands();
+    const commands = deps.commands;
     const context: PageContext = {
       projectId: intentContext.projectId,
       runId: payload.runId,

@@ -1,7 +1,9 @@
 import { definePipeline } from "../../";
 import type { ProcessManagerApplier } from "../../pipeline/processBuilder";
-import type { FoldProjectionStore } from "../../projections/foldProjection.types";
+import { CachedFoldStore } from "../../projections/cachedFoldStore";
+import type { FoldCacheClient } from "../../projections/foldCache/foldCacheClient";
 import type { AppendStore } from "../../projections/mapProjection.types";
+import type { ExperimentRunStateRepository } from "./repositories/experimentRunState.repository";
 import {
   CompleteExperimentRunCommand,
   RecordEvaluatorResultCommand,
@@ -36,18 +38,29 @@ import {
   type ExperimentRunStateData,
   ExperimentRunStateFoldProjection,
 } from "./projections/experimentRunState.foldProjection";
+import { createExperimentRunStateFoldStore } from "./projections/experimentRunState.store";
 import { EXPERIMENT_RUN_EVENT_TYPES } from "./schemas/constants";
 import type { ExperimentRunProcessingEvent } from "./schemas/events";
 
+/**
+ * ADR-077 Rule 1 — the run-state store adapter and its cache tier are composed
+ * here, from the repository they wrap. `experimentRunItemAppendStore` stays a
+ * dep because it has no repository underneath it: it *is* the ClickHouse data
+ * access for `experiment_run_items`, so it crosses as layer 2 rather than being
+ * built from one.
+ */
 export interface ExperimentRunProcessingPipelineDeps {
-  experimentRunStateFoldStore: FoldProjectionStore<ExperimentRunStateData>;
+  experimentRunStateRepository: ExperimentRunStateRepository;
   experimentRunItemAppendStore: AppendStore<ClickHouseExperimentRunResultRecord>;
+  /** ADR-077 §3 — the resolved cache tier, never a redis client. */
+  foldCacheClient: FoldCacheClient;
   /**
    * Terminal-write dependencies for the `experimentRunExecution` process
-   * (ADR-073). Optional so the pipeline still builds where nothing can supply
-   * them; where it is absent, runs have no reaper, exactly as before.
+   * (ADR-073). Required-but-nullable (ADR-077 §6 hole 1): where it is `null`
+   * runs have no reaper, and every composition site has to say so on purpose
+   * rather than by omission.
    */
-  experimentRunExecutionDispatch?: ExperimentRunExecutionDispatchDeps;
+  experimentRunExecutionDispatch: ExperimentRunExecutionDispatchDeps | null;
 }
 
 /**
@@ -119,7 +132,11 @@ export function createExperimentRunProcessingPipeline(
     .withFoldProjection(
       "experimentRunState",
       new ExperimentRunStateFoldProjection({
-        store: deps.experimentRunStateFoldStore,
+        store: new CachedFoldStore<ExperimentRunStateData>(
+          createExperimentRunStateFoldStore(deps.experimentRunStateRepository),
+          deps.foldCacheClient,
+          { keyPrefix: "experiment_runs" },
+        ),
       }),
     )
     .withMapProjection(
@@ -135,7 +152,7 @@ export function createExperimentRunProcessingPipeline(
     .withCommand("recordEvaluatorResult", RecordEvaluatorResultCommand)
     .withCommand("completeExperimentRun", CompleteExperimentRunCommand);
 
-  if (deps.experimentRunExecutionDispatch) {
+  if (deps.experimentRunExecutionDispatch !== null) {
     withCommands.withProcessManager(
       EXPERIMENT_RUN_EXECUTION_PROCESS_NAME,
       experimentRunExecutionPM(deps.experimentRunExecutionDispatch),
