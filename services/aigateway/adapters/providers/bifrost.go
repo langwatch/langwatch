@@ -201,7 +201,13 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 
 	// Codex streams upstream always (the backend is SSE-only); the
 	// non-streaming path aggregates to the completed Response. See codex.go.
+	// The backend speaks the Responses dialect only, so /v1/messages is
+	// translated first (anthropic_codex.go): raw-forwarding an Anthropic body
+	// would be rejected before it ever left the gateway.
 	if cred.ProviderID == domain.ProviderOpenAICodex {
+		if req.Type == domain.RequestTypeMessages {
+			return r.dispatchMessagesTranslatedCodex(ctx, req, model, cred)
+		}
 		return r.dispatchCodex(ctx, req, model, cred)
 	}
 
@@ -508,8 +514,14 @@ func (r *BifrostRouter) DispatchStream(ctx context.Context, req *domain.Request,
 	}
 
 	// Codex bypasses Bifrost entirely: a direct SSE proxy to OpenAI's codex
-	// backend with OAuth + one-shot token refresh. See codex.go.
+	// backend with OAuth + one-shot token refresh. See codex.go. Its backend
+	// speaks the Responses dialect only, so /v1/messages goes through the
+	// translated codex lane (anthropic_codex.go) and comes back as the
+	// Anthropic SSE union.
 	if cred.ProviderID == domain.ProviderOpenAICodex {
+		if req.Type == domain.RequestTypeMessages {
+			return r.dispatchMessagesTranslatedCodexStream(ctx, req, model, cred)
+		}
 		return r.dispatchCodexStream(ctx, req, model, cred)
 	}
 
