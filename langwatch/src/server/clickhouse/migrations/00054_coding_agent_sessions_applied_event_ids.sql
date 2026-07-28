@@ -9,16 +9,7 @@
 -- committed write followed by a lost cache (TTL, eviction, restart) let a retry
 -- re-fold the same batch onto state that already contained it — a silent
 -- double-count. This column rides that set next to the state row so redelivery
--- dedup survives cache loss. Bounded to the in-flight batch — the fold declares
--- an explicit coalesceMaxBatch (128) so a single row's watermark stays a few KB,
--- because a ReplacingMergeTree keeps every superseded row version until TTL and
--- each carries its own copy.
---
--- Part of the same read-back row shape as migration 00053, so the same version
--- gate covers it: a row written before this column exists reads back an empty
--- set, and an empty watermark is indistinguishable from "nothing applied yet".
--- Such a row is declined wholesale by projection version rather than decoded —
--- see the version-gate section of 00053's header for the full argument.
+-- dedup survives cache loss. Bounded to the in-flight batch.
 -- ============================================================================
 
 -- +goose StatementBegin
