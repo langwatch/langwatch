@@ -247,7 +247,10 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 
 	bfReq, dispatchCtx, err := buildChatRequest(ctx, req, provider, model)
 	if err != nil {
-		return nil, err
+		// Everything buildChatRequest can reject is a client-body problem
+		// (unparseable JSON, malformed params): classify it as a 400 the
+		// same way the embeddings lane does, not an internal error.
+		return nil, herr.New(ctx, domain.ErrBadRequest, herr.M{"reason": err.Error()})
 	}
 
 	bfCtx := bfschemas.NewBifrostContext(withCredential(dispatchCtx, cred), time.Time{})
@@ -538,7 +541,8 @@ func (r *BifrostRouter) DispatchStream(ctx context.Context, req *domain.Request,
 
 	bfReq, dispatchCtx, err := buildChatRequest(ctx, req, provider, model)
 	if err != nil {
-		return nil, err
+		// Client-body problem, same classification as the sync lane.
+		return nil, herr.New(ctx, domain.ErrBadRequest, herr.M{"reason": err.Error()})
 	}
 
 	bfCtx := bfschemas.NewBifrostContext(withCredential(dispatchCtx, cred), time.Time{})

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 
 	bfschemas "github.com/maximhq/bifrost/core/schemas"
 
@@ -243,9 +244,50 @@ func parseOpenAIChatRequest(body []byte) ([]bfschemas.ChatMessage, *bfschemas.Ch
 		return nil, nil, fmt.Errorf("parse params: %w", err)
 	}
 
+	if err := liftMaxTokensAlias(body, &params); err != nil {
+		return nil, nil, err
+	}
 	liftExtensionParams(body, &params)
 
 	return messagesWrap.Messages, &params, nil
+}
+
+// liftMaxTokensAlias maps the legacy OpenAI output cap `max_tokens` onto
+// ChatParameters.MaxCompletionTokens for the translated lanes.
+//
+// ChatParameters has no top-level `max_tokens` field, so on the lanes that
+// parse the body (Anthropic, Bedrock, Gemini, Vertex: everything
+// isOpenAICompatibleProvider does not raw-forward) a client's `max_tokens`
+// used to unmarshal into nothing. The per-provider translators read only
+// MaxCompletionTokens and, finding nil, fall back to the model's own
+// maximum (Anthropic's Messages API requires max_tokens so Bifrost injects
+// a default; Bedrock and Gemini omit the cap field entirely): the client's
+// cap was silently ignored, and a request sent with max_tokens: 5 came
+// back with dozens of completion tokens and finish_reason "stop" instead
+// of "length".
+//
+// An explicit max_completion_tokens wins over the alias; OpenAI documents
+// max_tokens as the deprecated name for the same cap. Raw-forward lanes
+// (OpenAI, Azure, vLLM) are deliberately untouched: their bodies reach the
+// provider byte-for-byte and the provider applies its own alias rules
+// (gpt-5* rejects max_tokens with a 400 the gateway passes through
+// verbatim, per specs/ai-gateway/openai-param-compat.feature).
+func liftMaxTokensAlias(body []byte, params *bfschemas.ChatParameters) error {
+	v := gjson.GetBytes(body, "max_tokens")
+	if !v.Exists() || v.Type == gjson.Null {
+		return nil
+	}
+	// Mirror the strictness of max_completion_tokens (*int): a malformed
+	// cap must fail the request, not silently un-cap it.
+	if v.Type != gjson.Number || v.Num != math.Trunc(v.Num) {
+		return fmt.Errorf("max_tokens must be an integer")
+	}
+	if params.MaxCompletionTokens != nil {
+		return nil
+	}
+	n := int(v.Int())
+	params.MaxCompletionTokens = &n
+	return nil
 }
 
 // chatExtensionKeys enumerates the provider-extension fields the gateway

@@ -217,7 +217,8 @@ func (r *BifrostRouter) buildConverseInput(
 ) (*bedrockruntime.ConverseInput, error) {
 	bfReq, _, err := buildChatRequest(ctx, req, provider, model)
 	if err != nil {
-		return nil, err
+		// Client-body problem, same classification as the Bifrost chat lanes.
+		return nil, herr.New(ctx, domain.ErrBadRequest, herr.M{"reason": err.Error()})
 	}
 
 	system, messages, err := mapBedrockMessages(bfReq.Input)

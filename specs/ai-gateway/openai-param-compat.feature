@@ -128,3 +128,63 @@ Feature: AI Gateway — OpenAI client-param compatibility translation
     # gpt-4o-via-alias requests flow to gpt-5-mini with both the model
     # substitution AND the param translation. Too policy-heavy for v1.1 —
     # defer to v2 behind an explicit VK-config opt-in.
+
+  # ============================================================================
+  # Translated lanes: the client's output cap must survive translation
+  # ============================================================================
+
+  # Everything above is about the RAW-FORWARD lanes (OpenAI, Azure, vLLM),
+  # where the gateway passes the body through and upstream applies its own
+  # param rules. The lanes below are different: for Anthropic, Bedrock,
+  # Gemini and Vertex the gateway PARSES the OpenAI-shape body and builds
+  # the provider-native request itself, so param fidelity is the gateway's
+  # own responsibility. Bifrost's neutral ChatParameters carries the cap
+  # only as max_completion_tokens; a client's legacy max_tokens used to
+  # unmarshal into nothing, the Anthropic and Bedrock translators found no
+  # cap and substituted the model's own maximum (Anthropic's Messages API
+  # requires max_tokens, so a default was injected; Bedrock omitted
+  # inferenceConfig.maxTokens). Result observed on the production canary:
+  # max_tokens: 5 answered with 26 to 28 completion tokens and
+  # finish_reason "stop". A client-set cap is a guarantee, not a hint:
+  # dropping it silently breaks cost control on exactly the lanes where
+  # the gateway is the one writing the provider request.
+
+  Rule: Translated lanes honor the client's output cap
+
+    @unit
+    Scenario: translated lanes map legacy max_tokens onto the provider request
+      When a client POSTs /v1/chat/completions with max_tokens 5 toward an anthropic, bedrock, gemini, or vertex credential
+      Then the parsed provider request carries the client's cap as its native max-tokens field
+      And the provider stops generation at the cap, surfacing finish_reason "length"
+
+    @unit
+    Scenario: explicit max_completion_tokens wins over the max_tokens alias
+      When a client sends both max_tokens 5 and max_completion_tokens 9
+      Then the provider request carries 9
+      # max_tokens is OpenAI's deprecated alias for max_completion_tokens;
+      # when both arrive, the explicit modern field is authoritative.
+
+    @unit
+    Scenario: a malformed max_tokens is rejected, not silently un-capped
+      When a client sends max_tokens "five" or 5.7 toward a translated lane
+      Then the gateway responds 400 bad_request
+      And nothing is dispatched upstream
+      # Mirrors the strictness of max_completion_tokens, which is typed as
+      # an integer and already rejects malformed values at parse time.
+
+    @live
+    Scenario Outline: client cap verifiably bounds output on every translated lane
+      When a client POSTs /v1/chat/completions toward <provider> with <cap_field> 16 asking for a long answer, <mode>
+      Then the response carries usage.completion_tokens <= 16
+      And the finish reason is "length"
+
+      Examples:
+        | provider  | cap_field             | mode      |
+        | anthropic | max_tokens            | sync      |
+        | anthropic | max_tokens            | streaming |
+        | anthropic | max_completion_tokens | sync      |
+        | anthropic | max_completion_tokens | streaming |
+        | bedrock   | max_tokens            | sync      |
+        | bedrock   | max_tokens            | streaming |
+        | bedrock   | max_completion_tokens | sync      |
+        | bedrock   | max_completion_tokens | streaming |
