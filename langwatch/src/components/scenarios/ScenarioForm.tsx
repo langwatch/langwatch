@@ -90,10 +90,9 @@ type ScenarioFormProps = {
 };
 
 /**
- * The two modes. One line each: hover is a nudge, not the documentation —
- * the (i) beside "Attack" carries the full explanation, and every field below
- * has its own. A paragraph here would make the tooltip the thing you have to
- * read to pick, which is the opposite of what a tooltip is for.
+ * The two modes. No per-button tooltip: the (i) on the Type header explains
+ * the difference, so hovering a button added a second thing to read for the
+ * same answer.
  */
 const TYPE_HELP =
   "Standard sends a cooperative user who is trying to get something done. Red team sends an attacker trying to make the agent break the criteria you set — only use it on agents you own or have permission to test.";
@@ -102,12 +101,10 @@ const TYPES = [
   {
     redTeam: false,
     label: "Standard scenario",
-    help: "A cooperative user talks to your agent, judged against your criteria.",
   },
   {
     redTeam: true,
     label: "Red team",
-    help: "An attacker tries to break your criteria. Only test agents you own.",
   },
 ];
 
@@ -144,26 +141,25 @@ function ScenarioTypeSelector({
         {TYPES.map((type) => {
           const selected = type.redTeam === isRedTeam;
           return (
-            <Tooltip key={type.label} content={type.help} openDelay={200}>
-              <Button
-                size="sm"
-                variant="outline"
-                flex={1}
-                // Selected is a tint and a border, not a solid fill. A block of
-                // deep red for the whole button made choosing a mode look like
-                // a warning; the colour should say which one is on, and the
-                // drawer edge already says the scenario is an attack.
-                colorPalette={type.redTeam ? "redteam" : "gray"}
-                borderColor={selected ? "colorPalette.solid" : "border.muted"}
-                bg={selected ? "colorPalette.subtle" : undefined}
-                color={selected ? "colorPalette.fg" : "fg.muted"}
-                fontWeight={selected ? "medium" : "normal"}
-                onClick={() => onSelect(type.redTeam)}
-              >
-                {type.redTeam ? <ShieldAlert size={14} /> : null}
-                {type.label}
-              </Button>
-            </Tooltip>
+            <Button
+              key={type.label}
+              size="sm"
+              variant="outline"
+              flex={1}
+              // Selected is a tint and a border, not a solid fill. A block of
+              // deep red for the whole button made choosing a mode look like a
+              // warning; the colour should say which one is on, and the drawer
+              // edge already says the scenario is an attack.
+              colorPalette={type.redTeam ? "redteam" : "gray"}
+              borderColor={selected ? "colorPalette.solid" : "border.muted"}
+              bg={selected ? "colorPalette.subtle" : undefined}
+              color={selected ? "colorPalette.fg" : "fg.muted"}
+              fontWeight={selected ? "medium" : "normal"}
+              onClick={() => onSelect(type.redTeam)}
+            >
+              {type.redTeam ? <ShieldAlert size={14} /> : null}
+              {type.label}
+            </Button>
           );
         })}
       </HStack>
