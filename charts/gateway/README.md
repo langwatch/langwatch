@@ -98,6 +98,18 @@ listener (port `5563`, named `http`):
 Response shape and tuning are documented in
 [Health Checks](https://docs.langwatch.ai/ai-gateway/self-hosting/health-checks).
 
+## Status-page endpoint
+
+`GET /health` (also `HEAD`) is the public status-page surface, exposed
+through the ingress as an Exact path when `ingress.healthPath.enabled`
+(default `true`); point an uptime monitor at `https://<ingress.host>/health`.
+It reports the gateway process plus the control-plane connectivity
+verdict that a background probe refreshes every 15 s over the signed
+internal channel: HTTP 200 healthy, 503 once the control plane has been
+unreachable for over 60 s. It never contacts a model provider, so an
+OpenAI or Anthropic outage cannot turn it red, and a poll never fans
+out anywhere. Distinct from the k8s probes above, which stay in-cluster.
+
 ## Streaming / SSE
 
 The default ingress annotations (`charts/gateway/values.yaml: ingress.annotations`)

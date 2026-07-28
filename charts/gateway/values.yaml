@@ -57,6 +57,18 @@ ingress:
   host: gateway.langwatch.ai
   path: /v1
   pathType: Prefix
+  # Public status-page surface. An Exact match publishes this one path and
+  # nothing else, so /healthz, /readyz, /metrics and /internal stay
+  # in-cluster. Methods are bounded by the gateway route, which serves GET
+  # and HEAD and answers 405 otherwise, not by the ingress.
+  # The endpoint is unauthenticated by design: it reports the gateway
+  # process plus the control-plane connectivity verdict cached by a
+  # background probe, returns no tenant data, makes no upstream call per
+  # poll, and can never go red from a model-provider outage. Point the
+  # status-page HTTP monitor at https://<ingress.host>/health.
+  healthPath:
+    enabled: true
+    path: /health
   tls:
     enabled: true
     secretName: gateway-tls
