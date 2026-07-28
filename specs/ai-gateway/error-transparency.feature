@@ -193,6 +193,20 @@ Feature: AI Gateway — transparent upstream error forwarding
     And the circuit breaker stays closed, because an answered 4xx proves the slot alive
 
   @bdd @error-transparency @integration
+  Scenario: Provider 5xx answers count toward opening the circuit breaker
+    Given the provider answers requests with 5xx errors
+    When failures accumulate on the same credential
+    Then the circuit breaker records them as slot-health failures
+    So that a genuinely failing upstream is skipped instead of hammered
+
+  @bdd @error-transparency @integration
+  Scenario: A caller-abandoned request neither falls back nor moves the breaker
+    Given the caller disconnects or its request deadline expires mid-dispatch
+    When the attempt returns a bare context error
+    Then no fallback to the next credential is attempted
+    And the circuit breaker records neither a failure nor a success for the slot
+
+  @bdd @error-transparency @integration
   Scenario: An open circuit breaker surfaces circuit_open, not internal_error
     Given repeated provider 5xx failures opened the credential's circuit breaker
     When the client calls the gateway with "vk-demo"

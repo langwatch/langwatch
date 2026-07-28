@@ -72,7 +72,7 @@ func openAIChatRequest(stream bool) *http.Request {
 	return req
 }
 
-// @scenario "Provider error taxonomy reaches the wire with status and identity intact"
+// @scenario "Provider error taxonomy keeps status and identity through the gateway"
 func TestOpenAILane_ProviderErrorTaxonomy(t *testing.T) {
 	cases := []struct {
 		name string
@@ -178,7 +178,7 @@ func TestOpenAILane_ProviderErrorTaxonomy(t *testing.T) {
 	}
 }
 
-// @scenario "Anthropic error identity survives the messages lane"
+// @scenario "Upstream error responses name the provider that produced them"
 //
 // The anthropic rows that differ structurally from OpenAI's: the 529
 // overloaded_error (a status outside the IANA registry that must still pass
@@ -244,7 +244,7 @@ func TestMessagesLane_AnthropicErrorTaxonomy(t *testing.T) {
 	}
 }
 
-// @scenario "A provider quota outage cannot open the breaker into internal_error"
+// @scenario "Provider 4xx answers do not open the circuit breaker"
 //
 // The incident's exact mechanics: CI bots hammered the lane while OpenAI
 // answered 429 insufficient_quota; the 429s counted as breaker failures,

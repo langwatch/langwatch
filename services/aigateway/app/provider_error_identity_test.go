@@ -40,7 +40,7 @@ func quota429Response() *domain.Response {
 	}
 }
 
-// @scenario "Provider quota and server failures fall back to the next credential"
+// @scenario "Provider quota, rate-limit, and 5xx answers fail over to the next credential"
 func TestHandleChat_RawForward429Response_FallsBack(t *testing.T) {
 	for name, failing := range map[string]*domain.Response{
 		"429 insufficient_quota": quota429Response(),
@@ -74,7 +74,7 @@ func TestHandleChat_RawForward429Response_FallsBack(t *testing.T) {
 	}
 }
 
-// @scenario "A terminal provider 4xx answer does not fall back and is forwarded verbatim"
+// @scenario "Terminal provider 4xx answers do not fail over"
 func TestHandleChat_RawForwardTerminal400Response_NoFallback(t *testing.T) {
 	terminalBody := `{"error":{"message":"messages: at least one message is required","type":"invalid_request_error"}}`
 	callCount := 0
@@ -103,7 +103,7 @@ func TestHandleChat_RawForwardTerminal400Response_NoFallback(t *testing.T) {
 	assert.Equal(t, string(domain.ProviderOpenAI), ue.Provider)
 }
 
-// @scenario "An exhausted chain surfaces the last provider's error, not internal_error"
+// @scenario "An exhausted fallback chain surfaces the last provider's error"
 func TestHandleChat_ChainExhausted_SurfacesLastProviderError(t *testing.T) {
 	lastBody := `{"error":{"message":"Rate limit reached for gpt-4","type":"requests","code":"rate_limit_exceeded"}}`
 	provider := &mockProvider{
@@ -142,7 +142,7 @@ func (blockedBreaker) RecordSuccess(string)       {}
 func (blockedBreaker) RecordFailure(string)       {}
 func (blockedBreaker) State(string) breaker.State { return breaker.Open }
 
-// @scenario "An open circuit breaker surfaces a typed circuit_open error, not internal_error"
+// @scenario "An open circuit breaker surfaces circuit_open, not internal_error"
 func TestHandleChat_CircuitOpen_TypedError(t *testing.T) {
 	provider := &mockProvider{
 		dispatchFn: func(_ context.Context, _ *domain.Request, _ domain.Credential) (*domain.Response, error) {
@@ -163,7 +163,7 @@ func TestHandleChat_CircuitOpen_TypedError(t *testing.T) {
 		"a zero-attempt walk must translate to circuit_open, the incident surfaced it as 500 internal_error; got %v", err)
 }
 
-// @scenario "An open circuit breaker surfaces a typed circuit_open error on the stream path"
+// @scenario "An open circuit breaker surfaces circuit_open, not internal_error"
 func TestHandleChatStream_CircuitOpen_TypedError(t *testing.T) {
 	provider := &mockProvider{
 		streamFn: func(_ context.Context, _ *domain.Request, _ domain.Credential) (domain.StreamIterator, error) {
@@ -239,7 +239,7 @@ func TestHandleChat_5xxCountsAsBreakerFailure(t *testing.T) {
 	assert.Zero(t, counting.successes)
 }
 
-// @scenario "Gateway-own budget refusals never reach the provider chain"
+// @scenario "The gateway's own refusals never trigger provider fallback"
 func TestHandleChat_BudgetBlock_NeverDispatches(t *testing.T) {
 	dispatched := false
 	provider := &mockProvider{
