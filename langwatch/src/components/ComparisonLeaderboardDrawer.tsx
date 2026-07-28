@@ -27,7 +27,7 @@ import {
   findCheaperTiedAlternative,
 } from "./batch-evaluation-results/computeLeaderboardVerdict";
 import { computeSampleAdequacy } from "./batch-evaluation-results/computeSampleAdequacy";
-import { computeVariantMetrics } from "./batch-evaluation-results/computeVariantMetrics";
+import { useVariantMetrics } from "./batch-evaluation-results/useVariantMetrics";
 import { LeaderboardAskLangyButton } from "./batch-evaluation-results/LeaderboardAskLangyButton";
 import { LeaderboardStep } from "./batch-evaluation-results/LeaderboardStep";
 import { LeaderboardTrustPanel } from "./batch-evaluation-results/LeaderboardTrustPanel";
@@ -82,14 +82,10 @@ export function ComparisonLeaderboardDrawer({
   // the same fit for the same column, and it is expensive enough that doing
   // it twice was a visible pause when the drawer opened.
   const leaderboard = useBTLeaderboard({ column, variantIds });
-  const variantMetrics = useMemo(
-    () =>
-      computeVariantMetrics({
-        variantIds,
-        rows,
-      }),
-    [variantIds, rows],
-  );
+  // Shared across the card and the drawer — see useVariantMetrics. The
+  // paired difference intervals made this O(variants squared) bootstraps,
+  // so computing it in both places was a second visible pause.
+  const variantMetrics = useVariantMetrics({ rows, variantIds });
 
   const verdict = useMemo(
     () => computeLeaderboardVerdict(leaderboard),

@@ -35,7 +35,7 @@ import {
   computeLeaderboardVerdict,
   findCheaperTiedAlternative,
 } from "./computeLeaderboardVerdict";
-import { computeVariantMetrics } from "./computeVariantMetrics";
+import { useVariantMetrics } from "./useVariantMetrics";
 import { formatLeaderboardHeadline } from "./formatLeaderboardHeadline";
 import type { BatchComparisonColumn, BatchResultRow } from "./types";
 import { VARIANT_COLORS } from "./WinRateChart";
@@ -159,14 +159,10 @@ export function ComparisonLeaderboardChart({
     [column.variants],
   );
   const verdict = computeLeaderboardVerdict(leaderboard);
-  const variantMetrics = useMemo(
-    () =>
-      computeVariantMetrics({
-        variantIds,
-        rows,
-      }),
-    [variantIds, rows],
-  );
+  // Shared across the card and the drawer — see useVariantMetrics. The
+  // paired difference intervals made this O(variants squared) bootstraps,
+  // so computing it in both places was a second visible pause.
+  const variantMetrics = useVariantMetrics({ rows, variantIds });
   const cheaperAlternative = useMemo(
     () => findCheaperTiedAlternative({ verdict, variantMetrics }),
     [verdict, variantMetrics],
