@@ -12,6 +12,7 @@ import {
   redTeamFields,
   redTeamStateIssue,
   toPrismaRedTeamConfig,
+  touchesRedTeam,
 } from "~/server/scenarios/red-team-input";
 import { ScenarioService } from "~/server/scenarios/scenario.service";
 import { captureException } from "~/utils/posthogErrorCapture";
@@ -153,19 +154,26 @@ export const scenarioCrudRouter = createTRPCRouter({
       const { id, projectId, redTeamConfig, ...data } = input;
       const service = ScenarioService.create(ctx.prisma);
 
-      // Merge before judging: an update that touches only one red-team field
-      // must not be rejected for another field it never mentioned.
-      const existing = await service.getById({ id, projectId });
-      const updateIssue = redTeamStateIssue(
-        mergeRedTeamState(input, {
-          redTeamStrategy: existing?.redTeamStrategy,
-          redTeamTarget: existing?.redTeamTarget,
-          redTeamTotalTurns: existing?.redTeamTotalTurns,
-          redTeamConfig: existing?.redTeamConfig as RedTeamConfig | null,
-        }),
-      );
-      if (updateIssue) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: updateIssue.message });
+      // Only read the stored row when the write actually mentions the attack:
+      // merging is needed so a partial update is not rejected for a field it
+      // never sent, but a rename should not pay for a round trip to find that
+      // out.
+      if (touchesRedTeam(input)) {
+        const existing = await service.getById({ id, projectId });
+        const updateIssue = redTeamStateIssue(
+          mergeRedTeamState(input, {
+            redTeamStrategy: existing?.redTeamStrategy,
+            redTeamTarget: existing?.redTeamTarget,
+            redTeamTotalTurns: existing?.redTeamTotalTurns,
+            redTeamConfig: existing?.redTeamConfig as RedTeamConfig | null,
+          }),
+        );
+        if (updateIssue) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: updateIssue.message,
+          });
+        }
       }
       const result = await service.update(id, projectId, {
         ...data,

@@ -85,7 +85,9 @@ export function redTeamStateIssue(state: RedTeamInput): {
   // that do nothing.
   if (strategy === "goat") {
     const config = state.redTeamConfig ?? undefined;
-    if (config?.attackPlan ?? config?.metapromptTemplate) {
+    // Truthiness, not `??`: an empty attackPlan is not nullish, so `??` would
+    // short-circuit on "" and hide a metapromptTemplate that IS set.
+    if (Boolean(config?.attackPlan) || Boolean(config?.metapromptTemplate)) {
       return {
         field: "redTeamConfig",
         message:
@@ -115,17 +117,27 @@ export interface RedTeamInput {
  * the check exists to stop. Presence of the key is the signal, not its value.
  */
 export function mergeRedTeamState(
-  body: Record<string, unknown>,
+  body: Partial<RedTeamInput>,
   stored: RedTeamInput,
 ): RedTeamInput {
   const pick = <K extends keyof RedTeamInput>(key: K): RedTeamInput[K] =>
-    key in body ? (body[key] as RedTeamInput[K]) : stored[key];
+    key in body ? body[key] : stored[key];
   return {
     redTeamStrategy: pick("redTeamStrategy"),
     redTeamTarget: pick("redTeamTarget"),
     redTeamTotalTurns: pick("redTeamTotalTurns"),
     redTeamConfig: pick("redTeamConfig"),
   };
+}
+
+/** Whether a write mentions the attack at all. */
+export function touchesRedTeam(body: Partial<RedTeamInput>): boolean {
+  return (
+    "redTeamStrategy" in body ||
+    "redTeamTarget" in body ||
+    "redTeamTotalTurns" in body ||
+    "redTeamConfig" in body
+  );
 }
 
 /**

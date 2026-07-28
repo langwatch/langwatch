@@ -18,6 +18,7 @@ import {
   redTeamFields,
   redTeamStateIssue,
   toPrismaRedTeamWrite,
+  touchesRedTeam,
 } from "../red-team-input";
 
 const schema = z.object(redTeamFields);
@@ -117,6 +118,31 @@ describe("the red-team write contract", () => {
       expect(issue?.field).toBe("redTeamConfig");
     });
 
+    it("is refused even when an earlier planner field is blank", () => {
+      // `a ?? b` short-circuits on "" because empty is not nullish, so a blank
+      // attack plan used to hide a planning prompt that was actually set.
+      const issue = redTeamStateIssue({
+        redTeamStrategy: "goat",
+        redTeamTarget: "extract the code",
+        redTeamConfig: {
+          attackPlan: "",
+          metapromptTemplate: "Plan the attack for {target}.",
+        },
+      });
+
+      expect(issue?.field).toBe("redTeamConfig");
+    });
+
+    it("allows blank planner fields, which mean nothing was set", () => {
+      expect(
+        redTeamStateIssue({
+          redTeamStrategy: "goat",
+          redTeamTarget: "extract the code",
+          redTeamConfig: { attackPlan: "", metapromptTemplate: "" },
+        }),
+      ).toBeNull();
+    });
+
     it("accepts the same settings on Crescendo, which uses them", () => {
       expect(
         redTeamStateIssue({
@@ -161,6 +187,15 @@ describe("the red-team write contract", () => {
       );
 
       expect(redTeamStateIssue(merged)).toBeNull();
+    });
+  });
+
+  describe("given a write that does not mention the attack", () => {
+    it("is recognised, so the stored row need not be read to check it", () => {
+      expect(touchesRedTeam({})).toBe(false);
+      expect(touchesRedTeam({ redTeamTotalTurns: 12 })).toBe(true);
+      // An explicit clear still counts as mentioning it.
+      expect(touchesRedTeam({ redTeamStrategy: null })).toBe(true);
     });
   });
 
