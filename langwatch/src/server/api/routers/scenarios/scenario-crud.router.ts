@@ -8,6 +8,7 @@ import { trackServerEvent } from "~/server/posthog";
 import { ScenarioNotFoundError } from "~/server/scenarios/errors";
 import { type RedTeamConfig } from "~/server/scenarios/execution/types";
 import {
+  mergeRedTeamState,
   redTeamFields,
   redTeamStateIssue,
   toPrismaRedTeamConfig,
@@ -155,14 +156,14 @@ export const scenarioCrudRouter = createTRPCRouter({
       // Merge before judging: an update that touches only one red-team field
       // must not be rejected for another field it never mentioned.
       const existing = await service.getById({ id, projectId });
-      const updateIssue = redTeamStateIssue({
-        redTeamStrategy: input.redTeamStrategy ?? existing?.redTeamStrategy,
-        redTeamTarget: input.redTeamTarget ?? existing?.redTeamTarget,
-        redTeamTotalTurns:
-          input.redTeamTotalTurns ?? existing?.redTeamTotalTurns,
-        redTeamConfig: (redTeamConfig ??
-          existing?.redTeamConfig) as RedTeamConfig | null,
-      });
+      const updateIssue = redTeamStateIssue(
+        mergeRedTeamState(input, {
+          redTeamStrategy: existing?.redTeamStrategy,
+          redTeamTarget: existing?.redTeamTarget,
+          redTeamTotalTurns: existing?.redTeamTotalTurns,
+          redTeamConfig: existing?.redTeamConfig as RedTeamConfig | null,
+        }),
+      );
       if (updateIssue) {
         throw new TRPCError({ code: "BAD_REQUEST", message: updateIssue.message });
       }

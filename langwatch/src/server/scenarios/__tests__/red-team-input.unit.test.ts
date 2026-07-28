@@ -14,6 +14,7 @@ import { Prisma } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import {
+  mergeRedTeamState,
   redTeamFields,
   redTeamStateIssue,
   toPrismaRedTeamWrite,
@@ -124,6 +125,42 @@ describe("the red-team write contract", () => {
           redTeamConfig: { attackPlan: "Turns 1-10: build rapport." },
         }),
       ).toBeNull();
+    });
+  });
+
+  describe("given a partial update merged over what is stored", () => {
+    const stored = {
+      redTeamStrategy: "crescendo",
+      redTeamTarget: "extract the override code",
+      redTeamTotalTurns: 30,
+      redTeamConfig: null,
+    };
+
+    it("keeps fields the request never mentioned", () => {
+      const merged = mergeRedTeamState({ redTeamTotalTurns: 12 }, stored);
+
+      expect(merged.redTeamTarget).toBe("extract the override code");
+      expect(merged.redTeamTotalTurns).toBe(12);
+    });
+
+    /** @scenario A strategy with no objective is refused */
+    it("treats an explicit null as a clear, so the pairing check sees it", () => {
+      // Caught live: `??` merged the stored objective back in, the check
+      // passed, and the null was written anyway — the strategy was left with
+      // nothing to act on, which is the downgrade the check exists to stop.
+      const merged = mergeRedTeamState({ redTeamTarget: null }, stored);
+
+      expect(merged.redTeamTarget).toBeNull();
+      expect(redTeamStateIssue(merged)?.field).toBe("redTeamTarget");
+    });
+
+    it("allows clearing the whole attack at once", () => {
+      const merged = mergeRedTeamState(
+        { redTeamStrategy: null, redTeamTarget: null },
+        stored,
+      );
+
+      expect(redTeamStateIssue(merged)).toBeNull();
     });
   });
 

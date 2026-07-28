@@ -4,6 +4,7 @@ import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi/zod";
 import { z } from "zod";
 import {
+  mergeRedTeamState,
   redTeamFields,
   redTeamStateIssue,
   toPrismaRedTeamWrite,
@@ -261,13 +262,12 @@ export function registerScenarioRoutes(
         return c.json({ error: "Scenario not found" }, 404);
       }
 
-      const merged = {
-        redTeamStrategy: body.redTeamStrategy ?? existing.redTeamStrategy,
-        redTeamTarget: body.redTeamTarget ?? existing.redTeamTarget,
-        redTeamTotalTurns: body.redTeamTotalTurns ?? existing.redTeamTotalTurns,
-        redTeamConfig: (body.redTeamConfig ??
-          existing.redTeamConfig) as RedTeamConfig | null,
-      };
+      const merged = mergeRedTeamState(body, {
+        redTeamStrategy: existing.redTeamStrategy,
+        redTeamTarget: existing.redTeamTarget,
+        redTeamTotalTurns: existing.redTeamTotalTurns,
+        redTeamConfig: existing.redTeamConfig as RedTeamConfig | null,
+      });
       const updateIssue = redTeamStateIssue(merged);
       if (updateIssue) {
         return c.json(

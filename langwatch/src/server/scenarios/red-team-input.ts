@@ -105,6 +105,29 @@ export interface RedTeamInput {
   redTeamConfig?: RedTeamConfig | null;
 }
 
+
+/**
+ * Merge a partial write over what is stored.
+ *
+ * `??` is wrong here: it treats an explicit `null` as "not supplied", so a
+ * request clearing the objective merges the OLD objective back in, passes the
+ * pairing check, and then writes the null anyway — the exact silent downgrade
+ * the check exists to stop. Presence of the key is the signal, not its value.
+ */
+export function mergeRedTeamState(
+  body: Record<string, unknown>,
+  stored: RedTeamInput,
+): RedTeamInput {
+  const pick = <K extends keyof RedTeamInput>(key: K): RedTeamInput[K] =>
+    key in body ? (body[key] as RedTeamInput[K]) : stored[key];
+  return {
+    redTeamStrategy: pick("redTeamStrategy"),
+    redTeamTarget: pick("redTeamTarget"),
+    redTeamTotalTurns: pick("redTeamTotalTurns"),
+    redTeamConfig: pick("redTeamConfig"),
+  };
+}
+
 /**
  * Turns parsed input into the columns a Prisma write takes, dropping keys the
  * caller did not supply so an update never clears a field it was not asked to.
