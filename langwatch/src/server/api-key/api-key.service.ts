@@ -2,7 +2,11 @@ import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import type { ApiKey, PrismaClient } from "@prisma/client";
 import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
-import { type Permission, teamRoleHasPermission } from "~/server/api/rbac";
+import {
+  bindingScopeCanGrant,
+  type Permission,
+  teamRoleHasPermission,
+} from "~/server/api/rbac";
 import {
   MalformedCustomRolePermissionsError,
   parseCustomRolePermissions,
@@ -670,6 +674,14 @@ export class ApiKeyService {
           permission: perm as Permission,
         })) ||
         (legacyRole !== null &&
+          // ADR-021: a team/project-scoped grant can never confer an
+          // org-exclusive permission. `rbac.ts` applies this to legacy roles
+          // via `bindingGrants`, which opens with the same check — without it
+          // here, this ceiling would accept a permission the tRPC path
+          // refuses. No team role lists an org-exclusive resource today, so
+          // this is parity and defence in depth rather than a live hole; it
+          // stops being either the moment someone adds one.
+          bindingScopeCanGrant(RoleBindingScopeType.TEAM, perm as Permission) &&
           teamRoleHasPermission(legacyRole, perm as Permission));
 
       if (!userHas) {

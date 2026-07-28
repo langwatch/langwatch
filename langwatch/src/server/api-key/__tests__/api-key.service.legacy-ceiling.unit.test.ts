@@ -50,6 +50,20 @@ vi.mock("../api-key-token.utils", () => ({
   INGEST_KEY_PREFIX: "ik-lw-",
 }));
 
+const forceTeamRoleGrantsEverything = vi.fn();
+vi.mock("~/server/api/rbac", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("~/server/api/rbac")>();
+  return {
+    ...actual,
+    // Real `bindingScopeCanGrant` — that is the code under test.
+    teamRoleHasPermission: (...args: unknown[]) =>
+      forceTeamRoleGrantsEverything.mock.calls.length ||
+      forceTeamRoleGrantsEverything.getMockImplementation()
+        ? forceTeamRoleGrantsEverything(...args)
+        : (actual.teamRoleHasPermission as (...a: unknown[]) => boolean)(...args),
+  };
+});
+
 const { ApiKeyService } = await import("../api-key.service");
 
 function makePrisma({
@@ -123,6 +137,7 @@ const createRestrictedKey = (prisma: any) =>
 beforeEach(() => {
   mockCheckPermission.mockClear();
   mockCheckPermission.mockResolvedValue(false);
+  forceTeamRoleGrantsEverything.mockReset();
 });
 
 describe("ApiKeyService.create() — ceiling for legacy-membership users", () => {
@@ -176,6 +191,53 @@ describe("ApiKeyService.create() — ceiling for legacy-membership users", () =>
         /exceeds your own access/,
       );
       expect(teamUserFindFirst).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given an org-exclusive permission and only a legacy TEAM role", () => {
+    // ADR-021: a team/project-scoped grant never confers an org-exclusive
+    // permission. rbac.ts enforces this on legacy roles inside `bindingGrants`;
+    // the ceiling has to match, or it accepts what the tRPC path refuses.
+    //
+    // `teamRoleHasPermission` is forced to true here ON PURPOSE. No team role
+    // lists an org-exclusive resource today, so asserting against the real
+    // table would pass whether or not the scope guard exists — a test that
+    // proves nothing. Forcing the role table to say "yes" isolates the only
+    // thing under test: that scope still says "no".
+    it("refuses it even when the role table would allow it", async () => {
+      const { prisma } = makePrisma({
+        roleBindingCount: 0,
+        legacyTeamUser: { role: TeamUserRole.ADMIN },
+      });
+      forceTeamRoleGrantsEverything.mockReturnValue(true);
+
+      await expect(
+        ApiKeyService.create(prisma).create({
+          name: "Langy session",
+          isSystemManaged: true,
+          userId: USER_ID,
+          createdByUserId: USER_ID,
+          organizationId: ORG_ID,
+          permissionMode: "restricted",
+          permissions: ["organization:manage"],
+          bindings: [
+            { role: "CUSTOM", scopeType: "PROJECT", scopeId: PROJECT_ID } as any,
+          ],
+        }),
+      ).rejects.toThrow(/exceeds your own access/);
+    });
+
+    it("still allows a team-grantable permission on the same path", async () => {
+      // The mirror case, so the test above cannot pass by refusing everything.
+      const { prisma } = makePrisma({
+        roleBindingCount: 0,
+        legacyTeamUser: { role: TeamUserRole.ADMIN },
+      });
+      forceTeamRoleGrantsEverything.mockReturnValue(true);
+
+      await expect(createRestrictedKey(prisma)).resolves.toMatchObject({
+        token: "sk-lw-test",
+      });
     });
   });
 
