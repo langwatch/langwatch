@@ -23,6 +23,7 @@ import {
   redTeamFields,
   redTeamStateIssue,
   touchesRedTeam,
+  withApplicableRedTeamConfig,
 } from "../red-team-input";
 import { toPrismaRedTeamWrite } from "../red-team-prisma";
 
@@ -241,6 +242,48 @@ describe("the red-team write contract", () => {
       // of red-team keys — that is the shape the guard has to hold for.
       const rename = { name: "Renamed" };
       expect(normalizeRedTeamWrite(rename)).toEqual({ name: "Renamed" });
+    });
+  });
+
+  describe("given a draft carrying planner settings the strategy ignores", () => {
+    /** @scenario Switching to a strategy that ignores the planner clears it */
+    it("drops them on the way to the write", () => {
+      const written = withApplicableRedTeamConfig({
+        redTeamStrategy: "goat",
+        redTeamTarget: "extract the code",
+        redTeamConfig: {
+          attackPlan: "Turns 1-10: build rapport.",
+          metapromptTemplate: "Plan for {target}.",
+          successScore: 8,
+        },
+      });
+
+      expect(written.redTeamConfig).toEqual({ successScore: 8 });
+      // Stripped, so the rule that refuses the pair has nothing to refuse.
+      expect(redTeamStateIssue(written)).toBeNull();
+    });
+
+    it("keeps them for the strategy that reads them", () => {
+      const config = { attackPlan: "Turns 1-10: build rapport." };
+
+      expect(
+        withApplicableRedTeamConfig({
+          redTeamStrategy: "crescendo",
+          redTeamTarget: "extract the code",
+          redTeamConfig: config,
+        }).redTeamConfig,
+      ).toEqual(config);
+    });
+
+    it("leaves everything else on the write untouched", () => {
+      const state = {
+        redTeamStrategy: "goat",
+        redTeamTarget: "extract the code",
+        redTeamTotalTurns: 30,
+        redTeamConfig: { successScore: 8 },
+      };
+
+      expect(withApplicableRedTeamConfig(state)).toEqual(state);
     });
   });
 

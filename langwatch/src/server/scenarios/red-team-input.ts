@@ -112,6 +112,34 @@ export interface RedTeamInput {
 
 
 /**
+ * Drop the planner settings a strategy does not use.
+ *
+ * GOAT never generates a plan, so `attackPlan` and `metapromptTemplate` mean
+ * nothing to it — and `redTeamStateIssue` refuses to store them, on the
+ * principle that a saved setting which does nothing is worse than no setting.
+ *
+ * Applied at the point a draft becomes a write, which lets an editor keep
+ * holding a plan while the user looks at GOAT: switch across and back and the
+ * plan is still in the form, but a scenario saved as GOAT never carries one.
+ * The alternative — erasing on the switch — makes a glance at the other
+ * strategy destroy work, and the alternative to *that* was the editor
+ * refusing to save over a value it had stopped showing.
+ *
+ * Not a substitute for the rule: a caller that sends the pair anyway is still
+ * rejected, because over the API there is no draft to protect.
+ */
+export function withApplicableRedTeamConfig<T extends Partial<RedTeamInput>>(
+  state: T,
+): T {
+  const config = state.redTeamConfig;
+  if (!config || state.redTeamStrategy === "crescendo") return state;
+  if (!config.attackPlan && !config.metapromptTemplate) return state;
+
+  const { attackPlan: _plan, metapromptTemplate: _template, ...rest } = config;
+  return { ...state, redTeamConfig: rest };
+}
+
+/**
  * Clearing the strategy clears the whole attack.
  *
  * The editor and `scenario update --standard` both send all four fields as

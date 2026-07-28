@@ -40,6 +40,7 @@ import { TagList } from "../ui/TagList";
 import { toaster } from "../ui/toaster";
 import { SaveAndRunMenu } from "./SaveAndRunMenu";
 import { ScenarioEditorSidebar } from "./ScenarioEditorSidebar";
+import { withApplicableRedTeamConfig } from "../../server/scenarios/red-team-input";
 import {
   ScenarioForm,
   type ScenarioFormData,
@@ -333,14 +334,21 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
       const projectId = project?.id;
       if (!projectId) return null;
 
+      // The form deliberately keeps a Crescendo attack plan while the user is
+      // looking at GOAT, so switching across and back does not throw the plan
+      // away. This is where that draft becomes a write, so it is where the
+      // settings the chosen strategy ignores come off — a GOAT scenario is
+      // never stored carrying a plan it will not read.
+      const payload = withApplicableRedTeamConfig(data);
+
       return scenario
         ? await updateExisting({
             projectId,
             scenarioId: scenario.id,
-            data,
+            data: payload,
             models,
           })
-        : await createNew({ projectId, data, skipTransition, models });
+        : await createNew({ projectId, data: payload, skipTransition, models });
     },
     [project?.id, scenario, updateExisting, createNew],
   );

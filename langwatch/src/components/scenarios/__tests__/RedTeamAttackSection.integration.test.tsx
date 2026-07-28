@@ -19,6 +19,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { withApplicableRedTeamConfig } from "~/server/scenarios/red-team-input";
 import { ScenarioForm, type ScenarioFormData } from "../ScenarioForm";
 import type { UseFormReturn } from "react-hook-form";
 
@@ -75,22 +76,10 @@ describe("the attack section", () => {
   describe("given a Crescendo scenario with an attack plan", () => {
     describe("when the strategy is switched to GOAT", () => {
       /** @scenario Switching to a strategy that ignores the planner clears it */
-      it("drops the planner settings GOAT ignores", async () => {
+      it("can still be saved afterwards", async () => {
         // Hiding the inputs is not the same as clearing them. GOAT never
         // plans, so the rule rejects a leftover plan — at `redTeamConfig`,
         // which renders nothing, in a section that is no longer on screen.
-        const user = userEvent.setup();
-        const { getValues } = renderForm(crescendoWithPlan);
-
-        await user.click(screen.getByText("GOAT"));
-
-        await waitFor(() => {
-          expect(getValues("redTeamConfig")?.attackPlan).toBeUndefined();
-        });
-      });
-
-      /** @scenario Switching to a strategy that ignores the planner clears it */
-      it("can still be saved afterwards", async () => {
         const user = userEvent.setup();
         const { save, onValid, onInvalid } = renderForm(crescendoWithPlan);
 
@@ -100,6 +89,42 @@ describe("the attack section", () => {
         // The bug in one line: this used to be (0, 1), forever.
         expect(onValid).toHaveBeenCalledTimes(1);
         expect(onInvalid).not.toHaveBeenCalled();
+      });
+
+      /** @scenario Switching to a strategy that ignores the planner clears it */
+      it("keeps the plan in the draft, so switching back does not lose it", async () => {
+        // Looking at what the other strategy does must not destroy work.
+        const user = userEvent.setup();
+        const { getValues } = renderForm(crescendoWithPlan);
+
+        await user.click(screen.getByText("GOAT"));
+        await waitFor(() => {
+          expect(getValues("redTeamStrategy")).toBe("goat");
+        });
+        await user.click(screen.getByText("Crescendo"));
+
+        await waitFor(() => {
+          expect(getValues("redTeamStrategy")).toBe("crescendo");
+        });
+        expect(getValues("redTeamConfig")?.attackPlan).toBe(
+          "Turns 1-10: ask about products.",
+        );
+      });
+
+      /** @scenario Switching to a strategy that ignores the planner clears it */
+      it("does not hand the plan to the save, because GOAT would not read it", async () => {
+        // Kept in the draft, dropped from the write — the plan survives a
+        // glance at GOAT, but a GOAT scenario is never stored carrying one.
+        const user = userEvent.setup();
+        const { save, onValid } = renderForm(crescendoWithPlan);
+
+        await user.click(screen.getByText("GOAT"));
+        await save();
+
+        const [data] = onValid.mock.calls[0]!;
+        expect(withApplicableRedTeamConfig(data).redTeamConfig).not.toHaveProperty(
+          "attackPlan",
+        );
       });
 
       it("leaves the objective and the turn budget alone", async () => {

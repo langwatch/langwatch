@@ -128,28 +128,23 @@ export function RedTeamAttackSection({
   }, [hasConfigError]);
 
   /**
-   * Switching strategy has to take the settings that no longer apply with it.
+   * Switching strategy keeps the planner settings, and revalidates.
    *
-   * Hiding the planner inputs is not the same as clearing them: GOAT with a
-   * leftover attack plan fails the cross-field rule, the rule reports at
-   * `redTeamConfig`, and the user is left pressing Save on a form whose only
-   * invalid values are two inputs the form has stopped rendering. Nothing on
-   * screen is wrong, and Save does nothing, forever.
+   * The draft holds them so switching to GOAT to read what it does — and back
+   * — does not destroy an attack plan someone wrote. What must not happen is
+   * *storing* them on a GOAT scenario, and that is handled where the draft
+   * becomes a write (`withApplicableRedTeamConfig`), not here.
+   *
+   * `shouldValidate` matters: the cross-field rule is evaluated against the
+   * stripped value, so the stale error from the previous strategy has to be
+   * recomputed on the switch rather than left sitting on the form.
    */
   const selectStrategy = (
     value: RedTeamStrategyName,
     onChange: (value: RedTeamStrategyName) => void,
   ) => {
     onChange(value);
-    if (value === "crescendo") return;
-
-    const current = getValues("redTeamConfig");
-    if (!current?.attackPlan && !current?.metapromptTemplate) return;
-    const { attackPlan: _plan, metapromptTemplate: _template, ...rest } = current;
-    setValue("redTeamConfig", rest, {
-      shouldDirty: true,
-      shouldValidate: true,
-    });
+    void form.trigger();
   };
 
   return (

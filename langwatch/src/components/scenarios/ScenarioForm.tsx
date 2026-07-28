@@ -26,7 +26,10 @@ import {
   RedTeamConfigSchema,
   RedTeamStrategySchema,
 } from "~/server/scenarios/execution/types";
-import { redTeamStateIssue } from "~/server/scenarios/red-team-input";
+import {
+  redTeamStateIssue,
+  withApplicableRedTeamConfig,
+} from "~/server/scenarios/red-team-input";
 import { Tooltip } from "../ui/tooltip";
 import { RedTeamAttackSection } from "./RedTeamAttackSection";
 import { CriteriaInput } from "./ui/CriteriaInput";
@@ -56,7 +59,13 @@ export const scenarioFormSchema = z.object({
   .superRefine((values, ctx) => {
     // Same rule the API enforces, surfaced on the field rather than as a
     // failed save — see redTeamStateIssue for why it cannot be per-field.
-    const issue = redTeamStateIssue(values);
+    //
+    // Asked of what will be *sent*, not of what the form is holding. The
+    // editor keeps a Crescendo attack plan while the user looks at GOAT so
+    // switching back does not lose it; `handleSave` strips it on the way out,
+    // so validating the raw draft would block a save over a value the form
+    // has stopped rendering and is not going to write.
+    const issue = redTeamStateIssue(withApplicableRedTeamConfig(values));
     if (issue) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,

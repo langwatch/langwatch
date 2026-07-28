@@ -54,12 +54,16 @@ Feature: Red Team Scenarios
   # the planner inputs, and hiding an input is not the same as clearing it: the
   # rejection then names a field the editor no longer shows, so Save stops
   # working with nothing on screen to explain it.
+  #
+  # Dropped from the write rather than from the editor, so that reading what
+  # the other strategy does cannot destroy a plan somebody wrote.
   @integration
   Scenario: Switching to a strategy that ignores the planner clears it
     Given I am editing a red-team scenario with an attack plan
     When I switch the strategy to one that does not plan
-    Then the attack plan is cleared
-    And the scenario can be saved
+    Then the scenario can be saved
+    And the saved scenario carries no attack plan
+    But switching back restores the attack plan I wrote
 
   # Every rejection has to be visible where the user is looking, and the press
   # itself has to be answered. A save that stops happening, silently, is
