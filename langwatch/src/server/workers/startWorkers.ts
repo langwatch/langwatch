@@ -1,5 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import http from "http";
+import type { IncomingMessage, RequestListener, ServerResponse } from "http";
 import { register } from "prom-client";
 import { assertRedisReady } from "~/server/redis";
 
@@ -122,17 +123,38 @@ async function bootUsageStatsWorker(
   }
 }
 
-// Expose the worker process's prom-client registry over HTTP so the web
-// process can scrape it at GET /workers/metrics (proxied in start.ts). In
-// the in-process dev mode this is skipped — the web server serves the same
-// (shared) registry at /metrics directly.
-async function bootMetricsServer(
-  shutdownHandles: ShutdownHandles,
-): Promise<void> {
-  const { getWorkerMetricsPort, isMetricsAuthorized } =
-    await import("~/server/metrics");
-  const metricsPort = getWorkerMetricsPort();
-  const metricsServer = http.createServer((req, res) => {
+/**
+ * The worker's liveness path. Deliberately UNAUTHENTICATED and deliberately
+ * not `/metrics`.
+ *
+ * The kubelet needs a path it can call with no credentials, because it has
+ * neither of the two things `/metrics` demands. `/metrics` is fail-closed in
+ * production (no METRICS_API_KEY ⇒ 500, and the chart leaves the key unset by
+ * default), and an httpGet probe cannot read a Kubernetes Secret, so a
+ * secretKeyRef-delivered key can never reach a rendered Authorization header.
+ * Probing `/metrics` therefore crash-loops both the default install and the
+ * secretKeyRef install. See specs/server/worker-liveness-probe.feature.
+ *
+ * It answers 200 whenever the event loop is turning enough to accept the
+ * connection and run this handler — which is the whole question a liveness
+ * probe asks, and strictly more than the old `kill -0 1` could tell us. It
+ * carries no telemetry, so leaving it open exposes nothing the bearer gate on
+ * `/metrics` was protecting.
+ */
+export const WORKER_LIVENESS_PATH = "/healthz";
+
+/**
+ * The worker metrics server's request handler, split out so the routing and
+ * auth branches are testable without binding a port.
+ */
+export function createWorkerMetricsHandler(
+  isMetricsAuthorized: (req: IncomingMessage) => boolean,
+): RequestListener {
+  return (req: IncomingMessage, res: ServerResponse) => {
+    if (req.url === WORKER_LIVENESS_PATH) {
+      res.writeHead(200, { "Content-Type": "text/plain" }).end("ok");
+      return;
+    }
     if (req.url !== "/metrics") {
       res.writeHead(404).end();
       return;
@@ -156,7 +178,23 @@ async function bootMetricsServer(
         logger.error({ error }, "error getting worker metrics");
         res.writeHead(500).end();
       });
-  });
+  };
+}
+
+// Expose the worker process's prom-client registry over HTTP so the web
+// process can scrape it at GET /workers/metrics (proxied in start.ts). In
+// the in-process dev mode this is skipped — the web server serves the same
+// (shared) registry at /metrics directly. The same listener serves the
+// unauthenticated liveness path the chart's probes call.
+async function bootMetricsServer(
+  shutdownHandles: ShutdownHandles,
+): Promise<void> {
+  const { getWorkerMetricsPort, isMetricsAuthorized } =
+    await import("~/server/metrics");
+  const metricsPort = getWorkerMetricsPort();
+  const metricsServer = http.createServer(
+    createWorkerMetricsHandler(isMetricsAuthorized),
+  );
   await new Promise<void>((resolve, reject) => {
     metricsServer.once("error", reject);
     metricsServer.listen(metricsPort, () => {
