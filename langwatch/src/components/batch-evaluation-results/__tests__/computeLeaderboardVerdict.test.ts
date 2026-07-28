@@ -63,6 +63,11 @@ const makeMetrics = (
               // allowed to drive a cost recommendation.
               ({ avg, count: 20 } as VariantMetrics["costStats"]),
         durationStats: null,
+        // The cost RECOMMENDATION reads the mean and its row count, not the
+        // interval — that is the chart's business. Null keeps this fixture
+        // about the thing under test.
+        costMeanCI: null,
+        durationMeanCI: null,
       },
     ]),
   );

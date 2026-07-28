@@ -95,6 +95,12 @@ export function ParetoScatterChart({
       return stats?.avg ?? null;
     };
 
+    const readMeanCI = (variantId: string, metric: ParetoAxis) => {
+      const metrics = variantMetrics[variantId];
+      const ci = metric === "cost" ? metrics?.costMeanCI : metrics?.durationMeanCI;
+      return ci && ci.every((bound) => Number.isFinite(bound)) ? ci : null;
+    };
+
     return leaderboard.entries
       .map((entry, index) => {
         // Offsets, not bounds — recharts draws the bar relative to the point.
@@ -104,11 +110,26 @@ export function ParetoScatterChart({
         const hasInterval =
           ci !== null && ci.every((bound) => Number.isFinite(bound));
 
+        const x = readMetric(entry.variantId, xAxisMetric);
+        const xCI = readMeanCI(entry.variantId, xAxisMetric);
+
         return {
           variantId: entry.variantId,
           name: variantNames[entry.variantId] ?? entry.variantId,
           score: entry.score,
-          x: readMetric(entry.variantId, xAxisMetric),
+          x,
+          // Same offset form as the y bar. Clamped at zero because the
+          // resampled mean can land below the point estimate by more than the
+          // point estimate itself on a skewed cost distribution, and a
+          // negative arm would render as a bar pointing the wrong way.
+          xOffsets:
+            xCI && x !== null
+              ? ([Math.max(0, x - xCI[0]), Math.max(0, xCI[1] - x)] as [
+                  number,
+                  number,
+                ])
+              : undefined,
+          xCI,
           size: readMetric(entry.variantId, sizeMetric),
           dominated: (dominance.dominatedBy[entry.variantId]?.length ?? 0) > 0,
           ciOffsets: hasInterval
@@ -137,6 +158,7 @@ export function ParetoScatterChart({
 
   const sizeIsMeaningful = data.some((d) => d.size !== null);
   const anyInterval = data.some((d) => d.ciOffsets !== undefined);
+  const anyXInterval = data.some((d) => d.xOffsets !== undefined);
   const anyDominated = data.some((d) => d.dominated);
 
   return (
@@ -229,6 +251,9 @@ export function ParetoScatterChart({
                       </Text>
                       <Text>
                         {xLabel}: {formatX(point.x)}
+                        {point.xCI
+                          ? ` (${formatX(point.xCI[0])} to ${formatX(point.xCI[1])})`
+                          : ""}
                       </Text>
                       {point.size !== null ? (
                         <Text>
@@ -253,6 +278,21 @@ export function ParetoScatterChart({
                   <ErrorBar
                     dataKey="ciOffsets"
                     direction="y"
+                    width={4}
+                    strokeWidth={1.5}
+                    stroke="var(--chakra-colors-fg-muted)"
+                  />
+                ) : null}
+                {/*
+                  The horizontal arm. Same visual weight and colour as the
+                  vertical one because they are the same kind of statement —
+                  a 95% bootstrap interval for where the true value lies —
+                  and styling them differently would imply otherwise.
+                */}
+                {anyXInterval ? (
+                  <ErrorBar
+                    dataKey="xOffsets"
+                    direction="x"
                     width={4}
                     strokeWidth={1.5}
                     stroke="var(--chakra-colors-fg-muted)"
@@ -287,8 +327,10 @@ export function ParetoScatterChart({
             )}
             {anyInterval ? (
               <Text fontSize="xs" color="fg.muted">
-                Vertical bars are each score&apos;s confidence interval; where two
-                overlap, this run does not separate them on quality.
+                Bars are 95% confidence intervals — vertically for the score,
+                {anyXInterval
+                  ? ` horizontally for the ${xLabel.toLowerCase()}. Both say where the true value lies, not how much individual rows varied.`
+                  : "."}
               </Text>
             ) : null}
             {anyDominated ? (

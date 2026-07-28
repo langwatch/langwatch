@@ -225,6 +225,18 @@ Feature: Comparison leaderboard (Bradley-Terry ranking on the results page)
     When I view the trade-off chart
     Then each point carries an error bar spanning that variant's confidence interval
 
+  Scenario: The cost axis carries its uncertainty too
+    Given each variant's cost is an average over the rows it ran
+    When I view the trade-off chart
+    Then each point also carries a horizontal bar for how well that average is known
+    And that bar describes where the true average lies, not how much individual rows varied
+
+  Scenario: A cost averaged over a single row admits it cannot be bounded
+    Given a variant recorded a cost on exactly one row
+    When I view the trade-off chart
+    Then no horizontal bar is drawn for it
+    And it is not drawn as though its cost were known exactly
+
   Scenario: A variant beaten on every metric is named outright
     Given variant_1 scores distinguishably higher than variant_2
     And variant_1 costs meaningfully less than variant_2 and is meaningfully faster
