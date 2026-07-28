@@ -126,7 +126,7 @@ export function serializeRunsToCriteriaCsv({
     const core = buildCoreValues(run);
     const tail = buildTailValues(run);
     const push = (criterion: string, met: boolean) =>
-      rows.push([...core, criterion, String(met), ...tail]);
+      rows.push([...core, text(criterion), String(met), ...tail]);
 
     for (const criterion of run.results?.metCriteria ?? []) push(criterion, true);
     for (const criterion of run.results?.unmetCriteria ?? []) push(criterion, false);
@@ -161,8 +161,8 @@ export function serializeRunsToFullCsv({
       rows.push([
         ...head,
         String(index),
-        stringOrEmpty(m.role),
-        messageContent(m.content),
+        text(stringOrEmpty(m.role)),
+        text(messageContent(m.content)),
         stringOrEmpty(m.id),
         stringOrEmpty(m.trace_id),
         ...tail,
@@ -179,7 +179,7 @@ export function serializeRunsToFullCsv({
 function buildCoreValues(run: ExportableRun): string[] {
   const results = run.results;
   return [
-    run.name ?? "",
+    text(run.name ?? ""),
     run.status,
     categorizeRunStatus(run.status),
     results?.verdict ?? "",
@@ -192,9 +192,9 @@ function buildCoreValues(run: ExportableRun): string[] {
     nullableNumber(run.totalCost),
     isoTimestamp(run.timestamp),
     String(run.messages?.length ?? 0),
-    results?.reasoning ?? "",
-    results?.error ?? "",
-    run.description ?? "",
+    text(results?.reasoning ?? ""),
+    text(results?.error ?? ""),
+    text(run.description ?? ""),
   ];
 }
 
@@ -274,7 +274,7 @@ function collectTraceIds(run: ExportableRun): string[] {
  */
 function jsonArray(values: string[] | undefined): string {
   if (!values || values.length === 0) return "";
-  return JSON.stringify(values);
+  return text(JSON.stringify(values));
 }
 
 /**
@@ -293,6 +293,24 @@ function nullableNumber(value: number | null | undefined): string {
 
 function stringOrEmpty(value: unknown): string {
   return typeof value === "string" ? value : "";
+}
+
+/**
+ * Neutralize a free-text cell against spreadsheet formula injection.
+ *
+ * A cell whose first character is `=`, `+`, `-`, `@`, TAB or CR is evaluated
+ * as a formula by Excel and Sheets. RFC 4180 quoting does not prevent this —
+ * quoting protects the CSV grammar, not the spreadsheet that reads it. Since
+ * scenario names, judge reasoning, criteria and message content are all
+ * user- or model-controlled, and the entire point of this file is to be
+ * opened in a spreadsheet, every free-text cell is prefixed with an
+ * apostrophe, which those tools strip on display and treat as literal text.
+ *
+ * Deliberately applied only to text: numbers and timestamps are generated
+ * here, and prefixing a negative number would corrupt it.
+ */
+function text(value: string): string {
+  return /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
 }
 
 /**

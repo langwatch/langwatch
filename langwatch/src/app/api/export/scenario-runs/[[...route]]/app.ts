@@ -121,6 +121,7 @@ secured
             for await (const { chunk, progress } of service.exportRuns({
               request,
               signal: c.req.raw.signal,
+              total: totalCount,
             })) {
               controller.enqueue(encoder.encode(chunk));
               void broadcast.broadcastToTenant(

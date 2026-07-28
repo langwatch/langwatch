@@ -13,7 +13,10 @@ import type {
   ExportableRun,
   SimulationRepository,
 } from "~/server/app-layer/simulations/repositories/simulation.repository";
-import { categorizeRunStatus } from "~/server/scenarios/scenario-run-category";
+import {
+  categorizeRunStatus,
+  type RunStatusCategory,
+} from "~/server/scenarios/scenario-run-category";
 import {
   serializeRunsToCriteriaCsv,
   serializeRunsToFullCsv,
@@ -35,7 +38,10 @@ const logger = createLogger("langwatch:export:scenario-runs");
  * time by resolveRunStatus rather than stored, so only a post-mapping filter
  * can reproduce what the list shows.
  */
-const FILTER_TO_CATEGORY: Record<ScenarioRunExportStatusFilter, string> = {
+const FILTER_TO_CATEGORY: Record<
+  ScenarioRunExportStatusFilter,
+  RunStatusCategory
+> = {
   pass: "success",
   fail: "failure",
   stalled: "stalled",
@@ -72,9 +78,16 @@ export class ScenarioRunExportService {
   async *exportRuns({
     request,
     signal,
+    total: knownTotal,
   }: {
     request: ScenarioRunExportRequest;
     signal?: AbortSignal;
+    /**
+     * The count the caller already fetched for the X-Total-Runs header. Passed
+     * in so a single export does not run the (unmetered, full-table) count
+     * query twice.
+     */
+    total?: number;
   }): AsyncGenerator<{
     chunk: string;
     progress: ScenarioRunExportProgress;
@@ -84,7 +97,7 @@ export class ScenarioRunExportService {
       "Starting scenario run export",
     );
 
-    const total = await this.getTotalCount({ request });
+    const total = knownTotal ?? (await this.getTotalCount({ request }));
     let visited = 0;
     let isFirstBatch = true;
     let cursor: string | undefined;

@@ -42,7 +42,7 @@ function parse(csv: string): Record<string, string>[] {
 }
 
 describe("scenario run CSV serializers", () => {
-  describe("given any mode", () => {
+  describe("when writing the header of any mode", () => {
     // Column order is a design decision, not an accident: spreadsheets show
     // the leftmost columns first, so the readable ones lead and identifiers
     // trail. Pinned here so a later edit cannot quietly bury them again.
@@ -116,7 +116,7 @@ describe("scenario run CSV serializers", () => {
     });
   });
 
-  describe("given full mode, on the run-level columns", () => {
+  describe("when exporting in full mode", () => {
     it("writes one row per run when the run has no messages", () => {
       const csv = serializeRunsToFullCsv({
         runs: [buildRun({ scenarioRunId: "a" }), buildRun({ scenarioRunId: "b" })],
@@ -279,7 +279,92 @@ describe("scenario run CSV serializers", () => {
     });
   });
 
-  describe("given criteria mode", () => {
+  describe("when a cell begins with a spreadsheet formula character", () => {
+    // Quoting satisfies RFC 4180 but does nothing to stop Excel or Sheets
+    // evaluating a leading =, +, - or @. Every one of these fields is user- or
+    // model-controlled, and the file exists to be opened in a spreadsheet.
+    const DANGEROUS = '=HYPERLINK("http://evil.test","click")';
+
+    it("neutralizes the scenario name", () => {
+      const csv = serializeRunsToFullCsv({
+        runs: [buildRun({ name: DANGEROUS })],
+        includeHeader: true,
+      });
+      expect(parse(csv)[0]!.run_scenario_name).toBe(`'${DANGEROUS}`);
+    });
+
+    it("neutralizes the scenario description", () => {
+      const csv = serializeRunsToFullCsv({
+        runs: [buildRun({ description: DANGEROUS })],
+        includeHeader: true,
+      });
+      expect(parse(csv)[0]!.run_scenario_description).toBe(`'${DANGEROUS}`);
+    });
+
+    it("neutralizes judge reasoning and error text", () => {
+      const csv = serializeRunsToFullCsv({
+        runs: [
+          buildRun({
+            results: {
+              verdict: Verdict.FAILURE,
+              reasoning: DANGEROUS,
+              metCriteria: [],
+              unmetCriteria: [],
+              error: "+1+1",
+            },
+          }),
+        ],
+        includeHeader: true,
+      });
+      const row = parse(csv)[0]!;
+      expect(row.run_reasoning).toBe(`'${DANGEROUS}`);
+      expect(row.run_error).toBe("'+1+1");
+    });
+
+    it("neutralizes message content", () => {
+      const csv = serializeRunsToFullCsv({
+        runs: [
+          buildRun({
+            messages: [
+              { role: "user", content: DANGEROUS },
+            ] as ExportableRun["messages"],
+          }),
+        ],
+        includeHeader: true,
+      });
+      expect(parse(csv)[0]!.message_content).toBe(`'${DANGEROUS}`);
+    });
+
+    it("neutralizes a criterion", () => {
+      const csv = serializeRunsToCriteriaCsv({
+        runs: [
+          buildRun({
+            results: {
+              verdict: Verdict.FAILURE,
+              reasoning: "",
+              metCriteria: [],
+              unmetCriteria: [DANGEROUS],
+              error: undefined,
+            },
+          }),
+        ],
+        includeHeader: true,
+      });
+      expect(parse(csv)[0]!.criterion).toBe(`'${DANGEROUS}`);
+    });
+
+    it("leaves ordinary text and negative numbers alone", () => {
+      const csv = serializeRunsToFullCsv({
+        runs: [buildRun({ name: "Refund Request", durationInMs: -1 })],
+        includeHeader: true,
+      });
+      const row = parse(csv)[0]!;
+      expect(row.run_scenario_name).toBe("Refund Request");
+      expect(row.run_duration_ms).toBe("-1");
+    });
+  });
+
+  describe("when exporting in criteria mode", () => {
     it("writes one row per criterion, flagged met or unmet", () => {
       const csv = serializeRunsToCriteriaCsv({
         runs: [
@@ -352,7 +437,7 @@ describe("scenario run CSV serializers", () => {
     });
   });
 
-  describe("given full mode", () => {
+  describe("when exporting a conversation in full mode", () => {
     it("writes one row per message with run fields repeated", () => {
       const csv = serializeRunsToFullCsv({
         runs: [

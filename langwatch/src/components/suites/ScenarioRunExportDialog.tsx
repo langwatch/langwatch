@@ -6,8 +6,8 @@ import { Dialog } from "../ui/dialog";
 import { Radio, RadioGroup } from "../ui/radio";
 
 /**
- * Each mode states what one row is, because that is the only thing that
- * distinguishes them and it decides which questions the file can answer.
+ * Each mode states what one row is. That is the only thing distinguishing
+ * them, and it decides which questions the resulting file can answer.
  */
 const MODES: { value: ScenarioRunExportMode; label: string; hint: string }[] = [
   {

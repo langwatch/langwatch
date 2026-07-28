@@ -31,6 +31,19 @@ const TABLE_NAME = "simulation_runs" as const;
 export const RUN_ID_CAP = 10000;
 
 /**
+ * Sort key for the export sweep, as a single SQL expression.
+ *
+ * ORDER BY, the cursor predicate and the value returned as the cursor must all
+ * be *the same* expression. Sorting on StartedAt while seeding the cursor from
+ * a CreatedAt fallback makes the next page filter on a column it did not sort
+ * by, which silently drops or repeats runs at the boundary — and ClickHouse
+ * sorts NULLs first under ASC, so any NULL StartedAt rows land on page one and
+ * become unreachable for the rest of the sweep while the count still includes
+ * them. Coalescing here means there is one definition and no fallback in TS.
+ */
+const EXPORT_SORT_KEY = "toUnixTimestamp64Milli(ifNull(t.StartedAt, t.CreatedAt))";
+
+/**
  * Returns an IN-tuple dedup predicate for simulation_runs.
  *
  * simulation_runs uses ReplacingMergeTree(UpdatedAt) with dedup key
@@ -355,8 +368,11 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     // pattern that read all heavy columns (Messages, RoleCosts, etc.) across
     // entire granules (~8K rows) for dedup, causing OOM on parts with large
     // payloads.
-    const rows = await this.queryRows<ClickHouseSimulationRunRow>(
-      `SELECT ${RUN_COLUMNS}
+    const rows = await this.queryRows<
+      ClickHouseSimulationRunRow & { ExportSortKey: string }
+    >(
+      `SELECT ${RUN_COLUMNS},
+        toString(${EXPORT_SORT_KEY}) AS ExportSortKey
        FROM ${TABLE_NAME} AS t
        WHERE t.TenantId = {tenantId:String}
          AND t.ScenarioRunId = {scenarioRunId:String}
@@ -655,8 +671,11 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       }
     }
 
-    const rows = await this.queryRows<ClickHouseSimulationRunRow>(
-      `SELECT ${RUN_COLUMNS}
+    const rows = await this.queryRows<
+      ClickHouseSimulationRunRow & { ExportSortKey: string }
+    >(
+      `SELECT ${RUN_COLUMNS},
+        toString(${EXPORT_SORT_KEY}) AS ExportSortKey
        FROM ${TABLE_NAME} AS t
        WHERE t.TenantId = {tenantId:String}
          AND t.ScenarioSetId IN ({scenarioSetIds:Array(String)})
@@ -724,8 +743,11 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     projectId: string;
     scenarioSetId: string;
   }): Promise<ScenarioRunData[]> {
-    const rows = await this.queryRows<ClickHouseSimulationRunRow>(
-      `SELECT ${RUN_COLUMNS}
+    const rows = await this.queryRows<
+      ClickHouseSimulationRunRow & { ExportSortKey: string }
+    >(
+      `SELECT ${RUN_COLUMNS},
+        toString(${EXPORT_SORT_KEY}) AS ExportSortKey
        FROM ${TABLE_NAME} AS t
        WHERE t.TenantId = {tenantId:String}
          AND t.ScenarioSetId IN ({scenarioSetIds:Array(String)})
@@ -1211,6 +1233,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
          AND t.ArchivedAt IS NULL
          ${qualifiedDedupPredicate(`TenantId = {tenantId:String} ${unqualify(whereClause)}`)}`,
       { tenantId: projectId, ...params },
+      { expectedMaxDurationMs: 10000, expectedMaxReadBytes: 20_000_000 },
     );
 
     return Number(rows[0]?.Total ?? "0");
@@ -1266,20 +1289,23 @@ export class SimulationClickHouseRepository implements SimulationRepository {
 
     const cursorPredicate = decoded
       ? `AND (
-          (toUnixTimestamp64Milli(t.StartedAt) > toUInt64({cursorTs:String}))
-          OR (toUnixTimestamp64Milli(t.StartedAt) = toUInt64({cursorTs:String}) AND t.ScenarioRunId > {cursorRunId:String})
+          (${EXPORT_SORT_KEY} > toUInt64({cursorTs:String}))
+          OR (${EXPORT_SORT_KEY} = toUInt64({cursorTs:String}) AND t.ScenarioRunId > {cursorRunId:String})
         )`
       : "";
 
-    const rows = await this.queryRows<ClickHouseSimulationRunRow>(
-      `SELECT ${RUN_COLUMNS}
+    const rows = await this.queryRows<
+      ClickHouseSimulationRunRow & { ExportSortKey: string }
+    >(
+      `SELECT ${RUN_COLUMNS},
+        toString(${EXPORT_SORT_KEY}) AS ExportSortKey
        FROM ${TABLE_NAME} AS t
        WHERE t.TenantId = {tenantId:String}
          ${whereClause}
          ${cursorPredicate}
          AND t.ArchivedAt IS NULL
          ${qualifiedDedupPredicate(`TenantId = {tenantId:String} ${unqualify(whereClause)}`)}
-       ORDER BY t.StartedAt ASC, t.ScenarioRunId ASC
+       ORDER BY ${EXPORT_SORT_KEY} ASC, t.ScenarioRunId ASC
        LIMIT {fetchLimit:UInt32}`,
       {
         tenantId: projectId,
@@ -1299,7 +1325,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     const nextCursor =
       hasMore && lastRow
         ? this.encodeExportCursor(
-            lastRow.StartedAt ?? lastRow.CreatedAt,
+            lastRow.ExportSortKey,
             lastRow.ScenarioRunId,
           )
         : undefined;

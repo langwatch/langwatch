@@ -11,9 +11,9 @@ Feature: Scenario run CSV export
   #   criteria — one row per criterion → "which criterion fails most?" (pivot)
   # Both read the same underlying run record; neither costs an extra query.
   #
-  # There is deliberately no one-row-per-run mode: full already denormalizes
-  # every run field onto every message row, so de-duplicating on
-  # run_scenario_run_id yields exactly that.
+  # There is deliberately no one-row-per-run mode: every run field is repeated
+  # on every message row, so removing duplicate rows on run_scenario_run_id
+  # gives exactly that file.
 
   Background:
     Given I am logged into project "my-project"
@@ -93,10 +93,8 @@ Feature: Scenario run CSV export
   # Status: the file must agree with the screen
   # ============================================================================
 
-  # The export resolves status through the same mapper the run history UI uses,
-  # so stall detection and legacy-value normalisation apply identically. A run
-  # shown as stalled on screen exports as stalled; it is never possible for the
-  # CSV and the UI to disagree about a run's outcome.
+  # A run shown as stalled on screen exports as stalled. It is never possible
+  # for the CSV and the run history to disagree about a run's outcome.
 
   Scenario: Every row reports both the run's status and its category
     Given a run has status "SUCCESS"
@@ -120,10 +118,8 @@ Feature: Scenario run CSV export
   Scenario: The export computes no pass rate of its own
     When I export in any mode
     Then the CSV contains no aggregate row and no pass_rate column
-    # Pass rate is derived in two places already (run-history-transforms.ts and
-    # the sidebar ClickHouse aggregation). A third copy here would drift from
-    # the number shown on screen. The file carries per-run categories; the
-    # spreadsheet does the arithmetic.
+    # The file carries a category per run and the spreadsheet does the
+    # arithmetic, so an exported total can never disagree with the screen.
 
   # ============================================================================
   # Value encoding — the part that is a public contract
@@ -171,7 +167,7 @@ Feature: Scenario run CSV export
   Scenario: Export honours the pass/fail filter
     Given I have filtered the list to "Fail"
     When I export
-    Then only runs whose status_category is not "success" are included
+    Then only runs whose status_category is "failure" are included
 
   Scenario: Export from a scenario set is scoped to that set
     Given I am viewing the run history for scenario set "agq-seed-set"
