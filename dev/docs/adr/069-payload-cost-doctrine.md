@@ -127,19 +127,23 @@ visible.
 
    The *projection* half — lifting the derived slice at the seam so the staged
    job carries ~2 KB instead of the full span — is **not** shipped here, by
-   design. The enqueue seam runs on the shared routing-dispatch path: a throw
-   there fails the whole event's fan-out (fold, state, every subscriber) into a
-   routing retry, so only *cheap and total* work belongs on it. A filter is
-   both. The span projection is neither — it runs the full canonicalisation
-   registry and can throw on malformed span data — so moving it to the seam
-   would widen a poison span's blast radius from one isolated subscriber lane to
-   the entire fan-out. The normalization therefore stays in the subscriber's own
-   consumer lane (where a bad span retries only that job), and the
-   slice-on-the-wire optimization folds into phase 2, where the event carries a
-   cost-honest claim-check natively (invariant 1) and no per-subscriber
-   projection hook is needed at all. Filtering alone bounds the matched payloads
-   by real coding-agent volume, which is not the runaway the non-agent flood
-   was.
+   design. The enqueue seam runs on the shared routing-dispatch path, and that
+   path **has no retry**: `EventSourcingService.storeEvents` logs a dispatch
+   failure and continues, so that a projection fault cannot fail an
+   already-committed write, and nothing re-dispatches subscriber fan-out
+   afterwards. Work that throws at the seam therefore loses its job
+   permanently, where the same work in the subscriber's own consumer lane
+   merely retries that one job. Only *cheap and total* work belongs on the
+   seam. A filter is both. The span projection is neither — it runs the full
+   canonicalisation registry, which can throw on malformed span data — so
+   moving it to the seam would convert a retryable per-job failure into a
+   silent permanent drop for exactly the spans most likely to need a retry.
+   The normalization therefore stays in the subscriber's own consumer lane, and
+   the slice-on-the-wire optimization folds into phase 2, where the event
+   carries a cost-honest claim-check natively (invariant 1) and no
+   per-subscriber projection hook is needed at all. Filtering alone bounds the
+   matched payloads by real coding-agent volume, which is not the runaway the
+   non-agent flood was.
 2. **Phase 2 — invariants 1 + 2.** Blob references carry the payload's true
    byte size (and decode-expansion hint where known), and the remaining
    holding stages — per-job dispatch in flight, retry buffers — get byte
@@ -196,12 +200,19 @@ visible.
   to; a backlog is durable and visible where an OOM kill was lossy and
   post-hoc. Operators watch depth and grant saturation, not allocator
   folklore.
-- **The subscriber contract grows a seam authors must respect.** A filter runs
-  on the shared routing-dispatch path, so it must be cheap and total — a throw
-  fails the routing attempt into its retry path, loudly, never a silent drop,
-  but it fails the whole fan-out, so anything data-dependent or expensive stays
-  in the subscriber's own consumer lane. That boundary is contract, spec-pinned,
-  not convention.
+- **The subscriber contract grows a seam authors must respect, with a sharp
+  edge.** A filter runs on the shared routing-dispatch path, which has no
+  retry — a throw there is reported loudly (logged, and surfaced as an
+  `AggregateError` from `dispatch`) but still loses that subscriber's job for
+  that event permanently. Blast radius is one `(subscriber, event)` pair, not
+  the batch. So an enqueue hook must be **total**, not merely cheap, and
+  anything data-dependent or fallible stays in the subscriber's own consumer
+  lane where a failure retries just that job. This is the doctrine's one
+  genuinely load-bearing rule for future adopters; it is contract, spec-pinned,
+  not convention. Making the routing path retryable is a separate change to
+  `storeEvents` error handling with its own blast radius — deliberately not
+  taken here, and the reason the rule is stated as a restriction rather than a
+  promise.
 - **Phases 2–4 are real, sequenced work.** Until phase 2 lands, byte budgets
   remain stub-blind and the non-drain stages remain count-bounded; until
   phase 3, memory is still discovered rather than granted. The sequencing
