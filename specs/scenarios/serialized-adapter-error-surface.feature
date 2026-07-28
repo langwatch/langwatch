@@ -118,3 +118,18 @@ Feature: Serialized adapters surface user-vs-infra failures distinctly
     When SerializedCodeAgentAdapter.call rejects
     Then the error has source="timeout"
     And the message includes the configured timeout in milliseconds
+
+  @unit
+  Scenario: adapter classifies a response recorded from the live engine
+    Given a response body recorded verbatim from a running NLP engine whose user code raised
+    When SerializedCodeAgentAdapter.call rejects
+    Then the recorded response status is 200, not an error status
+    And the error has source="user_code"
+    And the message includes the original Python exception class name
+
+  @unit
+  Scenario: adapter does not blame user code for a workflow this adapter itself built
+    Given the NLP engine reports that the submitted workflow could not be parsed
+    When SerializedCodeAgentAdapter.call rejects
+    Then the error has source="nlp_service"
+    And the message does not claim user code raised the error

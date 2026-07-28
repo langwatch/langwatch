@@ -5,6 +5,7 @@
 import { type AgentInput, AgentRole } from "@langwatch/scenario";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CodeAgentData } from "../../types";
+import recordedNlpgoResponses from "./fixtures/nlpgo-recorded-responses.json";
 
 // Capture withActiveSpan calls so the timeout/error paths can be verified.
 // (lw#3438: traced failures must always leave a span footprint.)
@@ -1016,6 +1017,49 @@ describe("SerializedCodeAgentAdapter", () => {
         // `rawDetail` is an internal field a customer cannot reach, so the
         // persisted message must not name it (copywriting.md).
         expect(captured!.message).not.toMatch(/rawDetail/);
+      });
+    });
+
+    /**
+     * Recorded-contract tests. The bodies below are REAL bytes captured from a
+     * running nlpgo engine (Go + Python subprocess) — see the fixture's
+     * `_comment` for how to re-record. Hand-written mocks are what let this
+     * adapter classify against a FastAPI contract the engine never served, so
+     * the contract itself is now pinned by recorded evidence rather than by
+     * an author's belief about it (lw#3439).
+     */
+    describe("when replaying responses recorded from a live nlpgo engine", () => {
+      /** @scenario adapter classifies a response recorded from the live engine */
+      it("classifies the recorded user-code failure as user_code", async () => {
+        const rec = recordedNlpgoResponses.userCodeRaises;
+        mockFetch.mockImplementation(
+          async () =>
+            new Response(JSON.stringify(rec.body), { status: rec.status }),
+        );
+
+        const captured = await captureFailure();
+
+        // The engine returned 200 — a failed run is not a non-2xx.
+        expect(rec.status).toBe(200);
+        expect(captured).toBeInstanceOf(SerializedCodeAgentAdapterError);
+        expect(captured!.source).toBe("user_code");
+        expect(captured!.message).toMatch(/user code raised an error/);
+        expect(captured!.message).toMatch(/httpx\.TimeoutException/);
+      });
+
+      /** @scenario adapter does not blame user code for a workflow this adapter itself built */
+      it("classifies the recorded invalid_workflow as an infra failure", async () => {
+        const rec = recordedNlpgoResponses.invalidWorkflow;
+        mockFetch.mockImplementation(
+          async () =>
+            new Response(JSON.stringify(rec.body), { status: rec.status }),
+        );
+
+        const captured = await captureFailure();
+
+        // The adapter synthesizes the DSL, so a parse failure is ours.
+        expect(captured!.source).toBe("nlp_service");
+        expect(captured!.message).not.toMatch(/user code raised/);
       });
     });
 

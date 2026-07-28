@@ -151,3 +151,28 @@ Feature: Code block — execute user Python with isolated subprocess and structu
   # the Python langwatch_nlp engine has been removed (see _shared/contract.md —
   # nlpgo is the sole NLP engine), so /studio/execute_sync no longer exists and
   # there is no second engine to compare against.
+
+  Rule: The failure shape the TypeScript scenario adapter classifies on stays stable
+
+    # langwatch#3439. The TS SerializedCodeAgentAdapter decides "user code
+    # failed" vs "our infra failed" from this endpoint's response. It once
+    # classified against a FastAPI envelope this engine has never served, and
+    # nothing caught it because the TS side mocked the response by hand. These
+    # scenarios pin the shape the adapter depends on, from the engine side.
+
+    @unit
+    Scenario: a failing code block is reported as a 200 the TS adapter can classify
+      Given a code node whose body raises a Python exception
+      When the engine invokes the node
+      Then the HTTP response status is 200, not an error status
+      And the response status field is "error"
+      And the error carries the raised exception class as its type
+      And the error carries a message, a traceback, and the failing node id
+      And the error type is not one the TS adapter treats as an infra failure
+
+    @unit
+    Scenario: an unparseable workflow is reported with a type the TS adapter treats as infra
+      Given a workflow whose nodes cannot be parsed
+      When the engine is asked to execute it
+      Then the response status field is "error"
+      And the error type is "invalid_workflow"

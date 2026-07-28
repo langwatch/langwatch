@@ -88,20 +88,33 @@ export interface NlpEngineResult {
 }
 
 /**
- * Engine error types the NLP engine attributes to itself rather than to the
- * code it was asked to run — the members of `classifyNodeFault`'s platform
- * bucket in `services/nlpgo/app/engine/faults.go`.
+ * Engine error types that are NOT the customer's Python, even though they
+ * arrive on the same 200-with-`status:"error"` path.
+ *
+ * `engine_error` / `llm_executor_unavailable` are `classifyNodeFault`'s
+ * platform bucket in `services/nlpgo/app/engine/faults.go`. The other two are
+ * this adapter's own responsibility rather than the engine's taxonomy:
+ * `invalid_workflow` means the DSL failed to parse, and **this adapter
+ * synthesizes that DSL** (entry -> code -> end) from the agent config — the
+ * customer never writes it; `context_canceled` is `finalize`'s response to a
+ * cancelled request, which is our timeout, not their bug.
+ *
+ * Both were observed arriving as HTTP 200 from a live engine while recording
+ * `__tests__/fixtures/nlpgo-recorded-responses.json` — neither was reachable
+ * through the hand-written mocks this PR replaced.
  *
  * This adapter submits a workflow of exactly one code node, so **every other**
  * node failure is the customer's Python (the type is then the raised
- * exception class). Denylisting the platform types rather than allowlisting
- * exception classes is what keeps an unseen Python exception classified as
- * user code instead of silently inverting to infra — the exact failure
- * lw#3439 is about.
+ * exception class — `TimeoutException`, `SyntaxError`, `KeyError`, all
+ * observed live). Denylisting rather than allowlisting exception classes is
+ * what keeps an unseen Python exception classified as user code instead of
+ * silently inverting to infra — the exact failure lw#3439 is about.
  */
 const PLATFORM_ENGINE_ERROR_TYPES: ReadonlySet<string> = new Set([
   "engine_error",
   "llm_executor_unavailable",
+  "invalid_workflow",
+  "context_canceled",
 ]);
 
 /**
