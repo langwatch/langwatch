@@ -23,16 +23,20 @@
 import { pullScheduleSchema } from "@ee/event-sourcing/pipelines/ingestion-pull-processing/schemas/events";
 import { ensureHiddenGovernanceProject } from "@ee/governance/services/governanceProject.service";
 import { syncIngestionPullSource } from "@ee/governance/services/pullers/ingestionPullLifecycle";
-import { NotFoundError, ValidationError } from "@langwatch/handled-error";
+import {
+  HandledError,
+  NotFoundError,
+  ValidationError,
+} from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { IngestionSource, Prisma, PrismaClient } from "@prisma/client";
-import { TRPCError } from "@trpc/server";
 import { createHash, randomBytes } from "crypto";
 import { env } from "~/env.mjs";
 import { isEnterpriseTier } from "~/server/api/enterprise";
 import { getApp } from "~/server/app-layer/app";
 import { encryptParserConfigCredentials } from "./ingestionCredentials";
 import { NON_ENTERPRISE_INGESTION_SOURCE_CAP } from "./ingestionSource.constants";
+import { unsupportedValue } from "./unsupportedValue";
 
 export type SourceType =
   | "otel_generic"
@@ -113,18 +117,22 @@ export class IngestionSourceNotFoundError extends NotFoundError {
 }
 
 /**
- * The cron field, validated where a rejection can still reach the field.
+ * The cron field, validated where the rejection can still say something
+ * useful about it.
  *
- * `assertValidPullSchedule` throws the zod issues away and rethrows a plain
- * `Error`, so a typo in a free-text box became an INTERNAL_SERVER_ERROR: the
- * admin read "Something went wrong — we've been notified" about their own
- * mistake, and a real 5xx incident was booked for it.
+ * The previous guard threw the zod issues away and rethrew a plain `Error`,
+ * so a typo in a free-text box became an INTERNAL_SERVER_ERROR: the admin
+ * read "Something went wrong — we've been notified" about their own mistake,
+ * and a real 5xx incident was booked for it.
  *
- * Kept on the same `{ fieldErrors, formErrors }` meta shape
- * `ValidationError.fromZodError` produces, because that is the contract the
- * client reads — `fieldErrors.pullSchedule` is what puts the complaint on the
- * input, and `formErrors` is what the registry's `validation_error` copy
- * renders when the field name isn't one it shows by name.
+ * The complaint rides in `meta.formErrors`, which the `validation_error`
+ * registry entry renders verbatim. There is deliberately no `fieldErrors`
+ * half: the source composer (`dashboard/pages/ingestion-sources.tsx`) holds
+ * its state in `useState`, not `react-hook-form`, so nothing calls
+ * `applyHandledErrorToForm` and a `fieldErrors.pullSchedule` key would have
+ * no reader. Wiring the composer to `react-hook-form` — so the rejection
+ * lands on the input instead of in a toast — is the better end state and is
+ * where that half comes back.
  */
 function assertPullSchedule(pullSchedule: string): void {
   const parsed = pullScheduleSchema.safeParse(pullSchedule);
@@ -133,12 +141,7 @@ function assertPullSchedule(pullSchedule: string): void {
   const complaints = parsed.error.issues.map((issue) => issue.message);
   throw new ValidationError(
     complaints.join(" ") || "Pull schedule is not a valid cron expression",
-    {
-      meta: {
-        fieldErrors: { pullSchedule: complaints },
-        formErrors: complaints,
-      },
-    },
+    { meta: { formErrors: complaints } },
   );
 }
 
@@ -283,15 +286,33 @@ export class IngestionSourceService {
         where: { organizationId: input.organizationId, archivedAt: null },
       });
       if (existing >= NON_ENTERPRISE_INGESTION_SOURCE_CAP) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: `Non-enterprise plans are limited to ${NON_ENTERPRISE_INGESTION_SOURCE_CAP} ingestion sources. Upgrade to Enterprise for unlimited.`,
-        });
+        // Handled, and from the service rather than the router, because the
+        // comment above is the whole point: workers and webhook adapters
+        // reach this guard too, and a `TRPCError` means nothing to them. A
+        // plan cap is exactly-known and exactly-actionable — archive one or
+        // upgrade — so it gets a code, and `meta.max` lets the UI say the
+        // number without the message having to.
+        throw new HandledError(
+          "ingestion_source_cap_reached",
+          `Non-enterprise plans are limited to ${NON_ENTERPRISE_INGESTION_SOURCE_CAP} ingestion sources.`,
+          {
+            httpStatus: 403,
+            meta: { max: NON_ENTERPRISE_INGESTION_SOURCE_CAP },
+          },
+        );
       }
     }
 
     if (!SUPPORTED_SOURCE_TYPES.includes(input.sourceType)) {
-      throw new Error(`Unsupported sourceType: ${input.sourceType}`);
+      // The router's zod enum catches this before the service sees it; a
+      // worker or webhook adapter's does not, and that is the caller this
+      // guard exists for. Naming the allowed values is the entire remedy, so
+      // it must not arrive as "Something went wrong — we've been notified".
+      throw unsupportedValue({
+        field: "sourceType",
+        value: input.sourceType,
+        allowed: SUPPORTED_SOURCE_TYPES,
+      });
     }
 
     // Lazy-ensure the hidden Governance Project on first source mint —

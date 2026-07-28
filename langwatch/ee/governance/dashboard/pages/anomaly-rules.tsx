@@ -13,7 +13,7 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import { Info, Pencil, Plus, Trash2 } from "lucide-react";
+import { Info, Pencil, Plus, RotateCw, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { EnterpriseLockedSurface } from "~/components/enterprise/EnterpriseLockedSurface";
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
@@ -358,77 +358,97 @@ function AnomalyRulesPage() {
               a failed load renders "Critical 0 / Warning 0 / Info 0". On an
               alerting-configuration surface that reads as "you have no
               critical rules" — a claim we cannot make when we never got the
-              list. Say what went wrong and show nothing instead. */}
-          <HandledErrorAlert
-            error={rulesQuery.error}
-            fallbackTitle="Couldn't load anomaly rules"
-          />
+              list. The alert says what went wrong, and the empty-state
+              sentence inside each section is suppressed; the sections and
+              their "New rule" buttons stay, because a failed read is no
+              reason to take away the ability to write. */}
+          {rulesQuery.error && (
+            <VStack align="start" gap={2}>
+              <HandledErrorAlert
+                error={rulesQuery.error}
+                fallbackTitle="Couldn't load anomaly rules"
+              />
+              <Button
+                size="xs"
+                variant="outline"
+                onClick={() => void rulesQuery.refetch()}
+                loading={rulesQuery.isFetching}
+              >
+                <RotateCw size={12} /> Try again
+              </Button>
+            </VStack>
+          )}
 
-          {!rulesQuery.error &&
-            (["critical", "warning", "info"] as const).map((sev) => {
-              const meta = SEVERITY_OPTIONS.find((o) => o.value === sev)!;
-              return (
-                <Box
-                  key={sev}
-                  as="section"
-                  borderWidth="1px"
-                  borderColor="border.muted"
-                  borderRadius="md"
-                  padding={4}
-                >
-                  <HStack alignItems="start" marginBottom={3}>
-                    <VStack align="start" gap={0}>
-                      <HStack gap={2}>
-                        <Text fontSize="sm" fontWeight="semibold">
-                          {meta.label}
-                        </Text>
+          {(["critical", "warning", "info"] as const).map((sev) => {
+            const meta = SEVERITY_OPTIONS.find((o) => o.value === sev)!;
+            return (
+              <Box
+                key={sev}
+                as="section"
+                borderWidth="1px"
+                borderColor="border.muted"
+                borderRadius="md"
+                padding={4}
+              >
+                <HStack alignItems="start" marginBottom={3}>
+                  <VStack align="start" gap={0}>
+                    <HStack gap={2}>
+                      <Text fontSize="sm" fontWeight="semibold">
+                        {meta.label}
+                      </Text>
+                      {/* A count is a claim about the fleet. We only have
+                            one when the list actually arrived. */}
+                      {!rulesQuery.error && (
                         <Badge size="sm" variant="surface">
                           {grouped[sev].length}
                         </Badge>
-                      </HStack>
-                    </VStack>
-                    <Spacer />
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        const fresh = blankComposer();
-                        fresh.severity = sev;
-                        setComposer(fresh);
-                      }}
-                      disabled={!!composer}
-                    >
-                      <Plus size={14} /> New rule
-                    </Button>
-                  </HStack>
-
-                  <VStack align="stretch" gap={2}>
-                    {grouped[sev].length === 0 && (
-                      <Text fontSize="sm" color="fg.muted">
-                        No {meta.label.toLowerCase()} rules.
-                      </Text>
-                    )}
-                    {grouped[sev].map((rule) => (
-                      <RuleRow
-                        key={rule.id}
-                        rule={rule}
-                        onEdit={() => startEdit(rule)}
-                        onArchive={() =>
-                          archiveMutation.mutate({
-                            id: rule.id,
-                            organizationId: orgId,
-                          })
-                        }
-                        isArchiving={
-                          archiveMutation.isPending &&
-                          archiveMutation.variables?.id === rule.id
-                        }
-                      />
-                    ))}
+                      )}
+                    </HStack>
                   </VStack>
-                </Box>
-              );
-            })}
+                  <Spacer />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      const fresh = blankComposer();
+                      fresh.severity = sev;
+                      setComposer(fresh);
+                    }}
+                    disabled={!!composer}
+                  >
+                    <Plus size={14} /> New rule
+                  </Button>
+                </HStack>
+
+                <VStack align="stretch" gap={2}>
+                  {/* Same rule as the sibling sources page: "None" is a
+                        claim we can only make when we know. */}
+                  {grouped[sev].length === 0 && !rulesQuery.error && (
+                    <Text fontSize="sm" color="fg.muted">
+                      No {meta.label.toLowerCase()} rules.
+                    </Text>
+                  )}
+                  {grouped[sev].map((rule) => (
+                    <RuleRow
+                      key={rule.id}
+                      rule={rule}
+                      onEdit={() => startEdit(rule)}
+                      onArchive={() =>
+                        archiveMutation.mutate({
+                          id: rule.id,
+                          organizationId: orgId,
+                        })
+                      }
+                      isArchiving={
+                        archiveMutation.isPending &&
+                        archiveMutation.variables?.id === rule.id
+                      }
+                    />
+                  ))}
+                </VStack>
+              </Box>
+            );
+          })}
         </VStack>
       </EnterpriseLockedSurface>
     </GovernanceLayout>

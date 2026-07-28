@@ -7,11 +7,15 @@
  *   1. Valid spend_spike configs round-trip through the tRPC create
  *      procedure and persist exactly as supplied.
  *   2. Invalid configs (missing fields, wrong types, negative numbers,
- *      snake_case typos) reject with TRPCError BAD_REQUEST. No row
+ *      snake_case typos) reject as a handled `validation_error`. No row
  *      lands in PG.
- *   3. Unknown ruleType rejects with BAD_REQUEST.
+ *   3. Unknown ruleType rejects the same way.
  *   4. The update path also re-validates: bad config on update is
  *      rejected; existing row stays unchanged.
+ *
+ * Assertions are on `code`, never on message prose: the wire message is the
+ * error's code slug (#5984), and the sentence the admin reads is registry
+ * copy that will change. The complaint travels in `meta.formErrors`.
  *   5. The evaluator's `safeParseSpendSpikeThresholdConfig` quarantines
  *      stale rows (skip + warn) instead of silently substituting
  *      DEFAULT_SPEND_SPIKE_CONFIG and firing on the wrong threshold.
@@ -140,6 +144,7 @@ const baseInput = (suffix: string) => ({
 
 describe("AnomalyRule.thresholdConfig — structured schema", () => {
   describe("valid configs round-trip", () => {
+    /** @scenario A valid spend_spike threshold config persists unchanged */
     it("persists a valid spend_spike config exactly as supplied", async () => {
       const caller = callerFor(adminUserId);
       const created = await caller.anomalyRules.create({
@@ -155,7 +160,8 @@ describe("AnomalyRule.thresholdConfig — structured schema", () => {
     });
   });
 
-  describe("invalid configs are rejected with BAD_REQUEST", () => {
+  describe("invalid configs are rejected as validation errors", () => {
+    /** @scenario Invalid spend_spike configs are rejected as validation errors */
     it.each([
       ["missing all fields", {}],
       [
@@ -186,11 +192,21 @@ describe("AnomalyRule.thresholdConfig — structured schema", () => {
           thresholdConfig: badConfig as Record<string, unknown>,
         }),
       ).rejects.toMatchObject({
-        code: "BAD_REQUEST",
-        message: expect.stringContaining("thresholdConfig"),
+        code: "UNPROCESSABLE_CONTENT",
+        cause: {
+          code: "validation_error",
+          // The complaint the admin actually reads. It names which config the
+          // issues belong to, because `windowSec` and `ratioVsBaseline` are
+          // not names the presentation registry can say — without this the
+          // copy degrades to "Some of the values aren't valid."
+          meta: {
+            formErrors: [expect.stringContaining("thresholdConfig")],
+          },
+        },
       });
     });
 
+    /** @scenario Unknown ruleType is rejected as a validation error listing the allowed types */
     it("rejects an unknown ruleType as a handled validation error", async () => {
       const caller = callerFor(adminUserId);
       // On `code`, not on prose: the sentence is copy and will change, and
@@ -205,7 +221,10 @@ describe("AnomalyRule.thresholdConfig — structured schema", () => {
         }),
       ).rejects.toMatchObject({
         code: "UNPROCESSABLE_CONTENT",
-        cause: { code: "validation_error" },
+        cause: {
+          code: "validation_error",
+          meta: { formErrors: [expect.stringContaining("spend_spike")] },
+        },
       });
 
       const persisted = await prisma.anomalyRule.findFirst({
@@ -216,6 +235,7 @@ describe("AnomalyRule.thresholdConfig — structured schema", () => {
   });
 
   describe("update path re-validates", () => {
+    /** @scenario Updating an existing rule with an invalid thresholdConfig is rejected */
     it("rejects an update with bad thresholdConfig and leaves the row unchanged", async () => {
       const caller = callerFor(adminUserId);
       const created = await caller.anomalyRules.create({
@@ -229,7 +249,10 @@ describe("AnomalyRule.thresholdConfig — structured schema", () => {
           id: created.id,
           thresholdConfig: { windowSec: -1 } as Record<string, unknown>,
         }),
-      ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+      ).rejects.toMatchObject({
+        code: "UNPROCESSABLE_CONTENT",
+        cause: { code: "validation_error" },
+      });
 
       const persisted = await prisma.anomalyRule.findUnique({
         where: { id: created.id },
@@ -237,6 +260,7 @@ describe("AnomalyRule.thresholdConfig — structured schema", () => {
       expect(persisted?.thresholdConfig).toEqual(validSpendSpikeConfig);
     });
 
+    /** @scenario Updating ruleType requires a matching thresholdConfig */
     it("rejects switching ruleType to an unknown type without a matching config", async () => {
       const caller = callerFor(adminUserId);
       const created = await caller.anomalyRules.create({
@@ -252,7 +276,10 @@ describe("AnomalyRule.thresholdConfig — structured schema", () => {
         }),
       ).rejects.toMatchObject({
         code: "UNPROCESSABLE_CONTENT",
-        cause: { code: "validation_error" },
+        cause: {
+          code: "validation_error",
+          meta: { formErrors: [expect.stringContaining("future_rule_type")] },
+        },
       });
 
       const persisted = await prisma.anomalyRule.findUnique({
@@ -269,6 +296,7 @@ describe("AnomalyRule.thresholdConfig — structured schema", () => {
       if (result.ok) expect(result.data).toEqual(validSpendSpikeConfig);
     });
 
+    /** @scenario Stale row that fails strict validation logs a warning and skips */
     it("returns ok=false with a ZodError for stale snake_case rows", () => {
       // Pre-Phase-2C rows could legitimately have shapes like this.
       // The evaluator uses safeParse to skip + log instead of crashing

@@ -81,16 +81,14 @@ const STATUS_META: Record<
 /**
  * Whether a failed load actually means "no such source".
  *
- * Reads the handled payload first — a `NotFoundError` carries `httpStatus`
- * 404 regardless of which tRPC code wrapped it — and falls back to the tRPC
- * envelope code for the plain `new TRPCError({ code: "NOT_FOUND" })` the
- * router throws today. Anything else is a load failure, not a deletion.
+ * One channel: `ingestionSources.get` raises `IngestionSourceNotFoundError`,
+ * and a `NotFoundError` carries `httpStatus` 404 whatever tRPC code wrapped
+ * it. The second branch that sniffed the tRPC envelope for a bare
+ * `NOT_FOUND` is gone with the bare throw it existed to cover. Anything else
+ * is a load failure, not a deletion.
  */
 function isNotFoundError(error: unknown): boolean {
-  if (!error) return false;
-  if (readHandledError(error)?.httpStatus === 404) return true;
-  const code = (error as { data?: { code?: unknown } })?.data?.code;
-  return code === "NOT_FOUND";
+  return readHandledError(error)?.httpStatus === 404;
 }
 
 const fmtUsd = (n: number) =>

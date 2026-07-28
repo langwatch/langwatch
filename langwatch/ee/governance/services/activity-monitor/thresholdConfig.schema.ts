@@ -20,8 +20,9 @@
  *
  * Spec: specs/ai-gateway/governance/anomaly-rule-threshold-schema.feature
  */
-import { ValidationError } from "@langwatch/handled-error";
 import { z } from "zod";
+
+import { unsupportedValue } from "./unsupportedValue";
 
 /**
  * Rule types with a wired detector / evaluator. Only these run on the
@@ -72,10 +73,10 @@ export type SpendSpikeThresholdConfigParsed = z.infer<
 >;
 
 /**
- * Validate a `thresholdConfig` payload against the schema for the
- * named `ruleType`. Throws ZodError on shape failure (the tRPC boundary
- * promotes it to `validation_error`); throws `ValidationError` directly
- * on an unknown ruleType.
+ * Validate a `thresholdConfig` payload against the schema for the named
+ * `ruleType`. Throws ZodError on shape failure (the router turns it into a
+ * `ValidationError` naming which config it belongs to); throws
+ * `ValidationError` directly on an unknown ruleType.
  */
 export function validateThresholdConfig({
   ruleType,
@@ -84,24 +85,16 @@ export function validateThresholdConfig({
   ruleType: string;
   config: unknown;
 }): SpendSpikeThresholdConfigParsed | null {
-  // Reject genuinely unknown types — saves the admin from a typo
-  // landing as a forever-dead rule.
-  //
-  // Handled, not a plain Error: the cause is exactly known and the admin can
-  // act on it (pick a listed type). As a plain Error it reached the customer
-  // as "Something went wrong — we've been notified", which is a promise
-  // nobody can keep about a typo. `validation_error` is already in the client
-  // registry, so the words come from one place; the specific complaint rides
-  // in `meta` — `formErrors` is what the registry's copy renders, and
-  // `fieldErrors.ruleType` is what `applyHandledErrorToForm` puts on the
-  // offending input.
+  // Reject genuinely unknown types — saves the admin from a typo landing as
+  // a forever-dead rule. Handled, not a plain Error, for the reasons in
+  // `unsupportedValue`: the cause is exactly known and picking a listed type
+  // is the whole fix. The complaint reaches the admin through the
+  // `validation_error` registry copy, which renders `meta.formErrors`.
   if (!ALLOWED_RULE_TYPES.includes(ruleType as AllowedRuleType)) {
-    const complaint = `Unsupported ruleType "${ruleType}". Allowed: ${ALLOWED_RULE_TYPES.join(", ")}.`;
-    throw new ValidationError(complaint, {
-      meta: {
-        fieldErrors: { ruleType: [complaint] },
-        formErrors: [complaint],
-      },
+    throw unsupportedValue({
+      field: "ruleType",
+      value: ruleType,
+      allowed: ALLOWED_RULE_TYPES,
     });
   }
   // Allowed but not yet detected — preview mode. Admin can save the

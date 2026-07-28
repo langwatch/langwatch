@@ -17,6 +17,7 @@ import type { AnomalyRule, Prisma, PrismaClient } from "@prisma/client";
 
 import { validateDestinationConfig } from "./destinationConfig.schema";
 import { validateThresholdConfig } from "./thresholdConfig.schema";
+import { unsupportedValue } from "./unsupportedValue";
 
 const logger = createLogger("langwatch:governance:anomaly-rule");
 
@@ -129,14 +130,22 @@ export class AnomalyRuleService {
 
   async createRule(input: CreateAnomalyRuleInput): Promise<AnomalyRule> {
     if (!SUPPORTED_SEVERITIES.includes(input.severity)) {
-      throw new Error(`Unsupported severity: ${input.severity}`);
+      throw unsupportedValue({
+        field: "severity",
+        value: input.severity,
+        allowed: SUPPORTED_SEVERITIES,
+      });
     }
     if (!SUPPORTED_SCOPES.includes(input.scope)) {
-      throw new Error(`Unsupported scope: ${input.scope}`);
+      throw unsupportedValue({
+        field: "scope",
+        value: input.scope,
+        allowed: SUPPORTED_SCOPES,
+      });
     }
-    // Strict per-rule-type validation. Throws ZodError on shape failure
-    // or a generic Error on unknown ruleType — both translate to
-    // BAD_REQUEST in the router. Spec:
+    // Strict per-rule-type validation. Throws ZodError on shape failure or a
+    // `ValidationError` on an unknown ruleType — both reach the admin as
+    // `validation_error`. Spec:
     // specs/ai-gateway/governance/anomaly-rule-threshold-schema.feature.
     validateThresholdConfig({
       ruleType: input.ruleType,
@@ -175,14 +184,22 @@ export class AnomalyRuleService {
     if (input.description !== undefined) data.description = input.description;
     if (input.severity !== undefined) {
       if (!SUPPORTED_SEVERITIES.includes(input.severity)) {
-        throw new Error(`Unsupported severity: ${input.severity}`);
+        throw unsupportedValue({
+          field: "severity",
+          value: input.severity,
+          allowed: SUPPORTED_SEVERITIES,
+        });
       }
       data.severity = input.severity;
     }
     if (input.ruleType !== undefined) data.ruleType = input.ruleType;
     if (input.scope !== undefined) {
       if (!SUPPORTED_SCOPES.includes(input.scope)) {
-        throw new Error(`Unsupported scope: ${input.scope}`);
+        throw unsupportedValue({
+          field: "scope",
+          value: input.scope,
+          allowed: SUPPORTED_SCOPES,
+        });
       }
       data.scope = input.scope;
     }
@@ -191,8 +208,8 @@ export class AnomalyRuleService {
       // Re-validate against the effective ruleType after this update.
       // If the caller supplies a new ruleType, the new config must match
       // its schema; if they keep the existing ruleType, the existing
-      // schema applies. Throws ZodError or a plain Error (unknown
-      // ruleType); router translates to BAD_REQUEST.
+      // schema applies. Throws ZodError or a `ValidationError` (unknown
+      // ruleType); both reach the admin as `validation_error`.
       validateThresholdConfig({
         ruleType: input.ruleType ?? existing.ruleType,
         config: input.thresholdConfig,

@@ -26,7 +26,7 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import { FileText, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { FileText, Info, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { HandledErrorAlert } from "~/features/errors";
@@ -67,6 +67,18 @@ const UNKNOWN_STATUS: PerStatementStatus = {
 };
 const VALID_STATUS: PerStatementStatus = { validity: "valid", message: null };
 
+/**
+ * Said once, above the list, because the reason belongs to the check and not
+ * to any one line. Both cases are ours to fix, not the admin's, so the copy
+ * says what is true — nothing looked at these — and never implies a verdict.
+ */
+const DEFERRED_NOTE: Record<string, string> = {
+  gateway_unconfigured:
+    "Statement checking is off in this environment, so these haven't been checked. They'll be checked once the gateway is running — you can still save them.",
+  endpoint_unavailable:
+    "This environment's gateway doesn't support statement checking yet, so these haven't been checked. You can still save them.",
+};
+
 export function OttlEditor({
   organizationId,
   sourceType,
@@ -80,6 +92,12 @@ export function OttlEditor({
   const [validating, setValidating] = useState(false);
   /** The failure that stopped validation running at all, if any. */
   const [validationError, setValidationError] = useState<unknown>(null);
+  /**
+   * Set when the server answered but told us the check didn't run. Not an
+   * error — nothing failed — so it gets a note rather than an alert, and the
+   * dots stay neutral either way.
+   */
+  const [deferredReason, setDeferredReason] = useState<string | null>(null);
 
   const starterQuery = api.ingestionSources.ottlStarter.useQuery(
     { organizationId, sourceType },
@@ -98,6 +116,7 @@ export function OttlEditor({
       const nonEmpty = next.filter((s) => s.trim().length > 0);
       if (nonEmpty.length === 0) {
         setValidationError(null);
+        setDeferredReason(null);
         setValidationStatus(next.map(() => UNKNOWN_STATUS));
         return;
       }
@@ -108,9 +127,17 @@ export function OttlEditor({
           statements: next,
         });
         setValidationError(null);
-        if (result.ok) {
+        if (result.status === "deferred") {
+          // The request succeeded and the answer was "nothing checked these".
+          // Green is a claim about the statements; there is no claim to make,
+          // so every dot stays neutral and the note says why.
+          setDeferredReason(result.reason);
+          setValidationStatus(next.map(() => UNKNOWN_STATUS));
+        } else if (result.status === "valid") {
+          setDeferredReason(null);
           setValidationStatus(next.map(() => VALID_STATUS));
         } else {
+          setDeferredReason(null);
           const errsByIdx = new Map<number, string>();
           for (const err of result.errors) {
             const where =
@@ -130,6 +157,7 @@ export function OttlEditor({
         // result either: every statement goes back to `unknown` (neutral
         // dot, no green) and the reason renders once, above the list.
         setValidationError(err);
+        setDeferredReason(null);
         setValidationStatus(next.map(() => UNKNOWN_STATUS));
       } finally {
         setValidating(false);
@@ -238,6 +266,29 @@ export function OttlEditor({
         error={validationError}
         fallbackTitle="Couldn't check these statements"
       />
+
+      {/* The check declined to run. Not a failure, so not an alert — but it
+          has to be said out loud, because the absence of red is otherwise
+          read as "these are fine". */}
+      {!validationError && deferredReason && (
+        <Box
+          borderWidth="1px"
+          borderColor="border.muted"
+          borderRadius="md"
+          paddingX={3}
+          paddingY={2}
+        >
+          <HStack alignItems="start" gap={2}>
+            <Box color="fg.muted" flexShrink={0} marginTop="2px">
+              <Info size={14} aria-hidden="true" />
+            </Box>
+            <Text fontSize="xs" color="fg.muted">
+              {DEFERRED_NOTE[deferredReason] ??
+                "These statements haven't been checked."}
+            </Text>
+          </HStack>
+        </Box>
+      )}
 
       <VStack align="stretch" gap={1}>
         {isEmpty && !hasStarter && (

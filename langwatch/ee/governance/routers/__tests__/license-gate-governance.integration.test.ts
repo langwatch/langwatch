@@ -222,7 +222,13 @@ describe("license-gate on governance backend", () => {
           }),
         ).rejects.toMatchObject({
           code: "FORBIDDEN",
-          message: expect.stringContaining("limited to 3"),
+          // On the handled cause, not the prose: the wire message is the code
+          // slug and the sentence is registry copy. `meta.max` is what lets a
+          // UI say the number without parsing it back out of a sentence.
+          cause: {
+            code: "ingestion_source_cap_reached",
+            meta: { max: NON_ENTERPRISE_INGESTION_SOURCE_CAP },
+          },
         });
 
         const overCap = await prisma.ingestionSource.findFirst({
@@ -301,7 +307,15 @@ describe("license-gate on governance backend", () => {
             name: "service-direct-blocked",
             actorUserId: adminUserId,
           }),
-        ).rejects.toMatchObject({ code: "FORBIDDEN" });
+          // The service is the layer under test here, so what it raises is a
+          // `HandledError` and not a tRPC object — which is the point: the
+          // callers this guard exists for (workers, webhook adapters) have no
+          // tRPC boundary to give a `TRPCError` meaning.
+        ).rejects.toMatchObject({
+          code: "ingestion_source_cap_reached",
+          httpStatus: 403,
+          meta: { max: NON_ENTERPRISE_INGESTION_SOURCE_CAP },
+        });
 
         const persisted = await prisma.ingestionSource.findFirst({
           where: { organizationId, name: "service-direct-blocked" },

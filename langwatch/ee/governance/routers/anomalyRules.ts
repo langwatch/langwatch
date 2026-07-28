@@ -18,11 +18,12 @@
  */
 
 import {
+  AnomalyRuleNotFoundError,
   AnomalyRuleService,
   SUPPORTED_SCOPES,
   SUPPORTED_SEVERITIES,
 } from "@ee/governance/services/activity-monitor/anomalyRule.service";
-import { TRPCError } from "@trpc/server";
+import { ValidationError } from "@langwatch/handled-error";
 import { z } from "zod";
 
 import {
@@ -38,15 +39,24 @@ const enterpriseGate = requireEnterprisePlan(
 
 /**
  * Translate threshold-config shape failures from the service layer into a
- * TRPCError BAD_REQUEST, naming which config the issues belong to.
+ * `ValidationError` that names which config the issues belong to.
  *
- * Only ZodErrors are handled here. An unknown ruleType now arrives as a
- * `ValidationError` from `thresholdConfig.schema.ts`, which is already on the
- * handled channel — it falls through the re-throw below and the boundary
- * serialises it with its own `meta`, so there is nothing to translate. The
- * branch that used to sniff `/Unsupported ruleType/` off a plain Error's
- * message is gone with it.
+ * This used to build a `TRPCError` whose hand-composed message never reached
+ * anyone. The formatter promotes a `ZodError` cause to
+ * `ValidationError.fromZodError` and replaces the wire message with the code
+ * slug, so `Invalid thresholdConfig for spend_spike: windowSec must be
+ * positive` was discarded — and `fromZodError` files the issues under
+ * `meta.fieldErrors` keyed `windowSec` / `ratioVsBaseline`, none of which the
+ * registry knows how to name, with `formErrors` empty for path-bearing
+ * issues. The admin read "Some of the values aren't valid." and nothing else.
  *
+ * So the complaint is composed here and carried in `meta.formErrors`, which
+ * the `validation_error` registry entry renders verbatim — the same shape
+ * `assertPullSchedule` uses.
+ *
+ * Only ZodErrors are handled here. An unknown ruleType already arrives as a
+ * `ValidationError` from `thresholdConfig.schema.ts`, so it falls through the
+ * re-throw below and the boundary serialises it with its own `meta`.
  * Anything else re-throws unchanged so genuine internal errors stay visible.
  */
 function translateConfigValidationError(
@@ -65,12 +75,11 @@ function translateConfigValidationError(
     const configName = isDestinationConfig
       ? "destinationConfig"
       : "thresholdConfig";
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: `Invalid ${configName}${
-        !isDestinationConfig && ruleType ? ` for ${ruleType}` : ""
-      }: ${err.issues.map((i) => i.message).join("; ")}`,
-      cause: err,
+    const complaint = `Invalid ${configName}${
+      !isDestinationConfig && ruleType ? ` for ${ruleType}` : ""
+    }: ${err.issues.map((i) => i.message).join("; ")}`;
+    throw new ValidationError(complaint, {
+      meta: { formErrors: [complaint] },
     });
   }
   throw err;
@@ -136,7 +145,9 @@ export const anomalyRulesRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const service = AnomalyRuleService.create(ctx.prisma);
       const row = await service.findById(input.id, input.organizationId);
-      if (!row) throw new TRPCError({ code: "NOT_FOUND" });
+      // Same named failure the mutations raise via `requireById`, so the
+      // client reads one channel and the registry supplies the words.
+      if (!row) throw new AnomalyRuleNotFoundError(input.id);
       return toDto(row);
     }),
 

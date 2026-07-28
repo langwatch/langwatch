@@ -19,6 +19,7 @@
  */
 
 import {
+  IngestionSourceNotFoundError,
   IngestionSourceService,
   SUPPORTED_SOURCE_TYPES,
 } from "@ee/governance/services/activity-monitor/ingestionSource.service";
@@ -102,7 +103,10 @@ export const ingestionSourcesRouter = createTRPCRouter({
       const service = IngestionSourceService.create(ctx.prisma);
       const row = await service.findById(input.id, input.organizationId);
       if (!row) {
-        throw new TRPCError({ code: "NOT_FOUND" });
+        // Same named failure the mutations raise, so the detail page reads
+        // one channel: a code the registry has copy for, not a bare 404 the
+        // client has to sniff out of the tRPC envelope.
+        throw new IngestionSourceNotFoundError(input.id);
       }
       return toDto(row);
     }),
@@ -232,9 +236,11 @@ export const ingestionSourcesRouter = createTRPCRouter({
    * statement; on parse / type errors, returns per-statement coordinates
    * so the editor can surface line/col error markers.
    *
-   * When `LW_GATEWAY_BASE_URL` is unset (dev fast-path) or the gateway
-   * is up but doesn't yet ship the endpoint, the client returns
-   * `{ ok: true }` so the composer doesn't block on infra.
+   * When `LW_GATEWAY_BASE_URL` is unset (dev fast-path) or the gateway is up
+   * but doesn't yet ship the endpoint, the client returns
+   * `{ status: "deferred" }` — the composer still doesn't block on infra, but
+   * the editor renders neutral dots plus a note rather than claiming a pass
+   * for statements nothing looked at.
    */
   validateOttl: protectedProcedure
     .input(
