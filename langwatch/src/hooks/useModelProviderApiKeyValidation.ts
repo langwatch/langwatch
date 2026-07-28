@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import { api } from "../utils/api";
+import { errorDisplayMessage } from "../utils/trpcError";
 
 /**
  * Hook for validating model provider API keys.
@@ -61,11 +62,11 @@ export function useModelProviderApiKeyValidation(
 
       return true;
     } catch (error) {
-      setValidationError(
-        error instanceof Error
-          ? error.message
-          : "An unexpected error occurred during validation",
-      );
+      // Not `error.message`: a handled error's message is replaced with its
+      // stable code on the wire, so reading it renders a slug like
+      // `provider_unreachable` straight into the drawer. `errorDisplayMessage`
+      // reads the authored prose first and only falls back to the code.
+      setValidationError(errorDisplayMessage(error));
       return false;
     } finally {
       setIsValidating(false);
@@ -109,11 +110,7 @@ export function useModelProviderApiKeyValidation(
 
         return true;
       } catch (error) {
-        setValidationError(
-          error instanceof Error
-            ? error.message
-            : "An unexpected error occurred during validation",
-        );
+        setValidationError(errorDisplayMessage(error));
         return false;
       } finally {
         setIsValidating(false);

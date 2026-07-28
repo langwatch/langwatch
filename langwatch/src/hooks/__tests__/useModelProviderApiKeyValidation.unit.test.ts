@@ -38,7 +38,28 @@ vi.mock("../../utils/api", () => ({
   },
 }));
 
+import { TRPCClientError } from "@trpc/client";
 import { useModelProviderApiKeyValidation } from "../useModelProviderApiKeyValidation";
+import { errorFormatterForTesting } from "../../server/api/trpc";
+import { ProviderUnreachableError } from "../../server/api/routers/providerValidation";
+
+/**
+ * The error the browser actually receives, assembled by the real formatter
+ * rather than described by hand. A handled error's free-text message is
+ * replaced with its stable code on the wire (ADR-045), so a fixture written
+ * from the constructor's message would test a shape that never travels.
+ */
+const wireErrorFor = (domainError: Error) =>
+  TRPCClientError.from({
+    error: errorFormatterForTesting({
+      shape: {
+        message: domainError.message,
+        code: -32603,
+        data: { code: "BAD_GATEWAY", httpStatus: 502 },
+      },
+      error: { cause: domainError, message: domainError.message },
+    }),
+  } as any);
 
 const renderValidation = () =>
   renderHook(() =>
@@ -96,7 +117,7 @@ describe("useModelProviderApiKeyValidation", () => {
       });
 
       it("surfaces a thrown request as an error rather than a pass", async () => {
-        mockMutateAsync.mockRejectedValue(new Error("validation_error"));
+        mockMutateAsync.mockRejectedValue(new Error("Failed to fetch"));
         const { result } = renderValidation();
 
         let valid: boolean | undefined;
@@ -105,7 +126,42 @@ describe("useModelProviderApiKeyValidation", () => {
         });
 
         expect(valid).toBe(false);
-        expect(result.current.validationError).toContain("validation_error");
+        expect(result.current.validationError).toContain("Failed to fetch");
+      });
+
+      /**
+       * @scenario An unreachable provider is explained, not named by its code
+       *
+       * The regression this pins is invisible server-side: the sentence the
+       * constructor writes is real there, and only the wire replaces it with
+       * the code. So this drives the genuine error through the genuine
+       * formatter into the genuine hook, and reads what the drawer would
+       * render.
+       */
+      it("explains an unreachable provider instead of showing its error code", async () => {
+        mockMutateAsync.mockRejectedValue(
+          wireErrorFor(
+            new ProviderUnreachableError({
+              provider: "gemini",
+              hasConfigurableEndpoint: true,
+            }),
+          ),
+        );
+        const { result } = renderValidation();
+
+        await act(async () => {
+          await result.current.validate();
+        });
+
+        expect(result.current.validationError).toBe(
+          "Could not reach the provider to check this API key. " +
+            "Check your network connection. " +
+            "Check the base URL is correct and reachable.",
+        );
+        // The defect was this slug reaching the customer verbatim.
+        expect(result.current.validationError).not.toContain(
+          "provider_unreachable",
+        );
       });
     });
   });

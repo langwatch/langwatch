@@ -273,6 +273,13 @@ Feature: Credential Validation
     Then the credential values are not stored
     And which credentials were set is still recorded
 
+  @unit
+  Scenario: A credential typed as a header is never persisted either
+    Given a recorded action carrying an authorization header
+    When it is written to the audit trail
+    Then the header value is not stored
+    And the header name is still recorded
+
 
   @unit
   Scenario: The API key is never sent in a URL
@@ -344,3 +351,23 @@ Feature: Credential Validation
     When I call validateProviderApiKey for it
     Then I am told validation failed with the status code
     And I am not told the API key is invalid
+
+  # A provider that never answered is the absence of a verdict, not a verdict.
+  # It is raised rather than returned — which means it crosses the wire as a
+  # handled error, where free text is replaced by a stable code. The sentence
+  # has to travel on the channel that survives that, or the customer reads the
+  # code itself at the exact moment they are least able to decode it.
+
+  @unit
+  Scenario: An unreachable provider is explained, not named by its code
+    Given the provider never answers the probe
+    When validation runs
+    Then I am told the provider could not be reached
+    And I am told what to check
+    And I am not shown an internal error code
+
+  @integration
+  Scenario: An unreachable provider is not recorded as our own failure
+    Given the base URL I entered never answers
+    When validation runs
+    Then the failure is attributed to the provider

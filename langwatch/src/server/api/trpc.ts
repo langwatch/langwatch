@@ -446,32 +446,63 @@ function isAuditLogExempt(path: string): boolean {
 }
 
 /**
+ * Fields on a model-provider write whose values are secrets. All three ride
+ * the same `modelProvider.update` mutation: `customKeys` holds the API key as
+ * typed, `providerConfig` is a passthrough object we do not get to police, and
+ * `extraHeaders` is precisely where an `Authorization: Bearer …` is entered.
+ */
+const CREDENTIAL_OBJECT_FIELDS = ["customKeys", "providerConfig"] as const;
+
+/** Keeps an object's field names, drops every value. */
+function redactValues(source: Record<string, unknown>): Record<string, string> {
+  return Object.fromEntries(
+    Object.keys(source).map((name) => [name, "[redacted]"]),
+  );
+}
+
+/**
  * Strips credential values out of what the audit trail persists.
  *
- * `auditLog` stores `args` verbatim, and `customKeys` carries provider API
- * keys as typed — on every model-provider write, and now on the credential
- * probe too, since that had to become a mutation to keep the key out of a
- * URL. A secret in a durable, queryable table is worse than one in a request
- * line, so the values go. The field names stay, because "which credentials
- * were set" is the part of the record worth having.
+ * `auditLog` stores `args` verbatim — on every model-provider write, and now
+ * on the credential probe too, since that had to become a mutation to keep the
+ * key out of a URL. A secret in a durable, queryable table is worse than one
+ * in a request line, so the values go. The field names stay, because "which
+ * credentials were set" is the part of the record worth having.
  */
 export function redactAuditArgs(input: unknown): unknown {
   if (typeof input !== "object" || input === null) return input;
 
   const record = input as Record<string, unknown>;
-  const customKeys = record.customKeys;
+  let redacted: Record<string, unknown> | undefined;
 
-  if (typeof customKeys !== "object" || customKeys === null) return input;
-
-  return {
-    ...record,
-    customKeys: Object.fromEntries(
-      Object.keys(customKeys as Record<string, unknown>).map((name) => [
-        name,
-        "[redacted]",
-      ]),
-    ),
+  // Built lazily so input carrying no credentials is returned as-is rather
+  // than copied — the audit row is then the object the procedure received.
+  const replace = (field: string, value: unknown) => {
+    redacted ??= { ...record };
+    redacted[field] = value;
   };
+
+  for (const field of CREDENTIAL_OBJECT_FIELDS) {
+    const value = record[field];
+    if (typeof value === "object" && value !== null && !Array.isArray(value)) {
+      replace(field, redactValues(value as Record<string, unknown>));
+    }
+  }
+
+  // A list of `{ key, value }` pairs rather than an object, so the header
+  // name survives and only what it carries is dropped.
+  if (Array.isArray(record.extraHeaders)) {
+    replace(
+      "extraHeaders",
+      record.extraHeaders.map((header) =>
+        typeof header === "object" && header !== null && "value" in header
+          ? { ...header, value: "[redacted]" }
+          : header,
+      ),
+    );
+  }
+
+  return redacted ?? input;
 }
 
 const auditLogMutations = t.middleware(
@@ -620,6 +651,11 @@ function handledErrorToTRPCCode(error: HandledError): TRPCError["code"] {
     409: "CONFLICT",
     422: "UNPROCESSABLE_CONTENT",
     429: "TOO_MANY_REQUESTS",
+    // 502/503/504 have no key in tRPC v10's code table (added in v11), so an
+    // upstream failure has to fall through to INTERNAL_SERVER_ERROR here. The
+    // domain status survives on the wire as `data.error.httpStatus`, and
+    // `logTrpcCall` logs the handled status rather than this one so a provider
+    // fault is not counted as our 500.
   };
   return map[error.httpStatus] ?? "INTERNAL_SERVER_ERROR";
 }
@@ -715,13 +751,18 @@ export function handleTrpcCallLogging({
       result.error instanceof TRPCError
         ? getHTTPStatusCodeFromError(result.error)
         : 500;
-    logData.statusCode = resolvedStatus;
 
     const cause =
       result.error instanceof TRPCError ? result.error.cause : undefined;
     // isHandled also matches an instance from a second copy of the package,
     // which bare `instanceof` misses — see its brand check.
     const handledCause = HandledError.isHandled(cause) ? cause : undefined;
+
+    // A handled error states its own status, and it is the accurate one: tRPC
+    // v10 has no code for 502/503/504, so an upstream failure resolves to 500
+    // through `handledErrorToTRPCCode` and would otherwise be counted against
+    // our own error budget every time a customer typos a base URL.
+    logData.statusCode = handledCause?.httpStatus ?? resolvedStatus;
 
     // Include handled error code + fault in log data for structured
     // filtering (and spike alerting on handledErrorCode).

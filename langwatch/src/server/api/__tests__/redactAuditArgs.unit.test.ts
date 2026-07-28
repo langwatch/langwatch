@@ -47,6 +47,55 @@ describe("redactAuditArgs", () => {
         expect(JSON.stringify(redacted)).not.toContain("secret-one");
         expect(JSON.stringify(redacted)).not.toContain("example.openai");
       });
+
+      /**
+       * @scenario "A credential typed as a header is never persisted either"
+       *
+       * `extraHeaders` rides the same `modelProvider.update` mutation as
+       * `customKeys` and is where an `Authorization: Bearer …` is typed, so
+       * redacting only the latter leaves the secret in the table anyway.
+       */
+      it("redacts a header's value while keeping its name", () => {
+        const redacted = redactAuditArgs({
+          extraHeaders: [
+            { key: "Authorization", value: "Bearer sk-the-real-token" },
+            { key: "X-Tenant", value: "acme" },
+          ],
+        }) as Record<string, unknown>;
+
+        expect(JSON.stringify(redacted)).not.toContain("sk-the-real-token");
+        expect(redacted.extraHeaders).toEqual([
+          { key: "Authorization", value: "[redacted]" },
+          { key: "X-Tenant", value: "[redacted]" },
+        ]);
+      });
+
+      /** A passthrough object, so its contents cannot be assumed harmless. */
+      it("redacts providerConfig values", () => {
+        const redacted = redactAuditArgs({
+          providerConfig: { serviceAccountJson: "{\"private_key\":\"pk\"}" },
+        }) as Record<string, unknown>;
+
+        expect(JSON.stringify(redacted)).not.toContain("private_key");
+        expect(redacted.providerConfig).toEqual({
+          serviceAccountJson: "[redacted]",
+        });
+      });
+
+      it("redacts every credential-carrying field on one write", () => {
+        const redacted = redactAuditArgs({
+          provider: "custom",
+          customKeys: { CUSTOM_API_KEY: "key-secret" },
+          extraHeaders: [{ key: "Authorization", value: "header-secret" }],
+          providerConfig: { token: "config-secret" },
+        }) as Record<string, unknown>;
+
+        const serialized = JSON.stringify(redacted);
+        expect(serialized).not.toContain("key-secret");
+        expect(serialized).not.toContain("header-secret");
+        expect(serialized).not.toContain("config-secret");
+        expect(redacted.provider).toBe("custom");
+      });
     });
   });
 
@@ -67,6 +116,12 @@ describe("redactAuditArgs", () => {
 
       it("leaves a non-object customKeys alone", () => {
         const input = { customKeys: null };
+
+        expect(redactAuditArgs(input)).toBe(input);
+      });
+
+      it("leaves a non-array extraHeaders alone", () => {
+        const input = { extraHeaders: null };
 
         expect(redactAuditArgs(input)).toBe(input);
       });

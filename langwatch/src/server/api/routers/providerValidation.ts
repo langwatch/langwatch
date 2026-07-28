@@ -92,6 +92,9 @@ const GEMINI_REASON_MESSAGES: Record<string, string> = {
   API_KEY_IOS_APP_BLOCKED: GEMINI_RESTRICTION_MESSAGE,
 };
 
+const UNREACHABLE_MESSAGE =
+  "Could not reach the provider to check this API key.";
+
 /**
  * The probe never reached the provider, so nothing was learned about the key.
  *
@@ -109,21 +112,26 @@ export class ProviderUnreachableError extends HandledError {
     provider: string;
     hasConfigurableEndpoint: boolean;
   }) {
-    super(
-      "provider_unreachable",
-      "Could not reach the provider to check this API key.",
-      {
-        fault: "provider",
-        httpStatus: 502,
-        meta: { provider },
-        tips: hasConfigurableEndpoint
-          ? [
-              "Check your network connection.",
-              "Check the base URL is correct and reachable.",
-            ]
-          : ["Check your network connection."],
-      },
-    );
+    const tips = hasConfigurableEndpoint
+      ? [
+          "Check your network connection.",
+          "Check the base URL is correct and reachable.",
+        ]
+      : ["Check your network connection."];
+
+    super("provider_unreachable", UNREACHABLE_MESSAGE, {
+      fault: "provider",
+      httpStatus: 502,
+      // A handled error's own message never crosses the tRPC boundary — the
+      // formatter replaces it with the code (ADR-045), so a surface reading
+      // `error.message` would render the literal slug. `meta.message` is the
+      // channel that does carry prose, and the one `errorDisplayMessage`
+      // reads first. The tips ride along in it so the single sentence the
+      // customer sees is the whole remediation, while `tips` stays structured
+      // for the API, CLI and MCP consumers that read it as data.
+      meta: { provider, message: [UNREACHABLE_MESSAGE, ...tips].join(" ") },
+      tips,
+    });
   }
 }
 
@@ -458,7 +466,7 @@ async function runProbeChain({
   /** The request never landed, so this says nothing about the key itself. */
   const unreachable = (): RankedFailure => ({
     valid: false,
-    error: "Could not reach the provider to check this API key.",
+    error: UNREACHABLE_MESSAGE,
     rank: FAILURE_RANK.unreachable,
   });
 
