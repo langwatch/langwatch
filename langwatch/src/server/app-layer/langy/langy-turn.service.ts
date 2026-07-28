@@ -26,6 +26,7 @@ import { LANGY_CONVERSATION_STATUS } from "@langwatch/langy";
 import { createLogger } from "@langwatch/observability";
 import { trace } from "@opentelemetry/api";
 import type { LangyCredentialService } from "~/server/app-layer/langy/LangyCredentialService";
+import type { PromptService } from "~/server/prompt-config/prompt.service";
 import { LangySessionKeyScopeError } from "~/server/app-layer/langy/langyApiKey";
 import {
   extractLangyConversationMemory,
@@ -33,7 +34,11 @@ import {
   renderLangyConversationMemory,
   renderLangyConversationTranscript,
 } from "~/server/app-layer/langy/langyConversationMemory";
-import { LANGY_TURN_OVERRIDE_FALLBACK } from "~/server/app-layer/langy/langyPromptRegistry";
+import {
+  LANGY_PROMPT_HANDLES,
+  LANGY_TURN_OVERRIDE_FALLBACK,
+  resolveLangyPrompt,
+} from "~/server/app-layer/langy/langyPromptRegistry";
 import type { LangyTurnContext } from "~/server/app-layer/langy/langyTurnContext.schema";
 import { renderLangyTurnContext } from "~/server/app-layer/langy/langyTurnContext.schema";
 import type { LangyWorkerPort } from "~/server/app-layer/langy/langyWorker";
@@ -74,6 +79,32 @@ const logger = createLogger("langwatch:langy:turn-service");
  * same bytes. Aliased here to keep the composition below readable.
  */
 const LANGY_OVERRIDE = LANGY_TURN_OVERRIDE_FALLBACK;
+
+/**
+ * The system-block override for this turn: the promoted registry row when an
+ * operator has configured the project that holds Langy's prompts, else the
+ * in-repo constant.
+ *
+ * The project id is read from `LANGY_PROMPT_PROJECT_ID` — the SAME variable
+ * `scripts/seed-langy-prompts.ts` seeds into, so "seed it, promote it, set the
+ * id" is one coherent operation rather than two halves that never met.
+ * Unconfigured is the default and costs nothing: no prompt service call, no
+ * database round trip on the turn path.
+ */
+async function resolveLangyTurnOverride(
+  deps: Pick<LangyTurnServiceDeps, "prompts">,
+): Promise<string> {
+  const projectId = process.env.LANGY_PROMPT_PROJECT_ID?.trim();
+  if (!projectId || !deps.prompts) return LANGY_OVERRIDE;
+
+  const resolved = await resolveLangyPrompt({
+    promptService: deps.prompts,
+    projectId,
+    handle: LANGY_PROMPT_HANDLES.turnOverride,
+    fallback: LANGY_OVERRIDE,
+  });
+  return resolved.text;
+}
 
 /**
  * Turn identity binds the client's idempotency key to WHO sent it and WHAT was
@@ -175,6 +206,12 @@ export interface StartConversationTurnInput {
 export interface LangyTurnServiceDeps {
   conversations: LangyConversationService;
   credentials: LangyCredentialService;
+  /**
+   * Reads Langy's versioned prompts (ADR-050). Optional: absent (tests, and any
+   * composition that has not wired it) means the in-repo fallback text, which
+   * is also what a configured-but-empty registry yields.
+   */
+  prompts?: Pick<PromptService, "getPromptByIdOrHandle">;
   /**
    * Resolve the project's configured Langy model; rejects when none is
    * configured. The returned `modelId` is the full provider-prefixed id and
@@ -675,7 +712,20 @@ export class LangyTurnService {
       // every turn instead of reading it. Everything volatile rides the turn's
       // USER message instead: the history seed below, and the per-turn context
       // inside the composed prompt.
-      const system = [LANGY_OVERRIDE, LANGY_REFERENT_POLICY].join("\n\n");
+      // ADR-050: the override text is a VERSIONED registry row when an operator
+      // has pointed us at the system project that holds it, and the in-repo
+      // constant otherwise. `resolveLangyPrompt` never throws — a miss, an
+      // empty row or a read error all yield the fallback — so the registry can
+      // never keep a turn from starting. With no system project configured the
+      // registry is skipped entirely and this is byte-identical to the constant,
+      // which is what makes turning it on a no-op until a row is promoted.
+      //
+      // This seam existed, seeded and documented, with NO caller: `pnpm
+      // seed:langy-prompts` + promoting to `production` changed nothing at
+      // runtime. It is wired here because that is where the system block is
+      // composed (#5881).
+      const overrideText = await resolveLangyTurnOverride(this.deps);
+      const system = [overrideText, LANGY_REFERENT_POLICY].join("\n\n");
 
       // The history seed rides EVERY dispatch, not just the one after a probe
       // miss, because the worker serving the turn is disposable at any point

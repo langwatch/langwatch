@@ -10,6 +10,7 @@ import { postSlackChatMessage } from "~/server/app-layer/automations/delivery/sl
 import { liveTriggerNotifier } from "~/server/app-layer/automations/delivery/triggerNotifier";
 import { LangyCredentialService } from "~/server/app-layer/langy/LangyCredentialService";
 import { LangyFeedbackPromptService } from "~/server/app-layer/langy/langy-feedback-prompt.service";
+import { PromptService } from "~/server/prompt-config/prompt.service";
 import {
   mintLangySessionApiKey,
   revokeLangySessionApiKey,
@@ -1042,6 +1043,10 @@ export function initializeDefaultApp(options?: {
   const langyTurns = LangyTurnService.create({
     conversations: langyConversations,
     credentials: LangyCredentialService.create(prisma),
+    // ADR-050 versioned prompts. Only consulted when LANGY_PROMPT_PROJECT_ID
+    // names the project holding the rows; unset (the default) skips the
+    // registry entirely and the in-repo text is used verbatim.
+    prompts: new PromptService(prisma),
     // Langy resolves through its own feature key (falling back to the
     // original prompt.create_default gate inside the resolver), so a codex
     // default set for Langy never leaks into new-prompt creation. The

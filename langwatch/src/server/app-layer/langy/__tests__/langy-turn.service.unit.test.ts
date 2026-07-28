@@ -1,5 +1,5 @@
 import { LANGY_CONVERSATION_STATUS } from "@langwatch/langy";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   LangyAgentUnavailableError,
   LangyConversationNotOwnedError,
@@ -1027,5 +1027,73 @@ describe("LangyTurnService.stopTurn", () => {
         outcome: "stopped",
       });
     });
+  });
+});
+
+/**
+ * ADR-050. The registry seam shipped with no caller: seeding a prompt and
+ * promoting it to `production` changed nothing at runtime. These pin both
+ * halves — that it is consulted when configured, and that an unconfigured
+ * install is byte-identical to the in-repo constant.
+ */
+/** The `system` string the worker was dispatched with. */
+const systemOf = (dispatch: ReturnType<typeof vi.fn>): string =>
+  (dispatch.mock.calls[0]?.[0] as { system?: string } | undefined)?.system ?? "";
+
+describe("when the project holding Langy's versioned prompts is configured", () => {
+  const PROJECT_ENV = "LANGY_PROMPT_PROJECT_ID";
+
+  afterEach(() => {
+    delete process.env[PROJECT_ENV];
+  });
+
+  /** @scenario A promoted prompt row is what the turn actually runs on */
+  it("sends the promoted registry text as the system override", async () => {
+    process.env[PROJECT_ENV] = "project-system";
+    const getPromptByIdOrHandle = vi.fn(async () => ({
+      prompt: "REGISTRY OVERRIDE TEXT",
+    }));
+    const { deps, mocks } = makeDeps({
+      prompts: { getPromptByIdOrHandle },
+    } as unknown as Partial<LangyTurnServiceDeps>);
+
+    await LangyTurnService.create(deps).startConversationTurn(input());
+
+    expect(getPromptByIdOrHandle).toHaveBeenCalledWith(
+      expect.objectContaining({ projectId: "project-system", tag: "production" }),
+    );
+    expect(systemOf(mocks.dispatch)).toContain("REGISTRY OVERRIDE TEXT");
+  });
+
+  /** @scenario A registry that cannot answer never blocks a turn */
+  it("falls back to the in-repo text when the registry read throws", async () => {
+    process.env[PROJECT_ENV] = "project-system";
+    const { deps, mocks } = makeDeps({
+      prompts: {
+        getPromptByIdOrHandle: vi.fn(async () => {
+          throw new Error("registry down");
+        }),
+      },
+    } as unknown as Partial<LangyTurnServiceDeps>);
+
+    await LangyTurnService.create(deps).startConversationTurn(input());
+
+    expect(mocks.dispatch).toHaveBeenCalledOnce();
+    expect(systemOf(mocks.dispatch)).not.toContain("REGISTRY");
+  });
+});
+
+describe("when no prompt project is configured", () => {
+  /** @scenario An install that opted into nothing pays nothing */
+  it("never consults the registry", async () => {
+    delete process.env.LANGY_PROMPT_PROJECT_ID;
+    const getPromptByIdOrHandle = vi.fn();
+    const { deps } = makeDeps({
+      prompts: { getPromptByIdOrHandle },
+    } as unknown as Partial<LangyTurnServiceDeps>);
+
+    await LangyTurnService.create(deps).startConversationTurn(input());
+
+    expect(getPromptByIdOrHandle).not.toHaveBeenCalled();
   });
 });
