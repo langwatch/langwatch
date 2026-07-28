@@ -161,7 +161,10 @@ const RESERVED_PREFIX = "langwatch.reserved.";
  * Without that guard the fragment came back as a single fake element and was
  * re-escaped into a fresh array on the next write, nesting one level deeper on
  * every read-back cycle. The durable fix for the cap itself is still a typed
- * column with an element cap, as `AnnotationIds` has.
+ * column with an element cap. No column in this row has one yet —
+ * `AnnotationIds` is an uncapped `Array(String)` and the fold appends to it
+ * unbounded — so there is no precedent here to copy, only the same debt in a
+ * second place.
  */
 const FOLD_ACCUMULATOR_KEYS: ReadonlySet<string> = new Set([
   "langwatch.prompt_ids",

@@ -196,4 +196,92 @@ describe("traceAnalytics fold projection — slim row derivation", () => {
       expect(row.origin).toBe("");
     });
   });
+
+  describe("given a trace whose FIRST signal is a log record", () => {
+    const logAtMs = new Date("2026-07-24T12:00:00.000Z").getTime();
+
+    const foldLogRecord = (state: TraceAnalyticsData) =>
+      slimProjection.handleTraceLogRecordReceived(
+        {
+          occurredAt: logAtMs,
+          data: {
+            traceId: "trace-log-only",
+            spanId: "span-1",
+            body: "hello",
+            attributes: {},
+            resourceAttributes: {},
+          },
+        } as never,
+        state,
+      );
+
+    it("leaves the storage anchor at the epoch, the known 197001 defect", () => {
+      // Pins CURRENT behaviour, which is wrong-but-deliberate. OccurredAt is the
+      // partition key AND the TTL anchor, so a log-only trace commits into
+      // partition 197001 with a deadline of 1970 + retention. The fix is a
+      // storage anchor held separately from the timing baseline (ADR-071 step
+      // 3); anchoring `occurredAt` from the log instead breaks the trace's
+      // duration, which the next test pins.
+      const state = foldLogRecord(createInitSlimState());
+
+      expect(state.occurredAt).toBe(0);
+      expect(projectFromState(state).occurredAtMs).toBe(0);
+    });
+
+    describe("when a span arrives after the log", () => {
+      it("reports the span's own duration, not the gap since the log", () => {
+        // REGRESSION GUARD. `SpanTimingService` treats `occurredAt > 0` as "a
+        // span has seeded the timing baseline" and computes
+        // `currentEnd = occurredAt + totalDurationMs`. Seeding `occurredAt` from
+        // a log — whose time is the platform ACCEPT time, not producer business
+        // time — makes the first span measure from the log instead of from
+        // itself, inflating TotalDurationMs by the whole ingest lag and taking
+        // TokensPerSecond (completion tokens / duration) with it.
+        //
+        // The span here completes 1s BEFORE the log is accepted, which is the
+        // ordinary case: a producer emits its log after the work finishes.
+        const spanStart = logAtMs - 5_000;
+        const spanEnd = logAtMs - 1_000;
+
+        const state = applySpanToAnalytics({
+          state: foldLogRecord(createInitSlimState()),
+          span: createTestSpan({
+            spanId: "s-after-log",
+            parentSpanId: null,
+            startTimeUnixMs: spanStart,
+            endTimeUnixMs: spanEnd,
+            durationMs: spanEnd - spanStart,
+          }),
+        });
+
+        expect(state.totalDurationMs).toBe(spanEnd - spanStart);
+        expect(state.occurredAt).toBe(spanStart);
+      });
+
+      it("reaches the same duration whichever of the two folds first", () => {
+        // The inflation was also order-dependent, so one trace could report two
+        // different latencies depending on delivery order.
+        const spanStart = logAtMs - 5_000;
+        const spanEnd = logAtMs - 1_000;
+        const span = createTestSpan({
+          spanId: "s-order",
+          parentSpanId: null,
+          startTimeUnixMs: spanStart,
+          endTimeUnixMs: spanEnd,
+          durationMs: spanEnd - spanStart,
+        });
+
+        const logFirst = applySpanToAnalytics({
+          state: foldLogRecord(createInitSlimState()),
+          span,
+        });
+        const spanFirst = foldLogRecord(
+          applySpanToAnalytics({ state: createInitSlimState(), span }),
+        );
+
+        expect(logFirst.totalDurationMs).toBe(spanFirst.totalDurationMs);
+        expect(logFirst.occurredAt).toBe(spanFirst.occurredAt);
+      });
+    });
+  });
 });

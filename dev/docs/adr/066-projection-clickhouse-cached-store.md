@@ -212,6 +212,47 @@ Recorded here so the application-side and server-side levers are visible togethe
 - Redelivery dedup travels with the state (applied-event-id set, reset on each fresh delivery, bounded to the in-flight batch) — and, for read-back folds, persists durably next to the state row (migration 00054), so it survives cache loss.
 - **High-fan-in `event_log` producers coalesce their appends** — a batched multi-row insert per drained batch, not one insert per item. A producer where a single aggregate can mint events faster than they drain, and does not coalesce, is a part-buildup regression. Any cap on coalescing coverage is logged, not silent.
 
+## Deploying an adopter: the rollout window fails loudly and retries
+
+A read-back adopter's migration is a migration like any other: it runs when
+migrations run. `clickhouse:migrate` runs from `start:prepare:db` on the app
+pod's entrypoint; the workers Deployment runs `start:workers`. The two roll
+concurrently, so for the length of a rollout new worker code can fold against
+the old schema.
+
+Both halves then fail, deliberately:
+
+- **reads** order by columns the migration adds, so the query throws
+  `UNKNOWN_IDENTIFIER`;
+- **writes** carry `input_format_skip_unknown_fields: 0`, so the insert is
+  rejected rather than silently dropping the new columns.
+
+Failing loudly is the correct behaviour and must not be softened. The
+alternative — letting ClickHouse drop unknown columns — writes a row stamped at
+the *current* projection version with the new columns defaulted, which then
+passes the version gate and decodes as real state. That corruption launders
+itself past the very gate that exists to reject it, and nothing later rebuilds
+it. A retry storm is recoverable; that is not.
+
+Nothing further is needed, because the failure is self-limiting: jobs retry on
+the shared platform budget (25 attempts, ≈2h27m) and recover the moment the
+migration lands, which is what a retrying queue is for. `es_fold_projection_total{status="failed"}`
+shows the window if anyone wants to watch it.
+
+### A version bump re-folds during the rollout
+
+The gate is strict equality, so an old pod reading a row stamped by a new
+pod reports `undecodable` and re-folds it — and each side rewrites at its own stamp,
+so the other refuses it again until the fleet has cycled. That is inherent: an
+old build cannot be taught a stamp that did not exist when it was compiled.
+`es_fold_refold_on_miss_total{outcome="performed"}` rises for the window and
+settles afterwards.
+
+Do not soften the gate to avoid it. A build that decodes a row it does not
+understand writes a current-stamped partial state over a complete one, and that
+corruption is undetectable afterwards — which is why the executor refuses to
+fold onto an empty state when a row was found, refused, and has no re-fold path.
+
 ## References
 
 - **Behavioural contract:** [specs/event-sourcing/fold-read-back-store.feature](../../../specs/event-sourcing/fold-read-back-store.feature) (pillar 1), [specs/event-sourcing/producer-append-coalescing.feature](../../../specs/event-sourcing/producer-append-coalescing.feature) (pillar 2), [specs/event-sourcing/fold-coalescing.feature](../../../specs/event-sourcing/fold-coalescing.feature) (the shared count+byte-bounded drain both sides ride)

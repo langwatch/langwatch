@@ -668,19 +668,38 @@ export const observeEsSubscriberDuration = ({
  * - `referenced` — a job carrying a claim-check reference instead of the
  *   payload was handed off.
  *
+ * - `failed` — the filter, the stage hook or the handoff threw. The routing
+ *   path has no retry, so this subscriber's job for this event is gone.
+ *
  * `staged` and `referenced` are counted only after the handoff succeeded: the
  * queue accepted the job, or (in the no-queue configuration) the handler ran
- * inline. A handoff that throws counts no outcome at all — it is reported as a
- * dispatch failure instead, so a queue outage cannot inflate either.
+ * inline. A handoff that throws counts `failed` instead, so a queue outage
+ * cannot inflate either.
  *
- * The outcomes therefore do not sum to "events routed"; the shortfall is
- * the failure count, which is the honest reading.
+ * - `killed` — an operator disabled this subscriber for the event's tenant, so
+ *   the seam never judged relevance. Counted rather than skipped silently:
+ *   subscriber fan-out is never replayed (ADR-069), so a kill drops those
+ *   events permanently, and an operator must be able to tell a killed
+ *   subscriber from an idle one — which is exactly when they are looking.
+ *
+ * The five outcomes therefore DO sum to "events routed to this subscriber",
+ * which is what makes `failed` readable as a rate: it is the only outcome that
+ * loses work unintentionally, and it is otherwise invisible — a permanent drop
+ * that moved no series looked exactly like a quiet day. `killed` loses work
+ * too, but deliberately, which is why it is its own outcome and not `filtered`:
+ * conflating "an operator stopped this" with "the subscriber judged it
+ * irrelevant" would hide the kill behind an ordinary-looking series.
  */
-type SubscriberEnqueueOutcome = "filtered" | "staged" | "referenced";
+type SubscriberEnqueueOutcome =
+  | "filtered"
+  | "staged"
+  | "referenced"
+  | "failed"
+  | "killed";
 register.removeSingleMetric("es_subscriber_enqueue_total");
 const esSubscriberEnqueueTotal = new Counter({
   name: "es_subscriber_enqueue_total",
-  help: "Event-sourcing subscriber fan-out outcomes decided at enqueue time (ADR-069): filtered before staging, or — once the handoff to the subscriber's lane succeeded — staged as a full event or referenced as a claim-check",
+  help: "Event-sourcing subscriber fan-out outcomes decided at enqueue time (ADR-069): filtered before staging, staged as a full event or referenced as a claim-check once the handoff succeeded, failed — the retry-less routing path lost the job — or killed, an operator disabled the subscriber for that tenant",
   labelNames: ["pipeline_name", "subscriber_name", "outcome"] as const,
 });
 
@@ -1249,7 +1268,14 @@ const codingAgentSessionListReadDuration = new Histogram({
   name: "coding_agent_session_list_read_duration_milliseconds",
   help: "Duration of the coding-agent session list read, whose dedup scope scans the tenant unpruned, by table and outcome",
   labelNames: ["table", "outcome"] as const,
-  buckets: [1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000],
+  // Runs to 30s deliberately. This metric's job is to catch the unpruned scan
+  // becoming expensive enough to promote ADR-071's writer freeze from "next" to
+  // "now", and a top bucket at 5s would put exactly that degradation into
+  // `+Inf`, where a p99 cannot be resolved — the histogram would go blind at
+  // the moment it was supposed to speak.
+  buckets: [
+    1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10_000, 30_000,
+  ],
 });
 
 /**

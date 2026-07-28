@@ -166,6 +166,40 @@ describe("TraceAnalyticsClickHouseRepository tied-version read", () => {
         expect(read?.appliedEventIds).toEqual(["a", "b", "c"]);
       });
     });
+
+    describe("when the keys disagree about which version is further along", () => {
+      it("ranks by the latest folded event before any other key", async () => {
+        // Every other fixture in this suite moves all four keys the same way,
+        // so a collapsed ORDER BY — one that dropped LastEventOccurredAt, or
+        // promoted OccurredAt ASC to first — still passes them. Here the keys
+        // point at DIFFERENT rows, which is the only shape that pins the
+        // priority the query's docstring argues for.
+        const { repository } = makeOrderingRepository([
+          tiedVersion({
+            lastEventOccurredAt: "1750000000000",
+            spanCount: 12,
+            appliedEventIds: ["a", "b", "c", "d", "e"],
+            occurredAt: "2026-07-24 11:00:00.000",
+          }),
+          tiedVersion({
+            // Further along by the only key that measures fold progress...
+            lastEventOccurredAt: "1750000009999",
+            // ...and behind on every key that does not.
+            spanCount: 1,
+            appliedEventIds: ["z"],
+            occurredAt: "2026-07-24 13:00:00.000",
+          }),
+        ]);
+
+        const read = await repository.findByTraceIdWithApplied({
+          tenantId: TENANT_ID,
+          traceId: TRACE_ID,
+        });
+
+        expect(read?.row.lastEventOccurredAt).toBe(1750000009999);
+        expect(read?.appliedEventIds).toEqual(["z"]);
+      });
+    });
   });
 });
 

@@ -21,6 +21,10 @@ import type {
   LangyMessageProjectionRecord,
 } from "@langwatch/langy";
 import { createLogger } from "@langwatch/observability";
+import {
+  generateKillSwitchKey,
+  type KillSwitchComponentType,
+} from "./utils/killSwitch";
 import type { PrismaClient } from "@prisma/client";
 import type { Cluster, Redis } from "ioredis";
 import { createOrUpdateQueueItems } from "~/server/api/routers/annotation";
@@ -1486,7 +1490,7 @@ export function getProcessManagerMetadata(): ProcessManagerMetadata[] {
 export interface KillSwitchDescriptor {
   key: string;
   aggregateType: string;
-  componentType: "projection" | "mapProjection" | "command";
+  componentType: KillSwitchComponentType;
   componentName: string;
   pipelineName: string;
 }
@@ -1519,6 +1523,33 @@ export function getKillSwitchDescriptors(): KillSwitchDescriptor[] {
         aggregateType,
         componentType: "command",
         componentName: cmd.name,
+        pipelineName,
+      });
+    }
+    // Subscribers belong here MORE than the others do, not less: the enqueue
+    // seam decides relevance and DISCARDS what it judges irrelevant, and
+    // subscriber fan-out is never replayed (ADR-069), so a bad filter loses
+    // those events for good. `ops.setFeatureFlag` rejects any key that is
+    // neither a registry entry nor a live descriptor, so a switch missing from
+    // this list is not merely unlisted — it is unsettable, leaving a revert as
+    // the only way to stop the seam it guards.
+    //
+    // A subscriber may override its key via `options.killSwitch.customKey`;
+    // emit the key the router will actually read, or the page would offer one
+    // nothing consults.
+    for (const definition of def.eventSubscribers.values()) {
+      out.push({
+        // Generated, never re-spelled: the comment above is the reason. A
+        // hand-built key that drifts from `generateKillSwitchKey` is not a
+        // cosmetic mismatch — `ops.setFeatureFlag` refuses a key that is
+        // neither a registry entry nor a live descriptor, so the switch
+        // becomes unsettable.
+        key:
+          definition.options?.killSwitch?.customKey ??
+          generateKillSwitchKey(aggregateType, "subscriber", definition.name),
+        aggregateType,
+        componentType: "subscriber",
+        componentName: definition.name,
         pipelineName,
       });
     }

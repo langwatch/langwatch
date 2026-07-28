@@ -143,7 +143,19 @@ export class RedisCachedFoldStore<State>
   async getWithApplied(
     aggregateId: string,
     context: ProjectionStoreContext,
-  ): Promise<{ state: State | null; appliedEventIds: string[] }> {
+  ): Promise<{
+    state: State | null;
+    appliedEventIds: string[];
+    /**
+     * Forwarded verbatim from the durable tier. DECLARED, not incidental: every
+     * ADR-066 adopter is wrapped by this store, so the executor's decision to
+     * skip a pointless unwindowed re-read on an `undecodable` row reaches it
+     * only through here. Left undeclared it survived purely because
+     * `readDurable` happens to return the inner object unchanged, and a routine
+     * refactor to `{ state, appliedEventIds }` would have silently disabled it.
+     */
+    miss?: "absent" | "undecodable";
+  }> {
     // The executor's read-window fallback re-reads moments after its windowed
     // attempt already consulted the cache — a second Redis read is a
     // guaranteed miss that would double-count the cache and dedup metrics, so
@@ -252,7 +264,11 @@ export class RedisCachedFoldStore<State>
   private async readDurable(
     aggregateId: string,
     context: ProjectionStoreContext,
-  ): Promise<{ state: State | null; appliedEventIds: string[] }> {
+  ): Promise<{
+    state: State | null;
+    appliedEventIds: string[];
+    miss?: "absent" | "undecodable";
+  }> {
     const startedAt = performance.now();
     const result = this.inner.getWithApplied
       ? await this.inner.getWithApplied(aggregateId, context)

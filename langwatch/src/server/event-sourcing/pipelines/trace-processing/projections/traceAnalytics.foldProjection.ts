@@ -811,6 +811,41 @@ function applyLogContribution({
   return {
     ...state,
     traceId: state.traceId || contribution.traceId,
+    // KNOWN DEFECT, deliberately NOT fixed here — do not "fix" it by anchoring
+    // `occurredAt` from the log.
+    //
+    // `OccurredAt` is this table's partition key AND its TTL anchor (00039), and
+    // only spans set it. A log-only trace — Claude Code Path B, Codex Path B,
+    // which `hasPersistableSignal` deliberately persists — therefore commits its
+    // row at OccurredAt 0: partition 197001, with a TTL deadline of
+    // `1970 + retention`, i.e. expired before it was written.
+    //
+    // The obvious fix (`state.occurredAt === 0 ? contribution.occurredAtMs : …`)
+    // is WRONG, and was reverted after review. `occurredAt` is not only the
+    // storage anchor: `SpanTimingService.accumulateTiming` uses `occurredAt > 0`
+    // as its "a span has seeded the timing baseline" sentinel, and computes
+    // `currentEnd = occurredAt + totalDurationMs`. Seeding it from a log — whose
+    // time is the platform ACCEPT time, not producer business time — inflates
+    // `TotalDurationMs` by the whole ingest lag, and `SpanCostService` divides
+    // completion tokens by that same value, so `TokensPerSecond` goes with it.
+    // Worse, the result depends on whether the log or the span folds first, so
+    // one trace can report two different latencies.
+    //
+    // Nor can the sentinel simply move to `spanCount`. A span whose timestamps
+    // are unusable still increments the count — `SpanTimingService` early-returns
+    // on `!isValidTimestamp(...)` while `applySpanToAnalytics` goes on to
+    // `spanCount + 1` — so `spanCount > 0` reads as "timing seeded" when it is
+    // not, and the next real span computes `min(0, start) = 0`. Pairing it as
+    // `spanCount > 0 && occurredAt > 0` fixes that but still misreads
+    // log-then-unusable-span-then-real, where the log has set `occurredAt` and
+    // the count is non-zero yet no span has seeded the baseline.
+    //
+    // (Synthetic spans are NOT part of this: `applySpanToAnalytics` returns
+    // before the increment for them, so they leave both signals untouched.)
+    //
+    // The real fix is a storage anchor that is separate from the timing
+    // baseline — a distinct state field, persisted or derived on read-back —
+    // which is ADR-071 step 3's stated target and needs its own change.
     attributes: mergedAttributes,
     models,
     totalCost,
@@ -863,11 +898,22 @@ export class TraceAnalyticsFoldProjection
    * from a real zero, so the store reports a miss and this option rebuilds that
    * aggregate from `event_log` — once. The rebuild is rewritten at the current
    * version, so the row hits from then on and the whole population self-heals
-   * with no backfill migration. In steady state every row is current-version,
-   * `store.get()` hits, and nothing refolds. Without the gate a stale row would
+   * with no backfill migration. Without the gate a stale row would
    * silently downgrade a user-renamed trace to a late span's name, freeze a
    * fallback-named trace, and reset the MAX_PROCESSED_SPANS cap so already-
    * committed cost/tokens were counted twice.
+   *
+   * TWO CLASSES DO NOT SELF-HEAL, so `es_fold_refold_on_miss_total` cannot
+   * reach zero for this adopter:
+   *
+   *   1. A log-only trace folds `occurredAt: 0`, so its row lands in partition
+   *      `197001` already past its TTL. Reusing `occurredAt` as the storage
+   *      anchor is NOT the fix — it is `SpanTimingService`'s baseline, and
+   *      seeding it from a log inflates TotalDurationMs and TokensPerSecond by
+   *      the ingest lag. A separate anchor (ADR-071 step 3) is.
+   *   2. A dimension-only trace (topic or annotation, no span, no log record)
+   *      folds a state `hasPersistableSignal` refuses, so no row is written —
+   *      and a refold's result is refused by the same gate, so it recurs.
    *
    * `coalesceMaxBatch` — see below.
    *

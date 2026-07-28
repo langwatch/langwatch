@@ -82,8 +82,10 @@ describe("evaluation_analytics round-trip (migrations 00041 + 00056)", () => {
   describe("given a fully populated slim row", () => {
     it("reads back the lifecycle operands so the fold recovers its state", async () => {
       const row = evalRow({ evaluationId: `${tag}-rt` });
-      // upsertBatch waits for the async insert (wait_for_async_insert: 1) so the
-      // row is durably queryable; the single upsert is fire-and-forget by design.
+      // Both write paths carry `wait_for_async_insert: 1`, so the row is
+      // durably queryable once this resolves — the wait is a correctness
+      // requirement for the next delivery's read-back, not a batch-only
+      // nicety. The batch path is used here only because it is the store's.
       await repo.upsertBatch([{ row, retentionDays: 30 }]);
 
       const read = await repo.findByEvaluationIdWithApplied({

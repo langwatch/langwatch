@@ -35,10 +35,11 @@ Feature: Payload cost governs the scheduling plane
     Then work is queued for that subscriber
 
   @unit
-  Scenario: a redelivered event is not processed twice
+  Scenario: a redelivered event resolves to the unit of work already queued
     Given a relevant event already queued for the subscriber
     When the same event is published again within the deduplication window
-    Then no second unit of work is queued
+    Then it resolves to the same unit of work, so the queue recognises it as a duplicate
+    And an event on another aggregate never resolves to that same unit
 
   @unit
   Scenario: two relevant events that share no payload identity are still delivered separately
@@ -96,6 +97,23 @@ Feature: Payload cost governs the scheduling plane
     When the event is published
     Then publishing reports the failure
     And the event is not counted among the work queued
+
+  @unit
+  Scenario: work lost before it was queued is visible as lost
+    Given a subscriber that cannot decide relevance
+    When the event is published
+    Then an operator-visible count records the work as lost
+    And the counted outcomes account for every event routed to that subscriber
+
+  # --- Discarding work is reversible without a release ---
+
+  @unit
+  Scenario: a subscriber can be stopped for one tenant without a deploy
+    Given a subscriber that discards the events it considers irrelevant
+    And an operator has stopped that subscriber for one tenant
+    When an event for that tenant is published
+    Then the subscriber neither judges the event nor receives work for it
+    And no event is recorded as discarded on that tenant's behalf
 
   # --- Waiting work costs a pointer, not a payload ---
 

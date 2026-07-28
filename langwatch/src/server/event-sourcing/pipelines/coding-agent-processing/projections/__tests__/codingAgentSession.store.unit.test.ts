@@ -257,6 +257,7 @@ describe("CodingAgentSessionStore read-back gate", () => {
 
   describe("given a row stamped with the current projection version", () => {
     describe("when the fold reads it back", () => {
+      /** @scenario a stored state written under the fold's current shape is read straight back */
       it("returns the decoded state and the durable watermark", async () => {
         const repo = new FakeRepo();
         repo.withApplied = {
@@ -307,7 +308,7 @@ describe("CodingAgentSessionStore read-back gate", () => {
         };
         const store = new CodingAgentSessionStore(repo);
 
-        const { state, appliedEventIds } = await store.getWithApplied(
+        const { state, appliedEventIds, miss } = await store.getWithApplied(
           "session-1",
           context(),
         );
@@ -316,6 +317,11 @@ describe("CodingAgentSessionStore read-back gate", () => {
         // The watermark goes with the state: keeping it would suppress the very
         // events the re-fold needs to see.
         expect(appliedEventIds).toEqual([]);
+        // Asserted on the REAL store. The executor skips its unwindowed
+        // re-read on `undecodable`; without this the only test naming the
+        // value fabricated it from a mock, so deleting the discriminator
+        // here left the suite green.
+        expect(miss).toBe("undecodable");
       });
 
       it("misses through get() too, so both read paths agree", async () => {
@@ -324,6 +330,45 @@ describe("CodingAgentSessionStore read-back gate", () => {
         const store = new CodingAgentSessionStore(repo);
 
         expect(await store.get("session-1", context())).toBeNull();
+      });
+    });
+  });
+
+  describe("given a rebuilt aggregate's state committed at the current version", () => {
+    describe("when it is read back", () => {
+      /** @scenario rebuilding an aggregate once retires it from rebuilding again */
+      it("returns the committed state rather than reporting a miss", async () => {
+        const repo = new FakeRepo();
+        const store = new CodingAgentSessionStore(repo);
+
+        // Stands in for the re-fold's commit: whatever version the refused
+        // row wore, the rewrite carries the current one. The refold itself
+        // belongs to the executor and is exercised there — what matters here
+        // is that the rewritten row reads back, which is what retires it.
+        await store.store(
+          committedState(),
+          context({ appliedEventIds: ["e1", "e2"] }),
+        );
+        const written = repo.upsertCalls[0]!;
+        repo.withApplied = {
+          row: written.row,
+          appliedEventIds: [...(written.appliedEventIds ?? [])],
+        };
+
+        const { state, appliedEventIds, miss } = await store.getWithApplied(
+          "session-1",
+          context(),
+        );
+
+        // Asserted explicitly, because the executor cannot catch this one:
+        // `loadWithApplied` returns as soon as a state is present, so a
+        // result carrying BOTH a state and a miss is read as a plain success
+        // and the miss is never looked at again. A store that reported one
+        // would go unnoticed everywhere else.
+        expect(miss).toBeUndefined();
+        expect(state?.subAgentIds).toEqual(["sub-a", "sub-b"]);
+        expect(state?.previousCallContextTokens).toBe(12_000);
+        expect(appliedEventIds).toEqual(["e1", "e2"]);
       });
     });
   });

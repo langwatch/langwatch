@@ -229,6 +229,7 @@ describe("replayEvents", () => {
   });
 
   describe("when replaying resets state from init()", () => {
+    /** @scenario the event log is read only for a deliberate rebuild */
     it("always starts from init state, never loads existing", async () => {
       const { projection, storeBatchSpy } = createTestProjection();
       const events = [

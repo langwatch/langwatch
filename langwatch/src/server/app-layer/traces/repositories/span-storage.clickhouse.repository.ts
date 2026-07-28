@@ -708,7 +708,14 @@ interface ClickHouseSpanRecord {
   _retention_days: number;
 }
 
-interface FullSpanRow {
+/**
+ * The projection of `stored_spans` that {@link mapChRowToNormalized} reads.
+ * Exported so the claim-check equivalence test can drive the REAL mapping
+ * rather than a hand-built stand-in — the whole claim-check design rests on a
+ * resolved span producing the same command as the inline one, and a
+ * column-mapping regression is exactly what that contract must catch.
+ */
+export interface FullSpanRow {
   SpanId: string;
   TraceId: string;
   TenantId: string;
@@ -737,7 +744,7 @@ interface FullSpanRow {
   Links_Attributes: Record<string, unknown>[];
 }
 
-function mapChRowToNormalized(row: FullSpanRow) {
+export function mapChRowToNormalized(row: FullSpanRow) {
   return {
     id: "",
     traceId: row.TraceId,
@@ -1110,6 +1117,12 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
    * lock that keeps the optimiser engaged live in
    * SINGLE_SPAN_FETCH_SETTINGS above. The doc's "Anti-Pattern 1"
    * rule predates LazilyRead and isn't load-bearing on this shape.
+   *
+   * KNOWN MISMATCH, pre-existing: the engine's version column is `StartTime`
+   * (`ReplacingMergeTree(StartTime)`), not `UpdatedAt`. So a span re-exported
+   * with a CHANGED StartTime answers last-written-wins before a merge and
+   * largest-StartTime-wins after one. #6117 widened the blast radius by
+   * resolving claim-checks through this read, not just the UI.
    */
   private async fetchNormalizedSpanRow({
     tenantId,

@@ -1,3 +1,4 @@
+import type { FeatureFlagKey } from "../../featureFlag/registry";
 import type { Event } from "../domain/types";
 import type { DeduplicationStrategy } from "../queues/queue.types";
 
@@ -48,14 +49,34 @@ export interface EnqueueDispatchOptions<E extends Event = Event> {
    * store. Total field-picks only — no decoding, no normalization; return the
    * source event unchanged when a reference cannot be built. The handler must
    * understand every shape this can return, plus the full event (pre-upgrade
-   * jobs). Runs after `filter` accepted the event; a throw fails loudly into
-   * the routing retry.
+   * jobs). Runs after `filter` accepted the event.
+   *
+   * Same no-retry rule as `filter`: the routing path does not retry, so a throw
+   * here is reported loudly and still loses this subscriber's job for this
+   * event permanently. `stage` must be total for the same reason `filter` is.
+   *
+   * **Introducing a `stage` hook is a deploy-order dependency.** A reference is
+   * a different event type, and subscriber fan-out is never replayed, so during
+   * a rolling deploy a job staged by a new worker can be drained by one running
+   * the previous build — whose handler does not recognise the reference,
+   * returns, and *completes* the job, with no throw, no retry, no drop counter
+   * and no log. Ship the consumer half at least one release ahead of the
+   * producer half, and see ADR-069 for the exposure this leaves on upgrades
+   * that cross both in one step.
    */
   stage?: (event: E) => Event;
 }
 
 export interface EventSubscriberOptions<E extends Event = Event> {
+  /** Compile-time off switch. For a runtime one, see `killSwitch`. */
   disabled?: boolean;
+  /**
+   * Per-tenant runtime kill switch, resolved through the feature-flag service
+   * on the same `es-{aggregate}-subscriber-{name}-killswitch` convention every
+   * other dispatch path uses. Set `customKey` to share one flag across
+   * components; omit the whole option to get the derived key.
+   */
+  killSwitch?: { customKey?: FeatureFlagKey };
   delay?: number;
   deduplication?: DeduplicationStrategy<E>;
   groupKeyFn?: (event: E) => string;

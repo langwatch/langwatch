@@ -239,7 +239,16 @@ export class TraceAnalyticsClickHouseRepository
    * the only correct fallback here — the fold executor owns the miss retry (see
    * the unwindowed-inner note on {@link queryLatestVersion}), so a second
    * recovery ladder inside the repository would re-run a read the executor is
-   * about to re-issue anyway. Same shape as the trace_summaries read-back arm.
+   * about to re-issue anyway. Same FALLBACK POLICY as the trace_summaries
+   * read-back arm — but not the same cost, and the difference matters: that
+   * table is `ORDER BY (TenantId, TraceId)`, so its dedup subquery is a sort-key
+   * prefix seek, while this one is `(TenantId, OccurredAt, TraceId)` with the
+   * key third. Leaving the dedup scope unwindowed is required for correctness
+   * (see {@link queryLatestVersion}), so on this table it is a tenant-wide
+   * scan across every partition, narrowed only by the skip index — the outer
+   * window prunes the read but cannot prune the dedup. That, not the outer
+   * read, is this query's cost floor; ADR-066's "cache misses are O(one row)"
+   * describes the row count returned, not the granules opened.
    *
    * The centre/half-width round-trip is exact: fromMs/toMs are integers, so
    * their mean and half-difference are exactly representable in float64 and
@@ -265,26 +274,39 @@ export class TraceAnalyticsClickHouseRepository
       "TraceAnalyticsClickHouseRepository.findByTraceIdWithApplied",
     );
 
-    return await queryWindowed<{
-      row: TraceAnalyticsRow;
-      appliedEventIds: string[];
-    } | null>({
-      table: TABLE_NAME,
-      hintMs: window !== undefined ? (window.fromMs + window.toMs) / 2 : null,
-      ...(window !== undefined
-        ? { windowMs: (window.toMs - window.fromMs) / 2 }
-        : {}),
-      fallback: "none",
-      isEmpty: (result) => result === null,
-      run: async (fragment) =>
-        await this.queryLatestVersion({
-          tenantId,
-          traceId,
-          window: fragment
-            ? { fromMs: fragment.fromMs, toMs: fragment.toMs }
-            : undefined,
-        }),
-    });
+    try {
+      return await queryWindowed<{
+        row: TraceAnalyticsRow;
+        appliedEventIds: string[];
+      } | null>({
+        table: TABLE_NAME,
+        hintMs: window !== undefined ? (window.fromMs + window.toMs) / 2 : null,
+        ...(window !== undefined
+          ? { windowMs: (window.toMs - window.fromMs) / 2 }
+          : {}),
+        fallback: "none",
+        isEmpty: (result) => result === null,
+        run: async (fragment) =>
+          await this.queryLatestVersion({
+            tenantId,
+            traceId,
+            window: fragment
+              ? { fromMs: fragment.fromMs, toMs: fragment.toMs }
+              : undefined,
+          }),
+      });
+    } catch (error) {
+      // Logged with its identifiers, like every other read in this file.
+      // `queryWindowed` counts the error and rethrows but knows nothing about
+      // the row, so without this the deploy window ADR-066 documents — workers
+      // rolling ahead of migration 00056, every read throwing
+      // UNKNOWN_IDENTIFIER — surfaces as an untraceable line.
+      logger.error(
+        { tenantId, traceId, error },
+        "Failed to read back trace analytics row",
+      );
+      throw error;
+    }
   }
 
   /**
@@ -328,11 +350,19 @@ export class TraceAnalyticsClickHouseRepository
    *      that saw the same latest event time, more spans folded = more complete.
    *   3. `length(AppliedEventIds) DESC` — more deliveries absorbed. Last of the
    *      three because the watermark is a bounded ring, so it saturates.
-   *   4. `OccurredAt ASC` — a total order for the fully-tied case, and the
-   *      correct direction: OccurredAt is min(span start) and only ever
-   *      DECREASES as earlier spans land late, so the smallest is the
-   *      best-informed. Reading the array length costs only its offsets column,
-   *      and every other key is a scalar already in the row.
+   *   4. `OccurredAt ASC` — a deterministic last-resort tie-break, and nothing
+   *      more. It is here only to make the ordering TOTAL so the fully-tied case
+   *      resolves the same way on every execution instead of arbitrarily. ASC is
+   *      chosen for stability, NOT because a smaller value is better informed:
+   *      `OccurredAt` is a `min(span start)` only while a live aggregate keeps
+   *      reading its own state back, and a read-back miss re-runs `init()` and
+   *      re-stamps it from the next event, which can be LARGER than the value
+   *      already persisted. It moves in both directions, so its direction says
+   *      nothing about which version folded more (ADR-071 — the same reason no
+   *      bound on it is safe inside a dedup scope).
+   *
+   * Reading the array length costs only its offsets column, and every other key
+   * is a scalar already in the row.
    */
   private async queryLatestVersion({
     tenantId,
