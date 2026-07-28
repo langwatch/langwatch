@@ -2,8 +2,10 @@
 
 **Date:** 2026-07-21
 
-**Status:** Accepted (amended 2026-07-22 — see "Amendment: one decision point,
-enforced" for what shipped and what turned out to be wrong)
+**Status:** Accepted
+
+**Amended:** 2026-07-22 — see "Amendment: one decision point, enforced" below for
+what shipped and what turned out to be wrong.
 
 **Builds on:** the `@langwatch/langy/cards` contract (one card per result
 *shape*, shared by the CLI and the Langy panel so the two can never disagree

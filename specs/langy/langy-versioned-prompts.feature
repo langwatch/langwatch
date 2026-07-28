@@ -46,6 +46,18 @@ Feature: Langy's prompts are stored and versioned in the prompt registry
     Then Langy reuses the registry text it last read successfully
     And it does not swap back to the in-repo copy mid-conversation
 
+  # Reusing the last good text must not outlive the row it came from. Removing a
+  # promoted version is a deliberate act, and the removal has to stick: if a
+  # later blip could bring the old wording back, an operator could not rely on
+  # having withdrawn it.
+  @unit
+  Scenario: Withdrawing a promoted version is not undone by a later read failure
+    Given a Langy turn has already run from a promoted registry version
+    And that version is then withdrawn
+    When a later registry read fails
+    Then Langy uses the in-repo copy
+    And the withdrawn wording is not served again
+
   @unit
   Scenario: An empty or blank registry prompt is treated as a miss
     Given a Langy prompt row exists but its prompt text is blank

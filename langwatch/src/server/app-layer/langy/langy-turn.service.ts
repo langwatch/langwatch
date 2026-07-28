@@ -107,8 +107,20 @@ export interface ResolvedLangyTurnOverride {
  * the model's system instructions AND pay a full prefix rewrite at the write
  * premium — a transient blip mutating a live conversation.
  *
- * Only a read ERROR reuses it. A genuine MISS (row demoted or deleted) is an
- * operator decision, so it falls through to the in-repo constant as intended.
+ * The full matrix, and only a read ERROR reuses this:
+ *
+ *  - `registry` — a promoted row was read: use it, and STORE it as last-good.
+ *  - `fallback` — a genuine miss (row demoted, deleted or blank): use the
+ *    in-repo constant, and CLEAR last-good. The clear is the load-bearing half:
+ *    without it the text an operator deliberately removed stays held for the
+ *    life of the process, and the next transient read failure serves it back
+ *    out of this cache — resurrecting demoted content indefinitely.
+ *  - `error`    — a transient failure: reuse last-good if we hold one, else the
+ *    in-repo constant.
+ *
+ * So the cache only ever holds text the registry is currently serving, and a
+ * demotion is honoured from the turn that observed it onwards — not just on
+ * that one call.
  */
 let lastRegistryOverrideText: string | null = null;
 
@@ -149,9 +161,15 @@ async function resolveLangyTurnOverride(
     lastRegistryOverrideText = resolved.text;
     return { text: resolved.text, source: "registry" };
   }
-  if (resolved.source === "error" && lastRegistryOverrideText !== null) {
-    return { text: lastRegistryOverrideText, source: "cached" };
+  if (resolved.source === "error") {
+    if (lastRegistryOverrideText !== null) {
+      return { text: lastRegistryOverrideText, source: "cached" };
+    }
+    return { text: resolved.text, source: "fallback" };
   }
+  // A genuine miss: the row is gone, demoted or blank. Drop the held text so a
+  // later blip cannot serve back what the operator removed.
+  lastRegistryOverrideText = null;
   return { text: resolved.text, source: "fallback" };
 }
 

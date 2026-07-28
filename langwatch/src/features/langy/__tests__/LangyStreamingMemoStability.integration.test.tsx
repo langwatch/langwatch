@@ -117,55 +117,11 @@ vi.mock("~/components/Markdown", () => ({
 
 vi.mock("@paper-design/shaders-react", () => ({ MeshGradient: () => null }));
 
-vi.mock("~/utils/api", () => {
-  const trpcUtils = {
-    langy: {
-      list: {
-        getData: () => undefined,
-        setData: () => undefined,
-        getInfiniteData: () => undefined,
-        setInfiniteData: () => undefined,
-        cancel: () => Promise.resolve(),
-        invalidate: () => Promise.resolve(),
-      },
-      messages: { invalidate: () => Promise.resolve() },
-      detail: { setData: () => undefined },
-    },
-    langyGithub: { getInstallStatus: { invalidate: () => Promise.resolve() } },
-  };
-
-  const idleQuery = () => ({
-    data: undefined,
-    isLoading: false,
-    isInitialLoading: false,
-    isFetching: false,
-    isPreviousData: false,
-    isFetched: true,
-    isError: false,
-    error: null,
-    refetch: () => Promise.resolve(),
-  });
-  const noopMutation = () => ({
-    mutate: () => undefined,
-    mutateAsync: () => Promise.resolve(),
-    isPending: false,
-  });
-  const routerProxy: unknown = new Proxy(
-    {},
-    {
-      get: (_target, prop) => {
-        if (prop === "useQuery" || prop === "useInfiniteQuery") return idleQuery;
-        if (prop === "useMutation") return noopMutation;
-        if (prop === "useSubscription") return () => undefined;
-        return routerProxy;
-      },
-    },
+vi.mock("~/utils/api", async () => {
+  const { createTrpcUtils, idleQuery, withFallback } = await import(
+    "./support/langyApiMock"
   );
-  const withFallback = (explicit: Record<string, unknown>) =>
-    new Proxy(explicit, {
-      get: (target, prop) =>
-        prop in target ? target[prop as string] : (routerProxy as never),
-    });
+  const trpcUtils = createTrpcUtils();
 
   return {
     api: withFallback({

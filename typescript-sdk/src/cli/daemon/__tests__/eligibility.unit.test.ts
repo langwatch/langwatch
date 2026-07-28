@@ -411,11 +411,23 @@ describe("stdinCarriesData", () => {
       }
     });
 
-    it("reports a closed descriptor as carrying nothing rather than throwing", () => {
-      const fd = fs.openSync("/dev/null", "r");
-      fs.closeSync(fd);
+    it("reports a descriptor nothing is open on as carrying nothing rather than throwing", () => {
+      // NOT open-then-close: fd numbers are recycled lowest-first, so anything
+      // the runner opens between the close and the fstat lands on that same
+      // number and the assertion starts measuring an unrelated file — a failure
+      // with no relation to the code under test. A number far above what a
+      // process this size ever allocates is never handed out, so the fstat can
+      // only answer EBADF: exactly what a closed descriptor answers.
+      const neverAllocated = 4096;
 
-      expect(stdinCarriesData(fd)).toBe(false);
+      // Pin the premise, so a machine that somehow DID have this descriptor
+      // open says so plainly instead of failing the real assertion obscurely —
+      // and so the case below can never quietly become vacuous.
+      expect(() => fs.fstatSync(neverAllocated)).toThrow(
+        expect.objectContaining({ code: "EBADF" }),
+      );
+
+      expect(stdinCarriesData(neverAllocated)).toBe(false);
     });
   });
 });

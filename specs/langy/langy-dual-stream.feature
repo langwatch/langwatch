@@ -230,24 +230,24 @@ Feature: Langy dual-stream — a raw token fast-path beside the durable event-so
   # state — a silent hang with no error surfaced to the user.
   @unit
   Scenario: A turn that cannot be signed is refused instead of hanging
-    Given the conversation's runToken cannot be read because the store is unavailable
+    Given the conversation's credentials cannot be read because the store is unavailable
     When the user sends a message
-    Then the turn is refused with an agent-unavailable error
-    And no worker is dispatched
+    Then the turn fails straight away with an agent-unavailable error
+    And no answer ever starts streaming
 
   @unit
-  Scenario: A conversation carrying no runToken cannot start an unsignable turn
-    Given the conversation has no runToken recorded
+  Scenario: A conversation whose credentials are missing cannot start a turn
+    Given a conversation with no credentials recorded for its turns
     When the user sends a message
-    Then the turn is refused with an agent-unavailable error
-    And no worker is dispatched
+    Then the turn fails straight away with an agent-unavailable error
+    And no answer ever starts streaming
 
   @unit
-  Scenario: The worker is never handed an empty signing key
-    Given the conversation's runToken resolves to an empty value
+  Scenario: A conversation whose credentials read back blank cannot start a turn
+    Given the conversation's credentials read back blank
     When the user sends a message
-    Then the turn is refused before dispatch
-    And the worker never receives an empty signing key
+    Then the turn fails straight away with an agent-unavailable error
+    And the user is never left watching a turn that produces nothing
 
   # The durable token buffer used to hold tokens until ~64 words accumulated,
   # so short answers rendered nothing until the turn was nearly over.

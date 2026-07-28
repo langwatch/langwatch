@@ -136,7 +136,16 @@ describe("daemon over a unix socket", () => {
   /** A real listening unix socket at `at`, secured the way a daemon secures its own. */
   const bindSocket = async (at: string): Promise<net.Server> => {
     const bound = net.createServer();
-    await new Promise<void>((resolve) => bound.listen(at, resolve));
+    await new Promise<void>((resolve, reject) => {
+      // Without this listener an EADDRINUSE or ENAMETOOLONG from listen()
+      // neither resolves nor rejects, and the test dies on the vitest timeout
+      // with the actual cause reported nowhere.
+      bound.once("error", reject);
+      bound.listen(at, () => {
+        bound.removeListener("error", reject);
+        resolve();
+      });
+    });
     secureSocketFile(at);
     return bound;
   };

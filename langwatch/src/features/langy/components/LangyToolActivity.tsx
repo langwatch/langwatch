@@ -718,15 +718,27 @@ export function LangyActivityParts({
   ].sort((left, right) => left.order - right.order);
 
   return (
-    // `role="log"` is what makes the rest of this readable to assistive tech.
-    // A VStack is a plain div, whose implicit role is `generic` — and
-    // `aria-label` is prohibited there, so without a role the name is dropped
-    // and the whole transcript is anonymous and silent: neither the running
-    // indicator nor the red `role="alert"` failure card announces itself, and
-    // the reader has to go looking. `log` (polite by default) is the right one
-    // for a running record where new entries are appended at the end, which is
-    // exactly what a turn's activity is. Every sibling line in the column
-    // already carries `role="status" aria-live="polite"` for the same reason.
+    // `role="log"` is what makes this column readable to assistive tech. A
+    // VStack is a plain div, whose implicit role is `generic` — and `aria-label`
+    // is prohibited there, so without a role the name is dropped and the column
+    // is an anonymous stack: a reader who lands on the running indicator or on
+    // the red failure card gets the line but nothing saying what region it came
+    // from, and appended entries go unannounced. `log` (polite by default) is
+    // the right role for a running record whose entries are appended at the
+    // end, which is exactly what a turn's activity is.
+    //
+    // The settled rows below — CompletedActivityBatch, CapabilityBatchRow,
+    // FailedToolCallRow — deliberately carry no live-region attributes: `log`
+    // already announces an appended entry politely, and a nested `role="status"`
+    // on a row that only ever arrives by being appended would make some screen
+    // readers say it twice. So the rule for anything nested in here is: add a
+    // live region only when it earns one independently — because it updates IN
+    // PLACE rather than being appended (LangyCapabilityPendingCard's running
+    // headline, which is also rendered outside this column), or because it is
+    // assertive and announces wherever it sits (LangyToolErrorCard's
+    // `role="alert"`). The status lines beside this column
+    // (StreamingStatusLine, LangyThinkingLine, LangyRecoveringLine) sit OUTSIDE
+    // it, which is why each of those owns its own `role="status"`.
     <VStack align="stretch" gap={2} role="log" aria-label="Langy activity">
       {rows.map((row) => (
         <Fragment key={row.key}>{row.node}</Fragment>

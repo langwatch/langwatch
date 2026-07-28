@@ -35,7 +35,7 @@ type OrgScopedModelConfig = {
  * bounded by such a name reaches platform-owned rows only — never a customer's.
  * Matched exactly: no `contains`/`startsWith`, which would widen the reach.
  */
-const isSystemManagedKeyName = (value: any): boolean =>
+const isSystemManagedKeyName = (value: unknown): boolean =>
   typeof value === "string" && HIDDEN_SYSTEM_KEY_NAMES.includes(value);
 
 /**
@@ -54,8 +54,11 @@ const isSystemManagedKeyName = (value: any): boolean =>
  * `=== null` is deliberate: the sweep writes the literal, and accepting
  * `{ not: ... }`-style matchers here would give back the width just removed.
  */
-const isSystemManagedKeySweep = (clause: any): boolean =>
-  isSystemManagedKeyName(clause?.name) && clause?.revokedAt === null;
+const isSystemManagedKeySweep = (clause: unknown): boolean => {
+  if (!clause || typeof clause !== "object") return false;
+  const where = clause as Record<string, unknown>;
+  return isSystemManagedKeyName(where.name) && where.revokedAt === null;
+};
 
 const isNonEmptyStringList = (value: any): boolean =>
   value &&

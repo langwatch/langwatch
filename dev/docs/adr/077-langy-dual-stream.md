@@ -4,7 +4,14 @@
 
 **Status:** Accepted
 
-**Builds on:** ADR-044 (Langy event-driven turns: out-of-band spawn + Redis token
+> **Note on a retired ADR.** The event-driven-turns design was written as
+> ADR-043, renumbered to ADR-044, and then removed from the tree without a
+> successor; ADR-046 explicitly scopes the Redis token buffer OUT of itself.
+> Number 044 now belongs to scheduled-reports automation, so citing it here
+> would point at an unrelated document. The design lives in the code:
+> `langwatch/src/server/app-layer/langy/streaming/` and `services/langyagent/`.
+
+**Builds on:** the event-driven-turns design (out-of-band spawn + Redis token
 buffer + liveness), ADR-046 (event-sourced Langy conversations: durable
 `message_sent`/`tool_call_*`/`turn_finalized` + `langy_conversation_updated`
 broadcast + ephemeral status/progress), ADR-047 (hexagonal Go manager). Does
@@ -12,7 +19,7 @@ broadcast + ephemeral status/progress), ADR-047 (hexagonal Go manager). Does
 
 ## Context
 
-Langy's live answer reaches the browser today through **one** path (ADR-044):
+Langy's live answer reaches the browser today through **one** path:
 
 ```
 opencode → manager /chat (ndjson) → runTurn (worker) → Redis token buffer
@@ -45,7 +52,7 @@ smoothness.
 
 ### Stream A — durable / event-sourced (the truth). Unchanged.
 
-Everything in ADR-044/046 stays exactly as is: the token buffer, the
+Everything in the event-driven-turns design and ADR-046 stays exactly as is: the token buffer, the
 `useChat` bridge, `useLangyFreshness` / `useLangyTurnSignals`, the
 `langy_conversation_updated` broadcast, and `turn_finalized` as the
 authoritative final answer. Stream A renders tool-call cards, progress, and the

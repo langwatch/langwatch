@@ -4,7 +4,7 @@
 
 **Status:** Accepted
 
-**Builds on:** ADR-044 (event-driven turns: Redis token buffer + liveness),
+**Builds on:** the event-driven-turns design (Redis token buffer + liveness),
 ADR-046 (event-sourced conversations: the `langy_conversation` aggregate, the
 `agent_responded` terminal, the one-terminal-per-turn idempotency slot), ADR-077
 (dual-stream + "the buffered tail is the resume state"), ADR-049 (Postgres

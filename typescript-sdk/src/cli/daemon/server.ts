@@ -156,28 +156,42 @@ export interface FileIdentity {
 }
 
 /**
- * What `filePath` points at right now, or null if nothing does.
+ * What NAME `filePath` is right now, or null if nothing holds it.
  *
- * `stat` first, then `lstat`. The fallback is the DANGLING SYMLINK case, and it
- * is load-bearing rather than defensive: a symlink whose target is gone is a
- * name that exists (`link(2)` and `bind(2)` both fail EEXIST/EADDRINUSE on it)
- * while `stat` reports nothing at all. With only the `stat` branch,
- * `cleanStaleSocket` identified no corpse, unlinked nothing, and every daemon
- * from then on died at `publishSocket` with EEXIST — which `daemon.ts` reads as
- * "we lost a start race" and swallows in silence. One dangling link wedged the
- * daemon permanently, with no output on any invocation, forever.
+ * `lstat`, never `stat`, because the question every caller here is really
+ * asking is "what would `unlink(2)` remove, and does `link(2)`/`bind(2)` find
+ * this name taken?" — both of which are answered by the directory ENTRY, not by
+ * whatever it may resolve to.
  *
- * Identifying the LINK ITSELF is the right answer for `unlinkIfSameFile` too:
- * `unlink(2)` removes the link, never the target, so the link's own (dev, ino)
- * is exactly the file that call deletes. And the two branches cannot be
- * confused across time — a link that gains a target, or loses one, between the
- * identify and the unlink reports a different inode and the guard declines.
+ * That matters in two ways, and only `lstat` gets both right:
+ *
+ *   - A DANGLING SYMLINK is a name that exists (`link(2)` and `bind(2)` fail
+ *     EEXIST/EADDRINUSE on it) while `stat` reports nothing at all. Under
+ *     `stat`, `cleanStaleSocket` identified no corpse, unlinked nothing, and
+ *     every daemon from then on died at `publishSocket` with EEXIST — which
+ *     `daemon.ts` reads as "we lost a start race" and swallows in silence. One
+ *     dangling link wedged the daemon permanently, with no output on any
+ *     invocation, forever.
+ *   - A LIVE SYMLINK is the mirror image. `stat` succeeds there, so the
+ *     identity recorded is the TARGET's — but `unlink(2)` removes the link and
+ *     never the target, so `unlinkIfSameFile` would be guarding an inode the
+ *     call it authorises does not touch. Two different links to one target
+ *     compare equal; one link repointed between the identify and the unlink
+ *     compares unequal. Both answers are wrong, in opposite directions.
+ *
+ * `lstat` collapses the two into one rule: the link's own (dev, ino) is exactly
+ * the file `unlink(2)` deletes, and a name that gains a target, or loses one,
+ * between the identify and the unlink still reports the same inode — because
+ * the entry itself did not change. `lstat` also succeeds everywhere `stat` does
+ * (plus on symlink loops, where `stat` returns ELOOP), so nothing is lost.
+ *
+ * Neither the socket nor the staging path is ever a symlink of OUR making; the
+ * symlink cases are debris `inspectSocketTrust` classifies as
+ * `socket-not-a-socket` and this module then has to be able to clean up.
  */
 function identifyFile(filePath: string): FileIdentity | null {
   try {
-    const stat =
-      fs.statSync(filePath, { throwIfNoEntry: false }) ??
-      fs.lstatSync(filePath, { throwIfNoEntry: false });
+    const stat = fs.lstatSync(filePath, { throwIfNoEntry: false });
     return stat ? { dev: stat.dev, ino: stat.ino } : null;
   } catch {
     // A path we cannot even stat is certainly not one we may delete.

@@ -10,9 +10,15 @@
  */
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import * as fs from "node:fs";
+// The mock factory below needs the module's type. A top-level `import type`
+// gives it that without an inline `import()` annotation: the CLI's exception
+// for inline imports covers load-bearing LAZY RUNTIME imports that keep the
+// boot graph small, not a type argument, which costs nothing to hoist.
+import type * as NodeFs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 
+import { MAX_STAGING_OVERHEAD_BYTES } from "../identity";
 import {
   DaemonAlreadyRunningError,
   publishSocket,
@@ -25,7 +31,7 @@ const { refuseLink } = vi.hoisted(() => ({
 }));
 
 vi.mock("node:fs", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("node:fs")>();
+  const actual = await importOriginal<typeof NodeFs>();
   const linkSync: typeof actual.linkSync = (existingPath, newPath) => {
     if (refuseLink.code === null) {
       actual.linkSync(existingPath, newPath);
@@ -40,8 +46,13 @@ vi.mock("node:fs", async (importOriginal) => {
   return { ...actual, default: { ...actual, linkSync }, linkSync };
 });
 
+/**
+ * The identity the production code records, reproduced here: `lstat`, so a
+ * symlink is identified as the LINK — the file `unlink(2)` would remove — and
+ * not as whatever it points at. Identical to `stat` for every plain file below.
+ */
 const identify = (filePath: string): { dev: number; ino: number } => {
-  const stat = fs.statSync(filePath);
+  const stat = fs.lstatSync(filePath);
   return { dev: stat.dev, ino: stat.ino };
 };
 
@@ -112,6 +123,42 @@ describe("unlinkIfSameFile", () => {
       });
     });
   });
+
+  /**
+   * A LIVE symlink is the case `stat` gets quietly wrong. `stat` succeeds on
+   * it, so the identity recorded is the TARGET's inode — while `unlink(2)`
+   * removes the LINK. The guard would then be authorising a removal against an
+   * inode the removal does not touch, which is wrong in both directions: two
+   * different links to one target compare equal, and one link repointed between
+   * the identify and the unlink compares unequal.
+   */
+  describe("given a live symlink standing where the socket should be", () => {
+    let target: string;
+    let link: string;
+
+    beforeEach(() => {
+      target = path.join(dir, "target");
+      fs.writeFileSync(target, "target");
+      link = path.join(dir, "live.sock");
+      fs.symlinkSync(target, link);
+    });
+
+    describe("when the recorded identity is the target's, as `stat` would report it", () => {
+      it("declines, because that is not the file the unlink would remove", () => {
+        expect(unlinkIfSameFile(link, identify(target))).toBe(false);
+        expect(fs.lstatSync(link).isSymbolicLink()).toBe(true);
+      });
+    });
+
+    describe("when the recorded identity is the link's own", () => {
+      it("removes the link and leaves its target alone, which is what unlink(2) does", () => {
+        expect(unlinkIfSameFile(link, identify(link))).toBe(true);
+
+        expect(fs.lstatSync(link, { throwIfNoEntry: false })).toBeUndefined();
+        expect(fs.readFileSync(target, "utf8")).toBe("target");
+      });
+    });
+  });
 });
 
 describe("stagingSocketPath", () => {
@@ -129,11 +176,17 @@ describe("stagingSocketPath", () => {
         // The staging path is the one handed to bind(), so it — not the shared
         // path — is what has to fit. Worst case is the longest pid a platform
         // can issue (7 digits on Linux) standing in for `.sock`.
+        //
+        // Asserted against the CONSTANT, not a literal 3: that constant is the
+        // allowance `daemonSocketDir` and `isDaemonSocketPathUsable` reserve, so
+        // a literal here would keep passing after somebody widened the budget
+        // (8-digit pids, say) and left this — the one test that measures the
+        // real overhead — checking a number nothing else uses any more.
         const widest = stagingSocketPath(shared, 4194304);
 
         expect(
           Buffer.byteLength(widest, "utf8") - Buffer.byteLength(shared, "utf8"),
-        ).toBeLessThanOrEqual(3);
+        ).toBeLessThanOrEqual(MAX_STAGING_OVERHEAD_BYTES);
       });
     });
 

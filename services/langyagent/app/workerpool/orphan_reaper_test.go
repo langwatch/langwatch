@@ -2,8 +2,10 @@ package workerpool
 
 import (
 	"context"
+	"errors"
 	"io"
 	"os/exec"
+	"sync"
 	"testing"
 	"time"
 )
@@ -14,15 +16,24 @@ import (
 // watcher and can reap a worker before cmd.Wait() sees it — turning a clean
 // exit into "waitid: no child processes" and discarding the real exit status.
 func TestStartOrphanReaper_DoesNotStartOffPID1(t *testing.T) {
-	if started := startReaperForTest(t, 4242); started {
+	if started, _ := startReaperForTest(t, 4242); started {
 		t.Fatal("reaper started off PID 1; it would race cmd.Wait() for the pool's own workers")
 	}
 }
 
 func TestStartOrphanReaper_StartsOnPID1(t *testing.T) {
-	if started := startReaperForTest(t, 1); !started {
+	started, stop := startReaperForTest(t, 1)
+	if !started {
 		t.Fatal("reaper did not start as PID 1; orphaned opencode children would leak")
 	}
+	// Tear the loop down HERE, inside the body, rather than leaving it to the
+	// t.Cleanup safety net: cleanups run only after the body returns, so between
+	// those two points a live Wait4(-1, ...) is armed in this process while the
+	// framework is free to move on. That window is a hazard for whatever runs
+	// next under any ordering — a -run filter's next test, a parallel test, a
+	// child either of them spawns. Stopping here makes the SIGCHLD handler's
+	// lifetime strictly shorter than this test's.
+	stop()
 }
 
 // The regression itself: with the gate in place, a child's exit status is still
@@ -30,7 +41,9 @@ func TestStartOrphanReaper_StartsOnPID1(t *testing.T) {
 // merely can win — it wins every time, leaving cmd.Wait() with ECHILD instead of
 // the true exit code.
 func TestStartOrphanReaper_LeavesChildExitStatusToTheSpawner(t *testing.T) {
-	startReaperForTest(t, 4242)
+	if started, _ := startReaperForTest(t, 4242); started {
+		t.Fatal("reaper armed off PID 1; this test's premise is that the gate declined")
+	}
 
 	cmd := exec.Command("sh", "-c", "exit 7")
 	// stdout is the exit signal: sh's fds close when it exits, so reading to EOF
@@ -62,7 +75,7 @@ func TestStartOrphanReaper_LeavesChildExitStatusToTheSpawner(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected a non-zero exit, got success")
 	}
-	if !asExitError(err, &exitErr) {
+	if !errors.As(err, &exitErr) {
 		t.Fatalf("exit status was stolen before cmd.Wait() observed it: %v", err)
 	}
 	if got := exitErr.ExitCode(); got != 7 {
@@ -70,33 +83,33 @@ func TestStartOrphanReaper_LeavesChildExitStatusToTheSpawner(t *testing.T) {
 	}
 }
 
-// startReaperForTest arms the reaper under the given pid and ties the goroutine's
-// lifetime to the test. Context cancellation alone is async and the goroutine's
-// signal.Stop is deferred, so without waiting on the done channel a live SIGCHLD
-// handler leaks into whichever test runs next (Go runs them in source order) and
-// reaps that test's children out from under it.
-func startReaperForTest(t *testing.T, pid int) bool {
+// startReaperForTest arms the reaper under the given pid. It reports whether the
+// loop armed, plus an idempotent stop that cancels the context and blocks until
+// the goroutine is fully gone — its signal.Stop has already run by then, so
+// after stop returns no SIGCHLD handler of ours is installed.
+//
+// stop is also registered as a t.Cleanup so an early t.Fatal cannot leak a live
+// handler, but a test that arms the loop should call it explicitly: a cleanup
+// runs after the body returns, which is late enough for the handler to overlap
+// whatever the framework does next.
+func startReaperForTest(t *testing.T, pid int) (started bool, stop func()) {
 	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
 	started, done := startOrphanReaper(ctx, pid)
-	t.Cleanup(func() {
-		cancel()
-		if !started {
-			return
-		}
-		select {
-		case <-done:
-		case <-time.After(5 * time.Second):
-			t.Error("reaper goroutine did not stop after cancellation")
-		}
-	})
-	return started
-}
-
-func asExitError(err error, target **exec.ExitError) bool {
-	if e, ok := err.(*exec.ExitError); ok {
-		*target = e
-		return true
+	var once sync.Once
+	stop = func() {
+		once.Do(func() {
+			cancel()
+			if done == nil {
+				return
+			}
+			select {
+			case <-done:
+			case <-time.After(5 * time.Second):
+				t.Error("reaper goroutine did not stop after cancellation")
+			}
+		})
 	}
-	return false
+	t.Cleanup(stop)
+	return started, stop
 }

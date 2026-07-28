@@ -157,6 +157,11 @@ vi.mock("@paper-design/shaders-react", () => ({
 
 vi.mock("~/utils/api", async () => {
   const React = await import("react");
+  // The inert default for every router this suite does not speak for; only the
+  // stale-read `messages.useQuery` below is this file's own business.
+  const { createTrpcUtils, idleQuery, withFallback } = await import(
+    "./support/langyApiMock"
+  );
 
   const useHistoryQuery = (enabled: boolean) => {
     React.useSyncExternalStore(
@@ -206,54 +211,7 @@ vi.mock("~/utils/api", async () => {
     };
   };
 
-  const trpcUtils = {
-    langy: {
-      list: {
-        getData: () => undefined,
-        setData: () => undefined,
-        getInfiniteData: () => undefined,
-        setInfiniteData: () => undefined,
-        cancel: () => Promise.resolve(),
-        invalidate: () => Promise.resolve(),
-      },
-      messages: { invalidate: () => Promise.resolve() },
-      detail: { setData: () => undefined },
-    },
-    langyGithub: { getInstallStatus: { invalidate: () => Promise.resolve() } },
-  };
-
-  const idleQuery = () => ({
-    data: undefined,
-    isLoading: false,
-    isInitialLoading: false,
-    isFetching: false,
-    isPreviousData: false,
-    isFetched: true,
-    isError: false,
-    error: null,
-    refetch: () => Promise.resolve(),
-  });
-  const noopMutation = () => ({
-    mutate: () => undefined,
-    mutateAsync: () => Promise.resolve(),
-    isPending: false,
-  });
-  const routerProxy: unknown = new Proxy(
-    {},
-    {
-      get: (_target, prop) => {
-        if (prop === "useQuery" || prop === "useInfiniteQuery") return idleQuery;
-        if (prop === "useMutation") return noopMutation;
-        if (prop === "useSubscription") return () => undefined;
-        return routerProxy;
-      },
-    },
-  );
-  const withFallback = (explicit: Record<string, unknown>) =>
-    new Proxy(explicit, {
-      get: (target, prop) =>
-        prop in target ? target[prop as string] : (routerProxy as never),
-    });
+  const trpcUtils = createTrpcUtils();
 
   const explicitApi: Record<string, unknown> = {
     langy: withFallback({

@@ -580,16 +580,18 @@ function clearDraftFor(
 }
 
 /**
- * Push a lens's saved filter into the filter store without surfacing a
- * parse error if the saved text is corrupt (falls back to empty). Imperative
- * one-way write — viewStore never subscribes to filterStore.
+ * Push a lens's saved filter into the filter store. Imperative one-way write —
+ * viewStore never subscribes to filterStore.
+ *
+ * Corrupt saved text does not surface a parse error to the user, but that
+ * fallback belongs to `setFilterFromLens`, which returns an empty AST when
+ * `safeParseAndSerialize` reports a parse error. It does not throw, so there is
+ * nothing here to catch: a `try`/`catch` around this call would only swallow a
+ * real, unexpected failure to install the lens's filter — leaving the user on
+ * the previous lens's filter with no indication anything went wrong.
  */
 function applyFilterTextFromLens(text: string): void {
-  try {
-    useFilterStore.getState().setFilterFromLens(text);
-  } catch {
-    // filterStore unavailable (e.g. SSR boot) — safe to skip.
-  }
+  useFilterStore.getState().setFilterFromLens(text);
 }
 
 /**
@@ -622,11 +624,7 @@ function dropKeysetCursorsIfSortChanged(
   ) {
     return;
   }
-  try {
-    useFilterStore.getState().resetPagination();
-  } catch {
-    // filterStore unavailable (e.g. SSR boot) — safe to skip.
-  }
+  useFilterStore.getState().resetPagination();
 }
 
 const initialDismissedBuiltIns = loadDismissedBuiltInIds();

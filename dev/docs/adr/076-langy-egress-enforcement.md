@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-10
 
-**Status:** Accepted (implemented)
+**Status:** Accepted
 
 > **Implemented.** This was PR4-of-4 in the Langy egress-hardening series and
 > was written docs-only, blocked on PR3's seam. That seam landed and the rungs

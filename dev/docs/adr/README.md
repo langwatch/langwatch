@@ -46,10 +46,10 @@ Document **important technical and architectural decisions** — context, trade-
 | [068](./068-windowed-clickhouse-reads.md)                         | One windowed ClickHouse read with a measured fallback (`queryWindowed`)                      | Accepted                                          |
 | [069](./069-payload-cost-doctrine.md)                             | Payload cost is a scheduling input — extraction at ingest, byte bounds, memory by grant     | Accepted                                          |
 | [071](./071-coding-agent-session-immutable-storage-anchor.md)     | A storage anchor is immutable and platform-assigned — take the moving column out of the dedup scope | Accepted                                  |
-| [076](./076-langy-egress-enforcement.md)                          | Langy egress enforcement — monitor first, enforce last                                      | Accepted (implemented)                            |
+| [076](./076-langy-egress-enforcement.md)                          | Langy egress enforcement — monitor first, enforce last (implemented)                        | Accepted                                          |
 | [077](./077-langy-dual-stream.md)                                 | Langy dual-stream — raw token fast-path alongside the durable event-sourced stream          | Accepted                                          |
 | [078](./078-langy-user-turn-controls.md)                          | Langy user-initiated turn controls — stop for real, continue, resume-on-refresh             | Accepted                                          |
-| [079](./079-card-selection-is-deterministic.md)                   | Card selection is deterministic — the model supplies data, never presentation               | Accepted (amended 2026-07-22)                     |
+| [079](./079-card-selection-is-deterministic.md)                   | Card selection is deterministic — the model supplies data, never presentation (amended 2026-07-22) | Accepted                                          |
 
 ## When to Write an ADR
 

@@ -729,7 +729,7 @@ describe("when the conversation's runToken cannot be resolved", () => {
     expect(mocks.dispatch).not.toHaveBeenCalled();
   });
 
-  /** @scenario A conversation carrying no runToken cannot start an unsignable turn */
+  /** @scenario A conversation whose credentials are missing cannot start a turn */
   it("refuses the turn when the conversation carries no runToken", async () => {
     const { deps, mocks } = makeDeps();
     mocks.getRunToken.mockResolvedValue(null);
@@ -741,7 +741,7 @@ describe("when the conversation's runToken cannot be resolved", () => {
     expect(mocks.dispatch).not.toHaveBeenCalled();
   });
 
-  /** @scenario The worker is never handed an empty signing key */
+  /** @scenario A conversation whose credentials read back blank cannot start a turn */
   it("never dispatches a turn with a falsy runToken", async () => {
     const { deps, mocks } = makeDeps();
     mocks.getRunToken.mockResolvedValue("");
@@ -1122,6 +1122,40 @@ describe("when the project holding Langy's versioned prompts is configured", () 
     expect(systemOf(second.mocks.dispatch)).not.toContain(
       LANGY_TURN_OVERRIDE_FALLBACK,
     );
+  });
+
+  // @scenario "Withdrawing a promoted version is not undone by a later read failure"
+  it("does not resurrect a demoted row when a later read fails", async () => {
+    process.env[PROJECT_ENV] = "project-system";
+    let readCount = 0;
+    // Read 1 hits a promoted row; read 2 is a GENUINE miss (the operator
+    // demoted or deleted it); read 3 is a transient failure. The blip must
+    // fall back to the in-repo constant — the text from read 1 is gone on
+    // purpose, and a cache that outlives the miss would serve it back on every
+    // failure for the rest of the process's life.
+    const getPromptByIdOrHandle = vi.fn(async () => {
+      readCount += 1;
+      if (readCount === 1) return { prompt: "REGISTRY OVERRIDE TEXT" };
+      if (readCount === 2) return null;
+      throw new Error("registry down");
+    });
+    const startTurn = async () => {
+      const { deps, mocks } = makeDeps({
+        prompts: { getPromptByIdOrHandle },
+      } as unknown as Partial<LangyTurnServiceDeps>);
+      await LangyTurnService.create(deps).startConversationTurn(input());
+      return systemOf(mocks.dispatch);
+    };
+
+    expect(await startTurn()).toContain("REGISTRY OVERRIDE TEXT");
+    // The turn that observes the miss already fell through correctly before
+    // this fix; it is the one AFTER it that regressed.
+    expect(await startTurn()).toContain(LANGY_TURN_OVERRIDE_FALLBACK);
+
+    const afterBlip = await startTurn();
+
+    expect(afterBlip).not.toContain("REGISTRY OVERRIDE TEXT");
+    expect(afterBlip).toContain(LANGY_TURN_OVERRIDE_FALLBACK);
   });
 });
 

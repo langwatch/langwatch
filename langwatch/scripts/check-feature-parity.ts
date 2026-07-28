@@ -40,7 +40,7 @@ const REPO_ROOT = resolve(__dirname, "../..");
 const SPECS_ROOTS = [
   resolve(REPO_ROOT, "specs"),
   resolve(REPO_ROOT, "typescript-sdk/specs"),
-];
+] as const;
 
 /**
  * Test roots scanned for `@scenario` bindings. Every `.test.ts` /
@@ -207,7 +207,7 @@ interface UnknownAnnotation {
   ref: BindingRef;
 }
 
-interface CollectedBinding {
+export interface CollectedBinding {
   title: string;
   ref: BindingRef;
 }
@@ -409,21 +409,33 @@ function isNextLineBatsTest(lines: string[], startLineIdx: number): boolean {
 const GO_TEST_FUNC_RE =
   /^func\s+Test[A-Za-z0-9_]*\s*\(\s*[A-Za-z_][A-Za-z0-9_]*\s+\*testing\.T\s*\)/;
 
-/**
- * `t.Run("name", func(t *testing.T) {`. The subtest name may be a quoted
- * literal, a backtick literal, or an expression (`tc.name`), so it is matched
- * loosely up to the comma; the closure signature is what makes it a subtest.
- * Kept to a single line (`[^\n]`) both because that is what gofmt produces and
- * so the scan stays linear — an unbounded `[\s\S]*?` here would backtrack
- * across the rest of the file on every non-match.
- */
-const GO_SUBTEST_RE =
-  /^[A-Za-z_][A-Za-z0-9_]*\.Run\([^\n]*?,\s*func\s*\(\s*[A-Za-z_][A-Za-z0-9_]*\s+\*testing\.T\s*\)\s*\{/;
+/** Opening of a subtest call: `t.Run(` / `subT.Run(` / … */
+const GO_SUBTEST_HEAD_RE = /^[A-Za-z_][A-Za-z0-9_]*\.Run\(/;
 
-function isFollowedByGoTestFunc(src: string, start: number): boolean {
-  const len = src.length;
+/** What makes a `.Run(...)` call a SUBTEST: the `func(t *testing.T) {` closure. */
+const GO_SUBTEST_CLOSURE_RE =
+  /^func\s*\(\s*[A-Za-z_][A-Za-z0-9_]*\s+\*testing\.T\s*\)\s*\{/;
+
+/**
+ * Longest prefix of a `.Run(` call the scan will read before giving up. The
+ * first argument plus its comma is a few dozen characters even when the call
+ * is spread over several lines; the cap exists only so a truncated or
+ * malformed file cannot turn the scan into a walk to EOF.
+ */
+const GO_SUBTEST_SCAN_BUDGET = 4096;
+
+/**
+ * Advance past Go whitespace and comments, returning the index of the next
+ * significant character, or `-1` if `limit` is reached first. Linear: every
+ * character is visited at most once, no backtracking.
+ */
+function skipGoSpaceAndComments(
+  src: string,
+  start: number,
+  limit: number
+): number {
   let i = start;
-  while (i < len) {
+  while (i < limit) {
     const ch = src[i];
     if (ch === " " || ch === "\t" || ch === "\n" || ch === "\r") {
       i++;
@@ -431,23 +443,130 @@ function isFollowedByGoTestFunc(src: string, start: number): boolean {
     }
     if (ch === "/" && src[i + 1] === "*") {
       const close = src.indexOf("*/", i + 2);
-      if (close === -1) return false;
+      if (close === -1 || close + 2 > limit) return -1;
       i = close + 2;
       continue;
     }
     if (ch === "/" && src[i + 1] === "/") {
       const nl = src.indexOf("\n", i);
-      if (nl === -1) return false;
+      if (nl === -1 || nl + 1 > limit) return -1;
       i = nl + 1;
       continue;
     }
-    const rest = src.slice(i);
-    return GO_TEST_FUNC_RE.test(rest) || GO_SUBTEST_RE.test(rest);
+    return i;
   }
-  return false;
+  return -1;
 }
 
-function collectGoBindings(testRoots: string[]): CollectedBinding[] {
+/**
+ * Is `rest` the start of a `t.Run("name", func(t *testing.T) { … }` subtest
+ * declaration?
+ *
+ * The subtest name may be a quoted literal, a raw (backtick) literal, or an
+ * arbitrary expression (`tc.name`, `fmt.Sprintf("%s/%s", a, b)`), and gofmt
+ * does NOT collapse the call onto one line — it preserves whatever the author
+ * wrote, so the very common
+ *
+ *   t.Run(
+ *     "a long subtest name",
+ *     func(t *testing.T) {
+ *
+ * has to bind too. A regex that spans the newline would either backtrack
+ * across the rest of the file on every non-match (`[\s\S]*?`) or, bounded to
+ * one line (`[^\n]*?`), silently reject the form above. So the first argument
+ * is walked forward instead, character by character and once each: string,
+ * raw-string and rune literals are skipped whole so a comma inside them is not
+ * read as the argument separator, bracket depth is tracked for the same reason,
+ * and the walk stops at the first top-level comma. What follows that comma must
+ * be the `*testing.T` closure.
+ */
+function isGoSubtestDeclaration(rest: string): boolean {
+  const head = rest.match(GO_SUBTEST_HEAD_RE);
+  if (!head) return false;
+
+  const headLength = head[0]!.length;
+  const limit = Math.min(rest.length, headLength + GO_SUBTEST_SCAN_BUDGET);
+  let depth = 0;
+  let i = headLength;
+  let commaAt = -1;
+
+  while (i < limit) {
+    const ch = rest[i];
+
+    if (ch === '"' || ch === "'") {
+      // Interpreted string / rune literal: backslash escapes, never spans a line.
+      const quote = ch;
+      i++;
+      let closed = false;
+      while (i < limit) {
+        const c = rest[i];
+        if (c === "\\") {
+          i += 2;
+          continue;
+        }
+        if (c === "\n") return false;
+        i++;
+        if (c === quote) {
+          closed = true;
+          break;
+        }
+      }
+      if (!closed) return false;
+      continue;
+    }
+
+    if (ch === "`") {
+      // Raw string literal: no escapes, may span lines.
+      const close = rest.indexOf("`", i + 1);
+      if (close === -1 || close >= limit) return false;
+      i = close + 1;
+      continue;
+    }
+
+    if (ch === "/" && (rest[i + 1] === "/" || rest[i + 1] === "*")) {
+      const next = skipGoSpaceAndComments(rest, i, limit);
+      if (next === -1) return false;
+      i = next;
+      continue;
+    }
+
+    if (ch === "(" || ch === "[" || ch === "{") {
+      depth++;
+      i++;
+      continue;
+    }
+
+    if (ch === ")" || ch === "]" || ch === "}") {
+      // The call closed before any top-level comma: `t.Run(name)` is not a subtest.
+      if (depth === 0) return false;
+      depth--;
+      i++;
+      continue;
+    }
+
+    if (ch === "," && depth === 0) {
+      commaAt = i;
+      break;
+    }
+
+    i++;
+  }
+
+  if (commaAt === -1) return false;
+
+  const closureAt = skipGoSpaceAndComments(rest, commaAt + 1, limit);
+  if (closureAt === -1) return false;
+  return GO_SUBTEST_CLOSURE_RE.test(rest.slice(closureAt));
+}
+
+function isFollowedByGoTestFunc(src: string, start: number): boolean {
+  const i = skipGoSpaceAndComments(src, start, src.length);
+  if (i === -1) return false;
+  const rest = src.slice(i);
+  return GO_TEST_FUNC_RE.test(rest) || isGoSubtestDeclaration(rest);
+}
+
+export function collectGoBindings(testRoots: string[]): CollectedBinding[] {
   const bindings: CollectedBinding[] = [];
   const files: string[] = [];
   for (const r of testRoots) {
@@ -843,4 +962,10 @@ function main(): void {
   }
 }
 
-main();
+// Run only when invoked as a script (`tsx scripts/check-feature-parity.ts`),
+// so the collectors above can be imported and exercised by unit tests without
+// the whole repo scan — and its `process.exit(1)` — running on import.
+const invokedPath = process.argv[1];
+if (invokedPath !== undefined && resolve(invokedPath) === __filename) {
+  main();
+}

@@ -40,9 +40,12 @@ const (
 	egressDeniedSNIMismatch egressDecision = "denied_sni_mismatch"
 	// egressDeniedSNIUnreadable: the stream is a TLS handshake but no SNI could
 	// be recovered from it, while an allow-list (or the enforced floor) is in
-	// force. Fragmenting the ClientHello across records is the cheap way to make
-	// the cross-check unreadable, so under an enforcing policy "cannot read"
-	// must fail closed — otherwise the anti-fronting check is opt-out.
+	// force. Fragmentation alone does not get you here — the peek reassembles a
+	// ClientHello split across records — so what remains is ClientHello data that
+	// is malformed, incomplete, or unsupported (including a record version no TLS
+	// record uses), or a peer that claims a handshake and then sends nothing.
+	// Under an enforcing policy "cannot read" must fail closed — otherwise the
+	// anti-fronting check is opt-out.
 	egressDeniedSNIUnreadable  egressDecision = "denied_sni_unreadable"
 	egressDeniedPrivateAddress egressDecision = "denied_private_address"
 )
