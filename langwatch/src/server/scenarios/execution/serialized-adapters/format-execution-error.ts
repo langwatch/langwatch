@@ -411,17 +411,33 @@ export function formatMalformedBodyError(args: {
 const IP_ADDRESS =
   /\[[0-9a-fA-F:]+\](?::\d{1,5})?|\b\d{1,3}(?:\.\d{1,3}){3}(?::\d{1,5})?\b/g;
 /**
- * Hostnames carrying a port, e.g. `nlp-internal:5561`.
+ * A `token:port` pair — the candidate shape for `nlp-internal:5561`.
  *
- * The host must contain a `.` or `-`, and the port must not be followed by
- * more digits or another colon. Without those guards this matched ordinary
- * colon-bearing prose and corrupted it: `script.py:42` — the single most
- * common substring in a Python traceback — became `[redacted]`, and
- * `retry after 12:34:56` became `[redacted]:56`. Since this now runs over
- * infra error bodies, that damage would be user-visible.
+ * Deliberately ONE unnested quantifier. The obvious "host is labels joined by
+ * separators" form — `[A-Za-z0-9_-]*(?:[.-][A-Za-z0-9_-]+)+` — lets a `-` be
+ * consumed by either side, which is exponential backtracking on a run of
+ * `--` (CodeQL `js/redos`, high). This function runs over error bodies
+ * written by upstreams we do not control, so that is reachable. Whether a
+ * match is really a host is decided in code below, not by the pattern.
  */
-const HOST_WITH_PORT =
-  /\b(?![0-9]+:)[A-Za-z0-9][A-Za-z0-9_-]*(?:[.-][A-Za-z0-9_-]+)+:\d{2,5}\b(?![.:\d])/g;
+const TOKEN_WITH_PORT = /\b[A-Za-z0-9][A-Za-z0-9._-]*:\d{2,5}\b(?![.:\d])/g;
+
+/**
+ * Source-file suffixes that make a `token:port` a code location rather than
+ * an address. `File "script.py:42"` is the single most common shape in a
+ * Python traceback, and this function now runs over rendered infra detail —
+ * redacting it would corrupt the customer's own debugging information.
+ */
+const SOURCE_FILE_SUFFIX =
+  /\.(py|pyc|ts|tsx|js|jsx|mjs|cjs|go|rb|java|kt|c|cc|cpp|h|hpp|rs|sh|sql|json|ya?ml|toml|txt|log)$/i;
+
+/** True when a `token:port` match names a host rather than a code location. */
+function looksLikeHostPort(match: string): boolean {
+  const host = match.slice(0, match.lastIndexOf(":"));
+  if (!/[.-]/.test(host)) return false; // bare word: `code:127`
+  if (/^[\d.]+$/.test(host)) return false; // handled by IP_ADDRESS
+  return !SOURCE_FILE_SUFFIX.test(host);
+}
 /** Absolute URLs. */
 const URL_PATTERN = /\b[a-z][a-z0-9+.-]*:\/\/\S+/gi;
 /**
@@ -434,7 +450,7 @@ const URL_PATTERN = /\b[a-z][a-z0-9+.-]*:\/\/\S+/gi;
  * act on are their own.
  */
 const ENGINE_HARNESS_FRAME =
-  /^\s*File "\/tmp\/nlpgo-codeblock-[^"]*",.*$\n?(?:^\s{4,}\S.*$\n?|^\s*\^+\s*$\n?)*/gm;
+  /^[ \t]*File "\/tmp\/nlpgo-codeblock-[^"]*",.*$\n?(?:^[ \t]{4,}[^ \t\n].*$\n?|^[ \t]*\^+[ \t]*$\n?)*/gm;
 
 /**
  * Remove anything that identifies the internal NLP service from a string that
@@ -446,7 +462,9 @@ export function redactInternalAddresses(text: string): string {
   return text
     .replace(URL_PATTERN, "[redacted]")
     .replace(IP_ADDRESS, "[redacted]")
-    .replace(HOST_WITH_PORT, "[redacted]");
+    .replace(TOKEN_WITH_PORT, (match) =>
+      looksLikeHostPort(match) ? "[redacted]" : match,
+    );
 }
 
 /**

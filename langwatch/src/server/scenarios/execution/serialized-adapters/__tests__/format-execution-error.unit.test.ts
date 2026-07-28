@@ -493,5 +493,30 @@ describe("format-execution-error helpers (lw#3439)", () => {
     ])("leaves ordinary colon-bearing text intact: %s", (input, survives) => {
       expect(redactInternalAddresses(input)).toMatch(survives);
     });
+
+    it("leaves a source-file location intact even without trailing punctuation", () => {
+      // The earlier guard only held because the fixture happened to have a
+      // trailing colon; a bare `script.py:42` was still being redacted.
+      expect(redactInternalAddresses('File "script.py:42"')).toMatch(
+        /script\.py:42/,
+      );
+      expect(redactInternalAddresses("at handler.go:1204")).toMatch(
+        /handler\.go:1204/,
+      );
+    });
+
+    it("completes in linear time on the input that made the old pattern exponential", () => {
+      // Guards the CodeQL js/redos finding (high). The previous host pattern
+      // let a `-` be consumed by either of two adjacent quantifiers, so a
+      // dash-separated run that ultimately FAILS to match backtracks
+      // exponentially: measured on the old pattern, 20 repeats took 37ms,
+      // 24 took 570ms and 26 took 2276ms — a ~60-character string. Upstream
+      // error bodies are attacker-influenceable, so this was reachable.
+      // 200 repeats would not terminate this decade under the old pattern.
+      const evil = `a${"-a".repeat(200)}!`;
+      const started = performance.now();
+      redactInternalAddresses(evil);
+      expect(performance.now() - started).toBeLessThan(1_000);
+    });
   });
 });
