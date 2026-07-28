@@ -312,7 +312,7 @@ describe("given a blocking budget on traffic the gateway is serving", () => {
   });
 
   describe("given spend recorded before the UTC rollup rebuild", () => {
-    // The upgrade path migration 00056 protects: a deployment whose
+    // The upgrade path migration 00058 protects: a deployment whose
     // ClickHouse ran outside UTC folded its history at local midnight, a
     // bucket /budget/check never reads. The migration rebuilds the rollup
     // from the ledger under UTC boundaries, so that history must count
@@ -454,7 +454,7 @@ describe("given a blocking budget on traffic the gateway is serving", () => {
         const client = await getClickHouseClientForProject(PRE_PROJECT_ID);
         await replayGooseMigrationUp(
           client!,
-          "00056_gateway_budget_scope_totals_utc.sql",
+          "00058_gateway_budget_scope_totals_utc.sql",
         );
 
         const decision = await decidePreProject();

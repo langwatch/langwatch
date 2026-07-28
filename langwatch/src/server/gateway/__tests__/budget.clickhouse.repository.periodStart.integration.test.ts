@@ -258,7 +258,7 @@ describe("given a debit recorded against a budget in ClickHouse", () => {
   describe("when the rollup is rebuilt with period boundaries pinned to UTC", () => {
     // The reviewer-protected upgrade path: a deployment that folded spend
     // under migration 00055 on a non-UTC server has its history keyed by
-    // local midnight. Migration 00056 moves the rollup key to UTC and
+    // local midnight. Migration 00058 moves the rollup key to UTC and
     // rebuilds the rollup from the ledger, so that history must read back
     // in full afterwards. On data already keyed by UTC boundaries the
     // rebuild must reproduce identical totals.
@@ -360,7 +360,7 @@ describe("given a debit recorded against a budget in ClickHouse", () => {
       // rollup from the ledger.
       await replayGooseMigrationUp(
         client!,
-        "00056_gateway_budget_scope_totals_utc.sql",
+        "00058_gateway_budget_scope_totals_utc.sql",
       );
 
       utcRowsAfterRebuild = await captureUtcRows();

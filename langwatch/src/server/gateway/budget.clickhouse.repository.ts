@@ -565,7 +565,7 @@ function windowToClickHouse(window: GatewayBudgetWindow): string {
  * This is one half of a contract: the rollup only ever returns a row when
  * this lands on exactly the PeriodStart the materialised view bucketed the
  * debit into. The other half is the multiIf() in
- * 00055_gateway_budget_scope_totals_period_start.sql, and the two are pinned
+ * 00058_gateway_budget_scope_totals_utc.sql, and the two are pinned
  * together by budget.clickhouse.repository.periodStart.integration.test.ts.
  * Change one without the other and the affected window stops accruing
  * entirely: spend is written, every read returns 0, and budgets on that
