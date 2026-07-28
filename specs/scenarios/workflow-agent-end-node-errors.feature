@@ -143,6 +143,16 @@ Feature: Workflow agent surfaces End-node misconfiguration instead of an empty r
     When the workflow runs
     Then the reported error does not contain the secret's value
 
+  # Redacting only the error left the secret a field next door to escape
+  # through: a node's captured output ships in the same response and in every
+  # progress event, and printing a secret needs no exception at all.
+  @unit
+  Scenario: A code node that prints a secret does not leak it through stdout
+    Given a code node that prints a project secret's value to stdout and to stderr
+    When the workflow runs
+    Then the captured output does not contain the secret's value
+    And the rest of the captured output is still reported
+
   # ============================================================================
   # AC #2 — the scenario adapter surfaces the engine's error, never an empty reply
   # ============================================================================
@@ -219,6 +229,7 @@ Feature: Workflow agent surfaces End-node misconfiguration instead of an empty r
   #   same change or this fix opens a secret-exfiltration path →
   #   Scenario "A code node that raises with a secret in the message does not leak it"
   #   Scenario "An if/else condition node that raises with a secret does not leak it"
+  #   Scenario "A code node that prints a secret does not leak it through stdout"
   # Issue #3198 AC #3: "a workflow that runs to completion but where the END node
   #   produces no output for the configured scenarioOutputField returns a 400 with
   #   the existing 'field not found' message rather than a 500" → the BEHAVIOUR is
