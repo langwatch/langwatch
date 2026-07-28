@@ -90,6 +90,7 @@ Feature: Payload cost governs the scheduling plane
 
   # --- Claim-check staging: a matched event's job carries a reference ---
 
+  @unit
   Scenario: a matched event's heavy payload travels as a claim-check, not inline
     Given an event the subscriber considers relevant whose payload is large
     When the event is routed to subscribers
@@ -97,6 +98,7 @@ Feature: Payload cost governs the scheduling plane
     And the handler completes its work by reading the payload from its canonical store
     And the reference preserves the identity the scheduler orders and dedups by
 
+  @unit
   Scenario: a reference that cannot be resolved yet retries, never drops
     Given a relevant event staged as a reference
     And the referenced payload is not yet readable in its store
@@ -104,17 +106,32 @@ Feature: Payload cost governs the scheduling plane
     Then the attempt fails into the queue's retry
     And the job completes once the payload becomes readable
 
+  @unit
   Scenario: a reference this build cannot read fails loudly, never half-parses
     Given a staged reference carrying a schema version this build does not know
     When the handler processes the job
     Then the attempt fails into the queue's retry
     And the job is never mistaken for another kind of payload
 
+  @unit
   Scenario: an event that cannot be referenced stages whole
     Given a relevant event missing the identity a reference needs
     When the event is routed to subscribers
     Then the staged job carries the full event
     And the handler processes it to the same outcome as before references existed
+
+  # The stage hook shares the filter's seam and therefore the filter's sharp
+  # edge: the routing path has no retry, so a throw here loses this
+  # subscriber's job for this event. It is pinned separately because the
+  # tempting failure mode is the quiet one — falling back to staging the
+  # payload whole, which would hide a broken reference behind the very cost
+  # the claim-check exists to avoid.
+  @unit
+  Scenario: a raising claim-check stage is reported as a failure, not as a quiet full stage
+    Given a relevant event whose subscriber's claim-check stage raises
+    When the event is routed to subscribers
+    Then the routing attempt reports the failure
+    And the subscriber's handler never runs for that event
 
   # --- Phases 2-4: the remaining ADR-069 invariants ---
 

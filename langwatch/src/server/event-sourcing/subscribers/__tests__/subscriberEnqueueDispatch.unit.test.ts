@@ -373,7 +373,7 @@ describe("subscriber enqueue-time contract", () => {
     });
 
     describe("when the hook throws", () => {
-      /** @scenario a throwing enqueue filter surfaces into retry, never a silent drop */
+      /** @scenario a raising claim-check stage is reported as a failure, not as a quiet full stage */
       it("fails loudly into the routing retry rather than dropping silently", async () => {
         let handlerRan = false;
         const router = makeRouter({
