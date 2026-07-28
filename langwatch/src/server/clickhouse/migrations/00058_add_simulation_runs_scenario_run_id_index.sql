@@ -3,7 +3,7 @@
 
 -- Bloom-filter skip index on simulation_runs.ScenarioRunId.
 --
--- Same shape as the evaluation_runs.EvaluationId index (migration 00042):
+-- Same shape as the evaluation_runs.EvaluationId index (migration 00057):
 -- simulation_runs is ORDER BY (TenantId, ScenarioRunId) and
 -- PARTITION BY toYearWeek(StartedAt). A point lookup by
 -- (TenantId, ScenarioRunId) carries no StartedAt predicate, so it cannot prune
