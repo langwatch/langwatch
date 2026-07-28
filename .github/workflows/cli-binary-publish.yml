@@ -206,8 +206,7 @@ jobs:
         # src/internal/generated/* from langwatch/ + langevals/ sources and
         # skills/ — the Bun compile fails to resolve those otherwise (same
         # gotcha Dockerfile.langyagent's cli-builder stage documents).
-        working-directory: typescript-sdk
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --filter "langwatch..."
 
       - name: Resolve asset name
         id: names

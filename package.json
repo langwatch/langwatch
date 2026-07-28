@@ -43,9 +43,18 @@
     "skills/",
     "feature-map.json",
     "README.md",
-    "LICENSE.md"
+    "LICENSE.md",
+    "pnpm-workspace.yaml",
+    "pnpm-lock.yaml",
+    "packages/server/package.json",
+    "typescript-sdk/package.json",
+    "agentic-e2e-tests/package.json"
   ],
   "scripts": {
+    "build": "pnpm -r --filter \"!@langwatch/server\" build",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck",
+    "build:app": "pnpm --filter @langwatch/web... build",
     "build:cli": "pnpm --filter @langwatch/server-cli build",
     "dev:cli": "pnpm --filter @langwatch/server-cli dev",
     "test:cli": "pnpm --filter @langwatch/server-cli test",

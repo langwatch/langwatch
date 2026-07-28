@@ -106,14 +106,34 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certifi
     && npm install -g pnpm@10.24.0 \
     && rm -rf /var/lib/apt/lists/*
 
-# typescript-sdk/pnpm-workspace.yaml declares `.` + `../packages/langy`, so
-# both trees must be present for `workspace:*` to resolve. langy is
-# source-only (its `main` points at src/index.ts) and is bundled into the binary.
+# Since ADR-076 the repo is a SINGLE pnpm workspace, so the lockfile and
+# workspace definition live at the root and the install runs from there. langy
+# is still a `workspace:*` dependency of the CLI; it is source-only (its `main`
+# points at src/index.ts) and is bundled into the binary.
+COPY pnpm-workspace.yaml pnpm-lock.yaml package.json .npmrc ./
 COPY packages/langy ./packages/langy
 COPY typescript-sdk ./typescript-sdk
+# Manifests only. `--frozen-lockfile` checks the lockfile against every
+# workspace member it can see, so each member needs at least its package.json.
+COPY langwatch/package.json ./langwatch/
+COPY langwatch/packages/api/package.json ./langwatch/packages/api/
+COPY langwatch/packages/automations/package.json ./langwatch/packages/automations/
+COPY langwatch/packages/observability/package.json ./langwatch/packages/observability/
+COPY langwatch/packages/react-rum/package.json ./langwatch/packages/react-rum/
+COPY langwatch/packages/redaction/package.json ./langwatch/packages/redaction/
+COPY langwatch/packages/ssrf/package.json ./langwatch/packages/ssrf/
+COPY packages/handled-error/package.json ./packages/handled-error/
+COPY packages/server/package.json ./packages/server/
+COPY mcp-server/package.json ./mcp-server/
+COPY skills/package.json ./skills/
+COPY agentic-e2e-tests/package.json ./agentic-e2e-tests/
 
+WORKDIR /src
+RUN pnpm install --frozen-lockfile --ignore-scripts --filter "langwatch..."
+
+# Back to the SDK for the generator + compile steps below, which resolve their
+# inputs (../langwatch, ../langevals, ../feature-map.json) relative to it.
 WORKDIR /src/typescript-sdk
-RUN pnpm install --frozen-lockfile --ignore-scripts
 
 # The CLI imports types GENERATED from the platform source: copy-types.sh copies
 # the Zod-first modules out of langwatch/ + langevals/ and derives

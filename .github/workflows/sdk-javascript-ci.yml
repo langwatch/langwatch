@@ -63,11 +63,15 @@ jobs:
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          cache-dependency-path: "typescript-sdk/pnpm-lock.yaml"
-          install-dir: typescript-sdk
+          install: "langwatch..."
 
+      # No `-w`. That flag means "the workspace root", which used to BE
+      # typescript-sdk/ when it was its own install root; since ADR-076 the
+      # root is the repo, so `-w` would write the dependency into the root
+      # manifest and the shared lockfile instead of into the SDK. The job's
+      # working-directory already scopes this to typescript-sdk.
       - name: Install TypeScript Native Preview
-        run: pnpm install -D -w @typescript/native-preview
+        run: pnpm add -D @typescript/native-preview
 
       - name: Run lint check
         run: pnpm run lint
@@ -180,10 +184,7 @@ jobs:
         with:
           node-version: 24
           cache: "pnpm"
-          cache-dependency-path: |
-            typescript-sdk/pnpm-lock.yaml
-            langwatch/pnpm-lock.yaml
-            mcp-server/pnpm-lock.yaml
+          cache-dependency-path: pnpm-lock.yaml
 
       # node-pty@1.1.0 only ships prebuilds for darwin/win32, so on Linux
       # its postinstall always falls back to `node-gyp rebuild`. With
@@ -193,13 +194,16 @@ jobs:
       - name: Install node-gyp (for node-pty postinstall)
         run: npm install -g node-gyp@12.3.0
 
-      - name: Build mcp-server
-        working-directory: mcp-server
-        run: pnpm install --frozen-lockfile && pnpm run build
+      # One install covering the app, the MCP server (a workspace dependency
+      # of the app) and the SDK under test. See ADR-076.
+      - name: Install dependencies
+        run: >
+          CI=true pnpm install --frozen-lockfile
+          --filter "@langwatch/web..."
+          --filter "langwatch..."
 
-      - name: Install LangWatch app dependencies
-        working-directory: langwatch
-        run: CI=true pnpm install --frozen-lockfile
+      - name: Build mcp-server
+        run: pnpm --filter @langwatch/mcp-server run build
 
       - name: Prepare LangWatch files
         working-directory: langwatch
@@ -250,8 +254,7 @@ jobs:
           timeout 60 bash -c 'until curl -f http://localhost:5560 2>/dev/null | grep -q "LangWatch\|<!DOCTYPE"; do sleep 2; done'
           echo "✅ LangWatch server is ready"
 
-      - name: Install SDK dependencies
-        run: pnpm install --frozen-lockfile
+      # Already installed above alongside the app; nothing further to fetch.
 
       - name: Build SDK
         run: pnpm run build

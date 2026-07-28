@@ -274,7 +274,7 @@ clean:
 # is the first goal this recipe is a no-op. Plain `make install` is unaffected.
 install:
 ifneq (haven,$(firstword $(MAKECMDGOALS)))
-	cd langwatch && pnpm install
+	pnpm install
 else
 	@:
 endif
