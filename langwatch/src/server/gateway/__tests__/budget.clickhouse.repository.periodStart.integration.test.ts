@@ -26,6 +26,7 @@ import {
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import { replayGooseMigrationUp } from "~/server/clickhouse/__tests__/migrationReplay";
 import { prisma } from "~/server/db";
 import { GatewayBudgetClickHouseRepository } from "../budget.clickhouse.repository";
 
@@ -252,6 +253,154 @@ describe("given a debit recorded against a budget in ClickHouse", () => {
         expect(Number.parseFloat(spend[0]!.spentUsd)).toBeGreaterThan(0);
       },
     );
+  });
+
+  describe("when the rollup is rebuilt with period boundaries pinned to UTC", () => {
+    // The reviewer-protected upgrade path: a deployment that folded spend
+    // under migration 00055 on a non-UTC server has its history keyed by
+    // local midnight. Migration 00056 moves the rollup key to UTC and
+    // rebuilds the rollup from the ledger, so that history must read back
+    // in full afterwards. On data already keyed by UTC boundaries the
+    // rebuild must reproduce identical totals.
+    const PRE_WINDOWS: GatewayBudgetWindow[] = ["DAY", "WEEK", "MONTH"];
+    const preBudgets = PRE_WINDOWS.map((window) => ({
+      ...budgetFor(window),
+      id: `bdg-pre-${window}-${suffix}`,
+      scopeId: `proj-pre-${window}-${suffix}`,
+    }));
+    const preOccurredAt = new Date();
+
+    let spendBeforeRebuild: Map<string, string>;
+    let utcRowsBeforeRebuild: unknown[];
+    let utcRowsAfterRebuild: unknown[];
+
+    // Merged read-back of every rollup row this file wrote through the
+    // UTC-pinned view, keyed and valued exactly as the read path sees
+    // them. UpdatedAt is bookkeeping the rebuild re-stamps by design, so
+    // it stays out of the comparison.
+    const captureUtcRows = async () => {
+      const client = await getClickHouseClientForProject(TENANT_ID);
+      const result = await client!.query({
+        query: `
+          SELECT
+            Scope,
+            ScopeId,
+            Window,
+            toString(PeriodStart) AS periodStart,
+            toString(sumMerge(SpendUSD)) AS spend,
+            toString(sumMerge(TokensInput)) AS tokensInput,
+            toString(sumMerge(TokensOutput)) AS tokensOutput,
+            toString(sumMerge(TokensCacheRead)) AS tokensCacheRead,
+            toString(sumMerge(TokensCacheWrite)) AS tokensCacheWrite,
+            toString(countMerge(RequestCount)) AS requests
+          FROM gateway_budget_scope_totals
+          WHERE TenantId = {tenantId:String}
+            AND ScopeId NOT LIKE 'proj-pre-%'
+          GROUP BY Scope, ScopeId, Window, PeriodStart
+          ORDER BY Scope, ScopeId, Window, PeriodStart
+        `,
+        query_params: { tenantId: TENANT_ID },
+        format: "JSONEachRow",
+      });
+      return (await result.json()) as unknown[];
+    };
+
+    beforeAll(async () => {
+      const client = await getClickHouseClientForProject(TENANT_ID);
+
+      utcRowsBeforeRebuild = await captureUtcRows();
+
+      // Pre-upgrade state: the 00055 view truncates periods in the server
+      // session timezone.
+      await replayGooseMigrationUp(
+        client!,
+        "00055_gateway_budget_scope_totals_period_start.sql",
+      );
+
+      // Pre-upgrade history, folded by the old view as a Sao Paulo server
+      // would fold it (same synchronous session_timezone technique as the
+      // scenario above).
+      await client!.insert({
+        table: "gateway_budget_ledger_events",
+        values: preBudgets.map((budget) => ({
+          TenantId: TENANT_ID,
+          BudgetId: budget.id,
+          Scope: "project",
+          ScopeId: budget.scopeId,
+          Window: budget.window,
+          VirtualKeyId: `vk_${suffix}`,
+          ProviderCredentialId: "",
+          GatewayRequestId: `grq_pre_${budget.window}_${suffix}`,
+          AmountUSD: DEBIT_USD,
+          TokensInput: 300,
+          TokensOutput: 150,
+          TokensCacheRead: 0,
+          TokensCacheWrite: 0,
+          Model: "gpt-5-mini",
+          ProviderSlot: "",
+          DurationMS: 120,
+          Status: "success",
+          OccurredAt: preOccurredAt.getTime(),
+          EventTimestamp: preOccurredAt.getTime(),
+        })),
+        format: "JSONEachRow",
+        clickhouse_settings: {
+          session_timezone: "America/Sao_Paulo",
+        },
+      });
+
+      const spend = await repo.getSpendForBudgets(
+        TENANT_ID,
+        preBudgets,
+        preOccurredAt,
+      );
+      spendBeforeRebuild = new Map(spend.map((s) => [s.budgetId, s.spentUsd]));
+
+      // The upgrade under test: pin the truncation to UTC and rebuild the
+      // rollup from the ledger.
+      await replayGooseMigrationUp(
+        client!,
+        "00056_gateway_budget_scope_totals_utc.sql",
+      );
+
+      utcRowsAfterRebuild = await captureUtcRows();
+    }, 120_000);
+
+    /** @scenario "Spend recorded before the rollup rebuild still counts after it" */
+    it.each(PRE_WINDOWS)(
+      "starts from a %s budget whose recorded spend reads $0",
+      (window) => {
+        // The pre-rebuild read is the bug the rebuild exists for: history
+        // sits in a local-midnight bucket the reader never asks about. If
+        // this reads non-zero the fixture is not on the seam and the
+        // assertions below prove nothing.
+        const budget = preBudgets.find((b) => b.window === window)!;
+        expect(Number.parseFloat(spendBeforeRebuild.get(budget.id)!)).toBe(0);
+      },
+    );
+
+    /** @scenario "Spend recorded before the rollup rebuild still counts after it" */
+    it.each(PRE_WINDOWS)(
+      "reads the full pre-rebuild spend on a %s budget after the rebuild",
+      async (window) => {
+        const budget = preBudgets.find((b) => b.window === window)!;
+        const spend = await repo.getSpendForBudgets(
+          TENANT_ID,
+          [budget],
+          preOccurredAt,
+        );
+
+        expect(Number.parseFloat(spend[0]!.spentUsd)).toBe(
+          Number.parseFloat(DEBIT_USD),
+        );
+      },
+    );
+
+    /** @scenario "Spend recorded before the rollup rebuild still counts after it" */
+    it("reproduces identical totals for spend already keyed by UTC boundaries", () => {
+      expect(utcRowsBeforeRebuild.length).toBeGreaterThan(0);
+      expect(utcRowsAfterRebuild).toEqual(utcRowsBeforeRebuild);
+    });
   });
 
   describe("when comparing the periods the two sides use", () => {
