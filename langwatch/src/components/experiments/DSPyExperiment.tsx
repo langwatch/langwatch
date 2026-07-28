@@ -639,6 +639,11 @@ export const RunDetails = React.memo(
           flexDirection="column"
           minWidth="0"
           colorPalette="blue"
+          // Every panel here (Predictors, Evaluations, LLM Calls) is a
+          // read-only render of the same dspyStep query with no
+          // user-entered state, so fully unmounting inactive tabs is safe.
+          lazyMount
+          unmountOnExit
         >
           <Tabs.List
             position="relative"

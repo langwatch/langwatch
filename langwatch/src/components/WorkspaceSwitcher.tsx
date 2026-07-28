@@ -278,13 +278,18 @@ export const WorkspaceSwitcher = React.memo(function WorkspaceSwitcher({
     }
   }
 
-  // Hide teams with zero projects — they're navigation dead-ends in the
-  // dropdown (clicking the team name takes you to /settings/teams/<slug>
-  // which is admin-only). Empty teams are an org-admin curiosity, not a
-  // workspace-switcher target. Re-add later if rchaves wants team-level
-  // usage as a discoverable surface.
-  const teamsWithProjects = teams.filter(
-    (team) => (projectsByTeam.get(team.teamId) ?? []).length > 0,
+  // Teams with zero projects are navigation dead-ends for most viewers
+  // (clicking the team name takes you to /settings/teams/<slug> which is
+  // admin-only), so they are hidden — except when the viewer can create a
+  // project on them. A coding-usage (governance) signup starts with one
+  // empty shared team; hiding it would leave the dropdown with no create
+  // affordance at all, stranding them on personal usage with no path to a
+  // first shared project. For those viewers the row renders with its
+  // per-team "+" create button.
+  const visibleTeams = teams.filter(
+    (team) =>
+      (projectsByTeam.get(team.teamId) ?? []).length > 0 ||
+      (team.canCreateProject && !!onCreateProjectForTeam),
   );
 
   // Group teams by org so multi-org users see clear org boundaries instead
@@ -296,7 +301,7 @@ export const WorkspaceSwitcher = React.memo(function WorkspaceSwitcher({
     string,
     { orgName: string; orgSlug: string; teams: typeof teams }
   >();
-  for (const team of teamsWithProjects) {
+  for (const team of visibleTeams) {
     const bucket =
       teamsByOrg.get(team.orgId) ?? {
         orgName: team.orgName,

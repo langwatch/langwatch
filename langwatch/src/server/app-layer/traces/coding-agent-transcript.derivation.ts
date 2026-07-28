@@ -1,6 +1,6 @@
 import type { SpanDetail } from "~/server/api/routers/tracesV2.schemas";
+import type { CodingAgent } from "~/server/event-sourcing/pipelines/coding-agent-processing/agents/_types";
 import {
-  type CodingAgent,
   detectCodingAgent,
   normalizeEventName,
   parseMcpToolName,
@@ -121,6 +121,11 @@ export interface CodingAgentTranscript {
 export interface TranscriptLogRecord {
   timestampMs: number;
   attributes: Record<string, unknown>;
+  /**
+   * Resource-level service.name, when the caller has it. The only signal
+   * that separates Cowork from the Claude Code runtime it reuses.
+   */
+  serviceName?: string | null;
 }
 
 const MODEL_CALL_SPAN_NAMES = new Set([
@@ -596,6 +601,7 @@ function detectAgentFrom({
   for (const log of logs) {
     const agent = detectCodingAgent({
       recordName: readString(log.attributes, "event.name"),
+      serviceName: log.serviceName,
     });
     if (agent !== "unknown") return agent;
   }

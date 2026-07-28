@@ -89,10 +89,12 @@ function logFactsEvent({
   facts,
   traceId = null,
   timeMs = 1_500,
+  agent = "claude_code",
 }: {
   facts: Record<string, string | number | boolean>;
   traceId?: string | null;
   timeMs?: number;
+  agent?: string;
 }): LogFactsContributedEvent {
   return {
     tenantId: createTenantId("tenant-1"),
@@ -101,7 +103,7 @@ function logFactsEvent({
       tenantId: "tenant-1",
       sessionId: SESSION_ID,
       sessionKeySource: "provider",
-      agent: "claude_code",
+      agent,
       occurredAt: timeMs,
       recordId: `rec-${timeMs}`,
       traceId,
@@ -458,7 +460,7 @@ describe("CodingAgentSessionFoldProjection", () => {
         state,
         tenantId: "tenant-1",
         sessionId: SESSION_ID,
-        version: "2026-07-21",
+        version: CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST,
       });
 
       expect(row.sessionId).toBe(SESSION_ID);
@@ -543,6 +545,109 @@ describe("read-back losslessness (ADR-066)", () => {
       const decoded = codingAgentSessionStateFromRow(row);
 
       expect(decoded).toEqual(state);
+    });
+  });
+
+  describe("when a Cowork session folds from events only", () => {
+    /** @scenario a Cowork session is an agent session */
+    it("folds the model call — tokens, model, cost — from the api_request event", () => {
+      const projection = makeProjection();
+
+      const state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          agent: "claude_cowork",
+          facts: {
+            "event.name": "claude_code.api_request",
+            cost_usd: 0.42,
+            input_tokens: 100,
+            output_tokens: 50,
+            cache_read_tokens: 1_000,
+            cache_creation_tokens: 200,
+            model: "claude-fable-5",
+            duration_ms: 800,
+          },
+        }),
+        initStateOf(projection),
+      );
+
+      expect(state.agent).toBe("claude_cowork");
+      expect(state.modelCalls).toBe(1);
+      expect(state.inputTokens).toBe(100);
+      expect(state.outputTokens).toBe(50);
+      expect(state.cacheReadTokens).toBe(1_000);
+      expect(state.cacheCreationTokens).toBe(200);
+      expect(state.costUsd).toBeCloseTo(0.42);
+      expect(state.models).toEqual(["claude-fable-5"]);
+    });
+
+    it("folds the tool run — name, count, step — from the tool_result event", () => {
+      const projection = makeProjection();
+
+      const state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          agent: "claude_cowork",
+          timeMs: 2_000,
+          facts: {
+            "event.name": "claude_code.tool_result",
+            tool_name: "Bash",
+            success: "true",
+            duration_ms: 120,
+            tool_result_size_bytes: 2_048,
+          },
+        }),
+        initStateOf(projection),
+      );
+
+      expect(state.toolCalls).toBe(1);
+      expect(state.toolCounts).toEqual({ Bash: 1 });
+      expect(state.steps).toEqual([
+        { name: "Bash", count: 1, startedAtMs: 2_000, failed: false },
+      ]);
+      expect(state.toolResultBytes).toBe(2_048);
+    });
+
+    it("identifies the user from Cowork's account uuid", () => {
+      const projection = makeProjection();
+
+      const state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          agent: "claude_cowork",
+          facts: {
+            "event.name": "claude_code.user_prompt",
+            prompt_length: 12,
+            "user.account_uuid": "0f6f44f5-2f4c-4a5e-9d3b-7f8f2f9a1b2c",
+          },
+        }),
+        initStateOf(projection),
+      );
+
+      expect(state.userId).toBe("0f6f44f5-2f4c-4a5e-9d3b-7f8f2f9a1b2c");
+    });
+  });
+
+  describe("when a span-bearing agent's api_request event contributes", () => {
+    /** @scenario re-delivered telemetry does not inflate a session */
+    it("folds cost only — its tokens arrive on the llm_request span", () => {
+      const projection = makeProjection();
+
+      const state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          agent: "claude_code",
+          facts: {
+            "event.name": "claude_code.api_request",
+            cost_usd: 0.42,
+            input_tokens: 100,
+            output_tokens: 50,
+          },
+        }),
+        initStateOf(projection),
+      );
+
+      expect(state.costUsd).toBeCloseTo(0.42);
+      // The double-count gate: these fold from the span for claude_code.
+      expect(state.modelCalls).toBe(0);
+      expect(state.inputTokens).toBe(0);
+      expect(state.outputTokens).toBe(0);
     });
   });
 });

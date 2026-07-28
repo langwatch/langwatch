@@ -83,6 +83,13 @@ function makeAnalyticsRow(
     reasoningTokens: null,
     hasError: false,
     hasAnnotation: null,
+    spanCount: 1,
+    annotationIds: [],
+    rootSpanStartTimeMs: 0,
+    traceNameFromFallback: false,
+    rootMetadataFromFallback: false,
+    traceNameUserOverridden: false,
+    lastEventOccurredAt: baseMs,
     attributes: {},
     ...overrides,
   };

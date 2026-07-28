@@ -8,9 +8,21 @@
  * @see specs/coding-agent/session-aggregate.feature
  */
 import { describe, expect, it } from "vitest";
+import { ZodError } from "zod";
+import { CanonicalizeSpanAttributesService } from "~/server/app-layer/traces/canonicalisation";
+import {
+  deserializeAttributes,
+  serializeAttributes,
+} from "~/server/app-layer/traces/repositories/span-storage.clickhouse.repository";
+import { SpanNormalizationPipelineService } from "~/server/app-layer/traces/span-normalization.service";
 import { createTenantId } from "~/server/event-sourcing";
 import { SPAN_RECEIVED_EVENT_TYPE } from "../../../trace-processing/schemas/constants";
-import type { TraceProcessingEvent } from "../../../trace-processing/schemas/events";
+import {
+  makeSpanReferencedEvent,
+  type SpanReceivedEvent,
+  type TraceProcessingEvent,
+} from "../../../trace-processing/schemas/events";
+import type { NormalizedSpan } from "../../../trace-processing/schemas/spans";
 import type { ContributeSpanFactsCommandData } from "../../schemas/commands";
 import { createCodingAgentSpanFactsDispatchSubscriber } from "../codingAgentSpanFactsDispatch.subscriber";
 
@@ -20,6 +32,8 @@ const TRACE_ID = "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6";
 function rawSpanEvent({
   name,
   spanId,
+  eventId = `evt-${spanId}`,
+  resourceAttributes = {},
   attributes = {},
   startMs = 1_000,
   endMs = 2_000,
@@ -27,6 +41,9 @@ function rawSpanEvent({
 }: {
   name: string;
   spanId: string;
+  /** The event envelope's own id — distinct per event even when the span is not. */
+  eventId?: string;
+  resourceAttributes?: Record<string, string>;
   attributes?: Record<string, string | number>;
   startMs?: number;
   endMs?: number;
@@ -34,7 +51,11 @@ function rawSpanEvent({
   statusCode?: number;
 }): TraceProcessingEvent {
   return {
+    id: eventId,
+    aggregateId: TRACE_ID,
+    aggregateType: "trace",
     tenantId: createTenantId("tenant-1"),
+    createdAt: startMs,
     type: SPAN_RECEIVED_EVENT_TYPE,
     occurredAt: startMs,
     data: {
@@ -56,20 +77,84 @@ function rawSpanEvent({
         events: [],
         links: [],
       },
-      resource: { attributes: [] },
+      resource: {
+        attributes: Object.entries(resourceAttributes).map(([key, value]) => ({
+          key,
+          value: { stringValue: value },
+        })),
+      },
       instrumentationScope: { name: "com.anthropic.claude_code.tracing" },
     },
   } as unknown as TraceProcessingEvent;
 }
 
-function makeSubscriber() {
+/** The same normalization the platform runs — builds expected store rows. */
+const normalization = new SpanNormalizationPipelineService(
+  new CanonicalizeSpanAttributesService(),
+);
+
+function normalizedFrom(event: SpanReceivedEvent): NormalizedSpan {
+  return normalization.normalizeSpanReceived(
+    event.tenantId,
+    event.data.span,
+    event.data.resource,
+    event.data.instrumentationScope,
+  );
+}
+
+/**
+ * What the claim-check path actually reads: the normalized span AFTER its
+ * attributes round-tripped ClickHouse's Map(String, String) columns — the
+ * deliberately lossy deserialize turns "true"/"1.0"/"90210" style strings
+ * into booleans and numbers, which is exactly the divergence the
+ * identical-command contract has to absorb.
+ */
+function storeReadBackFrom(event: SpanReceivedEvent): NormalizedSpan {
+  const span = normalizedFrom(event);
+  return {
+    ...span,
+    spanAttributes: deserializeAttributes(
+      serializeAttributes(span.spanAttributes),
+    ),
+    resourceAttributes: deserializeAttributes(
+      serializeAttributes(span.resourceAttributes),
+    ),
+  };
+}
+
+function makeSubscriber(
+  spanStore: (params: {
+    tenantId: string;
+    traceId: string;
+    spanId: string;
+    occurredAtMs: number;
+  }) => Promise<NormalizedSpan | null> = async () => null,
+) {
   const dispatched: ContributeSpanFactsCommandData[] = [];
+  // `tenantId` is recorded on purpose: it is the predicate that scopes the
+  // claim-check read, and a regression that dropped or crossed it would be
+  // invisible to a recorder that only kept trace/span.
+  const reads: Array<{
+    tenantId: string;
+    traceId: string;
+    spanId: string;
+    occurredAtMs: number;
+  }> = [];
   const subscriber = createCodingAgentSpanFactsDispatchSubscriber({
     contributeSpanFacts: async (data) => {
       dispatched.push(data);
     },
+    getNormalizedSpanById: async (params) => {
+      reads.push({
+        tenantId: params.tenantId,
+        traceId: params.traceId,
+        spanId: params.spanId,
+        occurredAtMs: params.occurredAtMs,
+      });
+      return spanStore(params);
+    },
   });
-  return { subscriber, dispatched };
+  return { subscriber, dispatched, reads };
 }
 
 const context = { tenantId: "tenant-1", aggregateId: TRACE_ID };
@@ -145,7 +230,13 @@ describe("codingAgentSpanFactsDispatch", () => {
   });
 
   describe("when a span from an ordinary LLM trace passes by", () => {
-    /** @scenario traces from other sources are untouched */
+    // The handler's inline gate is the rollover-safety guard: a build without
+    // the enqueue filter stages a job for every span, so after the upgrade the
+    // handler must still discard the non-matching ones it dequeues.
+    //
+    // NB: the parity checker only reads an annotation whose line ends in `*/`,
+    // so this stays a one-line JSDoc with the prose above it.
+    /** @scenario work queued before the relevance rule existed still reaches the same outcome */
     it("is ignored without decoding it", async () => {
       const { subscriber, dispatched } = makeSubscriber();
 
@@ -155,6 +246,381 @@ describe("codingAgentSpanFactsDispatch", () => {
       );
 
       expect(dispatched).toHaveLength(0);
+    });
+  });
+
+  describe("given the enqueue-time filter (ADR-069)", () => {
+    describe("when the raw span name is a coding-agent name", () => {
+      /** @scenario a matching event mints a job for the subscriber */
+      it("passes the filter so a job is staged", () => {
+        const { subscriber } = makeSubscriber();
+
+        expect(
+          subscriber.options?.enqueue?.filter?.(
+            rawSpanEvent({ name: "claude_code.tool", spanId: "tool-1" }),
+          ),
+        ).toBe(true);
+      });
+    });
+
+    describe("when the raw span name is an ordinary trace name", () => {
+      /** @scenario a non-matching event never mints a job */
+      it("fails the filter so no job is ever minted", () => {
+        const { subscriber } = makeSubscriber();
+
+        expect(
+          subscriber.options?.enqueue?.filter?.(
+            rawSpanEvent({ name: "openai.chat", spanId: "s-1" }),
+          ),
+        ).toBe(false);
+      });
+    });
+  });
+
+  describe("given the dedup key", () => {
+    describe("when keying a span job", () => {
+      /** @scenario a redelivered event is not processed twice */
+      it("keys on tenant, trace and span so two traces' spans never collide", () => {
+        const { subscriber } = makeSubscriber();
+        const event = rawSpanEvent({
+          name: "claude_code.tool",
+          spanId: "tool-dedup",
+          attributes: { tool_name: "Bash" },
+        });
+
+        // `deduplication` is the `"aggregate" | DeduplicationConfig` union;
+        // this subscriber uses the custom-key form.
+        const dedup = subscriber.options?.deduplication;
+        if (dedup === undefined || dedup === "aggregate") {
+          throw new Error("expected a custom deduplication config");
+        }
+
+        expect(dedup.makeId(event)).toBe(
+          `coding-agent-span-facts:tenant-1:${TRACE_ID}:tool-dedup`,
+        );
+      });
+    });
+
+    describe("when keying a claim-check job", () => {
+      /** @scenario relevant work waits in the queue at the cost of a pointer, not of its payload */
+      it("derives the identical key from the reference shape", () => {
+        const { subscriber } = makeSubscriber();
+        const event = rawSpanEvent({
+          name: "claude_code.tool",
+          spanId: "tool-dedup",
+          attributes: { tool_name: "Bash" },
+        }) as SpanReceivedEvent;
+
+        const dedup = subscriber.options?.deduplication;
+        if (dedup === undefined || dedup === "aggregate") {
+          throw new Error("expected a custom deduplication config");
+        }
+
+        expect(
+          dedup.makeId(makeSpanReferencedEvent(event) as TraceProcessingEvent),
+        ).toBe(dedup.makeId(event));
+      });
+    });
+
+    describe("when two spans in one trace carry no wire span id", () => {
+      // The id-less span is the shape `makeSpanReferencedEvent` refuses to
+      // reference and stages whole, so this is a reachable production path,
+      // not a hypothetical. Keying it on an empty span id would make both
+      // spans share `…:<tenant>:<trace>:`, and the second one inside the 60s
+      // TTL would dedup away — its facts dropped, silently. The event's own
+      // correlation id keeps them distinct.
+      /** @scenario two relevant events that share no payload identity are still delivered separately */
+      it("keys each on its own event id instead of collapsing to the trace", () => {
+        const { subscriber } = makeSubscriber();
+        const first = rawSpanEvent({
+          name: "claude_code.tool",
+          spanId: "",
+          eventId: "evt-idless-1",
+          attributes: { tool_name: "Bash" },
+        });
+        const second = rawSpanEvent({
+          name: "claude_code.tool",
+          spanId: "",
+          eventId: "evt-idless-2",
+          attributes: { tool_name: "Read" },
+        });
+
+        const dedup = subscriber.options?.deduplication;
+        if (dedup === undefined || dedup === "aggregate") {
+          throw new Error("expected a custom deduplication config");
+        }
+
+        expect(dedup.makeId(first)).not.toBe(dedup.makeId(second));
+        // And the reference upgrade cannot change the key: a reference copies
+        // the source event's id, so an id-less span keys identically whichever
+        // shape the seam happened to stage.
+        expect(
+          dedup.makeId(
+            makeSpanReferencedEvent(first as SpanReceivedEvent) as
+              TraceProcessingEvent,
+          ),
+        ).toBe(dedup.makeId(first));
+      });
+    });
+  });
+
+  describe("given a claim-check staged job (ADR-069)", () => {
+    describe("when the referenced span is readable in the store", () => {
+      /** @scenario relevant work waits in the queue at the cost of a pointer, not of its payload */
+      it("lifts the identical command the full-event path produces", async () => {
+        const event = rawSpanEvent({
+          name: "claude_code.llm_request",
+          spanId: "llm-ref",
+          attributes: {
+            "gen_ai.conversation.id": "sess-ref",
+            input_tokens: 42,
+            stop_reason: "end_turn",
+          },
+        }) as SpanReceivedEvent;
+
+        const fullPath = makeSubscriber();
+        await fullPath.subscriber.handle(event, context);
+
+        const refPath = makeSubscriber(async () => storeReadBackFrom(event));
+        await refPath.subscriber.handle(
+          makeSpanReferencedEvent(event) as TraceProcessingEvent,
+          context,
+        );
+
+        expect(refPath.dispatched).toHaveLength(1);
+        expect(refPath.dispatched[0]).toEqual(fullPath.dispatched[0]);
+        expect(refPath.reads).toEqual([
+          {
+            tenantId: "tenant-1",
+            traceId: TRACE_ID,
+            spanId: "llm-ref",
+            occurredAtMs: 1_000,
+          },
+        ]);
+        // The full-event path never touches the store.
+        expect(fullPath.reads).toHaveLength(0);
+      });
+    });
+
+    describe("when the reference belongs to another tenant", () => {
+      // The claim-check read is the one place span facts leave this event's
+      // envelope, so the tenant predicate has to travel with it. A read that
+      // dropped the tenant — or carried a hardcoded one — would resolve
+      // against the wrong project's spans, so the assertion uses a tenant
+      // that appears nowhere else in this suite.
+      it("scopes the store read to the referencing event's own tenant", async () => {
+        const base = rawSpanEvent({
+          name: "claude_code.tool",
+          spanId: "tool-tenant",
+          attributes: { tool_name: "Bash" },
+        }) as SpanReceivedEvent;
+        const event = { ...base, tenantId: createTenantId("tenant-other") };
+
+        const { subscriber, reads } = makeSubscriber(async () =>
+          normalizedFrom(event),
+        );
+        await subscriber.handle(
+          makeSpanReferencedEvent(event) as TraceProcessingEvent,
+          context,
+        );
+
+        expect(reads[0]?.tenantId).toBe("tenant-other");
+      });
+    });
+
+    describe("when the store read-back deserialized numeric-looking scalars", () => {
+      /** @scenario relevant work waits in the queue at the cost of a pointer, not of its payload */
+      it("keys the session identically and keeps the version fact in canonicalized form", async () => {
+        // A purely numeric session key and a numeric-looking service.version:
+        // the Map(String, String) round-trip hands them back as NUMBERS, and
+        // the lift must land on the same command either way — not fall back
+        // to trace-keyed sessions or silently drop the fact.
+        const event = rawSpanEvent({
+          name: "claude_code.llm_request",
+          spanId: "llm-numeric",
+          attributes: { "gen_ai.conversation.id": "175335720123" },
+          resourceAttributes: { "service.version": "1.0" },
+        }) as SpanReceivedEvent;
+
+        const fullPath = makeSubscriber();
+        await fullPath.subscriber.handle(event, context);
+
+        const refPath = makeSubscriber(async () => storeReadBackFrom(event));
+        await refPath.subscriber.handle(
+          makeSpanReferencedEvent(event) as TraceProcessingEvent,
+          context,
+        );
+
+        // The session key — the field that decides which aggregate the facts
+        // land on — is identical across paths.
+        expect(fullPath.dispatched[0]?.sessionId).toBe("175335720123");
+        expect(fullPath.dispatched[0]?.sessionKeySource).toBe("provider");
+        expect(refPath.dispatched[0]?.sessionId).toBe("175335720123");
+        expect(refPath.dispatched[0]?.sessionKeySource).toBe("provider");
+        // The version fact survives, canonicalized: the Map(String, String)
+        // round-trip collapses "1.0" to the number 1, so the claim-check path
+        // reports "1" — kept (not dropped), with the numeric formatting lost.
+        expect(fullPath.dispatched[0]?.facts["service.version"]).toBe("1.0");
+        expect(refPath.dispatched[0]?.facts["service.version"]).toBe("1");
+      });
+    });
+
+    describe("when the referenced span outlived the ingest-time window", () => {
+      /** @scenario work whose payload is not readable yet retries, never drops */
+      it("centers the store read on the span's own start, not on ingest time", async () => {
+        const threeDays = 3 * 24 * 60 * 60 * 1000;
+        const startMs = 1_000_000;
+        const base = rawSpanEvent({
+          name: "claude_code.blocked_on_user",
+          spanId: "long-span",
+          startMs,
+          endMs: startMs + threeDays,
+        }) as SpanReceivedEvent;
+        // Ingest happened when the span ENDED — three days after it started,
+        // which is outside a fixed window centered on ingest time.
+        const event = { ...base, occurredAt: startMs + threeDays };
+
+        const { subscriber, reads } = makeSubscriber(async () =>
+          normalizedFrom(event),
+        );
+        await subscriber.handle(
+          makeSpanReferencedEvent(event) as TraceProcessingEvent,
+          context,
+        );
+
+        expect(reads).toEqual([
+          {
+            tenantId: "tenant-1",
+            traceId: TRACE_ID,
+            spanId: "long-span",
+            occurredAtMs: startMs,
+          },
+        ]);
+      });
+
+      it("falls back to ingest time when the wire span carried no parseable start", async () => {
+        const valid = rawSpanEvent({
+          name: "claude_code.tool",
+          spanId: "no-start",
+          attributes: { tool_name: "Bash" },
+        }) as SpanReceivedEvent;
+        const base = rawSpanEvent({
+          name: "claude_code.tool",
+          spanId: "no-start",
+          attributes: { tool_name: "Bash" },
+        }) as SpanReceivedEvent;
+        const span = base.data.span as { startTimeUnixNano?: unknown };
+        span.startTimeUnixNano = "not-a-timestamp";
+        const event = { ...base, occurredAt: 5_000 };
+
+        // Only the read HINT is under test; the stub's span content just has
+        // to be a well-formed store row (a garbage start can't normalize, so
+        // the store never holds one).
+        const { subscriber, reads } = makeSubscriber(async () =>
+          normalizedFrom(valid),
+        );
+        await subscriber.handle(
+          makeSpanReferencedEvent(event) as TraceProcessingEvent,
+          context,
+        );
+
+        expect(reads[0]?.occurredAtMs).toBe(5_000);
+      });
+    });
+
+    describe("when the referenced span is not readable yet", () => {
+      /** @scenario work whose payload is not readable yet retries, never drops */
+      it("throws into the queue's retry instead of dropping silently", async () => {
+        const event = rawSpanEvent({
+          name: "claude_code.tool",
+          spanId: "tool-late",
+          attributes: { tool_name: "Bash" },
+        }) as SpanReceivedEvent;
+        const { subscriber, dispatched } = makeSubscriber(async () => null);
+
+        await expect(
+          subscriber.handle(
+            makeSpanReferencedEvent(event) as TraceProcessingEvent,
+            context,
+          ),
+        ).rejects.toThrow(/not readable yet/);
+        expect(dispatched).toHaveLength(0);
+      });
+    });
+
+    describe("when the reference carries a version this build does not know", () => {
+      /** @scenario work a build cannot read fails loudly, never half-processed */
+      it("throws into the queue's retry instead of no-opping as another shape", async () => {
+        const event = rawSpanEvent({
+          name: "claude_code.tool",
+          spanId: "tool-vnext",
+          attributes: { tool_name: "Bash" },
+        }) as SpanReceivedEvent;
+        const future = {
+          ...makeSpanReferencedEvent(event),
+          version: "2199-01-01",
+        };
+        const { subscriber, dispatched } = makeSubscriber(async () =>
+          normalizedFrom(event),
+        );
+
+        // A bare `toThrow()` would green on a fixture typo or a stub fault as
+        // readily as on the version gate. Pin the failure to the gate itself:
+        // a schema rejection whose issue is the `version` field.
+        const failure: unknown = await subscriber
+          .handle(future as TraceProcessingEvent, context)
+          .then(
+            () => null,
+            (error: unknown) => error,
+          );
+        expect(failure).toBeInstanceOf(ZodError);
+        expect(
+          (failure as ZodError).issues.map((issue) => issue.path.join(".")),
+        ).toContain("version");
+        expect(dispatched).toHaveLength(0);
+      });
+    });
+
+    describe("when the matched span has no span id to reference", () => {
+      /** @scenario an event whose payload cannot be pointed at is still processed */
+      it("stages the full event unchanged and the handler processes it as before", async () => {
+        const event = rawSpanEvent({
+          name: "claude_code.tool",
+          spanId: "",
+          attributes: { tool_name: "Bash" },
+        }) as SpanReceivedEvent;
+
+        const staged = makeSpanReferencedEvent(event);
+        expect(staged).toBe(event);
+
+        const { subscriber, dispatched, reads } = makeSubscriber();
+        await subscriber.handle(staged as TraceProcessingEvent, context);
+        expect(dispatched).toHaveLength(1);
+        expect(reads).toHaveLength(0);
+      });
+    });
+  });
+
+  describe("when a Cowork session's span arrives (beta trace export)", () => {
+    /** @scenario Cowork telemetry that shares Claude Code's event vocabulary is still Cowork */
+    it("labels the contribution claude_cowork from the resource service", async () => {
+      const { subscriber, dispatched } = makeSubscriber();
+
+      // Claude Code's span name and scope; only resource service.name says
+      // cowork. The label must follow the service, not the runtime.
+      await subscriber.handle(
+        rawSpanEvent({
+          name: "claude_code.llm_request",
+          spanId: "s-cw",
+          attributes: { "gen_ai.conversation.id": "cw-sess-1" },
+          resourceAttributes: { "service.name": "cowork" },
+        }),
+        context,
+      );
+
+      expect(dispatched).toHaveLength(1);
+      expect(dispatched[0]!.agent).toBe("claude_cowork");
+      expect(dispatched[0]!.sessionId).toBe("cw-sess-1");
     });
   });
 });

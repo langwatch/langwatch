@@ -1,5 +1,8 @@
+import { performance } from "node:perf_hooks";
 import { createLogger } from "@langwatch/observability";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import { parseClickHouseDateTimeMs } from "~/server/clickhouse/dateTime";
+import { asNumber, asStringArray } from "~/server/clickhouse/recordDecode";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import type {
   CodingAgentSessionMetricSeriesRow,
@@ -7,6 +10,10 @@ import type {
 } from "~/server/event-sourcing/pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
 import { SecurityError } from "~/server/event-sourcing/services/errorHandling";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
+import {
+  observeCodingAgentSessionListReadDuration,
+  type CodingAgentSessionListReadOutcome,
+} from "~/server/metrics";
 import type { CodingAgentSessionRepository } from "./coding-agent-session.repository";
 
 const TABLE_NAME = "coding_agent_sessions" as const;
@@ -345,6 +352,58 @@ export class CodingAgentSessionClickHouseRepository
    * Unwindowed, the same case yields an EMPTY outer read, which the caller's
    * retry recovers. The subquery touches only sort-key columns, so it stays a
    * cheap keyed seek without partition pruning.
+   *
+   * ORDER BY breaks UpdatedAt ties. It is NOT the
+   * `ORDER BY <version> DESC LIMIT 1` anti-pattern in
+   * dev/docs/best_practices/clickhouse-queries.md: the IN-tuple has already cut
+   * the input to the rows sharing max(UpdatedAt) — normally one — so the sort
+   * reads no column `SELECT *` was not already materialising for those same
+   * rows, rather than every unmerged version of the session.
+   *
+   * This is DEFENCE IN DEPTH, not a live bug. `nextVersionStamp` above already
+   * makes a tie unreachable while per-aggregate group serialization holds, and
+   * that is the mechanism relied on. The tiebreak covers the residual: the
+   * stamp's monotonic floor is per-writer plus whatever the read-back threaded,
+   * so two processes that resumed from the same committed version outside that
+   * serialization window can still land on the same ms. A bare LIMIT 1 would
+   * then pick arbitrarily and hand the fold stale state it resumes from and
+   * rewrites, dropping the other version's contributions and its applied-id
+   * watermark.
+   *
+   * Keys 1-4 order by how far each version's fold actually got, and the session
+   * is fed by three signal families, so it needs a key for each. Key 5 is not a
+   * progress key at all — it is only there to close the ordering:
+   *   1. `LastEventOccurredAt DESC` — the fold's own progress watermark
+   *      (`max(prev, event.occurredAt)`, so non-decreasing): the version that
+   *      applied the latest event wins.
+   *   2. `ModelCalls + ToolCalls + Prompts DESC` — span- and log-fed progress.
+   *      Every term is a `prev + 1` accumulator threaded through read-back and
+   *      never reset, so the sum only ever increases: a larger sum absorbed
+   *      strictly more contributions.
+   *   3. `length(MetricSeries) DESC` — metric-fed progress. The overlay
+   *      REPLACES per series rather than incrementing (ADR-056 §5), so the
+   *      count of converged units only grows. This key is not redundant with
+   *      (2): a metric-only session — a first-class case, since metrics are the
+   *      sole source of lines-of-code, commits and PRs — holds those three
+   *      counters at zero forever, and this is its only progress signal.
+   *   4. `length(AppliedEventIds) DESC` — more deliveries absorbed. After the
+   *      others because the watermark is reset per fresh delivery, so it
+   *      saturates and discriminates weakly.
+   *   5. `StartedAt ASC` — a deterministic last-resort tie-break, and nothing
+   *      more. It is here only to make the ordering TOTAL so the fully-tied
+   *      case resolves the same way on every execution instead of arbitrarily.
+   *      It is explicitly NOT a correctness or progress signal, and ASC is
+   *      chosen for stability rather than because a smaller value is better
+   *      informed: `StartedAt` is a `min(occurredAt)` only while a live
+   *      aggregate keeps reading its own state back, and a read-back miss
+   *      re-runs `init()` (`startedAtMs: 0`), re-stamping it from the next
+   *      event's `occurredAt` — which can be LARGER than the value already
+   *      persisted. So it moves in both directions and its direction carries no
+   *      information about which version folded more (ADR-071; the same reason
+   *      no bound on it is safe inside a dedup scope).
+   *
+   * Reading the two array lengths costs only their offsets columns; every other
+   * key is a scalar already in the row.
    */
   private async findLatestRecord({
     tenantId,
@@ -380,6 +439,12 @@ export class CodingAgentSessionClickHouseRepository
               AND SessionId = {sessionId:String}
             GROUP BY TenantId, SessionId
           )
+        ORDER BY
+          LastEventOccurredAt DESC,
+          ModelCalls + ToolCalls + Prompts DESC,
+          length(MetricSeries) DESC,
+          length(AppliedEventIds) DESC,
+          StartedAt ASC
         LIMIT 1
       `,
       query_params: {
@@ -425,14 +490,47 @@ export class CodingAgentSessionClickHouseRepository
   }
 
   /**
-   * A project's sessions in a period, newest first. StartedAt is both the
-   * partition filter and the sort; the IN-tuple dedup keeps one version per
-   * session even when a late signal shifted StartedAt between versions.
+   * A project's sessions in a period, newest first. `StartedAt` bounds the
+   * OUTER scope only — it is the partition key and the sort, so the bound is
+   * what prunes this read to the caller's weeks.
+   *
+   * The inner dedup subquery is deliberately UNWINDOWED, the same discipline
+   * `findLatestRecord` applies to the point read (ADR-071 consequence 4).
+   * `StartedAt` moves: the fold takes `min(state.startedAtMs, occurredAt)`, so
+   * a late-arriving earlier signal backdates it. Range-filtering the inner
+   * scope on that moving column drops the true latest version out of the
+   * `max(UpdatedAt)` group whenever it has drifted past the window edge, and
+   * the group then resolves to a STALE in-window version which the outer scope
+   * happily returns — wrong start time, stale totals, non-null so no fallback
+   * catches it. Unwindowed, the inner resolves the true latest and the outer
+   * `BETWEEN` judges THAT: a session whose real start has drifted below the
+   * window correctly leaves the window instead of rendering stale.
+   *
+   * No bound belongs on the inner scope, not even an upper one. "The latest
+   * version always holds the smallest `StartedAt`, because the fold takes a
+   * min" is false: a read-back store miss re-runs `init()` and re-stamps
+   * `startedAtMs` from the next event's `occurredAt`, which can be LARGER than
+   * the value already persisted. Any bound can therefore hide the true latest.
+   *
+   * The cost is real and worth stating: the inner no longer prunes to the
+   * window, so it scans this tenant's sessions across partitions. It touches
+   * only sort-key columns plus `UpdatedAt` — no heavy columns — and groups to
+   * one row per session, so it stays a compact scan, and the outer scope still
+   * prunes. ADR-071's sequenced "freeze the writer" step makes `StartedAt`
+   * immutable and lets the pruning bound come back here safely.
+   *
+   * That cost is MEASURED, not asserted:
+   * `coding_agent_session_list_read_duration_milliseconds{table,outcome}` times
+   * this read, so "the compact scan is acceptable" and "the freeze can keep
+   * waiting" are observations rather than assumptions (ADR-071 sequencing steps
+   * 2-3). Duration only — the query result exposes no rows-scanned counter; see
+   * the metric's docblock in `~/server/metrics`.
    *
    * `userId`, when given, narrows to the agent-reported identity — folded
-   * into BOTH the outer filter and the dedup subquery so the two agree on
-   * which rows are in scope. Omitted for personal-workspace usage, where the
-   * personal project already isolates the user.
+   * into BOTH scopes so the two agree on which rows are in scope. Unlike the
+   * range filter it is safe there: it is a stable column, so it cannot move a
+   * version out of the dedup group. Omitted for personal-workspace usage,
+   * where the personal project already isolates the user.
    */
   async findManyRecent({
     tenantId,
@@ -456,35 +554,53 @@ export class CodingAgentSessionClickHouseRepository
     const userFilter =
       userId !== undefined ? "AND UserId = {userId:String}" : "";
 
-    const result = await client.query({
-      query: `
-        SELECT *
-        FROM ${TABLE_NAME}
-        WHERE TenantId = {tenantId:String}
-          ${userFilter}
-          AND StartedAt BETWEEN fromUnixTimestamp64Milli({from:Int64}) AND fromUnixTimestamp64Milli({to:Int64})
-          AND (TenantId, SessionId, UpdatedAt) IN (
-            SELECT TenantId, SessionId, max(UpdatedAt)
-            FROM ${TABLE_NAME}
-            WHERE TenantId = {tenantId:String}
-              ${userFilter}
-              AND StartedAt BETWEEN fromUnixTimestamp64Milli({from:Int64}) AND fromUnixTimestamp64Milli({to:Int64})
-            GROUP BY TenantId, SessionId
-          )
-        ORDER BY StartedAt DESC
-        LIMIT {limit:UInt32}
-      `,
-      query_params: {
-        tenantId,
-        from: fromMs,
-        to: toMs,
-        limit,
-        ...(userId !== undefined ? { userId } : {}),
-      },
-      format: "JSONEachRow",
-    });
+    const startedAt = performance.now();
+    const observe = (outcome: CodingAgentSessionListReadOutcome) =>
+      observeCodingAgentSessionListReadDuration({
+        table: TABLE_NAME,
+        outcome,
+        durationMs: performance.now() - startedAt,
+      });
 
-    const rows = await result.json<Record<string, unknown>>();
+    let rows: Record<string, unknown>[];
+    try {
+      const result = await client.query({
+        query: `
+          SELECT *
+          FROM ${TABLE_NAME}
+          WHERE TenantId = {tenantId:String}
+            ${userFilter}
+            AND StartedAt BETWEEN fromUnixTimestamp64Milli({from:Int64}) AND fromUnixTimestamp64Milli({to:Int64})
+            AND (TenantId, SessionId, UpdatedAt) IN (
+              SELECT TenantId, SessionId, max(UpdatedAt)
+              FROM ${TABLE_NAME}
+              WHERE TenantId = {tenantId:String}
+                ${userFilter}
+              GROUP BY TenantId, SessionId
+            )
+          ORDER BY StartedAt DESC
+          LIMIT {limit:UInt32}
+        `,
+        query_params: {
+          tenantId,
+          from: fromMs,
+          to: toMs,
+          limit,
+          ...(userId !== undefined ? { userId } : {}),
+        },
+        format: "JSONEachRow",
+      });
+
+      rows = await result.json<Record<string, unknown>>();
+    } catch (error) {
+      observe("error");
+      throw error;
+    }
+    // Timed around the read alone: decoding ~90 columns per row is the caller's
+    // cost, not the dedup scan's, and mixing it in would move the distribution
+    // with page size rather than with scan width.
+    observe(rows.length > 0 ? "hit" : "empty");
+
     return rows.map(fromRecord);
   }
 
@@ -539,16 +655,6 @@ export class CodingAgentSessionClickHouseRepository
   }
 }
 
-const asNumber = (value: unknown): number => {
-  const n = Number(value);
-  return Number.isFinite(n) ? n : 0;
-};
-
-const asStringArray = (value: unknown): string[] =>
-  Array.isArray(value)
-    ? value.filter((v): v is string => typeof v === "string")
-    : [];
-
 const asNumberArray = (value: unknown): number[] =>
   Array.isArray(value) ? value.map(asNumber) : [];
 
@@ -587,6 +693,18 @@ const asNumberMap = (value: unknown): Record<string, number> =>
       )
     : {};
 
+/**
+ * Decode one `JSONEachRow` record.
+ *
+ * Every DateTime64(3) goes through `parseClickHouseDateTimeMs`: ClickHouse emits
+ * them without a zone suffix ("2026-07-24 12:00:00.123") and V8 reads a bare
+ * datetime as LOCAL time, so `new Date(str)` skews each one by the host's UTC
+ * offset. `LastEventOccurredAt` makes that load-bearing rather than cosmetic —
+ * `CodingAgentSessionStore` reads it as the "was this row written after
+ * migration 00053" discriminator, and a pre-00053 row's `1970-01-01
+ * 00:00:00.000` decodes POSITIVE anywhere west of UTC, which would let the
+ * store decode exactly the rows its gate exists to reject.
+ */
 function fromRecord(record: Record<string, unknown>): CodingAgentSessionRow {
   const steps = Array.isArray(record.Steps) ? record.Steps : [];
   return {
@@ -594,7 +712,7 @@ function fromRecord(record: Record<string, unknown>): CodingAgentSessionRow {
     sessionId: String(record.SessionId ?? ""),
     sessionKeySource: String(record.SessionKeySource ?? ""),
     version: String(record.Version ?? ""),
-    startedAtMs: new Date(String(record.StartedAt)).getTime(),
+    startedAtMs: parseClickHouseDateTimeMs(String(record.StartedAt ?? "")),
 
     agent: String(record.Agent ?? ""),
     agentVersion: String(record.AgentVersion ?? ""),
@@ -687,8 +805,10 @@ function fromRecord(record: Record<string, unknown>): CodingAgentSessionRow {
     stepStartedAt: asNumberArray(record.StepStartedAt),
     previousCallContextTokens: asNumber(record.PreviousCallContextTokens),
     metricSeries: asMetricSeriesRows(record.MetricSeries),
-    createdAt: new Date(String(record.CreatedAt)).getTime(),
-    updatedAt: new Date(String(record.UpdatedAt)).getTime(),
-    lastEventOccurredAt: new Date(String(record.LastEventOccurredAt)).getTime(),
+    createdAt: parseClickHouseDateTimeMs(String(record.CreatedAt ?? "")),
+    updatedAt: parseClickHouseDateTimeMs(String(record.UpdatedAt ?? "")),
+    lastEventOccurredAt: parseClickHouseDateTimeMs(
+      String(record.LastEventOccurredAt ?? ""),
+    ),
   };
 }

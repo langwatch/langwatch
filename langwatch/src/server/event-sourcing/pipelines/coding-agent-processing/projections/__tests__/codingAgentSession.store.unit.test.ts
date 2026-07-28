@@ -219,3 +219,171 @@ describe("CodingAgentSessionStore durable dedup", () => {
     });
   });
 });
+
+/**
+ * The read-back gate (ADR-066). The columns of migrations 00053/00054 are only
+ * trustworthy on a row written after 00053 applied; on an older row each decodes
+ * as a ClickHouse default indistinguishable from a real value, so the store
+ * reports a miss and the fold's `refoldOnStoreMiss` rebuilds it once.
+ *
+ * The version alone cannot tell those apart. 00053 and 00054 shipped WITHOUT
+ * bumping the stamp, so `2026-07-21` covers rows on both sides of the column
+ * change. The gate therefore pairs it with the `LastEventOccurredAt` checkpoint,
+ * which arrived in 00053, defaults to 0, and only ever takes a positive
+ * `occurredAt` — 0 on every pre-00053 row and positive on every later one, by
+ * construction.
+ */
+describe("CodingAgentSessionStore read-back gate", () => {
+  /** A session with every read-back column carrying real, non-default values. */
+  function committedState(): CodingAgentSessionState {
+    return makeState({
+      modelCalls: 3,
+      subAgents: 2,
+      subAgentIds: ["sub-a", "sub-b"],
+      previousCallContextTokens: 12_000,
+      steps: [{ name: "Read", count: 2, failed: false, startedAtMs: 9_000 }],
+      metricSeries: {
+        "loc-added": {
+          metricName: "claude_code.lines_of_code.count",
+          type: "added",
+          decision: null,
+          language: null,
+          value: 42,
+        },
+      },
+      linesAdded: 42,
+    });
+  }
+
+  describe("given a row stamped with the current projection version", () => {
+    describe("when the fold reads it back", () => {
+      it("returns the decoded state and the durable watermark", async () => {
+        const repo = new FakeRepo();
+        repo.withApplied = {
+          row: makeRow(committedState()),
+          appliedEventIds: ["e1", "e2"],
+        };
+        const store = new CodingAgentSessionStore(repo);
+
+        const { state, appliedEventIds } = await store.getWithApplied(
+          "session-1",
+          context(),
+        );
+
+        expect(state?.subAgentIds).toEqual(["sub-a", "sub-b"]);
+        expect(state?.steps[0]?.startedAtMs).toBe(9_000);
+        expect(Object.keys(state?.metricSeries ?? {})).toEqual(["loc-added"]);
+        expect(appliedEventIds).toEqual(["e1", "e2"]);
+      });
+    });
+  });
+
+  describe("given a row stamped with an older projection version", () => {
+    /**
+     * Such a row predates the read-back columns, so each one carries its column
+     * default: an empty metric-series map makes the next contribution recompute
+     * every metric-fed total from that one series alone, an empty sub-agent id
+     * set resets the count to one, zeroed step start times leave later steps
+     * only their arrival order to be placed by, and a zeroed previous context
+     * size reads as "first call ever" so the next cache rebuild goes uncounted.
+     */
+    const staleRow = (): CodingAgentSessionRow => ({
+      ...makeRow(committedState()),
+      version: "2026-07-21",
+      subAgentIds: [],
+      stepStartedAt: [],
+      previousCallContextTokens: 0,
+      metricSeries: [],
+      lastEventOccurredAt: 0,
+    });
+
+    describe("when the fold reads it back", () => {
+      /** @scenario a stored state written under an older shape is rebuilt rather than trusted */
+      it("reports a store miss so the fold rebuilds instead of trusting it", async () => {
+        const repo = new FakeRepo();
+        repo.withApplied = {
+          row: staleRow(),
+          appliedEventIds: ["e1", "e2"],
+        };
+        const store = new CodingAgentSessionStore(repo);
+
+        const { state, appliedEventIds } = await store.getWithApplied(
+          "session-1",
+          context(),
+        );
+
+        expect(state).toBeNull();
+        // The watermark goes with the state: keeping it would suppress the very
+        // events the re-fold needs to see.
+        expect(appliedEventIds).toEqual([]);
+      });
+
+      it("misses through get() too, so both read paths agree", async () => {
+        const repo = new FakeRepo();
+        repo.withApplied = { row: staleRow(), appliedEventIds: ["e1"] };
+        const store = new CodingAgentSessionStore(repo);
+
+        expect(await store.get("session-1", context())).toBeNull();
+      });
+    });
+  });
+
+  describe("given a pre-bump row whose read-back columns are populated", () => {
+    /**
+     * The population migrations 00053/00054 created without a stamp bump: rows
+     * written by a build that HAD the read-back columns, still carrying
+     * `2026-07-21` because neither migration touched the version. Rejecting
+     * these on the version alone would refold a large live population from full
+     * `event_log` history for no gain — the exact cost ADR-066 exists to remove,
+     * on the aggregate class behind the 2026-07-23 outage.
+     */
+    const preBumpRow = (): CodingAgentSessionRow => ({
+      ...makeRow(committedState()),
+      version: "2026-07-21",
+      lastEventOccurredAt: 1_900,
+    });
+
+    describe("when the fold reads it back", () => {
+      it("decodes it rather than forcing a full-history refold", async () => {
+        const repo = new FakeRepo();
+        repo.withApplied = {
+          row: preBumpRow(),
+          appliedEventIds: ["e1", "e2"],
+        };
+        const store = new CodingAgentSessionStore(repo);
+
+        const { state, appliedEventIds } = await store.getWithApplied(
+          "session-1",
+          context(),
+        );
+
+        expect(state?.subAgentIds).toEqual(["sub-a", "sub-b"]);
+        expect(state?.steps[0]?.startedAtMs).toBe(9_000);
+        expect(state?.previousCallContextTokens).toBe(12_000);
+        expect(appliedEventIds).toEqual(["e1", "e2"]);
+      });
+    });
+  });
+
+  describe("given a row on neither the current nor the pre-bump stamp", () => {
+    describe("when the fold reads it back", () => {
+      it("misses regardless of its checkpoint", async () => {
+        // A populated checkpoint only rehabilitates the ONE stamp that is known
+        // to straddle the column change. Any other stamp is a shape this build
+        // has never reasoned about, so it refolds.
+        const repo = new FakeRepo();
+        repo.withApplied = {
+          row: {
+            ...makeRow(committedState()),
+            version: "2026-06-01",
+            lastEventOccurredAt: 1_900,
+          },
+          appliedEventIds: ["e1"],
+        };
+        const store = new CodingAgentSessionStore(repo);
+
+        expect(await store.get("session-1", context())).toBeNull();
+      });
+    });
+  });
+});

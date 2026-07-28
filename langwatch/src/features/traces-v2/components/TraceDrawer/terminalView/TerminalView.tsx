@@ -561,6 +561,7 @@ const AGENT_BANNERS: Record<
   { name: string; mark: MarkSpec }
 > = {
   claude_code: { name: "Claude Code", mark: claudeGradientMark(MARK_ROWS) },
+  claude_cowork: { name: "Claude Cowork", mark: claudeGradientMark(MARK_ROWS) },
   opencode: { name: "opencode", mark: OPENCODE_MARK },
   codex: { name: "Codex", mark: CODEX_MARK },
   gemini_cli: { name: "Gemini CLI", mark: GEMINI_MARK },

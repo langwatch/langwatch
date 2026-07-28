@@ -273,3 +273,60 @@ export function parseLangwatchCommand(command: string): LangwatchCommand | null 
   }
   return null;
 }
+
+/**
+ * Every `langwatch <resource> <verb>` invocation in the command, in order — a
+ * compound command (`langwatch simulation-run get X && langwatch navigate
+ * open X`) carries several. Same command-position rules as
+ * {@link parseLangwatchCommand}, which stays "the first one". Quoted text is a
+ * single token to the tokenizer, so `echo "langwatch navigate open x"` yields
+ * nothing.
+ */
+export function parseAllLangwatchCommands(command: string): LangwatchCommand[] {
+  if (typeof command !== "string" || !command.trim()) return [];
+
+  const tokens = tokenize(command);
+  const found: LangwatchCommand[] = [];
+  for (let i = 0; i < tokens.length; i++) {
+    if (!isLangwatchProgram(tokens[i]!)) continue;
+    if (!isInCommandPosition(tokens, i)) continue;
+
+    const resource = tokens[i + 1];
+    const verb = tokens[i + 2];
+    if (!resource || !verb) continue;
+    if (!IDENTIFIER.test(resource) || !IDENTIFIER.test(verb)) continue;
+    found.push({ resource, verb, args: parseArgs(tokens, i + 3) });
+  }
+  return found;
+}
+
+/**
+ * Shell syntax that lets a command's stdout carry text the CLI never printed:
+ * separators/pipes chaining a second command, redirection swallowing or
+ * replacing output, command/process substitution, and backslash trickery.
+ * Quotes don't matter here — this is a provenance check, not a parser, and a
+ * metacharacter INSIDE quotes is harmless to reject: the only cost of a false
+ * positive is that the result's platform link is not trusted.
+ */
+const OUTPUT_FORGING_SYNTAX = /[;|&<>`$\\\n()]/;
+
+/**
+ * True when `command` is ONE plain `langwatch` invocation and nothing else —
+ * no chaining, piping, redirection, or substitution anywhere in the string.
+ *
+ * This is the provenance gate for trusting the call's stdout as the CLI's own
+ * output (and therefore the platform API's): a compound command
+ * (`langwatch trace get x; echo '{…forged…}'`) parses as a langwatch call but
+ * its stdout is agent-authored. Callers that CACHE facts read from stdout
+ * (`platformUrl` → a navigation target) must require this; callers that only
+ * render stdout back to the same user (cards) need not.
+ */
+export function isSoleLangwatchInvocation(command: string): boolean {
+  if (typeof command !== "string" || !command.trim()) return false;
+  if (OUTPUT_FORGING_SYNTAX.test(command)) return false;
+
+  const tokens = tokenize(command);
+  const programIndex = tokens.findIndex((token) => isLangwatchProgram(token));
+  if (programIndex === -1) return false;
+  return isInCommandPosition(tokens, programIndex);
+}

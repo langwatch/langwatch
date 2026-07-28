@@ -14,7 +14,7 @@
  * Spec: specs/langy/langy-baseline.feature ("Access and rollout gating")
  */
 import { cleanup, renderHook } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 type FlagOptions = {
   projectId?: string;
@@ -37,26 +37,6 @@ vi.mock("~/hooks/useRequiredSession", () => ({
   useRequiredSession: () => ({ data: { user: { id: "user-1" } } }),
 }));
 
-vi.mock("~/hooks/useOrganizationTeamProject", () => ({
-  useOrganizationTeamProject: () => ({
-    project: { id: "project-1", slug: "acme" },
-    team: {
-      isPersonal: false,
-      ownerUserId: "someone-else",
-      members: [{ userId: "user-1" }],
-    },
-    organization: { id: "org-1" },
-    organizationRole: "MEMBER",
-    hasPermission: (permission: string) => permission === "langy:view",
-  }),
-}));
-
-vi.mock("~/hooks/usePublicEnv", () => ({
-  // A demo slug that does NOT match the active project, so the demo-refusal
-  // branch stays out of the way and the rollout is what decides visibility.
-  usePublicEnv: () => ({ data: { DEMO_PROJECT_SLUG: "not-this-project" } }),
-}));
-
 vi.mock("~/hooks/useFeatureFlag", () => ({
   useFeatureFlag: (_flag: string, options: FlagOptions) => {
     gate.lastFlagOptions = options;
@@ -73,12 +53,45 @@ vi.mock("~/hooks/useFeatureFlag", () => ({
   },
 }));
 
+// Mutable so a later describe block can swap in an unresolved-project shape
+// without a second vi.mock (hoisting only allows one factory per module).
+const context = {
+  project: { id: "project-1", slug: "acme" } as { id: string; slug: string } | undefined,
+  demoProjectSlug: "not-this-project" as string | undefined,
+};
+
+vi.mock("~/hooks/useOrganizationTeamProject", () => ({
+  useOrganizationTeamProject: () => ({
+    get project() {
+      return context.project;
+    },
+    team: {
+      isPersonal: false,
+      ownerUserId: "someone-else",
+      members: [{ userId: "user-1" }],
+    },
+    organization: { id: "org-1" },
+    organizationRole: "MEMBER",
+    hasPermission: (permission: string) => permission === "langy:view",
+  }),
+}));
+
+vi.mock("~/hooks/usePublicEnv", () => ({
+  usePublicEnv: () => ({
+    get data() {
+      return { DEMO_PROJECT_SLUG: context.demoProjectSlug };
+    },
+  }),
+}));
+
 import { useShowLangy } from "../useShowLangy";
 
 afterEach(() => {
   cleanup();
   gate.rule = null;
   gate.lastFlagOptions = undefined;
+  context.project = { id: "project-1", slug: "acme" };
+  context.demoProjectSlug = "not-this-project";
 });
 
 describe("useShowLangy", () => {
@@ -122,6 +135,26 @@ describe("useShowLangy", () => {
 
         expect(result.current).toBe(false);
       });
+    });
+  });
+
+  describe("when the active project has not resolved yet", () => {
+    beforeEach(() => {
+      context.project = undefined;
+      context.demoProjectSlug = undefined;
+    });
+
+    // `DEMO_PROJECT_SLUG === project?.slug` with both sides undefined must
+    // not read as "this is the demo project". An install with no demo
+    // project configured hits exactly this on any route whose project
+    // hasn't resolved yet, and did not deserve to lose Langy for it.
+    /** @scenario The handle stays visible while the active project is still loading */
+    it("does not treat the unresolved project as the demo project", () => {
+      gate.rule = { organizationId: "org-1" };
+
+      const { result } = renderHook(() => useShowLangy());
+
+      expect(result.current).toBe(true);
     });
   });
 });

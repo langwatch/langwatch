@@ -474,6 +474,33 @@ export const incrementEsFoldRefoldTotal = (
   outcome: "performed" | "declined" | "unavailable",
 ) => esFoldRefoldTotal.labels(projectionName, outcome).inc();
 
+register.removeSingleMetric("es_fold_refold_on_miss_total");
+const esFoldRefoldOnMissTotal = new Counter({
+  name: "es_fold_refold_on_miss_total",
+  help: "Store-miss re-folds from the event log, by whether the aggregate had any history to replay",
+  labelNames: ["projection_name", "outcome"] as const,
+});
+
+/**
+ * Makes the ADR-066 transitional net observable. `refoldOnStoreMiss` survives on
+ * the three read-back folds ONLY to rebuild aggregates whose committed row
+ * predates their read-back columns, and its deletion condition is "it stopped
+ * firing" — which without this counter is an assumption, not an observation. A
+ * transitional refold and a regression to the pre-ADR-066 steady state (every
+ * cache miss walking `event_log`, the 2026-07-23 `TOO_MANY_PARTS` outage) look
+ * identical from the outside; the difference is only visible as a rate that
+ * decays to nothing versus one that tracks `es_fold_projection_total`.
+ *
+ * `performed` — history was replayed, i.e. the net actually caught something.
+ * `absent` — the history read came back empty, so the aggregate was genuinely
+ * new and the executor fell through to `init()`. Expect a steady floor of these
+ * on high-cardinality folds; they are not transitional debt.
+ */
+export const incrementEsFoldRefoldOnMissTotal = (
+  projectionName: string,
+  outcome: "performed" | "absent",
+) => esFoldRefoldOnMissTotal.labels(projectionName, outcome).inc();
+
 register.removeSingleMetric("es_fold_read_window_fallback_total");
 const esFoldReadWindowFallbackTotal = new Counter({
   name: "es_fold_read_window_fallback_total",
@@ -630,6 +657,43 @@ export const observeEsSubscriberDuration = ({
   durationMs: number;
 }) =>
   esSubscriberDuration.labels(pipelineName, subscriberName).observe(durationMs);
+
+/**
+ * Outcome of a subscriber's enqueue-time fan-out decision (payload-cost
+ * doctrine invariant 4 — ADR-069):
+ *
+ * - `filtered` — the predicate declined; no job was minted.
+ * - `staged` — a job carrying the full event was handed off to the
+ *   subscriber's lane.
+ * - `referenced` — a job carrying a claim-check reference instead of the
+ *   payload was handed off.
+ *
+ * `staged` and `referenced` are counted only after the handoff succeeded: the
+ * queue accepted the job, or (in the no-queue configuration) the handler ran
+ * inline. A handoff that throws counts no outcome at all — it is reported as a
+ * dispatch failure instead, so a queue outage cannot inflate either.
+ *
+ * The outcomes therefore do not sum to "events routed"; the shortfall is
+ * the failure count, which is the honest reading.
+ */
+type SubscriberEnqueueOutcome = "filtered" | "staged" | "referenced";
+register.removeSingleMetric("es_subscriber_enqueue_total");
+const esSubscriberEnqueueTotal = new Counter({
+  name: "es_subscriber_enqueue_total",
+  help: "Event-sourcing subscriber fan-out outcomes decided at enqueue time (ADR-069): filtered before staging, or — once the handoff to the subscriber's lane succeeded — staged as a full event or referenced as a claim-check",
+  labelNames: ["pipeline_name", "subscriber_name", "outcome"] as const,
+});
+
+export const incrementEsSubscriberEnqueueTotal = ({
+  pipelineName,
+  subscriberName,
+  outcome,
+}: {
+  pipelineName: string;
+  subscriberName: string;
+  outcome: SubscriberEnqueueOutcome;
+}) =>
+  esSubscriberEnqueueTotal.labels(pipelineName, subscriberName, outcome).inc();
 
 // --- Process manager metrics ---
 register.removeSingleMetric("es_process_manager_total");
@@ -1166,6 +1230,70 @@ const storedObjectSizeBytesHistogram = new Histogram({
 
 export const getStoredObjectSizeBytesHistogram = (purpose: string) =>
   storedObjectSizeBytesHistogram.labels(purpose);
+
+// ============================================================================
+// Coding-agent session reads
+// ============================================================================
+
+/**
+ * `hit` — the window returned rows. `empty` — it returned none, which still
+ * paid the full dedup scan. `error` — the read threw, so its duration is a
+ * failure time and must not sit in the same distribution as the successes.
+ */
+export type CodingAgentSessionListReadOutcome = "hit" | "empty" | "error";
+
+register.removeSingleMetric(
+  "coding_agent_session_list_read_duration_milliseconds",
+);
+const codingAgentSessionListReadDuration = new Histogram({
+  name: "coding_agent_session_list_read_duration_milliseconds",
+  help: "Duration of the coding-agent session list read, whose dedup scope scans the tenant unpruned, by table and outcome",
+  labelNames: ["table", "outcome"] as const,
+  buckets: [1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000],
+});
+
+/**
+ * Prices ADR-071 sequencing step 2. `findManyRecent`'s inner `max(UpdatedAt)`
+ * subquery dropped its `StartedAt` bound, because a bound on a moving column
+ * inside a dedup scope returns a stale version. The scope therefore no longer
+ * prunes partitions and scans this tenant's sessions rather than the window's
+ * weeks — compact (sort-key columns plus `UpdatedAt`, one group row per
+ * session), but a real increase the ADR states rather than measures.
+ *
+ * Without this the ADR's own exit conditions are unfalsifiable: "the compact
+ * scan is acceptable" and "step 3's freeze can keep waiting" are both claims
+ * about this read's cost, and nothing else observes it. A rising p99 here is
+ * what promotes the freeze from deferred to due, and a flat one is what earns
+ * the deferral.
+ *
+ * `empty` is not noise. An empty window still runs the whole unwindowed dedup
+ * scan and materialises nothing in the outer `SELECT *`, so it isolates the
+ * scan's own floor from the cost of rendering rows.
+ *
+ * Duration only, deliberately. `client.query()` resolves a `ResultSet`, which
+ * carries `response_headers` but no parsed summary — the client parses
+ * `X-ClickHouse-Summary` (`read_rows`, `read_bytes`) for `insert`/`command`/
+ * `exec` alone, and for a streaming `SELECT` those counters are complete only
+ * under `wait_end_of_query=1`. Rows *returned* is capped by the caller's limit
+ * and so says nothing about the scan, which is why it is not recorded as a
+ * stand-in.
+ *
+ * `table` and `outcome` only: per-tenant attribution belongs in the structured
+ * log lines, never as a label (the cardinality doctrine above). This table is
+ * one row per session, so a tenant label would track the customer count.
+ */
+export const observeCodingAgentSessionListReadDuration = ({
+  table,
+  outcome,
+  durationMs,
+}: {
+  table: string;
+  outcome: CodingAgentSessionListReadOutcome;
+  durationMs: number;
+}) =>
+  codingAgentSessionListReadDuration
+    .labels(table, outcome)
+    .observe(durationMs);
 
 // ============================================================================
 // withMetrics utility

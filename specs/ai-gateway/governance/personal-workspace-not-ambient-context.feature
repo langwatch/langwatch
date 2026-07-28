@@ -20,7 +20,7 @@ Feature: A personal workspace is never the ambient context for organization work
   Pairs with:
     - specs/ai-gateway/governance/workspace-switcher.feature (picking a context)
     - specs/ai-gateway/governance/personal-workspace-features.feature
-    - specs/model-providers/first-project-required.feature
+    - specs/model-providers/providers-without-a-project.feature
 
   Background:
     Given jane belongs to organization "ACME"
@@ -107,3 +107,63 @@ Feature: A personal workspace is never the ambient context for organization work
       Given bob has just been in his personal project
       When bob opens an organization-scoped settings page
       Then the ambient project is still his personal project
+
+  # ============================================================================
+  # /me is the one exception: it means the personal workspace on purpose
+  # ============================================================================
+
+  Rule: the personal-workspace page itself resolves to the personal team, never the shared one
+
+    A page with no project in its address bar is normally organization-scoped
+    work, which is exactly why the ambient context prefers a shared team. `/me`
+    and its sub-routes are the one page family where that assumption is
+    backwards: they ARE the personal workspace, so resolving them to the
+    organization's shared team instead hands every personal-scope feature
+    (Langy chief among them) a project that is either the wrong one or does
+    not exist, even though nothing in the address bar or the remembered
+    selection asked for that.
+
+    @integration
+    Scenario: Visiting the personal-workspace page resolves the personal team
+      Given jane's personal team is listed before the shared team
+      And jane has not opened any project yet
+      When jane opens her personal-workspace page
+      Then the ambient team is her personal team
+      And the ambient project is her personal project
+
+    @integration
+    Scenario: A shared team without a project does not leak into the personal-workspace page
+      Given the shared team holds no project yet
+      When jane opens her personal-workspace page
+      Then the ambient team is still her personal team
+      And the ambient project is still her personal project
+      # The organization-scoped equivalent of this fixture correctly leaves
+      # the page without a project; /me must not inherit that outcome just
+      # because the same project-less shared team exists in the organization.
+
+    @integration
+    Scenario: Every personal-workspace sub-route gets the same treatment
+      When jane opens a sub-page of her personal-workspace page
+      Then the ambient team is still her personal team
+
+    @integration
+    Scenario: A team remembered from an earlier organization-scoped visit does not follow jane onto the personal-workspace page
+      Given jane's last remembered team selection is the shared team, from an
+        earlier organization-scoped page
+      When jane opens her personal-workspace page
+      Then the ambient team is her personal team, not the remembered shared one
+      # A stale PERSONAL selection fading off an organization-scoped page is
+      # already handled (see "Leaving the personal project releases it"
+      # above). The mirror case is what this locks in: a stale SHARED
+      # selection must not follow her onto the personal-workspace page
+      # either, because that page can never mean anything but her own
+      # workspace.
+
+    @integration
+    Scenario: A member with no personal workspace of their own falls back to the ambient team
+      Given an external member belongs only to the shared team
+      When that member opens the personal-workspace page
+      Then the ambient team is the shared team
+      # The /me preference only ever adds a resolution, never a requirement:
+      # someone with no personal team gets the same ambient fallback as
+      # every organization-scoped page already does.

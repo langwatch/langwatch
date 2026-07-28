@@ -2,6 +2,7 @@ import { createLogger } from "@langwatch/observability";
 import {
   incrementEsFoldDuplicateEventsSkipped,
   incrementEsFoldReadWindowFallbackTotal,
+  incrementEsFoldRefoldOnMissTotal,
   incrementEsFoldRefoldTotal,
   observeEsFoldBlindReapplyEvents,
 } from "~/server/metrics";
@@ -334,6 +335,13 @@ export class FoldProjectionExecutor {
         [event],
         context,
       );
+      // The ADR-066 transitional net, made observable: its deletion condition is
+      // "it stopped firing", which is otherwise indistinguishable from a
+      // regression to the pre-ADR-066 steady state of refolding on every miss.
+      incrementEsFoldRefoldOnMissTotal(
+        projection.name,
+        refolded === null ? "absent" : "performed",
+      );
       if (refolded !== null) {
         await projection.store.store(
           refolded,
@@ -486,6 +494,11 @@ export class FoldProjectionExecutor {
         projection,
         ordered,
         context,
+      );
+      // Counted as on the single-event path above.
+      incrementEsFoldRefoldOnMissTotal(
+        projection.name,
+        refolded === null ? "absent" : "performed",
       );
       if (refolded !== null) {
         await projection.store.store(

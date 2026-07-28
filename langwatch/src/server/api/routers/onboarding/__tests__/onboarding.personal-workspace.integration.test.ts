@@ -17,7 +17,9 @@
  * PersonalWorkspaceService. Requires: PostgreSQL database (Prisma).
  *
  * Spec: specs/features/onboarding/intent-fork.feature
+ *       specs/ai-governance/personal-portal/default-catalog.feature
  */
+import { STARTER_PACK_TILES } from "@ee/governance/services/aiToolEntry.service";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -108,6 +110,7 @@ describe("onboarding.initializeOrganization personal workspace", () => {
         });
       }
       await prisma.project.deleteMany({ where: { team: { organizationId } } });
+      await prisma.aiToolEntry.deleteMany({ where: { organizationId } });
       await prisma.roleBinding.deleteMany({ where: { organizationId } });
       await prisma.teamUser.deleteMany({ where: { team: { organizationId } } });
       await prisma.team.deleteMany({ where: { organizationId } });
@@ -174,6 +177,21 @@ describe("onboarding.initializeOrganization personal workspace", () => {
       expect(await repository.getTeamCount(organizationId)).toBe(1);
     });
 
+    /** @scenario A fresh organization gets the full standard catalog with no admin action */
+    it("provisions the standard AI tool catalog", async () => {
+      const tiles = await prisma.aiToolEntry.findMany({
+        where: { organizationId },
+        orderBy: { order: "asc" },
+      });
+
+      expect(tiles.map((t) => t.slug)).toEqual(
+        STARTER_PACK_TILES.map((t) => t.slug),
+      );
+      expect(tiles.every((t) => t.enabled && t.archivedAt === null)).toBe(
+        true,
+      );
+    });
+
     /** @scenario The personal workspace does not spend the plan's allowance */
     it("is idempotent, so a later CLI login adds no second workspace", async () => {
       const { PersonalWorkspaceService } = await import(
@@ -226,6 +244,24 @@ describe("onboarding.initializeOrganization personal workspace", () => {
       });
 
       expect(sharedProjects).toHaveLength(1);
+    });
+
+    /** @scenario A fresh organization gets the full standard catalog with no admin action */
+    it("provisions the standard AI tool catalog for this intent too", async () => {
+      // The catalog is intent-independent: whichever door the org came in
+      // through, its members' /me portal must render tiles, not the
+      // empty state.
+      const tiles = await prisma.aiToolEntry.findMany({
+        where: { organizationId },
+        orderBy: { order: "asc" },
+      });
+
+      expect(tiles.map((t) => t.slug)).toEqual(
+        STARTER_PACK_TILES.map((t) => t.slug),
+      );
+      expect(tiles.every((t) => t.enabled && t.archivedAt === null)).toBe(
+        true,
+      );
     });
   });
 });

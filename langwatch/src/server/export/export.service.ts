@@ -16,6 +16,7 @@ import type { Protections } from "~/server/traces/protections";
 import type { TraceService } from "~/server/traces/trace.service";
 import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
 import {
+  CSV_NEWLINE,
   serializeTracesToFullCsv,
   serializeTracesToSummaryCsv,
 } from "./serializers/csv-serializer";
@@ -344,9 +345,16 @@ function serializeJsonBatch({
 
 /**
  * Remove the first line (header) from a CSV string.
+ *
+ * Must search for the same sequence the serializer wrote. Splitting on "\n"
+ * while the rows are terminated with "\r\n" leaves a stray carriage return at
+ * the head of the chunk, which becomes a phantom leading field.
+ *
+ * Exported for the batch-boundary tests, which concatenate chunks exactly as
+ * this service does. A test-local copy could pass while this regressed.
  */
-function stripCsvHeader(csv: string): string {
-  const firstNewline = csv.indexOf("\n");
-  if (firstNewline === -1) return "";
-  return csv.slice(firstNewline + 1);
+export function stripCsvHeader(csv: string): string {
+  const firstBreak = csv.indexOf(CSV_NEWLINE);
+  if (firstBreak === -1) return "";
+  return csv.slice(firstBreak + CSV_NEWLINE.length);
 }

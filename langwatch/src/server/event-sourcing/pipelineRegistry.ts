@@ -468,6 +468,8 @@ export class PipelineRegistry {
       codingAgentSubscribers: [
         createCodingAgentSpanFactsDispatchSubscriber({
           contributeSpanFacts: codingAgentCommands.contributeSpanFacts,
+          getNormalizedSpanById: (params) =>
+            this.deps.traces.spans.getNormalizedSpanById(params),
         }),
       ],
     });
@@ -838,10 +840,10 @@ export class PipelineRegistry {
         evalRunStore: new EvaluationRunStore(
           this.deps.evaluations.runs.repository,
         ),
-        // Redis cache is the eval slim fold's ONLY warm read path — its
-        // store's get() returns null by design (lossy row, no read-back),
-        // and on a cache miss the fold's refoldOnStoreMiss option rebuilds
-        // state from the event log. Same wiring as trace_analytics.
+        // Redis cache is the eval slim fold's warm read path; a miss now falls
+        // through to the store's own ClickHouse read-back (ADR-066, migration
+        // 00056) rather than re-folding the event log. Same wiring as
+        // trace_analytics.
         evaluationAnalyticsStore: this.cached<EvaluationAnalyticsData>(
           new EvaluationAnalyticsStore(
             this.deps.repositories.evaluationAnalytics,
@@ -966,11 +968,10 @@ export class PipelineRegistry {
         traceAnalyticsRollupAppendStore: new TraceAnalyticsRollupAppendStore(
           this.deps.repositories.traceAnalyticsRollup,
         ),
-        // Redis cache is the slim fold's ONLY warm read path — its store's
-        // get() returns null by design (lossy row, no read-back), and on a
-        // cache miss the fold's refoldOnStoreMiss option rebuilds state from
-        // the event log. Without this wrapper every event would trigger a
-        // full event-log re-fold.
+        // Redis cache is the slim fold's warm read path; a miss now falls
+        // through to the store's own ClickHouse read-back (ADR-066, migration
+        // 00056) rather than re-folding the event log. The wrapper still earns
+        // its keep — it keeps the steady state off ClickHouse entirely.
         traceAnalyticsStore: this.cached<TraceAnalyticsData>(
           new TraceAnalyticsStore(this.deps.repositories.traceAnalytics),
           "trace_analytics",
