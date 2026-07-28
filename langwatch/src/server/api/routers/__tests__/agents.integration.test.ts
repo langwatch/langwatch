@@ -152,8 +152,9 @@ describe("Agents Endpoints", () => {
             (p) => p.identifier === "code" && p.type === "code",
           );
           // dedented: top-level `class` now starts at column 0 (no IndentationError downstream)
-          expect(codeParam?.value.startsWith("class Code:")).toBe(true);
-          expect(codeParam?.value).not.toMatch(/^\s+class/);
+          expect(codeParam?.value).toBe(
+            'class Code:\n    def __call__(self, input):\n        return {"output": input.upper()}\n',
+          );
         });
       });
     });
@@ -356,8 +357,9 @@ describe("Agents Endpoints", () => {
             (p) => p.identifier === "code" && p.type === "code",
           );
           // dedented: top-level `class` now starts at column 0 (no IndentationError downstream)
-          expect(codeParam?.value.startsWith("class Code:")).toBe(true);
-          expect(codeParam?.value).not.toMatch(/^\s+class/);
+          expect(codeParam?.value).toBe(
+            'class Code:\n    def __call__(self, input):\n        return {"output": input.upper()}\n',
+          );
         });
       });
     });

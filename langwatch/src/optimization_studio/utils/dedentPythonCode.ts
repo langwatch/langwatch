@@ -16,7 +16,10 @@ export function dedentPythonCode(code: string): string {
   let common: string | null = null;
   for (const line of lines) {
     if (line.trim() === "") continue; // ignore whitespace-only lines
-    const indent = /^[ \t]*/.exec(line)![0];
+    // Only spaces and tabs count as indentation, matching CPython's
+    // `([ \t]*)(?=[^ \t\n])` — `trimStart()` would also eat exotic whitespace
+    // (a non-breaking space from a browser paste) and diverge from it.
+    const indent = /^[ \t]*/.exec(line)?.[0] ?? "";
     if (common === null) {
       common = indent;
       continue;

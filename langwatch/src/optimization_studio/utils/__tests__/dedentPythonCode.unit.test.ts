@@ -18,9 +18,8 @@ describe("dedentPythonCode", () => {
           '          return {"output": inputs}\n';
         const result = dedentPythonCode(code);
         const firstLine = result.split("\n")[0]!;
-        expect(firstLine.startsWith("class Code(dspy.Module):")).toBe(true);
         // No longer illegally indented -> compile() would not raise IndentationError.
-        expect(result).not.toMatch(/^\s+class/);
+        expect(firstLine).toBe("class Code(dspy.Module):");
       });
     });
   });
@@ -105,6 +104,68 @@ describe("dedentPythonCode", () => {
       it("returns the line unchanged", () => {
         expect(dedentPythonCode("x = 1")).toBe("x = 1");
       });
+    });
+  });
+
+  /**
+   * The whole design rests on this function agreeing with the Python side, and
+   * nothing else pins that: the runner dedents with textwrap.dedent, the server
+   * dedents with this. Each expectation below was captured by running
+   * `textwrap.dedent` on the input under CPython 3.12.3 — so an edit to either
+   * implementation that pulls them apart fails here instead of silently
+   * producing two different stored/executed programs.
+   *
+   * Note for whoever extends this: CPython <= 3.12 normalizes whitespace-only
+   * lines via `^[ \t]+$`, so a line of exotic whitespace (a non-breaking space
+   * from a browser paste) is treated differently than on 3.13+. Every case here
+   * uses ordinary spaces and tabs, where all versions agree.
+   */
+  describe("given the reference cases captured from CPython's textwrap.dedent", () => {
+    const cpythonPairs: [name: string, input: string, expected: string][] = [
+      [
+        "uniform two-space indent",
+        '  class Code:\n      def __call__(self, input):\n          return {"output": input.upper()}\n',
+        'class Code:\n    def __call__(self, input):\n        return {"output": input.upper()}\n',
+      ],
+      [
+        "already flush",
+        "class Code:\n    def __call__(self, input):\n        return 1\n",
+        "class Code:\n    def __call__(self, input):\n        return 1\n",
+      ],
+      [
+        "non-uniform indent is left alone",
+        "if True:\n        x = 1\n  y = 2\n",
+        "if True:\n        x = 1\n  y = 2\n",
+      ],
+      [
+        "blank line inside an indented block",
+        "    a = 1\n\n    b = 2\n",
+        "a = 1\n\nb = 2\n",
+      ],
+      [
+        "whitespace-only line inside an indented block",
+        "    a = 1\n      \n    b = 2\n",
+        "a = 1\n\nb = 2\n",
+      ],
+      [
+        "tabs as the common indent",
+        "\tdef f():\n\t\treturn 1\n",
+        "def f():\n\treturn 1\n",
+      ],
+      [
+        "mixed tab and space prefixes share no common indent",
+        "\ta = 1\n  b = 2\n",
+        "\ta = 1\n  b = 2\n",
+      ],
+      ["trailing newline preserved", "  x = 1\n", "x = 1\n"],
+      ["single indented line", "    only = 1", "only = 1"],
+      ["empty string", "", ""],
+      ["only whitespace lines", "   \n\t\n", "\n\n"],
+      ["CRLF line endings", "  a = 1\r\n  b = 2\r\n", "a = 1\r\nb = 2\r\n"],
+    ];
+
+    it.each(cpythonPairs)("matches textwrap.dedent for %s", (_n, i, o) => {
+      expect(dedentPythonCode(i)).toBe(o);
     });
   });
 });
