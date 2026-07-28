@@ -192,6 +192,45 @@ Feature: AI Gateway — Budgets
     And no Postgres gatewayBudgetLedger row is read
 
   # ============================================================================
+  # Spend must survive the thing that recorded it
+  # ============================================================================
+  #
+  # The scenarios above cover spend being counted ONCE (idempotency by
+  # gateway_request_id). These cover it being counted AT ALL.
+  #
+  # Debits are written today by `gatewayBudgetSync`, a reactor, and the
+  # projection router never dispatches a reactor on the replay path
+  # (`LIVE_DISPATCH_IS_REPLAY = false`). So a debit lost to a failed handler is
+  # lost permanently: the spend happened, the gateway trace records it, and the
+  # budget never learns. The same handler emits the BUDGET_UPDATED change the
+  # gateway consumes to evict cached bundles, so losing it also leaves the
+  # gateway authorising against stale spend.
+  #
+  # Both failures move measured spend DOWN, which is the dangerous direction
+  # for a control whose job is to stop spending. ADR-075 (Class C) converts the
+  # write to a projection so a rebuild recovers it. @unimplemented until then.
+
+  @integration @unimplemented
+  Scenario: Spend recorded during a failure still counts against the budget
+    Given a gateway request that consumed budget
+    When the work recording that debit fails
+    Then the debit is recorded once the failure clears
+    And the budget reflects it
+
+  @integration @unimplemented
+  Scenario: Total spend can be reconciled against the traces that produced it
+    Given a period of gateway requests that consumed budget
+    When spend for that period is recomputed from the recorded gateway traces
+    Then it matches the spend the budget was charged
+    And any debit missing from the ledger is reported
+
+  @integration @unimplemented
+  Scenario: The gateway stops serving on stale spend after a restart
+    Given spend recorded while the gateway held a cached view of the budget
+    When the process that would have notified the gateway dies first
+    Then the gateway still stops authorising once the budget is exhausted
+
+  # ============================================================================
   # Spend must read back for every window offered
   # ============================================================================
   #
