@@ -64,16 +64,44 @@ jobs:
           curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${version}/gitleaks_${version}_linux_x64.tar.gz" \
             | tar -xz -C /usr/local/bin gitleaks
           gitleaks --version
-          gitleaks git --redact --no-banner .
+          # Scoped to this branch's own commits, not all history. A repository
+          # this age has rotated credentials still sitting in old objects
+          # (#5708); scanning everything would fail every PR for something no
+          # PR author did, and the gate would be off within a day.
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.base_ref }}"
+            git fetch --no-tags origin "+refs/heads/$BASE:refs/remotes/origin/$BASE"
+            gitleaks git --redact --no-banner --log-opts="origin/$BASE..HEAD" .
+          else
+            gitleaks git --redact --no-banner --log-opts="-1" .
+          fi
 
       # gitleaks matches patterns; trufflehog additionally VERIFIES a candidate
       # against the provider, so it catches live credentials that do not match
       # a known shape. --only-verified keeps it to secrets proven live, which
       # is what makes it safe to block on.
+      #
+      # The binary rather than trufflesecurity/trufflehog, for the same reason
+      # as gitleaks above: every other `uses:` in this repo is a first-party
+      # actions/* or an already-approved pin, and this workflow's first run
+      # ended in startup_failure with the third-party action as its only
+      # unapproved reference. A pinned release tarball needs no allowlist.
       - name: trufflehog
-        uses: trufflesecurity/trufflehog@6f3c981e7b77f235fd2702dd74af25fc4b72bf11 # v3.96.0
-        with:
-          extra_args: --only-verified --results=verified
+        run: |
+          version=3.96.0
+          curl -sSfL "https://github.com/trufflesecurity/trufflehog/releases/download/v${version}/trufflehog_${version}_linux_amd64.tar.gz" \
+            | tar -xz -C /usr/local/bin trufflehog
+          trufflehog --version
+          # Same scoping as gitleaks. --only-verified means it blocks only on a
+          # credential the provider confirms is live, so a historical rotated
+          # one does not stop the queue.
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            trufflehog git "file://$(pwd)" \
+              --since-commit "$(git merge-base HEAD "origin/${{ github.base_ref }}")" \
+              --only-verified --fail --no-update
+          else
+            trufflehog git "file://$(pwd)" --max-depth=1 --only-verified --fail --no-update
+          fi
 
   sast:
     name: semgrep (changed lines)
