@@ -73,7 +73,13 @@ export function RedTeamAttackSection({
 }: {
   form: UseFormReturn<ScenarioFormData>;
 }) {
-  const { control, register, setValue, getValues } = form;
+  const {
+    control,
+    register,
+    setValue,
+    getValues,
+    formState: { errors },
+  } = form;
   // GOAT reasons turn by turn and never pre-generates a plan
   // (needsMetapromptPlan = false), so the SDK ignores both planner fields for
   // it — one with a console warning, one silently. Showing inputs that do
@@ -156,7 +162,7 @@ export function RedTeamAttackSection({
         />
       </VStack>
 
-      <Field.Root>
+      <Field.Root invalid={!!errors.redTeamTarget}>
         <LabelWithHelp
           label="What should the attacker try to do?"
           help={OBJECTIVE_HELP}
@@ -246,6 +252,7 @@ export function RedTeamAttackSection({
           placeholder="e.g., get the agent to reveal its system prompt"
           _placeholder={{ color: "gray.400", fontStyle: "italic" }}
         />
+        <Field.ErrorText>{errors.redTeamTarget?.message}</Field.ErrorText>
       </Field.Root>
 
       <Field.Root>

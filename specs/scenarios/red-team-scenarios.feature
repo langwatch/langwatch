@@ -33,6 +33,23 @@ Feature: Red Team Scenarios
     And I leave the attack objective empty
     Then I cannot save the configuration
 
+  # Enforced on every surface rather than in the editor alone: without an
+  # objective the run falls back to the cooperative user simulator, so the
+  # scenario looks configured, no attack happens, and the judge reports that
+  # the agent held up.
+  @unit
+  Scenario: A strategy with no objective is refused
+    When a scenario is saved with a strategy but no attack objective
+    Then it is rejected with an error naming the objective
+    And no scenario is stored with a strategy it cannot act on
+
+  # GOAT reasons turn by turn and never generates a plan, so the SDK ignores
+  # both planner settings for it.
+  @unit
+  Scenario: Planner settings are refused on a strategy that ignores them
+    When a GOAT scenario is saved with an attack plan or planning prompt
+    Then it is rejected rather than accepted and silently ignored
+
   @unit @unimplemented
   Scenario: Turn count is bounded
     Given a red-team scenario configuration
@@ -81,7 +98,7 @@ Feature: Red Team Scenarios
     Then the request is rejected
     And no scenario is stored
 
-  @unit @unimplemented
+  @unit
   Scenario: Red-team configuration reaches the run
     Given a red-team scenario exists
     When a run is prepared for it

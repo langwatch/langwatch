@@ -54,6 +54,49 @@ export function toPrismaRedTeamConfig(
   return { redTeamConfig: value };
 }
 
+/**
+ * The rules that only make sense against a scenario's *final* state, so they
+ * cannot live in the field schemas above.
+ *
+ * A PUT that sets only `redTeamStrategy` on a scenario that already has an
+ * objective is legitimate, so a per-field `required` would reject valid
+ * updates. Callers merge first, then ask this.
+ */
+export function redTeamStateIssue(state: RedTeamInput): {
+  field: keyof RedTeamInput;
+  message: string;
+} | null {
+  const strategy = state.redTeamStrategy ?? null;
+  const target = state.redTeamTarget?.trim() ?? "";
+
+  // Without an objective the run silently falls back to the cooperative user
+  // simulator: the scenario looks configured, the attack never happens, and
+  // the judge reports that the agent held up.
+  if (strategy && !target) {
+    return {
+      field: "redTeamTarget",
+      message:
+        "A red-team scenario needs an attack objective — without one the run falls back to a standard scenario.",
+    };
+  }
+
+  // GOAT reasons turn by turn and never generates a plan, so the SDK ignores
+  // both planner fields for it. Accepting them would be accepting settings
+  // that do nothing.
+  if (strategy === "goat") {
+    const config = state.redTeamConfig ?? undefined;
+    if (config?.attackPlan ?? config?.metapromptTemplate) {
+      return {
+        field: "redTeamConfig",
+        message:
+          "An attack plan and planning prompt only apply to Crescendo — GOAT plans nothing, so the SDK ignores them.",
+      };
+    }
+  }
+
+  return null;
+}
+
 /** The shape `redTeamFields` parses to, before Prisma translation. */
 export interface RedTeamInput {
   redTeamStrategy?: string | null;

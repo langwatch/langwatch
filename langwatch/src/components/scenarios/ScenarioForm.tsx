@@ -19,7 +19,11 @@ import {
   useWatch,
 } from "react-hook-form";
 import { z } from "zod";
-import { RED_TEAM_DEFAULT_TURNS } from "~/server/scenarios/execution/types";
+import {
+  RED_TEAM_DEFAULT_TURNS,
+  RED_TEAM_MAX_TURNS,
+} from "~/server/scenarios/execution/types";
+import { redTeamStateIssue } from "~/server/scenarios/red-team-input";
 import { Tooltip } from "../ui/tooltip";
 import { RedTeamAttackSection } from "./RedTeamAttackSection";
 import { CriteriaInput } from "./ui/CriteriaInput";
@@ -38,7 +42,7 @@ export const scenarioFormSchema = z.object({
   // shows the attack section only once a strategy is picked.
   redTeamStrategy: z.enum(["goat", "crescendo"]).nullish(),
   redTeamTarget: z.string().nullish(),
-  redTeamTotalTurns: z.number().int().min(1).max(50).nullish(),
+  redTeamTotalTurns: z.number().int().min(1).max(RED_TEAM_MAX_TURNS).nullish(),
   redTeamConfig: z
     .object({
       scoreResponses: z.boolean().optional(),
@@ -50,6 +54,18 @@ export const scenarioFormSchema = z.object({
       injectionProbability: z.number().min(0).max(1).optional(),
     })
     .nullish(),
+  })
+  .superRefine((values, ctx) => {
+    // Same rule the API enforces, surfaced on the field rather than as a
+    // failed save — see redTeamStateIssue for why it cannot be per-field.
+    const issue = redTeamStateIssue(values);
+    if (issue) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [issue.field],
+        message: issue.message,
+      });
+    }
 });
 
 export type ScenarioFormData = z.infer<typeof scenarioFormSchema>;

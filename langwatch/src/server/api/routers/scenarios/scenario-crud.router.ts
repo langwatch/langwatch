@@ -6,11 +6,10 @@ import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { enforceLicenseLimit } from "~/server/license-enforcement";
 import { trackServerEvent } from "~/server/posthog";
 import { ScenarioNotFoundError } from "~/server/scenarios/errors";
-import {
-  type RedTeamConfig,
-} from "~/server/scenarios/execution/types";
+import { type RedTeamConfig } from "~/server/scenarios/execution/types";
 import {
   redTeamFields,
+  redTeamStateIssue,
   toPrismaRedTeamConfig,
 } from "~/server/scenarios/red-team-input";
 import { ScenarioService } from "~/server/scenarios/scenario.service";
@@ -60,6 +59,11 @@ export const scenarioCrudRouter = createTRPCRouter({
 
       // Enforce scenario limit before creation
       await enforceLicenseLimit(ctx, input.projectId, "scenarios");
+
+      const createIssue = redTeamStateIssue(input);
+      if (createIssue) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: createIssue.message });
+      }
 
       const { redTeamConfig, ...rest } = input;
       const service = ScenarioService.create(ctx.prisma);
@@ -147,6 +151,21 @@ export const scenarioCrudRouter = createTRPCRouter({
 
       const { id, projectId, redTeamConfig, ...data } = input;
       const service = ScenarioService.create(ctx.prisma);
+
+      // Merge before judging: an update that touches only one red-team field
+      // must not be rejected for another field it never mentioned.
+      const existing = await service.getById({ id, projectId });
+      const updateIssue = redTeamStateIssue({
+        redTeamStrategy: input.redTeamStrategy ?? existing?.redTeamStrategy,
+        redTeamTarget: input.redTeamTarget ?? existing?.redTeamTarget,
+        redTeamTotalTurns:
+          input.redTeamTotalTurns ?? existing?.redTeamTotalTurns,
+        redTeamConfig: (redTeamConfig ??
+          existing?.redTeamConfig) as RedTeamConfig | null,
+      });
+      if (updateIssue) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: updateIssue.message });
+      }
       const result = await service.update(id, projectId, {
         ...data,
         ...toPrismaRedTeamConfig(redTeamConfig),

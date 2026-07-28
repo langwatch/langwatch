@@ -5,8 +5,10 @@ import { resolver } from "hono-openapi/zod";
 import { z } from "zod";
 import {
   redTeamFields,
+  redTeamStateIssue,
   toPrismaRedTeamWrite,
 } from "~/server/scenarios/red-team-input";
+import type { RedTeamConfig } from "~/server/scenarios/execution/types";
 import { badRequestSchema } from "~/app/api/shared/schemas";
 import { requires, type SecuredApp } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
@@ -190,6 +192,11 @@ export function registerScenarioRoutes(
 
       logger.info({ projectId: project.id }, "Creating scenario");
 
+      const issue = redTeamStateIssue(body);
+      if (issue) {
+        return c.json({ error: issue.message, field: issue.field }, 400);
+      }
+
       const service = getService();
       const scenario = await service.create({
         projectId: project.id,
@@ -252,6 +259,21 @@ export function registerScenarioRoutes(
       const existing = await service.getById({ id, projectId: project.id });
       if (!existing) {
         return c.json({ error: "Scenario not found" }, 404);
+      }
+
+      const merged = {
+        redTeamStrategy: body.redTeamStrategy ?? existing.redTeamStrategy,
+        redTeamTarget: body.redTeamTarget ?? existing.redTeamTarget,
+        redTeamTotalTurns: body.redTeamTotalTurns ?? existing.redTeamTotalTurns,
+        redTeamConfig: (body.redTeamConfig ??
+          existing.redTeamConfig) as RedTeamConfig | null,
+      };
+      const updateIssue = redTeamStateIssue(merged);
+      if (updateIssue) {
+        return c.json(
+          { error: updateIssue.message, field: updateIssue.field },
+          400,
+        );
       }
 
       const scenario = await service.update(id, project.id, {

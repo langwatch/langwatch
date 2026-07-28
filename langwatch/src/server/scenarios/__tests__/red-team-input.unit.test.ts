@@ -13,7 +13,11 @@
 import { Prisma } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { redTeamFields, toPrismaRedTeamWrite } from "../red-team-input";
+import {
+  redTeamFields,
+  redTeamStateIssue,
+  toPrismaRedTeamWrite,
+} from "../red-team-input";
 
 const schema = z.object(redTeamFields);
 
@@ -62,6 +66,64 @@ describe("the red-team write contract", () => {
         // `null` rather than SQL NULL.
         redTeamConfig: Prisma.DbNull,
       });
+    });
+  });
+
+  describe("given a strategy with no objective", () => {
+    /** @scenario A strategy with no objective is refused */
+    it("is refused, because the run would quietly become a standard one", () => {
+      // buildRedTeamAgent needs both; with only a strategy it returns null and
+      // the run uses the cooperative simulator, passing with no attack made.
+      const issue = redTeamStateIssue({ redTeamStrategy: "crescendo" });
+
+      expect(issue?.field).toBe("redTeamTarget");
+    });
+
+    it("is refused when the objective is present but blank", () => {
+      expect(
+        redTeamStateIssue({ redTeamStrategy: "goat", redTeamTarget: "   " })
+          ?.field,
+      ).toBe("redTeamTarget");
+    });
+  });
+
+  describe("given a complete attack", () => {
+    it("raises nothing", () => {
+      expect(
+        redTeamStateIssue({
+          redTeamStrategy: "crescendo",
+          redTeamTarget: "extract the override code",
+        }),
+      ).toBeNull();
+    });
+  });
+
+  describe("given an objective but no strategy", () => {
+    it("raises nothing, since that is simply a standard scenario", () => {
+      expect(redTeamStateIssue({ redTeamTarget: "extract the code" })).toBeNull();
+    });
+  });
+
+  describe("given planner settings on GOAT, which ignores them", () => {
+    /** @scenario Planner settings are refused on a strategy that ignores them */
+    it("is refused rather than accepted and dropped", () => {
+      const issue = redTeamStateIssue({
+        redTeamStrategy: "goat",
+        redTeamTarget: "extract the code",
+        redTeamConfig: { attackPlan: "Turns 1-10: build rapport." },
+      });
+
+      expect(issue?.field).toBe("redTeamConfig");
+    });
+
+    it("accepts the same settings on Crescendo, which uses them", () => {
+      expect(
+        redTeamStateIssue({
+          redTeamStrategy: "crescendo",
+          redTeamTarget: "extract the code",
+          redTeamConfig: { attackPlan: "Turns 1-10: build rapport." },
+        }),
+      ).toBeNull();
     });
   });
 

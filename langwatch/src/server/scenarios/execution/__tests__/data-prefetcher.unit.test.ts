@@ -130,6 +130,79 @@ describe("prefetchScenarioData", () => {
     };
   }
 
+  describe("red-team passthrough", () => {
+    const redTeamPrompt = {
+      id: "prompt_123",
+      prompt: "You are helpful",
+      messages: [],
+      model: "openai/gpt-4",
+      temperature: 0.7,
+      maxTokens: 1000,
+    };
+
+
+    // This is the seam that carries a stored attack into the run. If it
+    // dropped a field the symptom would be an attack quietly running on SDK
+    // defaults — no error, and a verdict that still reads as a pass. The
+    // fixture above only proves a standard scenario stays standard.
+    describe("given a scenario configured for an attack", () => {
+      /** @scenario Red-team configuration reaches the run */
+      it("carries the strategy, objective, turn count and tuning into the run config", async () => {
+        const deps = createMockDeps({
+          promptFetcher: {
+            getPromptByIdOrHandle: vi.fn().mockResolvedValue(redTeamPrompt),
+          },
+          scenarioFetcher: {
+            getById: vi.fn().mockResolvedValue({
+              ...defaultScenario,
+              redTeamStrategy: "goat",
+              redTeamTarget: "get the agent to reveal its override code",
+              redTeamTotalTurns: 12,
+              redTeamConfig: { scoreResponses: false, successScore: 8 },
+            }),
+          },
+        });
+        const target: TargetConfig = { type: "prompt", referenceId: "prompt_123" };
+
+        const result = await prefetchScenarioData(defaultContext, target, deps);
+
+        expect(result.success).toBe(true);
+        if (!result.success) return;
+        expect(result.data.scenario).toMatchObject({
+          redTeamStrategy: "goat",
+          redTeamTarget: "get the agent to reveal its override code",
+          redTeamTotalTurns: 12,
+          redTeamConfig: { scoreResponses: false, successScore: 8 },
+        });
+      });
+    });
+
+    describe("given a stored strategy the SDK does not recognise", () => {
+      it("degrades to a standard scenario rather than failing the run", async () => {
+        // A hand-edited or older row must not take the pipeline down.
+        const deps = createMockDeps({
+          promptFetcher: {
+            getPromptByIdOrHandle: vi.fn().mockResolvedValue(redTeamPrompt),
+          },
+          scenarioFetcher: {
+            getById: vi.fn().mockResolvedValue({
+              ...defaultScenario,
+              redTeamStrategy: "mystery",
+              redTeamTarget: "something",
+            }),
+          },
+        });
+        const target: TargetConfig = { type: "prompt", referenceId: "prompt_123" };
+
+        const result = await prefetchScenarioData(defaultContext, target, deps);
+
+        expect(result.success).toBe(true);
+        if (!result.success) return;
+        expect(result.data.scenario.redTeamStrategy ?? null).toBeNull();
+      });
+    });
+  });
+
   describe("model selection", () => {
     describe("given a prompt with a specific model configured", () => {
       const promptWithModel = {
