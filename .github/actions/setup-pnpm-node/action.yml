@@ -47,10 +47,13 @@ runs:
     # native-module install lifecycle script (e.g. node-pty's prebuild fallback
     # in mcp-server and skills) ELIFECYCLEs with "sh: 1: node-gyp: not found".
     # Install it globally so spawned scripts can resolve it via PATH.
+    # Pinned, not @latest: a mutable dist-tag makes every workflow using this
+    # action depend on whatever npm published today. 12.3.0 is the version the
+    # workflows that install node-gyp directly already pin to.
     - name: Install node-gyp
       if: inputs.install != ''
       shell: bash
-      run: npm install -g node-gyp@latest
+      run: npm install -g node-gyp@12.3.0
 
     - name: Install dependencies
       if: inputs.install != ''
