@@ -48,7 +48,7 @@ describe("Subscription sync hook", () => {
   });
 
   describe("when a subscription is activated", () => {
-    it("identifies all org members with has_subscription true", async () => {
+    it("identifies all org members with has_subscription true and the raw seat-event plan", async () => {
       mockFindMany.mockResolvedValue([
         { userId: "user-1" },
         { userId: "user-2" },
@@ -57,6 +57,7 @@ describe("Subscription sync hook", () => {
       fireSubscriptionSyncNurturing({
         organizationId: "org-123",
         hasSubscription: true,
+        plan: "GROWTH_SEAT_USD_MONTHLY",
       });
 
       await vi.waitFor(() => {
@@ -65,11 +66,40 @@ describe("Subscription sync hook", () => {
 
       expect(mockNurturing.identifyUser).toHaveBeenCalledWith({
         userId: "user-1",
-        traits: { has_subscription: true },
+        traits: {
+          has_subscription: true,
+          plan: "GROWTH_SEAT_USD_MONTHLY",
+        },
       });
       expect(mockNurturing.identifyUser).toHaveBeenCalledWith({
         userId: "user-2",
-        traits: { has_subscription: true },
+        traits: {
+          has_subscription: true,
+          plan: "GROWTH_SEAT_USD_MONTHLY",
+        },
+      });
+    });
+
+    it("syncs the org-level plan trait once via groupUser", async () => {
+      mockFindMany.mockResolvedValue([
+        { userId: "user-1" },
+        { userId: "user-2" },
+      ]);
+
+      fireSubscriptionSyncNurturing({
+        organizationId: "org-123",
+        hasSubscription: true,
+        plan: "GROWTH_SEAT_EUR_ANNUAL",
+      });
+
+      await vi.waitFor(() => {
+        expect(mockNurturing.groupUser).toHaveBeenCalledTimes(1);
+      });
+
+      expect(mockNurturing.groupUser).toHaveBeenCalledWith({
+        userId: "user-1",
+        groupId: "org-123",
+        traits: { plan: "GROWTH_SEAT_EUR_ANNUAL" },
       });
     });
 
@@ -91,7 +121,7 @@ describe("Subscription sync hook", () => {
   });
 
   describe("when a subscription is cancelled", () => {
-    it("identifies all org members with has_subscription false", async () => {
+    it("identifies all org members with has_subscription false and plan free", async () => {
       mockFindMany.mockResolvedValue([
         { userId: "user-1" },
         { userId: "user-2" },
@@ -109,7 +139,26 @@ describe("Subscription sync hook", () => {
 
       expect(mockNurturing.identifyUser).toHaveBeenCalledWith({
         userId: "user-1",
-        traits: { has_subscription: false },
+        traits: { has_subscription: false, plan: "free" },
+      });
+    });
+
+    it("reverts plan to free even when a stale plan is passed alongside hasSubscription false", async () => {
+      mockFindMany.mockResolvedValue([{ userId: "user-1" }]);
+
+      fireSubscriptionSyncNurturing({
+        organizationId: "org-123",
+        hasSubscription: false,
+        plan: "GROWTH_SEAT_USD_MONTHLY",
+      });
+
+      await vi.waitFor(() => {
+        expect(mockNurturing.identifyUser).toHaveBeenCalledTimes(1);
+      });
+
+      expect(mockNurturing.identifyUser).toHaveBeenCalledWith({
+        userId: "user-1",
+        traits: { has_subscription: false, plan: "free" },
       });
     });
   });
