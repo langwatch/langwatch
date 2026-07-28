@@ -236,8 +236,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     Then the team is renamed successfully
 
   # A personal workspace stays one person's however the organization is
-  # administered: through the team editor, through a group, by changing
-  # someone's role, or by naming the personal project instead of the team.
+  # administered, and whether access is given to a person or to a group.
 
   @integration
   Scenario: Giving someone else access to a personal workspace is refused
