@@ -213,6 +213,47 @@ in the type system and survivable at runtime *today*. It becomes a live bug the
 moment anyone adds `mget`, `pipeline`, `scan` or a multi-key `del` — which is
 precisely the change nobody will think to check, because the type says `Redis`.
 
+> **RESOLVED, and this ADR had the answer backwards.** Step 0 shipped, and the
+> reconciliation is **cache under Cluster**, not degrade to uncached.
+>
+> This section proposed degrading, on the grounds that it matched what the
+> automations path already did. Two errors in that.
+>
+> **First, caching is not optional.** ADR-066 §5 is explicit: *"Caching is
+> neither optional nor a speed feature — it is the event processor's
+> read-your-write consistency layer,"* and *"the cache TTL is a correctness
+> invariant, not a latency knob."* ClickHouse replicates asynchronously, so a
+> miss only implies settlement while a cache is actually in front of it.
+> Degrading under Cluster would strip that invariant from six fold **writers**.
+>
+> **Second, the two sites are not symmetric.** The automations path holds three
+> `.get()` calls and no writes — it is a pure *reader* of the fold the trace
+> pipeline writes. Uncached costs it a read-back; uncached costs the writer its
+> consistency layer. Calling them "the same policy" was the mistake that made
+> degrading look safe.
+>
+> The hazard this section was really guarding against — someone later adding
+> `mget`/`pipeline`/`scan` because the type said `Redis` — is closed better than
+> a guard closes it. `FoldCacheClient` exposes only `read` and `write`, so a
+> multi-key command is a compile error. Note `Pick<Redis, "get" | "set">` would
+> **not** have closed it: `Cluster` exposes `mget` too, so that fails at runtime.
+> The fix was narrowing what the store *demands*, not narrowing which
+> deployments get a cache.
+>
+> Net effect is also smaller than this ADR anticipated: the registry path is
+> behaviour-preserving and only the automations reader changes, gaining the warm
+> tier under Cluster.
+>
+> **Shape rule, learned by getting it wrong twice.** A factory that takes a
+> nullable and branches (`createFoldCache(client | null)`) is a hidden decision —
+> the same failure as `buildAutomationDispatchPorts`, one level down. And a port
+> whose no-cache implementation is called `UncachedFoldCache` is a null object in
+> a class costume; the tell is that you cannot name it without contradicting
+> yourself. Constructor composition —
+> `new CachedFoldStore(inner, new RedisFoldCacheClient(redis), { keyPrefix })` —
+> gives the decision to the layer that should own it and makes it greppable at
+> the composition root.
+
 **The decision: infrastructure publishes a resolved capability, not a client.**
 
 ```ts
@@ -267,7 +308,7 @@ rather than discovered from a latency graph.
 | Subscriber | `pipelines/<x>/subscribers/` | domain | `pipeline.ts` | the ports its `Deps` declare |
 | Process-manager `evolve`/`onWake` | `pipelines/<x>/process-manager/*.process.ts` | domain | `pipeline.ts`, via the in-file `xPM()` applier | — |
 | Process-manager **intent handler** | `pipelines/<x>/process-manager/*IntentHandlers.ts` | domain | `pipeline.ts` | its `DispatchDeps` port bundle |
-| Cross-pipeline dispatcher | the *consuming* pipeline's `subscribers/` | domain | `pipeline.ts` | the command bus (§5) |
+| Cross-pipeline dispatcher | the pipeline that owns the **domain knowledge**, i.e. the one whose commands it sends | domain | `pipeline.ts` | the command bus (§5) |
 | Caching / coalescing / retry strategy | the owning **service** | 3 | the app boundary | as a port on the service it belongs to |
 | `service.method` → port adaptation | `pipelines/<x>/*.adapter.ts` | 5 | the composition root | the ports it produces |
 
@@ -372,12 +413,18 @@ take constructor DI and therefore have no zero-arg constructor:
 | `ExecuteEvaluationCommand` | `constructor(private readonly deps: ExecuteEvaluationCommandDeps) {}` |
 | `ComputeRunMetricsCommand` | `constructor(private readonly deps: ComputeRunMetricsDeps) {}` |
 | `ReportUsageForMonthCommand` | `constructor(private readonly deps: ReportUsageForMonthCommandDeps) {}` |
-| `RecordSpanCommand` | conditional `withCommandInstance` at `trace-processing/pipeline.ts:298` |
+
+> **Corrected during implementation.** `RecordSpanCommand` was listed here and
+> does not belong: its constructor is
+> `constructor(deps?: Partial<RecordSpanCommandDependencies>)` — the argument is
+> optional, so it *does* satisfy `new () =>`. There are **four**
+> `.withCommandInstance` call sites and **three** classes genuinely excluded.
+> The conclusion is unchanged; the count was wrong.
 
 Constraining the bus to `DefinedCommandClass` would exclude `executeEvaluation`
 (trace → evaluation), `computeRunMetrics` (trace → simulation *and* simulation →
-self) and `reportUsageForMonth` (billing → self) — four of the eleven rows above,
-including the one the pattern was derived from. `CommandHandlerClassStatic<any,
+self) and `reportUsageForMonth` (billing → self) — three of the eleven rows
+above, including the one the pattern was derived from. `CommandHandlerClassStatic<any,
 any>` is the widest constraint that covers both registration paths, and the
 builder already proves it works: `withCommand` extracts with
 `ExtractCommandHandlerPayload<handlerClass>` (line 528) and `withCommandInstance`
@@ -620,6 +667,45 @@ of the file, importing `getApp()` — read the *live runtime*, not the registry.
 They are a consumer of registration, not part of it, and they are already the
 only thing tests import from this module. They belong in `introspection.ts`.
 
+
+> **Placement corrected.** This row said the *consuming* pipeline's
+> `subscribers/`, which contradicted §5's own call-site example and would put
+> `codingAgentMetricFactsDispatch.subscriber.ts` under `metric-processing/`
+> because metric events are what it consumes. That is wrong: it would drag
+> `detectCodingAgent`, `liftCodingAgentLogFacts` and
+> `scalarsFromCanonicalAttributes` across the boundary with it, and
+> `metric-processing` has no business knowing what a coding agent is. **The
+> owning pipeline is the one holding the domain knowledge** — the one whose
+> commands the dispatcher sends. `codingAgentMetricFactsDispatch` stays in
+> `coding-agent-processing/subscribers/`, which is also where it already lives,
+> so nothing moves.
+
+> **Bus corrections from implementation (§5).** Three, one of them a
+> correctness bug.
+>
+> - **`DisabledPipeline` was missed entirely.** `register()` returns early into
+>   a disabled proxy when event sourcing is off, *before* any dispatcher loop
+>   exists. A bus built to this ADR's letter resolves nothing there, so every
+>   cross-pipeline send throws where the codebase's contract is a logged silent
+>   drop. The disabled proxy's dispatchers must be indexed too.
+> - **"A four-line change in that same loop" is not buildable.** The
+>   `eventSourcing.ts` loop walks `pipeline.service.getCommandQueues()`, a
+>   `Map<name, processor>` — `handlerClass` is not in scope. The index comes
+>   from `definition.commands`, a separate array, keyed by name against the
+>   dispatchers record.
+> - **The boot assertion was specified as something uncomputable.** "Every
+>   command class reachable from a registered pipeline" has no static
+>   description — nothing declares what a pipeline dispatches into. Inverted:
+>   the bus records every class handed to `port()` and asserts those resolve.
+>   Binding a port enrols you, so it cannot rot. It does not cover bare `send()`
+>   sites, which is the honest limit.
+
+> **Ordering comments: one, not three, and not yet deletable.** `registerAll`
+> carries a single ordering comment (plus one on the `registerCodingAgentPipeline`
+> docblock). It cannot go at step 1 either: trace-processing still builds
+> `createCodingAgentSpanFactsDispatchSubscriber` in the registry, closing over
+> `codingAgentCommands.contributeSpanFacts` eagerly. Both comments are narrowed
+> to trace and go at step 7.
 ## Migration order
 
 Ten-plus pipelines, one at a time, each independently shippable. Ordered by what
