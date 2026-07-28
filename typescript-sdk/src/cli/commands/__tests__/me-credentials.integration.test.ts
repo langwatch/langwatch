@@ -295,7 +295,7 @@ describe("device session powers data commands with zero env vars", () => {
 
     expect(result.exitCode).toBe(1);
     expect(result.stderr).toContain(
-      "Error: not logged in and LANGWATCH_API_KEY is not set.",
+      "Error: you're not logged in, and LANGWATCH_API_KEY is not set.",
     );
     // The command never reached the API with the stolen key...
     expect(lastSearchAuth).toBeNull();
@@ -365,9 +365,12 @@ describe("device session powers data commands with zero env vars", () => {
 
     expect(result.exitCode).toBe(1);
     expect(result.stderr).toContain(
-      "Error: not logged in and LANGWATCH_API_KEY is not set.",
+      "Error: you're not logged in, and LANGWATCH_API_KEY is not set.",
     );
-    expect(result.stderr).toContain("Easiest: langwatch login");
+    expect(result.stderr).toContain(
+      "Sign in with your browser, no API key needed:",
+    );
+    expect(result.stderr).toContain("  langwatch login");
   });
 });
 

@@ -263,11 +263,18 @@ Feature: /me credentials just work - CLI credential resolution after device logi
     Then the command exits 1
     And stderr explains, in order:
       """
-      Error: not logged in and LANGWATCH_API_KEY is not set.
-      Easiest: langwatch login          (browser sign-in, no key needed)
-      With a key: langwatch login --api-key <key>   or   echo 'LANGWATCH_API_KEY=<key>' >> .env
-      Keys live at: <endpoint>/authorize
+      Error: you're not logged in, and LANGWATCH_API_KEY is not set.
+
+      Sign in with your browser, no API key needed:
+        langwatch login
+
+      If you have an API key, either of these works:
+        langwatch login --api-key <key>
+        echo 'LANGWATCH_API_KEY=<key>' >> .env
+
+      Create an API key at <endpoint>/authorize
       """
+    And <endpoint> is the resolved endpoint, https://app.langwatch.ai by default or the self-hosted LANGWATCH_ENDPOINT, never a literal placeholder
 
   @bdd @cli-onboarding @error @unit
   Scenario: machine callers get the structured missing_api_key document with the same message

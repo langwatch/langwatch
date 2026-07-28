@@ -236,12 +236,25 @@ function markPersonalProjectValidated(cfg: GovernanceConfig): void {
   saveConfig(cfg);
 }
 
-/** The human error block, line by line. Exported for tests. */
+/**
+ * The human error block, line by line. Exported for tests.
+ *
+ * Shape: what is wrong, the browser sign-in as the primary fix, the API-key
+ * alternative, then where a key is created. Command lines are indented two
+ * spaces (the renderer colors them cyan by that prefix), and every line stays
+ * under 80 columns so no terminal wraps a command mid-token.
+ */
 export const missingCredentialsLines = (authUrl: string): string[] => [
-  "Error: not logged in and LANGWATCH_API_KEY is not set.",
-  "Easiest: langwatch login          (browser sign-in, no key needed)",
-  "With a key: langwatch login --api-key <key>   or   echo 'LANGWATCH_API_KEY=<key>' >> .env",
-  `Keys live at: ${authUrl}`,
+  "Error: you're not logged in, and LANGWATCH_API_KEY is not set.",
+  "",
+  "Sign in with your browser, no API key needed:",
+  "  langwatch login",
+  "",
+  "If you have an API key, either of these works:",
+  "  langwatch login --api-key <key>",
+  "  echo 'LANGWATCH_API_KEY=<key>' >> .env",
+  "",
+  `Create an API key at ${authUrl}`,
 ];
 
 function reportMissingCredentials(endpoint: string): never {
@@ -256,14 +269,14 @@ function reportMissingCredentials(endpoint: string): never {
         code: "missing_api_key",
         kind: "missing_api_key",
         message:
-          "Not logged in and LANGWATCH_API_KEY is not set. Easiest: `langwatch login` (browser sign-in, no key needed). With a key: `langwatch login --api-key <key>` or add LANGWATCH_API_KEY to your .env.",
+          "Not logged in and LANGWATCH_API_KEY is not set. Sign in with `langwatch login` (browser, no API key needed), pass `--api-key <key>`, or add LANGWATCH_API_KEY to your .env.",
         httpStatus: 0,
         meta: { authUrl },
         isHandled: true,
       }),
     );
     console.error(
-      chalk.red("Error: not logged in and LANGWATCH_API_KEY is not set."),
+      chalk.red("Error: you're not logged in, and LANGWATCH_API_KEY is not set."),
     );
     process.exit(1);
   }
@@ -271,7 +284,7 @@ function reportMissingCredentials(endpoint: string): never {
   const [headline, ...rest] = missingCredentialsLines(authUrl);
   console.error(chalk.red(headline));
   for (const line of rest) {
-    console.error(chalk.gray(line));
+    console.error(line.startsWith("  ") ? chalk.cyan(line) : chalk.gray(line));
   }
   process.exit(1);
 }

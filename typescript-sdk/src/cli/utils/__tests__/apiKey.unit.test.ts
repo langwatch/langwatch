@@ -350,22 +350,45 @@ describe("resolveCredentials()", () => {
         );
 
         expect(logSpy).not.toHaveBeenCalled();
+        // Full-block equality: pins the copy, the ordering, and the blank
+        // lines between sections, not just the presence of fragments. ANSI
+        // codes are stripped so a color-forcing environment cannot skew it.
+        const stderr = errorSpy.mock.calls
+          .map((c: unknown[]) => String(c[0]).replace(/\u001b\[[0-9;]*m/g, ""))
+          .join("\n");
+        expect(stderr).toBe(
+          [
+            "Error: you're not logged in, and LANGWATCH_API_KEY is not set.",
+            "",
+            "Sign in with your browser, no API key needed:",
+            "  langwatch login",
+            "",
+            "If you have an API key, either of these works:",
+            "  langwatch login --api-key <key>",
+            "  echo 'LANGWATCH_API_KEY=<key>' >> .env",
+            "",
+            "Create an API key at https://app.langwatch.ai/authorize",
+          ].join("\n"),
+        );
+        expect(exitSpy).toHaveBeenCalledWith(1);
+      });
+
+      /** @scenario no login and no env var yields the not-logged-in error */
+      it("interpolates a self-hosted LANGWATCH_ENDPOINT into the authorize URL", async () => {
+        process.env.LANGWATCH_ENDPOINT = "https://langwatch.acme.internal";
+        setOutputFormat(undefined);
+
+        await expect(resolveCredentials()).rejects.toThrow(
+          "process.exit called",
+        );
+
         const stderr = errorSpy.mock.calls
           .map((c: unknown[]) => String(c[0]))
           .join("\n");
         expect(stderr).toContain(
-          "Error: not logged in and LANGWATCH_API_KEY is not set.",
+          "Create an API key at https://langwatch.acme.internal/authorize",
         );
-        expect(stderr).toContain(
-          "Easiest: langwatch login          (browser sign-in, no key needed)",
-        );
-        expect(stderr).toContain(
-          "With a key: langwatch login --api-key <key>   or   echo 'LANGWATCH_API_KEY=<key>' >> .env",
-        );
-        expect(stderr).toContain(
-          "Keys live at: https://app.langwatch.ai/authorize",
-        );
-        expect(exitSpy).toHaveBeenCalledWith(1);
+        expect(stderr).not.toContain("<endpoint>");
       });
     });
 
