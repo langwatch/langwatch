@@ -32,6 +32,7 @@ jobs:
               - 'pkg/**'
               - 'cmd/**'
               - 'tools/migrationorder/**'
+              - 'tools/thuishaven/**'
               - 'go.mod'
               - 'go.sum'
               - '.golangci.yml'
@@ -49,7 +50,7 @@ jobs:
           go-version-file: go.mod
           cache-dependency-path: go.sum
       - run: go mod verify
-      - run: go build ./cmd/...
+      - run: go build ./cmd/... ./tools/thuishaven/...
 
   test:
     needs: changes
@@ -62,7 +63,7 @@ jobs:
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
-      - run: go test -count=1 -race ./services/aigateway/... ./services/nlpgo/... ./pkg/... ./tools/migrationorder/...
+      - run: go test -count=1 -race ./services/aigateway/... ./services/nlpgo/... ./pkg/... ./tools/migrationorder/... ./tools/thuishaven/...
 
   lint:
     needs: changes
@@ -75,6 +76,13 @@ jobs:
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
+      # tools/thuishaven is deliberately absent here while it is present in the
+      # build, test and vet jobs. It carries ~230 pre-existing findings, three
+      # quarters of them misspell (which enforces US spelling against prose
+      # written in British English) and gosec file modes on a local dev tool.
+      # Clearing those is a judgement-heavy sweep that belongs in its own change,
+      # not bundled into unrelated work — but building, testing and vetting it
+      # costs nothing and is worth having now.
       - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
           version: v2.11.4
@@ -91,4 +99,4 @@ jobs:
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
-      - run: go vet ./services/aigateway/... ./services/nlpgo/... ./pkg/... ./cmd/... ./tools/migrationorder/...
+      - run: go vet ./services/aigateway/... ./services/nlpgo/... ./pkg/... ./cmd/... ./tools/migrationorder/... ./tools/thuishaven/...

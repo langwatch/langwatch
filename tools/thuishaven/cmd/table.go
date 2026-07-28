@@ -390,6 +390,11 @@ var table = []commandSpec{
 		summary: "pnpm typecheck under a machine-wide RAM slot (args forwarded)",
 		args:    "[args…]",
 		maxArgs: -1,
+		// The summary promises the arguments are forwarded, and they are handed
+		// to tsc verbatim — so tsc's own flags (--watch, --noEmit, -p) have to
+		// reach it. Without this every one of them was rejected as an unknown
+		// haven flag and the command could only ever run bare.
+		minusArgs: true,
 		run: func(ctx context.Context, d deps, inv invocation) error {
 			return d.orch.Typecheck(ctx, d.lwDir, inv.raw, envInt("HAVEN_TYPECHECK_SLOTS", 0), envInt("HAVEN_TYPECHECK_MAX_RSS_MB", 0))
 		},

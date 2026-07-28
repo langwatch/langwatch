@@ -609,6 +609,11 @@ type PlayTeardownHooks struct {
 type playStep struct {
 	name string
 	run  func() error
+	// onlyIfClean marks a step that must be skipped when an earlier step failed.
+	// The record is the only such step: it is what makes a sandbox findable, so
+	// removing it after a failed teardown strands whatever survived — containers,
+	// volumes, a checkout — with nothing left to reap them.
+	onlyIfClean bool
 }
 
 // playTeardownPlan fixes the teardown order. Processes first (nothing may hold
@@ -618,21 +623,29 @@ type playStep struct {
 // still discoverable and re-runnable by `haven clean`.
 func playTeardownPlan(h PlayTeardownHooks) []playStep {
 	return []playStep{
-		{"stop processes", h.StopProcesses},
-		{"remove routes", h.RemoveRoutes},
-		{"remove containers", h.RemoveContainers},
-		{"remove volumes", h.RemoveVolumes},
-		{"remove checkout", h.RemoveCheckout},
-		{"remove record", h.RemoveRecord},
+		{name: "stop processes", run: h.StopProcesses},
+		{name: "remove routes", run: h.RemoveRoutes},
+		{name: "remove containers", run: h.RemoveContainers},
+		{name: "remove volumes", run: h.RemoveVolumes},
+		{name: "remove checkout", run: h.RemoveCheckout},
+		{name: "remove record", run: h.RemoveRecord, onlyIfClean: true},
 	}
 }
 
-// runPlayTeardown executes every step in order, best-effort: a failure is
-// reported and joined into the returned error, never a reason to stop.
+// runPlayTeardown executes the steps in order, best-effort: a failure is
+// reported and joined into the returned error, never a reason to stop the
+// remaining steps. The one exception is a step marked onlyIfClean, which is
+// skipped once anything has failed — see playStep.
 func runPlayTeardown(steps []playStep, report func(step string, err error)) error {
 	var errs []error
 	for _, s := range steps {
 		if s.run == nil {
+			continue
+		}
+		if s.onlyIfClean && len(errs) > 0 {
+			if report != nil {
+				report(s.name+" (kept: teardown was incomplete, so `haven clean` can finish it)", nil)
+			}
 			continue
 		}
 		err := s.run()
@@ -667,13 +680,18 @@ func (o *Orchestrator) PlayTeardown(ctx context.Context, rec PlayRecord) error {
 			o.proxy.Remove(domain.ClickHouseService, rec.Slug)
 			return nil
 		},
+		// No `|| true` on either of these. `rm -f` and `volume rm -f` already
+		// succeed on names that do not exist, so swallowing the exit status buys
+		// no idempotency — it only hides the failures that matter (a volume still
+		// held by a container, a docker daemon that is not running) and reports a
+		// clean teardown while the sandbox's data is still on disk.
 		RemoveContainers: func() error {
 			return o.playDocker(ctx, rec.Checkout, "play-rm",
-				"docker rm -f "+strings.Join(playContainerNames(rec.Number), " ")+" >/dev/null 2>&1 || true")
+				"docker rm -f "+strings.Join(playContainerNames(rec.Number), " ")+" >/dev/null")
 		},
 		RemoveVolumes: func() error {
 			return o.playDocker(ctx, rec.Checkout, "play-rm-volumes",
-				"docker volume rm -f "+strings.Join(playVolumeNames(rec.Number), " ")+" >/dev/null 2>&1 || true")
+				"docker volume rm -f "+strings.Join(playVolumeNames(rec.Number), " ")+" >/dev/null")
 		},
 		RemoveCheckout: func() error {
 			if !PlayCheckoutContained(o.cfg.Home, rec.Checkout) {

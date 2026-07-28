@@ -52,6 +52,26 @@ func TestLangyImageTagIsContentAddressed(t *testing.T) {
 		}
 	})
 
+	// The whole point of a content address is that it survives everything that
+	// is not content. `git worktree add`, a branch switch and a fresh clone all
+	// rewrite mtimes without touching a byte; if those moved the tag, every new
+	// worktree would pay the multi-minute build this hash exists to avoid, and a
+	// CI-published image could never match a developer's tag.
+	t.Run("when only a file's mtime changes, the tag is unchanged", func(t *testing.T) {
+		target := filepath.Join(root, "services", "langyagent", "main.go")
+		touched := time.Now().Add(90 * time.Second)
+		if err := os.Chtimes(target, touched, touched); err != nil {
+			t.Fatal(err)
+		}
+		again, err := langyImageTag(root)
+		if err != nil {
+			t.Fatalf("langyImageTag: %v", err)
+		}
+		if again != first {
+			t.Errorf("a touch with no content change moved the tag: %q vs %q", again, first)
+		}
+	})
+
 	t.Run("when a copied source changes, the tag changes", func(t *testing.T) {
 		target := filepath.Join(root, "services", "langyagent", "main.go")
 		if err := os.WriteFile(target, []byte("v2 — longer"), 0o644); err != nil {

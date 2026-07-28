@@ -326,3 +326,38 @@ func TestViewerFirstReadIsBoundedToATailWindow(t *testing.T) {
 		})
 	})
 }
+
+// Quitting the play viewer destroys the sandbox, and only q and ctrl+c are
+// advertised as doing that. esc is the universal "back out of this screen"
+// key, so it must not be a destroy key here.
+func TestEscDoesNotDestroyAPlaySandbox(t *testing.T) {
+	t.Run("given the play viewer, where quitting destroys everything", func(t *testing.T) {
+		t.Run("when esc is pressed, it does not quit", func(t *testing.T) {
+			m := newViewerModel("play-42", "", "")
+			m.destroyOnQuit = true
+			if _, cmd := m.Update(key("esc")); cmd != nil {
+				t.Error("esc must not quit a viewer whose quit destroys the sandbox")
+			}
+			if m.toast == "" {
+				t.Error("esc should explain which key actually quits")
+			}
+		})
+
+		t.Run("when q is pressed, it still quits", func(t *testing.T) {
+			m := newViewerModel("play-42", "", "")
+			m.destroyOnQuit = true
+			if _, cmd := m.Update(key("q")); cmd == nil {
+				t.Error("q is the advertised quit key and must still work")
+			}
+		})
+	})
+
+	t.Run("given the up viewer, where quitting only detaches", func(t *testing.T) {
+		t.Run("when esc is pressed, it detaches as before", func(t *testing.T) {
+			m := newViewerModel("feat-x", "", "")
+			if _, cmd := m.Update(key("esc")); cmd == nil {
+				t.Error("esc should still detach a non-destructive viewer")
+			}
+		})
+	})
+}

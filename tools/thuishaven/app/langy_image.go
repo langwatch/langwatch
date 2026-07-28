@@ -9,6 +9,7 @@ package app
 import (
 	"crypto/sha256"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -76,19 +77,35 @@ func dockerfileCopySources(dockerfile string) []string {
 // hashPath folds one COPY source (file or directory tree) into the hash. A
 // missing source is folded in as such rather than failing: the docker build
 // will surface the real error with a far better message.
-func hashPath(h interface{ Write(p []byte) (int, error) }, repoRoot, src string) error {
+//
+// Files are folded in by CONTENT, not by mtime. An mtime-derived tag is not a
+// content address at all: `git worktree add`, a branch switch or a fresh clone
+// rewrites mtimes without changing a byte, which forced the multi-minute langy
+// build this hash exists to avoid, and meant a CI-published image could never
+// carry a tag a developer's checkout would reproduce.
+func hashPath(h io.Writer, repoRoot, src string) error {
 	root := filepath.Join(repoRoot, src)
 	info, err := os.Stat(root)
 	if err != nil {
 		fmt.Fprintf(h, "missing %s\n", src)
 		return nil
 	}
-	hashFile := func(rel string, info fs.FileInfo) {
-		fmt.Fprintf(h, "%s %d %d\n", rel, info.Size(), info.ModTime().UnixNano())
+	// Framing (path + length before the bytes) keeps the digest unambiguous, so
+	// two different file layouts cannot serialise to the same stream.
+	hashFile := func(rel, path string, info fs.FileInfo) error {
+		fmt.Fprintf(h, "%s %d\n", rel, info.Size())
+		f, err := os.Open(path)
+		if err != nil {
+			// Unreadable is a real difference; fold it in rather than ignoring it.
+			fmt.Fprintf(h, "unreadable %s\n", rel)
+			return nil
+		}
+		defer func() { _ = f.Close() }()
+		_, err = io.Copy(h, f)
+		return err
 	}
 	if !info.IsDir() {
-		hashFile(src, info)
-		return nil
+		return hashFile(src, root, info)
 	}
 	return filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -106,8 +123,7 @@ func hashPath(h interface{ Write(p []byte) (int, error) }, repoRoot, src string)
 			return err
 		}
 		rel, _ := filepath.Rel(repoRoot, path)
-		hashFile(rel, info)
-		return nil
+		return hashFile(rel, path, info)
 	})
 }
 

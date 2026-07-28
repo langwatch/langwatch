@@ -198,7 +198,17 @@ func (m *viewerModel) handleKey(s string) (tea.Model, tea.Cmd) {
 		}
 	}
 	switch s {
-	case "q", "esc", "ctrl+c":
+	case "esc":
+		// esc is the universal "back out of this screen" key, and on the play
+		// viewer quitting irreversibly destroys the sandbox — databases,
+		// containers, checkout. Only the keys the banner actually names (q, and
+		// ctrl+c as the usual interrupt) may do that.
+		if m.destroyOnQuit {
+			m.setToast("press q to quit — it DESTROYS this sandbox")
+			return m, nil
+		}
+		return m, tea.Quit
+	case "q", "ctrl+c":
 		return m, tea.Quit
 	case "right", "l", "tab":
 		m.preferred = ""

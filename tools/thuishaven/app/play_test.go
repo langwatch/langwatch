@@ -3,6 +3,7 @@ package app
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 
@@ -287,29 +288,67 @@ func TestPlayInfraShellsUseOwnPortsAndVolumes(t *testing.T) {
 
 // @scenario "Quitting always destroys everything"
 func TestPlayTeardownRunsEveryStepInOrderBestEffort(t *testing.T) {
-	var ran []string
-	step := func(name string, err error) func() error {
-		return func() error {
-			ran = append(ran, name)
-			return err
+	newRecorder := func(ran *[]string) func(string, error) func() error {
+		return func(name string, err error) func() error {
+			return func() error {
+				*ran = append(*ran, name)
+				return err
+			}
 		}
 	}
-	routeErr := errors.New("proxy is down")
-	err := runPlayTeardown(playTeardownPlan(PlayTeardownHooks{
-		StopProcesses:    step("stop processes", nil),
-		RemoveRoutes:     step("remove routes", routeErr), // an early failure...
-		RemoveContainers: step("remove containers", nil),
-		RemoveVolumes:    step("remove volumes", nil),
-		RemoveCheckout:   step("remove checkout", nil),
-		RemoveRecord:     step("remove record", nil),
-	}), nil)
-	want := []string{"stop processes", "remove routes", "remove containers", "remove volumes", "remove checkout", "remove record"}
-	if strings.Join(ran, "|") != strings.Join(want, "|") {
-		t.Errorf("teardown ran %v, want %v (fixed order, no early stop)", ran, want)
-	}
-	if err == nil || !errors.Is(err, routeErr) {
-		t.Errorf("teardown err = %v, want it to carry the failing step's error", err)
-	}
+
+	t.Run("given every resource step succeeds", func(t *testing.T) {
+		t.Run("when teardown runs, every step runs in order and the record is dropped", func(t *testing.T) {
+			var ran []string
+			step := newRecorder(&ran)
+			err := runPlayTeardown(playTeardownPlan(PlayTeardownHooks{
+				StopProcesses:    step("stop processes", nil),
+				RemoveRoutes:     step("remove routes", nil),
+				RemoveContainers: step("remove containers", nil),
+				RemoveVolumes:    step("remove volumes", nil),
+				RemoveCheckout:   step("remove checkout", nil),
+				RemoveRecord:     step("remove record", nil),
+			}), nil)
+			want := []string{"stop processes", "remove routes", "remove containers", "remove volumes", "remove checkout", "remove record"}
+			if strings.Join(ran, "|") != strings.Join(want, "|") {
+				t.Errorf("teardown ran %v, want %v (fixed order)", ran, want)
+			}
+			if err != nil {
+				t.Errorf("a clean teardown must not error, got %v", err)
+			}
+		})
+	})
+
+	// The record is what makes a sandbox findable. Dropping it after a failed
+	// teardown strands whatever survived — containers, volumes, a checkout —
+	// with nothing left able to reap them, while the banner claimed nothing
+	// survives.
+	t.Run("given a resource step fails", func(t *testing.T) {
+		t.Run("when teardown runs, the later steps still run but the record is kept", func(t *testing.T) {
+			var ran []string
+			step := newRecorder(&ran)
+			volumeErr := errors.New("volume still in use")
+			err := runPlayTeardown(playTeardownPlan(PlayTeardownHooks{
+				StopProcesses:    step("stop processes", nil),
+				RemoveRoutes:     step("remove routes", nil),
+				RemoveContainers: step("remove containers", nil),
+				RemoveVolumes:    step("remove volumes", volumeErr),
+				RemoveCheckout:   step("remove checkout", nil),
+				RemoveRecord:     step("remove record", nil),
+			}), nil)
+
+			if slices.Contains(ran, "remove record") {
+				t.Error("the record must be kept after a failed teardown so `haven clean` can finish it")
+			}
+			// Best-effort still holds for everything else.
+			if !slices.Contains(ran, "remove checkout") {
+				t.Errorf("a failure must not stop the remaining resource steps, ran %v", ran)
+			}
+			if err == nil || !errors.Is(err, volumeErr) {
+				t.Errorf("teardown err = %v, want it to carry the failing step's error", err)
+			}
+		})
+	})
 }
 
 // @scenario "A crashed play is discoverable and reapable"

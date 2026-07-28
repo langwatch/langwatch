@@ -53,7 +53,7 @@ Feature: haven CLI surface
     When the developer runs "haven db reset"
     Then it states which databases will be dropped and recreated and asks for confirmation
     And "--yes" replaces the prompt for scripts and agents
-    And "--demo" seeds the demo preset after the reset
+    And a preset name after "reset" seeds that preset, as in "haven db reset demo"
 
   Scenario: Connection strings come from one place
     When the developer runs "haven db url postgres"
