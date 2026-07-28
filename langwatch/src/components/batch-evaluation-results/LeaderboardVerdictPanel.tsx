@@ -33,6 +33,52 @@ const nameOf = (
   variantNames: Record<string, string>,
 ): string => variantNames[variantId] ?? variantId;
 
+/**
+ * The horizontal scale for the score bars: which scores are allowed to set the
+ * axis bounds, and how a value maps onto 0-100%.
+ *
+ * A named function rather than an inline filter chain because the rule it
+ * encodes has already been lost once in a refactor. Two exclusions carry the
+ * whole behaviour:
+ *
+ *  - **Scale to the scores, not the intervals.** Over few comparisons a single
+ *    interval can be many times wider than the spread of the scores; scaling
+ *    to it squashes every marker into one edge and the reader loses the
+ *    comparison entirely. Bands clip at the track edges instead, which reads
+ *    as "the uncertainty runs off the chart" — the correct impression.
+ *  - **Degenerate entries do not set the bounds.** A variant that never won or
+ *    never lost has no meaningful MLE score and in practice lands on an
+ *    extreme sink value. Letting it into min/max stretches the axis around a
+ *    number that means nothing. Its bar is still drawn and still labelled
+ *    "not scoreable"; it just does not get a vote on the scale.
+ *
+ * Returns null when nothing is scoreable, which the caller renders as no bars
+ * rather than as a degenerate axis.
+ */
+export const computeScoreBarScale = (
+  entries: BTLeaderboard["entries"],
+): { min: number; max: number; pct: (value: number) => number } | null => {
+  const scores = entries
+    .filter((entry) => !entry.degenerate)
+    .map((entry) => entry.score)
+    .filter((score) => Number.isFinite(score));
+  if (scores.length === 0) return null;
+
+  const rawMin = Math.min(...scores);
+  const rawMax = Math.max(...scores);
+  const pad = (rawMax - rawMin || 1) * 0.1;
+  const min = rawMin - pad;
+  const max = rawMax + pad;
+  const span = max - min || 1;
+
+  return {
+    min,
+    max,
+    pct: (value: number) =>
+      Math.min(100, Math.max(0, ((value - min) / span) * 100)),
+  };
+};
+
 export function LeaderboardVerdictPanel({
   leaderboard,
   verdict,
@@ -142,25 +188,9 @@ function ScoreBars({
       ? entry.scoreCI
       : null;
 
-  // Scale to the scores, not to the intervals. Over few comparisons a single
-  // interval can be many times wider than the spread of the scores, and
-  // scaling to it squashes every marker into the left edge — the reader
-  // loses the comparison entirely. Bands instead clip at the track edges,
-  // which reads as "the uncertainty runs off the chart" and is the correct
-  // impression anyway.
-  const scores = entries
-    .map((entry) => entry.score)
-    .filter((score) => Number.isFinite(score));
-  if (scores.length === 0) return null;
-
-  const rawMin = Math.min(...scores);
-  const rawMax = Math.max(...scores);
-  const pad = (rawMax - rawMin || 1) * 0.1;
-  const min = rawMin - pad;
-  const max = rawMax + pad;
-  const span = max - min || 1;
-  const clamp = (value: number) => Math.min(100, Math.max(0, value));
-  const pct = (value: number) => clamp(((value - min) / span) * 100);
+  const scale = computeScoreBarScale(entries);
+  if (!scale) return null;
+  const { pct } = scale;
 
   return (
     <VStack align="stretch" gap={2}>

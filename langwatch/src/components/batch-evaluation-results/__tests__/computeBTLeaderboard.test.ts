@@ -257,7 +257,7 @@ describe("computeBTLeaderboard bootstrap stability", () => {
       }
     });
 
-    it("keeps the interval ordered and containing the point estimate", () => {
+    it("keeps the interval ordered", () => {
       const result = computeBTLeaderboard(comparisons, ["a", "b"], {
         bootstrapSamples: 200,
         seed: 1,

@@ -1,0 +1,115 @@
+
+> langwatch@3.7.0 dev:haven /home/aryansharma28/langwatch_codebase/lb-6110/langwatch
+> NODE_ENV=development START_WORKERS=true FORCE_COLOR=1 go run github.com/langwatch/langwatch/cmd/haven up 2>&1 | tee server.log
+
+
+  thuishaven: stack "lb-6110"  (redis db 1)
+    app        https://app.lb-6110.langwatch.localhost:1355  ->  127.0.0.1:45001
+    └ api      https://app.lb-6110.langwatch.localhost:1355/api  ->  127.0.0.1:44807
+    gateway    https://gateway.lb-6110.langwatch.localhost:1355  ->  127.0.0.1:45275
+    nlp        https://nlp.lb-6110.langwatch.localhost:1355  ->  127.0.0.1:45097
+    langyagent https://langyagent.lb-6110.langwatch.localhost:1355  ->  127.0.0.1:45181
+    hub        https://hub.langwatch.localhost:1355
+
+codegen  | /home/aryansharma28/.profile: line 29: /home/aryansharma28/.local/bin/env: No such file or directory
+codegen  | [2mEnvironment variables loaded from .env[22m
+codegen  | [2mPrisma schema loaded from prisma/schema.prisma[22m
+codegen  | 
+codegen  | ✔ Generated [1mPrisma Client[22m (v5.7.1)[2m to ./node_modules/.pnpm/@prisma+client@5.7.1_prisma@5.7.1/node_modules/@prisma/client[22m in 1.51s
+codegen  | 
+codegen  | Start using Prisma Client in Node.js (See: [4mhttps://pris.ly/d/client[24m)
+codegen  | [2m```[22m
+codegen  | [36mimport[39m [34m{[39m PrismaClient [34m}[39m [36mfrom[39m [1m[32m'@prisma/client'[39m[22m
+codegen  | [36mconst[39m prisma = [36mnew[39m PrismaClient[34m([39m[34m)[39m
+codegen  | [2m```[22m
+codegen  | or start using Prisma Client at the edge (See: [4mhttps://pris.ly/d/accelerate[24m)
+codegen  | [2m```[22m
+codegen  | [36mimport[39m [34m{[39m PrismaClient [34m}[39m [36mfrom[39m [1m[32m'@prisma/client/edge'[39m[22m
+codegen  | [36mconst[39m prisma = [36mnew[39m PrismaClient[34m([39m[34m)[39m
+codegen  | [2m```[22m
+codegen  | 
+codegen  | See other ways of importing Prisma Client: [4mhttp://pris.ly/d/importing-client[24m
+codegen  | 
+codegen  | [90m[90m┌─[39m[90m[90m────────────────────────────────────────────────────────────┐[39m[90m
+codegen  | [90m│[39m[90m  [0mDeploying your app to serverless or edge functions?[0m        [90m│[39m[90m
+codegen  | [90m│[39m[90m  [0mTry Prisma Accelerate for connection pooling and caching.[0m  [90m│[39m[90m
+codegen  | [90m│[39m[90m  [0m[4mhttps://pris.ly/cli/accelerate[24m[0m                             [90m│[39m[90m
+codegen  | └─────────────────────────────────────────────────────────────┘[39m
+codegen  | 
+codegen  | [90m[90m┌─[39m[90m[90m────────────────────────────────────────────────────────┐[39m[90m
+codegen  | [90m│[39m[90m  [0m[34mUpdate available[39m[90m 5.7.1 -> 7.9.1[0m                        [90m│[39m[90m
+codegen  | [90m│[39m[90m  [0m[0m                                                       [90m│[39m[90m
+codegen  | [90m│[39m[90m  [0mThis is a major update - please follow the guide at[0m    [90m│[39m[90m
+codegen  | [90m│[39m[90m  [0mhttps://pris.ly/d/major-version-upgrade[0m                [90m│[39m[90m
+codegen  | [90m│[39m[90m  [0m[0m                                                       [90m│[39m[90m
+codegen  | [90m│[39m[90m  [0mRun the following to update[0m                            [90m│[39m[90m
+codegen  | [90m│[39m[90m  [0m  [1mnpm i --save-dev prisma@latest[22m[0m                       [90m│[39m[90m
+codegen  | [90m│[39m[90m  [0m  [1mnpm i @prisma/client@latest[22m[0m                          [90m│[39m[90m
+codegen  | └─────────────────────────────────────────────────────────┘[39m
+codegen  | building mcp server... built in 7.0s
+codegen  | Generated 20 Langy skills (11 skills, 9 recipes) -> langwatch/src/shared/langy/langySkills.generated.json
+prepare  | /home/aryansharma28/.profile: line 29: /home/aryansharma28/.local/bin/env: No such file or directory
+prepare  | [2mEnvironment variables loaded from .env[22m
+prepare  | [2mPrisma schema loaded from prisma/schema.prisma[22m
+prepare  | [2mDatasource "db": PostgreSQL database "mydb", schema "mydb" at "localhost:5432"[22m
+prepare  | 
+prepare  | 214 migrations found in prisma/migrations
+prepare  | 
+prepare  | 
+prepare  | [32mNo pending migrations to apply.[39m
+prepare  | [10:31:27.598] [32mINFO[39m (langwatch:task): [36mrunning[39m [90m{"traceId":null,"spanId":null,"organizationId":null,"projectId":null,"userId":null,"taskName":"clickhouseMigrate"}[39m
+prepare  | [10:31:27.599] [32mINFO[39m (langwatch:clickhouse:migrations): [36mRunning ClickHouse migrations...[39m [90m{"traceId":null,"spanId":null,"organizationId":null,"projectId":null,"userId":null}[39m
+prepare  | [10:31:27.599] [32mINFO[39m (langwatch:clickhouse:migrations): [36mRunning pre-flight checks...[39m [90m{"traceId":null,"spanId":null,"organizationId":null,"projectId":null,"userId":null}[39m
+prepare  | [10:31:27.824] [32mINFO[39m (langwatch:redis): [36mconnected[39m [90m{"traceId":null,"spanId":null,"organizationId":null,"projectId":null,"userId":null,"db":1}[39m
+prepare  | [10:31:27.831] [34mDEBUG[39m (langwatch:clickhouse:migrations): [36mClickHouse connectivity check passed[39m [90m{"traceId":null,"spanId":null,"organizationId":null,"projectId":null,"userId":null}[39m
+prepare  | [10:31:27.831] [32mINFO[39m (langwatch:clickhouse:migrations): [36mPre-flight checks passed[39m [90m{"traceId":null,"spanId":null,"organizationId":null,"projectId":null,"userId":null}[39m
+prepare  | [10:31:27.832] [32mINFO[39m (langwatch:clickhouse:migrations): [36mBootstrapping ClickHouse database[39m [90m{"traceId":null,"spanId":null,"organizationId":null,"projectId":null,"userId":null,"database":"langwatch"}[39m
+prepare  | [10:31:27.862] [32mINFO[39m (langwatch:redis): [36mready to accept commands[39m [90m{"traceId":null,"spanId":null,"organizationId":null,"projectId":null,"userId":null,"db":1}[39m
+prepare  | [10:31:27.872] [34mDEBUG[39m (langwatch:clickhouse:migrations): [36mDatabase engine verified[39m [90m{"traceId":null,"spanId":null,"organizationId":null,"projectId":null,"userId":null,"database":"langwatch","engine":"Atomic"}[39m
+prepare  | [10:31:27.872] [32mINFO[39m (langwatch:clickhouse:migrations): [36mExecuting bootstrap SQL[39m [90m{"traceId":null,"spanId":null,"organizationId":null,"projectId":null,"userId":null,"sql":"CREATE DATABASE IF NOT EXISTS langwatch  "}[39m
+prepare  | [10:31:27.885] [32mINFO[39m (langwatch:clickhouse:migrations): [36mExecuting bootstrap SQL[39m [90m{"traceId":null,"spanId":null,"organizationId":null,"projectId":null,"userId":null,"sql":"CREATE TABLE IF NOT EXISTS langwatch.goose_db_version (\n        version_id Int64,\n        is_applied UInt8,\n        date Date DEFAULT now(),\n        tstamp DateTime DEFAULT now()\n      ) ENGINE = MergeTree()\n      ORDER BY date\n      SETTINGS index_granularity = 8192"}[39m
+prepare  | [10:31:27.893] [32mINFO[39m (langwatch:clickhouse:migrations): [36mExecuting bootstrap SQL[39m [90m{"traceId":null,"spanId":null,"organizationId":null,"projectId":null,"userId":null,"sql":"INSERT INTO langwatch.goose_db_version (version_id, is_applied)\n       SELECT 0, 1\n       WHERE NOT EXISTS (SELECT 1 FROM langwatch.goose_db_version LIMIT 1)"}[39m
+prepare  | [10:31:27.945] [32mINFO[39m (langwatch:clickhouse:migrations): [36mStorage policy 'local_primary' not found — migrations will use 'default' policy[39m [90m{"traceId":null,"spanId":null,"organizationId":null,"projectId":null,"userId":null}[39m
+prepare  | [10:31:27.945] [32mINFO[39m (langwatch:clickhouse:migrations): [36mBootstrap completed[39m [90m{"traceId":null,"spanId":null,"organizationId":null,"projectId":null,"userId":null}[39m
+prepare  | [10:31:27.946] [32mINFO[39m (langwatch:clickhouse:migrations): [36mClickHouse migration configuration[39m [90m{"traceId":null,"spanId":null,"organizationId":null,"projectId":null,"userId":null,"database":"langwatch"}[39m
+prepare  | [10:31:27.946] [32mINFO[39m (langwatch:clickhouse:migrations): [36mGoose migrations directory[39m [90m{"traceId":null,"spanId":null,"organizationId":null,"projectId":null,"userId":null,"migrationsDir":"/home/aryansharma28/langwatch_codebase/lb-6110/langwatch/src/server/clickhouse/migrations","__dirname":"/home/aryansharma28/langwatch_codebase/lb-6110/langwatch/src/server/clickhouse"}[39m
+prepare  | [10:31:27.946] [32mINFO[39m (langwatch:clickhouse:migrations): [36mGoose connection string[39m [90m{"traceId":null,"spanId":null,"organizationId":null,"projectId":null,"userId":null,"connectionString":"http://default:***@localhost:8123/?database=langwatch"}[39m
+prepare  | [10:31:28.195] [32mINFO[39m (langwatch:clickhouse:migrations): [36mGoose output[39m [90m{"traceId":null,"spanId":null,"organizationId":null,"projectId":null,"userId":null,"gooseOutput":"2026/07/28 10:31:28 goose: no migrations to run. current version: 55\n","exitCode":0}[39m
+prepare  | [10:31:28.195] [32mINFO[39m (langwatch:clickhouse:migrations): [36mClickHouse migrations completed.[39m [90m{"traceId":null,"spanId":null,"organizationId":null,"projectId":null,"userId":null}[39m
+prepare  | [10:31:28.236] [32mINFO[39m (langwatch:clickhouse:ttl-reconciler): [36mTable uses 'default' policy (not 'local_primary'), skipping cold-storage TTL[39m [90m{"traceId":null,"spanId":null,"organizationId":null,"projectId":null,"userId":null,"table":"billable_events","policy":"default"}[39m
+prepare  | [10:31:28.236] [32mINFO[39m (langwatch:clickhouse:ttl-reconciler): [36mTable uses 'default' policy (not 'local_primary'), skipping cold-storage TTL[39m [90m{"traceId":null,"spanId":null,"organizationId":null,"projectId":null,"userId":null,"table":"dspy_steps","policy":"default"}[39m
+prepare  | [10:31:28.236] [32mINFO[39m (langwatch:clickhouse:ttl-reconciler): [36mTable uses 'default' policy (not 'local_primary'), skipping cold-storage TTL[39m [90m{"traceId":null,"spanId":null,"organizationId":null,"projectId":null,"userId":null,"table":"evaluation_runs","policy":"default"}[39m
+prepare  | [10:31:28.236] [32mINFO[39m (langwatch:clickhouse:ttl-reconciler): [36mTable uses 'default' policy (not 'local_primary'), skipping cold-storage TTL[39m [90m{"traceId":null,"spanId":null,"organizationId":null,"projectId":null,"userId":null,"table":"event_log","policy":"default"}[39m
+prepare  | [10:31:28.236] [32mINFO[39m (langwatch:clickhouse:ttl-reconciler): [36mTable uses 'default' policy (not 'local_primary'), skipping cold-storage TTL[39m [90m{"traceId":null,"spanId":null,"organizationId":null,"projectId":null,"userId":null,"table":"langy_analytics_events","policy":"default"}[39m
+prepare  | [10:31:28.236] [32mINFO[39m (langwatch:clickhouse:ttl-reconciler): [36mTable uses 'default' policy (not 'local_primary'), skipping cold-storage TTL[39m [90m{"traceId":null,"spanId":null,"organizationId":null,"projectId":null,"userId":null,"table":"experiment_run_items","policy":"default"}[39m
+prepare  | [10:31:28.236] [32mINFO[39m (langwatch:clickhouse:ttl-reconciler): [36mTable uses 'default' policy (not 'local_primary'), skipping cold-storage TTL[39m [90m{"traceId":null,"spanId":null,"organizationId":null,"projectId":null,"userId":null,"table":"experiment_runs","policy":"default"}[39m
+prepare  | [10:31:28.236] [32mINFO[39m (langwatch:clickhouse:ttl-reconciler): [36mTable uses 'default' policy (not 'local_primary'), skipping cold-storage TTL[39m [90m{"traceId":null,"spanId":null,"organizationId":null,"projectId":null,"userId":null,"table":"simulation_runs","policy":"default"}[39m
+prepare  | [10:31:28.236] [32mINFO[39m (langwatch:clickhouse:ttl-reconciler): [36mTable uses 'default' policy (not 'local_primary'), skipping cold-storage TTL[39m [90m{"traceId":null,"spanId":null,"organizationId":null,"projectId":null,"userId":null,"table":"stored_log_records","policy":"default"}[39m
+prepare  | [10:31:28.236] [32mINFO[39m (langwatch:clickhouse:ttl-reconciler): [36mTable uses 'default' policy (not 'local_primary'), skipping cold-storage TTL[39m [90m{"traceId":null,"spanId":null,"organizationId":null,"projectId":null,"userId":null,"table":"log_records","policy":"default"}[39m
+prepare  | [10:31:28.236] [32mINFO[39m (langwatch:clickhouse:ttl-reconciler): [36mTable uses 'default' policy (not 'local_primary'), skipping cold-storage TTL[39m [90m{"traceId":null,"spanId":null,"organizationId":null,"projectId":null,"userId":null,"table":"suite_runs","policy":"default"}[39m
+prepare  | [10:31:28.236] [32mINFO[39m (langwatch:clickhouse:ttl-reconciler): [36mTable uses 'default' policy (not 'local_primary'), skipping cold-storage TTL[39m [90m{"traceId":null,"spanId":null,"organizationId":null,"projectId":null,"userId":null,"table":"metric_data_points","policy":"default"}[39m
+prepare  | [10:31:28.236] [32mINFO[39m (langwatch:clickhouse:ttl-reconciler): [36mTable uses 'default' policy (not 'local_primary'), skipping cold-storage TTL[39m [90m{"traceId":null,"spanId":null,"organizationId":null,"projectId":null,"userId":null,"table":"metric_series","policy":"default"}[39m
+prepare  | [10:31:28.236] [32mINFO[39m (langwatch:clickhouse:ttl-reconciler): [36mTable uses 'default' policy (not 'local_primary'), skipping cold-storage TTL[39m [90m{"traceId":null,"spanId":null,"organizationId":null,"projectId":null,"userId":null,"table":"metric_time_rollups","policy":"default"}[39m
+prepare  | [10:31:28.236] [32mINFO[39m (langwatch:clickhouse:ttl-reconciler): [36mTable uses 'default' policy (not 'local_primary'), skipping cold-storage TTL[39m [90m{"traceId":null,"spanId":null,"organizationId":null,"projectId":null,"userId":null,"table":"stored_spans","policy":"default"}[39m
+prepare  | [10:31:28.236] [32mINFO[39m (langwatch:clickhouse:ttl-reconciler): [36mTable uses 'default' policy (not 'local_primary'), skipping cold-storage TTL[39m [90m{"traceId":null,"spanId":null,"organizationId":null,"projectId":null,"userId":null,"table":"trace_summaries","policy":"default"}[39m
+prepare  | [10:31:28.236] [32mINFO[39m (langwatch:clickhouse:ttl-reconciler): [36mTable uses 'default' policy (not 'local_primary'), skipping cold-storage TTL[39m [90m{"traceId":null,"spanId":null,"organizationId":null,"projectId":null,"userId":null,"table":"trace_analytics","policy":"default"}[39m
+prepare  | [10:31:28.236] [32mINFO[39m (langwatch:clickhouse:ttl-reconciler): [36mTable uses 'default' policy (not 'local_primary'), skipping cold-storage TTL[39m [90m{"traceId":null,"spanId":null,"organizationId":null,"projectId":null,"userId":null,"table":"trace_analytics_rollup","policy":"default"}[39m
+prepare  | [10:31:28.236] [32mINFO[39m (langwatch:clickhouse:ttl-reconciler): [36mTable uses 'default' policy (not 'local_primary'), skipping cold-storage TTL[39m [90m{"traceId":null,"spanId":null,"organizationId":null,"projectId":null,"userId":null,"table":"evaluation_analytics","policy":"default"}[39m
+prepare  | [10:31:28.236] [32mINFO[39m (langwatch:clickhouse:ttl-reconciler): [36mTable uses 'default' policy (not 'local_primary'), skipping cold-storage TTL[39m [90m{"traceId":null,"spanId":null,"organizationId":null,"projectId":null,"userId":null,"table":"evaluation_analytics_rollup","policy":"default"}[39m
+prepare  | [10:31:28.236] [32mINFO[39m (langwatch:clickhouse:ttl-reconciler): [36mTTL reconciliation complete[39m [90m{"traceId":null,"spanId":null,"organizationId":null,"projectId":null,"userId":null,"updated":0,"skipped":20}[39m
+prepare  | [10:31:28.236] [32mINFO[39m (langwatch:task): [36mdone[39m [90m{"traceId":null,"spanId":null,"organizationId":null,"projectId":null,"userId":null}[39m
+seed     | /home/aryansharma28/.profile: line 29: /home/aryansharma28/.local/bin/env: No such file or directory
+seed     | 🌱 Seeding static local dev identity (ingestion key: sk-lw-lo…)
+seed     | ✅ Model provider: openai (keys from environment)
+seed     | ✅ Model provider: anthropic (keys from environment)
+seed     | ✅ Model provider: gemini (keys from environment)
+seed     | ✅ Model provider: azure (keys from environment)
+seed     | ⏭️  Model provider vertex_ai: GOOGLE_APPLICATION_CREDENTIALS is set but the key set is incomplete (missing VERTEXAI_PROJECT, VERTEXAI_LOCATION) — skipped
+seed     | ✅ Model provider: azure_safety (keys from environment)
+seed     | ✅ Organization: local-dev-organization (local-dev-org)
+seed     | ✅ Team:         local-dev-team (local-dev-team)
+seed     | ✅ Project:      local-dev-project (local-dev-project)
+seed     | ✅ Admin login:  admin@haven.localhost / LocalHavenAdmin!2026
+seed     | ✅ Ingestion key:        sk-lw-local-development-key
+seed     | ✅ Private access token: sk-lw-LocalDevPrivate1_LocalDevPrivateAccessTokenSecretFixedValue000000
+seed     | ✅ Public access token:  ik-lw-LocalDevPublicIk_LocalDevPublicIngestionTokenSecretFixedValue0000

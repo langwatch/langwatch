@@ -228,12 +228,31 @@ function SortableHeader({
   const active = sortKey === col;
   const ArrowIcon = !active ? LuArrowUpDown : sortDir === "asc" ? LuArrowUp : LuArrowDown;
   return (
-    <Table.ColumnHeader>
+    // `aria-sort` on the header itself, not just a keyboard handler on the
+    // control inside it: the arrow icon communicates the sort state visually,
+    // and this is the only thing that communicates it to a screen reader.
+    // Keyboard reachability without it would let someone sort the table and
+    // have no way to learn that they had.
+    <Table.ColumnHeader
+      aria-sort={active ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
+    >
       <HStack
         gap={1}
         cursor="pointer"
         onClick={() => onSort(col)}
         userSelect="none"
+        role="button"
+        tabIndex={0}
+        aria-label={`Sort by ${label}`}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            // Space scrolls the page by default; a control that responds to it
+            // has to say so.
+            e.preventDefault();
+            onSort(col);
+          }
+        }}
+        _focusVisible={{ outline: "2px solid", outlineColor: "blue.focusRing" }}
       >
         <Text>{label}</Text>
         <Icon as={ArrowIcon} boxSize="12px" color={active ? "fg" : "fg.muted"} />
@@ -339,22 +358,51 @@ function WinMatrixHeatmap({
                   const l = leaderboard.winMatrix[colId]?.[rowId] ?? 0;
                   const total = w + l;
                   const rate = total > 0 ? w / total : null;
+                  const clickable = total > 0 && !!onCellClick;
+                  const rowName = variantNames[rowId] ?? rowId;
+                  const colName = variantNames[colId] ?? colId;
+                  const summary =
+                    rate === null
+                      ? "No matchups"
+                      : `${w} wins / ${total} matchups (${Math.round(rate * 100)}%)`;
                   return (
                     <Table.Cell
                       key={colId}
                       textAlign="center"
                       bg={heatmapBg(rate)}
-                      cursor={total > 0 && onCellClick ? "pointer" : undefined}
+                      cursor={clickable ? "pointer" : undefined}
                       onClick={
-                        total > 0 && onCellClick
-                          ? () => onCellClick(rowId, colId)
-                          : undefined
+                        clickable ? () => onCellClick!(rowId, colId) : undefined
                       }
-                      title={
-                        rate === null
-                          ? "No matchups"
-                          : `${w} wins / ${total} matchups (${Math.round(rate * 100)}%)`
+                      // Only the cells that actually do something are focus
+                      // stops. Making every cell tabbable would put an N×N grid
+                      // of dead targets in the tab order — worse than no
+                      // keyboard support, because it buries the real ones.
+                      {...(clickable
+                        ? {
+                            role: "button",
+                            tabIndex: 0,
+                            onKeyDown: (e: React.KeyboardEvent) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                onCellClick!(rowId, colId);
+                              }
+                            },
+                            _focusVisible: {
+                              outline: "2px solid",
+                              outlineColor: "blue.focusRing",
+                            },
+                          }
+                        : {})}
+                      // The visible cell is a bare number, which tells a screen
+                      // reader nothing about whose matchup it is or that
+                      // activating it opens the judge's reasoning.
+                      aria-label={
+                        clickable
+                          ? `${rowName} vs ${colName}: ${summary}. Show the judge's reasoning.`
+                          : `${rowName} vs ${colName}: ${summary}`
                       }
+                      title={summary}
                     >
                       {total === 0 ? "—" : w}
                     </Table.Cell>
