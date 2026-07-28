@@ -133,3 +133,23 @@ Feature: Serialized adapters surface user-vs-infra failures distinctly
     When SerializedCodeAgentAdapter.call rejects
     Then the error has source="nlp_service"
     And the message does not claim user code raised the error
+
+  @unit
+  Scenario: a missing declared output leaves the same structured footprint as any other failure
+    Given the agent run succeeds but omits the output field the agent declared
+    When SerializedCodeAgentAdapter.call rejects
+    Then the error is a SerializedCodeAgentAdapterError with source="user_code"
+    And the failure is recorded on the span like every other failure
+
+  @unit
+  Scenario: a success response that is not valid JSON is surfaced as its own failure kind
+    Given the NLP service answers 200 with a body that is not valid JSON
+    When SerializedCodeAgentAdapter.call rejects
+    Then the error has source="nlp_service"
+    And the failure is not recorded as an HTTP failure
+
+  @unit
+  Scenario: a failure after the response arrived is not blamed on the response time
+    Given the NLP service answers in full and the failure happens afterwards
+    When SerializedCodeAgentAdapter.call rejects
+    Then the message does not claim the service failed to respond in time

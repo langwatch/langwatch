@@ -17,11 +17,12 @@ import { getLangWatchTracer } from "langwatch";
 import { LATEST_SPEC_VERSION } from "../../../../optimization_studio/types/dsl";
 import { resolveFieldMappings } from "../resolve-field-mappings";
 import type { CodeAgentData } from "../types";
-import type { NlpEngineError } from "./format-execution-error";
+import type { NlpEngineResult } from "./format-execution-error";
 import {
   formatEngineError,
   formatFetchError,
   formatHttpError,
+  formatMalformedBodyError,
 } from "./format-execution-error";
 
 /** Timeout for NLP service requests (2 minutes) */
@@ -31,9 +32,19 @@ const NLP_FETCH_TIMEOUT_MS = 120_000;
  * Categories for adapter failures, surfaced as the `error.kind` span attribute.
  *
  * `execution` is a run the NLP engine accepted and then finalized as failed —
- * it arrives as a 200, so it is not an `http` failure.
+ * it arrives as a 200, so it is not an `http` failure. `parse` is a 2xx whose
+ * body is not the JSON the engine promises, and `output` is a run that
+ * succeeded without producing the field the agent declared. Keeping these
+ * distinct is the point: an operator filtering `error.kind=http` must not be
+ * handed a 200.
  */
-type AdapterErrorKind = "timeout" | "fetch" | "http" | "execution";
+type AdapterErrorKind =
+  | "timeout"
+  | "fetch"
+  | "http"
+  | "execution"
+  | "parse"
+  | "output";
 
 /** Whether a rejection is the AbortController firing, in either runtime shape. */
 function isAbortError(error: unknown): boolean {
@@ -311,6 +322,8 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
       async (span) => {
         const controller = new AbortController();
         let timedOut = false;
+        // Latched once the full response body is read — see the disarm below.
+        let responseComplete = false;
         const timeout = setTimeout(() => {
           timedOut = true;
           controller.abort();
@@ -344,6 +357,12 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
           // non-JSON payload — it rejects with "Body is unusable" and the
           // customer is shown an empty body (review lw#3439).
           const rawBody = await response.text();
+          // The response is complete. Disarm now, so a timer that fires from
+          // here on cannot relabel an unrelated downstream failure (a missing
+          // output field, say) as "the NLP service did not respond" — it
+          // demonstrably did (review lw#3439).
+          clearTimeout(timeout);
+          responseComplete = true;
 
           if (!response.ok) {
             // Classification is single-sourced inside formatHttpError: the
@@ -363,7 +382,12 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
             });
           }
 
-          const result = this.parseExecutionResult({ rawBody, endpoint, span });
+          const result = this.parseExecutionResult({
+            rawBody,
+            status: response.status,
+            endpoint,
+            span,
+          });
 
           span.setAttribute("nlp.status", result.status ?? "unknown");
           if (result.trace_id) {
@@ -391,7 +415,27 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
             });
           }
 
-          return this.extractOutput(result.result ?? null);
+          try {
+            return this.extractOutput(result.result ?? null);
+          } catch (outputError) {
+            // A declared output the agent never returned is the customer's
+            // config, and it must leave the same span footprint and structured
+            // fields as every other failure — otherwise it is the untraced
+            // failure lw#3438 exists to eliminate.
+            span.setAttribute("error.kind", "output" satisfies AdapterErrorKind);
+            throw new SerializedCodeAgentAdapterError(
+              outputError instanceof Error
+                ? outputError.message
+                : String(outputError),
+              {
+                kind: "output",
+                source: "user_code",
+                endpoint,
+                httpStatus: response.status,
+                cause: outputError,
+              },
+            );
+          }
         } catch (error) {
           if (error instanceof SerializedCodeAgentAdapterError) throw error;
           // The abort timer stays armed once headers arrive, so it can fire
@@ -399,7 +443,15 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
           // outside the fetch try — classify it as the timeout it is rather
           // than letting a bare "The operation was aborted." escape unwrapped
           // (review lw#3439).
-          if (timedOut || isAbortError(error)) {
+          //
+          // `responseComplete` covers the narrow race where the timer fired
+          // DURING the body read but the body arrived anyway: the latch is
+          // then true over a response that demonstrably completed, and a
+          // later failure must not be relabelled a timeout. It is
+          // defence-in-depth — today every post-body failure is already
+          // wrapped as a SerializedCodeAgentAdapterError and returns above —
+          // and it is what keeps that true if a future path throws raw.
+          if (!responseComplete && (timedOut || isAbortError(error))) {
             span.setAttribute(
               "error.kind",
               "timeout" satisfies AdapterErrorKind,
@@ -429,39 +481,31 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
    */
   private parseExecutionResult({
     rawBody,
+    status,
     endpoint,
     span,
   }: {
     rawBody: string;
+    status: number;
     endpoint: string;
     span: { setAttribute: (key: string, value: string | number) => void };
-  }): {
-    trace_id?: string;
-    status?: string;
-    result?: Record<string, unknown> | null;
-    error?: NlpEngineError;
-  } {
+  }): NlpEngineResult {
     try {
-      return JSON.parse(rawBody) as ReturnType<
-        typeof this.parseExecutionResult
-      >;
+      return JSON.parse(rawBody) as NlpEngineResult;
     } catch (parseError) {
-      span.setAttribute("error.kind", "http" satisfies AdapterErrorKind);
-      throw new SerializedCodeAgentAdapterError(
-        [
-          "SerializedCodeAgentAdapter: NLP service returned a response that is not valid JSON.",
-          "  body:",
-          rawBody.slice(0, 500) || "    (empty)",
-        ].join("\n"),
-        {
-          kind: "http",
-          source: "nlp_service",
-          endpoint,
-          httpStatus: 200,
-          rawDetail: rawBody,
-          cause: parseError,
-        },
-      );
+      const { message, source, rawDetail } = formatMalformedBodyError({
+        status,
+        rawBody,
+      });
+      span.setAttribute("error.kind", "parse" satisfies AdapterErrorKind);
+      throw new SerializedCodeAgentAdapterError(message, {
+        kind: "parse",
+        source,
+        endpoint,
+        httpStatus: status,
+        rawDetail,
+        cause: parseError,
+      });
     }
   }
 

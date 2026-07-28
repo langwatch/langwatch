@@ -66,6 +66,17 @@ describe("format-execution-error helpers (lw#3439)", () => {
     it("does not name an internal field the customer cannot reach", () => {
       expect(cleanErrorDetail("x".repeat(5_000))).not.toMatch(/rawDetail/);
     });
+
+    it("counts the surviving detail in the truncation marker, not the noise it deleted", () => {
+      // Reporting raw.length would tell a support engineer there are
+      // thousands more characters of traceback to go find, when the formatter
+      // itself deleted them as noise.
+      const noise = "AI SDK Warning (foo): bar\n".repeat(200);
+      const real = "y".repeat(2_500);
+      const cleaned = cleanErrorDetail(noise + real);
+      expect(cleaned).toMatch(/truncated, original was 2500 chars/);
+      expect(cleaned).not.toMatch(/original was \d{4,}\d chars/);
+    });
   });
 
   describe("parseErrorEnvelope", () => {
@@ -162,6 +173,18 @@ describe("format-execution-error helpers (lw#3439)", () => {
       ).toBe("user_code");
     });
 
+    it("agrees with the engine path on invalid_workflow, whichever transport carried it", () => {
+      // The engine can report the same root cause as a 200 node failure or as
+      // a non-2xx herr envelope. Same cause must not get opposite blame.
+      const viaHerr = classifyHttpFailure({
+        status: 400,
+        envelope: parseErrorEnvelope(herrBody("invalid_workflow", "bad dsl")),
+      });
+      const viaEngine = classifyEngineFailure({ errorType: "invalid_workflow" });
+      expect(viaHerr).toBe(viaEngine);
+      expect(viaHerr).toBe("nlp_service");
+    });
+
     it("classifies an opaque 500 as nlp_service", () => {
       expect(
         classifyHttpFailure({
@@ -253,17 +276,45 @@ describe("format-execution-error helpers (lw#3439)", () => {
       expect(out.message).toMatch(/field required/);
     });
 
-    it("never leaks an internal endpoint into the surfaced message", () => {
-      const userCode = formatHttpError({
-        status: 400,
-        rawBody: herrBody("bad_request", "boom"),
+    // These fixtures carry a REAL internal address. The previous version of
+    // this test asserted absence against address-free bodies, so it passed
+    // whether or not anything redacted — a vacuous absence assertion.
+    it("strips the upstream address an infra error page names", () => {
+      const out = formatHttpError({
+        status: 502,
+        rawBody:
+          "<html><body><p>upstream connect error: connecting to 10.4.2.11:5561</p></body></html>",
       });
-      const infra = formatHttpError({
+      expect(out.source).toBe("nlp_service");
+      expect(out.message).not.toMatch(/10\.4\.2\.11/);
+      expect(out.message).not.toMatch(/5561/);
+    });
+
+    it("strips the internal endpoint a herr infra message names", () => {
+      const out = formatHttpError({
         status: 503,
-        rawBody: herrBody("child_unavailable", "down"),
+        rawBody: herrBody(
+          "child_unavailable",
+          "dial tcp http://nlp-internal:5561/go/studio/execute_sync: connection refused",
+        ),
       });
-      expect(userCode.message).not.toMatch(/execute_sync|https?:\/\//);
-      expect(infra.message).not.toMatch(/execute_sync|https?:\/\//);
+      expect(out.source).toBe("nlp_service");
+      expect(out.message).not.toMatch(/nlp-internal/);
+      expect(out.message).not.toMatch(/execute_sync/);
+    });
+
+    it("leaves a URL the customer wrote in their own traceback intact", () => {
+      // The mirror of the two above: redacting the customer's own URL would
+      // hide their bug from them, so the user-code branch is not redacted.
+      const out = formatHttpError({
+        status: 500,
+        rawBody: JSON.stringify({
+          detail:
+            "httpx.ConnectError: failed to reach https://api.theirservice.com/v1/chat",
+        }),
+      });
+      expect(out.source).toBe("user_code");
+      expect(out.message).toMatch(/api\.theirservice\.com/);
     });
 
     it("returns a source that always agrees with the message wording", () => {

@@ -54,6 +54,8 @@
  *   out worker logs.
  */
 
+import { goErrorEnvelopeSchema } from "../../../nlpgo/goHandledError";
+
 const MAX_DETAIL_LENGTH = 2_000;
 
 /** Lines we strip from the rendered surface (still preserved on the raw payload). */
@@ -81,9 +83,14 @@ export interface NlpEngineError {
   traceback?: string;
 }
 
-/** A run that the engine finalized as failed. */
+/**
+ * The engine's `WorkflowResult` (`services/nlpgo/app/app.go:121`) — the 2xx
+ * body. `result` is omitted when the run failed.
+ */
 export interface NlpEngineResult {
+  trace_id?: string;
   status?: string;
+  result?: Record<string, unknown> | null;
   error?: NlpEngineError;
 }
 
@@ -121,16 +128,21 @@ const PLATFORM_ENGINE_ERROR_TYPES: ReadonlySet<string> = new Set([
  * herr codes the NLP engine attributes to the customer, mirroring
  * `handlerFault` in `services/nlpgo/adapters/httpapi/handler_errors.go`.
  *
- * Deliberate divergence from that Go function: it also counts `unauthorized`
- * and `not_found` as customer faults, but on this path both describe the
- * *adapter's own* request envelope — the adapter supplies the API key and the
- * synthetic workflow id, the customer never sees them. Blaming user code for
- * a bad platform credential is the same mislabelling in the other direction,
- * so those two stay infra here.
+ * Deliberate divergence from that Go function: it also counts `unauthorized`,
+ * `not_found` and `invalid_workflow` as customer faults, but on this path all
+ * three describe the *adapter's own* request envelope — the adapter supplies
+ * the API key and the synthetic workflow id, and it synthesizes the DSL, so
+ * the customer authors none of them. Blaming user code for a bad platform
+ * credential is the same mislabelling in the other direction, so all three
+ * stay infra here.
+ *
+ * `invalid_workflow` in particular MUST agree with its entry in
+ * `PLATFORM_ENGINE_ERROR_TYPES` above: the engine can report the same root
+ * cause on either transport, and the same cause must not get opposite blame
+ * depending on which one it took.
  */
 const CUSTOMER_FAULT_HERR_CODES: ReadonlySet<string> = new Set([
   "bad_request",
-  "invalid_workflow",
   "invalid_dataset",
   "unsupported_node_kind",
   "code_block_timeout",
@@ -169,25 +181,28 @@ export function parseErrorEnvelope(rawBody: string): ParsedErrorEnvelope {
   } catch {
     return { legacyDetail: false };
   }
-  if (typeof parsed !== "object" || parsed === null) {
-    return { legacyDetail: false };
-  }
 
-  const body = parsed as { error?: unknown; detail?: unknown };
-
-  if (typeof body.error === "object" && body.error !== null) {
-    const herr = body.error as { type?: unknown; message?: unknown };
+  // The herr envelope is parsed with the SAME schema every other nlpgo reader
+  // uses (`goHandledError.ts`), so a shape change lands in one place rather
+  // than in a third hand-rolled parser.
+  const herr = goErrorEnvelopeSchema.safeParse(parsed);
+  if (herr.success) {
     return {
-      code: typeof herr.type === "string" ? herr.type : undefined,
-      detail: asDetailString(herr.message),
+      code: herr.data.error.type,
+      detail: asDetailString(herr.data.error.message),
       legacyDetail: false,
     };
   }
 
+  if (typeof parsed !== "object" || parsed === null) {
+    return { legacyDetail: false };
+  }
+  // Legacy FastAPI `{ detail }` — the only shape the shared schema does not
+  // model, because nlpgo never emits it.
+  const body = parsed as { detail?: unknown };
   if ("detail" in body) {
     return { detail: asDetailString(body.detail), legacyDetail: true };
   }
-
   return { legacyDetail: false };
 }
 
@@ -243,9 +258,11 @@ export function cleanErrorDetail(raw: string): string {
   // lines (not 3+) or a two-line noise block leaves a gap mid-traceback.
   cleaned = cleaned.replace(/\n[ \t]*\n[ \t]*\n*/g, "\n\n").trim();
   if (cleaned.length > MAX_DETAIL_LENGTH) {
+    // Report the length of what was actually withheld, not `raw.length` —
+    // noise this function already deleted is not text anyone can go read.
     cleaned =
       cleaned.slice(0, MAX_DETAIL_LENGTH) +
-      `\n... (truncated, original was ${raw.length} chars)`;
+      `\n... (truncated, original was ${cleaned.length} chars)`;
   }
   return cleaned;
 }
@@ -263,7 +280,17 @@ function renderUserCodeFailure(args: {
   ].join("\n");
 }
 
-/** The customer-facing rendering of an NLP-service failure. */
+/**
+ * The customer-facing rendering of an NLP-service failure.
+ *
+ * The detail is redacted here and NOT in `renderUserCodeFailure`, and the
+ * split is deliberate. An infra body is written by our own stack — an nginx
+ * 502 page, an Envoy `upstream connect error`, a herr `child_unavailable`
+ * message — and routinely names the upstream `host:port` this module promises
+ * to withhold from the persisted run record. A user-code detail is the
+ * customer's own traceback, which may legitimately contain a URL *they* wrote;
+ * redacting that would hide their bug from them.
+ */
 function renderServiceFailure(args: {
   headline: string;
   detail: string;
@@ -271,7 +298,7 @@ function renderServiceFailure(args: {
   return [
     args.headline,
     `  body:`,
-    indent(args.detail || "(empty)", "    "),
+    indent(redactInternalAddresses(args.detail) || "(empty)", "    "),
   ].join("\n");
 }
 
@@ -354,6 +381,27 @@ export function formatHttpError(args: { status: number; rawBody: string }): {
     message: renderServiceFailure({
       headline: `SerializedCodeAgentAdapter: NLP service returned HTTP ${status}.`,
       detail: cleaned,
+    }),
+  };
+}
+
+/**
+ * Format a 2xx whose body is not the JSON the engine promises — something is
+ * answering on the NLP service's behalf (a proxy, a captive portal).
+ *
+ * Shares `renderServiceFailure` with the non-2xx path so the two cannot drift
+ * in wording, truncation limit, noise-stripping or redaction.
+ */
+export function formatMalformedBodyError(args: {
+  status: number;
+  rawBody: string;
+}): { message: string; source: HttpFailureSource; rawDetail: string } {
+  return {
+    source: "nlp_service",
+    rawDetail: args.rawBody,
+    message: renderServiceFailure({
+      headline: `SerializedCodeAgentAdapter: NLP service returned HTTP ${args.status} with a body that is not valid JSON.`,
+      detail: cleanErrorDetail(args.rawBody),
     }),
   };
 }

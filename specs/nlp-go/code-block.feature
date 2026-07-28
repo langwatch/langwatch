@@ -160,7 +160,7 @@ Feature: Code block — execute user Python with isolated subprocess and structu
     # nothing caught it because the TS side mocked the response by hand. These
     # scenarios pin the shape the adapter depends on, from the engine side.
 
-    @unit
+    @integration
     Scenario: a failing code block is reported as a 200 the TS adapter can classify
       Given a code node whose body raises a Python exception
       When the engine invokes the node
@@ -170,7 +170,7 @@ Feature: Code block — execute user Python with isolated subprocess and structu
       And the error carries a message, a traceback, and the failing node id
       And the error type is not one the TS adapter treats as an infra failure
 
-    @unit
+    @integration
     Scenario: an unparseable workflow is reported with a type the TS adapter treats as infra
       Given a workflow whose nodes cannot be parsed
       When the engine is asked to execute it

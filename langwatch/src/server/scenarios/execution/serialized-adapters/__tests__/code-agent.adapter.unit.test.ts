@@ -1164,6 +1164,121 @@ describe("SerializedCodeAgentAdapter", () => {
       });
     });
 
+    describe("when the response arrives but the run cannot be used", () => {
+      const configDemandingOutputField: CodeAgentData = {
+        ...defaultConfig,
+        scenarioOutputField: "answer",
+      };
+
+      const captureWithOutputField = async () => {
+        const adapter = new SerializedCodeAgentAdapter(
+          configDemandingOutputField,
+          nlpServiceUrl,
+          apiKey,
+        );
+        try {
+          await adapter.call(defaultInput);
+        } catch (e) {
+          return e as SerializedCodeAgentAdapterError;
+        }
+        return undefined;
+      };
+
+      /** @scenario a missing declared output leaves the same structured footprint as any other failure */
+      it("tags a missing declared output like every other failure", async () => {
+        mockFetch.mockImplementation(async () =>
+          jsonResponse(
+            { trace_id: "t", status: "success", result: { unexpected: "x" } },
+            200,
+          ),
+        );
+
+        const captured = await captureWithOutputField();
+
+        expect(captured).toBeInstanceOf(SerializedCodeAgentAdapterError);
+        expect(captured!.source).toBe("user_code");
+        expect(captured!.kind).toBe("output");
+        const span = withActiveSpanCalls.find(
+          (c) => c.name === "SerializedCodeAgentAdapter.execute_nlp_request",
+        );
+        const kindCall = span!.span.setAttribute.mock.calls.find(
+          (c) => c[0] === "error.kind",
+        );
+        expect(kindCall?.[1]).toBe("output");
+      });
+
+      /** @scenario a success response that is not valid JSON is surfaced as its own failure kind */
+      it("does not report a malformed 200 as an HTTP failure", async () => {
+        mockFetch.mockImplementation(
+          async () => new Response("<html>hi</html>", { status: 200 }),
+        );
+
+        const captured = await captureFailure();
+
+        expect(captured!.source).toBe("nlp_service");
+        // An operator filtering error.kind=http must not be handed a 200.
+        expect(captured!.kind).toBe("parse");
+        expect(captured!.message).toMatch(/not valid JSON/);
+      });
+
+      /**
+       * The hazard is narrow and the obvious test for it is vacuous: if the
+       * timer never fires, `timedOut` stays false and the guard is never
+       * exercised. So this models the real race — the abort fires WHILE the
+       * body is streaming, and the body arrives anyway. `timedOut` is then
+       * latched true over a response that demonstrably completed, and the
+       * next failure downstream used to be rewritten as "the NLP service did
+       * not respond within 120000ms".
+       */
+      /** @scenario a failure after the response arrived is not blamed on the response time */
+      it("does not blame the response time for a failure that happened after it", async () => {
+        mockFetch.mockImplementation(
+          async (_url: string, opts: { signal: AbortSignal }) => {
+            const payload = JSON.stringify({
+              trace_id: "t",
+              status: "success",
+              result: { unexpected: "x" },
+            });
+            const body = new ReadableStream({
+              start(controller) {
+                // Deliver the body only once the abort has fired, so the
+                // latch is set over a response that still completed.
+                opts.signal.addEventListener("abort", () => {
+                  controller.enqueue(new TextEncoder().encode(payload));
+                  controller.close();
+                });
+              },
+            });
+            return new Response(body, { status: 200 });
+          },
+        );
+
+        vi.useFakeTimers();
+        let captured: SerializedCodeAgentAdapterError | undefined;
+        try {
+          const adapter = new SerializedCodeAgentAdapter(
+            configDemandingOutputField,
+            nlpServiceUrl,
+            apiKey,
+          );
+          const p = adapter
+            .call(defaultInput)
+            .catch((e: SerializedCodeAgentAdapterError) => {
+              captured = e;
+            });
+          await vi.advanceTimersByTimeAsync(120_001);
+          await p;
+        } finally {
+          vi.useRealTimers();
+        }
+
+        expect(captured).toBeInstanceOf(SerializedCodeAgentAdapterError);
+        expect(captured!.message).not.toMatch(/did not respond within/);
+        expect(captured!.kind).toBe("output");
+        expect(captured!.source).toBe("user_code");
+      });
+    });
+
     describe("when the request never completes", () => {
       /** @scenario adapter labels a fetch failure as a network error */
       it("labels a fetch-time failure as a network error", async () => {
