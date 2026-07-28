@@ -3,15 +3,18 @@ package providers
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	bfschemas "github.com/maximhq/bifrost/core/schemas"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/tidwall/gjson"
 
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
@@ -156,6 +159,87 @@ func TestMessagesTranslatedStream_BedrockVPCE_DispatchesThroughPrivateEndpoint(t
 	types := eventTypes(events)
 	assert.Equal(t, "message_start", types[0])
 	assert.Equal(t, "message_stop", types[len(types)-1])
+}
+
+// Claude Code's thinking request must survive onto the private endpoint. The
+// translated reasoning becomes Bedrock's additionalModelRequestFields
+// (thinking type + budget) exactly as it does on the public Bedrock lane; a
+// VPCE customer silently losing thinking would violate the translation
+// contract without any error to notice it by.
+//
+// @scenario "A managed-Bedrock private endpoint is honored on the translated lane"
+func TestMessagesTranslated_BedrockVPCE_PreservesThinking(t *testing.T) {
+	var mu sync.Mutex
+	var bodies [][]byte
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		mu.Lock()
+		bodies = append(bodies, body)
+		mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"output": {"message": {"role": "assistant", "content": [{"text": "thought about it"}]}},
+			"stopReason": "end_turn",
+			"usage": {"inputTokens": 11, "outputTokens": 7, "totalTokens": 18}
+		}`))
+	}))
+	defer srv.Close()
+
+	thinkingReq := func() *domain.Request {
+		return &domain.Request{
+			Type:  domain.RequestTypeMessages,
+			Model: "anthropic.claude-3-5-sonnet-20240620-v1:0",
+			Body: []byte(`{"model":"claude-3-5-sonnet","max_tokens":2048,` +
+				`"thinking":{"type":"enabled","budget_tokens":1500},` +
+				`"messages":[{"role":"user","content":"think hard"}]}`),
+		}
+	}
+
+	router := &BifrostRouter{}
+	cred := vpceBedrockCred(srv.URL)
+	bfCtx := bfschemasNewCtx()
+	bfReq, err := buildMessagesResponsesRequest(bfCtx, thinkingReq(), mapProvider(cred),
+		"anthropic.claude-3-5-sonnet-20240620-v1:0")
+	require.NoError(t, err)
+	_, err = router.dispatchMessagesTranslatedBedrockVPCE(
+		context.Background(), bfCtx, bfReq,
+		"anthropic.claude-3-5-sonnet-20240620-v1:0", cred, srv.URL)
+	require.NoError(t, err)
+
+	mu.Lock()
+	require.Len(t, bodies, 1)
+	outbound := bodies[0]
+	mu.Unlock()
+	thinking := gjson.GetBytes(outbound, "additionalModelRequestFields.thinking")
+	require.True(t, thinking.Exists(),
+		"the translated thinking config must reach the private endpoint, not be silently dropped: %s", outbound)
+	assert.Equal(t, "enabled", thinking.Get("type").String())
+	assert.GreaterOrEqual(t, thinking.Get("budget_tokens").Int(), int64(1024),
+		"the budget must respect Anthropic's minimum, same as the public Bedrock lane")
+
+	// The streaming clone must carry the same fields; a thinking turn that
+	// works non-streaming and silently degrades on stream would be maddening
+	// to diagnose.
+	streamReq := thinkingReq()
+	streamReq.Body = []byte(strings.Replace(string(streamReq.Body), `"max_tokens"`, `"stream":true,"max_tokens"`, 1))
+	bfStreamReq, err := buildMessagesResponsesRequest(bfCtx, streamReq, mapProvider(cred),
+		"anthropic.claude-3-5-sonnet-20240620-v1:0")
+	require.NoError(t, err)
+	iter, err := router.dispatchMessagesTranslatedBedrockVPCEStream(
+		context.Background(), bfCtx, bfStreamReq, streamReq,
+		"anthropic.claude-3-5-sonnet-20240620-v1:0", cred, srv.URL)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = iter.Close() })
+
+	mu.Lock()
+	require.Len(t, bodies, 2)
+	streamOutbound := bodies[1]
+	mu.Unlock()
+	streamThinking := gjson.GetBytes(streamOutbound, "additionalModelRequestFields.thinking")
+	require.True(t, streamThinking.Exists(),
+		"the streaming Converse input must carry the same thinking config: %s", streamOutbound)
+	assert.Equal(t, "enabled", streamThinking.Get("type").String())
+	assert.GreaterOrEqual(t, streamThinking.Get("budget_tokens").Int(), int64(1024))
 }
 
 // The routing decision itself: a VPCE-bearing Bedrock credential must be

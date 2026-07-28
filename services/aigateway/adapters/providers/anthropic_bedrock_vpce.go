@@ -7,8 +7,11 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/bedrockruntime"
+	brdocument "github.com/aws/aws-sdk-go-v2/service/bedrockruntime/document"
+	brtypes "github.com/aws/aws-sdk-go-v2/service/bedrockruntime/types"
 	smithyhttp "github.com/aws/smithy-go/transport/http"
 
+	bfbedrock "github.com/maximhq/bifrost/core/providers/bedrock"
 	bfschemas "github.com/maximhq/bifrost/core/schemas"
 
 	"github.com/langwatch/langwatch/services/aigateway/domain"
@@ -36,7 +39,7 @@ func (r *BifrostRouter) dispatchMessagesTranslatedBedrockVPCE(
 	cred domain.Credential,
 	endpoint string,
 ) (*domain.Response, error) {
-	input, err := converseInputFromResponsesRequest(bfReq, model, cred)
+	input, err := converseInputFromResponsesRequest(bfCtx, bfReq, model, cred)
 	if err != nil {
 		return nil, anthropicUpstreamError(http.StatusBadRequest, err.Error())
 	}
@@ -74,17 +77,18 @@ func (r *BifrostRouter) dispatchMessagesTranslatedBedrockVPCEStream(
 	cred domain.Credential,
 	endpoint string,
 ) (domain.StreamIterator, error) {
-	input, err := converseInputFromResponsesRequest(bfReq, model, cred)
+	input, err := converseInputFromResponsesRequest(bfCtx, bfReq, model, cred)
 	if err != nil {
 		return nil, anthropicUpstreamError(http.StatusBadRequest, err.Error())
 	}
 
 	streamInput := &bedrockruntime.ConverseStreamInput{
-		ModelId:         input.ModelId,
-		Messages:        input.Messages,
-		System:          input.System,
-		InferenceConfig: input.InferenceConfig,
-		ToolConfig:      input.ToolConfig,
+		ModelId:                      input.ModelId,
+		Messages:                     input.Messages,
+		System:                       input.System,
+		InferenceConfig:              input.InferenceConfig,
+		ToolConfig:                   input.ToolConfig,
+		AdditionalModelRequestFields: input.AdditionalModelRequestFields,
 	}
 
 	client := newBedrockRuntimeClient(cred, endpoint)
@@ -111,9 +115,17 @@ func (r *BifrostRouter) dispatchMessagesTranslatedBedrockVPCEStream(
 }
 
 // converseInputFromResponsesRequest maps the neutral Responses request (built
-// from the Anthropic body) onto Bedrock's Converse input via the vendored
-// chat conversion, reusing the chat lane's message and config mappers.
+// from the Anthropic body) onto Bedrock's Converse input. Messages and tools
+// ride the chat lane's aws-sdk mappers; the inference config and the
+// model-specific reasoning fields come from the vendored Responses conversion,
+// the same function Bifrost runs for public Bedrock. That reuse is what keeps
+// Claude Code's `thinking` request intact on the private endpoint: the
+// vendored conversion turns the translated reasoning into Bedrock's
+// `additionalModelRequestFields` (`thinking`/`output_config` for Anthropic
+// models, `reasoningConfig` for Nova), and hand-rolling that mapping here
+// would drift from the public lane the moment either changes.
 func converseInputFromResponsesRequest(
+	bfCtx *bfschemas.BifrostContext,
 	bfReq *bfschemas.BifrostResponsesRequest,
 	model string,
 	cred domain.Credential,
@@ -128,13 +140,58 @@ func converseInputFromResponsesRequest(
 		return nil, err
 	}
 
-	return &bedrockruntime.ConverseInput{
+	// Only the params matter to the vendored conversion here; the messages
+	// were already mapped above, so Input is cleared to skip a second
+	// conversion pass that could only add a redundant failure mode.
+	slim := *bfReq
+	slim.Input = nil
+	vendored, err := bfbedrock.ToBedrockResponsesRequest(bfCtx, &slim)
+	if err != nil {
+		return nil, err
+	}
+
+	input := &bedrockruntime.ConverseInput{
 		ModelId:         aws.String(bedrockModelID(model, cred)),
 		Messages:        messages,
 		System:          system,
-		InferenceConfig: mapBedrockInferenceConfig(chatReq.Params),
+		InferenceConfig: convertBedrockInferenceConfig(vendored.InferenceConfig),
 		ToolConfig:      mapBedrockToolConfig(chatReq.Params),
-	}, nil
+	}
+	if fields := vendored.AdditionalModelRequestFields; fields != nil && fields.Len() > 0 {
+		input.AdditionalModelRequestFields = brdocument.NewLazyDocument(fields.ToMap())
+	}
+	return input, nil
+}
+
+// convertBedrockInferenceConfig maps the vendored conversion's inference
+// config onto the aws-sdk type. Returns nil when no knobs are set so an empty
+// inferenceConfig object never reaches the wire.
+func convertBedrockInferenceConfig(cfg *bfbedrock.BedrockInferenceConfig) *brtypes.InferenceConfiguration {
+	if cfg == nil {
+		return nil
+	}
+	out := &brtypes.InferenceConfiguration{}
+	set := false
+	if cfg.MaxTokens != nil {
+		out.MaxTokens = int32Ptr(*cfg.MaxTokens)
+		set = true
+	}
+	if cfg.Temperature != nil {
+		out.Temperature = float32Ptr(*cfg.Temperature)
+		set = true
+	}
+	if cfg.TopP != nil {
+		out.TopP = float32Ptr(*cfg.TopP)
+		set = true
+	}
+	if len(cfg.StopSequences) > 0 {
+		out.StopSequences = cfg.StopSequences
+		set = true
+	}
+	if !set {
+		return nil
+	}
+	return out
 }
 
 // pumpBedrockChunksAsResponsesEvents drives the Bedrock stream's typed seam
