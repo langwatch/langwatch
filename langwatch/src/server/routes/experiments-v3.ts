@@ -59,9 +59,18 @@ const logger = createLogger("langwatch:experiments-v3");
 const secured = createServiceApp({ basePath: "/api/experiments" });
 const sessionAuth = handlerManagedAuth(
   "user session validated in-handler via getServerAuthSession",
+  { permissions: ["evaluations:manage"] },
 );
-const apiKeyAuth = handlerManagedAuth(
+// The read endpoints (runs list / status / results) and the run endpoint gate
+// on different grains, so they declare separately: a single shared policy
+// would report the coarser of the two for routes that only read.
+const apiKeyAuthRead = handlerManagedAuth(
   "project API key resolved in-handler via TokenResolver + enforceApiKeyCeiling",
+  { permissions: ["evaluations:view"] },
+);
+const apiKeyAuthRun = handlerManagedAuth(
+  "project API key resolved in-handler via TokenResolver + enforceApiKeyCeiling",
+  { permissions: ["evaluations:create"] },
 );
 
 // Backward-compat aliases: redirect old /api/evaluations/v3/... paths to new /api/experiments/...
@@ -348,7 +357,7 @@ secured.access(sessionAuth).post("/abort", async (c) => {
 
 // ── POST /:slug/run  (CI/CD execution) ──────────────────────────────
 
-secured.access(apiKeyAuth).post("/:slug/run", async (c) => {
+secured.access(apiKeyAuthRun).post("/:slug/run", async (c) => {
   const { slug } = c.req.param();
 
   // Starting a run CREATES a run row against an experiment that already
@@ -524,7 +533,7 @@ secured.access(apiKeyAuth).post("/:slug/run", async (c) => {
 
 // ── GET /runs?experimentSlug=... (list runs for an experiment) ──────
 
-secured.access(apiKeyAuth).get("/runs", async (c) => {
+secured.access(apiKeyAuthRead).get("/runs", async (c) => {
   const authResult = await authenticateRequest(c, "evaluations:view");
   if ("error" in authResult) {
     return c.json({ error: authResult.error }, { status: authResult.status });
@@ -584,7 +593,7 @@ secured.access(apiKeyAuth).get("/runs", async (c) => {
 
 // ── GET /runs/:runId (poll run status) ───────────────────────────────
 
-secured.access(apiKeyAuth).get("/runs/:runId", async (c) => {
+secured.access(apiKeyAuthRead).get("/runs/:runId", async (c) => {
   const { runId } = c.req.param();
 
   const authResult = await authenticateRequest(c, "evaluations:view");
@@ -666,7 +675,7 @@ secured.access(apiKeyAuth).get("/runs/:runId", async (c) => {
 });
 
 // ── GET /runs/:runId/results (full per-row results from ClickHouse) ──
-secured.access(apiKeyAuth).get("/runs/:runId/results", async (c) => {
+secured.access(apiKeyAuthRead).get("/runs/:runId/results", async (c) => {
   const { runId } = c.req.param();
 
   const authResult = await authenticateRequest(c, "evaluations:view");

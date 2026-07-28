@@ -42,7 +42,21 @@ export type AccessPolicy =
   | { readonly kind: "anyAuthenticated" }
   | { readonly kind: "public"; readonly reason: string }
   | { readonly kind: "internal"; readonly reason: string }
-  | { readonly kind: "handlerManaged"; readonly reason: string };
+  | {
+      readonly kind: "handlerManaged";
+      readonly reason: string;
+      /**
+       * The permissions the handler enforces for itself. Optional, because a
+       * handler-managed route may gate on something that is not an RBAC
+       * permission at all — but when it DOES check one, declaring it here is
+       * what keeps the route's real requirement visible to the registry.
+       * Without it a handler-enforced grain is invisible to every audit that
+       * reads the registry, which is how `POST /api/experiments/:slug/run`
+       * sat on `evaluations:manage` — a grain no least-privilege key can hold
+       * — without anything noticing.
+       */
+      readonly permissions?: readonly Permission[];
+    };
 
 /**
  * Require a specific RBAC permission at the app's scope. The secured app
@@ -119,9 +133,35 @@ export function internalSecret(reason: string): AccessPolicy {
  * unaccounted-for endpoint. Prefer a real `requires(...)` / `internalSecret(...)`
  * strategy when the auth can be expressed as middleware.
  */
-export function handlerManagedAuth(reason: string): AccessPolicy {
+export function handlerManagedAuth(
+  reason: string,
+  options: { permissions?: readonly Permission[] } = {},
+): AccessPolicy {
   assertReason(reason, "handlerManagedAuth");
-  return { kind: "handlerManaged", reason };
+  return options.permissions
+    ? { kind: "handlerManaged", reason, permissions: options.permissions }
+    : { kind: "handlerManaged", reason };
+}
+
+/**
+ * Every RBAC permission a route requires, whichever way it declares it —
+ * middleware policy or self-enforcing handler. The single place any audit
+ * should ask "what does this route actually demand?", so a new policy kind
+ * cannot quietly drop out of the answer.
+ */
+export function policyPermissions(policy: AccessPolicy): readonly Permission[] {
+  switch (policy.kind) {
+    case "permission":
+    case "apiKeyPermission":
+    case "projectPermission":
+      return [policy.permission];
+    case "handlerManaged":
+      return policy.permissions ?? [];
+    case "anyAuthenticated":
+    case "public":
+    case "internal":
+      return [];
+  }
 }
 
 function assertReason(reason: string, fn: string): void {

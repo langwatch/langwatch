@@ -48,6 +48,13 @@ const tracer = getLangWatchTracer("langwatch.langy.api-key");
 // what stores model-provider credentials and `project:manage` regenerates the
 // project's API key, so the assistant gets the read and nothing else.
 //
+// WHAT IS ABSENT FROM THIS LIST IS NOT SELF-EXPLANATORY, so do not rely on
+// reading it to tell an oversight from a decision — that ambiguity is what put
+// the same 403 in front of users three times. `langyPermissionPolicy.ts` states
+// the rule this enumeration expresses, and `langy-permission-coverage` fails CI
+// when a route demands a permission the rule says Langy should hold but this
+// list omits. Add the line here; the reason for any EXCLUSION goes in the policy.
+//
 // THE OTHER HALF OF THIS CONTRACT IS THE ROUTE. A permission listed here is
 // worthless unless the endpoint asks for that grain: `POST /api/scenarios`
 // used to require `scenarios:manage`, so a key holding exactly
@@ -58,7 +65,7 @@ const tracer = getLangWatchTracer("langwatch.langy.api-key");
 // rights it must not have, to buy a create it should already have had. When a
 // Langy write is refused for a permission this list already contains, look at
 // the route's `requires(...)` first.
-const LANGY_CANDIDATE_PERMISSIONS: Permission[] = [
+export const LANGY_CANDIDATE_PERMISSIONS: Permission[] = [
   "project:view",
   "traces:view",
   "traces:create",

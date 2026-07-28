@@ -53,6 +53,31 @@ Feature: Per-session caller-scoped Langy key
     And Langy still cannot delete my evaluations
 
   # ---------------------------------------------------------------------------
+  # Keeping the reach honest
+  #
+  # The same refusal reached users three times, because a permission Langy was
+  # never given looks exactly like one it was deliberately denied. These
+  # scenarios are about the difference being visible.
+  # ---------------------------------------------------------------------------
+
+  Scenario: A new capability cannot ship without deciding what Langy may do with it
+    Given a part of the product asks for a permission nobody has considered for Langy
+    When the team tries to ship it
+    Then they are told which capability is undecided
+    And they must either let Langy use it or record why it is withheld
+
+  Scenario: Langy is never refused something the product says it may do
+    Given every action Langy is allowed to take on my behalf
+    When Langy uses the corresponding part of the product
+    Then it is never turned away for lacking permission
+
+  Scenario: Withholding something from Langy states its reason
+    Given an action Langy is deliberately not allowed to take
+    When someone asks why
+    Then the reason is recorded alongside the decision
+    And it cannot be mistaken for an oversight
+
+  # ---------------------------------------------------------------------------
   # Guardrails
   # ---------------------------------------------------------------------------
 
