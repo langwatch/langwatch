@@ -151,8 +151,8 @@ func (r *BifrostRouter) dispatchMessagesTranslated(
 	// on the VPCE, and even when it is not, they configured private
 	// networking on purpose. Bifrost signs over the public host, so this
 	// dispatch goes through the pinned aws-sdk client instead.
-	if endpoint, epErr := bedrockVPCEEndpoint(cred); epErr != nil {
-		return nil, anthropicUpstreamError(http.StatusBadRequest, epErr.Error())
+	if endpoint, epErr := resolveBedrockVPCEEndpoint(cred); epErr != nil {
+		return nil, epErr
 	} else if endpoint != "" {
 		return r.dispatchMessagesTranslatedBedrockVPCE(ctx, bfCtx, bfReq, model, cred, endpoint)
 	}
@@ -233,8 +233,8 @@ func (r *BifrostRouter) dispatchMessagesTranslatedStream(
 	}
 
 	// Same endpoint pinning as the non-streaming lane above.
-	if endpoint, epErr := bedrockVPCEEndpoint(cred); epErr != nil {
-		return nil, anthropicUpstreamError(http.StatusBadRequest, epErr.Error())
+	if endpoint, epErr := resolveBedrockVPCEEndpoint(cred); epErr != nil {
+		return nil, epErr
 	} else if endpoint != "" {
 		return r.dispatchMessagesTranslatedBedrockVPCEStream(ctx, bfCtx, bfReq, req, model, cred, endpoint)
 	}
@@ -250,6 +250,19 @@ func (r *BifrostRouter) dispatchMessagesTranslatedStream(
 		framer: newAnthropicStreamFramer("", modelForClient(req, model)),
 		logger: r.logger,
 	}, nil
+}
+
+// resolveBedrockVPCEEndpoint is the fail-closed gate for private-endpoint
+// routing, shared by the streaming and non-streaming translated lanes. An
+// invalid endpoint comes back as the Anthropic-shaped 400 both lanes owe
+// their clients; keeping the check in one place means the error contract and
+// any future bypass condition cannot drift between the two.
+func resolveBedrockVPCEEndpoint(cred domain.Credential) (string, error) {
+	endpoint, err := bedrockVPCEEndpoint(cred)
+	if err != nil {
+		return "", anthropicUpstreamError(http.StatusBadRequest, err.Error())
+	}
+	return endpoint, nil
 }
 
 // modelForClient picks the model name echoed back to the client. Anthropic
