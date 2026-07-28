@@ -20,6 +20,31 @@ const VALID_SIGNATURE_CONFIG = {
   prompt: "You are a helpful assistant",
 };
 
+/**
+ * Python source carrying the same uniform indent on every line — what an
+ * editor's auto-indent-on-paste produces, and what crashes the code-block
+ * runner's compile() with IndentationError (issue #3013).
+ */
+const INDENTED_CODE =
+  '  class Code:\n      def __call__(self, input):\n          return {"output": input.upper()}\n';
+const FLUSH_CODE =
+  'class Code:\n    def __call__(self, input):\n        return {"output": input.upper()}\n';
+
+const codeConfigWith = (value: string) => ({
+  name: "Python Processor",
+  parameters: [{ identifier: "code", type: "code", value }],
+  inputs: [{ identifier: "input", type: "str" }],
+  outputs: [{ identifier: "output", type: "str" }],
+});
+
+const codeValueOf = (config: unknown): string | undefined => {
+  const parameters = (
+    config as { parameters?: { identifier: string; value?: unknown }[] }
+  ).parameters;
+  const parameter = parameters?.find((p) => p.identifier === "code");
+  return typeof parameter?.value === "string" ? parameter.value : undefined;
+};
+
 describe("Feature: Agent REST API", () => {
   let testApiKey: string;
   let testProjectId: string;
@@ -129,6 +154,14 @@ describe("Feature: Agent REST API", () => {
     });
     await resetApp();
   });
+
+  /** Reads the row straight from the DB, so assertions see what was persisted. */
+  async function storedConfigOf(agentId: string) {
+    const stored = await prisma.agent.findFirstOrThrow({
+      where: { id: agentId, projectId: testProjectId },
+    });
+    return stored.config;
+  }
 
   async function createAgent(overrides: {
     name: string;
@@ -315,6 +348,22 @@ describe("Feature: Agent REST API", () => {
         expect(res.status).toBe(403);
       });
     });
+
+    describe("when the code agent's Python source is uniformly indented", () => {
+      /** @scenario Create a code agent normalizes Python indentation */
+      it("persists the code dedented to flush", async () => {
+        const res = await helpers.api.post("/api/agents", {
+          name: "Indented Processor",
+          type: "code",
+          config: codeConfigWith(INDENTED_CODE),
+        });
+        expect(res.status).toBe(201);
+
+        const body = await res.json();
+        expect(codeValueOf(body.config)).toBe(FLUSH_CODE);
+        expect(codeValueOf(await storedConfigOf(body.id))).toBe(FLUSH_CODE);
+      });
+    });
   });
 
   // ── Get Single Agent ─────────────────────────────────────────
@@ -374,6 +423,27 @@ describe("Feature: Agent REST API", () => {
 
       const body = await res.json();
       expect(body.config).toMatchObject(newConfig);
+    });
+
+    describe("when the updated code agent's Python source is uniformly indented", () => {
+      /** @scenario Update a code agent normalizes Python indentation */
+      it("persists the code dedented to flush", async () => {
+        const created = await helpers.api.post("/api/agents", {
+          name: "Flush Processor",
+          type: "code",
+          config: codeConfigWith(FLUSH_CODE),
+        });
+        const { id } = await created.json();
+
+        const res = await helpers.api.patch(`/api/agents/${id}`, {
+          config: codeConfigWith(INDENTED_CODE),
+        });
+        expect(res.status).toBe(200);
+
+        const body = await res.json();
+        expect(codeValueOf(body.config)).toBe(FLUSH_CODE);
+        expect(codeValueOf(await storedConfigOf(id))).toBe(FLUSH_CODE);
+      });
     });
 
     /** @scenario Update a non-existent agent returns 404 */
