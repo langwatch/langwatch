@@ -153,3 +153,10 @@ Feature: Serialized adapters surface user-vs-infra failures distinctly
     Given the NLP service answers in full and the failure happens afterwards
     When SerializedCodeAgentAdapter.call rejects
     Then the message does not claim the service failed to respond in time
+
+  @unit
+  Scenario: the surfaced traceback keeps the customer's frames and drops the engine's own
+    Given the NLP engine returns a traceback containing its own execution-harness frames
+    When the failure is rendered for the customer
+    Then the harness frames and their internal server path are gone
+    And the customer's own frame and exception line remain

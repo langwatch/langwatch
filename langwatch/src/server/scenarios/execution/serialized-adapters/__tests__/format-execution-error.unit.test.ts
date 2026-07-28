@@ -63,6 +63,27 @@ describe("format-execution-error helpers (lw#3439)", () => {
       expect(cleaned).toMatch(/truncated, original was 5000 chars/);
     });
 
+    /** @scenario the surfaced traceback keeps the customer's frames and drops the engine's own */
+    it("strips the engine's own harness frames but keeps the customer's", () => {
+      // The engine anonymizes the customer frame to <code-block>; its wrapper
+      // frames ride along in the same traceback and are both an internal
+      // server path and noise the customer cannot act on.
+      const raw = [
+        "Traceback (most recent call last):",
+        '  File "/tmp/nlpgo-codeblock-369240540/runner.py", line 143, in main',
+        "    result = _invoke_user_entrypoint(module_globals, inputs)",
+        "             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^",
+        '  File "<code-block>", line 3, in execute',
+        "httpx.TimeoutException: The read operation timed out",
+      ].join("\n");
+      const cleaned = cleanErrorDetail(raw);
+      expect(cleaned).not.toMatch(/nlpgo-codeblock/);
+      expect(cleaned).not.toMatch(/runner\.py/);
+      expect(cleaned).not.toMatch(/_invoke_user_entrypoint/);
+      expect(cleaned).toMatch(/<code-block>", line 3, in execute/);
+      expect(cleaned).toMatch(/httpx\.TimeoutException/);
+    });
+
     it("does not name an internal field the customer cannot reach", () => {
       expect(cleanErrorDetail("x".repeat(5_000))).not.toMatch(/rawDetail/);
     });
@@ -102,6 +123,16 @@ describe("format-execution-error helpers (lw#3439)", () => {
       expect(typeof out.detail).toBe("string");
     });
 
+    it.each(["42", '"a string"', "null", "[1,2]", "{}"])(
+      "treats JSON that is not an error envelope as opaque: %s",
+      (body) => {
+        const out = parseErrorEnvelope(body);
+        expect(out.code).toBeUndefined();
+        expect(out.detail).toBeUndefined();
+        expect(out.legacyDetail).toBe(false);
+      },
+    );
+
     it("treats an unparseable body as opaque", () => {
       const out = parseErrorEnvelope("<html>500</html>");
       expect(out.code).toBeUndefined();
@@ -123,6 +154,13 @@ describe("format-execution-error helpers (lw#3439)", () => {
       );
     });
 
+    it.each(["engine_error", "llm_executor_unavailable", "invalid_workflow", "context_canceled"])(
+      "classifies the platform type %s as nlp_service",
+      (errorType) => {
+        expect(classifyEngineFailure({ errorType })).toBe("nlp_service");
+      },
+    );
+
     it("defaults an unrecognised type to user_code, not infra", () => {
       // The workflow is one code node, so anything the engine does not own is
       // the customer's code. Defaulting the other way is the lw#3439 inversion.
@@ -140,6 +178,30 @@ describe("format-execution-error helpers (lw#3439)", () => {
           envelope: parseErrorEnvelope(herrBody("bad_request", "x")),
         }),
       ).toBe("user_code");
+    });
+
+    it.each([
+      "bad_request",
+      "invalid_dataset",
+      "unsupported_node_kind",
+      "code_block_timeout",
+      "ssrf_blocked",
+    ])("classifies the customer-fault herr code %s as user_code", (code) => {
+      expect(
+        classifyHttpFailure({
+          status: 400,
+          envelope: parseErrorEnvelope(herrBody(code, "x")),
+        }),
+      ).toBe("user_code");
+    });
+
+    it("classifies a legacy detail on a non-500 status as nlp_service", () => {
+      expect(
+        classifyHttpFailure({
+          status: 503,
+          envelope: parseErrorEnvelope(JSON.stringify({ detail: "down" })),
+        }),
+      ).toBe("nlp_service");
     });
 
     it("classifies a platform-fault herr code as nlp_service", () => {
@@ -365,8 +427,9 @@ describe("format-execution-error helpers (lw#3439)", () => {
     });
 
     it("reduces an undici connect failure to its code, dropping the address", () => {
-      // The cause undici actually attaches. Without redaction the internal
-      // host:port lands in the message persisted on the run record.
+      // NOTE: `.code` is preferred and short-circuits before redaction, so
+      // this test does NOT exercise redactInternalAddresses — it pins the
+      // code-preference itself. The no-code case below is what pins redaction.
       const inner = Object.assign(
         new Error("connect ECONNREFUSED 10.4.2.11:5561"),
         { code: "ECONNREFUSED" },
@@ -375,6 +438,18 @@ describe("format-execution-error helpers (lw#3439)", () => {
         cause: new TypeError("fetch failed", { cause: inner }),
       });
       expect(out).toMatch(/ECONNREFUSED/);
+      expect(out).not.toMatch(/10\.4\.2\.11/);
+      expect(out).not.toMatch(/5561/);
+    });
+
+    it("redacts the address when the cause carries no code to fall back on", () => {
+      // This is the case that forces the redaction path: no `.code`, so the
+      // raw message is what gets rendered. Deleting redactInternalAddresses
+      // fails here and nowhere else on this branch.
+      const inner = new Error("connect ECONNREFUSED 10.4.2.11:5561");
+      const out = formatFetchError({
+        cause: new TypeError("fetch failed", { cause: inner }),
+      });
       expect(out).not.toMatch(/10\.4\.2\.11/);
       expect(out).not.toMatch(/5561/);
     });
@@ -399,6 +474,24 @@ describe("format-execution-error helpers (lw#3439)", () => {
       expect(
         redactInternalAddresses("posting to http://nlp-internal:5561/go/x"),
       ).not.toMatch(/nlp-internal/);
+    });
+
+    it("removes a bare ipv4 address carrying no port", () => {
+      // A real getaddrinfo/connect failure often names the host with no port.
+      expect(redactInternalAddresses("no route to 10.4.2.11")).not.toMatch(
+        /10\.4\.2\.11/,
+      );
+    });
+
+    // This function now runs over infra error bodies, so over-redaction is
+    // user-visible damage, not a cosmetic nit.
+    it.each([
+      ['File "user.py", line 42', /user\.py/],
+      ["script.py:42: DeprecationWarning: old api", /script\.py:42/],
+      ["retry after 12:34:56 UTC", /12:34:56/],
+      ["exit code:127", /code:127/],
+    ])("leaves ordinary colon-bearing text intact: %s", (input, survives) => {
+      expect(redactInternalAddresses(input)).toMatch(survives);
     });
   });
 });

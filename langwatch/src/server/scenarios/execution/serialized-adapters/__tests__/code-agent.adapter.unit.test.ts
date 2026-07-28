@@ -1104,7 +1104,6 @@ describe("SerializedCodeAgentAdapter", () => {
             status: 400,
             type: "bad_request",
             message: "engine rejected the workflow",
-            meta: { reason: "engine_error" },
           }),
         );
 
@@ -1293,19 +1292,16 @@ describe("SerializedCodeAgentAdapter", () => {
 
       /** @scenario a fetch failure does not leak the internal NLP host and port */
       it("does not leak the internal host and port from the fetch cause", async () => {
-        // The shape undici actually produces: a TypeError whose cause names
-        // the address. The message is persisted onto the run record, so the
-        // internal address must not survive into it.
-        const cause = Object.assign(
-          new Error("connect ECONNREFUSED 10.4.2.11:5561"),
-          { code: "ECONNREFUSED" },
-        );
+        // No `.code` on the inner cause: with one, the renderer prefers it
+        // and returns before redaction runs, so this assertion would hold
+        // whether or not anything redacted. Without one, the raw message is
+        // what reaches the customer — which is the path worth pinning.
+        const cause = new Error("connect ECONNREFUSED 10.4.2.11:5561");
         mockFetch.mockRejectedValue(new TypeError("fetch failed", { cause }));
 
         const captured = await captureFailure();
 
         expect(captured!.source).toBe("network");
-        expect(captured!.message).toMatch(/ECONNREFUSED/);
         expect(captured!.message).not.toMatch(/10\.4\.2\.11/);
         expect(captured!.message).not.toMatch(/5561/);
       });

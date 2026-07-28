@@ -251,6 +251,7 @@ export function classifyHttpFailure(args: {
  */
 export function cleanErrorDetail(raw: string): string {
   let cleaned = raw.replace(ANSI_ESCAPE, "");
+  cleaned = cleaned.replace(ENGINE_HARNESS_FRAME, "");
   for (const pattern of NOISE_PATTERNS) {
     cleaned = cleaned.replace(pattern, "");
   }
@@ -406,13 +407,34 @@ export function formatMalformedBodyError(args: {
   };
 }
 
-/** IPv4 (and bracketed IPv6) host:port pairs, e.g. `10.4.2.11:5561`. */
-const ADDRESS_WITH_PORT =
-  /\[[0-9a-fA-F:]+\]:\d+|\b\d{1,3}(?:\.\d{1,3}){3}:\d+\b/g;
-/** Bare hostnames carrying a port, e.g. `nlp-internal:5561`. */
-const HOST_WITH_PORT = /\b[A-Za-z0-9][A-Za-z0-9._-]*:\d{2,5}\b/g;
+/** IPv4 (and bracketed IPv6) addresses, with or without a port. */
+const IP_ADDRESS =
+  /\[[0-9a-fA-F:]+\](?::\d{1,5})?|\b\d{1,3}(?:\.\d{1,3}){3}(?::\d{1,5})?\b/g;
+/**
+ * Hostnames carrying a port, e.g. `nlp-internal:5561`.
+ *
+ * The host must contain a `.` or `-`, and the port must not be followed by
+ * more digits or another colon. Without those guards this matched ordinary
+ * colon-bearing prose and corrupted it: `script.py:42` — the single most
+ * common substring in a Python traceback — became `[redacted]`, and
+ * `retry after 12:34:56` became `[redacted]:56`. Since this now runs over
+ * infra error bodies, that damage would be user-visible.
+ */
+const HOST_WITH_PORT =
+  /\b(?![0-9]+:)[A-Za-z0-9][A-Za-z0-9_-]*(?:[.-][A-Za-z0-9_-]+)+:\d{2,5}\b(?![.:\d])/g;
 /** Absolute URLs. */
 const URL_PATTERN = /\b[a-z][a-z0-9+.-]*:\/\/\S+/gi;
+/**
+ * The engine's own execution-harness frames, e.g.
+ * `File "/tmp/nlpgo-codeblock-369240540/runner.py", line 143, in main`.
+ *
+ * The engine already anonymizes the customer's own frame to `<code-block>`,
+ * but its wrapper frames ride along in the same traceback. They are both an
+ * internal server path and pure noise to the customer — the frames they can
+ * act on are their own.
+ */
+const ENGINE_HARNESS_FRAME =
+  /^\s*File "\/tmp\/nlpgo-codeblock-[^"]*",.*$\n?(?:^\s{4,}\S.*$\n?|^\s*\^+\s*$\n?)*/gm;
 
 /**
  * Remove anything that identifies the internal NLP service from a string that
@@ -423,7 +445,7 @@ const URL_PATTERN = /\b[a-z][a-z0-9+.-]*:\/\/\S+/gi;
 export function redactInternalAddresses(text: string): string {
   return text
     .replace(URL_PATTERN, "[redacted]")
-    .replace(ADDRESS_WITH_PORT, "[redacted]")
+    .replace(IP_ADDRESS, "[redacted]")
     .replace(HOST_WITH_PORT, "[redacted]");
 }
 
