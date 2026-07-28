@@ -27,12 +27,27 @@
 -- the default instead of decoding a header that was never written.
 --
 -- These MODIFYs are idempotent — replaying one that is already applied is a
--- no-op — which matters because the first seven were applied by hand during
--- the 2026-07-28 incident, ahead of this migration.
+-- no-op — which matters because all seven were applied by hand during the
+-- 2026-07-28 incident, ahead of this migration.
 --
 -- Cluster note: no ON CLUSTER. When CLICKHOUSE_CLUSTER is set the database
 -- uses the Replicated engine (00001), which propagates DDL to every node on
 -- its own; ON CLUSTER against a Replicated database is rejected.
+--
+-- Scope — these seven are every ALTER-added Array column that still exists:
+--
+--   trace_summaries.AnnotationIds (00013) was the first occurrence, and is
+--     already fixed by 00014.
+--   trace_summaries.`Events.*` (00019) is the same defect, but 00025 DROPped
+--     all four columns, so there is nothing left to modify. MODIFY COLUMN has
+--     no IF EXISTS escape, so naming a dropped column fails the whole
+--     migration. The surviving `Events.*` columns are on stored_spans, where
+--     they come from the original CREATE (00002) and so are materialised in
+--     every part — not this defect.
+--   simulation_runs.RoleCosts / RoleLatencies (00008) are Map, not Array. The
+--     same variable-size header applies, but the incident did not implicate
+--     them and a Map default needs its own type-checked literal; tracked
+--     separately rather than folded into an incident fix.
 --
 -- The corresponding rule for new code: an Array column added by ALTER MUST
 -- carry a DEFAULT. Prefer `DEFAULT []` at ADD time over a follow-up migration.
@@ -81,45 +96,14 @@ ALTER TABLE ${CLICKHOUSE_DATABASE}.coding_agent_sessions
     DEFAULT [] CODEC(ZSTD(1));
 -- +goose StatementEnd
 
--- --- trace_summaries Events.* (added by 00019) ------------------------------
---
--- Same defect, already surfacing on this table as
---   ATTEMPT_TO_READ_AFTER_EOF: (while reading column Events.Attributes)
--- rather than as an allocation failure — the header decodes to a length that
--- runs off the end of the stream instead of to an absurd one.
---
--- These are Nested subcolumns, so all four must stay the same length; an empty
--- default on each keeps that invariant on a part that carries none of them.
-
--- +goose StatementBegin
-ALTER TABLE ${CLICKHOUSE_DATABASE}.trace_summaries
-  MODIFY COLUMN `Events.SpanId` Array(String) DEFAULT [] CODEC(ZSTD(1));
--- +goose StatementEnd
-
--- +goose StatementBegin
-ALTER TABLE ${CLICKHOUSE_DATABASE}.trace_summaries
-  MODIFY COLUMN `Events.Timestamp` Array(DateTime64(3)) DEFAULT [] CODEC(ZSTD(1));
--- +goose StatementEnd
-
--- +goose StatementBegin
-ALTER TABLE ${CLICKHOUSE_DATABASE}.trace_summaries
-  MODIFY COLUMN `Events.Name` Array(LowCardinality(String)) DEFAULT [] CODEC(ZSTD(1));
--- +goose StatementEnd
-
--- +goose StatementBegin
-ALTER TABLE ${CLICKHOUSE_DATABASE}.trace_summaries
-  MODIFY COLUMN `Events.Attributes`
-    Array(Map(LowCardinality(String), String)) DEFAULT [] CODEC(ZSTD(1));
--- +goose StatementEnd
-
 -- +goose ENVSUB OFF
 
 -- +goose Down
--- Down migrations are commented out to prevent accidental data loss.
--- To roll back, uncomment and run manually.
---
--- Rolling back reinstates the defect: it drops the DEFAULT, so parts written
--- before the original ADD COLUMN decode an unwritten size header again.
+-- IRREVERSIBLE: rolling back reinstates the defect. Dropping the DEFAULT puts
+-- parts written before the original ADD COLUMN back to decoding a size header
+-- that was never written, which is the read-time OOM this migration exists to
+-- stop. The Down migration is therefore commented out to prevent accidental
+-- data loss. To roll back, uncomment and run manually.
 --
 -- ALTER TABLE ${CLICKHOUSE_DATABASE}.trace_analytics       MODIFY COLUMN AnnotationIds Array(String) CODEC(ZSTD(1));
 -- ALTER TABLE ${CLICKHOUSE_DATABASE}.trace_analytics       MODIFY COLUMN AppliedEventIds Array(String) CODEC(ZSTD(1));
@@ -128,7 +112,3 @@ ALTER TABLE ${CLICKHOUSE_DATABASE}.trace_summaries
 -- ALTER TABLE ${CLICKHOUSE_DATABASE}.coding_agent_sessions MODIFY COLUMN SubAgentIds Array(String) CODEC(ZSTD(1));
 -- ALTER TABLE ${CLICKHOUSE_DATABASE}.coding_agent_sessions MODIFY COLUMN StepStartedAt Array(UInt64) CODEC(ZSTD(1));
 -- ALTER TABLE ${CLICKHOUSE_DATABASE}.coding_agent_sessions MODIFY COLUMN MetricSeries Array(Tuple(String, String, String, String, String, Float64)) CODEC(ZSTD(1));
--- ALTER TABLE ${CLICKHOUSE_DATABASE}.trace_summaries       MODIFY COLUMN `Events.SpanId` Array(String) CODEC(ZSTD(1));
--- ALTER TABLE ${CLICKHOUSE_DATABASE}.trace_summaries       MODIFY COLUMN `Events.Timestamp` Array(DateTime64(3)) CODEC(ZSTD(1));
--- ALTER TABLE ${CLICKHOUSE_DATABASE}.trace_summaries       MODIFY COLUMN `Events.Name` Array(LowCardinality(String)) CODEC(ZSTD(1));
--- ALTER TABLE ${CLICKHOUSE_DATABASE}.trace_summaries       MODIFY COLUMN `Events.Attributes` Array(Map(LowCardinality(String), String)) CODEC(ZSTD(1));
