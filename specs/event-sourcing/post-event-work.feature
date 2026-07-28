@@ -20,6 +20,15 @@ Feature: Work that happens after an event
   # rebuilds. The distinction that matters to a customer is not which of these
   # ran, but whether losing it is allowed to leave a permanent mark.
   #
+  # Boundary against payload-cost.feature (ADR-069): that file owns the
+  # ENQUEUE SEAM — which events mint a job at all, what a staged job costs in
+  # bytes, and what happens when a relevance predicate throws. This file owns
+  # the SUBSTRATE CHOICE — given that work is going to happen, which of the two
+  # kinds runs it and what the customer is owed if it is lost. They meet at one
+  # point worth knowing: a reactor's relevance guard fails OPEN, the enqueue
+  # filter fails LOST, so a guard cannot simply be moved from one to the other.
+  # ADR-075 "The one migration hazard" states the rule.
+  #
   # These scenarios are @unimplemented: they describe the contract ADR-075
   # adopts, not what ships today. Today seventeen reactors still exist and
   # replay does not run them.
