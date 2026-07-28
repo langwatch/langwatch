@@ -431,6 +431,15 @@ app:
       ## @param app.dataplane.legacyS3ReadBucket [string] Existing S3 bucket to keep reading during an S3->Azure migration.
     legacyS3ReadBucket: ""
 
+    # Mirror of legacyS3ReadBucket for the Azure->S3 direction. Set true when
+    # moving writes back to S3 while objects written to Azure must stay
+    # readable: the Azure connection settings under providers.azureBlob keep
+    # being emitted, but STORED_OBJECTS_BACKEND does not, so new writes go to
+    # S3 and historical azure-blob:// URIs still resolve. Leave false unless
+    # Azure objects exist.
+    ## @param app.dataplane.legacyAzureRead [default: false] Keep Azure settings for reads after moving writes back to S3.
+    legacyAzureRead: false
+
   # Stored Objects - externalized byte content (audio, image, PDF, document).
   # By default, uses a local-filesystem PVC so the chart works plug-and-play
   # for single-replica installs. Operators running horizontally-scaled

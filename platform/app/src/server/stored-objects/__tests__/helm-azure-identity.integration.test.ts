@@ -121,15 +121,17 @@ describeHelm("Helm ServiceAccount surface for cloud identity", () => {
 
   describe("given the service account is enabled with an identity annotation", () => {
     /** @scenario "The chart binds every storage-touching workload to one federated service account" */
-    it("names the same account on the app, the workers, and the cronjobs", () => {
+    it("names the same account on the app and the workers, and not on cron pods", () => {
       const out = render([
         ...ALL_WORKLOADS,
         "--set", "global.serviceAccount.create=true",
       ]);
 
       const named = out.match(/serviceAccountName: t$/gm) ?? [];
-      // App + workers + cronjob — one each, all resolving to the same name.
-      expect(named).toHaveLength(3);
+      // App and workers only. Cron pods curl the app over HTTP and never
+      // touch storage, so binding the Blob identity to them would hand every
+      // cron image access it has no use for.
+      expect(named).toHaveLength(2);
 
       // And the webhook label on each of those same three pod templates:
       // a count short here means one workload silently never gets a token.
@@ -150,6 +152,23 @@ describeHelm("Helm ServiceAccount surface for cloud identity", () => {
       expect(out).toContain(
         "azure.workload.identity/client-id: 00000000-1111-2222-3333-444444444444",
       );
+    });
+
+    /**
+     * Least privilege (langwatch-agent review on PR #6181): cron pods only
+     * curl the app over HTTP. Giving them the Blob-capable federated token
+     * would mean a compromise of any cron image inherits Storage Blob Data
+     * Contributor on the account for no functional gain.
+     */
+    it("never binds the storage identity to cron pods", () => {
+      const out = render([
+        ...ALL_WORKLOADS,
+        "--set", "global.serviceAccount.create=true",
+      ]);
+
+      const cronSection = out.slice(out.indexOf("kind: CronJob"));
+      expect(cronSection).not.toContain("serviceAccountName: t\n");
+      expect(cronSection).not.toContain("azure.workload.identity/use");
     });
 
     /** @scenario "The chart leaves token projection to the platform webhook" */
@@ -210,7 +229,8 @@ describeHelm("Helm ServiceAccount surface for cloud identity", () => {
       // which is exactly the shape of the bug this label exists to prevent.
       const labelled =
         out.match(/^\s*azure\.workload\.identity\/use: "true"$/gm) ?? [];
-      expect(labelled).toHaveLength(3);
+      // The two storage consumers, and deliberately not the cron pods.
+      expect(labelled).toHaveLength(2);
     });
 
     /** @scenario "The chart does not require an account key under a token-based mode" */
@@ -298,7 +318,7 @@ describeHelm("Helm ServiceAccount surface for cloud identity", () => {
         "--set", "global.serviceAccount.name=preexisting-identity",
       ]);
 
-      expect(out.match(/serviceAccountName: preexisting-identity$/gm) ?? []).toHaveLength(3);
+      expect(out.match(/serviceAccountName: preexisting-identity$/gm) ?? []).toHaveLength(2);
       // create=false, so we must not manufacture the account.
       expect(out).not.toMatch(/kind: ServiceAccount\n[\s\S]{0,200}?name: preexisting-identity\n/);
     });

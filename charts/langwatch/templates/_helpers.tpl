@@ -835,9 +835,18 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- if eq .Values.app.dataplane.provider "azureBlob" }}
 # Azure Blob backend (AC37, issue #4133). STORED_OBJECTS_BACKEND is the
 # EXPLICIT toggle resolveProjectStorageDestination reads — AZURE_BLOB_* env
-# presence alone never selects this backend, only this value does.
+# presence alone never selects this backend, only this value does, which is
+# why the connection settings below can outlive it (see legacyAzureRead).
 - name: STORED_OBJECTS_BACKEND
   value: "azure"
+{{- end }}
+{{/* Azure connection settings are emitted when Azure is the active write
+     backend OR when legacyAzureRead is set for an Azure->S3 migration. The
+     app's driver registration resolves these for READS independently of the
+     write toggle, so keeping them after the switch is what lets already
+     written azure-blob:// objects stay readable — the mirror of
+     legacyS3ReadBucket in the other direction. */}}
+{{- if or (eq .Values.app.dataplane.provider "azureBlob") .Values.app.dataplane.legacyAzureRead }}
 {{- include "langwatch.secretOrValue" (dict "envName" "AZURE_BLOB_ACCOUNT_NAME" "fieldValues" .Values.app.dataplane.providers.azureBlob.accountName) }}
 - name: AZURE_BLOB_AUTH_MODE
   value: {{ .Values.app.dataplane.providers.azureBlob.authMode | default "sharedKey" | quote }}
