@@ -115,7 +115,7 @@ export function RunHistoryFilters({
             <Spinner size="xs" />
             <Text fontSize="sm" color="fg.muted" whiteSpace="nowrap">
               {exportProgress?.total
-                ? `Exporting ${exportProgress.total.toLocaleString()} runs…`
+                ? `Exporting ${exportProgress.exported.toLocaleString()} of ${exportProgress.total.toLocaleString()} runs…`
                 : "Exporting…"}
             </Text>
             {onCancelExport && (

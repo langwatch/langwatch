@@ -1,5 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import { toaster } from "~/components/ui/toaster";
+import type { ExportProgressEvent } from "~/server/api/routers/export";
+import { api } from "~/utils/api";
 import type {
   ScenarioRunExportMode,
   ScenarioRunExportStatusFilter,
@@ -41,7 +43,29 @@ export function useExportScenarioRuns({
     exported: 0,
     total: 0,
   });
+  /**
+   * Set from the X-Export-Id response header once the stream starts. The
+   * server broadcasts progress over Redis rather than in the response body
+   * because the body is the file itself — it goes to disk, so the only way to
+   * report a count is out of band.
+   */
+  const [exportId, setExportId] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  api.export.onScenarioRunExportProgress.useSubscription(
+    { projectId: projectId!, exportId: exportId! },
+    {
+      enabled: isExporting && !!exportId && !!projectId,
+      onData: (event: ExportProgressEvent) => {
+        if (event.exported !== undefined) {
+          setProgress((prev) => ({
+            exported: event.exported ?? prev.exported,
+            total: event.total ?? prev.total,
+          }));
+        }
+      },
+    },
+  );
 
   const openExportDialog = useCallback(() => setIsDialogOpen(true), []);
   const closeExportDialog = useCallback(() => setIsDialogOpen(false), []);
@@ -51,6 +75,7 @@ export function useExportScenarioRuns({
     abortControllerRef.current = null;
     setIsExporting(false);
     setProgress({ exported: 0, total: 0 });
+    setExportId(null);
   }, []);
 
   const startExport = useCallback(
@@ -64,6 +89,7 @@ export function useExportScenarioRuns({
       setIsDialogOpen(false);
       setIsExporting(true);
       setProgress({ exported: 0, total: 0 });
+      setExportId(null);
 
       const today = new Date().toISOString().split("T")[0];
       const fallbackFilename = `${projectId} - Scenario Runs - ${today} - ${mode}.csv`;
@@ -90,6 +116,9 @@ export function useExportScenarioRuns({
           // has a denominator immediately rather than after the first chunk.
           const total = Number(response.headers.get("X-Total-Runs") ?? "0");
           setProgress({ exported: 0, total });
+          // Activating the subscription here rather than before the fetch: the
+          // id only exists once the server has accepted the request.
+          setExportId(response.headers.get("X-Export-Id"));
           const blob = await response.blob();
           setProgress({ exported: total, total });
           if (blob.size === 0) {
@@ -122,6 +151,7 @@ export function useExportScenarioRuns({
           if (abortControllerRef.current === abortController) {
             abortControllerRef.current = null;
             setIsExporting(false);
+            setExportId(null);
           }
         });
     },

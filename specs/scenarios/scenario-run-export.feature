@@ -192,8 +192,11 @@ Feature: Scenario run CSV export
   Scenario: Progress is shown while a large export streams
     Given 5000 runs match my current filters
     When I export
-    Then a progress indicator reports how many runs have been written so far
-    And the progress reaches the total when the download completes
+    Then the Export button is replaced by a running count and a Cancel action
+    And the count reports how many runs have been swept so far, out of the total
+    And the count reaches the total when the download completes
+    # The count arrives over a subscription rather than the response body:
+    # the body is the file, and it goes to disk.
 
   Scenario: The download is compressed in transit
     Given an export of several thousand runs
