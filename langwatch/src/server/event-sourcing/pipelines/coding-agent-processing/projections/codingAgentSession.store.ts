@@ -1,13 +1,11 @@
-import type {
-  CodingAgentSessionRepository,
-  CodingAgentSessionRow,
-} from "~/server/app-layer/coding-agent/repositories/coding-agent-session.repository";
+import type { CodingAgentSessionRepository } from "~/server/app-layer/coding-agent/repositories/coding-agent-session.repository";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import type { FoldProjectionStore } from "../../../projections/foldProjection.types";
 import type { ProjectionStoreContext } from "../../../projections/projectionStoreContext";
 import {
   CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST,
   CODING_AGENT_SESSION_PROJECTION_VERSION_PRE_STAMP,
+  type CodingAgentSessionRow,
   type CodingAgentSessionState,
   codingAgentSessionStateFromRow,
   projectCodingAgentSessionToRow,
