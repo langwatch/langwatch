@@ -314,7 +314,10 @@ export const CARDS_BY_RESOURCE: Record<string, ResourceCards> = {
     read: "resourceRead",
     byVerb: { run: "evalRun", results: "evalRun", status: "evalRun" },
   },
-  scenario: { read: "scenario", byVerb: { run: "evalRun" } },
+  // `evalRun` is evaluations/experiments only; simulations have their own
+  // kinds — ONE run (`simulation-run get`, live-rendered by id) vs a SET of
+  // runs (a listing, or the batch a `scenario run` / `suite run` launches).
+  scenario: { read: "scenario", byVerb: { run: "simulationSetRun" } },
   // `get` is the single-resource read these cards are for; `list` stays a
   // collection, which the generic rows card already draws well.
   evaluator: { read: "resourceRead", byVerb: { get: "evaluatorConfig" } },
@@ -322,8 +325,11 @@ export const CARDS_BY_RESOURCE: Record<string, ResourceCards> = {
   dashboard: { read: "resourceRead", byVerb: { get: "dashboard" } },
   graph: { read: "resourceRead", byVerb: { get: "dashboard" } },
   "virtual-keys": { read: "resourceRead", byVerb: { get: "spend" } },
-  "simulation-run": { read: "evalRun" },
-  suite: { read: "resourceRead", byVerb: { run: "evalRun" } },
+  "simulation-run": {
+    read: "simulationSetRun",
+    byVerb: { get: "simulationRun" },
+  },
+  suite: { read: "resourceRead", byVerb: { run: "simulationSetRun" } },
   prompt: { read: "resourceRead" },
   agent: { read: "resourceRead", byVerb: { run: "evalRun" } },
   workflow: { read: "resourceRead", byVerb: { run: "evalRun" } },

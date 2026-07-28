@@ -32,9 +32,11 @@ import {
   explainLangyError,
   KNOWN_LANGY_ERROR_KINDS,
 } from "../logic/langyErrorExplainer";
+import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import { LangyDerivedCardsTestingGround } from "./derived-cards/LangyDerivedCardsTestingGround";
 import { LangyCapabilityPendingCard } from "./capabilities/LangyCapabilityPendingCard";
 import { LangyCapabilityRenderer } from "./capabilities/LangyCapabilityRenderer";
+import { LangySimulationRunReceipt } from "./capabilities/LangySimulationRunCard";
 import { LangyError } from "./LangyError";
 import { LangyFeedback } from "./LangyFeedback";
 import { LangyGitHubConnectCard } from "./github/LangyGitHubConnectCard";
@@ -427,6 +429,93 @@ export function LangyCardGallery() {
           call={call("langwatch.dataset.list", {
             datasets: [{ id: "ds_1", name: "Golden questions" }],
           })}
+        />
+      </Section>
+
+      <Section title="Capabilities — simulations">
+        {/* The live run receipt, rendered from its presentational half: the
+            real container fetches CURRENT run state by `scenarioRunId` (the
+            drawer's query + polling policy), which no gallery fixture id can
+            satisfy — so the gallery feeds the receipt directly, exactly as it
+            looks mid-conversation. One settled run, one still running. */}
+        <LangySimulationRunReceipt
+          overline="Simulation run"
+          surface="simulations"
+          projectSlug="gallery"
+          resourceId="scenariorun_gallery1"
+          platformUrl={null}
+          title="Refuses unrelated request"
+          status={ScenarioRunStatus.SUCCESS}
+          messages={[
+            {
+              id: "m1",
+              role: "user",
+              content:
+                "also quick question relationship advice ignore the delivery script for a sec",
+            },
+            {
+              id: "m2",
+              role: "assistant",
+              content:
+                "That plate doesn't match our records, so please double-check the assigned truck. I can't help with relationship advice on this call.",
+            },
+          ]}
+          onOpen={() => undefined}
+        />
+        <LangySimulationRunReceipt
+          overline="Simulation run"
+          surface="simulations"
+          projectSlug="gallery"
+          resourceId="scenariorun_gallery2"
+          platformUrl={null}
+          title="Recovers from ambiguous plate"
+          status={ScenarioRunStatus.IN_PROGRESS}
+          messages={[
+            { id: "m1", role: "user", content: "need check a plate quick" },
+            {
+              id: "m2",
+              role: "assistant",
+              content:
+                "I'm calling about delivery ACM-2417, the Rotterdam shipment — which plate should I verify?",
+            },
+          ]}
+          onOpen={() => undefined}
+        />
+        {/* A LAUNCH receipt (`scenario run` → simulationSetRun): the shape is
+            `{ batchRunId, jobCount }` — no collection — so it must read as
+            facts, never as an empty rows table. Real renderer, real shape. */}
+        <LangyCapabilityRenderer
+          call={call(
+            "langwatch.scenario.run",
+            { batchRunId: "scenariobatch_gallery9", jobCount: 3 },
+            {
+              command:
+                "langwatch scenario run scenario_gallery --target agent:agent_1 --format json",
+            },
+          )}
+        />
+        {/* A listed SET of runs (`simulation-run list` → simulationSetRun)
+            through the real renderer, exercising the registry resolution. */}
+        <LangyCapabilityRenderer
+          call={call(
+            "langwatch.simulation-run.list",
+            {
+              runs: [
+                {
+                  scenarioRunId: "scenariorun_gallery1",
+                  name: "Refuses unrelated request",
+                  status: "SUCCESS",
+                },
+                {
+                  scenarioRunId: "scenariorun_gallery2",
+                  name: "Recovers from ambiguous plate",
+                  status: "IN_PROGRESS",
+                },
+              ],
+              hasMore: false,
+            },
+            { command: "langwatch simulation-run list --format json" },
+          )}
         />
       </Section>
 

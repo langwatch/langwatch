@@ -46,6 +46,7 @@ import { LangyFollowUpChips } from "./LangyFollowUpChips";
 import { LangyMetricsCard } from "./LangyMetricsCard";
 import { LangyTimeseriesCard } from "./LangyTimeseriesCard";
 import { LangyScenarioCard } from "./LangyScenarioCard";
+import { LangySimulationRunCard } from "./LangySimulationRunCard";
 import { LangyTraceSampleCard } from "./LangyTraceSampleCard";
 import { LangyTracesCard } from "./LangyTracesCard";
 
@@ -252,6 +253,12 @@ function CapabilityCard({
       return <LangyTimeseriesCard {...props} />;
     case "evalRun":
       return <LangyEvalRunCard {...props} />;
+    // ONE simulation run, addressed by its structured `scenarioRunId` — the
+    // card fetches the run's LIVE state by it. A SET of runs (a listing, a
+    // launched batch) has no single id to go live on and reads as the
+    // declarative card below.
+    case "simulationRun":
+      return <LangySimulationRunCard {...props} />;
     case "dataset":
       return <LangyDatasetCard {...props} />;
     case "scenario":

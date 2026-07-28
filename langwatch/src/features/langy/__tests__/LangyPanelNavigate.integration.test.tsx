@@ -53,7 +53,10 @@ vi.mock("~/hooks/useFeatureFlag", () => ({
   useFeatureFlag: () => ({ enabled: false, isLoading: false }),
 }));
 
-vi.mock("~/components/Markdown", () => ({
+vi.mock("~/components/Markdown", async (importOriginal) => ({
+  // Keep the REAL isInternalHref — the panel's navigate handler guards with
+  // it, and stubbing the guard would un-test the behavior under test.
+  ...(await importOriginal<typeof import("~/components/Markdown")>()),
   Markdown: ({ children }: { children: string }) => <span>{children}</span>,
 }));
 

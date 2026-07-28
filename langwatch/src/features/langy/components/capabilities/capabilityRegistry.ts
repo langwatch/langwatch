@@ -397,6 +397,14 @@ function derivedBodyWidget({
       return "facts";
     case "dashboard":
       return "rows";
+    // ONE run reads as facts (the live card overrides rendering anyway). A
+    // SET of runs splits by verb: a LISTING has rows to draw; a LAUNCH
+    // receipt (`scenario run` / `suite run`) is `{ batchRunId, jobCount }` —
+    // no collection at all — and reads as facts, never as an empty table.
+    case "simulationRun":
+      return "facts";
+    case "simulationSetRun":
+      return CLI_COLLECTION_VERBS.has(verb) ? "rows" : "facts";
     case "promptDiff":
       return "diff";
     case "resourceCreated":

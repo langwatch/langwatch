@@ -134,7 +134,7 @@ describe("resolveCapability, given a LangWatch CLI tool call", () => {
   describe("when the resource name is kebab-case", () => {
     it("words it as a phrase from the catalog", () => {
       expect(resolveCapability("langwatch.simulation-run.get")).toMatchObject({
-        render: "evalRun",
+        render: "simulationRun",
         tone: "read",
         surface: "simulations",
         overline: "simulation run",

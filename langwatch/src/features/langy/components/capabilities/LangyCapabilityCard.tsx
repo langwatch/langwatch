@@ -44,7 +44,7 @@ import type { ReactNode } from "react";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import { toRelativeSameOriginHref } from "~/utils/platformHref";
 import { LangySpaAnchor } from "../LangySpaAnchor";
-import { useSpaLinkClick } from "../../logic/spaLink";
+import { useSpaLinkClick } from "../../hooks/useSpaLinkClick";
 import { langyThinkingShimmerStyles } from "../langyShimmer";
 import type {
   CapabilityIconName,

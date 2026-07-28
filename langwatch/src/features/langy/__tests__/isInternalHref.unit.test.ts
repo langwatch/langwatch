@@ -1,6 +1,20 @@
+/**
+ * @vitest-environment jsdom
+ *
+ * The guard itself lives in `~/components/Markdown` (one notion of "internal",
+ * shared by markdown links, `useSpaLinkClick` and the panel's navigate
+ * handler); its test sits with the langy consumers that drive every branch of
+ * it, rather than in `src/components/__tests__`. Importing `Markdown.tsx`
+ * pulls the whole component graph in, and doing that inside the
+ * `src/components` unit pool is enough extra load to flake
+ * `OutputsSection`'s latency-sensitive typing assertions.
+ *
+ * The environment is declared because the import needs a DOM, not because the
+ * predicate does.
+ */
 import { describe, expect, it } from "vitest";
 
-import { isInternalHref } from "../spaLink";
+import { isInternalHref } from "~/components/Markdown";
 
 describe("isInternalHref", () => {
   describe("given a same-app relative path", () => {

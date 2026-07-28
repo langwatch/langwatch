@@ -15,6 +15,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { githubProgressFromToolParts } from "~/server/app-layer/langy/execution/githubCommand";
 import { githubPrsFromToolParts } from "~/shared/langy/githubPrCard";
 import { useRouter } from "~/utils/compat/next-router";
+import { useSpaLinkClick } from "../hooks/useSpaLinkClick";
 import {
   hasLangyBlockParts,
   type LangyAnswerSegment,
@@ -26,7 +27,6 @@ import {
 } from "../logic/langyFeedbackDirective";
 import { langyPlan } from "../logic/langyPlan";
 import { questionToolCardParts } from "../logic/langyQuestionTool";
-import { useSpaLinkClick } from "../logic/spaLink";
 import {
   foldReasoningTitles,
   stripReasoningTitles,

@@ -1,0 +1,302 @@
+/**
+ * Live simulation-run card (the `simulationRun` card kind —
+ * `simulation-run get`).
+ *
+ * The tool envelope only carries the STRUCTURED reference — the
+ * `simulationRun` card schema requires `scenarioRunId`, so by the time this
+ * card mounts the id is validated data, never something regexed out of prose.
+ * The card renders the run's CURRENT state through the same query + polling
+ * policy the simulations drawer uses (`getRunState` +
+ * `getRunStatePollInterval` + the SSE update listener). A running simulation
+ * visibly progresses in the chat; a renamed scenario shows its current name.
+ *
+ * A run the platform can't answer for (deleted, stale id) falls back to the
+ * snapshot rendering (`LangyEvalRunCard`), so the card never renders an
+ * error for prose the agent already explained.
+ *
+ * Spec: specs/langy/langy-live-scenario-cards.feature
+ */
+import { Badge, chakra, HStack, Spinner, Text } from "@chakra-ui/react";
+import { useEffect, useState } from "react";
+import { MessagePreview } from "~/components/suites/MessagePreview";
+import { getRunStatePollInterval } from "~/components/simulations/run-state-polling";
+import { SCENARIO_RUN_STATUS_CONFIG } from "~/components/simulations/scenario-run-status-config";
+import { useDrawer } from "~/hooks/useDrawer";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useSimulationStreamingState } from "~/hooks/useSimulationStreamingState";
+import { useSimulationUpdateListener } from "~/hooks/useSimulationUpdateListener";
+import type { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
+import type { StreamingMessage } from "~/hooks/useSimulationStreamingState";
+import { api } from "~/utils/api";
+import { extractPlatformUrl } from "~/utils/platformHref";
+import type {
+  CapabilityCardInput,
+  CapabilityDescriptor,
+} from "./capabilityRegistry";
+import { LangyCapabilityCard } from "./LangyCapabilityCard";
+import { LangyEvalRunCard } from "./LangyEvalRunCard";
+
+export function LangySimulationRunCard(props: CapabilityCardInput) {
+  // The `simulationRun` schema requires `scenarioRunId`, so a validated
+  // payload always carries it — this read is the typed contract, not a scan.
+  const runId =
+    props.output && typeof props.output === "object"
+      ? (props.output as { scenarioRunId?: unknown }).scenarioRunId
+      : undefined;
+
+  if (typeof runId !== "string" || !runId) {
+    return <LangyEvalRunCard {...props} />;
+  }
+  return <LiveSimulationRunCard {...props} runId={runId} />;
+}
+
+/** Terminal per the drawer's own polling policy — the single source of "done". */
+function statusIsTerminal(status?: ScenarioRunStatus): boolean {
+  return (
+    status !== undefined &&
+    getRunStatePollInterval({ status, sseConnected: false }) === false
+  );
+}
+
+function LiveSimulationRunCard({
+  runId,
+  ...props
+}: CapabilityCardInput & { runId: string }) {
+  const { project } = useOrganizationTeamProject();
+  const { openDrawer } = useDrawer();
+
+  const { streamingMessages, handleStreamingEvent, clearCompleted } =
+    useSimulationStreamingState(runId);
+
+  // A terminal run never changes; don't hold an SSE subscription per settled
+  // card in a long conversation. SEEDED from the envelope's own status — the
+  // typed payload already says "SUCCESS", so a settled card never opens a
+  // subscription even for its first render. An unknown/absent status (a run
+  // surfaced mid-flight) stays subscribed so it streams from the first frame;
+  // the live query below flips the flag once the platform reports terminal.
+  const [isTerminal, setIsTerminal] = useState(() =>
+    statusIsTerminal(
+      typeof (props.output as { status?: unknown }).status === "string"
+        ? ((props.output as { status: string }).status as ScenarioRunStatus)
+        : undefined,
+    ),
+  );
+
+  // A run the platform can't answer for renders the fallback, and `isTerminal`
+  // never flips for it (only a terminal STATUS does) — so without this the
+  // dead card would hold its SSE subscription open indefinitely. It has to be
+  // state rather than the query's own `error`, because the listener is
+  // declared ABOVE the query: `refetchInterval` is evaluated synchronously
+  // while `useQuery` runs, so `sseConnected` must already be bound by then
+  // (the drawer, whose polling policy this mirrors, orders them the same way).
+  const [isRunUnresolvable, setIsRunUnresolvable] = useState(false);
+
+  const { isConnected: sseConnected } = useSimulationUpdateListener({
+    projectId: project?.id ?? "",
+    enabled: !!project?.id && !isTerminal && !isRunUnresolvable,
+    debounceMs: 300,
+    filter: { scenarioRunId: runId },
+    onStreamingEvent: handleStreamingEvent,
+  });
+
+  const { data, error } = api.scenarios.getRunState.useQuery(
+    { projectId: project?.id ?? "", scenarioRunId: runId },
+    {
+      // `!isRunUnresolvable` matters as much as `retry: false`: with no status
+      // to key off, `getRunStatePollInterval` hands back the FAST cadence, so
+      // a deleted or foreign run would re-poll every 3s forever behind the
+      // fallback card — once per dead card in the conversation.
+      enabled: !!project?.id && !isRunUnresolvable,
+      // An unknown run is a fallback, never a retry storm.
+      retry: false,
+      // Finished runs never change — stop polling entirely. Live runs poll
+      // fast only while the event stream is down (the drawer's exact policy).
+      refetchInterval: (queryData) =>
+        getRunStatePollInterval({ status: queryData?.status, sseConnected }),
+    },
+  );
+
+  const status = data?.status;
+  useEffect(() => {
+    if (statusIsTerminal(status)) setIsTerminal(true);
+  }, [status]);
+
+  useEffect(() => {
+    if (error) setIsRunUnresolvable(true);
+  }, [error]);
+
+  // Drop optimistic streamed messages once the server state includes them.
+  useEffect(() => {
+    if (data?.messages) {
+      clearCompleted(
+        data.messages
+          .map((m: { id?: string }) => m.id)
+          .filter((id): id is string => !!id),
+      );
+    }
+  }, [data?.messages, clearCompleted]);
+
+  // The platform can't answer for this run (deleted, other project, stale
+  // id): keep the chat useful with the snapshot the envelope carried.
+  if (error) return <LangyEvalRunCard {...props} />;
+
+  return (
+    <LangySimulationRunReceipt
+      overline={props.descriptor.overline}
+      surface={props.descriptor.surface}
+      projectSlug={props.projectSlug ?? null}
+      resourceId={runId}
+      platformUrl={extractPlatformUrl(props.output)}
+      title={data ? (data.name ?? data.scenarioId) : ""}
+      status={data?.status}
+      messages={data?.messages}
+      streamingMessages={streamingMessages}
+      onOpen={() =>
+        openDrawer("scenarioRunDetail", {
+          urlParams: { scenarioRunId: runId },
+        })
+      }
+    />
+  );
+}
+
+/**
+ * The receipt itself, pure of data fetching — the panel's own card language,
+ * not the simulations grid's. A surfaced run is a READ receipt
+ * (specs/langy/langy-card-taxonomy.feature): hairline shell, quiet overline,
+ * and the outcome spent ONCE, as a small badge — never as a status-tinted
+ * surface. The grid card's green belongs on the simulations page, where 30
+ * cards are scanned by outcome. Exported so the developer card gallery can
+ * render it from fixtures (the container above fetches live state by id,
+ * which a gallery fixture id could never satisfy).
+ */
+export function LangySimulationRunReceipt({
+  overline,
+  surface,
+  projectSlug,
+  resourceId,
+  platformUrl,
+  title,
+  status,
+  messages,
+  streamingMessages,
+  onOpen,
+}: {
+  overline: string;
+  surface: CapabilityDescriptor["surface"];
+  projectSlug: string | null;
+  resourceId: string;
+  platformUrl: string | null;
+  title: string;
+  /** Undefined while the live state is still loading — renders a spinner. */
+  status?: ScenarioRunStatus;
+  messages?: ScenarioRunData["messages"];
+  streamingMessages?: StreamingMessage[];
+  onOpen: () => void;
+}) {
+  return (
+    <LangyCapabilityCard
+      tone="read"
+      surface={surface}
+      overline={overline}
+      title={<SimulationRunTitle title={title} status={status} />}
+      projectSlug={projectSlug}
+      resourceId={resourceId}
+      platformUrl={platformUrl}
+    >
+      {messages ? (
+        <SimulationRunPreview
+          messages={messages}
+          streamingMessages={streamingMessages}
+          title={title}
+          onOpen={onOpen}
+        />
+      ) : null}
+    </LangyCapabilityCard>
+  );
+}
+
+/**
+ * Name plus outcome — the card's status chrome, kept apart from the card
+ * assembly above. The outcome is spent ONCE here, as a small badge; a run
+ * still going shows a spinner inside it, and a run whose state has not landed
+ * yet shows the spinner alone rather than guessing a status.
+ */
+function SimulationRunTitle({
+  title,
+  status,
+}: {
+  title: string;
+  status?: ScenarioRunStatus;
+}) {
+  const statusConfig =
+    status !== undefined ? SCENARIO_RUN_STATUS_CONFIG[status] : null;
+  // Completion, NOT polling cadence. The two part company on `STALLED`: it is
+  // a finished state to a reader, but stays pollable because new events can
+  // still revive it. Deriving the spinner from the cadence put a "still
+  // working" spinner next to the `stalled` badge.
+  const isRunning = statusConfig?.isComplete === false;
+
+  return (
+    <HStack gap={2} align="center" flexWrap="wrap">
+      <Text textStyle="xs" fontWeight="640" color="fg" lineHeight="1.3">
+        {title || "Simulation run"}
+      </Text>
+      {statusConfig ? (
+        <Badge size="sm" variant="subtle" colorPalette={statusConfig.colorPalette}>
+          {isRunning ? <Spinner size="xs" color="currentColor" /> : null}
+          {statusConfig.label}
+        </Badge>
+      ) : (
+        <Spinner size="xs" color="fg.subtle" />
+      )}
+    </HStack>
+  );
+}
+
+/**
+ * The conversation preview, as the card's one affordance: clicking anywhere on
+ * it opens the run. A real `<button>` rather than `<Box as="button">` so the
+ * native button props (`type`) are type-checked — this sits inside a chat, and
+ * a button that defaults to `submit` is a trap waiting for the first form
+ * ancestor.
+ */
+function SimulationRunPreview({
+  messages,
+  streamingMessages,
+  title,
+  onOpen,
+}: {
+  messages: NonNullable<ScenarioRunData["messages"]>;
+  streamingMessages?: StreamingMessage[];
+  title: string;
+  onOpen: () => void;
+}) {
+  return (
+    <chakra.button
+      type="button"
+      onClick={onOpen}
+      cursor="pointer"
+      textAlign="left"
+      width="full"
+      maxHeight="130px"
+      overflow="hidden"
+      position="relative"
+      aria-label={`View details for ${title || "simulation run"}`}
+      // Fade the preview's cut edge into the card ground instead of clipping a
+      // message blob mid-line.
+      _after={{
+        content: '""',
+        position: "absolute",
+        insetInline: 0,
+        bottom: 0,
+        height: "26px",
+        background: "linear-gradient(transparent, var(--chakra-colors-bg-subtle))",
+        pointerEvents: "none",
+      }}
+    >
+      <MessagePreview messages={messages} streamingMessages={streamingMessages} />
+    </chakra.button>
+  );
+}
