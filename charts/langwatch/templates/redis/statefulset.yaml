@@ -24,34 +24,30 @@ spec:
     spec:
       # Redis does not call the Kubernetes API, so don't mount the SA token.
       automountServiceAccountToken: {{ .Values.global.automountServiceAccountToken }}
-      {{- with .Values.global.scheduling.nodeSelector }}
+      {{- with (coalesce .Values.redis.nodeSelector .Values.global.scheduling.nodeSelector) }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.global.scheduling.tolerations }}
+      {{- with (coalesce .Values.redis.tolerations .Values.global.scheduling.tolerations) }}
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.global.scheduling.affinity }}
+      {{- with (coalesce .Values.redis.affinity .Values.global.scheduling.affinity) }}
       affinity:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      # uid 999 is the redis image's own user, so this cannot inherit
+      # global.podSecurityContext (uid 1000). A per-component override
+      # layers on top rather than replacing, so a partial override cannot
+      # strip runAsNonRoot or the seccomp profile.
       securityContext:
-        runAsUser: 999
-        runAsGroup: 999
-        fsGroup: 999
-        runAsNonRoot: true
-        seccompProfile:
-          type: RuntimeDefault
+        {{- $base := dict "runAsUser" 999 "runAsGroup" 999 "fsGroup" 999 "runAsNonRoot" true "seccompProfile" (dict "type" "RuntimeDefault") }}
+        {{- toYaml (mustMergeOverwrite $base (.Values.redis.podSecurityContext | default dict)) | nindent 8 }}
       terminationGracePeriodSeconds: 30
       containers:
         - name: redis
           securityContext:
-            runAsNonRoot: true
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
-            capabilities:
-              drop: ["ALL"]
+            {{- include "langwatch.containerSecurityContext" (dict "ctx" . "component" .Values.redis) | nindent 12 }}
           image: "{{ .Values.redis.image.repository }}:{{ .Values.redis.image.tag }}"
           imagePullPolicy: {{ .Values.redis.image.pullPolicy | default "IfNotPresent" }}
           {{- if $authEnabled }}

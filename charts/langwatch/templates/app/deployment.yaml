@@ -73,10 +73,8 @@ spec:
       # The app does not call the Kubernetes API, so don't mount the SA token.
       automountServiceAccountToken: {{ .Values.global.automountServiceAccountToken }}
       # Pod security context - https://kubespec.dev/v1/Pod#spec.securityContext
-      {{- with (coalesce .Values.app.podSecurityContext .Values.global.podSecurityContext)}}
       securityContext:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
+        {{- include "langwatch.podSecurityContext" (dict "ctx" . "component" .Values.app) | nindent 8 }}
 
       # Node selection - https://kubespec.dev/v1/Pod#spec.nodeSelector
       {{- with (coalesce .Values.app.nodeSelector .Values.global.scheduling.nodeSelector)}}
@@ -112,7 +110,7 @@ spec:
         {{- end }}
         - name: {{ .Release.Name }}-app
           securityContext:
-            {{- toYaml (coalesce .Values.app.containerSecurityContext .Values.global.containerSecurityContext) | nindent 12 }}
+            {{- include "langwatch.containerSecurityContext" (dict "ctx" . "component" .Values.app) | nindent 12 }}
           image: "{{ .Values.images.app.repository }}:{{ .Values.images.app.tag }}"
           imagePullPolicy: "{{ .Values.images.app.pullPolicy }}"
           ports:

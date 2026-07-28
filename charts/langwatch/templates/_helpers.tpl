@@ -945,3 +945,28 @@ podAffinity:
     {{- .Values.clickhouse.external.cluster -}}
   {{- end -}}
 {{- end -}}
+
+{{/*
+  Security contexts: a per-component override LAYERS onto the hardened global
+  default. The operator's key wins; every key they do not mention keeps its
+  default. Overriding one field is therefore never a way to drop the others.
+
+  Use mustMergeOverwrite, not coalesce: coalesce is all-or-nothing, taking the
+  component map whole as soon as it is non-empty, which makes a partial
+  override behave as a full replacement. deepCopy because mustMergeOverwrite
+  mutates its first argument and .Values.global is shared across every
+  component in the release.
+
+  Usage: {{- include "langwatch.podSecurityContext" (dict "ctx" . "component" .Values.app) }}
+*/}}
+{{- define "langwatch.podSecurityContext" -}}
+{{- $global := .ctx.Values.global.podSecurityContext | default dict -}}
+{{- $override := .component.podSecurityContext | default dict -}}
+{{- toYaml (mustMergeOverwrite (deepCopy $global) $override) -}}
+{{- end -}}
+
+{{- define "langwatch.containerSecurityContext" -}}
+{{- $global := .ctx.Values.global.containerSecurityContext | default dict -}}
+{{- $override := .component.containerSecurityContext | default dict -}}
+{{- toYaml (mustMergeOverwrite (deepCopy $global) $override) -}}
+{{- end -}}
