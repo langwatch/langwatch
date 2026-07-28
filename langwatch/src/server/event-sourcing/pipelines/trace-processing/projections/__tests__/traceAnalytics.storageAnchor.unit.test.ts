@@ -20,13 +20,13 @@ import {
 } from "./fixtures/trace-summary-test.fixtures";
 
 /**
- * The slim fold's STORAGE ANCHOR (ADR-071 step 3, migration 00059).
+ * The slim fold's STORAGE ANCHOR (ADR-071 step 3, migration 00060).
  *
  * `OccurredAt` on `trace_analytics` is the partition key, the lead sort key and
  * the TTL anchor. It used to carry the fold's span timing baseline — the running
  * `min(span.startTimeUnixMs)` — which only SPANS ever set. A trace whose only
  * signal is a log record (Claude Code / Codex "Path B") therefore committed at
- * `new Date(0)`: partition 197001, TTL deadline `1970 + retention`, already past.
+ * `new Date(0)`: partition 196952, TTL deadline `1970 + retention`, already past.
  *
  * The two jobs are now separate state: `storageAnchorMs`, frozen on the first
  * contribution of any kind that carries a usable business time, and `occurredAt`,
@@ -136,7 +136,7 @@ describe("traceAnalytics storage anchor", () => {
     });
 
     /** @scenario "A trace whose only signal is a log record is anchored in real time" */
-    it("commits into a live partition rather than 197001", () => {
+    it("commits into a live partition rather than 196952", () => {
       // The defect this fix exists for, stated the way ClickHouse sees it: the
       // partition expression is toYearWeek(OccurredAt) and the TTL is
       // OccurredAt + retention, so an epoch anchor is a row born expired.

@@ -91,7 +91,7 @@ describe("traceAnalytics read-back (fromRow)", () => {
 
     it("keeps the storage anchor and the span timing baseline apart", () => {
       // The anchor rides in OccurredAt (partition + sort key + TTL) and the
-      // baseline in its own column (migration 00059). Decoding either from the
+      // baseline in its own column (migration 00060). Decoding either from the
       // other's column is the defect this split exists to stop: it would either
       // move a committed row's partition or restart the trace's duration.
       expect(decoded.storageAnchorMs).toBe(BASE_MS + 250);
@@ -152,7 +152,7 @@ describe("traceAnalytics read-back (fromRow)", () => {
         rootMetadataFromFallback: false,
         traceNameUserOverridden: false,
         lastEventOccurredAt: 0,
-        // And, on a row written before migration 00059, no span timing baseline.
+        // And, on a row written before migration 00060, no span timing baseline.
         earliestSpanStartMs: 0,
       };
 
@@ -213,7 +213,7 @@ describe("TraceAnalyticsStore read-back version gate", () => {
     // as a ClickHouse default indistinguishable from a real value — spanCount 0
     // would re-add committed cost past the span cap, a false
     // traceNameUserOverridden would let a late span overwrite a user's rename,
-    // and a zero span timing baseline (migration 00059) would restart the
+    // and a zero span timing baseline (migration 00060) would restart the
     // trace's duration from whichever span arrived next.
     const staleRow = (): TraceAnalyticsRow => ({
       ...project(committedState()),

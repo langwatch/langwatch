@@ -16,7 +16,7 @@
 -- whose only signal is a log record — Claude Code / Codex "Path B", which emit
 -- no spans at all — folded it as 0, was accepted by the store's
 -- persistable-signal gate on its log-record count, and committed with
--- `OccurredAt = 1970-01-01`. That is partition `197001`, with a TTL deadline of
+-- `OccurredAt = 1970-01-01`. That is partition `196952`, with a TTL deadline of
 -- `1970 + retention` which is already years past, so the row was deleted on the
 -- next TTL merge. Before the reap the fold's windowed read-back missed it and
 -- the executor paid an unwindowed scan per delivery; after it, `store.get()`

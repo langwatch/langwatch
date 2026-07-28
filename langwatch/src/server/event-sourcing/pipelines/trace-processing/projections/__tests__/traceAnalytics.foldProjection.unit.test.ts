@@ -220,7 +220,7 @@ describe("traceAnalytics fold projection — slim row derivation", () => {
     it("anchors the row at the log's own time, not the epoch", () => {
       // The counterpart of the lock this replaces. `OccurredAt` is the
       // partition key AND the TTL anchor, so anchoring a log-only trace at 0
-      // committed it into partition 197001 with a deadline of 1970 +
+      // committed it into partition 196952 with a deadline of 1970 +
       // retention — expired before it was written. The anchor is now its own
       // state field (ADR-071 step 3), seeded by ANY contribution.
       const state = foldLogRecord(createInitSlimState());

@@ -105,8 +105,8 @@ import {
  * contribution that carries a usable business time and never moved after
  * (`storageAnchorMs`). It is no longer the running minimum of span starts; that
  * value is the fold's timing baseline and now has its own column
- * (`EarliestSpanStartMs`, migration 00059). Sharing one column between the two
- * jobs is what wrote a log-only trace into partition 197001 with an
+ * (`EarliestSpanStartMs`, migration 00060). Sharing one column between the two
+ * jobs is what wrote a log-only trace into partition 196952 with an
  * already-expired TTL deadline.
  *
  * Re-fold safety (ADR-021/022): a re-fold produces the same canonical state,
@@ -154,7 +154,7 @@ const traceAnalyticsEvents = [
  *  cannot be told apart from real zeroes and it is treated as a store miss
  *  (see `TraceAnalyticsStore.getWithApplied`).
  *
- *  2026-07-29 — the storage anchor split (ADR-071 step 3, migration 00059).
+ *  2026-07-29 — the storage anchor split (ADR-071 step 3, migration 00060).
  *  BOTH halves of what this stamp records changed at once: the DERIVATION
  *  (`OccurredAt` is now the frozen first-observed business time rather than the
  *  running min of span starts) and the ROW SHAPE (`EarliestSpanStartMs` carries
@@ -234,7 +234,7 @@ export interface TraceAnalyticsRow {
   occurredAtMs: number;
   /**
    * The span timing baseline → the `EarliestSpanStartMs` column (migration
-   * 00059): the earliest start time across the trace's non-synthetic spans, or
+   * 00060): the earliest start time across the trace's non-synthetic spans, or
    * 0 while no span has been folded. `TotalDurationMs` is measured from it.
    *
    * It has its own column because `OccurredAt` no longer carries it, and
@@ -348,7 +348,7 @@ export interface TraceAnalyticsData {
    * is the timing baseline; only spans may touch it, because `SpanTimingService`
    * reads `occurredAt > 0` as "a span has seeded the baseline" and measures
    * `TotalDurationMs` from it. Anchoring the two on one field is what put
-   * log-only traces (Claude Code / Codex "Path B") in partition 197001 with a
+   * log-only traces (Claude Code / Codex "Path B") in partition 196952 with a
    * TTL deadline of `1970 + retention`, already past, so they were reaped on the
    * next TTL merge and every later delivery refolded the whole aggregate.
    */
@@ -942,7 +942,7 @@ function applyLogContribution({
     // `OccurredAt` is this table's partition key AND its TTL anchor (00039), and
     // only spans set it. A log-only trace — Claude Code Path B, Codex Path B,
     // which `hasPersistableSignal` deliberately persists — therefore commits its
-    // row at OccurredAt 0: partition 197001, with a TTL deadline of
+    // row at OccurredAt 0: partition 196952, with a TTL deadline of
     // `1970 + retention`, i.e. expired before it was written.
     //
     // The obvious fix (`state.occurredAt === 0 ? contribution.occurredAtMs : …`)
@@ -1027,14 +1027,14 @@ export class TraceAnalyticsFoldProjection
    * silently downgrade a user-renamed trace to a late span's name, freeze a
    * fallback-named trace, reset the MAX_PROCESSED_SPANS cap so already-
    * committed cost/tokens were counted twice, and — since the storage-anchor
-   * split (migration 00059) — hand back a zero span timing baseline, so the
+   * split (migration 00060) — hand back a zero span timing baseline, so the
    * trace's duration restarted from whichever span happened to arrive next.
    *
    * TWO CLASSES DO NOT SELF-HEAL, so `es_fold_refold_on_miss_total` cannot
    * reach zero for this adopter:
    *
    *   1. A log-only trace folds `occurredAt: 0`, so its row lands in partition
-   *      `197001` already past its TTL. Reusing `occurredAt` as the storage
+   *      `196952` already past its TTL. Reusing `occurredAt` as the storage
    *      anchor is NOT the fix — it is `SpanTimingService`'s baseline, and
    *      seeding it from a log inflates TotalDurationMs and TokensPerSecond by
    *      the ingest lag. A separate anchor (ADR-071 step 3) is.
