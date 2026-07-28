@@ -1321,7 +1321,8 @@ local activeKey    = keyPrefix .. "group:" .. groupId .. ":active"
 -- 1. Block the group — prevents dispatcher from re-dispatching
 redis.call("SADD", blockedKey, groupId)
 
--- 2. Re-stage the failed job with a new ID
+-- 2. Re-stage the failed job under the id it was dispatched under (ADR-080).
+--    Its member was ZREMed at claim time, so this insert lands on an absent one.
 local inserted = redis.call("ZADD", groupJobsKey, score, newStagedJobId)
 redis.call("HSET", groupDataKey, newStagedJobId, jobDataJson)
 local stagedLease = gqParseLease(jobDataJson)
@@ -1430,7 +1431,7 @@ addToReadyOrParked(readyKey, groupId, dispatchAfterMs, false)
 --    activeTtlSec and push the ready score out with it, delaying the retry by
 --    up to activeTtlSec instead of the backoff. This used to be prevented
 --    here: the re-stage rotated the active key to a NEW id, so a late beat
---    naming the retired id no longer matched. Since ADR-076 the id is reused,
+--    naming the retired id no longer matched. Since ADR-080 the id is reused,
 --    so newStagedJobId equals stagedJobId and this write invalidates nothing.
 --    The ONLY protection is that the caller stops the heartbeat before issuing
 --    this script (stopHeartbeat() in groupQueue.ts, ordered ahead of
@@ -2043,16 +2044,26 @@ export class GroupStagingScripts {
     groupId,
     stagedJobId,
     activeTtlSec,
+    isCancelled,
   }: {
     groupId: string;
     stagedJobId: string;
     activeTtlSec: number;
+    /**
+     * Withdraws the refresh if the caller stops wanting it while the call is in
+     * flight. Only the NOSCRIPT fallback can be withdrawn — see
+     * {@link CachedLuaScript.runCancellable} — which is exactly the window
+     * where a refresh could otherwise land behind a re-stage and undo its
+     * backoff.
+     */
+    isCancelled?: () => boolean;
   }): Promise<boolean> {
     const activeKey = `${this.keyPrefix}group:${groupId}:active`;
     const readyKey = `${this.keyPrefix}ready`;
 
-    const result = await refreshScript.run(
+    const result = await refreshScript.runCancellable(
       this.redis,
+      isCancelled ?? null,
       2,
       activeKey,
       readyKey,

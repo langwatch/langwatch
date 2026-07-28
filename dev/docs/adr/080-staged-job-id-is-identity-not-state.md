@@ -1,4 +1,4 @@
-# ADR-076: A staged job id is an identity, not a place to keep state
+# ADR-080: A staged job id is an identity, not a place to keep state
 
 **Date:** 2026-07-28
 
@@ -24,7 +24,7 @@ The id **grows without bound**, gaining a segment per retry and per operator unb
 
 That last one is the actual defect; the other two are its symptoms. The count lived in the id to serve exactly one reader. When a job's body is held in a blob store that is temporarily unreachable, the ladder that decides whether to retry or give up (ADR-030 §2) cannot decode the payload — the payload is what it cannot read — so it could not consult the attempt stamped inside. Counting segments was the available answer.
 
-It was never the only one. A staged value is `<prefix><headerByteLength>|<header><body>`, where the header is plain inline JSON sitting in front of the body. It is what the Lua dispatcher slices to route a job without touching a blob. And queue machinery — including `__attempt` — has travelled in that header since ADR-029, lifted out of the body by `splitMachineryFromBody` specifically so it would not perturb the content hash that collapses a fan-out. The count the ladder needs has been readable all along; nothing on the wire has to change.
+It was never the only one. A staged value is `<prefix><headerByteLength>|<header><body>`, where the header is plain inline JSON sitting in front of the body. It is what the Lua dispatcher slices to route a job without touching a blob. And queue machinery — including `__attempt` — has travelled in that header since ADR-029, lifted out of the body by `splitMachineryFromBody` specifically so it would not perturb the content hash that collapses a fan-out. The wire FORMAT does not have to change — `__attempt` has ridden in the header since ADR-029. What is new is that the transient ladder now writes one: it used to re-stage its value untouched, which is exactly why it had nothing to read.
 
 Two constraints shaped the decision, both found by reviewing the design rather than by building it.
 
@@ -42,9 +42,11 @@ This is safe because a job's id is removed from staging the moment it is claimed
 
 **The unreadable-body ladder takes the higher of the message and the group's retry chain, and writes the chain on every rung.** Both halves matter. The write is what guarantees termination when the message cannot carry a count. The `max` is what survives a redelivery: with a stable id, an at-least-once redelivery lands on the same staging member and overwrites the waiting job's message with a fresh attempt-1 envelope, so the message alone is not trustworthy. This mirrors the rule the main ladder already uses.
 
-**A legacy trailing `/r/<n>` is read as a last resort, and never written.** A job part-way up the transient ladder at deploy time recorded its count only in the id; without this it would be handed a fresh budget, resetting a fail-safe mid-flight. The segment is a value to interpret on the way out, not a format to keep alive.
+**A legacy `/r/<n>` is read as a last resort, and never written.** The reader takes the highest such segment that is within the retry budget, so the wall-clock stamp the terminal re-stage used to append is not mistaken for a count. A job part-way up the transient ladder at deploy time recorded its count only in the id; without this it would be handed a fresh budget, resetting a fail-safe mid-flight. The segment is a value to interpret on the way out, not a format to keep alive.
 
-**The heartbeat stops before the re-stage is issued**, on every outcome path, rather than in the worker's outer cleanup.
+**The heartbeat stops before the retry re-stage is issued**, rather than in the worker's outer cleanup. That is the one path that leaves the active key alive for a late beat to match; exhaustion and poison-park re-stage through a script that DELetes the active key in the same atomic step, so a late beat there finds nothing to match and no-ops. The transient ladder needs no guard either — both of its entry points run before the heartbeat is ever started.
+
+Ordering alone is not quite enough, and the gap is worth naming because it is invisible: the cached-script wrapper retries a cache miss AFTER an await, so on a cold script cache that one hop can be issued behind the re-stage. The refresh is therefore also **cancellable**, and the heartbeat withdraws it once stopped.
 
 **Unblocking a group clears every counter that outlived the block** — the retry chain and the consecutive-failure streak, alongside the claim strikes and stored error it already cleared. Both omissions are pre-existing: a group blocked by exhaustion came back with no attempts left *and* a streak already at the quarantine threshold, so its first failure re-blocked it, and whether it did depended on how long the operator took to press the button (the chain expires on its own after 30 minutes). An unblock is an operator saying "try this again"; every counter that decides whether trying is allowed belongs in that reset.
 
@@ -60,11 +62,11 @@ One consequence is deliberately not mitigated. A redelivery arriving while a job
 
 ## Consequences
 
-The id becomes a name an operator can look up and a producer can predict: the id a job is dispatched under is the id it is blocked, parked, and inspected under.
+The id becomes a name an operator can look up: the id a job is dispatched under is the id it is blocked, parked, and inspected under. A producer can predict it whenever its payload carries an `id`; reactor jobs still stage without one and get a minted id, which #5538 tracks separately.
 
 `header.m` is promoted from opaque machinery to a field the queue's control flow depends on. Anything that rewrites an envelope must now preserve it, and the header's byte-length prefix must be recomputed on any header change — which the existing `finalize` already does, and which a scenario now pins.
 
-The `/r/`-parsing module is deleted rather than kept for compatibility. Two id schemes in one queue would be worse than either.
+The `/r/`-*writing* paths are deleted, and so is the module that implemented the rejected keep-a-marker design. What survives is a single read-only reader, `legacyStagedJobAttempt`, and it is a migration artifact rather than a second id scheme: it is deleted once no job staged before this deploy can still be in backoff (an hour is comfortably past `GROUP_ATTEMPT_TTL_SECONDS`). Do not remove it before then — it is the only thing standing between an in-flight transient ladder and a fresh budget.
 
 Jobs already staged under grown ids keep working: a worker uses whatever id it was handed, so those ids stop growing and are read for a count only when nothing else can answer.
 

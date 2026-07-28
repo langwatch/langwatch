@@ -4,7 +4,7 @@ Feature: A staged job's id is its identity and its retry count rides on the mess
   So that the id stays a name I can look up, a key a database can index, and a
   thing two workers can agree is the same job.
 
-  # Decision: dev/docs/adr/076-staged-job-id-is-identity-not-state.md
+  # Decision: dev/docs/adr/080-staged-job-id-is-identity-not-state.md
   #
   # Why this exists — production, 2026-07
   #

@@ -20,7 +20,7 @@ let queueCounter = 0;
 /**
  * The counters that decide whether a group's next job is allowed to run. Each
  * one outlives a block, so an operator recovery that leaves any behind hands
- * the group id's next job an inheritance it did not earn (ADR-076).
+ * the group id's next job an inheritance it did not earn (ADR-080).
  */
 const counterSuffixes = ["strikes", "attempt", "failstreak"] as const;
 
@@ -67,7 +67,7 @@ describe("operator recovery clears every per-group counter", () => {
         const { wasBlocked } = await repo.unblockGroup({ queueName, groupId });
 
         expect(wasBlocked).toBe(true);
-        // Pre-ADR-076 this returned ["attempt", "failstreak"]: the group came
+        // Pre-ADR-080 this returned ["attempt", "failstreak"]: the group came
         // back with a spent ladder AND a streak at the quarantine threshold.
         expect(await survivingCounters()).toEqual([]);
       });

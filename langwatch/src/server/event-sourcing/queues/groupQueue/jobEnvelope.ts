@@ -747,6 +747,11 @@ export function readJobAttempt(value: string): number | null {
       ? ((splitEnvelope(value).header.m ?? {}) as Record<string, unknown>)
       : (JSON.parse(value) as Record<string, unknown>);
     const attempt = machinery.__attempt;
+    // Reported verbatim: this is a reader, and one that silently reshapes what
+    // is stored cannot be used to check what was written. `__attempt` is lifted
+    // out of the payload by name, so a job whose payload carried that key could
+    // name a number past the budget — the ladder then treats it as already
+    // spent and retires the job, which is the fail-closed direction.
     return typeof attempt === "number" && Number.isInteger(attempt) && attempt > 0
       ? attempt
       : null;
@@ -764,9 +769,10 @@ export function readJobAttempt(value: string): number | null {
  * re-encoding it to change a counter would split that shared copy and churn the
  * lease identity. Advancing an attempt is metadata, and costs no blob I/O.
  *
- * A value whose machinery does not live in the header (GQ1, legacy bare JSON)
- * is returned unchanged — {@link readJobAttempt} reports null for those, and
- * the caller falls back to the group's retry chain.
+ * GQ1 and legacy bare JSON are returned unchanged. The asymmetry is worth
+ * naming: bare JSON's attempt is still READABLE by {@link readJobAttempt} (it
+ * is an ordinary body field), just not advanceable here — so for those the
+ * group's retry chain is what keeps the ladder finite.
  */
 export function withJobAttempt({
   value,

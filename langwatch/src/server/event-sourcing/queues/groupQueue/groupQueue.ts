@@ -101,18 +101,6 @@ export const GROUP_ATTEMPT_TTL_SECONDS = Math.ceil(
 );
 
 /**
- * The retry count off a staged job id left over from before ADR-076, when the
- * ladder appended `/r/<n>` to the id and read the count back by counting the
- * segments.
- *
- * READ-ONLY, and only as a last resort. A job part-way up the unreadable-body
- * ladder at deploy time recorded its count nowhere else — that path re-staged
- * the value unmodified and never wrote the group's chain — so without this it
- * would come back with a fresh budget and a fail-safe would reset mid-flight.
- * Nothing writes this shape any more: a legacy id is a value to interpret on
- * the way out, not a format to keep alive.
- */
-/**
  * A field off an untrusted payload, when it is actually a usable string.
  *
  * The queue's payloads are `Record<string, unknown>` by design — it routes for
@@ -124,9 +112,26 @@ function nonEmptyString(value: unknown): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
+/**
+ * The retry count off a staged job id left over from before ADR-080, when the
+ * ladder appended `/r/<n>` to the id and read the count back by counting the
+ * segments.
+ *
+ * READ-ONLY, and only as a last resort. A job part-way up the unreadable-body
+ * ladder at deploy time recorded its count nowhere else — that path re-staged
+ * the value unmodified and never wrote the group's chain — so without this it
+ * would come back with a fresh budget and a fail-safe would reset mid-flight.
+ * Nothing writes this shape any more: a legacy id is a value to interpret on
+ * the way out, not a format to keep alive.
+ */
 export function legacyStagedJobAttempt(stagedJobId: string): number {
+  // Anchored to the TRAILING ladder. The legacy markers were always appended,
+  // so nothing before the tail is one — and an unanchored scan would let a
+  // producer's own event id (which is free-form and forms the base of the
+  // staged id) donate a `/r/<n>` segment and set another job's retry budget.
+  const tail = /((?:\/[rp]\/[^/]+)+)$/.exec(stagedJobId)?.[1] ?? "";
   let highest = 0;
-  for (const [, digits] of stagedJobId.matchAll(/\/r\/(\d+)(?=\/|$)/g)) {
+  for (const [, digits] of tail.matchAll(/\/r\/(\d+)(?=\/|$)/g)) {
     const value = Number(digits);
     // The terminal restage stamped a wall clock under this same marker. Reading
     // one as an attempt would vault past the budget and discard a job that
@@ -1071,6 +1076,10 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     }
 
     const jobStartTime = performance.now();
+    // Idempotent so an outcome path can stop the beat at the moment it decides
+    // (see the retry path) while the `finally` still guarantees it is stopped
+    // on every other exit.
+    let heartbeatStopped = false;
     const heartbeat = this.startActiveKeyHeartbeat({
       groupId,
       stagedJobId,
@@ -1078,11 +1087,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         jobDataJson,
         ...drainedSiblings.map((sibling) => sibling.jobDataJson),
       ],
+      isCancelled: () => heartbeatStopped,
     });
-    // Idempotent so an outcome path can stop the beat at the moment it decides
-    // (see the retry path) while the `finally` still guarantees it is stopped
-    // on every other exit.
-    let heartbeatStopped = false;
     const stopHeartbeat = (): void => {
       if (heartbeatStopped) return;
       heartbeatStopped = true;
@@ -1351,7 +1357,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                 const backoffMs = retryBackoffMsFor({ attempt, error: err });
                 gqRetryAttempt.observe(routingLabels, attempt);
                 gqRetryBackoffMilliseconds.observe(routingLabels, backoffMs);
-                // The job keeps the id it was dispatched under (ADR-076). Its
+                // The job keeps the id it was dispatched under (ADR-080). Its
                 // staging member was removed at claim time, so re-staging under
                 // the same id inserts one that is genuinely absent.
                 const newStagedJobId = stagedJobId;
@@ -1408,22 +1414,27 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                   attempt: attempt + 1,
                 });
                 // STOP THE HEARTBEAT BEFORE THE RE-STAGE IS ISSUED, not after
-                // it returns (ADR-076).
+                // it returns (ADR-080).
                 //
                 // The re-stage sets the active key's TTL to the backoff window;
                 // a heartbeat REFRESH sets it to the full activeTtlSec and
-                // pushes the group's ready score out to match. The two travel
-                // the same connection and are served in send order, so a beat
-                // that fires while the re-stage is in flight has already been
-                // sent BEHIND it, and would stretch a sub-second backoff into a
-                // multi-minute stall. Clearing the interval here is what makes
-                // that impossible: a tick issues its REFRESH synchronously, so
-                // once this returns no further REFRESH can be sent.
+                // pushes the group's ready score out to match, which would
+                // stretch a sub-second backoff into a multi-minute stall.
+                //
+                // Two things close that window, and BOTH are needed:
+                //
+                //  - Ordering. A tick issues its EVALSHA synchronously, so any
+                //    beat already in flight was sent AHEAD of the re-stage on
+                //    the same connection and is served before it — its TTL is
+                //    then overwritten by the re-stage's.
+                //  - Cancellation. `runCancellable` withdraws the NOSCRIPT
+                //    fallback, which is the one hop that is issued AFTER an
+                //    await and could otherwise land behind the re-stage on a
+                //    cold script cache. Ordering alone does not cover it.
                 //
                 // This used to be handled by the id: the re-stage rotated the
                 // active key to a NEW id, so a late beat naming the old one no
-                // longer matched. With the id reused that guard is gone, and
-                // ordering is the whole protection.
+                // longer matched. With the id reused that guard is gone.
                 stopHeartbeat();
                 const restaged = await this.scripts.retryRestage({
                   groupId,
@@ -1762,10 +1773,13 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     groupId,
     stagedJobId,
     jobDataValues,
+    isCancelled,
   }: {
     groupId: string;
     stagedJobId: string;
     jobDataValues: string[];
+    /** True once the job's outcome is decided; see `stopHeartbeat`. */
+    isCancelled: () => boolean;
   }): ReturnType<typeof setInterval> {
     const intervalMs = (GROUP_QUEUE_CONFIG.activeTtlSec * 1000) / 3;
     return setInterval(() => {
@@ -1774,6 +1788,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
           groupId,
           stagedJobId,
           activeTtlSec: GROUP_QUEUE_CONFIG.activeTtlSec,
+          isCancelled,
         })
         .catch((err) => {
           this.logger.warn(
@@ -1818,7 +1833,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         ? originalScore
         : (this.score?.(payload) ?? Date.now());
 
-    // Re-stage under the id the job was dispatched under (ADR-076), so the
+    // Re-stage under the id the job was dispatched under (ADR-080), so the
     // staged job an operator inspects is named by the id its producer knows.
     const newStagedJobId = stagedJobId;
     const jobDataJson = await this.blobLifecycle.encode({
@@ -2030,7 +2045,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       typeof originalScore === "number" ? originalScore : Date.now();
     await this.scripts.restageAndBlock({
       groupId,
-      // Parked under the id it was dispatched under (ADR-076). This used to
+      // Parked under the id it was dispatched under (ADR-080). This used to
       // append a wall-clock marker, which made a parked job impossible to find
       // by the id its producer knows and grew the value on every park.
       newStagedJobId: stagedJobId,
@@ -2062,7 +2077,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
    * restage renews that lease before returning.
    *
    * The ladder is bounded by a count this path can reach WITHOUT the body it
-   * cannot read (ADR-076): the attempt on the message's header, the group's
+   * cannot read (ADR-080): the attempt on the message's header, the group's
    * retry chain, and — only for a job staged before that change, where neither
    * can answer — a legacy retry segment on the id. It takes the highest of the
    * three, because a redelivery can overwrite the waiting job's message with a

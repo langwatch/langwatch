@@ -118,11 +118,11 @@ describe("langy tool call id", () => {
   describe("given a tool call whose id carried a provider signature", () => {
     describe("when its start is recorded as a durable milestone", () => {
       /** @scenario A tool call's durable key is built from the normalised id */
-      it("builds the event's idempotency key from the normalised id", () => {
+      it("builds the event's idempotency key from the normalised id", async () => {
         const frame = langyRelayFrameSchema.parse(toolFrame(POLLUTED_ID));
         if (frame.type !== "tool") throw new Error("expected a tool frame");
 
-        const [event] = new InitiateToolCallCommand().handle({
+        const [event] = await new InitiateToolCallCommand().handle({
           type: "langy.conversation.initiate_tool_call",
           tenantId: "project-1",
           data: {

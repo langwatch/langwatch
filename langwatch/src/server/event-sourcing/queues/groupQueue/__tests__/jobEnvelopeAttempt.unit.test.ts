@@ -26,7 +26,7 @@ function blobStore(): TieredBlobStore {
   return new TieredBlobStore({
     redisBlobs: new InMemoryJobBlobStore(),
     objectStoreFor: () => new InMemoryObjectStore(),
-    resolveDestination: () => null,
+    resolveDestination: async () => ({ kind: "s3", bucket: "test-bucket" }),
   });
 }
 

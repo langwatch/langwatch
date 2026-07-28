@@ -64,7 +64,7 @@ const STORAGE_DESTINATION = async () =>
 const OFFLOADABLE_S3_VALUE = () => incompressible(768 * 1024);
 
 describe.skipIf(!hasTestcontainers)(
-  "GroupQueueProcessor — a staged job id is identity, not state (ADR-076)",
+  "GroupQueueProcessor — a staged job id is identity, not state (ADR-080)",
   () => {
     let redis: Redis;
     let queues: GroupQueueProcessor<TestPayload>[];
@@ -248,7 +248,7 @@ describe.skipIf(!hasTestcontainers)(
      * probe only fires callbacks the implementation has LEFT armed.
      *
      * The cast is to the global's own signature: there is no exported seam for
-     * "which intervals are currently armed", and the whole point of ADR-076's
+     * "which intervals are currently armed", and the whole point of ADR-080's
      * heartbeat ordering is that the interval is gone before the re-stage is
      * issued.
      */
@@ -287,7 +287,7 @@ describe.skipIf(!hasTestcontainers)(
     }
 
     /**
-     * Ticks every still-armed interval at the WORST moment ADR-076 describes:
+     * Ticks every still-armed interval at the WORST moment ADR-080 describes:
      * the re-stage has been sent and the worker is still tidying up. A beat
      * that lands there names an id the re-stage has just re-used, so
      * `REFRESH_LUA` matches and stretches a sub-second backoff into the full
@@ -378,7 +378,7 @@ describe.skipIf(!hasTestcontainers)(
           expect(ids).toEqual([
             "event_000649zPnIW3V0Ug6yVk9DECNYK3S/subscriber/pm:langyConversation",
           ]);
-          // Pre-ADR-076 an id gained `/r/<n>` per retry and a `/r/<Date.now()>`
+          // Pre-ADR-080 an id gained `/r/<n>` per retry and a `/r/<Date.now()>`
           // on the terminal restage; nothing mints either shape any more.
           expect(ids[0]).not.toMatch(/\/r\//);
           expect(ids[0]).not.toMatch(/\/p\//);
@@ -428,7 +428,7 @@ describe.skipIf(!hasTestcontainers)(
             { timeout: 10000, interval: 25 },
           );
 
-          // Pre-ADR-076 this read `event_retry/subscriber/pm:langyConversation/r/1`.
+          // Pre-ADR-080 this read `event_retry/subscriber/pm:langyConversation/r/1`.
           expect(await stagedIds(name, groupId)).toEqual([
             expectedStagedId(payload),
           ]);
@@ -478,7 +478,7 @@ describe.skipIf(!hasTestcontainers)(
             { timeout: 15000, interval: 50 },
           );
 
-          // Pre-ADR-076 `handleExhaustedRetries` appended `/r/<Date.now()>`, so
+          // Pre-ADR-080 `handleExhaustedRetries` appended `/r/<Date.now()>`, so
           // the parked job could not be found by the id its producer knows.
           expect(await stagedIds(name, groupId)).toEqual([
             expectedStagedId(payload),
@@ -527,7 +527,7 @@ describe.skipIf(!hasTestcontainers)(
           );
 
           expect(processed).not.toHaveBeenCalled();
-          // Pre-ADR-076 the park appended `/p/<Date.now()>`.
+          // Pre-ADR-080 the park appended `/p/<Date.now()>`.
           expect(await stagedIds(name, groupId)).toEqual([
             expectedStagedId(payload),
           ]);
@@ -667,7 +667,7 @@ describe.skipIf(!hasTestcontainers)(
 
           await queue.send(payload);
 
-          // Pre-ADR-076 the retry re-staged under `<id>/r/5`, so a redelivery
+          // Pre-ADR-080 the retry re-staged under `<id>/r/5`, so a redelivery
           // under `<id>` landed on a DIFFERENT member: two jobs for one event.
           expect(await stagedIds(name, groupId)).toEqual([
             expectedStagedId(payload),
@@ -797,7 +797,7 @@ describe.skipIf(!hasTestcontainers)(
             expect(probe.refreshed).toContain(
               "event_beat/subscriber/pm:langyConversation",
             );
-            // Pre-ADR-076 the interval was cleared only in the worker's outer
+            // Pre-ADR-080 the interval was cleared only in the worker's outer
             // `finally`, so ticking it here produced another REFRESH — one that
             // now matches, because the re-stage reuses the id.
             expect(probe.beats.afterRestage).toBe(0);
@@ -889,7 +889,7 @@ describe.skipIf(!hasTestcontainers)(
               __jobName: "pm:langyConversation",
             });
 
-            // The retry runs on its ~3s hold. Pre-ADR-076 the beat ticked after
+            // The retry runs on its ~3s hold. Pre-ADR-080 the beat ticked after
             // the re-stage pushed the hold (and the ready score) to the full
             // 300s active window, so nothing would run inside this timeout.
             await vi.waitFor(() => expect(deliveries).toEqual([1, 2]), {
@@ -960,7 +960,7 @@ describe.skipIf(!hasTestcontainers)(
             timeout: 20000,
             interval: 25,
           });
-          // Pre-ADR-076 the chain survived the unblock, so this run read as
+          // Pre-ADR-080 the chain survived the unblock, so this run read as
           // attempt 25 and the group re-blocked on its very first failure.
           expect(seen[1]).toBe(1);
           expect(await blockedMembers(name)).not.toContain(groupId);
@@ -1025,7 +1025,7 @@ describe.skipIf(!hasTestcontainers)(
             timeout: 20000,
             interval: 25,
           });
-          // Pre-ADR-076 the streak survived at 3, so this single failure took
+          // Pre-ADR-080 the streak survived at 3, so this single failure took
           // it to 4 — past the threshold — and quarantined the group instantly.
           await vi.waitFor(
             async () => {
@@ -1107,7 +1107,7 @@ describe.skipIf(!hasTestcontainers)(
             { timeout: 25000, interval: 25 },
           );
 
-          // Pre-ADR-076 the promptly-unblocked group came back on attempt 25
+          // Pre-ADR-080 the promptly-unblocked group came back on attempt 25
           // and the patient operator's group came back on attempt 1.
           expect(seen.filter((s) => s.groupId === promptGroup)[1]!.attempt).toBe(
             1,
@@ -1169,7 +1169,7 @@ describe.skipIf(!hasTestcontainers)(
 
           await runLadderOnce({ name, groupId, objectStore, expectChain: "6" });
 
-          // Pre-ADR-076 this ladder could only count `/r/` segments on the id,
+          // Pre-ADR-080 this ladder could only count `/r/` segments on the id,
           // so a message that already said "attempt 5" was read as a fresh one.
           expect(
             readJobAttempt((await stagedValue(name, groupId, stagedJobId))!),
@@ -1296,7 +1296,7 @@ describe.skipIf(!hasTestcontainers)(
             interval: 25,
           });
 
-          // Pre-ADR-076 nothing on the message or the chain moved at all: the
+          // Pre-ADR-080 nothing on the message or the chain moved at all: the
           // count lived only in a segment appended to the id.
           expect(rungs.map((r) => r.onMessage)).toEqual([1, 2, 3]);
           // recordGroupAttempt runs before the re-stage, so the chain already
@@ -1526,7 +1526,7 @@ describe.skipIf(!hasTestcontainers)(
             },
             { timeout: 20000, interval: 50 },
           );
-          // Pre-ADR-076 each of these three steps appended another segment:
+          // Pre-ADR-080 each of these three steps appended another segment:
           // `/r/1`, then `/r/<Date.now()>`, then `/p/<Date.now()>`.
           expect(await stagedIds(name, groupId)).toEqual([LEGACY_ID]);
         }, 90000);

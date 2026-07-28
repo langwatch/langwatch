@@ -56,7 +56,7 @@ if wasBlocked > 0 then
   redis.call("DEL", errorKey)
   -- Unblocking is an operator's "try again", so EVERY counter that decides
   -- whether trying is allowed has to be reset — not just the claim strikes
-  -- (ADR-076). A group blocked by retry exhaustion came back with its retry
+  -- (ADR-080). A group blocked by retry exhaustion came back with its retry
   -- chain still reading "budget spent" and its failure streak still at the
   -- quarantine threshold, so the very first failure re-blocked it, and whether
   -- it did depended on how long the operator took to press the button (the
@@ -121,7 +121,7 @@ redis.call("DEL", errorKey)
 -- whether a later job is allowed to run goes with it. Leaving any behind means
 -- a re-created group with the same id inherits it: claim strikes park it on its
 -- first claim, a spent retry chain exhausts it on its first failure, and a
--- carried failure streak re-quarantines it (ADR-076,
+-- carried failure streak re-quarantines it (ADR-080,
 -- specs/event-sourcing/poison-group-park-guard.feature).
 redis.call("DEL", strikesKey)
 redis.call("DEL", attemptKey)
@@ -189,7 +189,7 @@ redis.call("DEL", srcErrorKey)
 -- Moving to the DLQ empties the live group just like a drain, so it clears the
 -- same counters for the same reason: a re-created group with the same id must
 -- get a fresh run, not inherit strikes, a spent retry chain, or a failure
--- streak from the jobs that were carried off (ADR-076).
+-- streak from the jobs that were carried off (ADR-080).
 redis.call("DEL", strikesKey)
 redis.call("DEL", attemptKey)
 redis.call("DEL", failStreakKey)

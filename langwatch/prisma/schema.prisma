@@ -3143,7 +3143,12 @@ model ProcessManagerInbox {
   /// derived by the store (`stores/inboxKey.ts`). Postgres cannot index a btree
   /// row past ~2704 bytes; keying on a digest makes the constraint the same
   /// width no matter what any pipeline concatenates into an idempotency key.
-  sourceEventKey String
+  ///
+  /// Nullable ONLY for the rolling deploy that introduces it — pods running the
+  /// previous build write rows without it, and a NOT NULL would fail their
+  /// commits. The store always supplies it. A follow-up migration tightens this
+  /// once the fleet has cycled.
+  sourceEventKey String?
   consumedAt     DateTime @db.Timestamptz(3)
 
   @@unique([processName, projectId, sourceEventKey])
