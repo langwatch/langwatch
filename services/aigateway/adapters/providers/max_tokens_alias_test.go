@@ -7,6 +7,7 @@ import (
 
 	bfschemas "github.com/maximhq/bifrost/core/schemas"
 
+	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
@@ -80,12 +81,47 @@ func TestBuildChatRequest_MalformedMaxTokensRejected(t *testing.T) {
 		"string":  []byte(`{"model":"m","messages":[],"max_tokens":"five"}`),
 		"decimal": []byte(`{"model":"m","messages":[],"max_tokens":5.7}`),
 		"object":  []byte(`{"model":"m","messages":[],"max_tokens":{}}`),
+		// Deliberate: a malformed alias is rejected even when a valid
+		// max_completion_tokens would win. OpenAI validates every provided
+		// field before applying precedence, so the raw-forward lanes 400
+		// on this body too; accepting it here would make the translated
+		// lanes more lenient than the reference behavior.
+		"string_with_valid_winner": []byte(`{"model":"m","messages":[],"max_tokens":"five","max_completion_tokens":9}`),
 	} {
 		req := &domain.Request{Type: domain.RequestTypeChat, Body: body}
 		_, _, err := buildChatRequest(context.Background(), req, bfschemas.Anthropic, "m")
 		if err == nil {
 			t.Fatalf("%s: buildChatRequest accepted a malformed max_tokens; the request would dispatch uncapped", name)
 		}
+	}
+}
+
+// A body the parse rejects must surface to the client as a 400
+// bad_request, not an internal error, on both dispatch lanes. The
+// classification lives at the Dispatch / DispatchStream call sites, so
+// it needs its own assertion beyond buildChatRequest's returned error.
+func TestDispatch_MalformedChatBodyClassifiedBadRequest(t *testing.T) {
+	router := &BifrostRouter{}
+	req := &domain.Request{
+		Type: domain.RequestTypeChat,
+		Body: []byte(`{"model":"m","messages":[],"max_tokens":"five"}`),
+	}
+	cred := domain.Credential{ID: "mp-1", ProviderID: domain.ProviderAnthropic, APIKey: "sk"}
+
+	_, err := router.Dispatch(context.Background(), req, cred)
+	if err == nil {
+		t.Fatal("Dispatch accepted a malformed body")
+	}
+	if !herr.IsCode(err, domain.ErrBadRequest) {
+		t.Fatalf("Dispatch error = %v, want bad_request classification", err)
+	}
+
+	_, err = router.DispatchStream(context.Background(), req, cred)
+	if err == nil {
+		t.Fatal("DispatchStream accepted a malformed body")
+	}
+	if !herr.IsCode(err, domain.ErrBadRequest) {
+		t.Fatalf("DispatchStream error = %v, want bad_request classification", err)
 	}
 }
 
