@@ -9,7 +9,15 @@ import {
 } from "../schemas/constants";
 import type { TraceProcessingEvent } from "../schemas/events";
 
-const OLD_TRACE_THRESHOLD_MS = 60 * 60 * 1000;
+/**
+ * How stale an *event* may be before the guards reject it — replay and resync
+ * paths re-emit events with historical `occurredAt`, and re-running side
+ * effects for them is never wanted. Exported and single-sourced here (like
+ * `passesTraceOriginGuards` below) so the subscriber variant in
+ * `_originGuardedSubscriber.ts`, which rejects on the same threshold
+ * pre-enqueue via `when`, cannot drift from the handler-side check.
+ */
+export const OLD_TRACE_THRESHOLD_MS = 60 * 60 * 1000;
 
 /**
  * Never re-run an on-message reactor for a trace whose first span is older

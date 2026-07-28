@@ -1066,13 +1066,6 @@ export interface ProjectionMetadata {
   kind: "fold" | "map";
 }
 
-export interface ReactorMetadata {
-  reactorName: string;
-  pipelineName: string;
-  aggregateType: string;
-  afterProjection: string;
-}
-
 export interface EventSubscriberMetadata {
   subscriberName: string;
   pipelineName: string;
@@ -1120,20 +1113,6 @@ export function getProjectionMetadata(): ProjectionMetadata[] {
       }),
     );
     return [...folds, ...maps];
-  });
-}
-
-export function getReactorMetadata(): ReactorMetadata[] {
-  return getDefinitions().flatMap((def) => {
-    const { name: pipelineName, aggregateType } = def.metadata;
-    return Array.from(def.foldReactors.values()).map(
-      ({ projectionName, definition }) => ({
-        reactorName: definition.name,
-        pipelineName,
-        aggregateType,
-        afterProjection: projectionName,
-      }),
-    );
   });
 }
 

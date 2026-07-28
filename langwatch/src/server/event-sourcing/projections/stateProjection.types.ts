@@ -63,30 +63,3 @@ export interface StateProjectionDefinition<
   key?: (event: E) => string;
   options?: StateProjectionOptions;
 }
-
-/** Reuse an existing type-aware fold reducer with a direct operational store. */
-export function createStateProjection<State, E extends Event>({
-  name,
-  reducer,
-  store,
-  options,
-}: {
-  name: string;
-  reducer: Pick<
-    StateProjectionDefinition<State, E>,
-    "version" | "eventTypes" | "init" | "apply" | "key"
-  >;
-  store: StateProjectionStore<State>;
-  options?: StateProjectionOptions;
-}): StateProjectionDefinition<State, E> {
-  return {
-    name,
-    version: reducer.version,
-    eventTypes: reducer.eventTypes,
-    init: () => reducer.init(),
-    apply: (state, event) => reducer.apply(state, event),
-    store,
-    ...(reducer.key ? { key: reducer.key } : {}),
-    ...(options ? { options } : {}),
-  };
-}

@@ -8,9 +8,10 @@
  * This stream is an AUDIT trail. `folds.feature` and
  * `event-log-durability.feature` both told auditors it "derives from the
  * append-only event_log" and is "rebuildable at any time". It was not:
- * it was written by `governanceOcsfEventsSync.reactor.ts`, and the
- * projection router pins `LIVE_DISPATCH_IS_REPLAY = false` because replay
- * never dispatches a reactor. An entry lost to a failed write was lost
+ * it was written by `governanceOcsfEventsSync.reactor.ts`, and the projection
+ * router only ever dispatches a reactor on the live event path — replay
+ * rebuilds folds and never invokes a reactor. An entry lost to a failed write
+ * was lost
  * permanently, and the audit trail could diverge from the log it claims
  * to derive from with nothing able to notice or repair it.
  *

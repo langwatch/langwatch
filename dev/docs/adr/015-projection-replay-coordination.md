@@ -111,7 +111,7 @@ After all projections complete, the service runs `OPTIMIZE TABLE {table}` (witho
 **Negative:**
 - Added complexity in the live event path — `RedisReplayMarkerChecker` adds a Redis HGET per event (mitigated: ~0.1ms when no replay active, returns null immediately)
 - GroupQueue pause affects all events for the projection, not just the replayed aggregates — brief pause window minimizes impact
-- Redis becomes a coordination dependency — if Redis is down, replay cannot run (but live processing continues via `NoopReplayMarkerChecker` fallback)
+- Redis becomes a coordination dependency — if Redis is down, replay cannot run (but live processing continues: `replayMarkerChecker` is an optional dependency, and the router treats an absent checker as "process")
 
 **Neutral:**
 - The CLI package still exists for the TUI experience but contains no business logic — it delegates entirely to the framework service

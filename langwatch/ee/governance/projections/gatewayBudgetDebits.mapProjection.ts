@@ -211,9 +211,10 @@ export function deriveGatewayDebitRecord(
  * ADR-075 Class C: gateway spend as derived state, so replay can rebuild it.
  *
  * Replaces `gatewayBudgetSync.reactor.ts`'s ClickHouse half. The reactor's
- * writes sat outside the event-sourced guarantee — the projection router pins
- * `LIVE_DISPATCH_IS_REPLAY = false` and the replay service never invokes a
- * reactor — so a debit lost to a failed handler was lost permanently: the
+ * writes sat outside the event-sourced guarantee — the projection router only
+ * ever dispatches a reactor on the live event path and the replay service
+ * never invokes a reactor — so a debit lost to a failed handler was lost
+ * permanently: the
  * spend happened, the trace recorded it, and the budget never learned. Both of
  * a reactor's failure modes push measured spend DOWN, which is the wrong
  * direction for a control whose job is to stop spending.

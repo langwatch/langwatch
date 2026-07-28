@@ -165,7 +165,7 @@ export interface CutoffInfo {
 }
 
 /** Compare canonical event-log positions. Aggregate IDs never define order. */
-export function compareEventPositions(
+function compareEventPositions(
   left: CutoffInfo,
   right: CutoffInfo,
 ): number {

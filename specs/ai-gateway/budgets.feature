@@ -199,8 +199,9 @@ Feature: AI Gateway — Budgets
   # gateway_request_id). These cover it being counted AT ALL.
   #
   # Debits are written today by `gatewayBudgetSync`, a reactor, and the
-  # projection router never dispatches a reactor on the replay path
-  # (`LIVE_DISPATCH_IS_REPLAY = false`). So a debit lost to a failed handler is
+  # projection router never dispatches a reactor on the replay path — the
+  # replay service rebuilds fold projections and never invokes a reactor at
+  # all. So a debit lost to a failed handler is
   # lost permanently: the spend happened, the gateway trace records it, and the
   # budget never learns. The same handler emits the BUDGET_UPDATED change the
   # gateway consumes to evict cached bundles, so losing it also leaves the

@@ -12,9 +12,10 @@ import type { TraceProcessingEvent } from "../schemas/events";
 // `_originGuardedReactor.ts` and is imported here so both the reactor and the
 // subscriber (and the EE trace-alert subscriber) share one copy of the
 // replay/loop-prevention guard — a future fix can never miss a stale duplicate.
-import { passesTraceOriginGuards } from "./_originGuardedReactor";
-
-const OLD_TRACE_THRESHOLD_MS = 60 * 60 * 1000;
+import {
+  OLD_TRACE_THRESHOLD_MS,
+  passesTraceOriginGuards,
+} from "./_originGuardedReactor";
 
 /**
  * A named subscriber spec on the traceSummary fold, ready for

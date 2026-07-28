@@ -40,20 +40,23 @@ self-idempotent) and a **process manager** (transactional inbox, durable state,
 deadlines, leased outbox). The third is the **reactor**: a side-effect handler
 tied to a fold projection, dispatched after the fold applies and stores.
 
-The reactor's defining property is stated in the router itself:
+The reactor's defining property used to be stated in the router itself, as a
+constant every dispatch site passed:
 
 ```ts
-// projectionRouter.ts
+// projectionRouter.ts — deleted, see "What is deleted" below
 // The router only ever dispatches reactors on the live event path — the
 // replay service rebuilds fold projections and never invokes reactors, so
 // no reactor context here can be a replay.
 const LIVE_DISPATCH_IS_REPLAY = false;
 ```
 
-`ReactorContext.isReplay` exists but is wired to that constant on every call
-site. A reactor sees live events only. Anything a reactor writes is therefore
-**outside the event-sourced guarantee**: replay cannot rebuild it, and any
-divergence between the event log and what the reactor produced is permanent.
+`ReactorContext.isReplay` existed but was wired to that constant on every call
+site and read by no handler — write-only plumbing, since removed. The property
+it described still holds: a reactor sees live events only. Anything a reactor
+writes is therefore **outside the event-sourced guarantee**: replay cannot
+rebuild it, and any divergence between the event log and what the reactor
+produced is permanent.
 
 ADR-072 removed two aggregates that had exactly this bug. `suite_runs` was
 maintained by `suiteRunSync.reactor.ts` with non-idempotent `+ 1` counters on
@@ -318,9 +321,16 @@ requires a big-bang cutover, and no step depends on a later one.
 ### What is deleted
 
 `ReactorDefinition`, `ReactorContext`, `ReactorOptions`, `withReactor`, the
-router's reactor dispatch path, `LIVE_DISPATCH_IS_REPLAY` and the vestigial
-`isReplay` plumbing, and `specs/event-sourcing/reactors.feature` (superseded by
-`post-event-work.feature`). ADR-026 is superseded: `shouldReact`'s successor is
+router's reactor dispatch path, and `specs/event-sourcing/reactors.feature`
+(superseded by `post-event-work.feature`).
+
+**Already deleted:** `LIVE_DISPATCH_IS_REPLAY` and the vestigial `isReplay`
+plumbing are gone. They came out ahead of the rest because they were
+write-only — the field was declared once, written as the constant at the three
+router dispatch sites, and read by no handler anywhere — so removing them did
+not require a single reactor call site to move. The invariant they documented
+(replay never reaches a reactor) is unchanged and is recorded in this ADR
+instead; it is the whole reason Class C exists. ADR-026 is superseded: `shouldReact`'s successor is
 `EnqueueDispatchOptions.filter` on the event-only subscriber contract (ADR-069
 phase 1) or the fold-bound subscriber's trigger predicate, plus the process
 manager's.

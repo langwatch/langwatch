@@ -1,32 +1,12 @@
-import { z } from "zod";
-import { type TenantId, TenantIdSchema } from "../domain/tenantId";
+import type { TenantId } from "../domain/tenantId";
 import type { Projection } from "../domain/types";
 
 /**
- * Zod schema for projection store read context.
  * Context for reading projections from the projection store.
  *
  * **Security Note:** tenantId is REQUIRED for tenant isolation.
  * All queries MUST filter by tenant to prevent cross-tenant data access.
  */
-export const ProjectionStoreReadContextSchema = z.object({
-  /**
-   * Tenant identifier for multi-tenant systems.
-   * REQUIRED - all operations must be scoped to a specific tenant for security.
-   */
-  tenantId: TenantIdSchema,
-  /**
-   * Additional metadata for the read operation.
-   * Should not be used to bypass security checks.
-   */
-  metadata: z.record(z.unknown()).optional(),
-  /**
-   * Raw/implementation-specific context.
-   * Use with caution - should not bypass security or validation.
-   */
-  raw: z.record(z.unknown()).optional(),
-});
-
 export interface ProjectionStoreReadContext {
   /**
    * Tenant identifier for multi-tenant systems.

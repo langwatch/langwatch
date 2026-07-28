@@ -78,17 +78,6 @@ const SLOW_PROJECTION_OPERATION_MS = 5_000;
 const MAX_LOGGED_EVENT_IDS = 10;
 
 /**
- * The router only ever dispatches reactors on the live event path — the
- * replay service (`replay/replayService.ts`) rebuilds fold projections and
- * never invokes reactors, so no reactor context here can be a replay.
- * Named constant so the `isReplay` plumbing in `ReactorContext` is honestly
- * "always false on this path" rather than looking like a forgotten TODO. If a
- * replay path that reaches reactors is ever added, it must thread a real
- * flag instead of this constant.
- */
-const LIVE_DISPATCH_IS_REPLAY = false;
-
-/**
  * Central router that registers fold and map projections and dispatches events.
  *
  * - FoldProjections: enqueued to GroupQueue (per-aggregate ordering), incremental only
@@ -380,7 +369,6 @@ export class ProjectionRouter<
                 tenantId: payload.event.tenantId,
                 aggregateId: String(payload.event.aggregateId),
                 foldState: payload.foldState,
-                isReplay: LIVE_DISPATCH_IS_REPLAY,
               });
             },
           },
@@ -418,7 +406,6 @@ export class ProjectionRouter<
                 tenantId: payload.event.tenantId,
                 aggregateId: String(payload.event.aggregateId),
                 foldState: payload.foldState,
-                isReplay: LIVE_DISPATCH_IS_REPLAY,
               });
             },
           },
@@ -1825,7 +1812,6 @@ export class ProjectionRouter<
       tenantId: event.tenantId,
       aggregateId: String(event.aggregateId),
       foldState,
-      isReplay: LIVE_DISPATCH_IS_REPLAY,
     };
   }
 

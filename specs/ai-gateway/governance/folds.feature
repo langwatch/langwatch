@@ -20,8 +20,9 @@ Feature: Governance derived streams atop the unified observability store
   # today. There is no fold projection for either: they are written by
   # `governanceKpisSync.reactor.ts` and `governanceOcsfEventsSync.reactor.ts`
   # into repositories, and the projection router never dispatches a reactor on
-  # the replay path (`LIVE_DISPATCH_IS_REPLAY = false`). So a lost or failed
-  # write cannot be recovered by rebuilding, and drift is permanent.
+  # the replay path — the replay service rebuilds fold projections and never
+  # invokes a reactor at all. So a lost or failed write cannot be recovered by
+  # rebuilding, and drift is permanent.
   #
   # That matters most for governance_ocsf_events, which is an audit stream.
   # event-log-durability.feature tells auditors that read projections derive

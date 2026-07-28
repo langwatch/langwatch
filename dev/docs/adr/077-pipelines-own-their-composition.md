@@ -751,9 +751,12 @@ The class exists only to hang `this.deps` and `this.cached` off; both move —
 `const x = es.register(createXPipeline({…}))`.
 
 **The introspection tail moves out.** `getProjectionMetadata`,
-`getReactorMetadata`, `getEventSubscriberMetadata`, `getProcessManagerMetadata`,
+`getEventSubscriberMetadata`, `getProcessManagerMetadata`,
 `getKillSwitchDescriptors` and `getDejaViewProjections` — 200 lines at the bottom
 of the file, importing `getApp()` — read the *live runtime*, not the registry.
+(`getReactorMetadata` was in this list; #6047 replaced the ops surface's
+`reactors` with `eventSubscribers` and left it with no caller, so it has been
+deleted rather than moved.)
 They are a consumer of registration, not part of it, and they are already the
 only thing tests import from this module. They belong in `introspection.ts`.
 
