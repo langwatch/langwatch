@@ -262,6 +262,45 @@ Feature: Comparison leaderboard (Bradley-Terry ranking on the results page)
     Then any dominance statement covers quality and cost only
     And speed is not named as something either variant won or lost on
 
+  Scenario: Cheaper and faster are decided per row, not on the averages
+    Given two variants answered the same rows
+    When the run decides whether one is cheaper or faster than the other
+    Then it compares them within each row and asks whether the average difference excludes zero
+    And a gap between their overall averages is not enough on its own
+
+  Scenario: A speed difference swamped by row-to-row variation is not claimed
+    Given one variant averages several seconds faster than another
+    But individual rows vary far more than that difference
+    When I view the trade-off chart
+    Then it is not described as faster
+    And the dimensions it did win on are still named
+
+  Scenario: Two variants that share too few rows are not compared on cost
+    Given both variants recorded a cost on enough rows of their own
+    But they were priced on almost none of the same rows
+    When I view the trade-off chart
+    Then neither is described as cheaper than the other
+
+  Scenario: Asking about a pair in either order gives the same answer
+    Given any two variants in the run
+    When the run is asked which is cheaper, in both orders
+    Then the two answers are mirror images
+    And it can never hold that each is cheaper than the other
+
+  # ── What a count across pairs does not mean ────────────────────────────
+
+  Scenario: The count of separated pairs states its own multiplicity
+    Given the run separated some of several variant pairs
+    When I read how much the run settled
+    Then I am told each pair is judged on its own at 95%
+    And I am told the chance that at least one of them separated by luck
+
+  Scenario: Margins of error built from unsettled fits say so
+    Given many of the resamples used to size the margins of error did not settle
+    When I view the trust panel
+    Then I am told the margins are approximate
+    And this is reported separately from whether the ranking itself settled
+
   Scenario: A variant nothing beats outright is left for the reader to choose between
     Given no variant is beaten on every metric by another
     When I view the trade-off chart

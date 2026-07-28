@@ -219,3 +219,101 @@ describe("buildTrustChecks", () => {
     });
   });
 });
+
+describe("buildTrustChecks — what a count across pairs does not promise", () => {
+  describe("given several pairs were separated", () => {
+    it("states that each pair was judged on its own", () => {
+      // The count is several 95% tests reported as one number. Without this
+      // it reads as a joint guarantee, which it is not.
+      const detail = find(build(), "How much this run settled").detail;
+
+      expect(detail).toContain("Each pair is judged on its own at 95%");
+    });
+
+    it("quantifies the chance one of them separated by luck", () => {
+      const detail = find(build(), "How much this run settled").detail;
+
+      // 1 - 0.95^6 rounds to 26%.
+      expect(detail).toContain("26% chance");
+    });
+  });
+
+  describe("given nothing was separated", () => {
+    it("says nothing about multiplicity, because there is no claim to qualify", () => {
+      const detail = find(
+        build({ sampleAdequacy: adequacy({ separatedPairs: 0 }) }),
+        "How much this run settled",
+      ).detail;
+
+      expect(detail).not.toContain("by luck");
+    });
+  });
+
+  describe("given a single pair", () => {
+    it("does not raise multiplicity at all", () => {
+      const detail = find(
+        build({
+          sampleAdequacy: adequacy({
+            rankedVariantCount: 2,
+            separatedPairs: 1,
+            totalPairs: 1,
+            resolution: 1,
+            familyWiseFalsePositiveRate: null,
+          }),
+        }),
+        "How much this run settled",
+      ).detail;
+
+      expect(detail).not.toContain("by luck");
+    });
+  });
+});
+
+describe("buildTrustChecks — margins of error built from unsettled fits", () => {
+  describe("given many resamples did not settle", () => {
+    it("reports the margins as approximate", () => {
+      // Distinct from the ranking's own convergence: the intervals come from
+      // a thousand OTHER fits, and a run can settle cleanly while they did not.
+      const checks = build({
+        leaderboard: leaderboard({ bootstrapNonConvergence: 0.3 }),
+      });
+      const check = find(checks, "Margins of error are approximate");
+
+      expect(check.tone).toBe("warn");
+      expect(check.detail).toContain("30%");
+    });
+
+    it("keeps it separate from whether the ranking settled", () => {
+      const checks = build({
+        leaderboard: leaderboard({ bootstrapNonConvergence: 0.3 }),
+      });
+
+      expect(find(checks, "Ranking settled").tone).toBe("ok");
+    });
+  });
+
+  describe("given a handful of awkward resamples", () => {
+    it("stays quiet, because that is normal", () => {
+      // Warning on any at all would fire on healthy runs and be tuned out.
+      const checks = build({
+        leaderboard: leaderboard({ bootstrapNonConvergence: 0.01 }),
+      });
+
+      expect(
+        checks.some((c) => c.label === "Margins of error are approximate"),
+      ).toBe(false);
+    });
+  });
+
+  describe("given the bootstrap did not run", () => {
+    it("makes no claim about the margins either way", () => {
+      const checks = build({
+        leaderboard: leaderboard({ bootstrapNonConvergence: null }),
+      });
+
+      expect(
+        checks.some((c) => c.label === "Margins of error are approximate"),
+      ).toBe(false);
+    });
+  });
+});
