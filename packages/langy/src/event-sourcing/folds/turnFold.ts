@@ -113,7 +113,7 @@ export const langyTurnToolCallSchema = z
  *
  * `QuestionParts` is reserved: it is populated once the conversation flow shares
  * a turnId between the user message (`message_recorded`) and the response
- * (`agent_turn_accepted`) — see LANGY_REWORK_PLAN.md, Step S2. Until then the
+ * (`agent_turn_accepted`) — see ADR-046. Until then the
  * answer parts already carry everything renderable (text + tool-output cards +
  * enrichment card + actions).
  */

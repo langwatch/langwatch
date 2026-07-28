@@ -1,6 +1,6 @@
 /**
  * LangyTurnRelay — the control-plane consumer of one worker→relay frame stream
- * (LANGY_WORKER_REDESIGN_PLAN §0/§0b), the successor to `runTurn`'s streaming
+ * the successor to `runTurn`'s streaming
  * role. One instance per pushed connection (one turn). For each authenticated
  * frame it fans out to two places:
  *

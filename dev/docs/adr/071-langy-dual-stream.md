@@ -1,10 +1,4 @@
-> **Numbering collision (#5881).** Three documents answer to "ADR-048": this one,
-> `048-langy-shutdown-handoff.md`, and a stale `dev/haven.mk` reference. #5741 added
-> two of them in the same PR. A bare "ADR-048" citation is therefore ambiguous —
-> cite the filename. Renumbering is deferred to a docs-only change because ~18
-> shipped source comments cite these numbers.
-
-# ADR-048: Langy dual-stream — raw token fast-path (Stream B) alongside the durable event-sourced stream (Stream A)
+# ADR-071: Langy dual-stream — raw token fast-path (Stream B) alongside the durable event-sourced stream (Stream A)
 
 **Date:** 2026-07-11
 

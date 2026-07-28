@@ -1,5 +1,5 @@
 /**
- * SECURITY invariant (LANGY_WORKER_REDESIGN_PLAN §0a): the per-conversation
+ * SECURITY invariant (see `app-layer/langy/streaming/langyFrameAuth.ts`): the per-conversation
  * `runToken` is the HMAC key that authenticates the worker's stream. It must
  * live ONLY on the server-only state column and must NEVER reach a client-facing
  * projection — above all the turn (render) document the browser reads.

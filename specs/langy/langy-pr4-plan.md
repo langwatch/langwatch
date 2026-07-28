@@ -149,7 +149,7 @@ Docs:
 
 - [ ] `docs/langy-github-app.md §4` — update the existing L3/L4-FQDN note to
       point at the egress adapter as the primary FQDN enforcement point and
-      ADR-043 as the design; keep the Cilium option, add the netns fallback.
+      ADR-070 as the design; keep the Cilium option, add the netns fallback.
 
 ## Safe rollout order (monitor → throttle → block)
 

@@ -227,7 +227,7 @@ Feature: Langy lets me stop a turn for real, continue where it left off, and rej
   # (3) Refresh and carry on from where it was streaming
   # ===========================================================================
 
-  # The durable half is already built (ADR-048: "the buffered tail is the resume
+  # The durable half is already built (ADR-071: "the buffered tail is the resume
   # state"; the server settles a turn whose terminal frame was missed). What was
   # missing is the browser REJOINING on a cold mount. The in-flight turn id lives
   # on the conversation projection, so a reloaded panel can read it and resubscribe.

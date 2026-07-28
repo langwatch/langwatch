@@ -1,6 +1,7 @@
 /**
  * Langy relay — the worker's INBOUND authenticated frame stream
- * (LANGY_WORKER_REDESIGN_PLAN §0/§0b). Mounted at `/api/internal/langy/relay`,
+ * (see `app-layer/langy/streaming/langyTurnRelay.ts`). Mounted at
+ * `/api/internal/langy/relay`,
  * protected by the shared `LANGY_INTERNAL_SECRET` (so only the worker can push),
  * with per-frame HMAC + frameNonce dedup layered INSIDE that trusted channel.
  *

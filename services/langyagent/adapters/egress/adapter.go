@@ -16,7 +16,7 @@ import (
 	"github.com/langwatch/langwatch/pkg/ssrf"
 )
 
-// egressAdapter is the per-worker outbound forward proxy (ADR-043). It is the
+// egressAdapter is the per-worker outbound forward proxy (ADR-070). It is the
 // egress twin of the workerpool authProxy: the authProxy fronts a worker's
 // INBOUND opencode control port; this fronts the worker's OUTBOUND traffic. The
 // worker's tools (`gh`, `git`, `npm`, `curl`, `pip`) egress through it via
@@ -33,7 +33,7 @@ import (
 //	                            with the TLS SNI as a cross-check.
 //	rung 0   monitor          — every decision above ALSO flags (see event.go).
 //
-// Honest limit (ADR-043 "Where FQDN enforcement lives"): within one pod netns
+// Honest limit (ADR-070 "Where FQDN enforcement lives"): within one pod netns
 // nothing forces a worker's traffic THROUGH this loopback proxy — a hostile
 // worker can ignore HTTPS_PROXY and connect() straight to an external IP:443.
 // This adapter is authoritative for COOPERATING clients (the primary

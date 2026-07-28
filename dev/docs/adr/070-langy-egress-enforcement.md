@@ -1,8 +1,4 @@
-> **Numbering collision (#5881).** `043-automation-facet-model.md` also answers to
-> "ADR-043". The egress source comments (`adapters/egress/policy.go`, `adapter.go`,
-> `egress.go`) and the charts README all mean THIS document. Cite the filename.
-
-# ADR-043: Langy egress enforcement — monitor first, enforce last
+# ADR-070: Langy egress enforcement — monitor first, enforce last
 
 **Date:** 2026-07-10
 

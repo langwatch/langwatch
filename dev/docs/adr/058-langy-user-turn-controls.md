@@ -28,7 +28,7 @@ control of one in-flight turn:
 2. **Continue a stopped chat.** With no real stop there is no real resume. Even the
    conversation lifecycle has no notion of "the user stopped here."
 
-3. **Carry on after a refresh.** ADR-048 made the durable token buffer the resume
+3. **Carry on after a refresh.** ADR-071 made the durable token buffer the resume
    state and the server already settles a turn whose terminal frame was missed
    (`langyTurnSettlement.ts`), but the browser never *rejoins* a running turn on a
    cold mount — `reconnectToStream()` returns null and the "Catching up…" state is

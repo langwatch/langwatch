@@ -16,7 +16,7 @@ import (
 )
 
 // These tests are the executable acceptance bar for
-// specs/langy/langy-egress-enforcement.feature (ADR-043). They exercise the
+// specs/langy/langy-egress-enforcement.feature (ADR-070). They exercise the
 // adapter's decision pipeline end-to-end (a real CONNECT over a loopback
 // socket), not string assertions: a denied destination must never be dialed,
 // a cleartext forward must be refused, a listed host must tunnel, and the

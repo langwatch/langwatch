@@ -32,7 +32,7 @@ export const langyConversationStartedEventDataSchema = z.object({
   /** Optional initial title (else derived from the first message). */
   title: z.string().nullable().optional(),
   /**
-   * The per-conversation `runToken` (LANGY_WORKER_REDESIGN_PLAN §0a): a 32-byte
+   * The per-conversation `runToken` (see `streaming/langyFrameAuth.ts`): a 32-byte
    * CSPRNG secret (hex) minted here, injected into the worker at spawn, and used
    * to HMAC every frame the worker streams back. SERVER-ONLY — it is folded into
    * a server-only state column (never a client-facing projection or the turn

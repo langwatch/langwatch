@@ -37,7 +37,7 @@ export interface LangyTurnHandoff {
   modelOverride?: string;
   credentials: LangyCredentials;
   /**
-   * The per-conversation runToken (LANGY_WORKER_REDESIGN_PLAN §0a) the manager
+   * The per-conversation runToken (see `langyFrameAuth.ts`) the manager
    * signs its relay frames with. Carried HERE rather than relying on operational
    * state, because a brand-new conversation's creation event may still be queued
    * when its first dispatch intent runs. The service mints it (new) or reads it

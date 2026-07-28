@@ -269,7 +269,7 @@ export class LangyGithubInstallationsService {
   /**
    * Mint the per-turn installation token Langy hands the worker.
    *
-   * Repo resolution (LANGY_GITHUB_AUTH_PLAN.md §7.2 — agent-infers, control
+   * Repo resolution (agent-infers, control
    * plane validates): when the turn carries an explicit `repositoryFullName`,
    * find the installation that can reach it and scope the token to ONLY that
    * repo. Otherwise scope to the installation's full repository set (still

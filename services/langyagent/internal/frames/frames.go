@@ -1,5 +1,5 @@
 // Package frames is the worker's OUTPUT frame producer
-// (LANGY_WORKER_REDESIGN_PLAN §0/§0a) — the Go counterpart to the TS relay's
+// — the Go counterpart to the TS relay's
 // langyRelayFrame union. The worker emits one typed frame per stream line; each
 // frame is JSON-marshalled, then signed with the per-conversation runToken
 // (frameauth) so the relay can verify it.

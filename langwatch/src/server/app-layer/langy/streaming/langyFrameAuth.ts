@@ -1,5 +1,6 @@
 /**
- * Langy authenticated frame contract (LANGY_WORKER_REDESIGN_PLAN.md §0a).
+ * Langy authenticated frame contract. This module IS the contract's home; the
+ * wire vectors are pinned by specs/langy/langy-frame-auth.vectors.json.
  *
  * Every frame the worker streams back to the control plane carries a per-frame
  * HMAC proving BOTH who it is and that it really is who it says. The Go worker

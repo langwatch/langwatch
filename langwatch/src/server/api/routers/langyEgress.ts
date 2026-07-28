@@ -1,5 +1,5 @@
 /**
- * tRPC router for the per-project Langy egress allow-list (ADR-043).
+ * tRPC router for the per-project Langy egress allow-list (ADR-070).
  *
  *   get — the current allow-list for the settings editor. `null` means the
  *         project is in monitor-only mode (watch, never block).

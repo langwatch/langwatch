@@ -8,7 +8,7 @@
 // Two implementations live here:
 //   - PassThrough: no-op, no proxy — the worker egresses direct, exactly as
 //     before (used in tests / partial wiring).
-//   - EnforcingGuard (enforcing.go): ADR-043 enforcement — a per-worker outbound
+//   - EnforcingGuard (enforcing.go): ADR-070 enforcement — a per-worker outbound
 //     forward proxy (adapter.go) that require-TLS / throttles / applies the
 //     floor ∪ allow-list policy / SNI-cross-checks every CONNECT, monitor-first.
 package egress
@@ -17,14 +17,14 @@ import "context"
 
 // WorkerContext is the per-worker identity + policy inputs the guard needs at
 // spawn. Widened from PR3's {ConversationID, UID} to carry the project's egress
-// allow-list (ADR-043 rung 2) threaded from the credentials envelope.
+// allow-list (ADR-070 rung 2) threaded from the credentials envelope.
 type WorkerContext struct {
 	// ConversationID is the per-conversation worker key.
 	ConversationID string
 	// UID is the kernel UID the worker subprocess runs as.
 	UID uint32
 	// EgressAllowlist is the project's per-project Langy egress allow-list
-	// (ADR-043 rung 2). The *presence* of the list is the enforcement mode:
+	// (ADR-070 rung 2). The *presence* of the list is the enforcement mode:
 	// nil/empty ⇒ the guard watches but blocks nothing; non-empty ⇒ the guard
 	// restricts outbound to floor ∪ this list.
 	EgressAllowlist []string

@@ -9,7 +9,7 @@ import (
 )
 
 // The egress adapter reads the FQDN from the CONNECT authority as the primary,
-// enforceable destination (ADR-043 "Where FQDN enforcement lives"). It ALSO
+// enforceable destination (ADR-070 "Where FQDN enforcement lives"). It ALSO
 // peeks the TLS ClientHello SNI as a cross-check: a cooperative-but-hostile
 // client that sends `CONNECT allowed.com:443` and then negotiates TLS with SNI
 // `attacker.com` (domain-fronting a shared CDN) would otherwise slip past an

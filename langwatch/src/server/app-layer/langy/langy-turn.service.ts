@@ -1,6 +1,6 @@
 /**
  * LangyTurnService — durable turn admission and dispatch orchestration, lifted out of
- * `routes/langy.ts` (ADR-046 / LANGY_REWORK_PLAN.md S2 increment C).
+ * `routes/langy.ts` (ADR-046).
  *
  * The Hono route now keeps only Phase 1 (session auth, demo gate, rate limit,
  * body validation, project-permission gate) and maps DomainErrors to HTTP. This

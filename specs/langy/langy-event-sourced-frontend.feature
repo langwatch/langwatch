@@ -174,7 +174,7 @@ Feature: Langy's view of a conversation is the recorded conversation itself
   # Tokens stay ephemeral; the record stays authoritative
   # ===========================================================================
 
-  # The dual-stream split (ADR-048) is unchanged: streamed tokens are the fast
+  # The dual-stream split (ADR-071) is unchanged: streamed tokens are the fast
   # ephemeral path for text, and the recorded steps are the durable truth. The
   # streamed text reconciles against the folded answer — never the other way
   # around.

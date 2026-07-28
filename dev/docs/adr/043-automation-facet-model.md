@@ -1,6 +1,3 @@
-> **Numbering collision (#5881).** `043-langy-egress-enforcement.md` also answers to
-> "ADR-043". Cite the filename, not the number.
-
 # ADR-043: Automations as orthogonal facets (name / type / subject / cadence / severity / delivery)
 
 - Status: Proposed

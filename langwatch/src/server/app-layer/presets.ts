@@ -1034,7 +1034,7 @@ export function initializeDefaultApp(options?: {
     langyGithubAppTokens,
   );
 
-  // Langy turn-start orchestration (LANGY_REWORK_PLAN.md S2 C): the pipeline the
+  // Langy turn-start orchestration (ADR-046): the pipeline the
   // Hono route used to inline, now an app-layer service with injected ports. The
   // worker port + turn stores are null when their infra is absent (no agent env /
   // no Redis); the service raises LangyAgentUnavailableError in that case, exactly

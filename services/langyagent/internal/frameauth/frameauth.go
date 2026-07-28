@@ -1,5 +1,5 @@
 // Package frameauth is the Langy authenticated frame contract
-// (LANGY_WORKER_REDESIGN_PLAN.md §0a): every frame the worker streams back to
+// : every frame the worker streams back to
 // the control plane carries a per-frame HMAC proving BOTH who it is and that it
 // really is who it says.
 //

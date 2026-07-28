@@ -11,7 +11,7 @@ The pin test added in Phase 1 caught a real framework bug on its first run
 (the state-projection cursor comparator tie-broke KSUIDs with localeCompare
 while ClickHouse orders byte-wise), fixed alongside.
 
-**Builds on:** ADR-046 (event-sourced conversations), ADR-048 (dual-stream),
+**Builds on:** ADR-046 (event-sourced conversations), ADR-071 (dual-stream),
 ADR-049 (Postgres projections), ADR-058 (turn-phase machine — the proof of
 concept for the pure-reducer pattern this ADR generalises).
 
@@ -149,7 +149,7 @@ pushing events over the broadcast:
 3. **It preserves `langy-frontend-realtime.feature`'s invariant** — the
    real-time channel never pushes conversation data.
 
-The token stream (ADR-048 Stream B) stays the ephemeral fast-path for delta
+The token stream (ADR-071 Stream B) stays the ephemeral fast-path for delta
 text / reasoning. The optimistic token text reconciles against the folded
 durable answer — the same length-monotone rule as today, but the "durable" side
 is now a *local fold* rather than a re-fetch.

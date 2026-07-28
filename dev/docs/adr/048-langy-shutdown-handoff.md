@@ -1,8 +1,3 @@
-> **Numbering collision (#5881).** See `048-langy-dual-stream.md` — both were added
-> by #5741 under the same number. Most in-code "ADR-048" citations
-> (`packages/langy/src/constants.ts`, `event-sourcing/contracts/events.ts`) mean
-> THIS document, the shutdown handoff. Cite the filename, not the number.
-
 # ADR-048: Langy worker shutdown-handoff — checkpoint on SIGTERM, resume on the next worker
 
 **Date:** 2026-07-11
@@ -13,7 +8,7 @@
 foundations — hexagonal Go service), ADR-044 (event-driven worker + streaming +
 self-observability). Based on **PR3** (`feat/langy-worker-streaming`), where the
 panic-recovery (`clog.Go`/`HandlePanic`) and early-OTel-flush-on-SIGTERM
-primitives live, so this composes with them directly. Independent of the ADR-043
+primitives live, so this composes with them directly. Independent of the ADR-070
 egress enforcement (PR4, a sibling branch) — the handoff is egress-agnostic.
 
 ## Context
@@ -239,7 +234,7 @@ Config: `LANGY_SHUTDOWN_HANDOFF_DEADLINE_MS` (default 5000) and
 ## References
 
 - Related ADRs: ADR-046 (event-sourced Langy conversations), ADR-047 (Langy
-  foundations), ADR-044 (event-driven worker + streaming), ADR-043 (egress
+  foundations), ADR-044 (event-driven worker + streaming), ADR-070 (egress
   enforcement), ADR-033 (worker network isolation).
 - Spec: `specs/langy/langy-shutdown-handoff.feature`
 - Code: `services/langyagent/` (serve.go, config.go, adapters/workerpool),

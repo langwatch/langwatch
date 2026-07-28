@@ -1,5 +1,5 @@
 /**
- * The wire shapes the Langy relay ingests (LANGY_WORKER_REDESIGN_PLAN §0/§0a).
+ * The wire shapes the Langy relay ingests (see `langyTurnRelay.ts`).
  *
  * The worker streams one ndjson line per frame. Each line is a
  * `LangyFrameEnvelope`: the authenticated identity + nonce + an opaque `payload`
