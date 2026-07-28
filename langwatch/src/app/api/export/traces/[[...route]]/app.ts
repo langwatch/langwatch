@@ -10,6 +10,7 @@
  */
 
 import { validator as zValidator } from "~/server/api/validation";
+import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import crypto from "crypto";
 import { hasProjectPermission } from "~/server/api/rbac";
@@ -18,6 +19,10 @@ import { getUserProtectionsForProject } from "~/server/api/utils";
 import { getApp } from "~/server/app-layer/app";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
+import {
+  ExportFailedError,
+  ExportUnauthenticatedError,
+} from "~/server/export/errors";
 import { ExportService } from "~/server/export/export.service";
 import { exportRequestSchema } from "~/server/export/types";
 import type { NextRequest } from "~/types/next-stubs";
@@ -43,10 +48,10 @@ secured.access(handlerManagedAuth("user session + traces:view enforced in-handle
   // Authenticate
   const session = await getServerAuthSession({ req: c.req.raw as NextRequest });
   if (!session) {
-    return c.json(
-      { error: "You must be logged in to access this endpoint." },
-      { status: 401 },
-    );
+    // Thrown, not hand-rolled: `createServiceApp`'s onError serialises a
+    // HandledError with its code, which is what lets the browser render the
+    // registry's copy instead of an unrecognisable prose blob.
+    throw new ExportUnauthenticatedError();
   }
 
   // Authorize
@@ -92,7 +97,13 @@ secured.access(handlerManagedAuth("user session + traces:view enforced in-handle
     exportService = await ExportService.create();
     totalCount = await exportService.getTotalCount({ request, protections });
   } catch (error) {
-    throw error;
+    // A failure that already knows what it is — a query timeout, a time range
+    // too wide, ClickHouse unavailable — says something more useful than
+    // "the export failed", so it travels untouched. Anything else becomes the
+    // generic export failure, which at least tells the user nothing was
+    // changed; the cause rides its reason chain for the log line.
+    if (HandledError.isHandled(error)) throw error;
+    throw new ExportFailedError(error);
   }
 
   const headers = new Headers({
