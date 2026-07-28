@@ -129,9 +129,10 @@ jobs:
       # asserts both), so the artifact THIS job boots must carry them too —
       # otherwise the smoke exercises a tree shape no npm user ever receives
       # and pays a full on-runner vite build for it inside the health budget.
-      - name: Install langwatch app deps
-        run: pnpm -C langwatch install --frozen-lockfile --prod=false
-
+      # No separate app install: since ADR-076 langwatch/ is a member of the
+      # single root workspace, so "Install pnpm dependencies (workspace)"
+      # above already covers it. Same redundancy that was removed from
+      # npx-server-publish.yml.
       - name: Build langwatch app (vite + scenario + mcp + generated types)
         run: pnpm -C langwatch run build
         env:
