@@ -267,8 +267,14 @@ describe("computeBTLeaderboard", () => {
       variantIds: ["A", "B"],
       bootstrapSamples: 0,
     });
-    // Z dropped → only the A>B row contributes.
-    expect(result.comparisonCount).toBe(2); // both rows were "usable" — filter happens inside buildWinMatrix
+    // Z dropped → only the A>B row contributes, and the count says so.
+    //
+    // This used to assert 2, on the grounds that both rows passed the
+    // `winner !== null` filter and the real drop happened later inside
+    // buildWinMatrix. But comparisonCount is what the UI narrates as "based
+    // on N comparisons" and what it hands to Langy, so counting a row that
+    // contributed no evidence overstated the run to the reader.
+    expect(result.comparisonCount).toBe(1);
     expect(result.winMatrix["A"]!["B"]).toBe(1);
     const aEntry = result.entries.find((e) => e.variantId === "A")!;
     const bEntry = result.entries.find((e) => e.variantId === "B")!;

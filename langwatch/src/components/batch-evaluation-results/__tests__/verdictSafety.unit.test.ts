@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import { computeBTLeaderboard } from "../computeBTLeaderboard";
-import { computeLeaderboardVerdict } from "../computeLeaderboardVerdict";
+import {
+  computeLeaderboardVerdict,
+  findCheaperTiedAlternative,
+} from "../computeLeaderboardVerdict";
 import { computeSampleAdequacy } from "../computeSampleAdequacy";
 
 /**
@@ -183,6 +186,73 @@ describe("computeBTLeaderboard — evidence it must not invent", () => {
       const c = leaderboard.entries.find((e) => e.variantId === "c")!;
       expect(c.matchups).toBe(0);
       expect(c.degenerate).toBe(true);
+    });
+  });
+});
+
+describe("findCheaperTiedAlternative — the saving it quotes", () => {
+  const tie = (ids: string[]) => ({
+    kind: "tie-at-top" as const,
+    leaderId: ids[0]!,
+    tiedIds: ids,
+  });
+
+  const metrics = (costs: Record<string, [number, number] | null>) =>
+    Object.fromEntries(
+      Object.entries(costs).map(([id, v]) => [
+        id,
+        {
+          costStats: v === null ? null : { avg: v[0], count: v[1] },
+          durationStats: null,
+        },
+      ]),
+    ) as any;
+
+  describe("given the leader is not the dearest tied variant", () => {
+    it("measures the saving against the leader, not the dearest", () => {
+      // Leader $0.002, another tied option $0.010, cheapest $0.0018.
+      // Against the dearest that is an 82% saving; but the reader ships the
+      // leader by default, and switching from it saves 10%.
+      const result = findCheaperTiedAlternative({
+        verdict: tie(["L", "M", "C"]),
+        variantMetrics: metrics({
+          L: [0.002, 20],
+          M: [0.01, 20],
+          C: [0.0018, 20],
+        }),
+        minSaving: 0.05,
+      });
+
+      expect(result?.variantId).toBe("C");
+      expect(result?.dearestCost).toBe(0.002);
+      expect(result?.savingRatio).toBeCloseTo(0.1, 5);
+    });
+  });
+
+  describe("given the leader is itself the cheapest", () => {
+    it("compares against the dearest tied option, since there is no switch", () => {
+      const result = findCheaperTiedAlternative({
+        verdict: tie(["L", "M"]),
+        variantMetrics: metrics({ L: [0.002, 20], M: [0.01, 20] }),
+      });
+
+      expect(result?.isLeader).toBe(true);
+      expect(result?.dearestCost).toBe(0.01);
+      expect(result?.savingRatio).toBeCloseTo(0.8, 5);
+    });
+  });
+
+  describe("given a mean drawn from too few priced rows", () => {
+    it("declines to recommend on cost", () => {
+      // Rows are priced independently, so a run can record cost on one row
+      // and leave the rest null. That average was previously printed as
+      // "$X per row" and drove the headline.
+      expect(
+        findCheaperTiedAlternative({
+          verdict: tie(["L", "C"]),
+          variantMetrics: metrics({ L: [0.01, 1], C: [0.001, 1] }),
+        }),
+      ).toBeNull();
     });
   });
 });

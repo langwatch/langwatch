@@ -54,7 +54,11 @@ const makeMetrics = (
       {
         variantId,
         costStats:
-          avg === null ? null : ({ avg } as VariantMetrics["costStats"]),
+          avg === null
+            ? null
+            : // `count` matters: a mean over too few priced rows is not
+              // allowed to drive a cost recommendation.
+              ({ avg, count: 20 } as VariantMetrics["costStats"]),
         durationStats: null,
       },
     ]),

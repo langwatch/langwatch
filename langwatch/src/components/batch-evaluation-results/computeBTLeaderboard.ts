@@ -30,7 +30,12 @@ export type BTLeaderboardEntry = {
   wins: number;
   /** Total losses (1 per loss, 0.5 per tie). */
   losses: number;
-  /** Total matchups (non-skipped rows involving this variant). */
+  /**
+   * Total PAIRWISE matchups this variant took part in — wins + losses in the
+   * win matrix, where an N-way verdict contributes one matchup per pair it
+   * implies. Not a row count: on a four-way run a variant appearing in all 60
+   * rows records 116 matchups, not 60. `winRate` is over the same denominator.
+   */
   matchups: number;
   /** Win rate over matchups, or null if no matchups. */
   winRate: number | null;
@@ -76,7 +81,15 @@ export type BTLeaderboard = {
 };
 
 export type BTLeaderboardOptions = {
-  /** Bootstrap resamples for CI. 0 disables. Default: 200. */
+  /**
+   * Bootstrap resamples for CI. 0 disables. Default: 1000.
+   *
+   * Not 200: at that size the Monte-Carlo error on the interval endpoints was
+   * large enough to change which pairs the run called separated on a mere
+   * reseed — measured on 24 of 60 datasets, worst spread 3 pairs of 6. Since
+   * "did this run separate them" is the product's central claim, it must not
+   * depend on the seed. 1000 cuts the endpoint SD roughly in half.
+   */
   bootstrapSamples?: number;
   /** Deterministic seed (mulberry32). Default: 1. */
   seed?: number;
@@ -87,7 +100,7 @@ export type BTLeaderboardOptions = {
 };
 
 const DEFAULT_OPTS: Required<BTLeaderboardOptions> = {
-  bootstrapSamples: 200,
+  bootstrapSamples: 1000,
   seed: 1,
   maxIter: 500,
   tol: 1e-6,
@@ -117,7 +130,14 @@ export function computeBTLeaderboard({
   }
 
   const idx = new Map(variantIds.map((id, i) => [id, i]));
-  const usable = comparisons.filter((c) => c.winner !== null);
+  // Rows that survive to contribute evidence. `winner !== null` alone was too
+  // permissive: an N-way tie, an unknown winner, or an empty candidate list all
+  // pass it and are then discarded inside the matrix builders, so the run
+  // reported "based on 60 comparisons" while ranking on fewer. Resolve first
+  // and count what is left.
+  const usable = comparisons.filter(
+    (c) => c.winner !== null && resolveComparison({ comparison: c, idx }) !== null,
+  );
 
   const W = buildWinMatrix(usable, idx, n);
   const { wins, losses, matchups } = perVariantTotals(W);
@@ -143,7 +163,6 @@ export function computeBTLeaderboard({
       comparisons: usable,
       idx,
       n,
-      smooth,
       samples: opts.bootstrapSamples,
       seed: opts.seed,
       maxIter: opts.maxIter,
@@ -308,8 +327,9 @@ function perVariantTotals(W: number[][]): {
       if (i === j) continue;
       wins[i] += W[i]![j]!;
       losses[i] += W[j]![i]!;
-      // matchups counts each pair once per row; W[i][j] + W[j][i] is the
-      // total weight of rows where i and j faced off.
+      // Only pairs INVOLVING THE WINNER get weight: an N-way verdict says the
+      // winner beat each other candidate and says nothing about how the losers
+      // compare to each other, so a 4-candidate row records 3 matchups, not 6.
     }
     matchups[i] = wins[i] + losses[i];
   }
@@ -405,7 +425,6 @@ function bootstrapScoreCI({
   comparisons,
   idx,
   n,
-  smooth,
   samples,
   seed,
   maxIter,
@@ -414,7 +433,6 @@ function bootstrapScoreCI({
   comparisons: PairwiseComparison[];
   idx: Map<string, number>;
   n: number;
-  smooth: number;
   samples: number;
   seed: number;
   maxIter: number;

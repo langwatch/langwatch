@@ -129,14 +129,24 @@ export const computeLeaderboardVerdict = (
   };
 };
 
+/**
+ * Priced rows a variant needs before its mean cost may drive a headline.
+ * Low on purpose — this is a floor against "one row happened to record a
+ * cost", not a statistical sample-size requirement.
+ */
+const MIN_PRICED_ROWS = 5;
+
 export type CheaperAlternative = {
   /** Cheapest variant among the tied set. May be the top-ranked one. */
   variantId: string;
   /** Mean cost of the recommended variant. */
   cost: number;
-  /** Mean cost of the dearest variant it is tied with. */
+  /**
+   * Cost of what the reader would otherwise ship: the leader, or — when the
+   * cheapest IS the leader — the dearest variant tied with it.
+   */
   dearestCost: number;
-  /** e.g. 0.6 means the recommendation costs 60% less than the dearest. */
+  /** e.g. 0.6 means the recommendation costs 60% less than that baseline. */
   savingRatio: number;
   /** True when the cheapest tied variant also tops the ranking. */
   isLeader: boolean;
@@ -153,13 +163,16 @@ export type CheaperAlternative = {
  * the top row. An earlier version only looked BELOW the leader, so a run
  * where the leader was already the cheapest — the clearest possible
  * outcome, top of the ranking and cheapest to run — fell through to a bare
- * "too close to call" and threw the decision away. Cost is therefore
- * measured against the dearest variant in the tie rather than against the
- * leader, which is the same number whenever the leader is the dearest and
- * a true one in every other arrangement.
+ * "too close to call" and threw the decision away.
  *
- * Returns null when costs are unknown, when the spread is inside the noise
- * floor, or when there is nothing to break a tie between.
+ * The saving is measured against whatever the reader would otherwise have
+ * shipped — the leader — since that is the switch being proposed. Only when
+ * the cheapest IS the leader is there no switch, and the comparison becomes
+ * the dearest tied option instead: the cost avoided by not reaching for it.
+ *
+ * Returns null when costs are unknown, when too few rows carried a price to
+ * average, when the spread is inside the noise floor, or when there is
+ * nothing to break a tie between.
  */
 export const findCheaperTiedAlternative = ({
   verdict,
@@ -179,24 +192,51 @@ export const findCheaperTiedAlternative = ({
   const costOf = (variantId: string): number | null =>
     variantMetrics[variantId]?.costStats?.avg ?? null;
 
+  // A mean over one priced row is not a cost. Rows are priced independently,
+  // so a run can record cost on a handful and leave the rest null — and the
+  // old code read `avg` without ever asking how many rows it came from, then
+  // printed the result as "$X per row". Require the same floor a matchup count
+  // gets before it is allowed to carry a recommendation.
+  const pricedRowsOf = (variantId: string): number =>
+    variantMetrics[variantId]?.costStats?.count ?? 0;
+
   const priced = verdict.tiedIds
-    .map((variantId) => ({ variantId, cost: costOf(variantId) }))
-    .filter((entry): entry is { variantId: string; cost: number } =>
-      entry.cost !== null && Number.isFinite(entry.cost),
+    .map((variantId) => ({
+      variantId,
+      cost: costOf(variantId),
+      rows: pricedRowsOf(variantId),
+    }))
+    .filter(
+      (entry): entry is { variantId: string; cost: number; rows: number } =>
+        entry.cost !== null &&
+        Number.isFinite(entry.cost) &&
+        entry.rows >= MIN_PRICED_ROWS,
     );
   if (priced.length < 2) return null;
 
   const cheapest = priced.reduce((a, b) => (b.cost < a.cost ? b : a));
-  const dearest = priced.reduce((a, b) => (b.cost > a.cost ? b : a));
-  if (dearest.cost <= 0) return null;
 
-  const savingRatio = (dearest.cost - cheapest.cost) / dearest.cost;
+  // What the reader would otherwise have shipped is the BASELINE.
+  //
+  // Measuring against the dearest tied variant inflates the saving whenever
+  // the leader is not itself the dearest: a field of leader $0.002, other
+  // $0.010, cheapest $0.0018 was announced as "82% cheaper" when switching
+  // from the leader actually saves 10%. The heading names no baseline, so the
+  // reader has no way to notice. When the cheapest IS the leader there is no
+  // switch to make, and the dearest tied option is the right comparison —
+  // that is the cost avoided by not reaching for the pricier alternative.
+  const baseline = cheapest.variantId === verdict.leaderId
+    ? priced.reduce((a, b) => (b.cost > a.cost ? b : a))
+    : priced.find((entry) => entry.variantId === verdict.leaderId);
+  if (!baseline || baseline.cost <= 0) return null;
+
+  const savingRatio = (baseline.cost - cheapest.cost) / baseline.cost;
   if (savingRatio < minSaving) return null;
 
   return {
     variantId: cheapest.variantId,
     cost: cheapest.cost,
-    dearestCost: dearest.cost,
+    dearestCost: baseline.cost,
     savingRatio,
     isLeader: cheapest.variantId === verdict.leaderId,
   };

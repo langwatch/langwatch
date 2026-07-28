@@ -110,7 +110,7 @@ export const buildTrustChecks = ({
       tone: leaderboard.minMatchups >= warnThreshold ? "ok" : "warn",
       detail:
         leaderboard.minMatchups >= warnThreshold
-          ? `Every variant was compared at least ${leaderboard.minMatchups} times.`
+          ? `Every variant took part in at least ${leaderboard.minMatchups} matchups.`
           : `The least-compared variant has only ${leaderboard.minMatchups} of the ${warnThreshold} matchups needed for a stable score. Run more rows.`,
     },
     {
