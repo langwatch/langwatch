@@ -32,7 +32,6 @@
   },
   "files": [
     "packages/server/dist/",
-    "packages/server/templates/",
     "packages/handled-error/",
     "packages/langy/",
     "langwatch/",

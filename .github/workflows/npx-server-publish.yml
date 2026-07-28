@@ -198,31 +198,42 @@ jobs:
         run: |
           set -e
           tarball="${{ steps.pack.outputs.tarball }}"
+          # Everything lives under package/app/ since ADR-076: the artifact is
+          # staged one level down so the workspace root is NOT the package
+          # root, which is the only way npm will carry pnpm-lock.yaml.
           required=(
-            "package/packages/server/dist/cli.cjs"
-            "package/langwatch/package.json"
-            "package/langwatch/dist/client/index.html"
-            "package/langwatch/dist/scenario-child-process.js"
-            "package/langevals/pyproject.toml"
+            "package/app/packages/server/dist/cli.cjs"
+            # The lockfile and workspace definition. npm deletes a lockfile at
+            # the package ROOT unconditionally, so these two paths existing is
+            # the whole reason for the staged layout — assert them, or a future
+            # layout change silently returns the end-user install to
+            # non-reproducible.
+            "package/app/pnpm-lock.yaml"
+            "package/app/pnpm-workspace.yaml"
+            "package/app/package.json"
+            "package/app/langwatch/package.json"
+            "package/app/langwatch/dist/client/index.html"
+            "package/app/langwatch/dist/scenario-child-process.js"
+            "package/app/langevals/pyproject.toml"
             # langevals resolves the python SDK as a local path dependency,
             # so the tarball must ship python-sdk/pyproject.toml + src/.
-            "package/python-sdk/pyproject.toml"
-            "package/python-sdk/src"
-            # langwatch's pnpm-workspace.yaml lists "../mcp-server" as a
-            # workspace package; without the prebuilt dist the langwatch app
-            # crashes loading "@langwatch/mcp-server/create-mcp-server".
-            "package/mcp-server/package.json"
-            "package/mcp-server/dist/create-mcp-server.js"
+            "package/app/python-sdk/pyproject.toml"
+            "package/app/python-sdk/src"
+            # mcp-server is a workspace dependency of the app; without the
+            # prebuilt dist the langwatch app crashes loading
+            # "@langwatch/mcp-server/create-mcp-server".
+            "package/app/mcp-server/package.json"
+            "package/app/mcp-server/dist/create-mcp-server.js"
             # Langy reads the platform feature map at runtime
             # (langwatch/src/shared/langy/featureMap.ts imports it from the
             # repo root).
-            "package/feature-map.json"
+            "package/app/feature-map.json"
             # The app's prepare step imports the skills front-matter helper
             # (scripts/generate-langy-skills.ts) when a tree rebuilds. The
             # source is .ts (tsx resolves the .js import specifier back to
             # it); the tarball never ships a compiled .js, so asserting .js
             # here always failed even on a correctly packaged tarball.
-            "package/skills/_lib/frontmatter.ts"
+            "package/app/skills/_lib/frontmatter.ts"
           )
           # Every workspace package in the checkout must ship: a missing one
           # leaves dangling pnpm links in the installed tree and the app dies
@@ -232,22 +243,28 @@ jobs:
           # are derived from a directory listing rather than named one by one,
           # so a new package on either side is covered by this gate the day
           # it appears, with nothing to remember to add here.
+          # packages/server is no longer skipped: since ADR-076 it is a member
+          # of the single workspace, so `--frozen-lockfile` on the end user's
+          # machine checks the lockfile against its manifest and fails without
+          # it. Every member's package.json must ship, this one included.
           for pkgdir in langwatch/packages/*/ packages/*/; do
             pkgdir="${pkgdir%/}"
             [ -f "$pkgdir/package.json" ] || continue
-            # packages/server is this CLI itself, not a workspace dependency
-            # the app imports (langwatch's pnpm-workspace.yaml lists .,
-            # packages/*, ../mcp-server, ../packages/handled-error,
-            # ../packages/langy — never packages/server). Its package.json
-            # is deliberately excluded from files[]; only dist/ + templates/
-            # ship, already covered by the cli.cjs required path above.
-            [ "$pkgdir" = "packages/server" ] && continue
-            required+=("package/$pkgdir/package.json")
+            required+=("package/app/$pkgdir/package.json")
+          done
+          # The remaining members carry no source into the tarball, only the
+          # manifest the workspace needs to stay coherent.
+          for member in typescript-sdk agentic-e2e-tests; do
+            required+=("package/app/$member/package.json")
           done
           forbidden=(
-            "package/langwatch/node_modules"
-            "package/langwatch/.next/cache"
-            "package/.env"
+            "package/app/langwatch/node_modules"
+            "package/app/langwatch/.next/cache"
+            "package/app/.env"
+            # The lockfile must be under app/, never at the package root —
+            # npm would delete it there and the guard above would still pass
+            # if someone re-added it in both places.
+            "package/pnpm-lock.yaml"
           )
           listing="$(mktemp)"
           tar -tzf "$tarball" > "$listing"

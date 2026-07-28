@@ -121,9 +121,16 @@ Feature: One workspace for every JavaScript project in the repo
     Then it installs from the workspace shipped inside the package
     And it installs only the application and what the application needs
     And it does not install the SDK, the skills compiler, or the test suites
-    # The published tarball is the reason the application used to need its own
-    # lockfile. It now carries the repo's workspace definition and lockfile,
-    # and narrows the install to the application at install time instead.
+
+  Scenario: The published package carries a lockfile
+    Given the published package
+    When its contents are listed
+    Then a lockfile is present
+    # Not a given. The packaging tool deletes a lockfile sitting at the very
+    # top of a published package, silently, no matter what the manifest asks
+    # for — one directory further down it is kept. The old layout satisfied
+    # this by accident, because the lockfile happened to live beside the
+    # application rather than at the top.
 
   Scenario: The install still refuses to drift from the lockfile
     Given the published package
@@ -131,6 +138,14 @@ Feature: One workspace for every JavaScript project in the repo
     Then the install fails if the lockfile does not match the manifests
     # The frozen-lockfile guarantee is what makes an end user's install
     # reproducible; narrowing the install must not weaken it.
+
+  Scenario: The published layout is not a mirror of the repository layout
+    Given the published package is assembled
+    When its layout is chosen
+    Then it is decided by the packaging step, not by where files sit in the repo
+    # The two were the same thing, so moving a directory in the repo silently
+    # changed what shipped. Rearranging the workspace broke the published
+    # install exactly that way.
 
   Scenario: Every project the lockfile mentions is resolvable
     Given the published package
