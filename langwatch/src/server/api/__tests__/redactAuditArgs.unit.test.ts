@@ -79,6 +79,16 @@ describe("redactAuditArgs", () => {
         });
       });
 
+      // No schema produces this shape. The point is the failure direction:
+      // an unexpected shape must not be the one that gets through.
+      it("redacts a credential field arriving in an unexpected shape", () => {
+        const redacted = redactAuditArgs({
+          customKeys: ["sk-off-schema-but-still-a-secret"],
+        }) as Record<string, unknown>;
+
+        expect(JSON.stringify(redacted)).not.toContain("off-schema");
+      });
+
       it("redacts every credential-carrying field on one write", () => {
         const redacted = redactAuditArgs({
           provider: "custom",

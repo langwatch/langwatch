@@ -484,9 +484,17 @@ export function redactAuditArgs(input: unknown): unknown {
 
   for (const field of CREDENTIAL_OBJECT_FIELDS) {
     const value = record[field];
-    if (typeof value === "object" && value !== null && !Array.isArray(value)) {
-      replace(field, redactValues(value as Record<string, unknown>));
-    }
+    if (typeof value !== "object" || value === null) continue;
+
+    // No schema produces an array here, but a redactor has to fail safe on a
+    // shape it did not expect rather than wave it through — the cost of
+    // guessing wrong is a secret in a durable table.
+    replace(
+      field,
+      Array.isArray(value)
+        ? value.map(() => "[redacted]")
+        : redactValues(value as Record<string, unknown>),
+    );
   }
 
   // A list of `{ key, value }` pairs rather than an object, so the header
