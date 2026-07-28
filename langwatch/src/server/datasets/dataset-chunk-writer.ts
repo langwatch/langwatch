@@ -57,6 +57,13 @@ export class StreamingChunkWriter {
       storage: DatasetStorage;
       projectId: string;
       datasetId: string;
+      /**
+       * ADR-034: fired once per chunk flush with the running cumulative row
+       * count. The natural ~16 MB throttle point for live progress — the
+       * normalize job reads input bytes separately and combines the two. Optional
+       * so the backfill producer and tests need not wire it.
+       */
+      onProgress?: (rowsWritten: number) => void;
     },
   ) {}
 
@@ -103,6 +110,8 @@ export class StreamingChunkWriter {
     this.nextIndex += written.length;
     this.buffer = [];
     this.bufferBytes = 0;
+    // ADR-034: report cumulative rows after each flush (throttled downstream).
+    this.deps.onProgress?.(this.nextStartRow);
   }
 
   /**

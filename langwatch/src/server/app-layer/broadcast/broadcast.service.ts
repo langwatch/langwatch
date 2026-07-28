@@ -9,6 +9,12 @@ export type BroadcastEventType =
   | "trace_updated"
   | "simulation_updated"
   | "export_progress"
+  // ADR-034: ephemeral live progress for an async dataset-normalize job
+  // (bytes / rows / phase). Registered here AND in ALL_EVENT_TYPES below so the
+  // Redis subscriber actually subscribes to its channel — otherwise progress is
+  // silently delivered only when the worker and the SSE subscriber share a pod
+  // (I-XPOD). Multiplexed per project; the client filters by datasetId.
+  | "dataset_progress"
   | "presence_updated"
   | "presence_cursor"
   // Fires when a tenant's facet `discover` payload finishes background
@@ -28,6 +34,7 @@ const ALL_EVENT_TYPES: BroadcastEventType[] = [
   "trace_updated",
   "simulation_updated",
   "export_progress",
+  "dataset_progress",
   "presence_updated",
   "presence_cursor",
   "discover_updated",
@@ -53,7 +60,7 @@ export class BroadcastService {
   private cleanupInterval: NodeJS.Timeout | null = null;
   private readonly EMITTER_CLEANUP_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
   private emitterEmptyTimes = new Map<string, number>(); // tenantId -> timestamp when emitter became empty
-  private active: boolean = false;
+  private active = false;
   private readonly senderRateLimiter = new TenantRateLimiter();
   private readonly subscriberRateLimiter = new TenantRateLimiter();
 
@@ -73,10 +80,16 @@ export class BroadcastService {
     const channels = ALL_EVENT_TYPES.map(redisChannel);
     this.subscriber.subscribe(...channels, (err, count) => {
       if (err) {
-        this.logger.error({ error: err }, "Failed to subscribe to SSE channels");
+        this.logger.error(
+          { error: err },
+          "Failed to subscribe to SSE channels",
+        );
         return;
       }
-      this.logger.debug({ subscriberCount: count, channels }, "Subscribed to SSE channels");
+      this.logger.debug(
+        { subscriberCount: count, channels },
+        "Subscribed to SSE channels",
+      );
     });
 
     this.subscriber.on("message", (channel, message) => {
@@ -295,7 +308,9 @@ export class BroadcastService {
     this.active = false;
 
     // Allow in-flight Redis publishes to drain
-    await new Promise((resolve) => setTimeout(resolve, BroadcastService.DRAIN_DELAY_MS));
+    await new Promise((resolve) =>
+      setTimeout(resolve, BroadcastService.DRAIN_DELAY_MS),
+    );
 
     if (!this.subscriber) return;
 

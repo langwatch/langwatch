@@ -27,10 +27,15 @@
  */
 
 import readline from "node:readline";
-import type { Readable } from "node:stream";
+import { type Readable, Transform } from "node:stream";
 import Papa from "papaparse";
 import type { DatasetRepository } from "./dataset.repository";
 import { StreamingChunkWriter } from "./dataset-chunk-writer";
+import {
+  DATASET_PROGRESS_BROADCAST_MIN_INTERVAL_MS,
+  type DatasetProgressEvent,
+  type EmitDatasetProgress,
+} from "./dataset-progress";
 import type { DatasetStorage } from "./dataset-storage";
 import { UPLOAD_MAX_BYTES } from "./presigned-upload";
 import type { DatasetColumns, DatasetConfirmColumns } from "./types";
@@ -97,6 +102,13 @@ export type DatasetNormalizePayload = {
 export type DatasetNormalizeDeps = {
   repository: DatasetRepository;
   getStorage: (projectId: string) => Promise<DatasetStorage>;
+  /**
+   * ADR-034: optional emit seam for live progress. Wired to `BroadcastService`
+   * in `pipelineRegistry`; omitted by tests and anywhere progress isn't wanted.
+   * Progress is ephemeral and never persisted — the dataset's durable `status`
+   * is the terminal authority the client reconciles against.
+   */
+  emitProgress?: EmitDatasetProgress;
 };
 
 /**
@@ -465,6 +477,30 @@ export const createDatasetNormalizeHandler = (deps: DatasetNormalizeDeps) => {
 
     const storage = await deps.getStorage(projectId);
 
+    // ADR-034: progress is best-effort telemetry. This wrapper guarantees an
+    // emit can NEVER affect the job's outcome — critically, a throw from the
+    // terminal `done` emit runs AFTER the `ready` commit, and the catch below
+    // deletes every chunk (fromIndex 0); an unguarded throw there would destroy
+    // a fully-processed dataset. Swallow everything, sync and async.
+    const safeEmit = (event: DatasetProgressEvent): void => {
+      try {
+        const result = deps.emitProgress?.(
+          projectId,
+          event,
+        ) as void | PromiseLike<void>;
+        // An injected emitter may be async; swallow a rejected promise too so it
+        // never surfaces as an unhandled rejection.
+        if (
+          result &&
+          typeof (result as PromiseLike<void>).then === "function"
+        ) {
+          void Promise.resolve(result).catch(() => undefined);
+        }
+      } catch {
+        // never let a progress broadcast fail (or delete) a normalize
+      }
+    };
+
     try {
       // Defense-in-depth fast reject (I-MEM): finalize already capped this, but
       // never start streaming an over-cap object.
@@ -477,11 +513,66 @@ export const createDatasetNormalizeHandler = (deps: DatasetNormalizeDeps) => {
       }
 
       const format = detectFileFormat(filename);
-      const stream = await storage.streamStaged({ projectId, key: stagingKey });
+
+      // ADR-034: live progress scaffolding. `totalBytes` is the input-side HEAD
+      // size (denominator); `bytesRead` counts bytes consumed from the staged
+      // stream (numerator); `rowsWritten` is the running row count. All
+      // ephemeral — broadcast only, never persisted.
+      const totalBytes = sizeBytes;
+      let bytesRead = 0;
+      let rowsWritten = 0;
+      let lastEmitAt = 0;
+      const emitProcessing = (force = false): void => {
+        if (!deps.emitProgress) return;
+        const now = Date.now();
+        // Producer-side min-interval throttle (I-RATE) — the shared limiter is a
+        // token bucket, not an interval throttle, so the floor lives here.
+        if (
+          !force &&
+          now - lastEmitAt < DATASET_PROGRESS_BROADCAST_MIN_INTERVAL_MS
+        ) {
+          return;
+        }
+        lastEmitAt = now;
+        safeEmit({
+          datasetId,
+          type: "progress",
+          phase: "processing",
+          bytesRead,
+          totalBytes,
+          rows: rowsWritten,
+        });
+      };
+
+      const rawStream = await storage.streamStaged({
+        projectId,
+        key: stagingKey,
+      });
+      // Count INPUT bytes through a passthrough the parser reads from — keeps
+      // backpressure intact (the parser pulls, the counter forwards). `pipe`
+      // does not forward 'error', so forward it explicitly or a source read
+      // failure would hang the parser instead of failing the dataset.
+      const countingStream = new Transform({
+        transform(chunk: Buffer | string, _enc, cb) {
+          bytesRead +=
+            typeof chunk === "string"
+              ? Buffer.byteLength(chunk, "utf8")
+              : chunk.length;
+          cb(null, chunk);
+        },
+      });
+      rawStream.on("error", (err) => countingStream.destroy(err));
+      rawStream.pipe(countingStream);
+
       const writer = new StreamingChunkWriter({
         storage,
         projectId,
         datasetId,
+        // Throttled per-flush tick combining the latest input bytes + row count.
+        onProgress: (rows) => {
+          rowsWritten = rows;
+          emitProcessing();
+        },
       });
 
       // ADR-032 v19: the upload's confirm step persists the user-chosen columns
@@ -491,12 +582,26 @@ export const createDatasetNormalizeHandler = (deps: DatasetNormalizeDeps) => {
       // all-`string` below, exactly as before.
       const confirmedColumns = (dataset.columnTypes as DatasetColumns) ?? [];
       const { headers, appliedColumnTypes } = await parseInto({
-        stream,
+        stream: countingStream,
         format,
         writer,
         sizeBytes,
         targetColumns: confirmedColumns.length > 0 ? confirmedColumns : null,
       });
+      // ADR-034: the input stream is drained; the remaining flush + DB write are
+      // the "finalizing" phase. Forced (bypasses the throttle) so the stepper
+      // always shows it even on a fast job.
+      safeEmit({
+        datasetId,
+        type: "progress",
+        phase: "finalizing",
+        bytesRead,
+        totalBytes,
+        rows: rowsWritten,
+      });
+      // Claim the throttle window so finalize()'s own flush doesn't emit a late
+      // `processing` tick after this — which would flick the stepper back.
+      lastEmitAt = Date.now();
       // I-MEM: finalize returns the aggregated meta built from per-chunk
       // metadata only — the chunk `jsonl` payloads were released at each flush,
       // so the whole normalized file is never accumulated in heap.
@@ -532,6 +637,19 @@ export const createDatasetNormalizeHandler = (deps: DatasetNormalizeDeps) => {
         },
       });
 
+      // ADR-034 Decision 5 / I-ORDER: terminal `done` only AFTER the durable
+      // `ready` commit above, via emitProgress's PLAIN (non-rate-limited) path
+      // so the limiter can't strand the bar at 99%. Best-effort — `getById`
+      // reconciliation is the actual guarantee (I-TERMINAL-REACHED).
+      safeEmit({
+        datasetId,
+        type: "done",
+        phase: "ready",
+        bytesRead: totalBytes,
+        totalBytes,
+        rows: meta.rowCount,
+      });
+
       // Best-effort staging cleanup — non-fatal (the lifecycle rule reaps it
       // otherwise; a failed delete must not fail a successful normalize).
       try {
@@ -561,6 +679,14 @@ export const createDatasetNormalizeHandler = (deps: DatasetNormalizeDeps) => {
         id: datasetId,
         projectId,
         data: { status: "failed", statusError },
+      });
+      // ADR-034: terminal `error` after the durable `failed` commit. The client
+      // shows generic-failed; the durable `statusError` survives a refresh.
+      safeEmit({
+        datasetId,
+        type: "error",
+        phase: "failed",
+        message: statusError,
       });
       throw error;
     }

@@ -56,7 +56,13 @@ const getByIdQuery = vi.fn(() => ({
 }));
 vi.mock("~/utils/api", () => ({
   api: {
-    dataset: { getById: { useQuery: () => getByIdQuery() } },
+    dataset: {
+      getById: { useQuery: () => getByIdQuery() },
+      // ADR-034: the drawer opens one lifted progress subscription; the test
+      // drives no live events, so a no-op stub keeps the rows on their getById
+      // status poll (which resolves ready above).
+      onDatasetProgress: { useSubscription: () => undefined },
+    },
     useContext: () => ({}),
   },
 }));
