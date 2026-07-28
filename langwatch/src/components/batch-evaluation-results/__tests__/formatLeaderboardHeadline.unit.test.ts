@@ -41,7 +41,15 @@ describe("formatLeaderboardHeadline", () => {
         variantNames: NAMES,
       });
 
-      expect(headline.heading).toBe("Ship warm — same quality, 75% cheaper");
+      // NOT "same quality". This branch is reached when two confidence
+      // intervals overlap, which means the run failed to separate them — it
+      // is not a measurement of equivalence, and no non-inferiority test was
+      // run. The distinction matters here more than anywhere else in the
+      // feature: this heading is the only string the compact card renders, so
+      // it is the sentence most readers act on.
+      expect(headline.heading).toBe(
+        "Ship warm — not separated on quality, 75% cheaper",
+      );
       expect(headline.detail).toContain("warm-premium and warm");
       expect(headline.tone).toBe("positive");
     });

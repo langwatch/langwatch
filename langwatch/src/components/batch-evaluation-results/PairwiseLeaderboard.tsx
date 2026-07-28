@@ -352,12 +352,20 @@ function WinMatrixHeatmap({
       <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
         Win matrix (row = winner, column = opponent) — click a cell for why
       </Text>
+      {/*
+        The note states only what the detector actually establishes.
+        `winMatrixHasPairwiseDetail` tests whether any row VARIES across
+        opponents. The previous copy went further and asserted why — "every
+        verdict judged all N variants together" — a strictly stronger claim
+        the check cannot support: eight strictly two-way rows produce uniform
+        rows too, and there the sentence was simply untrue.
+      */}
       {!hasPairwiseDetail ? (
         <Text fontSize="2xs" color="fg.muted">
-          Every verdict in this run judged all {ids.length} variants together,
-          so the counts along each row are identical — that variant&apos;s total
-          wins, not a per-opponent tally. The shading is still per pair: how
-          often the row variant won when those two met.
+          Each row here is the same number repeated — that variant&apos;s total
+          wins, not a per-opponent tally, so the counts cannot tell you who it
+          beat. The shading still can: it is how often the row variant won when
+          those two met.
         </Text>
       ) : null}
       <Box overflowX="auto">

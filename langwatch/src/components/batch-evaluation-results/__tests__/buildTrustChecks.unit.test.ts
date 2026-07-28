@@ -20,6 +20,7 @@ const leaderboard = (
   minMatchups: 60,
   hasDegenerate: false,
   didConverge: true,
+  comparability: { identifiable: true, groups: [], dominates: [] },
   ...overrides,
 });
 

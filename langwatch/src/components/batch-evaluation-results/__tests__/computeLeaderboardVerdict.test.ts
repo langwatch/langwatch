@@ -41,6 +41,7 @@ const makeLeaderboard = (
   minMatchups: 15,
   hasDegenerate: entries.some((e) => e.degenerate),
   didConverge: true,
+  comparability: { identifiable: true, groups: [], dominates: [] },
   ...overrides,
 });
 

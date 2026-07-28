@@ -56,6 +56,45 @@ const joinNames = (names: string[]): string =>
     ? (names[0] ?? "")
     : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
 
+/**
+ * Whether the run actually connected the field well enough to rank it.
+ *
+ * Bradley-Terry needs the win graph to be strongly connected for a unique
+ * answer to exist. When it is not, the solver still returns numbers — it has
+ * to stop somewhere — but the gap across the break reflects the iteration cap
+ * rather than the evidence, and grows if you raise the cap. Two shapes reach
+ * here from ordinary data: a field that splits into tiers where the top never
+ * lost to the bottom, and a field where some variants never met at all
+ * (routine when a candidate produces no output for a row and is dropped).
+ *
+ * Reported as a warning rather than suppressing the table, because the
+ * WITHIN-group ordering is still sound and usually still the answer.
+ */
+const buildComparabilityCheck = (
+  leaderboard: LeaderboardTrustPanelProps["leaderboard"],
+): TrustCheck => {
+  const { comparability } = leaderboard;
+  const groupCount = comparability.groups.length;
+
+  if (comparability.identifiable || groupCount <= 1) {
+    return {
+      label: "Everything is on one scale",
+      tone: "ok",
+      detail:
+        "Every variant is linked to the rest through wins and losses, so the whole ranking is on a single scale.",
+    };
+  }
+
+  return {
+    label: "Not all on one scale",
+    tone: "warn",
+    detail:
+      `The run splits into ${groupCount} groups that it never connected by a two-way result. ` +
+      "Inside a group the scores compare normally; across groups only the order is meaningful, " +
+      "and the size of the gap is not — it reflects where the solver stopped rather than the evidence.",
+  };
+};
+
 /** Exported for tests: the checks that decide whether a run is trustworthy. */
 export const buildTrustChecks = ({
   leaderboard,
@@ -79,8 +118,16 @@ export const buildTrustChecks = ({
       tone: leaderboard.hasDegenerate ? "warn" : "ok",
       detail: leaderboard.hasDegenerate
         ? "At least one variant never won, or never lost. There is no score that fits that, so it is excluded from the ranking."
-        : "No variant swept or was swept, so all of them can be placed on the same scale.",
+        : "No variant swept or was swept.",
     },
+    // Split out from the check above, which used to end "...so all of them can
+    // be placed on the same scale". No variant sweeping is necessary for that
+    // and not sufficient: a field can have every variant winning and losing
+    // and still break into groups the run never bridged, in which case the
+    // scores across that break are an artefact of where the solver stopped
+    // rather than a measurement. Ford (1957) is the sufficient condition, so
+    // it gets its own check rather than riding on the sweep one.
+    buildComparabilityCheck(leaderboard),
     {
       label: "Ranking settled",
       tone: leaderboard.didConverge ? "ok" : "warn",

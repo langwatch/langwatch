@@ -8,6 +8,11 @@
  * Tie convention: 0.5 win + 0.5 loss to each side (LMSYS Arena).
  */
 
+import {
+  computeComparability,
+  type Comparability,
+} from "./computeComparability";
+
 export type PairwiseComparison = {
   /** Candidate target ids involved in this comparison (>= 2). */
   candidates: string[];
@@ -60,6 +65,14 @@ export type BTLeaderboard = {
   hasDegenerate: boolean;
   /** True when the MM solver converged within maxIter. */
   didConverge: boolean;
+  /**
+   * Which variants this fit is entitled to compare.
+   *
+   * `hasDegenerate` above tests a per-variant condition that is necessary but
+   * NOT sufficient for the MLE to exist. This is the sufficient one (Ford
+   * 1957): scores are comparable only within a strongly connected component.
+   */
+  comparability: Comparability;
 };
 
 export type BTLeaderboardOptions = {
@@ -99,6 +112,7 @@ export function computeBTLeaderboard({
       minMatchups: 0,
       hasDegenerate: false,
       didConverge: true,
+      comparability: { identifiable: true, groups: [], dominates: [] },
     };
   }
 
@@ -177,6 +191,7 @@ export function computeBTLeaderboard({
     minMatchups,
     hasDegenerate,
     didConverge: converged,
+    comparability: computeComparability({ winMatrix, variantIds }),
   };
 }
 
@@ -205,7 +220,13 @@ function buildWinMatrix(
       continue;
     }
     const wIdx = idx.get(c.winner as string);
-    if (wIdx === undefined) continue;
+    // The winner must have been ON the row. types.ts assembles variantIds from
+    // every label the column ever produced, while `candidates` is the per-row
+    // set the judge actually saw — so a winner naming a variant that was
+    // dropped from this row (no output) resolves fine against the global index
+    // and then beats opponents it never faced. Ten such rows fabricated twenty
+    // matchups and a first-place finish.
+    if (wIdx === undefined || !candIdxs.includes(wIdx)) continue;
     for (const cIdx of candIdxs) {
       if (cIdx !== wIdx) W[wIdx]![cIdx]! += 1;
     }
@@ -246,7 +267,10 @@ function resolveComparison({
   }
 
   const wIdx = idx.get(comparison.winner as string);
-  if (wIdx === undefined) return null;
+  // Same guard as buildWinMatrix: a winner absent from this row's candidates
+  // is not evidence about this row. The two paths must agree, or the bootstrap
+  // would describe a different dataset than the point estimate.
+  if (wIdx === undefined || !candIdxs.includes(wIdx)) return null;
   return { candIdxs, winner: wIdx };
 }
 

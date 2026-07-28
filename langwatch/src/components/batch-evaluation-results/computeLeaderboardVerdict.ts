@@ -53,6 +53,17 @@ const areDistinguishable = (
   b: BTLeaderboardEntry,
 ): boolean => {
   if (!a.scoreCI || !b.scoreCI) return false;
+  // A non-finite bound is not evidence of a difference, and NaN in particular
+  // would masquerade as one: every comparison against NaN is false, so
+  // `intervalsOverlap` returns false and the negation reads "distinguishable".
+  // That produced a `clear-winner` on the same leaderboard where
+  // computeSampleAdequacy — which has always checked this — reported zero
+  // separated pairs, so the two panels contradicted each other on screen.
+  if (
+    ![...a.scoreCI, ...b.scoreCI].every((bound) => Number.isFinite(bound))
+  ) {
+    return false;
+  }
   return !intervalsOverlap(a.scoreCI, b.scoreCI);
 };
 
@@ -67,12 +78,41 @@ export const computeLeaderboardVerdict = (
     return { kind: "no-signal", leaderId: null, tiedIds: [] };
   }
 
+  // Nothing to crown when the field collapsed to a single rankable variant.
+  //
+  // `ranked` has already dropped the degenerates, and a variant is degenerate
+  // precisely because it swept or was swept — which is to say, because it beat
+  // or lost to the survivor every single time. Falling through to
+  // `clear-winner` here read that as "nobody could be separated from the
+  // leader" and recommended shipping it. On a straight a > b > c run that
+  // named b: the variant that lost every match it played against a, while the
+  // table above showed a at a 100% win rate.
+  if (ranked.length === 1) {
+    return { kind: "no-signal", leaderId: null, tiedIds: [] };
+  }
+
   const leader = ranked[0]!;
-  const tied = ranked.filter(
-    (entry) =>
-      entry.variantId === leader.variantId ||
-      !areDistinguishable(leader, entry),
-  );
+
+  // The tie set has to be MUTUALLY indistinguishable, not merely
+  // indistinguishable from the leader.
+  //
+  // Filtering against the leader alone builds a set that can contain two
+  // variants this very run separated: L overlaps M, L overlaps C, and M and C
+  // do not overlap each other. The headline then says "L, M and C score too
+  // closely to separate" — contradicting the trust panel beside it, which
+  // counts that M/C pair as separated — and, because the set is offered as
+  // interchangeable-on-quality, invites shipping C on cost when the same run
+  // showed M to be better.
+  //
+  // Grown greedily in rank order: a candidate joins only if it is
+  // indistinguishable from everything already in the set. That keeps the
+  // leader in by construction and yields the top clique in score order.
+  const tied: BTLeaderboardEntry[] = [leader];
+  for (const entry of ranked.slice(1)) {
+    if (tied.every((member) => !areDistinguishable(member, entry))) {
+      tied.push(entry);
+    }
+  }
 
   if (tied.length === 1) {
     return {

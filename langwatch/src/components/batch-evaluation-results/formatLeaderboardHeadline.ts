@@ -79,7 +79,13 @@ export const formatLeaderboardHeadline = ({
   // A tie plus a price difference is not an inconclusive result — it is a
   // decision, just made on cost instead of on quality.
   if (cheaperAlternative) {
-    const percent = Math.round(cheaperAlternative.savingRatio * 100);
+    // Never round to 100: that reads as free, and the cheapest variant in a
+    // real run costs something. A variant at $0.00004 against $0.012 is a
+    // 99.7% saving, not a giveaway.
+    const percent = Math.min(
+      99,
+      Math.round(cheaperAlternative.savingRatio * 100),
+    );
     const name = nameOf(cheaperAlternative.variantId, variantNames);
     const others =
       verdict.tiedIds.length > 2
@@ -100,7 +106,7 @@ export const formatLeaderboardHeadline = ({
         }
       : {
           tone: "positive",
-          heading: `Ship ${name} — same quality, ${percent}% cheaper`,
+          heading: `Ship ${name} — not separated on quality, ${percent}% cheaper`,
           detail: `${tiedNames} score too closely for this run to separate them, so quality is not the deciding factor here. ${name} costs less than ${others}: ${price}`,
         };
   }
