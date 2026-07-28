@@ -147,7 +147,7 @@ describe("gateway_spend_events retention exemption", () => {
     const migration = readFileSync(
       join(
         process.cwd(),
-        "src/server/clickhouse/migrations/00059_create_gateway_spend_events.sql",
+        "src/server/clickhouse/migrations/00060_create_gateway_spend_events.sql",
       ),
       "utf8",
     );

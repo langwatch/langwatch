@@ -297,7 +297,7 @@ describe("gatewayBudgetSync reactor", () => {
         window: "MONTH",
       } as GatewayBudget;
 
-      const { deps, insertDebit } = mockDeps(
+      const { deps, insertDebits } = mockDeps(
         { id: "vk-1", organizationId: "org-1", principalUserId: "user-1" },
         {
           id: "project-1",
@@ -332,8 +332,8 @@ describe("gatewayBudgetSync reactor", () => {
         ),
       );
 
-      expect(insertDebit).toHaveBeenCalledTimes(1);
-      const rows = insertDebit.mock.calls[0]![0];
+      expect(insertDebits).toHaveBeenCalledTimes(1);
+      const rows = insertDebits.mock.calls[0]![0];
       expect(rows).toHaveLength(1);
       expect(rows[0]).toMatchObject({
         budgetId: "budget-grp",
@@ -465,7 +465,7 @@ describe("gatewayBudgetSync reactor", () => {
         tokensInput: 100,
         tokensCacheRead: 20540,
         tokensCacheWrite: 22994,
-        providerCredentialId: "mp-9",
+        providerKey: "mp-9",
         status: "SUCCESS",
         durationMs: 100,
       });
@@ -476,6 +476,96 @@ describe("gatewayBudgetSync reactor", () => {
         durationMs: 200,
       });
       expect(rows[0].occurredAt.getTime()).toBe(1700_000_000_000);
+    });
+
+    it("provider-filtered budgets accrue only the entries dispatched to their provider", async () => {
+      const filtered = {
+        id: "budget-openai",
+        scopeType: "PROJECT",
+        scopeId: "project-1",
+        providerKey: "mp-openai",
+        window: "MONTH",
+      } as GatewayBudget;
+
+      const { deps, insertDebits } = mockDeps(
+        { id: "vk-1", organizationId: "org-1", principalUserId: null },
+        {
+          id: "project-1",
+          teamId: "team-1",
+          team: { organizationId: "org-1" },
+        },
+        [filtered],
+        [
+          {
+            budget: filtered,
+            bucketScopeId: "project-1|provider:mp-openai",
+            principalUserId: null,
+            groupId: null,
+          },
+        ],
+      );
+      const reactor = createGatewayBudgetSyncReactor(deps);
+
+      const mixedEntries = JSON.stringify([
+        {
+          requestId: "req-openai",
+          virtualKeyId: "vk-1",
+          model: "openai/gpt-5-mini",
+          modelProviderId: "mp-openai",
+          inputTokens: 10,
+          outputTokens: 5,
+          cacheReadTokens: 0,
+          cacheWriteTokens: 0,
+          reasoningTokens: 0,
+          costUsd: 0.003,
+          status: "success",
+          errorClass: "",
+          httpStatus: 0,
+          endUserId: "",
+          occurredAtMs: 1700_000_000_000,
+          durationMs: 80,
+        },
+        {
+          requestId: "req-anthropic",
+          virtualKeyId: "vk-1",
+          model: "anthropic/claude-sonnet-5",
+          modelProviderId: "mp-anthropic",
+          inputTokens: 10,
+          outputTokens: 5,
+          cacheReadTokens: 0,
+          cacheWriteTokens: 0,
+          reasoningTokens: 0,
+          costUsd: 0.004,
+          status: "success",
+          errorClass: "",
+          httpStatus: 0,
+          endUserId: "",
+          occurredAtMs: 1700_000_050_000,
+          durationMs: 90,
+        },
+      ]);
+
+      await reactor.handle(
+        event,
+        ctx(
+          createFoldState({
+            "langwatch.virtual_key_id": "vk-1",
+            "langwatch.gateway_request_id": "req-openai",
+            "langwatch.reserved.gateway_spans": mixedEntries,
+          }),
+        ),
+      );
+
+      expect(insertDebits).toHaveBeenCalledTimes(1);
+      const rows = insertDebits.mock.calls[0]![0];
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({
+        budgetId: "budget-openai",
+        gatewayRequestId: "req-openai",
+        scopeId: "project-1|provider:mp-openai",
+        providerKey: "mp-openai",
+        amountUsd: "0.0030000000",
+      });
     });
   });
 });
