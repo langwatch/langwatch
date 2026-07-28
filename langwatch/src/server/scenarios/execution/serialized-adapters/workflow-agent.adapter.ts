@@ -39,9 +39,9 @@ type NlpErrorBody = {
 };
 
 /**
- * First non-empty candidate. Deliberately not `??`/`||` chains: `??` passes
- * `""` straight through, which would leave a thrown message ending in a bare
- * colon, and `||` would also swallow a legitimate `"0"`.
+ * First non-empty candidate. Deliberately not a `??` chain: `??` only skips
+ * `null`/`undefined`, so an envelope carrying `message: ""` would fall through
+ * as the answer and leave a thrown message ending in a bare colon.
  */
 function firstNonEmpty(
   ...candidates: (string | undefined)[]
@@ -50,10 +50,18 @@ function firstNonEmpty(
 }
 
 /**
- * Best available human-readable reason from an engine error envelope. The
- * type is the fallback because it is still actionable ("missing_end_node"
- * beats "unknown"), and the literal last resort keeps the thrown message
- * well-formed if the engine ever sends `status: "error"` with nothing else.
+ * Best available human-readable reason from an engine error envelope.
+ *
+ * The type is a fallback rather than a discriminator, and it is worth knowing
+ * how weak a one: `cmd/engine_adapter.go` flattens EVERY error the engine
+ * returns to `type: "engine_error"`, so for planner-originated failures — the
+ * primary #3198 case — the type conveys nothing. The specific types
+ * (`missing_end_node`, `unreached_end_node`) only survive on the `finalize`
+ * path, where `convertResult` copies `NodeError.Type` through. Do not treat
+ * `error.type` as machine-readable here.
+ *
+ * The literal last resort keeps the thrown message well-formed if the engine
+ * ever sends `status: "error"` with nothing else.
  */
 function engineErrorMessage(body: NlpErrorBody): string {
   return (

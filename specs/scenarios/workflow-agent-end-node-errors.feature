@@ -102,6 +102,47 @@ Feature: Workflow agent surfaces End-node misconfiguration instead of an empty r
     When the run is finalized
     Then the result carries a success status
 
+  # A deliberate behaviour change, called out under Deployment Impact on the PR.
+  # Neither planner guard can see this shape: the End node IS reachable, so the
+  # plan includes it, and only the branch outcome at run time decides it never
+  # executes. Erroring is the call — on the surface this issue was filed
+  # against, an empty result IS the bug.
+  @unit
+  Scenario: A full run whose only End node is skipped by an untaken branch errors
+    Given a workflow whose only End node is fed by one branch of a condition
+    And the condition sends the run down the other branch
+    When the workflow runs
+    Then the result carries an error status
+    And the error says the run never reached its End node
+
+  @unit
+  Scenario: A run whose condition reaches its End node still succeeds
+    Given a workflow whose only End node is fed by one branch of a condition
+    And the condition sends the run down that branch
+    When the workflow runs
+    Then the result carries a success status
+
+  # ============================================================================
+  # Not leaking a project secret through the error surface this change opened
+  # ============================================================================
+
+  # Making engine errors visible is what turns an unredacted code-node
+  # traceback into a customer-visible, persisted string. Code nodes get project
+  # secrets as a live `secrets.NAME` namespace, so a raised exception can carry
+  # a secret's plaintext — the same hazard the HTTP node already redacts.
+  @unit
+  Scenario: A code node that raises with a secret in the message does not leak it
+    Given a code node whose raised exception embeds a project secret's value
+    When the workflow runs
+    Then the reported error does not contain the secret's value
+    And the reported error shows the value was redacted
+
+  @unit
+  Scenario: An if/else condition node that raises with a secret does not leak it
+    Given an if/else condition written in Python whose exception embeds a project secret's value
+    When the workflow runs
+    Then the reported error does not contain the secret's value
+
   # ============================================================================
   # AC #2 — the scenario adapter surfaces the engine's error, never an empty reply
   # ============================================================================

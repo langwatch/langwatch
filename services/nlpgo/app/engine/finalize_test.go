@@ -25,7 +25,7 @@ func TestFinalize_RequireEndWithNoEndNodeErrors(t *testing.T) {
 		},
 	}
 	state := newRunState(w)
-	require.Empty(t, state.endNodeID, "fixture must have no End node")
+	require.Empty(t, state.endNodeIDs, "fixture must have no End node")
 
 	res := finalize(state, "trace", time.Now(), nil, true)
 
@@ -51,8 +51,8 @@ func TestFinalize_RequireEndFalseAllowsNoEndNode(t *testing.T) {
 }
 
 // TestFinalize_RequireEndWithEndNodeThatNeverRanErrors is the guard the
-// presence-only check misses (#3198): the End node EXISTS, so endNodeID is
-// set and the missing_end_node branch does not fire, but nothing was ever
+// presence-only check misses (#3198): the End node EXISTS, so the
+// missing_end_node branch does not fire, but nothing was ever
 // recorded against it — the node never entered the plan (unwired) or never
 // executed. Pre-fix this fell through to `status: "success"` with an empty
 // result, which is the exact symptom the issue was filed about.
@@ -66,14 +66,14 @@ func TestFinalize_RequireEndWithEndNodeThatNeverRanErrors(t *testing.T) {
 		},
 	}
 	state := newRunState(w)
-	require.Equal(t, "end", state.endNodeID, "fixture must have an End node")
+	require.Equal(t, []string{"end"}, state.endNodeIDs, "fixture must have an End node")
 
 	res := finalize(state, "trace", time.Now(), nil, true)
 
 	require.Equal(t, "error", res.Status)
 	require.NotNil(t, res.Error)
 	assert.Equal(t, "unreached_end_node", res.Error.Type)
-	assert.Equal(t, planner.UnreachedEndNodeMessage, res.Error.Message)
+	assert.Equal(t, UnreachedEndNodeMessage, res.Error.Message)
 }
 
 // TestFinalize_RequireEndFalseAllowsEndNodeThatNeverRan is the exempt twin
@@ -96,7 +96,7 @@ func TestFinalize_RequireEndFalseAllowsEndNodeThatNeverRan(t *testing.T) {
 
 // TestFinalize_UsesTheEndNodeThatActuallyProducedOutput covers the branching
 // shape: two End nodes, and the one that ran is NOT the first in node order.
-// endNodeID is assigned by node order, so keying the result off it alone
+// End nodes are collected in node order, so keying the result off the first
 // would report an empty success for a run that did produce a result.
 //
 // @scenario "A full run takes its result from an End node that did produce output"
@@ -108,7 +108,7 @@ func TestFinalize_UsesTheEndNodeThatActuallyProducedOutput(t *testing.T) {
 		},
 	}
 	state := newRunState(w)
-	require.Equal(t, "end_a", state.endNodeID, "endNodeID is the first End in node order")
+	require.Equal(t, []string{"end_a", "end_b"}, state.endNodeIDs, "both End nodes are tracked, in node order")
 	state.recordOutputs("end_b", map[string]any{"output": "from b"})
 
 	res := finalize(state, "trace", time.Now(), nil, true)

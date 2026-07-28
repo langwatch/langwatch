@@ -391,12 +391,12 @@ func (e *Engine) runIfElsePython(ctx context.Context, node *dsl.Node, inputs map
 		Secrets:         secrets,
 	})
 	if err != nil {
-		return nil, &NodeError{Type: "code_runner_error", Message: err.Error()}
+		return nil, &NodeError{Type: "code_runner_error", Message: redactSecrets(err.Error(), secrets)}
 	}
 	ns.Stdout = res.Stdout
 	ns.Stderr = res.Stderr
 	if res.Error != nil {
-		return nil, &NodeError{Type: res.Error.Type, Message: res.Error.Message, Traceback: res.Error.Traceback}
+		return nil, codeNodeError(res.Error, secrets)
 	}
 	result, ok := res.Outputs["result"].(bool)
 	if !ok {
@@ -455,14 +455,32 @@ func (e *Engine) runCode(ctx context.Context, node *dsl.Node, inputs map[string]
 		Secrets:         secrets,
 	})
 	if err != nil {
-		return nil, &NodeError{Type: "code_runner_error", Message: err.Error()}
+		return nil, &NodeError{Type: "code_runner_error", Message: redactSecrets(err.Error(), secrets)}
 	}
 	ns.Stdout = res.Stdout
 	ns.Stderr = res.Stderr
 	if res.Error != nil {
-		return nil, &NodeError{Type: res.Error.Type, Message: res.Error.Message, Traceback: res.Error.Traceback}
+		return nil, codeNodeError(res.Error, secrets)
 	}
 	return res.Outputs, nil
+}
+
+// codeNodeError converts a code-runner failure into a NodeError with every
+// resolved secret value scrubbed from the message and traceback.
+//
+// Code nodes get project secrets as a live `secrets.NAME` namespace, so user
+// code can interpolate one into a URL, header, or formatted string; when that
+// call raises, the plaintext rides out in the exception. runHTTP already
+// defends the same class for its own errors — this is that guard for the code
+// path, which had `secrets` in hand and was not using it. It matters now
+// because the workflow-agent adapter re-throws `error.message` and the
+// scenario runner persists it onto the user-visible run record (#3198).
+func codeNodeError(e *codeblock.Error, secrets map[string]string) *NodeError {
+	return &NodeError{
+		Type:      e.Type,
+		Message:   redactSecrets(e.Message, secrets),
+		Traceback: redactSecrets(e.Traceback, secrets),
+	}
 }
 
 func (e *Engine) runHTTP(ctx context.Context, node *dsl.Node, inputs map[string]any, ns *NodeState, secrets map[string]string) (map[string]any, *NodeError) {
@@ -1149,12 +1167,11 @@ type runState struct {
 	outputs    map[string]map[string]any
 	states     map[string]*NodeState
 	firstError *NodeError
-	endNodeID  string
 	// endNodeIDs lists every End node in the workflow, in node order.
-	// endNodeID above is just the first of them, which is fine for the
-	// single-End shape but not for a branching workflow where the End that
-	// actually ran is not the first one declared — finalize resolves the
-	// result across all of them (#3198).
+	// Deliberately not a single "the End node" field: a branching workflow
+	// can terminate at an End that is not the first one declared, and keying
+	// the result off the first would report an empty success for a run that
+	// did produce one (#3198).
 	endNodeIDs []string
 	totalCost  float64
 	// edgesByTarget indexes Edge entries by their target node id so
@@ -1180,9 +1197,6 @@ func newRunState(w *dsl.Workflow) *runState {
 		n := &w.Nodes[i]
 		r.nodes[n.ID] = n
 		if n.Type == dsl.ComponentEnd {
-			if r.endNodeID == "" {
-				r.endNodeID = n.ID
-			}
 			r.endNodeIDs = append(r.endNodeIDs, n.ID)
 		}
 	}
@@ -1193,9 +1207,7 @@ func newRunState(w *dsl.Workflow) *runState {
 }
 
 // endOutputs returns the outputs recorded against the first End node that
-// actually executed, and whether any End node executed at all. Keying off
-// endNodeID alone would report an empty success for a branching workflow
-// whose taken branch ends at a later-declared End node (#3198).
+// actually executed, and whether any End node executed at all.
 func (r *runState) endOutputs() (map[string]any, bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -1362,6 +1374,12 @@ func stripHandlePrefix(handle, prefix string) string {
 	return handle
 }
 
+// UnreachedEndNodeMessage explains a run that planned fine and still finished
+// without its End node producing anything. Unlike the planner's two End-node
+// messages this describes a condition only observable AFTER a run, so it lives
+// with finalize rather than in the planner's validation vocabulary.
+const UnreachedEndNodeMessage = "workflow finished without reaching its End node, so it produced no result; check that the End node is wired and reachable on every branch"
+
 func finalize(state *runState, traceID string, started time.Time, ctxErr error, requireEnd bool) *ExecuteResult {
 	res := &ExecuteResult{
 		TraceID:    traceID,
@@ -1385,7 +1403,7 @@ func finalize(state *runState, traceID string, started time.Time, ctxErr error, 
 	// gate (#3198). Partial runs (execute_component, "run until here")
 	// legitimately have no End, so requireEnd is false for them and the
 	// happy path proceeds.
-	if requireEnd && state.endNodeID == "" {
+	if requireEnd && len(state.endNodeIDs) == 0 {
 		res.Status = "error"
 		res.Error = &NodeError{Type: "missing_end_node", Message: planner.MissingEndNodeMessage}
 		return res
@@ -1394,12 +1412,20 @@ func finalize(state *runState, traceID string, started time.Time, ctxErr error, 
 	// An End node that exists but never ran is the other half of #3198: the
 	// planner's presence check is satisfied, so the guard above stays quiet,
 	// yet nothing was recorded against the End node and the old code fell
-	// straight through to an empty `success`. Reject it on a full run — a
-	// partial run (execute_component, "run until here") stops before the End
+	// straight through to an empty `success`.
+	//
+	// This is not belt-and-braces for a hypothetical future caller — it is the
+	// ONLY guard for a shape that exists today. The planner's unwired-End check
+	// is skipped when reachability scoping did not run (no Entry node →
+	// allowed == nil), so an Entry-less workflow with a dangling End plans
+	// cleanly and arrives here. It also catches an End skipped at runtime by
+	// if/else branch gating, which no static check can see.
+	//
+	// A partial run (execute_component, "run until here") stops before the End
 	// by design, so requireEnd is false and the happy path proceeds.
 	if requireEnd && !endRan {
 		res.Status = "error"
-		res.Error = &NodeError{Type: "unreached_end_node", Message: planner.UnreachedEndNodeMessage}
+		res.Error = &NodeError{Type: "unreached_end_node", Message: UnreachedEndNodeMessage}
 		return res
 	}
 	res.Status = "success"

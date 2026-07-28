@@ -143,13 +143,6 @@ func (e *MissingEndNodeError) Error() string {
 // the End node dangling is easier than deleting it (#3198).
 const UnwiredEndNodeMessage = "End node has no wired inputs; connect a node's output to the End node so the run produces a result"
 
-// UnreachedEndNodeMessage is the engine-side twin of the two messages above,
-// for a run that planned fine but still finished without its End node
-// producing anything — a branch that skipped it, or any future entrypoint
-// that bypasses these planner guards. It lives here so the whole End-node
-// vocabulary has one home and the strings cannot drift apart (#3198).
-const UnreachedEndNodeMessage = "workflow finished without reaching its End node, so it produced no result; check that the End node is wired and reachable on every branch"
-
 // UnwiredEndNodeError signals a full-run workflow whose End node is present
 // but not reachable from the Entry node, so reachability scoping drops it
 // from the plan and the run finalizes with an empty result — the same #3198
@@ -181,11 +174,16 @@ func WithUntilNode(id string) Option {
 	return func(o *planOptions) { o.untilNodeID = id }
 }
 
-// AllowMissingEnd permits a workflow with no End node to plan. The engine
-// sets it for execute_component (single-node) runs, where only the target
-// node is dispatched and the End node is irrelevant. Full execute_flow
-// runs do NOT set it, so a missing End surfaces as MissingEndNodeError
-// (issue #3198).
+// AllowMissingEnd disables BOTH End-node guards — the missing-End check and
+// the unwired-End check. The engine sets it for execute_component
+// (single-node) runs, where only the target node is dispatched and the End
+// node is irrelevant however it is (or isn't) wired. Full execute_flow runs
+// do NOT set it, so an unusable End surfaces as MissingEndNodeError or
+// UnwiredEndNodeError (issue #3198).
+//
+// Named for the first guard it disabled; it covers both. Renaming it is a
+// caller-visible change and is not worth the churn on its own — but do not
+// read the name as the whole contract.
 func AllowMissingEnd() Option {
 	return func(o *planOptions) { o.endOptional = true }
 }
@@ -197,18 +195,16 @@ func AllowMissingEnd() Option {
 //  2. Unsupported node kinds
 //  3. Edge endpoints exist in the node table
 //  4. Cycle detection (DFS coloring)
-//  5. Missing End node (full runs only): a workflow with no End node
-//     would finalize with an empty result, so reject it — issue #3198.
-//     Skipped for "Run until here" (untilNodeID) and execute_component
-//     (AllowMissingEnd) partial runs, which legitimately stop before End.
-//  6. Reachability scoping: full BFS from Entry (and a backward DFS from
+//  5. Reachability scoping: full BFS from Entry (and a backward DFS from
 //     untilNodeID when provided) — disconnected nodes never enter the
 //     plan. Mirrors Python's `find_reachable_nodes` /
 //     `find_path_until_node` in studio/parser.py.
-//  7. Unwired End node (full runs only): step 5 asks whether an End node
-//     EXISTS; this asks whether one made it into the plan. It has to run
-//     after step 6 because that is what drops a dangling End — issue #3198.
-//  8. Layered topological sort (Kahn's algorithm with stable ordering)
+//  6. End-node usability (full runs only): a workflow with no End node, or
+//     whose End node did not survive step 5, would finalize with an empty
+//     result — issue #3198. Must run after step 5, which is what drops a
+//     dangling End. Skipped for "Run until here" (untilNodeID) and
+//     execute_component (AllowMissingEnd), which stop before End by design.
+//  7. Layered topological sort (Kahn's algorithm with stable ordering)
 //
 // Errors short-circuit at the first failure so the caller surfaces a
 // single root cause to the customer.
@@ -267,26 +263,7 @@ func New(w *dsl.Workflow, opts ...Option) (*Plan, error) {
 		return nil, &CycleError{Cycle: cycle}
 	}
 
-	// 5. Missing End node. A full run with no End node finalizes with an
-	// empty result and a misleading success — issue #3198. Reject it here
-	// so the API surfaces a clear validation error instead. Exempt the
-	// partial-run shapes that legitimately stop before End: a "Run until
-	// here" plan (untilNodeID set) and a single-component run
-	// (AllowMissingEnd, set by the engine for execute_component).
-	if o.untilNodeID == "" && !o.endOptional {
-		hasEnd := false
-		for _, t := range nodeIDs {
-			if t == dsl.ComponentEnd {
-				hasEnd = true
-				break
-			}
-		}
-		if !hasEnd {
-			return nil, &MissingEndNodeError{}
-		}
-	}
-
-	// 6. Reachability scope. The Studio canvas tolerates nodes the
+	// 5. Reachability scope. The Studio canvas tolerates nodes the
 	// author hasn't wired up yet — an orphan LLM node, a disconnected
 	// sub-chain. Python parity is to skip those: a full run includes
 	// only nodes reachable forward from Entry, and a "Run until here"
@@ -316,31 +293,38 @@ func New(w *dsl.Workflow, opts ...Option) (*Plan, error) {
 		allowed = path
 	}
 
-	// 7. Unwired End node. Step 5 only established that an End node exists
-	// somewhere in the node table; step 6 is what decides whether it will
-	// ever be dispatched. An End node the author dropped on the canvas but
-	// never connected is not reachable from Entry, so it is absent from
-	// `allowed`, never executes, and the run finalizes with an empty result
-	// — the same #3198 symptom as having no End node at all.
+	// 6. End-node usability. One policy — "does this run shape need an End
+	// node that will actually execute?" — so one place decides it, rather
+	// than the same exemption predicate appearing at two sites that can
+	// drift apart. Two distinct author mistakes with two distinct fixes:
 	//
-	// Only meaningful when reachability scoping actually ran: allowed==nil
-	// is the "no Entry node" legacy fallback that includes every node, so
-	// there is no plan-membership signal to judge against. The partial-run
-	// shapes are exempt for the same reason as in step 5.
-	if o.untilNodeID == "" && !o.endOptional && allowed != nil {
-		endInPlan := false
-		for id := range allowed {
-			if nodeIDs[id] == dsl.ComponentEnd {
-				endInPlan = true
-				break
-			}
+	//   - No End node at all: the author has to add one.
+	//   - An End node that exists but never entered the plan: the author has
+	//     to connect the one they already have. Reachability scoping above
+	//     is what drops a dangling End, which is why this cannot be answered
+	//     before now — the node table alone says the workflow is fine.
+	//
+	// Either way the run would finalize with an empty result and a
+	// misleading success (#3198). Exempt the partial-run shapes that
+	// legitimately stop before End: a "Run until here" plan (untilNodeID)
+	// and a single-component run (AllowMissingEnd, set by the engine for
+	// execute_component).
+	//
+	// The unwired check additionally needs `allowed != nil` — that is the
+	// no-Entry-node legacy fallback where scoping never ran, so there is no
+	// plan-membership signal to judge against. A workflow with no Entry AND
+	// a dangling End therefore reaches execution; engine.finalize's
+	// unreached_end_node guard is that shape's only defence.
+	if o.untilNodeID == "" && !o.endOptional {
+		if !hasEndNode(w.Nodes) {
+			return nil, &MissingEndNodeError{}
 		}
-		if !endInPlan {
+		if allowed != nil && !hasEndNodeInPlan(w.Nodes, allowed) {
 			return nil, &UnwiredEndNodeError{}
 		}
 	}
 
-	// 8. Layered topo sort. We seed with the input ordering of Nodes
+	// 7. Layered topo sort. We seed with the input ordering of Nodes
 	// to keep results stable across runs; a stable order helps both
 	// debugging and integration-test diffs against Python output.
 	layers := layerize(w.Nodes, children, parents, allowed)
@@ -350,6 +334,35 @@ func New(w *dsl.Workflow, opts ...Option) (*Plan, error) {
 		Children: children,
 		Parents:  parents,
 	}, nil
+}
+
+// hasEndNode reports whether the workflow declares an End node at all.
+func hasEndNode(nodes []dsl.Node) bool {
+	for i := range nodes {
+		if nodes[i].Type == dsl.ComponentEnd {
+			return true
+		}
+	}
+	return false
+}
+
+// hasEndNodeInPlan reports whether at least one End node survived reachability
+// scoping and will therefore actually be dispatched.
+//
+// Tests `allowed[id]` by VALUE, matching layerize — the two must agree on what
+// membership means. Key-presence (`for id := range allowed`) happens to give
+// the same answer today only because the scoping helpers never store `false`;
+// the moment anyone expresses exclusion as `allowed[id] = false` rather than
+// `delete`, a presence check would report the End as in-plan while layerize
+// correctly dropped it, and the guard would wave through the exact silent
+// empty success it exists to catch.
+func hasEndNodeInPlan(nodes []dsl.Node, allowed map[string]bool) bool {
+	for i := range nodes {
+		if nodes[i].Type == dsl.ComponentEnd && allowed[nodes[i].ID] {
+			return true
+		}
+	}
+	return false
 }
 
 // findCycle returns one cycle path if the graph has a directed cycle,
