@@ -365,8 +365,9 @@ export class CodingAgentSessionClickHouseRepository
    * rewrites, dropping the other version's contributions and its applied-id
    * watermark.
    *
-   * The tiebreak orders by how far each version's fold actually got, and the
-   * session is fed by three signal families, so it needs a key for each:
+   * Keys 1-4 order by how far each version's fold actually got, and the session
+   * is fed by three signal families, so it needs a key for each. Key 5 is not a
+   * progress key at all — it is only there to close the ordering:
    *   1. `LastEventOccurredAt DESC` — the fold's own progress watermark
    *      (`max(prev, event.occurredAt)`, so non-decreasing): the version that
    *      applied the latest event wins.
