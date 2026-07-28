@@ -242,7 +242,9 @@ registry, and dashboard stay the same.
   - _neither_ (default): the worker runs in the shared colima VM with the
     per-worker UID sandbox on (production-like); nothing it does can touch your
     real filesystem. haven builds `langyagent:dev` into colima on first `up`
-    (minutes once; `HAVEN_LANGY_REBUILD=1` forces a rebuild after source changes).
+    (minutes once; the image tag is content-addressed, so it rebuilds by itself
+    when its build inputs change — `haven up --rebuild` or
+    `haven restart langy --rebuild` forces it).
   - `LANGY_UNSAFE_CONTAINER=1`: still in the colima VM (host still isolated), but
     the per-worker UID sandbox is off — simpler/faster when iterating.
   - `LANGY_UNSAFE_HOST_ACCESS=1`: runs the worker as a bare host process, no VM,

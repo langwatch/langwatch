@@ -377,14 +377,30 @@ func (o *Orchestrator) reconcileRunningStack(p UpParams, opts PlanOptions) (proc
 		o.store.RemoveStack(slug)
 		return true, nil
 	}
-	if !opts.ShouldForce && domain.SelectionFromStack(st) == opts.Selection && st.LangyImage == opts.langyImageTag {
+	// Everything that makes the running stack differ from what was asked for.
+	// A term missing here becomes a silent no-op: `up` reports "nothing to do"
+	// while the stack keeps running under the old settings.
+	selectionMatches := domain.SelectionFromStack(st) == opts.Selection
+	imageMatches := st.LangyImage == opts.langyImageTag
+	// The langy isolation posture is a security property, not a preference:
+	// re-running `up` after unsetting LANGY_UNSAFE_CONTAINER must actually put
+	// the UID sandbox back, not report a match.
+	tierMatches := st.LangyTier == opts.LangyTier
+	if !opts.ShouldForce && !opts.ShouldRebuildImages && selectionMatches && imageMatches && tierMatches {
 		fmt.Printf("stack %q is already running (launcher pid %d) and matches the selection — nothing to do\n", slug, st.LauncherPID)
 		fmt.Printf("  bounce a service: haven restart [service] · restart everything: haven up -f · stop: haven down\n")
 		return false, nil
 	}
-	if opts.ShouldForce {
+	switch {
+	case opts.ShouldForce:
 		fmt.Printf("stack %q is running — replacing it (-f)\n", slug)
-	} else {
+	case opts.ShouldRebuildImages:
+		fmt.Printf("stack %q is running — replacing it to rebuild its images (--rebuild)\n", slug)
+	case !tierMatches:
+		fmt.Printf("stack %q is running under a different langy isolation tier — restarting it with the requested one\n", slug)
+	case !imageMatches:
+		fmt.Printf("stack %q is running an older langy image (its build inputs changed) — restarting it\n", slug)
+	default:
 		fmt.Printf("stack %q is running with a different selection — restarting it here with the new one\n", slug)
 	}
 	o.sys.Terminate(st.LauncherPID)

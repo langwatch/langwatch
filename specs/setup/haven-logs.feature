@@ -1,3 +1,4 @@
+@unit
 Feature: haven logs
   Every service's output is captured per-service whether the stack is
   attached or detached, so logs can be replayed, followed, and filtered
@@ -23,6 +24,7 @@ Feature: haven logs
     Then only nlp's lines appear
     And "haven logs nlp gateway" combines the two
 
+  @integration @unimplemented
   Scenario: Tailing is -t and only -t
     When the developer runs "haven logs -t"
     Then output streams live until interrupted
@@ -36,6 +38,7 @@ Feature: haven logs
     When the developer runs "haven logs --level warn"
     Then only lines at warn or above appear
 
+  @integration @unimplemented
   Scenario: Another stack's logs by name
     When the developer runs "haven logs --stack otherslug"
     Then that worktree's services print instead of this one's
@@ -45,6 +48,7 @@ Feature: haven logs
     When the developer runs "haven logs"
     Then the last run's output is still readable
 
+  @integration @unimplemented
   Scenario: The observability stack is a log target like any other
     When the developer runs "haven logs obs"
     Then the observability stack's container output appears

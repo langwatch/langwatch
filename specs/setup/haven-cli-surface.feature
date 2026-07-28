@@ -1,3 +1,4 @@
+@unit
 Feature: haven CLI surface
   One name per command, one meaning per flag, one way to do each thing.
   The daily surface is six verbs (hub, up, down, restart, logs, status);
@@ -14,12 +15,14 @@ Feature: haven CLI surface
     And "-f" is accepted only where it means "--force" — forcing the lifecycle on up and down
     And non-interactive confirmation of a destructive DATA action is always "--yes", never "--force"
 
+  @integration @unimplemented
   Scenario: Status is one word with one meaning
     When the developer runs "haven status"
     Then one report covers this worktree's selection and service health, the shared servers, and RAM footprints
     And "--json" emits the same report machine-readably
     And no other command or subcommand is named "status"
 
+  @integration @unimplemented
   Scenario: Bare haven opens the hub
     Given a terminal
     When the developer runs "haven"
@@ -31,6 +34,7 @@ Feature: haven CLI surface
     Then it fails listing the closest valid commands
     And nothing is started or changed
 
+  @integration @unimplemented
   Scenario: Down never touches data
     Given a running stack
     When the developer runs "haven down"
@@ -38,6 +42,7 @@ Feature: haven CLI surface
     And "haven down -f" kills hard instead of waiting on graceful shutdown
     And no flag on down can drop data
 
+  @integration @unimplemented
   Scenario: Down --all returns the machine
     Given stacks running in several worktrees
     When the developer runs "haven down --all"
@@ -55,6 +60,7 @@ Feature: haven CLI surface
     Then this stack's Postgres connection string is printed
     And "clickhouse" and "redis" work the same way
 
+  @integration @unimplemented
   Scenario: Cleanup is one interactive command
     When the developer runs "haven clean"
     Then the interactive picker offers every worktree with its databases, disk size, and idle time

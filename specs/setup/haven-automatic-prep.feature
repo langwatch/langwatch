@@ -1,9 +1,11 @@
+@unit
 Feature: haven automatic preparation
   up owns the whole path from a fresh machine to a running stack: bootstrap,
   dependency install, database create-and-recover, and image reuse are
   idempotent preflight steps — never separate commands, never errors the
   developer must know how to fix by hand. See ADR-064.
 
+  @integration @unimplemented
   Scenario: First up on a fresh machine needs no setup command
     Given a machine where portless has never been installed
     When the developer runs "haven up"
@@ -15,22 +17,26 @@ Feature: haven automatic preparation
     When the developer runs "haven up"
     Then dependencies are installed before any service starts
 
+  @integration @unimplemented
   Scenario: A missing database is created, migrated, and seeded
     Given this worktree has no databases yet
     When the developer runs "haven up"
     Then its databases exist, are migrated, and are seeded before the app starts
 
+  @integration @unimplemented
   Scenario: A stopped database server is started, not reported
     Given the shared ClickHouse container is stopped
     When the developer runs "haven up"
     Then the container is started and up proceeds
 
+  @integration @unimplemented
   Scenario: A wedged database container is recovered without data loss
     Given the shared ClickHouse container is unhealthy and not responding
     When the developer runs "haven up"
     Then the container is recreated with its data volume preserved
     And up proceeds once it is healthy
 
+  @integration @unimplemented
   Scenario: A broken database is never silently dropped
     Given migrations fail against this worktree's existing database
     When the developer runs "haven up"

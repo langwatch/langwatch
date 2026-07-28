@@ -186,8 +186,13 @@ func TestUpReconcilesRunningStack(t *testing.T) {
 
 	t.Run("given the stack is live and matches the selection", func(t *testing.T) {
 		t.Run("when up runs, it is a friendly no-op — nothing terminated, nothing provisioned", func(t *testing.T) {
-			store, sys, o := newFixture(true)
-			opts := PlanOptions{Selection: domain.SelectionFromStack(store.stacks[0])}
+			_, sys, o := newFixture(true)
+			// Spelled out rather than derived through SelectionFromStack: deriving
+			// the expectation with the same function reconcile compares with makes
+			// the assertion f(x) == f(x), which holds for any implementation.
+			// restartStack runs app + a standalone worker lane + a real gateway;
+			// its nlp is a baseline fallback, so it is not part of the selection.
+			opts := PlanOptions{Selection: domain.Selection{Workers: true, Gateway: true}}
 			proceed, err := o.reconcileRunningStack(params, opts)
 			if err != nil {
 				t.Fatalf("reconcile: %v", err)
@@ -197,6 +202,45 @@ func TestUpReconcilesRunningStack(t *testing.T) {
 			}
 			if len(sys.terminated) != 0 {
 				t.Errorf("nothing may be terminated, got %v", sys.terminated)
+			}
+		})
+
+		// --rebuild exists to force fresh image bytes; reporting "nothing to do"
+		// hands the developer a stale image and no indication of it.
+		t.Run("when up runs with --rebuild, the stack is replaced so the image is rebuilt", func(t *testing.T) {
+			store, _, o := newFixture(true)
+			opts := PlanOptions{
+				Selection:           domain.SelectionFromStack(store.stacks[0]),
+				ShouldRebuildImages: true,
+			}
+			proceed, err := o.reconcileRunningStack(params, opts)
+			if err != nil {
+				t.Fatalf("reconcile: %v", err)
+			}
+			if !proceed {
+				t.Error("--rebuild must re-provision even a matching stack")
+			}
+		})
+
+		// The isolation tier is a security posture: turning the sandbox back on
+		// must take effect, not be reported as already-matching.
+		t.Run("when the langy isolation tier differs, the stack is replaced", func(t *testing.T) {
+			store, sys, o := newFixture(true)
+			// The running stack is at the zero value (sandboxed); ask for a
+			// different posture and reconcile must act on it.
+			opts := PlanOptions{
+				Selection: domain.SelectionFromStack(store.stacks[0]),
+				LangyTier: domain.LangyTierHostUnsafe,
+			}
+			proceed, err := o.reconcileRunningStack(params, opts)
+			if err != nil {
+				t.Fatalf("reconcile: %v", err)
+			}
+			if !proceed {
+				t.Error("a changed langy isolation tier must re-provision")
+			}
+			if len(sys.terminated) != 1 || sys.terminated[0] != 42 {
+				t.Errorf("the old launcher must be terminated, got %v", sys.terminated)
 			}
 		})
 	})

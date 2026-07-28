@@ -62,7 +62,15 @@ func (s *logSink) writeLine(line string) {
 // open appends to the existing file (mode 0600 — service output can carry
 // seeded credentials), starting the byte counter from its current size so the
 // cap holds across restarts.
-func (s *logSink) open() error {
+func (s *logSink) open() error { return s.openFile(true) }
+
+// openFile is open's body. mayRotate exists to make the open/rotate cycle
+// provably finite: rotate reopens through openFile(false), so a rename that
+// fails to shrink the file can never bounce straight back into rotate. Before
+// that, a read-only log directory or a locked file turned "capture the output"
+// into unbounded recursion and a stack overflow that took the launcher — and
+// with it the whole stack — down.
+func (s *logSink) openFile(mayRotate bool) error {
 	if err := os.MkdirAll(filepath.Dir(s.path), 0o755); err != nil {
 		return err
 	}
@@ -74,19 +82,26 @@ func (s *logSink) open() error {
 		s.written = info.Size()
 	}
 	s.file = f
-	if s.written >= logSinkMaxBytes {
+	if mayRotate && s.written >= logSinkMaxBytes {
 		s.rotate()
 	}
 	return nil
 }
 
 // rotate moves the live file to its single kept generation and reopens fresh.
+// A capture sink must never take the service down, so every failure here
+// disables capture rather than propagating.
 func (s *logSink) rotate() {
 	_ = s.file.Close()
 	s.file = nil
-	_ = os.Rename(s.path, s.path+".1")
+	if err := os.Rename(s.path, s.path+".1"); err != nil {
+		// The oversized file is still in place; reopening would find it over the
+		// cap again and rotate forever.
+		s.disabled = true
+		return
+	}
 	s.written = 0
-	if err := s.open(); err != nil {
+	if err := s.openFile(false); err != nil {
 		s.disabled = true
 	}
 }

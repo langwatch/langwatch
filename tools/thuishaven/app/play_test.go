@@ -136,6 +136,10 @@ func forkCommit(sha, login, name string, verified bool) ghPRCommit {
 // fork, GitHub's author/committer attribution is derived from the commit's email
 // header, which the PR author chooses — so an unsigned commit claiming to be a
 // maintainer must not buy any trust at all.
+//
+// @scenario "A fork commit claiming a maintainer's identity is still untrusted"
+// @scenario "A fork commit is trusted only when a verified signer has write access"
+// @scenario "One unsigned commit taints a fork PR"
 func TestForkCommitAttributionIsNotTrustedWithoutASignature(t *testing.T) {
 	// Every maintainer login would pass a permission check; that is the point.
 	everyoneHasWrite := func(string) bool { return true }
@@ -178,6 +182,30 @@ func TestForkCommitAttributionIsNotTrustedWithoutASignature(t *testing.T) {
 			}
 			if untrusted := untrustedForkCommits(commits, everyoneHasWrite); len(untrusted) != 1 {
 				t.Errorf("one unsigned commit must taint the PR, got %v", untrusted)
+			}
+		})
+	})
+}
+
+// @scenario "A commit listing that hits GitHub's cap fails closed"
+func TestTruncatedCommitListingFailsClosed(t *testing.T) {
+	t.Run("given a listing below GitHub's cap", func(t *testing.T) {
+		t.Run("when the gate reads it, the listing is complete and usable", func(t *testing.T) {
+			if err := errIfCommitListingTruncated(7, playPRCommitsAPICap-1); err != nil {
+				t.Errorf("a complete listing must be accepted, got %v", err)
+			}
+		})
+	})
+
+	t.Run("given a listing that reached GitHub's cap", func(t *testing.T) {
+		// The cap withholds the NEWEST commits, which are the ones that run.
+		t.Run("when the gate reads it, play refuses rather than vouching for it", func(t *testing.T) {
+			err := errIfCommitListingTruncated(7, playPRCommitsAPICap)
+			if err == nil {
+				t.Fatal("a truncated listing must not be treated as complete")
+			}
+			if !strings.Contains(err.Error(), "--allow-untrusted") {
+				t.Errorf("the error should name the explicit way past, got %q", err)
 			}
 		})
 	})

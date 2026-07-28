@@ -5,9 +5,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
 // The `haven logs` command: every service's captured output, from any
@@ -56,6 +59,11 @@ func runLogsCmd(ctx context.Context, d deps, inv invocation) error {
 			return err
 		}
 		slug = resolved
+	} else if !domain.ValidSlug(slug) {
+		// This value becomes a path segment below. Every other slug entry point
+		// gates on ValidSlug; without it `--stack ../../..` walks out of the haven
+		// home and prints whatever *.log files it finds there.
+		return fmt.Errorf("--stack %q is not a valid stack slug", slug)
 	}
 	dir := filepath.Join(havenHome(), "logs", slug)
 
@@ -196,11 +204,31 @@ var logLevelRank = map[string]int{"trace": 1, "debug": 2, "info": 3, "warn": 4, 
 
 func minLevelRank(level string) int { return logLevelRank[strings.ToLower(level)] }
 
-// lineLevelRank sniffs a line's severity from its first level-looking token.
+// ansiSequence matches the escape sequences services colour their output with.
+// Captured logs are raw service stdout, so a level word arrives wrapped —
+// pino-pretty and the Go services both emit things like
+// "\x1b[0m\x1b[33mWARN\x1b[0m". Tokenising that text without stripping the
+// escapes finds no level word at all, which silently made --level drop every
+// line it was meant to select.
+var ansiSequence = regexp.MustCompile(`\x1b\[[0-9;?]*[a-zA-Z]`)
+
+func stripANSI(s string) string { return ansiSequence.ReplaceAllString(s, "") }
+
+// levelSniffTokens bounds how far into a line a level word is looked for. A
+// level prefix appears at the very start; scanning the whole line means ordinary
+// prose ("failed to fetch trace abc") is read as a severity and the line is
+// hidden by exactly the filter meant to surface it.
+const levelSniffTokens = 4
+
+// lineLevelRank sniffs a line's severity from its leading level-looking token.
 // 0 means the line names no level (a continuation, a raw print) — such lines
 // pass an unfiltered view and are hidden by --level.
 func lineLevelRank(text string) int {
-	for _, tok := range strings.Fields(text) {
+	fields := strings.Fields(stripANSI(text))
+	for i, tok := range fields {
+		if i >= levelSniffTokens {
+			break
+		}
 		tok = strings.Trim(tok, "[]():")
 		if r, ok := logLevelRank[strings.ToLower(tok)]; ok {
 			return r
@@ -210,13 +238,13 @@ func lineLevelRank(text string) int {
 }
 
 func filterLogLines(lines []logLine, since time.Time, level string) []logLine {
-	min := minLevelRank(level)
+	minRank := minLevelRank(level)
 	var out []logLine
 	for _, l := range lines {
 		if !since.IsZero() && l.ts.Before(since) {
 			continue
 		}
-		if min > 0 && lineLevelRank(l.text) < min {
+		if minRank > 0 && lineLevelRank(l.text) < minRank {
 			continue
 		}
 		out = append(out, l)

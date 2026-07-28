@@ -104,6 +104,38 @@ func TestFilterLogLines(t *testing.T) {
 			t.Errorf("got %d, want all 4", len(got))
 		}
 	})
+
+	// Captured output is raw service stdout, so the level word arrives wrapped in
+	// colour escapes. Hand-written plain fixtures pass while the filter drops
+	// every real line, so these are shaped like what the sink actually stores.
+	t.Run("given colourised output, as every real service emits", func(t *testing.T) {
+		colourised := []logLine{
+			{ts: base, service: "nlp", text: "\x1b[0m\x1b[32mINFO\x1b[0m\x1b[32m listening on :5561\x1b[0m"},
+			{ts: base.Add(time.Minute), service: "nlp", text: "\x1b[0m\x1b[33mWARN\x1b[0m\x1b[33m slow query\x1b[0m"},
+			{ts: base.Add(2 * time.Minute), service: "app", text: "\x1b[31mERROR\x1b[0m exploded"},
+		}
+
+		t.Run("when filtering by level, the escapes do not hide the severity", func(t *testing.T) {
+			got := filterLogLines(colourised, time.Time{}, "warn")
+			if len(got) != 2 {
+				t.Errorf("got %d lines, want the warn and error lines — ANSI must be stripped before sniffing", len(got))
+			}
+		})
+	})
+
+	// "trace" and "debug" are ordinary nouns in this codebase, so a level word
+	// found deep in prose is almost always a false positive.
+	t.Run("given a level word appearing in the middle of a message", func(t *testing.T) {
+		prose := []logLine{
+			{ts: base, service: "app", text: "ERROR failed to fetch trace abc: connection refused"},
+		}
+
+		t.Run("when filtering by warn, the line is still surfaced", func(t *testing.T) {
+			if got := filterLogLines(prose, time.Time{}, "warn"); len(got) != 1 {
+				t.Error("an ERROR line must not be reclassified by the word 'trace' later in the message")
+			}
+		})
+	})
 }
 
 // @scenario "Logs outlive the stack"

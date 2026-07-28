@@ -377,14 +377,25 @@ func playPRCommits(ctx context.Context, repoRoot string, number int) ([]ghPRComm
 		}
 		all = append(all, page...)
 	}
-	if len(all) >= playPRCommitsAPICap {
-		return nil, fmt.Errorf(
-			"PR #%d has at least %d commits, which is GitHub's listing cap for this endpoint — "+
-				"haven cannot see the newest commits, so it cannot vouch for what it would run.\n"+
-				"Review it by hand, or re-run with --allow-untrusted to accept that explicitly.",
-			number, playPRCommitsAPICap)
+	if err := errIfCommitListingTruncated(number, len(all)); err != nil {
+		return nil, err
 	}
 	return all, nil
+}
+
+// errIfCommitListingTruncated fails closed when the listing reached GitHub's
+// cap. A truncated page set is not a smaller PR: it is the same PR with its
+// newest commits — the ones that actually get checked out — withheld, so
+// gating on what came back would vouch for code nobody looked at.
+func errIfCommitListingTruncated(number, got int) error {
+	if got < playPRCommitsAPICap {
+		return nil
+	}
+	return fmt.Errorf(
+		"PR #%d has at least %d commits, which is GitHub's listing cap for this endpoint — "+
+			"haven cannot see the newest commits, so it cannot vouch for what it would run.\n"+
+			"Review it by hand, or re-run with --allow-untrusted to accept that explicitly.",
+		number, playPRCommitsAPICap)
 }
 
 // collaboratorPermission asks GitHub what access a login has on this repo.

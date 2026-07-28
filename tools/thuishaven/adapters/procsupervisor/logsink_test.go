@@ -59,6 +59,40 @@ func TestLogSinkRotatesAtTheCap(t *testing.T) {
 	}
 }
 
+// A capture sink must never take the service down. When rotation cannot
+// shrink the file, reopening finds it over the cap and rotates again — so the
+// failure has to disable capture rather than recurse.
+func TestLogSinkGivesUpWhenRotationCannotShrinkTheFile(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "app.log")
+	if err := os.WriteFile(path, make([]byte, logSinkMaxBytes+1), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	// A read-only directory makes the rename fail the way a locked or
+	// permission-denied log directory would in the field.
+	if err := os.Chmod(dir, 0o500); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o700) })
+
+	sink := newLogSink(path)
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		sink.writeLine("this must not recurse forever")
+	}()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("writeLine did not return: rotation is looping instead of giving up")
+	}
+
+	if !sink.disabled {
+		t.Error("a sink that cannot rotate must disable itself rather than retry indefinitely")
+	}
+}
+
 func TestNilSinkIsANoOp(t *testing.T) {
 	var sink *logSink
 	sink.writeLine("should not panic") // one-shot lanes have no capture
