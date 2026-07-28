@@ -99,7 +99,8 @@ func TestMessagesTranslated_BedrockVPCE_DispatchesThroughPrivateEndpoint(t *test
 	content, ok := msg["content"].([]any)
 	require.True(t, ok)
 	require.Len(t, content, 1)
-	block := content[0].(map[string]any)
+	block, ok := content[0].(map[string]any)
+	require.True(t, ok, "content[0] must be a content block object, got %T", content[0])
 	assert.Equal(t, "text", block["type"])
 	assert.Equal(t, "the answer is 42", block["text"])
 
@@ -181,7 +182,8 @@ func TestMessagesTranslated_BedrockVPCE_GateRunsBeforeBifrost(t *testing.T) {
 	var envelope map[string]any
 	require.NoError(t, json.Unmarshal(ue.Body, &envelope))
 	assert.Equal(t, "error", envelope["type"])
-	detail := envelope["error"].(map[string]any)
+	detail, ok := envelope["error"].(map[string]any)
+	require.True(t, ok, "the error field must be an object, got %T", envelope["error"])
 	assert.Contains(t, detail["message"], "amazonaws.com",
 		"the error must name the endpoint problem so the customer can fix their config")
 
