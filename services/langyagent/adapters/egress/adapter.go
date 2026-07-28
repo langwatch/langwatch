@@ -221,14 +221,25 @@ func (a *egressAdapter) handleConnect(w http.ResponseWriter, r *http.Request) {
 	// differing SNI would NOT pass the same allow set, it never reaches the
 	// destination. A benign quirk (SNI differs but is itself allowed) proceeds.
 	if a.cfg.sniCrossCheck {
-		sni, replay, perr := peekClientHelloSNI(clientConn, a.cfg.sniPeekTimeout)
+		sni, sawHandshake, replay, _ := peekClientHelloSNI(clientConn, a.cfg.sniPeekTimeout)
 		clientConn = replay
-		if perr == nil && sni != "" && sni != fqdn {
+		switch {
+		case sni != "" && sni != fqdn:
 			if a.cfg.policy.decide(sni).blocked() {
 				a.record(sni, port, egressDeniedSNIMismatch,
 					fmt.Sprintf("sni %q not allowed (authority was %q)", sni, fqdn), 0)
 				return
 			}
+		case sni == "" && sawHandshake && a.cfg.policy.enforcing():
+			// It IS a TLS handshake, yet no SNI came out of it. Under an
+			// enforcing policy that has to fail closed: an unreadable hello is
+			// exactly what a client fronting a shared CDN would produce on
+			// purpose, and treating it as "nothing to check" made the whole
+			// cross-check opt-out. Monitor-only is unaffected — nothing is
+			// blocked there anyway — so opaque and non-TLS tunnels still pass.
+			a.record(fqdn, port, egressDeniedSNIUnreadable,
+				fmt.Sprintf("unreadable TLS ClientHello under an enforcing policy (authority was %q)", fqdn), 0)
+			return
 		}
 	}
 

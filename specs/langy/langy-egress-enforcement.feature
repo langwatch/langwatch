@@ -1,4 +1,9 @@
-@unimplemented
+# Implemented. The feature-level @unimplemented tag was stale: the adapter,
+# policy, throttle and SNI cross-check all ship in
+# services/langyagent/adapters/egress/ and are wired by cmd/manager.go
+# (startEgressAdapter -> NewEnforcingGuard) and app/workerpool/pool.go.
+# Mislabelling a SECURITY control as unbuilt is worse than mislabelling a
+# feature — it invites someone to conclude the control does not exist. See #5881.
 Feature: Langy worker egress enforcement — monitor first, enforce last
   As the operator of the langyagent backend, and as a customer whose project
   Langy acts on
@@ -159,3 +164,39 @@ Feature: Langy worker egress enforcement — monitor first, enforce last
     When workers make their normal outbound requests after this change ships
     Then no new outbound request is blocked by default
     And every outbound request is monitored and attributable
+
+  # ===========================================================================
+  # Rung 3 cross-check — the SNI must be readable, not merely non-contradictory
+  # ===========================================================================
+
+  # A TLS handshake message may legally be fragmented across records. Reading
+  # only the first record let a hostile worker push its SNI into record 2, so
+  # the cross-check found nothing to compare and waved the tunnel through —
+  # the anti-domain-fronting control was opt-out for anyone who wanted out.
+  Scenario: A ClientHello split across TLS records still reveals its SNI
+    Given a project allow-list that permits "allowed.example"
+    And a worker that CONNECTs to "allowed.example" but negotiates TLS for "attacker.example"
+    When the worker fragments its ClientHello across two TLS records
+    Then the adapter reassembles the handshake and reads the real SNI
+    And the connection is refused before the destination is dialed
+    And the refusal is flagged as an SNI mismatch
+
+  Scenario: An unreadable ClientHello is refused while a policy is enforcing
+    Given a project allow-list is in force
+    And a worker opens a tunnel whose TLS handshake yields no readable SNI
+    Then the connection is refused
+    And the refusal is flagged as an unreadable SNI
+
+  # Monitor-only blocks nothing by definition, so failing closed there would be
+  # a behaviour change for installs that opted into nothing.
+  Scenario: An unreadable ClientHello is left alone under monitor-only
+    Given no allow-list is set and the floor is not enforced
+    And a worker opens a tunnel whose TLS handshake yields no readable SNI
+    Then the connection is allowed
+    And the flow is still monitored and attributable
+
+  Scenario: A tunnel that is not TLS at all is unaffected by the cross-check
+    Given a project allow-list is in force
+    And a worker opens a tunnel carrying a protocol that is not TLS
+    Then the SNI cross-check does not refuse it
+    And the require-TLS rung remains the control that governs cleartext

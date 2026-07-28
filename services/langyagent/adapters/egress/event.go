@@ -37,7 +37,13 @@ const (
 	egressDeniedCleartext egressDecision = "denied_cleartext"
 	// egressDeniedSNIMismatch: the TLS ClientHello SNI did not match the CONNECT
 	// authority the decision was made against (domain-fronting attempt).
-	egressDeniedSNIMismatch    egressDecision = "denied_sni_mismatch"
+	egressDeniedSNIMismatch egressDecision = "denied_sni_mismatch"
+	// egressDeniedSNIUnreadable: the stream is a TLS handshake but no SNI could
+	// be recovered from it, while an allow-list (or the enforced floor) is in
+	// force. Fragmenting the ClientHello across records is the cheap way to make
+	// the cross-check unreadable, so under an enforcing policy "cannot read"
+	// must fail closed — otherwise the anti-fronting check is opt-out.
+	egressDeniedSNIUnreadable  egressDecision = "denied_sni_unreadable"
 	egressDeniedPrivateAddress egressDecision = "denied_private_address"
 )
 
@@ -45,7 +51,7 @@ const (
 // destination). Used at the call site to choose 403 vs. tunnel.
 func (d egressDecision) blocked() bool {
 	switch d {
-	case egressDenied, egressDeniedCleartext, egressDeniedSNIMismatch, egressDeniedPrivateAddress:
+	case egressDenied, egressDeniedCleartext, egressDeniedSNIMismatch, egressDeniedSNIUnreadable, egressDeniedPrivateAddress:
 		return true
 	default:
 		return false

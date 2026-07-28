@@ -27,14 +27,36 @@ import (
 // Go's runtime does NOT auto-reap PID 1's adopted orphans; the standard idiom is
 // a SIGCHLD-driven Wait4(-1, WNOHANG, ...) loop.
 //
-// No-op when the manager isn't PID 1 (Wait4 returns ECHILD immediately because
-// no orphans get reparented to a non-init PID). Fire-and-forget: it spawns a
-// goroutine that stops when ctx is cancelled, so it plugs straight into a
-// pkg/lifecycle Worker. The goroutine is launched via clog.Go so a panic can
-// never crash the manager, and each SIGCHLD-drain is additionally guarded so a
-// panic in one drain can't silently end zombie-reaping forever.
+// GATED ON PID 1, and that gate is load-bearing rather than cosmetic.
+// Wait4(-1, ...) matches ANY child of this process, not merely a reparented
+// orphan — and the manager always has direct children, namely the worker
+// subprocesses. So off PID 1 this loop does not idle; it races
+// Pool.spawnInner's exit watcher for the pool's own workers. Whichever caller
+// reaps first wins, and the loser's cmd.Wait() returns ECHILD, which would
+// report a clean exit as "waitid: no child processes" and discard the real exit
+// status. Reaping orphans is only PID 1's job in the first place, so confining
+// the loop to PID 1 removes the race everywhere else (tests, local dev, any
+// non-init packaging) at zero cost to the behavior it exists for.
+//
+// Fire-and-forget: it spawns a goroutine that stops when ctx is cancelled, so
+// it plugs straight into a pkg/lifecycle Worker. The goroutine is launched via
+// clog.Go so a panic can never crash the manager, and each SIGCHLD-drain is
+// additionally guarded so a panic in one drain can't silently end zombie-reaping
+// forever.
 func StartOrphanReaper(ctx context.Context) {
+	startOrphanReaper(ctx, os.Getpid())
+}
+
+// startOrphanReaper is StartOrphanReaper with the PID injected so the gate is
+// testable off init. Returns true when the reaper loop was started.
+func startOrphanReaper(ctx context.Context, pid int) bool {
 	log := clog.Get(ctx)
+	if pid != 1 {
+		// Not init: nothing reparents here, and Wait4(-1) would only steal the
+		// pool's own worker exits from cmd.Wait().
+		log.Debug("orphan reaper not started: manager is not PID 1")
+		return false
+	}
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGCHLD)
 	clog.Go(ctx, "orphan-reaper", func() {
@@ -54,6 +76,7 @@ func StartOrphanReaper(ctx context.Context) {
 			}
 		}
 	})
+	return true
 }
 
 // drainOrphans reaps every currently-reapable child in a tight loop — one
