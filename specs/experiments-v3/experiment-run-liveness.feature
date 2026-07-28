@@ -1,41 +1,120 @@
 Feature: Experiment runs always reach a terminal state
   An experiment run is watched by a durable process for as long as it is
-  producing results. If the work behind it disappears, the run is recorded as
-  failed instead of staying started forever. (ADR-073.)
+  producing results. If the work behind it disappears, the run stops being
+  reported as running instead of staying started forever. (ADR-073.)
 
-  # @unimplemented: NONE of this is built yet. ADR-073 splits into two steps;
-  # step 1 shipped the equivalent process for *simulation* runs — see
-  # specs/scenarios/scenario-execution-process-manager.feature, which is bound.
-  # Experiment runs (evals v3) still execute in an async generator inside the
-  # web request's own process, with progress in Redis on a 24h TTL and no
-  # reaper of any kind. This file is the target these scenarios describe, kept
-  # here so the gap is stated rather than implied; bind each scenario as the
-  # `experimentRunExecution` process manager lands.
+  # CORRECTION (2026-07-28). The first draft of this file asked for a terminal
+  # state the domain cannot express. `experimentRunCompletedEventDataSchema`
+  # models exactly two fields — `finishedAt` and `stoppedAt` — the
+  # `experiment_runs` table has no failure or reason column, and every reader
+  # derives "terminal" from `finishedAt ?? stoppedAt`. There is no *failed*
+  # experiment run. Scenarios now say "stops being reported as running", which
+  # is what the platform can honestly deliver: a reaped run is written as
+  # STOPPED, never FINISHED, because presenting a partial result set as a
+  # complete one is worse than presenting it as cut short.
+  #
+  # Giving the reason a durable home — an additive optional field on the
+  # completed event plus a stored column — is the same move ADR-073 step 2
+  # makes for simulations, and belongs with it rather than here.
+  #
+  # Dispatch scenarios have moved out. "Executes on the fleet" cannot be
+  # delivered in the shape this file implied: ADR-076 establishes that the
+  # leasable unit is a slice of cells and that a per-cell time cap is its
+  # precondition. Liveness does not need that and does not wait for it.
 
   Background:
     Given an experiment with a dataset and evaluators
 
-  # --- Liveness ---
+  # ============================================================================
+  # Staying alive
+  # ============================================================================
 
-  @integration @unimplemented
+  @unit
   Scenario: Results keep a running experiment alive
     Given an experiment run that is producing results
     When it keeps producing results for longer than the silence allowed
-    Then the run is not failed for inactivity
+    Then it is not ended for inactivity
+    And each result extends how long it may go quiet
 
-  @integration @unimplemented
-  Scenario: An experiment run whose work disappears is failed
+  @unit
+  Scenario: A backlog does not end a healthy run
+    Given results are being recorded later than they occurred
+    When a result arrives describing a moment already past
+    Then the run's remaining quiet time is measured from now
+    And a healthy run is not ended because of the delay
+
+  # ============================================================================
+  # Being ended
+  # ============================================================================
+
+  @unit
+  Scenario: An experiment run whose work disappears is ended
     Given an experiment run that has started
     When the work behind it stops producing results and never completes
-    Then the run is reported as failed
-    And the reason given is that it stalled
+    Then the run stops being reported as running
+    And it is reported as cut short rather than as having completed
 
-  @integration @unimplemented
-  Scenario: An abandoned interactive run is recorded as failed
-    Given an interactive experiment run streaming to a browser
-    When the process running it is lost
-    Then the run is reported as failed
-    And it does not stay reported as running
+  @unit
+  Scenario: Ending a run stops it spending
+    Given an experiment run that is ended for inactivity
+    When the platform records the outcome
+    Then the work is signalled to stop first
+    So that a run ended in error cannot keep costing the customer money
+
+  @unit
+  Scenario: A stop that is never observed still ends the run
+    Given an experiment run whose work cannot be signalled
+    When the user stops it
+    Then the run still reaches a terminal state
+
+  # ============================================================================
+  # Not being ended twice
+  # ============================================================================
+
+  @unit
+  Scenario: A completed run stops being watched
+    Given an experiment run that completes normally
+    When its completion is recorded
+    Then no further deadline is armed for it
+    And it is not ended afterwards for inactivity
+
+  @unit
+  Scenario: A late result cannot revive a completed run
+    Given an experiment run that has completed
+    When a straggling result arrives afterwards
+    Then the run is not put back under watch
+
+  @unit
+  Scenario: Recording the outcome twice records it once
+    Given an experiment run that has been ended
+    When the recording is retried
+    Then the run has one terminal outcome, not two
+
+  @unit
+  Scenario: A run nothing is known about is abandoned rather than retried forever
+    Given no result has said which experiment the run belongs to
+    When its deadline fires
+    Then nothing is recorded against it
+    And it is not re-examined on every later sweep
+
+  # ============================================================================
+  # What the watch costs
+  # ============================================================================
+  #
+  # Experiment-run events carry the customer's dataset rows, the model's
+  # outputs, evaluator inputs and free-text errors. Watching a run must not
+  # copy any of that into the platform's own bookkeeping.
+
+  @unit
+  Scenario: Watching a run does not copy what the run is about
+    Given an experiment run whose results carry dataset rows and model outputs
+    When the platform watches the run for liveness
+    Then only the identities needed to find the run again are kept
+    And no dataset row, model output or evaluator input is copied into them
+
+  # ============================================================================
+  # Reading a run back
+  # ============================================================================
 
   @integration @unimplemented
   Scenario: Recovery does not depend on a cached progress record
@@ -43,41 +122,26 @@ Feature: Experiment runs always reach a terminal state
     When the run is read
     Then its outcome is still reported
 
-  # --- Dispatch ---
+  # ============================================================================
+  # Known gaps — specified so they are not mistaken for working behaviour
+  # ============================================================================
 
-  @integration @unimplemented
-  Scenario: A run started without a listener executes on the fleet
-    Given an experiment run started for automated use
-    When the request that started it has returned
-    Then the run continues on the fleet
-    And its outcome is recorded
-
-  @integration @unimplemented
-  Scenario: An interactive run keeps streaming to its listener
-    Given an interactive experiment run
-    When results are produced
-    Then they are streamed to the listener as they arrive
-
-  # --- Stopping ---
-
-  @integration @unimplemented
-  Scenario: Stopping a run ends it
+  @unimplemented
+  Scenario: Stopping a run ends it promptly
     Given an experiment run that is executing
     When the user stops it
-    Then the work is signalled to stop
-    And the run is reported as stopped
+    Then the run reaches a terminal state without waiting out the silence window
+    # Not built: the abort route raises a flag and emits no event, so the
+    # watching process cannot tell "quiet because stopped" from "quiet because
+    # dead" and can only fall back on the ordinary silence window. Closing this
+    # needs a stop-requested event, which is additive but not liveness-only.
 
-  @integration @unimplemented
-  Scenario: A stop that is never observed still ends the run
-    Given an experiment run whose work cannot be signalled
-    When the user stops it
-    Then the run still reaches a terminal state
-
-  # --- Completion ---
-
-  @integration @unimplemented
-  Scenario: A completed run stops being watched
-    Given an experiment run that completes normally
-    When its completion is recorded
-    Then no further deadline is armed for it
-    And it is not failed afterwards for inactivity
+  @unimplemented
+  Scenario: An interactive run with no experiment behind it is still watched
+    Given an interactive run started from the workbench with no experiment
+    When the process running it is lost
+    Then the run stops being reported as running
+    # Not built, and not fixable by a watching process alone: an experiment is
+    # optional on this path and every record of progress is skipped without
+    # one, so the run produces nothing to watch. It needs an identity of its
+    # own before anything can recover it.
