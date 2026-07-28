@@ -114,6 +114,16 @@ Feature: Public REST API — /api/gateway/v1/*
     And error.code is "trace_project_required"
 
   @integration @rest @rbac
+  Scenario: An explicit trace destination gives an org-scoped key a home for its spend
+    Given the same organization with no governance project
+    When the org-admin creates the ORGANIZATION-scoped key with `trace_project_id` naming a project there
+    Then the response status is 201 and the DTO echoes `trace_project_id`
+    # The destination routes traces AND budget debits into that project,
+    # so choosing it needs `virtualKeys:manage` on the target project:
+    When a legacy project key names a sibling team's project as the destination
+    Then the response status is 403
+
+  @integration @rest @rbac
   Scenario: Cross-org scopes are rejected
     When an org-admin API key requests a scope belonging to another organization
     Then the response status is 400

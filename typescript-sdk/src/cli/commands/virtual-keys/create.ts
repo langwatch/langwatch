@@ -14,6 +14,7 @@ export interface CreateVirtualKeyOptions {
   name: string;
   description?: string;
   scope?: string[];
+  traceProject?: string;
   routingPolicy?: string;
   routingMode?: string;
   principalUser?: string;
@@ -111,6 +112,7 @@ export const createVirtualKeyCommand = async (
       description: options.description,
       principal_user_id: options.principalUser ?? null,
       scopes,
+      trace_project_id: options.traceProject ?? null,
       routing_policy_id: options.routingPolicy ?? null,
       routing_mode: routingMode,
       budget,

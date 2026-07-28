@@ -16,6 +16,8 @@ export interface UpdateVirtualKeyOptions {
   description?: string;
   clearDescription?: boolean;
   scope?: string[];
+  traceProject?: string;
+  clearTraceProject?: boolean;
   routingPolicy?: string;
   clearRoutingPolicy?: boolean;
   routingMode?: string;
@@ -123,6 +125,8 @@ export const updateVirtualKeyCommand = async (
     options.description === undefined &&
     !options.clearDescription &&
     (options.scope === undefined || options.scope.length === 0) &&
+    options.traceProject === undefined &&
+    !options.clearTraceProject &&
     options.routingPolicy === undefined &&
     !options.clearRoutingPolicy &&
     routingMode === undefined &&
@@ -156,6 +160,11 @@ export const updateVirtualKeyCommand = async (
       name: options.name,
       description: options.clearDescription ? null : options.description,
       scopes,
+      ...(options.clearTraceProject
+        ? { trace_project_id: null }
+        : options.traceProject !== undefined
+          ? { trace_project_id: options.traceProject }
+          : {}),
       routing_policy_id: options.clearRoutingPolicy ? null : options.routingPolicy,
       routing_mode: routingMode,
       budget,

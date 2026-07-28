@@ -24040,6 +24040,12 @@
                               "null"
                             ]
                           },
+                          "trace_project_id": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
                           "scopes": {
                             "type": "array",
                             "items": {
@@ -24104,6 +24110,7 @@
                           "purpose",
                           "display_prefix",
                           "principal_user_id",
+                          "trace_project_id",
                           "scopes",
                           "routing_policy_id",
                           "routing_mode",
@@ -24266,6 +24273,12 @@
                             "null"
                           ]
                         },
+                        "trace_project_id": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
                         "scopes": {
                           "type": "array",
                           "items": {
@@ -24330,6 +24343,7 @@
                         "purpose",
                         "display_prefix",
                         "principal_user_id",
+                        "trace_project_id",
                         "scopes",
                         "routing_policy_id",
                         "routing_mode",
@@ -24490,7 +24504,7 @@
         ],
         "parameters": [],
         "summary": "Create virtual key",
-        "description": "Mints a new virtual key and returns the secret exactly once. The caller MUST persist the `secret` value — LangWatch stores only a hash. `scopes` defaults to the caller's project; org- and team-scoped keys require a scoped API key holding `virtualKeys:manage` at each requested scope. An org- or team-scoped key additionally needs the organization's governance project so its traces and spend land somewhere a budget can see (`trace_project_required` otherwise)."
+        "description": "Mints a new virtual key and returns the secret exactly once. The caller MUST persist the `secret` value — LangWatch stores only a hash. `scopes` defaults to the caller's project; org- and team-scoped keys require a scoped API key holding `virtualKeys:manage` at each requested scope. An org- or team-scoped key also needs a place for its traces and spend to land: pass `trace_project_id` (needs `virtualKeys:manage` on that project), or the organization's governance project is used, and creation refuses with `trace_project_required` when neither exists."
       }
     },
     "/api/gateway/v1/virtual-keys/{id}": {
@@ -24539,6 +24553,12 @@
                           "type": "string"
                         },
                         "principal_user_id": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "trace_project_id": {
                           "type": [
                             "string",
                             "null"
@@ -24608,6 +24628,7 @@
                         "purpose",
                         "display_prefix",
                         "principal_user_id",
+                        "trace_project_id",
                         "scopes",
                         "routing_policy_id",
                         "routing_mode",
@@ -24811,6 +24832,12 @@
                             "null"
                           ]
                         },
+                        "trace_project_id": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
                         "scopes": {
                           "type": "array",
                           "items": {
@@ -24875,6 +24902,7 @@
                         "purpose",
                         "display_prefix",
                         "principal_user_id",
+                        "trace_project_id",
                         "scopes",
                         "routing_policy_id",
                         "routing_mode",
@@ -25276,6 +25304,12 @@
                             "null"
                           ]
                         },
+                        "trace_project_id": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
                         "scopes": {
                           "type": "array",
                           "items": {
@@ -25340,6 +25374,7 @@
                         "purpose",
                         "display_prefix",
                         "principal_user_id",
+                        "trace_project_id",
                         "scopes",
                         "routing_policy_id",
                         "routing_mode",
@@ -25516,6 +25551,12 @@
                             "null"
                           ]
                         },
+                        "trace_project_id": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
                         "scopes": {
                           "type": "array",
                           "items": {
@@ -25580,6 +25621,7 @@
                         "purpose",
                         "display_prefix",
                         "principal_user_id",
+                        "trace_project_id",
                         "scopes",
                         "routing_policy_id",
                         "routing_mode",
@@ -26469,7 +26511,173 @@
         ],
         "parameters": [],
         "summary": "Create budget",
-        "description": "Creates an organization-owned budget. The scope discriminates which resource the budget covers (organization / team / project / virtual_key / principal / group). GROUP budgets are per-member allowances and require a deployment with the ClickHouse spend ledger (`group_budget_requires_clickhouse` otherwise). `provider_key` optionally pins the budget to one model provider."
+        "description": "Creates an organization-owned budget. The scope discriminates which resource the budget covers (organization / team / project / virtual_key / principal / group). GROUP budgets are per-member allowances and require a deployment with the ClickHouse spend ledger (`group_budget_requires_clickhouse` otherwise). `provider_key` optionally pins the budget to one model provider.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "scope": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "const": "ORGANIZATION"
+                          },
+                          "organization_id": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "organization_id"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "const": "TEAM"
+                          },
+                          "team_id": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "team_id"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "const": "PROJECT"
+                          },
+                          "project_id": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "project_id"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "const": "VIRTUAL_KEY"
+                          },
+                          "virtual_key_id": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "virtual_key_id"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "const": "PRINCIPAL"
+                          },
+                          "principal_user_id": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "principal_user_id"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "const": "GROUP"
+                          },
+                          "group_id": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "group_id"
+                        ]
+                      }
+                    ]
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "window": {
+                    "type": "string",
+                    "enum": [
+                      "MINUTE",
+                      "HOUR",
+                      "DAY",
+                      "WEEK",
+                      "MONTH",
+                      "TOTAL"
+                    ]
+                  },
+                  "limit_usd": {
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      {
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "on_breach": {
+                    "type": "string",
+                    "enum": [
+                      "BLOCK",
+                      "WARN"
+                    ]
+                  },
+                  "timezone": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "provider_key": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "scope",
+                  "name",
+                  "window",
+                  "limit_usd"
+                ]
+              }
+            }
+          }
+        }
       }
     },
     "/api/gateway/v1/budgets/{id}": {

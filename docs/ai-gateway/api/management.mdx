@@ -44,6 +44,7 @@ Response:
       "purpose": "user",
       "display_prefix": "vk-lw-01HZX9",
       "principal_user_id": null,
+      "trace_project_id": null,
       "scopes": [{ "scope_type": "PROJECT", "scope_id": "proj_01HZ..." }],
       "routing_policy_id": null,
       "routing_mode": "NONE",
@@ -81,8 +82,9 @@ Body (only `name` is required):
 }
 ```
 
-- `scopes` defaults to the calling project. Team- and org-scoped keys need a scoped API key holding `virtualKeys:manage` at each requested scope; legacy project keys can only mint keys for their own project. An org- or team-scoped key also requires the organization's governance project so its traces and spend land somewhere a budget can see (`trace_project_required` otherwise).
-- `budget` creates a VIRTUAL_KEY-scoped budget atomically with the key: the key can never exist without the cap you asked for. Windows: `DAY`, `WEEK`, `MONTH`.
+- `scopes` defaults to the calling project. Team- and org-scoped keys need a scoped API key holding `virtualKeys:manage` at each requested scope; legacy project keys can only mint keys for their own project.
+- An org- or team-scoped key also needs a place for its traces and spend to land: pass `trace_project_id` (requires `virtualKeys:manage` on that project; it is a destination, not a scope, and grants no access to the key), or the organization's governance project is used, and creation refuses with `trace_project_required` when neither exists.
+- `budget` creates a budget atomically with the key and manages exactly that row on later updates: the key can never exist without the cap you asked for. Windows: `DAY`, `WEEK`, `MONTH`.
 - `routing_mode` is one of `NONE` (default: no silent failover), `FALLBACK_ALL`, or `POLICY` (requires `routing_policy_id`).
 
 Response `201`:

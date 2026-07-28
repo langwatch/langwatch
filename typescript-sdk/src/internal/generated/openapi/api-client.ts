@@ -1842,7 +1842,7 @@ export interface paths {
         put?: never;
         /**
          * Create virtual key
-         * @description Mints a new virtual key and returns the secret exactly once. The caller MUST persist the `secret` value — LangWatch stores only a hash. `scopes` defaults to the caller's project; org- and team-scoped keys require a scoped API key holding `virtualKeys:manage` at each requested scope. An org- or team-scoped key additionally needs the organization's governance project so its traces and spend land somewhere a budget can see (`trace_project_required` otherwise).
+         * @description Mints a new virtual key and returns the secret exactly once. The caller MUST persist the `secret` value — LangWatch stores only a hash. `scopes` defaults to the caller's project; org- and team-scoped keys require a scoped API key holding `virtualKeys:manage` at each requested scope. An org- or team-scoped key also needs a place for its traces and spend to land: pass `trace_project_id` (needs `virtualKeys:manage` on that project), or the organization's governance project is used, and creation refuses with `trace_project_required` when neither exists.
          */
         post: operations["postApiGatewayV1Virtual-keys"];
         delete?: never;
@@ -12569,6 +12569,7 @@ export interface operations {
                             purpose: "user" | "langy";
                             display_prefix: string;
                             principal_user_id: string | null;
+                            trace_project_id: string | null;
                             scopes: {
                                 scope_type: string;
                                 scope_id: string;
@@ -12663,6 +12664,7 @@ export interface operations {
                             purpose: "user" | "langy";
                             display_prefix: string;
                             principal_user_id: string | null;
+                            trace_project_id: string | null;
                             scopes: {
                                 scope_type: string;
                                 scope_id: string;
@@ -12778,6 +12780,7 @@ export interface operations {
                             purpose: "user" | "langy";
                             display_prefix: string;
                             principal_user_id: string | null;
+                            trace_project_id: string | null;
                             scopes: {
                                 scope_type: string;
                                 scope_id: string;
@@ -12889,6 +12892,7 @@ export interface operations {
                             purpose: "user" | "langy";
                             display_prefix: string;
                             principal_user_id: string | null;
+                            trace_project_id: string | null;
                             scopes: {
                                 scope_type: string;
                                 scope_id: string;
@@ -13096,6 +13100,7 @@ export interface operations {
                             purpose: "user" | "langy";
                             display_prefix: string;
                             principal_user_id: string | null;
+                            trace_project_id: string | null;
                             scopes: {
                                 scope_type: string;
                                 scope_id: string;
@@ -13193,6 +13198,7 @@ export interface operations {
                             purpose: "user" | "langy";
                             display_prefix: string;
                             principal_user_id: string | null;
+                            trace_project_id: string | null;
                             scopes: {
                                 scope_type: string;
                                 scope_id: string;
@@ -13517,7 +13523,46 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": {
+                    scope: {
+                        /** @constant */
+                        kind: "ORGANIZATION";
+                        organization_id: string;
+                    } | {
+                        /** @constant */
+                        kind: "TEAM";
+                        team_id: string;
+                    } | {
+                        /** @constant */
+                        kind: "PROJECT";
+                        project_id: string;
+                    } | {
+                        /** @constant */
+                        kind: "VIRTUAL_KEY";
+                        virtual_key_id: string;
+                    } | {
+                        /** @constant */
+                        kind: "PRINCIPAL";
+                        principal_user_id: string;
+                    } | {
+                        /** @constant */
+                        kind: "GROUP";
+                        group_id: string;
+                    };
+                    name: string;
+                    description?: string;
+                    /** @enum {string} */
+                    window: "MINUTE" | "HOUR" | "DAY" | "WEEK" | "MONTH" | "TOTAL";
+                    limit_usd: number | string;
+                    /** @enum {string} */
+                    on_breach?: "BLOCK" | "WARN";
+                    timezone?: string | null;
+                    provider_key?: string | null;
+                };
+            };
+        };
         responses: {
             /** @description Budget created */
             201: {

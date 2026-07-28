@@ -608,6 +608,31 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       expect(body.error.code).toBe("trace_project_required");
     });
 
+    /** @scenario An explicit trace destination gives an org-scoped key a home for its spend */
+    it("accepts trace_project_id where the governance fallback is absent", async () => {
+      // Same org that just refused above: the explicit destination is what
+      // makes the difference, through the same service resolution.
+      const { status, body } = await createVk(
+        {
+          name: `nogov-explicit-${suffix}`,
+          scopes: [{ scope_type: "ORGANIZATION", scope_id: NOGOV_ORG_ID }],
+          trace_project_id: NOGOV_PROJECT_ID,
+        },
+        apiKeyAuth(nogovAdminToken, NOGOV_PROJECT_ID),
+      );
+      expect(status).toBe(201);
+      expect(body.virtual_key.trace_project_id).toBe(NOGOV_PROJECT_ID);
+
+      // Choosing a destination routes spend into that project, so it
+      // demands manage there: a legacy key cannot point at a sibling
+      // team's project.
+      const denied = await createVk({
+        name: `sibling-dest-${suffix}`,
+        trace_project_id: SIBLING_PROJECT_ID,
+      });
+      expect(denied.status).toBe(403);
+    });
+
     /** @scenario Cross-org scopes are rejected */
     it("refuses scopes from another organization", async () => {
       const { status, body } = await createVk(

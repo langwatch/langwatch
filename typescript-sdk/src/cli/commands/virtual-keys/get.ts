@@ -39,6 +39,9 @@ export const getVirtualKeyCommand = async (
         console.log(`${chalk.bold("Prefix:")}       ${vk.display_prefix}...`);
         console.log(`${chalk.bold("Principal:")}    ${vk.principal_user_id ?? chalk.gray("—")}`);
         console.log(`${chalk.bold("Scopes:")}       ${vk.scopes.map(formatScope).join(", ") || chalk.gray("—")}`);
+        if (vk.trace_project_id) {
+          console.log(`${chalk.bold("Trace proj.:")}  ${vk.trace_project_id}`);
+        }
         console.log(`${chalk.bold("Routing mode:")} ${vk.routing_mode.toLowerCase()}`);
         console.log(`${chalk.bold("Routing pol.:")} ${vk.routing_policy_id ?? chalk.gray("(none)")}`);
         console.log(`${chalk.bold("Created:")}      ${new Date(vk.created_at).toLocaleString()}`);

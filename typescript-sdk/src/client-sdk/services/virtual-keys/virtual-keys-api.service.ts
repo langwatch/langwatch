@@ -28,6 +28,11 @@ export interface VirtualKey {
   /** e.g. "vk-lw-01HZX9" — the only secret material kept after creation. */
   display_prefix: string;
   principal_user_id: string | null;
+  /**
+   * Where an org- or team-owned key's traces and costs land. Not a
+   * scope: it grants no access to the key.
+   */
+  trace_project_id: string | null;
   scopes: VirtualKeyScope[];
   routing_policy_id: string | null;
   routing_mode: VirtualKeyRoutingMode;
@@ -47,7 +52,6 @@ export interface VirtualKey {
 export interface VirtualKeyBudgetInput {
   limit_usd: string | number;
   window: "DAY" | "WEEK" | "MONTH";
-  timezone?: string | null;
   on_breach?: "BLOCK" | "WARN";
   name?: string;
 }
@@ -58,6 +62,11 @@ export interface CreateVirtualKeyInput {
   principal_user_id?: string | null;
   /** Defaults to the caller's project when omitted. */
   scopes?: VirtualKeyScope[];
+  /**
+   * Explicit trace destination for org- and team-owned keys; requires
+   * `virtualKeys:manage` on that project. NOT a scope.
+   */
+  trace_project_id?: string | null;
   routing_policy_id?: string | null;
   routing_mode?: VirtualKeyRoutingMode;
   /** Optional cap created atomically with the key. */
@@ -69,6 +78,7 @@ export interface UpdateVirtualKeyInput {
   name?: string;
   description?: string | null;
   scopes?: VirtualKeyScope[];
+  trace_project_id?: string | null;
   routing_policy_id?: string | null;
   routing_mode?: VirtualKeyRoutingMode;
   /** Undefined leaves the cap alone; a value upserts it; null archives it. */
