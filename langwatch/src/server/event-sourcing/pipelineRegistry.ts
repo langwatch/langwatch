@@ -21,6 +21,10 @@ import type {
   LangyMessageProjectionRecord,
 } from "@langwatch/langy";
 import { createLogger } from "@langwatch/observability";
+import {
+  generateKillSwitchKey,
+  type KillSwitchComponentType,
+} from "./utils/killSwitch";
 import type { PrismaClient } from "@prisma/client";
 import type { Cluster, Redis } from "ioredis";
 import { createOrUpdateQueueItems } from "~/server/api/routers/annotation";
@@ -1486,7 +1490,7 @@ export function getProcessManagerMetadata(): ProcessManagerMetadata[] {
 export interface KillSwitchDescriptor {
   key: string;
   aggregateType: string;
-  componentType: "projection" | "mapProjection" | "command" | "subscriber";
+  componentType: KillSwitchComponentType;
   componentName: string;
   pipelineName: string;
 }
@@ -1535,9 +1539,14 @@ export function getKillSwitchDescriptors(): KillSwitchDescriptor[] {
     // nothing consults.
     for (const definition of def.eventSubscribers.values()) {
       out.push({
+        // Generated, never re-spelled: the comment above is the reason. A
+        // hand-built key that drifts from `generateKillSwitchKey` is not a
+        // cosmetic mismatch — `ops.setFeatureFlag` refuses a key that is
+        // neither a registry entry nor a live descriptor, so the switch
+        // becomes unsettable.
         key:
           definition.options?.killSwitch?.customKey ??
-          `es-${aggregateType}-subscriber-${definition.name}-killswitch`,
+          generateKillSwitchKey(aggregateType, "subscriber", definition.name),
         aggregateType,
         componentType: "subscriber",
         componentName: definition.name,

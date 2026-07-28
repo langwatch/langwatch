@@ -241,8 +241,8 @@ shows the window if anyone wants to watch it.
 
 ### A version bump re-folds during the rollout
 
-The gate is strict equality, so an old pod reading a row a new pod stamped
-reports `undecodable` and re-folds it — and each side rewrites at its own stamp,
+The gate is strict equality, so an old pod reading a row stamped by a new
+pod reports `undecodable` and re-folds it — and each side rewrites at its own stamp,
 so the other refuses it again until the fleet has cycled. That is inherent: an
 old build cannot be taught a stamp that did not exist when it was compiled.
 `es_fold_refold_on_miss_total{outcome="performed"}` rises for the window and

@@ -668,6 +668,20 @@ export class FoldProjectionExecutor {
    * refold can still come back empty. {@link assertUndecodableWasRebuilt}
    * closes that half, and both are needed.
    */
+  private assertUndecodableIsRecoverable<State, E extends Event>(
+    projection: FoldProjectionDefinition<State, E>,
+    miss: "absent" | "undecodable" | undefined,
+  ): void {
+    if (miss !== "undecodable" || this.shouldRefoldOnMiss(projection)) return;
+    throw new Error(
+      `Fold projection "${projection.name}" read back a row it cannot decode and has no re-fold path ` +
+        `(refoldOnStoreMiss=${String(projection.options?.refoldOnStoreMiss)}, ` +
+        `eventLoaderUpTo=${projection.eventLoaderUpTo === undefined ? "unwired" : "wired"}). ` +
+        `Refusing to fold onto an empty state, which would overwrite the committed row with a partial ` +
+        `one stamped at the current version.`,
+    );
+  }
+
   /**
    * The second half of the undecodable guard: the rebuild must have PRODUCED
    * something.
@@ -690,20 +704,6 @@ export class FoldProjectionExecutor {
       `Fold projection "${projection.name}" read back a row it cannot decode, and re-folding it from the event log ` +
         `produced no state (empty or unavailable history). Refusing to fold onto an empty state, which would ` +
         `overwrite the committed row with a partial one stamped at the current version.`,
-    );
-  }
-
-  private assertUndecodableIsRecoverable<State, E extends Event>(
-    projection: FoldProjectionDefinition<State, E>,
-    miss: "absent" | "undecodable" | undefined,
-  ): void {
-    if (miss !== "undecodable" || this.shouldRefoldOnMiss(projection)) return;
-    throw new Error(
-      `Fold projection "${projection.name}" read back a row it cannot decode and has no re-fold path ` +
-        `(refoldOnStoreMiss=${String(projection.options?.refoldOnStoreMiss)}, ` +
-        `eventLoaderUpTo=${projection.eventLoaderUpTo === undefined ? "unwired" : "wired"}). ` +
-        `Refusing to fold onto an empty state, which would overwrite the committed row with a partial ` +
-        `one stamped at the current version.`,
     );
   }
 

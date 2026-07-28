@@ -361,15 +361,18 @@ describe("TraceAnalyticsStore dimension-only signal", () => {
   /** A repository that answers reads from whatever the store actually wrote. */
   function recordingRepo() {
     const rows: TraceAnalyticsRow[] = [];
-    const repo: TraceAnalyticsRepository = {
-      upsert: async (row) => {
+    // Cast through `unknown` like the other partial stubs here: this answers
+    // only the two members the store exercises, so annotating it as a complete
+    // `TraceAnalyticsRepository` would claim members it does not implement.
+    const repo = {
+      upsert: async (row: TraceAnalyticsRow) => {
         rows.push(row);
       },
       findByTraceIdWithApplied: async () => {
         const row = rows[rows.length - 1];
         return row ? { row, appliedEventIds: [] } : null;
       },
-    };
+    } as unknown as TraceAnalyticsRepository;
     return { repo, rows };
   }
 

@@ -197,7 +197,7 @@ describe("traceAnalytics fold projection — slim row derivation", () => {
     });
   });
 
-  describe("given a trace whose only signal is a log record", () => {
+  describe("given a trace whose FIRST signal is a log record", () => {
     const logAtMs = new Date("2026-07-24T12:00:00.000Z").getTime();
 
     const foldLogRecord = (state: TraceAnalyticsData) =>
