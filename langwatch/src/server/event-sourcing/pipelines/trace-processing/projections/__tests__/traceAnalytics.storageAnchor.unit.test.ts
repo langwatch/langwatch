@@ -20,7 +20,7 @@ import {
 } from "./fixtures/trace-summary-test.fixtures";
 
 /**
- * The slim fold's STORAGE ANCHOR (ADR-071 step 3, migration 00058).
+ * The slim fold's STORAGE ANCHOR (ADR-071 step 3, migration 00059).
  *
  * `OccurredAt` on `trace_analytics` is the partition key, the lead sort key and
  * the TTL anchor. It used to carry the fold's span timing baseline — the running

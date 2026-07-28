@@ -115,7 +115,7 @@ export class TraceAnalyticsStore
    * user-renamed trace, and `traceNameFromFallback` false freezes a
    * fallback-named trace against a real root that arrives later. The same
    * argument is what carries the storage-anchor split (ADR-071 step 3, migration
-   * 00058) through the gate: on a row written before it, `EarliestSpanStartMs`
+   * 00059) through the gate: on a row written before it, `EarliestSpanStartMs`
    * decodes as 0 — "no span yet" on a trace that has spans — and the next span
    * would measure the whole trace's duration from itself. So a
    * stale-version row is reported as a MISS (null state, empty watermark — the

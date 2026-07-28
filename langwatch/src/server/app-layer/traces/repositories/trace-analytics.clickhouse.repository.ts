@@ -78,7 +78,7 @@ interface ClickHouseTraceAnalyticsWriteRecord {
   TraceNameUserOverridden: boolean;
   LastEventOccurredAt: string;
 
-  // ── Span timing baseline (ADR-071 step 3, migration 00058) ─────────────
+  // ── Span timing baseline (ADR-071 step 3, migration 00059) ─────────────
   // The earliest span start, split out of OccurredAt when that column became
   // the frozen storage anchor. Same string-carried UInt64 treatment.
   EarliestSpanStartMs: string;
@@ -431,7 +431,7 @@ export class TraceAnalyticsClickHouseRepository
  * Decode a raw ClickHouse record into a {@link TraceAnalyticsRow}. The inverse
  * of {@link toClickHouseRecord}: DateTime64 columns come back as strings, the
  * UInt64 epoch-ms columns as strings, arrays/maps as themselves. A
- * pre-migration record simply omits the 00056 / 00058 fields, so the parsers
+ * pre-migration record simply omits the 00056 / 00059 fields, so the parsers
  * fall back to the documented defaults (0 / empty / false).
  *
  * DateTime64 columns MUST go through `parseClickHouseDateTimeMs`, never

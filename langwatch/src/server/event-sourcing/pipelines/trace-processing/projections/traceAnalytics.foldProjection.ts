@@ -105,7 +105,7 @@ import {
  * contribution that carries a usable business time and never moved after
  * (`storageAnchorMs`). It is no longer the running minimum of span starts; that
  * value is the fold's timing baseline and now has its own column
- * (`EarliestSpanStartMs`, migration 00058). Sharing one column between the two
+ * (`EarliestSpanStartMs`, migration 00059). Sharing one column between the two
  * jobs is what wrote a log-only trace into partition 197001 with an
  * already-expired TTL deadline.
  *
@@ -154,7 +154,7 @@ const traceAnalyticsEvents = [
  *  cannot be told apart from real zeroes and it is treated as a store miss
  *  (see `TraceAnalyticsStore.getWithApplied`).
  *
- *  2026-07-29 — the storage anchor split (ADR-071 step 3, migration 00058).
+ *  2026-07-29 — the storage anchor split (ADR-071 step 3, migration 00059).
  *  BOTH halves of what this stamp records changed at once: the DERIVATION
  *  (`OccurredAt` is now the frozen first-observed business time rather than the
  *  running min of span starts) and the ROW SHAPE (`EarliestSpanStartMs` carries
@@ -234,7 +234,7 @@ export interface TraceAnalyticsRow {
   occurredAtMs: number;
   /**
    * The span timing baseline → the `EarliestSpanStartMs` column (migration
-   * 00058): the earliest start time across the trace's non-synthetic spans, or
+   * 00059): the earliest start time across the trace's non-synthetic spans, or
    * 0 while no span has been folded. `TotalDurationMs` is measured from it.
    *
    * It has its own column because `OccurredAt` no longer carries it, and
@@ -1027,7 +1027,7 @@ export class TraceAnalyticsFoldProjection
    * silently downgrade a user-renamed trace to a late span's name, freeze a
    * fallback-named trace, reset the MAX_PROCESSED_SPANS cap so already-
    * committed cost/tokens were counted twice, and — since the storage-anchor
-   * split (migration 00058) — hand back a zero span timing baseline, so the
+   * split (migration 00059) — hand back a zero span timing baseline, so the
    * trace's duration restarted from whichever span happened to arrive next.
    *
    * TWO CLASSES DO NOT SELF-HEAL, so `es_fold_refold_on_miss_total` cannot
