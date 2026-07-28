@@ -131,9 +131,16 @@ vi.mock(
 // Drives langyNeedsModel. `model: null` (or absent) => setup; a string => the
 // panel resolves a model and skips the prompt. A refetch spy lets the "save
 // unblocks" test flip the state without remounting (no page reload).
-const resolvedDefaultRef = {
+const resolvedDefaultRef: {
   current: {
-    data: undefined as { model: string | null } | undefined,
+    data: { model: string | null } | undefined;
+    isLoading: boolean;
+    /** Optional so the cases that only care about data/loading stay terse. */
+    isError?: boolean;
+  };
+} = {
+  current: {
+    data: undefined,
     isLoading: false,
     isError: false,
   },
@@ -235,8 +242,8 @@ vi.mock("~/utils/api", () => ({
           // between the three so this mock cannot drift from that contract.
           isSuccess:
             !resolvedDefaultRef.current.isLoading &&
-            !resolvedDefaultRef.current.isError,
-          isError: resolvedDefaultRef.current.isError,
+            !(resolvedDefaultRef.current.isError ?? false),
+          isError: resolvedDefaultRef.current.isError ?? false,
           refetch: refetchResolvedDefault,
         }),
       },
