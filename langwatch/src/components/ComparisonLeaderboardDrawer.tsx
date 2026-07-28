@@ -171,8 +171,9 @@ export function ComparisonLeaderboardDrawer({
               subtitle="The ranking, and whether the run actually separates them."
               help={
                 <>
-                  Each variant gets a score from every head-to-head verdict the
-                  judge gave, weighted by how strong its opponents were — so
+                  Each verdict the judge gave is read as one matchup per pair
+                  of variants in it. Each variant gets a score from those,
+                  weighted by how strong its opponents were — so
                   beating a good variant counts for more than beating a weak
                   one. The score is chess-rating style: 0 is average for this
                   group, and it is the GAP that means something, not the number.

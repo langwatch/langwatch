@@ -59,7 +59,7 @@ export const formatLeaderboardHeadline = ({
       tone: "neutral",
       heading: "No ranking yet",
       detail:
-        "This run has not resolved enough head-to-head comparisons to place the variants in an order. Run it over more rows.",
+        "This run has not resolved enough comparisons to place the variants in an order. Run it over more rows.",
     };
   }
 

@@ -85,7 +85,7 @@ export const buildLeaderboardLangyPrompt = ({
     "",
     `The conclusion on screen: ${headline.heading}. ${headline.detail}`,
     "",
-    "The ranking (Bradley-Terry, from head-to-head judge verdicts):",
+    "The ranking (Bradley-Terry, over the matchups implied by each verdict):",
     rows || "- (nothing rankable)",
     "",
     `Confidence: ${sampleAdequacy.separatedPairs} of ${sampleAdequacy.totalPairs} variant pairs were separated beyond their margins of error, from ${sampleAdequacy.comparisonCount} comparisons. Variants whose plausible ranges overlap are NOT distinguishable — please don't describe one of those as better than the other.`,

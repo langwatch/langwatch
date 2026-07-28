@@ -118,8 +118,15 @@ export function PairwiseLeaderboard({
           Leaderboard (Bradley-Terry, 95% CI)
         </Text>
         <Text fontSize="xs" color="fg.muted">
+          {/*
+            Two different units, so both are named. A comparison is one judge
+            verdict over the whole field; a matchup is one variant against one
+            other, which that verdict yields several of. Printed as bare
+            numbers, the per-variant figure routinely exceeds the total and
+            the pair reads as a contradiction.
+          */}
           {leaderboard.comparisonCount} comparisons · min{" "}
-          {leaderboard.minMatchups} per variant
+          {leaderboard.minMatchups} matchups per variant
         </Text>
       </HStack>
 

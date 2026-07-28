@@ -230,8 +230,13 @@ export function LeaderboardTrustPanel(props: LeaderboardTrustPanelProps) {
   return (
     <VStack align="stretch" gap={2}>
       <Text fontSize="xs" color="fg.muted">
-        Based on {props.leaderboard.comparisonCount} head-to-head comparisons
-        the judge resolved.
+        {/*
+          Not "head-to-head": a Comparison judges the whole field in one
+          verdict, so with four variants these are four-way calls, not pairs.
+          The pairwise matchups are derived from them and counted separately.
+        */}
+        Based on {props.leaderboard.comparisonCount} comparisons the judge
+        resolved.
       </Text>
       {checks.map((check) => {
         const style = TONE_STYLES[check.tone];
