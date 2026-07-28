@@ -79,6 +79,8 @@ import type { AutomationDispatchPorts } from "../event-sourcing/pipelines/automa
 import { createEvaluationAlertTriggerMatchHandler } from "../event-sourcing/pipelines/automations/subscribers/evaluationAlertTriggerMatch.subscriber";
 import { createGraphTriggerActivityHandler } from "../event-sourcing/pipelines/automations/subscribers/graphTriggerActivity.subscriber";
 import { type CommandDispatcher, Deferred } from "./deferred";
+import { abortManager } from "~/server/experiments-v3/execution/abortManager";
+import { runStateManager } from "~/server/experiments-v3/execution/runStateManager";
 import { createTenantId } from "./domain/tenantId";
 import type { EventSourcing } from "./eventSourcing";
 import { mapCommands } from "./mapCommands";
@@ -1018,10 +1020,21 @@ export class PipelineRegistry {
         experimentRunItemAppendStore:
           this.deps.repositories.experimentRunItemStorage,
         foldCacheClient: this.deps.foldCacheClient,
-        // ADR-073's run reaper has never been wired: nothing has ever supplied
-        // this, so the `experimentRunExecution` process manager is not mounted
-        // in production. Stated rather than omitted (ADR-077 §6 hole 1).
-        experimentRunExecutionDispatch: null,
+        commands: this.deps.eventSourcing.commandBus,
+        // ADR-073: the reaper's terminal write is this pipeline's own command
+        // and binds inside it. These are the two effects it cannot own — stop
+        // work that may still be running, and mark the cached progress record.
+        //
+        // Stopping FIRST is deliberate: result dispatch is `.catch()`-swallowed
+        // in the orchestrator, so a ClickHouse outage looks exactly like process
+        // death. If the deadline fired wrongly and work is still going, this
+        // makes the terminal state true rather than merely recorded — and stops
+        // the run spending against a run the platform has already ended.
+        experimentRunExecutionEffects: {
+          signalStop: ({ runId }) => abortManager.requestAbort(runId),
+          markRunFailed: ({ runId, reason }) =>
+            runStateManager.failRun(runId, reason),
+        },
       }),
     );
   }

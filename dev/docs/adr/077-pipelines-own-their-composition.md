@@ -357,6 +357,19 @@ rather than discovered from a latency graph.
 | Command handler | `pipelines/<x>/commands/` | domain | `pipeline.ts` | the repositories/ports its constructor takes |
 | Fold / map projection | `pipelines/<x>/projections/` | domain | `pipeline.ts` | — |
 | Projection **store adapter** (`TraceSummaryStore`, `SpanAppendStore`) | `pipelines/<x>/projections/` | 2 | `pipeline.ts` | the **repository** it wraps |
+
+> **This assumes a two-layer split that does not always exist.** Some store
+> adapters have no repository beneath them: `createExperimentRunItemAppendStore(resolveClient)`
+> *is* the ClickHouse data access for `experiment_run_items`. Building it in
+> `pipeline.ts` would drag a `ClickHouseClientResolver` into layer 6. The
+> escape: **where a store adapter has no repository beneath it, it is itself
+> the layer-2 value and crosses `Deps`.**
+>
+> Also: re-homing a store adapter brings its **cache tier** with it — the wrap
+> and its `keyPrefix` are inseparable from the store. So a pipeline that
+> re-homes a cached fold *gains* a `FoldCacheClient` dep. §4 says the fold cache
+> crosses as a port; the migration table never says which steps add it. Steps 3
+> and 5 both do.
 | Fold cache | `event-sourcing/projections/` | 1 | app boundary | a `FoldCache` port |
 | Subscriber | `pipelines/<x>/subscribers/` | domain | `pipeline.ts` | the ports its `Deps` declare |
 | Process-manager `evolve`/`onWake` | `pipelines/<x>/process-manager/*.process.ts` | domain | `pipeline.ts`, via the in-file `xPM()` applier | — |
@@ -825,6 +838,17 @@ incrementally instead of as one PR.
    and on a DI'd command, and kills two `Deferred`s.
 5. **`langy-conversation-processing`, `topic-clustering-processing`,
    `billing-reporting`, `experiment-run-processing`** — mechanical; each removes
+> **There are two untyped `getPipeline()` self-dispatch sites, not one.** The
+> registry site is retired by this step. The second lives in the `EventSourcing`
+> **constructor** (`eventSourcing.ts:156`), feeding
+> `createBillingMeterDispatchReactor` for the SaaS billable-events meter. It is
+> invisible to the migration table because it is not on a pipeline at all — it
+> is on the runtime, and its row would read "billing → billing (self)". It
+> cannot be retired the same way: the bus lives on the instance being
+> constructed, and importing the command class as a *value* into
+> `eventSourcing.ts` adds a runtime edge to a module every pipeline already
+> imports. It needs its own decision.
+
    one late-binding mechanism. `billing-reporting` retires the untyped
    `getPipeline()` self-dispatch.
 6. **`evaluation-processing`** — the honest one. See below.

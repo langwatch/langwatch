@@ -1,4 +1,5 @@
 import { definePipeline } from "../../";
+import type { CommandBus } from "../../commands/commandBus";
 import type { ProcessManagerApplier } from "../../pipeline/processBuilder";
 import { CachedFoldStore } from "../../projections/cachedFoldStore";
 import type { FoldCacheClient } from "../../projections/foldCache/foldCacheClient";
@@ -55,12 +56,22 @@ export interface ExperimentRunProcessingPipelineDeps {
   /** ADR-077 §3 — the resolved cache tier, never a redis client. */
   foldCacheClient: FoldCacheClient;
   /**
-   * Terminal-write dependencies for the `experimentRunExecution` process
-   * (ADR-073). Required-but-nullable (ADR-077 §6 hole 1): where it is `null`
-   * runs have no reaper, and every composition site has to say so on purpose
-   * rather than by omission.
+   * ADR-077 §5 — the reaper's terminal write is a command on THIS pipeline.
+   * Self-dispatch needs no late binding: `port()` records the class and
+   * resolves on first use, which is strictly after registration.
    */
-  experimentRunExecutionDispatch: ExperimentRunExecutionDispatchDeps | null;
+  commands: CommandBus;
+  /**
+   * The two effects the reaper needs that this pipeline does not own: stopping
+   * work that may still be running, and marking the cached progress record.
+   * Required-but-nullable (ADR-077 §6 hole 1) — where it is `null` runs have no
+   * reaper, and every composition site has to say so on purpose rather than by
+   * omission.
+   */
+  experimentRunExecutionEffects: Pick<
+    ExperimentRunExecutionDispatchDeps,
+    "signalStop" | "markRunFailed"
+  > | null;
 }
 
 /**
@@ -152,10 +163,16 @@ export function createExperimentRunProcessingPipeline(
     .withCommand("recordEvaluatorResult", RecordEvaluatorResultCommand)
     .withCommand("completeExperimentRun", CompleteExperimentRunCommand);
 
-  if (deps.experimentRunExecutionDispatch !== null) {
+  if (deps.experimentRunExecutionEffects !== null) {
     withCommands.withProcessManager(
       EXPERIMENT_RUN_EXECUTION_PROCESS_NAME,
-      experimentRunExecutionPM(deps.experimentRunExecutionDispatch),
+      experimentRunExecutionPM({
+        // The terminal write is this pipeline's own command, bound here rather
+        // than injected — `completeExperimentRun` carries a fixed idempotency
+        // key, so a retry or a race with the run's own completion collapses.
+        completeRun: deps.commands.port(CompleteExperimentRunCommand),
+        ...deps.experimentRunExecutionEffects,
+      }),
     );
   }
 
