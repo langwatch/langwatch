@@ -754,7 +754,7 @@ describe("CodingAgentSessionClickHouseRepository list-read dedup scope", () => {
 
   describe("given two versions of one session tied on max(UpdatedAt)", () => {
     describe("when the window is listed", () => {
-      /** @scenario a session whose earliest signal arrives late is listed once, up to date */
+      /** @scenario a session stored as two indistinguishable versions is listed once */
       it("lists the session once, with the further-along version's totals", async () => {
         // Both versions satisfy the IN-tuple: they share max(UpdatedAt) and
         // differ in StartedAt, so the RMT never collapses them either. Without a

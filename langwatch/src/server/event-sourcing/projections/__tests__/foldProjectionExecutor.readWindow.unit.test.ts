@@ -274,6 +274,11 @@ describe("FoldProjectionExecutor declared read window", () => {
           readWindow: { widthMs: WIDTH_MS },
           refoldable: true,
         });
+        // A history to rebuild FROM: an empty one is its own failure case,
+        // covered below.
+        (
+          fold as typeof fold & { eventLoaderUpTo?: unknown }
+        ).eventLoaderUpTo = async () => [eventAt(OCCURRED_AT)];
         const getWithApplied = vi.fn().mockResolvedValue({
           state: null,
           appliedEventIds: [],
@@ -313,6 +318,33 @@ describe("FoldProjectionExecutor declared read window", () => {
         // The committed row survives: folding from `init()` would have written
         // a partial state stamped at the CURRENT version, which the gate that
         // just refused the row would accept from then on.
+        expect(store.store).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when a refused row's rebuild comes back empty", () => {
+      /** @scenario a state that cannot be read back is never quietly replaced by a partial one */
+      it("fails loudly rather than committing the partial fold it just built", async () => {
+        // The refold path IS configured, so the first guard passes — but the
+        // aggregate's history reads back empty (truncated log, retention
+        // sweep), so the rebuild produces nothing. Falling through would
+        // commit a partial state at the current version, which is the same
+        // corruption by a different route.
+        const { fold, store } = makeFold({
+          readWindow: { widthMs: WIDTH_MS },
+          refoldable: true,
+        });
+        // `makeFold`'s refoldable loader answers with no history at all.
+        store.getWithApplied = vi.fn().mockResolvedValue({
+          state: null,
+          appliedEventIds: [],
+          miss: "undecodable",
+        });
+
+        await expect(
+          executor.execute(fold, eventAt(OCCURRED_AT), context),
+        ).rejects.toThrow(/produced no state/);
+
         expect(store.store).not.toHaveBeenCalled();
       });
     });

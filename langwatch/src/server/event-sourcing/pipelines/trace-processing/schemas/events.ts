@@ -1,4 +1,3 @@
-import type { Fixed64 } from "@opentelemetry/otlp-transformer-next/build/esm/common/internal-types";
 import { z } from "zod";
 
 import { EventSchema } from "../../../domain/types";
@@ -203,7 +202,13 @@ export function makeSpanReferencedEvent(
 function parseStartTimeUnixMs(value: unknown): number | null {
   let nano: number;
   try {
-    nano = TraceRequestUtils.normalizeOtlpUnixNano(value as Fixed64);
+    // Typed off the normalizer itself rather than importing `Fixed64` from a
+    // deep `build/esm/**/internal-types` path: that path is not public API and
+    // moves with the package's build layout, and this way the cast cannot
+    // drift from the signature it feeds.
+    nano = TraceRequestUtils.normalizeOtlpUnixNano(
+      value as Parameters<typeof TraceRequestUtils.normalizeOtlpUnixNano>[0],
+    );
   } catch {
     return null;
   }

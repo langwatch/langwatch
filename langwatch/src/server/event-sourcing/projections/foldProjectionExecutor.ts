@@ -377,6 +377,7 @@ export class FoldProjectionExecutor {
         );
         return refolded;
       }
+      this.assertUndecodableWasRebuilt(projection, miss);
     }
 
     // A redelivery of an event already folded into the loaded state: the state
@@ -540,6 +541,7 @@ export class FoldProjectionExecutor {
         );
         return refolded;
       }
+      this.assertUndecodableWasRebuilt(projection, miss);
     }
 
     const fresh = this.dropAlreadyApplied({
@@ -661,7 +663,36 @@ export class FoldProjectionExecutor {
    * This pairing is easy to break from a distance: `refoldOnStoreMiss` is
    * documented for deletion once its population ages out, and `eventLoaderUpTo`
    * is auto-wired only when the service has an event store.
+   *
+   * This proves only that a rebuild is POSSIBLE, not that it happened — the
+   * refold can still come back empty. {@link assertUndecodableWasRebuilt}
+   * closes that half, and both are needed.
    */
+  /**
+   * The second half of the undecodable guard: the rebuild must have PRODUCED
+   * something.
+   *
+   * `refoldUpToDelivered` returns null when the aggregate's history reads back
+   * empty — a truncated log, a retention sweep, an event store that answered
+   * nothing. For an `absent` miss that is ordinary and folding from `init()` is
+   * right. For an `undecodable` one it is the corruption case again by another
+   * route: a complete row exists, this build cannot read it, and the rebuild
+   * that was supposed to make refusing it safe came back with nothing. Falling
+   * through would commit a partial state at the current version and launder it
+   * past the gate exactly as if no refold had been configured at all.
+   */
+  private assertUndecodableWasRebuilt<State, E extends Event>(
+    projection: FoldProjectionDefinition<State, E>,
+    miss: "absent" | "undecodable" | undefined,
+  ): void {
+    if (miss !== "undecodable") return;
+    throw new Error(
+      `Fold projection "${projection.name}" read back a row it cannot decode, and re-folding it from the event log ` +
+        `produced no state (empty or unavailable history). Refusing to fold onto an empty state, which would ` +
+        `overwrite the committed row with a partial one stamped at the current version.`,
+    );
+  }
+
   private assertUndecodableIsRecoverable<State, E extends Event>(
     projection: FoldProjectionDefinition<State, E>,
     miss: "absent" | "undecodable" | undefined,

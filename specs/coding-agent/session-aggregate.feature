@@ -76,6 +76,12 @@ Feature: Coding-agent sessions
     Then the session is not listed for that period
     And no version of it is shown with the totals it held before that signal
 
+  Scenario: a session stored as two indistinguishable versions is listed once
+    Given two stored versions of one session that cannot be told apart by update time
+    When the project's sessions are listed
+    Then the session appears once
+    And it shows the totals of the version that folded the most telemetry
+
   Scenario: a user-narrowed list is never answered from a superseded version
     Given a session whose newest version was folded from telemetry that reports no user
     When that user's sessions are listed

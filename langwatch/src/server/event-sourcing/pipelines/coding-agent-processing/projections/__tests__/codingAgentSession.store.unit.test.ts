@@ -334,15 +334,17 @@ describe("CodingAgentSessionStore read-back gate", () => {
     });
   });
 
-  describe("given an aggregate the fold rebuilt after its older-shape row was refused", () => {
-    describe("when a further event for it arrives", () => {
+  describe("given a rebuilt aggregate's state committed at the current version", () => {
+    describe("when it is read back", () => {
       /** @scenario rebuilding an aggregate once retires it from rebuilding again */
-      it("reads the rebuilt state straight back rather than missing a second time", async () => {
+      it("returns the committed state rather than reporting a miss", async () => {
         const repo = new FakeRepo();
         const store = new CodingAgentSessionStore(repo);
 
-        // The re-fold's commit. Whatever version the refused row wore, the
-        // rewrite carries the current one.
+        // Stands in for the re-fold's commit: whatever version the refused
+        // row wore, the rewrite carries the current one. The refold itself
+        // belongs to the executor and is exercised there — what matters here
+        // is that the rewritten row reads back, which is what retires it.
         await store.store(
           committedState(),
           context({ appliedEventIds: ["e1", "e2"] }),
@@ -353,11 +355,15 @@ describe("CodingAgentSessionStore read-back gate", () => {
           appliedEventIds: [...(written.appliedEventIds ?? [])],
         };
 
-        const { state, appliedEventIds } = await store.getWithApplied(
+        const { state, appliedEventIds, miss } = await store.getWithApplied(
           "session-1",
           context(),
         );
 
+        // Asserted explicitly: a result carrying BOTH a state and a miss
+        // would satisfy every assertion below while still sending the
+        // executor down the refold path this test exists to retire.
+        expect(miss).toBeUndefined();
         expect(state?.subAgentIds).toEqual(["sub-a", "sub-b"]);
         expect(state?.previousCallContextTokens).toBe(12_000);
         expect(appliedEventIds).toEqual(["e1", "e2"]);
