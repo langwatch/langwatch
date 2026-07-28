@@ -399,12 +399,14 @@ secured.access(requires("scenarios:create")).post(
       }
 
       try {
-        const idempotencyKey = body.idempotencyKey ?? `api-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        // Passed through as-is: a fabricated default would make every submit
+        // look keyed while none of them deduplicated. Supplying a key is what
+        // opts a caller into an idempotent retry.
         const result = await service.run({
           suite,
           projectId: project.id,
           organizationId,
-          idempotencyKey,
+          idempotencyKey: body.idempotencyKey,
         });
 
         return c.json({

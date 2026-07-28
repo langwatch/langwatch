@@ -675,16 +675,13 @@ describe("SuiteService", () => {
 
     describe("given idempotencyKey is provided", () => {
       describe("when the same suite run is triggered twice", () => {
-        // The key is accepted by the public API but has never made a repeated
-        // submit idempotent: every call mints fresh scenarioRunIds, so both
-        // submits queue a full set of runs. Before ADR-072 it deduplicated the
-        // `suite_run.started` event, which no read path consulted — so a
-        // double submit produced one suite-run record claiming N items
-        // alongside 2N actual simulation runs. This pins the behaviour that
-        // is actually observable, so that giving the key real force (by
-        // deriving run ids from it) is a visible change rather than a silent
-        // one. See ADR-072 "Consequences".
-        it("queues a full set of runs each time", async () => {
+        // The key now has force. Run ids are derived from it, and everything
+        // downstream already keys on `scenarioRunId` — QueueRunCommand's
+        // aggregateId, its idempotencyKey and its job id — so a retry
+        // re-dispatches identical commands the event store collapses. The
+        // service is still entered twice; what changed is that the second
+        // pass asks for the runs that already exist.
+        it("passes the key down so the same runs are asked for", async () => {
           const { service, suiteRunService } = createService();
           const suite = makeSuite();
           const run = () =>
@@ -697,6 +694,11 @@ describe("SuiteService", () => {
           await run();
 
           expect(suiteRunService.startRun).toHaveBeenCalledTimes(2);
+          for (const call of suiteRunService.startRun.mock.calls) {
+            expect(call[0]).toMatchObject({
+              idempotencyKey: "user-provided-key",
+            });
+          }
         });
       });
     });

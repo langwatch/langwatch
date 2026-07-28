@@ -446,29 +446,27 @@ export class PipelineRegistry {
         }),
       ],
     });
-    const {
-      pipeline: tracePipeline,
-      simComputeRunMetrics,
-    } = this.registerTracePipeline({
-      evalPipeline,
-      traceSummaryStore,
-      automations: {
-        triggerMatchHandler: createTraceAlertTriggerMatchHandler({
-          triggers: this.deps.triggers,
-          recordTriggerMatch: {
-            send: automationCommands.recordTriggerMatch,
-          },
-        }),
-        graphActivityHandler,
-      },
-      codingAgentSubscribers: [
-        createCodingAgentSpanFactsDispatchSubscriber({
-          contributeSpanFacts: codingAgentCommands.contributeSpanFacts,
-          getNormalizedSpanById: (params) =>
-            this.deps.traces.spans.getNormalizedSpanById(params),
-        }),
-      ],
-    });
+    const { pipeline: tracePipeline, simComputeRunMetrics } =
+      this.registerTracePipeline({
+        evalPipeline,
+        traceSummaryStore,
+        automations: {
+          triggerMatchHandler: createTraceAlertTriggerMatchHandler({
+            triggers: this.deps.triggers,
+            recordTriggerMatch: {
+              send: automationCommands.recordTriggerMatch,
+            },
+          }),
+          graphActivityHandler,
+        },
+        codingAgentSubscribers: [
+          createCodingAgentSpanFactsDispatchSubscriber({
+            contributeSpanFacts: codingAgentCommands.contributeSpanFacts,
+            getNormalizedSpanById: (params) =>
+              this.deps.traces.spans.getNormalizedSpanById(params),
+          }),
+        ],
+      });
     const { pipeline: simulationPipeline, scenarioExecutionHandle } =
       this.registerSimulationPipeline({
         traceSummaryStore,
@@ -1193,15 +1191,13 @@ export class PipelineRegistry {
       "experiment_runs",
     );
 
-    const experimentRunPipeline = this.deps.eventSourcing.register(
+    return this.deps.eventSourcing.register(
       createExperimentRunProcessingPipeline({
         experimentRunStateFoldStore: experimentRunStore,
         experimentRunItemAppendStore:
           this.deps.repositories.experimentRunItemStorage,
       }),
     );
-
-    return experimentRunPipeline;
   }
 }
 
