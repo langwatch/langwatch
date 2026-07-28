@@ -99,15 +99,20 @@ Feature: Comparison leaderboard (Bradley-Terry ranking on the results page)
   Scenario: A matrix with no pairwise information says so
     Given every verdict in the run judged all of the variants together
     When I open the expanded leaderboard
-    Then I see that each row of the win matrix is the same number repeated
-    And I am told the grid shows how often each variant won overall, not how it fared against any particular opponent
+    Then I see that the counts along each row of the win matrix are identical
+    And I am told those counts are the variant's total wins rather than a per-opponent tally
+    And I am told the cell shading is still per pair
     # A Comparison judges the whole field at once, so one verdict makes the
-    # winner beat every other variant simultaneously. Every cell in a winner's
-    # row is then identical by construction, and the grid carries no more
-    # information than a win count — while its per-cell tinting implies
-    # head-to-head structure that the run never measured. Saying so costs a
-    # sentence; letting a reader infer "warm beats formal specifically" from a
-    # number that only means "warm won 28 rows" costs them a wrong decision.
+    # winner beat every other variant simultaneously, and every count in a
+    # winner's row is identical by construction. Reading "warm beats formal
+    # specifically" off a 28 that only means "warm won 28 rows" is a wrong
+    # decision waiting to happen.
+    #
+    # The shading is a different matter and the caveat must not dismiss it:
+    # cells are tinted by w/(w+l) for that pair, so warm's 28-against-20 with
+    # premium and 28-against-4 with formal shade differently, and that
+    # difference is real head-to-head evidence. Point the reader at the
+    # shading rather than writing the grid off.
 
   Scenario: A matrix built from differing candidate sets keeps its pairwise reading
     Given some verdicts judged only a subset of the variants

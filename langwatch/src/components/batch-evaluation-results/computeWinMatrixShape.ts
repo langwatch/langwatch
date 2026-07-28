@@ -8,11 +8,15 @@
  *
  * A Comparison evaluator judges the WHOLE field in one verdict, so a single
  * win makes the winner beat every other variant at once. When every verdict
- * covers every variant, each winner's row is the same number repeated — the
- * grid then says nothing a win count doesn't, and its tinting implies
- * structure the run never measured. Observed on a real four-way run: rows of
- * 28|28|28, 20|20|20, 8|8|8, 4|4|4, from 60 verdicts that all had exactly
- * four candidates.
+ * covers every variant, each winner's row is the same number repeated — that
+ * variant's total wins, carrying no per-opponent signal. Observed on a real
+ * four-way run: rows of 28|28|28, 20|20|20, 8|8|8, 4|4|4, from 60 verdicts
+ * that all had exactly four candidates.
+ *
+ * The CELLS are not equally empty, and the caveat must not say they are: each
+ * is tinted by w/(w+l) for that pair, which does vary — 28 wins against 20
+ * losses reads very differently from 28 against 4. So the caveat points the
+ * reader at the shading rather than dismissing the grid.
  *
  * Detecting it from the matrix itself, rather than from the candidate lists,
  * keeps this honest for the mixed case too: a run whose verdicts happened to

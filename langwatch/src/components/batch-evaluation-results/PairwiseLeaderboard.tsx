@@ -355,8 +355,9 @@ function WinMatrixHeatmap({
       {!hasPairwiseDetail ? (
         <Text fontSize="2xs" color="fg.muted">
           Every verdict in this run judged all {ids.length} variants together,
-          so each row repeats one number: how often that variant won overall,
-          not how it did against a particular opponent.
+          so the counts along each row are identical — that variant&apos;s total
+          wins, not a per-opponent tally. The shading is still per pair: how
+          often the row variant won when those two met.
         </Text>
       ) : null}
       <Box overflowX="auto">
