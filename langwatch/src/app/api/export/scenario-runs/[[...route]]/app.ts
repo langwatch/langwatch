@@ -13,8 +13,8 @@
  * @see specs/scenarios/scenario-run-export.feature
  */
 
+import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
-import crypto from "crypto";
 import { hasProjectPermission } from "~/server/api/rbac";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
@@ -26,7 +26,12 @@ import {
   ScenarioRunExportForbiddenError,
   ScenarioRunExportUnauthenticatedError,
 } from "~/server/export/scenario-runs/errors";
-import { scenarioRunExportRequestSchema } from "~/server/export/scenario-runs/types";
+import type { ScenarioRunExportService } from "~/server/export/scenario-runs/scenario-run-export.service";
+import {
+  scenarioRunExportRequestSchema,
+  type ScenarioRunExportRequest,
+} from "~/server/export/scenario-runs/types";
+import { KSUID_RESOURCES } from "~/utils/constants";
 
 const logger = createLogger("langwatch:api:export-scenario-runs");
 
@@ -78,7 +83,7 @@ secured
         },
       });
 
-      const exportId = crypto.randomUUID();
+      const exportId = generate(KSUID_RESOURCES.EXPORT).toString();
       const broadcast = getApp().broadcast;
 
       const today = new Date().toISOString().slice(0, 10);
@@ -105,51 +110,13 @@ secured
         "Access-Control-Expose-Headers":
           "X-Export-Id, X-Total-Runs, Content-Disposition",
       });
-      const encoder = new TextEncoder();
-
-      const stream = new ReadableStream({
-        async start(controller) {
-          try {
-            for await (const { chunk, progress } of service.exportRuns({
-              request,
-              signal: c.req.raw.signal,
-              total: totalCount,
-            })) {
-              controller.enqueue(encoder.encode(chunk));
-              void broadcast.broadcastToTenant(
-                request.projectId,
-                JSON.stringify({
-                  exportId,
-                  type: "progress",
-                  exported: progress.exported,
-                  total: progress.total,
-                }),
-                "export_progress",
-              );
-            }
-            void broadcast.broadcastToTenant(
-              request.projectId,
-              JSON.stringify({ exportId, type: "done" }),
-              "export_progress",
-            );
-            controller.close();
-          } catch (error) {
-            logger.error(
-              { error, projectId: request.projectId },
-              "Scenario run export stream error",
-            );
-            void broadcast.broadcastToTenant(
-              request.projectId,
-              JSON.stringify({
-                exportId,
-                type: "error",
-                message: "Export failed",
-              }),
-              "export_progress",
-            );
-            controller.error(error);
-          }
-        },
+      const stream = buildExportStream({
+        service,
+        request,
+        exportId,
+        totalCount,
+        signal: c.req.raw.signal,
+        broadcast,
       });
 
       return new Response(
@@ -158,5 +125,66 @@ secured
       );
     },
   );
+
+/**
+ * Drives the export generator into a ReadableStream, broadcasting progress as
+ * chunks land.
+ *
+ * Split out of the handler so that reads as auth → audit → headers → respond.
+ * Progress rides Redis pub/sub rather than the response body because the file
+ * is a download: the bytes go to disk, so the only way the page can show a
+ * count is out of band.
+ */
+function buildExportStream({
+  service,
+  request,
+  exportId,
+  totalCount,
+  signal,
+  broadcast,
+}: {
+  service: ScenarioRunExportService;
+  request: ScenarioRunExportRequest;
+  exportId: string;
+  totalCount: number;
+  signal: AbortSignal;
+  broadcast: ReturnType<typeof getApp>["broadcast"];
+}) {
+  const encoder = new TextEncoder();
+  const publish = (payload: Record<string, unknown>) =>
+    void broadcast.broadcastToTenant(
+      request.projectId,
+      JSON.stringify({ exportId, ...payload }),
+      "export_progress",
+    );
+
+  return new ReadableStream({
+    async start(controller) {
+      try {
+        for await (const { chunk, progress } of service.exportRuns({
+          request,
+          signal,
+          total: totalCount,
+        })) {
+          controller.enqueue(encoder.encode(chunk));
+          publish({
+            type: "progress",
+            exported: progress.exported,
+            total: progress.total,
+          });
+        }
+        publish({ type: "done" });
+        controller.close();
+      } catch (error) {
+        logger.error(
+          { error, projectId: request.projectId },
+          "Scenario run export stream error",
+        );
+        publish({ type: "error", message: "Export failed" });
+        controller.error(error);
+      }
+    },
+  });
+}
 
 export const app = secured.hono;
