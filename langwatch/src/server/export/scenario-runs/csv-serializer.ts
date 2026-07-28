@@ -2,8 +2,16 @@
  * CSV serialization for scenario run export.
  *
  * Three row axes over the same run record — see ScenarioRunExportMode. Every
- * mode shares the run-level columns built by `buildRunValues`, so a column
- * means the same thing whichever file you opened.
+ * mode shares the same column groups, so a column means the same thing
+ * whichever file you opened.
+ *
+ * Column order is deliberate: spreadsheets show the leftmost columns first, so
+ * the file opens on the ones a person reads and the identifiers sit past them.
+ * Nothing is dropped for being unreadable — it is only moved.
+ *
+ *   CORE    what ran, what happened, why      ← visible on open
+ *   payload the mode's reason to exist        ← criteria / messages
+ *   TAIL    ids, target, trace links          ← scroll or hide
  *
  * Uses PapaParse for RFC 4180-compliant output.
  *
@@ -15,51 +23,72 @@ import type { ExportableRun } from "~/server/app-layer/simulations/repositories/
 import { categorizeRunStatus } from "~/server/scenarios/scenario-run-category";
 
 /**
- * Run-level columns, shared by all three modes.
+ * The columns a person reads, shortest and highest-signal first so the useful
+ * ones fit on screen before the long prose pushes everything sideways.
  *
  * `status` is the resolved status (the same value the run history shows,
- * including derived STALLED) and `status_category` is its outcome bucket.
- * Both are emitted: the category is what you pivot on, the status is what you
- * need when a single run looks wrong.
+ * including derived STALLED) and `status_category` is its outcome bucket. Both
+ * are emitted: the category is what you pivot on, the status is what you need
+ * when a single run looks wrong.
  *
  * There is deliberately no pass_rate or any other aggregate — that formula
  * already lives in run-history-transforms.ts and the sidebar ClickHouse query,
  * and a third copy here would drift from the number shown on screen.
  */
-const RUN_COLUMNS = [
-  "scenario_run_id",
-  "scenario_id",
+const CORE_COLUMNS = [
   "scenario_name",
-  "scenario_description",
-  "batch_run_id",
-  "scenario_set_id",
   "status",
   "status_category",
   "verdict",
-  "reasoning",
-  "error",
   "met_criteria_count",
   "unmet_criteria_count",
-  "started_at",
   "duration_ms",
   "total_cost",
+  "started_at",
+  "message_count",
+  // long prose last within the core block
+  "reasoning",
+  "error",
+  "scenario_description",
+] as const;
+
+/**
+ * Identifiers and plumbing. Never dropped — they are what lets an export be
+ * joined to another export, to traces, or back to the platform — but nobody
+ * reads a ksuid, so they sit behind the columns that carry meaning.
+ */
+const TAIL_COLUMNS = [
+  "scenario_run_id",
+  "scenario_id",
+  "batch_run_id",
+  "scenario_set_id",
   "target_type",
   "target_reference_id",
   "simulation_suite_id",
-  "message_count",
   "trace_ids",
 ] as const;
 
-/** Summary adds the full criteria lists; the other modes carry them per row. */
-const SUMMARY_ONLY_COLUMNS = ["met_criteria", "unmet_criteria"] as const;
+/**
+ * The judged criteria, as JSON lists.
+ *
+ * Carried by summary AND full. Full mode is where someone reads a failing
+ * transcript, and "why did this fail" is only half-answered by the judge's
+ * prose `reasoning` — the other half is which specific criteria went unmet.
+ * Counts alone cannot answer it.
+ *
+ * Criteria mode omits them: it already explodes the same data into one row
+ * per criterion, so repeating both full lists on every one of those rows
+ * would bloat the file to say nothing new.
+ */
+const CRITERIA_LIST_COLUMNS = ["met_criteria", "unmet_criteria"] as const;
 
 const CRITERIA_COLUMNS = ["criterion", "met"] as const;
 
 const MESSAGE_COLUMNS = [
   "message_index",
-  "message_id",
   "message_role",
   "message_content",
+  "message_id",
   "message_trace_id",
 ] as const;
 
@@ -68,15 +97,20 @@ const MESSAGE_COLUMNS = [
 // ---------------------------------------------------------------------------
 
 export function summaryHeaders(): string[] {
-  return [...RUN_COLUMNS, ...SUMMARY_ONLY_COLUMNS];
+  return [...CORE_COLUMNS, ...CRITERIA_LIST_COLUMNS, ...TAIL_COLUMNS];
 }
 
 export function criteriaHeaders(): string[] {
-  return [...RUN_COLUMNS, ...CRITERIA_COLUMNS];
+  return [...CORE_COLUMNS, ...CRITERIA_COLUMNS, ...TAIL_COLUMNS];
 }
 
 export function fullHeaders(): string[] {
-  return [...RUN_COLUMNS.map((c) => `run_${c}`), ...MESSAGE_COLUMNS];
+  return [
+    ...CORE_COLUMNS.map((c) => `run_${c}`),
+    ...CRITERIA_LIST_COLUMNS.map((c) => `run_${c}`),
+    ...MESSAGE_COLUMNS,
+    ...TAIL_COLUMNS.map((c) => `run_${c}`),
+  ];
 }
 
 /** One row per run. */
@@ -88,9 +122,9 @@ export function serializeRunsToSummaryCsv({
   includeHeader: boolean;
 }): string {
   const rows = runs.map((run) => [
-    ...buildRunValues(run),
-    jsonArray(run.results?.metCriteria),
-    jsonArray(run.results?.unmetCriteria),
+    ...buildCoreValues(run),
+    ...buildCriteriaListValues(run),
+    ...buildTailValues(run),
   ]);
   return unparse({ headers: summaryHeaders(), rows, includeHeader });
 }
@@ -109,13 +143,13 @@ export function serializeRunsToCriteriaCsv({
 }): string {
   const rows: string[][] = [];
   for (const run of runs) {
-    const runValues = buildRunValues(run);
-    for (const criterion of run.results?.metCriteria ?? []) {
-      rows.push([...runValues, criterion, "true"]);
-    }
-    for (const criterion of run.results?.unmetCriteria ?? []) {
-      rows.push([...runValues, criterion, "false"]);
-    }
+    const core = buildCoreValues(run);
+    const tail = buildTailValues(run);
+    const push = (criterion: string, met: boolean) =>
+      rows.push([...core, criterion, String(met), ...tail]);
+
+    for (const criterion of run.results?.metCriteria ?? []) push(criterion, true);
+    for (const criterion of run.results?.unmetCriteria ?? []) push(criterion, false);
   }
   return unparse({ headers: criteriaHeaders(), rows, includeHeader });
 }
@@ -134,21 +168,24 @@ export function serializeRunsToFullCsv({
 }): string {
   const rows: string[][] = [];
   for (const run of runs) {
-    const runValues = buildRunValues(run);
+    const head = [...buildCoreValues(run), ...buildCriteriaListValues(run)];
+    const tail = buildTailValues(run);
     const messages = run.messages ?? [];
+
     if (messages.length === 0) {
-      rows.push([...runValues, "", "", "", "", ""]);
+      rows.push([...head, "", "", "", "", "", ...tail]);
       continue;
     }
     messages.forEach((message, index) => {
       const m = message as Record<string, unknown>;
       rows.push([
-        ...runValues,
+        ...head,
         String(index),
-        stringOrEmpty(m.id),
         stringOrEmpty(m.role),
         messageContent(m.content),
+        stringOrEmpty(m.id),
         stringOrEmpty(m.trace_id),
+        ...tail,
       ]);
     });
   }
@@ -156,45 +193,56 @@ export function serializeRunsToFullCsv({
 }
 
 // ---------------------------------------------------------------------------
-// Shared row construction
+// Shared row construction — one builder per column group, in header order
 // ---------------------------------------------------------------------------
 
-function buildRunValues(run: ExportableRun): string[] {
-  const target = extractTarget(run.metadata);
+function buildCoreValues(run: ExportableRun): string[] {
   const results = run.results;
-
   return [
-    run.scenarioRunId,
-    run.scenarioId,
     run.name ?? "",
-    run.description ?? "",
-    run.batchRunId,
-    run.scenarioSetId,
     run.status,
     categorizeRunStatus(run.status),
     results?.verdict ?? "",
-    results?.reasoning ?? "",
-    results?.error ?? "",
     String(results?.metCriteria?.length ?? 0),
     String(results?.unmetCriteria?.length ?? 0),
-    isoTimestamp(run.timestamp),
     // For a run still in flight this is elapsed-so-far, not a final duration —
     // the mapper derives it from UpdatedAt when FinishedAt is absent. Read it
     // together with status_category.
     nullableNumber(run.durationInMs),
     nullableNumber(run.totalCost),
+    isoTimestamp(run.timestamp),
+    String(run.messages?.length ?? 0),
+    results?.reasoning ?? "",
+    results?.error ?? "",
+    run.description ?? "",
+  ];
+}
+
+function buildCriteriaListValues(run: ExportableRun): string[] {
+  return [
+    jsonArray(run.results?.metCriteria),
+    jsonArray(run.results?.unmetCriteria),
+  ];
+}
+
+function buildTailValues(run: ExportableRun): string[] {
+  const target = extractTarget(run.metadata);
+  return [
+    run.scenarioRunId,
+    run.scenarioId,
+    run.batchRunId,
+    run.scenarioSetId,
     target.targetType,
     target.targetReferenceId,
     target.simulationSuiteId,
-    String(run.messages?.length ?? 0),
     jsonArray(collectTraceIds(run)),
   ];
 }
 
 /**
  * The langwatch metadata namespace carries which target the run executed
- * against. It is optional — SDK-driven runs may not populate it — so every
- * field degrades to an empty cell rather than throwing.
+ * against. It is optional — SDK- and CLI-driven runs do not populate it — so
+ * every field degrades to an empty cell rather than throwing.
  */
 function extractTarget(metadata: Record<string, unknown> | null | undefined): {
   targetType: string;
@@ -232,7 +280,6 @@ function collectTraceIds(run: ExportableRun): string[] {
   }
   return [...ids];
 }
-
 
 // ---------------------------------------------------------------------------
 // Value encoding

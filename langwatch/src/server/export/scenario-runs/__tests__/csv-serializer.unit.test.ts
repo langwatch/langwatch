@@ -43,6 +43,80 @@ function parse(csv: string): Record<string, string>[] {
 }
 
 describe("scenario run CSV serializers", () => {
+  describe("given any mode", () => {
+    // Column order is a design decision, not an accident: spreadsheets show
+    // the leftmost columns first, so the readable ones lead and identifiers
+    // trail. Pinned here so a later edit cannot quietly bury them again.
+    const IDENTIFIER_COLUMNS = [
+      "scenario_run_id",
+      "scenario_id",
+      "batch_run_id",
+      "scenario_set_id",
+      "trace_ids",
+    ];
+
+    it("leads with the columns a person reads", () => {
+      const csv = serializeRunsToSummaryCsv({
+        runs: [buildRun()],
+        includeHeader: true,
+      });
+      const header = csv.split("\r\n")[0]!.split(",");
+
+      expect(header.slice(0, 4)).toEqual([
+        "scenario_name",
+        "status",
+        "status_category",
+        "verdict",
+      ]);
+    });
+
+    it("puts every identifier after the readable columns", () => {
+      for (const csv of [
+        serializeRunsToSummaryCsv({ runs: [buildRun()], includeHeader: true }),
+        serializeRunsToCriteriaCsv({ runs: [buildRun()], includeHeader: true }),
+        serializeRunsToFullCsv({ runs: [buildRun()], includeHeader: true }),
+      ]) {
+        const header = csv.split("\r\n")[0]!.split(",");
+        const firstIdentifier = Math.min(
+          ...IDENTIFIER_COLUMNS.map((c) =>
+            header.findIndex((h) => h.replace(/^run_/, "") === c),
+          ).filter((i) => i >= 0),
+        );
+        const verdictAt = header.findIndex(
+          (h) => h.replace(/^run_/, "") === "verdict",
+        );
+        const reasoningAt = header.findIndex(
+          (h) => h.replace(/^run_/, "") === "reasoning",
+        );
+
+        expect(verdictAt).toBeLessThan(firstIdentifier);
+        expect(reasoningAt).toBeLessThan(firstIdentifier);
+      }
+    });
+
+    it("keeps the mode's own payload ahead of the identifiers", () => {
+      const criteria = serializeRunsToCriteriaCsv({
+        runs: [buildRun()],
+        includeHeader: true,
+      })
+        .split("\r\n")[0]!
+        .split(",");
+      const full = serializeRunsToFullCsv({
+        runs: [buildRun()],
+        includeHeader: true,
+      })
+        .split("\r\n")[0]!
+        .split(",");
+
+      expect(criteria.indexOf("criterion")).toBeLessThan(
+        criteria.indexOf("scenario_run_id"),
+      );
+      expect(full.indexOf("message_content")).toBeLessThan(
+        full.indexOf("run_scenario_run_id"),
+      );
+    });
+  });
+
   describe("given summary mode", () => {
     it("writes one row per run", () => {
       const csv = serializeRunsToSummaryCsv({
@@ -300,6 +374,35 @@ describe("scenario run CSV serializers", () => {
       expect(new Set(rows.map((r) => r.run_scenario_run_id))).toEqual(
         new Set(["run_1"]),
       );
+    });
+
+    it("carries the criteria that failed, not just how many", () => {
+      const csv = serializeRunsToFullCsv({
+        runs: [
+          buildRun({
+            results: {
+              verdict: Verdict.FAILURE,
+              reasoning: "The agent asked a clarifying question.",
+              metCriteria: ["stays polite"],
+              unmetCriteria: ["offers a refund", "does not ask questions"],
+              error: undefined,
+            },
+            messages: [
+              { role: "user", content: "refund please" },
+            ] as ExportableRun["messages"],
+          }),
+        ],
+        includeHeader: true,
+      });
+
+      const row = parse(csv)[0]!;
+      expect(row.run_unmet_criteria_count).toBe("2");
+      expect(JSON.parse(row.run_unmet_criteria!)).toEqual([
+        "offers a refund",
+        "does not ask questions",
+      ]);
+      expect(JSON.parse(row.run_met_criteria!)).toEqual(["stays polite"]);
+      expect(row.run_reasoning).toBe("The agent asked a clarifying question.");
     });
 
     it("still writes one row for a run that produced no messages", () => {
