@@ -1,4 +1,5 @@
 import type { OpenAIResponsesProviderOptions } from "@ai-sdk/openai";
+import { NotFoundError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { Prisma, PrismaClient, WorkflowVersion } from "@prisma/client";
 import type { JsonValue } from "@prisma/client/runtime/library";
@@ -431,11 +432,19 @@ export const workflowRouter = createTRPCRouter({
         include: { currentVersion: true },
       });
 
+      // Handled, like the same failure already is in `runWorkflow.ts`. As a
+      // bare `TRPCError` this crossed the boundary as prose, so the client had
+      // no code to key copy off: the studio's error card fell back to the
+      // caller's generic headline, printed the humanised slug underneath it,
+      // and — because an unrecognised code is not something the reader can be
+      // told how to fix — offered them an error id for a workflow that had
+      // simply been deleted.
       if (!workflow) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Workflow not found",
-        });
+        throw new NotFoundError(
+          "workflow_not_found",
+          "Workflow",
+          input.workflowId,
+        );
       }
 
       if (workflow.currentVersion) {
