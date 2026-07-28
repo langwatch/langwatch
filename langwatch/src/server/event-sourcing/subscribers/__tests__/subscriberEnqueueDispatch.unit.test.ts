@@ -74,10 +74,7 @@ function makeEvent(id: string): Event {
   );
 }
 
-async function enqueueOutcomeCount(
-  outcome: string,
-  subscriberName = "seamSubscriber",
-): Promise<number> {
+async function enqueueOutcomeCount(outcome: string): Promise<number> {
   const metric = register.getSingleMetric("es_subscriber_enqueue_total");
   if (!metric) return 0;
   const snapshot = (await metric.get()) as {
@@ -86,7 +83,7 @@ async function enqueueOutcomeCount(
   return snapshot.values
     .filter(
       (v) =>
-        v.labels.subscriber_name === subscriberName &&
+        v.labels.subscriber_name === "seamSubscriber" &&
         v.labels.outcome === outcome,
     )
     .reduce((sum, v) => sum + v.value, 0);
@@ -111,6 +108,8 @@ async function expectDispatchFailure(
   );
   expect(caught).toBeInstanceOf(AggregateError);
   const causes = (caught as AggregateError).errors as Error[];
+  // Without this the loop below vacuously passes on an empty errors array.
+  expect(causes.length).toBeGreaterThan(0);
   for (const cause of causes) {
     expect(cause.message).toMatch(expected);
   }
