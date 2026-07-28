@@ -347,6 +347,48 @@ export class CodingAgentSessionClickHouseRepository
    * Unwindowed, the same case yields an EMPTY outer read, which the caller's
    * retry recovers. The subquery touches only sort-key columns, so it stays a
    * cheap keyed seek without partition pruning.
+   *
+   * ORDER BY breaks UpdatedAt ties. It is NOT the
+   * `ORDER BY <version> DESC LIMIT 1` anti-pattern in
+   * dev/docs/best_practices/clickhouse-queries.md: the IN-tuple has already cut
+   * the input to the rows sharing max(UpdatedAt) — normally one — so the sort
+   * reads no column `SELECT *` was not already materialising for those same
+   * rows, rather than every unmerged version of the session.
+   *
+   * This is DEFENCE IN DEPTH, not a live bug. `nextVersionStamp` above already
+   * makes a tie unreachable while per-aggregate group serialization holds, and
+   * that is the mechanism relied on. The tiebreak covers the residual: the
+   * stamp's monotonic floor is per-writer plus whatever the read-back threaded,
+   * so two processes that resumed from the same committed version outside that
+   * serialization window can still land on the same ms. A bare LIMIT 1 would
+   * then pick arbitrarily and hand the fold stale state it resumes from and
+   * rewrites, dropping the other version's contributions and its applied-id
+   * watermark.
+   *
+   * The tiebreak orders by how far each version's fold actually got, and the
+   * session is fed by three signal families, so it needs a key for each:
+   *   1. `LastEventOccurredAt DESC` — the fold's own progress watermark
+   *      (`max(prev, event.occurredAt)`, so non-decreasing): the version that
+   *      applied the latest event wins.
+   *   2. `ModelCalls + ToolCalls + Prompts DESC` — span- and log-fed progress.
+   *      Every term is a `prev + 1` accumulator threaded through read-back and
+   *      never reset, so the sum only ever increases: a larger sum absorbed
+   *      strictly more contributions.
+   *   3. `length(MetricSeries) DESC` — metric-fed progress. The overlay
+   *      REPLACES per series rather than incrementing (ADR-056 §5), so the
+   *      count of converged units only grows. This key is not redundant with
+   *      (2): a metric-only session — a first-class case, since metrics are the
+   *      sole source of lines-of-code, commits and PRs — holds those three
+   *      counters at zero forever, and this is its only progress signal.
+   *   4. `length(AppliedEventIds) DESC` — more deliveries absorbed. After the
+   *      others because the watermark is reset per fresh delivery, so it
+   *      saturates and discriminates weakly.
+   *   5. `StartedAt ASC` — a total order for the fully-tied case, and the
+   *      correct direction: StartedAt is `min(occurredAt)` over the session's
+   *      contributions and only ever DECREASES as earlier signals land late, so
+   *      the smallest is the best-informed. Reading the two array lengths costs
+   *      only their offsets columns; every other key is a scalar already in the
+   *      row.
    */
   private async findLatestRecord({
     tenantId,
@@ -382,6 +424,12 @@ export class CodingAgentSessionClickHouseRepository
               AND SessionId = {sessionId:String}
             GROUP BY TenantId, SessionId
           )
+        ORDER BY
+          LastEventOccurredAt DESC,
+          ModelCalls + ToolCalls + Prompts DESC,
+          length(MetricSeries) DESC,
+          length(AppliedEventIds) DESC,
+          StartedAt ASC
         LIMIT 1
       `,
       query_params: {

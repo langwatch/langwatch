@@ -216,3 +216,189 @@ describe("CodingAgentSessionClickHouseRepository DateTime64 decode", () => {
     });
   });
 });
+
+/**
+ * A client that actually APPLIES the ORDER BY the repository sent, to rows
+ * handed over in a deliberately adverse order (the stale version first).
+ *
+ * A passthrough mock would return the fixture's own insertion order and pass
+ * whatever the repository did, so a dropped tiebreak — or one aimed at the
+ * wrong column or direction — would go unnoticed. Here the stale version wins
+ * unless the repository ordered correctly.
+ *
+ * A local equivalent of the analytics suites' shared fake rather than an import
+ * of it: that helper lives on an unmerged branch, and its grammar does not
+ * cover the summed key this repository emits.
+ */
+function orderingClient(rows: Array<Record<string, unknown>>): ClickHouseClient {
+  return {
+    query: async (params: { query: string }) => ({
+      json: async () => applyOrderBy(rows, params.query).slice(0, 1),
+    }),
+  } as unknown as ClickHouseClient;
+}
+
+/**
+ * Understands only the grammar this repository emits: comma-separated
+ * `<expression> ASC|DESC` keys before LIMIT, where an expression is a column, a
+ * `length(<column>)`, or a `+`-separated sum of columns.
+ */
+function applyOrderBy(
+  rows: Array<Record<string, unknown>>,
+  query: string,
+): Array<Record<string, unknown>> {
+  const clause = /ORDER BY([\s\S]*?)LIMIT/i.exec(query)?.[1];
+  if (clause === undefined) return [...rows];
+
+  const keys = clause
+    .split(",")
+    .map((key) => key.trim())
+    .filter((key) => key.length > 0)
+    .map((key) => ({
+      descending: /\bDESC\b/i.test(key),
+      expression: key.replace(/\b(ASC|DESC)\b/i, "").trim(),
+    }));
+
+  return [...rows].sort((left, right) => {
+    for (const { expression, descending } of keys) {
+      const a = evaluate(left, expression);
+      const b = evaluate(right, expression);
+      if (a === b) continue;
+      return (a < b ? -1 : 1) * (descending ? -1 : 1);
+    }
+    return 0;
+  });
+}
+
+/** UInt64 columns arrive as strings on the wire; DateTime64 sorts lexically. */
+function evaluate(
+  row: Record<string, unknown>,
+  expression: string,
+): number | string {
+  const arrayLength = /^length\((.+)\)$/i.exec(expression);
+  if (arrayLength) {
+    const value = row[arrayLength[1]!.trim()];
+    return Array.isArray(value) ? value.length : 0;
+  }
+  if (expression.includes("+")) {
+    return expression
+      .split("+")
+      .reduce((sum, column) => sum + Number(row[column.trim()] ?? 0), 0);
+  }
+  const raw = row[expression];
+  if (typeof raw === "number") return raw;
+  const asString = String(raw ?? "");
+  return asString !== "" && !Number.isNaN(Number(asString))
+    ? Number(asString)
+    : asString;
+}
+
+/**
+ * Two versions of one session that TIED on UpdatedAt, so both satisfy the
+ * IN-tuple dedup and the tiebreak alone decides. Defaults are identical; each
+ * case overrides only the keys it is pinning.
+ */
+function tiedVersions(
+  stale: Record<string, unknown>,
+  fresh: Record<string, unknown>,
+): ClickHouseClient {
+  const base = {
+    TenantId: "tenant-1",
+    SessionId: "sess-1",
+    UpdatedAt: "2026-07-24 12:00:00.000",
+    StartedAt: "2026-07-24 11:00:00.000",
+    LastEventOccurredAt: "2026-07-24 11:30:00.000",
+    ModelCalls: 0,
+    ToolCalls: 0,
+    Prompts: 0,
+    MetricSeries: [],
+    AppliedEventIds: [],
+  };
+  // Adverse order: the stale version first, so insertion order alone loses.
+  return orderingClient([
+    { ...base, ...stale },
+    { ...base, ...fresh },
+  ]);
+}
+
+const read = (client: ClickHouseClient) =>
+  new CodingAgentSessionClickHouseRepository(
+    async () => client,
+  ).findBySessionIdWithApplied({ tenantId: "tenant-1", sessionId: "sess-1" });
+
+describe("CodingAgentSessionClickHouseRepository point-read tiebreak", () => {
+  describe("given two versions of one session tied on UpdatedAt", () => {
+    describe("when one applied a later event than the other", () => {
+      it("returns the version with the higher progress watermark", async () => {
+        const result = await read(
+          tiedVersions(
+            { LastEventOccurredAt: "2026-07-24 11:00:00.000", Commits: 1 },
+            { LastEventOccurredAt: "2026-07-24 11:45:00.000", Commits: 9 },
+          ),
+        );
+
+        expect(result?.row.commits).toBe(9);
+      });
+    });
+
+    describe("when they share a watermark but folded different amounts of span and log work", () => {
+      it("returns the version that absorbed more contributions in total, not the one leading on any single counter", async () => {
+        const result = await read(
+          tiedVersions(
+            { ModelCalls: 9, ToolCalls: 1, Prompts: 0, Commits: 1 },
+            { ModelCalls: 2, ToolCalls: 8, Prompts: 3, Commits: 9 },
+          ),
+        );
+
+        expect(result?.row.commits).toBe(9);
+      });
+    });
+
+    describe("when the session is metric-only, so every span and log counter stays zero", () => {
+      it("returns the version holding more converged metric units", async () => {
+        const result = await read(
+          tiedVersions(
+            { MetricSeries: [["s1", "cost", "", "", "", 1]], Commits: 1 },
+            {
+              MetricSeries: [
+                ["s1", "cost", "", "", "", 1],
+                ["s2", "commits", "", "", "", 9],
+              ],
+              Commits: 9,
+            },
+          ),
+        );
+
+        expect(result?.row.commits).toBe(9);
+      });
+    });
+
+    describe("when they folded equal work but absorbed different numbers of deliveries", () => {
+      it("returns the version with more applied events", async () => {
+        const result = await read(
+          tiedVersions(
+            { AppliedEventIds: ["e1"], Commits: 1 },
+            { AppliedEventIds: ["e1", "e2"], Commits: 9 },
+          ),
+        );
+
+        expect(result?.row.commits).toBe(9);
+      });
+    });
+
+    describe("when every progress signal is identical and only the start time differs", () => {
+      it("returns the version with the EARLIER start time, which is the better-informed one", async () => {
+        // StartedAt is min(occurredAt) and only ever moves backwards, so the
+        // smallest value belongs to the version that saw the earliest signal.
+        const result = await read(
+          tiedVersions(
+            { StartedAt: "2026-07-24 11:30:00.000", Commits: 1 },
+            { StartedAt: "2026-07-24 09:00:00.000", Commits: 9 },
+          ),
+        );
+
+        expect(result?.row.commits).toBe(9);
+      });
+    });
+  });
+});
