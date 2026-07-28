@@ -2999,6 +2999,15 @@ export class ClickHouseTraceService {
           // sort-key resolve failed open) -> hint null -> unbounded scan, the
           // same slow-but-correct branch the summary read above takes. A
           // hinted-but-empty span read is authoritative and never widened.
+          //
+          // Cost, accepted knowingly: callers that pass a broad occurredAt
+          // (the trace-list routes forward the user's whole date filter) now
+          // scan spans over that range rather than the matched traces' own
+          // times — more weekly partitions, though the summary read in the
+          // same call already scans exactly this window. Keeping the tight
+          // per-chunk window only when the batch covers the whole id list
+          // would recover that, at the price of a branch whose invariance
+          // argument is far longer than this one's.
           const spanHintMs = summaryHintMs;
           const spanWindowMs = summaryWindowMs;
 
