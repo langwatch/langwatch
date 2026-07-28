@@ -111,6 +111,7 @@ screenshot-*.png
 .claude-qa/
 dev-*.log
 haven-boot*.log
+haven.log
 
 # Local agent dev log tee (pnpm dev), never committed.
 .claude-dev.log
