@@ -370,8 +370,75 @@ function fallbackNamedTrace(): readonly FoldEvent[] {
   ];
 }
 
+/**
+ * The Path-B shape: a Claude Code / Codex trace whose first signals are LOG
+ * RECORDS, with a span turning up only later (or, for most such traces, never).
+ *
+ * This is the sequence the storage anchor exists for (ADR-071 step 3). It puts
+ * two fields under the equivalence property that the span-led sequences cannot:
+ * the anchor `OccurredAt` carries — which for this trace is a log's time, and
+ * must come back frozen rather than re-derived from whatever folds next — and
+ * the span timing baseline in `EarliestSpanStartMs`, which is 0 across the whole
+ * log-only prefix and must NOT be confused with the anchor on the way back.
+ */
+function logLedTrace(): readonly FoldEvent[] {
+  const logRecord = (index: number, occurredAt: number): FoldEvent =>
+    traceEvent({
+      id: `evt-ll-log-${index}`,
+      type: "lw.obs.trace.log_record_received",
+      occurredAt,
+      data: {
+        traceId: TRACE_ID,
+        spanId: `ffff00000000000${index}`,
+        timeUnixMs: occurredAt,
+        severityNumber: 9,
+        severityText: "INFO",
+        body: "api_request",
+        attributes: {},
+        resourceAttributes: {},
+        scopeName: "com.anthropic.claude_code",
+        scopeVersion: null,
+        piiRedactionLevel: "DISABLED",
+      },
+    });
+
+  return [
+    logRecord(1, BASE_MS + 1000),
+    logRecord(2, BASE_MS + 1500),
+    traceEvent({
+      id: "evt-ll-topic",
+      type: "lw.obs.trace.topic_assigned",
+      occurredAt: BASE_MS + 1800,
+      data: {
+        topicId: "topic-3",
+        topicName: "Coding",
+        subtopicId: null,
+        subtopicName: null,
+        isIncremental: false,
+      },
+    }),
+    logRecord(3, BASE_MS + 2000),
+    // A span finally arrives, and starts BEFORE every log — so the timing
+    // baseline lands earlier than the anchor, which stays put.
+    spanEvent({
+      eventId: "evt-ll-span",
+      spanId: "ffff0000000000ff",
+      parentSpanId: null,
+      name: "agent-run",
+      startMs: BASE_MS + 200,
+      endMs: BASE_MS + 2500,
+      attributes: {
+        "langwatch.span.type": "agent",
+        "gen_ai.usage.output_tokens": 40,
+      },
+    }),
+    logRecord(4, BASE_MS + 3000),
+  ];
+}
+
 const LIFECYCLE = renamedBeforeRootTrace();
 const FALLBACK_LIFECYCLE = fallbackNamedTrace();
+const LOG_LED_LIFECYCLE = logLedTrace();
 
 /**
  * The two orderings differ in which name-resolution latch is load-bearing — the
@@ -387,6 +454,10 @@ const SEQUENCES = [
   {
     name: "a trace left fallback-named until its root span arrived",
     events: FALLBACK_LIFECYCLE,
+  },
+  {
+    name: "a trace whose first signals are log records, with a span arriving late",
+    events: LOG_LED_LIFECYCLE,
   },
 ];
 
@@ -425,6 +496,48 @@ describe("traceAnalytics fold-equivalence across the read-back boundary", () => 
         });
       },
     );
+  });
+
+  /**
+   * The storage anchor and the span timing baseline, called out by name.
+   *
+   * The property above already compares every column, so this adds no coverage
+   * — it adds a NAME. These two fields are one column apart and mean opposite
+   * things (a frozen storage address vs. a value that moves as earlier spans
+   * land), so a decoder that swaps them fails a test that says which is which,
+   * instead of one that says "some column differs".
+   */
+  describe("given the log-led trace interrupted before its span arrives", () => {
+    const splitAt = LOG_LED_LIFECYCLE.length - 2;
+    const committed = foldAll(
+      LOG_LED_LIFECYCLE.slice(0, splitAt),
+      projection.init(),
+    );
+    const rest = LOG_LED_LIFECYCLE.slice(splitAt);
+
+    /** @scenario "A log-led trace resumed from its committed row keeps its anchor and its timing" */
+    it("resumes with the anchor its first log froze", () => {
+      const uninterrupted = foldAll(rest, committed);
+      const resumed = foldAll(rest, roundTrip(committed));
+
+      expect(resumed.storageAnchorMs).toBe(uninterrupted.storageAnchorMs);
+      expect(project(resumed).occurredAtMs).toBe(
+        project(committed).occurredAtMs,
+      );
+    });
+
+    /** @scenario "A log-led trace resumed from its committed row keeps its anchor and its timing" */
+    it("resumes with the same timing baseline the late span sets", () => {
+      const uninterrupted = foldAll(rest, committed);
+      const resumed = foldAll(rest, roundTrip(committed));
+
+      // The span in the tail starts BEFORE every log, so this is also the case
+      // where the baseline ends up earlier than the anchor — decoding one from
+      // the other's column would be visible here.
+      expect(resumed.occurredAt).toBe(uninterrupted.occurredAt);
+      expect(resumed.occurredAt).toBeLessThan(resumed.storageAnchorMs);
+      expect(resumed.totalDurationMs).toBe(uninterrupted.totalDurationMs);
+    });
   });
 
   describe("given the fallback-named trace folded without interruption", () => {
@@ -623,6 +736,7 @@ const TRACE_STATE_DISPOSITION = {
   subTopicId: "restored",
   traceName: "restored",
   models: "restored",
+  storageAnchorMs: "restored",
   occurredAt: "restored",
   totalDurationMs: "restored",
   totalCost: "restored",

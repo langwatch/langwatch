@@ -113,7 +113,11 @@ export class TraceAnalyticsStore
    * the MAX_PROCESSED_SPANS cap and re-adds committed cost/tokens,
    * `traceNameUserOverridden` false lets one late non-root span overwrite a
    * user-renamed trace, and `traceNameFromFallback` false freezes a
-   * fallback-named trace against a real root that arrives later. So a
+   * fallback-named trace against a real root that arrives later. The same
+   * argument is what carries the storage-anchor split (ADR-071 step 3, migration
+   * 00058) through the gate: on a row written before it, `EarliestSpanStartMs`
+   * decodes as 0 — "no span yet" on a trace that has spans — and the next span
+   * would measure the whole trace's duration from itself. So a
    * stale-version row is reported as a MISS (null state, empty watermark — the
    * same answer as "no row"), which the fold's `refoldOnStoreMiss` rebuilds from
    * `event_log` once; the rewrite carries the current version and every later
@@ -185,6 +189,15 @@ export class TraceAnalyticsStore
  * row means `get()` misses, and the fold's `refoldOnStoreMiss` rebuilds the
  * dimension from `event_log`. Before the version gate restored that net, such a
  * state lived in Redis alone and its signal was lost for good on eviction.
+ *
+ * `storageAnchorMs` is deliberately NOT a third door, even though ADR-071 step 3
+ * gives every contribution a real anchor and so removes the only technical
+ * reason such a row could not be written. What decides it is not the anchor: a
+ * row on this table is a TRACE for every analytics read — it is counted,
+ * grouped and averaged over — so admitting a trace whose sole signal is an
+ * annotation or a classification would change what the product means by "a
+ * trace", not just what the fold persists. That is a product call, and it is not
+ * this change's to make.
  */
 function hasPersistableSignal(state: TraceAnalyticsData): boolean {
   if (state.spanCount > 0) return true;

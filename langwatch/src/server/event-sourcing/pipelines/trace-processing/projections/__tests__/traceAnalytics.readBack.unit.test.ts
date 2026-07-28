@@ -46,6 +46,11 @@ function committedState(): TraceAnalyticsData {
     subTopicId: "sub-1",
     traceName: "My Trace",
     models: ["gpt-5-mini", "claude-fable-5"],
+    // Deliberately LATER than `occurredAt`: the anchor froze on the first span
+    // this trace folded, and an earlier-starting span then arrived and pulled
+    // the timing baseline back. Keeping the two apart in the fixture is what
+    // makes a decoder that reads one out of the other's column fail here.
+    storageAnchorMs: BASE_MS + 250,
     occurredAt: BASE_MS,
     totalDurationMs: 4200,
     totalCost: 0.42,
@@ -83,6 +88,17 @@ describe("traceAnalytics read-back (fromRow)", () => {
     const state = committedState();
     const row = project(state);
     const decoded = traceAnalyticsStateFromRow(row);
+
+    it("keeps the storage anchor and the span timing baseline apart", () => {
+      // The anchor rides in OccurredAt (partition + sort key + TTL) and the
+      // baseline in its own column (migration 00058). Decoding either from the
+      // other's column is the defect this split exists to stop: it would either
+      // move a committed row's partition or restart the trace's duration.
+      expect(decoded.storageAnchorMs).toBe(BASE_MS + 250);
+      expect(decoded.occurredAt).toBe(BASE_MS);
+      expect(row.occurredAtMs).toBe(BASE_MS + 250);
+      expect(row.earliestSpanStartMs).toBe(BASE_MS);
+    });
 
     it("recovers the fold bookkeeping the trimmed row would otherwise drop", () => {
       expect(decoded.spanCount).toBe(7);
@@ -136,6 +152,8 @@ describe("traceAnalytics read-back (fromRow)", () => {
         rootMetadataFromFallback: false,
         traceNameUserOverridden: false,
         lastEventOccurredAt: 0,
+        // And, on a row written before migration 00058, no span timing baseline.
+        earliestSpanStartMs: 0,
       };
 
       const decoded = traceAnalyticsStateFromRow(legacyRow);
@@ -151,6 +169,9 @@ describe("traceAnalytics read-back (fromRow)", () => {
       expect(decoded.annotationIds).toEqual([]);
       expect(decoded.spanCount).toBe(0);
       expect(decoded.LastEventOccurredAt).toBe(0);
+      // 0 reads back as "no span has seeded the timing baseline" — which is
+      // precisely why the store refuses such a row rather than folding onto it.
+      expect(decoded.occurredAt).toBe(0);
     });
   });
 });
@@ -190,8 +211,10 @@ describe("TraceAnalyticsStore read-back version gate", () => {
   describe("given a row stamped with an older projection version", () => {
     // Such a row predates the read-back columns, so every one of them decodes
     // as a ClickHouse default indistinguishable from a real value — spanCount 0
-    // would re-add committed cost past the span cap, and a false
-    // traceNameUserOverridden would let a late span overwrite a user's rename.
+    // would re-add committed cost past the span cap, a false
+    // traceNameUserOverridden would let a late span overwrite a user's rename,
+    // and a zero span timing baseline (migration 00058) would restart the
+    // trace's duration from whichever span arrived next.
     const staleRow = (): TraceAnalyticsRow => ({
       ...project(committedState()),
       version: "2026-06-20",
@@ -200,6 +223,7 @@ describe("TraceAnalyticsStore read-back version gate", () => {
       rootSpanStartTimeMs: 0,
       traceNameUserOverridden: false,
       lastEventOccurredAt: 0,
+      earliestSpanStartMs: 0,
     });
 
     /** @scenario a stored state written under an older shape is rebuilt rather than trusted */

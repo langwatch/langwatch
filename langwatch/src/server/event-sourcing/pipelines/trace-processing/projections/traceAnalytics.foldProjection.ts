@@ -100,14 +100,24 @@ import {
  * zero/default placeholders for the fields the slim state drops — those
  * placeholders feed only the service call and are discarded, never persisted.
  *
+ * Storage anchor (ADR-071 step 3): `OccurredAt` is the partition key, the lead
+ * sort key AND the TTL anchor, so it is a STORAGE ANCHOR — frozen on the first
+ * contribution that carries a usable business time and never moved after
+ * (`storageAnchorMs`). It is no longer the running minimum of span starts; that
+ * value is the fold's timing baseline and now has its own column
+ * (`EarliestSpanStartMs`, migration 00058). Sharing one column between the two
+ * jobs is what wrote a log-only trace into partition 197001 with an
+ * already-expired TTL deadline.
+ *
  * Re-fold safety (ADR-021/022): a re-fold produces the same canonical state,
  * written with a later UpdatedAt — the LWW column readers dedup on. Note the
  * ENGINE only physically collapses rows sharing the full sort key
- * `(TenantId, OccurredAt, TraceId)`; OccurredAt can shift when an
- * earlier-starting span arrives late, so superseded rows may persist until
- * TTL and every read MUST dedup by (TenantId, TraceId, max(UpdatedAt)) — the
- * IN-tuple pattern the slim query builders use. No explicit truncate, no
- * settle, no signs.
+ * `(TenantId, OccurredAt, TraceId)`. Freezing the anchor is what lets versions
+ * of one trace share that key and collapse; rows written BEFORE the freeze, and
+ * a trace whose anchor was re-stamped by a rebuild after a store miss, still
+ * carry more than one value, so every read MUST dedup by
+ * (TenantId, TraceId, max(UpdatedAt)) — the IN-tuple pattern the slim query
+ * builders use. No explicit truncate, no settle, no signs.
  *
  * State continuity (ADR-066): the store reads its own last committed row back
  * (`get` → `findByTraceIdWithApplied` → `traceAnalyticsStateFromRow`). The
@@ -142,14 +152,25 @@ const traceAnalyticsEvents = [
  *  (ADR-021/022), and the store's read-back path uses it as the discriminator:
  *  a row carrying an OLDER version predates those columns, so its defaults
  *  cannot be told apart from real zeroes and it is treated as a store miss
- *  (see `TraceAnalyticsStore.getWithApplied`). */
-export const TRACE_ANALYTICS_PROJECTION_VERSION_LATEST = "2026-07-27" as const;
+ *  (see `TraceAnalyticsStore.getWithApplied`).
+ *
+ *  2026-07-29 — the storage anchor split (ADR-071 step 3, migration 00058).
+ *  BOTH halves of what this stamp records changed at once: the DERIVATION
+ *  (`OccurredAt` is now the frozen first-observed business time rather than the
+ *  running min of span starts) and the ROW SHAPE (`EarliestSpanStartMs` carries
+ *  the span timing baseline that `OccurredAt` used to double as). A 2026-07-27
+ *  row has no `EarliestSpanStartMs`, so it decodes as 0 — indistinguishable
+ *  from "no span yet" — which would reset the timing baseline and make the next
+ *  span measure the trace's duration from itself alone. Rejected as a store
+ *  miss and refolded once, exactly as the 00056 rows were. */
+export const TRACE_ANALYTICS_PROJECTION_VERSION_LATEST = "2026-07-29" as const;
 
 /**
- * How far a trace's OccurredAt (the partition column) may sit from the business
- * time a read is anchored on. Spans/logs/metrics land within the trace's active
- * window (seconds-minutes), but a late annotation or topic assignment can arrive
- * days later, so the read-back window is ±7 days. Declared once, on the fold;
+ * How far a trace's OccurredAt (the partition column, and since ADR-071 step 3
+ * the frozen storage anchor) may sit from the business time a read is anchored
+ * on. Spans/logs/metrics land within the trace's active window
+ * (seconds-minutes), but a late annotation or topic assignment can arrive days
+ * later, so the read-back window is ±7 days. Declared once, on the fold;
  * the executor derives `context.readWindow` from it and retries a windowed miss
  * unwindowed, so a signal outside the window is still found.
  */
@@ -162,11 +183,13 @@ export const TRACE_ANALYTICS_READ_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
  * applied-event-id watermark INTO its ClickHouse row: on a fresh delivery the
  * stored set is exactly the batch's ids, so the coalesce ceiling IS the per-row
  * watermark size. `trace_analytics` is a ReplacingMergeTree that only collapses
- * rows sharing the full sort key, and a late earlier-starting span shifts
- * OccurredAt, so superseded row versions — each carrying their own watermark —
- * survive until TTL. 128 ids is a few KB per version instead of ~15-20 KB, and
- * still drains a backed-up hot trace in 128-event bites: the O(n²) → O(n)
- * collapse comes from coalescing at all, not from the size of the ceiling.
+ * rows sharing the full sort key; the frozen anchor (ADR-071 step 3) keeps a
+ * trace's versions on one key, but the pre-freeze rows whose OccurredAt moved
+ * with each late earlier-starting span still carry a version — and its own
+ * watermark — per distinct value, surviving until TTL. 128 ids is a few KB per
+ * version instead of ~15-20 KB, and still drains a backed-up hot trace in
+ * 128-event bites: the O(n²) → O(n) collapse comes from coalescing at all, not
+ * from the size of the ceiling.
  *
  * Must stay below MAX_APPLIED_EVENT_IDS (the Redis cache trims the set at that
  * cap; a batch at or above it would break redelivery dedup — the projection
@@ -189,8 +212,8 @@ export const TRACE_ANALYTICS_COALESCE_MAX_BATCH = 128;
  *     / OutputSpanEndTimeMs / BlockedByGuardrail / RootSpanType
  *   - Events.*, Links.*, InstrumentationScope, ScopeName, ScopeVersion
  *
- * What's kept: keys, OccurredAt, hoisted dim columns, metric scalars,
- * HasError + HasAnnotation, and the trimmed Attributes map.
+ * What's kept: keys, the storage anchor (OccurredAt), hoisted dim columns,
+ * metric scalars, HasError + HasAnnotation, and the trimmed Attributes map.
  */
 export interface TraceAnalyticsRow {
   tenantId: string;
@@ -198,8 +221,27 @@ export interface TraceAnalyticsRow {
   /** Schema-snapshot version (NOT the LWW dedup key — that is UpdatedAt,
    *  same as trace_summaries; migration 00039). */
   version: string;
-  /** The trace's occurred-at (partition column + lead sort key). */
+  /**
+   * The trace's STORAGE ANCHOR → the `OccurredAt` column: partition key, lead
+   * sort key and TTL anchor all at once (migration 00039).
+   *
+   * Since ADR-071 step 3 this is `state.storageAnchorMs` — the first business
+   * time the fold observed for the trace, frozen — NOT the running minimum of
+   * span start times it used to be. The min lives on `earliestSpanStartMs`.
+   * The field keeps its column-shaped name so the repository's record literal
+   * stays a 1:1 column mapping; its MEANING is the anchor.
+   */
   occurredAtMs: number;
+  /**
+   * The span timing baseline → the `EarliestSpanStartMs` column (migration
+   * 00058): the earliest start time across the trace's non-synthetic spans, or
+   * 0 while no span has been folded. `TotalDurationMs` is measured from it.
+   *
+   * It has its own column because `OccurredAt` no longer carries it, and
+   * without one the read-back would decode "no span yet" onto a trace that has
+   * spans — restarting its duration from the next span alone.
+   */
+  earliestSpanStartMs: number;
   createdAtMs: number;
   updatedAtMs: number;
 
@@ -293,7 +335,31 @@ export interface TraceAnalyticsData {
   traceName: string;
   models: string[];
 
+  /**
+   * The trace's STORAGE ANCHOR, epoch ms (0 = nothing observed yet).
+   *
+   * Written to the `OccurredAt` column, which is the partition key, the lead
+   * sort key AND the TTL anchor. Seeded by the FIRST contribution that carries
+   * a usable business time — a span, a log record, a metric correlation, an
+   * annotation, a topic assignment, an origin resolution, a rename — and never
+   * moved afterwards (ADR-071: a storage anchor is written once).
+   *
+   * Deliberately separate from `occurredAt` below. That one is span-seeded and
+   * is the timing baseline; only spans may touch it, because `SpanTimingService`
+   * reads `occurredAt > 0` as "a span has seeded the baseline" and measures
+   * `TotalDurationMs` from it. Anchoring the two on one field is what put
+   * log-only traces (Claude Code / Codex "Path B") in partition 197001 with a
+   * TTL deadline of `1970 + retention`, already past, so they were reaped on the
+   * next TTL merge and every later delivery refolded the whole aggregate.
+   */
+  storageAnchorMs: number;
+
   // Metric scalars
+  /**
+   * The span timing baseline, epoch ms: the earliest start across the trace's
+   * non-synthetic spans, 0 while none has been folded. SPAN-SEEDED ONLY — see
+   * `storageAnchorMs` above for why a log record must not set it.
+   */
   occurredAt: number;
   totalDurationMs: number;
   totalCost: number | null;
@@ -331,6 +397,47 @@ export interface TraceAnalyticsData {
   LastEventOccurredAt: number;
 }
 
+/** Usable as a business time: a finite, strictly positive epoch-ms value. */
+function isUsableAnchorMs(value: number | undefined): value is number {
+  return typeof value === "number" && value > 0 && Number.isFinite(value);
+}
+
+/**
+ * Freeze the storage anchor on the first contribution that carries a usable
+ * business time (ADR-071). First-observed, never `min` and never `max`: the
+ * anchor's whole job is to hold a row's partition, sort position and TTL
+ * deadline still, and every consequence ADR-071 prices comes from the column
+ * moving rather than from which column it is.
+ *
+ * A span's own start time wins over the envelope's `occurredAt` when the fold
+ * has one, because `span_received` stamps the envelope at ingest — a
+ * long-running span's start can predate it by the span's whole duration, and
+ * anchoring on ingest would move every span trace's partition off the value
+ * written before this change. `state.occurredAt` holds exactly that start once
+ * `SpanTimingService` has seen the span, so it is read from there rather than
+ * re-derived.
+ *
+ * Handles no event itself — {@link TraceAnalyticsFoldProjection.apply} calls it
+ * once per event, after the handler, so every contribution type anchors without
+ * ten handlers each remembering to.
+ *
+ * @internal Exported for unit testing.
+ */
+export function anchorStorageTime({
+  state,
+  eventOccurredAtMs,
+}: {
+  state: TraceAnalyticsData;
+  eventOccurredAtMs: number | undefined;
+}): TraceAnalyticsData {
+  if (state.storageAnchorMs > 0) return state;
+  const candidate = isUsableAnchorMs(state.occurredAt)
+    ? state.occurredAt
+    : eventOccurredAtMs;
+  if (!isUsableAnchorMs(candidate)) return state;
+  return { ...state, storageAnchorMs: candidate };
+}
+
 /**
  * Project the in-memory slim state into the slim `TraceAnalyticsRow`. Pure:
  * no I/O, no external state.
@@ -361,7 +468,17 @@ export function projectAnalyticsStateToRow({
     tenantId,
     traceId: state.traceId,
     version,
-    occurredAtMs: state.occurredAt,
+    // The anchor, not the timing baseline (ADR-071). The `createdAt` fallback
+    // is a last resort for a state whose every event carried a zero
+    // `occurredAt` — the event schema allows it (`nonnegative`, not
+    // `positive`) — and it exists so the partition column can never be the
+    // epoch. It is fold time, so it is re-stampable on a rebuild; the
+    // read-back promotes whatever landed in the column to the frozen anchor,
+    // which is what stops it drifting after the first write.
+    occurredAtMs: isUsableAnchorMs(state.storageAnchorMs)
+      ? state.storageAnchorMs
+      : state.createdAt,
+    earliestSpanStartMs: state.occurredAt,
     createdAtMs: state.createdAt,
     updatedAtMs: state.updatedAt,
 
@@ -433,9 +550,10 @@ export function projectAnalyticsStateToRow({
  *
  * This decoder is TOTAL: handed a row whose read-back columns are absent it
  * still answers, mapping the ClickHouse column defaults to state defaults
- * (spanCount 0, empty annotation set, no root claimed, checkpoint 0). Those
- * defaults are indistinguishable from real zeroes, so deciding WHETHER a row may
- * be decoded is the store's job, not this function's: `getWithApplied` refuses
+ * (spanCount 0, empty annotation set, no root claimed, checkpoint 0, no span
+ * timing baseline). Those defaults are indistinguishable from real zeroes, so
+ * deciding WHETHER a row may be decoded is the store's job, not this
+ * function's: `getWithApplied` refuses
  * any row stamped with an older projection version and reports a store miss, and
  * the fold's `refoldOnStoreMiss` rebuilds that aggregate from `event_log` once.
  * A caller that bypasses the version gate gets the defaults above.
@@ -467,7 +585,14 @@ export function traceAnalyticsStateFromRow(
     traceName: row.traceName,
     models: row.models,
 
-    occurredAt: row.occurredAtMs,
+    // The anchor comes back frozen: whatever the column holds is what the row
+    // was partitioned and TTL'd on, so re-deriving it would be free to move it.
+    storageAnchorMs: row.occurredAtMs,
+    // …and the timing baseline comes back from its OWN column, never from the
+    // anchor. Reading it off `occurredAtMs` would hand `SpanTimingService` a
+    // log-shaped time as a span start and inflate the trace's duration — and
+    // for a log-only trace it would fabricate a span that never arrived.
+    occurredAt: row.earliestSpanStartMs,
     totalDurationMs: row.totalDurationMs,
     totalCost: row.totalCost,
     nonBilledCost: row.nonBilledCost,
@@ -900,8 +1025,10 @@ export class TraceAnalyticsFoldProjection
    * version, so the row hits from then on and the whole population self-heals
    * with no backfill migration. Without the gate a stale row would
    * silently downgrade a user-renamed trace to a late span's name, freeze a
-   * fallback-named trace, and reset the MAX_PROCESSED_SPANS cap so already-
-   * committed cost/tokens were counted twice.
+   * fallback-named trace, reset the MAX_PROCESSED_SPANS cap so already-
+   * committed cost/tokens were counted twice, and — since the storage-anchor
+   * split (migration 00058) — hand back a zero span timing baseline, so the
+   * trace's duration restarted from whichever span happened to arrive next.
    *
    * TWO CLASSES DO NOT SELF-HEAL, so `es_fold_refold_on_miss_total` cannot
    * reach zero for this adopter:
@@ -951,6 +1078,9 @@ export class TraceAnalyticsFoldProjection
       subTopicId: null,
       traceName: "",
       models: [],
+      // Sentinel: 0 means "nothing observed yet". `apply` freezes it on the
+      // first contribution carrying a usable business time.
+      storageAnchorMs: 0,
       // Sentinel: 0 means "no spans received yet". The timing service uses
       // occurredAt > 0 to decide first-span vs min-of-existing. Using
       // Date.now() here would break the Math.min logic.
@@ -970,6 +1100,37 @@ export class TraceAnalyticsFoldProjection
       traceNameFromFallback: false,
       rootMetadataFromFallback: false,
     };
+  }
+
+  /**
+   * Dispatch as the base class does, then freeze the storage anchor if this is
+   * the first contribution that carried a usable business time (ADR-071 step 3,
+   * {@link anchorStorageTime}).
+   *
+   * Here rather than in the ten handlers because the anchor's rule is about
+   * CONTRIBUTIONS, not about spans: a trace whose only signal is a log record,
+   * a metric correlation or a topic assignment must still get a real partition
+   * and a real TTL deadline. One seam also means a new event type cannot
+   * silently arrive un-anchored — the way `state.occurredAt` left every
+   * non-span contribution anchored at the epoch.
+   *
+   * After `super.apply`, so a span's own start time (which the handler has by
+   * then put on `state.occurredAt`) is preferred over the envelope's ingest
+   * stamp, and so an unhandled event type — which `super.apply` returns
+   * untouched — anchors nothing.
+   */
+  override apply(
+    state: TraceAnalyticsData,
+    event: { type: string },
+  ): TraceAnalyticsData {
+    const folded = super.apply(state, event);
+    if (folded === state) return state;
+    const eventOccurredAt = (event as { occurredAt?: unknown }).occurredAt;
+    return anchorStorageTime({
+      state: folded,
+      eventOccurredAtMs:
+        typeof eventOccurredAt === "number" ? eventOccurredAt : undefined,
+    });
   }
 
   handleTraceSpanReceived(

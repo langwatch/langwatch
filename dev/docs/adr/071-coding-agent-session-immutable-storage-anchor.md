@@ -8,6 +8,8 @@
 
 **Scope:** the fix and the freeze are `coding_agent_sessions`. **The anchor finding is systemic** — `trace_analytics` (00039) and `evaluation_analytics` (00041) make the same mistake under the column name `OccurredAt`, and are recorded here as same-class instances so nobody re-derives it. No table is re-plumbed and no migration ships.
 
+> **Amendment (2026-07-29) — sequencing step 3 has landed for `trace_analytics` first.** The scope sentence above is now historical for that one table: `trace_analytics.OccurredAt` carries a frozen, first-observed anchor (`storageAnchorMs`), its span timing baseline moved to a new `EarliestSpanStartMs` column (migration **00058**), and the fold's projection stamp was bumped so pre-split rows are refolded rather than decoded. It went first because it had a consequence `coding_agent_sessions` does not: only spans set that column, so a log-only trace (Claude Code / Codex "Path B") committed at `new Date(0)` — partition `197001`, TTL deadline already past — and was reaped, after which every delivery refolded the aggregate's whole history. That is this ADR's rules applied unchanged, not a new decision: the anchor is first-observed rather than `min`, the displayed/derived business value is a separate column, and the target anchor is still platform accept time behind the human sign-off recorded in sequencing item 6. `coding_agent_sessions` step 3 and `evaluation_analytics` are unchanged and still pending.
+
 **Relates to:** [ADR-066](./066-projection-clickhouse-cached-store.md) (the read-back store that writes this row, and its `MetricSeries` step 2), [ADR-068](./068-windowed-clickhouse-reads.md) (windowed reads — the list read here is the counter-example that motivates the rule, and its bound-then-filter shape is how an accept-time anchor still answers business-time questions), [ADR-034](./034-event-sourced-analytics-materialization.md) (the RMT-plus-IN-tuple materialisation shape).
 
 ## Context
@@ -136,9 +138,9 @@ The obvious reaction to this ADR is that `coding_agent_sessions` picked an idios
 
 | Table | Anchor (partition + sort key + TTL) | How it is derived | Direction it moves |
 |---|---|---|---|
-| `coding_agent_sessions` (00051:192-195) | `StartedAt` | `min(state.startedAtMs, occurredAt)` — `codingAgentSession.foldProjection.ts:247-252` | backwards |
-| `trace_analytics` (00039:189-192) | `OccurredAt` | `min(state.occurredAt, span.startTimeUnixMs)` — `span-timing.service.ts:36-38`, projected at `traceAnalytics.foldProjection.ts:603` | backwards |
-| `evaluation_analytics` (00041:135-138) | `OccurredAt` | `LastEventOccurredAt`, i.e. `max(prev, event.occurredAt)` — `abstractFoldProjection.ts:235-238`, projected at `evaluationAnalytics.foldProjection.ts:252` | forwards |
+| `coding_agent_sessions` (00051:192-195) | `StartedAt` | `min(state.startedAtMs, occurredAt)` — `codingAgentSession.foldProjection.ts:165-170` | backwards |
+| `trace_analytics` (00039:189-192) | `OccurredAt` | `min(state.occurredAt, span.startTimeUnixMs)` — `span-timing.service.ts:36-38`, projected at `traceAnalytics.foldProjection.ts:302` — **fixed by the amendment above: now first-observed and frozen** | backwards (no longer moves) |
+| `evaluation_analytics` (00041:135-138) | `OccurredAt` | `LastEventOccurredAt`, i.e. `max(prev, event.occurredAt)` — `abstractFoldProjection.ts:235-238`, projected at `evaluationAnalytics.foldProjection.ts:201` | forwards |
 
 `span.startTimeUnixMs` and `event.occurredAt` are **producer-supplied**. Renaming the column fixes nothing.
 
