@@ -319,9 +319,26 @@ func (e *Engine) dispatch(ctx context.Context, req ExecuteRequest, node *dsl.Nod
 	return outputs, derr
 }
 
-// redactNodeSecrets scrubs resolved secret values from every string a node
-// hands back to a caller. Mutates in place: derr is the same pointer that
-// reaches runState.firstError and therefore the run's top-level error.
+// redactNodeSecrets scrubs resolved secret values from a node's DIAGNOSTIC
+// output — the error message, the traceback, stdout and stderr.
+//
+// It deliberately does NOT touch ns.Outputs, and that asymmetry is the whole
+// design rather than an oversight. Those four channels only ever carry a
+// secret by accident: nobody means to put one in a traceback. Outputs are a
+// DATA channel, and routing a secret through one is the supported use — a code
+// node returning a token for an HTTP node's header is exactly what the
+// `secrets.NAME` namespace exists for. Redacting there would corrupt the
+// workflow's own data, and for an End node it would corrupt the run's result.
+//
+// So: if you are here because a secret reached somewhere it should not have,
+// check whether it arrived through an output before adding a field to this
+// function.
+//
+// Mutates in place: derr is the same pointer that reaches
+// runState.firstError and therefore the run's top-level error. Both callers
+// (runLayer, runLayerStream) read it only after dispatch returns, so the
+// mutation lands before ns.Error, recordError, logNodeFailure, the OTel span,
+// and the execution_state_change frame all see it.
 func redactNodeSecrets(ns *NodeState, derr *NodeError, secrets map[string]string) {
 	if len(secrets) == 0 {
 		return
