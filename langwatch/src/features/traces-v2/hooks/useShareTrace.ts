@@ -1,5 +1,6 @@
 import type { ShareLink } from "@prisma/client";
 import { useCallback } from "react";
+import { showErrorToast } from "~/features/errors";
 import { toaster } from "~/components/ui/toaster";
 import { api } from "~/utils/api";
 
@@ -74,21 +75,13 @@ function useShareLinkMutations({
   const createMutation = api.share.createShare.useMutation({
     onSuccess: invalidate,
     onError: (error) =>
-      toaster.create({
-        title: "Failed to create share link",
-        description: error.message,
-        type: "error",
-      }),
+      showErrorToast({ error, fallbackTitle: "Couldn't create the share link" }),
   });
 
   const revokeMutation = api.share.revoke.useMutation({
     onSuccess: invalidate,
     onError: (error) =>
-      toaster.create({
-        title: "Failed to revoke share link",
-        description: error.message,
-        type: "error",
-      }),
+      showErrorToast({ error, fallbackTitle: "Couldn't revoke the share link" }),
   });
 
   const createLink = useCallback(

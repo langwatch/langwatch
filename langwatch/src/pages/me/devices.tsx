@@ -13,6 +13,7 @@ import { useState } from "react";
 import { InstallCliCard } from "~/components/me/InstallCliCard";
 import MyLayout from "~/components/me/MyLayout";
 import { usePersonalContext } from "~/components/me/usePersonalContext";
+import { showErrorToast } from "~/features/errors";
 import { toaster } from "~/components/ui/toaster";
 import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { api } from "~/utils/api";
@@ -68,12 +69,8 @@ function MyDevicesPage() {
         type: "success",
       });
     },
-    onError: (err) => {
-      toaster.create({
-        title: "Failed to revoke device",
-        description: err.message,
-        type: "error",
-      });
+    onError: (error) => {
+      showErrorToast({ error, fallbackTitle: "Couldn't revoke the device" });
     },
   });
 
@@ -89,12 +86,8 @@ function MyDevicesPage() {
         type: "success",
       });
     },
-    onError: (err) => {
-      toaster.create({
-        title: "Failed to revoke all devices",
-        description: err.message,
-        type: "error",
-      });
+    onError: (error) => {
+      showErrorToast({ error, fallbackTitle: "Couldn't revoke the devices" });
     },
   });
 

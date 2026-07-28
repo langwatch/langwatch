@@ -7,6 +7,7 @@ import {
   isCodexModel,
   LANGY_CHAT_FEATURE_KEY,
 } from "~/server/modelProviders/codexRestrictions";
+import { showErrorToast } from "~/features/errors";
 import type { ScopeAssignment } from "~/server/scopes/scope.types";
 import { api } from "~/utils/api";
 import {
@@ -128,11 +129,7 @@ async function acceptCodexCodingDefaults({
     });
     onClose();
   } catch (error) {
-    toaster.create({
-      title: "Could not set the defaults",
-      description: error instanceof Error ? error.message : undefined,
-      type: "error",
-    });
+    showErrorToast({ error, fallbackTitle: "Could not set the defaults" });
   }
 }
 
