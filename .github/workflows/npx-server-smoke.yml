@@ -140,8 +140,8 @@ jobs:
       - name: Pack the npm tarball
         id: pack
         # Use the same wrapper as npx-server-publish.yml so the smoke tarball
-        # matches what end users get from npm (Apache LICENSE swap, exact
-        # files[] from package.json — no go.mod/cmd/, etc).
+        # matches what end users get from npm (exact files[] from
+        # package.json — no go.mod/cmd/, etc).
         run: |
           mkdir -p "$GITHUB_WORKSPACE/_pack"
           bash scripts/pack-npm.sh --pack-destination "$GITHUB_WORKSPACE/_pack"
@@ -151,8 +151,20 @@ jobs:
           ls -lh "$tarball"
           # Belt-and-suspenders: tarball must NOT ship Go source (silent
           # local-build foot-gun from beta.8 era).
-          if tar -tzf "$tarball" | grep -qE "^package/(go\.mod|cmd/|pkg/|services/)"; then
+          #
+          # Anchored at package/app/ since ADR-076 — the artifact is staged
+          # one level down so the workspace root is not the package root. The
+          # old `^package/(...)` anchor cannot match any path in the staged
+          # layout, so it would have passed unconditionally and stopped
+          # guarding anything.
+          if tar -tzf "$tarball" | grep -qE "^package/app/(go\.mod|cmd/|pkg/|services/)"; then
             echo "✗ tarball ships Go source dirs — local-build fallback regression."
+            exit 1
+          fi
+          # The lockfile is the whole reason for the staged layout: npm strips
+          # it from the package ROOT. Assert it arrived.
+          if ! tar -tzf "$tarball" | grep -qx "package/app/pnpm-lock.yaml"; then
+            echo "✗ tarball ships no lockfile — the end-user install would not be reproducible."
             exit 1
           fi
 
@@ -185,7 +197,13 @@ jobs:
           install_dir="$RUNNER_TEMP/npx-server-smoke/node_modules/@langwatch/server"
           mkdir -p "$install_dir"
           tar -xzf "${{ steps.pack.outputs.tarball }}" -C "$install_dir" --strip-components=1
-          node "$install_dir/packages/server/dist/cli.cjs" start \
+          # Resolve the entrypoint from the manifest's `bin` rather than
+          # hardcoding it. The artifact is staged under app/ since ADR-076, and
+          # a hardcoded path silently stops matching the day the layout moves —
+          # which is exactly what this job exists to catch.
+          cli="$install_dir/$(node -p "Object.values(require('$install_dir/package.json').bin)[0]")"
+          test -f "$cli" || { echo "✗ bin entry does not resolve: $cli"; exit 1; }
+          node "$cli" start \
             --yes \
             --no-open \
             --port-base "$PORT_BASE" \
