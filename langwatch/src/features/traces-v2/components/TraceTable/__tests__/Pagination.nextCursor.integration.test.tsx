@@ -49,35 +49,39 @@ afterEach(() => cleanup());
 
 describe("Pagination Next", () => {
   describe("given the first batch, which the server answered with a cursor", () => {
-    it("files that cursor under the batch it opens, leaving the first batch cursor-free", () => {
-      renderPagination(CURSOR_TO_PAGE_2);
+    describe("when the user clicks Next", () => {
+      it("files that cursor under the batch it opens, leaving the first batch cursor-free", () => {
+        renderPagination(CURSOR_TO_PAGE_2);
 
-      clickNext();
+        clickNext();
 
-      expect(pagination()).toEqual({
-        page: 2,
-        pageCursors: { 1: null, 2: CURSOR_TO_PAGE_2 },
+        expect(pagination()).toEqual({
+          page: 2,
+          pageCursors: { 1: null, 2: CURSOR_TO_PAGE_2 },
+        });
       });
     });
   });
 
   describe("given the user is already on the second batch", () => {
-    it("files the new cursor under the third, without disturbing the second's", () => {
-      useFilterStore.setState({
-        page: 2,
-        pageCursors: { 1: null, 2: CURSOR_TO_PAGE_2 },
-      });
-      renderPagination(CURSOR_TO_PAGE_3);
+    describe("when the user clicks Next again", () => {
+      it("files the new cursor under the third, without disturbing the second's", () => {
+        useFilterStore.setState({
+          page: 2,
+          pageCursors: { 1: null, 2: CURSOR_TO_PAGE_2 },
+        });
+        renderPagination(CURSOR_TO_PAGE_3);
 
-      clickNext();
+        clickNext();
 
-      expect(pagination()).toEqual({
-        page: 3,
-        pageCursors: {
-          1: null,
-          2: CURSOR_TO_PAGE_2,
-          3: CURSOR_TO_PAGE_3,
-        },
+        expect(pagination()).toEqual({
+          page: 3,
+          pageCursors: {
+            1: null,
+            2: CURSOR_TO_PAGE_2,
+            3: CURSOR_TO_PAGE_3,
+          },
+        });
       });
     });
   });

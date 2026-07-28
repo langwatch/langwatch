@@ -26,13 +26,15 @@ func TestStartOrphanReaper_StartsOnPID1(t *testing.T) {
 	if !started {
 		t.Fatal("reaper did not start as PID 1; orphaned opencode children would leak")
 	}
-	// Tear the loop down HERE, inside the body, rather than leaving it to the
-	// t.Cleanup safety net: cleanups run only after the body returns, so between
-	// those two points a live Wait4(-1, ...) is armed in this process while the
-	// framework is free to move on. That window is a hazard for whatever runs
-	// next under any ordering — a -run filter's next test, a parallel test, a
-	// child either of them spawns. Stopping here makes the SIGCHLD handler's
-	// lifetime strictly shorter than this test's.
+	// Tear the loop down HERE rather than leaving it to the t.Cleanup safety
+	// net. Cleanups run as part of this test's own teardown, before the next
+	// SERIAL test starts, so the point is not that the framework runs ahead of
+	// them — it doesn't. The point is that a process-wide Wait4(-1, ...) reaps
+	// ANY child, so every extra moment it stays armed is a moment it can take
+	// an exit status that is not its own: from a child this test's own cleanups
+	// spawn, or from a t.Parallel sibling, which really can be running now.
+	// Stopping here keeps the handler's lifetime as short as the assertion
+	// above allows.
 	stop()
 }
 
@@ -89,9 +91,10 @@ func TestStartOrphanReaper_LeavesChildExitStatusToTheSpawner(t *testing.T) {
 // after stop returns no SIGCHLD handler of ours is installed.
 //
 // stop is also registered as a t.Cleanup so an early t.Fatal cannot leak a live
-// handler, but a test that arms the loop should call it explicitly: a cleanup
-// runs after the body returns, which is late enough for the handler to overlap
-// whatever the framework does next.
+// handler. A test that arms the loop should still call it explicitly: the
+// cleanup runs during this test's teardown, which is early enough to protect
+// the next serial test but still leaves the process-wide Wait4(-1, ...) armed
+// across the body's remainder and any other cleanups.
 func startReaperForTest(t *testing.T, pid int) (started bool, stop func()) {
 	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
