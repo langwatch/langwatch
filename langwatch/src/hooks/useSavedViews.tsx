@@ -30,11 +30,9 @@ import { availableFilters } from "../server/filters/registry";
 import type { FilterField } from "../server/filters/types";
 import { api } from "../utils/api";
 import {
-  DEFAULT_VIEWS,
   type DefaultView,
   findMatchingView,
   MAX_VIEW_NAME_LENGTH,
-  normalizeFilterValue,
   type SavedView,
 } from "./savedViewsLogic";
 import type { FilterParam } from "./useFilterParams";

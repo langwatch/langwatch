@@ -1,12 +1,4 @@
-import {
-  Box,
-  Button,
-  HStack,
-  Spacer,
-  Spinner,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import type { AnnotationQueueItem } from "@prisma/client";
 import { useEffect, useMemo, useState } from "react";
 import { Check, ChevronLeft, ChevronRight } from "react-feather";

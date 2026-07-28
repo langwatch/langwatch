@@ -1,7 +1,6 @@
 import { Box, Grid, VStack } from "@chakra-ui/react";
 import type React from "react";
 import { useMemo, useState } from "react";
-import { useActiveProject } from "../../contexts/ActiveProjectContext";
 import { getRegistryEntry } from "../../regions/observability/codegen/registry";
 import type {
   FrameworkKey,

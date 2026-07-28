@@ -1,11 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { TenantId } from "../../domain/tenantId";
 import type { Projection } from "../../domain/types";
-import type {
-  ProjectionStore,
-  ProjectionStoreReadContext,
-  ProjectionStoreWriteContext,
-} from "../../stores/projectionStore.types";
+import type { ProjectionStore } from "../../stores/projectionStore.types";
 import type { ProjectionStoreContext } from "../projectionStoreContext";
 import { RepositoryFoldStore } from "../repositoryFoldStore";
 

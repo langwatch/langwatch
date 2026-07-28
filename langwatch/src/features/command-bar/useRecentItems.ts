@@ -2,7 +2,7 @@ import { differenceInDays, isToday, isYesterday } from "date-fns";
 import { useCallback, useMemo } from "react";
 import { useLocalStorage } from "usehooks-ts";
 import { MAX_RECENT_ITEMS } from "./constants";
-import type { RecentItem, RecentItemType } from "./types";
+import type { RecentItem } from "./types";
 import { RecentItemSchema } from "./types";
 
 const STORAGE_KEY = "langwatch-recent-items";

@@ -11,7 +11,6 @@ import {
 } from "@chakra-ui/react";
 import { type ReactNode, useState } from "react";
 import { LuCircleAlert, LuCircleSlash, LuQuote } from "react-icons/lu";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { AZURE_SAFETY_NOT_CONFIGURED_MESSAGE } from "~/server/app-layer/evaluations/azure-safety-env";
 import { formatCost, formatDuration } from "../../../utils/formatters";
 import { RunHistorySparkline } from "./RunHistorySparkline";

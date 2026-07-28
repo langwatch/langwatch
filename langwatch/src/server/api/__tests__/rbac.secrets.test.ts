@@ -8,7 +8,6 @@ import {
   canManage,
   canView,
   getOrganizationRolePermissions,
-  getTeamRolePermissions,
   Resources,
   teamRoleHasPermission,
 } from "../rbac";

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type LiquidToken, tokenizeLiquidTemplate } from "../liquidTokenizer";
+import { tokenizeLiquidTemplate } from "../liquidTokenizer";
 
 describe("tokenizeLiquidTemplate()", () => {
   describe("when text contains if/endif tags", () => {

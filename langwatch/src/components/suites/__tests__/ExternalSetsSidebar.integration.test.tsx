@@ -27,7 +27,7 @@ vi.mock("posthog-js", () => ({
 
 import { NowProvider } from "../NowProvider";
 import { SuiteSidebar } from "../SuiteSidebar";
-import { ALL_RUNS_ID, toExternalSetSelection } from "../useSuiteRouting";
+import { toExternalSetSelection } from "../useSuiteRouting";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

@@ -26,7 +26,6 @@ import { CurrentDrawer } from "~/components/CurrentDrawer";
 import {
   clearDrawerStack,
   clearFlowCallbacks,
-  getDrawerStack,
   getFlowCallbacks,
 } from "~/hooks/useDrawer";
 import {

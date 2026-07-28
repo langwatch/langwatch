@@ -22,7 +22,7 @@
  * Requires dev server on $NEXTAUTH_URL (default http://localhost:5571)
  * in NEXTAUTH_PROVIDER=email mode.
  */
-import { chromium, type BrowserContext } from "playwright";
+import { type BrowserContext, chromium } from "playwright";
 import { prisma } from "../../src/server/db";
 
 const BASE_URL = process.env.NEXTAUTH_URL ?? "http://localhost:5571";
@@ -57,18 +57,13 @@ async function signUpAndIn(
   await pwFields[0]!.fill(password);
   await pwFields[1]!.fill(password);
   await page.click('button:has-text("Sign up")');
-  await page.waitForURL(
-    (url) => !url.toString().includes("/auth/signup"),
-    { timeout: 15000 },
-  );
+  await page.waitForURL((url) => !url.toString().includes("/auth/signup"), {
+    timeout: 15000,
+  });
   return page;
 }
 
-async function signIn(
-  ctx: BrowserContext,
-  email: string,
-  password: string,
-) {
+async function signIn(ctx: BrowserContext, email: string, password: string) {
   const page = await ctx.newPage();
   await page.goto(`${BASE_URL}/auth/signin`, { waitUntil: "networkidle" });
   await page.waitForSelector("form", { timeout: 10000 });
@@ -76,10 +71,9 @@ async function signIn(
   await page.fill('input[type="password"]', password);
   await page.click('button:has-text("Sign in")');
   try {
-    await page.waitForURL(
-      (url) => !url.toString().includes("/auth/signin"),
-      { timeout: 15000 },
-    );
+    await page.waitForURL((url) => !url.toString().includes("/auth/signin"), {
+      timeout: 15000,
+    });
     return { page, ok: true };
   } catch {
     return { page, ok: false };
@@ -106,7 +100,10 @@ async function main() {
     const ctxB = await browser.newContext();
 
     const pageA0 = await signUpAndIn(ctxA, EMAIL, OLD_PASSWORD);
-    check("context A: signup succeeded", !pageA0.url().includes("/auth/signup"));
+    check(
+      "context A: signup succeeded",
+      !pageA0.url().includes("/auth/signup"),
+    );
 
     // Context B signs in fresh — this creates a SECOND Session row.
     const signInB = await signIn(ctxB, EMAIL, OLD_PASSWORD);

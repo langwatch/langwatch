@@ -5,7 +5,6 @@ import {
   bindingsToSelections,
   computeBindings,
   getUserPermissionsAtScope,
-  type PermissionMode,
   permissionLabelToRole,
   permissionsSummary,
   roleSummary,

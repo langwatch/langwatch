@@ -1,5 +1,5 @@
-import { AlertType } from "../../enums";
 import { describe, expect, it } from "vitest";
+import { AlertType } from "../../enums";
 import { EXAMPLE_MATCHES, TEMPLATE_VARIABLES } from "../exampleContext";
 
 const TEMPLATE_VARIABLE_PATHS = TEMPLATE_VARIABLES.map((v) => v.path);

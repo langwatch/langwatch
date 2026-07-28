@@ -7,11 +7,7 @@ import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { Tooltip } from "../../../../components/ui/tooltip";
 import { useActiveProject } from "../../contexts/ActiveProjectContext";
 import { CodePreview } from "./observability/CodePreview";
-import {
-  buildMcpJson,
-  CLOUD_ENDPOINT,
-  findLangwatchEnvLines,
-} from "./shared/build-mcp-config";
+import { buildMcpJson, findLangwatchEnvLines } from "./shared/build-mcp-config";
 import { TabButton } from "./shared/TabButton";
 
 const MotionVStack = motion.create(VStack);

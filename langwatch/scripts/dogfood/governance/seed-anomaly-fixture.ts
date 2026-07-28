@@ -42,6 +42,7 @@ export interface SeedAnomalyFixtureSummary {
 
 function parseArgs(argv: string[]): SeedAnomalyFixtureArgs {
   let email: string | undefined;
+  // biome-ignore lint/style/useForOf: flag parser advances the index (argv[++i]) to consume a value; for...of has no index to advance.
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === "--email") email = argv[++i];
   }

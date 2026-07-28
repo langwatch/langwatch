@@ -11,7 +11,6 @@ import {
   hasProjectPermission,
   hasTeamPermission,
   type Permission,
-  type PermissionResult,
   resolveProjectPermission,
   resolveTeamPermission,
   skipPermissionCheck,

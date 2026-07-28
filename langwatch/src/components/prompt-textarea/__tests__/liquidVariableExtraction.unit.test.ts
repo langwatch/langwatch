@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  extractLiquidVariables,
-  type LiquidVariableExtractionResult,
-} from "../liquidTokenizer";
+import { extractLiquidVariables } from "../liquidTokenizer";
 
 describe("extractLiquidVariables()", () => {
   describe("when text contains variables inside Liquid tags", () => {

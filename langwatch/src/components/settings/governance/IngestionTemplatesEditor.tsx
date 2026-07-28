@@ -16,6 +16,7 @@ import { OttlEditor } from "@ee/governance/dashboard/components/OttlEditor";
 import { Eye, Pencil, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import { Drawer } from "~/components/ui/drawer";
 import { Link } from "~/components/ui/link";
 import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";

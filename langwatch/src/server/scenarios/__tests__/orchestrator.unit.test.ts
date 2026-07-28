@@ -9,15 +9,7 @@
 
 import { describe, expect, it } from "vitest";
 import { ScenarioExecutionOrchestrator } from "../execution/orchestrator";
-import type {
-  AdapterFactory,
-  ModelParamsProvider,
-  OrchestratorDependencies,
-  ProjectRepository,
-  ScenarioExecutor,
-  ScenarioRepository,
-  TracerFactory,
-} from "../execution/orchestrator.types";
+import type { OrchestratorDependencies } from "../execution/orchestrator.types";
 import type { LiteLLMParams, ScenarioConfig } from "../execution/types";
 
 // Test doubles that record state for verification

@@ -8,10 +8,7 @@
  */
 import { describe, expect, it } from "vitest";
 import type { ElasticSearchEvaluation } from "../../../server/tracer/types";
-import {
-  type EvaluationGroup,
-  groupEvaluationsByEvaluator,
-} from "../groupEvaluations";
+import { groupEvaluationsByEvaluator } from "../groupEvaluations";
 
 function makeEvaluation(
   overrides: Partial<ElasticSearchEvaluation> & {

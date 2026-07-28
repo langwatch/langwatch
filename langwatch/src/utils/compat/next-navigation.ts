@@ -6,7 +6,6 @@
  */
 import {
   useLocation,
-  useNavigate,
   useParams as useRRParams,
   useSearchParams as useRRSearchParams,
 } from "react-router";

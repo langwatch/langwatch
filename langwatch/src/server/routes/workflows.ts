@@ -32,7 +32,6 @@ import { DatasetNotReadyError } from "~/server/datasets/errors";
 import { prisma } from "~/server/db";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
-import type { NextRequestShim as any } from "./types";
 
 const logger = createLogger("langwatch:workflows");
 

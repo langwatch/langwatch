@@ -4,7 +4,6 @@ import {
   Button,
   Card,
   EmptyState,
-  Heading,
   HStack,
   Spacer,
   Spinner,

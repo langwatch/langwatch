@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { EventExplorerService } from "../event-explorer.service";
 import type {
-  AggregateSearchResult,
   EventExplorerRepository,
   RawEventRow,
 } from "../repositories/event-explorer.repository";

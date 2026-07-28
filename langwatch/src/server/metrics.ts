@@ -3,7 +3,6 @@ import { performance } from "node:perf_hooks";
 import {
   Counter,
   collectDefaultMetrics,
-  Gauge,
   Histogram,
   register,
 } from "prom-client";

@@ -12,14 +12,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { Currency as PrismaCurrency } from "@prisma/client";
-import {
-  ArrowLeft,
-  Check,
-  CircleDollarSign,
-  DollarSign,
-  Euro,
-  Info,
-} from "lucide-react";
+import { ArrowLeft, Check, DollarSign, Euro, Info } from "lucide-react";
 import { useState } from "react";
 import { Link } from "~/components/ui/link";
 import { api } from "~/utils/api";

@@ -12,7 +12,6 @@ import {
   UNNAMED_FAILURE,
 } from "~/server/experiments-v3/execution/types";
 import { fetchSSE } from "~/utils/sse/fetchSSE";
-import type { EvaluationResults } from "../types";
 import {
   computeExecutionCells,
   createExecutionCellSet,

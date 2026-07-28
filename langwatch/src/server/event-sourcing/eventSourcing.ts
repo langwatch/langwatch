@@ -1,4 +1,3 @@
-import type { ClickHouseClient } from "@clickhouse/client";
 import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
 import type IORedis from "ioredis";
@@ -29,10 +28,7 @@ import { createBillingMeterDispatchReactor } from "./projections/global/billingM
 import { orgBillableEventsMeterProjection } from "./projections/global/orgBillableEventsMeter.mapProjection";
 import { ProjectionRegistry } from "./projections/projectionRegistry";
 import { RedisReplayMarkerChecker } from "./projections/replayMarkerCheck";
-import type {
-  EventSourcedQueueDefinition,
-  EventSourcedQueueProcessor,
-} from "./queues";
+import type { EventSourcedQueueProcessor } from "./queues";
 import { GroupQueueProcessor } from "./queues/groupQueue/groupQueue";
 import { EventSourcedQueueProcessorMemory } from "./queues/memory";
 import { EventSourcingPipeline } from "./runtimePipeline";

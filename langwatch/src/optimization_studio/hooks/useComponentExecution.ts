@@ -1,6 +1,5 @@
 import { createLogger } from "@langwatch/observability";
 import type { Node } from "@xyflow/react";
-import { nanoid } from "nanoid";
 import { useCallback, useEffect, useState } from "react";
 import { toaster } from "../../components/ui/toaster";
 import { generateOtelTraceId } from "../../utils/trace";

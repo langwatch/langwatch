@@ -9,7 +9,6 @@ import {
   Text,
 } from "@chakra-ui/react";
 import { BarChart2 } from "lucide-react";
-import qs from "qs";
 import { Fragment, useCallback } from "react";
 import {
   CustomGraph,
@@ -21,7 +20,6 @@ import { Link } from "~/components/ui/link";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
-import { AnalyticsHeader } from "../../../components/analytics/AnalyticsHeader";
 import { withPermissionGuard } from "../../../components/WithPermissionGuard";
 import { getEvaluatorDefinitions } from "../../../server/evaluations/getEvaluator";
 

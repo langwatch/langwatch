@@ -17,7 +17,6 @@
  */
 process.env.TZ = "Asia/Kolkata";
 
-import type { ClickHouseClient } from "@clickhouse/client";
 import { describe, expect, it } from "vitest";
 import type { EvaluationAnalyticsRow } from "~/server/event-sourcing/pipelines/evaluation-processing/projections/evaluationAnalytics.foldProjection";
 import {

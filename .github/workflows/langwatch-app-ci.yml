@@ -8,7 +8,11 @@ on:
   push:
     branches:
       - main
+  # ready_for_review is NOT a default pull_request activity type. Without it,
+  # taking a PR out of draft fires no event, so the heavy jobs gated on
+  # `draft == false` below would never get their first run.
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
   merge_group:
   workflow_dispatch:
 
@@ -25,6 +29,18 @@ jobs:
     outputs:
       relevant: ${{ steps.detect.outputs.relevant }}
       feature-parity: ${{ steps.detect.outputs.feature-parity }}
+      # Draft PRs get the fast, cheap signal only: lint, ast-grep, typecheck,
+      # feature-parity. The 10 test shards and the build are the runner budget,
+      # and on a draft they mostly re-run against work in progress.
+      #
+      # Everything heavy comes back on ready_for_review, and `merge_group`
+      # is never a draft — so nothing reaches main without the full suite
+      # having run on it.
+      heavy: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
+      # One shard each on a draft, because the draft run is affected-tests-only
+      # and a subset does not need splitting.
+      unit-shards: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && '[1,2,3,4]' || '[1]' }}
+      integration-shards: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && '[1,2,3,4,5,6]' || '[1]' }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
       - uses: ./.github/actions/detect-changes
@@ -112,7 +128,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4]
+        shard: ${{ fromJSON(needs.changes.outputs.unit-shards) }}
     env:
       VITEST_MAX_WORKERS: "4" # physical core count on GitHub-hosted ubuntu runners
       DATABASE_URL: "postgresql://langwatch_ci:ci_password@localhost:5432/langwatch_test"
@@ -147,10 +163,23 @@ jobs:
         run: |
           # shardFailureReporter feeds the globalSetup hard-floor so a wedged
           # shard that already printed failures exits 1, not a masked 0.
-          pnpm test:unit --run --shard=${{ matrix.shard }}/4 \
-            --coverage --coverage.reporter=lcov --coverage.reporter=text \
-            --reporter=default --reporter=./src/test-utils/shardFailureReporter.ts \
-            --dangerouslyIgnoreUnhandledErrors
+          #
+          # On a draft we run only the tests whose module graph reaches the
+          # diff (`--changed`), unsharded, on one runner. Real signal for a
+          # tenth of the budget. The full sharded suite returns on
+          # ready_for_review and in the merge queue, so nothing reaches main
+          # having only had the subset.
+          if [ "${{ needs.changes.outputs.heavy }}" != "true" ]; then
+            git fetch --no-tags --depth=1 origin main
+            pnpm test:unit --run --changed origin/main --passWithNoTests \
+              --reporter=default --reporter=./src/test-utils/shardFailureReporter.ts \
+              --dangerouslyIgnoreUnhandledErrors
+          else
+            pnpm test:unit --run --shard=${{ matrix.shard }}/4 \
+              --coverage --coverage.reporter=lcov --coverage.reporter=text \
+              --reporter=default --reporter=./src/test-utils/shardFailureReporter.ts \
+              --dangerouslyIgnoreUnhandledErrors
+          fi
 
       - name: Extract test failures
         if: failure()
@@ -180,7 +209,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5, 6]
+        shard: ${{ fromJSON(needs.changes.outputs.integration-shards) }}
     env:
       # Several integration suites (groupQueue, scripts, loopPrevention,
       # traceparent) call redis.flushall() directly in afterEach against the
@@ -294,10 +323,20 @@ jobs:
         run: |
           # shardFailureReporter feeds the globalSetup hard-floor so a wedged
           # shard that already printed failures exits 1, not a masked 0.
-          pnpm test:integration --shard=${{ matrix.shard }}/6 \
-            --coverage --coverage.reporter=lcov --coverage.reporter=text \
-            --reporter=default --reporter=json --reporter=./src/test-utils/shardFailureReporter.ts \
-            --outputFile=test-results.json
+          #
+          # Draft: affected integration tests only, one runner (see test-unit).
+          # The services are already up by this point either way.
+          if [ "${{ needs.changes.outputs.heavy }}" != "true" ]; then
+            git fetch --no-tags --depth=1 origin main
+            pnpm test:integration --changed origin/main --passWithNoTests \
+              --reporter=default --reporter=json --reporter=./src/test-utils/shardFailureReporter.ts \
+              --outputFile=test-results.json
+          else
+            pnpm test:integration --shard=${{ matrix.shard }}/6 \
+              --coverage --coverage.reporter=lcov --coverage.reporter=text \
+              --reporter=default --reporter=json --reporter=./src/test-utils/shardFailureReporter.ts \
+              --outputFile=test-results.json
+          fi
 
       - name: Extract test failures
         if: failure()
@@ -352,25 +391,31 @@ jobs:
         working-directory: langwatch
         run: pnpm lint
 
-      # Structural house rules (function length, cognitive complexity, param
-      # count) carry a baseline in the thousands, so they are enforced on
-      # changed lines only. --since needs full history; fetch-depth: 0 above.
-      - name: Biome — new-code rules (blocking)
-        working-directory: langwatch
-        run: |
-          git fetch --no-tags --depth=1 origin main
-          pnpm lint:new-code
-
-      # Kept for inline PR annotations only. Not a gate — see above.
-      - uses: mongolyy/reviewdog-action-biome@c49bee54c1f87e4be32446ae3deca3a186b88a3a # v2
+      # The house rules that still carry a baseline are `warn` in biome.jsonc,
+      # so the step above lets them through. This step makes them BLOCKING on
+      # the lines the PR actually adds.
+      #
+      # reviewdog maps each diagnostic onto the diff and drops anything outside
+      # the added lines — the line-level filtering Biome cannot do itself.
+      # `biome lint --changed` is not a substitute: it is file-granular, so a
+      # one-line typo fix in a legacy file would inherit every long-function
+      # violation already in it (measured at 902 on this branch alone). A gate
+      # that fires on work you did not do is a gate people switch off.
+      #
+      # fail_on_error: true is what makes this a gate at all. The action
+      # defaults it to false, which is how the pre-existing Biome step reported
+      # success for months while Biome was refusing to start.
+      - name: Biome house rules — blocking on added lines
         if: github.event_name == 'pull_request'
+        uses: mongolyy/reviewdog-action-biome@c49bee54c1f87e4be32446ae3deca3a186b88a3a # v2
         with:
           reporter: github-pr-review
-          fail_level: error
-          # The action resolves the Biome version (from the lockfile) and runs
-          # Biome inside workdir, so biome_flags paths are relative to it.
+          filter_mode: added
+          fail_level: warning
+          fail_on_error: true
+          level: warning
           workdir: langwatch
-          biome_flags: "./src"
+          biome_flags: "./src ./ee ./scripts ./e2e ./prisma ./vite ./packages"
 
       - name: Notify Slack on failure
         if: failure() && github.ref == 'refs/heads/main'
@@ -456,7 +501,7 @@ jobs:
 
   build:
     needs: changes
-    if: needs.changes.outputs.relevant == 'true'
+    if: needs.changes.outputs.relevant == 'true' && needs.changes.outputs.heavy == 'true'
     runs-on: ubuntu-latest
     env:
       # Disable telemetry and optimize build for CI

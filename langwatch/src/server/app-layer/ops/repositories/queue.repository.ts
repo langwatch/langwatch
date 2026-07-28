@@ -1,6 +1,6 @@
 // biome-ignore-all lint/suspicious/noEmptyBlockStatements: Null* repositories implement the interface as intentional no-ops.
 
-import type { ErrorCluster, GroupInfo, QueueInfo } from "../types";
+import type { ErrorCluster, QueueInfo } from "../types";
 
 export interface BlockedSummary {
   totalBlocked: number;

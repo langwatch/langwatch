@@ -10,7 +10,7 @@
  */
 
 import { Box, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
-import { Square, X } from "lucide-react";
+import { Square } from "lucide-react";
 import { formatCost, formatLatency } from "~/components/shared/formatters";
 import { SCENARIO_RUN_STATUS_CONFIG } from "~/components/simulations/scenario-run-status-config";
 import { Tooltip } from "~/components/ui/tooltip";

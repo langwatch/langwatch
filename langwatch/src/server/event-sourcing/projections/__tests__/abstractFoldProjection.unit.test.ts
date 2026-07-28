@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import {
   AbstractFoldProjection,
-  type AnyEventSchema,
   type FoldEventHandlers,
 } from "../abstractFoldProjection";
 import type { FoldProjectionStore } from "../foldProjection.types";

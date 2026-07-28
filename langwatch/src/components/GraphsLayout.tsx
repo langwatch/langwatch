@@ -1,4 +1,4 @@
-import { Container, Heading, HStack, VStack } from "@chakra-ui/react";
+import { Container, HStack, VStack } from "@chakra-ui/react";
 import type { PropsWithChildren } from "react";
 import { CustomDashboardsSection } from "~/components/analytics/CustomDashboardsSection";
 import { DashboardLayout } from "~/components/DashboardLayout";

@@ -15,7 +15,7 @@
  * The local-git cases below are therefore the important half of this file.
  */
 import { describe, expect, it } from "vitest";
-import { githubStepOf, needsGithubAuth } from "../githubCommand";
+import { needsGithubAuth } from "../githubCommand";
 
 describe("needsGithubAuth", () => {
   describe("given the GitHub CLI", () => {

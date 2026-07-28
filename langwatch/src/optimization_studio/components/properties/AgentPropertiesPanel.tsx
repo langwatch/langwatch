@@ -29,7 +29,6 @@ import type { FieldMapping } from "~/components/variables";
 import { type Variable, VariablesSection } from "~/components/variables";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type {
-  CodeComponentConfig,
   HttpAuth,
   HttpComponentConfig,
   HttpHeader,

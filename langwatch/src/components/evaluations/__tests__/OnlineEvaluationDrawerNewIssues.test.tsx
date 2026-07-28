@@ -19,12 +19,8 @@ import {
   clearFlowCallbacks,
   getFlowCallbacks,
 } from "~/hooks/useDrawer";
+import { clearOnlineEvaluationDrawerState } from "../OnlineEvaluationDrawer";
 import {
-  clearOnlineEvaluationDrawerState,
-  OnlineEvaluationDrawer,
-} from "../OnlineEvaluationDrawer";
-import {
-  isOnlineEvalOpen,
   mockEvaluators,
   resetState,
   state,

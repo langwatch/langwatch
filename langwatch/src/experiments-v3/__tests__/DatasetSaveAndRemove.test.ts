@@ -6,7 +6,7 @@
  * 2. Save as dataset with name conflict should auto-suggest next available name
  * 3. Removing a saved dataset should handle edge case when it's the last one
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import type { DatasetColumn, DatasetReference } from "../types";

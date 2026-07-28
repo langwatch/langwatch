@@ -2,7 +2,6 @@ import { HandledError } from "@langwatch/handled-error";
 import { INVALID_TRACE_ID } from "@langwatch/observability/constants";
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-import { NotFoundError as PromptNotFoundError } from "~/server/prompt-config/errors";
 import {
   grafanaConfigFromEnv,
   grafanaLinksForTrace,

@@ -2,20 +2,17 @@ import {
   EmptyState,
   Heading,
   HStack,
-  Separator,
   Skeleton,
   Text,
   VStack,
 } from "@chakra-ui/react";
 import React, { useEffect, useRef, useState } from "react";
-import { HelpCircle } from "react-feather";
 import { useRouter } from "~/utils/compat/next-router";
 import { useFilterParams } from "../../hooks/useFilterParams";
 import { api } from "../../utils/api";
 import { Delayed } from "../Delayed";
 import { OverflownTextWithTooltip } from "../OverflownText";
 import { Checkbox } from "../ui/checkbox";
-import { Tooltip } from "../ui/tooltip";
 
 export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
   const router = useRouter();

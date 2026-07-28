@@ -15,7 +15,7 @@ import {
   subDays,
 } from "date-fns";
 import { useCallback, useMemo } from "react";
-import { Calendar, ChevronDown } from "react-feather";
+import { ChevronDown } from "react-feather";
 import { LuCalendar } from "react-icons/lu";
 import { useRouter } from "~/utils/compat/next-router";
 import { Popover } from "./ui/popover";

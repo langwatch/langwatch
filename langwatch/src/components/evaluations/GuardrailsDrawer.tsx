@@ -2,7 +2,6 @@ import {
   Box,
   Button,
   Heading,
-  HStack,
   Link,
   NativeSelect,
   Text,
@@ -13,7 +12,6 @@ import { ExternalLink } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Drawer } from "~/components/ui/drawer";
 import { setFlowCallbacks, useDrawer } from "~/hooks/useDrawer";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { RenderCode } from "../code/RenderCode";
 import { HorizontalFormControl } from "../HorizontalFormControl";
 import { EvaluatorSelectionBox } from "./EvaluatorSelectionBox";

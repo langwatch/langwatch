@@ -1,5 +1,39 @@
 {
 	"$schema": "https://biomejs.dev/schemas/2.5.1/schema.json",
+
+	// SEVERITY IS THE TIER.
+	//
+	//   error — baseline is clean; blocks everywhere, for everyone.
+	//   warn  — a real house rule that already has a baseline, so it cannot
+	//           block the whole tree. CI runs reviewdog with
+	//           `filter_mode: added` + `fail_level: warning`, which turns each
+	//           of these into a BLOCKING failure on the lines a PR actually
+	//           adds. New code is held to the full rule; existing code shows
+	//           the warning and stops nobody.
+	//
+	// That is why there is no second "new code" config: the severity carries
+	// the tier and reviewdog carries the scope.
+	//
+	// Baselines when these were switched on (biome 2.5.1 over src, ee, scripts,
+	// e2e, prisma, vite, packages):
+	//
+	//   noExcessiveLinesPerFunction     3592
+	//   noExcessiveCognitiveComplexity  2055
+	//   useMaxParams                     324
+	//   noEmptyBlockStatements            93
+	//   noFloatingPromises                39
+	//   noMisusedPromises                 19
+	//   noForIn                            2
+	//                                   ----
+	//                                   6124 across 2807 files
+	//
+	// A hard error threshold was measured and rejected: the tail is long enough
+	// that even maxLines 800 leaves 17 violations and complexity 75 leaves 28,
+	// and functions over 1500 lines and complexity over 100 both exist. Any
+	// threshold cheap enough to adopt was too loose to mean anything.
+	//
+	// Promote a rule to error once its baseline hits zero, and delete the
+	// matching clause from /.coderabbit.yaml so it stops being reported twice.
 	"vcs": {
 		"enabled": true,
 		"clientKind": "git",
@@ -22,11 +56,28 @@
 				"noUselessThisAlias": "error",
 				"noUselessTypeConstraint": "error",
 				"useLiteralKeys": "error",
-				"useOptionalChain": "error"
+				"useOptionalChain": "error",
+				"noExcessiveCognitiveComplexity": {
+					"level": "warn",
+					"options": { "maxAllowedComplexity": 10 }
+				},
+				"noExcessiveLinesPerFunction": {
+					"level": "warn",
+					"options": {
+						"maxLines": 60,
+						"skipBlankLines": true,
+						"skipIifes": true
+					}
+				},
+				"useMaxParams": {
+					"level": "warn",
+					"options": { "max": 3 }
+				}
 			},
 			"correctness": {
 				"noNextAsyncClientComponent": "warn",
 				"noPrecisionLoss": "error",
+				"noUnusedImports": "error",
 				"noUnusedVariables": "warn"
 			},
 			"nursery": {
@@ -68,6 +119,7 @@
 				"noDocumentImportInPage": "error",
 				"noEmptyBlockStatements": "error",
 				"noEmptyInterface": "error",
+				"noForIn": "error",
 				"noExplicitAny": "off",
 				"noExtraNonNullAssertion": "error",
 				"noHeadImportInDocument": "error",
@@ -78,8 +130,7 @@
 				"useAdjacentOverloadSignatures": "error",
 				"useAwait": "off",
 				"useGoogleFontDisplay": "warn",
-				"useNamespaceKeyword": "error",
-				"noForIn": "error"
+				"useNamespaceKeyword": "error"
 			}
 		}
 	},
@@ -127,6 +178,38 @@
 						"noUnsafeNegation": "off",
 						"noVar": "error",
 						"useGetterReturn": "off"
+					}
+				}
+			}
+		},
+		{
+			// e2e/ and scripts/dogfood/ are throwaway operator scripts — browser
+			// QA walkthroughs and seed/demo tooling — not product code. They are
+			// full of best-effort `catch {}` around actions allowed to fail, and
+			// fire-and-forget awaits. Same category as the test-file exemption
+			// below; they ship to nobody.
+			"includes": ["e2e/**", "scripts/dogfood/**", "scripts/_dogfood_*"],
+			"linter": {
+				"rules": {
+					"nursery": {
+						"noFloatingPromises": "off",
+						"noMisusedPromises": "off"
+					},
+					"suspicious": {
+						"noEmptyBlockStatements": "off"
+					}
+				}
+			}
+		},
+		{
+			// A floating promise in a test is still an unhandled rejection, but
+			// these are assertion chains and setup calls where the assertion
+			// already owns the failure. Scoped to test files only.
+			"includes": ["**/__tests__/**"],
+			"linter": {
+				"rules": {
+					"nursery": {
+						"noFloatingPromises": "off"
 					}
 				}
 			}

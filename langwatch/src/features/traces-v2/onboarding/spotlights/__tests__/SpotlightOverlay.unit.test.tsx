@@ -59,8 +59,6 @@ vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
 });
 vi.stubGlobal("cancelAnimationFrame", () => undefined);
 
-// ─── Module under test ────────────────────────────────────────────────────────
-import React from "react";
 import {
   type AnchorRect,
   isAnchorParkedOffscreen,

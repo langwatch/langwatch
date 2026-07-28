@@ -44,7 +44,6 @@ import {
   publishCancellation,
   subscribeToCancellations,
 } from "../cancellation-channel";
-import type { ExecutionJobData } from "../execution/execution-pool";
 import { ScenarioExecutionPool } from "../execution/execution-pool";
 import type { ProcessorDependencies } from "../scenario.processor";
 import { startScenarioProcessor } from "../scenario.processor";

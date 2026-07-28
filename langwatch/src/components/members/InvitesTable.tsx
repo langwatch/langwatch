@@ -6,7 +6,6 @@ import {
   HStack,
   IconButton,
   Table,
-  Text,
   VStack,
 } from "@chakra-ui/react";
 import { Mail, MoreVertical, Trash2 } from "lucide-react";

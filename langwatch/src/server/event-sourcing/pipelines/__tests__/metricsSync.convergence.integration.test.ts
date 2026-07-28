@@ -19,7 +19,6 @@ import { SpanStorageClickHouseRepository } from "~/server/app-layer/traces/repos
 import { TraceSummaryClickHouseRepository } from "~/server/app-layer/traces/repositories/trace-summary.clickhouse.repository";
 import { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
 import { TraceSummaryService } from "~/server/app-layer/traces/trace-summary.service";
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { AggregateType } from "../../";
 import { definePipeline } from "../../";
 import { getTestClickHouseClient } from "../../__tests__/integration/testContainers";

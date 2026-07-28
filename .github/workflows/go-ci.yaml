@@ -6,7 +6,10 @@ name: go-ci
 on:
   push:
     branches: [main]
+  # ready_for_review is not a default activity type; without it, taking a PR
+  # out of draft fires no event and the heavy jobs below never get their run.
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
   # Evaluate against the queued merge commit too, so the generated-code drift
   # check can gate the queue rather than only the PR head.
   merge_group:
@@ -25,6 +28,9 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       go: ${{ steps.filter.outputs.go || steps.force.outputs.go }}
+      # Draft PRs keep lint + vet (seconds) and skip the race-detector test
+      # run and the build. Both come back on ready_for_review.
+      heavy: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       # Only `pull_request` has a base to diff against. Every other event
@@ -66,7 +72,7 @@ jobs:
 
   build:
     needs: changes
-    if: ${{ needs.changes.outputs.go == 'true' }}
+    if: ${{ needs.changes.outputs.go == 'true' && needs.changes.outputs.heavy == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -80,7 +86,7 @@ jobs:
 
   test:
     needs: changes
-    if: ${{ needs.changes.outputs.go == 'true' }}
+    if: ${{ needs.changes.outputs.go == 'true' && needs.changes.outputs.heavy == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:

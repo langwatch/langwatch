@@ -18,7 +18,6 @@ import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 import { nlpgoProxyBaseURL } from "~/server/nlpgo/nlpgoFetch";
-import type { NextRequestShim as any } from "./types";
 
 const errorCache: Record<string, any> = {};
 

@@ -1,5 +1,5 @@
 import { Box, type BoxProps, HStack, Text, VStack } from "@chakra-ui/react";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { isJson } from "../utils/isJson";
 import { Markdown } from "./Markdown";
 import { RenderInputOutput } from "./traces/RenderInputOutput";

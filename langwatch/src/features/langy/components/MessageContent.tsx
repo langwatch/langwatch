@@ -43,7 +43,6 @@ import { LangyFeedback } from "./LangyFeedback";
 import { LANGY_ACTION_SHADOW, LangyMeshLayer } from "./LangyMark";
 import { LangyPlanCard } from "./LangyPlanCard";
 import { hasLangyActivity, LangyToolActivity } from "./LangyToolActivity";
-import { StreamingText } from "./StreamingText";
 
 export interface LangyProposal {
   langyProposal: true;

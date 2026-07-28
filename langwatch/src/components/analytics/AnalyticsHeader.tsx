@@ -1,4 +1,4 @@
-import { Box, Button, Heading, HStack, Input, Spacer } from "@chakra-ui/react";
+import { Box, HStack, Input, Spacer } from "@chakra-ui/react";
 import { Edit2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { LuListTree } from "react-icons/lu";

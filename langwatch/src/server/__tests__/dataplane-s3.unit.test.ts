@@ -6,7 +6,7 @@
  * Env var format: DATAPLANE_S3__<label>__<orgId>=<jsonConfig>
  * JSON: { endpoint, bucket, accessKeyId, secretAccessKey }
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 const mockLogger = {
   info: vi.fn(),

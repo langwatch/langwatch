@@ -1,9 +1,8 @@
 import { Box, HStack, Input, Link, Text, VStack } from "@chakra-ui/react";
 import { ExternalLink } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Popover } from "../../ui/popover";
 import {
-  TEMPLATE_LOGIC_CONSTRUCTS,
   TEMPLATE_SYNTAX_DOCS_URL,
   type TemplateLogicConstruct,
 } from "../templateLogicConstructs";

@@ -2,7 +2,6 @@ import type { Edge, Node } from "@xyflow/react";
 import { nanoid } from "nanoid";
 import type {
   EvaluatorConfig,
-  FieldMapping,
   LocalPromptConfig,
   TargetConfig,
 } from "~/experiments-v3/types";

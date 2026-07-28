@@ -12,19 +12,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SubscriptionPage } from "../SubscriptionPage";
 import {
   createMockPlan,
-  mockAddTeamMemberOrEvents,
-  mockCreateInvites,
   mockCreateInvitesMutate,
-  mockCreateSubscription,
-  mockDetectCurrency,
   mockGetActivePlan,
-  mockGetOrganizationWithMembers,
   mockGetPendingInvites,
-  mockListInvoices,
-  mockManageSubscription,
-  mockOpenSeats,
-  mockOrganizationMembers,
-  mockUpdateUsers,
   mockUpgradeWithInvites,
   resetMocks,
 } from "./subscription-test-setup";

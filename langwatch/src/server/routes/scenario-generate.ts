@@ -19,7 +19,6 @@ import {
   isAbortLikeError,
   nlpgoHandledErrorFrom,
 } from "~/server/nlpgo/goHandledError";
-import type { NextRequestShim as any } from "./types";
 
 const logger = createLogger("langwatch:api:scenario:generate");
 

@@ -5,7 +5,7 @@
  * drive it with REAL signed envelopes (langyFrameAuth.signFrame) so the auth
  * path is exercised end to end, and lock which frames become durable events.
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 // A navigate instruction resolves its address by comparing a resource's
 // remembered platformUrl against BASE_HOST (the server-side notion of "this

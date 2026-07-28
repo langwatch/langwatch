@@ -18,7 +18,6 @@ import {
   ArrowUpCircle,
   ChevronDown,
   Code,
-  Play,
   Share2,
   XCircle,
 } from "react-feather";

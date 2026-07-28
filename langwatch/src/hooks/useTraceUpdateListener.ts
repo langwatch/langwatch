@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "~/utils/api";
-import type { ConnectionState } from "./useSSESubscription";
 import { useSSESubscription } from "./useSSESubscription";
 
 interface UseTraceUpdateListenerOptions {

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSession } from "~/utils/auth-client";
-import { usePathname, useRouter } from "~/utils/compat/next-navigation";
+import { usePathname } from "~/utils/compat/next-navigation";
 import { CommandBar } from "./CommandBar";
 import { CommandBarContext } from "./CommandBarContext";
 import { useActivityTracker } from "./useActivityTracker";

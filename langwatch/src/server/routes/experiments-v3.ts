@@ -49,7 +49,6 @@ import {
 import { mapThrownErrorEvent } from "~/server/experiments-v3/execution/resultMapper";
 import { runStateManager } from "~/server/experiments-v3/execution/runStateManager";
 import {
-  type EvaluationV3Event,
   type ExecutionScope,
   executionRequestSchema,
   runInputsBodySchema,
@@ -59,7 +58,6 @@ import { trackServerEvent } from "~/server/posthog";
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { fireExperimentRanNurturing } from "../../../ee/billing/nurturing/hooks/featureAdoption";
-import type { NextRequestShim as any } from "./types";
 
 const logger = createLogger("langwatch:experiments-v3");
 

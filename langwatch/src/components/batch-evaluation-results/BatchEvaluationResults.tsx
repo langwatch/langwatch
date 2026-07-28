@@ -33,7 +33,7 @@ import {
   DEFAULT_HIDDEN_COLUMNS,
 } from "./BatchEvaluationResultsTable";
 import { type BatchRunSummary, BatchRunsSidebar } from "./BatchRunsSidebar";
-import { ComparisonCharts, type XAxisOption } from "./ComparisonCharts";
+import { ComparisonCharts } from "./ComparisonCharts";
 import { downloadCsv } from "./csvExport";
 import { getRunDisplayName } from "./getRunDisplayName";
 import { isRunFinished } from "./isRunFinished";

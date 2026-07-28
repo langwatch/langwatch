@@ -9,7 +9,6 @@ import {
   createTestTenantId,
   TEST_CONSTANTS,
 } from "../../services/__tests__/testHelpers";
-import { ConfigurationError } from "../../services/errorHandling";
 import type { JobRegistryEntry } from "../../services/queues/queueManager";
 import { ProjectionRegistry } from "../projectionRegistry";
 

@@ -12,6 +12,7 @@
  * See ADR-058 and specs/observability/browser-rum-trace-correlation.feature.
  */
 
+export { startBrowserTracing } from "./browserTracing";
 export {
   ATTR_NAVIGATION_FROM_PATH,
   ATTR_NAVIGATION_SUPERSEDED,
@@ -23,7 +24,6 @@ export {
   RUM_SESSION_HEADER,
   RUM_TRACES_PATH,
 } from "./constants";
-export { startBrowserTracing } from "./browserTracing";
 export type { NavigationSpanHandle, NavigationType } from "./navigation";
 export { startNavigationSpan } from "./navigation";
 // Exported because the ambient-navigation behaviour is only in effect when

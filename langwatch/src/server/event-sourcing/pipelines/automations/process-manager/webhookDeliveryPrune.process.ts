@@ -1,11 +1,9 @@
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
-import type { ProcessManagerApplier } from "~/server/event-sourcing/pipeline/processBuilder";
 import type {
   IntentSpec,
   WakeHandler,
 } from "~/server/event-sourcing/pipeline/processManagerDefinition";
-import type { AutomationEvent } from "~/server/event-sourcing/pipelines/automations/schemas/events";
 
 const logger = createLogger("langwatch:triggers:webhook-delivery-prune");
 

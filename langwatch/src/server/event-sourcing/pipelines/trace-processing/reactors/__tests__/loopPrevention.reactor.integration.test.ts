@@ -68,10 +68,7 @@ import { AssignTopicCommand } from "../../commands/assignTopicCommand";
 import { RecordSpanCommand } from "../../commands/recordSpanCommand";
 import { SpanStorageMapProjection } from "../../projections/spanStorage.mapProjection";
 import { SpanAppendStore } from "../../projections/spanStorage.store";
-import {
-  type TraceSummaryData,
-  TraceSummaryFoldProjection,
-} from "../../projections/traceSummary.foldProjection";
+import { TraceSummaryFoldProjection } from "../../projections/traceSummary.foldProjection";
 import { TraceSummaryStore } from "../../projections/traceSummary.store";
 import type { TraceProcessingEvent } from "../../schemas/events";
 import type { OtlpSpan } from "../../schemas/otlp";

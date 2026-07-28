@@ -1,11 +1,9 @@
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
-import type { ProcessManagerApplier } from "~/server/event-sourcing/pipeline/processBuilder";
 import type {
   IntentSpec,
   WakeHandler,
 } from "~/server/event-sourcing/pipeline/processManagerDefinition";
-import type { AutomationEvent } from "~/server/event-sourcing/pipelines/automations/schemas/events";
 
 import type { GraphTriggerEvaluationReason } from "../../../../app-layer/automations/graph-trigger-evaluation.service";
 import type { GraphTriggerSweepCandidate } from "../../../../app-layer/automations/graph-trigger-heartbeat";

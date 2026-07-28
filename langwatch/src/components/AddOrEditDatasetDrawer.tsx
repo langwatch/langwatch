@@ -1,5 +1,4 @@
 import {
-  Box,
   Button,
   Field,
   Heading,
@@ -7,11 +6,10 @@ import {
   IconButton,
   Input,
   NativeSelect,
-  Text,
   VStack,
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Eye, EyeOff, Trash2 } from "react-feather";
 import { type FieldErrors, useFieldArray, useForm } from "react-hook-form";
 import type { InMemoryDataset } from "~/components/datasets/editor/DatasetEditorTable";

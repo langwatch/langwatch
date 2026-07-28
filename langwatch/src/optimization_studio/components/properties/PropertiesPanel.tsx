@@ -10,7 +10,6 @@ import type { Component, ComponentType } from "../../types/dsl";
 import { InputPanel } from "../component_execution/InputPanel";
 import { OutputPanel } from "../component_execution/OutputPanel";
 import { AgentPropertiesPanel } from "./AgentPropertiesPanel";
-import { BasePropertiesPanel } from "./BasePropertiesPanel";
 import { CodePropertiesPanel } from "./CodePropertiesPanel";
 import { CustomPropertiesPanel } from "./CustomPropertiesPanel";
 import { EndPropertiesPanel } from "./EndPropertiesPanel";

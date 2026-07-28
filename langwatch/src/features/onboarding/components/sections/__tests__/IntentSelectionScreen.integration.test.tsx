@@ -9,7 +9,6 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { fireEvent, render, screen } from "@testing-library/react";
-import type React from "react";
 import { describe, expect, it, vi } from "vitest";
 
 import { OnboardingFormProvider } from "../../../contexts/form-context";

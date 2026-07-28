@@ -3,10 +3,7 @@
  */
 
 import { type AnchorHTMLAttributes, forwardRef, type ReactNode } from "react";
-import {
-  Link as RouterLink,
-  type LinkProps as RouterLinkProps,
-} from "react-router";
+import { Link as RouterLink } from "react-router";
 
 interface NextLinkProps
   extends Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "href"> {

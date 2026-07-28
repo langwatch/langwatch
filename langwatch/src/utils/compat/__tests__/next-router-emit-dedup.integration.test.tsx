@@ -12,7 +12,7 @@
  */
 
 import { act, cleanup, render } from "@testing-library/react";
-import React, { useEffect } from "react";
+import { useEffect } from "react";
 import { MemoryRouter, Route, Routes, useNavigate } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 

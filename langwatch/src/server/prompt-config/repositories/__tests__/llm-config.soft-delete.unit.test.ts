@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@prisma/client";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { LlmConfigRepository } from "../llm-config.repository";
 
 function makeMockPrisma(overrides: Record<string, unknown> = {}) {

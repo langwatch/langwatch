@@ -3,7 +3,6 @@ import {
   Badge,
   Box,
   HStack,
-  LinkOverlay,
   Skeleton,
   Spacer,
   Tag,
@@ -11,7 +10,7 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import type { Annotation, Project } from "@prisma/client";
+import type { Project } from "@prisma/client";
 import numeral from "numeral";
 import {
   CheckCircle,

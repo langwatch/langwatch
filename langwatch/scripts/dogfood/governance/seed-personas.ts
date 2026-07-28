@@ -41,13 +41,13 @@
  * to provision new personas. Operator runs this script once per demo
  * persona during environment setup; cron tops up the data afterwards.
  */
-import { randomBytes } from "crypto";
-import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
 
+import { PersonalVirtualKeyService } from "@ee/governance/services/personalVirtualKey.service";
+import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
+import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
+import { randomBytes } from "crypto";
 import { prisma } from "~/server/db";
 import { encrypt } from "~/utils/encryption";
-import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
-import { PersonalVirtualKeyService } from "@ee/governance/services/personalVirtualKey.service";
 
 export interface SeedPersonasArgs {
   email: string;
@@ -73,9 +73,11 @@ export interface SeedPersonasSummary {
 
 function parseArgs(argv: string[]): SeedPersonasArgs {
   const out: Partial<SeedPersonasArgs> = { mintVk: false };
+  // biome-ignore lint/style/useForOf: flag parser advances the index (argv[++i]) to consume a value; for...of has no index to advance.
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === "--email") out.email = argv[++i] as string;
-    else if (argv[i] === "--persona") out.persona = argv[++i] as SeedPersonasArgs["persona"];
+    else if (argv[i] === "--persona")
+      out.persona = argv[++i] as SeedPersonasArgs["persona"];
     else if (argv[i] === "--mint-vk") out.mintVk = true;
   }
   if (!out.email) throw new Error("--email is required");
@@ -93,7 +95,9 @@ export async function runSeedPersonas(
   const user = await prisma.user.findUnique({ where: { email: args.email } });
   if (!user) throw new Error(`user ${args.email} not found — sign up first`);
 
-  process.stderr.write(`[seed-personas] persona=${args.persona} user=${user.id}\n`);
+  process.stderr.write(
+    `[seed-personas] persona=${args.persona} user=${user.id}\n`,
+  );
 
   if (args.persona === "p1") {
     await prisma.user.update({
@@ -240,7 +244,8 @@ export async function runSeedPersonas(
     );
 
     const vkSvc = PersonalVirtualKeyService.create(prisma, {
-      gatewayBaseUrl: process.env.LW_GATEWAY_BASE_URL ?? "http://localhost:5563",
+      gatewayBaseUrl:
+        process.env.LW_GATEWAY_BASE_URL ?? "http://localhost:5563",
     });
     const issued = await vkSvc.issue({
       userId: user.id,
@@ -325,7 +330,9 @@ if (isCliInvocation) {
       process.stdout.write(JSON.stringify(summary) + "\n");
     })
     .catch((err) => {
-      process.stderr.write(`[seed-personas] ERROR: ${err.message}\n${err.stack}\n`);
+      process.stderr.write(
+        `[seed-personas] ERROR: ${err.message}\n${err.stack}\n`,
+      );
       process.exit(1);
     })
     .finally(async () => {

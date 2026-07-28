@@ -8,7 +8,6 @@ import {
   Text,
 } from "@react-email/components";
 import { render } from "@react-email/render";
-import React from "react";
 import { sendEmail } from "./emailSender";
 
 interface ProjectUsageData {

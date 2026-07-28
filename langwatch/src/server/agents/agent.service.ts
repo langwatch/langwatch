@@ -6,7 +6,6 @@ import {
   type AgentCopyRow,
   AgentRepository,
   type AgentType,
-  type CreateAgentInput,
 } from "./agent.repository";
 import { AgentNotFoundError } from "./errors";
 

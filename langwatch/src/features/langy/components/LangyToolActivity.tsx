@@ -62,7 +62,6 @@ import {
   resolveCapability,
   resolveCapabilityProgress,
 } from "./capabilities/capabilityRegistry";
-import { collectionOf } from "./capabilities/cliResultDocument";
 import { LangyCapabilityPendingCard } from "./capabilities/LangyCapabilityPendingCard";
 import {
   type CapabilityToolCall,

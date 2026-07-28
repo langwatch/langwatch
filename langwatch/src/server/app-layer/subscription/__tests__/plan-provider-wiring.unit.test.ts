@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import type { PlanInfo } from "../../../../../ee/licensing/planInfo";
-import { type PlanProvider, PlanProviderService } from "../plan-provider";
+import { PlanProviderService } from "../plan-provider";
 
 describe("PlanProvider wiring patterns", () => {
   describe("when wiring SaaS adapter", () => {

@@ -39,12 +39,9 @@ import {
   type LangyConversationListCursorDto,
   type LangyConversationListItemDto,
   type LangyMessageDto,
-  langyConversationDetailSchema,
   langyConversationListCursorSchema,
-  langyConversationListItemSchema,
   langyConversationStatusSchema,
   langyMessageRoleSchema,
-  langyMessageSchema,
 } from "./langy.schemas";
 import { enforceLangyAccess, refuseDemoProject } from "./langyAccessMiddleware";
 

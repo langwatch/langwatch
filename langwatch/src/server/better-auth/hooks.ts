@@ -1,7 +1,6 @@
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import {
-  type Organization,
   Prisma,
   type PrismaClient,
   RoleBindingScopeType,

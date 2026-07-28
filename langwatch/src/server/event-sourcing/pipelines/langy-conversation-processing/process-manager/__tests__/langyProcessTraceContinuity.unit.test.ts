@@ -27,7 +27,6 @@ import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/p
 import {
   InMemoryProcessStore,
   OutboxDispatcherService,
-  ProcessManagerService,
   type ProcessRef,
 } from "~/server/event-sourcing/process-manager";
 import {
@@ -36,10 +35,7 @@ import {
 } from "~/server/event-sourcing/process-manager/processRuntime";
 import type { EventSubscriberContext } from "~/server/event-sourcing/subscribers/eventSubscriber.types";
 import { langyConversationProcess } from "../langyConversationProcess";
-import {
-  LANGY_CONVERSATION_PROCESS_NAME,
-  type LangyConversationProcessState,
-} from "../langyConversationProcess.types";
+import { LANGY_CONVERSATION_PROCESS_NAME } from "../langyConversationProcess.types";
 import { createStubLangyEffectPorts } from "../langyEffectPorts";
 import {
   agentTurnAcceptedEvent,

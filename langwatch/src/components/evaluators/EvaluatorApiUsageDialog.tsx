@@ -9,7 +9,6 @@ import {
 import type { Evaluator } from "@prisma/client";
 import { ExternalLink } from "lucide-react";
 import { useState } from "react";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,

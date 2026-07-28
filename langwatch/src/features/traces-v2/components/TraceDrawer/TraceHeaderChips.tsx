@@ -1,12 +1,4 @@
-import {
-  Avatar,
-  Box,
-  Circle,
-  HStack,
-  Icon,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Circle, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { Lightbulb } from "lucide-react";
 import {
   LuBookMarked,

@@ -1,9 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
-import {
-  PromptTagAssignmentRepository,
-  TagValidationError,
-} from "../llm-config-tag.repository";
+import { PromptTagAssignmentRepository } from "../llm-config-tag.repository";
 
 function makeMockPrisma(overrides: Record<string, unknown> = {}) {
   return {

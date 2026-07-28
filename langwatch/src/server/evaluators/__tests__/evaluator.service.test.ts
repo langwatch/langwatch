@@ -7,10 +7,9 @@
  */
 
 import type { Evaluator, PrismaClient } from "@prisma/client";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { EvaluatorRepository } from "../evaluator.repository";
 import {
-  type EvaluatorField,
   EvaluatorService,
   STANDARD_EVALUATOR_OUTPUT_FIELDS,
 } from "../evaluator.service";

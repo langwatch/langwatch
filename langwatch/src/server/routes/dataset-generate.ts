@@ -21,7 +21,6 @@ import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
-import type { NextRequestShim as any } from "./types";
 
 const logger = createLogger("langwatch:api:dataset:generate");
 

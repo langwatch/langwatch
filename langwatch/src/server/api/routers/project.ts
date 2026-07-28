@@ -2,14 +2,12 @@ import { generate } from "@langwatch/ksuid";
 import {
   Prisma,
   type PrismaClient,
-  type Project,
   RoleBindingScopeType,
   TeamUserRole,
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
-import { env } from "~/env.mjs";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 import { provisionLangyVirtualKey } from "~/server/app-layer/langy/langyVirtualKey";
@@ -29,7 +27,6 @@ import {
   checkProjectPermission,
   checkTeamPermission,
   hasProjectPermission,
-  skipPermissionCheck,
   skipPermissionCheckProjectCreation,
 } from "../rbac";
 import { getUserProtectionsForProject } from "../utils";

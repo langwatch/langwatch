@@ -1,5 +1,5 @@
 import { nanoid } from "nanoid";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { prisma } from "~/server/db";
 import { createTenantId } from "~/server/event-sourcing/domain/tenantId";

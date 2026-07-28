@@ -38,7 +38,6 @@ import {
 import type {
   Formatter,
   NameType,
-  Payload,
   ValueType,
 } from "recharts/types/component/DefaultTooltipContent";
 import type { z } from "zod";

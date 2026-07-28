@@ -2,7 +2,6 @@ import {
   Badge,
   chakra,
   HoverCard,
-  HStack,
   Icon,
   Portal,
   Text,

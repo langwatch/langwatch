@@ -23,7 +23,6 @@ import {
 import {
   ENTERPRISE_TEMPLATE,
   LicenseHandler,
-  PRO_TEMPLATE,
   parseLicenseKey,
   verifySignature,
 } from "../../../../../ee/licensing";

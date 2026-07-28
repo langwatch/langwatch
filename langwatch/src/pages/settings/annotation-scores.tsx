@@ -2,7 +2,6 @@ import {
   Badge,
   Box,
   Button,
-  Card,
   Heading,
   HStack,
   Skeleton,
@@ -25,7 +24,6 @@ import { Link } from "../../components/ui/link";
 import { Menu } from "../../components/ui/menu";
 import { Switch } from "../../components/ui/switch";
 import { toaster } from "../../components/ui/toaster";
-import { Tooltip } from "../../components/ui/tooltip";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
 import { api } from "../../utils/api";
 import { isHandledByGlobalHandler } from "../../utils/trpcError";

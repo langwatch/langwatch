@@ -1,12 +1,4 @@
-import {
-  Avatar,
-  Box,
-  Button,
-  HStack,
-  Icon,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import {
   Database,
   Edit3,
