@@ -1,4 +1,4 @@
-# ADR-071: `coding_agent_sessions` has a mutable storage anchor — take it out of the list read now, freeze it in the writer next, defer the re-key
+# ADR-071: a mutable storage anchor — take it out of the list read now, freeze it in the writer next, and target platform accept time when we re-key
 
 **Date:** 2026-07-28
 
@@ -6,7 +6,9 @@
 
 **Corrects:** [ADR-056](./056-coding-agent-pipeline-session-aggregate.md) §"Engine / partition / retention" — the decision to lead the sort key with `StartedAt` and to anchor both the partition and the TTL on it. ADR-056 knew the column moved and priced only the *dedup* cost; it did not price the partition, the TTL, or the range-filtered list read.
 
-**Relates to:** [ADR-066](./066-projection-clickhouse-cached-store.md) (the read-back store that writes this row, and its `MetricSeries` step 2), [ADR-068](./068-windowed-clickhouse-reads.md) (windowed reads — the list read here is the counter-example that motivates the rule), [ADR-034](./034-event-sourced-analytics-materialization.md) (the RMT-plus-IN-tuple materialisation shape).
+**Scope:** the fix and the freeze are `coding_agent_sessions`. **The anchor finding is systemic** — `trace_analytics` (00039) and `evaluation_analytics` (00041) make the same mistake under the column name `OccurredAt`, and are recorded here as same-class instances so nobody re-derives it. No table is re-plumbed and no migration ships.
+
+**Relates to:** [ADR-066](./066-projection-clickhouse-cached-store.md) (the read-back store that writes this row, and its `MetricSeries` step 2), [ADR-068](./068-windowed-clickhouse-reads.md) (windowed reads — the list read here is the counter-example that motivates the rule, and its bound-then-filter shape is how an accept-time anchor still answers business-time questions), [ADR-034](./034-event-sourced-analytics-materialization.md) (the RMT-plus-IN-tuple materialisation shape).
 
 ## Context
 
@@ -95,9 +97,11 @@ Regression cover is in `coding-agent-session.clickhouse.repository.unit.test.ts`
 
 ## Decision
 
-**The correct end state is a dedup key with no mutable column in it — `ORDER BY (TenantId, SessionId)` — with a partition key and TTL anchor that do not move.**
+**The correct end state is a dedup key with no mutable column in it — `ORDER BY (TenantId, SessionId)` — with a partition key and TTL anchor anchored on platform accept time rather than producer business time.**
 
-**We are not migrating the table to get there. We are making `StartedAt` immutable in the writer instead, and deferring the re-key behind named triggers.**
+That anchor choice is a **systemic finding, not a `coding_agent_sessions` one**: `trace_analytics` and `evaluation_analytics` have the same defect under the column name `OccurredAt`, verified below. Freezing a producer-supplied column is an improvement over letting it move, but accept time is what the invariant actually requires — see "Which column, if we ever do re-key".
+
+**We are not migrating any of the three tables to get there.** Near term we fix the list read that returns a wrong answer today, and make `StartedAt` immutable in the writer; the re-key stays deferred behind named triggers, and adopts accept time whenever it happens.
 
 The reasoning is that **all four consequences are caused by the column moving, not by which column is in the key.** Freeze the anchor at the source and every one of them stops for rows written afterwards — with no new table, no backfill, and no swap:
 
@@ -118,14 +122,52 @@ Re-keying alone does not fix the consequence that actually bites. Freezing does,
 
 The same honesty applies to both options: neither `StartedAt`-frozen nor any alternative column is *structurally* immutable, because a read-back miss re-runs `init()` and re-stamps (`abstractFoldProjection.ts:207-211`). It is immutable **for a live aggregate that reads back successfully**, which is the invariant ADR-066 already depends on everywhere else. A re-key would inherit exactly the same caveat, so it is not a reason to prefer one over the other.
 
-### Which column, if we ever do re-key
+### Which column, if we ever do re-key — and the finding that changes the answer
 
-Ruled out on evidence:
+**The target anchor is platform accept time.** Freezing `StartedAt` remains the near-term step, but it is not the end state, and the reason only became visible once consequence 4 was traced to its cause.
+
+#### The defect is not "the anchor is `StartedAt` rather than `OccurredAt`"
+
+The obvious reaction to this ADR is that `coding_agent_sessions` picked an idiosyncratic column while the sibling analytics tables got it right. **They did not.** Both carry the same defect under a different column name. Checked, not assumed:
+
+| Table | Anchor (partition + sort key + TTL) | How it is derived | Direction it moves |
+|---|---|---|---|
+| `coding_agent_sessions` (00051:192-195) | `StartedAt` | `min(state.startedAtMs, occurredAt)` — `codingAgentSession.foldProjection.ts:165-170` | backwards |
+| `trace_analytics` (00039:189-192) | `OccurredAt` | `min(state.occurredAt, span.startTimeUnixMs)` — `span-timing.service.ts:36-38`, projected at `traceAnalytics.foldProjection.ts:302` | backwards |
+| `evaluation_analytics` (00041:135-138) | `OccurredAt` | `LastEventOccurredAt`, i.e. `max(prev, event.occurredAt)` — `abstractFoldProjection.ts:235-238`, projected at `evaluationAnalytics.foldProjection.ts:201` | forwards |
+
+`span.startTimeUnixMs` and `event.occurredAt` are **producer-supplied**. Renaming the column fixes nothing.
+
+`trace_analytics` knew about consequence 1 and priced only that one, exactly as ADR-056 did — its own fold docblock says *"OccurredAt can shift when an earlier-starting span arrives late, so superseded rows may persist until TTL"* (`traceAnalytics.foldProjection.ts:105-109`). The partition, TTL and dedup-scope consequences went unpriced there too.
+
+Two honest differences, rather than flattening this into "same bug three times":
+
+- **`evaluation_analytics` moves forwards**, so consequence 3 *inverts*: its TTL deadline moves *away* from the row, which outlives the retention it was promised rather than dying early. Consequences 1, 2 and 4 apply unchanged — a version can drift out of a caller's window upwards just as well as downwards.
+- **`evaluation_analytics` already sets `eventOrdering: "acceptedAt"`** (`evaluationAnalytics.foldProjection.ts:301`). The codebase already refuses to trust producer business time for *ordering*, while still anchoring its *storage* on it. That inconsistency is the finding in one line.
+
+#### The real axis: producer business time vs. platform accept time
+
+A partition key, a sort key and a TTL anchor each need all three of **immutable**, **monotonic**, and **not producer-controlled**. Only accept time has all three.
+
+- **Producer business time** — `occurredAt`, `startTimeUnixMs`, and every `min`/`max` folded over them. Backdatable by whoever is sending the telemetry, and mutated after the row is written. Fails all three.
+- **Platform accept time** — assigned at ingest, written once, monotonic, and already the canonical event-log cursor. The codebase names it: `eventOrdering: "occurredAt" | "acceptedAt"`, where `acceptedAt` *"follows the canonical event-log cursor `(createdAt/EventTimestamp, EventId)` and is for lifecycle aggregates whose accepted transition order must win even when a producer submits a backdated business timestamp"* (`foldProjection.types.ts:130-140`).
+
+**Accept time is strictly stronger than freezing.** Freezing makes the value immutable but leaves it producer-supplied, so one backdated first event pins that row into an old, cold, near-TTL partition **permanently**, and no later signal can move it out. Freezing removes the *mutation*; only accept time removes the *producer's control over which partition a row lives in and when it dies*.
+
+**One trap for whoever implements it.** The anchor must be the **event log's** accept time threaded into the row — not the projection's own `CreatedAt`. `CreatedAt` is stamped `Date.now()` inside `init()` (`abstractFoldProjection.ts:206-213`), which is *fold* time, and `init()` re-runs on a read-back miss. It is platform-assigned but re-stampable, so it inherits exactly the caveat recorded above for a frozen `StartedAt`. The log cursor does not have that property.
+
+#### The two trade-offs, stated rather than waved through
+
+1. **TTL semantics change** from *"delete N days after it happened"* to *"delete N days after we accepted it"*. The upside is real: retention measured from **custody** is the date the platform can actually attest to, which is the auditable one — and it closes a live data-loss hazard, because today a producer that backdates `occurredAt` past the retention horizon gets a row deleted almost immediately after it lands. The downside is equally real for genuinely late-arriving telemetry, where the two dates differ by the lag. **This is a compliance decision and needs a human sign-off before implementation. This ADR does not settle it.** The near-term freeze deliberately sidesteps it: a frozen `StartedAt` is still business time, so retention semantics do not change under the interim step.
+2. **Reads lose direct pruning on business time.** The resolution is ADR-068's existing shape, not a new mechanism: bound *accept* time by `[businessFrom − maxLag, businessTo]` so the partition filter still prunes, then apply the exact business-time predicate in the outer scope. **The window prunes; the exact predicate is what is correct.** That is the same split this ADR's own list-read fix relies on — a cheap bound for the planner, an exact test for the answer.
+
+#### Scope of this finding
+
+This records the **target anchor** and a **systemic finding across three tables**. It re-plumbs nothing and adds no migration. `trace_analytics` and `evaluation_analytics` are named as same-class instances so nobody re-derives this later; whether either also needs the consequence-4 read fix `coding_agent_sessions` just got belongs to sequencing step 4's audit, not to this change.
+
+Also ruled out, unchanged:
 
 - **The session id's embedded time — there is none.** `SessionId` is `provider` (the agent's own opaque session id) or `trace_fallback` (a trace id): `sessionKeySourceSchema = z.enum(["provider", "trace_fallback"])` (`contributions.ts:30`). Neither is a KSUID and neither carries a timestamp. This option does not exist.
-- **`CreatedAt`** is the closest thing to an immutable column — stamped once at `init()` and threaded through read-back — but anchoring TTL on it changes retention semantics from *"delete N days after the session happened"* to *"delete N days after we first folded it"*. For late-arriving telemetry those differ, and retention semantics are a compliance surface, not an implementation detail. It is defensible (arguably more correct), but it is a **separate decision** that must be made deliberately, not as a side effect of a storage fix.
-
-A frozen `StartedAt` sidesteps this entirely: it stays business time, so retention semantics are unchanged.
 
 **Note for whoever revisits this:** `PARTITION BY` cannot be altered on an existing table — that alone forces the create-new-and-swap. `ALTER TABLE … MODIFY TTL` *is* supported, so the TTL anchor could be repointed on its own if it were the only problem. It is not.
 
@@ -170,29 +212,33 @@ That sequencing is right, and one hazard is worth recording because it is the ob
 
 1. **Now, and shipping with this ADR — the point read's tiebreak.** `findLatestRecord` ended in `LIMIT 1` with no `ORDER BY`, so two versions sharing `max(UpdatedAt)` resolved arbitrarily. It now orders by how far each version's fold got: the progress watermark, then span/log accumulator total, then converged metric-unit count (the only progress signal a metric-only session has), then applied-id count, then `StartedAt ASC` — smallest is best-informed, because it is the minimum. This is **defence in depth, not a live bug fix**: `nextVersionStamp` already makes a tie unreachable while per-aggregate serialization holds. Reversible, no migration, no behaviour change when there is no tie. Matches the fix applied to the two sibling analytics repositories.
 2. **Now, and shipping with this ADR — the list read's dedup scope.** `findManyRecent`'s inner `max(UpdatedAt)` subquery no longer filters on `StartedAt`; only the outer scope does. **This closes consequence 4** — the wrong answer — ahead of the freeze rather than behind it, because it needs no migration and no writer change. It costs an unwindowed dedup scan per list read (compact: sort-key columns plus `UpdatedAt`, one group row per session) until step 3 makes the pruning bound safe again. Reversible, no migration.
-3. **Next — freeze the writer.** `StartedAt` becomes first-observed; add `EarliestSignalAt` for the business truth; point the session view and list display/sort at it. One additive migration, one fold change, one read-path change. **This is the change that closes consequences 1-3**, and it is what lets step 2's dedup scope take its pruning bound back. Reversible in the sense that reverting stops the freeze — it does not un-write frozen rows, and does not need to.
-4. **Then — audit the other range-filtered dedup scopes.** Consequence 4 is a *pattern*, not one query: any read that puts a mutable column in an IN-tuple dedup subquery has it. `findManyRecent` was the instance found here and is fixed; the sweep for others is not done. This is what ADR-068's windowed-read discipline should be extended to say.
+3. **Next — freeze the writer.** `StartedAt` becomes first-observed; add `EarliestSignalAt` for the business truth; point the session view and list display/sort at it. One additive migration, one fold change, one read-path change. **This is the change that closes consequences 1-3**, and it is what lets step 2's dedup scope take its pruning bound back. Reversible in the sense that reverting stops the freeze — it does not un-write frozen rows, and does not need to. It is an interim step, not the target: it stops the anchor moving but leaves it producer-supplied. None of it is wasted if the accept-time re-key later happens — `EarliestSignalAt` stays the displayed business truth either way, and splitting anchor from business value is a prerequisite for both.
+4. **Then — audit the other range-filtered dedup scopes.** Consequence 4 is a *pattern*, not one query: any read that puts a mutable column in an IN-tuple dedup subquery has it. `findManyRecent` was the instance found here and is fixed; the sweep for others is not done, and `trace_analytics` and `evaluation_analytics` are the first places to look, since both anchor on a moving column too. This is what ADR-068's windowed-read discipline should be extended to say.
 5. **Not now — ADR-066 step 2** (`MetricSeries` out of the fold). Independent, number-changing, its own validation.
-6. **Deferred indefinitely — the table re-key.** Recorded as the correct end state so nobody re-derives it, and priced above so nobody under-estimates it.
+6. **Not now, and gated on a human — the TTL semantics decision.** Adopting accept time as the anchor changes retention from *"N days after it happened"* to *"N days after we accepted it"*. Recorded above with the argument for it; it needs a deliberate sign-off, not an engineering judgement call, and nothing here presumes the answer.
+7. **Deferred indefinitely — the table re-key, across all three tables.** Recorded as the correct end state so nobody re-derives it, priced above so nobody under-estimates it, and now with the anchor it should adopt: platform accept time, not a frozen business-time column.
 
 **The triggers that would change the deferral** — any one is sufficient:
 
 - **Orphan ratio.** Rows in `coding_agent_sessions` exceeding ~1.5× distinct `(TenantId, SessionId)` after the freeze has been live a full retention period. Post-freeze the residue is a fixed legacy population that ages out; if it does not, the model above is wrong.
 - **A second correctness bug traced to the sort key rather than to the column moving.** The freeze fixes mutation; it does not make `(TenantId, StartedAt, SessionId)` a good key for point lookups. If per-session seeks become hot enough to matter, that is a real re-key motive rather than a hygiene one.
 - **The table stops being one bounded row per session.** The cost analysis above rests on it being an aggregate. If it grows a heavy column, the backfill arithmetic changes and so does the balance.
-- **A re-key becomes free.** If `coding_agent_sessions` is rebuilt for another reason (a projection-version replay per ADR-015, a retention-policy change forcing a TTL anchor move), take the new key in the same rewrite. This is the most likely path to it ever happening.
+- **A re-key becomes free.** If `coding_agent_sessions` is rebuilt for another reason (a projection-version replay per ADR-015, a retention-policy change forcing a TTL anchor move), take the new key — anchored on accept time — in the same rewrite. This is the most likely path to it ever happening.
+
+**The systemic finding cuts towards doing it once, properly, rather than towards doing it sooner.** Three tables share the anchor defect, so three tables would share a rebuild's design, its backfill shape and its TTL-semantics decision. That is an argument for a single deliberate migration when one of them is being rebuilt anyway — not for three ad-hoc ones, and not for bringing the deferral forward on urgency it does not have now that the read is fixed.
 
 **The risk of deferring**, stated plainly. The justification is no longer "the freeze closes consequence 4" — consequence 4 is closed here, in the read, and the deferral has to stand on what is left. It does, but the accounting differs per item:
 
 - **Deferring the re-key (indefinitely)** leaves consequences 1 and 2: a bounded orphan population, O(distinct `StartedAt` values) per session rather than O(writes), which ages out at TTL instead of being cleaned up. That is **storage hygiene on an aggregate table** — no read returns a wrong answer because of it — and the orphan-ratio trigger above is what would reopen the decision if the bound turns out to be wrong.
 - **Deferring the freeze (to the next step, not indefinitely)** leaves consequence 3: rows near their retention deadline can have the true-latest version deleted by a merge while a stale one survives, and the read then returns the stale one. That **is** a wrong answer — the honest statement is that consequence 4 was the only one wrong on an *ordinary* day, not the only one capable of being wrong at all. Its fuse is a full retention period (308 days by default), which is why it has only ever been observed in a test fixture that backdated a row onto the boundary. It also leaves the list read paying an unwindowed dedup scan, which exists only because the anchor still moves.
 
-We accept both. Nothing on the deferred list is a live wrong answer once this change lands; what remains is a legacy orphan population that expires on its own, and one fuse measured in a retention period whose fix is the very next step rather than an open-ended one.
+We accept both. Neither is a wrong answer on an ordinary read once this change lands: what remains is a legacy orphan population that expires on its own, and one fuse measured in a full retention period whose fix is the very next step rather than an open-ended one.
 
 ## Rules
 
-- **No mutable column in a ReplacingMergeTree sort key, a `PARTITION BY`, or a TTL anchor.** If a fold derives a value that can change (a min, a max, a first-seen that can be revised), that value is a **payload column**, not a storage anchor. A storage anchor is written once.
-- **A column that is a storage anchor and a displayed business value at the same time is a bug waiting for a late event.** Split them: the anchor is frozen, the business value is free to move.
+- **A storage anchor is platform-assigned accept time, written once.** A ReplacingMergeTree sort key, a `PARTITION BY` and a TTL anchor each need all three of **immutable**, **monotonic** and **not producer-controlled**. `occurredAt`, `startTimeUnixMs` and every `min`/`max` folded over them fail all three, whatever the column is named — `StartedAt` and `OccurredAt` are the same mistake. If a fold derives a value that can change (a min, a max, a first-seen that can be revised), that value is a **payload column**. Freezing such a value is an improvement, not the rule: it stops the mutation but leaves the producer deciding which partition the row lives in and when it dies.
+- **A column that is a storage anchor and a displayed business value at the same time is a bug waiting for a late event.** Split them: the anchor is accept time (frozen business time is the interim step, not the target), the business value is free to move.
+- **Prune on the anchor, answer on the business value.** When the anchor is accept time and the caller asks in business time, bound accept time by `[businessFrom − maxLag, businessTo]` for partition pruning and apply the exact business-time predicate in the outer scope. The window prunes; the exact predicate is what is correct (ADR-068).
 - **A dedup subquery must never filter on a column that can move a row out of the caller's range.** The outer scope may be range-filtered for partition pruning; the inner `max(version)` scope must resolve the true latest. Both reads on this table now obey it and say why in their docblocks — `findLatestRecord` always did, and `findManyRecent`'s range filter was removed from its dedup scope in this change. Narrowings on **stable** columns (`TenantId`, `UserId`) stay in both scopes: they cannot move a version out of its group. **Not even an upper bound is safe on a moving column**, because a read-back miss re-stamps the anchor *forwards*, so "the latest version holds the smallest value" does not hold.
 - **A latest-version point read ends in a deterministic `ORDER BY … LIMIT 1`**, ranked by fold progress, even where a write-side version stamp already makes ties unreachable. The stamp is the mechanism; the tiebreak is the backstop, and it costs nothing because the IN-tuple has already cut the input to the tied rows.
 - **`TenantId` is first in every scope, outer and inner.** Unchanged, restated because this ADR touches both scopes of two queries.
@@ -203,6 +249,8 @@ We accept both. Nothing on the deferred list is a live wrong answer once this ch
 - [ADR-034](./034-event-sourced-analytics-materialization.md) — analytics materialisation (the RMT + IN-tuple shape)
 - [ADR-056](./056-coding-agent-pipeline-session-aggregate.md) — coding-agent session aggregate (its key choice is corrected here)
 - [ADR-066](./066-projection-clickhouse-cached-store.md) — read-back fold store (writes this row; owns the `MetricSeries` step 2 this ADR declines to bundle)
-- [ADR-068](./068-windowed-clickhouse-reads.md) — windowed ClickHouse reads (extended by sequencing step 3)
+- [ADR-068](./068-windowed-clickhouse-reads.md) — windowed ClickHouse reads (the list read here is the counter-example; sequencing step 4 extends its discipline to the dedup-scope rule)
 - [ADR-015](./015-projection-replay-coordination.md) — replay coordination (the most likely vehicle for a re-key, if it ever happens)
 - `dev/docs/best_practices/clickhouse-queries.md` — IN-tuple dedup, version-stamp monotonicity, the `ORDER BY <version> DESC LIMIT 1` anti-pattern this tiebreak is not
+- **Same-class instances of the anchor defect** (recorded, not changed here): `00039_create_trace_analytics.sql:189-192` with `span-timing.service.ts:36-38`; `00041_create_evaluation_analytics.sql:135-138` with `evaluationAnalytics.foldProjection.ts:201` and `abstractFoldProjection.ts:235-238`
+- **Accept time as the codebase already names it:** `foldProjection.types.ts:130-140` (`eventOrdering: "occurredAt" | "acceptedAt"`, the `(createdAt/EventTimestamp, EventId)` log cursor)
