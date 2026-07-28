@@ -71,4 +71,28 @@ describe("FrameDecoder", () => {
       expect(() => decoder.push("x".repeat(64))).toThrow(/maximum size/);
     });
   });
+
+  describe("given a multi-byte character split across two socket reads", () => {
+    it("decodes it whole instead of resolving each half to U+FFFD", () => {
+      // A socket splits wherever it likes. Decoding each chunk independently
+      // turned a straddling UTF-8 sequence into two replacement characters —
+      // and because the surrounding JSON stayed well-formed, the frame parsed
+      // fine and shipped corrupted argv (e.g. `dataset records add --json`
+      // uploading mangled records at exit 0).
+      const decoder = new FrameDecoder<ServerFrame>();
+      const frame = Buffer.from(
+        encodeFrame({ t: "err", message: "\u6f22\u5b57\u6f22\u5b57" } as ServerFrame),
+        "utf8",
+      );
+      // Split inside the first multi-byte character.
+      const cut = frame.indexOf(Buffer.from("\u6f22", "utf8")) + 1;
+
+      expect(decoder.push(frame.subarray(0, cut))).toEqual([]);
+      const frames = decoder.push(frame.subarray(cut));
+
+      expect(frames).toHaveLength(1);
+      expect((frames[0] as { message: string }).message).toBe("\u6f22\u5b57\u6f22\u5b57");
+      expect(JSON.stringify(frames[0])).not.toContain("\uFFFD");
+    });
+  });
 });

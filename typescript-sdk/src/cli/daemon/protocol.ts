@@ -14,6 +14,7 @@
  * on the client's hot path, where every millisecond of module load is a
  * millisecond added to every CLI invocation.
  */
+import { StringDecoder } from "node:string_decoder";
 
 /**
  * Bumped whenever the frame shapes change incompatibly. A client refuses to
@@ -163,6 +164,16 @@ export function encodeFrame(frame: AnyFrame): string {
  */
 export class FrameDecoder<T extends AnyFrame = AnyFrame> {
   private buffer = "";
+  /**
+   * Decodes across chunk boundaries. A socket splits wherever it likes, so a
+   * multi-byte UTF-8 sequence routinely straddles two reads — and
+   * `chunk.toString("utf8")` per chunk resolves each half to U+FFFD, silently
+   * mangling the frame while still producing parseable JSON. StringDecoder
+   * holds the incomplete tail until the rest of the sequence arrives. (The
+   * header above already warned about this for the base64'd output path; the
+   * framing layer itself had the same bug.)
+   */
+  private readonly utf8 = new StringDecoder("utf8");
 
   /**
    * @param maxLineBytes Guard against a peer that never sends a newline.
@@ -171,7 +182,8 @@ export class FrameDecoder<T extends AnyFrame = AnyFrame> {
   constructor(private readonly maxLineBytes = 64 * 1024 * 1024) {}
 
   push(chunk: Buffer | string): T[] {
-    this.buffer += typeof chunk === "string" ? chunk : chunk.toString("utf8");
+    this.buffer +=
+      typeof chunk === "string" ? chunk : this.utf8.write(chunk);
     if (this.buffer.length > this.maxLineBytes) {
       this.buffer = "";
       throw new Error("daemon protocol: frame exceeded maximum size");
