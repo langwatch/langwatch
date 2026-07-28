@@ -182,10 +182,13 @@ export class GatewayBudgetClickHouseRepository {
   async getSpendForBudgets(
     tenantId: string,
     budgets: GatewayBudget[],
+    // The instant the read is anchored to. Injectable so a test that wrote
+    // a debit at a known time can read the same period deterministically
+    // instead of racing the wall clock across a MINUTE or HOUR boundary.
+    now: Date = new Date(),
   ): Promise<ScopeSpend[]> {
     if (budgets.length === 0) return [];
 
-    const now = new Date();
     const byWindow = new Map<GatewayBudgetWindow, GatewayBudget[]>();
     for (const b of budgets) {
       const list = byWindow.get(b.window) ?? [];
@@ -562,7 +565,7 @@ function windowToClickHouse(window: GatewayBudgetWindow): string {
  * This is one half of a contract: the rollup only ever returns a row when
  * this lands on exactly the PeriodStart the materialised view bucketed the
  * debit into. The other half is the multiIf() in
- * 00055_gateway_budget_scope_totals_period_start.sql, and the two are pinned
+ * 00058_gateway_budget_scope_totals_utc.sql, and the two are pinned
  * together by budget.clickhouse.repository.periodStart.integration.test.ts.
  * Change one without the other and the affected window stops accruing
  * entirely: spend is written, every read returns 0, and budgets on that

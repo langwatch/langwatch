@@ -218,6 +218,35 @@ Feature: AI Gateway — Budgets
       | month  |
       | total  |
 
+  # The ledger's OccurredAt column carries no timezone, so the rollup's
+  # period truncation follows the ClickHouse server timezone unless the
+  # view pins one. The reader always computes period starts in UTC. On a
+  # server whose default timezone is not UTC, an unpinned view buckets
+  # DAY, WEEK, and MONTH spend at local midnight while the reader asks
+  # for UTC midnight: the same never-readable-bucket failure, reachable
+  # by deployment configuration instead of code drift.
+  @integration
+  Scenario: Spend stays visible when the ClickHouse server does not run in UTC
+    Given the underlying spend store computes period boundaries in its own local timezone
+    And a budget for each of the day, week, and month windows
+    When spend is recorded against each budget
+    Then each budget reports non-zero spend
+
+  # Period boundaries are part of the rollup's key, and the rollup is what
+  # every read and every enforcement decision consults. When the key moves
+  # to UTC boundaries, spend already recorded under local boundaries must
+  # be carried across by rebuilding the rollup from the ledger, which keeps
+  # every debit. Otherwise an org that spent $800 of a $1000 monthly budget
+  # before the upgrade would read $0 after it and sail past its cap.
+  @integration
+  Scenario: Spend recorded before the rollup rebuild still counts after it
+    Given the underlying spend store computes period boundaries in its own local timezone
+    And day, week, and month budgets already carry recorded spend
+    When the deployment is upgraded to compute period boundaries in UTC
+    Then each budget reports exactly the spend recorded before the rebuild
+    And spend recorded on boundaries that were already UTC is unchanged
+    And a budget blocks when spend recorded before and after the rebuild together pass its limit
+
   @integration
   Scenario: A blocking budget blocks once its recorded spend passes the limit
     Given project "gateway-demo" has a blocking budget of $0.0001 for today
