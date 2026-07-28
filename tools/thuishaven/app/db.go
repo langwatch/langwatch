@@ -37,6 +37,12 @@ type seedPreset struct {
 // unseeded presets (onboarding/bare) keep the tiny default.
 const seedRetentionStep = "seed:retention"
 
+// defaultMassSeedMonths is the mass preset's backdated window, mirroring
+// seed-mass.ts's own fallback. Kept as a string because it travels as an
+// environment value to both seed:retention and seed:mass, which must agree on
+// the window or the retention pin will not cover the oldest rows.
+const defaultMassSeedMonths = "3"
+
 // seedPresets is the registry of variants, shared by `db seed` and `db reset`.
 var seedPresets = map[string]seedPreset{
 	"demo":            {env: []string{"HAVEN_SEED_PRESET=demo"}, ingest: []string{seedRetentionStep, "seed:sample-traces", "seed:realistic-platform"}, summary: "past onboarding + sample traces + realistic platform data"},
@@ -48,8 +54,13 @@ var seedPresets = map[string]seedPreset{
 	// Event-sourced products are seeded through their event logs (replayed by
 	// the projection workers); traces backdate through the collector inside
 	// its 31-day window and, older than that, through recordSpan commands.
-	// HAVEN_SEED_MONTHS tunes the window (default 3).
-	"mass": {env: []string{"HAVEN_SEED_PRESET=demo"}, ingest: []string{seedRetentionStep, "seed:sample-traces", "seed:realistic-platform", "seed:mass"}, summary: "demo plus months of backdated traces, runs, and metric series (HAVEN_SEED_MONTHS, default 3)"},
+	// HAVEN_SEED_MONTHS tunes the window (default 3). It is set explicitly rather
+	// than left to seed:mass's own default because seed:retention reads the same
+	// variable to decide whether to wait out the retention-policy cache before
+	// backdated rows are written: unset, it computed a zero-day window, skipped
+	// the wait, and a worker holding the cached 7-day default could stamp months
+	// of history pre-expired.
+	"mass": {env: []string{"HAVEN_SEED_PRESET=demo", "HAVEN_SEED_MONTHS=" + defaultMassSeedMonths}, ingest: []string{seedRetentionStep, "seed:sample-traces", "seed:realistic-platform", "seed:mass"}, summary: "demo plus months of backdated traces, runs, and metric series (HAVEN_SEED_MONTHS, default 3)"},
 }
 
 // SeedPresetNames lists the registry for errors and help, sorted.

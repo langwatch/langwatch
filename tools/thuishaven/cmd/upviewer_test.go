@@ -276,3 +276,53 @@ func TestViewerRingIsCapped(t *testing.T) {
 		t.Errorf("ring = %d lines, want capped at %d", len(m.lines["all"]), viewerRingCap)
 	}
 }
+
+// The combined per-stack log is append-only and uncapped, so attaching to a
+// long-lived worktree must not read it whole just to render a screenful.
+func TestViewerFirstReadIsBoundedToATailWindow(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "combined.log")
+
+	ts := time.Now().UTC().Format(time.RFC3339Nano)
+	var big strings.Builder
+	for big.Len() < readFreshTailWindow*3 {
+		big.WriteString(ts + " an old line nobody will ever scroll back to\n")
+	}
+	if err := os.WriteFile(path, []byte(big.String()), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	m := newViewerModel("feat-x", path, t.TempDir())
+
+	t.Run("given a capture file far larger than the window", func(t *testing.T) {
+		t.Run("when the viewer first reads it, it consumes only the tail", func(t *testing.T) {
+			lines := m.readFresh("all", path)
+			consumed := 0
+			for _, l := range lines {
+				consumed += len(l) + 1
+			}
+			if consumed > readFreshTailWindow {
+				t.Errorf("first read consumed %d bytes, want at most the %d-byte window", consumed, readFreshTailWindow)
+			}
+			if len(lines) == 0 {
+				t.Error("first read should still return the tail, got nothing")
+			}
+		})
+
+		t.Run("when more is appended, the next read returns exactly the new lines", func(t *testing.T) {
+			f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0o600)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := f.WriteString(ts + " a brand new line\n"); err != nil {
+				t.Fatal(err)
+			}
+			_ = f.Close()
+
+			lines := m.readFresh("all", path)
+			if len(lines) != 1 || !strings.Contains(lines[0], "a brand new line") {
+				t.Errorf("incremental read = %v, want just the appended line", lines)
+			}
+		})
+	})
+}

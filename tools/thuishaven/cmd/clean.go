@@ -28,9 +28,19 @@ const sharedResourcesNote = "shared ClickHouse · Postgres · Redis · observabi
 // run. `--yes` skips the picker and applies ONLY the safe categories, never a
 // worktree deletion. Agents (and any non-TTY) get the read-only report and
 // delete nothing without `--yes`.
+//
+// "Safe categories" is literal: regenerable build artefacts and orphaned dev
+// processes. It deliberately excludes each worktree's ClickHouse and Postgres
+// databases, which are NOT regenerable — only the interactive picker, which
+// shows the user exactly which databases are in scope, may drop those. Data loss
+// is always explicit (ADR-064), and `--yes` is by definition unattended.
 func runClean(ctx context.Context, d deps, inv invocation) error {
 	if inv.has("--yes") {
-		if err := d.orch.Prune(ctx, d.worktree, true); err != nil {
+		if err := d.orch.Prune(ctx, d.worktree, app.PruneOptions{
+			ShouldAct: true,
+			// Never on this path — see the note above.
+			ShouldReclaimDatabases: false,
+		}); err != nil {
 			return err
 		}
 		reapOrphanRuntimes(d)
@@ -154,7 +164,7 @@ func printPruneReport(ctx context.Context, d deps, rows []app.PruneRow, threshol
 	metas := make([]app.PruneMeta, len(rows))
 	d.orch.ScanMeta(ctx, rows, func(i int, meta app.PruneMeta) { metas[i] = meta })
 
-	fmt.Printf("haven prune — %d worktree(s)\n\n", len(rows))
+	fmt.Printf("haven clean — %d worktree(s)\n\n", len(rows))
 	defaults := 0
 	for i, r := range rows {
 		meta := metas[i]
@@ -178,7 +188,7 @@ func printPruneReport(ctx context.Context, d deps, rows []app.PruneRow, threshol
 	days := int(threshold / (24 * time.Hour))
 	fmt.Printf("\n* = idle ≥ %dd and safe to delete — %d worktree(s).\n", days, defaults)
 	fmt.Println(strings.ToUpper(sharedResourcesNote[:1]) + sharedResourcesNote[1:] + ".")
-	fmt.Println("Run `haven prune` in a terminal to see sizes, sort, and delete; `haven prune --artifacts --yes` reclaims build caches without deleting worktrees.")
+	fmt.Println("Run `haven clean` in a terminal to see sizes, sort, and delete; `haven clean --yes` reclaims build caches and orphan processes without deleting worktrees or databases.")
 	return nil
 }
 

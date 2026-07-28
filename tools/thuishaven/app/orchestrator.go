@@ -250,8 +250,10 @@ func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) err
 	endRegistration()
 	fmt.Printf("  %s\n\n", opts.Selection.Describe())
 
-	// Stale dependencies install themselves before anything needs them.
-	if err := o.ensureDeps(ctx, p.LwDir); err != nil {
+	// Stale dependencies install themselves before anything needs them. This is
+	// the developer's own worktree, so lifecycle scripts (the repo's postinstall)
+	// run as normal; only untrusted checkouts suppress them.
+	if err := o.ensureDeps(ctx, p.LwDir, true); err != nil {
 		return err
 	}
 	// DOTENV_CONFIG_QUIET drops dotenv v17's promo line for any one-shot script

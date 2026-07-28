@@ -113,6 +113,76 @@ func TestWebFlowCommitterIsNotAnAuthor(t *testing.T) {
 	}
 }
 
+// forkCommit builds a fork PR commit whose GitHub-attributed login is `login`
+// — the field an attacker steers by choosing a commit email — with `verified`
+// controlling whether GitHub actually validated a signature over its contents.
+func forkCommit(sha, login, name string, verified bool) ghPRCommit {
+	c := ghPRCommit{SHA: sha}
+	if login != "" {
+		c.Author = &struct {
+			Login string `json:"login"`
+		}{Login: login}
+		c.Committer = &struct {
+			Login string `json:"login"`
+		}{Login: login}
+	}
+	c.Commit.Author.Name = name
+	c.Commit.Author.Email = name + "@example.com"
+	c.Commit.Verification.Verified = verified
+	return c
+}
+
+// The gate's whole job is to stop a stranger's code running unprompted. On a
+// fork, GitHub's author/committer attribution is derived from the commit's email
+// header, which the PR author chooses — so an unsigned commit claiming to be a
+// maintainer must not buy any trust at all.
+func TestForkCommitAttributionIsNotTrustedWithoutASignature(t *testing.T) {
+	// Every maintainer login would pass a permission check; that is the point.
+	everyoneHasWrite := func(string) bool { return true }
+
+	t.Run("given a fork commit that merely claims a maintainer's identity", func(t *testing.T) {
+		t.Run("when the commit carries no verified signature, it is untrusted", func(t *testing.T) {
+			commits := []ghPRCommit{forkCommit("deadbeefcafe", "trusted-maintainer", "Trusted Maintainer", false)}
+			untrusted := untrustedForkCommits(commits, everyoneHasWrite)
+			if len(untrusted) != 1 {
+				t.Fatalf("a spoofable unsigned fork commit must be untrusted, got %v", untrusted)
+			}
+			if !strings.Contains(untrusted[0], "deadbee") {
+				t.Errorf("the warning should name the commit, got %q", untrusted[0])
+			}
+		})
+
+		t.Run("when the commit is verified and the signer has write access, it is trusted", func(t *testing.T) {
+			commits := []ghPRCommit{forkCommit("deadbeefcafe", "trusted-maintainer", "Trusted Maintainer", true)}
+			if untrusted := untrustedForkCommits(commits, everyoneHasWrite); len(untrusted) != 0 {
+				t.Errorf("a verified commit from a writer is trusted, got %v", untrusted)
+			}
+		})
+
+		t.Run("when the commit is verified but the signer lacks write access, it is untrusted", func(t *testing.T) {
+			commits := []ghPRCommit{forkCommit("deadbeefcafe", "outsider", "Outsider", true)}
+			nobodyHasWrite := func(string) bool { return false }
+			if untrusted := untrustedForkCommits(commits, nobodyHasWrite); len(untrusted) != 1 {
+				t.Errorf("a verified signer without write access is untrusted, got %v", untrusted)
+			}
+		})
+	})
+
+	t.Run("given a fork PR where only some commits are signed", func(t *testing.T) {
+		// The head commit is what actually runs, so one unsigned commit anywhere
+		// has to stop the whole thing.
+		t.Run("when any commit is unsigned, the PR is untrusted", func(t *testing.T) {
+			commits := []ghPRCommit{
+				forkCommit("1111111aaaa", "trusted-maintainer", "Trusted Maintainer", true),
+				forkCommit("2222222bbbb", "trusted-maintainer", "Trusted Maintainer", false),
+			}
+			if untrusted := untrustedForkCommits(commits, everyoneHasWrite); len(untrusted) != 1 {
+				t.Errorf("one unsigned commit must taint the PR, got %v", untrusted)
+			}
+		})
+	})
+}
+
 func TestPermissionGrantsWrite(t *testing.T) {
 	cases := map[string]bool{
 		"admin": true, "write": true, "maintain": true,

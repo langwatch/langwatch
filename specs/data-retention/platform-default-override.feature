@@ -13,9 +13,14 @@ Feature: Local-dev override of the platform retention default
   #
   # This is strictly a local-dev affordance. Lowering the default in production
   # would silently expire customer data, so the control plane FAILS LOUD at
-  # start-up if the variable is ever set while NODE_ENV=production. And because
-  # every retention-managed table is partitioned weekly (toYearWeek), the value
-  # must be a whole number of weeks, or start-up fails loud too.
+  # start-up unless it positively recognises the environment as non-production.
+  # The check is fail-CLOSED on purpose: NODE_ENV reaches a deployment from
+  # operator-supplied Helm values, so an environment spelled "prod", "staging"
+  # or left unset must not be able to shrink the platform default by omission.
+  # Only "development" and "test" open the gate. And because every
+  # retention-managed table is partitioned weekly (toYearWeek), the value must be
+  # a whole number of weeks within the storage column's ceiling, or start-up
+  # fails loud too.
 
   @unit
   Scenario: An unset variable resolves to the fixed platform default
@@ -44,6 +49,14 @@ Feature: Local-dev override of the platform retention default
     When the platform retention default is resolved
     Then start-up fails with an error naming the variable
     And the error explains the default must not be lowered in production
+
+  @unit
+  Scenario: Setting the override outside development or test fails loud
+    Given NODE_ENV is "staging", "prod", or not set at all
+    And LANGWATCH_DEFAULT_RETENTION_DAYS is 7
+    When the platform retention default is resolved
+    Then start-up fails with an error naming the variable
+    And an unrecognised environment is treated as production, never as dev
 
   @unit
   Scenario: A default that is not a whole number of weeks fails loud

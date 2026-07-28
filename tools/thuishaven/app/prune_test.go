@@ -49,10 +49,14 @@ func TestPruneDatabaseReclaim(t *testing.T) {
 		return ch, pg, pruneOrch(store, sys, ch, pg, hyg)
 	}
 
+	// reclaiming is the picker's option set: the only caller allowed to drop a
+	// worktree's databases, because it has shown the user which ones are in scope.
+	reclaiming := PruneOptions{ShouldAct: true, ShouldReclaimDatabases: true}
+
 	t.Run("given a safe worktree whose slug-cached databases exist", func(t *testing.T) {
 		t.Run("when pruning as a dry run, it announces the drop without dropping", func(t *testing.T) {
 			ch, pg, o := newOrch(nil, map[int]bool{}, map[string]string{victim: "feat-x"})
-			if err := o.Prune(ctx, repoRoot, false); err != nil {
+			if err := o.Prune(ctx, repoRoot, PruneOptions{ShouldReclaimDatabases: true}); err != nil {
 				t.Fatalf("Prune: %v", err)
 			}
 			if len(ch.dropped) != 0 || len(pg.dropped) != 0 {
@@ -64,9 +68,9 @@ func TestPruneDatabaseReclaim(t *testing.T) {
 			}
 		})
 
-		t.Run("when pruning with --yes, it drops exactly the slug-cached database", func(t *testing.T) {
+		t.Run("when reclaiming databases, it drops exactly the slug-cached database", func(t *testing.T) {
 			ch, pg, o := newOrch(nil, map[int]bool{}, map[string]string{victim: "feat-x"})
-			if err := o.Prune(ctx, repoRoot, true); err != nil {
+			if err := o.Prune(ctx, repoRoot, reclaiming); err != nil {
 				t.Fatalf("Prune: %v", err)
 			}
 			if len(ch.dropped) != 1 || ch.dropped[0] != "lw_feat_x" {
@@ -76,12 +80,40 @@ func TestPruneDatabaseReclaim(t *testing.T) {
 				t.Errorf("should drop only the slug-cached postgres db, got %v", pg.dropped)
 			}
 		})
+
+		// The unattended path must never take out non-regenerable data. `haven
+		// clean --yes` is what the agent report tells a non-TTY caller to run, so a
+		// regression here silently destroys every idle worktree's seeded state.
+		t.Run("when reclaiming only the safe categories, every database survives", func(t *testing.T) {
+			ch, pg, o := newOrch(nil, map[int]bool{}, map[string]string{victim: "feat-x"})
+			if err := o.Prune(ctx, repoRoot, PruneOptions{ShouldAct: true}); err != nil {
+				t.Fatalf("Prune: %v", err)
+			}
+			if len(ch.dropped) != 0 || len(pg.dropped) != 0 {
+				t.Errorf("--yes must not drop databases, got ch=%v pg=%v", ch.dropped, pg.dropped)
+			}
+		})
+	})
+
+	t.Run("given a worktree whose slug is the standing main database", func(t *testing.T) {
+		// lw_main is the database every worktree without its own falls back to.
+		// Bulk cleanup must refuse it even when the worktree is otherwise a
+		// perfectly valid candidate.
+		t.Run("when reclaiming databases, the protected main database survives", func(t *testing.T) {
+			ch, pg, o := newOrch(nil, map[int]bool{}, map[string]string{victim: "main"})
+			if err := o.Prune(ctx, repoRoot, reclaiming); err != nil {
+				t.Fatalf("Prune: %v", err)
+			}
+			if len(ch.dropped) != 0 || len(pg.dropped) != 0 {
+				t.Errorf("lw_main must never be dropped by bulk cleanup, got ch=%v pg=%v", ch.dropped, pg.dropped)
+			}
+		})
 	})
 
 	t.Run("given a worktree that never ran a stack (no slug cache)", func(t *testing.T) {
-		t.Run("when pruning with --yes, its databases are untouched", func(t *testing.T) {
+		t.Run("when reclaiming databases, its databases are untouched", func(t *testing.T) {
 			ch, pg, o := newOrch(nil, map[int]bool{}, map[string]string{})
-			if err := o.Prune(ctx, repoRoot, true); err != nil {
+			if err := o.Prune(ctx, repoRoot, reclaiming); err != nil {
 				t.Fatalf("Prune: %v", err)
 			}
 			if len(ch.dropped) != 0 || len(pg.dropped) != 0 {
@@ -91,10 +123,10 @@ func TestPruneDatabaseReclaim(t *testing.T) {
 	})
 
 	t.Run("given the worktree is up (a live registered stack)", func(t *testing.T) {
-		t.Run("when pruning with --yes, its database survives", func(t *testing.T) {
+		t.Run("when reclaiming databases, its database survives", func(t *testing.T) {
 			stacks := []domain.Stack{{Slug: "feat-x", WorktreeDir: victim, LauncherPID: 42}}
 			ch, pg, o := newOrch(stacks, map[int]bool{42: true}, map[string]string{victim: "feat-x"})
-			if err := o.Prune(ctx, repoRoot, true); err != nil {
+			if err := o.Prune(ctx, repoRoot, reclaiming); err != nil {
 				t.Fatalf("Prune: %v", err)
 			}
 			if len(ch.dropped) != 0 || len(pg.dropped) != 0 {
@@ -104,13 +136,13 @@ func TestPruneDatabaseReclaim(t *testing.T) {
 	})
 
 	t.Run("given the worktree is dirty", func(t *testing.T) {
-		t.Run("when pruning with --yes, its database survives", func(t *testing.T) {
+		t.Run("when reclaiming databases, its database survives", func(t *testing.T) {
 			store := &fakeStore{slugCache: map[string]string{victim: "feat-x"}}
 			ch := &fakeDBServer{databases: []string{"lw_feat_x", "lw_main"}}
 			pg := &fakeDBServer{databases: []string{"lw_feat_x", "lw_main"}}
 			hyg := dirtyHygiene{&fakeHygiene{worktrees: []Worktree{{Dir: victim}}}}
 			o := pruneOrch(store, &fakeSystem{alive: map[int]bool{}}, ch, pg, hyg)
-			if err := o.Prune(ctx, repoRoot, true); err != nil {
+			if err := o.Prune(ctx, repoRoot, reclaiming); err != nil {
 				t.Fatalf("Prune: %v", err)
 			}
 			if len(ch.dropped) != 0 || len(pg.dropped) != 0 {

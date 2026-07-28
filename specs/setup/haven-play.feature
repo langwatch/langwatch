@@ -30,9 +30,43 @@ Feature: haven play, a throwaway PR sandbox
 
   @unit
   Scenario: Authors with write access proceed without a prompt
-    Given every commit on the PR was authored and committed by people with write access
+    Given a same-repo PR
+    And every commit on it was authored and committed by people with write access
     When the trust gate runs
     Then play proceeds without asking anything
+
+  # Commit attribution is not authentication. A commit's author and committer are
+  # free-text git headers, and the account GitHub shows for them is only a lookup
+  # of that attacker-chosen email against verified addresses — and the
+  # <id>+<login>@users.noreply.github.com form is publicly derivable. So on a fork,
+  # where the PR author controls every commit, attribution buys no trust at all.
+  @unit
+  Scenario: A fork commit claiming a maintainer's identity is still untrusted
+    Given a fork PR whose commit is attributed to someone with write access
+    And the commit carries no signature GitHub verified
+    When the trust gate runs
+    Then that commit counts as untrusted and is named by its sha
+
+  @unit
+  Scenario: A fork commit is trusted only when a verified signer has write access
+    Given a fork PR whose every commit carries a signature GitHub verified
+    And each verified signer has write access
+    When the trust gate runs
+    Then play proceeds without asking anything
+
+  @unit
+  Scenario: One unsigned commit taints a fork PR
+    Given a fork PR where some commits are verified and one is not
+    When the trust gate runs
+    Then play stops, because the unsigned commit is the code that would run
+
+  # GitHub returns at most 250 commits for a PR, oldest first — so a truncated
+  # listing omits exactly the head commit that gets checked out and run.
+  @unit
+  Scenario: A commit listing that hits GitHub's cap fails closed
+    Given a PR with at least 250 commits
+    When the trust gate reads them
+    Then play fails rather than vouching for commits it never saw
 
   @unit
   Scenario: An untrusted author stops play until explicitly confirmed
@@ -43,9 +77,19 @@ Feature: haven play, a throwaway PR sandbox
 
   @unit
   Scenario: A commit with no GitHub account is untrusted
-    Given a commit whose author maps to no GitHub login
+    Given a same-repo PR
+    And a commit whose author maps to no GitHub login
     When the trust gate runs
     Then that author counts as untrusted
+
+  # The repo has a postinstall and a PR controls package scripts, so installing
+  # normally would run PR-authored code before any gate on the app code mattered.
+  @unit
+  Scenario: The sandbox never runs the checkout's package scripts
+    Given a play sandbox installing the PR's dependencies
+    When the install runs
+    Then it passes --ignore-scripts
+    And codegen still runs explicitly afterwards
 
   @unit
   Scenario: Agent mode never prompts about trust

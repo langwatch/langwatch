@@ -50,11 +50,13 @@ func runPlay(ctx context.Context, d deps, inv invocation) error {
 		return err
 	}
 
-	// The trust gate runs BEFORE anything is checked out: every commit author
-	// and committer on the PR must have write access, or the user must accept
-	// the risk explicitly - interactively in a terminal, via --allow-untrusted
-	// in agent mode (there is no prompt to answer there).
-	untrusted, err := app.CollectUntrustedPlayAuthors(ctx, d.worktree, pr.Number)
+	// The trust gate runs BEFORE anything is checked out. On a same-repo PR every
+	// commit author and committer must have write access; on a fork, where commit
+	// attribution is chosen by the PR author and proves nothing, only commits
+	// carrying a GitHub-verified signature from someone with write access count.
+	// Otherwise the user must accept the risk explicitly - interactively in a
+	// terminal, via --allow-untrusted in agent mode (no prompt to answer there).
+	untrusted, err := app.CollectUntrustedPlayAuthors(ctx, d.worktree, pr.Number, pr.IsCrossRepository)
 	if err != nil {
 		return err
 	}

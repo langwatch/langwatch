@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { resolvePlatformDefaultRetentionDays } from "../retentionPolicy.schema";
+import {
+  MAX_RETENTION_DAYS,
+  resolvePlatformDefaultRetentionDays,
+} from "../retentionPolicy.schema";
 
 describe("resolvePlatformDefaultRetentionDays", () => {
   describe("given the variable is not set", () => {
@@ -42,6 +45,39 @@ describe("resolvePlatformDefaultRetentionDays", () => {
     });
   });
 
+  describe("given the override is set under an unrecognized environment", () => {
+    // @scenario "Setting the override outside development or test fails loud"
+    it("refuses every environment that is not explicitly development or test", () => {
+      for (const nodeEnv of [
+        undefined,
+        "",
+        "prod",
+        "Production",
+        "PRODUCTION",
+        "staging",
+        "ci",
+      ]) {
+        expect(() =>
+          resolvePlatformDefaultRetentionDays({
+            NODE_ENV: nodeEnv,
+            LANGWATCH_DEFAULT_RETENTION_DAYS: "7",
+          }),
+        ).toThrow(/LANGWATCH_DEFAULT_RETENTION_DAYS/);
+      }
+    });
+  });
+
+  describe("given the override is set under test", () => {
+    it("honours the override, because test is a recognized non-production environment", () => {
+      expect(
+        resolvePlatformDefaultRetentionDays({
+          NODE_ENV: "test",
+          LANGWATCH_DEFAULT_RETENTION_DAYS: "14",
+        }),
+      ).toBe(14);
+    });
+  });
+
   describe("given an override that is not a whole number of weeks", () => {
     // @scenario "A default that is not a whole number of weeks fails loud"
     it("throws an error about whole weeks", () => {
@@ -53,6 +89,17 @@ describe("resolvePlatformDefaultRetentionDays", () => {
           }),
         ).toThrow(/whole number of weeks/);
       }
+    });
+  });
+
+  describe("given an override above the storage column's ceiling", () => {
+    it("rejects a week-aligned value that would wrap the UInt16 retention column", () => {
+      expect(() =>
+        resolvePlatformDefaultRetentionDays({
+          NODE_ENV: "development",
+          LANGWATCH_DEFAULT_RETENTION_DAYS: String(MAX_RETENTION_DAYS + 7),
+        }),
+      ).toThrow(/whole number of weeks/);
     });
   });
 });

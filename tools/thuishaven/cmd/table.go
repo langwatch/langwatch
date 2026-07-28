@@ -380,7 +380,7 @@ var table = []commandSpec{
 		name:    "clean",
 		summary: "one cleanup: worktree picker, then safe reclaim (artifacts, orphan processes)",
 		flags: []flagSpec{
-			{long: "--yes", summary: "no picker: apply only the safe categories, never worktree deletion"},
+			{long: "--yes", summary: "no picker: build artefacts + orphan processes only — never worktrees or databases"},
 			{long: "--stale-days", takesValue: true, value: "<n>", summary: "idle age pre-ticked for deletion"},
 		},
 		run: runClean,

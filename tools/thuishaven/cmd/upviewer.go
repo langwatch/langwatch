@@ -363,18 +363,42 @@ func (m *viewerModel) ingestCapture(fileSvc, cli string) {
 	}
 }
 
+// readFreshTailWindow bounds the FIRST read of any capture file. The viewer only
+// ever renders the last few hundred lines, but the combined per-stack log
+// (logs/<slug>.log) is append-only and uncapped — long-lived worktrees reach
+// hundreds of megabytes. Starting a fresh model at offset 0 therefore allocated
+// the whole file, then copied it again through strings.Split, to show a screenful.
+// 256 KiB is far more than the ring can hold and is read in one syscall.
+const readFreshTailWindow = 256 << 10
+
 // readFresh returns the whole lines appended to path since the last pass,
 // starting over when the file rotated (shrank) underneath us.
+//
+// The first read of a key opens at a bounded tail window rather than at the
+// start of the file, so attaching to a stack with a large existing log costs a
+// fixed amount of memory. Subsequent reads are true incremental tails.
 func (m *viewerModel) readFresh(key, path string) []string {
 	info, err := os.Stat(path)
 	if err != nil {
 		return nil
 	}
-	offset := m.offsets[key]
+	offset, seen := m.offsets[key]
+	// A partial first line is expected when we seek into the middle of the file;
+	// drop it rather than render a fragment.
+	dropFirstPartialLine := false
+	if !seen {
+		if info.Size() > readFreshTailWindow {
+			offset = info.Size() - readFreshTailWindow
+			dropFirstPartialLine = true
+		} else {
+			offset = 0
+		}
+	}
 	if info.Size() < offset {
 		offset = 0
 	}
 	if info.Size() == offset {
+		m.offsets[key] = offset
 		return nil
 	}
 	f, err := os.Open(path)
@@ -387,8 +411,16 @@ func (m *viewerModel) readFresh(key, path string) []string {
 		return nil
 	}
 	m.offsets[key] = info.Size()
+	text := string(buf)
+	if dropFirstPartialLine {
+		if nl := strings.IndexByte(text, '\n'); nl >= 0 {
+			text = text[nl+1:]
+		} else {
+			text = ""
+		}
+	}
 	var out []string
-	for _, raw := range strings.Split(string(buf), "\n") {
+	for _, raw := range strings.Split(text, "\n") {
 		if raw != "" {
 			out = append(out, raw)
 		}

@@ -290,13 +290,34 @@ The rules it adds, and how they honour the constitution:
   volumes and the shared Redis on 6379), and its own `play-<n>` slug, which
   can never equal a `haven pr` checkout's `pr-<n>` slug, so both can exist
   for the same PR.
-- **Trust is gated before checkout.** Every commit author AND committer on
-  the PR is checked for write access; an identity with no GitHub account is
-  untrusted by definition. Any untrusted identity stops play: a real y/N
-  prompt (default no) naming the authors in a terminal, a hard failure in
-  agent mode, where `--allow-untrusted` is the only way past. Not `--force`:
-  that letter is lifecycle-only, and accepting untrusted code deserves a
-  flag that says exactly what it does.
+- **Trust is gated before checkout, on authenticated facts only.** What
+  counts as proof depends on where the head branch lives, because commit
+  metadata is not evidence of anything. A commit's author and committer are
+  free-text git headers, and GitHub's own `author`/`committer` objects are
+  just a lookup of those attacker-chosen emails against accounts' verified
+  addresses — the `<id>+<login>@users.noreply.github.com` form is publicly
+  derivable, so anyone can make a commit *appear* to be a maintainer's.
+  Therefore:
+  - **Same-repo PR** — the branch exists in this repository, which required
+    push access to create, so the code already passed a real access check.
+    Every commit author and committer is checked for write access, and an
+    identity with no GitHub account is untrusted by definition.
+  - **Fork PR** — attribution proves nothing, so only a commit carrying a
+    signature GitHub *verified*, whose verified signer has write access,
+    counts as trusted. Every other commit is named as untrusted by sha.
+
+  A listing that hits GitHub's 250-commit cap fails closed rather than
+  vouching for commits it never saw. Any untrusted commit stops play: a real
+  y/N prompt (default no) in a terminal, a hard failure in agent mode, where
+  `--allow-untrusted` is the only way past. Not `--force`: that letter is
+  lifecycle-only, and accepting untrusted code deserves a flag that says
+  exactly what it does.
+- **The sandbox never runs a checkout's package scripts.** Installs use
+  `--ignore-scripts` unconditionally, because this repo has a postinstall and
+  a PR controls package scripts — a plain install would execute PR-authored
+  code with the developer's environment before any gate on the *application*
+  code mattered. Nothing is lost: the postinstall is codegen, which the
+  sandbox then runs explicitly through `start:prepare:files`.
 - **Quitting always destroys everything** (processes, hostnames, containers,
   volumes, checkout, record), the exact opposite of `up`, where q detaches.
   No `--yes` is asked at teardown: the data-loss-is-explicit rule is

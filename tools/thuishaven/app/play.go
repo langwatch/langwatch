@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -42,7 +43,39 @@ func ResolvePlayPR(ctx context.Context, repoRoot, ref string) (PlayPR, error) {
 	if err != nil {
 		return PlayPR{}, err
 	}
-	return PlayPR{Number: view.Number, State: view.State, HeadRefName: view.HeadRefName, Title: "", URL: view.URL}, nil
+	pr := PlayPR{Number: view.Number, State: view.State, HeadRefName: view.HeadRefName, Title: "", URL: view.URL}
+	fork, title, err := playPRProvenance(ctx, repoRoot, view.Number)
+	if err != nil {
+		return PlayPR{}, err
+	}
+	pr.IsCrossRepository = fork
+	pr.Title = title
+	return pr, nil
+}
+
+// playPRProvenance reads the two facts the trust gate cannot infer from commit
+// metadata: whether the head branch lives in a fork, and the PR's title (shown
+// in the disclosure banner so the user confirms against something readable).
+//
+// isCrossRepository is load-bearing, not cosmetic: a same-repo head branch can
+// only exist because someone with push access created it, whereas a fork's
+// contents are controlled entirely by the PR author.
+func playPRProvenance(ctx context.Context, repoRoot string, number int) (bool, string, error) {
+	cmd := exec.CommandContext(ctx, "gh", "pr", "view", strconv.Itoa(number),
+		"--json", "isCrossRepository,title")
+	cmd.Dir = repoRoot
+	out, err := cmd.Output()
+	if err != nil {
+		return false, "", fmt.Errorf("could not read PR #%d's provenance via gh%s", number, gitStderrHint(err))
+	}
+	var view struct {
+		IsCrossRepository bool   `json:"isCrossRepository"`
+		Title             string `json:"title"`
+	}
+	if err := json.Unmarshal(out, &view); err != nil {
+		return false, "", fmt.Errorf("unexpected gh output for PR #%d: %w", number, err)
+	}
+	return view.IsCrossRepository, view.Title, nil
 }
 
 // PlayPR is the slice of a PR that play needs.
@@ -52,6 +85,9 @@ type PlayPR struct {
 	HeadRefName string `json:"headRefName"`
 	Title       string `json:"title"`
 	URL         string `json:"url"`
+	// IsCrossRepository reports that the head branch lives in a fork, so nothing
+	// about its commits implies repo write access. See playPRProvenance.
+	IsCrossRepository bool `json:"isCrossRepository"`
 }
 
 // ListOpenPlayPRs returns the repo's open PRs for the no-argument picker.
@@ -81,7 +117,16 @@ type PlayIdentity struct {
 }
 
 // ghPRCommit is the slice of the pulls/N/commits payload the gate reads.
+//
+// A note on what is and is not trustworthy here. `commit.author` / `commit.committer`
+// are raw git headers: free text the pusher chose. GitHub's top-level `author` /
+// `committer` objects look authoritative but are only a lookup of those same
+// attacker-chosen email headers against accounts' verified addresses — and the
+// `<id>+<login>@users.noreply.github.com` form is publicly derivable for any
+// user. Neither field authenticates anybody. Only `commit.verification` does,
+// because it is a signature check GitHub performed over the commit contents.
 type ghPRCommit struct {
+	SHA    string `json:"sha"`
 	Author *struct {
 		Login string `json:"login"`
 	} `json:"author"`
@@ -89,9 +134,40 @@ type ghPRCommit struct {
 		Login string `json:"login"`
 	} `json:"committer"`
 	Commit struct {
-		Author    struct{ Name, Email string } `json:"author"`
-		Committer struct{ Name, Email string } `json:"committer"`
+		Author       struct{ Name, Email string } `json:"author"`
+		Committer    struct{ Name, Email string } `json:"committer"`
+		Verification struct {
+			Verified bool `json:"verified"`
+		} `json:"verification"`
 	} `json:"commit"`
+}
+
+// verifiedSigner returns the login GitHub cryptographically verified as having
+// signed this commit, or "" when the commit carries no valid signature.
+//
+// GitHub reports the signer through the same resolved-account object as the
+// author, but gated on `verification.verified`, which only passes when the
+// signature validates against a key that account registered. That is the one
+// commit-level fact an attacker cannot forge without the key.
+func (c ghPRCommit) verifiedSigner() string {
+	if !c.Commit.Verification.Verified {
+		return ""
+	}
+	if c.Committer != nil && c.Committer.Login != "" {
+		return c.Committer.Login
+	}
+	if c.Author != nil && c.Author.Login != "" {
+		return c.Author.Login
+	}
+	return ""
+}
+
+// shortSHA is the display form for naming an individual untrusted commit.
+func (c ghPRCommit) shortSHA() string {
+	if len(c.SHA) > 7 {
+		return c.SHA[:7]
+	}
+	return c.SHA
 }
 
 // webFlowLogin is GitHub's own service account, the committer on every commit
@@ -199,23 +275,91 @@ func PlayTrustError(untrusted []string) error {
 		strings.Join(untrusted, ", "))
 }
 
-// CollectUntrustedPlayAuthors gathers every commit identity on the PR via gh
-// and checks each login's repo permission. A permission lookup that fails (404,
-// no access, network) counts as untrusted - the gate fails closed.
-func CollectUntrustedPlayAuthors(ctx context.Context, repoRoot string, number int) ([]string, error) {
+// CollectUntrustedPlayAuthors decides who, if anyone, on this PR is untrusted.
+//
+// The rule depends on where the head branch lives, because that is what decides
+// whether commit metadata means anything:
+//
+//   - Same-repo PR. The branch exists inside this repository, which required
+//     push access to create, so the code has already passed a real access check.
+//     Commit identities are checked for write access as before.
+//
+//   - Fork PR. Everything about the fork's commits — including the account
+//     GitHub attributes them to — is chosen by whoever opened the PR. Setting
+//     `user.email` to a maintainer's publicly-derivable noreply address is enough
+//     to make `author.login` report that maintainer, so attribution alone would
+//     let any stranger's code run unprompted. On a fork we therefore trust only
+//     commits carrying a signature GitHub verified, and only when the verified
+//     signer has write access. Every other commit is named as untrusted.
+//
+// A permission lookup that fails (404, no access, network) counts as untrusted -
+// the gate fails closed.
+func CollectUntrustedPlayAuthors(ctx context.Context, repoRoot string, number int, isCrossRepository bool) ([]string, error) {
 	commits, err := playPRCommits(ctx, repoRoot, number)
 	if err != nil {
 		return nil, err
 	}
-	ids := playIdentitiesFromCommits(commits)
-	return UntrustedPlayAuthors(ids, func(login string) bool {
-		perm, err := collaboratorPermission(ctx, repoRoot, login)
-		return err == nil && PermissionGrantsWrite(perm)
-	}), nil
+	hasWrite := func(login string) bool {
+		perm, permErr := collaboratorPermission(ctx, repoRoot, login)
+		return permErr == nil && PermissionGrantsWrite(perm)
+	}
+	if isCrossRepository {
+		return untrustedForkCommits(commits, hasWrite), nil
+	}
+	return UntrustedPlayAuthors(playIdentitiesFromCommits(commits), hasWrite), nil
 }
+
+// untrustedForkCommits names every commit on a fork PR that is not provably the
+// work of someone with write access. Unsigned commits are listed individually by
+// sha, because on a fork that is the only stable thing to point at - the names
+// and emails attached to them are attacker-supplied.
+func untrustedForkCommits(commits []ghPRCommit, hasWrite func(login string) bool) []string {
+	verdictFor := map[string]bool{}
+	var out []string
+	seen := map[string]bool{}
+	for _, c := range commits {
+		signer := c.verifiedSigner()
+		if signer != "" {
+			trusted, known := verdictFor[strings.ToLower(signer)]
+			if !known {
+				trusted = hasWrite(signer)
+				verdictFor[strings.ToLower(signer)] = trusted
+			}
+			if trusted {
+				continue
+			}
+			label := fmt.Sprintf("%s (signed by %s, who has no write access)", c.shortSHA(), signer)
+			if !seen[label] {
+				seen[label] = true
+				out = append(out, label)
+			}
+			continue
+		}
+		who := strings.TrimSpace(c.Commit.Author.Name)
+		if who == "" {
+			who = strings.TrimSpace(c.Commit.Author.Email)
+		}
+		label := fmt.Sprintf("%s (unsigned commit from a fork, attributed to %q)", c.shortSHA(), who)
+		if !seen[label] {
+			seen[label] = true
+			out = append(out, label)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+// playPRCommitsAPICap is GitHub's hard ceiling on pulls/N/commits: it returns at
+// most 250 commits however you paginate, and silently returns the OLDEST ones -
+// so the head commit, the one actually checked out and run, is exactly what a
+// truncated listing omits.
+const playPRCommitsAPICap = 250
 
 // playPRCommits fetches every commit on the PR. `gh api --paginate` emits one
 // JSON array per page back to back, so decode arrays until the stream ends.
+//
+// It fails closed on truncation rather than gating on a partial view: a listing
+// that stops at the API cap has not shown us the commits that matter most.
 func playPRCommits(ctx context.Context, repoRoot string, number int) ([]ghPRCommit, error) {
 	cmd := exec.CommandContext(ctx, "gh", "api", "--paginate",
 		fmt.Sprintf("repos/{owner}/{repo}/pulls/%d/commits", number))
@@ -232,6 +376,13 @@ func playPRCommits(ctx context.Context, repoRoot string, number int) ([]ghPRComm
 			return nil, fmt.Errorf("unexpected gh output for PR #%d's commits: %w", number, err)
 		}
 		all = append(all, page...)
+	}
+	if len(all) >= playPRCommitsAPICap {
+		return nil, fmt.Errorf(
+			"PR #%d has at least %d commits, which is GitHub's listing cap for this endpoint — "+
+				"haven cannot see the newest commits, so it cannot vouch for what it would run.\n"+
+				"Review it by hand, or re-run with --allow-untrusted to accept that explicitly.",
+			number, playPRCommitsAPICap)
 	}
 	return all, nil
 }
@@ -732,7 +883,12 @@ func (o *Orchestrator) PlayLaunch(ctx context.Context, number int, checkout, lwD
 	}
 	o.printStack(st)
 
-	if err := o.ensureDeps(ctx, lwDir); err != nil {
+	// A sandbox exists to run somebody else's PR, so its package scripts are
+	// never trusted — install without lifecycle scripts unconditionally rather
+	// than re-deriving fork status inside this detached child. Nothing is lost:
+	// the repo's postinstall is codegen, and the very next step runs it
+	// explicitly through start:prepare:files.
+	if err := o.ensureDeps(ctx, lwDir, false); err != nil {
 		return err
 	}
 	env := append(st.OverlayEnv(), "DOTENV_CONFIG_QUIET=true")
