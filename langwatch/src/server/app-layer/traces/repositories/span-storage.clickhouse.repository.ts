@@ -1047,8 +1047,15 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
    * is an EXPECTED transient state here — the reference is often dequeued
    * before the sibling spanStorage write lands — so `fallback: "none"` keeps a
    * miss one cheap windowed probe (the caller throws into the queue's backoff)
-   * instead of an unbounded scan per retry. The occurredAt hint comes from the
-   * reference envelope, so the window is authoritative, not guessed.
+   * instead of an unbounded scan per retry.
+   *
+   * The hint must be the SPAN'S OWN start, not the ingest time of the event
+   * that referenced it: this table's partition column is `StartTime`, so a
+   * window centred on ingest time excludes any span whose duration plus export
+   * lag exceeded it — and spans export on end. Such a span would sit outside
+   * every retry's window forever. Callers pass the reference's parsed
+   * `startTimeUnixMs`, falling back to the envelope's occurredAt only when the
+   * wire span carried no parseable start.
    */
   async getNormalizedSpanById({
     tenantId,
