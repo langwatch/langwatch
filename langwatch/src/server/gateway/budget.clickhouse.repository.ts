@@ -165,12 +165,18 @@ export class GatewayBudgetClickHouseRepository {
    * (TenantId, GatewayRequestId) already exists in the ledger. The ledger
    * ORDER BY is `(TenantId, BudgetId, GatewayRequestId)` so this query
    * hits the index and is sub-millisecond. All rows in a single insertDebit
-   * call share the same gateway_request_id (one reactor fire = one VK
-   * trace = one batch covering every applicable budget) so a single
-   * existence probe covers the whole batch.
+   * call share the same gateway_request_id (one write = one gateway request
+   * covering every applicable budget) so a single existence probe covers the
+   * whole batch.
+   *
+   * Returns whether rows were actually written. Callers use it to tell a
+   * first write from a replay that found the ledger already intact — the
+   * ADR-075 `gatewayBudgetDebits` projection gates its `BUDGET_UPDATED`
+   * change event on it, so replaying a window cannot flood the gateway's
+   * revision feed with notifications for spend it already knows about.
    */
-  async insertDebit(rows: BudgetDebitRow[]): Promise<void> {
-    if (rows.length === 0) return;
+  async insertDebit(rows: BudgetDebitRow[]): Promise<{ inserted: boolean }> {
+    if (rows.length === 0) return { inserted: false };
     const tenantId = rows[0]!.tenantId;
     const gatewayRequestId = rows[0]!.gatewayRequestId;
     if (rows.some((r) => r.tenantId !== tenantId)) {
@@ -196,7 +202,7 @@ export class GatewayBudgetClickHouseRepository {
         { tenantId, gatewayRequestId, batchSize: rows.length },
         "skipping replay — gateway_request_id already in ledger",
       );
-      return;
+      return { inserted: false };
     }
 
     const records = rows.map((r) => ({
@@ -236,6 +242,8 @@ export class GatewayBudgetClickHouseRepository {
       );
       throw error;
     }
+
+    return { inserted: true };
   }
 
   /**

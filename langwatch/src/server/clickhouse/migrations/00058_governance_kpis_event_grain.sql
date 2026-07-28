@@ -1,0 +1,102 @@
+-- +goose Up
+-- +goose ENVSUB ON
+--
+-- ============================================================================
+-- governance_kpis: make the contribution set re-derivable (ADR-075 Class C).
+--
+-- WHY
+-- ---
+-- Migration 00031 created governance_kpis as
+--   ReplacingMergeTree(LastEventOccurredAt)
+--   ORDER BY (TenantId, SourceId, HourBucket, TraceId)
+-- and its header claims the fold "can be dropped + rebuilt at any time from
+-- event_log without data loss". It could not, on two counts:
+--
+--  1. Nothing rebuilt it. The rows were written by
+--     governanceKpisSync.reactor.ts, and the projection router never
+--     dispatches a reactor on the replay path (LIVE_DISPATCH_IS_REPLAY =
+--     false). specs/ai-gateway/governance/folds.feature and
+--     event-log-durability.feature both told auditors otherwise; ADR-075
+--     Class C is the correction.
+--
+--  2. Even given a rebuild, the key could not absorb it. The row was keyed
+--     per TRACE but written with the trace's RUNNING totals — once per
+--     reactor firing — so successive firings wrote different SpendUsd under
+--     the same key, and the tie-break between them was the version column
+--     LastEventOccurredAt = TraceSummaryData.occurredAt. That value is the
+--     trace's EARLIEST span start (SpanTimingService takes a Math.min), so
+--     it is CONSTANT across firings and can even DECREASE when a span with
+--     an earlier start lands late. Competing rows therefore tie on version
+--     and the survivor is arbitrary, and a more complete row can lose to a
+--     less complete one. A replay writing the final totals would tie in
+--     exactly the same way.
+--
+-- WHAT THIS CHANGES
+-- -----------------
+-- Move the key from the TRACE to the EVENT. EventId is the span id (hex) —
+-- the same identity folds.feature already declares for
+-- governance_ocsf_events, and an immutable field of the source event. Each
+-- governance span contributes ONE row carrying that span's own cost and
+-- tokens, so re-deriving a span produces a byte-identical row under the
+-- same key and a rebuild is a set-union of elements the set already
+-- contains. Reads keep summing over the (SourceId, HourBucket) group
+-- unchanged — the aggregate is still computed at read time, it is the row
+-- SET that is now idempotent.
+--
+-- WHY THE TWO ACTIONS ARE ONE STATEMENT
+-- -------------------------------------
+-- ClickHouse only permits MODIFY ORDER BY to extend the sorting key with a
+-- column ADDed in the SAME ALTER query, with its default unmodified — that
+-- is what guarantees existing parts are still correctly sorted under the
+-- new key (every pre-existing row holds the same '' default, so appending
+-- the column to the sort expression cannot reorder them). Splitting this
+-- into two statements does not work; it is one ALTER with two actions, not
+-- two ALTERs sharing a block.
+--
+-- The primary key is unchanged (it stays the pre-existing sorting-key
+-- prefix), so this is a metadata-only change with no part rewrite.
+--
+-- ROWS WRITTEN BEFORE THIS
+-- ------------------------
+-- Pre-existing rows materialise EventId = '' and keep collapsing among
+-- themselves at trace grain, so historical reads are unaffected. They are
+-- trace-CUMULATIVE while new rows are per-span, so a window straddling the
+-- cutover can double-count the traces that were in flight across it. That
+-- is bounded by one trace-lifetime, and it is the unavoidable cost of any
+-- grain change; the alternative — leaving the stream unrebuildable — is
+-- the defect this migration exists to fix. Operators wanting an exact
+-- window can DELETE the pre-cutover rows for the affected hour buckets and
+-- rebuild them from event_log, which is now possible for the first time.
+--
+-- Spec: specs/ai-gateway/governance/folds.feature
+-- ADR:  dev/docs/adr/075-post-event-work-subscribers-and-process-managers.md
+-- ============================================================================
+
+-- +goose StatementBegin
+ALTER TABLE ${CLICKHOUSE_DATABASE}.governance_kpis
+    ADD COLUMN EventId String DEFAULT '' CODEC(ZSTD(1)) AFTER TraceId,
+    MODIFY ORDER BY (TenantId, SourceId, HourBucket, TraceId, EventId);
+-- +goose StatementEnd
+
+-- +goose ENVSUB OFF
+
+-- +goose Down
+-- +goose ENVSUB ON
+--
+-- Down migration intentionally not provided — reverting the sorting key
+-- would silently collapse every per-span contribution in an hour bucket
+-- down to one row per trace, i.e. destroy governance spend data rather
+-- than merely un-apply a schema change. To roll back: uncomment below and
+-- run manually AFTER coordinating with operators, accepting that loss.
+--
+-- -- +goose StatementBegin
+-- -- ALTER TABLE ${CLICKHOUSE_DATABASE}.governance_kpis
+-- --     MODIFY ORDER BY (TenantId, SourceId, HourBucket, TraceId);
+-- -- +goose StatementEnd
+--
+-- -- +goose StatementBegin
+-- -- ALTER TABLE ${CLICKHOUSE_DATABASE}.governance_kpis
+-- --     DROP COLUMN IF EXISTS EventId;
+-- -- +goose StatementEnd
+
+-- +goose ENVSUB OFF
