@@ -11,8 +11,8 @@ import {
   type ModelProviderScopeEntry,
   type OrgModelProvider,
   resolveEligible,
+  type VirtualKeyScopeEntry,
 } from "./eligibleModelProviders";
-import type { VirtualKeyScopeEntry } from "./VirtualKeyScopePicker";
 
 type ScopeNames = {
   organizationName?: string;

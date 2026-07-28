@@ -57,6 +57,7 @@ func paramsWithBodies() domain.AITraceParams {
 		RequestType:        domain.RequestType("chat"),
 		VirtualKeyID:       "vk-1",
 		GatewayRequestID:   "req-1",
+		ModelProviderID:    "mp-1",
 		Usage: domain.Usage{
 			PromptTokens:     120,
 			CompletionTokens: 34,
@@ -119,6 +120,7 @@ func TestStampInternalGenAI_KeepsOperationalMetadata(t *testing.T) {
 	assert.Equal(t, "154", got[AttrGenAIUsageTotal])
 	assert.Equal(t, "vk-1", got[customertracebridge.AttrVirtualKeyID])
 	assert.Equal(t, "req-1", got[customertracebridge.AttrGatewayReqID])
+	assert.Equal(t, "mp-1", got[customertracebridge.AttrModelProviderID])
 }
 
 func TestStampInternalGenAI_OmitsUntrustedModelMetadata(t *testing.T) {
@@ -191,6 +193,9 @@ func TestStampInternalGenAI_StampsOnlyTheAllowedKeySet(t *testing.T) {
 		customertracebridge.AttrGenAIUsageIn, AttrGenAIUsageOut, AttrGenAIUsageTotal,
 		customertracebridge.AttrGenAIUsageCacheRead, customertracebridge.AttrGenAIUsageCacheCreate, AttrCostUSD,
 		customertracebridge.AttrVirtualKeyID, customertracebridge.AttrGatewayReqID,
+		// The dispatched ModelProvider row id: a manager-owned identifier
+		// from gateway config, no content channel.
+		customertracebridge.AttrModelProviderID,
 		AttrErrorType, AttrUpstreamStatusCode,
 	}, got, "the internal span's key set changed — review whether the new key can carry content before extending this list")
 }

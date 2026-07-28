@@ -23,6 +23,8 @@ type BudgetRow = {
   name: string;
   description: string | null;
   scopeType: string;
+  scopeTarget?: { name: string } | null;
+  providerLabel?: string | null;
   window: string;
   limitUsd: string;
   onBreach: "BLOCK" | "WARN";
@@ -136,10 +138,20 @@ export function BudgetEditDrawer({
               />
             </Field.Root>
             <Field.Root>
-              <Field.Label>Scope</Field.Label>
+              <Field.Label>Applies to</Field.Label>
               <Text fontSize="sm" color="fg.muted">
-                {budget?.scopeType.toLowerCase()} (immutable after create)
+                {budget?.scopeType === "GROUP"
+                  ? "group"
+                  : budget?.scopeType.toLowerCase().replace("_", " ")}
+                {budget?.scopeTarget?.name ? `, ${budget.scopeTarget.name}` : ""}
+                {budget?.providerLabel ? `, ${budget.providerLabel} only` : ""}{" "}
+                (immutable after create)
               </Text>
+              {budget?.scopeType === "GROUP" && (
+                <Field.HelperText>
+                  Each member of the group gets this limit individually.
+                </Field.HelperText>
+              )}
             </Field.Root>
             <Field.Root>
               <Field.Label>Window</Field.Label>
@@ -170,7 +182,7 @@ export function BudgetEditDrawer({
               <Field.Label>
                 On breach
                 <FieldInfoTooltip
-                  description="BLOCK: reject new requests with 402 budget_exceeded. WARN: trace annotation only, no user-facing error — useful for soft budgets where ops monitors spend without enforcing a hard cap."
+                  description="BLOCK: reject new requests with 402 budget_exceeded. WARN: trace annotation only, no user-facing error, which suits soft budgets where ops monitors spend without enforcing a hard cap."
                   docHref="/ai-gateway/budgets#on_breach"
                 />
               </Field.Label>
@@ -184,10 +196,10 @@ export function BudgetEditDrawer({
                   }
                 >
                   <option value="BLOCK">
-                    Block — reject requests at limit
+                    Block: reject requests at limit
                   </option>
                   <option value="WARN">
-                    Warn — tag responses, keep serving
+                    Warn: tag responses, keep serving
                   </option>
                 </NativeSelect.Field>
               </NativeSelect.Root>

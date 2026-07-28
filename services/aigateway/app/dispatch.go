@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/tidwall/gjson"
@@ -17,9 +18,9 @@ func (a *App) coreDispatch(ctx context.Context, call *pipeline.Call) (*domain.Re
 	if err := call.MaterializeBody(); err != nil {
 		return nil, err
 	}
-	creds := eligibleCredentials(call.Bundle.Credentials, call.Request.Resolved)
-	if len(creds) == 0 {
-		return nil, errNoProviderConfigured(ctx)
+	creds, err := a.candidateChain(ctx, call)
+	if err != nil {
+		return nil, err
 	}
 	resp, el, err := retry.Walk(ctx, a.retryOpts(call.Bundle), credentialIDs(creds),
 		func(ctx context.Context, slotID string) (*domain.Response, error) {
@@ -55,9 +56,9 @@ func (a *App) coreDispatchStream(ctx context.Context, call *pipeline.Call) (doma
 	if err := call.MaterializeBody(); err != nil {
 		return nil, err
 	}
-	creds := eligibleCredentials(call.Bundle.Credentials, call.Request.Resolved)
-	if len(creds) == 0 {
-		return nil, errNoProviderConfigured(ctx)
+	creds, err := a.candidateChain(ctx, call)
+	if err != nil {
+		return nil, err
 	}
 	iter, el, err := retry.Walk(ctx, a.retryOpts(call.Bundle), credentialIDs(creds),
 		func(ctx context.Context, slotID string) (domain.StreamIterator, error) {
@@ -115,6 +116,78 @@ func translateWalkError(ctx context.Context, err error) error {
 	})
 }
 
+// candidateChain assembles the credentials this request may be dispatched to,
+// in fallback order, or the error that explains why there are none:
+//
+//  1. Model-aware trim: providers that cannot serve the resolved model are
+//     skipped (eligibleCredentials, with its keep-something safety net).
+//  2. Provider allowlist: a key narrowed to specific providers cannot
+//     dispatch outside them even if the bundle's credential chain is stale
+//     or hand-crafted. The control plane already materializes the chain
+//     filtered; this is the enforcement that makes the narrowing real at
+//     the seam rather than a property of one producer.
+//  3. Budget exclusions: providers whose provider-filtered blocking budgets
+//     are out of money are treated like unavailable providers (contract
+//     §4.6). If they empty the chain, the request is refused with the
+//     budget error naming one of the excluding budgets (the last one
+//     iterated; with several simultaneous exclusions any of them is an
+//     accurate answer to "why was nothing dispatchable").
+func (a *App) candidateChain(ctx context.Context, call *pipeline.Call) ([]domain.Credential, error) {
+	creds := eligibleCredentials(call.Bundle.Credentials, call.Request.Resolved)
+	if len(creds) == 0 {
+		return nil, errNoProviderConfigured(ctx)
+	}
+
+	allowed := creds[:0:0]
+	for _, c := range creds {
+		if call.Bundle.Config.AllowsProvider(c.ID) {
+			allowed = append(allowed, c)
+		}
+	}
+	if len(allowed) == 0 {
+		return nil, errProviderNotAllowed(ctx, call.Request)
+	}
+
+	if len(call.BudgetExcludedProviders) == 0 {
+		return allowed, nil
+	}
+	excluded := make(map[string]domain.ExcludedProvider, len(call.BudgetExcludedProviders))
+	for i := range call.BudgetExcludedProviders {
+		excluded[call.BudgetExcludedProviders[i].ProviderKey] = call.BudgetExcludedProviders[i]
+	}
+	kept := allowed[:0:0]
+	var lastExcluded domain.ExcludedProvider
+	for _, c := range allowed {
+		if e, ok := excluded[c.ID]; ok {
+			lastExcluded = e
+			continue
+		}
+		kept = append(kept, c)
+	}
+	if len(kept) == 0 {
+		// Every provider that could have served this request sits behind an
+		// exhausted provider-filtered budget. With routing mode "none" the
+		// chain was length one, so this is the plain block that mode promises.
+		a.metrics.RecordBudgetBlock(lastExcluded.Budget.Scope)
+		return nil, pipeline.BudgetBreachError(ctx, lastExcluded.Budget)
+	}
+	return kept, nil
+}
+
+// errProviderNotAllowed is the terminal answer when the provider allowlist
+// leaves no credential that could serve the request: the model resolves to a
+// provider this key was narrowed away from.
+func errProviderNotAllowed(ctx context.Context, req *domain.Request) error {
+	model := req.Model
+	if req.Resolved != nil {
+		model = req.Resolved.ModelID
+	}
+	return herr.New(ctx, domain.ErrModelNotAllowed, herr.M{
+		"message": fmt.Sprintf("model %q is served by a provider this virtual key is not allowed to use. Ask the key's owner to widen its provider access", model),
+		"fault":   "customer",
+	})
+}
+
 // recordDispatch turns the retry engine's event log into provider metrics
 // and publishes the request's provider and model back to the transport
 // layer. Must run before the event log is released back to its pool.
@@ -130,6 +203,14 @@ func (a *App) recordDispatch(ctx context.Context, call *pipeline.Call, creds []d
 	provider = a.dispatchProvider(call, creds, el)
 	a.metrics.SetRequestLabels(ctx, provider, model)
 
+	// Publish the ModelProvider row id the request was dispatched to. The
+	// trace interceptor stamps it on the customer span as
+	// langwatch.model_provider_id, which the control plane's trace fold needs
+	// to debit provider-filtered budgets; without it they never accrue.
+	if slotID := dispatchedSlotID(el); slotID != "" {
+		call.Meta.Update(func(m *pipeline.Meta) { m.DispatchedProviderID = slotID })
+	}
+
 	var previousSlot string
 	for _, e := range el.Events() {
 		a.metrics.RecordProviderAttempt(e.SlotID, string(e.Reason), provider, model, e.Duration.Seconds())
@@ -142,6 +223,29 @@ func (a *App) recordDispatch(ctx context.Context, call *pipeline.Call, creds []d
 		previousSlot = e.SlotID
 	}
 	return provider, model
+}
+
+// dispatchedSlotID returns the id of the last credential slot the walk
+// actually dispatched against: the one that served the request on success,
+// the last one tried on failure. Slots the walk skipped without dialing
+// (open circuit, exhausted attempt budget, canceled context) do not count:
+// reporting one would attribute spend to a provider that never saw the
+// request.
+func dispatchedSlotID(el *retry.EventLog) string {
+	events := el.Events()
+	for i := len(events) - 1; i >= 0; i-- {
+		e := events[i]
+		if e.SlotID == "" {
+			continue
+		}
+		switch e.Reason {
+		case retry.ReasonCircuitOpen, retry.ReasonChainExhausted, retry.ReasonContextDone:
+			continue
+		default:
+			return e.SlotID
+		}
+	}
+	return ""
 }
 
 // dispatchProvider names the provider this request went to. An explicit

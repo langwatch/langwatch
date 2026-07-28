@@ -21,6 +21,10 @@ import { GatewayAuditAdapter } from "./auditLog.repository";
 import { serializeRowForAudit } from "./auditSerializer";
 import { GatewayBudgetClickHouseRepository } from "./budget.clickhouse.repository";
 import {
+  budgetAppliesToProvider,
+  resolveApplicableBudgets,
+} from "./budgetResolution.service";
+import {
   type BudgetScopeReach,
   resolveBudgetScopeReach,
 } from "./budgetScopeReach";
@@ -44,7 +48,8 @@ export type BudgetScope =
   | { kind: "TEAM"; teamId: string }
   | { kind: "PROJECT"; projectId: string }
   | { kind: "VIRTUAL_KEY"; virtualKeyId: string }
-  | { kind: "PRINCIPAL"; principalUserId: string };
+  | { kind: "PRINCIPAL"; principalUserId: string }
+  | { kind: "GROUP"; groupId: string };
 
 export type CreateBudgetInput = {
   organizationId: string;
@@ -55,6 +60,12 @@ export type CreateBudgetInput = {
   limitUsd: number | string | Prisma.Decimal;
   onBreach?: "BLOCK" | "WARN";
   timezone?: string | null;
+  /**
+   * ModelProvider row id the budget counts and constrains. Null (the
+   * default) counts every provider. Orthogonal to the scope target, which
+   * is what makes the full target x provider matrix expressible.
+   */
+  providerKey?: string | null;
   actorUserId: string;
 };
 
@@ -91,7 +102,15 @@ export type BudgetScopeTarget =
       secondary: string | null;
       projectSlug: string | null;
     }
-  | { kind: "PRINCIPAL"; id: string; name: string; secondary: string | null };
+  | { kind: "PRINCIPAL"; id: string; name: string; secondary: string | null }
+  | {
+      kind: "GROUP";
+      id: string;
+      name: string;
+      secondary: string | null;
+      /** Members the per-member allowance currently applies to. */
+      memberCount: number;
+    };
 
 export type BudgetLedgerLine = {
   id: string;
@@ -134,6 +153,13 @@ export type BudgetCheckInput = {
   virtualKeyId: string;
   principalUserId?: string | null;
   projectedCostUsd: number | string;
+  /**
+   * The provider this request would dispatch to, when the caller knows it.
+   * Given it, provider-filtered budgets are consulted; without it only
+   * unfiltered budgets are, so a provider filter can never block a request
+   * that was never going to that provider.
+   */
+  providerKey?: string | null;
 };
 
 export type BudgetCheckResult = {
@@ -440,6 +466,10 @@ export class GatewayBudgetService {
         // future iteration teaches the repo to fan out across projects.
         return null;
       case "PRINCIPAL":
+      case "GROUP":
+        // Principal and per-member group buckets span every project
+        // the person works in, so there is no single CH tenant to read
+        // their recent ledger from.
         return null;
     }
   }
@@ -518,6 +548,19 @@ export class GatewayBudgetService {
           id: budget.scopeId,
           name: user?.name ?? user?.email ?? budget.scopeId,
           secondary: user?.email ?? null,
+        };
+      }
+      case "GROUP": {
+        const group = await this.prisma.group.findUnique({
+          where: { id: budget.scopeId },
+          select: { name: true, slug: true, _count: { select: { members: true } } },
+        });
+        return {
+          kind: "GROUP",
+          id: budget.scopeId,
+          name: group?.name ?? budget.scopeId,
+          secondary: group?.slug ?? null,
+          memberCount: group?._count.members ?? 0,
         };
       }
     }
@@ -607,6 +650,63 @@ export class GatewayBudgetService {
       }
     }
 
+    if (input.scope.kind === "GROUP") {
+      // A GROUP budget is one enforcement bucket per member, and per-member
+      // buckets only exist on the ClickHouse spend path. Without it,
+      // `check()` falls back to the single PG `spentUsd` figure per budget
+      // row, which would enforce each member against the whole
+      // group's combined spend: a different control than the one the
+      // admin asked for. Refuse rather than create a cap that cannot mean
+      // what it says. Detection matches `check()`'s own CH-vs-PG pick:
+      // the presence of the ClickHouse repo this service was built with.
+      // Spec: specs/ai-gateway/gateway-budget-targeting.feature.
+      if (!this.chRepo) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            "group_budget_requires_clickhouse: group budgets track spend per member, which needs the ClickHouse spend ledger; this deployment reads budget spend from Postgres only, which cannot keep members apart.",
+        });
+      }
+      // Cross-org guard, mirroring the TEAM / PROJECT / PRINCIPAL guards:
+      // the scope id is request-supplied, so without this a caller could
+      // put a per-member budget on another tenant's group.
+      const group = await this.prisma.group.findFirst({
+        where: {
+          id: input.scope.groupId,
+          organizationId: input.organizationId,
+        },
+        select: { id: true },
+      });
+      if (!group) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            "groupId does not belong to this organization; GROUP budgets must scope a group inside the budget's org.",
+        });
+      }
+    }
+
+    // Provider-filtered budgets reference a ModelProvider row. The id is
+    // request-supplied, so pin it to the budget's own organization: a
+    // cross-org id would create a filter that can never match this org's
+    // dispatches and silently count nothing.
+    if (input.providerKey) {
+      const provider = await this.prisma.modelProvider.findFirst({
+        where: {
+          id: input.providerKey,
+          organizationId: input.organizationId,
+        },
+        select: { id: true },
+      });
+      if (!provider) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            "provider_not_in_organization: the provider filter must name a model provider configured in this organization.",
+        });
+      }
+    }
+
     const resetsAt = nextResetAt(input.window);
     const projectId = resolveProjectFromScope(input.scope);
 
@@ -622,6 +722,7 @@ export class GatewayBudgetService {
           limitUsd: new Prisma.Decimal(input.limitUsd.toString()),
           onBreach: input.onBreach ?? "BLOCK",
           timezone: input.timezone ?? null,
+          providerKey: input.providerKey ?? null,
           resetsAt,
           currentPeriodStartedAt: new Date(),
           createdById: input.actorUserId,
@@ -743,26 +844,18 @@ export class GatewayBudgetService {
   async check(input: BudgetCheckInput): Promise<BudgetCheckResult> {
     const projected = new Prisma.Decimal(input.projectedCostUsd.toString());
 
-    const ors: Prisma.GatewayBudgetWhereInput[] = [
-      { scopeType: "ORGANIZATION", scopeId: input.organizationId },
-      { scopeType: "VIRTUAL_KEY", scopeId: input.virtualKeyId },
-    ];
-    if (input.teamId) {
-      ors.push({ scopeType: "TEAM", scopeId: input.teamId });
-    }
-    if (input.projectId) {
-      ors.push({ scopeType: "PROJECT", scopeId: input.projectId });
-    }
-    if (input.principalUserId) {
-      ors.push({ scopeType: "PRINCIPAL", scopeId: input.principalUserId });
-    }
-    const applicable = await this.prisma.gatewayBudget.findMany({
-      where: {
+    // Same resolver the bundle and the trace fold use, so what enforces
+    // here is exactly what the key was told applies to it.
+    const resolved = (
+      await resolveApplicableBudgets(this.prisma, {
         organizationId: input.organizationId,
-        archivedAt: null,
-        OR: ors,
-      },
-    });
+        teamId: input.teamId,
+        projectId: input.projectId,
+        virtualKeyId: input.virtualKeyId,
+        principalUserId: input.principalUserId,
+      })
+    ).filter((r) => budgetAppliesToProvider(r.budget, input.providerKey));
+    const applicable = resolved.map((r) => r.budget);
 
     // Prefer ClickHouse spend (trace-fold ledger) when the repo is wired,
     // fall back to the PG `spentUsd` column for deploys without CH. The
@@ -785,7 +878,13 @@ export class GatewayBudgetService {
           if (tenantIds.length === 0) return new Map<string, string>();
           const spends = await this.chRepo!.getSpendForBudgetsAcrossTenants(
             tenantIds,
-            applicable,
+            resolved.map((r) => ({
+              budgetId: r.budget.id,
+              scope: r.budget.scopeType,
+              scopeId: r.bucketScopeId,
+              window: r.budget.window,
+              match: "exact" as const,
+            })),
           );
           return new Map(spends.map((s) => [s.budgetId, s.spentUsd] as const));
         })()
@@ -864,6 +963,8 @@ function scopeIdForScope(scope: BudgetScope): string {
       return scope.virtualKeyId;
     case "PRINCIPAL":
       return scope.principalUserId;
+    case "GROUP":
+      return scope.groupId;
   }
 }
 
@@ -874,7 +975,8 @@ function scopeKindToEnum(
   | "TEAM"
   | "PROJECT"
   | "VIRTUAL_KEY"
-  | "PRINCIPAL" {
+  | "PRINCIPAL"
+  | "GROUP" {
   return kind;
 }
 

@@ -70,6 +70,25 @@ export function normalizeVkTags(tags: readonly string[]): string[] {
 
 export const virtualKeyConfigSchema = z.object({
   modelsAllowed: z.array(z.string()).nullable().default(null),
+  /**
+   * ModelProvider ids the key may dispatch to. `null` is not "none": it is
+   * "every provider this key can reach through its scope graph, including
+   * providers added later". That is the semantic a creator gets by leaving
+   * the All box ticked, and storing it as absence is what makes a provider
+   * added next month usable without touching the key.
+   *
+   * An explicit list must name at least one provider. That rule is
+   * enforced on the write path (`VirtualKeyService`), not here: this
+   * schema also parses on the gateway's config-fetch, where throwing on a
+   * malformed stored row would take the key offline instead of degrading.
+   * Reading an empty list therefore normalises to the permissive default
+   * rather than to a key that can serve nothing.
+   */
+  providersAllowed: z
+    .array(z.string())
+    .nullable()
+    .default(null)
+    .transform((v) => (v && v.length > 0 ? v : null)),
   cache: z
     .object({
       mode: cacheModeSchema.default("respect"),

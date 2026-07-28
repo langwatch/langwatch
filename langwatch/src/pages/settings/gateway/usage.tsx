@@ -1,6 +1,8 @@
 import {
+  Badge,
   Box,
   Button,
+  chakra,
   EmptyState,
   HStack,
   Heading,
@@ -11,9 +13,9 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { BarChart3, Download } from "lucide-react";
+import { BarChart3, Download, X } from "lucide-react";
 import Parse from "papaparse";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import {
   Area,
   AreaChart,
@@ -25,37 +27,91 @@ import {
 } from "recharts";
 
 import AiGatewayLayout from "~/components/gateway/AiGatewayLayout";
+import { formatBudgetUsd } from "~/components/gateway/formatBudgetUsd";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { GatewayErrorPanel } from "~/components/gateway/GatewayErrorPanel";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Link } from "~/components/ui/link";
 import { Tooltip as UITooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useRollingWindow } from "~/hooks/useRollingWindow";
 import { api } from "~/utils/api";
+import { useRouter } from "~/utils/compat/next-router";
 
-const PRESETS: Array<{ label: string; days: number }> = [
+const PRESETS: Array<{ label: string; days: number | "mtd" }> = [
   { label: "Last 24h", days: 1 },
   { label: "Last 7 days", days: 7 },
   { label: "Last 30 days", days: 30 },
   { label: "Last 90 days", days: 90 },
+  { label: "This month", days: "mtd" },
 ];
 
 function GatewayUsagePage() {
-  const { project } = useOrganizationTeamProject();
-  const [days, setDays] = useState(30);
+  const { organization, project } = useOrganizationTeamProject();
+  const router = useRouter();
 
-  const { fromIso, toIso } = useMemo(() => {
-    const to = new Date();
-    const from = new Date(to.getTime() - days * 24 * 60 * 60 * 1000);
-    return { fromIso: from.toISOString(), toIso: to.toISOString() };
-  }, [days]);
+  // Range and key filter live in the URL, so the deep link from the
+  // virtual-keys table ("Spent this month" click-through) survives a
+  // refresh and can be shared as-is.
+  const days = ((): number | "mtd" => {
+    const raw = Array.isArray(router.query.days)
+      ? router.query.days[0]
+      : router.query.days;
+    if (raw === "mtd") return "mtd";
+    const parsed = raw ? Number.parseInt(raw, 10) : NaN;
+    return PRESETS.some((p) => p.days === parsed) ? parsed : 30;
+  })();
+  const virtualKeyId =
+    (Array.isArray(router.query.vk) ? router.query.vk[0] : router.query.vk) ??
+    null;
+
+  const setDays = (next: number | "mtd") => {
+    void router.push({
+      pathname: router.pathname,
+      query: { ...router.query, days: next.toString() },
+    });
+  };
+  const clearKeyFilter = () => {
+    const { vk: _vk, ...rest } = router.query;
+    void router.push({ pathname: router.pathname, query: rest });
+  };
+
+  const { fromIso, toIso } = useRollingWindow(days);
 
   const summaryQuery = api.gatewayUsage.summary.useQuery(
     { projectId: project?.id ?? "", fromDate: fromIso, toDate: toIso },
-    { enabled: !!project?.id },
+    { enabled: !!project?.id && !virtualKeyId },
   );
+  const vkSummaryQuery = api.gatewayUsage.summaryForVirtualKey.useQuery(
+    {
+      projectId: project?.id ?? "",
+      virtualKeyId: virtualKeyId ?? "",
+      fromDate: fromIso,
+      toDate: toIso,
+    },
+    { enabled: !!project?.id && !!virtualKeyId },
+  );
+  const keyQuery = api.virtualKeys.get.useQuery(
+    { organizationId: organization?.id ?? "", id: virtualKeyId ?? "" },
+    { enabled: !!organization?.id && !!virtualKeyId },
+  );
+  const filteredKeyName = virtualKeyId
+    ? (keyQuery.data?.name ?? virtualKeyId)
+    : null;
 
-  const data = summaryQuery.data;
+  const activeQuery = virtualKeyId ? vkSummaryQuery : summaryQuery;
+  const data = virtualKeyId
+    ? vkSummaryQuery.data && {
+        ...vkSummaryQuery.data,
+        byVirtualKey: [] as Array<{
+          virtualKeyId: string;
+          name: string;
+          displayPrefix: string | null;
+          totalUsd: string;
+          requests: number;
+        }>,
+      }
+    : summaryQuery.data;
 
   // Build a single CSV that flattens the three summary slices the
   // finance reviewer usually wants together: daily spend, spend by
@@ -99,7 +155,9 @@ function GatewayUsagePage() {
     const stamp = new Date().toISOString().split("T")[0];
     link.setAttribute(
       "download",
-      `gateway_usage_${project?.slug ?? "project"}_${days}d_${stamp}.csv`,
+      `gateway_usage_${project?.slug ?? "project"}${
+        virtualKeyId ? `_${virtualKeyId}` : ""
+      }_${days === "mtd" ? "mtd" : `${days}d`}_${stamp}.csv`,
     );
     document.body.appendChild(link);
     link.click();
@@ -112,6 +170,27 @@ function GatewayUsagePage() {
       <>
         <PageLayout.Header>
           <PageLayout.Heading>Usage</PageLayout.Heading>
+          {filteredKeyName && (
+            <Badge
+              variant="subtle"
+              colorPalette="orange"
+              marginLeft={3}
+              data-testid="usage-key-filter"
+            >
+              <HStack gap={1}>
+                <Text>Key: {filteredKeyName}</Text>
+                <chakra.button
+                  type="button"
+                  aria-label="Clear key filter"
+                  onClick={clearKeyFilter}
+                  cursor="pointer"
+                  display="inline-flex"
+                >
+                  <X size={12} />
+                </chakra.button>
+              </HStack>
+            </Badge>
+          )}
           <Spacer />
           <HStack gap={1}>
             {PRESETS.map((p) => (
@@ -145,13 +224,13 @@ function GatewayUsagePage() {
         </PageLayout.Header>
 
         <Box padding={6} width="full" maxWidth="1600px" marginX="auto">
-          {summaryQuery.isLoading ? (
+          {activeQuery.isLoading ? (
             <Spinner />
-          ) : summaryQuery.isError ? (
+          ) : activeQuery.isError ? (
             <GatewayErrorPanel
               title="Failed to load usage"
-              error={summaryQuery.error}
-              onRetry={() => summaryQuery.refetch()}
+              error={activeQuery.error}
+              onRetry={() => activeQuery.refetch()}
             />
           ) : !data || data.totalRequests === 0 ? (
             <EmptyState.Root>
@@ -173,7 +252,7 @@ function GatewayUsagePage() {
               <HStack gap={4} align="stretch">
                 <StatTile
                   label="Total spend"
-                  value={`$${Number(data.totalUsd).toFixed(2)}`}
+                  value={formatBudgetUsd(data.totalUsd)}
                 />
                 <StatTile
                   label="Requests"
@@ -193,6 +272,7 @@ function GatewayUsagePage() {
 
               {data.byDay.length >= 2 && <SpendSparkline byDay={data.byDay} />}
 
+              {!virtualKeyId && (
               <VStack align="stretch" gap={2}>
                 <Heading size="sm">Top virtual keys</Heading>
                 <Table.Root size="sm">
@@ -220,7 +300,7 @@ function GatewayUsagePage() {
                           </Text>
                         </Table.Cell>
                         <Table.Cell>
-                          ${Number(row.totalUsd).toFixed(2)}
+                          {formatBudgetUsd(row.totalUsd)}
                         </Table.Cell>
                         <Table.Cell>{row.requests}</Table.Cell>
                       </Table.Row>
@@ -228,6 +308,7 @@ function GatewayUsagePage() {
                   </Table.Body>
                 </Table.Root>
               </VStack>
+              )}
 
               <VStack align="stretch" gap={2}>
                 <Heading size="sm">Top models</Heading>
@@ -248,7 +329,7 @@ function GatewayUsagePage() {
                           </Text>
                         </Table.Cell>
                         <Table.Cell>
-                          ${Number(row.totalUsd).toFixed(2)}
+                          {formatBudgetUsd(row.totalUsd)}
                         </Table.Cell>
                         <Table.Cell>{row.requests}</Table.Cell>
                       </Table.Row>

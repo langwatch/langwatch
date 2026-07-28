@@ -1,9 +1,9 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "LangWatch API",
-    "version": "1.0.0",
-    "description": "LangWatch openapi spec"
+    "title": "Hono Documentation",
+    "version": "0.0.0",
+    "description": "Development documentation"
   },
   "servers": [
     {
@@ -5354,6 +5354,12 @@
                           "spent_usd": {
                             "type": "string"
                           },
+                          "provider_key": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
                           "resets_at": {
                             "type": "string"
                           },
@@ -5375,6 +5381,7 @@
                           "on_breach",
                           "limit_usd",
                           "spent_usd",
+                          "provider_key",
                           "resets_at",
                           "archived_at"
                         ]
@@ -5530,6 +5537,12 @@
                         "spent_usd": {
                           "type": "string"
                         },
+                        "provider_key": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
                         "resets_at": {
                           "type": "string"
                         },
@@ -5551,6 +5564,7 @@
                         "on_breach",
                         "limit_usd",
                         "spent_usd",
+                        "provider_key",
                         "resets_at",
                         "archived_at"
                       ]
@@ -5667,7 +5681,173 @@
         ],
         "parameters": [],
         "summary": "Create budget",
-        "description": "Creates an organization-owned budget. The scope discriminates which resource the budget covers (organization / team / project / virtual_key / principal)."
+        "description": "Creates an organization-owned budget. The scope discriminates which resource the budget covers (organization / team / project / group / virtual_key / principal); group budgets cap each member individually.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "scope": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "const": "ORGANIZATION"
+                          },
+                          "organization_id": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "organization_id"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "const": "TEAM"
+                          },
+                          "team_id": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "team_id"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "const": "PROJECT"
+                          },
+                          "project_id": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "project_id"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "const": "VIRTUAL_KEY"
+                          },
+                          "virtual_key_id": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "virtual_key_id"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "const": "PRINCIPAL"
+                          },
+                          "principal_user_id": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "principal_user_id"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "const": "GROUP"
+                          },
+                          "group_id": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "group_id"
+                        ]
+                      }
+                    ]
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "window": {
+                    "type": "string",
+                    "enum": [
+                      "MINUTE",
+                      "HOUR",
+                      "DAY",
+                      "WEEK",
+                      "MONTH",
+                      "TOTAL"
+                    ]
+                  },
+                  "limit_usd": {
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      {
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "on_breach": {
+                    "type": "string",
+                    "enum": [
+                      "BLOCK",
+                      "WARN"
+                    ]
+                  },
+                  "timezone": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "provider_key": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "scope",
+                  "name",
+                  "window",
+                  "limit_usd"
+                ]
+              }
+            }
+          }
+        }
       }
     },
     "/api/gateway/v1/budgets/{id}": {
@@ -5720,6 +5900,12 @@
                         "spent_usd": {
                           "type": "string"
                         },
+                        "provider_key": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
                         "resets_at": {
                           "type": "string"
                         },
@@ -5741,6 +5927,7 @@
                         "on_breach",
                         "limit_usd",
                         "spent_usd",
+                        "provider_key",
                         "resets_at",
                         "archived_at"
                       ]
@@ -5904,6 +6091,12 @@
                         "spent_usd": {
                           "type": "string"
                         },
+                        "provider_key": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
                         "resets_at": {
                           "type": "string"
                         },
@@ -5925,6 +6118,7 @@
                         "on_breach",
                         "limit_usd",
                         "spent_usd",
+                        "provider_key",
                         "resets_at",
                         "archived_at"
                       ]
@@ -7685,6 +7879,20 @@
                               "null"
                             ]
                           },
+                          "trace_project_id": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "routing_mode": {
+                            "type": "string",
+                            "enum": [
+                              "NONE",
+                              "FALLBACK_ALL",
+                              "POLICY"
+                            ]
+                          },
                           "provider_credential_ids": {
                             "type": "array",
                             "items": {
@@ -7711,6 +7919,8 @@
                           "description",
                           "status",
                           "principal_user_id",
+                          "trace_project_id",
+                          "routing_mode",
                           "provider_credential_ids",
                           "revision",
                           "last_used_at",
@@ -7859,6 +8069,20 @@
                             "null"
                           ]
                         },
+                        "trace_project_id": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "routing_mode": {
+                          "type": "string",
+                          "enum": [
+                            "NONE",
+                            "FALLBACK_ALL",
+                            "POLICY"
+                          ]
+                        },
                         "provider_credential_ids": {
                           "type": "array",
                           "items": {
@@ -7885,6 +8109,8 @@
                         "description",
                         "status",
                         "principal_user_id",
+                        "trace_project_id",
+                        "routing_mode",
                         "provider_credential_ids",
                         "revision",
                         "last_used_at",
@@ -8051,6 +8277,20 @@
                             "null"
                           ]
                         },
+                        "trace_project_id": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "routing_mode": {
+                          "type": "string",
+                          "enum": [
+                            "NONE",
+                            "FALLBACK_ALL",
+                            "POLICY"
+                          ]
+                        },
                         "provider_credential_ids": {
                           "type": "array",
                           "items": {
@@ -8077,6 +8317,8 @@
                         "description",
                         "status",
                         "principal_user_id",
+                        "trace_project_id",
+                        "routing_mode",
                         "provider_credential_ids",
                         "revision",
                         "last_used_at",
@@ -8266,6 +8508,20 @@
                             "null"
                           ]
                         },
+                        "trace_project_id": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "routing_mode": {
+                          "type": "string",
+                          "enum": [
+                            "NONE",
+                            "FALLBACK_ALL",
+                            "POLICY"
+                          ]
+                        },
                         "provider_credential_ids": {
                           "type": "array",
                           "items": {
@@ -8292,6 +8548,8 @@
                         "description",
                         "status",
                         "principal_user_id",
+                        "trace_project_id",
+                        "routing_mode",
                         "provider_credential_ids",
                         "revision",
                         "last_used_at",
@@ -8463,6 +8721,20 @@
                             "null"
                           ]
                         },
+                        "trace_project_id": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "routing_mode": {
+                          "type": "string",
+                          "enum": [
+                            "NONE",
+                            "FALLBACK_ALL",
+                            "POLICY"
+                          ]
+                        },
                         "provider_credential_ids": {
                           "type": "array",
                           "items": {
@@ -8489,6 +8761,8 @@
                         "description",
                         "status",
                         "principal_user_id",
+                        "trace_project_id",
+                        "routing_mode",
                         "provider_credential_ids",
                         "revision",
                         "last_used_at",
@@ -8647,6 +8921,20 @@
                             "null"
                           ]
                         },
+                        "trace_project_id": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "routing_mode": {
+                          "type": "string",
+                          "enum": [
+                            "NONE",
+                            "FALLBACK_ALL",
+                            "POLICY"
+                          ]
+                        },
                         "provider_credential_ids": {
                           "type": "array",
                           "items": {
@@ -8673,6 +8961,8 @@
                         "description",
                         "status",
                         "principal_user_id",
+                        "trace_project_id",
+                        "routing_mode",
                         "provider_credential_ids",
                         "revision",
                         "last_used_at",

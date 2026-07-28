@@ -208,6 +208,22 @@ describe("virtualKeys — scope-aware RBAC", () => {
         },
       });
     }
+    // ORG/TEAM-scoped creates need a resolvable trace project
+    // (trace_project_required otherwise); the governance project is that
+    // destination, the same shape provisioned orgs have. RBAC stays the
+    // only thing under test here.
+    await prisma.project.create({
+      data: {
+        id: `proj-gov-${ns}`,
+        name: `gov-${ns}`,
+        slug: `gov-${ns}`,
+        teamId: TEAM_PLATFORM,
+        language: "en",
+        framework: "openai",
+        apiKey: `key-gov-${ns}`,
+        kind: "internal_governance",
+      },
+    });
   }, 60_000);
 
   afterAll(async () => {

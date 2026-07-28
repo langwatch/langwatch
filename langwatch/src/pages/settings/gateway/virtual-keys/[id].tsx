@@ -47,6 +47,7 @@ import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useRollingWindow } from "~/hooks/useRollingWindow";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
@@ -94,17 +95,13 @@ function VirtualKeyDetailPage() {
     }
     return map;
   }, [organization?.teams]);
-  const usageWindow = useMemo(() => {
-    const to = new Date();
-    const from = new Date(to.getTime() - 30 * 24 * 60 * 60 * 1000);
-    return { fromDate: from.toISOString(), toDate: to.toISOString() };
-  }, []);
+  const usageWindow = useRollingWindow(30);
   const usageQuery = api.gatewayUsage.summaryForVirtualKey.useQuery(
     {
       projectId: project?.id ?? "",
       virtualKeyId: vkId,
-      fromDate: usageWindow.fromDate,
-      toDate: usageWindow.toDate,
+      fromDate: usageWindow.fromIso,
+      toDate: usageWindow.toIso,
     },
     { enabled: !!project?.id && !!vkId },
   );

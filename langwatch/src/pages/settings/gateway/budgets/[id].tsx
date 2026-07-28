@@ -441,7 +441,14 @@ type ScopeTarget =
       secondary: string | null;
       projectSlug: string | null;
     }
-  | { kind: "PRINCIPAL"; id: string; name: string; secondary: string | null };
+  | { kind: "PRINCIPAL"; id: string; name: string; secondary: string | null }
+  | {
+      kind: "GROUP";
+      id: string;
+      name: string;
+      secondary: string | null;
+      memberCount: number;
+    };
 
 function ScopeBadge({
   target,
@@ -473,6 +480,14 @@ function ScopeBadge({
         <Code fontSize="xs" color="fg.muted">
           {target.secondary}
         </Code>
+      )}
+      {target.kind === "GROUP" && (
+        <Text fontSize="xs" color="fg.muted">
+          {target.memberCount === 1
+            ? "1 member"
+            : `${target.memberCount} members`}
+          , each with their own allowance
+        </Text>
       )}
     </HStack>
   );
