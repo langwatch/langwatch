@@ -89,3 +89,8 @@ ORDER BY (TenantId, GatewayRequestId)
 TTL toDateTime(OccurredAt) + INTERVAL 13 MONTH DELETE
 SETTINGS index_granularity = 8192${CLICKHOUSE_STORAGE_POLICY_SETTING};
 -- +goose StatementEnd
+
+-- +goose Down
+-- +goose StatementBegin
+DROP TABLE IF EXISTS ${CLICKHOUSE_DATABASE}.gateway_spend_events;
+-- +goose StatementEnd

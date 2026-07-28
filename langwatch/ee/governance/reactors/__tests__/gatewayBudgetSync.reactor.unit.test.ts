@@ -108,9 +108,9 @@ function mockDeps(
   resolved?: ResolvedBudgetStub[],
 ): {
   deps: GatewayBudgetSyncReactorDeps;
-  insertDebit: ReturnType<typeof vi.fn>;
+  insertDebits: ReturnType<typeof vi.fn>;
 } {
-  const insertDebit = vi.fn().mockResolvedValue(undefined);
+  const insertDebits = vi.fn().mockResolvedValue(undefined);
   return {
     deps: {
       prisma: {
@@ -135,10 +135,10 @@ function mockDeps(
         ),
       } as any,
       budgetCHRepository: {
-        insertDebit,
+        insertDebits,
       } as any,
     },
-    insertDebit,
+    insertDebits,
   };
 }
 
@@ -155,19 +155,19 @@ describe("gatewayBudgetSync reactor", () => {
 
   describe("when the trace lacks gateway attributes", () => {
     it("short-circuits without reading PG or writing CH", async () => {
-      const { deps, insertDebit } = mockDeps(null, null, []);
+      const { deps, insertDebits } = mockDeps(null, null, []);
       const reactor = createGatewayBudgetSyncReactor(deps);
 
       await reactor.handle(event, ctx(createFoldState({})));
 
-      expect(insertDebit).not.toHaveBeenCalled();
+      expect(insertDebits).not.toHaveBeenCalled();
       expect(deps.prisma.virtualKey.findUnique).not.toHaveBeenCalled();
     });
   });
 
   describe("when the VK is unknown", () => {
     it("logs + skips without writing to CH", async () => {
-      const { deps, insertDebit } = mockDeps(null, null, []);
+      const { deps, insertDebits } = mockDeps(null, null, []);
       const reactor = createGatewayBudgetSyncReactor(deps);
 
       await reactor.handle(
@@ -180,13 +180,13 @@ describe("gatewayBudgetSync reactor", () => {
         ),
       );
 
-      expect(insertDebit).not.toHaveBeenCalled();
+      expect(insertDebits).not.toHaveBeenCalled();
     });
   });
 
   describe("when the VK belongs to a different org", () => {
     it("logs + skips without writing to CH", async () => {
-      const { deps, insertDebit } = mockDeps(
+      const { deps, insertDebits } = mockDeps(
         { id: "vk-1", organizationId: "org-other", principalUserId: null },
         {
           id: "project-1",
@@ -206,13 +206,13 @@ describe("gatewayBudgetSync reactor", () => {
         ),
       );
 
-      expect(insertDebit).not.toHaveBeenCalled();
+      expect(insertDebits).not.toHaveBeenCalled();
     });
   });
 
   describe("when the VK has no applicable budgets", () => {
     it("skips the CH write — no rows to fold", async () => {
-      const { deps, insertDebit } = mockDeps(
+      const { deps, insertDebits } = mockDeps(
         { id: "vk-1", organizationId: "org-1", principalUserId: null },
         {
           id: "project-1",
@@ -233,7 +233,7 @@ describe("gatewayBudgetSync reactor", () => {
         ),
       );
 
-      expect(insertDebit).not.toHaveBeenCalled();
+      expect(insertDebits).not.toHaveBeenCalled();
     });
   });
 
@@ -246,7 +246,7 @@ describe("gatewayBudgetSync reactor", () => {
         window: "MONTH",
       } as GatewayBudget;
 
-      const { deps, insertDebit } = mockDeps(
+      const { deps, insertDebits } = mockDeps(
         { id: "vk-1", organizationId: "org-1", principalUserId: null },
         {
           id: "project-1",
@@ -267,8 +267,8 @@ describe("gatewayBudgetSync reactor", () => {
         ),
       );
 
-      expect(insertDebit).toHaveBeenCalledTimes(1);
-      const rows = insertDebit.mock.calls[0]![0];
+      expect(insertDebits).toHaveBeenCalledTimes(1);
+      const rows = insertDebits.mock.calls[0]![0];
       expect(rows).toHaveLength(1);
       expect(rows[0]).toMatchObject({
         tenantId: "project-1",
@@ -353,7 +353,7 @@ describe("gatewayBudgetSync reactor", () => {
         window: "MONTH",
       } as GatewayBudget;
 
-      const { deps, insertDebit } = mockDeps(
+      const { deps, insertDebits } = mockDeps(
         { id: "vk-1", organizationId: "org-1", principalUserId: null },
         {
           id: "project-1",
@@ -377,11 +377,105 @@ describe("gatewayBudgetSync reactor", () => {
         ),
       );
 
-      expect(insertDebit).toHaveBeenCalledTimes(1);
-      expect(insertDebit.mock.calls[0]![0][0]).toMatchObject({
+      expect(insertDebits).toHaveBeenCalledTimes(1);
+      expect(insertDebits.mock.calls[0]![0][0]).toMatchObject({
         status: "BLOCKED_BY_GUARDRAIL",
         amountUsd: "0.0000000000",
       });
+    });
+  });
+
+  describe("when the fold carries per-request gateway span entries", () => {
+    const budget = {
+      id: "budget-1",
+      scopeType: "PROJECT",
+      scopeId: "project-1",
+      window: "MONTH",
+    } as GatewayBudget;
+
+    const entriesAttr = JSON.stringify([
+      {
+        requestId: "req-1",
+        virtualKeyId: "vk-1",
+        model: "openai/gpt-5-mini",
+        modelProviderId: "mp-9",
+        inputTokens: 100,
+        outputTokens: 20,
+        cacheReadTokens: 20540,
+        cacheWriteTokens: 22994,
+        reasoningTokens: 0,
+        costUsd: 0.001,
+        status: "success",
+        errorClass: "",
+        httpStatus: 0,
+        endUserId: "",
+        occurredAtMs: 1700_000_000_000,
+        durationMs: 100,
+      },
+      {
+        requestId: "req-2",
+        virtualKeyId: "vk-1",
+        model: "openai/gpt-5-mini",
+        modelProviderId: "",
+        inputTokens: 50,
+        outputTokens: 10,
+        cacheReadTokens: 0,
+        cacheWriteTokens: 0,
+        reasoningTokens: 0,
+        costUsd: 0.002,
+        status: "error",
+        errorClass: "provider_timeout",
+        httpStatus: 504,
+        endUserId: "",
+        occurredAtMs: 1700_000_100_000,
+        durationMs: 200,
+      },
+    ]);
+
+    /** @scenario Cache read and cache write tokens are metered with real values */
+    it("debits per request with real cache token classes and the provider id", async () => {
+      const { deps, insertDebits } = mockDeps(
+        { id: "vk-1", organizationId: "org-1", principalUserId: null },
+        {
+          id: "project-1",
+          teamId: "team-1",
+          team: { organizationId: "org-1" },
+        },
+        [budget],
+      );
+      const reactor = createGatewayBudgetSyncReactor(deps);
+
+      await reactor.handle(
+        event,
+        ctx(
+          createFoldState({
+            "langwatch.virtual_key_id": "vk-1",
+            "langwatch.gateway_request_id": "req-1",
+            "langwatch.reserved.gateway_spans": entriesAttr,
+          }),
+        ),
+      );
+
+      expect(insertDebits).toHaveBeenCalledTimes(1);
+      const rows = insertDebits.mock.calls[0]![0];
+      expect(rows).toHaveLength(2);
+      expect(rows[0]).toMatchObject({
+        gatewayRequestId: "req-1",
+        amountUsd: "0.0010000000",
+        tokensInput: 100,
+        tokensCacheRead: 20540,
+        tokensCacheWrite: 22994,
+        providerCredentialId: "mp-9",
+        status: "SUCCESS",
+        durationMs: 100,
+      });
+      expect(rows[1]).toMatchObject({
+        gatewayRequestId: "req-2",
+        amountUsd: "0.0020000000",
+        status: "PROVIDER_ERROR",
+        durationMs: 200,
+      });
+      expect(rows[0].occurredAt.getTime()).toBe(1700_000_000_000);
     });
   });
 });
