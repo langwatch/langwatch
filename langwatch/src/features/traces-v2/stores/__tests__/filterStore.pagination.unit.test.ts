@@ -6,10 +6,23 @@ import { INITIAL_TIME_RANGE, useFilterStore } from "../filterStore";
  * of the last row of batch n-1, and the server pages by comparing it against
  * the CURRENT sort expression + filter. That makes every cursor a claim about
  * one specific result set — narrow the filter or move the time window and the
- * claim is void. Because `totalHits` is computed without the cursor, a stale
- * one doesn't surface as an empty state; it surfaces as a blank table under a
- * confident "12,345 traces · showing 51–50". These tests pin which mutations
- * are obliged to throw the cursors away, and which must leave them alone.
+ * claim is void. Because `totalHits` is computed without the cursor, and
+ * `Pagination` derives its row range from the page number rather than the rows
+ * that came back, a stale cursor doesn't surface as an empty state; it
+ * surfaces as a blank table under a caption that still reports the whole count
+ * and a live-looking range ("… traces · showing 101–101" on page 3). These
+ * tests pin which mutations are obliged to throw the cursors away, and which
+ * must leave them alone.
+ *
+ * `filterStore` itself is unchanged by the work that added this file — these
+ * are characterization tests, standing as a forward regression net around
+ * behaviour the pagination fix now depends on.
+ *
+ * Which page a freshly minted cursor is filed under is deliberately NOT tested
+ * here: that is Next's decision, and `setPageCursor`/`setPage` are plain
+ * assignments, so asserting them would only echo their own arguments back. It
+ * is pinned where it can actually break, in
+ * `components/TraceTable/__tests__/Pagination.nextCursor.integration.test.tsx`.
  */
 
 const CURSOR_PAGE_2 = { sortValue: 1_700_000_002_000, traceId: "trace-b" };
@@ -111,19 +124,6 @@ describe("filterStore keyset cursors", () => {
         expect(pagination()).toEqual({
           page: 2,
           pageCursors: { 1: null, 2: CURSOR_PAGE_2, 3: CURSOR_PAGE_3 },
-        });
-      });
-    });
-  });
-
-  describe("given the first batch has been read", () => {
-    describe("when Next mints a cursor for the following batch", () => {
-      it("records it against the page it opens, leaving page 1 cursor-free", () => {
-        useFilterStore.getState().setPageCursor(2, CURSOR_PAGE_2);
-        useFilterStore.getState().setPage(2);
-        expect(pagination()).toEqual({
-          page: 2,
-          pageCursors: { 1: null, 2: CURSOR_PAGE_2 },
         });
       });
     });

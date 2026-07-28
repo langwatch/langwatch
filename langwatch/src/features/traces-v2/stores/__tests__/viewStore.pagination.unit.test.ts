@@ -11,7 +11,9 @@ import { useViewStore } from "../viewStore";
  * because a grouped RowKind can't order by `time`/`spans`/`ttft`/`size` and
  * those all reconcile to `count`. Left carrying a flat-lens cursor, the query
  * compares a span count against epoch milliseconds and returns nothing, while
- * the cursor-free `totalHits` keeps insisting there are thousands of rows.
+ * the cursor-free `totalHits` keeps reporting the whole count and `Pagination`
+ * keeps captioning a row range off the page number ("… traces · showing
+ * 101–101" on page 3) — so the blank table never admits to being empty.
  */
 
 const CURSOR_PAGE_2 = { sortValue: 42, traceId: "trace-b" };

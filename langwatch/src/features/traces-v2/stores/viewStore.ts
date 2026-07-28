@@ -602,11 +602,13 @@ function applyFilterTextFromLens(text: string): void {
  * (`sortValue: 0.0042`) carried into a time-ordered query becomes
  * `toUnixTimestamp64Milli(OccurredAt) < 0.0042` — a batch that matches
  * nothing. `totalHits` is computed without the cursor and keeps reporting the
- * full count, so the empty state never shows: the user is left staring at a
- * blank table captioned "12,345 traces · showing 51–50", and switching back
- * doesn't recover because the stale cursor is still in the store. Direction
- * flips the comparison operator, so it invalidates cursors for the same
- * reason.
+ * full count, and `Pagination` derives its row range from the page number
+ * rather than from the rows that came back, so the empty state never shows:
+ * the user is left staring at a blank table still captioned with the whole
+ * count and a live-looking range ("… traces · showing 101–101" on page 3),
+ * and switching back doesn't recover because the stale cursor is still in the
+ * store. Direction flips the comparison operator, so it invalidates cursors
+ * for the same reason.
  *
  * Imperative one-way write — viewStore never subscribes to filterStore.
  */

@@ -14,7 +14,8 @@ import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { INITIAL_TIME_RANGE, useFilterStore } from "../../stores/filterStore";
-import { useViewStore } from "../../stores/viewStore";
+import { ACTIVE_LENS_KEY, useViewStore } from "../../stores/viewStore";
+import { getPresetById } from "../../utils/timeRangePresets";
 import { useURLSync } from "../useURLSync";
 
 const CURSOR_PAGE_2 = { sortValue: 1_700_000_002_000, traceId: "trace-b" };
@@ -37,11 +38,24 @@ const pagination = () => {
   return { page, pageCursors };
 };
 
+/** Move the bar off the default window, the way the range picker would. */
+function selectSevenDayRange(): void {
+  const preset = getPresetById("7d");
+  if (!preset) throw new Error("the 7d preset went missing");
+  const { from, to } = preset.compute();
+  useFilterStore
+    .getState()
+    .setTimeRange({ from, to, label: preset.label, presetId: preset.id });
+}
+
 beforeEach(() => {
   // `#all-traces` rather than a bare URL: the write-back effect collapses the
   // default lens with no overrides to an empty fragment, and we want a body
   // that stays put for the duration of the test.
   window.history.replaceState(null, "", "/#all-traces");
+  // The bare-URL branch reads the stored last-used lens, so leaving one behind
+  // would make these tests depend on their own execution order.
+  window.localStorage.removeItem(ACTIVE_LENS_KEY);
   useFilterStore.getState().clearAll();
   useFilterStore.setState({
     timeRange: INITIAL_TIME_RANGE,
@@ -87,9 +101,9 @@ describe("useURLSync pagination across browser history navigation", () => {
 
     describe("when the hook mounts on a bare URL carrying no fragment at all", () => {
       it("still applies the fragment — an empty body is not 'already in sync'", () => {
-        // The skip is keyed off a `null` sentinel rather than an empty
-        // string precisely so this first apply isn't swallowed: a bare URL
-        // has to restore the default/last-used lens and start from page 1.
+        // The very first apply is unconditional precisely so it isn't
+        // swallowed by the in-sync guard: a bare URL still has to restore the
+        // default/last-used lens and start from page 1.
         window.history.replaceState(null, "", "/");
         seedThirdPage();
 
@@ -111,6 +125,72 @@ describe("useURLSync pagination across browser history navigation", () => {
         });
 
         expect(useViewStore.getState().activeLensId).toBe("all-traces");
+        expect(pagination()).toEqual({ page: 1, pageCursors: { 1: null } });
+      });
+    });
+
+    describe("when Back lands on the drawer's entry, whose body is stale but denotes the same state", () => {
+      it("keeps the page and its cursors", () => {
+        // The drawer pushes its entry before the write effect has collapsed
+        // the default lens to an empty body, so the two strings differ while
+        // the bar state they denote is identical. Only the newest entry ever
+        // gets rewritten, so this asymmetry is permanent.
+        renderHook(() => useURLSync());
+        act(() => seedThirdPage());
+
+        act(() => {
+          window.history.replaceState(null, "", "/?trace=trace-a");
+          popState();
+        });
+
+        expect(pagination()).toEqual({
+          page: 3,
+          pageCursors: { 1: null, 2: CURSOR_PAGE_2, 3: CURSOR_PAGE_3 },
+        });
+      });
+    });
+
+    describe("when Back lands on an entry spelling the current state the long way", () => {
+      it("keeps the page and its cursors", () => {
+        // `#all-traces` and an empty fragment are the same bar state — the
+        // writer collapses the default lens with no overrides to `""`.
+        window.history.replaceState(null, "", "/");
+        renderHook(() => useURLSync());
+        act(() => seedThirdPage());
+
+        act(() => {
+          window.history.replaceState(null, "", "/#all-traces");
+          popState();
+        });
+
+        expect(pagination()).toEqual({
+          page: 3,
+          pageCursors: { 1: null, 2: CURSOR_PAGE_2, 3: CURSOR_PAGE_3 },
+        });
+      });
+    });
+
+    describe("when Back lands on an entry from before the time range was changed", () => {
+      it("restores the window that entry denotes instead of applying half of it", () => {
+        // The full drawer sequence: open + close the drawer (its entries
+        // carry the empty body), then move the range to Last 7 days — which
+        // only rewrites the CURRENT entry — then page forward and press Back.
+        // The entry we land on denotes the default window, so restoring the
+        // pagination without restoring the window leaves the user on a range
+        // no history entry ever held.
+        renderHook(() => useURLSync());
+        act(() => {
+          window.history.replaceState(null, "", "/#all-traces?preset=7d");
+          selectSevenDayRange();
+          seedThirdPage();
+        });
+
+        act(() => {
+          window.history.replaceState(null, "", "/?trace=trace-a");
+          popState();
+        });
+
+        expect(useFilterStore.getState().timeRange.presetId).toBe("30d");
         expect(pagination()).toEqual({ page: 1, pageCursors: { 1: null } });
       });
     });
