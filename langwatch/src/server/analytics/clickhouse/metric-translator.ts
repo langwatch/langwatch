@@ -33,7 +33,7 @@ const MAX_THREAD_SESSION_DURATION_MS = 3 * 60 * 60 * 1000; // 10800000ms = 3 hou
  *
  * Exported for the aggregation builder's grouped (CTE/dedup) path, which
  * materializes this exact expression as a per-trace CTE column and rewrites
- * metric expressions against it (see DEDUP_SUBSTITUTIONS).
+ * metric expressions against it (see `dedupSubstitutions()` in aggregation-builder.ts).
  */
 export function nonBilledCostExpression(ts: string): string {
   return `coalesce(${ts}.NonBilledCost, if(${ts}.Attributes['langwatch.cost.non_billable'] = 'true', ${ts}.TotalCost, 0), 0)`;

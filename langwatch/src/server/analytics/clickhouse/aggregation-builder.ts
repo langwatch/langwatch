@@ -802,7 +802,7 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
     (usesArrayJoin || groupByRequiresSpans || spanModelPartitioned) &&
     groupByColumn
   ) {
-    return buildArrayJoinTimeseriesQuery(
+    return buildArrayJoinTimeseriesQuery({
       input,
       groupByColumn,
       groupByHandlesUnknown,
@@ -810,10 +810,10 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
       joinClauses,
       baseWhere,
       filterWhere,
-      allTranslationParams,
+      filterParams: allTranslationParams,
       timeZone,
       spanModelPartitioned,
-    );
+    });
   }
 
   // Separate simple and subquery metrics
@@ -1320,18 +1320,29 @@ function replaceColumnWithAlias(
  * or span-level grouping (model, span_type).
  * This prevents trace duplication from affecting aggregate counts.
  */
-function buildArrayJoinTimeseriesQuery(
-  input: TimeseriesQueryInput,
-  groupByColumn: string,
-  groupByHandlesUnknown: boolean,
-  metricTranslations: MetricTranslation[],
-  joinClauses: string,
-  baseWhere: string,
-  filterWhere: string,
-  filterParams: Record<string, unknown>,
-  timeZone: string,
+function buildArrayJoinTimeseriesQuery({
+  input,
+  groupByColumn,
+  groupByHandlesUnknown,
+  metricTranslations,
+  joinClauses,
+  baseWhere,
+  filterWhere,
+  filterParams,
+  timeZone,
   spanModelPartitioned = false,
-): BuiltQuery {
+}: {
+  input: TimeseriesQueryInput;
+  groupByColumn: string;
+  groupByHandlesUnknown: boolean;
+  metricTranslations: MetricTranslation[];
+  joinClauses: string;
+  baseWhere: string;
+  filterWhere: string;
+  filterParams: Record<string, unknown>;
+  timeZone: string;
+  spanModelPartitioned?: boolean;
+}): BuiltQuery {
   const ts = tableAliases.trace_summaries;
 
   // Build date truncation for CTE
@@ -1438,7 +1449,7 @@ function buildArrayJoinTimeseriesQuery(
   const traceColumnWrapper = (col: string) =>
     hasEvalMixWithTrace ? `any(${col})` : col;
   // IMPORTANT: When adding a new trace-level column to metric-translator.ts, it
-  // MUST also be added to this CTE select list AND to DEDUP_SUBSTITUTIONS
+  // MUST also be added to this CTE select list AND to dedupSubstitutions()
   // (consumed by transformMetricForDedup below). The simple-path
   // buildMixedEvalTimeseriesQuery uses dynamic column extraction via
   // extractTraceAggregationColumn, but this arrayJoin path still uses the
@@ -1455,9 +1466,9 @@ function buildArrayJoinTimeseriesQuery(
   // Non-additive trace-level columns (duration, TTFT, tokens/second) keep
   // whole-trace attribution in every bucket the trace touched.
   const smdMiss = `(${SPAN_MODEL_ALIAS}.SpanModelKey IS NULL OR ${SPAN_MODEL_ALIAS}.SpanModelKey = '')`;
-  const partitionedOrTrace = (bucketColumn: string, traceExpr: string) =>
+  const partitionedOrTrace = (bucketExpr: string, traceExpr: string) =>
     spanModelPartitioned
-      ? `if(${smdMiss}, ${traceExpr}, ${SPAN_MODEL_ALIAS}.${bucketColumn})`
+      ? `if(${smdMiss}, ${traceExpr}, ${bucketExpr})`
       : traceExpr;
   // The effective non-billed cost (column + legacy-marker fallback) is only
   // materialized when a requested metric reads it, because the fallback reads
@@ -1466,6 +1477,16 @@ function buildArrayJoinTimeseriesQuery(
   const needsNonBilledCost = simpleMetrics.some((m) =>
     m.selectExpression.includes("NonBilledCost"),
   );
+  // Bucket-level non-billed cost mirrors nonBilledCostExpression's precedence
+  // exactly: the fold-time per-span split wins; the legacy all-or-nothing
+  // `langwatch.cost.non_billable` trace marker only kicks in when the
+  // trace-level NonBilledCost column is NULL (rows folded before the column
+  // existed). The marker classifies the WHOLE trace as bundled, so under it
+  // every bucket's non-billed share equals the bucket's cost, keeping the
+  // buckets an exact partition of the trace expression.
+  const bucketNonBilledExpr = needsNonBilledCost
+    ? `if(${ts}.NonBilledCost IS NULL AND ${ts}.Attributes['langwatch.cost.non_billable'] = 'true', ${SPAN_MODEL_ALIAS}.SpanModelCost, ${SPAN_MODEL_ALIAS}.SpanModelNonBilledCost)`
+    : `${SPAN_MODEL_ALIAS}.SpanModelNonBilledCost`;
   const needsCacheTokenColumns = simpleMetrics.some(
     (m) =>
       m.selectExpression.includes("langwatch.reserved.cache_read_tokens") ||
@@ -1473,12 +1494,12 @@ function buildArrayJoinTimeseriesQuery(
       m.selectExpression.includes("langwatch.reserved.reasoning_tokens"),
   );
   cteSelectExprs.push(
-    `${traceColumnWrapper(partitionedOrTrace("SpanModelCost", `${ts}.TotalCost`))} AS trace_total_cost`,
+    `${traceColumnWrapper(partitionedOrTrace(`${SPAN_MODEL_ALIAS}.SpanModelCost`, `${ts}.TotalCost`))} AS trace_total_cost`,
   );
   cteSelectExprs.push(
     `${traceColumnWrapper(
       partitionedOrTrace(
-        "SpanModelNonBilledCost",
+        bucketNonBilledExpr,
         needsNonBilledCost ? nonBilledCostExpression(ts) : `${ts}.NonBilledCost`,
       ),
     )} AS trace_non_billed_cost`,
@@ -1487,10 +1508,10 @@ function buildArrayJoinTimeseriesQuery(
     `${traceColumnWrapper(`${ts}.TotalDurationMs`)} AS trace_duration_ms`,
   );
   cteSelectExprs.push(
-    `${traceColumnWrapper(partitionedOrTrace("SpanModelPromptTokens", `${ts}.TotalPromptTokenCount`))} AS trace_prompt_tokens`,
+    `${traceColumnWrapper(partitionedOrTrace(`${SPAN_MODEL_ALIAS}.SpanModelPromptTokens`, `${ts}.TotalPromptTokenCount`))} AS trace_prompt_tokens`,
   );
   cteSelectExprs.push(
-    `${traceColumnWrapper(partitionedOrTrace("SpanModelCompletionTokens", `${ts}.TotalCompletionTokenCount`))} AS trace_completion_tokens`,
+    `${traceColumnWrapper(partitionedOrTrace(`${SPAN_MODEL_ALIAS}.SpanModelCompletionTokens`, `${ts}.TotalCompletionTokenCount`))} AS trace_completion_tokens`,
   );
   cteSelectExprs.push(
     `${traceColumnWrapper(`${ts}.TokensPerSecond`)} AS trace_tokens_per_second`,
@@ -1504,7 +1525,7 @@ function buildArrayJoinTimeseriesQuery(
     cteSelectExprs.push(
       `${traceColumnWrapper(
         partitionedOrTrace(
-          "SpanModelCacheReadTokens",
+          `${SPAN_MODEL_ALIAS}.SpanModelCacheReadTokens`,
           `toFloat64(toUInt64OrZero(${ts}.Attributes['langwatch.reserved.cache_read_tokens']))`,
         ),
       )} AS trace_cache_read_tokens`,
@@ -1512,7 +1533,7 @@ function buildArrayJoinTimeseriesQuery(
     cteSelectExprs.push(
       `${traceColumnWrapper(
         partitionedOrTrace(
-          "SpanModelCacheWriteTokens",
+          `${SPAN_MODEL_ALIAS}.SpanModelCacheWriteTokens`,
           `toFloat64(toUInt64OrZero(${ts}.Attributes['langwatch.reserved.cache_creation_tokens']))`,
         ),
       )} AS trace_cache_write_tokens`,
@@ -1520,7 +1541,7 @@ function buildArrayJoinTimeseriesQuery(
     cteSelectExprs.push(
       `${traceColumnWrapper(
         partitionedOrTrace(
-          "SpanModelReasoningTokens",
+          `${SPAN_MODEL_ALIAS}.SpanModelReasoningTokens`,
           `toFloat64(toUInt64OrZero(${ts}.Attributes['langwatch.reserved.reasoning_tokens']))`,
         ),
       )} AS trace_reasoning_tokens`,

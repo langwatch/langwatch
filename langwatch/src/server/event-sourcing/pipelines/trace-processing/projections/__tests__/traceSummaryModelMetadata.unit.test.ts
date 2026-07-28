@@ -4,8 +4,9 @@
  * Pins the trace-level model metadata stamp: the fold derives
  * `metadata.model` (primary = most recently used model, `models[0]`) and
  * `metadata.models` (the full set, most-recent-first) from its spans'
- * gen_ai model attributes. Regression: `trace.metadata.model` was null on
- * ALL traces because the model only ever lived at span level.
+ * gen_ai model attributes. Regression: no DERIVED model metadata existed at
+ * trace level (the model only ever lived at span level), so unless the user
+ * supplied `metadata.model` themselves, `trace.metadata.model` was null.
  *
  * User-provided `metadata.model` must keep winning over the stamp.
  */
@@ -78,6 +79,39 @@ describe("trace-level model metadata stamping", () => {
     });
   });
 
+  describe("when user metadata.model arrives only AFTER an earlier span already stamped", () => {
+    it("lets the late user value win and stops stamping", () => {
+      // First span has no user metadata: the fold stamps.
+      let state = applySpanToSummary({
+        state: createInitState(),
+        span: llmSpan("s1", "claude-opus-5"),
+      });
+      expect(state.attributes["metadata.model"]).toBe("claude-opus-5");
+
+      // Second span carries user-provided metadata.model. The user value must
+      // replace the stamp, and stamping must stop.
+      state = applySpanToSummary({
+        state,
+        span: createTestSpan({
+          id: "s2",
+          spanId: "s2",
+          spanAttributes: {
+            "gen_ai.request.model": "claude-sonnet-4-5",
+            "metadata.model": "my-custom-router",
+          },
+        }),
+      });
+      expect(state.attributes["metadata.model"]).toBe("my-custom-router");
+
+      // A third span without user metadata must not resume stamping.
+      state = applySpanToSummary({
+        state,
+        span: llmSpan("s3", "claude-haiku-4-5"),
+      });
+      expect(state.attributes["metadata.model"]).toBe("my-custom-router");
+    });
+  });
+
   describe("when the user provides metadata.model themselves", () => {
     it("does not clobber the user's value", () => {
       const userSpan = createTestSpan({
@@ -117,7 +151,7 @@ describe("trace-level model metadata stamping", () => {
     });
   });
 
-  describe("slim analytics fold", () => {
+  describe("when folding spans into slim analytics", () => {
     it("stamps the same metadata as the trace-summary fold", () => {
       const projection = new TraceAnalyticsFoldProjection({
         store: { store: async () => {}, get: async () => null },
@@ -136,7 +170,7 @@ describe("trace-level model metadata stamping", () => {
     });
   });
 
-  describe("read-side metadata mapping", () => {
+  describe("when mapping folded attributes to read-side metadata", () => {
     it("surfaces model as a string and models as an array, hiding the stamp marker", () => {
       let state = applySpanToSummary({
         state: createInitState(),

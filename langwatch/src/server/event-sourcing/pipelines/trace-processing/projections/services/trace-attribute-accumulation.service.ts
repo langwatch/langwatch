@@ -337,6 +337,30 @@ export class TraceAttributeAccumulationService {
       }
     }
 
+    // User-provided model metadata wins over an earlier fold's stamp. The
+    // existing-wins merge above keeps the STAMPED values when a later span
+    // carries user `metadata.model` / `metadata.models`, which would silently
+    // drop the user's value. Apply the incoming user keys and clear the
+    // marker so stamping stops for good. (Our own stamp never appears in
+    // spanAttrs: extractAttributes reads the span, the stamp lives on state.)
+    if (merged[MODEL_METADATA_STAMPED_MARKER] === "true") {
+      const incomingModel = spanAttrs[STAMPED_MODEL_ATTRIBUTE];
+      const incomingModels = spanAttrs[STAMPED_MODELS_ATTRIBUTE];
+      if (incomingModel !== undefined || incomingModels !== undefined) {
+        delete merged[MODEL_METADATA_STAMPED_MARKER];
+        if (incomingModel !== undefined) {
+          merged[STAMPED_MODEL_ATTRIBUTE] = incomingModel;
+        } else {
+          delete merged[STAMPED_MODEL_ATTRIBUTE];
+        }
+        if (incomingModels !== undefined) {
+          merged[STAMPED_MODELS_ATTRIBUTE] = incomingModels;
+        } else {
+          delete merged[STAMPED_MODELS_ATTRIBUTE];
+        }
+      }
+    }
+
     this.traceOriginService.stripLegacyMarkers(merged);
     this.traceOriginService.hoistOrigin({
       state,
@@ -401,10 +425,9 @@ export class TraceAttributeAccumulationService {
    * `metadata.model` / `metadata.models` (span or resource metadata) win: the
    * reserved marker records that WE stamped the current values, and without
    * it a present value is treated as the user's and left untouched. A user
-   * value arriving only after a fold has already stamped is superseded by the
-   * stamp (the accumulator's existing-wins merge has already dropped it by
-   * the time this runs); resource-level metadata rides every span, so real
-   * user metadata is present from the first fold and always wins.
+   * value arriving only on a LATER span, after a fold has already stamped,
+   * also wins: `accumulateAttributes` detects the incoming user key, applies
+   * it over the stamp, and clears the marker so stamping stops for good.
    */
   stampModelMetadata({
     attributes,
