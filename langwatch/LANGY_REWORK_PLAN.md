@@ -1,3 +1,11 @@
+> **Historical working note — not current documentation.**
+> A planning document from the #5741 Langy rework. It is kept (rather than
+> deleted) because ~18 source comments cite its section numbers as the design
+> record for things like the frame-auth `runToken` contract. It records intent
+> at the time of writing, which is **not** always what shipped — a retrospective
+> review found it vouching for code that has no callers. Verify any claim here
+> against the code before relying on it. See issue #5881.
+
 # Langy event-sourcing rework — remaining plan
 
 Working plan for `feat/langy-rework`. Consolidates the earlier step plan, the
@@ -157,7 +165,7 @@ replay/refold, so a throw + a time-based give-up are both safe.
   runTurn). All were a dead cluster (spawnAgent dispatches directly now). Cleared the
   `langy-turn.processor.ts:818` pre-existing type error. G4 (GitHub PR flow) was already dead in the
   self-drive model — its re-home is a fresh #24 feature, not a preservation. `langy-turn-errors`,
-  `langy-final-parts`, `githubCommand`, `githubPrDetails` kept (used / #24 targets).
+  `langy-final-parts`, `githubCommand` kept (used / #24 targets). NOTE (#5881): `githubPrDetails` was kept but has NO caller — this line asserted it was used and misled a later reviewer; the module has since been deleted.
 - **M2d DONE** — moved ALL of `src/server/services/langy/*` → `src/server/app-layer/langy/*` (27 source
   + tests, `git mv` renames so history is preserved; `streaming/` + `execution/` subdirs kept). Rewrote
   every import `services/langy` → `app-layer/langy` across `.ts` + `.tsx`. `services/langy` is gone.
@@ -195,7 +203,8 @@ replay/refold, so a throw + a time-based give-up are both safe.
   concern is moot for this PR (nothing to release), and non-GitHub turns no longer over-reserve.
 - Frontend connect card (`LangyGitHubConnectCard`) is already inert (its trigger
   `langy_github_not_connected` was produced by the deleted `runTurn`); no persistent connect button.
-- Kept: `langyGithub*` modules, `githubCommand`, `githubPrDetails`, the OAuth connect route + app-layer
+- Kept: `langyGithub*` modules, `githubCommand`, the OAuth connect route + app-layer
+  (`githubPrDetails` was listed here but had no caller and was deleted — see #5881)
   credential service, the permit functions. #24 flips `LANGY_GITHUB_ENABLED = true` + re-homes the PR flow.
 - RESIDUAL (minor, optional Go follow-up): the worker still ships the `github` skill, so an agent MAY
   attempt `gh` and fail gracefully (no token). Removing the skill when GitHub is off is a Go-side nicety,

@@ -24,7 +24,7 @@ Feature: Langy dual-stream — a raw token fast-path beside the durable event-so
   # Manager: the multiplexed fast frame
   # ---------------------------------------------------------------------------
 
-  @unit
+  @unimplemented
   Scenario: The manager emits a raw token frame for a text delta
     Given the worker's opencode stream produces a text delta for the routed session
     When the manager forwards the turn
@@ -32,7 +32,7 @@ Feature: Langy dual-stream — a raw token fast-path beside the durable event-so
     And it still forwards the full parsed event as before
     And the raw token frame is flushed ahead of the full event line
 
-  @unit
+  @unimplemented
   Scenario: The manager emits no raw token frame for a non-text event
     Given the worker's opencode stream produces a tool-call or lifecycle event
     When the manager forwards the turn
@@ -108,14 +108,14 @@ Feature: Langy dual-stream — a raw token fast-path beside the durable event-so
   # Control plane: split at the turn processor, ephemeral pub/sub
   # ---------------------------------------------------------------------------
 
-  @integration
+  @unimplemented
   Scenario: Raw tokens are fanned to the ephemeral fast channel, deltas to the durable buffer
     Given a turn is running for a conversation
     When the manager sends raw token frames and full text-delta events
     Then the raw tokens are published to the per-turn fast channel
     And the durable token buffer is fed by the full text-delta events exactly as before
 
-  @integration
+  @unimplemented
   Scenario: The fast stream endpoint streams raw tokens to the browser
     Given a turn is running for a conversation I own
     When I open the fast stream for that turn
@@ -123,13 +123,13 @@ Feature: Langy dual-stream — a raw token fast-path beside the durable event-so
     And the stream ends when the turn signals end
     And the stream closes when I disconnect
 
-  @integration
+  @unimplemented
   Scenario: The fast stream refuses a turn I cannot see
     Given a conversation that is not mine and not shared
     When I open the fast stream for that turn
     Then the request is refused
 
-  @integration
+  @unimplemented
   Scenario: The fast stream is best-effort and never replays
     Given a turn produced tokens before I subscribed
     When I open the fast stream late
@@ -140,13 +140,13 @@ Feature: Langy dual-stream — a raw token fast-path beside the durable event-so
   # Frontend reconciliation
   # ---------------------------------------------------------------------------
 
-  @unit
+  @unimplemented
   Scenario: The optimistic text leads while it is a superset of the durable text
     Given the durable text so far is a prefix of the fast text
     When the answer is reconciled for display
     Then the fast text is shown
 
-  @unit
+  @unimplemented
   Scenario: The durable text wins when the fast text has a gap
     Given the fast text is not a prefix-consistent superset of the durable text
     When the answer is reconciled for display

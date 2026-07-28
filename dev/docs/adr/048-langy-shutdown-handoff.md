@@ -1,3 +1,8 @@
+> **Numbering collision (#5881).** See `048-langy-dual-stream.md` — both were added
+> by #5741 under the same number. Most in-code "ADR-048" citations
+> (`packages/langy/src/constants.ts`, `event-sourcing/contracts/events.ts`) mean
+> THIS document, the shutdown handoff. Cite the filename, not the number.
+
 # ADR-048: Langy worker shutdown-handoff — checkpoint on SIGTERM, resume on the next worker
 
 **Date:** 2026-07-11

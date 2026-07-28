@@ -1,3 +1,11 @@
+> **Historical working note — not current documentation.**
+> A planning document from the #5741 Langy rework. It is kept (rather than
+> deleted) because ~18 source comments cite its section numbers as the design
+> record for things like the frame-auth `runToken` contract. It records intent
+> at the time of writing, which is **not** always what shipped — a retrospective
+> review found it vouching for code that has no callers. Verify any claim here
+> against the code before relying on it. See issue #5881.
+
 # Langy progress/status UX for open-ended agent work — design plan
 
 Research pass 2026-07-15 (file-level machinery audit + industry synthesis).

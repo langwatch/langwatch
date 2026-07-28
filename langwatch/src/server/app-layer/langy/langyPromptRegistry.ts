@@ -1,6 +1,16 @@
 /**
  * Langy prompt registry loader.
  *
+ * !! NOT WIRED (#5881). `resolveLangyPrompt` has no caller. The only consumer of
+ * this module is `langy-turn.service.ts`, and it imports exactly one symbol —
+ * the `LANGY_TURN_OVERRIDE_FALLBACK` constant — which it assigns unconditionally
+ * at module scope. So every turn uses the hardcoded in-repo text, and seeding a
+ * prompt via `pnpm seed:langy-prompts` + promoting it to `production` has NO
+ * runtime effect. The seam below is correct; nothing calls it. Either wire it
+ * into the turn service or delete this module and the seed script — the current
+ * state is the worst of the three, because it gives operators a workflow that
+ * silently does nothing. See ADR-050.
+ *
  * Langy has two prompt surfaces we want stored as VERSIONED rows in LangWatch's
  * own prompt registry (`LlmPromptConfig`), rather than hardcoded:
  *
