@@ -36,7 +36,18 @@ COPY skills ./skills
 COPY Dockerfile.langyagent ./Dockerfile.langyagent
 COPY feature-map.json ./feature-map.json
 
-COPY langwatch/package.json langwatch/pnpm-lock.yaml langwatch/pnpm-workspace.yaml ./langwatch/
+# Since ADR-076 the repo is a SINGLE pnpm workspace: the lockfile, the
+# workspace definition and the hoist settings all live at the root, and
+# langwatch/ is one member of it. The install therefore runs from /app rather
+# than /app/langwatch, and is narrowed with a filter so the TypeScript SDK,
+# the skills compiler and the e2e suites never enter the image.
+COPY pnpm-workspace.yaml pnpm-lock.yaml package.json .npmrc ./
+COPY langwatch/package.json ./langwatch/
+# Every workspace member's manifest must be present or `--frozen-lockfile`
+# has nothing to check the lockfile against. These three carry no source into
+# the image — only the manifest the workspace needs to stay coherent.
+COPY typescript-sdk/package.json ./typescript-sdk/
+COPY agentic-e2e-tests/package.json ./agentic-e2e-tests/
 # The `packages/*` workspace members (e.g. @langwatch/observability, @langwatch/api)
 # are consumed as source, so pnpm install must see their package.json to link them
 # and install their own dependencies (pino, pino-pretty, ...) into
@@ -46,12 +57,15 @@ COPY langwatch/package.json langwatch/pnpm-lock.yaml langwatch/pnpm-workspace.ya
 COPY langwatch/packages ./langwatch/packages
 COPY langwatch/vendor ./langwatch/vendor
 # https://stackoverflow.com/questions/70154568/pnpm-equivalent-command-for-npm-ci
-RUN cd langwatch && CI=true pnpm install --frozen-lockfile
+RUN CI=true pnpm install --frozen-lockfile --filter "@langwatch/web..."
 COPY langwatch ./langwatch
 RUN cd langwatch && NODE_OPTIONS=--max-old-space-size=4096 pnpm run build
 
-# Remove dev dependencies — not needed at runtime
-RUN cd langwatch && CI=true pnpm prune --prod
+# Remove dev dependencies — not needed at runtime. A filtered re-install with
+# --prod rather than `pnpm prune --prod`: prune takes no --filter, so in a
+# workspace it reasons about every project instead of the one subtree we
+# installed. Both converge on the same prod-only tree.
+RUN CI=true pnpm install --frozen-lockfile --prod --filter "@langwatch/web..."
 # Regenerate Prisma client after pruning (prisma is a prod dep, but generate needs re-run)
 RUN cd langwatch && pnpm prisma generate
 
