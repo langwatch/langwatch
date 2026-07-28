@@ -122,7 +122,16 @@ export function UserMetrics() {
       <GridItem>
         <Card.Root border="1px solid" borderColor="border.emphasized">
           <Card.Body paddingTop={2}>
-            <Tabs.Root variant="plain" defaultValue="messages">
+            <Tabs.Root
+              variant="plain"
+              defaultValue="messages"
+              // Every panel here is a read-only CustomGraph analytics
+              // query with no user-entered state, so fully unmounting
+              // inactive tabs is safe and avoids holding queries for
+              // graphs the user never looks at.
+              lazyMount
+              unmountOnExit
+            >
               <Tabs.List gap={8}>
                 <Tabs.Trigger
                   value="messages"
