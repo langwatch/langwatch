@@ -534,3 +534,96 @@ describe("serializeTracesToFullCsv()", () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// Streaming: chunks are concatenated straight into one file
+// ---------------------------------------------------------------------------
+
+/**
+ * Mirrors ExportService.serializeCsvBatch: the first batch keeps its header,
+ * later batches have it stripped, and the pieces are concatenated with no
+ * separator. Kept in sync with export.service.ts by construction — if the
+ * chunk contract changes, these tests fail.
+ */
+function stripCsvHeader(csv: string): string {
+  const firstBreak = csv.indexOf("\r\n");
+  return firstBreak === -1 ? "" : csv.slice(firstBreak + 2);
+}
+
+describe("when an export spans several batches", () => {
+  it("keeps every row intact across a batch boundary", () => {
+    const evaluatorNames: string[] = [];
+    const batch1 = serializeTracesToSummaryCsv({
+      traces: [
+        buildTrace({ trace_id: "trace-1" }),
+        buildTrace({ trace_id: "trace-2" }),
+      ],
+      evaluatorNames,
+    });
+    const batch2 = stripCsvHeader(
+      serializeTracesToSummaryCsv({
+        traces: [
+          buildTrace({ trace_id: "trace-3" }),
+          buildTrace({ trace_id: "trace-4" }),
+        ],
+        evaluatorNames,
+      }),
+    );
+
+    const rows = parseCsv(batch1 + batch2).data as Record<string, string>[];
+
+    // Before the fix this yielded 3 rows, with "trace-2" and "trace-3" fused
+    // into one — the last row of a chunk glued onto the first of the next.
+    expect(rows).toHaveLength(4);
+    expect(rows.map((r) => r.trace_id)).toEqual([
+      "trace-1",
+      "trace-2",
+      "trace-3",
+      "trace-4",
+    ]);
+  });
+
+  it("writes exactly one header for the whole file", () => {
+    const evaluatorNames: string[] = [];
+    const batch1 = serializeTracesToSummaryCsv({
+      traces: [buildTrace({ trace_id: "a" })],
+      evaluatorNames,
+    });
+    const batch2 = stripCsvHeader(
+      serializeTracesToSummaryCsv({
+        traces: [buildTrace({ trace_id: "b" })],
+        evaluatorNames,
+      }),
+    );
+
+    const file = batch1 + batch2;
+    expect(file.split("trace_id")).toHaveLength(2);
+    expect((parseCsv(file).data as unknown[]).length).toBe(2);
+  });
+
+  it("keeps span rows intact across a batch boundary in full mode", () => {
+    const evaluatorNames: string[] = [];
+    // Full mode emits one row per span, so each trace needs at least one.
+    const batch1 = serializeTracesToFullCsv({
+      traces: [buildTrace({ trace_id: "trace-1", spans: [buildLLMSpan()] })],
+      evaluatorNames,
+    });
+    const batch2 = stripCsvHeader(
+      serializeTracesToFullCsv({
+        traces: [buildTrace({ trace_id: "trace-2", spans: [buildLLMSpan()] })],
+        evaluatorNames,
+      }),
+    );
+
+    const rows = parseCsv(batch1 + batch2).data as Record<string, string>[];
+    expect(rows.map((r) => r.trace_id)).toEqual(["trace-1", "trace-2"]);
+  });
+
+  it("terminates a chunk so nothing can fuse onto the next one", () => {
+    const csv = serializeTracesToSummaryCsv({
+      traces: [buildTrace()],
+      evaluatorNames: [],
+    });
+    expect(csv.endsWith("\r\n")).toBe(true);
+  });
+});

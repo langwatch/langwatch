@@ -19,6 +19,22 @@ import type {
 } from "~/server/tracer/types";
 import { RESERVED_METADATA_KEYS } from "./constants";
 
+/**
+ * RFC 4180 line ending, stated explicitly rather than relying on PapaParse's
+ * default.
+ *
+ * Every chunk must both use this internally AND end with it. A streamed export
+ * concatenates chunks straight into one file, so a chunk with no trailing
+ * newline glues its last row onto the next chunk's first row — and a chunk
+ * that terminates rows with a different sequence than the one PapaParse wrote
+ * inside it makes the whole remainder of the file parse as a single row.
+ * Neither shows up until an export exceeds one batch.
+ *
+ * Exported so export.service.ts strips the header on the same sequence it was
+ * written with.
+ */
+export const CSV_NEWLINE = "\r\n";
+
 // ---------------------------------------------------------------------------
 // Summary CSV
 // ---------------------------------------------------------------------------
@@ -58,7 +74,10 @@ export function serializeTracesToSummaryCsv({
     buildSummaryRow({ trace, evaluatorNames }),
   );
 
-  return Parse.unparse({ fields: headers, data: rows });
+  return (
+    Parse.unparse({ fields: headers, data: rows }, { newline: CSV_NEWLINE }) +
+    CSV_NEWLINE
+  );
 }
 
 function buildSummaryHeaders({
@@ -173,7 +192,10 @@ export function serializeTracesToFullCsv({
     }
   }
 
-  return Parse.unparse({ fields: headers, data: rows });
+  return (
+    Parse.unparse({ fields: headers, data: rows }, { newline: CSV_NEWLINE }) +
+    CSV_NEWLINE
+  );
 }
 
 function buildFullHeaders({
