@@ -4,6 +4,19 @@ Feature: Suite run progress is derived from its simulation runs
   into a separate record, so a lost or repeated update cannot change what the
   user sees. (ADR-072; run liveness per ADR-073.)
 
+  # KNOWN GAP — the derivation scenarios below carry no tag, so
+  # `check:feature-parity` enforces none of them and the file reports as green
+  # while every scenario in it is inert. The behaviour IS implemented and
+  # tested; what is missing is the `@scenario` JSDoc binding tying each test
+  # back to its scenario here. Tagging them without first writing those
+  # bindings would fail parity, so the two go together and are tracked as
+  # follow-up. Only the idempotency scenario at the foot of this file is
+  # genuinely bound and enforced.
+  #
+  # See specs/ai-gateway/governance/folds.feature for the same trap found on a
+  # compliance surface, and dev/docs/TESTING_PHILOSOPHY.md for the tag
+  # contract.
+
   Background:
     Given a suite with scenarios and targets
 
@@ -68,3 +81,39 @@ Feature: Suite run progress is derived from its simulation runs
     When it starts and later finishes
     Then no separate suite-run record is written for it
     And the batch's progress is still readable
+
+  # --- Submitting the same run twice ---
+  #
+  # Retrying a submit is ordinary: a CI job times out and runs again, a browser
+  # resends, a script retries a 502. Without a key that costs the customer a
+  # duplicate suite run and duplicate spend, and there is no way to tell the
+  # duplicate from a deliberate second run.
+  #
+  # The key is optional on purpose. Omitting it is how "run this again" is
+  # expressed, and that stays the default.
+
+  @unit
+  Scenario: Resubmitting a suite with the same key does not queue it twice
+    Given a suite was submitted for a run with an idempotency key
+    When the same suite is submitted again with that same key
+    Then the same runs are asked for
+    And no second set of runs is queued
+
+  @unit
+  Scenario: Submitting without a key runs the suite again
+    Given a suite was submitted for a run with no idempotency key
+    When the same suite is submitted again with no key
+    Then a second set of runs is queued
+    And the two runs are reported separately
+
+  @unit
+  Scenario: A different key runs the suite again
+    Given a suite was submitted for a run with an idempotency key
+    When the same suite is submitted with a different key
+    Then a second set of runs is queued
+
+  @unit
+  Scenario: Two projects reusing one key do not collide
+    Given two projects each submit a suite with the same idempotency key
+    Then each project queues its own runs
+    And neither project's runs are attributed to the other

@@ -1,7 +1,11 @@
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import type { QueueRunCommandData } from "~/server/event-sourcing/pipelines/simulation-processing/schemas/commands";
-import { generateBatchRunId } from "~/server/scenarios/scenario.ids";
+import {
+  deriveBatchRunId,
+  deriveScenarioRunId,
+  generateBatchRunId,
+} from "~/server/scenarios/scenario.ids";
 import { getSuiteSetId } from "~/server/suites/suite-set-id";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { traced } from "../tracing";
@@ -64,6 +68,14 @@ export class SuiteRunService {
     repeatCount: number;
     skippedArchived: SuiteRunResult["skippedArchived"];
     batchRunId?: string;
+    /**
+     * Supplied by the caller to make a repeated submit idempotent. When set,
+     * the batch and every run id are derived from it, so a retry re-dispatches
+     * the same `queueRun` commands and the event store collapses them. Absent,
+     * ids are random and a second submit is a second run — which is what the
+     * UI's "run again" wants.
+     */
+    idempotencyKey?: string;
   }): Promise<SuiteRunResult> {
     const {
       suiteId,
@@ -73,9 +85,14 @@ export class SuiteRunService {
       activeTargets,
       repeatCount,
       skippedArchived,
+      idempotencyKey,
     } = params;
 
-    const batchRunId = params.batchRunId ?? generateBatchRunId();
+    const batchRunId =
+      params.batchRunId ??
+      (idempotencyKey
+        ? deriveBatchRunId({ projectId, suiteId, idempotencyKey })
+        : generateBatchRunId());
     const setId = getSuiteSetId(suiteId);
     const total = activeScenarioIds.length * activeTargets.length * repeatCount;
 
@@ -104,7 +121,15 @@ export class SuiteRunService {
             scenarioId,
             target,
             repeat,
-            scenarioRunId: generate(KSUID_RESOURCES.SCENARIO_RUN).toString(),
+            scenarioRunId: idempotencyKey
+              ? deriveScenarioRunId({
+                  projectId,
+                  idempotencyKey,
+                  scenarioId,
+                  targetReferenceId: target.referenceId,
+                  repeat,
+                })
+              : generate(KSUID_RESOURCES.SCENARIO_RUN).toString(),
           });
         }
       }
