@@ -25,3 +25,53 @@ export class ModelProviderNotFoundError extends HandledError {
     this.name = "ModelProviderNotFoundError";
   }
 }
+
+/** What the call was missing. Drives the copy; never rendered raw. */
+export type ModelProviderAnchorRequirement =
+  /** Either handle identifies the tenant, so either one will do. */
+  | "project_or_organization"
+  /** Deleting by provider NAME resolves within a project, so only a project will do. */
+  | "project";
+
+/**
+ * The request did not say which tenant to act in.
+ *
+ * A provider belongs to an organization and reaches the scopes attached to it,
+ * so a project handle (which resolves to its organization) or an organization
+ * handle both work — except when deleting by provider name, which is the legacy
+ * project-shaped contract and resolves only within a project.
+ *
+ * Coded rather than left as a `TRPCError({ code: "BAD_REQUEST" })`: an API or
+ * SDK caller can fix this by sending the missing handle, which is exactly the
+ * "known cause, actionable by the caller" test.
+ */
+export class ModelProviderAnchorRequiredError extends HandledError {
+  declare readonly code: "model_provider_anchor_required";
+
+  constructor(requires: ModelProviderAnchorRequirement) {
+    super(
+      "model_provider_anchor_required",
+      `Model provider call is missing its tenant anchor (requires: ${requires})`,
+      { meta: { requires }, httpStatus: 400, fault: "customer" },
+    );
+    this.name = "ModelProviderAnchorRequiredError";
+  }
+}
+
+/**
+ * A new provider anchored to an organization rather than a project carries no
+ * scopes by default — there is no project to derive one from — so the call has
+ * to say which scopes it is being set up for.
+ */
+export class ModelProviderScopesRequiredError extends HandledError {
+  declare readonly code: "model_provider_scopes_required";
+
+  constructor() {
+    super(
+      "model_provider_scopes_required",
+      "A model provider created without a project must declare its scopes",
+      { httpStatus: 400, fault: "customer" },
+    );
+    this.name = "ModelProviderScopesRequiredError";
+  }
+}

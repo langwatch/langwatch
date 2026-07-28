@@ -1,5 +1,4 @@
 import type { PrismaClient, Project } from "@prisma/client";
-import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { env } from "~/env.mjs";
 import type { Session } from "~/server/auth";
@@ -7,7 +6,11 @@ import { isManagedProvider } from "../../../ee/managed-providers/managedBedrockC
 import { KEY_CHECK, MASKED_KEY_PLACEHOLDER } from "../../utils/constants";
 import type { CustomModelsInput } from "./customModel.schema";
 import { toLegacyCompatibleCustomModels } from "./customModel.schema";
-import { ModelProviderNotFoundError } from "./errors";
+import {
+  ModelProviderAnchorRequiredError,
+  ModelProviderNotFoundError,
+  ModelProviderScopesRequiredError,
+} from "./errors";
 import {
   assertCanManageAllScopes,
   canReadAnyScope,
@@ -460,11 +463,7 @@ export class ModelProviderService {
     } = input;
 
     if (!projectId && !organizationId) {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message:
-          "A model provider write needs either a project or an organization to anchor it.",
-      });
+      throw new ModelProviderAnchorRequiredError("project_or_organization");
     }
 
     const advanced = {
@@ -554,11 +553,7 @@ export class ModelProviderService {
           : undefined));
 
     if (!existingProvider && !createScopes) {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message:
-          "A new model provider needs at least one scope when no project is given.",
-      });
+      throw new ModelProviderScopesRequiredError();
     }
 
     return await this.prisma.$transaction(async (tx) => {
@@ -701,19 +696,12 @@ export class ModelProviderService {
     const { id, projectId, provider } = input;
 
     if (!projectId && !input.organizationId) {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message:
-          "A model provider delete needs either a project or an organization to anchor it.",
-      });
+      throw new ModelProviderAnchorRequiredError("project_or_organization");
     }
     // Matching by provider string is the legacy project-shaped contract —
     // it asks for "this provider type in this project", which needs one.
     if (!id && !projectId) {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message: "Deleting a model provider by provider name needs a project.",
-      });
+      throw new ModelProviderAnchorRequiredError("project");
     }
 
     const anchor = await this.resolveOrganizationAnchor({

@@ -279,13 +279,20 @@ describe("explainHandledError", () => {
        *
        * Narrower than {@link ALLOWED_ECHOES}: an exemption that applies to
        * every code is a hole, and `meta.message` is the field a relayed Go
-       * service can write, so exactly one code may render it.
+       * service can write, so it is named per code and nowhere else.
        */
       const ALLOWED_PER_CODE: Record<string, Set<string>> = {
         // The provider's own reason for rejecting delivery is the entire
         // value of this error — "invite the bot with /invite @LangWatch".
         // Authored server-side by `explainSlackPostError`, never relayed.
         notification_delivery_error: new Set(["message"]),
+        // The model provider's own rejection, captured by the langyagent LLM
+        // proxy. Relayed rather than authored — the one exemption here that is
+        // — and deliberately so: it is the same sentence the provider's SDK
+        // shows its caller, and "your credit balance is too low" is the whole
+        // fix where "try again" is advice that cannot work. Clamped by
+        // `safeProse`, because the endpoint behind it may be the customer's.
+        llm_upstream_error: new Set(["message"]),
         // Here `reason` is not a machine sub-classifier: it is the sentence
         // the service wrote for this exact case ("This automation has no email
         // recipients to test-fire to."), and it names WHICH piece is missing.

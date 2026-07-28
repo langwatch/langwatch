@@ -114,7 +114,7 @@ This is the part that trips people up, so be precise about it:
 | What a customer reads **in the app** | The **client presentation registry**, keyed by `code` — `langwatch/src/features/errors/logic/presentation.ts` |
 | `HandledError.message` | Logs, OTel, exception capture — **and the REST response body**. Customer-safe by rule, never the app's UI copy |
 | The wire `message` field | **Per transport.** tRPC collapses it to the `code` ([#5984](https://github.com/langwatch/langwatch/pull/5984)). REST sends `{ error: code, message }`, so the sentence rides *alongside* the code. SSE sends the code with the serialised payload beside it |
-| Server-authored dynamic prose | `meta.message`, an explicit opt-in — mirrors Go, where free text appears only when a caller sets `Meta["message"]` |
+| Server-authored dynamic prose | `meta.message`, an explicit opt-in — mirrors Go, where free text appears only when a caller sets `Meta["message"]`. Almost always prose *we* wrote; the exception is a third party's own sentence deliberately relayed because it is the whole answer (a model provider's "your credit balance is too low" — `llm_upstream_error`). Either way a registry entry that renders it passes it through `safeProse` first, and the codes allowed to render it at all are named one by one in `presentation.unit.test.ts` |
 | What a consumer with no registry reads | `meta.message` → `message` → `code`, in that order — the CLI (`packages/cli-cards/src/handled-error.ts`) and the Python SDK (`extract_api_error_detail`) both implement it |
 
 Handled-error messages were leaking env vars and internal hostnames to browsers.
