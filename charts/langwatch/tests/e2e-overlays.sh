@@ -43,7 +43,7 @@ tmpl_only() {
 # Check rendered YAML contains a string (uses <<< to avoid broken pipe with large output)
 assert_contains() {
   local label="$1" haystack="$2" needle="$3"
-  if grep -qF "$needle" <<< "$haystack"; then
+  if grep -qF -- "$needle" <<< "$haystack"; then
     pass "$label"
   else
     fail "$label: expected to find '$needle'"
@@ -53,7 +53,7 @@ assert_contains() {
 # Check rendered YAML does NOT contain a string
 assert_not_contains() {
   local label="$1" haystack="$2" needle="$3"
-  if grep -qF "$needle" <<< "$haystack"; then
+  if grep -qF -- "$needle" <<< "$haystack"; then
     fail "$label: expected NOT to find '$needle'"
   else
     pass "$label"
@@ -63,7 +63,10 @@ assert_not_contains() {
 # Count occurrences of a pattern in rendered YAML
 count_matches() {
   local haystack="$1" pattern="$2"
-  grep -c "$pattern" <<< "$haystack" || echo "0"
+  # grep -c already prints 0 when there are no matches; it just exits 1. The
+  # `|| echo 0` form would append a SECOND line, and the caller's (( n >= 10 ))
+  # then dies with an arithmetic syntax error instead of reporting the count.
+  grep -c -- "$pattern" <<< "$haystack" || true
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -257,7 +260,14 @@ test_size_overlays() {
     -f "${OVERLAYS}/size-minimal.yaml" \
     -f "${OVERLAYS}/access-nodeport.yaml")
   assert_contains "minimal: workers deployed" "$min_out" "# Source: langwatch/templates/workers/deployment.yaml"
-  assert_contains "minimal: app replicas 1" "$min_out" "replicas: 1"
+  # Scoped to the app Deployment: the full render carries six other `replicas: 1`
+  # lines (redis, postgres, clickhouse, nlp, langevals), so a whole-document
+  # grep passes even for size-prod, where the app has two.
+  local min_app
+  min_app=$(tmpl_only "templates/app/deployment.yaml" --set autogen.enabled=true \
+    -f "${OVERLAYS}/size-minimal.yaml" \
+    -f "${OVERLAYS}/access-nodeport.yaml")
+  assert_contains "minimal: app replicas 1" "$min_app" "replicas: 1"
 
   # size-prod: 2 app replicas, PDB
   local prod_out
@@ -278,63 +288,165 @@ test_size_overlays() {
 
 # ─────────────────────────────────────────────────────────────────────────────
 # SUITE: pod security hardening — guard the strict-admission posture
-# (every container read-only-root + non-escalating + RuntimeDefault seccomp,
-# no automounted SA token, no privileged/writable-root opt-outs). These render-
-# level checks catch regressions of the hardening without needing Gatekeeper.
+#
+# Assertions here are scoped PER WORKLOAD via --show-only, never grepped over
+# the whole render. A whole-render grep ("is readOnlyRootFilesystem present?")
+# passes when one container out of ten has it, and a whole-render count
+# ("at least 10 sites") passes when a workload regresses as long as some other
+# workload gains a field. Both let the exact regression they name through.
+#
+# Two workloads deliberately do NOT comply and are listed as exemptions below.
+# An exemption is only legitimate if strict-admission.yaml turns that workload
+# off, which the last block asserts.
 # ─────────────────────────────────────────────────────────────────────────────
+
+# Workloads LangWatch authors and hardens. Every container must carry the full
+# posture. Adding a workload to the chart without adding it here fails the
+# "no untriaged workloads" check below — that is deliberate.
+HARDENED_WORKLOADS=(
+  "templates/app/deployment.yaml"
+  "templates/workers/deployment.yaml"
+  "templates/langwatch_nlp/deployment.yaml"
+  "templates/langevals/deployment.yaml"
+  "templates/postgresql/statefulset.yaml"
+  "templates/redis/statefulset.yaml"
+  "charts/gateway/templates/deployment.yaml"
+  "charts/clickhouse/templates/statefulset.yaml"
+)
+
+# Workloads that cannot comply, each with the reason and the values key that
+# removes it. strict-admission.yaml must set every one of these to false.
+EXEMPT_WORKLOADS=(
+  # Upstream subchart we do not control: no readOnlyRootFilesystem, no seccomp,
+  # no limits on the config-reload sidecar.
+  "charts/prometheus/templates/deploy.yaml:prometheus.chartManaged"
+  # Root by design: the manager needs CHOWN/DAC_OVERRIDE/FOWNER/SETUID/SETGID
+  # to hand each worker a distinct UID. Forcing it non-root re-opens
+  # cross-worker credential theft (ADR-033).
+  "charts/langyagent/templates/deployment.yaml:langyagent.chartManaged"
+)
+
+# Assert one workload template carries the full hardened posture.
+assert_workload_hardened() {
+  local tpl="$1" out
+  out=$(tmpl_only "$tpl" --set autogen.enabled=true) || {
+    fail "hardening: could not render $tpl"; return
+  }
+
+  assert_contains "hardening[$tpl]: read-only root"        "$out" "readOnlyRootFilesystem: true"
+  assert_contains "hardening[$tpl]: privilege esc off"     "$out" "allowPrivilegeEscalation: false"
+  assert_contains "hardening[$tpl]: RuntimeDefault seccomp" "$out" "type: RuntimeDefault"
+  assert_contains "hardening[$tpl]: SA token not mounted"  "$out" "automountServiceAccountToken: false"
+  assert_not_contains "hardening[$tpl]: not writable-root" "$out" "readOnlyRootFilesystem: false"
+  assert_not_contains "hardening[$tpl]: not privileged"    "$out" "privileged: true"
+
+  # Capabilities are dropped in two rendered forms: `drop: ["ALL"]` inline
+  # (datastores) and a `- ALL` list item (global containerSecurityContext).
+  if grep -qE 'drop: \["ALL"\]|^[[:space:]]+- ALL' <<< "$out"; then
+    pass "hardening[$tpl]: capabilities dropped"
+  else
+    fail "hardening[$tpl]: expected capabilities.drop ALL"
+  fi
+
+  # runAsNonRoot must appear at BOTH pod and container level: Kubernetes
+  # inherits the pod-level value, but some Gatekeeper flavours of
+  # k8sreadonlyrootfilesystem read the container-level field directly and deny
+  # pods that only carry it on the pod. Regression guard for the customer
+  # report where pod-level alone tripped their constraint — so this asserts
+  # TWO occurrences, which a pod-level-only regression cannot satisfy.
+  local nr
+  nr=$(count_matches "$out" "runAsNonRoot: true")
+  if (( nr >= 2 )); then
+    pass "hardening[$tpl]: runAsNonRoot at pod + container level"
+  else
+    fail "hardening[$tpl]: expected runAsNonRoot at pod AND container level, found $nr occurrence(s)"
+  fi
+}
+
 test_pod_security() {
   sep; info "Suite: pod security hardening"
 
-  # Default render: chart-managed everything (app, workers, nlp, langevals,
-  # cronjobs, postgres, redis, clickhouse, gateway).
+  local tpl
+  for tpl in "${HARDENED_WORKLOADS[@]}"; do
+    assert_workload_hardened "$tpl"
+  done
+
   local def
   def=$(tmpl --set autogen.enabled=true)
 
-  assert_contains "hardening: read-only root filesystem set" "$def" "readOnlyRootFilesystem: true"
-  # After hardening, nothing opts back into a writable root.
-  assert_not_contains "hardening: no writable-root containers" "$def" "readOnlyRootFilesystem: false"
-  assert_contains "hardening: RuntimeDefault seccomp" "$def" "type: RuntimeDefault"
-  assert_contains "hardening: privilege escalation disabled" "$def" "allowPrivilegeEscalation: false"
-  assert_not_contains "hardening: no privileged containers" "$def" "privileged: true"
-  assert_contains "hardening: SA token not automounted" "$def" "automountServiceAccountToken: false"
-  assert_contains "hardening: clickhouse pins uid 101" "$def" "runAsUser: 101"
+  # ClickHouse pins its image uid explicitly rather than relying on the USER
+  # directive, so MustRunAs policies that read the pod spec accept it.
+  local ch
+  ch=$(tmpl_only "charts/clickhouse/templates/statefulset.yaml" --set autogen.enabled=true)
+  assert_contains "hardening: clickhouse pins uid 101" "$ch" "runAsUser: 101"
+
   # The app moved off Next.js; the dead permissions init container stays gone.
   assert_not_contains "hardening: no dead next.js init container" "$def" "fix-nextjs-permissions"
 
-  # read-only root should cover every workload container (app, workers, nlp,
-  # langevals, 2 cronjobs, postgres, redis, clickhouse, gateway = 10).
-  local ro_count
-  ro_count=$(count_matches "$def" "readOnlyRootFilesystem: true")
-  if (( ro_count >= 10 )); then
-    pass "hardening: read-only root on $ro_count containers (>=10)"
+  # A per-component securityContext override layers onto the hardened global
+  # default rather than replacing it: the overridden key takes the operator's
+  # value, every other key keeps its default. Checked at both pod and container
+  # level, since each has its own merge site.
+  local pod_override cont_override
+  pod_override=$(tmpl_only "templates/app/deployment.yaml" \
+    --set autogen.enabled=true --set app.podSecurityContext.fsGroup=2000)
+  assert_contains "override: fsGroup applied"            "$pod_override" "fsGroup: 2000"
+  assert_contains "override: keeps runAsNonRoot default" "$pod_override" "runAsNonRoot: true"
+  assert_contains "override: keeps seccomp default"      "$pod_override" "type: RuntimeDefault"
+
+  cont_override=$(tmpl_only "templates/app/deployment.yaml" \
+    --set autogen.enabled=true --set app.containerSecurityContext.readOnlyRootFilesystem=false)
+  assert_contains "override: readOnlyRootFilesystem applied"    "$cont_override" "readOnlyRootFilesystem: false"
+  assert_contains "override: keeps allowPrivilegeEscalation"    "$cont_override" "allowPrivilegeEscalation: false"
+  assert_contains "override: keeps dropped capabilities"        "$cont_override" "- ALL"
+
+  # No workload may exist that is neither hardened nor a recorded exemption.
+  # This is what stops a new subchart from silently shipping unhardened.
+  local rendered expected found
+  rendered=$(awk '/^# Source:/{src=$3} /^kind: (Deployment|StatefulSet|CronJob|Job)$/{print src}' <<< "$def" \
+    | sed 's|^langwatch/||' | sort -u)
+  expected=$(printf '%s\n' "${HARDENED_WORKLOADS[@]}" "${EXEMPT_WORKLOADS[@]%%:*}" | sort -u)
+  found=$(comm -23 <(printf '%s\n' "$rendered") <(printf '%s\n' "$expected") || true)
+  if [[ -z "$found" ]]; then
+    pass "hardening: no untriaged workloads in the default render"
   else
-    fail "hardening: expected >=10 read-only-root containers, found $ro_count"
+    fail "hardening: workload(s) neither hardened nor exempt: $(tr '\n' ' ' <<< "$found")"
   fi
 
-  # runAsNonRoot must be set at the *container* level too, not only the pod,
-  # because some Gatekeeper flavours of k8sreadonlyrootfilesystem inspect the
-  # container-level field directly. Regression guard for the customer report
-  # where pod-level alone tripped their constraint.
-  local nr_count
-  nr_count=$(count_matches "$def" "runAsNonRoot: true")
-  if (( nr_count >= 10 )); then
-    pass "hardening: container-level runAsNonRoot on $nr_count sites (>=10)"
-  else
-    fail "hardening: expected >=10 container-level runAsNonRoot, found $nr_count"
-  fi
-
-  # Gateway pod must set automount on the POD spec, not just its ServiceAccount
-  # (regression guard for the gap this work closed).
-  local gw_block
-  gw_block=$(awk -v RS='---' '/kind: Deployment/ && /name: '"${RELEASE}"'-gateway/{print}' <<< "$def")
-  assert_contains "hardening: gateway pod automount disabled" "$gw_block" "automountServiceAccountToken: false"
-
-  # strict-admission overlay drops the components that can't comply.
-  local strict
+  # strict-admission overlay must remove every exempt workload, and the
+  # gateway HPA. Asserted against the workload's own template source, so an
+  # unrelated resource keeping the same string cannot mask a failure.
+  local strict entry
   strict=$(tmpl --set autogen.enabled=true -f "${OVERLAYS}/strict-admission.yaml")
-  assert_not_contains "strict-admission: prometheus subchart off" "$strict" "prometheus-config"
-  assert_not_contains "strict-admission: gateway HPA off" "$strict" "kind: HorizontalPodAutoscaler"
-  assert_not_contains "strict-admission: app metrics scrape off" "$strict" "prometheus.io/scrape"
+  for entry in "${EXEMPT_WORKLOADS[@]}"; do
+    assert_not_contains "strict-admission: ${entry##*:} off" "$strict" "# Source: langwatch/${entry%%:*}"
+  done
+  assert_not_contains "strict-admission: gateway HPA off" "$strict" "# Source: langwatch/charts/gateway/templates/hpa.yaml"
+
+  # app metrics: prove the overlay actually suppresses the scrape annotation.
+  # Asserting its absence against a default render is vacuous — the annotation
+  # is off by chart default, so it is absent whether or not the overlay works.
+  #
+  # The overlay's job is to win over a BASE VALUES FILE that turned metrics on,
+  # so the baseline has to come from `-f` too: `--set` outranks every `-f`
+  # regardless of order, so a --set baseline could never be overridden and the
+  # test would fail against a perfectly good overlay.
+  local metrics_base
+  metrics_base=$(mktemp)
+  cat > "$metrics_base" <<'YAML'
+app:
+  telemetry:
+    metrics:
+      enabled: true
+      apiKey:
+        value: test-key
+YAML
+  local metrics_on metrics_off
+  metrics_on=$(tmpl --set autogen.enabled=true -f "$metrics_base")
+  assert_contains "baseline: app metrics scrape present when enabled" "$metrics_on" "prometheus.io/scrape"
+  metrics_off=$(tmpl --set autogen.enabled=true -f "$metrics_base" -f "${OVERLAYS}/strict-admission.yaml")
+  assert_not_contains "strict-admission: app metrics scrape off" "$metrics_off" "prometheus.io/scrape"
+  rm -f "$metrics_base"
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -548,11 +660,14 @@ test_install_minimal() {
     -f "${CHART_DIR}/tests/values-e2e.yaml"
   pass "helm install (minimal + nodeport)"
 
-  # Workers should NOT exist
+  # values-e2e.yaml is passed last and sets workers.enabled=false, so this
+  # asserts the ENABLE GATE still removes the Deployment. It is not a statement
+  # about size-minimal, which enables workers — the label used to say otherwise
+  # and only stayed green by accident of the -f ordering.
   if kc get deployment "${RELEASE}-workers" &>/dev/null; then
-    fail "Workers Deployment should not exist in size-minimal"
+    fail "workers.enabled=false should remove the Workers Deployment"
   else
-    pass "Workers Deployment absent (size-minimal)"
+    pass "Workers Deployment absent (workers.enabled=false via values-e2e)"
   fi
 
   # ClickHouse should be a single pod
