@@ -180,7 +180,7 @@ jobs:
             COV="--coverage --coverage.reporter=lcov --coverage.reporter=text"
           fi
           if [ "${{ needs.changes.outputs.heavy }}" != "true" ]; then
-            git fetch --no-tags --depth=1 origin main
+            git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
             pnpm test:unit --run --changed origin/main --passWithNoTests \
               --reporter=default --reporter=./src/test-utils/shardFailureReporter.ts \
               --dangerouslyIgnoreUnhandledErrors
@@ -341,7 +341,7 @@ jobs:
             COV="--coverage --coverage.reporter=lcov --coverage.reporter=text"
           fi
           if [ "${{ needs.changes.outputs.heavy }}" != "true" ]; then
-            git fetch --no-tags --depth=1 origin main
+            git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
             pnpm test:integration --changed origin/main --passWithNoTests \
               --reporter=default --reporter=json --reporter=./src/test-utils/shardFailureReporter.ts \
               --outputFile=test-results.json
@@ -472,8 +472,9 @@ jobs:
 
       - name: Scan changed files
         run: |
-          git fetch --no-tags --depth=1 origin main
-          files=$(git diff --name-only --diff-filter=ACMR origin/main...HEAD -- '*.ts' '*.tsx')
+          BASE="${{ github.base_ref || 'main' }}"
+          git fetch --no-tags origin "+refs/heads/$BASE:refs/remotes/origin/$BASE"
+          files=$(git diff --name-only --diff-filter=ACMR "origin/$BASE...HEAD" -- '*.ts' '*.tsx')
           if [ -z "$files" ]; then
             echo "No changed TS/TSX files."
             exit 0
