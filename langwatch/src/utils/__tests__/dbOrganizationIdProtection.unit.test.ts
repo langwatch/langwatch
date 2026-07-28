@@ -1,6 +1,8 @@
+import type { PrismaClient } from "@prisma/client";
 import { Prisma } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
 
+import { reapExpiredLangySessionApiKeys } from "~/server/app-layer/langy/langyApiKey";
 import {
   ORG_SCOPED_MODEL_NAMES,
   ORG_TENANCY_EXEMPT,
@@ -355,22 +357,73 @@ describe("organization-tenancy regime partition", () => {
  * was pinned at zero.
  */
 describe("guardOrganizationId — platform-owned API-key sweeps", () => {
-  describe("when the expired-Langy-session reaper runs its updateMany", () => {
-    it("does NOT throw — a reserved key name reaches platform rows only", async () => {
+  /**
+   * A Prisma stand-in that installs the SAME middleware the real client does
+   * (`db.ts` → `prisma.$use(guardOrganizationId)`), so a call through it is
+   * subject to the guard exactly as it is in production. No database: the guard
+   * is a pure function of the query arguments.
+   */
+  function guardedPrisma(rowsAffected: number) {
+    const calls: unknown[] = [];
+    const client = {
+      apiKey: {
+        updateMany: async (args: unknown) => {
+          calls.push(args);
+          return guardOrganizationId(
+            {
+              model: "ApiKey",
+              action: "updateMany",
+              args,
+              dataPath: [],
+              runInTransaction: false,
+            } as Prisma.MiddlewareParams,
+            async () => ({ count: rowsAffected }),
+          );
+        },
+      },
+    };
+    return { client, calls };
+  }
+
+  describe("when the expired-Langy-session reaper runs its real hourly sweep", () => {
+    /**
+     * The REAL reaper, not a re-typed copy of its where clause.
+     *
+     * What this pins is an INTERACTION — the reaper writes a predicate, the
+     * guard decides whether to admit it — and an interaction cannot be pinned
+     * by asserting a hand-copied literal on each side: generalise the reaper's
+     * predicate (say, to `name: { in: HIDDEN_SYSTEM_KEY_NAMES }`, or drop its
+     * un-revoked clause) and each literal still matches its own copy while
+     * every hourly tick throws in production. Driving the actual function
+     * through the actual middleware means drift on EITHER side fails here.
+     */
+    it("passes the guard and revokes the rows", async () => {
+      const { client, calls } = guardedPrisma(2);
+
+      await expect(
+        reapExpiredLangySessionApiKeys({
+          prisma: client as unknown as PrismaClient,
+          now: new Date("2026-07-28T12:00:00Z"),
+        }),
+      ).resolves.toBe(2);
+
+      expect(calls).toHaveLength(1);
+    });
+  });
+
+  describe("when a reserved-name query omits the sweep's un-revoked clause", () => {
+    it("THROWS — the name escape admits the sweep's shape, not any named read", async () => {
+      // The reserved name alone is sound for tenancy but far wider than the
+      // sweep needs: it would also admit a read of every session key that ever
+      // existed. `revokedAt: null` is what the reaper carries and an
+      // exfiltrating query would not.
       await expect(
         runGuard({
           model: "ApiKey",
-          action: "updateMany",
-          args: {
-            where: {
-              name: "Langy session",
-              revokedAt: null,
-              expiresAt: { not: null, lte: new Date() },
-            },
-            data: { revokedAt: new Date() },
-          },
+          action: "findMany",
+          args: { where: { name: "Langy session" } },
         }),
-      ).resolves.toBe("ok");
+      ).rejects.toThrow();
     });
   });
 

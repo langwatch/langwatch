@@ -93,7 +93,7 @@ describe("resolveLangyPrompt", () => {
   });
 
   describe("given the registry read throws", () => {
-    it("never propagates the error and falls back", async () => {
+    it("never propagates the error and falls back, reporting source 'error'", async () => {
       const read = vi.fn().mockRejectedValue(new Error("db down"));
       const result = await resolveLangyPrompt({
         promptService: fakePromptService(read),
@@ -102,7 +102,12 @@ describe("resolveLangyPrompt", () => {
         fallback: FALLBACK,
       });
 
-      expect(result).toEqual({ text: FALLBACK, source: "fallback" });
+      // The TEXT is the fallback either way — the invariant is that a read
+      // failure never blocks a turn. The SOURCE is what tells a failure apart
+      // from a genuine miss, so a caller composing a per-conversation prefix can
+      // hold its last good text through a blip instead of swapping the model's
+      // instructions mid-conversation.
+      expect(result).toEqual({ text: FALLBACK, source: "error" });
     });
   });
 

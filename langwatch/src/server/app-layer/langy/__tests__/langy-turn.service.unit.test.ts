@@ -9,6 +9,7 @@ import {
   LangyTurnNotStoppableError,
 } from "../errors";
 import {
+  __resetLangyTurnOverrideCacheForTests,
   LangyTurnService,
   type LangyTurnServiceDeps,
   langyTurnIdentity,
@@ -1044,6 +1045,13 @@ const systemOf = (dispatch: ReturnType<typeof vi.fn>): string =>
 describe("when the project holding Langy's versioned prompts is configured", () => {
   const PROJECT_ENV = "LANGY_PROMPT_PROJECT_ID";
 
+  beforeEach(() => {
+    // The resolver holds the last text it read from the registry for the life
+    // of the PROCESS, deliberately (see below). Clear it between tests so one
+    // test's successful read cannot decide another test's outcome.
+    __resetLangyTurnOverrideCacheForTests();
+  });
+
   afterEach(() => {
     delete process.env[PROJECT_ENV];
   });
@@ -1084,6 +1092,36 @@ describe("when the project holding Langy's versioned prompts is configured", () 
     // EMPTY system block, which is the failure the never-throws-always-falls-
     // back invariant exists to prevent.
     expect(systemOf(mocks.dispatch)).toContain(LANGY_TURN_OVERRIDE_FALLBACK);
+  });
+
+  // @scenario "A read failure after a successful read keeps the text already in use"
+  it("reuses the last text it read when a later read fails, not the constant", async () => {
+    process.env[PROJECT_ENV] = "project-system";
+    let readCount = 0;
+    const getPromptByIdOrHandle = vi.fn(async () => {
+      readCount += 1;
+      if (readCount === 1) return { prompt: "REGISTRY OVERRIDE TEXT" };
+      throw new Error("registry down");
+    });
+
+    const first = makeDeps({
+      prompts: { getPromptByIdOrHandle },
+    } as unknown as Partial<LangyTurnServiceDeps>);
+    await LangyTurnService.create(first.deps).startConversationTurn(input());
+    expect(systemOf(first.mocks.dispatch)).toContain("REGISTRY OVERRIDE TEXT");
+
+    const second = makeDeps({
+      prompts: { getPromptByIdOrHandle },
+    } as unknown as Partial<LangyTurnServiceDeps>);
+    await LangyTurnService.create(second.deps).startConversationTurn(input());
+
+    // A Prisma blip on turn 2 must NOT swap the system block. That lane is the
+    // provider's cache prefix, so a swap changes the model's instructions
+    // mid-conversation AND pays a full prefix rewrite at the write premium.
+    expect(systemOf(second.mocks.dispatch)).toContain("REGISTRY OVERRIDE TEXT");
+    expect(systemOf(second.mocks.dispatch)).not.toContain(
+      LANGY_TURN_OVERRIDE_FALLBACK,
+    );
   });
 });
 

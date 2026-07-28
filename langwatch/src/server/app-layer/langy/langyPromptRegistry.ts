@@ -118,16 +118,31 @@ export interface ResolveLangyPromptParams {
 
 export interface ResolvedLangyPrompt {
   text: string;
-  source: "registry" | "fallback";
+  /**
+   * Which path produced `text`:
+   *
+   *  - `registry` — a promoted row was read.
+   *  - `fallback` — a GENUINE miss: no row, or a row whose prompt is empty.
+   *    An operator demoting or deleting the row is deliberate, so the in-repo
+   *    copy is the right answer.
+   *  - `error`    — the read FAILED (Prisma timeout, connection blip). The
+   *    text is the fallback because the caller must be handed something, but
+   *    the distinction matters: a caller composing a per-conversation prefix
+   *    can hold its last good text rather than swap the model's instructions
+   *    mid-conversation over a transient failure. See
+   *    `resolveLangyTurnOverride` in `langy-turn.service.ts`.
+   */
+  source: "registry" | "fallback" | "error";
 }
 
 /**
  * Resolve a Langy prompt from the registry, falling back to the in-repo copy.
  *
  * NEVER throws. A registry hit with a non-empty `prompt` wins; anything else
- * (no row, empty prompt, read error) yields the fallback. The `source` field
- * lets callers surface which path was taken (metrics / a version label on the
- * worker's rendered AGENTS.md).
+ * (no row, empty prompt, read error) yields the fallback text, with `source`
+ * telling a miss apart from a failure so callers can treat them differently
+ * and surface which path was taken (metrics / a span attribute / a version
+ * label on the worker's rendered AGENTS.md).
  */
 export async function resolveLangyPrompt(
   params: ResolveLangyPromptParams,
@@ -154,6 +169,7 @@ export async function resolveLangyPrompt(
       { error, handle, projectId, tag },
       "langy prompt registry read failed — using in-repo fallback",
     );
+    return { text: fallback, source: "error" };
   }
   return { text: fallback, source: "fallback" };
 }

@@ -2121,10 +2121,16 @@ model ApiKey {
   @@index([lookupId])
   @@index([ingestSourceType])
   @@index([ingestionTemplateId])
-  // The Langy session-key reaper's sweep predicate
-  // (name = <reserved> AND revokedAt IS NULL AND expiresAt <= now). Without
-  // it the hourly tick sequentially scans a monotonically growing table.
-  @@index([name, revokedAt, expiresAt])
+  // NOT DECLARED HERE: the Langy session-key reaper's sweep predicate
+  // (name = <reserved> AND revokedAt IS NULL AND expiresAt <= now) is served by
+  // a PARTIAL index, `ApiKey_name_expiresAt_unrevoked_idx`, defined in
+  // prisma/migrations/20260728120000_index_apikey_for_session_key_reap. Prisma
+  // cannot express `WHERE "revokedAt" IS NULL`, and the predicate is the whole
+  // point: session keys are minted per chat turn and never deleted, so the
+  // un-revoked working set is what stays small while the table grows. Prisma's
+  // migrate diff does not read index predicates, so leaving it undeclared is
+  // drift-free; declaring it would make every diff want to recreate it as a
+  // non-partial index.
 }
 
 model BillingMeterCheckpoint {

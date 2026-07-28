@@ -63,13 +63,12 @@ export const langySessionKeyReapWake: WakeHandler<
 export function runLangySessionKeyReap(deps: LangySessionKeyReapDeps) {
   return async (): Promise<void> => {
     const startedAt = (deps.now ?? Date.now)();
-    const revoked = await deps.reap();
-
-    if (revoked > 0) {
-      // A small steady rate is normal (SIGKILLed managers); a jump means
-      // revoke-on-worker-death is broken, which is the thing worth knowing.
-      logger.info({ revoked }, "Reaped expired Langy session keys");
-    }
+    // `reap` owns the outcome reporting — it increments the reaped counter and
+    // logs the count under `langwatch:langy:api-key`. A second INFO line here,
+    // under a different logger name, only splits one event across two Loki
+    // streams so a query on either reports half the story. This wrapper logs
+    // its OWN failure mode (the retention prune) and nothing else.
+    await deps.reap();
 
     try {
       await deps.deleteDispatchedBefore({

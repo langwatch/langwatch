@@ -41,9 +41,10 @@ export interface LangyTurnHandoff {
    * signs its relay frames with. Carried HERE rather than relying on operational
    * state, because a brand-new conversation's creation event may still be queued
    * when its first dispatch intent runs. The service mints it (new) or reads it
-   * (continue) and stashes it before command dispatch. Empty only for a legacy
-   * conversation with no runToken (the
-   * dispatch then runs with no live edge; the durable final still lands).
+   * (continue) and stashes it before command dispatch. Never empty: a turn
+   * whose conversation has no runToken is refused before it reaches this stash
+   * (see the runToken guard in `langy-turn.service.ts` for the trade that
+   * choice makes).
    */
   runToken: string;
   /**

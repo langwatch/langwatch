@@ -179,7 +179,7 @@ export class ApiKeyRepository {
       where: {
         organizationId,
         revokedAt: null,
-        name: { notIn: HIDDEN_SYSTEM_KEY_NAMES },
+        name: { notIn: [...HIDDEN_SYSTEM_KEY_NAMES] },
         OR: [{ userId }, { userId: null, ingestSourceType: null }],
       },
       include: {
@@ -204,7 +204,7 @@ export class ApiKeyRepository {
       where: {
         organizationId,
         revokedAt: null,
-        name: { notIn: HIDDEN_SYSTEM_KEY_NAMES },
+        name: { notIn: [...HIDDEN_SYSTEM_KEY_NAMES] },
       },
       include: {
         roleBindings: {

@@ -38,6 +38,25 @@ type OrgScopedModelConfig = {
 const isSystemManagedKeyName = (value: any): boolean =>
   typeof value === "string" && HIDDEN_SYSTEM_KEY_NAMES.includes(value);
 
+/**
+ * The shape of the platform's own maintenance sweep over system-managed keys:
+ * a reserved NAME **and** `revokedAt: null`.
+ *
+ * The name alone would already be sound for tenancy — no customer row can carry
+ * one — but sound is not narrow, and this predicate is the only bound the
+ * ApiKey model requires, on `findMany`, `updateMany` and `deleteMany` alike.
+ * Requiring the un-revoked clause admits exactly the sweep's shape ("revoke what
+ * has not been revoked") and turns away a read of every such key that ever
+ * existed, which no sweep needs and an exfiltration would want. The reserved-name
+ * list is a tenancy boundary either way — see the note on
+ * `HIDDEN_SYSTEM_KEY_NAMES` before adding to it.
+ *
+ * `=== null` is deliberate: the sweep writes the literal, and accepting
+ * `{ not: ... }`-style matchers here would give back the width just removed.
+ */
+const isSystemManagedKeySweep = (clause: any): boolean =>
+  isSystemManagedKeyName(clause?.name) && clause?.revokedAt === null;
+
 const isNonEmptyStringList = (value: any): boolean =>
   value &&
   typeof value === "object" &&
@@ -116,15 +135,18 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
     // lookupId is the globally-unique public half of an API token; the auth
     // path resolves a bearer token to its single owning org through it.
     //
-    // A system-managed key NAME is the other bounded predicate. These names are
-    // reserved: `ApiKeyService.create` refuses them unless the caller is
-    // system-managed, and renaming a key into one is blocked, so no customer
-    // can own a row a name-bounded query would reach. That makes such a query
-    // platform-owned by construction — which is what the expired-Langy-session
-    // sweep is. Without this the sweep, whose whole job is to be cross-tenant,
-    // was rejected by this guard on every run and had never revoked a key.
+    // The platform's own sweep over system-managed keys is the other bounded
+    // predicate. Those names are reserved: `ApiKeyService.create` refuses them
+    // unless the caller is system-managed, and renaming a key into one is
+    // blocked, so no customer can own a row a name-bounded query would reach.
+    // That makes such a query platform-owned by construction — which is what
+    // the expired-Langy-session sweep is. Without it the sweep, whose whole job
+    // is to be cross-tenant, was rejected by this guard on every run and had
+    // never revoked a key. It must carry the sweep's un-revoked clause too, so
+    // the escape is the sweep's shape rather than any query naming a reserved
+    // key.
     extraBound: (c) =>
-      typeof c?.lookupId === "string" || isSystemManagedKeyName(c?.name),
+      typeof c?.lookupId === "string" || isSystemManagedKeySweep(c),
   },
   RoutingPolicy: {},
   AiToolEntry: {},
