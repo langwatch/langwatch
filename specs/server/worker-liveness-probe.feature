@@ -38,7 +38,7 @@ Feature: Worker liveness probe endpoint
   Rule: /healthz answers unauthenticated, in every auth configuration
 
     Scenario: Default install — no metrics API key in production
-      Given the process runs with NODE_ENV set to "production"
+      Given the worker is running in production mode
       And no metrics API key is configured
       When the kubelet requests "/healthz" without an Authorization header
       Then the response status is 200
@@ -62,7 +62,7 @@ Feature: Worker liveness probe endpoint
       Then the response status is 401
 
     Scenario: Metrics still fail closed in production without a key
-      Given the process runs with NODE_ENV set to "production"
+      Given the worker is running in production mode
       And no metrics API key is configured
       When a caller requests "/metrics" with any credentials
       Then the response status is 500
