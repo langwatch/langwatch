@@ -1175,8 +1175,9 @@ ingress:
   ## @param ingress.annotations [object] Additional ingress annotations.
   annotations: {}
 
-  # Path prefixes the ingress must NEVER route to the app — a hard, on-by-default
-  # block at the edge.
+  # Path prefixes this ingress must NEVER route to the app — a hard,
+  # on-by-default block at the edge. See SCOPE below for what that does and does
+  # not cover.
   #
   # WHY: everything under `/api/internal/*` is the app's private control-plane
   # surface (the Langy agent manager's callbacks in langy-internal.ts /
@@ -1192,9 +1193,26 @@ ingress:
   # `pathType: Prefix`) that points at a dedicated no-endpoints Service
   # (`{{ .Release.Name }}-blackhole`). A spec-conformant controller returns
   # 502/503 for a Service with no endpoints, so the block is a genuine dead end
-  # rather than a soft redirect. For `pathType: Prefix`, longest-prefix wins on
-  # conformant controllers, so `/api/internal` beats the app's catch-all `/`
-  # regardless of the order paths are listed.
+  # rather than a soft redirect. Blocked paths are emitted ahead of the
+  # application's own paths: Kubernetes defines longest-match precedence only for
+  # `pathType: Exact` and `Prefix`, and the app's catch-all `/` below ships as
+  # `ImplementationSpecific`, whose matching is left to the IngressClass — so the
+  # ordering is what carries the block on default values. An application path
+  # nested under a blocked prefix (say `/api/internal/status`) would out-match
+  # the blackhole under either rule, so templates/ingress.yaml refuses to render
+  # that combination at all rather than let it silently undo the block.
+  #
+  # SCOPE: this covers traffic arriving through THIS ingress — the chart's public
+  # entrypoint — and is not a property of the application itself. An install that
+  # publishes the app by another route (an `app.service.type` of NodePort or
+  # LoadBalancer, as in examples/overlays/access-nodeport.yaml, or an Ingress the
+  # operator writes themselves against `{{ .Release.Name }}-app`) does not
+  # inherit these prefixes, and wants an equivalent restriction wherever that
+  # route terminates.
+  #
+  # OPERATIONS: blocked requests answer 502/503, so probes against
+  # `/api/internal` land in whatever 5xx error-rate alerting you run over the
+  # ingress. That is the block working, not the app faulting.
   #
   # Operators can extend this list, or set it to `[]` to (explicitly, knowingly)
   # disable the block. NOTE: `/api/cron/*` and `/metrics` are also internal-only
