@@ -7,6 +7,7 @@ import {
   TOPIC_ASSIGNED_EVENT_TYPE,
 } from "../../schemas/constants";
 import {
+  anchorStorageTime,
   projectAnalyticsStateToRow,
   TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
   type TraceAnalyticsData,
@@ -141,6 +142,12 @@ describe("traceAnalytics storage anchor", () => {
       // partition expression is toYearWeek(OccurredAt) and the TTL is
       // OccurredAt + retention, so an epoch anchor is a row born expired.
       expect(new Date(row.occurredAtMs).getUTCFullYear()).toBeGreaterThan(1970);
+      // Pinned to the ANCHOR, not merely to "not 1970". `projectAnalyticsStateToRow`
+      // falls back to `state.createdAt` (fold time, so also a live partition)
+      // when nothing anchored, which would satisfy the year check on its own —
+      // this is what makes the test fail if the anchor silently stops working
+      // and the fallback quietly covers for it.
+      expect(state.storageAnchorMs).toBe(logAtMs);
     });
 
     it("leaves the span timing baseline unset, inventing no duration", () => {
@@ -164,6 +171,11 @@ describe("traceAnalytics storage anchor", () => {
           tenantId: createTenantId(TENANT),
         } as unknown as ProjectionStoreContext);
 
+        // Named before it is dereferenced: this is the only test proving the
+        // deliberately-unchanged `hasPersistableSignal` still admits a log-only
+        // trace, and without it a refusal surfaces as "cannot read properties
+        // of undefined" instead of pointing at the gate.
+        expect(upsert).toHaveBeenCalledTimes(1);
         const written = upsert.mock.calls[0]?.[0] as TraceAnalyticsRow;
         expect(written.traceId).toBe(TRACE_ID);
         expect(written.occurredAtMs).toBe(logAtMs);
@@ -189,7 +201,7 @@ describe("traceAnalytics storage anchor", () => {
     ]);
     const row = project(state);
 
-    /** @scenario "A trace with spans keeps the anchor it had before the split" */
+    /** @scenario "A trace with spans is anchored at its first span's start" */
     it("anchors on the first span's start, where the column already sat", () => {
       // The no-partition-shift guarantee: before the split this column held
       // min(span start), which for an in-order trace IS the first span's start.
@@ -347,6 +359,123 @@ describe("traceAnalytics storage anchor", () => {
       ]);
 
       expect(state.storageAnchorMs).toBe(0);
+    });
+  });
+
+  describe("given a business time a producer sent from far in the future", () => {
+    // The anchor is producer-controlled and the collector bounds only the PAST
+    // edge, so without a future bound one span claiming to start in 2286 fixes
+    // that row's partition AND its `OccurredAt + retention` TTL deadline in
+    // 2286 — a row that outlives its tenant's retention indefinitely and that
+    // `ttlReconciler` cannot reach, because it anchors on the same column.
+    // Before the freeze this self-corrected: `min(span start)` pulled the live
+    // row back as soon as a sane span arrived. Freezing is what makes it stick.
+    const now = BASE_MS;
+    const farFuture = BASE_MS + 400 * 24 * 60 * 60 * 1000;
+
+    /** @scenario "A trace anchored in the far future is refused that time" */
+    it("refuses it rather than freezing the row into a partition years away", () => {
+      const state = anchorStorageTime({
+        state: projection.init(),
+        eventOccurredAtMs: farFuture,
+        now,
+      });
+
+      expect(state.storageAnchorMs).toBe(0);
+    });
+
+    it("still accepts a time inside the skew allowance, so a merely wrong clock anchors on itself", () => {
+      const skewed = now + 60 * 60 * 1000;
+
+      const state = anchorStorageTime({
+        state: projection.init(),
+        eventOccurredAtMs: skewed,
+        now,
+      });
+
+      expect(state.storageAnchorMs).toBe(skewed);
+    });
+
+    it("lets the next usable contribution anchor instead", () => {
+      // Refusing must not strand the trace un-anchorable — it only declines
+      // THIS candidate.
+      const refused = anchorStorageTime({
+        state: projection.init(),
+        eventOccurredAtMs: farFuture,
+        now,
+      });
+
+      const anchored = anchorStorageTime({
+        state: refused,
+        eventOccurredAtMs: BASE_MS + 5_000,
+        now,
+      });
+
+      expect(anchored.storageAnchorMs).toBe(BASE_MS + 5_000);
+    });
+  });
+
+  describe("given a contribution whose business time is unusable", () => {
+    it.each([
+      ["zero", 0],
+      ["negative", -1],
+      ["not a number", Number.NaN],
+      ["infinite", Number.POSITIVE_INFINITY],
+    ])("leaves the state untouched when the time is %s", (_label, value) => {
+      const before = projection.init();
+
+      const after = anchorStorageTime({
+        state: before,
+        eventOccurredAtMs: value,
+        now: BASE_MS,
+      });
+
+      // Same REFERENCE, not merely an equal object: an un-anchorable
+      // contribution must not churn the state.
+      expect(after).toBe(before);
+    });
+
+    it("leaves the state untouched when there is no time at all", () => {
+      const before = projection.init();
+
+      expect(
+        anchorStorageTime({
+          state: before,
+          eventOccurredAtMs: undefined,
+          now: BASE_MS,
+        }),
+      ).toBe(before);
+    });
+  });
+
+  describe("given a state nothing could anchor", () => {
+    // Every event carried `occurredAt: 0` — the event schema permits it
+    // (`nonnegative`, not `positive`). The partition column still must not be
+    // the epoch, so the projection falls back through fold time.
+    const unanchored = (): TraceAnalyticsData => ({
+      ...projection.init(),
+      traceId: TRACE_ID,
+      storageAnchorMs: 0,
+      createdAt: BASE_MS,
+    });
+
+    it("falls back to fold time so the row never lands in 196952", () => {
+      expect(project(unanchored()).occurredAtMs).toBe(BASE_MS);
+    });
+
+    it("falls back again when even fold time is unusable", () => {
+      // `parseClickHouseDateTimeMs` returns 0 on a parse failure, so a
+      // read-back state can carry `createdAt: 0`. Trusting it unchecked would
+      // put the row straight back into the partition this change exists to
+      // escape.
+      const row = projectAnalyticsStateToRow({
+        state: { ...unanchored(), createdAt: 0 },
+        tenantId: TENANT,
+        version: TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
+        now: BASE_MS,
+      });
+
+      expect(row.occurredAtMs).toBe(BASE_MS);
     });
   });
 });

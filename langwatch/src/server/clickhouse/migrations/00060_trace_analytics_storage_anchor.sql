@@ -28,14 +28,26 @@
 -- carries `storageAnchorMs` — the first business time the fold observed from
 -- ANY contribution (span, log record, metric correlation, annotation, topic,
 -- origin, rename), frozen thereafter — and this column carries the span timing
--- baseline that was sharing it. For a trace with spans the anchor is the first
--- span's start, which is what the column held before, so no span trace changes
--- partition. Only log-only traces move: out of 1970 and into real time.
+-- baseline that was sharing it.
+--
+-- For a trace whose spans arrive in start order the anchor is the first span's
+-- start, which is exactly what the column already held, so those traces do not
+-- move at all. Where the two differ is a trace that received an earlier-starting
+-- span LATE: the column used to hold `min(span start)` and now holds the start
+-- of the first span folded, which is later. That is the anchor doing its job —
+-- the old value moved backwards on every late span, which is what orphaned row
+-- versions and dragged the TTL deadline towards the row — but it does mean such
+-- a trace can land in a different week partition than it would have before.
+-- Existing rows are NOT re-anchored: the pre-split projection stamp is decoded
+-- rather than refolded, precisely so the population is not rewritten (see
+-- TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT).
+--
+-- Only log-only traces move unconditionally: out of 1970 and into real time.
 --
 -- Why the baseline needs a column of its own rather than being re-derived:
 -- `store.get()` decodes the fold's working state straight off this row
 -- (ADR-066). Without the column the baseline reads back as 0 — "no span yet" —
--- on a trace that has spans, and the next span measures the whole trace's
+-- on a POST-SPLIT trace that has spans, and the next span measures the whole trace's
 -- duration from itself, taking TokensPerSecond (completion tokens over that
 -- duration) with it. The projection version was bumped to 2026-07-29 in the same
 -- change, so a row written before this migration is reported as a store MISS and

@@ -7,6 +7,7 @@ import type { TraceProcessingEvent } from "../../schemas/events";
 import {
   projectAnalyticsStateToRow,
   TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
+  TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT,
   type TraceAnalyticsData,
   TraceAnalyticsFoldProjection,
   type TraceAnalyticsRow,
@@ -205,6 +206,98 @@ describe("TraceAnalyticsStore read-back version gate", () => {
       expect(state?.spanCount).toBe(7);
       expect(state?.traceNameUserOverridden).toBe(true);
       expect(appliedEventIds).toEqual(["evt-1", "evt-2"]);
+    });
+  });
+
+  describe("given a row stamped with the version just before the anchor split", () => {
+    // The one older stamp that is decoded rather than refused. On a pre-split
+    // row `OccurredAt` is `min(span start)` — at once a valid anchor (it is
+    // what the row is already partitioned and TTL'd on) and the correct span
+    // timing baseline (it is what the new column was split out to carry).
+    //
+    // The alternative — refusing it — would rebuild the entire population, and
+    // a rebuild re-derives the anchor, so the change whose premise is "an
+    // anchor is written once" would open by moving every one of them.
+    const preSplitRow = (over: Partial<TraceAnalyticsRow> = {}) =>
+      ({
+        ...project(committedState()),
+        version: TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT,
+        // The column this shape does not have. Its ClickHouse DEFAULT is 0, so
+        // that is what a real pre-split row decodes as.
+        earliestSpanStartMs: 0,
+        occurredAtMs: BASE_MS + 250,
+        ...over,
+      }) satisfies TraceAnalyticsRow;
+
+    it("decodes it instead of reporting a miss", async () => {
+      const { store } = storeOver(preSplitRow());
+
+      const { state, appliedEventIds, miss } = await store.getWithApplied(
+        "trace-rb",
+        context,
+      );
+
+      expect(miss).toBeUndefined();
+      expect(state).not.toBeNull();
+      // The watermark survives too — the row was trusted, so redelivery dedup
+      // keeps working across the transition.
+      expect(appliedEventIds).toEqual(["evt-1", "evt-2"]);
+    });
+
+    /** @scenario "A trace already stored keeps its anchor when the platform is upgraded" */
+    it("takes the timing baseline from the anchor's column, because there they are the same value", () => {
+      const state = traceAnalyticsStateFromRow(preSplitRow());
+
+      // Both read off OccurredAt: pre-split, that column WAS min(span start).
+      expect(state.storageAnchorMs).toBe(BASE_MS + 250);
+      expect(state.occurredAt).toBe(BASE_MS + 250);
+    });
+
+    /** @scenario "A trace already stored keeps its anchor when the platform is upgraded" */
+    it("keeps the anchor exactly where the row was already stored", () => {
+      // The point of decoding rather than refolding: re-projecting the decoded
+      // state must reproduce the same partition column, so the row is rewritten
+      // onto its own sort key rather than a second one.
+      const rewritten = project(traceAnalyticsStateFromRow(preSplitRow()));
+
+      expect(rewritten.occurredAtMs).toBe(BASE_MS + 250);
+    });
+
+    it("leaves a log-only pre-split row free to anchor on its next signal", () => {
+      // The 196952 row this whole change exists to rescue. It carries 0, which
+      // is right twice over — no span was ever folded, and an unusable anchor
+      // is what lets the next contribution freeze a real one.
+      const state = traceAnalyticsStateFromRow(
+        preSplitRow({ occurredAtMs: 0 }),
+      );
+
+      expect(state.storageAnchorMs).toBe(0);
+      expect(state.occurredAt).toBe(0);
+
+      const anchored = projection.apply(state, {
+        id: "evt-late-log",
+        type: "lw.obs.trace.log_record_received",
+        tenantId: TENANT,
+        aggregateId: "trace-rb",
+        occurredAt: BASE_MS + 9_000,
+        data: {
+          traceId: "trace-rb",
+          spanId: "ffffffffffffff01",
+          timeUnixMs: BASE_MS + 9_000,
+          severityNumber: 9,
+          severityText: "INFO",
+          body: "api_request",
+          attributes: {},
+          resourceAttributes: {},
+          scopeName: "com.anthropic.claude_code",
+          scopeVersion: null,
+          piiRedactionLevel: "DISABLED",
+        },
+      } as unknown as TraceProcessingEvent);
+
+      expect(anchored.storageAnchorMs).toBe(BASE_MS + 9_000);
+      // …and the timing baseline stays untouched: no span has been folded.
+      expect(anchored.occurredAt).toBe(0);
     });
   });
 

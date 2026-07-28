@@ -5,9 +5,24 @@ import type { ProjectionStoreContext } from "../../../projections/projectionStor
 import {
   projectAnalyticsStateToRow,
   TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
+  TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT,
   type TraceAnalyticsData,
   traceAnalyticsStateFromRow,
 } from "./traceAnalytics.foldProjection";
+
+/**
+ * The projection stamps whose rows `getWithApplied` will decode.
+ *
+ * Two, not one: the current shape, and the pre-split shape the decoder can read
+ * without ambiguity. Everything older is a store miss. Adding a member here is a
+ * claim that `traceAnalyticsStateFromRow` derives every field correctly from
+ * that shape — for the pre-split stamp that claim is discharged by the
+ * `occurredAt` branch in the decoder, and nowhere else.
+ */
+const DECODABLE_PROJECTION_VERSIONS: ReadonlySet<string> = new Set([
+  TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
+  TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT,
+]);
 
 /**
  * FoldProjectionStore adapter for the slim trace_analytics fold (ADR-034
@@ -113,17 +128,24 @@ export class TraceAnalyticsStore
    * the MAX_PROCESSED_SPANS cap and re-adds committed cost/tokens,
    * `traceNameUserOverridden` false lets one late non-root span overwrite a
    * user-renamed trace, and `traceNameFromFallback` false freezes a
-   * fallback-named trace against a real root that arrives later. The same
-   * argument is what carries the storage-anchor split (ADR-071 step 3, migration
-   * 00060) through the gate: on a row written before it, `EarliestSpanStartMs`
-   * decodes as 0 — "no span yet" on a trace that has spans — and the next span
-   * would measure the whole trace's duration from itself. So a
+   * fallback-named trace against a real root that arrives later. So a
    * stale-version row is reported as a MISS (null state, empty watermark — the
    * same answer as "no row"), which the fold's `refoldOnStoreMiss` rebuilds from
    * `event_log` once; the rewrite carries the current version and every later
    * read hits. Transitional by construction: it stops firing as soon as the
    * aggregate is rewritten, and for the population as a whole once retention has
    * aged the pre-00056 rows out.
+   *
+   * The storage-anchor split (ADR-071 step 3, migration 00060) is the ONE stamp
+   * change that does NOT take that route, and deliberately. Its predecessor is
+   * admitted and decoded, because on a pre-split row `OccurredAt` is
+   * `min(span start)` — at once a valid anchor (it is what the row is already
+   * partitioned and TTL'd on) and the correct span timing baseline (it is what
+   * the new column was split out to carry). Refusing it would force the whole
+   * population to rebuild, and a rebuild re-derives the anchor — re-anchoring
+   * every trace as the opening act of the change that exists to stop anchors
+   * moving. See {@link TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT} for why the
+   * pair is unambiguous before the split and ambiguous after it.
    *
    * `context.readWindow` — computed by the executor from the fold's declared
    * `options.readWindow` — prunes the read to a window of partitions around the
@@ -156,7 +178,7 @@ export class TraceAnalyticsStore
     // it as `undecodable`, not `absent`: the row was FOUND and refused, so the
     // executor must not answer with an unwindowed re-read that can only find
     // the same row again.
-    if (found.row.version !== TRACE_ANALYTICS_PROJECTION_VERSION_LATEST) {
+    if (!DECODABLE_PROJECTION_VERSIONS.has(found.row.version)) {
       return { state: null, appliedEventIds: [], miss: "undecodable" };
     }
     return {

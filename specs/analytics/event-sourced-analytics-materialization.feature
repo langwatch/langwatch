@@ -43,11 +43,24 @@ Feature: Event-sourced analytics materialization
       And it is not filed under a time so old that retention would already have discarded it
 
     @unit
-    Scenario: A trace with spans keeps the anchor it had before the split
+    Scenario: A trace with spans is anchored at its first span's start
       Given a trace whose spans arrive in the order they started
       When its slim row is written
       Then the row is anchored at the first span's start
-      And that is where the row was already being stored before the anchor was split out
+
+    @unit
+    Scenario: A trace already stored keeps its anchor when the platform is upgraded
+      Given a trace whose row was stored before the anchor was held separately
+      When that row is read back after the upgrade
+      Then it is still anchored where it was already stored
+      And its measured start is still the earliest span the trace ever reported
+
+    @unit
+    Scenario: A trace anchored in the far future is refused that time
+      Given a trace whose reported start time is years ahead of now
+      When its slim row is written
+      Then the row is not filed under that time
+      And it is kept for its full retention period rather than outliving it
 
     @unit
     Scenario: A late earlier-starting span moves the trace's timing, not its anchor

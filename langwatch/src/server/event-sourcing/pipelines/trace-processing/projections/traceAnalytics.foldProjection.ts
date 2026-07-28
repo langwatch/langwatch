@@ -51,6 +51,7 @@ import {
   TraceOriginService,
 } from "./services";
 import { trimAttributesForAnalytics } from "./services/analytics-attribute-trim.service";
+import { isValidTimestamp } from "./services/span-timing.service";
 import {
   MAX_PROCESSED_SPANS,
   mergeModelsMostRecentFirst,
@@ -158,12 +159,50 @@ const traceAnalyticsEvents = [
  *  BOTH halves of what this stamp records changed at once: the DERIVATION
  *  (`OccurredAt` is now the frozen first-observed business time rather than the
  *  running min of span starts) and the ROW SHAPE (`EarliestSpanStartMs` carries
- *  the span timing baseline that `OccurredAt` used to double as). A 2026-07-27
- *  row has no `EarliestSpanStartMs`, so it decodes as 0 — indistinguishable
- *  from "no span yet" — which would reset the timing baseline and make the next
- *  span measure the trace's duration from itself alone. Rejected as a store
- *  miss and refolded once, exactly as the 00056 rows were. */
+ *  the span timing baseline that `OccurredAt` used to double as).
+ *
+ *  This one is NOT a refold trigger, and that distinction is the whole point —
+ *  see {@link TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT}. */
 export const TRACE_ANALYTICS_PROJECTION_VERSION_LATEST = "2026-07-29" as const;
+
+/**
+ * The stamp immediately before the storage-anchor split — DECODED, not refused.
+ *
+ * A `2026-07-27` row has no `EarliestSpanStartMs`, so the obvious move is to
+ * treat it the way the 00056 rows were treated: report a store miss and let
+ * `refoldOnStoreMiss` rebuild it. That would be wrong here, and expensively so.
+ * Rejecting every existing row forces the WHOLE population to rebuild from
+ * `event_log` on its next delivery, and a rebuild RE-DERIVES the anchor from
+ * replayed history — so a change whose entire premise is "a storage anchor is
+ * written once" would open by re-anchoring every trace it touches. For a trace
+ * whose spans arrived out of order the rebuilt anchor is strictly later than the
+ * `min(span start)` the column held, so the row changes sort key, orphans its
+ * previous version until TTL, and can cross a `toYearWeek` boundary — ADR-071
+ * consequences 1-3, reintroduced at population scale by the fix for them.
+ *
+ * It is also unnecessary, because a pre-split row is NOT ambiguous. On it,
+ * `OccurredAt` is `min(span start)`, which is simultaneously:
+ *
+ *   - a VALID ANCHOR — it is the value the row was actually partitioned, sorted
+ *     and TTL'd on, so adopting it moves nothing; and
+ *   - the CORRECT BASELINE — it is exactly what `EarliestSpanStartMs` was split
+ *     out to carry.
+ *
+ * So the transitional decode reads both fields off that one column and the row
+ * heals in place: no refold, no re-anchoring, no backfill. A log-only pre-split
+ * row carries 0, which is the right answer twice over — no span has been folded,
+ * and an unusable anchor lets the next contribution freeze a real one, which is
+ * the 196952 escape this change exists to perform.
+ *
+ * Why the stamp still had to move: once BOTH shapes exist,
+ * `EarliestSpanStartMs = 0` means either "pre-split row, baseline lives in
+ * OccurredAt" or "post-split log-only trace, baseline genuinely 0 and OccurredAt
+ * is a LOG time". Reading the second as the first hands `SpanTimingService` a log
+ * time as a span start and inflates the trace's duration by the whole ingest lag.
+ * The version is what tells them apart.
+ */
+export const TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT =
+  "2026-07-27" as const;
 
 /**
  * How far a trace's OccurredAt (the partition column, and since ADR-071 step 3
@@ -397,9 +436,57 @@ export interface TraceAnalyticsData {
   LastEventOccurredAt: number;
 }
 
-/** Usable as a business time: a finite, strictly positive epoch-ms value. */
-function isUsableAnchorMs(value: number | undefined): value is number {
-  return typeof value === "number" && value > 0 && Number.isFinite(value);
+/**
+ * How far ahead of fold time a producer-supplied business time may still be
+ * taken as the storage anchor.
+ *
+ * The anchor is producer-controlled — a span's `startTimeUnixMs`, a log's
+ * `timeUnixMs`, an event envelope's `occurredAt` — and the collector accepts any
+ * 13-digit epoch-ms value, bounding only the PAST edge (`SPAN_MAX_PAST_MS`).
+ * Unbounded on the future edge, one span claiming to start in 2286 would fix
+ * that row's partition and its `TTL toDateTime(OccurredAt) + retention` deadline
+ * in 2286: a row that outlives its tenant's retention policy indefinitely, that
+ * `ttlReconciler` cannot reach because it anchors on the same column, and that
+ * sits outside every read window so every delivery pays an unwindowed scan.
+ *
+ * Before the freeze this self-corrected — `min(span start)` pulled the live row
+ * back into a real partition as soon as a sane span arrived, leaving only
+ * orphaned versions stranded. Freezing the anchor is exactly what makes the
+ * producer's value permanent, so the bound belongs to the freeze that needs it.
+ *
+ * A day, not an hour: client clock skew of minutes is routine and a whole day
+ * still lands inside the ±7-day read window, so a legitimately skewed trace
+ * anchors on its own time rather than being pushed onto fold time.
+ */
+const MAX_ANCHOR_FUTURE_SKEW_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Usable as a storage anchor: a valid timestamp (finite, strictly positive —
+ * the same predicate `SpanTimingService` applies to span times) that is not
+ * implausibly far in the future ({@link MAX_ANCHOR_FUTURE_SKEW_MS}).
+ *
+ * `now` is injected rather than read here so the fold stays testable; callers
+ * pass `Date.now()`, which is what `AbstractFoldProjection.apply` already uses
+ * to stamp `updatedAt`.
+ */
+function isUsableAnchorMs(
+  value: number | undefined,
+  now: number,
+): value is number {
+  return isValidTimestamp(value) && value <= now + MAX_ANCHOR_FUTURE_SKEW_MS;
+}
+
+/**
+ * The first candidate that survives {@link isUsableAnchorMs}, falling back to
+ * `now`. Written as a chain rather than nested ternaries because the point is
+ * that EVERY step is validated: the partition column must never be the epoch,
+ * and a fallback that is trusted rather than checked is how it would become one.
+ */
+function firstUsableAnchor(candidates: readonly number[], now: number): number {
+  for (const candidate of candidates) {
+    if (isUsableAnchorMs(candidate, now)) return candidate;
+  }
+  return now;
 }
 
 /**
@@ -417,6 +504,12 @@ function isUsableAnchorMs(value: number | undefined): value is number {
  * `SpanTimingService` has seen the span, so it is read from there rather than
  * re-derived.
  *
+ * A time implausibly far in the future is refused rather than frozen
+ * ({@link MAX_ANCHOR_FUTURE_SKEW_MS}) — the anchor is producer-controlled, and
+ * freezing is what would make a bad one permanent. Refusing simply leaves the
+ * state un-anchored, so the next contribution gets to try and, failing that, the
+ * write falls back to fold time.
+ *
  * Handles no event itself — {@link TraceAnalyticsFoldProjection.apply} calls it
  * once per event, after the handler, so every contribution type anchors without
  * ten handlers each remembering to.
@@ -426,21 +519,24 @@ function isUsableAnchorMs(value: number | undefined): value is number {
 export function anchorStorageTime({
   state,
   eventOccurredAtMs,
+  now = Date.now(),
 }: {
   state: TraceAnalyticsData;
   eventOccurredAtMs: number | undefined;
+  now?: number;
 }): TraceAnalyticsData {
   if (state.storageAnchorMs > 0) return state;
-  const candidate = isUsableAnchorMs(state.occurredAt)
+  const candidate = isUsableAnchorMs(state.occurredAt, now)
     ? state.occurredAt
     : eventOccurredAtMs;
-  if (!isUsableAnchorMs(candidate)) return state;
+  if (!isUsableAnchorMs(candidate, now)) return state;
   return { ...state, storageAnchorMs: candidate };
 }
 
 /**
- * Project the in-memory slim state into the slim `TraceAnalyticsRow`. Pure:
- * no I/O, no external state.
+ * Project the in-memory slim state into the slim `TraceAnalyticsRow`. Pure: no
+ * I/O, and no external state beyond the injectable `now` below — which only the
+ * anchor's last-resort fallback reads, and which a caller may pin.
  *
  * Used by the projection's store adapter to derive the persisted record.
  */
@@ -448,10 +544,17 @@ export function projectAnalyticsStateToRow({
   state,
   tenantId,
   version,
+  now = Date.now(),
 }: {
   state: TraceAnalyticsData;
   tenantId: string;
   version: string;
+  /**
+   * Fold time, injected so the function stays deterministic under test. Read
+   * ONLY by the anchor's last-resort fallback below, which is reached solely by
+   * a state that carries no usable business time at all.
+   */
+  now?: number;
 }): TraceAnalyticsRow {
   const attrs = state.attributes ?? {};
   const userId = readNullableString(attrs[TRACE_ANALYTICS_ATTR_KEYS.USER_ID]);
@@ -468,16 +571,26 @@ export function projectAnalyticsStateToRow({
     tenantId,
     traceId: state.traceId,
     version,
-    // The anchor, not the timing baseline (ADR-071). The `createdAt` fallback
-    // is a last resort for a state whose every event carried a zero
-    // `occurredAt` — the event schema allows it (`nonnegative`, not
-    // `positive`) — and it exists so the partition column can never be the
-    // epoch. It is fold time, so it is re-stampable on a rebuild; the
-    // read-back promotes whatever landed in the column to the frozen anchor,
-    // which is what stops it drifting after the first write.
-    occurredAtMs: isUsableAnchorMs(state.storageAnchorMs)
-      ? state.storageAnchorMs
-      : state.createdAt,
+    // The anchor, not the timing baseline (ADR-071).
+    //
+    // The fallback chain is a last resort for a state nothing could anchor: one
+    // whose every event carried a zero `occurredAt` (the event schema permits
+    // it — `nonnegative`, not `positive`), or whose only candidate times were
+    // implausibly far in the future. It exists so the partition column can never
+    // be the epoch, and each step is validated rather than trusted —
+    // `parseClickHouseDateTimeMs` returns 0 on a parse failure, so an unchecked
+    // `state.createdAt` would put the row straight back in 196952, which is the
+    // one outcome this whole change exists to prevent.
+    //
+    // ADR-071:163 names `CreatedAt` as a trap for exactly this use, and it is
+    // right: it is fold time, so a rebuild re-stamps it. That is accepted here
+    // and no worse than the alternative, because it applies ONLY to a state that
+    // has no business time at all, and because the read-back promotes whatever
+    // landed in the column to the frozen anchor — so it stops drifting after the
+    // first write. What the ADR argues for instead (the event log's accept time
+    // threaded into the row) is sequencing item 6 and needs the human sign-off
+    // recorded there; it is not this change's to take.
+    occurredAtMs: firstUsableAnchor([state.storageAnchorMs, state.createdAt], now),
     earliestSpanStartMs: state.occurredAt,
     createdAtMs: state.createdAt,
     updatedAtMs: state.updatedAt,
@@ -552,11 +665,15 @@ export function projectAnalyticsStateToRow({
  * still answers, mapping the ClickHouse column defaults to state defaults
  * (spanCount 0, empty annotation set, no root claimed, checkpoint 0, no span
  * timing baseline). Those defaults are indistinguishable from real zeroes, so
- * deciding WHETHER a row may be decoded is the store's job, not this
- * function's: `getWithApplied` refuses
- * any row stamped with an older projection version and reports a store miss, and
- * the fold's `refoldOnStoreMiss` rebuilds that aggregate from `event_log` once.
- * A caller that bypasses the version gate gets the defaults above.
+ * deciding WHETHER a row may be decoded is the store's job, not this function's:
+ * `getWithApplied` admits the current stamp and the one pre-split stamp it can
+ * read unambiguously, reports anything older as a store miss, and the fold's
+ * `refoldOnStoreMiss` rebuilds that aggregate from `event_log` once. A caller
+ * that bypasses the version gate gets the defaults above.
+ *
+ * The decoder is version-AWARE for exactly one field pair — see the
+ * `occurredAt` branch below and
+ * {@link TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT}.
  */
 export function traceAnalyticsStateFromRow(
   row: TraceAnalyticsRow,
@@ -592,7 +709,16 @@ export function traceAnalyticsStateFromRow(
     // anchor. Reading it off `occurredAtMs` would hand `SpanTimingService` a
     // log-shaped time as a span start and inflate the trace's duration — and
     // for a log-only trace it would fabricate a span that never arrived.
-    occurredAt: row.earliestSpanStartMs,
+    //
+    // The one exception is a PRE-SPLIT row, where the two were the same column
+    // and `OccurredAt` is the `min(span start)` this field wants. Taking it
+    // there is what lets the population heal without a refold; taking it
+    // anywhere else is the inflation bug above
+    // ({@link TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT}).
+    occurredAt:
+      row.version === TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT
+        ? row.occurredAtMs
+        : row.earliestSpanStartMs,
     totalDurationMs: row.totalDurationMs,
     totalCost: row.totalCost,
     nonBilledCost: row.nonBilledCost,
@@ -936,41 +1062,29 @@ function applyLogContribution({
   return {
     ...state,
     traceId: state.traceId || contribution.traceId,
-    // KNOWN DEFECT, deliberately NOT fixed here — do not "fix" it by anchoring
-    // `occurredAt` from the log.
+    // `occurredAt` is NOT set here, and must not be: it is the span timing
+    // baseline, span-seeded only.
     //
-    // `OccurredAt` is this table's partition key AND its TTL anchor (00039), and
-    // only spans set it. A log-only trace — Claude Code Path B, Codex Path B,
-    // which `hasPersistableSignal` deliberately persists — therefore commits its
-    // row at OccurredAt 0: partition 196952, with a TTL deadline of
-    // `1970 + retention`, i.e. expired before it was written.
+    // `SpanTimingService.accumulateTiming` reads `occurredAt > 0` as its "a span
+    // has seeded the baseline" sentinel and computes
+    // `currentEnd = occurredAt + totalDurationMs`. A log's time is the platform
+    // ACCEPT time, not producer business time, so seeding it from here inflates
+    // `TotalDurationMs` by the whole ingest lag — and `SpanCostService` divides
+    // completion tokens by that value, so `TokensPerSecond` goes with it. It is
+    // order-dependent too: the same trace would report two different latencies
+    // depending on whether the log or the span folded first. Two tests pin this.
     //
-    // The obvious fix (`state.occurredAt === 0 ? contribution.occurredAtMs : …`)
-    // is WRONG, and was reverted after review. `occurredAt` is not only the
-    // storage anchor: `SpanTimingService.accumulateTiming` uses `occurredAt > 0`
-    // as its "a span has seeded the timing baseline" sentinel, and computes
-    // `currentEnd = occurredAt + totalDurationMs`. Seeding it from a log — whose
-    // time is the platform ACCEPT time, not producer business time — inflates
-    // `TotalDurationMs` by the whole ingest lag, and `SpanCostService` divides
-    // completion tokens by that same value, so `TokensPerSecond` goes with it.
-    // Worse, the result depends on whether the log or the span folds first, so
-    // one trace can report two different latencies.
-    //
-    // Nor can the sentinel simply move to `spanCount`. A span whose timestamps
-    // are unusable still increments the count — `SpanTimingService` early-returns
-    // on `!isValidTimestamp(...)` while `applySpanToAnalytics` goes on to
+    // Nor can the sentinel move to `spanCount`. A span whose timestamps are
+    // unusable still increments the count — `SpanTimingService` early-returns on
+    // `!isValidTimestamp(...)` while `applySpanToAnalytics` goes on to
     // `spanCount + 1` — so `spanCount > 0` reads as "timing seeded" when it is
-    // not, and the next real span computes `min(0, start) = 0`. Pairing it as
-    // `spanCount > 0 && occurredAt > 0` fixes that but still misreads
-    // log-then-unusable-span-then-real, where the log has set `occurredAt` and
-    // the count is non-zero yet no span has seeded the baseline.
+    // not. (Synthetic spans are exempt: `applySpanToAnalytics` returns before
+    // the increment, leaving both signals untouched.)
     //
-    // (Synthetic spans are NOT part of this: `applySpanToAnalytics` returns
-    // before the increment for them, so they leave both signals untouched.)
-    //
-    // The real fix is a storage anchor that is separate from the timing
-    // baseline — a distinct state field, persisted or derived on read-back —
-    // which is ADR-071 step 3's stated target and needs its own change.
+    // What a log record DOES anchor is storage. `storageAnchorMs` is a separate
+    // field, frozen by `anchorStorageTime` from `apply` after this handler
+    // returns, so a log-only trace gets a real partition and a real TTL deadline
+    // without any of the above — ADR-071 step 3, landed.
     attributes: mergedAttributes,
     models,
     totalCost,
@@ -1025,34 +1139,47 @@ export class TraceAnalyticsFoldProjection
    * version, so the row hits from then on and the whole population self-heals
    * with no backfill migration. Without the gate a stale row would
    * silently downgrade a user-renamed trace to a late span's name, freeze a
-   * fallback-named trace, reset the MAX_PROCESSED_SPANS cap so already-
-   * committed cost/tokens were counted twice, and — since the storage-anchor
-   * split (migration 00060) — hand back a zero span timing baseline, so the
-   * trace's duration restarted from whichever span happened to arrive next.
+   * fallback-named trace, and reset the MAX_PROCESSED_SPANS cap so already-
+   * committed cost/tokens were counted twice.
    *
-   * TWO CLASSES DO NOT SELF-HEAL, so `es_fold_refold_on_miss_total` cannot
-   * reach zero for this adopter:
+   * The storage-anchor split (migration 00060) pointedly did NOT join that list
+   * — its predecessor stamp is decoded rather than refused, because refusing it
+   * would rebuild the whole population and a rebuild re-derives the anchor. See
+   * {@link TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT}.
    *
-   *   1. A log-only trace folds `occurredAt: 0`, so its row lands in partition
-   *      `196952` already past its TTL. Reusing `occurredAt` as the storage
-   *      anchor is NOT the fix — it is `SpanTimingService`'s baseline, and
-   *      seeding it from a log inflates TotalDurationMs and TokensPerSecond by
-   *      the ingest lag. A separate anchor (ADR-071 step 3) is.
-   *   2. A dimension-only trace (topic or annotation, no span, no log record)
-   *      folds a state `hasPersistableSignal` refuses, so no row is written —
-   *      and a refold's result is refused by the same gate, so it recurs.
+   * ONE CLASS DOES NOT SELF-HEAL, so `es_fold_refold_on_miss_total` cannot reach
+   * zero for this adopter: a dimension-only trace (topic or annotation, no span,
+   * no log record) folds a state `hasPersistableSignal` refuses, so no row is
+   * written — and a refold's result is refused by the same gate, so it recurs.
+   * Whether to admit such rows is a product question, deliberately still open;
+   * see the gate's docblock in `traceAnalytics.store.ts`.
+   *
+   * (The log-only trace used to be a second such class — its row landed in
+   * partition `196952` already past its TTL and was reaped. The storage anchor
+   * closed it.)
    *
    * `coalesceMaxBatch` — see below.
    *
-   * `refoldOnOutOfOrder: false` — spans are distributed and arrive in any
-   * order, and this fold is order-insensitive (sums / min / max + LWW-by-
-   * occurredAt), so a late event folds onto the loaded state in place; no
-   * history replay derives anything. WITHOUT this a hot trace (a Claude Code
-   * session streams 100k+ events into one aggregate) re-folded its ENTIRE
-   * history on every out-of-order batch, pinning the checkpoint at the max
-   * occurredAt so every later batch looked out of order too — an O(n²) death
-   * spiral that never caught up (2026-07-09 incident; see
+   * `refoldOnOutOfOrder: false` — spans are distributed and arrive in any order,
+   * and a late event folds onto the loaded state in place; no history replay
+   * derives anything. WITHOUT this a hot trace (a Claude Code session streams
+   * 100k+ events into one aggregate) re-folded its ENTIRE history on every
+   * out-of-order batch, pinning the checkpoint at the max occurredAt so every
+   * later batch looked out of order too — an O(n²) death spiral that never
+   * caught up (2026-07-09 incident; see
    * specs/event-sourcing/hot-trace-fold-amplification.feature).
+   *
+   * Precision about "order-insensitive", because the executor keys on this flag
+   * to choose the STREAMING refold (`streamRefoldUpToDelivered`, whose pages
+   * arrive in log-append rather than `occurredAt` order): every DERIVED field
+   * here commutes — sums, counters, min/max, LWW-by-occurredAt. `storageAnchorMs`
+   * does not: it is first-observed by construction. That is deliberate and it is
+   * safe here, because the anchor is a STORAGE address rather than a derived
+   * value — a rebuild that reaches a different first event still produces a valid
+   * anchor, and the committed one is preserved across the only transition that
+   * would otherwise re-derive it population-wide (the pre-split decode above).
+   * A field that is both first-observed AND read by consumers would not be safe
+   * on this path.
    */
   override options: FoldProjectionOptions = {
     refoldOnStoreMiss: true,
