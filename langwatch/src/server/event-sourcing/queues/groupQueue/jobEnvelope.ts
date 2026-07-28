@@ -759,7 +759,9 @@ export function readJobAttempt(value: string): number | null {
     // out of the payload by name, so a job whose payload carried that key could
     // name a number past the budget — the ladder then treats it as already
     // spent and retires the job, which is the fail-closed direction.
-    return typeof attempt === "number" && Number.isInteger(attempt) && attempt > 0
+    return typeof attempt === "number" &&
+      Number.isInteger(attempt) &&
+      attempt > 0
       ? attempt
       : null;
   } catch {

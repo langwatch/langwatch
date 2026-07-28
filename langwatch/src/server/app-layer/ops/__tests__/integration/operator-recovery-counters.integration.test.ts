@@ -30,8 +30,7 @@ describe("operator recovery clears every per-group counter", () => {
   let prefix: string;
   const groupId = "project-1/subscriber/pm:langyConversation";
 
-  const counterKey = (suffix: string) =>
-    `${prefix}group:${groupId}:${suffix}`;
+  const counterKey = (suffix: string) => `${prefix}group:${groupId}:${suffix}`;
 
   /** A group blocked after exhausting its budget, with every counter set. */
   async function seedExhaustedBlockedGroup(): Promise<void> {
@@ -102,5 +101,4 @@ describe("operator recovery clears every per-group counter", () => {
       });
     });
   });
-
 });

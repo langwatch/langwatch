@@ -26,14 +26,18 @@ describe("langy tool call id", () => {
     describe("when the frame is parsed at the wire boundary", () => {
       /** @scenario A tool id carrying a thought signature is reduced to the real id */
       it("records the tool call under the id the provider issued", () => {
-        const parsed = langyRelayFrameSchema.parse(toolFrame({ id: POLLUTED_ID }));
+        const parsed = langyRelayFrameSchema.parse(
+          toolFrame({ id: POLLUTED_ID }),
+        );
 
         expect(parsed).toMatchObject({ type: "tool", id: REAL_ID });
       });
 
       /** @scenario A tool id carrying a thought signature is reduced to the real id */
       it("keeps the signature out of everything it parsed", () => {
-        const parsed = langyRelayFrameSchema.parse(toolFrame({ id: POLLUTED_ID }));
+        const parsed = langyRelayFrameSchema.parse(
+          toolFrame({ id: POLLUTED_ID }),
+        );
 
         expect(JSON.stringify(parsed)).not.toContain("_ts_");
         expect(JSON.stringify(parsed)).not.toContain(SIGNATURE.slice(0, 32));
@@ -45,11 +49,16 @@ describe("langy tool call id", () => {
     describe("when each frame is parsed", () => {
       /** @scenario A start and an end frame for the same call still pair up */
       it("resolves both to the same tool call id", () => {
-        const start = langyRelayFrameSchema.parse(toolFrame({ id: POLLUTED_ID, phase: "start" }));
+        const start = langyRelayFrameSchema.parse(
+          toolFrame({ id: POLLUTED_ID, phase: "start" }),
+        );
         // The end frame carries the turn's LATER signature — a different blob
         // for the same call, which is exactly why the raw id could not pair.
         const end = langyRelayFrameSchema.parse(
-          toolFrame({ id: `${REAL_ID}_ts_${"Zz90-_18".repeat(400)}`, phase: "end" }),
+          toolFrame({
+            id: `${REAL_ID}_ts_${"Zz90-_18".repeat(400)}`,
+            phase: "end",
+          }),
         );
 
         expect(start).toMatchObject({ id: REAL_ID });
@@ -85,7 +94,9 @@ describe("langy tool call id", () => {
       it("leaves a long suffix alone when it is not base64url", () => {
         const id = `job_ts_${"a.b.c.d.".repeat(12)}`;
 
-        expect(langyRelayFrameSchema.parse(toolFrame({ id }))).toMatchObject({ id });
+        expect(langyRelayFrameSchema.parse(toolFrame({ id }))).toMatchObject({
+          id,
+        });
       });
     });
   });
@@ -125,7 +136,9 @@ describe("langy tool call id", () => {
     describe("when its start is recorded as a durable milestone", () => {
       /** @scenario A tool call's durable key is built from the normalised id */
       it("builds the event's idempotency key from the normalised id", async () => {
-        const frame = langyRelayFrameSchema.parse(toolFrame({ id: POLLUTED_ID }));
+        const frame = langyRelayFrameSchema.parse(
+          toolFrame({ id: POLLUTED_ID }),
+        );
         if (frame.type !== "tool") throw new Error("expected a tool frame");
 
         const [event] = await new InitiateToolCallCommand().handle({
