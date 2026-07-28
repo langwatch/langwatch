@@ -898,11 +898,31 @@ export class TraceAnalyticsFoldProjection
    * from a real zero, so the store reports a miss and this option rebuilds that
    * aggregate from `event_log` — once. The rebuild is rewritten at the current
    * version, so the row hits from then on and the whole population self-heals
-   * with no backfill migration. In steady state every row is current-version,
-   * `store.get()` hits, and nothing refolds. Without the gate a stale row would
+   * with no backfill migration. Without the gate a stale row would
    * silently downgrade a user-renamed trace to a late span's name, freeze a
    * fallback-named trace, and reset the MAX_PROCESSED_SPANS cap so already-
    * committed cost/tokens were counted twice.
+   *
+   * TWO CLASSES DO NOT SELF-HEAL, so "transitional" does not yet describe this
+   * adopter and `es_fold_refold_on_miss_total` cannot reach zero for it. Both
+   * are known and neither is closed here:
+   *
+   *   1. A log-only trace folds `occurredAt: 0`, so its row commits into
+   *      partition `197001` with a TTL deadline of `1970 + retention` — already
+   *      past. Before the reap the windowed read misses it and the executor
+   *      pays an unwindowed retry per delivery; after the reap `get()` misses
+   *      forever and every delivery past the cache TTL refolds the whole
+   *      history. Reusing `occurredAt` as the storage anchor is NOT the fix —
+   *      it is `SpanTimingService`'s baseline sentinel, and seeding it from a
+   *      log measured the first span from the platform accept time, inflating
+   *      TotalDurationMs and TokensPerSecond by the ingest lag. The fix is a
+   *      storage anchor held separately from the timing baseline (ADR-071
+   *      step 3), which needs its own column and migration.
+   *   2. A dimension-only trace (topic or annotation, no span and no log
+   *      record) folds a state `hasPersistableSignal` refuses, so no row is
+   *      written at all — and a refold's own result is refused by the same
+   *      gate, so the miss recurs on every delivery past the cache TTL rather
+   *      than healing once.
    *
    * `coalesceMaxBatch` — see below.
    *

@@ -596,16 +596,89 @@ describe("CodingAgentSessionClickHouseRepository list-read dedup scope", () => {
         expect(boundsStartedAt(inner)).toBe(false);
       });
 
-      it("keeps the tenant and the user narrowing in both scopes, which cannot move a row out of its dedup group", async () => {
+      it("narrows to the user on the outer scope only, keeping just the key narrowing in the dedup group", async () => {
         const { client, lastQuery } = listClient([]);
 
         await listRecent(client, "user-1");
 
         const { inner, outer } = splitScopes(lastQuery());
-        expect(narrowsToUser(inner)).toBe(true);
         expect(narrowsToUser(outer)).toBe(true);
+        // `UserId` looks stable and is not: spans carry no identity, and a
+        // re-fold restarts from init(), so a later version can hold no user.
+        // Only TenantId belongs in the group, because it IS part of the key.
+        expect(narrowsToUser(inner)).toBe(false);
         expect(inner).toContain("TenantId = {tenantId:String}");
         expect(outer).toContain("TenantId = {tenantId:String}");
+      });
+    });
+  });
+
+  describe("given a session whose true latest version carries no user id", () => {
+    describe("when that user's sessions are listed", () => {
+      /** @scenario a user-narrowed list is never answered from a superseded version */
+      it("omits the session rather than serving the superseded version's totals", async () => {
+        // v1 folded from Claude's log events, which stamp identity. v2 — the
+        // true latest — folded from spans, which carry none, after a read-back
+        // miss re-ran init() and cleared the user. Narrowing the dedup scope
+        // on UserId would hide v2 from its own group, resolve max(UpdatedAt)
+        // to v1, and answer with v1's stale cost under the user's filter.
+        const { client } = listClient([
+          version({
+            sessionId: "identified",
+            startedAtMs: WINDOW_FROM + 60_000,
+            updatedAtMs: WINDOW_FROM + 60_000,
+            costUsd: 1,
+          }),
+          version({
+            sessionId: "identified",
+            startedAtMs: WINDOW_FROM + 60_000,
+            updatedAtMs: WINDOW_FROM + 120_000,
+            costUsd: 9,
+            userId: "",
+          }),
+        ]);
+
+        const rows = await listRecent(client, "user-1");
+
+        expect(rows).toEqual([]);
+      });
+    });
+  });
+
+  describe("given more tied duplicates than the page has room for", () => {
+    describe("when a full page is listed", () => {
+      /** @scenario a page is never shortened by collapsing a session's tied versions */
+      it("still returns a full page of distinct sessions", async () => {
+        // Every session has two versions tied on UpdatedAt, so both satisfy
+        // the IN-tuple and the collapse halves whatever the query returned.
+        // Cutting the page to `limit` in ClickHouse would hand the caller 25
+        // sessions for a 50-session page — and through getUsageTotals, 25
+        // sessions' cost silently missing.
+        const rows: Array<Record<string, unknown>> = [];
+        for (let index = 0; index < 60; index++) {
+          const startedAtMs = WINDOW_FROM + index * 60_000;
+          const updatedAtMs = WINDOW_FROM + index * 60_000;
+          rows.push(
+            version({
+              sessionId: `session-${index}`,
+              startedAtMs,
+              updatedAtMs,
+              costUsd: 1,
+            }),
+            version({
+              sessionId: `session-${index}`,
+              startedAtMs,
+              updatedAtMs,
+              costUsd: 1,
+            }),
+          );
+        }
+        const { client } = listClient(rows);
+
+        const listed = await listRecent(client);
+
+        expect(listed).toHaveLength(50);
+        expect(new Set(listed.map((row) => row.sessionId)).size).toBe(50);
       });
     });
   });

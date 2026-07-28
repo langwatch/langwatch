@@ -35,10 +35,11 @@ Feature: Payload cost governs the scheduling plane
     Then work is queued for that subscriber
 
   @unit
-  Scenario: a redelivered event is not processed twice
+  Scenario: a redelivered event resolves to the unit of work already queued
     Given a relevant event already queued for the subscriber
     When the same event is published again within the deduplication window
-    Then no second unit of work is queued
+    Then it resolves to the same unit of work, so the queue recognises it as a duplicate
+    And an event on another aggregate never resolves to that same unit
 
   @unit
   Scenario: two relevant events that share no payload identity are still delivered separately
@@ -47,6 +48,13 @@ Feature: Payload cost governs the scheduling plane
     When both are published within the deduplication window
     Then each is queued as its own unit of work
     And neither event's facts are dropped in favour of the other's
+
+  @unit
+  Scenario: a rolling deploy never hands a worker a payload shape it cannot read
+    Given the pointer form of queued work has not been switched on for the project
+    When a relevant event is published
+    Then the whole event is queued, which every running release can process
+    And no pointer is minted for a worker that could not resolve it
 
   @unit
   Scenario: work queued before the relevance rule existed still reaches the same outcome

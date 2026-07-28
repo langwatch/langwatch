@@ -18,6 +18,18 @@ import type { CodingAgentSessionRepository } from "./coding-agent-session.reposi
 
 const TABLE_NAME = "coding_agent_sessions" as const;
 
+/**
+ * How much `findManyRecent` over-reads so its TypeScript dedup cannot shorten
+ * the page.
+ *
+ * Duplicates only arise from an `UpdatedAt` tie between two versions of one
+ * session, so they are the exception rather than the rule and a doubling is
+ * ample headroom; anything the collapse still trims comes off the tail, which
+ * `slice` was going to drop anyway. Set this to 1 and a tie silently costs the
+ * caller a whole session.
+ */
+const LIST_READ_DEDUP_OVERFETCH = 2;
+
 const logger = createLogger(
   "langwatch:app-layer:coding-agent:session-repository",
 );
@@ -526,11 +538,19 @@ export class CodingAgentSessionClickHouseRepository
    * 2-3). Duration only — the query result exposes no rows-scanned counter; see
    * the metric's docblock in `~/server/metrics`.
    *
-   * `userId`, when given, narrows to the agent-reported identity — folded
-   * into BOTH scopes so the two agree on which rows are in scope. Unlike the
-   * range filter it is safe there: it is a stable column, so it cannot move a
-   * version out of the dedup group. Omitted for personal-workspace usage,
-   * where the personal project already isolates the user.
+   * `userId`, when given, narrows to the agent-reported identity — in the
+   * OUTER scope only, for the same reason the range filter is. `UserId` is not
+   * the stable column it looks like: only Claude stamps identity on log
+   * events, spans carry none, and a re-fold after a read-back miss restarts
+   * from `init()` with `userId: null`. So a later span-only delivery can commit
+   * a version with an empty `UserId` that holds `max(UpdatedAt)`. Filtering the
+   * dedup scope would hide that version from the group, resolve the max to a
+   * SUPERSEDED row, and serve its stale totals — the moving-anchor defect
+   * again, wearing a different column. Narrowing outside the group instead
+   * drops such a session from the filtered list, which is the honest answer.
+   * Only `TenantId` is genuinely immune, because it is part of the key.
+   * Omitted for personal-workspace usage, where the personal project already
+   * isolates the user.
    */
   async findManyRecent({
     tenantId,
@@ -575,7 +595,6 @@ export class CodingAgentSessionClickHouseRepository
               SELECT TenantId, SessionId, max(UpdatedAt)
               FROM ${TABLE_NAME}
               WHERE TenantId = {tenantId:String}
-                ${userFilter}
               GROUP BY TenantId, SessionId
             )
           ORDER BY StartedAt DESC
@@ -585,7 +604,15 @@ export class CodingAgentSessionClickHouseRepository
           tenantId,
           from: fromMs,
           to: toMs,
-          limit,
+          // Over-fetched because the collapse happens in TypeScript, below.
+          // Two versions of one session can tie on `max(UpdatedAt)` and both
+          // satisfy the IN-tuple — the tie `preferredOf` exists to resolve —
+          // so a page cut to `limit` HERE spends slots on rows that are about
+          // to merge, and the caller silently receives fewer sessions than it
+          // asked for. Through `getUsageTotals` that is not a short page but
+          // an omitted session's cost and tokens: the mirror of the double
+          // count the tiebreak prevents.
+          limit: limit * LIST_READ_DEDUP_OVERFETCH,
           ...(userId !== undefined ? { userId } : {}),
         },
         format: "JSONEachRow",
@@ -604,7 +631,8 @@ export class CodingAgentSessionClickHouseRepository
 
     return dedupToLatestPerSession(rows)
       .map(fromRecord)
-      .sort((a, b) => b.startedAtMs - a.startedAtMs);
+      .sort((a, b) => b.startedAtMs - a.startedAtMs)
+      .slice(0, limit);
   }
 
   async upsertBatch(

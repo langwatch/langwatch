@@ -167,6 +167,40 @@ describe("EvaluationAnalyticsClickHouseRepository tied-version read", () => {
         expect(read?.appliedEventIds).toEqual(["a", "b"]);
       });
     });
+
+    describe("when the keys disagree about which version is further along", () => {
+      it("ranks by the latest folded event before completion or applied count", async () => {
+        // The other fixtures move every key the same way, so an ORDER BY that
+        // collapsed to its last key alone would still pass them. Here the keys
+        // point at different rows, which is what actually pins the priority.
+        const { repository } = makeOrderingRepository([
+          tiedVersion({
+            occurredAt: "2026-07-24 12:00:00.000",
+            startedAt: "1750000000000",
+            completedAt: "1750000009000",
+            appliedEventIds: ["a", "b", "c"],
+          }),
+          tiedVersion({
+            // Latest folded event — the leading key...
+            occurredAt: "2026-07-24 12:00:09.000",
+            startedAt: "1750000000000",
+            // ...while behind on every key that follows it.
+            completedAt: "0",
+            appliedEventIds: ["z"],
+          }),
+        ]);
+
+        const read = await repository.findByEvaluationIdWithApplied({
+          tenantId: TENANT_ID,
+          evaluationId: EVALUATION_ID,
+        });
+
+        // Unset round-trips as null, not zero — the winner here is the version
+        // that has folded furthest, not the one that has finished.
+        expect(read?.row.completedAtMs).toBeNull();
+        expect(read?.appliedEventIds).toEqual(["z"]);
+      });
+    });
   });
 });
 

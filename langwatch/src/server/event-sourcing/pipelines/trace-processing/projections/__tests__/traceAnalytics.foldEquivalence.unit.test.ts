@@ -483,8 +483,10 @@ describe("traceAnalytics fold-equivalence across the read-back boundary", () => 
    * the OLD 256-char boundary (~300 chars of JSON): it is the case that used to
    * fail, so it stays here as the regression guard. It does NOT exercise the
    * 4096-char metadata cap — past that, truncation still breaks the JSON and
-   * resets the union, and the durable fix is a typed column with an element cap
-   * as `AnnotationIds` has.
+   * resets the union, and the durable fix is a typed column with an element
+   * cap. Nothing on this row is that today: `AnnotationIds` is an uncapped
+   * `Array(String)` the fold appends to without bound, so it is a second
+   * instance of the debt rather than the pattern to follow.
    */
   describe("given a trace whose accumulated prompt ids outgrow the attribute cap", () => {
     const promptSpans = Array.from({ length: 9 }, (_, index) =>

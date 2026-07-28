@@ -86,8 +86,13 @@ export const spanReferencedEventDataSchema = z.object({
    * how long the span ran or how late it exported — `occurredAt` is ingest
    * time, which trails a long-lived span's start by the span's whole
    * duration, and a fixed window around it goes permanently blind past that.
-   * Null when the wire span carried no parseable start; the reader then
-   * falls back to `occurredAt`, matching the store's own fallback stamping.
+   * Nullable for forward compatibility only — **the current producer never
+   * emits null.** `makeSpanReferencedEvent` stages the WHOLE event instead
+   * when it cannot parse a start, precisely because an `occurredAt`-centered
+   * window is the permanently-blind case described above. So the reader's
+   * `?? occurredAt` fallback is a total-function backstop for a shape only a
+   * future producer could send, not a live path; do not reason about it as
+   * one.
    */
   startTimeUnixMs: z.number().nullable(),
 });

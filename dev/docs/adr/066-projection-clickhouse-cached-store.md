@@ -251,6 +251,38 @@ it is deliberately **not** taken here, because it makes a failed migration fail
 the whole release, and that is a deployment-policy decision rather than an
 engineering one.
 
+### The version stamp is a second deploy-order dependency
+
+The gate is strict equality on both sides, which is right for correctness and
+costly for one release window: an old pod reads a row a new pod stamped, does
+not recognise the stamp, and reports `undecodable` exactly as it would for a
+stale row. So **every projection-version bump makes the concurrent rollout
+refold from `event_log`**, in both directions — each side rewrites at its own
+stamp, so the other refuses it again on the next delivery — for every aggregate
+that receives traffic during the window. On a hot aggregate carrying a long
+history that is the shape this ADR exists to remove, re-entered by a routine
+deploy.
+
+Nothing in the gate can fix this: an old build cannot be taught a stamp that
+did not exist when it was compiled. Accepting a set of known-decodable versions
+(as `TRACE_SUMMARY_PROJECTION_VERSIONS` does) removes the *new pod reads old
+row* half after the first release, but never the *old pod reads new row* half.
+So a bump is a release procedure too:
+
+1. Bump versions in their own release, separate from a migration.
+2. Keep the rollout short, and prefer a low-traffic window — the cost is
+   proportional to how long the two builds coexist, not to the fleet size.
+3. Watch `es_fold_refold_on_miss_total{outcome="performed"}`; it should return
+   to its pre-deploy level once the fleet has cycled, and a floor that does not
+   come back down means an adopter has a class of aggregate that never reads
+   back (see `traceAnalytics`' two).
+
+Do not soften the gate to avoid this. A build that decodes a row it does not
+understand writes a current-stamped partial state over a complete one, and that
+corruption is undetectable afterwards — the executor now refuses to fold onto
+an empty state when a row was found and refused and no re-fold path exists,
+rather than letting it happen quietly.
+
 ## References
 
 - **Behavioural contract:** [specs/event-sourcing/fold-read-back-store.feature](../../../specs/event-sourcing/fold-read-back-store.feature) (pillar 1), [specs/event-sourcing/producer-append-coalescing.feature](../../../specs/event-sourcing/producer-append-coalescing.feature) (pillar 2), [specs/event-sourcing/fold-coalescing.feature](../../../specs/event-sourcing/fold-coalescing.feature) (the shared count+byte-bounded drain both sides ride)

@@ -582,6 +582,18 @@ function detectAgentFrom({
   spans: SpanDetail[];
   logs: TranscriptLogRecord[];
 }): CodingAgent {
+  // Logs first, deliberately. They are the only records here that carry
+  // `service.name`, which is the sole signal separating agents that share a
+  // runtime: Cowork emits `claude_code.*` span names, so a span-first scan
+  // matches `claude_code` and returns before the logs — which know better —
+  // are ever consulted. Spans still decide for agents that send no logs.
+  for (const log of logs) {
+    const agent = detectCodingAgent({
+      recordName: readString(log.attributes, "event.name"),
+      serviceName: log.serviceName,
+    });
+    if (agent !== "unknown") return agent;
+  }
   for (const span of spans) {
     const agent = detectCodingAgent({ recordName: span.name });
     if (agent !== "unknown") return agent;
@@ -597,13 +609,6 @@ function detectAgentFrom({
     ) {
       return "opencode";
     }
-  }
-  for (const log of logs) {
-    const agent = detectCodingAgent({
-      recordName: readString(log.attributes, "event.name"),
-      serviceName: log.serviceName,
-    });
-    if (agent !== "unknown") return agent;
   }
   return "unknown";
 }

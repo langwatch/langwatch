@@ -26,7 +26,19 @@ interface CounterState {
 const WIDTH_MS = 60_000;
 const OCCURRED_AT = 1_700_000_000_000;
 
-function makeFold({ readWindow }: { readWindow?: { widthMs: number } } = {}) {
+function makeFold({
+  readWindow,
+  refoldable = false,
+}: {
+  readWindow?: { widthMs: number };
+  /**
+   * Pair `refoldOnStoreMiss` with a wired `eventLoaderUpTo`, which is the only
+   * shape that may answer `undecodable`: rejecting a row is safe solely
+   * because the history can rebuild it. The executor refuses to fold onto an
+   * empty state otherwise.
+   */
+  refoldable?: boolean;
+} = {}) {
   const store = createMockFoldProjectionStore<CounterState>();
   const fold = createMockFoldProjectionDefinition("windowed", {
     store,
@@ -38,8 +50,19 @@ function makeFold({ readWindow }: { readWindow?: { widthMs: number } } = {}) {
         event.occurredAt ?? 0,
       ),
     }),
-    options: { refoldOnOutOfOrder: false, ...(readWindow ? { readWindow } : {}) },
+    options: {
+      refoldOnOutOfOrder: false,
+      ...(readWindow ? { readWindow } : {}),
+      ...(refoldable ? { refoldOnStoreMiss: true } : {}),
+    },
   }) as FoldProjectionDefinition<CounterState, Event>;
+  if (refoldable) {
+    (
+      fold as FoldProjectionDefinition<CounterState, Event> & {
+        eventLoaderUpTo?: unknown;
+      }
+    ).eventLoaderUpTo = async () => [];
+  }
   return { fold, store };
 }
 
@@ -247,7 +270,10 @@ describe("FoldProjectionExecutor declared read window", () => {
     describe("when the store found a row but refused it as undecodable", () => {
       /** @scenario a row the store found but refused is not read again unwindowed */
       it("does not re-read unwindowed, because a wider scope finds the same row", async () => {
-        const { fold, store } = makeFold({ readWindow: { widthMs: WIDTH_MS } });
+        const { fold, store } = makeFold({
+          readWindow: { widthMs: WIDTH_MS },
+          refoldable: true,
+        });
         const getWithApplied = vi.fn().mockResolvedValue({
           state: null,
           appliedEventIds: [],
@@ -264,6 +290,30 @@ describe("FoldProjectionExecutor declared read window", () => {
         // And the window's own health signal stays about the window: a version
         // rejection counted as `absent` reads as "widen readWindow.widthMs".
         expect(fallbackMetric).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when a refused row cannot be rebuilt from the log", () => {
+      /** @scenario a state that cannot be read back is never quietly replaced by a partial one */
+      it("fails loudly instead of folding onto an empty state", async () => {
+        // No `refoldable`: the pairing that makes a rejection recoverable is
+        // absent, which is what removing `refoldOnStoreMiss` on schedule — or
+        // an unwired event loader — leaves behind.
+        const { fold, store } = makeFold({ readWindow: { widthMs: WIDTH_MS } });
+        store.getWithApplied = vi.fn().mockResolvedValue({
+          state: null,
+          appliedEventIds: [],
+          miss: "undecodable",
+        });
+
+        await expect(
+          executor.execute(fold, eventAt(OCCURRED_AT), context),
+        ).rejects.toThrow(/cannot decode/);
+
+        // The committed row survives: folding from `init()` would have written
+        // a partial state stamped at the CURRENT version, which the gate that
+        // just refused the row would accept from then on.
+        expect(store.store).not.toHaveBeenCalled();
       });
     });
   });

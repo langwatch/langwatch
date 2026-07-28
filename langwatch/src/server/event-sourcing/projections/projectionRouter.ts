@@ -39,7 +39,10 @@ import type { QueueManager } from "../services/queues/queueManager";
 import type { EventStoreReadContext } from "../stores/eventStore.types";
 import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.types";
 import { EventUtils } from "../utils/event.utils";
-import { isComponentDisabled } from "../utils/killSwitch";
+import {
+  isComponentDisabled,
+  isTenantFeatureEnabled,
+} from "../utils/killSwitch";
 import { MAX_APPLIED_EVENT_IDS } from "./foldCache/foldCacheEntry";
 import type { FoldProjectionDefinition } from "./foldProjection.types";
 import { FoldProjectionExecutor } from "./foldProjectionExecutor";
@@ -1223,6 +1226,27 @@ export class ProjectionRouter<
         return disabled;
       };
 
+      // Claim-check producer gate, memoized per tenant on the same reasoning
+      // as the kill switch above. Resolved only when the subscriber actually
+      // declares a `stage` hook, so the overwhelming majority of subscribers
+      // pay nothing for it.
+      const stagingByTenant = new Map<string, boolean>();
+      const isStagingEnabledFor = async (
+        tenantId: string,
+      ): Promise<boolean> => {
+        if (!enqueue?.stageFlag) return false;
+        const cached = stagingByTenant.get(tenantId);
+        if (cached !== undefined) return cached;
+        const enabled = await isTenantFeatureEnabled({
+          featureFlagService: this.featureFlagService,
+          flagKey: enqueue.stageFlag,
+          tenantId,
+          logger: this.logger,
+        });
+        stagingByTenant.set(tenantId, enabled);
+        return enabled;
+      };
+
       for (const event of matching) {
         try {
           if (await isKilledFor(event.tenantId)) {
@@ -1259,9 +1283,16 @@ export class ProjectionRouter<
           // this subscriber's job for this event. There is no routing retry:
           // eventSourcingService catches and logs the dispatch AggregateError
           // without rethrowing.
-          const staged = enqueue?.stage
-            ? (enqueue.stage(event) as EventType)
-            : event;
+          //
+          // Gated, and dark by default (`stageFlag`). A reference is a
+          // different event type, and a worker running the previous build
+          // silently COMPLETES a job it cannot decode — so the producer half
+          // has to stay off until the fleet has cycled. Ungated, `stage` never
+          // runs and the full event is staged, which every build handles.
+          const staged =
+            enqueue?.stage && (await isStagingEnabledFor(event.tenantId))
+              ? (enqueue.stage(event) as EventType)
+              : event;
 
           const queue = queued
             ? this.queueManager.getSubscriberQueue(name)

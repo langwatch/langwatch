@@ -61,9 +61,17 @@ const codingAgentSessionEvents = [
  *  agent's model calls and tool runs no longer fold from BOTH its log events
  *  and the equivalent spans. Rows stamped `2026-07-27` were folded by the
  *  one-sided gate, so a Cowork session that also exported spans counted every
- *  turn twice; rejecting that stamp is what rebuilds them. It also re-labels
- *  sessions the registry now detects as Cowork but which first folded under
- *  `claude_code` (identity is first-writer-wins, so only a refold moves it).
+ *  turn twice; rejecting that stamp is what rebuilds them.
+ *
+ *  What the bump does NOT do is re-label. A refold replays stored
+ *  contributions, and each one carries the `agent` its dispatcher resolved at
+ *  ingest (`contributionBaseSchema`); `withContributionIdentity` is
+ *  first-writer-wins over that replay, so it reproduces the original label
+ *  exactly. Sessions whose first contribution was written before the registry
+ *  could detect Cowork therefore keep `claude_code` until they are re-ingested
+ *  — no refold moves them. The `2026-07-27` population is unaffected by that
+ *  limit: its contributions were already written with the Cowork label, which
+ *  is why refolding them fixes the counting.
  *
  *  2026-07-27 — the read-back columns of migrations 00053 (`SubAgentIds`,
  *  `PreviousCallContextTokens`, `StepStartedAt`, `MetricSeries`,
@@ -85,6 +93,13 @@ export const CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST = "2026-07-28";
  * the logs-only fold entirely, so no agent folded a turn from both a log and a
  * span into them. They are stale in shape, never double-counted, and the
  * discriminator already covers the shape.
+ *
+ * Rejecting them would buy nothing anyway. They also predate Cowork detection,
+ * so their contributions were stored labelled `claude_code` and a refold
+ * replays exactly that (see the version docblock above) — the label and the
+ * logs-only counts it gates are only corrected by re-ingestion, never by
+ * refolding. Accepting the stamp trades no correctness for one avoided refold
+ * wave over every session that predates migrations 00053/00054.
  */
 export const CODING_AGENT_SESSION_PROJECTION_VERSION_PRE_STAMP = "2026-07-21";
 

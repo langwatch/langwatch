@@ -708,7 +708,14 @@ interface ClickHouseSpanRecord {
   _retention_days: number;
 }
 
-interface FullSpanRow {
+/**
+ * The projection of `stored_spans` that {@link mapChRowToNormalized} reads.
+ * Exported so the claim-check equivalence test can drive the REAL mapping
+ * rather than a hand-built stand-in — the whole claim-check design rests on a
+ * resolved span producing the same command as the inline one, and a
+ * column-mapping regression is exactly what that contract must catch.
+ */
+export interface FullSpanRow {
   SpanId: string;
   TraceId: string;
   TenantId: string;
@@ -737,7 +744,7 @@ interface FullSpanRow {
   Links_Attributes: Record<string, unknown>[];
 }
 
-function mapChRowToNormalized(row: FullSpanRow) {
+export function mapChRowToNormalized(row: FullSpanRow) {
   return {
     id: "",
     traceId: row.TraceId,
@@ -1110,6 +1117,21 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
    * lock that keeps the optimiser engaged live in
    * SINGLE_SPAN_FETCH_SETTINGS above. The doc's "Anti-Pattern 1"
    * rule predates LazilyRead and isn't load-bearing on this shape.
+   *
+   * KNOWN MISMATCH, pre-existing and deliberately not changed here:
+   * `stored_spans` is `ReplacingMergeTree(StartTime)`, so `StartTime` — not
+   * `UpdatedAt` — is the engine's version column, and
+   * `dev/docs/best_practices/clickhouse-queries.md` says to dedup this table on
+   * it. Ordering by `UpdatedAt` therefore answers last-written-wins before a
+   * background merge and largest-`StartTime`-wins after one, for the same span,
+   * whenever a re-export CHANGES `StartTime` (a re-export at the same start is
+   * unaffected, which is the ordinary case). #6117 widened the blast radius by
+   * building the claim-check resolution on this read, so a span's facts now
+   * derive from whichever version the merge state happens to expose rather than
+   * only its rendering. Reconciling the two means either re-ordering this read
+   * (and re-validating the LazilyRead behaviour the settings above depend on)
+   * or changing the engine's version column — neither belongs in a review
+   * follow-up, but neither should stay unwritten either.
    */
   private async fetchNormalizedSpanRow({
     tenantId,

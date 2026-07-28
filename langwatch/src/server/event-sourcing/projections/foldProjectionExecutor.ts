@@ -338,12 +338,17 @@ export class FoldProjectionExecutor {
     // a read window gets its backing read bounded to occurredAt ± widthMs, with
     // the executor retrying unwindowed on a miss (see loadWithApplied).
     const loadContext = withReadHints({ context, event, projection });
-    const { state: loaded, appliedEventIds } = await this.loadWithApplied({
+    const {
+      state: loaded,
+      appliedEventIds,
+      miss,
+    } = await this.loadWithApplied({
       projectionName: projection.name,
       store: projection.store,
       key,
       context: loadContext,
     });
+    this.assertUndecodableIsRecoverable(projection, miss);
 
     if (loaded === null && this.shouldRefoldOnMiss(projection)) {
       const refolded = await this.refoldUpToDelivered(
@@ -498,12 +503,17 @@ export class FoldProjectionExecutor {
       event: ordered[0]!,
       projection,
     });
-    const { state: loaded, appliedEventIds } = await this.loadWithApplied({
+    const {
+      state: loaded,
+      appliedEventIds,
+      miss,
+    } = await this.loadWithApplied({
       projectionName: projection.name,
       store: projection.store,
       key,
       context: loadContext,
     });
+    this.assertUndecodableIsRecoverable(projection, miss);
 
     if (loaded === null && this.shouldRefoldOnMiss(projection)) {
       const refolded = await this.refoldUpToDelivered(
@@ -629,6 +639,40 @@ export class FoldProjectionExecutor {
     return (
       projection.options?.refoldOnStoreMiss === true &&
       projection.eventLoaderUpTo !== undefined
+    );
+  }
+
+  /**
+   * Refuse to fold onto `init()` when the store FOUND a row and rejected it.
+   *
+   * `absent` and `undecodable` are both "no state", but they must not be
+   * handled alike. An absent row means this batch is the aggregate's first, so
+   * folding from `init()` is exactly right. An undecodable row means a complete
+   * state exists and this build cannot read it — folding from `init()` would
+   * write a PARTIAL state stamped at the CURRENT version, which the gate that
+   * just rejected the row would then accept forever. The corruption launders
+   * itself and the original is gone.
+   *
+   * Refolding from `event_log` is what makes a rejection safe, so without it
+   * the only correct move is to stop. Throwing puts the job on its retry
+   * budget and surfaces to an operator; the alternative is silent, permanent,
+   * and undetectable after the fact.
+   *
+   * This pairing is easy to break from a distance: `refoldOnStoreMiss` is
+   * documented for deletion once its population ages out, and `eventLoaderUpTo`
+   * is auto-wired only when the service has an event store.
+   */
+  private assertUndecodableIsRecoverable<State, E extends Event>(
+    projection: FoldProjectionDefinition<State, E>,
+    miss: "absent" | "undecodable" | undefined,
+  ): void {
+    if (miss !== "undecodable" || this.shouldRefoldOnMiss(projection)) return;
+    throw new Error(
+      `Fold projection "${projection.name}" read back a row it cannot decode and has no re-fold path ` +
+        `(refoldOnStoreMiss=${String(projection.options?.refoldOnStoreMiss)}, ` +
+        `eventLoaderUpTo=${projection.eventLoaderUpTo === undefined ? "unwired" : "wired"}). ` +
+        `Refusing to fold onto an empty state, which would overwrite the committed row with a partial ` +
+        `one stamped at the current version.`,
     );
   }
 

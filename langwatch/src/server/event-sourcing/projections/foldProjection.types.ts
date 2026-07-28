@@ -190,6 +190,15 @@ export interface FoldProjectionOptions {
    * out. See `traceAnalytics`, `evaluationAnalytics` and `codingAgentSession`
    * for the pattern.
    *
+   * **Check each adopter before deleting it — "transitional" is a claim about
+   * the adopter, not about this option.** An adopter whose store can decline to
+   * write a row (a persistability gate) or can write one the read window will
+   * never find (a bad partition anchor) has a class of aggregate that misses on
+   * EVERY delivery, so its `es_fold_refold_on_miss_total{outcome="performed"}`
+   * never goes quiet and removing this option turns a permanent refold into
+   * permanent data loss instead. `traceAnalytics` has two such classes today,
+   * both documented on the projection.
+   *
    * Requires `eventLoaderUpTo` (auto-wired by EventSourcingService) — the
    * executor silently declines to re-fold without it. Pair the store with a
    * RedisCachedFoldStore so a re-fold can only follow cache

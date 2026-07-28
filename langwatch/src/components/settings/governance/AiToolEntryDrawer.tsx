@@ -16,6 +16,7 @@ import { Bot, Wrench } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
+  ASSISTANT_KINDS,
   ASSISTANT_OPTIONS,
   ASSISTANT_PRESETS,
   type AssistantKind,
@@ -52,14 +53,12 @@ const PRESET_PREFIX = "preset:";
 const DATA_URL_PREFIX = "data:";
 const MAX_ICON_BASE64_BYTES = 256 * 1024; // matches server-side iconAssetSchema cap
 
-const ASSISTANT_KIND_VALUES = new Set<AssistantKind>([
-  "claude_code",
-  "codex",
-  "gemini",
-  "opencode",
-  "cursor",
-  "custom",
-]);
+// Derived, never re-listed. This gate decides which values the assistant
+// picker will accept, and the picker's own options come from
+// `ASSISTANT_PRESETS` — so a hand-maintained copy silently renders options it
+// then refuses (a new preset was selectable-looking but unselectable, and a
+// stored entry carrying it decoded back to `custom` and lost its icon).
+const ASSISTANT_KIND_VALUES = new Set<AssistantKind>(ASSISTANT_KINDS);
 
 function isAssistantKind(value: string): value is AssistantKind {
   return ASSISTANT_KIND_VALUES.has(value as AssistantKind);

@@ -816,9 +816,27 @@ export function applyLogToCodingAgentSession({
 }
 
 /**
- * Converged metric units kept per session. Well above any real session's
- * series count (a Claude Code session emits ~10–30) while bounding a
- * pathological delta stream.
+ * Converged metric UNITS kept per session — not series, and the difference is
+ * load-bearing.
+ *
+ * A cumulative point converges per series, so for those the two are the same.
+ * A delta point does not: the dispatcher keys it by `point.pointId`, because
+ * summing a delta exactly once requires remembering each point, so one unit is
+ * one POINT. An agent exporting deltas on an interval therefore accrues units
+ * for as long as the session runs, and a long session reaches this bound on
+ * ordinary traffic rather than pathological traffic.
+ *
+ * What happens then is a silent stop: `applyMetricToCodingAgentSession` returns
+ * `base` for every subsequent new unit, so the metric-fed fields (lines of
+ * code, commits, pull requests, edit decisions, active time) freeze at the
+ * value they held when the bound was reached, with no error and no signal.
+ * Sums already folded stay correct; they just stop moving.
+ *
+ * The bound itself has to exist — the unit map is persisted on the row, so an
+ * unbounded delta stream would grow it without limit. Fixing the freeze means
+ * changing what a unit IS (a per-series running total, with point ids retained
+ * only long enough to dedup), which changes fold output and needs its own
+ * version bump and validation. Raising the number alone only moves the cliff.
  */
 const MAX_METRIC_SERIES = 200;
 

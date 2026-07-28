@@ -61,6 +61,35 @@ function makeRouter(...subscribers: EventSubscriberDefinition<Event>[]) {
   return router;
 }
 
+/** The registered producer gate for claim-check staging (ADR-069). */
+const STAGING_FLAG = "ops_es_span_claim_check_staging_enabled";
+
+/**
+ * A router whose claim-check staging has been switched ON.
+ *
+ * `stage` is dark by default: a reference is a different event type, and a
+ * worker running the previous build completes such a job without decoding it,
+ * so the producer only turns on once an operator confirms the fleet has
+ * cycled. Every scenario below that describes staging describes the seam AFTER
+ * that flip, so it resolves the flag true. The scenario for the pre-flip state
+ * uses `makeRouter`, which has no flag service at all.
+ */
+function makeStagingRouter(...subscribers: EventSubscriberDefinition<Event>[]) {
+  const router = new ProjectionRouter<Event>(
+    aggregateType,
+    TEST_CONSTANTS.PIPELINE_NAME,
+    makeQueueManager(),
+    {
+      isEnabled: async (key: string): Promise<boolean> =>
+        key === STAGING_FLAG,
+    } as never,
+  );
+  for (const subscriber of subscribers) {
+    router.registerEventSubscriber(subscriber);
+  }
+  return router;
+}
+
 function makeEvent(id: string): Event {
   return createTestEvent(
     TEST_CONSTANTS.AGGREGATE_ID,
@@ -134,7 +163,7 @@ describe("subscriber enqueue-time contract", () => {
         // wrong subscriber, or a hardcoded tenant — and per-tenant targeting is
         // this switch's entire distinguishing claim.
         const asked: Array<{ key: string; projectId?: string }> = [];
-        const killedTenant = `${tenantId}-killed`;
+        const killedTenant = createTestTenantId(`${tenantId}-killed`);
         const router = new ProjectionRouter<Event>(
           aggregateType,
           TEST_CONSTANTS.PIPELINE_NAME,
@@ -364,9 +393,49 @@ describe("subscriber enqueue-time contract", () => {
     });
   });
 
+  describe("given a stream of relevant and irrelevant events", () => {
+    describe("when they are published together", () => {
+      /** @scenario enqueue outcomes are visible to operators */
+      it("moves the discarded and the queued counts independently", async () => {
+        const beforeStaged = await enqueueOutcomeCount("staged");
+        const beforeFiltered = await enqueueOutcomeCount("filtered");
+        const handled: string[] = [];
+        const router = makeRouter({
+          name: "seamSubscriber",
+          eventTypes: [],
+          handle: async (event) => {
+            handled.push(event.id);
+          },
+          options: {
+            enqueue: {
+              filter: (event) => event.id.startsWith("keep"),
+            },
+          },
+        });
+
+        await router.dispatch(
+          [
+            makeEvent("keep-1"),
+            makeEvent("drop-1"),
+            makeEvent("drop-2"),
+            makeEvent("keep-2"),
+            makeEvent("drop-3"),
+          ],
+          readContext,
+        );
+
+        // Both series move, by their own amounts — the distinction an operator
+        // reads. One counter for both outcomes, or a filtered event counted as
+        // staged, would show the seam doing work it declined to do.
+        expect(await enqueueOutcomeCount("staged")).toBe(beforeStaged + 2);
+        expect(await enqueueOutcomeCount("filtered")).toBe(beforeFiltered + 3);
+        expect(handled).toEqual(["keep-1", "keep-2"]);
+      });
+    });
+  });
+
   describe("given a subscriber with no enqueue filter", () => {
     describe("when the event is staged", () => {
-      /** @scenario enqueue outcomes are visible to operators */
       it("stages the full event unchanged and counts it as staged", async () => {
         const received: unknown[] = [];
         const before = await enqueueOutcomeCount("staged");
@@ -427,7 +496,7 @@ describe("subscriber enqueue-time contract", () => {
         const received: unknown[] = [];
         const before = await enqueueOutcomeCount("referenced");
         const event = makeEvent("evt-ref");
-        const router = makeRouter({
+        const router = makeStagingRouter({
           name: "seamSubscriber",
           eventTypes: [],
           handle: async (staged) => {
@@ -435,6 +504,7 @@ describe("subscriber enqueue-time contract", () => {
           },
           options: {
             enqueue: {
+              stageFlag: STAGING_FLAG,
               stage: (source) => ({
                 ...source,
                 type: "test.referenced",
@@ -471,13 +541,15 @@ describe("subscriber enqueue-time contract", () => {
         const beforeStaged = await enqueueOutcomeCount("staged");
         const beforeReferenced = await enqueueOutcomeCount("referenced");
         const event = makeEvent("evt-passthrough");
-        const router = makeRouter({
+        const router = makeStagingRouter({
           name: "seamSubscriber",
           eventTypes: [],
           handle: async (staged) => {
             received.push(staged);
           },
-          options: { enqueue: { stage: (source) => source } },
+          options: {
+            enqueue: { stageFlag: STAGING_FLAG, stage: (source) => source },
+          },
         });
 
         await router.dispatch([event], readContext);
@@ -488,11 +560,50 @@ describe("subscriber enqueue-time contract", () => {
       });
     });
 
+    describe("when the producer gate has not been enabled", () => {
+      /** @scenario a rolling deploy never hands a worker a payload shape it cannot read */
+      it("stages the whole event, so a worker on the previous build still reads it", async () => {
+        const received: unknown[] = [];
+        const beforeStaged = await enqueueOutcomeCount("staged");
+        const beforeReferenced = await enqueueOutcomeCount("referenced");
+        const event = makeEvent("evt-gate-off");
+        let stageRan = false;
+        // `makeRouter` wires no feature-flag service, which is how the seam
+        // resolves during the deploy window: it cannot confirm the fleet has
+        // cycled, so it must not mint a shape only the new build understands.
+        const router = makeRouter({
+          name: "seamSubscriber",
+          eventTypes: [],
+          handle: async (staged) => {
+            received.push(staged);
+          },
+          options: {
+            enqueue: {
+              stageFlag: STAGING_FLAG,
+              stage: (source) => {
+                stageRan = true;
+                return { ...source, type: "test.referenced", data: {} };
+              },
+            },
+          },
+        });
+
+        await router.dispatch([event], readContext);
+
+        // The hook is not merely ignored downstream — it never runs, so a
+        // reference is never minted for a worker that could not decode it.
+        expect(stageRan).toBe(false);
+        expect(received[0]).toEqual(event);
+        expect(await enqueueOutcomeCount("staged")).toBe(beforeStaged + 1);
+        expect(await enqueueOutcomeCount("referenced")).toBe(beforeReferenced);
+      });
+    });
+
     describe("when the hook throws", () => {
       /** @scenario a failure preparing queued work is reported, never hidden behind the whole payload */
       it("fails loudly into the routing retry rather than dropping silently", async () => {
         let handlerRan = false;
-        const router = makeRouter({
+        const router = makeStagingRouter({
           name: "seamSubscriber",
           eventTypes: [],
           handle: async () => {
@@ -500,6 +611,7 @@ describe("subscriber enqueue-time contract", () => {
           },
           options: {
             enqueue: {
+              stageFlag: STAGING_FLAG,
               stage: () => {
                 throw new Error("stage blew up");
               },

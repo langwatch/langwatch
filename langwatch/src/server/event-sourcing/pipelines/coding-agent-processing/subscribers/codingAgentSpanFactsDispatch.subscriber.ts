@@ -75,6 +75,21 @@ export function createCodingAgentSpanFactsDispatchSubscriber(deps: {
         // payload for its claim-check (or returns the event unchanged when
         // the span has no id to reference).
         stage: (event) => makeSpanReferencedEvent(event as SpanReceivedEvent),
+        // Dark until an operator confirms the fleet has cycled. #6117 was
+        // written to deploy consumer-first precisely because a pre-#6117
+        // worker draining a reference completes the job and drops the facts
+        // silently; stacking it onto #6111 shipped both halves in one commit
+        // and lost that protection. The flag restores it: off, this seam
+        // stages the whole event, which every build understands.
+        //
+        // It must also stay off wherever span storage is not ClickHouse-backed
+        // (`NullSpanStorageRepository`, wired when ClickHouse is disabled):
+        // there every reference resolves to null forever, so the handler's
+        // "not readable YET" throw — correct against a real store, where the
+        // sibling write is racing — burns the whole retry budget and then
+        // blocks this subscriber's per-trace group. Default-off means such a
+        // deployment never mints one unless an operator turns it on.
+        stageFlag: "ops_es_span_claim_check_staging_enabled",
       },
       // Debounce past the spanStorage sibling write: the reference resolves
       // against the span store, and both jobs are staged by the same fan-out.
