@@ -31,18 +31,8 @@ jobs:
         id: detect
         with:
           filters: |
-            # `packages/**` is source-only and linked into the app via
-            # `workspace:*`, so its files are type-checked as part of this job
-            # and NOT by any Go workflow. Without it, a Go-only PR that adds an
-            # herr code and regenerates `packages/handled-error/codes.generated.ts`
-            # skips typecheck entirely — and that typecheck is the thing that
-            # fails when the new code has no customer-facing copy
-            # (`satisfies Record<AppErrorCode | GoErrorCode, ...>` in
-            # src/features/errors/logic/presentation.ts). Exactly the PR class
-            # the enforcement exists for would sail through.
             relevant:
               - 'langwatch/**'
-              - 'packages/**'
               - '.github/workflows/langwatch-app-ci.yml'
               - '.github/.release-please-manifest.json'
               - '.github/scripts/**'
@@ -342,89 +332,45 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      # Installs the Biome version the lockfile pins and puts it on PATH. The
-      # reviewdog action below does this internally too; doing it explicitly is
-      # what lets the gate step call `biome` directly instead of depending on a
-      # third party's step ordering.
-      - name: Setup Biome
-        uses: biomejs/setup-biome@4c91541eaada48f67d7dbd7833600ce162b68f51 # v2.7.1
+      - uses: ./.github/actions/setup-pnpm-node
         with:
-          working-dir: langwatch
+          cache-dependency-path: "langwatch/pnpm-lock.yaml"
+          install-dir: langwatch
 
-      # Inline PR annotations, and nothing else — this step cannot gate.
-      # `github-pr-review` has no PR to annotate on `merge_group` or `push`, so
-      # it no-ops there, and `detect-changes` forces this job relevant on those
-      # events, which meant the job reported green with nothing checked. Its
-      # `filter_mode` also defaults to `added`, so a diagnostic on a line the PR
-      # didn't touch is never reported at all. Neither is a reviewdog bug:
-      # reviewdog is a reviewer. The gate is the step after it.
+      # THE GATE. Everything below this step is annotation, not enforcement.
+      #
+      # reviewdog-action-biome runs with fail_on_error: false and pipes Biome's
+      # stdout into reviewdog, so it reports success whenever Biome produces no
+      # parseable diagnostics — including when Biome refuses to start. That is
+      # not hypothetical: three `nursery` rules graduated out of nursery in
+      # Biome 2.5.x, the unknown keys were a fatal config error, and `pnpm lint`
+      # exited 1 having checked zero files while this job stayed green.
+      #
+      # So run Biome ourselves and let a non-zero exit fail the job. A config
+      # error and a lint violation both surface here.
+      - name: Biome (blocking — config errors included)
+        working-directory: langwatch
+        run: pnpm lint
+
+      # Structural house rules (function length, cognitive complexity, param
+      # count) carry a baseline in the thousands, so they are enforced on
+      # changed lines only. --since needs full history; fetch-depth: 0 above.
+      - name: Biome — new-code rules (blocking)
+        working-directory: langwatch
+        run: |
+          git fetch --no-tags --depth=1 origin main
+          pnpm lint:new-code
+
+      # Kept for inline PR annotations only. Not a gate — see above.
       - uses: mongolyy/reviewdog-action-biome@c49bee54c1f87e4be32446ae3deca3a186b88a3a # v2
+        if: github.event_name == 'pull_request'
         with:
           reporter: github-pr-review
           fail_level: error
           # The action resolves the Biome version (from the lockfile) and runs
           # Biome inside workdir, so biome_flags paths are relative to it.
-          #
-          # `--max-diagnostics` is load-bearing: Biome caps output at 20
-          # diagnostics by default and `src` + `ee` carry thousands of
-          # pre-existing format and lint diagnostics. reviewdog parses Biome's
-          # stdout, so a suppressed diagnostic never reaches the PR — which made
-          # the raw-error-toast plugin's diagnostic a coin flip on whether it
-          # was inside the cap at all.
           workdir: langwatch
-          biome_flags: "./src ./ee --max-diagnostics=1000"
-
-      # The gate below can only fail if the plugin still matches something. A
-      # GritQL pattern that drifts — a renamed node kind, a regex that stopped
-      # anchoring — compiles fine, matches nothing, reports "No fixes applied"
-      # and is green forever, which is indistinguishable from a clean repo.
-      # This is the plugin's `SCANNED_FILE_FLOOR`: run it over a file of
-      # deliberate violations and require it to *fail* before believing the
-      # pass it reports on real code.
-      #
-      # The fixture lives outside ./src and ./ee, so the gate below never sees
-      # it — do not move it in, and do not add it to biome.json's ignores.
-      - name: Self-test the analyzer plugins
-        working-directory: langwatch
-        env:
-          # One diagnostic per deliberate violation in the fixture. A floor
-          # rather than an equality so adding a violation doesn't fail the
-          # build; raise it when you add a pattern to the plugin.
-          PLUGIN_FIXTURE_FLOOR: "18"
-        run: |
-          fixture=biome-plugins/__tests__/no-raw-error-toast.fixtures.tsx
-          set +e
-          output=$(biome lint --only=plugin --max-diagnostics=none --colors=off "$fixture" 2>&1)
-          status=$?
-          set -e
-          echo "$output"
-          if [ "$status" -eq 0 ]; then
-            echo "FAIL: no-raw-error-toast.grit flagged nothing in its own violation fixture."
-            echo "Its patterns have drifted — 'Enforce analyzer plugins' can no longer fail."
-            exit 1
-          fi
-          # One header line per diagnostic: `path:line:col plugin ━━━…`.
-          found=$(printf '%s\n' "$output" | grep -cE '^[^ ]+:[0-9]+:[0-9]+ plugin ' || true)
-          if [ "$found" -lt "$PLUGIN_FIXTURE_FLOOR" ]; then
-            echo "FAIL: the plugin flagged $found of the $PLUGIN_FIXTURE_FLOOR violations in $fixture."
-            echo "Some patterns still match and some no longer do; the gate is partially blind."
-            exit 1
-          fi
-          echo "PASS: the plugin flagged $found violations in its own fixture."
-
-      # The gate: every event, every line, nothing suppressed.
-      #
-      # Scoped to the analyzer plugins rather than the whole ruleset on purpose.
-      # `src` + `ee` currently emit thousands of pre-existing format and lint
-      # diagnostics, so a blanket `biome ci` here would fail every PR from day
-      # one and be switched off within the week. The plugins are the rules we
-      # have decided are non-negotiable — today that is
-      # `langwatch/biome-plugins/no-raw-error-toast.grit`, whose companion
-      # source-scanning guard lives in
-      # `src/features/errors/logic/__tests__/noRawErrorToasts.unit.test.ts`.
-      - name: Enforce analyzer plugins
-        working-directory: langwatch
-        run: biome lint --only=plugin --max-diagnostics=none --colors=off ./src ./ee
+          biome_flags: "./src"
 
       - name: Notify Slack on failure
         if: failure() && github.ref == 'refs/heads/main'
@@ -432,6 +378,57 @@ jobs:
           SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
           GH_TOKEN: ${{ github.token }}
         run: bash .github/scripts/notify-slack-job-failure.sh lint
+
+  # The ast-grep ruleset at /.ast-grep/ encodes deterministic house rules.
+  # coderabbit-config-check.yml only proves each rule still matches its own
+  # fixture; until this job existed, nothing ran them against actual code
+  # except CodeRabbit, once per PR, as a comment.
+  #
+  # Scans changed files only. The rules are severity: warning during rollout,
+  # so this reports without failing; promote a rule to severity: error in its
+  # .yml once its baseline is clean and this job starts gating on it.
+  ast-grep:
+    needs: changes
+    if: needs.changes.outputs.relevant == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v5
+        with:
+          python-version: "3.12"
+
+      # Pinned to the same version coderabbit-config-check.yml uses —
+      # rule-matching behaviour is version-sensitive. Bump both together.
+      - name: Install pinned ast-grep
+        run: pip install "ast-grep-cli==0.42.3"
+
+      - name: Rule fixtures must still pass
+        working-directory: .ast-grep
+        run: ast-grep test -c sgconfig.yml -t rule-tests
+
+      - name: Scan changed files
+        run: |
+          git fetch --no-tags --depth=1 origin main
+          files=$(git diff --name-only --diff-filter=ACMR origin/main...HEAD -- '*.ts' '*.tsx')
+          if [ -z "$files" ]; then
+            echo "No changed TS/TSX files."
+            exit 0
+          fi
+          echo "$files" | sed 's/^/  /'
+          # shellcheck disable=SC2086
+          ast-grep scan -c .ast-grep/sgconfig.yml $files
+
+      - name: Notify Slack on failure
+        if: failure() && github.ref == 'refs/heads/main'
+        env:
+          SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
+          GH_TOKEN: ${{ github.token }}
+        run: bash .github/scripts/notify-slack-job-failure.sh ast-grep
 
   feature-parity:
     needs: changes
@@ -617,11 +614,11 @@ jobs:
           cat langwatch/test-failures.txt
 
   langwatch-app-complete:
-    needs: [changes, typecheck, test-unit, test-integration, lint, feature-parity, build, ci-scripts-test, ci-self-test]
+    needs: [changes, typecheck, test-unit, test-integration, lint, ast-grep, feature-parity, build, ci-scripts-test, ci-self-test]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - uses: re-actors/alls-green@05ac9388f0aebcb5727afa17fcccfecd6f8ec5fe # v1.2.2
         with:
           jobs: ${{ toJSON(needs) }}
-          allowed-skips: typecheck, test-unit, test-integration, lint, feature-parity, build, ci-scripts-test, ci-self-test
+          allowed-skips: typecheck, test-unit, test-integration, lint, ast-grep, feature-parity, build, ci-scripts-test, ci-self-test
