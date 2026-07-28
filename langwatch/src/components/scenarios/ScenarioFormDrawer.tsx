@@ -374,6 +374,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
           error instanceof Error ? error.message : "An error occurred",
         type: "error",
         meta: { closable: true },
+        error,
       });
     }
   }, [

@@ -190,6 +190,7 @@ export function TryItOut({
           meta: {
             closable: true,
           },
+          error: e,
         });
         console.error(e);
         return;

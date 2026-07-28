@@ -89,6 +89,7 @@ import { verifyRedisReady } from "./server/redis";
 import { serveStaticOrFallback } from "./server/static-handler";
 import { setupTRPCWebSocket } from "./server/websockets/trpc-ws";
 import { startWorkers, type WorkerHandle } from "./server/workers/startWorkers";
+import { captureException, toError } from "./utils/posthogErrorCapture";
 
 const logger = createLogger("langwatch:start");
 
@@ -392,7 +393,14 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
 
   process.on("uncaughtException", (err) => {
     logger.fatal({ error: err }, "uncaught exception detected");
-    server.close(() => process.exit(1));
+    captureException(err, {
+      level: "error",
+      tags: { source: "uncaughtException", process: "server" },
+    });
+    // Flush the buffered $exception before exiting — posthog-node batches
+    // events, so without this the event dies with the process. The 1s abort
+    // below is the hard backstop if the flush hangs.
+    void shutdownPostHog().finally(() => server.close(() => process.exit(1)));
     setTimeout(() => process.abort(), 1000).unref();
   });
 
@@ -401,6 +409,10 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
       { reason: reason instanceof Error ? reason : { value: reason }, promise },
       "unhandled rejection detected"
     );
+    captureException(toError(reason), {
+      level: "error",
+      tags: { source: "unhandledRejection", process: "server" },
+    });
   });
 
   // In-process worker stack (dev opt-in via WORKERS_IN_PROCESS=1). Booted last —

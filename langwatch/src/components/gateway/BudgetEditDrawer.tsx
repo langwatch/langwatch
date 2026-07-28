@@ -96,6 +96,7 @@ export function BudgetEditDrawer({
       toaster.create({
         title: error instanceof Error ? error.message : "Failed to update budget",
         type: "error",
+        error: error,
       });
     }
   };

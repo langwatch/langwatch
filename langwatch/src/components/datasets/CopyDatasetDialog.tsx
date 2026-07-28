@@ -99,6 +99,7 @@ export const CopyDatasetDialog = ({
         title: "Error replicating dataset",
         description: error instanceof Error ? error.message : "Unknown error",
         type: "error",
+        error: error,
       });
     }
   };

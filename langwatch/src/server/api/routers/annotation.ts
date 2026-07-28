@@ -4,6 +4,7 @@ import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { AnnotationService } from "~/server/annotations/annotation.service";
+import { trackProjectEvent } from "~/server/posthog";
 import { getApp } from "~/server/app-layer/app";
 import type { Session } from "~/server/auth";
 import { TraceService } from "~/server/traces/trace.service";
@@ -184,6 +185,24 @@ export const annotationRouter = createTRPCRouter({
           "Failed to sync annotation to ClickHouse",
         );
       }
+
+      // Annotations are a leading indicator of "this team is using
+      // LangWatch as a feedback loop" — usually power-user behavior.
+      // Properties capture the SHAPE of annotation (thumbs/score/comment)
+      // so we can see which feedback mechanism users actually pick.
+      trackProjectEvent({
+        prisma: ctx.prisma,
+        userId: ctx.session.user.id,
+        event: "annotation_created",
+        projectId: input.projectId,
+        properties: {
+          annotationId: createdAnnotation.id,
+          hasComment: Boolean(input.comment),
+          hasThumbsUp: input.isThumbsUp != null,
+          scoreOptionsCount: Object.keys(input.scoreOptions ?? {}).length,
+          hasExpectedOutput: Boolean(input.expectedOutput),
+        },
+      });
 
       return createdAnnotation;
     }),

@@ -137,7 +137,7 @@ export function BudgetCreateDrawer({
       if (scopeKind === "PRINCIPAL") {
         setSubmitError(message);
       } else {
-        toaster.create({ title: message, type: "error" });
+        toaster.create({ title: message, type: "error", error });
       }
     }
   };

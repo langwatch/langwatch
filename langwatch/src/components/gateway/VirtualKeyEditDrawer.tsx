@@ -179,6 +179,7 @@ export function VirtualKeyEditDrawer({
             ? error.message
             : "Failed to update virtual key",
         type: "error",
+        error: error,
       });
     }
   };

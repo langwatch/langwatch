@@ -133,7 +133,7 @@ export function GroupDetailDialog({
       onClose();
     } catch (e) {
       const message = e instanceof Error ? e.message : "Failed to save";
-      toaster.create({ title: message, type: "error" });
+      toaster.create({ title: message, type: "error", error: e });
     } finally {
       setIsSaving(false);
     }

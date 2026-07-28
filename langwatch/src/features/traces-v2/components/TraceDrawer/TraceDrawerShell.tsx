@@ -1,3 +1,4 @@
+import { useTrackTraceOpened } from "~/hooks/useTrackTraceOpened";
 import { Drawer } from "~/components/ui/drawer";
 import { DrawerSpotlights } from "../../onboarding/spotlights/DrawerSpotlights";
 import {
@@ -40,6 +41,10 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
     handleClose,
     drawerContentRef,
   } = useTraceDrawerScaffold();
+
+  // Only count a view once the trace has actually loaded — firing on the
+  // raw traceId would also count failed/empty fetches as `trace_opened`.
+  useTrackTraceOpened(trace ? trace.traceId : undefined, "v2");
 
   const widthPx = useDrawerStore((s) => s.widthPx);
   const shortcutsOpen = useDrawerStore((s) => s.shortcutsOpen);

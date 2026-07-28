@@ -22,7 +22,9 @@ import "./instrumentation.node";
 import "./server/handled-error-wiring";
 import { setEnvironment } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
+import { shutdownPostHog } from "./server/posthog";
 import { startWorkers, type WorkerHandle } from "./server/workers/startWorkers";
+import { captureException, toError } from "./utils/posthogErrorCapture";
 
 setEnvironment(process.env.ENVIRONMENT ?? "local");
 
@@ -57,11 +59,15 @@ async function gracefulShutdown(): Promise<void> {
   } catch (error) {
     logger.error({ error }, "error closing app during shutdown");
   }
-  process.exit(0);
+  // Exiting is left to the caller (rather than done here) so the
+  // uncaughtException handler below can race this against shutdownPostHog()
+  // and pick the exit code — an internal process.exit() here would fire the
+  // instant this function's own work settled, killing the process before the
+  // PostHog flush it's racing against ever completes.
 }
 
-process.on("SIGINT", () => void gracefulShutdown());
-process.on("SIGTERM", () => void gracefulShutdown());
+process.on("SIGINT", () => void gracefulShutdown().then(() => process.exit(0)));
+process.on("SIGTERM", () => void gracefulShutdown().then(() => process.exit(0)));
 
 void startWorkers({ shouldStartMetricsServer: true })
   .then((handle) => {
@@ -74,7 +80,23 @@ void startWorkers({ shouldStartMetricsServer: true })
 
 process.on("uncaughtException", (err) => {
   logger.fatal({ error: err }, "uncaught exception detected");
-  process.exit(1);
+  captureException(err, {
+    level: "error",
+    tags: { source: "uncaughtException", process: "worker" },
+  });
+
+  // Attempt graceful shutdown, abort if it takes too long. Both run in
+  // parallel — gracefulShutdown() no longer exits internally (see its
+  // definition above), so nothing here races an internal process.exit()
+  // against the flush. shutdownPostHog()'s own error is swallowed so a
+  // slow/unreachable PostHog can never skip the job drain; the whole
+  // sequence is still bounded by the 3s race.
+  Promise.race([
+    Promise.all([gracefulShutdown(), shutdownPostHog().catch(() => {})]),
+    new Promise((_, reject) => setTimeout(() => reject(new Error("Shutdown timeout")), 3000)),
+  ])
+    .catch(() => process.abort())
+    .finally(() => process.exit(1));
 });
 
 process.on("unhandledRejection", (reason, promise) => {
@@ -82,4 +104,8 @@ process.on("unhandledRejection", (reason, promise) => {
     { reason: reason instanceof Error ? reason : { value: reason }, promise },
     "unhandled rejection detected",
   );
+  captureException(toError(reason), {
+    level: "error",
+    tags: { source: "unhandledRejection", process: "worker" },
+  });
 });

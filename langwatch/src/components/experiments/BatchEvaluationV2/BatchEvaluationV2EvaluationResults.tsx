@@ -197,6 +197,7 @@ export const useBatchEvaluationDownloadCSV = ({
         meta: {
           closable: true,
         },
+        error: error,
       });
       console.error(error);
     }

@@ -23,6 +23,7 @@ import {
   createLicenseEnforcementService,
   LimitExceededError,
 } from "../../license-enforcement";
+import { trackServerEvent } from "~/server/posthog";
 import { generateApiKey } from "../../utils/apiKeyGenerator";
 import {
   checkOrganizationPermission,
@@ -191,6 +192,22 @@ export const projectRouter = createTRPCRouter({
           },
         });
       }
+
+      // Activation funnel step 3 on "the truth": org → project. The
+      // `language`/`framework` properties drive the "which SDKs are most
+      // chosen" breakdown — a roadmap signal for which integrations to
+      // invest in next.
+      trackServerEvent({
+        userId,
+        event: "project_created",
+        projectId: project.id,
+        organizationId: input.organizationId,
+        properties: {
+          language: input.language,
+          framework: input.framework,
+          teamCreatedInline: !input.teamId,
+        },
+      });
 
       return { success: true, projectSlug: project.slug };
     }),
