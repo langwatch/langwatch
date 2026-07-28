@@ -22,6 +22,10 @@ import { getApp } from "~/server/app-layer/app";
 import { getServerAuthSession } from "~/server/auth";
 import { auditLog } from "~/server/auditLog";
 import { prisma } from "~/server/db";
+import {
+  ScenarioRunExportForbiddenError,
+  ScenarioRunExportUnauthenticatedError,
+} from "~/server/export/scenario-runs/errors";
 import { ScenarioRunExportService } from "~/server/export/scenario-runs/scenario-run-export.service";
 import { scenarioRunExportRequestSchema } from "~/server/export/scenario-runs/types";
 import type { NextRequest } from "~/types/next-stubs";
@@ -42,10 +46,7 @@ secured
         req: c.req.raw as NextRequest,
       });
       if (!session) {
-        return c.json(
-          { error: "You must be logged in to access this endpoint." },
-          { status: 401 },
-        );
+        throw new ScenarioRunExportUnauthenticatedError();
       }
 
       const hasPermission = await hasProjectPermission(
@@ -54,10 +55,7 @@ secured
         "scenarios:view",
       );
       if (!hasPermission) {
-        return c.json(
-          { error: "You do not have permission to access this endpoint." },
-          { status: 403 },
-        );
+        throw new ScenarioRunExportForbiddenError(request.projectId);
       }
 
       logger.info(
