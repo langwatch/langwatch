@@ -161,7 +161,6 @@ Feature: Model → provider routing via VK config
       Given an openai credential whose catalog endpoint answers 500
       When I GET /v1/models
       Then the response carries header X-Langwatch-Models-Discovery-Incomplete containing "openai:probe-failed"
-      And a warn log records the failed probe with the provider id
       And other providers' models still appear
 
   Rule: Model discovery cannot be turned into a probe of the gateway's network

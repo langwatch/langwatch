@@ -17,8 +17,8 @@ type ProviderRouter interface {
 	Dispatch(ctx context.Context, req *domain.Request, cred domain.Credential) (*domain.Response, error)
 	DispatchStream(ctx context.Context, req *domain.Request, cred domain.Credential) (domain.StreamIterator, error)
 	// ListModels aggregates the chain's catalogs. Alongside the models it
-	// reports discovery gaps: providers dispatch can route to that
-	// contributed no catalog (and why), so the surface never silently
+	// reports discovery gaps: providers that dispatch can route to but
+	// that contributed no catalog (and why), so the surface never silently
 	// reads as "no models" for a chain that can serve traffic.
 	ListModels(ctx context.Context, creds []domain.Credential) ([]domain.Model, []domain.ModelDiscoveryGap, error)
 }

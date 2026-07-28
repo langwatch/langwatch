@@ -773,7 +773,10 @@ func TestRouter_ModelsEndpoint_SurfacesDiscoveryGapsHeader(t *testing.T) {
 		app.WithProviders(&mockProvider{
 			listFn: func(_ context.Context, _ []domain.Credential) ([]domain.Model, []domain.ModelDiscoveryGap, error) {
 				return []domain.Model{{ID: "claude-haiku-4-5", ProviderID: domain.ProviderAnthropic}},
-					[]domain.ModelDiscoveryGap{{ProviderID: domain.ProviderBedrock, Reason: domain.ModelDiscoveryNotEnumerable}},
+					[]domain.ModelDiscoveryGap{
+						{ProviderID: domain.ProviderOpenAI, Reason: domain.ModelDiscoveryProbeFailed},
+						{ProviderID: domain.ProviderBedrock, Reason: domain.ModelDiscoveryNotEnumerable},
+					},
 					nil
 			},
 		}),
@@ -785,7 +788,10 @@ func TestRouter_ModelsEndpoint_SurfacesDiscoveryGapsHeader(t *testing.T) {
 	router.ServeHTTP(rec, req)
 
 	require.Equal(t, http.StatusOK, rec.Code)
-	assert.Equal(t, "bedrock:not-enumerable", rec.Header().Get("X-Langwatch-Models-Discovery-Incomplete"))
+	// Both reasons serialize distinctly: a formatter collapsing every
+	// reason to one token would pass a single-gap assertion.
+	assert.Equal(t, "openai:probe-failed,bedrock:not-enumerable",
+		rec.Header().Get("X-Langwatch-Models-Discovery-Incomplete"))
 	var parsed struct {
 		Data []struct {
 			ID string `json:"id"`

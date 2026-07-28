@@ -139,9 +139,9 @@ func (discardMetrics) WrapStream(iter domain.StreamIterator, _, _ string) domain
 // are not queried) or models discovered from the credential chain's
 // catalogs. Models matching a deny policy rule are filtered out.
 //
-// The second return reports discovery gaps: providers dispatch can route
-// to that contributed nothing to the list (catalog probe failed, or the
-// provider's models cannot be enumerated). Empty whenever discovery did
+// The second return reports discovery gaps: providers that dispatch can
+// route to but that contributed nothing to the list (catalog probe
+// failed, or the provider's models cannot be enumerated). Empty whenever discovery did
 // not run — a literal allowlist is authoritative, so there is no gap to
 // report.
 func (a *App) ListModels(ctx context.Context, bundle *domain.Bundle) ([]domain.Model, []domain.ModelDiscoveryGap, error) {

@@ -249,8 +249,8 @@ func TestListModels_InvalidPolicyPatternLogsWarning(t *testing.T) {
 // @scenario "GET /v1/models says so when a provider's catalog cannot be enumerated"
 // @scenario "a failed catalog probe surfaces as a gap, not a silent empty list"
 // Discovery gaps travel from the provider router to the caller untouched:
-// they are how the HTTP surface tells a client that a provider dispatch
-// can serve contributed nothing to the list.
+// they are how the HTTP surface tells a client that a provider the key
+// can dispatch to contributed nothing to the list.
 // Spec: specs/ai-gateway/provider-routing.feature
 func TestListModels_ForwardsDiscoveryGaps(t *testing.T) {
 	wantGaps := []domain.ModelDiscoveryGap{
