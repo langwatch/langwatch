@@ -400,9 +400,10 @@ export function formatFetchError(args: {
 function describeInnerCause(cause: unknown): string {
   if (!(cause instanceof Error) || !("cause" in cause)) return "";
   const inner = (cause as Error & { cause?: unknown }).cause;
+  // Falsy covers null/undefined, so the later `in` check needs no null guard.
   if (!inner) return "";
   const code =
-    typeof inner === "object" && inner !== null && "code" in inner
+    typeof inner === "object" && "code" in inner
       ? (inner as { code?: unknown }).code
       : undefined;
   if (typeof code === "string" && code.length > 0) {
