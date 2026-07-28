@@ -17,27 +17,27 @@ Feature: Experiment runs always reach a terminal state
 
   # --- Liveness ---
 
-  @unimplemented
+  @integration @unimplemented
   Scenario: Results keep a running experiment alive
     Given an experiment run that is producing results
     When it keeps producing results for longer than the silence allowed
     Then the run is not failed for inactivity
 
-  @unimplemented
+  @integration @unimplemented
   Scenario: An experiment run whose work disappears is failed
     Given an experiment run that has started
     When the work behind it stops producing results and never completes
     Then the run is reported as failed
     And the reason given is that it stalled
 
-  @unimplemented
+  @integration @unimplemented
   Scenario: An abandoned interactive run is recorded as failed
     Given an interactive experiment run streaming to a browser
     When the process running it is lost
     Then the run is reported as failed
     And it does not stay reported as running
 
-  @unimplemented
+  @integration @unimplemented
   Scenario: Recovery does not depend on a cached progress record
     Given an experiment run whose cached progress has expired
     When the run is read
@@ -45,14 +45,14 @@ Feature: Experiment runs always reach a terminal state
 
   # --- Dispatch ---
 
-  @unimplemented
+  @integration @unimplemented
   Scenario: A run started without a listener executes on the fleet
     Given an experiment run started for automated use
     When the request that started it has returned
     Then the run continues on the fleet
     And its outcome is recorded
 
-  @unimplemented
+  @integration @unimplemented
   Scenario: An interactive run keeps streaming to its listener
     Given an interactive experiment run
     When results are produced
@@ -60,14 +60,14 @@ Feature: Experiment runs always reach a terminal state
 
   # --- Stopping ---
 
-  @unimplemented
+  @integration @unimplemented
   Scenario: Stopping a run ends it
     Given an experiment run that is executing
     When the user stops it
     Then the work is signalled to stop
     And the run is reported as stopped
 
-  @unimplemented
+  @integration @unimplemented
   Scenario: A stop that is never observed still ends the run
     Given an experiment run whose work cannot be signalled
     When the user stops it
@@ -75,7 +75,7 @@ Feature: Experiment runs always reach a terminal state
 
   # --- Completion ---
 
-  @unimplemented
+  @integration @unimplemented
   Scenario: A completed run stops being watched
     Given an experiment run that completes normally
     When its completion is recorded
