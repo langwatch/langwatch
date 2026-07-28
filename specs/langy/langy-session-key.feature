@@ -37,6 +37,22 @@ Feature: Per-session caller-scoped Langy key
     And it carries none of the actions I lack
 
   # ---------------------------------------------------------------------------
+  # Reach — the actions Langy is allowed to ask for on my behalf
+  # ---------------------------------------------------------------------------
+
+  Scenario: Langy can list the experiments in my project
+    Given I can see my project's experiments
+    When I ask Langy about my experiments
+    Then Langy lists them
+    And Langy is not refused for a permission I already hold
+
+  Scenario: Langy can start an experiment run without being able to delete experiments
+    Given I can run experiments in my project
+    When I ask Langy to run one
+    Then the run starts
+    And Langy still cannot delete my evaluations
+
+  # ---------------------------------------------------------------------------
   # Guardrails
   # ---------------------------------------------------------------------------
 

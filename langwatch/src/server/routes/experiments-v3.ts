@@ -351,7 +351,14 @@ secured.access(sessionAuth).post("/abort", async (c) => {
 secured.access(apiKeyAuth).post("/:slug/run", async (c) => {
   const { slug } = c.req.param();
 
-  const authResult = await authenticateRequest(c, "evaluations:manage");
+  // Starting a run CREATES a run row against an experiment that already
+  // exists; it does not administer the evaluations family. Asking for
+  // `:manage` here refused every least-privilege key that legitimately holds
+  // the create — the Langy session key among them, which stops short of
+  // `:manage` precisely because `:manage` implies the delete. `:manage` still
+  // satisfies `:create` through `hasPermissionWithHierarchy`, so narrowing the
+  // grain takes access away from nobody.
+  const authResult = await authenticateRequest(c, "evaluations:create");
   if ("error" in authResult) {
     return c.json({ error: authResult.error }, { status: authResult.status });
   }

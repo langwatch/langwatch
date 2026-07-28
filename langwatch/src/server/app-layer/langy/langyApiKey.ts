@@ -96,6 +96,16 @@ const LANGY_CANDIDATE_PERMISSIONS: Permission[] = [
   "workflows:view",
   "workflows:create",
   "workflows:update",
+  // The second read-only family, and for the opposite reason to triggers: the
+  // view is simply all the family has to offer Langy. Experiments used to ride
+  // on `workflows:view`; they now have their own permission, and `GET
+  // /api/experiments` is the one route that asks for it — so leaving it out
+  // refused `langwatch experiment list`, and with it `langwatch status`, a read
+  // every project role already holds down to VIEWER and the EXTERNAL lite
+  // member. The family's only other action is `:manage`, which is the delete
+  // Langy must never hold; RUNNING an experiment is gated by the evaluations
+  // family above, not this one.
+  "experiments:view",
 ];
 
 // A leaked Langy session key auto-expires after this window. Sized to comfortably
