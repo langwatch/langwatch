@@ -307,9 +307,26 @@ Feature: Azure Blob stored-objects authenticate without a shared account key
   Scenario: The chart binds every storage-touching workload to one federated service account
     Given the azureBlob provider is selected with workloadIdentity auth
     When the chart renders
-    Then the app, workers, and cronjob pods all name the same service account
+    Then the app and workers pods both name the same service account
     And that service account carries the identity client-id annotation
     And each of those pods carries the label that enables the workload-identity webhook
+
+  # Cron pods run a plain curl image whose only job is an HTTP call to the app.
+  # They never touch object storage, so granting them the storage identity
+  # would be an over-grant rather than a convenience.
+  @integration
+  Scenario: Cron pods never receive the storage identity
+    Given the azureBlob provider is selected with workloadIdentity auth
+    When the chart renders
+    Then the cron pods name no service account
+    And the cron pods do not carry the workload-identity webhook label
+
+  @integration
+  Scenario: The chart refuses a workload-identity install with no service account
+    Given workloadIdentity auth is selected
+    And no service account is configured for the release
+    When the chart renders
+    Then rendering fails with an error naming the missing service account
 
   @integration
   Scenario: The chart leaves token projection to the platform webhook
@@ -332,6 +349,20 @@ Feature: Azure Blob stored-objects authenticate without a shared account key
     And no accountKey value or secret reference is configured
     When the chart renders
     Then rendering fails with an error naming the missing accountKey
+
+  # Moving writes to S3 does not retire the Azure identity: the pods still
+  # resolve reads of everything already written to azure-blob://. Tying the
+  # identity to the ACTIVE write provider stranded exactly those objects, with
+  # the chart still rendering green.
+  @integration
+  Scenario: Historical Azure objects stay readable after moving writes to S3
+    Given the active provider is awsS3 with legacy Azure reads kept enabled
+    And the Azure auth mode is workloadIdentity
+    When the chart renders
+    Then no stored-objects backend toggle selects Azure for writes
+    And the Azure connection settings are still emitted for reads
+    And the app and workers pods still carry the workload-identity webhook label
+    And the cron pods still do not carry it
 
   @integration
   Scenario: Installs that do not use Azure render exactly as they did before

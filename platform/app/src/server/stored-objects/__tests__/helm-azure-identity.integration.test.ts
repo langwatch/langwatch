@@ -331,6 +331,73 @@ describeHelm("Helm ServiceAccount surface for cloud identity", () => {
     });
   });
 
+  /**
+   * Regression: an Azure->S3 migration keeps Azure settings alive for READS
+   * (legacyAzureRead) while writes move to S3. Both the identity label and the
+   * chart's validation used to be gated on `provider == "azureBlob"`, which is
+   * false here — so the pod got the Azure connection settings but no injected
+   * token, `maybeAzureDriver()` returned undefined, and every historical
+   * azure-blob:// object became unreadable with the chart still rendering green.
+   */
+  describe("given an Azure->S3 migration under workload identity", () => {
+    /** The migration itself, with no identity backing it. */
+    const MIGRATION_WITHOUT_SERVICE_ACCOUNT = [
+      ...ALL_WORKLOADS,
+      "--set", "app.dataplane.enabled=true",
+      "--set", "app.dataplane.provider=awsS3",
+      "--set", "app.dataplane.providers.awsS3.bucket.value=bucket",
+      "--set", "app.dataplane.providers.awsS3.region=us-east-1",
+      "--set", "app.dataplane.legacyAzureRead=true",
+      "--set", "app.dataplane.providers.azureBlob.authMode=workloadIdentity",
+      "--set", "app.dataplane.providers.azureBlob.accountName.value=acct",
+      "--set", "app.dataplane.providers.azureBlob.container.value=cont",
+      "--set", "app.storedObjects.localFilesystem.enabled=false",
+    ];
+
+    const MIGRATION = [
+      ...MIGRATION_WITHOUT_SERVICE_ACCOUNT,
+      "--set", "global.serviceAccount.create=true",
+    ];
+
+    /** @scenario "Historical Azure objects stay readable after moving writes to S3" */
+    it("writes to S3 while keeping the Azure read settings", () => {
+      const out = render(MIGRATION);
+
+      // The write toggle is what selects the backend; it must be gone.
+      expect(out).not.toContain("STORED_OBJECTS_BACKEND");
+      // ...but the connection settings the read path resolves must remain.
+      expect(out).toContain("name: AZURE_BLOB_ACCOUNT_NAME");
+      expect(out).toContain("name: AZURE_BLOB_CONTAINER");
+      expect(out).toContain('value: "workloadIdentity"');
+    });
+
+    /** @scenario "Historical Azure objects stay readable after moving writes to S3" */
+    it("still labels app and workers so the webhook injects a token", () => {
+      const out = render(MIGRATION);
+
+      // Without this the webhook never fires and the reads fail at runtime.
+      expect(
+        out.match(/azure\.workload\.identity\/use: "true"/g) ?? [],
+      ).toHaveLength(2);
+    });
+
+    /** @scenario "Cron pods never receive the storage identity" */
+    it("still withholds the identity from cron pods", () => {
+      const out = render(MIGRATION);
+
+      const cronIndex = out.indexOf("kind: CronJob");
+      expect(cronIndex).toBeGreaterThan(-1);
+      expect(out.slice(cronIndex)).not.toContain("azure.workload.identity/use");
+    });
+
+    /** @scenario "The chart refuses a workload-identity install with no service account" */
+    it("refuses to render when no service account backs the identity", () => {
+      expect(
+        renderExpectingFailure(MIGRATION_WITHOUT_SERVICE_ACCOUNT),
+      ).toMatch(/ServiceAccount to bind to/);
+    });
+  });
+
   describe("given an existing account name is supplied instead", () => {
     /** @scenario "The chart binds every storage-touching workload to one federated service account" */
     it("uses that name without rendering an account of its own", () => {
