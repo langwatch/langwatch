@@ -103,9 +103,35 @@ export function createVirtualKeyLastUsedSubscriber(
 
         const vk = await deps.prisma.virtualKey.findUnique({
           where: { id: virtualKeyId },
-          select: { id: true, lastUsedAt: true },
+          select: { id: true, lastUsedAt: true, organizationId: true },
         });
         if (!vk) return;
+
+        // Cross-tenant guard. `virtualKeyId` comes off a span attribute the
+        // customer writes, and it is not in the reserved namespace the receiver
+        // strips — so any tenant can name any VK id here. The multitenancy
+        // middleware does NOT catch it: VirtualKey's validateWhere accepts a
+        // bare row id as tenancy proof for single-row writes.
+        //
+        // The debit half of this split carries the same check
+        // (gatewayBudgetDebits.store.ts). Splitting the touch out into its own
+        // subscriber removed the only path that resolved project -> org, so
+        // without this the guard is structurally absent rather than merely
+        // late, and a forged span blind-writes another org's row.
+        const project = await deps.prisma.project.findUnique({
+          where: { id: projectId },
+          select: { team: { select: { organizationId: true } } },
+        });
+        if (
+          !project ||
+          project.team.organizationId !== vk.organizationId
+        ) {
+          logger.warn(
+            { projectId, virtualKeyId },
+            "span references a cross-tenant virtual key — refusing to touch lastUsedAt",
+          );
+          return;
+        }
 
         const now = new Date();
         const isStale =

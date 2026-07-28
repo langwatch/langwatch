@@ -48,14 +48,34 @@ function gatewayEvent(
   }) as unknown as TraceProcessingEvent;
 }
 
+const TENANT_ORG = "org-1";
+
 function buildSubscriber(
-  vk: { id: string; lastUsedAt: Date | null } | null,
+  vk: { id: string; lastUsedAt: Date | null; organizationId?: string } | null,
+  options: { projectOrganizationId?: string | null } = {},
 ) {
   const update = vi.fn().mockResolvedValue({});
+  const projectOrg =
+    options.projectOrganizationId === undefined
+      ? TENANT_ORG
+      : options.projectOrganizationId;
   const prisma = {
     virtualKey: {
-      findUnique: vi.fn().mockResolvedValue(vk),
+      findUnique: vi
+        .fn()
+        .mockResolvedValue(
+          vk ? { organizationId: TENANT_ORG, ...vk } : null,
+        ),
       update,
+    },
+    project: {
+      findUnique: vi
+        .fn()
+        .mockResolvedValue(
+          projectOrg === null
+            ? null
+            : { team: { organizationId: projectOrg } },
+        ),
     },
   };
   return {
@@ -146,6 +166,34 @@ describe("virtualKeyLastUsed subscriber", () => {
       await subscriber.handle(gatewayEvent(), CONTEXT);
 
       expect(update).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("given a span naming a virtual key from another organization", () => {
+    it("refuses the write rather than trusting the span's key id", async () => {
+      // `langwatch.virtual_key_id` is customer-writable and is not in the
+      // reserved namespace the receiver strips, so any tenant can name any VK
+      // id. The multitenancy middleware does not catch it either — VirtualKey's
+      // validateWhere accepts a bare row id as tenancy proof.
+      const { subscriber, update } = buildSubscriber(
+        { id: "vk-1", lastUsedAt: null, organizationId: "org-victim" },
+        { projectOrganizationId: "org-attacker" },
+      );
+
+      await subscriber.handle(gatewayEvent(), CONTEXT);
+
+      expect(update).not.toHaveBeenCalled();
+    });
+
+    it("refuses the write when the tenant project cannot be resolved", async () => {
+      const { subscriber, update } = buildSubscriber(
+        { id: "vk-1", lastUsedAt: null },
+        { projectOrganizationId: null },
+      );
+
+      await subscriber.handle(gatewayEvent(), CONTEXT);
+
+      expect(update).not.toHaveBeenCalled();
     });
   });
 
