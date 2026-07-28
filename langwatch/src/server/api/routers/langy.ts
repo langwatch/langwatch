@@ -1,9 +1,14 @@
 import { on } from "node:events";
+import { ValidationError } from "@langwatch/handled-error";
 import { TRPCError } from "@trpc/server";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
+import {
+  LangyConversationNotFoundError,
+  LangyRateLimitedError,
+} from "~/server/app-layer/langy/errors";
 import { AGENT_CHAT_TIMEOUT_MS } from "~/server/app-layer/langy/execution/langy-turn-errors";
 import type {
   ConversationDetail,
