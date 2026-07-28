@@ -1,6 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import type Stripe from "stripe";
 import { z } from "zod";
+import { UsageReportFailedError } from "../errors";
 
 const logger = createLogger("langwatch:billing:usageReportingService");
 
@@ -238,17 +239,50 @@ export class StripeUsageReportingService implements UsageReportingService {
     return results;
   }
 
+  /**
+   * The meter read behind {@link getUsageSummary}, with the two named,
+   * non-retryable rejections separated from everything else.
+   *
+   * A malformed request or refused credentials are our configuration, so the
+   * caller gets a code it can render ("Couldn't build that usage report")
+   * rather than a generic unknown. Timeouts and provider 5xx are re-thrown
+   * untouched: retryable, and not something we can name — they degrade to
+   * "unknown" with a trace id, which is the correct outcome.
+   */
+  private async listEventSummaries({
+    stripeCustomerId,
+    startTime,
+    endTime,
+  }: {
+    stripeCustomerId: string;
+    startTime: number;
+    endTime: number;
+  }) {
+    try {
+      return await this.stripe.billing.meters.listEventSummaries(this.meterId, {
+        customer: stripeCustomerId,
+        start_time: startTime,
+        end_time: endTime,
+      });
+    } catch (error) {
+      if (
+        isStripeInvalidRequestError(error) ||
+        isStripeAuthenticationError(error)
+      ) {
+        logger.error(
+          { stripeCustomerId, meterId: this.meterId, error: error.message },
+          "[billing] Usage summary rejected by Stripe",
+        );
+        throw new UsageReportFailedError({ reasons: [error] });
+      }
+      throw error;
+    }
+  }
+
   async getUsageSummary(input: GetUsageSummaryInput): Promise<UsageSummary> {
     const validated = getUsageSummaryInputSchema.parse(input);
 
-    const response = await this.stripe.billing.meters.listEventSummaries(
-      this.meterId,
-      {
-        customer: validated.stripeCustomerId,
-        start_time: validated.startTime,
-        end_time: validated.endTime,
-      },
-    );
+    const response = await this.listEventSummaries(validated);
 
     if (response.data.length === 0) {
       logger.warn(

@@ -11,7 +11,10 @@ export class SubscriptionServiceUnavailableError extends HandledError {
     super(
       "subscription_service_unavailable",
       "Subscription service is not available in self-hosted mode",
-      { httpStatus: 501 },
+      // `fault` defaults to "customer", which would log a 501 as routine
+      // caller noise. Nothing the customer did caused this and nothing they
+      // can do fixes it — the deployment simply has no billing provider.
+      { httpStatus: 501, fault: "platform" },
     );
   }
 }

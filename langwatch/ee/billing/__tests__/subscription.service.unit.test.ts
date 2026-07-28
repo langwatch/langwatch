@@ -15,11 +15,6 @@ import type Stripe from "stripe";
 import type { OrganizationRepository } from "../../../src/server/app-layer/organizations/repositories/organization.repository";
 import type { SubscriptionRepository } from "../../../src/server/app-layer/subscription/subscription.repository";
 import type { SubscriptionService } from "../../../src/server/app-layer/subscription/subscription.service";
-import {
-  InvalidPlanError,
-  OrganizationNotFoundError,
-  SeatBillingUnavailableError,
-} from "../errors";
 import { PlanTypes, SubscriptionStatus } from "../planTypes";
 import type { SeatEventSubscriptionFns } from "../services/seatEventSubscription";
 import {
@@ -398,7 +393,7 @@ describe("EESubscriptionService", () => {
     });
 
     describe("when plan is invalid", () => {
-      it("throws InvalidPlanError without creating a pending subscription", async () => {
+      it("raises billing_plan_price_missing without creating a pending subscription", async () => {
         repository.findLastNonCancelled.mockResolvedValue(null);
 
         await expect(
@@ -408,7 +403,7 @@ describe("EESubscriptionService", () => {
             plan: "INVALID_PLAN" as any,
             customerId: "cus_123",
           }),
-        ).rejects.toThrow(InvalidPlanError);
+        ).rejects.toMatchObject({ code: "billing_plan_price_missing" });
 
         expect(repository.createPending).not.toHaveBeenCalled();
       });
@@ -569,7 +564,7 @@ describe("EESubscriptionService", () => {
     });
 
     describe("when organization not found", () => {
-      it("throws OrganizationNotFoundError", async () => {
+      it("raises organization_not_found", async () => {
         organizationRepository.findNameById.mockResolvedValue(null);
 
         await expect(
@@ -578,14 +573,14 @@ describe("EESubscriptionService", () => {
             plan: PlanTypes.LAUNCH,
             actorEmail: "actor@example.com",
           }),
-        ).rejects.toThrow(OrganizationNotFoundError);
+        ).rejects.toMatchObject({ code: "organization_not_found" });
       });
     });
   });
 
   describe("createSubscriptionWithInvites()", () => {
     describe("when seatEventFns is not configured", () => {
-      it("throws SeatBillingUnavailableError", async () => {
+      it("raises seat_billing_unavailable", async () => {
         await expect(
           service.createSubscriptionWithInvites({
             organizationId: "org_123",
@@ -594,7 +589,7 @@ describe("EESubscriptionService", () => {
             customerId: "cus_123",
             invites: [{ email: "alice@example.com", role: "MEMBER" as any }],
           }),
-        ).rejects.toThrow(SeatBillingUnavailableError);
+        ).rejects.toMatchObject({ code: "seat_billing_unavailable" });
       });
     });
 
@@ -645,13 +640,13 @@ describe("EESubscriptionService", () => {
 
   describe("previewProration()", () => {
     describe("when seatEventFns is not configured", () => {
-      it("throws SeatBillingUnavailableError", async () => {
+      it("raises seat_billing_unavailable", async () => {
         await expect(
           service.previewProration({
             organizationId: "org_123",
             newTotalSeats: 5,
           }),
-        ).rejects.toThrow(SeatBillingUnavailableError);
+        ).rejects.toMatchObject({ code: "seat_billing_unavailable" });
       });
     });
 

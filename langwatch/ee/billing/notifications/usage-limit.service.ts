@@ -6,7 +6,10 @@ import type { UsageService } from "../../../src/server/app-layer/usage/usage.ser
 import { LIMIT_TYPE_DISPLAY_LABELS } from "../../../src/server/license-enforcement/constants";
 import { getCurrentMonthStart } from "../../../src/server/utils/dateUtils";
 import { TtlCache } from "../../../src/server/utils/ttlCache";
-import { captureException } from "../../../src/utils/posthogErrorCapture";
+import {
+  captureException,
+  toError,
+} from "../../../src/utils/posthogErrorCapture";
 import type {
   PlanLimitNotifierInput,
   ResourceLimitNotifierInput,
@@ -280,7 +283,16 @@ export class UsageLimitService {
         current,
         max,
       });
-    } catch {
+    } catch (error) {
+      // A silent catch here lost the whole "a customer hit a resource limit"
+      // signal whenever Slack was down — no log, no capture, just a released
+      // cooldown. Report it the way the sibling plan-limit path does, then
+      // release so the next attempt is allowed through.
+      logger.error(
+        { error, organizationId, limitType },
+        "[billing] Failed to send resource limit alert",
+      );
+      captureException(toError(error));
       await resourceLimitCooldown.delete(cooldownKey);
     }
   }

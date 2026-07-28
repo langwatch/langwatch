@@ -2,7 +2,6 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "../../../src/server/db";
 import { LicenseEnforcementRepository } from "../../../src/server/license-enforcement/license-enforcement.repository";
 import { FREE_PLAN } from "../constants";
-import { OrganizationNotFoundError } from "../errors";
 import { type ITraceUsageService, LicenseHandler } from "../licenseHandler";
 import { TEST_PUBLIC_KEY } from "./fixtures/testKeys";
 import {
@@ -277,13 +276,13 @@ describe("LicenseHandler Integration", () => {
       }
     });
 
-    it("throws OrganizationNotFoundError for non-existent org", async () => {
+    it("raises organization_not_found for a non-existent org", async () => {
       await expect(
         handler.validateAndStoreLicense(
           "non-existent-org-id",
           VALID_LICENSE_KEY,
         ),
-      ).rejects.toThrow(OrganizationNotFoundError);
+      ).rejects.toMatchObject({ code: "organization_not_found" });
     });
 
     it("updates existing license when storing new one", async () => {
@@ -360,10 +359,10 @@ describe("LicenseHandler Integration", () => {
       expect(result.removed).toBe(true);
     });
 
-    it("throws OrganizationNotFoundError for non-existent org", async () => {
+    it("raises organization_not_found for a non-existent org", async () => {
       await expect(
         handler.removeLicense("non-existent-org-id"),
-      ).rejects.toThrow(OrganizationNotFoundError);
+      ).rejects.toMatchObject({ code: "organization_not_found" });
     });
   });
 

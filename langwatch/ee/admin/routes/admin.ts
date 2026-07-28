@@ -10,11 +10,7 @@
  *   - POST        /api/admin/:resource   (ra-data-simple-prisma)
  */
 
-import {
-  HandledError,
-  NotFoundError,
-  ValidationError,
-} from "@langwatch/handled-error";
+import { HandledError, ValidationError } from "@langwatch/handled-error";
 import { PlanTypes, type Prisma, SubscriptionStatus } from "@prisma/client";
 import {
   defaultHandler,
@@ -51,9 +47,26 @@ const adminAuth = handlerManagedAuth(
  * than something naming the backoffice, for the same reason. It goes through
  * the handled channel anyway so the response carries a trace id — an operator
  * whose session quietly stopped being an admin has something to quote.
+ *
+ * The identifying fields are the part that has to stay out. `NotFoundError`
+ * builds `"<resource> not found: <id>"` and puts the id in `meta`, so the
+ * earlier spelling answered `{ error: "not_found", message: "Route not found:
+ * /api/admin", id: "/api/admin" }` — byte-for-byte distinguishable from the
+ * framework's own 404 for a path that was never registered, which told a
+ * prober the route exists and they merely lack the session for it. Only the
+ * code and the trace id are carried now.
  */
-function adminSurfaceHidden(): NotFoundError {
-  return new NotFoundError("not_found", "Route", "/api/admin");
+function adminSurfaceHidden(): HandledError {
+  return new AdminSurfaceHiddenError();
+}
+
+class AdminSurfaceHiddenError extends HandledError {
+  declare readonly code: "not_found";
+
+  constructor() {
+    super("not_found", "Not found", { httpStatus: 404, fault: "customer" });
+    this.name = "AdminSurfaceHiddenError";
+  }
 }
 
 /**
@@ -73,7 +86,7 @@ class AdminSessionExpiredError extends HandledError {
 }
 
 /**
- * The request body never parsed, so nothing was validated.
+ * The request body is not a JSON object, so nothing was validated.
  *
  * A different failure from `ValidationError`'s 422: that one means we read the
  * document and disagreed with it. This one means there was no document, which
@@ -84,7 +97,7 @@ class AdminMalformedBodyError extends HandledError {
   declare readonly code: "malformed_request";
 
   constructor() {
-    super("malformed_request", "Admin request body is not valid JSON", {
+    super("malformed_request", "Admin request body must be a JSON object", {
       httpStatus: 400,
       fault: "customer",
     });
@@ -151,12 +164,16 @@ async function handleImpersonate(c: any, method: "POST" | "DELETE") {
 
   const body = await readJsonBody(c);
 
-  const { userIdToImpersonate, reason } = body;
-  const missing = [
-    ...(userIdToImpersonate ? [] : ["userIdToImpersonate"]),
-    ...(reason ? [] : ["reason"]),
-  ];
-  if (missing.length > 0) {
+  // `readJsonBody` guarantees an object, not the shape of one — a caller can
+  // still send `{ reason: 12 }`. Both fields are required strings downstream,
+  // so anything else is reported as missing rather than handed on.
+  const userIdToImpersonate = asNonEmptyString(body.userIdToImpersonate);
+  const reason = asNonEmptyString(body.reason);
+  if (!userIdToImpersonate || !reason) {
+    const missing = [
+      ...(userIdToImpersonate ? [] : ["userIdToImpersonate"]),
+      ...(reason ? [] : ["reason"]),
+    ];
     throw new ValidationError("Impersonation request is missing fields", {
       // `fieldErrors` is the validation_error contract the client reads —
       // `applyHandledErrorToForm` puts each one on its own input.
@@ -184,20 +201,54 @@ async function handleImpersonate(c: any, method: "POST" | "DELETE") {
 }
 
 /**
- * The request body, or a handled 400.
+ * The request body as an object, or a handled 400.
  *
  * Both admin routes parse a body the same way, and both used to answer an
  * unparseable one with a bare `{ message: "Bad request" }` — no code, so the
  * client had nothing to recognise and fell back to "we've been notified"
  * about a malformed request that will never repair itself.
+ *
+ * Catching the parse failure is not enough to keep that promise. `null`, `5`
+ * and `[]` are all valid JSON, so they came back as "the body" and the callers
+ * went straight on to destructure them or assign a property onto a primitive —
+ * a `TypeError` escaping as an unhandled 500 for precisely the malformed
+ * request this helper exists to name. Anything that is not a non-array object
+ * is rejected here instead.
  */
-async function readJsonBody(c: any): Promise<Record<string, any>> {
+async function readJsonBody(c: any): Promise<Record<string, unknown>> {
+  let parsed: unknown;
   try {
-    return (await c.req.json()) as Record<string, any>;
+    parsed = await c.req.json();
   } catch {
     throw new AdminMalformedBodyError();
   }
+
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    throw new AdminMalformedBodyError();
+  }
+
+  return parsed as Record<string, unknown>;
 }
+
+/** A caller-supplied field that is only usable when it is a non-empty string. */
+function asNonEmptyString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() !== "" ? value : undefined;
+}
+
+/**
+ * The `ra-data-simple-prisma` request this route forwards.
+ *
+ * `readJsonBody` promises an object and nothing more, which is the honest type
+ * for arbitrary JSON. The handler below works against react-admin's request
+ * envelope, so it names that shape once here rather than casting at a dozen
+ * property reads. Every field stays optional: this is what the caller *sent*,
+ * not what has been validated.
+ */
+type AdminDataRequest = Record<string, any> & {
+  resource?: unknown;
+  method?: unknown;
+  params?: { filter?: { query?: string }; id?: unknown; data?: unknown };
+};
 
 // ---------- POST /api/admin/:resource ----------
 secured.access(adminAuth).post("/admin/:resource", async (c) => {
@@ -207,7 +258,7 @@ secured.access(adminAuth).post("/admin/:resource", async (c) => {
     throw adminSurfaceHidden();
   }
 
-  const body = await readJsonBody(c);
+  const body = (await readJsonBody(c)) as AdminDataRequest;
 
   // The request body carries resource + method inside it, but the
   // URL also has the resource param. We use the body's resource field
@@ -216,17 +267,21 @@ secured.access(adminAuth).post("/admin/:resource", async (c) => {
     body.resource = c.req.param("resource");
   }
 
-  if (!ALLOWED_RESOURCES.has(body.resource)) {
-    throw new ValidationError(
-      `Unknown admin resource "${String(body.resource)}"`,
-      {
-        meta: {
-          fieldErrors: {
-            resource: ["This isn't a resource the admin API serves."],
-          },
+  if (
+    typeof body.resource !== "string" ||
+    !ALLOWED_RESOURCES.has(body.resource)
+  ) {
+    // The rejected value is caller-supplied and unbounded, so it is not echoed
+    // back into the message. `fieldErrors.resource` already says exactly what
+    // is wrong, and the value the caller sent is the one thing they do not
+    // need told back to them.
+    throw new ValidationError("Unknown admin resource", {
+      meta: {
+        fieldErrors: {
+          resource: ["This isn't a resource the admin API serves."],
         },
       },
-    );
+    });
   }
 
   if (body.resource === "organizations") body.resource = "organization";

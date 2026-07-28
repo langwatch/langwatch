@@ -17,10 +17,6 @@ vi.mock("../utils/growthSeatEvent", () => ({
   resolveGrowthSeatPlanType: vi.fn().mockReturnValue("GROWTH_SEAT_USD_MONTHLY"),
 }));
 
-import {
-  NoActiveSubscriptionError,
-  SubscriptionItemNotFoundError,
-} from "../errors";
 import { SubscriptionStatus } from "../planTypes";
 import { createSeatEventSubscriptionFns } from "../services/seatEventSubscription";
 
@@ -279,7 +275,7 @@ describe("seatEventSubscription", () => {
     });
 
     describe("when no active subscription exists", () => {
-      it("throws NoActiveSubscriptionError", async () => {
+      it("raises subscription_sync_failed", async () => {
         db.subscription.findFirst.mockResolvedValue(null);
 
         await expect(
@@ -287,12 +283,12 @@ describe("seatEventSubscription", () => {
             organizationId: "org_1",
             newTotalSeats: 3,
           }),
-        ).rejects.toThrow(NoActiveSubscriptionError);
+        ).rejects.toMatchObject({ code: "subscription_sync_failed" });
       });
     });
 
     describe("when Stripe subscription is not active", () => {
-      it("throws NoActiveSubscriptionError", async () => {
+      it("raises subscription_sync_failed", async () => {
         db.subscription.findFirst.mockResolvedValue({
           id: "sub_db_1",
           stripeSubscriptionId: "sub_stripe_1",
@@ -308,12 +304,12 @@ describe("seatEventSubscription", () => {
             organizationId: "org_1",
             newTotalSeats: 3,
           }),
-        ).rejects.toThrow(NoActiveSubscriptionError);
+        ).rejects.toMatchObject({ code: "subscription_sync_failed" });
       });
     });
 
     describe("when no seat item found on subscription", () => {
-      it("throws SubscriptionItemNotFoundError", async () => {
+      it("raises subscription_sync_failed for a missing seat item", async () => {
         db.subscription.findFirst.mockResolvedValue({
           id: "sub_db_1",
           stripeSubscriptionId: "sub_stripe_1",
@@ -336,7 +332,7 @@ describe("seatEventSubscription", () => {
             organizationId: "org_1",
             newTotalSeats: 3,
           }),
-        ).rejects.toThrow(SubscriptionItemNotFoundError);
+        ).rejects.toMatchObject({ code: "subscription_sync_failed" });
       });
     });
   });

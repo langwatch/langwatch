@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/observability";
 import {
   Currency,
   type OrganizationUserRole,
@@ -40,6 +41,8 @@ import type {
   getItemsToUpdate,
   prices,
 } from "./subscriptionItemCalculator";
+
+const logger = createLogger("langwatch:billing:subscriptionService");
 
 export const RECENT_INVOICES_LIMIT = 4;
 
@@ -499,6 +502,14 @@ export class EESubscriptionService implements SubscriptionService {
     baseUrl: string;
   }): Promise<{ url: string | null }> {
     if (!isStripePriceName(plan as StripePriceName)) {
+      // The catalog detail belongs here, not in the error a customer reads:
+      // a plan with no price on our side is our misconfiguration, and naming
+      // the price catalog to the person who just clicked Upgrade invites them
+      // to act on something only we can fix.
+      logger.error(
+        { organizationId, plan },
+        "[billing] Plan has no price in the Stripe price catalog",
+      );
       throw new InvalidPlanError(plan);
     }
 

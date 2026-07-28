@@ -1,5 +1,4 @@
 import { Currency } from "@prisma/client";
-import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { checkOrganizationPermission } from "../../src/server/api/rbac";
 import {
@@ -7,9 +6,15 @@ import {
   protectedProcedure,
 } from "../../src/server/api/trpc";
 import type { SubscriptionService } from "../../src/server/app-layer/subscription/subscription.service";
-import { billingErrorHandler } from "./middleware";
+import { UserEmailRequiredError } from "./errors";
 import { type PlanTypes as PlanType, SUBSCRIBABLE_PLANS } from "./planTypes";
 import type { CustomerService } from "./services/customerService";
+
+// No billing-specific error middleware: every error the services raise is a
+// `HandledError`, so the shared handled-error middleware in `trpc.ts` maps it
+// to the right tRPC code and keeps the error as the `cause`. The middleware
+// this replaced re-threw a bare `TRPCError` with no cause, which is what
+// turned every 5xx billing failure into "An unknown error occurred".
 
 const subscriptionPlanEnum = z.enum(SUBSCRIBABLE_PLANS);
 
@@ -33,7 +38,6 @@ export const createSubscriptionRouterFactory = ({
         }),
       )
       .use(checkOrganizationPermission("organization:manage"))
-      .use(billingErrorHandler)
       .mutation(async ({ input }) => {
         return await subscriptionService.updateSubscriptionItems({
           organizationId: input.organizationId,
@@ -58,7 +62,6 @@ export const createSubscriptionRouterFactory = ({
         }),
       )
       .use(checkOrganizationPermission("organization:manage"))
-      .use(billingErrorHandler)
       .mutation(async ({ input, ctx }) => {
         const customerId = await customerService.getOrCreateCustomerId({
           user: ctx.session.user,
@@ -80,7 +83,6 @@ export const createSubscriptionRouterFactory = ({
     manage: protectedProcedure
       .input(z.object({ organizationId: z.string(), baseUrl: z.string() }))
       .use(checkOrganizationPermission("organization:manage"))
-      .use(billingErrorHandler)
       .mutation(async ({ input, ctx }) => {
         const customerId = await customerService.getOrCreateCustomerId({
           user: ctx.session.user,
@@ -102,7 +104,6 @@ export const createSubscriptionRouterFactory = ({
         }),
       )
       .use(checkOrganizationPermission("organization:manage"))
-      .use(billingErrorHandler)
       .query(async ({ input }) => {
         return await subscriptionService.previewProration({
           organizationId: input.organizationId,
@@ -113,7 +114,6 @@ export const createSubscriptionRouterFactory = ({
     getLastSubscription: protectedProcedure
       .input(z.object({ organizationId: z.string() }))
       .use(checkOrganizationPermission("organization:view"))
-      .use(billingErrorHandler)
       .query(async ({ input }) => {
         return await subscriptionService.getLastNonCancelledSubscription(
           input.organizationId,
@@ -137,7 +137,6 @@ export const createSubscriptionRouterFactory = ({
         }),
       )
       .use(checkOrganizationPermission("organization:manage"))
-      .use(billingErrorHandler)
       .mutation(async ({ input, ctx }) => {
         const customerId = await customerService.getOrCreateCustomerId({
           user: ctx.session.user,
@@ -166,14 +165,10 @@ export const createSubscriptionRouterFactory = ({
         }),
       )
       .use(checkOrganizationPermission("organization:manage"))
-      .use(billingErrorHandler)
       .mutation(async ({ input, ctx }) => {
         const actorEmail = ctx.session.user.email;
         if (!actorEmail) {
-          throw new TRPCError({
-            code: "UNAUTHORIZED",
-            message: "User email is required to trigger notifications",
-          });
+          throw new UserEmailRequiredError();
         }
 
         return await subscriptionService.notifyProspective({
@@ -189,7 +184,6 @@ export const createSubscriptionRouterFactory = ({
     listInvoices: protectedProcedure
       .input(z.object({ organizationId: z.string() }))
       .use(checkOrganizationPermission("organization:view"))
-      .use(billingErrorHandler)
       .query(async ({ input }) => {
         return await subscriptionService.listInvoices({
           organizationId: input.organizationId,
