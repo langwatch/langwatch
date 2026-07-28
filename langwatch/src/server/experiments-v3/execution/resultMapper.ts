@@ -312,13 +312,19 @@ export const mapEvaluatorResult = (
  * through untouched to `mapEvaluatorResult`.
  * @returns The mapped SSE event, or null if the event should be ignored
  */
-export const mapNlpEvent = (
-  event: StudioServerEvent,
-  rowIndex: number,
-  targetNodes: Set<string>,
-  config?: ResultMapperConfig,
-  evaluatorInputs?: Record<string, unknown>,
-): EvaluationV3Event | null => {
+export const mapNlpEvent = ({
+  event,
+  rowIndex,
+  targetNodes,
+  config,
+  evaluatorInputs,
+}: {
+  event: StudioServerEvent;
+  rowIndex: number;
+  targetNodes: Set<string>;
+  config?: ResultMapperConfig;
+  evaluatorInputs?: Record<string, unknown>;
+}): EvaluationV3Event | null => {
   if (event.type !== "component_state_change") {
     // Ignore non-component events (debug, done, etc.)
     return null;

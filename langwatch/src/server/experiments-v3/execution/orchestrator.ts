@@ -1143,12 +1143,12 @@ export async function* executeCell(
 
       // Map and yield target events
       for (const event of targetEvents) {
-        const mappedEvent = mapNlpEvent(
+        const mappedEvent = mapNlpEvent({
           event,
-          cell.rowIndex,
+          rowIndex: cell.rowIndex,
           targetNodes,
-          cellConfig,
-        );
+          config: cellConfig,
+        });
         if (!mappedEvent) continue;
         // The engine reports token usage but no cost (it has no price table),
         // so price the target's tokens here at the canonical model rate. This
@@ -1236,13 +1236,13 @@ export async function* executeCell(
 
           // Map and yield evaluator events
           for (const event of evaluatorEvents) {
-            const mappedEvent = mapNlpEvent(
+            const mappedEvent = mapNlpEvent({
               event,
-              cell.rowIndex,
+              rowIndex: cell.rowIndex,
               targetNodes,
-              cellConfig,
+              config: cellConfig,
               evaluatorInputs,
-            );
+            });
             if (mappedEvent) {
               yield mappedEvent;
             }
