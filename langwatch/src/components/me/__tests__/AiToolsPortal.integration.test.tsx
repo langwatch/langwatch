@@ -25,7 +25,10 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   })),
 }));
 
-// Empty catalog: list resolves to [], availability to no configured providers.
+// Zero enabled entries: list resolves to [], availability to no configured
+// providers. Server-side auto-provisioning means a fresh org never actually
+// serves an empty list; this state is only reachable when the catalog was
+// curated down to no enabled tools (the curated-empty fallback these pin).
 vi.mock("~/utils/api", () => ({
   api: {
     aiTools: {
@@ -43,7 +46,7 @@ function renderWithProviders(ui: React.ReactElement) {
   return render(<ChakraProvider value={defaultSystem}>{ui}</ChakraProvider>);
 }
 
-describe("<AiToolsPortal /> empty state", () => {
+describe("<AiToolsPortal /> curated-empty fallback", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -52,12 +55,12 @@ describe("<AiToolsPortal /> empty state", () => {
     cleanup();
   });
 
-  describe("when the catalog is empty and the viewer can manage it", () => {
+  describe("when the catalog query returns no enabled tools and the viewer can manage the catalog", () => {
     beforeEach(() => {
       mockCanManage = true;
     });
 
-    /** @scenario brand-new org shows the getting-started banner to a catalog admin */
+    /** @scenario curated-empty catalog shows the getting-started banner to a catalog admin */
     it("renders the governance getting-started banner linking to the tool catalog", () => {
       renderWithProviders(<AiToolsPortal />);
 
@@ -78,12 +81,12 @@ describe("<AiToolsPortal /> empty state", () => {
     });
   });
 
-  describe("when the catalog is empty and the viewer is a member", () => {
+  describe("when the catalog query returns no enabled tools and the viewer is a member", () => {
     beforeEach(() => {
       mockCanManage = false;
     });
 
-    /** @scenario brand-new org with no catalog shows a member empty-state note */
+    /** @scenario curated-empty catalog shows a member empty-state note */
     it("renders the member note and no getting-started banner or CLI card", () => {
       renderWithProviders(<AiToolsPortal />);
 

@@ -17,19 +17,24 @@ every matching user's `/me` portal grid.
 
 ## Starter pack
 
-A fresh organization has an empty catalog. Your first visit shows an
-**Import starter pack** CTA, one click publishes a sensible default
-set:
+A fresh organization does not start empty: the standard catalog is
+provisioned automatically at signup (and on the portal's first load for
+organizations created before this behavior), so your members' `/me`
+portal renders tiles from day one:
 
-- Coding assistants: Claude Code, Copilot, Cursor, Codex
-- Model providers: OpenAI, Anthropic, Bedrock, Gemini
+- Coding assistants: Claude Code, Codex, Gemini CLI, opencode
+- Model providers: OpenAI, Anthropic, AWS Bedrock, Google AI
 - External tools: empty (admins fill these in per-org with internal
   links)
 
-The starter pack is org-scoped and editable like any other entry. You
-can reorder, scope to specific teams, or archive entries afterward.
-There's no penalty for skipping the starter pack and adding tiles
-manually if your org's allowed-AI list is narrower.
+The provisioned set is org-scoped and editable like any other entry.
+You can reorder, scope, disable, or archive entries afterward.
+Auto-provisioning only ever runs on a catalog that has never had any
+entry, so a catalog you curated down to nothing stays empty. The
+**Import starter pack** button in the editor adds starter tiles the
+catalog never had, such as tiles added to the pack after your org was
+provisioned. Tiles you archived are respected as removed: import skips
+them, and **+ Add tile** recreates one if you want it back.
 
 ## Adding a tile
 
