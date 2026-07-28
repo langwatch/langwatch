@@ -14,6 +14,35 @@ export interface CapturedQuery {
   query_params?: Record<string, unknown>;
 }
 
+export interface CapturedInsert {
+  table?: string;
+  values?: unknown;
+  format?: string;
+  clickhouse_settings?: Record<string, unknown>;
+}
+
+/**
+ * A client that records the parameters of every `insert` and does nothing else.
+ *
+ * `wrapWithDefaultSettings` proxies only `.query`, so nothing injects settings
+ * into an insert on the way past — whatever the repository passes is exactly
+ * what reaches ClickHouse. That is why the settings have to be asserted here on
+ * the caller's own params rather than trusted to a wrapper.
+ */
+export function capturingInsertClient(): {
+  client: ClickHouseClient;
+  inserts: CapturedInsert[];
+} {
+  const inserts: CapturedInsert[] = [];
+  const client = {
+    insert: async (params: CapturedInsert) => {
+      inserts.push(params);
+      return { executed: true };
+    },
+  } as unknown as ClickHouseClient;
+  return { client, inserts };
+}
+
 /**
  * A client that returns one fixed record — the wire shape ClickHouse produces
  * for JSONEachRow, where DateTime64 columns arrive as strings.

@@ -510,6 +510,92 @@ describe("traceAnalytics fold-equivalence across the read-back boundary", () => 
       expect(project(resumed)).toEqual(project(uninterrupted));
     });
   });
+
+  /**
+   * PAST the accumulator cap, where equivalence is no longer the property.
+   *
+   * Every over-cap fixture above is a plain string no later span re-sends, so
+   * nothing ever read a truncated value back. This one does: the committed row's
+   * `langwatch.prompt_ids` is cut mid-array by the 4096-char cap, and the spans
+   * after the split each carry another `langwatch.prompt.id`, so the accumulator
+   * READS the fragment and writes the union back.
+   *
+   * Equivalence cannot hold here — a truncated union is information the row did
+   * not keep — so the property under test is the weaker one the trim's docblock
+   * actually promises: truncation RESETS the union. What it must never do is
+   * treat the fragment as an element, which re-escapes it into the next array
+   * and nests one level deeper per cycle until the value is unreadable garbage
+   * for every downstream `prompt_ids` consumer. Three cycles is enough for
+   * nesting to be unmistakable; a reset is a fixed point after the first.
+   */
+  describe("given accumulated prompt ids past the 4096-char cap re-sent by a later span", () => {
+    // ~31 chars of JSON per id, so 200 ids is comfortably past 4096 and the
+    // committed value is certain to be cut mid-array.
+    const OVER_CAP_SPANS = 200;
+    const overCapSpans = Array.from({ length: OVER_CAP_SPANS }, (_, index) =>
+      spanEvent({
+        eventId: `evt-overcap-${index}`,
+        spanId: `eeee${String(index).padStart(12, "0")}`,
+        parentSpanId: "eeee0000000000ff",
+        name: `llm-call-${index}`,
+        startMs: BASE_MS + index * 10,
+        endMs: BASE_MS + index * 10 + 5,
+        attributes: {
+          "langwatch.span.type": "llm",
+          "langwatch.prompt.id": `prompt_2Zx9QwErTyUiOpAsDfGhJ${index}:3`,
+        },
+      }),
+    );
+
+    const committed = foldAll(
+      overCapSpans.slice(0, OVER_CAP_SPANS - 3),
+      projection.init(),
+    );
+    const tail = overCapSpans.slice(OVER_CAP_SPANS - 3);
+
+    /** One crash-and-resume cycle: commit the row, read it back, fold on. */
+    function cycle(state: TraceAnalyticsData): TraceAnalyticsData {
+      return foldAll(tail, roundTrip(state));
+    }
+
+    it("commits a value the cap really did cut mid-array", () => {
+      // Guards the guard: if the fixture ever stops crossing the cap, every
+      // assertion below would pass vacuously against an intact array.
+      const raw = project(committed).attributes["langwatch.prompt_ids"] ?? "";
+
+      expect(raw.length).toBeGreaterThan(4096);
+      expect(raw.endsWith("]")).toBe(false);
+    });
+
+    it("restarts the union from the spans after the truncation", () => {
+      const resumed = cycle(committed);
+      const ids = JSON.parse(
+        project(resumed).attributes["langwatch.prompt_ids"] ?? "[]",
+      ) as string[];
+
+      expect(ids).toEqual(
+        tail.map(
+          (_, index) =>
+            `prompt_2Zx9QwErTyUiOpAsDfGhJ${OVER_CAP_SPANS - 3 + index}:3`,
+        ),
+      );
+    });
+
+    it("does not nest the truncated fragment back into the array", () => {
+      let state = committed;
+      for (let cycles = 0; cycles < 3; cycles++) state = cycle(state);
+
+      const ids = JSON.parse(
+        project(state).attributes["langwatch.prompt_ids"] ?? "[]",
+      ) as string[];
+
+      // The nesting signature: an element that is itself a serialised array.
+      // Note the LENGTH stays put either way — the trim re-truncates to the same
+      // cap every cycle — so size is not the tell; the element shape is.
+      expect(ids.some((id) => id.trimStart().startsWith("["))).toBe(false);
+      expect(ids.every((id) => id.startsWith("prompt_"))).toBe(true);
+    });
+  });
 });
 
 /**

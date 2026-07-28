@@ -19,7 +19,9 @@ process.env.TZ = "Asia/Kolkata";
 
 import type { ClickHouseClient } from "@clickhouse/client";
 import { describe, expect, it } from "vitest";
+import type { EvaluationAnalyticsRow } from "~/server/event-sourcing/pipelines/evaluation-processing/projections/evaluationAnalytics.foldProjection";
 import {
+  capturingInsertClient,
   clientReturning,
   orderingClient,
   windowedReadCount,
@@ -239,6 +241,80 @@ describe("EvaluationAnalyticsClickHouseRepository windowed read", () => {
 
         expect(await windowedReadCount({ table: TABLE, outcome: "unwindowed" })).toBe(before + 1);
         expect(seen[0]?.query).not.toContain("fromUnixTimestamp64Milli");
+      });
+    });
+  });
+});
+
+/**
+ * The write half of the migration window (ADR-066).
+ *
+ * `wrapWithDefaultSettings` proxies only `.query`, so an insert carries exactly
+ * the settings the repository passes and nothing else. ClickHouse defaults
+ * `input_format_skip_unknown_fields` ON, and the workers Deployment overrides
+ * the entrypoint so it never runs migrations — they run in the app pod's boot,
+ * and the two roll concurrently. Without the explicit 0, a worker writing before
+ * migration 00056 applies gets HTTP 200 with the new columns dropped and the row
+ * stamped at the CURRENT projection version, so it later passes the store's
+ * version gate and decodes as all-defaults with no rebuild path.
+ */
+describe("EvaluationAnalyticsClickHouseRepository insert settings", () => {
+  const ROW: EvaluationAnalyticsRow = {
+    tenantId: TENANT_ID,
+    evaluationId: EVALUATION_ID,
+    version: "2026-07-27",
+    occurredAtMs: 1_750_000_000_000,
+    createdAtMs: 1_750_000_000_000,
+    updatedAtMs: 1_750_000_000_000,
+    evaluatorType: "langevals/llm_answer_match",
+    evaluatorName: "Judge",
+    status: "processed",
+    isGuardrail: false,
+    passed: null,
+    score: null,
+    label: null,
+    model: null,
+    traceId: "trace-1",
+    userId: null,
+    conversationId: null,
+    customerId: null,
+    origin: null,
+    durationMs: null,
+    totalCost: null,
+    nonBilledCost: null,
+    attributes: {},
+    startedAtMs: 1_750_000_000_000,
+    completedAtMs: null,
+  };
+
+  describe("given a table that predates the row's columns", () => {
+    describe("when a single row is upserted", () => {
+      it("refuses to let ClickHouse silently drop an unknown column", async () => {
+        const { client, inserts } = capturingInsertClient();
+        const repository = new EvaluationAnalyticsClickHouseRepository(
+          async () => client,
+        );
+
+        await repository.upsert(ROW);
+
+        expect(inserts[0]?.clickhouse_settings).toMatchObject({
+          input_format_skip_unknown_fields: 0,
+        });
+      });
+    });
+
+    describe("when a batch is upserted", () => {
+      it("refuses to let ClickHouse silently drop an unknown column", async () => {
+        const { client, inserts } = capturingInsertClient();
+        const repository = new EvaluationAnalyticsClickHouseRepository(
+          async () => client,
+        );
+
+        await repository.upsertBatch([{ row: ROW }]);
+
+        expect(inserts[0]?.clickhouse_settings).toMatchObject({
+          input_format_skip_unknown_fields: 0,
+        });
       });
     });
   });

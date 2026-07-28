@@ -60,12 +60,20 @@ const codingAgentSessionEvents = [
  *  2026-07-27 — the read-back columns of migrations 00053 (`SubAgentIds`,
  *  `PreviousCallContextTokens`, `StepStartedAt`, `MetricSeries`,
  *  `LastEventOccurredAt`) and 00054 (`AppliedEventIds`) joined the projected row
- *  shape. That shape change is exactly what this stamp records (ADR-021/022),
- *  and the store's read-back path uses it as the discriminator: a row carrying
- *  an OLDER version predates those columns, so its defaults cannot be told apart
- *  from real values and it is treated as a store miss (see
- *  `CodingAgentSessionStore.getWithApplied`). */
+ *  shape. That shape change is exactly what this stamp records (ADR-021/022). */
 export const CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST = "2026-07-27";
+
+/**
+ * The stamp rows carried while migrations 00053 and 00054 shipped.
+ *
+ * Neither migration bumped the projection version, so this stamp spans BOTH
+ * sides of the read-back columns: rows written before 00053 deployed carry it
+ * with those columns absent, and rows written after carry it with them fully
+ * populated. The version alone therefore cannot decide whether a row is
+ * decodable — see `CodingAgentSessionStore.getWithApplied` for the second half
+ * of the discriminator.
+ */
+export const CODING_AGENT_SESSION_PROJECTION_VERSION_PRE_STAMP = "2026-07-21";
 
 /**
  * How far a session's StartedAt (the table's partition column) may drift from
@@ -140,18 +148,25 @@ export class CodingAgentSessionFoldProjection
    * round-trips the full working state, so `get()` returns it and, in steady
    * state, nothing on the delivery path reads `event_log`.
    *
-   * `refoldOnStoreMiss: true` — a version-gated TRANSITIONAL net, not the old
-   * continuity mechanism. The store reads back only rows stamped with the
-   * CURRENT projection version; a row written before the 00053/00054 read-back
-   * columns existed decodes every one of them as a column default it cannot tell
-   * apart from a real value, so the store reports a miss and this option
-   * rebuilds that aggregate from `event_log` — once. The rebuild is rewritten at
-   * the current version, so the row hits from then on and the whole population
-   * self-heals with no backfill migration. In steady state every row is
-   * current-version, `store.get()` hits, and nothing refolds. Without the gate a
-   * stale row would collapse the metric-fed totals to whatever series arrived
-   * next, reset the sub-agent count to one, scramble the step sequence into
-   * arrival order, and blind the cache-rebuild detector for one model call.
+   * `refoldOnStoreMiss: true` — a schema-gated TRANSITIONAL net, not the old
+   * continuity mechanism. A row written before the 00053/00054 read-back columns
+   * existed decodes every one of them as a column default it cannot tell apart
+   * from a real value, so the store reports a miss and this option rebuilds that
+   * aggregate from `event_log` — once. The rebuild is rewritten at the current
+   * version, so the row hits from then on and the whole population self-heals
+   * with no backfill migration. In steady state `store.get()` hits and nothing
+   * refolds. Without the gate a stale row would collapse the metric-fed totals
+   * to whatever series arrived next, reset the sub-agent count to one, scramble
+   * the step sequence into arrival order, and blind the cache-rebuild detector
+   * for one model call.
+   *
+   * The gate is deliberately NOT "current stamp only": 00053 and 00054 shipped
+   * without bumping the version, so the pre-bump stamp covers rows on both sides
+   * of the column change and the store uses the `LastEventOccurredAt` checkpoint
+   * to tell them apart. Rejecting the whole stamp would refold a large live
+   * population for nothing — see `CodingAgentSessionStore.getWithApplied`.
+   * `es_fold_refold_on_miss_total{projection_name="codingAgentSession"}` is what
+   * says when this net has stopped firing and can come out.
    *
    * `coalesceMaxBatch` — see `CODING_AGENT_SESSION_COALESCE_MAX_BATCH`.
    *
