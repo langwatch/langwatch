@@ -164,10 +164,11 @@ export const computeParetoDominance = ({
     // a stand-in from when no interval existed, and it could call a 6% gap
     // "cheaper" on two rows or miss a dead-certain 4% gap on two hundred.
     const metrics = variantMetrics[a.variantId];
-    const paired =
+    const differences =
       dimension === "cost"
-        ? metrics?.costDifferenceCI?.[b.variantId]
-        : metrics?.durationDifferenceCI?.[b.variantId];
+        ? metrics?.costDifferenceCI
+        : metrics?.durationDifferenceCI;
+    const paired = differences?.[b.variantId];
     if (paired && paired.every((bound) => Number.isFinite(bound))) {
       // Lower is better, so a is better when the whole interval is below zero.
       if (paired[1] < 0) return 1;
@@ -175,6 +176,15 @@ export const computeParetoDominance = ({
       return 0;
     }
 
+    // The map is present but this pair is not in it, which means the paired
+    // test RAN AND DECLINED — the two shared too few rows to compare. Falling
+    // through to the averages here would judge anyway, by a cruder test, in
+    // exactly the case where the averages are least trustworthy, and would
+    // re-assert the claim the paired test had just refused to make.
+    if (differences) return 0;
+
+    // No map at all: a caller from before the paired intervals existed. The
+    // relative floor is the best available answer rather than a preference.
     const read = dimension === "cost" ? costOf : speedOf;
     const aValue = read(a.variantId);
     const bValue = read(b.variantId);

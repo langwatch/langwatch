@@ -171,7 +171,9 @@ export function computeVariantMetrics({
     for (let j = i + 1; j < variantIds.length; j++) {
       const left = variantIds[i]!;
       const right = variantIds[j]!;
-      const seed = seedFor(`${left} ${right}`);
+      // NUL rather than a space: variant ids are free-form, and with a
+      // space "a b" + "c" and "a" + "b c" hash to the same seed.
+      const seed = seedFor(`${left}\u0000${right}`);
 
       const cost = pairedDifferenceCI({
         a: costByRow[left]!,

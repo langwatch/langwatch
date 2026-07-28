@@ -341,3 +341,59 @@ describe("computeParetoDominance", () => {
     });
   });
 });
+
+describe("computeParetoDominance — when the paired test declined", () => {
+  const board2 = (entries: any[]) =>
+    ({
+      entries,
+      winMatrix: {},
+      comparisonCount: 60,
+      minMatchups: 60,
+      hasDegenerate: false,
+      didConverge: true,
+      comparability: { identifiable: true, groups: [], dominates: [] },
+      scoreDifferenceCI: null,
+      bootstrapNonConvergence: null,
+    }) as any;
+
+  describe("given the run computed intervals but not for this pair", () => {
+    it("treats cost as unknown rather than falling back to the averages", () => {
+      // The interval is absent precisely because the two shared too few rows.
+      // Falling back to a threshold on the averages judges anyway, using a
+      // cruder test, in the one case where the averages are least
+      // trustworthy — and re-asserts the claim the paired test just refused.
+      const leaderboard = board2([
+        entry({ variantId: "a", score: 200, scoreCI: [150, 250] }),
+        entry({ variantId: "b", score: 10, scoreCI: [-40, 40] }),
+      ]);
+      const variantMetrics = {
+        a: {
+          variantId: "a",
+          costStats: { avg: 0.001, count: 20 },
+          durationStats: null,
+          costMeanCI: null,
+          durationMeanCI: null,
+          // Present but empty: the pipeline ran and produced nothing here.
+          costDifferenceCI: {},
+          durationDifferenceCI: {},
+        },
+        b: {
+          variantId: "b",
+          costStats: { avg: 0.01, count: 20 },
+          durationStats: null,
+          costMeanCI: null,
+          durationMeanCI: null,
+          costDifferenceCI: {},
+          durationDifferenceCI: {},
+        },
+      } as any;
+
+      const dominance = computeParetoDominance({ leaderboard, variantMetrics });
+      const edge = dominance.edges.find((e) => e.loserId === "b");
+
+      // a still wins on quality, but cost must not be claimed.
+      expect(edge?.strictlyBetterOn).toEqual(["quality"]);
+      expect(edge?.strictlyBetterOn).not.toContain("cost");
+    });
+  });
+});
