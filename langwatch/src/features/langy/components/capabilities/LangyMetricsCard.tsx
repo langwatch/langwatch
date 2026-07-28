@@ -90,11 +90,6 @@ function isUnreadable(parsed: ParsedAnalytics): boolean {
   return !parsed.empty && parsed.metric == null && parsed.points === 0;
 }
 
-/** Shared guard for capability rendering — help/error text is an activity receipt. */
-export function hasRenderableAnalyticsResult(output: unknown): boolean {
-  return !isUnreadable(parseAnalytics(output));
-}
-
 /**
  * A metric key as a person would say it: `performance.total_cost` → "Total
  * cost". The API's dotted key is a lookup path, not a title, and printing it as

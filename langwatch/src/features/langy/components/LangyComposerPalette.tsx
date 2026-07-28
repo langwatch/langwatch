@@ -11,8 +11,6 @@ import { Cpu, Plus, Sparkles, Waypoints } from "lucide-react";
 import { useEffect, useMemo } from "react";
 import { LANGY_SKILLS, type LangySkill } from "~/shared/langy/langySkills";
 import {
-} from "../logic/langyContextKindIntent";
-import {
   absorbContextTarget,
   type LangyContextTarget,
   type LangyRevealableKind,
