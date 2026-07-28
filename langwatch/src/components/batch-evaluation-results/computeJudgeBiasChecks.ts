@@ -32,6 +32,16 @@ export type VerbosityProfile = {
   leaderMeanLength: number | null;
   /** Mean length across every variant except the leader. */
   fieldMeanLength: number | null;
+  /**
+   * The leader the ratio was measured against, or null when the run produced
+   * none.
+   *
+   * Carried so a caller can tell the two reasons for a missing ratio apart.
+   * Both "no leader to compare against" and "no output text was captured"
+   * leave `leaderRatio` null, and reporting the second for both told readers
+   * their outputs were missing when they were on screen in front of them.
+   */
+  leaderId: string | null;
 };
 
 export type JudgeIndependence = {
@@ -108,6 +118,7 @@ export const computeVerbosityProfile = ({
     leaderRatio,
     leaderMeanLength,
     fieldMeanLength,
+    leaderId: leaderId ?? null,
   };
 };
 

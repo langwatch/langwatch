@@ -45,6 +45,7 @@ const verbosity = (
   leaderRatio: 1.05,
   leaderMeanLength: 1000,
   fieldMeanLength: 950,
+  leaderId: "a",
   ...overrides,
 });
 
@@ -314,6 +315,70 @@ describe("buildTrustChecks — margins of error built from unsettled fits", () =
       expect(
         checks.some((c) => c.label === "Margins of error are approximate"),
       ).toBe(false);
+    });
+  });
+});
+
+describe("buildTrustChecks — reasons that must be the actual reason", () => {
+  describe("given the run produced no leader to compare lengths against", () => {
+    it("says that, rather than claiming no text was recorded", () => {
+      // leaderRatio is null when there is no leader OR when no text was
+      // captured, and the panel reported the second reason for both. On a
+      // no-signal run it told the reader their outputs were missing when
+      // they were sitting on screen.
+      const checks = build({
+        verbosity: verbosity({
+          leaderRatio: null,
+          leaderMeanLength: null,
+          leaderId: null,
+          meanLengthByVariant: { a: 900, b: 950 },
+        }),
+      });
+
+      const detail = find(checks, "Answer length").detail;
+      expect(detail).not.toContain("Not enough output text");
+      expect(detail).toContain("no single leader");
+    });
+  });
+
+  describe("given a leader exists but no output text was captured", () => {
+    it("still says the text was missing", () => {
+      const checks = build({
+        verbosity: verbosity({
+          leaderRatio: null,
+          leaderMeanLength: null,
+          leaderId: "a",
+          meanLengthByVariant: { a: null, b: null },
+        }),
+      });
+
+      expect(find(checks, "Answer length").detail).toContain(
+        "Not enough output text",
+      );
+    });
+  });
+
+  describe("given the judge shares a family with a variant that is not leading", () => {
+    it("does not tell the reader to discount a lead it does not have", () => {
+      // Self-preference inflates that variant's score wherever it sits. Only
+      // when it is the leader is there a lead to discount.
+      const checks = build({
+        leaderboard: leaderboard({
+          entries: [
+            { variantId: "a", degenerate: false } as any,
+            { variantId: "b", degenerate: false } as any,
+          ],
+        }),
+        judgeIndependence: independence({
+          judgeModel: "openai/gpt-5",
+          judgeFamily: "openai",
+          sharedFamilyVariantIds: ["b"],
+        }),
+      });
+
+      const detail = find(checks, "Judge independence").detail;
+      expect(detail).toContain("warm-premium");
+      expect(detail).not.toContain("discount that variant's lead");
     });
   });
 });

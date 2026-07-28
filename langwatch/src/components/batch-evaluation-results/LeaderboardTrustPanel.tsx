@@ -180,7 +180,13 @@ export const buildTrustChecks = ({
   // promise the run cannot keep.
   checks.push(buildResolutionCheck(sampleAdequacy));
   checks.push(buildVerbosityCheck(verbosity));
-  checks.push(buildJudgeIndependenceCheck(judgeIndependence, variantNames));
+  // The top variant the fit is entitled to rank — degenerates are excluded
+  // from every claim, so one of them is not a leader.
+  const leaderId =
+    leaderboard.entries.find((entry) => !entry.degenerate)?.variantId ?? null;
+  checks.push(
+    buildJudgeIndependenceCheck(judgeIndependence, variantNames, leaderId),
+  );
 
   return checks;
 };
@@ -239,11 +245,17 @@ const buildVerbosityCheck = (verbosity: VerbosityProfile): TrustCheck => {
   const { leaderRatio } = verbosity;
 
   if (leaderRatio === null) {
+    // Two different reasons produce a null ratio, and saying the wrong one is
+    // worse than saying neither: telling a reader their outputs were not
+    // recorded, while those outputs are on screen, sends them to debug an
+    // ingestion problem that does not exist.
     return {
       label: "Answer length",
       tone: "note",
       detail:
-        "Not enough output text was recorded to compare how long each variant's answers were.",
+        verbosity.leaderId === null
+          ? "This run has no single leader, so there is nothing to compare answer lengths against."
+          : "Not enough output text was recorded to compare how long each variant's answers were.",
     };
   }
 
@@ -285,6 +297,7 @@ const buildVerbosityCheck = (verbosity: VerbosityProfile): TrustCheck => {
 const buildJudgeIndependenceCheck = (
   independence: JudgeIndependence,
   variantNames: Record<string, string>,
+  leaderId: string | null,
 ): TrustCheck => {
   const { judgeModel, sharedFamilyVariantIds } = independence;
 
@@ -301,10 +314,20 @@ const buildJudgeIndependenceCheck = (
     const names = joinNames(
       sharedFamilyVariantIds.map((id) => nameOf(id, variantNames)),
     );
+    // "discount that variant's lead" was said whoever the shared variant was,
+    // including one sitting at the bottom of the table with no lead to
+    // discount. Self-preference inflates a score wherever it sits; only when
+    // the affected variant is on top is there a lead in the first place.
+    const affectsLeader =
+      leaderId !== null && sharedFamilyVariantIds.includes(leaderId);
     return {
       label: "Judge independence",
       tone: "warn",
-      detail: `The judge (${judgeModel}) shares a model family with ${names}. Judges tend to rate their own family's output higher, so discount that variant's lead accordingly.`,
+      detail: `The judge (${judgeModel}) shares a model family with ${names}. Judges tend to rate their own family's output higher, so ${
+        affectsLeader
+          ? "discount that variant's lead accordingly."
+          : "that variant's score may be flattered — which matters most if it is close to the one you are about to ship."
+      }`,
     };
   }
 

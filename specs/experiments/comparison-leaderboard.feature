@@ -400,6 +400,19 @@ Feature: Comparison leaderboard (Bradley-Terry ranking on the results page)
     # Self-preference: a judge scores its own family's output higher. This
     # does not invalidate the run, but the reader has to know to discount it.
 
+  Scenario: A judge sharing a family with a variant that is not leading
+    Given the judge shares a model family with a variant near the bottom
+    When I view the trust panel
+    Then I am told that variant's score may be flattered
+    But I am not told to discount a lead it does not have
+
+  Scenario: A run with no leader says so rather than blaming missing text
+    Given the run produced no single leader
+    And every variant recorded its output text
+    When I view the trust panel
+    Then I am told there is no leader to compare answer lengths against
+    And I am not told the output text was missing
+
   Scenario: An independent judge is confirmed rather than left silent
     Given the comparison was judged by a model whose family no candidate uses
     When I open the expanded leaderboard
