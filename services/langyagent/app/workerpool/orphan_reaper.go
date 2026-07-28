@@ -35,8 +35,25 @@ import (
 // reaps first wins, and the loser's cmd.Wait() returns ECHILD, which would
 // report a clean exit as "waitid: no child processes" and discard the real exit
 // status. Reaping orphans is only PID 1's job in the first place, so confining
-// the loop to PID 1 removes the race everywhere else (tests, local dev, any
-// non-init packaging) at zero cost to the behavior it exists for.
+// the loop to PID 1 removes the race everywhere it is pure downside — tests,
+// local dev, any non-init packaging.
+//
+// THE GATE DOES NOT REMOVE THAT RACE ON PID 1, and it cannot. In the pod the
+// manager is init AND the workers' parent, so the same Wait4(-1) that drains
+// adopted orphans is equally eligible for a worker the pool is waiting on. The
+// only way to close it properly is to stop having two owners: route every child
+// exit through one reaper that dispatches statuses to whoever is waiting,
+// instead of pairing each spawn with its own cmd.Wait(). That is a real change
+// to process ownership, not a tweak, and it is deliberately not made here.
+//
+// What the residual race costs, checked rather than assumed: nothing in this
+// service reads a worker's exit status. `ProcessState`, `ExitCode()` and
+// `.Sys()` appear nowhere outside tests; `onWorkerExit` takes cmd only to
+// compare identity. The single consumer of cmd.Wait()'s error is the "worker
+// exited" log line in spawnInner's exit watcher. So when the reaper wins, that
+// line reads "waitid: no child processes" instead of the true status — a
+// degraded diagnostic on a path nothing branches on. Worth fixing one day;
+// not worth a process-ownership redesign inside a retrospective bug-fix.
 //
 // Fire-and-forget: it spawns a goroutine that stops when ctx is cancelled, so
 // it plugs straight into a pkg/lifecycle Worker. The goroutine is launched via

@@ -192,8 +192,7 @@ Feature: Langy worker egress enforcement — monitor first, enforce last
     Given a project allow-list that permits "allowed.example"
     And a worker that CONNECTs to "allowed.example" but negotiates TLS for "attacker.example"
     When the worker fragments its ClientHello across two TLS records
-    Then the adapter reassembles the handshake and reads the real SNI
-    And the connection is refused before the destination is dialed
+    Then the connection is refused before the destination is dialed
     And the refusal is flagged as an SNI mismatch
 
   @unit

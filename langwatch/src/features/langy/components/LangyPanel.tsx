@@ -1208,6 +1208,18 @@ function LangyPanel({
   /** The failure that really does own the column: nothing else can be shown. */
   const blockingHistoryError = isHistoryStale ? null : historyErrorPresentation;
 
+  /**
+   * Is another read already on its way, or is the quiet line the end of the road?
+   *
+   * The stale line's whole premise is "the next tick will clear this" — but
+   * `langy.messages` only re-reads on an interval while the fold says a turn is
+   * in flight (see `langyMessagesPollInterval`), which is the same flag this
+   * reads. A settled conversation therefore has NOTHING coming: the reader is
+   * left looking at a passive notice that nothing will ever refresh. So when
+   * there is no tick to wait for, the line carries the retry instead.
+   */
+  const historyRetryIsComing = isFoldTurnInFlight;
+
   // RESTORING, not starting fresh. The panel remembered which conversation was
   // open, so the moment it mounts it already knows there is one — before the
   // history read lands. Without this the empty state's invitation painted over
@@ -1806,7 +1818,7 @@ function LangyPanel({
   // hands React a new array (and a new last message) on every streamed token,
   // so a plain `useMemo` on `displayMessages` minted a new timeline at token
   // rate and passed it to every `memo(MessageContent)` in the column — the same
-  // defeat-the-memo problem as `onChoiceSelect` above, and the timeline's own
+  // defeat-the-memo problem as `selectChoice` below, and the timeline's own
   // value barely moves within a turn: it changes only when a question or a
   // selection lands.
   const choicesTimelineRef = useRef<{
@@ -2494,11 +2506,16 @@ function LangyPanel({
                       ) : null}
                       {/* A refresh of the open conversation failed while the
                           conversation itself is still on screen. One line, no
-                          card, no action: the poll retries on its own and the
-                          messages below are real — see `isHistoryStale`. */}
+                          card: the messages below are real — see
+                          `isHistoryStale`. While a turn is running the poll
+                          behind it clears this on its own, so the line stays
+                          silent; on a settled conversation nothing is coming,
+                          so it carries the retry (`historyRetryIsComing`). */}
                       {isHistoryStale ? (
-                        <Box
+                        <HStack
                           data-testid="langy-history-stale"
+                          gap={1.5}
+                          align="baseline"
                           paddingX={floating ? "19px" : "14px"}
                           paddingTop={floating ? "19px" : "14px"}
                         >
@@ -2506,7 +2523,26 @@ function LangyPanel({
                             Showing the messages we last loaded. This
                             conversation couldn&apos;t be refreshed.
                           </Text>
-                        </Box>
+                          {historyRetryIsComing ? null : (
+                            // The same quiet retry the inline error uses (see
+                            // LangyError's `inline` render): a plain amber link,
+                            // no box, no alarm.
+                            <chakra.button
+                              type="button"
+                              onClick={() => refetchHistory()}
+                              flexShrink={0}
+                              borderWidth={0}
+                              background="transparent"
+                              color="orange.fg"
+                              cursor="pointer"
+                              textStyle="2xs"
+                              fontWeight="560"
+                              _hover={{ textDecoration: "underline" }}
+                            >
+                              Try again
+                            </chakra.button>
+                          )}
+                        </HStack>
                       ) : null}
                       {showCardGallery ? (
                         <LangyCardGallery />

@@ -614,10 +614,13 @@ function applyFilterTextFromLens(text: string): void {
  *
  * Imperative one-way write — viewStore never subscribes to filterStore.
  */
-function dropKeysetCursorsIfSortChanged(
-  previous: SortConfig,
-  next: SortConfig,
-): void {
+function dropKeysetCursorsIfSortChanged({
+  previous,
+  next,
+}: {
+  previous: SortConfig;
+  next: SortConfig;
+}): void {
   if (
     previous.columnId === next.columnId &&
     previous.direction === next.direction
@@ -690,11 +693,28 @@ export const useViewStore = create<ViewState>((set, get) => ({
   // localStorage (the menu's Save item stays disabled), but the user can
   // duplicate to keep the changes.
   //
-  // Pagination invalidation lives here rather than at the call sites: a new
-  // sort is reachable both by clicking a header AND by switching grouping
-  // (below), and the grouping path is the one that shipped without it.
+  // Pagination invalidation: a new sort is reachable from many actions, and
+  // the cursors it invalidates are dropped on two different axes.
+  //
+  // `setSort` (here) and `setGrouping` (below) install a sort WITHOUT touching
+  // the filter, so they are the only paths that call
+  // `dropKeysetCursorsIfSortChanged` explicitly — the guard lives here rather
+  // than at the UI call sites because a new sort is reachable both by clicking
+  // a header AND by switching grouping, and the grouping path is the one that
+  // shipped without it.
+  //
+  // Every OTHER path that installs a sort — `selectLens`, `createLens` (with
+  // overrides), `revertLens`, `duplicateLens`, `deleteLens` and
+  // `setUserLenses` — is applying a lens, and so also calls
+  // `applyFilterTextFromLens`. That resets `page`/`pageCursors` inside
+  // `setFilterFromLens`, which is why those paths are safe today. That safety
+  // is INCIDENTAL: they are covered on the filter axis, not the sort axis. If
+  // `setFilterFromLens` ever stops resetting pagination, or a lens-applying
+  // path stops pushing the lens's filter text, every one of them starts
+  // carrying stale cursors into a new sort — add the explicit guard there
+  // rather than assuming the side effect still holds.
   setSort: (sort) => {
-    dropKeysetCursorsIfSortChanged(get().sort, sort);
+    dropKeysetCursorsIfSortChanged({ previous: get().sort, next: sort });
     set((s) => ({
       sort,
       draftState: setDraft(s.draftState, s.activeLensId, { sort }),
@@ -721,7 +741,7 @@ export const useViewStore = create<ViewState>((set, get) => ({
     // the user ever touching a header: a grouped RowKind can't order by
     // `time` (nor `spans`/`ttft`/`size`), so those all land on `count`. That
     // is a sort change like any other, and the cursors have to go with it.
-    dropKeysetCursorsIfSortChanged(s.sort, sort);
+    dropKeysetCursorsIfSortChanged({ previous: s.sort, next: sort });
     set({
       grouping: mode,
       columnOrder: columns,

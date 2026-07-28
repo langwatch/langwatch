@@ -143,7 +143,7 @@ which the RFC1918 ranges do NOT cover. **If your service CIDR or a VPC CIDR live
 outside RFC1918, append it to `privateExcept`.** The metadata service over plain
 `:80` (IMDSv2) is denied by default-deny — there is no `:80` egress rule at all.
 
-**FQDN egress (ADR-076).** FQDN bounding ("only github/npm/…") is enforced at L7
+**FQDN egress (ADR-076).** FQDN bounding ("only GitHub/npm/…") is enforced at L7
 by the per-worker egress adapter (worker tools egress via `HTTPS_PROXY`), tuned
 by `egress.*`. For bypass-proof datapath FQDN egress on a Cilium CNI, set
 `egress.cilium.enabled: true` (renders a `CiliumNetworkPolicy` enforcing the same

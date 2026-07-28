@@ -320,6 +320,19 @@ function renderedToolFailure(part: ToolPartLike): boolean {
  * INVARIANT: no parts array may be mutated in place. Every producer builds a new
  * one — the engine's history hydration, the time-travel view, and LangyPlanCard's
  * per-step subsets alike.
+ *
+ * That invariant is only PARTLY enforceable, and it is worth being honest about
+ * which part. `PartsView.parts` is `readonly unknown[]`, so nothing reached
+ * through this seam — these readers, the components they feed — can push into an
+ * array it has already answered for. What the type cannot reach is a producer
+ * still holding the array as a mutable `unknown[]` before it hands it over; if
+ * one ever pushed there, the WeakMap would keep serving the pre-push answer for
+ * as long as the array lives. The risk is accepted rather than designed away
+ * because the producer set is small, closed and listed above, and because the
+ * one that generates the churn — @ai-sdk/react — cannot mutate by construction:
+ * it `structuredClone`s the message on every update, so each token arrives as a
+ * fresh array. A cache keyed on a deep hash instead would re-walk and re-parse
+ * every CLI document per render, which is the exact cost this exists to remove.
  */
 function memoizeOnParts<T>(
   read: (message: PartsView) => T,

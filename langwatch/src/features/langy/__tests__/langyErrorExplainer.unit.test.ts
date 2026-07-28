@@ -486,57 +486,67 @@ describe("isStaleLangyHistoryRead", () => {
     explainLangyError(domain({ code, httpStatus: 404 }));
 
   describe("given the transcript is still on screen", () => {
-    it("demotes a failure that the next poll might clear", () => {
-      expect(
-        isStaleLangyHistoryRead({
-          presentation: readFailedWith("clickhouse_unavailable"),
-          hasContentOnScreen: true,
-        }),
-      ).toBe(true);
+    describe("when the failure is one the next poll might clear", () => {
+      it("demotes it to the quiet line", () => {
+        expect(
+          isStaleLangyHistoryRead({
+            presentation: readFailedWith("clickhouse_unavailable"),
+            hasContentOnScreen: true,
+          }),
+        ).toBe(true);
+      });
     });
 
-    it("refuses to demote a conversation that is gone", () => {
-      // Deleted from another tab: every poll from here on answers the same
-      // thing, and the engine still holds the messages. Demoted, the reader
-      // goes on reading a conversation that no longer exists, with no retry
-      // and no next step, forever.
-      expect(
-        isStaleLangyHistoryRead({
-          presentation: readFailedWith("langy_conversation_not_found"),
-          hasContentOnScreen: true,
-        }),
-      ).toBe(false);
+    describe("when the conversation is gone", () => {
+      it("refuses to demote it", () => {
+        // Deleted from another tab: every poll from here on answers the same
+        // thing, and the engine still holds the messages. Demoted, the reader
+        // goes on reading a conversation that no longer exists, with no retry
+        // and no next step, forever.
+        expect(
+          isStaleLangyHistoryRead({
+            presentation: readFailedWith("langy_conversation_not_found"),
+            hasContentOnScreen: true,
+          }),
+        ).toBe(false);
+      });
     });
 
-    it("refuses to demote a conversation that is someone else's", () => {
-      expect(
-        isStaleLangyHistoryRead({
-          presentation: readFailedWith("langy_conversation_not_owned"),
-          hasContentOnScreen: true,
-        }),
-      ).toBe(false);
+    describe("when the conversation is someone else's", () => {
+      it("refuses to demote it", () => {
+        expect(
+          isStaleLangyHistoryRead({
+            presentation: readFailedWith("langy_conversation_not_owned"),
+            hasContentOnScreen: true,
+          }),
+        ).toBe(false);
+      });
     });
   });
 
   describe("given nothing is on screen to protect", () => {
-    it("lets even a transient failure own the column", () => {
-      expect(
-        isStaleLangyHistoryRead({
-          presentation: readFailedWith("clickhouse_unavailable"),
-          hasContentOnScreen: false,
-        }),
-      ).toBe(false);
+    describe("when even a transient failure arrives", () => {
+      it("lets it own the column", () => {
+        expect(
+          isStaleLangyHistoryRead({
+            presentation: readFailedWith("clickhouse_unavailable"),
+            hasContentOnScreen: false,
+          }),
+        ).toBe(false);
+      });
     });
   });
 
   describe("given the read succeeded", () => {
-    it("has nothing to say", () => {
-      expect(
-        isStaleLangyHistoryRead({
-          presentation: null,
-          hasContentOnScreen: true,
-        }),
-      ).toBe(false);
+    describe("when there is no failure to explain at all", () => {
+      it("has nothing to say", () => {
+        expect(
+          isStaleLangyHistoryRead({
+            presentation: null,
+            hasContentOnScreen: true,
+          }),
+        ).toBe(false);
+      });
     });
   });
 });

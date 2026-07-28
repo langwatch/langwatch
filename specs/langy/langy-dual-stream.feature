@@ -4,10 +4,12 @@ Feature: Langy dual-stream — a raw token fast-path beside the durable event-so
   So that Langy feels fast, while the durable reconciled answer stays the source of truth
 
   # ADR-077. Two streams run per turn:
-  #   - Stream A (durable, the truth): the ADR-044/046 path — the Redis token
-  #     buffer bridged to useChat, the event-sourced agent_responded final answer,
-  #     the langy_conversation_updated broadcast, ephemeral status/progress. It
-  #     survives refresh (the buffered tail is the resume state). UNCHANGED.
+  #   - Stream A (durable, the truth): the event-driven-turns + ADR-046 path —
+  #     the Redis token buffer bridged to useChat (the event-driven-turns design
+  #     has no live ADR number; see the note atop ADR-077), the event-sourced
+  #     agent_responded final answer, the langy_conversation_updated broadcast,
+  #     ephemeral status/progress. It survives refresh (the buffered tail is the
+  #     resume state). UNCHANGED.
   #   - Stream B (speed, ephemeral): raw opencode text-delta tokens, minimally
   #     parsed, streamed straight to the browser over a per-turn Redis pub/sub
   #     channel. Not persisted; dies on disconnect.
@@ -228,23 +230,29 @@ Feature: Langy dual-stream — a raw token fast-path beside the durable event-so
   # HMAC key: publicly computable, and rejected by the relay as no-run-token. The
   # turn then ran to completion, emitted nothing, and never reached a terminal
   # state — a silent hang with no error surfaced to the user.
+  #
+  # The three scenarios below are one user-visible contract reached three ways:
+  # the credential store failing, no credentials ever recorded, and a read that
+  # comes back blank. None of that is distinguishable from the user's seat, so
+  # the steps state only the shared precondition and the unit tests pin which
+  # cause produced it.
   @unit
   Scenario: A turn that cannot be signed is refused instead of hanging
-    Given the conversation's credentials cannot be read because the store is unavailable
+    Given Langy cannot access the conversation credentials
     When the user sends a message
     Then the turn fails straight away with an agent-unavailable error
     And no answer ever starts streaming
 
   @unit
   Scenario: A conversation whose credentials are missing cannot start a turn
-    Given a conversation with no credentials recorded for its turns
+    Given Langy cannot access the conversation credentials
     When the user sends a message
     Then the turn fails straight away with an agent-unavailable error
     And no answer ever starts streaming
 
   @unit
   Scenario: A conversation whose credentials read back blank cannot start a turn
-    Given the conversation's credentials read back blank
+    Given Langy cannot access the conversation credentials
     When the user sends a message
     Then the turn fails straight away with an agent-unavailable error
     And the user is never left watching a turn that produces nothing

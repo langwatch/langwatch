@@ -246,7 +246,11 @@ func (a *egressAdapter) handleConnect(w http.ResponseWriter, r *http.Request) {
 		clientConn = replay
 		switch {
 		case sni != "" && sni != fqdn:
-			if a.cfg.policy.decide(sni).blocked() {
+			// Decided once, then both branches act on and RECORD that same
+			// value — recomputing it for the telemetry line would let the
+			// flagged decision drift from the one the branch acted on.
+			sniDecision := a.cfg.policy.decide(sni)
+			if sniDecision.blocked() {
 				a.record(sni, port, egressDeniedSNIMismatch,
 					fmt.Sprintf("sni %q not allowed (authority was %q)", sni, fqdn), 0)
 				return
@@ -257,7 +261,7 @@ func (a *egressAdapter) handleConnect(w http.ResponseWriter, r *http.Request) {
 			// says every decision flags. Without this, an operator reviewing
 			// egress telemetry after an incident sees a normal flow to the
 			// authority and no trace of the host actually spoken to.
-			a.record(sni, port, a.cfg.policy.decide(sni),
+			a.record(sni, port, sniDecision,
 				fmt.Sprintf("sni %q differs from authority %q but is allowed", sni, fqdn), 0)
 		case sni == "" && sniUnreadable(sawHandshake, perr) &&
 			!isIPLiteral(host) && a.cfg.policy.enforcing():

@@ -94,8 +94,9 @@ describe("langy activity readers", () => {
       });
 
       it("keeps it in the completed receipt, where the reader can see it ran", () => {
-        const [group] = toActivityGroups({ parts });
-        expect(group?.done).toBe(true);
+        const groups = toActivityGroups({ parts });
+        expect(groups).toHaveLength(1);
+        expect(groups[0]?.done).toBe(true);
       });
     });
   });
@@ -158,9 +159,11 @@ describe("langy activity readers", () => {
       }),
     ];
 
-    it("does not promote the console line to the call's verdict", () => {
-      expect(toFailedToolCalls({ parts })).toHaveLength(0);
-      expect(toActivityGroups({ parts })).toHaveLength(1);
+    describe("when the readers classify the call", () => {
+      it("does not promote the console line to the call's verdict", () => {
+        expect(toFailedToolCalls({ parts })).toHaveLength(0);
+        expect(toActivityGroups({ parts })).toHaveLength(1);
+      });
     });
   });
 

@@ -562,7 +562,7 @@ func TestEgress_UnreadableClientHelloIsAllowedUnderMonitorOnly(t *testing.T) {
 	}
 
 	waitFor(t, func() bool { return h.dialer.dialedAuthority("anywhere.example:443") },
-		"monitor-only must still dial the destination")
+		func() string { return "monitor-only must still dial the destination" })
 	if h.monitor.has(egressDeniedSNIUnreadable) {
 		t.Fatalf("monitor-only must not deny, got %v", h.monitor.decisions())
 	}
@@ -573,10 +573,15 @@ func TestEgress_UnreadableClientHelloIsAllowedUnderMonitorOnly(t *testing.T) {
 func waitForDecision(t *testing.T, h *harness, d egressDecision) {
 	t.Helper()
 	waitFor(t, func() bool { return h.monitor.has(d) },
-		fmt.Sprintf("expected decision %v, got %v", d, h.monitor.decisions()))
+		// Built at FAILURE time, not call time: the decisions slice is empty
+		// when polling starts, so an eagerly-formatted message would report
+		// "got []" on every timeout no matter what the adapter recorded.
+		func() string {
+			return fmt.Sprintf("expected decision %v, got %v", d, h.monitor.decisions())
+		})
 }
 
-func waitFor(t *testing.T, cond func() bool, msg string) {
+func waitFor(t *testing.T, cond func() bool, msg func() string) {
 	t.Helper()
 	deadline := time.Now().Add(3 * time.Second)
 	for time.Now().Before(deadline) {
@@ -585,7 +590,7 @@ func waitFor(t *testing.T, cond func() bool, msg string) {
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
-	t.Fatal(msg)
+	t.Fatal(msg())
 }
 
 // ---- Rung 1b: per-destination throttle, keyed per host ----

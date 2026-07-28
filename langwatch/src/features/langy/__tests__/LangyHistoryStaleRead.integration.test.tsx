@@ -18,7 +18,15 @@
  * The panel, the store and the error branch are real.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const PROJECT_ID = "project-demo";
@@ -43,6 +51,8 @@ const historyState = {
   errorCode: null as string | null,
 };
 const historyListeners = new Set<() => void>();
+/** Every re-read of the conversation, so the stale line's retry can be seen. */
+const historyRefetch = vi.fn(() => Promise.resolve());
 const setHistory = (next: Partial<typeof historyState>) =>
   act(() => {
     Object.assign(historyState, next);
@@ -207,7 +217,7 @@ vi.mock("~/utils/api", async () => {
       isSuccess: enabled && !historyState.errored && !!data,
       isError: enabled && historyState.errored,
       error: historyState.errored ? historyReadError() : null,
-      refetch: () => Promise.resolve(),
+      refetch: historyRefetch,
     };
   };
 
@@ -324,6 +334,7 @@ describe("a failed read of an open conversation's history", () => {
     historyState.hasMessages = true;
     historyState.turnInFlight = false;
     historyState.errorCode = null;
+    historyRefetch.mockClear();
     engine.messages = [];
     engine.version = 0;
     useLangyStore.setState({ scopeAnnounced: false });
@@ -379,6 +390,54 @@ describe("a failed read of an open conversation's history", () => {
 
         await waitFor(() => expect(staleNote()).toBeNull());
         expect(document.body.textContent).toContain(QUESTION);
+      });
+    });
+  });
+
+  describe("given the conversation is settled, so nothing will re-read it", () => {
+    /**
+     * The quiet line promises the reader that the messages below are the last
+     * good ones and leaves it at that, which only holds while something is
+     * coming back to clear it. The history read polls ONLY while the fold says
+     * a turn is in flight, so on a settled conversation the notice is the end
+     * of the road: no tick, no card, no action, nothing the reader can do.
+     */
+    describe("when a read of it fails", () => {
+      it("offers a retry that reads the conversation again", async () => {
+        renderOpenPanel();
+        await waitFor(() =>
+          expect(document.body.textContent).toContain(QUESTION),
+        );
+
+        setHistory({ errored: true });
+        await waitFor(() => expect(staleNote()).toBeTruthy());
+
+        historyRefetch.mockClear();
+        fireEvent.click(
+          within(staleNote()!).getByRole("button", { name: /try again/i }),
+        );
+
+        expect(historyRefetch).toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given a turn is running, so the poll behind it will clear the notice", () => {
+    describe("when the read fails mid-turn", () => {
+      it("stays a quiet line, with nothing for the reader to press", async () => {
+        historyState.turnInFlight = true;
+
+        renderOpenPanel();
+        await waitFor(() =>
+          expect(document.body.textContent).toContain(QUESTION),
+        );
+
+        setHistory({ errored: true });
+        await waitFor(() => expect(staleNote()).toBeTruthy());
+
+        expect(
+          within(staleNote()!).queryByRole("button", { name: /try again/i }),
+        ).toBeNull();
       });
     });
   });

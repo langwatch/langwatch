@@ -55,9 +55,8 @@ function writeFragment(fragmentBody: string): void {
  * states are the same state iff their canonical bodies match — by
  * construction, rather than by two encodings kept in step by hand.
  */
-function canonicalBody(state: BarState, lens: LensConfig): string {
+function canonicalBody(state: BarState): string {
   const overrides = computeOverrides({
-    activeLens: lens,
     query: state.query,
     timeRange: state.timeRange,
     defaultPresetId: DEFAULT_PRESET_ID,
@@ -215,8 +214,10 @@ export function useURLSync(): void {
       persistedLensId: getPersistedActiveLensId(),
     });
     const targetTimeRange = resolveTimeRange(target.overrides);
+    // Needed for the query fallback below — an absent `q` denotes the target
+    // lens's own filter text, so the guard can only run once that lens has
+    // actually hydrated.
     const targetLens = live.allLenses.find((l) => l.id === target.lensId);
-    const activeLens = live.allLenses.find((l) => l.id === live.activeLensId);
 
     // `popstate` fires for every history entry this page owns, and the trace
     // drawer pushes one of its own — its state lives in the query string,
@@ -236,29 +237,23 @@ export function useURLSync(): void {
     // No need to also check that a cursor survived for the current page —
     // `useTraceListQuery` already snaps back to page 1 whenever
     // `pageCursors[page]` is missing, which is the same guard one layer down.
-    if (!isFirstApply && targetLens && activeLens && targetTimeRange) {
+    if (!isFirstApply && targetLens && targetTimeRange) {
       const draft = live.draftState.get(target.lensId);
       // An absent `q` denotes the target lens's own filter — the value
       // `selectLens` installs below — not "keep the current query".
       const targetQuery =
         target.overrides.query ?? draft?.filter ?? targetLens.filterText;
       const alreadyInSync =
-        canonicalBody(
-          {
-            lensId: target.lensId,
-            query: targetQuery,
-            timeRange: targetTimeRange,
-          },
-          targetLens,
-        ) ===
-        canonicalBody(
-          {
-            lensId: live.activeLensId,
-            query: live.queryText,
-            timeRange: live.timeRange,
-          },
-          activeLens,
-        );
+        canonicalBody({
+          lensId: target.lensId,
+          query: targetQuery,
+          timeRange: targetTimeRange,
+        }) ===
+        canonicalBody({
+          lensId: live.activeLensId,
+          query: live.queryText,
+          timeRange: live.timeRange,
+        });
       if (alreadyInSync) return;
     }
 
@@ -296,17 +291,17 @@ export function useURLSync(): void {
     if (!hasAppliedFragment.current) return;
 
     const handle = window.setTimeout(() => {
-      const activeLens = allLenses.find((l) => l.id === activeLensId);
-      if (!activeLens) return;
+      // Never name a lens the list doesn't hold. The fragment is the shareable
+      // address of the view, and an id nothing resolves to just makes the next
+      // read fall back to the default — better to leave the previous, still
+      // valid, body in place until the lens hydrates.
+      if (!allLenses.some((l) => l.id === activeLensId)) return;
 
       // Same encoder the popstate guard compares against, so this entry now
       // reads back as "nothing left to apply" — and only this entry: older
       // ones keep whatever body they were written with.
       writeFragment(
-        canonicalBody(
-          { lensId: activeLensId, query: queryText, timeRange },
-          activeLens,
-        ),
+        canonicalBody({ lensId: activeLensId, query: queryText, timeRange }),
       );
     }, 150);
 

@@ -278,6 +278,9 @@ describe("Langy tool failure card", () => {
       ],
     } as UIMessage;
 
+    // The classification itself belongs to the readers, and is pinned there
+    // (langyActivityReaders.unit.test.ts, "given a command that SUCCEEDED but
+    // printed a failure phrase"). What this file owns is what the reader SEES.
     it("renders no error card for it", () => {
       render(
         <ChakraProvider value={defaultSystem}>
@@ -286,11 +289,6 @@ describe("Langy tool failure card", () => {
       );
 
       expect(screen.queryByRole("alert")).toBeNull();
-    });
-
-    it("keeps it in the completed receipt", () => {
-      expect(toFailedToolCalls(grepForThePhrase)).toHaveLength(0);
-      expect(toActivityGroups(grepForThePhrase)).toHaveLength(1);
     });
   });
 

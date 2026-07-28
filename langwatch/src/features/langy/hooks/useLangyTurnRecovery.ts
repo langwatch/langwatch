@@ -92,6 +92,10 @@ export function useLangyTurnRecovery({
    * Identity of THIS failure. A new value means a new failure arrived (useChat
    * mints a fresh Error per failure, so its reference is the natural identity);
    * the same value across renders must not re-arm the timer.
+   *
+   * NOT the whole identity on its own — see `handledFailureRef`. The same Error
+   * object can be RECLASSIFIED, so what the hook has already handled is the
+   * pair (kind, id).
    */
   errorId: unknown;
   /** Did the failed turn already run a project-mutating tool? */
@@ -104,7 +108,25 @@ export function useLangyTurnRecovery({
   // between one user message and the next, so a bounded policy really is bounded
   // per question — `reset()` starts a new one.
   const attemptsUsedRef = useRef(0);
-  const handledErrorRef = useRef<unknown>(null);
+  /**
+   * The failure this hook has already acted on, as the PAIR (kind, id) — never
+   * the id alone.
+   *
+   * A failure's kind is not fixed at the moment its Error is minted. The panel
+   * derives the kind through `resolveLiveTurnError`, whose last road reads the
+   * turn's classification off the DURABLE record — which arrives on the history
+   * poll, seconds after the stream died. So one and the same Error object is
+   * first explained as `unknown` and then, when the poll lands, as
+   * `langy_worker_restarting`: the kind moves under a stable identity.
+   *
+   * Keyed on the id alone, the short-circuit below swallowed that: the second
+   * pass returned early, so a failure the policy would have auto-recovered was
+   * never armed at all (and, the other way round, a timer armed for the first
+   * kind would have fired on the first kind's budget). Two fields rather than a
+   * `${kind}:${id}` composite on purpose — stringifying the id would collapse
+   * two distinct Errors carrying the same message into one identity.
+   */
+  const handledFailureRef = useRef<{ kind: string; id: unknown } | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onRetryRef = useRef(onRetry);
   onRetryRef.current = onRetry;
@@ -133,7 +155,7 @@ export function useLangyTurnRecovery({
   const reset = useCallback(() => {
     clearTimer();
     attemptsUsedRef.current = 0;
-    handledErrorRef.current = null;
+    handledFailureRef.current = null;
     setPending(null);
   }, [clearTimer]);
 
@@ -143,14 +165,17 @@ export function useLangyTurnRecovery({
     // the user sends something new, so a policy of "2 attempts" stays 2.
     if (!errorKind || !enabled) {
       clearTimer();
-      handledErrorRef.current = null;
+      handledFailureRef.current = null;
       setPending(null);
       return;
     }
 
-    // Same failure we already armed a timer for — don't re-arm on every render.
-    if (handledErrorRef.current === errorId) return;
-    handledErrorRef.current = errorId;
+    // Same failure, same classification: we already decided what to do with it,
+    // so don't re-arm on every render. A CHANGED kind is a different decision
+    // even on the same Error object — see `handledFailureRef`.
+    const handled = handledFailureRef.current;
+    if (handled && handled.id === errorId && handled.kind === errorKind) return;
+    handledFailureRef.current = { kind: errorKind, id: errorId };
 
     const attemptsUsed = attemptsUsedRef.current;
     if (
@@ -182,11 +207,12 @@ export function useLangyTurnRecovery({
     }, policy.delayMs(attempt));
 
     // NO CLEANUP, on purpose. An armed timer belongs to the FAILURE (identified
-    // by `errorId`), not to this effect instance, and every way a retry can
-    // legitimately be cancelled already clears it by hand: the failure clearing
-    // or the hook being disabled (the first branch), a NEW failure arriving or
-    // one that turns out to be terminal (both above), `reset()` when the
-    // conversation changes, and the unmount effect below.
+    // by kind + `errorId`), not to this effect instance, and every way a retry
+    // can legitimately be cancelled already clears it by hand: the failure
+    // clearing or the hook being disabled (the first branch), a NEW failure
+    // arriving — including the same Error reclassified — or one that turns out
+    // to be terminal (both above), `reset()` when the conversation changes, and
+    // the unmount effect below.
     //
     // Returning `clearTimer` here instead is what wedged the panel: React runs
     // the previous cleanup on ANY dep change, so a re-render killed the pending

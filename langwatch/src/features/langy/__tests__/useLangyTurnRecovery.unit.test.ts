@@ -160,6 +160,69 @@ describe("useLangyTurnRecovery", () => {
     });
   });
 
+  describe("given the durable record reclassifies the failure it already saw", () => {
+    // A failure's kind is not settled when its Error is minted. The panel
+    // resolves the kind through `resolveLiveTurnError`, whose last road reads
+    // the turn's real classification off the DURABLE record — which arrives on
+    // the history poll, seconds after the stream died with nothing typed on it.
+    // So the SAME Error object is explained as `unknown` first and as the real
+    // kind second, and a guard that keys on the error's identity alone treats
+    // the second, correct classification as old news.
+    describe("when a terminal classification is replaced by an auto-recoverable one", () => {
+      it("arms the retry for the kind that actually arrived", () => {
+        const errorId = new Error("stream closed");
+        const { result, rerender, onRetry } = setup({
+          errorKind: "unknown",
+          errorId,
+        });
+        expect(result.current.isRecovering).toBe(false);
+
+        // The poll lands: same Error, the server's own classification.
+        rerender({
+          errorKind: RESTARTING,
+          errorId,
+          sideEffectsObserved: false,
+        });
+
+        expect(result.current.isRecovering).toBe(true);
+        act(() => {
+          vi.advanceTimersByTime(langyRecoveryPolicy(RESTARTING).delayMs(1));
+        });
+        expect(onRetry).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe("when the reclassification changes which policy applies", () => {
+      it("retries on the new kind's budget, not the one already armed", () => {
+        const errorId = new Error("stream closed");
+        const { result, rerender, onRetry } = setup({ errorId });
+        expect(result.current.isRecovering).toBe(true);
+
+        rerender({
+          errorKind: "langy_turn_timeout",
+          errorId,
+          sideEffectsObserved: false,
+        });
+
+        // The restart policy's first wait is shorter than the timeout policy's.
+        // A timer left over from the restart classification would fire here.
+        act(() => {
+          vi.advanceTimersByTime(langyRecoveryPolicy(RESTARTING).delayMs(1));
+        });
+        expect(onRetry).not.toHaveBeenCalled();
+        expect(result.current.message).toContain("Taking another run");
+
+        act(() => {
+          vi.advanceTimersByTime(
+            langyRecoveryPolicy("langy_turn_timeout").delayMs(1) -
+              langyRecoveryPolicy(RESTARTING).delayMs(1),
+          );
+        });
+        expect(onRetry).toHaveBeenCalledTimes(1);
+      });
+    });
+  });
+
   describe("when the failed turn already changed something", () => {
     it("refuses to auto-retry — the replay is the user's call", () => {
       const { result, onRetry } = setup({ sideEffectsObserved: true });

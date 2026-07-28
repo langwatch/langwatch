@@ -23,9 +23,15 @@ func (m *Manager) EgressGuard() egress.Guard { return m.egressGuard }
 // startEgressAdapter builds the ADR-076 ENFORCING egress guard from config: a
 // per-worker outbound forward proxy that require-TLS / throttles / applies the
 // operator floor ∪ per-project allow-list / SNI-cross-checks every CONNECT,
-// monitor-first. The stock posture is monitor-only (no floor enforcement and no
-// per-project customer list) until an operator flips EgressEnforceFloor or a
-// customer sets an allow-list — see the Config defaults and ADR-076.
+// monitor-first.
+//
+// "Monitor-only" is specifically about DESTINATION enforcement: with no floor
+// (EgressEnforceFloor off) and no per-project customer list, no host is denied
+// for being the wrong host. It does not mean nothing is refused. Rung 1 ships
+// ON by default — EgressRequireTLS is true in the Config defaults, so a
+// cleartext forward or a non-:443 CONNECT is refused out of the box, and the
+// throttle slows a burst regardless of policy. See the Config defaults and
+// ADR-076's rung table.
 func startEgressAdapter(cfg langyagent.Config, logger *zap.Logger) *Manager {
 	return &Manager{
 		egressGuard: egress.NewEnforcingGuard(egress.EnforcingConfig{

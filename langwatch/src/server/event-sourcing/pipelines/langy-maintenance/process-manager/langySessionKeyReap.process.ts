@@ -8,8 +8,7 @@ import type {
 
 const logger = createLogger("langwatch:langy:session-key-reap");
 
-export const LANGY_SESSION_KEY_REAP_PROCESS_NAME =
-  "langySessionKeyReap" as const;
+export const LANGY_SESSION_KEY_REAP_PROCESS_NAME = "langySessionKeyReap";
 
 /**
  * Hourly. The keys carry their own `expiresAt` and `ApiKeyService.verify`
