@@ -12,19 +12,20 @@
  *     collector; older ones are dispatched as recordSpan pipeline commands,
  *     so the public boundary's age guard stays intact.
  */
-import {
-  DAY_MS,
-  dateKey,
-  mulberry32,
-  utcDayStart,
-  type TraceFixture,
-} from "./seed-primitives";
+
+import { DEMO_PLATFORM_IDS } from "../../prisma/demo-platform-ids";
 import {
   EXPERIMENT_ROWS,
   ORGANIC_TRAFFIC,
   SCENARIO_FIXTURES,
 } from "./platform-fixtures";
-import { DEMO_PLATFORM_IDS } from "../../prisma/demo-platform-ids";
+import {
+  DAY_MS,
+  dateKey,
+  mulberry32,
+  type TraceFixture,
+  utcDayStart,
+} from "./seed-primitives";
 
 export interface MassScenarioRun {
   runId: string;

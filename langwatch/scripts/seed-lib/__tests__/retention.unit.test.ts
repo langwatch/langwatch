@@ -1,10 +1,10 @@
-import { describe, expect, it } from "vitest";
 import type { PrismaClient } from "@prisma/client";
+import { describe, expect, it } from "vitest";
 import {
+  applySeedRetention,
   RETENTION_CATEGORIES,
   RETENTION_WEEK_DAYS,
   SEEDED_RETENTION_DAYS,
-  applySeedRetention,
   seededRetentionDays,
 } from "../retention";
 

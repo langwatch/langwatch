@@ -58,9 +58,9 @@ describe("buildMassMetrics", () => {
       for (const point of tokens.sum.dataPoints) {
         expect(point.asInt).toMatch(/^\d+$/);
         expect(point.startTimeUnixNano).toMatch(/^\d+$/);
-        expect(Number(BigInt(point.timeUnixNano) / 1_000_000n)).toBeLessThanOrEqual(
-          metrics.batches[0]!.dayStart + DAY_MS,
-        );
+        expect(
+          Number(BigInt(point.timeUnixNano) / 1_000_000n),
+        ).toBeLessThanOrEqual(metrics.batches[0]!.dayStart + DAY_MS);
       }
 
       const requests = first["app.requests"]!;
