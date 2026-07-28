@@ -61,6 +61,7 @@ ENVIRONMENT
     LANGWATCH_GO_WATCH=1         Hot-reload the Go services via air (else go run).
     LANGWATCH_SKIP_NLP=1         DEPRECATED (this run only) — use haven up -nlp.
     LANGWATCH_SKIP_AIGATEWAY=1   DEPRECATED (this run only) — use haven up -gateway.
+    LANGWATCH_SKIP_LANGYAGENT=1  DEPRECATED (this run only) — use haven up -langy.
     HAVEN_BASELINE=1             Mark this stack as the shared default others fall
                                  back to for services they don't run themselves.
     HAVEN_TYPECHECK_SLOTS=N      Cap concurrent "haven typecheck" runs (default:
@@ -76,7 +77,7 @@ ENVIRONMENT
                                  been up for this long (default 14 days; 0 disables).
                                  Only databases haven itself created are considered,
                                  and lw_main is always kept.
-    HAVEN_PRUNE_STALE_DAYS=5     Idle age at which "haven prune" pre-ticks a
+    HAVEN_PRUNE_STALE_DAYS=5     Idle age at which "haven clean" pre-ticks a
                                  worktree for deletion (--stale-days N overrides).
     HAVEN_WORKTREE_DIR=<dir>     Where haven pr creates PR worktrees (default: the
                                  sibling worktrees/ dir next to the checkout).
