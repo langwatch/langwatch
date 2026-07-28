@@ -347,6 +347,7 @@ describe("CodingAgentSessionClickHouseRepository point-read tiebreak", () => {
 
     describe("given they share a watermark but folded different amounts of span and log work", () => {
       describe("when the session is point-read", () => {
+        /** @scenario the most complete version of a session is the one that is read */
         it("returns the version that absorbed more contributions in total, not the one leading on any single counter", async () => {
           const result = await read(
             tiedVersions(
@@ -362,6 +363,7 @@ describe("CodingAgentSessionClickHouseRepository point-read tiebreak", () => {
 
     describe("given a metric-only session, so every span and log counter stays zero", () => {
       describe("when the session is point-read", () => {
+        /** @scenario the most complete version of a session is the one that is read */
         it("returns the version holding more converged metric units", async () => {
           const result = await read(
             tiedVersions(
@@ -383,6 +385,7 @@ describe("CodingAgentSessionClickHouseRepository point-read tiebreak", () => {
 
     describe("given they folded equal work but absorbed different numbers of deliveries", () => {
       describe("when the session is point-read", () => {
+        /** @scenario the most complete version of a session is the one that is read */
         it("returns the version with more applied events", async () => {
           const result = await read(
             tiedVersions(
@@ -398,6 +401,7 @@ describe("CodingAgentSessionClickHouseRepository point-read tiebreak", () => {
 
     describe("given every progress signal is identical and only the start time differs", () => {
       describe("when the session is point-read", () => {
+        /** @scenario the most complete version of a session is the one that is read */
         it("resolves the fully-tied case the same way whichever order the rows arrive in", async () => {
           // StartedAt is the last-resort key that makes the ordering TOTAL, and
           // nothing more. WHICH of the two it lands on carries no meaning:
@@ -608,6 +612,7 @@ describe("CodingAgentSessionClickHouseRepository list-read dedup scope", () => {
 
   describe("given a session whose true latest version backdated StartedAt out of the window", () => {
     describe("when the window is listed", () => {
+      /** @scenario a session is never listed under a start time it has moved off */
       it("omits the session entirely rather than rendering its stale in-window version", async () => {
         // v1 landed inside the window; v2 — the true latest — moved StartedAt
         // a day earlier, so the session no longer starts in this window. A
@@ -645,6 +650,7 @@ describe("CodingAgentSessionClickHouseRepository list-read dedup scope", () => {
   describe("given a session whose true latest version is inside the window", () => {
     describe("given an older version of it sits outside the window", () => {
       describe("when the window is listed", () => {
+        /** @scenario a session whose earliest signal arrives late is listed once, up to date */
         it("returns the latest version's totals, not the out-of-window one's", async () => {
           // The mirror case: a read-back miss re-ran init() and re-stamped
           // StartedAt FORWARD, into the window. The unwindowed dedup must still

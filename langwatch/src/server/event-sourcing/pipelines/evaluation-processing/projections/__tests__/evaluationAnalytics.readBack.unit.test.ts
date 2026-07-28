@@ -183,6 +183,7 @@ describe("EvaluationAnalyticsStore read-back version gate", () => {
   }
 
   describe("given a row stamped with the current projection version", () => {
+    /** @scenario a stored state written under the fold's current shape is read straight back */
     it("reads the state and the durable watermark back", async () => {
       const { store } = storeOver(project(committedState()));
 
@@ -208,6 +209,7 @@ describe("EvaluationAnalyticsStore read-back version gate", () => {
       completedAtMs: null,
     });
 
+    /** @scenario a stored state written under an older shape is rebuilt rather than trusted */
     it("reports a store miss so the fold refolds instead of trusting it", async () => {
       const { store } = storeOver(staleRow());
 

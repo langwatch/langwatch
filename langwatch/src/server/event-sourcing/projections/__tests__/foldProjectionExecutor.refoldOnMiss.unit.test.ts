@@ -58,6 +58,7 @@ describe("FoldProjectionExecutor refoldOnStoreMiss", () => {
   });
 
   describe("given the store misses and the option is enabled", () => {
+    /** @scenario a stored state written under an older shape is rebuilt rather than trusted */
     it("re-folds from the loaded history instead of only the delivered event", async () => {
       const e1 = makeEvent("e1", 1000);
       const e2 = makeEvent("e2", 2000);
@@ -183,6 +184,8 @@ describe("FoldProjectionExecutor refoldOnStoreMiss", () => {
   });
 
   describe("given the store has state", () => {
+    /** @scenario a cold cache recovers state from the store, not the event log */
+    /** @scenario the event log is read only for a deliberate rebuild */
     it("never consults the event log", async () => {
       const e2 = makeEvent("e2", 2000);
       const store = createMockFoldProjectionStore<CountState>();
@@ -215,6 +218,7 @@ describe("FoldProjectionExecutor refoldOnStoreMiss", () => {
     // reach event_log, whatever the executor's gate is later rewritten to. An
     // unbounded history scan is the expensive path (ADR-066), so it stays
     // opt-in — a fold earns continuity by persisting read-back state instead.
+    /** @scenario a brand-new aggregate starts from an empty state */
     it("starts from init+apply on a store miss without reading the event log", async () => {
       const e2 = makeEvent("e2", 2000);
       const store = createMockFoldProjectionStore<CountState>();

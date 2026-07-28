@@ -162,6 +162,7 @@ describe("FoldProjectionExecutor out-of-order re-fold", () => {
 
     describe("when the projection has opted out of re-folding", () => {
       /** @scenario "An order-insensitive fold never re-folds" */
+      /** @scenario an out-of-order event is folded in place, not replayed */
       it("never reads the event log and applies the batch on top in occurredAt order", async () => {
         const { fold, eventLoader } = makeFold({
           storedState: { count: 99, LastEventOccurredAt: CHECKPOINT_MS },
@@ -183,6 +184,7 @@ describe("FoldProjectionExecutor out-of-order re-fold", () => {
       });
 
       /** @scenario "A single out-of-order event honours the same opt-out" */
+      /** @scenario an out-of-order event is folded in place, not replayed */
       it("applies a lone out-of-order event on top without reading the event log", async () => {
         const { fold, eventLoader } = makeFold({
           storedState: { count: 99, LastEventOccurredAt: CHECKPOINT_MS },

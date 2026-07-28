@@ -1,3 +1,4 @@
+@unit
 Feature: Fold projections read back their own state
   A fold projection keeps its aggregate's state in a durable store fronted by a
   cache. When the cache is cold it recovers the state from the store — never by

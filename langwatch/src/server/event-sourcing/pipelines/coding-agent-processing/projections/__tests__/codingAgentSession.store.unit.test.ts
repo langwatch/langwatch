@@ -257,6 +257,7 @@ describe("CodingAgentSessionStore read-back gate", () => {
 
   describe("given a row stamped with the current projection version", () => {
     describe("when the fold reads it back", () => {
+      /** @scenario a stored state written under the fold's current shape is read straight back */
       it("returns the decoded state and the durable watermark", async () => {
         const repo = new FakeRepo();
         repo.withApplied = {
@@ -324,6 +325,37 @@ describe("CodingAgentSessionStore read-back gate", () => {
         const store = new CodingAgentSessionStore(repo);
 
         expect(await store.get("session-1", context())).toBeNull();
+      });
+    });
+  });
+
+  describe("given an aggregate the fold rebuilt after its older-shape row was refused", () => {
+    describe("when a further event for it arrives", () => {
+      /** @scenario rebuilding an aggregate once retires it from rebuilding again */
+      it("reads the rebuilt state straight back rather than missing a second time", async () => {
+        const repo = new FakeRepo();
+        const store = new CodingAgentSessionStore(repo);
+
+        // The re-fold's commit. Whatever version the refused row wore, the
+        // rewrite carries the current one.
+        await store.store(
+          committedState(),
+          context({ appliedEventIds: ["e1", "e2"] }),
+        );
+        const written = repo.upsertCalls[0]!;
+        repo.withApplied = {
+          row: written.row,
+          appliedEventIds: [...(written.appliedEventIds ?? [])],
+        };
+
+        const { state, appliedEventIds } = await store.getWithApplied(
+          "session-1",
+          context(),
+        );
+
+        expect(state?.subAgentIds).toEqual(["sub-a", "sub-b"]);
+        expect(state?.previousCallContextTokens).toBe(12_000);
+        expect(appliedEventIds).toEqual(["e1", "e2"]);
       });
     });
   });

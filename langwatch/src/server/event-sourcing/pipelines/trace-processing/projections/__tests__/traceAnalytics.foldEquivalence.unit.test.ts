@@ -414,6 +414,7 @@ describe("traceAnalytics fold-equivalence across the read-back boundary", () => 
         const before = events.slice(0, splitAt);
         const after = events.slice(splitAt);
 
+        /** @scenario a fold whose stored row is a slimmed analytics summary still recovers its working state */
         it("reaches the same row as the fold that never lost its state", () => {
           const committed = foldAll(before, projection.init());
 

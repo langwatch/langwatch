@@ -150,6 +150,7 @@ describe("RedisCachedFoldStore", () => {
 
   describe("given no cached entry", () => {
     describe("when the fold reads state", () => {
+      /** @scenario a cold cache recovers state from the store, not the event log */
       it("reads the durable store, which confirmation proves authoritative", async () => {
         const redis = createRedis();
         const { store, inner } = createStore(redis);

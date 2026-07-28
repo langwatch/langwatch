@@ -185,6 +185,7 @@ describe("subscriber enqueue-time contract", () => {
 
     describe("when the filter raises", () => {
       /** @scenario a subscriber that cannot decide relevance is reported, not read as declining */
+      /** @scenario work lost before it was queued is visible as lost */
       it("reports the failure and counts it as failed, so a raise is never mistaken for a decline", async () => {
         const beforeFiltered = await enqueueOutcomeCount("filtered");
         const beforeStaged = await enqueueOutcomeCount("staged");

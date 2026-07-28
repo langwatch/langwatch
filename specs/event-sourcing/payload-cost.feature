@@ -97,6 +97,23 @@ Feature: Payload cost governs the scheduling plane
     Then publishing reports the failure
     And the event is not counted among the work queued
 
+  @unit
+  Scenario: work lost before it was queued is visible as lost
+    Given a subscriber that cannot decide relevance
+    When the event is published
+    Then an operator-visible count records the work as lost
+    And the counted outcomes account for every event routed to that subscriber
+
+  # --- Discarding work is reversible without a release ---
+
+  @unit
+  Scenario: a subscriber can be stopped for one tenant without a deploy
+    Given a subscriber that discards the events it considers irrelevant
+    And an operator has stopped that subscriber for one tenant
+    When an event for that tenant is published
+    Then the subscriber neither judges the event nor receives work for it
+    And no event is recorded as discarded on that tenant's behalf
+
   # --- Waiting work costs a pointer, not a payload ---
 
   @unit

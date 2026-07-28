@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
+import type { TraceAnalyticsRepository } from "~/server/app-layer/traces/repositories/trace-analytics.repository";
 import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
+import { FoldProjectionExecutor } from "~/server/event-sourcing/projections/foldProjectionExecutor";
 import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
+import type { TraceProcessingEvent } from "../../schemas/events";
+import { createSpanReceivedEvent } from "./fixtures/trace-summary-test.fixtures";
 import {
   projectAnalyticsStateToRow,
   TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
@@ -168,6 +172,7 @@ describe("TraceAnalyticsStore read-back version gate", () => {
   }
 
   describe("given a row stamped with the current projection version", () => {
+    /** @scenario a stored state written under the fold's current shape is read straight back */
     it("reads the state and the durable watermark back", async () => {
       const { store } = storeOver(project(committedState()));
 
@@ -197,6 +202,7 @@ describe("TraceAnalyticsStore read-back version gate", () => {
       lastEventOccurredAt: 0,
     });
 
+    /** @scenario a stored state written under an older shape is rebuilt rather than trusted */
     it("reports a store miss so the fold refolds instead of trusting it", async () => {
       const { store } = storeOver(staleRow());
 
@@ -215,6 +221,164 @@ describe("TraceAnalyticsStore read-back version gate", () => {
       const { store } = storeOver(staleRow());
 
       expect(await store.get("trace-rb", context)).toBeNull();
+    });
+  });
+
+  describe("given a trace a person deliberately renamed", () => {
+    const renameEvent = {
+      id: "evt-rename",
+      type: "lw.obs.trace.trace_name_changed",
+      tenantId: TENANT,
+      aggregateId: "trace-rb",
+      aggregateType: "trace",
+      occurredAt: BASE_MS,
+      createdAt: BASE_MS,
+      metadata: {},
+      data: { traceId: "trace-rb", newName: "Renamed by a human" },
+    } as unknown as TraceProcessingEvent;
+
+    /**
+     * The kind of late contribution that names a trace when nothing else has:
+     * a parented span, which the fallback path would otherwise claim the name
+     * from because this trace has no real root.
+     */
+    const lateNamingSpan = () =>
+      createSpanReceivedEvent({
+        eventId: "evt-child",
+        tenantId: TENANT,
+        traceId: "trace-rb",
+        spanId: "cccc000000000001",
+        parentSpanId: "cccc00000000000f",
+        name: "llm-call",
+        occurredAt: BASE_MS + 1000,
+      });
+
+    const renamed = () =>
+      projection.apply(
+        { ...projection.init(), traceId: "trace-rb" },
+        renameEvent,
+      );
+
+    describe("when a late span that would otherwise supply a name arrives", () => {
+      /** @scenario a user-visible name survives a late unrelated contribution */
+      it("keeps the person's name across the recovery", () => {
+        const recovered = traceAnalyticsStateFromRow(project(renamed()));
+
+        expect(projection.apply(recovered, lateNamingSpan()).traceName).toBe(
+          "Renamed by a human",
+        );
+      });
+    });
+
+    describe("when its committed row predates the fold recording that a person set the name", () => {
+      /** @scenario a user-visible name survives a late unrelated contribution */
+      it("refuses the row, so the rename is rebuilt rather than overwritten", async () => {
+        const olderShape: TraceAnalyticsRow = {
+          ...project(renamed()),
+          version: "2026-06-20",
+          // Indistinguishable from "nobody ever renamed it".
+          traceNameUserOverridden: false,
+        };
+
+        // Read back, that row's own decoding lets the late span take the name.
+        expect(
+          projection.apply(
+            traceAnalyticsStateFromRow(olderShape),
+            lateNamingSpan(),
+          ).traceName,
+        ).toBe("llm-call");
+
+        // Which is why the store never hands it to the fold at all.
+        const { store } = storeOver(olderShape);
+        expect(await store.get("trace-rb", context)).toBeNull();
+      });
+    });
+  });
+});
+
+/**
+ * A trace whose only signal is a classification carries nothing the analytics
+ * row can hold, so the store writes no row for it. ADR-066 makes that safe
+ * rather than lossy: no row is a MISS, and the fold's `refoldOnStoreMiss`
+ * rebuilds the classification from `event_log` when a real event finally lands.
+ */
+describe("TraceAnalyticsStore dimension-only signal", () => {
+  const TRACE_ID = "aaaa0000000000000000000000000001";
+  const context: ProjectionStoreContext = {
+    aggregateId: TRACE_ID,
+    tenantId: createTenantId(TENANT),
+  };
+
+  const topicEvent = {
+    id: "evt-topic",
+    type: "lw.obs.trace.topic_assigned",
+    tenantId: TENANT,
+    aggregateId: TRACE_ID,
+    aggregateType: "trace",
+    occurredAt: BASE_MS,
+    createdAt: BASE_MS,
+    metadata: {},
+    data: {
+      topicId: "topic-1",
+      topicName: "Support",
+      subtopicId: null,
+      subtopicName: null,
+      isIncremental: false,
+    },
+  } as unknown as TraceProcessingEvent;
+
+  const spanEvent: TraceProcessingEvent = createSpanReceivedEvent({
+    eventId: "evt-span",
+    tenantId: TENANT,
+    traceId: TRACE_ID,
+    spanId: "bbbb000000000001",
+    parentSpanId: null,
+    name: "agent-run",
+    occurredAt: BASE_MS + 1000,
+  });
+
+  /** A repository that answers reads from whatever the store actually wrote. */
+  function recordingRepo() {
+    const rows: TraceAnalyticsRow[] = [];
+    const repo: TraceAnalyticsRepository = {
+      upsert: async (row) => {
+        rows.push(row);
+      },
+      findByTraceIdWithApplied: async () => {
+        const row = rows[rows.length - 1];
+        return row ? { row, appliedEventIds: [] } : null;
+      },
+    };
+    return { repo, rows };
+  }
+
+  describe("given a trace whose only signal so far is an assigned topic", () => {
+    describe("when its cached state is lost and a later span arrives", () => {
+      /** @scenario a signal with nothing else to store is not lost to a cold cache */
+      it("rebuilds the classification from the event log instead of losing it", async () => {
+        const { repo, rows } = recordingRepo();
+        const fold = new TraceAnalyticsFoldProjection({
+          store: new TraceAnalyticsStore(repo),
+        });
+        // The real loader is bounded at the delivered event; a fake that always
+        // returned the whole history would fold the span before it arrived.
+        fold.eventLoaderUpTo = async ({ upToEvent }) =>
+          [topicEvent, spanEvent].filter(
+            (event) => event.occurredAt <= upToEvent.occurredAt,
+          );
+        const executor = new FoldProjectionExecutor();
+
+        await executor.execute(fold, topicEvent, context);
+
+        // Nothing worth committing yet, so nothing was written — the topic
+        // lives only in the cache the next delivery is assumed to have lost.
+        expect(rows).toEqual([]);
+
+        const resumed = await executor.execute(fold, spanEvent, context);
+
+        expect(resumed.topicId).toBe("topic-1");
+        expect(resumed.spanCount).toBe(1);
+      });
     });
   });
 });

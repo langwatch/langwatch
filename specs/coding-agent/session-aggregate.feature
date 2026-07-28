@@ -1,3 +1,4 @@
+@unit
 Feature: Coding-agent sessions
   A coding-agent run is a session: many model calls, many tool runs, sometimes
   several traces, and telemetry arriving as spans, logs and metrics. LangWatch
