@@ -66,6 +66,37 @@ const sampleResults = {
   timestamps: { createdAt: 0, updatedAt: 0 },
 };
 
+/**
+ * A run with a Comparison evaluator.
+ *
+ * The shape is the point: dataset entries are per (row, target), and the
+ * comparison's verdict is per row only — recorded against its own id, which
+ * is not one of the targets. Anything keyed that way has no dataset entry to
+ * hang off, which is exactly how 60 real verdicts went missing on a live run
+ * while the run summary still advertised the comparison.
+ */
+const comparisonResults = {
+  experimentId: "exp_2",
+  runId: "run_2",
+  projectId: "proj_1",
+  progress: 4,
+  total: 4,
+  dataset: [
+    { index: 0, targetId: "target_a", entry: { input: "q1" } },
+    { index: 0, targetId: "target_b", entry: { input: "q1" } },
+    { index: 1, targetId: "target_a", entry: { input: "q2" } },
+    { index: 1, targetId: "target_b", entry: { input: "q2" } },
+  ],
+  evaluations: [
+    { evaluator: "quality", targetId: "target_a", index: 0, status: "processed", score: 0.9, passed: true },
+    { evaluator: "quality", targetId: "target_b", index: 0, status: "processed", score: 0.4, passed: true },
+    // Keyed to the comparison, not to a target — no dataset row matches this.
+    { evaluator: "target_comparison", targetId: "target_comparison", index: 0, status: "processed", score: 1, label: "target_a", details: "A was clearer." },
+    { evaluator: "target_comparison", targetId: "target_comparison", index: 1, status: "processed", score: 1, label: "target_b", details: "B was more accurate." },
+  ],
+  timestamps: { createdAt: 0, updatedAt: 0 },
+};
+
 describe("experimentResultsCommand()", () => {
   let mockGetRunResults: ReturnType<typeof vi.fn>;
   let mockListRuns: ReturnType<typeof vi.fn>;
@@ -281,6 +312,80 @@ describe("experimentResultsCommand()", () => {
         expect(printed).toContain("interrupted");
         expect(printed).not.toContain("No rows matched the filter");
         expect(printed).not.toContain("still in progress");
+      });
+    });
+  });
+
+  describe("given a run with a Comparison evaluator", () => {
+    describe("when the results are returned", () => {
+      it("keeps the verdicts that belong to no single target", async () => {
+        mockGetRunResults.mockResolvedValue(comparisonResults);
+
+        const result = await experimentResultsCommand({
+          experimentSlug: "doc-qa",
+        });
+
+        const evaluations = (result as any).data.evaluations;
+        const verdicts = evaluations.filter(
+          (e: any) => e.evaluator === "target_comparison",
+        );
+        expect(verdicts).toHaveLength(2);
+        expect(verdicts.map((v: any) => v.label)).toEqual([
+          "target_a",
+          "target_b",
+        ]);
+        // The judge's reasoning is the reason to reach for this at all.
+        expect(verdicts[0].details).toBe("A was clearer.");
+      });
+
+      it("still reports every target-scoped evaluation", async () => {
+        // The comparison must be additive — a fix that surfaced verdicts by
+        // displacing the per-target scores would trade one gap for another.
+        mockGetRunResults.mockResolvedValue(comparisonResults);
+
+        const result = await experimentResultsCommand({
+          experimentSlug: "doc-qa",
+        });
+
+        const evaluations = (result as any).data.evaluations;
+        expect(
+          evaluations.filter((e: any) => e.evaluator === "quality"),
+        ).toHaveLength(2);
+      });
+    });
+
+    describe("when --limit drops some rows", () => {
+      it("reports verdicts only for the rows still shown", async () => {
+        mockGetRunResults.mockResolvedValue(comparisonResults);
+
+        const result = await experimentResultsCommand({
+          experimentSlug: "doc-qa",
+          options: { limit: "2" },
+        });
+
+        // limit=2 keeps the two row-0 entries, so only row 0's verdict.
+        const evaluations = (result as any).data.evaluations;
+        const verdicts = evaluations.filter(
+          (e: any) => e.evaluator === "target_comparison",
+        );
+        expect(verdicts).toHaveLength(1);
+        expect(verdicts[0].index).toBe(0);
+      });
+    });
+
+    describe("when --evaluator names a different evaluator", () => {
+      it("excludes the comparison", async () => {
+        mockGetRunResults.mockResolvedValue(comparisonResults);
+
+        const result = await experimentResultsCommand({
+          experimentSlug: "doc-qa",
+          options: { evaluator: "quality" },
+        });
+
+        const evaluations = (result as any).data.evaluations;
+        expect(
+          evaluations.some((e: any) => e.evaluator === "target_comparison"),
+        ).toBe(false);
       });
     });
   });
