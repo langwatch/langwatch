@@ -139,3 +139,37 @@ describe("ProcessManagerBuilder", () => {
     });
   });
 });
+
+describe("given a process that ignores events", () => {
+  describe("when it also arms a deadline", () => {
+    it("refuses the combination rather than disarming itself silently", () => {
+      // `.ignores()` returns no decision; an omitted nextWakeAt resolves to
+      // null, and null is authoritative — so an ignored event would cancel the
+      // armed wake with nothing failing and no test catching it. The builder
+      // makes that combination unbuildable instead of documenting it.
+      expect(() =>
+        buildProcessManager<AutomationEvent>({
+          name: "ignoresAndWakes",
+          applier: (pm) =>
+            pm
+              .state({ seen: 0 })
+              .ignores("lw.automation.trigger.match_recorded")
+              .onWake((state) => ({ state })),
+        }),
+      ).toThrow(/cannot use both \.ignores\(\) and \.onWake\(\)/);
+    });
+
+    it("refuses it in the other order too", () => {
+      expect(() =>
+        buildProcessManager<AutomationEvent>({
+          name: "wakesAndIgnores",
+          applier: (pm) =>
+            pm
+              .state({ seen: 0 })
+              .onWake((state) => ({ state }))
+              .ignores("lw.automation.trigger.match_recorded"),
+        }),
+      ).toThrow(/cannot use \.ignores\(\) after \.onWake\(\)/);
+    });
+  });
+});

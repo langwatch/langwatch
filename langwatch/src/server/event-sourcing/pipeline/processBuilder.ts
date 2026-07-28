@@ -137,6 +137,7 @@ class ProcessManagerBuilder<E extends Event> {
     EventHandler<any, any, any>
   > = {};
   private wakeHandler: WakeHandler<any, any> | undefined;
+  private readonly ignoredEventTypes: string[] = [];
   private outboxOptions: OutboxOptions | undefined;
   private scheduleOptions: { everyMs: number } | undefined;
   private payloadMapper:
@@ -178,9 +179,31 @@ class ProcessManagerBuilder<E extends Event> {
     return this;
   }
 
+  /**
+   * Route these event types into the process's inbox and decide nothing from
+   * them — the instance still records that it saw them, which is what keeps a
+   * later replay deterministic.
+   *
+   * **This CLEARS any armed deadline.** `nextWakeAt` is authoritative and the
+   * runtime resolves an omitted one to `null`, so "no decision" and "cancel the
+   * wake" are the same value. That is safe only for a process that never arms
+   * one. Using this on a process with a deadline silently disarms it on the
+   * next ignored event, and nothing fails — so the builder refuses that
+   * combination rather than trusting the caller to notice.
+   */
   ignores(...eventTypes: string[]): this {
+    if (this.wakeHandler) {
+      throw new ConfigurationError(
+        "ProcessManagerBuilder",
+        `Process manager "${this.name}" cannot use .ignores() after .onWake(): ` +
+          `an ignored event clears the armed deadline. Handle those event ` +
+          `types explicitly and return the wake you want to keep.`,
+        { name: this.name, eventTypes },
+      );
+    }
+    this.ignoredEventTypes.push(...eventTypes);
     for (const eventType of eventTypes) {
-      this.on(eventType, (state) => ({ state }));
+      this.on(eventType, (state) => ({ state, nextWakeAt: null }));
     }
     return this;
   }
@@ -191,6 +214,20 @@ class ProcessManagerBuilder<E extends Event> {
         "ProcessManagerBuilder",
         `Process manager "${this.name}" already has a wake handler`,
         { name: this.name },
+      );
+    }
+    // `.ignores()` clears the deadline, because an omitted `nextWakeAt`
+    // resolves to null and null is authoritative. A process that both ignores
+    // events and arms a wake would disarm itself on the next ignored event,
+    // with nothing failing and no test catching it. Refuse the combination
+    // instead of documenting it.
+    if (this.ignoredEventTypes.length > 0) {
+      throw new ConfigurationError(
+        "ProcessManagerBuilder",
+        `Process manager "${this.name}" cannot use both .ignores() and .onWake(): ` +
+          `an ignored event clears the armed deadline. Handle those event ` +
+          `types explicitly and return the wake you want to keep.`,
+        { name: this.name, ignoredEventTypes: this.ignoredEventTypes },
       );
     }
     this.wakeHandler = handle;
