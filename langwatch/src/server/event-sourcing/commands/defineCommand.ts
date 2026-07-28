@@ -35,14 +35,14 @@ export type DefinedCommandClass<
  *
  * @example
  * ```typescript
- * export const StartSuiteRunCommand = defineCommand({
- *   commandType: "lw.suite_run.start",
- *   eventType: "lw.suite_run.started",
- *   eventVersion: "2026-03-01",
- *   aggregateType: "suite_run",
- *   schema: suiteRunStartedEventDataSchema,
- *   aggregateId: (d) => d.batchRunId,
- *   idempotencyKey: (d) => `${d.tenantId}:${d.batchRunId}:${d.idempotencyKey}`,
+ * export const QueueRunCommand = defineCommand({
+ *   commandType: "lw.simulation_run.queue",
+ *   eventType: "lw.simulation_run.queued",
+ *   eventVersion: "2026-03-08",
+ *   aggregateType: "simulation_run",
+ *   schema: simulationRunQueuedEventDataSchema,
+ *   aggregateId: (d) => d.scenarioRunId,
+ *   idempotencyKey: (d) => `${d.tenantId}:${d.scenarioRunId}:queueRun`,
  * });
  * ```
  */

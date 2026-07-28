@@ -24,6 +24,9 @@ export const TIME_LOCAL_AGGREGATE_TYPES: ReadonlySet<AggregateType> =
     "evaluation",
     "experiment_run",
     "simulation_run",
+    // No pipeline writes `suite_run` any more (ADR-072), but events committed
+    // before it was retired are still in `event_log` and still time-local.
+    // Listed until those rows age out, so a scan that meets one stays bounded.
     "suite_run",
   ]);
 
