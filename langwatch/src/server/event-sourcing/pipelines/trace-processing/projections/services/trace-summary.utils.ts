@@ -1,8 +1,9 @@
 import type { NormalizedAttributes } from "../../schemas/spans";
 
 /**
- * Parses a JSON-encoded string array, returning the raw string as a
- * single-element array when parsing fails (common for unquoted labels).
+ * Parses a JSON-encoded string array. Falls back to the raw string as a
+ * single-element array when parsing fails (common for unquoted labels), EXCEPT
+ * for a truncated array, which resets to empty.
  *
  * The lenient `[raw]` fallback is deliberate and load-bearing: a caller sending
  * `langwatch.labels` as a bare `prod` rather than `["prod"]` still gets one

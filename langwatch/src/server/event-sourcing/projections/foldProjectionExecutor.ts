@@ -495,9 +495,7 @@ export class FoldProjectionExecutor {
         ordered,
         context,
       );
-      // The ADR-066 transitional net, made observable: its deletion condition is
-      // "it stopped firing", which is otherwise indistinguishable from a
-      // regression to the pre-ADR-066 steady state of refolding on every miss.
+      // Counted as on the single-event path above.
       incrementEsFoldRefoldOnMissTotal(
         projection.name,
         refolded === null ? "absent" : "performed",
