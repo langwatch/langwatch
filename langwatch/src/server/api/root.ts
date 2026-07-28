@@ -39,6 +39,7 @@ import { graphsRouter } from "./routers/graphs";
 import { groupRouter } from "./routers/group";
 import { homeRouter } from "./routers/home";
 import { httpProxyRouter } from "./routers/httpProxy";
+import { inviteRouter } from "./routers/invite";
 import { integrationsChecksRouter } from "./routers/integrationsChecks";
 import { langyRouter } from "./routers/langy";
 import { langyEgressRouter } from "./routers/langyEgress";
@@ -88,6 +89,7 @@ const coreRouters = {
   agents: agentsRouter,
   evaluators: evaluatorsRouter,
   httpProxy: httpProxyRouter,
+  invite: inviteRouter,
   organization: organizationRouter,
   project: projectRouter,
   team: teamRouter,

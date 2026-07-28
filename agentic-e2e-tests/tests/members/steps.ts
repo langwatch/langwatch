@@ -230,7 +230,7 @@ export async function seedWaitingApprovalInvite({
   teamId: string;
 }) {
   const response = await page.request.post(
-    "/api/trpc/organization.createInviteRequest",
+    "/api/trpc/invite.createInviteRequest",
     {
       data: {
         json: {

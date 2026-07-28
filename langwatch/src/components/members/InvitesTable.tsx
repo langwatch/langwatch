@@ -19,7 +19,7 @@ import { orgRoleOptions } from "../settings/OrganizationUserRoleField";
 import { WaitingApprovalActions } from "./WaitingApprovalActions";
 
 type OrganizationInvite =
-  RouterOutputs["organization"]["getOrganizationPendingInvites"][number];
+  RouterOutputs["invite"]["getOrganizationPendingInvites"][number];
 
 interface InvitesTableProps {
   waitingApprovalInvites: OrganizationInvite[];

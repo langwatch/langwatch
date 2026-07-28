@@ -55,7 +55,7 @@ const {
 
 vi.mock("~/utils/api", () => ({
   api: {
-    organization: {
+    invite: {
       acceptInvite: {
         useMutation: (handlers: typeof mockState.handlers) => {
           mockState.handlers = handlers;
