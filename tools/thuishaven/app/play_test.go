@@ -97,6 +97,52 @@ func TestAgentModeFailsNamingTheFlag(t *testing.T) {
 	}
 }
 
+// @scenario "Untrusted code takes a second, deliberate confirmation"
+func TestSecondStepTakesOnlyThePRNumber(t *testing.T) {
+	const number = 4913
+	// The reflex answers are exactly the ones that must not pass — the second
+	// step exists because the first one is clearable without reading it.
+	for _, answer := range []string{"", "\n", "  ", "y", "y\n", "yes", "Y", "n", "4912", "49130", "#4912", "play 4913", "4913x"} {
+		if PlayConfirmationAccepted(answer, number) {
+			t.Errorf("PlayConfirmationAccepted(%q) = true, want false — only the PR number may pass the second step", answer)
+		}
+	}
+	// Typing the number does pass, in the forms a developer actually types it:
+	// with the trailing newline the reader hands over, and with the "#" GitHub
+	// puts in front of it everywhere they just read it.
+	for _, answer := range []string{"4913", "4913\n", "  4913  \n", "#4913", "# 4913\n"} {
+		if !PlayConfirmationAccepted(answer, number) {
+			t.Errorf("PlayConfirmationAccepted(%q) = false, want true", answer)
+		}
+	}
+	if !strings.Contains(PlayConfirmationPrompt(number), "4913") {
+		t.Errorf("the second step's prompt %q does not name the number it wants typed", PlayConfirmationPrompt(number))
+	}
+}
+
+// @scenario "Every untrusted path says what the code is given"
+func TestEveryUntrustedPathDisclosesTheAmbientAuthority(t *testing.T) {
+	// The literal is spelled out here rather than shared with the code on
+	// purpose: the guarantee is that three independently-written paths all still
+	// say it, so reading it from the same constant they use would assert nothing.
+	// (The --allow-untrusted warning is the third; it prints this exposure text.)
+	const disclosure = "as you, from this shell's environment"
+	paths := map[string]string{
+		"the second confirmation step": PlayUntrustedExposure(),
+		"the agent-mode failure":       PlayTrustError([]string{"mallory"}).Error(),
+	}
+	for name, text := range paths {
+		if !strings.Contains(text, disclosure) {
+			t.Errorf("%s does not say the code runs %q:\n%s", name, disclosure, text)
+		}
+	}
+	// It must also still say what IS isolated, or the warning reads as "the
+	// sandbox is pointless" and gets ignored wholesale.
+	if !strings.Contains(PlayUntrustedExposure(), ".env") {
+		t.Error("the exposure text drops the .env guarantee, leaving only the scary half")
+	}
+}
+
 func TestWebFlowCommitterIsNotAnAuthor(t *testing.T) {
 	// GitHub itself commits as web-flow for web-UI edits; it is not a person
 	// whose access could be checked and must not poison the gate.

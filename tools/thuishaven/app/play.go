@@ -265,14 +265,60 @@ func DecidePlayTrust(untrustedCount int, isAgent, allowUntrusted bool) PlayTrust
 	return PlayPrompt
 }
 
-// PlayTrustError is the agent-mode failure: it names the untrusted authors and
-// the one explicit flag that proceeds anyway.
+// PlayTrustError is the agent-mode failure: it names the untrusted authors, says
+// what running them would grant, and names the one explicit flag that proceeds
+// anyway.
 func PlayTrustError(untrusted []string) error {
 	return fmt.Errorf(
 		"PR authors without write access to this repo: %s\n"+
-			"haven play runs their code on this machine, so it will not proceed unprompted.\n"+
+			"haven play runs their code on this machine as you, from this shell's environment,\n"+
+			"so it will not proceed unprompted.\n"+
 			"Re-run with --allow-untrusted to accept that explicitly.",
 		strings.Join(untrusted, ", "))
+}
+
+// PlayUntrustedExposure is the second step of the interactive trust gate: what
+// accepting an unreviewed PR actually costs.
+//
+// The sandbox's isolation is real, but it isolates the PR's *data* — its own
+// databases, volumes, hostnames and checkout, and none of the developer's .env
+// files. It is not a boundary around the developer. The install, migrations,
+// seed and service commands are ordinary child processes of this command, so
+// they run under the developer's own account and inherit the environment haven
+// was launched from; whatever that shell exports travels with them. Naming that
+// is the whole point of the step, because the y/N before it can be cleared by
+// reflex without ever disclosing it.
+//
+// Every path that accepts untrusted code carries the same sentence — this text,
+// the --allow-untrusted warning, and PlayTrustError — so no route to running a
+// stranger's code is quieter than the others.
+func PlayUntrustedExposure() string {
+	return "" +
+		"  What the sandbox does NOT isolate: the PR's install, migrations, seed and\n" +
+		"  services run as you, from this shell's environment. Anything it exports goes\n" +
+		"  with them — SSH agent socket, GitHub, cloud and registry tokens — and your\n" +
+		"  home directory and network are reachable the whole time.\n" +
+		"  What it does isolate: its databases, volumes and hostnames are its own, and\n" +
+		"  it gets none of your .env files.\n" +
+		"  Reading the diff first is the only thing that narrows this.\n"
+}
+
+// PlayConfirmationAccepted reports whether the second step's answer is the PR's
+// own number typed back. Nothing else passes.
+//
+// That is the point of the step: it cannot be cleared by the same reflex "y"
+// that cleared the first prompt, and answering it means having read far enough
+// to know which PR is about to run. A leading "#" is accepted because that is
+// how GitHub writes the number everywhere the developer just read it.
+func PlayConfirmationAccepted(answer string, number int) bool {
+	typed := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(answer), "#"))
+	return typed == strconv.Itoa(number)
+}
+
+// PlayConfirmationPrompt is the second step's question, naming the exact thing
+// to type so the developer is never left guessing at a bare cursor.
+func PlayConfirmationPrompt(number int) string {
+	return fmt.Sprintf("  Type the PR number (%d) to run it, anything else aborts: ", number)
 }
 
 // CollectUntrustedPlayAuthors decides who, if anyone, on this PR is untrusted.

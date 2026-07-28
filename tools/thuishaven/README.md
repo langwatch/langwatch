@@ -89,8 +89,10 @@ haven play [pr]  run a PR in a throwaway sandbox: own checkout, own
                  Postgres/ClickHouse/Redis containers, own play-<n> hostname.
                  Quitting the view DESTROYS everything it created, every time.
                  No argument opens a picker of open PRs (terminal only).
-                 Trust-gated: every commit author must have write access, or
-                 an explicit y/N confirmation (--allow-untrusted in agent mode)
+                 Trust-gated: every commit author must have write access, or a
+                 two-step confirmation — y/N, then the PR number typed back
+                 after it discloses that the code runs as you, from this
+                 shell's environment (--allow-untrusted in agent mode)
 haven git        embedded git TUI (moron) for any worktree — `haven git <slug>`
 haven switch     print a worktree's dir by name; with `eval "$(haven shell-init)"`
                  it becomes a real cd, tab-completed

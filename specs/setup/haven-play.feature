@@ -82,6 +82,35 @@ Feature: haven play, a throwaway PR sandbox
     When the trust gate runs
     Then that author counts as untrusted
 
+  # The sandbox isolates the PR's data, not the developer's authority. Its
+  # databases, hostnames and checkout are its own and none of the developer's
+  # .env files reach it, but the PR's install, migrations, seed and services
+  # still run as the developer, in the launching shell's environment — so
+  # whatever that shell exports (agent sockets, cloud and registry tokens) is in
+  # reach of unreviewed code. A single keystroke is too cheap a way to accept
+  # that, so the code of someone without write access takes a second step that
+  # cannot be answered by reflex.
+  @unit
+  Scenario: Untrusted code takes a second, deliberate confirmation
+    Given a commit on the PR whose author does not have write access
+    And the developer answered yes to the first prompt in a terminal
+    When the second step is shown
+    Then it says the PR runs as them, with the launching shell's environment
+    And play proceeds only when they type the PR number back
+    And answering "y" a second time is not enough
+
+  @unit
+  Scenario: Declining the first prompt never reaches the second
+    Given a commit on the PR whose author does not have write access
+    When the developer declines the first prompt
+    Then nothing is checked out
+    And the second step is never shown
+
+  @unit
+  Scenario: Every untrusted path says what the code is given
+    Given an untrusted author on the PR
+    Then the terminal confirmation, the "--allow-untrusted" warning, and the agent-mode failure all say the PR runs as the developer with the launching shell's environment
+
   # The repo has a postinstall and a PR controls package scripts, so installing
   # normally would run PR-authored code before any gate on the app code mattered.
   @unit

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -69,9 +70,13 @@ func runPlay(ctx context.Context, d deps, inv invocation) error {
 			return nil
 		}
 	case app.PlayProceed:
+		// The flag skips the two interactive steps, but not the disclosure they
+		// carry: whoever passed it should still see what it bought, and an agent
+		// driving haven leaves that line in its log for a human to read later.
 		if len(untrusted) > 0 {
 			fmt.Printf("⚠ --allow-untrusted: running code from authors without write access: %s\n",
 				strings.Join(untrusted, ", "))
+			fmt.Print(app.PlayUntrustedExposure())
 		}
 	}
 
@@ -140,24 +145,50 @@ func runPlay(ctx context.Context, d deps, inv invocation) error {
 	return teardown()
 }
 
-// confirmUntrustedPlay is the interactive half of the trust gate: it names the
-// untrusted authors and requires an explicit yes. Default is no - Enter aborts.
+// confirmUntrustedPlay is the interactive half of the trust gate.
 func confirmUntrustedPlay(untrusted []string, number int) bool {
-	fmt.Printf("\n⚠ PR #%d has commits from authors WITHOUT write access to this repo:\n", number)
+	return confirmUntrustedPlayVia(os.Stdin, os.Stdout, untrusted, number)
+}
+
+// confirmUntrustedPlayVia is that gate over explicit streams, so the two-step
+// shape is testable without a terminal.
+//
+// Two steps, because they answer different questions and only the second one
+// is expensive to answer by accident. The first names who wrote the code and
+// takes a y/N, defaulting to no. The second discloses what running it grants —
+// the developer's own account and shell environment, which no amount of
+// container isolation around the PR's data takes back — and accepts only the
+// PR's number typed out. A stranger's code should never be one keystroke away.
+//
+// Both steps read from one buffered reader: a second reader over the same
+// stdin would discard whatever the first had already buffered, and the answer
+// to step two is usually sitting in that buffer.
+func confirmUntrustedPlayVia(r io.Reader, w io.Writer, untrusted []string, number int) bool {
+	in := bufio.NewReader(r)
+
+	fmt.Fprintf(w, "\n⚠ PR #%d has commits from authors WITHOUT write access to this repo:\n", number)
 	for _, name := range untrusted {
-		fmt.Printf("    %s\n", name)
+		fmt.Fprintf(w, "    %s\n", name)
 	}
-	fmt.Println("  haven play will run their code on this machine (install, migrations, services).")
-	fmt.Print("  Run it anyway? [y/N] ")
-	line, err := bufio.NewReader(os.Stdin).ReadString('\n')
-	if err != nil {
+	fmt.Fprintln(w, "  haven play will run their code on this machine (install, migrations, services).")
+	fmt.Fprint(w, "  Run it anyway? [y/N] ")
+	line, err := in.ReadString('\n')
+	if err != nil && line == "" {
 		return false
 	}
 	switch strings.ToLower(strings.TrimSpace(line)) {
 	case "y", "yes":
-		return true
+	default:
+		return false
 	}
-	return false
+
+	fmt.Fprintf(w, "\n%s", app.PlayUntrustedExposure())
+	fmt.Fprint(w, app.PlayConfirmationPrompt(number))
+	typed, err := in.ReadString('\n')
+	if err != nil && typed == "" {
+		return false
+	}
+	return app.PlayConfirmationAccepted(typed, number)
 }
 
 // playChild describes the backgrounded sandbox launcher.

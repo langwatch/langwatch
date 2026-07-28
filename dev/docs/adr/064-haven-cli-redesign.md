@@ -307,11 +307,33 @@ The rules it adds, and how they honour the constitution:
     counts as trusted. Every other commit is named as untrusted by sha.
 
   A listing that hits GitHub's 250-commit cap fails closed rather than
-  vouching for commits it never saw. Any untrusted commit stops play: a real
-  y/N prompt (default no) in a terminal, a hard failure in agent mode, where
-  `--allow-untrusted` is the only way past. Not `--force`: that letter is
-  lifecycle-only, and accepting untrusted code deserves a flag that says
-  exactly what it does.
+  vouching for commits it never saw. Any untrusted commit stops play: a hard
+  failure in agent mode, where `--allow-untrusted` is the only way past. Not
+  `--force`: that letter is lifecycle-only, and accepting untrusted code
+  deserves a flag that says exactly what it does.
+- **Accepting untrusted code takes two steps, not one keystroke.** In a
+  terminal the gate asks twice, because the two questions are different. The
+  first names the authors without write access and takes a y/N, defaulting to
+  no. The second discloses the part the sandbox's isolation does *not* cover,
+  then accepts only the PR's number typed back.
+
+  That second step exists because "isolated" is easy to over-read. The
+  isolation is of the PR's *data* — dedicated databases, volumes, hostnames and
+  checkout, and none of the developer's `.env` files. It is not a boundary
+  around the developer: the install, migrations, seed and service commands are
+  ordinary child processes, so they run under the developer's own account and
+  inherit the environment haven was launched from, and whatever that shell
+  exports — SSH agent socket, GitHub, cloud and registry tokens — goes with
+  them, alongside reachable home directory and network. Containerising the
+  sandbox's *execution* would be the way to close that, and is deliberately out
+  of scope here; what this decision buys instead is that nobody accepts it
+  without being told, and nobody accepts it by reflex. Typing the number cannot
+  be muscle memory the way a `y` can, and it means having read far enough to
+  know which PR is about to run.
+
+  The same disclosure rides every route that ends in a stranger's code
+  running — the second step, the `--allow-untrusted` warning line, and the
+  agent-mode failure — so no path to it is quieter than the others.
 - **The sandbox never runs a checkout's package scripts.** Installs use
   `--ignore-scripts` unconditionally, because this repo has a postinstall and
   a PR controls package scripts — a plain install would execute PR-authored
