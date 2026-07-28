@@ -423,7 +423,9 @@ describe("createResilientClickHouseClient()", () => {
       });
       const client = createResilientClickHouseClient({ client: mock });
 
-      await client.query({ query: "SELECT count() FROM t WHERE x = 1" });
+      await client.query({
+        query: "SELECT count() FROM t WHERE TenantId = {tenantId:String}",
+      });
 
       expect(mockQueryLogger.debug).toHaveBeenCalled();
       expect(mockQueryLogger.warn).not.toHaveBeenCalled();
