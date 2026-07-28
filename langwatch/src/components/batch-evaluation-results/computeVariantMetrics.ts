@@ -19,10 +19,13 @@ export type VariantMetrics = {
   durationStats: MetricStats | null;
 };
 
-export function computeVariantMetrics(
-  variantIds: string[],
-  rows: BatchResultRow[],
-): Record<string, VariantMetrics> {
+export function computeVariantMetrics({
+  variantIds,
+  rows,
+}: {
+  variantIds: string[];
+  rows: BatchResultRow[];
+}): Record<string, VariantMetrics> {
   const result: Record<string, VariantMetrics> = {};
 
   for (const variantId of variantIds) {

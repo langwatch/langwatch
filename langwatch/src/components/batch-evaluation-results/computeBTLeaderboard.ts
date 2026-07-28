@@ -80,11 +80,14 @@ const DEFAULT_OPTS: Required<BTLeaderboardOptions> = {
   tol: 1e-6,
 };
 
-export function computeBTLeaderboard(
-  comparisons: PairwiseComparison[],
-  variantIds: string[],
-  options: BTLeaderboardOptions = {},
-): BTLeaderboard {
+export function computeBTLeaderboard({
+  comparisons,
+  variantIds,
+  ...options
+}: {
+  comparisons: PairwiseComparison[];
+  variantIds: string[];
+} & BTLeaderboardOptions): BTLeaderboard {
   const opts = { ...DEFAULT_OPTS, ...options };
   const n = variantIds.length;
 
@@ -113,20 +116,25 @@ export function computeBTLeaderboard(
   // (Hunter §4) — it shrinks the leaderboard slightly without changing
   // ordering on healthy data.
   const smooth = hasDegenerate ? 0.5 : 0;
-  const { strength, converged } = fitBT(W, smooth, opts.maxIter, opts.tol);
+  const { strength, converged } = fitBT({
+    W,
+    smooth,
+    maxIter: opts.maxIter,
+    tol: opts.tol,
+  });
 
   let scoreCI: Array<[number, number] | null> = new Array(n).fill(null);
   if (opts.bootstrapSamples > 0 && usable.length > 1) {
-    scoreCI = bootstrapScoreCI(
-      usable,
+    scoreCI = bootstrapScoreCI({
+      comparisons: usable,
       idx,
       n,
       smooth,
-      opts.bootstrapSamples,
-      opts.seed,
-      opts.maxIter,
-      opts.tol,
-    );
+      samples: opts.bootstrapSamples,
+      seed: opts.seed,
+      maxIter: opts.maxIter,
+      tol: opts.tol,
+    });
   }
 
   const score = strength.map((s) => 400 * Math.log10(s));
@@ -217,24 +225,27 @@ type ResolvedComparison = {
 const TIE = -1;
 
 /** Null when the row carries no usable evidence (unknown ids, ambiguous tie). */
-function resolveComparison(
-  c: PairwiseComparison,
-  idx: Map<string, number>,
-): ResolvedComparison | null {
+function resolveComparison({
+  comparison,
+  idx,
+}: {
+  comparison: PairwiseComparison;
+  idx: Map<string, number>;
+}): ResolvedComparison | null {
   const candIdxs: number[] = [];
-  for (const id of c.candidates) {
+  for (const id of comparison.candidates) {
     const k = idx.get(id);
     if (k !== undefined) candIdxs.push(k);
   }
   if (candIdxs.length < 2) return null;
 
-  if (c.winner === "tie") {
+  if (comparison.winner === "tie") {
     // Only well-defined for 2-way. N>2 "tie" rows are dropped — semantics
     // are ambiguous (did all N tie pairwise? did some subset tie?).
     return candIdxs.length === 2 ? { candIdxs, winner: TIE } : null;
   }
 
-  const wIdx = idx.get(c.winner as string);
+  const wIdx = idx.get(comparison.winner as string);
   if (wIdx === undefined) return null;
   return { candIdxs, winner: wIdx };
 }
@@ -290,12 +301,17 @@ function perVariantTotals(W: number[][]): {
  * Normalizes after each iteration so geometric mean(p) = 1, which makes
  * score = 400*log10(p) center around 0.
  */
-function fitBT(
-  W: number[][],
-  smooth: number,
-  maxIter: number,
-  tol: number,
-): { strength: number[]; converged: boolean } {
+function fitBT({
+  W,
+  smooth,
+  maxIter,
+  tol,
+}: {
+  W: number[][];
+  smooth: number;
+  maxIter: number;
+  tol: number;
+}): { strength: number[]; converged: boolean } {
   const n = W.length;
   if (n === 0) return { strength: [], converged: true };
   if (n === 1) return { strength: [1], converged: true };
@@ -361,16 +377,25 @@ function smoothingFor(W: number[][], n: number): number {
   return 0;
 }
 
-function bootstrapScoreCI(
-  comparisons: PairwiseComparison[],
-  idx: Map<string, number>,
-  n: number,
-  smooth: number,
-  samples: number,
-  seed: number,
-  maxIter: number,
-  tol: number,
-): Array<[number, number] | null> {
+function bootstrapScoreCI({
+  comparisons,
+  idx,
+  n,
+  smooth,
+  samples,
+  seed,
+  maxIter,
+  tol,
+}: {
+  comparisons: PairwiseComparison[];
+  idx: Map<string, number>;
+  n: number;
+  smooth: number;
+  samples: number;
+  seed: number;
+  maxIter: number;
+  tol: number;
+}): Array<[number, number] | null> {
   const rand = mulberry32(seed);
   const m = comparisons.length;
   const scoreSamples: number[][] = Array.from({ length: n }, () => []);
@@ -383,7 +408,9 @@ function bootstrapScoreCI(
   // The array keeps its original length, nulls included, so the resampling
   // draws the same indices in the same order as before and the output stays
   // bit-identical — this is a speedup, not a change in behaviour.
-  const resolved = comparisons.map((c) => resolveComparison(c, idx));
+  const resolved = comparisons.map((comparison) =>
+    resolveComparison({ comparison, idx }),
+  );
 
   for (let b = 0; b < samples; b++) {
     const resampled: (ResolvedComparison | null)[] = new Array(m);
@@ -399,7 +426,12 @@ function bootstrapScoreCI(
     // geometric-mean renormalisation throws its opponent to ~1e300, i.e.
     // +120000. The resulting interval is not merely wide, it is fabricated,
     // and it is finite, so downstream isFinite() guards let it through.
-    const { strength } = fitBT(Wb, smoothingFor(Wb, n), maxIter, tol);
+    const { strength } = fitBT({
+      W: Wb,
+      smooth: smoothingFor(Wb, n),
+      maxIter,
+      tol,
+    });
     for (let i = 0; i < n; i++) {
       scoreSamples[i]!.push(400 * Math.log10(strength[i] ?? 1));
     }

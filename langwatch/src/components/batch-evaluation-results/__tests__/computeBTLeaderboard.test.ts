@@ -24,13 +24,17 @@ const wins = (
 
 const ties = (a: string, b: string, times = 1): PairwiseComparison[] => {
   const out: PairwiseComparison[] = [];
-  for (let k = 0; k < times; k++) out.push({ candidates: [a, b], winner: "tie" });
+  for (let k = 0; k < times; k++)
+    out.push({ candidates: [a, b], winner: "tie" });
   return out;
 };
 
 describe("computeBTLeaderboard", () => {
   it("returns empty leaderboard for empty input", () => {
-    const result = computeBTLeaderboard([], []);
+    const result = computeBTLeaderboard({
+      comparisons: [],
+      variantIds: [],
+    });
     expect(result.entries).toEqual([]);
     expect(result.comparisonCount).toBe(0);
     expect(result.hasDegenerate).toBe(false);
@@ -47,7 +51,9 @@ describe("computeBTLeaderboard", () => {
       ...wins("A", ["C"], 8),
       ...wins("C", ["A"], 2),
     ];
-    const result = computeBTLeaderboard(data, ["A", "B", "C"], {
+    const result = computeBTLeaderboard({
+      comparisons: data,
+      variantIds: ["A", "B", "C"],
       bootstrapSamples: 0,
     });
 
@@ -68,7 +74,9 @@ describe("computeBTLeaderboard", () => {
       ...wins("A", ["B"], 50),
       ...wins("B", ["A"], 50),
     ];
-    const result = computeBTLeaderboard(data, ["A", "B"], {
+    const result = computeBTLeaderboard({
+      comparisons: data,
+      variantIds: ["A", "B"],
       bootstrapSamples: 0,
     });
     expect(result.entries[0]!.score).toBeCloseTo(0, 6);
@@ -78,7 +86,9 @@ describe("computeBTLeaderboard", () => {
 
   it("treats ties as 0.5 win + 0.5 loss (LMSYS convention)", () => {
     // Pure ties between A and B → identical scores, half-wins recorded.
-    const result = computeBTLeaderboard(ties("A", "B", 20), ["A", "B"], {
+    const result = computeBTLeaderboard({
+      comparisons: ties("A", "B", 20),
+      variantIds: ["A", "B"],
       bootstrapSamples: 0,
     });
     expect(result.entries[0]!.wins).toBe(10);
@@ -99,7 +109,9 @@ describe("computeBTLeaderboard", () => {
       ...wins("B", ["C"], 3),
       ...wins("C", ["B"], 2),
     ];
-    const result = computeBTLeaderboard(data, ["A", "B", "C"], {
+    const result = computeBTLeaderboard({
+      comparisons: data,
+      variantIds: ["A", "B", "C"],
       bootstrapSamples: 0,
     });
     expect(result.hasDegenerate).toBe(true);
@@ -119,7 +131,9 @@ describe("computeBTLeaderboard", () => {
       { candidates: ["A", "B", "C"], winner: "A" },
       { candidates: ["A", "B", "C"], winner: "B" },
     ];
-    const result = computeBTLeaderboard(data, ["A", "B", "C"], {
+    const result = computeBTLeaderboard({
+      comparisons: data,
+      variantIds: ["A", "B", "C"],
       bootstrapSamples: 0,
     });
     expect(result.winMatrix["A"]!["B"]).toBe(2);
@@ -135,7 +149,9 @@ describe("computeBTLeaderboard", () => {
       { candidates: ["A", "B"], winner: null },
       { candidates: ["A", "B"], winner: null },
     ];
-    const result = computeBTLeaderboard(data, ["A", "B"], {
+    const result = computeBTLeaderboard({
+      comparisons: data,
+      variantIds: ["A", "B"],
       bootstrapSamples: 0,
     });
     expect(result.comparisonCount).toBe(1);
@@ -146,11 +162,15 @@ describe("computeBTLeaderboard", () => {
       ...wins("A", ["B"], 8),
       ...wins("B", ["A"], 4),
     ];
-    const r1 = computeBTLeaderboard(data, ["A", "B"], {
+    const r1 = computeBTLeaderboard({
+      comparisons: data,
+      variantIds: ["A", "B"],
       bootstrapSamples: 100,
       seed: 42,
     });
-    const r2 = computeBTLeaderboard(data, ["A", "B"], {
+    const r2 = computeBTLeaderboard({
+      comparisons: data,
+      variantIds: ["A", "B"],
       bootstrapSamples: 100,
       seed: 42,
     });
@@ -159,12 +179,58 @@ describe("computeBTLeaderboard", () => {
     expect(r1.entries[1]!.scoreCI).toEqual(r2.entries[1]!.scoreCI);
   });
 
+  describe("when the resample count changes", () => {
+    // Guards the wiring between `bootstrapSamples` and the resample loop.
+    //
+    // The determinism test above cannot: it compares two runs configured
+    // identically, so it passes just as happily if `samples` and `seed` are
+    // crossed on the way in — both runs are then wrong in the same way. That
+    // is not hypothetical; those two arguments were adjacent numbers, and
+    // swapping them silently reduces 200 resamples to 1 while still
+    // rendering a plausible-looking interval.
+    //
+    // Sample count leaves a signature a seed cannot fake: `quantile` over a
+    // one-element array returns that element for every q, so a single
+    // resample collapses the interval to a point, while many resamples must
+    // spread it. Asserting on that shape pins which argument is which.
+    const data: PairwiseComparison[] = [
+      ...wins("A", ["B"], 8),
+      ...wins("B", ["A"], 4),
+    ];
+
+    it("collapses the interval to a point for a single resample", () => {
+      const result = computeBTLeaderboard({
+        comparisons: data,
+        variantIds: ["A", "B"],
+        bootstrapSamples: 1,
+        seed: 42,
+      });
+      const ci = result.entries[0]!.scoreCI;
+      expect(ci).not.toBeNull();
+      expect(ci![0]).toBe(ci![1]);
+    });
+
+    it("spreads the interval for many resamples", () => {
+      const result = computeBTLeaderboard({
+        comparisons: data,
+        variantIds: ["A", "B"],
+        bootstrapSamples: 200,
+        seed: 42,
+      });
+      const ci = result.entries[0]!.scoreCI;
+      expect(ci).not.toBeNull();
+      expect(ci![0]).toBeLessThan(ci![1]);
+    });
+  });
+
   it("returns null CI when bootstrap is disabled", () => {
     const data: PairwiseComparison[] = [
       ...wins("A", ["B"], 5),
       ...wins("B", ["A"], 5),
     ];
-    const result = computeBTLeaderboard(data, ["A", "B"], {
+    const result = computeBTLeaderboard({
+      comparisons: data,
+      variantIds: ["A", "B"],
       bootstrapSamples: 0,
     });
     expect(result.entries[0]!.scoreCI).toBeNull();
@@ -181,7 +247,9 @@ describe("computeBTLeaderboard", () => {
       ...wins("B", ["C"], 1),
       ...wins("C", ["B"], 1),
     ];
-    const result = computeBTLeaderboard(data, ["A", "B", "C"], {
+    const result = computeBTLeaderboard({
+      comparisons: data,
+      variantIds: ["A", "B", "C"],
       bootstrapSamples: 0,
     });
     expect(result.minMatchups).toBe(4);
@@ -194,7 +262,9 @@ describe("computeBTLeaderboard", () => {
       ...wins("A", ["B"]),
       { candidates: ["A", "Z"], winner: "Z" },
     ];
-    const result = computeBTLeaderboard(data, ["A", "B"], {
+    const result = computeBTLeaderboard({
+      comparisons: data,
+      variantIds: ["A", "B"],
       bootstrapSamples: 0,
     });
     // Z dropped → only the A>B row contributes.
@@ -210,7 +280,9 @@ describe("computeBTLeaderboard", () => {
       { candidates: ["A", "B", "C"], winner: "tie" },
       { candidates: ["A", "B"], winner: "tie" },
     ];
-    const result = computeBTLeaderboard(data, ["A", "B", "C"], {
+    const result = computeBTLeaderboard({
+      comparisons: data,
+      variantIds: ["A", "B", "C"],
       bootstrapSamples: 0,
     });
     // Only the 2-way tie contributes.
@@ -240,7 +312,9 @@ describe("computeBTLeaderboard bootstrap stability", () => {
     ];
 
     it("produces intervals that stay within a plausible range", () => {
-      const result = computeBTLeaderboard(comparisons, ["a", "b"], {
+      const result = computeBTLeaderboard({
+        comparisons: comparisons,
+        variantIds: ["a", "b"],
         bootstrapSamples: 200,
         seed: 1,
       });
@@ -258,7 +332,9 @@ describe("computeBTLeaderboard bootstrap stability", () => {
     });
 
     it("keeps the interval ordered", () => {
-      const result = computeBTLeaderboard(comparisons, ["a", "b"], {
+      const result = computeBTLeaderboard({
+        comparisons: comparisons,
+        variantIds: ["a", "b"],
         bootstrapSamples: 200,
         seed: 1,
       });

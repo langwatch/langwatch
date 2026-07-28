@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import { computeVariantMetrics } from "../computeVariantMetrics";
 import type { BatchResultRow, BatchTargetOutput } from "../types";
 
-const target = (overrides: Partial<BatchTargetOutput> = {}): BatchTargetOutput => ({
+const target = (
+  overrides: Partial<BatchTargetOutput> = {},
+): BatchTargetOutput => ({
   targetId: "variant-a",
   output: { output: "hi" },
   cost: null,
@@ -29,7 +31,10 @@ describe("computeVariantMetrics", () => {
       row({ "variant-a": target({ cost: 0.03, duration: 300 }) }, 1),
     ];
 
-    const metrics = computeVariantMetrics(["variant-a"], rows);
+    const metrics = computeVariantMetrics({
+      variantIds: ["variant-a"],
+      rows: rows,
+    });
 
     expect(metrics["variant-a"]!.costStats?.avg).toBeCloseTo(0.02);
     expect(metrics["variant-a"]!.durationStats?.avg).toBeCloseTo(200);
@@ -42,7 +47,10 @@ describe("computeVariantMetrics", () => {
       row({ "variant-b": target({ targetId: "variant-b", cost: 0.05 }) }, 1),
     ];
 
-    const metrics = computeVariantMetrics(["variant-a"], rows);
+    const metrics = computeVariantMetrics({
+      variantIds: ["variant-a"],
+      rows: rows,
+    });
 
     expect(metrics["variant-a"]!.costStats?.count).toBe(1);
     expect(metrics["variant-a"]!.costStats?.avg).toBeCloseTo(0.01);
@@ -54,7 +62,10 @@ describe("computeVariantMetrics", () => {
       row({ "variant-a": target({ cost: 0.02, duration: null }) }, 1),
     ];
 
-    const metrics = computeVariantMetrics(["variant-a"], rows);
+    const metrics = computeVariantMetrics({
+      variantIds: ["variant-a"],
+      rows: rows,
+    });
 
     expect(metrics["variant-a"]!.costStats?.count).toBe(1);
     expect(metrics["variant-a"]!.costStats?.avg).toBeCloseTo(0.02);
@@ -67,14 +78,20 @@ describe("computeVariantMetrics", () => {
       row({ "variant-a": target({ cost: null, duration: null }) }, 0),
     ];
 
-    const metrics = computeVariantMetrics(["variant-a"], rows);
+    const metrics = computeVariantMetrics({
+      variantIds: ["variant-a"],
+      rows: rows,
+    });
 
     expect(metrics["variant-a"]!.costStats).toBeNull();
     expect(metrics["variant-a"]!.durationStats).toBeNull();
   });
 
   it("returns an entry for every requested variant id, even with zero rows", () => {
-    const metrics = computeVariantMetrics(["variant-a", "variant-b"], []);
+    const metrics = computeVariantMetrics({
+      variantIds: ["variant-a", "variant-b"],
+      rows: [],
+    });
 
     expect(Object.keys(metrics)).toEqual(["variant-a", "variant-b"]);
     expect(metrics["variant-b"]!.costStats).toBeNull();

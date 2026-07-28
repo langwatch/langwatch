@@ -38,7 +38,10 @@ import {
   DEFAULT_WARN_THRESHOLD,
   PairwiseLeaderboard,
 } from "./batch-evaluation-results/PairwiseLeaderboard";
-import type { BatchComparisonColumn, BatchResultRow } from "./batch-evaluation-results/types";
+import type {
+  BatchComparisonColumn,
+  BatchResultRow,
+} from "./batch-evaluation-results/types";
 import { useDrawer } from "~/hooks/useDrawer";
 import { Drawer } from "./ui/drawer";
 
@@ -52,8 +55,6 @@ export type ComparisonLeaderboardDrawerProps = {
   /** Model that judged this comparison, as recorded on the run. */
   judgeModel?: string | null;
 };
-
-
 
 export function ComparisonLeaderboardDrawer({
   column,
@@ -73,17 +74,24 @@ export function ComparisonLeaderboardDrawer({
     [column.variants],
   );
   const variantNames = useMemo(
-    () =>
-      Object.fromEntries(column.variants.map((v) => [v.id ?? "", v.name])),
+    () => Object.fromEntries(column.variants.map((v) => [v.id ?? "", v.name])),
     [column.variants],
   );
 
   const leaderboard = useMemo(
-    () => computeBTLeaderboard(buildPairwiseComparisons(column), variantIds),
+    () =>
+      computeBTLeaderboard({
+        comparisons: buildPairwiseComparisons(column),
+        variantIds,
+      }),
     [column, variantIds],
   );
   const variantMetrics = useMemo(
-    () => computeVariantMetrics(variantIds, rows),
+    () =>
+      computeVariantMetrics({
+        variantIds,
+        rows,
+      }),
     [variantIds, rows],
   );
 
@@ -142,7 +150,12 @@ export function ComparisonLeaderboardDrawer({
   }, [column.verdictsByRow, selectedPair]);
 
   return (
-    <Drawer.Root open={true} placement="end" size="lg" onOpenChange={closeDrawer}>
+    <Drawer.Root
+      open={true}
+      placement="end"
+      size="lg"
+      onOpenChange={closeDrawer}
+    >
       <Drawer.Content bg="bg">
         <Drawer.Header>
           <Text fontWeight="semibold" fontSize="lg">
@@ -164,9 +177,9 @@ export function ComparisonLeaderboardDrawer({
                   one. The score is chess-rating style: 0 is average for this
                   group, and it is the GAP that means something, not the number.
                   A 400-point gap is roughly 10:1 odds; 0 is a coin flip. The
-                  shaded band behind each bar is where the score could
-                  plausibly sit — when two bands overlap, this run cannot tell
-                  those two apart, whatever their bars look like.
+                  shaded band behind each bar is where the score could plausibly
+                  sit — when two bands overlap, this run cannot tell those two
+                  apart, whatever their bars look like.
                 </>
               }
             >
@@ -229,11 +242,11 @@ export function ComparisonLeaderboardDrawer({
               subtitle="Trade-offs, head-to-head detail, and the judge's own reasoning."
               help={
                 <>
-                  Cost and latency are shown next to quality, never blended
-                  into it — a single &quot;best overall&quot; number would hide
-                  the trade-off you are actually making. The grid below counts
-                  how often each variant beat each other one; click any cell to
-                  read the judge&apos;s own words for those rows.
+                  Cost and latency are shown next to quality, never blended into
+                  it — a single &quot;best overall&quot; number would hide the
+                  trade-off you are actually making. The grid below counts how
+                  often each variant beat each other one; click any cell to read
+                  the judge&apos;s own words for those rows.
                 </>
               }
             >

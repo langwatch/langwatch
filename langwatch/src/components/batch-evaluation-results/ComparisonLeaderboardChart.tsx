@@ -114,12 +114,18 @@ export function ComparisonLeaderboardChart({
   );
 
   const leaderboard = useMemo(
-    () => computeBTLeaderboard(buildPairwiseComparisons(column), variantIds),
+    () =>
+      computeBTLeaderboard({
+        comparisons: buildPairwiseComparisons(column),
+        variantIds,
+      }),
     [column, variantIds],
   );
 
   const nameById = new Map(column.variants.map((v) => [v.id, v.name]));
-  const axis = axisLabelProps(Math.min(leaderboard.entries.length, MAX_COMPACT_BARS));
+  const axis = axisLabelProps(
+    Math.min(leaderboard.entries.length, MAX_COMPACT_BARS),
+  );
   const displayNames = buildAxisLabels(
     leaderboard.entries.map((e) => nameById.get(e.variantId) ?? e.variantId),
     axis.maxLabelLength,
@@ -137,7 +143,8 @@ export function ComparisonLeaderboardChart({
     fullName: fullNames[index] ?? e.variantId,
     score: e.score,
     color:
-      targetColors?.[e.variantId] ?? VARIANT_COLORS[index % VARIANT_COLORS.length]!,
+      targetColors?.[e.variantId] ??
+      VARIANT_COLORS[index % VARIANT_COLORS.length]!,
   }));
 
   const yMax = Math.max(1, ...chartData.map((d) => Math.abs(d.score)));
@@ -158,7 +165,11 @@ export function ComparisonLeaderboardChart({
   );
   const verdict = computeLeaderboardVerdict(leaderboard);
   const variantMetrics = useMemo(
-    () => computeVariantMetrics(variantIds, rows),
+    () =>
+      computeVariantMetrics({
+        variantIds,
+        rows,
+      }),
     [variantIds, rows],
   );
   const cheaperAlternative = useMemo(
@@ -245,7 +256,11 @@ export function ComparisonLeaderboardChart({
         {headline.heading}
       </Text>
       <ResponsiveContainer width="100%" height={chartHeight}>
-        <BarChart data={chartData} layout="vertical" margin={{ left: 10, right: 20 }}>
+        <BarChart
+          data={chartData}
+          layout="vertical"
+          margin={{ left: 10, right: 20 }}
+        >
           <CartesianGrid
             horizontal={false}
             vertical={true}
@@ -291,7 +306,12 @@ export function ComparisonLeaderboardChart({
         </BarChart>
       </ResponsiveContainer>
       {hiddenCount > 0 ? (
-        <Text fontSize="2xs" color="fg.muted" textAlign="center" paddingBottom={1}>
+        <Text
+          fontSize="2xs"
+          color="fg.muted"
+          textAlign="center"
+          paddingBottom={1}
+        >
           +{hiddenCount} more — expand for the full leaderboard
         </Text>
       ) : null}
