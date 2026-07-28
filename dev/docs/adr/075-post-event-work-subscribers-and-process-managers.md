@@ -335,9 +335,36 @@ enqueue filter narrows on `eventTypes` alone.
   OCSF and KPI streams. Each repository must therefore be idempotent on its own
   natural event key **before** conversion — this is a precondition, not a
   consequence. OCSF rows carry the span id or log-record id as `event_id`
-  (`folds.feature`). `governance_kpis` needs work: it is an incrementing
-  aggregate per `(org, source, hour_bucket)`, so re-deriving means recomputing
-  the bucket rather than re-applying a delta.
+  (`folds.feature`).
+
+- **`governance_kpis` is not an incrementing aggregate, and "recompute the
+  bucket" would have been the wrong fix.** An earlier draft of this ADR said it
+  was, and told implementers to recompute. Migration 00031 says otherwise:
+  `ReplacingMergeTree(LastEventOccurredAt)` keyed
+  `(TenantId, SourceId, HourBucket, TraceId)` — already one row per trace,
+  summed at read time. Recomputing the bucket would have reintroduced the
+  load-mutate-store race across traces sharing an hour that 00031's header
+  explicitly rejected.
+
+  The actual defect is narrower and worse: the version column is
+  `LastEventOccurredAt`, which is the trace's *earliest* span start. It is
+  **constant across firings**, so competing rows for one key tie and the
+  survivor is arbitrary; and it can **decrease** when a span with an earlier
+  start lands late, so a more complete row can lose to a less complete one.
+  Rebuild-to-correct-drift could not have worked even in principle, because a
+  replay writing final totals ties with what is already there. The fix is to
+  move the key to event grain — one row per span, carrying that span's own
+  cost — so re-derivation is a set-union of rows the set already contains.
+
+- **This one was not merely un-rebuildable, it is wrong live, and it reaches a
+  customer-facing alert.** `spendSpikeAnomalyEvaluator.service.ts` reads
+  `sumIf(SpendUsd, …)` from `governance_kpis` with no `FINAL`, no `argMax` and
+  no IN-tuple dedup, against a `ReplacingMergeTree` whose duplicate-keyed rows
+  are exactly what the arbitrary-survivor tie produces. So the spend-spike rule
+  over-counts every unmerged partial today. Event-grain keying removes the
+  duplicate keys that cause it, but **the missing read-side dedup is a separate
+  defect and should be fixed on its own** — it decides whether a customer gets
+  paged.
 
 - **Do not delete the budget ledger's insert probe.** An earlier draft of this
   ADR said the ledger "collapses on `(TenantId, BudgetId, GatewayRequestId)`
