@@ -863,7 +863,8 @@ describe("ClickHouseTraceService", () => {
             json: () => Promise.resolve([{ total: String(traceIds.length) }]),
           })
           .mockResolvedValueOnce({
-            json: () => Promise.resolve(traceIds.map((id) => ({ TraceId: id }))),
+            json: () =>
+              Promise.resolve(traceIds.map((id) => ({ TraceId: id }))),
           })
           // Every read of more than one id OOMs; single ids succeed. The helper
           // must therefore walk 25 -> 12 -> 6 -> 3 -> 1 rather than giving up at
@@ -876,7 +877,8 @@ describe("ClickHouseTraceService", () => {
                 return Promise.reject(new Error("MEMORY_LIMIT_EXCEEDED"));
               }
               return Promise.resolve({
-                json: () => Promise.resolve(ids.map((id) => makeSummaryRow(id))),
+                json: () =>
+                  Promise.resolve(ids.map((id) => makeSummaryRow(id))),
               });
             },
           );
@@ -918,7 +920,8 @@ describe("ClickHouseTraceService", () => {
             json: () => Promise.resolve([{ total: String(traceIds.length) }]),
           })
           .mockResolvedValueOnce({
-            json: () => Promise.resolve(traceIds.map((id) => ({ TraceId: id }))),
+            json: () =>
+              Promise.resolve(traceIds.map((id) => ({ TraceId: id }))),
           })
           .mockImplementation(
             (args: { query_params?: { pageTraceIds?: string[] } }) => {
@@ -927,7 +930,8 @@ describe("ClickHouseTraceService", () => {
                 return Promise.reject(new Error("MEMORY_LIMIT_EXCEEDED"));
               }
               return Promise.resolve({
-                json: () => Promise.resolve(ids.map((id) => makeSummaryRow(id))),
+                json: () =>
+                  Promise.resolve(ids.map((id) => makeSummaryRow(id))),
               });
             },
           );
@@ -965,7 +969,8 @@ describe("ClickHouseTraceService", () => {
             json: () => Promise.resolve([{ total: String(traceIds.length) }]),
           })
           .mockResolvedValueOnce({
-            json: () => Promise.resolve(traceIds.map((id) => ({ TraceId: id }))),
+            json: () =>
+              Promise.resolve(traceIds.map((id) => ({ TraceId: id }))),
           })
           .mockImplementation(
             async (args: { query_params?: { pageTraceIds?: string[] } }) => {
@@ -1012,7 +1017,8 @@ describe("ClickHouseTraceService", () => {
             json: () => Promise.resolve([{ total: String(traceIds.length) }]),
           })
           .mockResolvedValueOnce({
-            json: () => Promise.resolve(traceIds.map((id) => ({ TraceId: id }))),
+            json: () =>
+              Promise.resolve(traceIds.map((id) => ({ TraceId: id }))),
           })
           // full list OOMs, the 25-id chunk OOMs, then the bisected lower half
           // fails for an unrelated reason — the guard's non-OOM arm in the
@@ -1048,7 +1054,8 @@ describe("ClickHouseTraceService", () => {
             json: () => Promise.resolve([{ total: String(traceIds.length) }]),
           })
           .mockResolvedValueOnce({
-            json: () => Promise.resolve(traceIds.map((id) => ({ TraceId: id }))),
+            json: () =>
+              Promise.resolve(traceIds.map((id) => ({ TraceId: id }))),
           })
           // Production never surfaces a raw Error carrying the ClickHouse
           // fragment any more: every read path runs through
