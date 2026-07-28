@@ -230,13 +230,20 @@ function safeReasons(value: unknown): readonly SerializedReason[] {
 /**
  * Server prose, clamped to something that can only ever be a sentence.
  *
- * The payload is not always ours: a handled error relayed from a Go service is
- * parsed out of an upstream response body (`nlpgo/goHandledError.ts` forwards
- * `message` and the whole of `meta` verbatim), and that body comes from
- * whatever model-provider endpoint the customer configured. React escapes it,
- * so this is not an injection — but an upstream should not get to write a
- * paragraph inside LangWatch's own error chrome, and a driver diagnostic that
- * lands here should be truncated rather than recited.
+ * Every caller passes text LangWatch wrote: a Zod validator's message about
+ * the customer's own input, our template parser's syntax position, the
+ * sentence `explainSlackPostError` picked for a Slack code it recognises. This
+ * is a length clamp, not a safety boundary — a paragraph does not belong in an
+ * error's chrome, and a diagnostic that lands here should be truncated rather
+ * than recited at full length.
+ *
+ * It is NOT a way to make an upstream's sentence safe to show, and there is no
+ * variant of it that is. Prose from outside LangWatch is not rendered at all;
+ * see the note below. That matters because `goHandledError.ts` forwards a Go
+ * service's `message` and the whole of `meta` verbatim, so `meta.message` CAN
+ * carry text this client did not author — the protection is that the only
+ * entries reading it are the two whose servers author it, and an unrecognised
+ * code renders no description at all.
  */
 export function safeProse(value: string): string {
   const collapsed = value.replace(/\s+/g, " ").trim();

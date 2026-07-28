@@ -67,6 +67,13 @@ function describeLLMError(type: Exclude<ParsedLLMError["type"], "unknown">) {
       return "The model provider rejected the request — usually a parameter this model doesn't support, or a conversation past its context limit.";
     case "connection":
       return "We couldn't reach the model provider.";
+    default:
+      // Unreachable while `type` really is one of the six, which the parse
+      // boundary now guarantees (`isLLMErrorType`). Kept because this value
+      // arrives via JSON.parse: before that guard, a provider's own `api_error`
+      // reached here and the switch returned `undefined`, rendering nothing
+      // where the error text belonged. A stock line beats a blank.
+      return "Something went wrong talking to the model provider.";
   }
 }
 
