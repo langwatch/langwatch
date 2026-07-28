@@ -55,7 +55,7 @@ export interface ApplySeedRetentionArgs {
    * Only needed when the seed is backdated (mass) — recent data tolerates the
    * brief window because a stale 7-day stamp still outlives a few minutes.
    */
-  waitForCacheRollover?: boolean;
+  shouldWaitForCacheRollover?: boolean;
   log?: (message: string) => void;
 }
 
@@ -72,10 +72,10 @@ export async function applySeedRetention(
     prisma,
     organizationId,
     retentionDays,
-    waitForCacheRollover = false,
+    shouldWaitForCacheRollover = false,
     log = () => {},
   } = args;
-  let changed = false;
+  let hasChanged = false;
   for (const category of RETENTION_CATEGORIES) {
     const where = {
       scopeType_scopeId_category: {
@@ -97,13 +97,13 @@ export async function applySeedRetention(
       },
       update: { retentionDays },
     });
-    changed = true;
+    hasChanged = true;
   }
-  if (changed && waitForCacheRollover) {
+  if (hasChanged && shouldWaitForCacheRollover) {
     log(
       `retention pinned to ${retentionDays} days — waiting 65s for the resolver caches to roll over…`,
     );
     await new Promise((resolve) => setTimeout(resolve, 65_000));
   }
-  return changed;
+  return hasChanged;
 }

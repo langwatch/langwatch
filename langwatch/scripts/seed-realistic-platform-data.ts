@@ -14,6 +14,7 @@ import { getSuiteSetId } from "../src/server/suites/suite-set-id";
 import { seedDemoPlatform } from "../prisma/seed-demo-platform";
 import { DEMO_PLATFORM_IDS } from "../prisma/demo-platform-ids";
 import {
+  DAY_MS,
   assertLocalUrl,
   dateKey,
   ingestTrace,
@@ -36,7 +37,6 @@ const target: CollectorTarget = {
     process.env.HAVEN_SEED_LANGWATCH_API_KEY ?? "sk-lw-local-development-key",
 };
 const BASE_TIME = Date.UTC(2026, 6, 15, 10, 0, 0);
-const DAY_MS = 24 * 60 * 60_000;
 const HISTORY_DAYS = 21;
 
 assertLocalUrl("HAVEN_SEED_ENDPOINT", target.endpoint);
@@ -451,7 +451,11 @@ async function main(): Promise<void> {
     const historicalRuns = buildHistoricalScenarioRuns();
     const traces = buildTraceFixtures(historicalRuns);
     for (const [index, trace] of traces.entries()) {
-      await ingestTrace(target, trace, Date.now() - (traces.length - index) * 4 * 60_000);
+      await ingestTrace({
+        target,
+        trace,
+        fallbackFinishedAt: Date.now() - (traces.length - index) * 4 * 60_000,
+      });
     }
     console.log(
       `🌱 Ingested ${traces.length} linked traces through ${target.endpoint}`,

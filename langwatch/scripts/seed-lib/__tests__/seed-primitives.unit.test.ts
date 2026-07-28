@@ -19,7 +19,7 @@ describe("buildCollectorPayload", () => {
 
   describe("when a fixture carries its own finish time", () => {
     it("back-computes span timestamps from latency and keeps both spans on the trace", () => {
-      const payload = buildCollectorPayload(trace, 0);
+      const payload = buildCollectorPayload({ trace, fallbackFinishedAt: 0 });
       expect(payload.trace_id).toBe("mass-trace-t");
       expect(payload.spans).toHaveLength(2);
       expect(payload.spans[0]!.timestamps.started_at).toBe(

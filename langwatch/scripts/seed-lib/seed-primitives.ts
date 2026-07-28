@@ -92,10 +92,13 @@ export interface CollectorPayload {
  * dispatches the same spans as pipeline commands when the collector's ingest
  * window has passed.
  */
-export function buildCollectorPayload(
-  trace: TraceFixture,
-  fallbackFinishedAt: number,
-): CollectorPayload {
+export function buildCollectorPayload({
+  trace,
+  fallbackFinishedAt,
+}: {
+  trace: TraceFixture;
+  fallbackFinishedAt: number;
+}): CollectorPayload {
   const finishedAt = trace.finishedAtMs ?? fallbackFinishedAt;
   const startedAt = finishedAt - trace.latencyMs;
   return {
@@ -147,18 +150,22 @@ export function buildCollectorPayload(
 }
 
 /** Ingest one two-span (agent + llm) trace through the real collector. */
-export async function ingestTrace(
-  target: CollectorTarget,
-  trace: TraceFixture,
-  fallbackFinishedAt: number,
-): Promise<void> {
+export async function ingestTrace({
+  target,
+  trace,
+  fallbackFinishedAt,
+}: {
+  target: CollectorTarget;
+  trace: TraceFixture;
+  fallbackFinishedAt: number;
+}): Promise<void> {
   const response = await fetch(`${target.endpoint}/api/collector`, {
     method: "POST",
     headers: {
       "X-Auth-Token": target.apiKey,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(buildCollectorPayload(trace, fallbackFinishedAt)),
+    body: JSON.stringify(buildCollectorPayload({ trace, fallbackFinishedAt })),
     signal: AbortSignal.timeout(15_000),
   });
   if (!response.ok) {
@@ -174,10 +181,13 @@ export async function ingestTrace(
  * through the production boundary as-is. A partialSuccess reply means points
  * were rejected for good — surface it as a failure so a seed never half-lands.
  */
-export async function ingestOtlpMetrics(
-  target: CollectorTarget,
-  request: unknown,
-): Promise<void> {
+export async function ingestOtlpMetrics({
+  target,
+  request,
+}: {
+  target: CollectorTarget;
+  request: unknown;
+}): Promise<void> {
   const response = await fetch(`${target.endpoint}/api/otel/v1/metrics`, {
     method: "POST",
     headers: {
@@ -192,7 +202,11 @@ export async function ingestOtlpMetrics(
       `metrics endpoint rejected the batch: ${response.status} ${await response.text()}`,
     );
   }
-  const body = (await response.json()) as {
+  // Some OTLP receivers answer 200 with an empty body instead of the
+  // ExportMetricsServiceResponse the spec asks for. The seed only needs
+  // partialSuccess, so an empty body is success, not a SyntaxError mid-run.
+  const text = await response.text();
+  const body = (text ? JSON.parse(text) : {}) as {
     partialSuccess?: { rejectedDataPoints?: number; errorMessage?: string };
   };
   if (body.partialSuccess?.rejectedDataPoints) {

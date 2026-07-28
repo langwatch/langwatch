@@ -26,15 +26,15 @@ async function main(): Promise<void> {
   try {
     const windowDays = windowDaysFromEnv();
     const retentionDays = seededRetentionDays(windowDays);
-    const changed = await applySeedRetention({
+    const hasChanged = await applySeedRetention({
       prisma,
       organizationId: ORG_ID,
       retentionDays,
-      waitForCacheRollover: windowDays > 0,
+      shouldWaitForCacheRollover: windowDays > 0,
       log: (message) => console.log(`🗓️  ${message}`),
     });
     console.log(
-      changed
+      hasChanged
         ? `✅ Seed retention set to ${retentionDays} days for the local-dev org`
         : `✅ Seed retention already ${retentionDays} days for the local-dev org`,
     );
@@ -43,4 +43,9 @@ async function main(): Promise<void> {
   }
 }
 
-void main();
+main()
+  .then(() => process.exit(0))
+  .catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });

@@ -264,28 +264,56 @@ func TestProcessOnlyKnobsAreDocumented(t *testing.T) {
 // @scenario "Removed selection env vars name their replacement"
 func TestRejectRemovedSelectionEnv(t *testing.T) {
 	t.Run("given a removed selection variable set to the value that used to apply", func(t *testing.T) {
-		for _, tc := range []struct{ name, value, wantHint string }{
+		for _, tc := range []struct{ name, value, wantReplacement string }{
 			{"LANGWATCH_SKIP_NLP", "1", "haven up -nlp"},
 			{"LANGWATCH_SKIP_AIGATEWAY", "1", "haven up -gateway"},
 			{"LANGWATCH_SKIP_LANGYAGENT", "1", "haven up -langy"},
 			{"WORKERS_IN_PROCESS", "0", "haven up +workers"},
-			{"START_WORKERS", "false", "haven up +workers"},
 		} {
 			t.Run("when up runs with "+tc.name, func(t *testing.T) {
-				t.Run("fails naming the sticky replacement", func(t *testing.T) {
+				t.Run("fails naming the sticky command that replaces it", func(t *testing.T) {
 					t.Setenv(tc.name, tc.value)
 					err := rejectRemovedSelectionEnv()
 					if err == nil {
 						t.Fatalf("%s=%s was accepted; it no longer selects services", tc.name, tc.value)
 					}
-					if !strings.Contains(err.Error(), tc.wantHint) {
-						t.Errorf("error %q does not point at %q", err, tc.wantHint)
+					if !strings.Contains(err.Error(), tc.wantReplacement) {
+						t.Errorf("error %q does not point at %q", err, tc.wantReplacement)
 					}
 				})
 			})
 		}
 	})
 
+	// START_WORKERS is the one with nothing to point at: it turned the worker
+	// stack off entirely, and there is no way to do that any more. Offering
+	// `+workers` here would be wrong in the opposite direction — that STARTS a
+	// standalone lane, so a developer following it would get more than before,
+	// not less.
+	t.Run("given START_WORKERS=false, which nothing replaces", func(t *testing.T) {
+		t.Run("when up runs", func(t *testing.T) {
+			t.Setenv("START_WORKERS", "false")
+			err := rejectRemovedSelectionEnv()
+			if err == nil {
+				t.Fatal("START_WORKERS=false was accepted; it no longer turns the workers off")
+			}
+
+			t.Run("says it does nothing rather than naming a replacement", func(t *testing.T) {
+				if !strings.Contains(err.Error(), "no longer does anything") {
+					t.Errorf("error %q should say the variable does nothing", err)
+				}
+				if strings.Contains(err.Error(), "run `") {
+					t.Errorf("error %q offers a replacement command; there is none", err)
+				}
+			})
+
+			t.Run("explains where the worker stack lives now", func(t *testing.T) {
+				if !strings.Contains(err.Error(), "part of the app") {
+					t.Errorf("error %q does not say the workers are part of the app now", err)
+				}
+			})
+		})
+	})
 }
 
 // WORKERS_IN_PROCESS=1 is still how plain `pnpm dev` asks for a single process

@@ -87,10 +87,10 @@ async function dispatchDeepTrace({
   app: ReturnType<typeof initializeDefaultApp>;
   trace: TraceFixture;
 }): Promise<void> {
-  const payload = buildCollectorPayload(
+  const payload = buildCollectorPayload({
     trace,
-    trace.finishedAtMs ?? Date.now(),
-  );
+    fallbackFinishedAt: trace.finishedAtMs ?? Date.now(),
+  });
   const reservedTraceMetadata: ReservedTraceMetadata = Object.fromEntries(
     Object.entries(reservedTraceMetadataSchema.parse(payload.metadata)).filter(
       ([, value]) => value !== null && value !== undefined,
@@ -278,19 +278,36 @@ interface ProjectionCounts {
   metricPoints: number;
 }
 
-async function projectionCounts(): Promise<ProjectionCounts> {
+/** The seeded window, so every count can prune to the partitions it wrote. */
+interface SeedWindow {
+  fromMs: number;
+  toMs: number;
+}
+
+/**
+ * Counts the rows the seed expects to see projected. Each subquery carries the
+ * seeded window on its table's own partition key, so the poll prunes to the
+ * weeks the seed actually wrote instead of scanning every partition (including
+ * cold ones on S3) — this runs every 2s for up to ten minutes.
+ */
+async function projectionCounts(window: SeedWindow): Promise<ProjectionCounts> {
   const client = await getClickHouseClientForProject(PROJECT_ID);
   if (!client) throw new Error("ClickHouse client is unavailable");
   const result = await client.query({
     query: `
       SELECT
-        (SELECT uniqExact(ScenarioRunId) FROM simulation_runs WHERE TenantId = {tenantId:String} AND ScenarioRunId LIKE 'mass-scenario-%') AS simulations,
-        (SELECT uniqExact(EvaluationId) FROM evaluation_runs WHERE TenantId = {tenantId:String} AND EvaluationId LIKE 'mass-eval-%') AS evaluations,
-        (SELECT uniqExact(RunId) FROM experiment_runs WHERE TenantId = {tenantId:String} AND RunId LIKE 'mass-exp-%') AS experimentRuns,
-        (SELECT uniqExact(TraceId) FROM trace_summaries WHERE TenantId = {tenantId:String} AND (TraceId LIKE 'mass-trace-%' OR TraceId LIKE 'mass-organic-%')) AS traces,
-        (SELECT uniqExact(PointId) FROM metric_data_points WHERE TenantId = {tenantId:String} AND ScopeName = {scopeName:String}) AS metricPoints
+        (SELECT uniqExact(ScenarioRunId) FROM simulation_runs WHERE TenantId = {tenantId:String} AND StartedAt BETWEEN {from:DateTime64(3)} AND {to:DateTime64(3)} AND ScenarioRunId LIKE 'mass-scenario-%') AS simulations,
+        (SELECT uniqExact(EvaluationId) FROM evaluation_runs WHERE TenantId = {tenantId:String} AND ScheduledAt BETWEEN {from:DateTime64(3)} AND {to:DateTime64(3)} AND EvaluationId LIKE 'mass-eval-%') AS evaluations,
+        (SELECT uniqExact(RunId) FROM experiment_runs WHERE TenantId = {tenantId:String} AND StartedAt BETWEEN {from:DateTime64(3)} AND {to:DateTime64(3)} AND RunId LIKE 'mass-exp-%') AS experimentRuns,
+        (SELECT uniqExact(TraceId) FROM trace_summaries WHERE TenantId = {tenantId:String} AND OccurredAt BETWEEN {from:DateTime64(3)} AND {to:DateTime64(3)} AND (TraceId LIKE 'mass-trace-%' OR TraceId LIKE 'mass-organic-%')) AS traces,
+        (SELECT uniqExact(PointId) FROM metric_data_points WHERE TenantId = {tenantId:String} AND TimeUnixMs BETWEEN {from:DateTime64(3)} AND {to:DateTime64(3)} AND ScopeName = {scopeName:String}) AS metricPoints
     `,
-    query_params: { tenantId: PROJECT_ID, scopeName: MASS_METRICS_SCOPE },
+    query_params: {
+      tenantId: PROJECT_ID,
+      scopeName: MASS_METRICS_SCOPE,
+      from: window.fromMs,
+      to: window.toMs,
+    },
     format: "JSONEachRow",
   });
   const [row] =
@@ -305,7 +322,10 @@ async function projectionCounts(): Promise<ProjectionCounts> {
   };
 }
 
-async function waitForProjections(expected: ProjectionCounts): Promise<ProjectionCounts> {
+async function waitForProjections(
+  expected: ProjectionCounts,
+  window: SeedWindow,
+): Promise<ProjectionCounts> {
   // Months of history is a lot of projection work for one worker; be patient.
   const deadline = Date.now() + 600_000;
   const ready = (counts: ProjectionCounts) =>
@@ -314,10 +334,10 @@ async function waitForProjections(expected: ProjectionCounts): Promise<Projectio
     counts.experimentRuns >= expected.experimentRuns &&
     counts.traces >= expected.traces &&
     counts.metricPoints >= expected.metricPoints;
-  let counts = await projectionCounts();
+  let counts = await projectionCounts(window);
   while (!ready(counts) && Date.now() < deadline) {
     await new Promise((resolve) => setTimeout(resolve, 2_000));
-    counts = await projectionCounts();
+    counts = await projectionCounts(window);
   }
   if (!ready(counts)) {
     throw new Error(
@@ -341,7 +361,7 @@ async function main(): Promise<void> {
       prisma,
       organizationId: ORG_ID,
       retentionDays: seededRetentionDays(timeline.days),
-      waitForCacheRollover: true,
+      shouldWaitForCacheRollover: true,
       log: (message) => console.log(`   ${message}`),
     });
 
@@ -364,11 +384,11 @@ async function main(): Promise<void> {
     );
 
     for (const trace of windowed) {
-      await ingestTrace(target, trace, now);
+      await ingestTrace({ target, trace, fallbackFinishedAt: now });
     }
     console.log(`   recent traces ingested through ${target.endpoint}`);
     for (const batch of metrics.batches) {
-      await ingestOtlpMetrics(target, batch.request);
+      await ingestOtlpMetrics({ target, request: batch.request });
     }
     console.log(
       `   ${metrics.totalPoints} metric points ingested through /api/otel/v1/metrics`,
@@ -381,13 +401,17 @@ async function main(): Promise<void> {
     console.log("   deep trace history dispatched as pipeline commands");
     await dispatchTimeline({ app, timeline });
     console.log("   lifecycles dispatched — waiting for projections…");
-    const counts = await waitForProjections({
-      simulations: timeline.scenarioRuns.length,
-      evaluations: timeline.scenarioRuns.length,
-      experimentRuns: timeline.experimentRuns.length,
-      traces: traces.length,
-      metricPoints: metrics.totalPoints,
-    });
+    const counts = await waitForProjections(
+      {
+        simulations: timeline.scenarioRuns.length,
+        evaluations: timeline.scenarioRuns.length,
+        experimentRuns: timeline.experimentRuns.length,
+        traces: traces.length,
+        metricPoints: metrics.totalPoints,
+      },
+      // A day of slack each side: lifecycles stamp a few hours past their run.
+      { fromMs: timeline.firstDayStart - DAY_MS, toMs: now + DAY_MS },
+    );
     console.log(
       `✅ Mass projections ready: ${counts.simulations} scenario runs, ${counts.evaluations} evaluations, ${counts.experimentRuns} experiment runs, ${counts.traces} traces, ${counts.metricPoints} metric points`,
     );
