@@ -79,6 +79,44 @@ export const computeScoreBarScale = (
   };
 };
 
+/**
+ * Which edges of an interval run past the chart.
+ *
+ * The scale is built from the scores, so a wide interval routinely extends
+ * beyond both bounds and `pct` clamps it to the track. Clamping alone is a
+ * lie by omission: a band cut off at the edge draws exactly like a band that
+ * genuinely ends there, which makes the uncertainty look SMALLER than it is —
+ * the one misreading this chart exists to prevent. The caller fades the
+ * clipped edge so "runs off the chart" and "stops here" stop looking alike.
+ */
+export const computeBandClipping = ({
+  ci,
+  min,
+  max,
+}: {
+  ci: [number, number];
+  min: number;
+  max: number;
+}): { start: boolean; end: boolean } => ({
+  start: ci[0] < min,
+  end: ci[1] > max,
+});
+
+/** CSS mask that fades whichever edges were clipped. Undefined when neither is. */
+export const clippedBandMask = ({
+  start,
+  end,
+}: {
+  start: boolean;
+  end: boolean;
+}): string | undefined => {
+  if (start && end)
+    return "linear-gradient(to right, transparent 0%, #000 14%, #000 86%, transparent 100%)";
+  if (start) return "linear-gradient(to right, transparent 0%, #000 14%)";
+  if (end) return "linear-gradient(to left, transparent 0%, #000 14%)";
+  return undefined;
+};
+
 export function LeaderboardVerdictPanel({
   leaderboard,
   verdict,
@@ -190,7 +228,7 @@ function ScoreBars({
 
   const scale = computeScoreBarScale(entries);
   if (!scale) return null;
-  const { pct } = scale;
+  const { pct, min, max } = scale;
 
   return (
     <VStack align="stretch" gap={2}>
@@ -198,6 +236,8 @@ function ScoreBars({
         const isTied = tied.has(entry.variantId);
         const color = targetColors?.[entry.variantId] ?? "rgb(37, 99, 235)";
         const ci = finiteCI(entry);
+        const clip = ci ? computeBandClipping({ ci, min, max }) : null;
+        const mask = clip ? clippedBandMask(clip) : undefined;
         return (
           <Box key={entry.variantId}>
             <HStack justify="space-between" marginBottom={1}>
@@ -241,6 +281,13 @@ function ScoreBars({
                   bg={color}
                   opacity={0.25}
                   borderRadius="sm"
+                  borderStartRadius={clip?.start ? 0 : undefined}
+                  borderEndRadius={clip?.end ? 0 : undefined}
+                  style={
+                    mask
+                      ? { maskImage: mask, WebkitMaskImage: mask }
+                      : undefined
+                  }
                 />
               ) : null}
               {/* point estimate */}
@@ -258,8 +305,12 @@ function ScoreBars({
         );
       })}
       <Text fontSize="2xs" color="fg.muted">
-        Bar marks the score; the shaded band is the range it could plausibly
-        be. Overlapping bands mean the run cannot tell those variants apart.
+        Bar marks the score, the shaded band the range it could plausibly be.
+        Where two bands overlap, this run did not separate those variants
+        {showTieShading
+          ? " — “tied for first” marks the ones it could not separate from the top scorer"
+          : ""}
+        . A faded edge means the band continues past the chart.
       </Text>
     </VStack>
   );
