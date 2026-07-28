@@ -192,8 +192,7 @@ function buildExperimentPair({
   random: () => number;
 }): MassExperimentRun[] {
   const week = dateKey(dayStart);
-  return ["baseline", "improved"].map((name) => {
-    const variant = name as MassExperimentRun["variant"];
+  return (["baseline", "improved"] as const).map((variant) => {
     const uplift = variant === "improved" ? 0.24 : 0;
     return {
       runId: `mass-exp-${week}-${variant}`,

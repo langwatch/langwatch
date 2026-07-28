@@ -322,10 +322,13 @@ async function projectionCounts(window: SeedWindow): Promise<ProjectionCounts> {
   };
 }
 
-async function waitForProjections(
-  expected: ProjectionCounts,
-  window: SeedWindow,
-): Promise<ProjectionCounts> {
+async function waitForProjections({
+  expected,
+  window,
+}: {
+  expected: ProjectionCounts;
+  window: SeedWindow;
+}): Promise<ProjectionCounts> {
   // Months of history is a lot of projection work for one worker; be patient.
   const deadline = Date.now() + 600_000;
   const ready = (counts: ProjectionCounts) =>
@@ -401,8 +404,8 @@ async function main(): Promise<void> {
     console.log("   deep trace history dispatched as pipeline commands");
     await dispatchTimeline({ app, timeline });
     console.log("   lifecycles dispatched — waiting for projections…");
-    const counts = await waitForProjections(
-      {
+    const counts = await waitForProjections({
+      expected: {
         simulations: timeline.scenarioRuns.length,
         evaluations: timeline.scenarioRuns.length,
         experimentRuns: timeline.experimentRuns.length,
@@ -410,8 +413,8 @@ async function main(): Promise<void> {
         metricPoints: metrics.totalPoints,
       },
       // A day of slack each side: lifecycles stamp a few hours past their run.
-      { fromMs: timeline.firstDayStart - DAY_MS, toMs: now + DAY_MS },
-    );
+      window: { fromMs: timeline.firstDayStart - DAY_MS, toMs: now + DAY_MS },
+    });
     console.log(
       `✅ Mass projections ready: ${counts.simulations} scenario runs, ${counts.evaluations} evaluations, ${counts.experimentRuns} experiment runs, ${counts.traces} traces, ${counts.metricPoints} metric points`,
     );

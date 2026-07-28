@@ -257,6 +257,19 @@ func TestProcessOnlyKnobsAreDocumented(t *testing.T) {
 	}
 }
 
+// onlyRemovedKnobSet clears every removed selection variable, then sets one.
+// rejectRemovedSelectionEnv reports the FIRST variable that applies, and it
+// resolves through langwatch/.env as well as the environment — so without this
+// a developer whose own .env still carries one of these would see these tests
+// assert against the wrong variable's error.
+func onlyRemovedKnobSet(t *testing.T, name, value string) {
+	t.Helper()
+	for _, knob := range removedSelectionEnv {
+		t.Setenv(knob.name, "")
+	}
+	t.Setenv(name, value)
+}
+
 // The selection env vars are gone, not quietly ignored: a stale export would
 // otherwise start services the developer believes they turned off, and `haven
 // status` would report a selection the env had overridden behind its back.
@@ -272,7 +285,7 @@ func TestRejectRemovedSelectionEnv(t *testing.T) {
 		} {
 			t.Run("when up runs with "+tc.name, func(t *testing.T) {
 				t.Run("fails naming the sticky command that replaces it", func(t *testing.T) {
-					t.Setenv(tc.name, tc.value)
+					onlyRemovedKnobSet(t, tc.name, tc.value)
 					err := rejectRemovedSelectionEnv()
 					if err == nil {
 						t.Fatalf("%s=%s was accepted; it no longer selects services", tc.name, tc.value)
@@ -292,7 +305,7 @@ func TestRejectRemovedSelectionEnv(t *testing.T) {
 	// not less.
 	t.Run("given START_WORKERS=false, which nothing replaces", func(t *testing.T) {
 		t.Run("when up runs", func(t *testing.T) {
-			t.Setenv("START_WORKERS", "false")
+			onlyRemovedKnobSet(t, "START_WORKERS", "false")
 			err := rejectRemovedSelectionEnv()
 			if err == nil {
 				t.Fatal("START_WORKERS=false was accepted; it no longer turns the workers off")
@@ -326,7 +339,7 @@ func TestWorkersInProcessOneDoesNotBlockUp(t *testing.T) {
 	t.Run("given WORKERS_IN_PROCESS=1", func(t *testing.T) {
 		t.Run("when up runs", func(t *testing.T) {
 			t.Run("starts normally", func(t *testing.T) {
-				t.Setenv("WORKERS_IN_PROCESS", "1")
+				onlyRemovedKnobSet(t, "WORKERS_IN_PROCESS", "1")
 				if err := rejectRemovedSelectionEnv(); err != nil {
 					t.Errorf("WORKERS_IN_PROCESS=1 must not block up: %v", err)
 				}
