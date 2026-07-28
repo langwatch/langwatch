@@ -27,6 +27,13 @@ export const ScenarioInfraErrorCode = {
   ModelProviderError: "scenario_model_provider_error",
   /** The run exceeded its time budget. */
   ExecutionTimeout: "scenario_execution_timeout",
+  /**
+   * The agent's own code raised. NOT an infrastructure failure — it is here
+   * because this classifier is the single place a scenario failure is turned
+   * into something a customer reads, and without it a user-code failure gets
+   * bucketed as one of the infra codes above (lw#3439).
+   */
+  UserCodeError: "scenario_user_code_error",
   /** Anything else that failed at the infrastructure level. */
   Infra: "scenario_infra_error",
 } as const;
@@ -74,6 +81,35 @@ function extractProviderMessage(raw: string): string | undefined {
 }
 
 /**
+ * Pull the customer-facing part out of the adapter's user-code failure.
+ *
+ * The adapter renders `type: <ExceptionClass>` and an indented traceback whose
+ * last line is the exception. That last line is what a developer reads first,
+ * so prefer it, then the declared type, then whatever is left.
+ */
+function extractUserCodeDetail(raw: string): string {
+  const lines = raw
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+
+  const exceptionLine = [...lines]
+    .reverse()
+    .find((line) => /^[A-Za-z_][\w.]*(Error|Exception|Warning)\b/.test(line));
+  if (exceptionLine) return summarize(exceptionLine);
+
+  const declaredType = /^type:\s*(\S+)/m.exec(raw)?.[1];
+  if (declaredType) return summarize(declaredType);
+
+  const withoutHeadline = lines.filter(
+    (line) =>
+      !contains(line, "user code raised an error during execution") &&
+      !contains(line, "user code error:"),
+  );
+  return summarize(withoutHeadline.join(" ") || raw);
+}
+
+/**
  * Collapse a raw error blob (often a multi-line child-process dump) into a
  * single concise line: strip the "Child process exited with code N:" wrapper
  * and any JSON-log noise, keep the first meaningful line, and cap the length.
@@ -105,6 +141,27 @@ interface ClassificationRule {
  * actionable than the generic "fetch failed" it usually rides on, so it wins.
  */
 const CLASSIFICATION_RULES: ClassificationRule[] = [
+  {
+    /**
+     * MUST stay first. The rules below scan for needles like "timed out",
+     * "ECONNREFUSED" and "fetch failed" — all of which routinely appear
+     * inside a customer's own Python traceback. The reported lw#3439 case is
+     * literally `httpx.TimeoutException: The read operation timed out`, so
+     * without this rule the customer's bug is rendered back to them as "The
+     * simulation timed out before it finished" — our infrastructure taking
+     * the blame for their code, which is the exact inversion lw#3439 is
+     * about, one layer further down than the adapter.
+     *
+     * The needle is the adapter's own headline, which is a fixed string it
+     * controls (`format-execution-error.ts`), not a guess at user content.
+     */
+    needles: ["user code raised an error during execution"],
+    build: (text) => ({
+      code: ScenarioInfraErrorCode.UserCodeError,
+      message: `The agent's code raised an error: ${extractUserCodeDetail(text)}`,
+      hint: "This is an error in the agent's own code, not in LangWatch. Open the run's trace for the full traceback.",
+    }),
+  },
   {
     // Untrusted TLS certificate — the local-dev self-signed-cert case.
     needles: [
@@ -143,7 +200,10 @@ const CLASSIFICATION_RULES: ClassificationRule[] = [
     },
   },
   {
-    needles: ["timed out", "ETIMEDOUT"],
+    // "did not respond within" is the serialized adapters' own timeout
+    // wording; without it an adapter timeout fell through to the generic
+    // bucket and lost its actionable hint (lw#3439).
+    needles: ["timed out", "ETIMEDOUT", "did not respond within"],
     build: () => ({
       code: ScenarioInfraErrorCode.ExecutionTimeout,
       message: "The simulation timed out before it finished.",
@@ -292,6 +352,8 @@ export function scenarioErrorTitle(code: ScenarioInfraErrorCode): string {
       return "Model provider error";
     case ScenarioInfraErrorCode.ExecutionTimeout:
       return "Simulation timed out";
+    case ScenarioInfraErrorCode.UserCodeError:
+      return "The agent's code failed";
     case ScenarioInfraErrorCode.Infra:
       return "Simulation failed";
     default: {

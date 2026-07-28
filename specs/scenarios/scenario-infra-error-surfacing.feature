@@ -47,6 +47,28 @@ Feature: Scenario infrastructure error surfacing and empty-response state
     Then the handled error code is "scenario_execution_timeout"
 
   @unit
+  Scenario: An adapter that never got a response is an execution timeout, not a generic failure
+    Given a scenario run failed because the NLP service did not respond in time
+    When the failure is classified
+    Then the handled error code is "scenario_execution_timeout"
+    And the message offers the timeout hint
+
+  @unit
+  @unit
+  Scenario: A failure in the agent's own code is not reported as our infrastructure failing
+    Given a scenario failed because the agent's Python code raised
+    And that error text happens to contain the words "timed out"
+    When the failure is classified
+    Then it is reported as a failure in the agent's code, not an execution timeout
+    And the message names the agent's own error
+    And the message does not claim the simulation timed out
+
+  @unit
+  Scenario: A failure in the agent's code is not reported as an unreachable endpoint
+    Given a scenario failed because the agent's Python code raised a connection error
+    When the failure is classified
+    Then it is reported as a failure in the agent's code, not an unreachable endpoint
+
   Scenario: An unrecognised failure keeps its message under a generic infra code
     Given a scenario run failed with a raw error "Something unexpected happened"
     When the failure is classified

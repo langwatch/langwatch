@@ -174,6 +174,59 @@ describe("resolveScenarioError", () => {
     expect(result.hint).toBeDefined();
   });
 
+  describe("when the agent's own code is what failed", () => {
+    // The adapter's headline (lw#3439). Its detail is the customer's own
+    // Python, so it routinely contains words this classifier scans for —
+    // the reported customer case is literally "The read operation timed out".
+    const userCodeFailure = [
+      "SerializedCodeAgentAdapter: user code raised an error during execution.",
+      "  type: TimeoutException",
+      "  user code error:",
+      '    File "<code-block>", line 3, in execute',
+      "    httpx.TimeoutException: The read operation timed out",
+    ].join("\n");
+
+    /** @scenario A failure in the agent's own code is not reported as our infrastructure failing */
+    it("does not report the agent's own timeout as an execution timeout", () => {
+      const result = classifyScenarioInfraError(userCodeFailure);
+
+      expect(result.code).toBe(ScenarioInfraErrorCode.UserCodeError);
+      expect(result.code).not.toBe(ScenarioInfraErrorCode.ExecutionTimeout);
+      expect(result.message).toMatch(/TimeoutException|read operation timed out/);
+      expect(result.message).not.toMatch(/The simulation timed out/);
+    });
+
+    /** @scenario A failure in the agent's code is not reported as an unreachable endpoint */
+    it("does not report the agent's own connection error as an unreachable endpoint", () => {
+      const result = classifyScenarioInfraError(
+        [
+          "SerializedCodeAgentAdapter: user code raised an error during execution.",
+          "  type: ConnectError",
+          "  user code error:",
+          "    httpx.ConnectError: [Errno 111] ECONNREFUSED",
+        ].join("\n"),
+      );
+
+      expect(result.code).toBe(ScenarioInfraErrorCode.UserCodeError);
+      expect(result.message).not.toMatch(/Couldn't reach the endpoint/);
+    });
+
+    /** @scenario An adapter that never got a response is an execution timeout, not a generic failure */
+    it("still classifies a genuine infra timeout as an execution timeout", () => {
+      // The guard must not swallow the real thing it sits in front of.
+      const result = classifyScenarioInfraError(
+        "SerializedCodeAgentAdapter: NLP service did not respond within 120000ms (request aborted).",
+      );
+      expect(result.code).toBe(ScenarioInfraErrorCode.ExecutionTimeout);
+      expect(result.hint).toBeDefined();
+    });
+
+    it("never renders a raw dump", () => {
+      const huge = `SerializedCodeAgentAdapter: user code raised an error during execution.\n${"x".repeat(5_000)}`;
+      expect(classifyScenarioInfraError(huge).message.length).toBeLessThan(500);
+    });
+  });
+
   it("returns an already-encoded envelope unchanged", () => {
     const envelope = classifyScenarioInfraError("ECONNREFUSED");
     expect(resolveScenarioError(encodeScenarioError(envelope))).toEqual(
