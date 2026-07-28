@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"sort"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -76,6 +77,49 @@ const modelsDiscoveryMaxResponseBytes = 1 << 20 // 1MiB
 // not be allowed to grow the result set without bound.
 const modelsDiscoveryMaxModelIDs = 2000
 
+// catalogProbe describes one GET the discovery round makes to list an
+// endpoint's models: the full URL, any provider-required headers beyond
+// auth, and an optional ID prefix to strip from the response.
+type catalogProbe struct {
+	modelsURL string
+	headers   map[string]string
+	// stripIDPrefix normalizes provider-decorated IDs to the names dispatch
+	// accepts (Gemini's OpenAI-compat catalog returns "models/gemini-2.5-flash";
+	// clients dispatch "gemini-2.5-flash").
+	stripIDPrefix string
+}
+
+// anthropicModelsAPIVersion is the anthropic-version header value the
+// hosted Anthropic catalog probe sends. api.anthropic.com rejects any
+// request without the header (400 "anthropic-version: header is
+// required"), so omitting it silently blanks the Anthropic catalog.
+const anthropicModelsAPIVersion = "2023-06-01"
+
+// hostedModelCatalogs maps hosted providers (credentials that are just an
+// API key, no base_url) to their public models endpoints. Dispatch routes
+// these credentials to the provider's well-known API, so discovery must
+// query the same place: a virtual key that can complete against a hosted
+// provider must never list zero models for it. Providers absent from this
+// table either cannot be enumerated with an API key (Bedrock and Vertex
+// need signed cloud SDK calls, Azure routes on deployments, Voyage and
+// ElevenLabs have no OpenAI-shape catalog, codex is an OAuth session) or
+// require a base_url by definition (custom).
+//
+// URLs and headers verified against the live providers: Anthropic needs
+// anthropic-version and caps pages at 1000 (11 models today, has_more
+// false); Gemini's OpenAI-compat catalog lives under /v1beta/openai and
+// prefixes IDs with "models/"; Groq nests its OpenAI surface under
+// /openai; the rest serve a stock /v1/models.
+var hostedModelCatalogs = map[domain.ProviderID]catalogProbe{
+	domain.ProviderOpenAI:    {modelsURL: "https://api.openai.com/v1/models"},
+	domain.ProviderAnthropic: {modelsURL: "https://api.anthropic.com/v1/models?limit=1000", headers: map[string]string{"anthropic-version": anthropicModelsAPIVersion}},
+	domain.ProviderGemini:    {modelsURL: "https://generativelanguage.googleapis.com/v1beta/openai/models", stripIDPrefix: "models/"},
+	domain.ProviderGroq:      {modelsURL: "https://api.groq.com/openai/v1/models"},
+	domain.ProviderXAI:       {modelsURL: "https://api.x.ai/v1/models"},
+	domain.ProviderCerebras:  {modelsURL: "https://api.cerebras.ai/v1/models"},
+	domain.ProviderDeepSeek:  {modelsURL: deepseekBaseURL + "/v1/models"},
+}
+
 // newModelsDiscoveryClient builds the HTTP client discovery probes use.
 //
 // It is deliberately stricter than a default client on two fronts that
@@ -128,6 +172,15 @@ func (p customerEndpointPolicy) allowsDialAddress(address string) error {
 	return endpointAddressError(ip, p.blockLocal, false)
 }
 
+// discoveredCatalog is one round's answer: the models plus the gaps
+// (providers that contributed nothing and why). Gaps ride the cache with
+// the models so every caller served from the entry sees the same honest
+// picture the probing caller saw.
+type discoveredCatalog struct {
+	models []domain.Model
+	gaps   []domain.ModelDiscoveryGap
+}
+
 // modelsDiscoveryCache memoises discovered catalogs per credential chain
 // and collapses concurrent misses onto a single probe, so a burst of
 // GET /v1/models calls costs one round of upstream requests rather than
@@ -138,10 +191,10 @@ type modelsDiscoveryCache struct {
 }
 
 type modelsDiscoveryEntry struct {
-	// done closes once models is populated. Waiters block on it, which
+	// done closes once catalog is populated. Waiters block on it, which
 	// is what collapses a concurrent burst onto one probe.
 	done      chan struct{}
-	models    []domain.Model
+	catalog   discoveredCatalog
 	expiresAt time.Time
 }
 
@@ -157,7 +210,7 @@ func (e *modelsDiscoveryEntry) fresh(now time.Time) bool {
 
 // get returns the cached catalog for key, computing it with fetch on a
 // miss. Concurrent callers for the same key share one fetch.
-func (c *modelsDiscoveryCache) get(ctx context.Context, key string, fetch func() []domain.Model) ([]domain.Model, error) {
+func (c *modelsDiscoveryCache) get(ctx context.Context, key string, fetch func() discoveredCatalog) (discoveredCatalog, error) {
 	now := time.Now()
 
 	c.mu.Lock()
@@ -168,9 +221,9 @@ func (c *modelsDiscoveryCache) get(ctx context.Context, key string, fetch func()
 		c.mu.Unlock()
 		select {
 		case <-existing.done:
-			return existing.models, nil
+			return existing.catalog, nil
 		case <-ctx.Done():
-			return nil, ctx.Err()
+			return discoveredCatalog{}, ctx.Err()
 		}
 	}
 	entry := &modelsDiscoveryEntry{done: make(chan struct{})}
@@ -194,20 +247,21 @@ func (c *modelsDiscoveryCache) get(ctx context.Context, key string, fetch func()
 		close(entry.done)
 	}()
 
-	entry.models = fetch()
+	entry.catalog = fetch()
 	// An empty catalog is usually a transient upstream failure rather than
 	// a real answer (every endpoint down, or the probe cut short), and
 	// holding it for the full TTL blanks the model list for everyone on
 	// this credential chain for a minute. Let it expire quickly so the
 	// next caller retries. A bundle with genuinely nothing to discover
-	// re-probes nothing: with no base URLs there is no request to make.
+	// re-probes nothing: with no probe-able endpoints there is no request
+	// to make.
 	ttl := modelsDiscoveryTTL
-	if len(entry.models) == 0 {
+	if len(entry.catalog.models) == 0 {
 		ttl = modelsDiscoveryEmptyTTL
 	}
 	entry.expiresAt = time.Now().Add(ttl)
 	completed = true
-	return entry.models, nil
+	return entry.catalog, nil
 }
 
 // evictLocked keeps the cache bounded: expired entries go first, and if
@@ -250,7 +304,9 @@ func (c *modelsDiscoveryCache) evictLocked(now time.Time) {
 // that changes what discovery would return or how it authenticates. The
 // API key is included so a rotated key invalidates the entry rather than
 // serving a catalog fetched with the old one; it is hashed with the rest
-// into an opaque key that is only ever compared, never logged.
+// into an opaque key that is only ever compared, never logged. The
+// deployment map is included because its keys are listed as models, so an
+// edit must not serve the previous map's catalog for a full TTL.
 func modelsDiscoveryCacheKey(creds []domain.Credential) string {
 	sum := sha256.New()
 	for _, cred := range creds {
@@ -263,18 +319,46 @@ func modelsDiscoveryCacheKey(creds []domain.Credential) string {
 			_, _ = sum.Write([]byte(field))
 			_, _ = sum.Write([]byte{0x1f})
 		}
+		for _, id := range deploymentMapModelIDs(cred) {
+			_, _ = sum.Write([]byte(id))
+			_, _ = sum.Write([]byte{0x1f})
+			_, _ = sum.Write([]byte(cred.DeploymentMap[id]))
+			_, _ = sum.Write([]byte{0x1f})
+		}
 		_, _ = sum.Write([]byte{0x1e})
 	}
 	return hex.EncodeToString(sum.Sum(nil))
 }
 
-// ListModels discovers models from credentials that carry a base URL
-// (self-hosted vLLM / LiteLLM / Anthropic-compatible servers — all serve
-// the OpenAI-shape GET /v1/models). Hosted credentials without a base URL
-// have no catalog to query and are skipped. A failing endpoint is skipped
-// too: one dead server must not blank out the whole list.
-func (r *BifrostRouter) ListModels(ctx context.Context, creds []domain.Credential) ([]domain.Model, error) {
-	return r.discoveryCache().get(ctx, modelsDiscoveryCacheKey(creds), func() []domain.Model {
+// deploymentMapModelIDs returns the credential's deployment-mapped model
+// ids in stable order. These are dispatchable by definition: dispatch
+// resolves exactly these ids onto the provider's deployments (Azure
+// deployments, Bedrock inference profiles, Vertex endpoints), so they
+// belong in the catalog without any network probe.
+func deploymentMapModelIDs(cred domain.Credential) []string {
+	if len(cred.DeploymentMap) == 0 {
+		return nil
+	}
+	ids := make([]string, 0, len(cred.DeploymentMap))
+	for id := range cred.DeploymentMap {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	return ids
+}
+
+// ListModels aggregates the credential chain's catalogs: credentials with
+// a base URL are asked for their OpenAI-shape GET /v1/models (self-hosted
+// vLLM / LiteLLM / Anthropic-compatible servers all serve it), hosted
+// API-key credentials are asked at their provider's public catalog
+// endpoint (hostedModelCatalogs), and deployment-mapped credentials
+// (Azure / Bedrock / Vertex) contribute their mapped model ids without a
+// probe. A failing endpoint is skipped rather than blanking the whole
+// list, and every provider that contributed nothing is reported as a gap
+// so the response never silently reads as "no models" for a chain that
+// dispatch can serve.
+func (r *BifrostRouter) ListModels(ctx context.Context, creds []domain.Credential) ([]domain.Model, []domain.ModelDiscoveryGap, error) {
+	catalog, err := r.discoveryCache().get(ctx, modelsDiscoveryCacheKey(creds), func() discoveredCatalog {
 		// Detached from the calling request: whoever misses the cache runs
 		// the probe on behalf of every concurrent waiter, so their client
 		// hanging up must not cancel it out from under the others (and
@@ -285,6 +369,10 @@ func (r *BifrostRouter) ListModels(ctx context.Context, creds []domain.Credentia
 		defer cancel()
 		return r.discoverModels(probeCtx, creds)
 	})
+	if err != nil {
+		return nil, nil, err
+	}
+	return catalog.models, catalog.gaps, nil
 }
 
 func (r *BifrostRouter) discoveryCache() *modelsDiscoveryCache {
@@ -295,22 +383,55 @@ func (r *BifrostRouter) discoveryCache() *modelsDiscoveryCache {
 	return r.discoveryModels
 }
 
-func (r *BifrostRouter) discoverModels(ctx context.Context, creds []domain.Credential) []domain.Model {
+// catalogProbeFor resolves the probe a credential's catalog answers on. A
+// customer base URL wins (self-hosted endpoints serve the stock
+// /v1/models); hosted API-key credentials use their provider's public
+// catalog endpoint. The second return is false when there is nothing to
+// probe.
+func (r *BifrostRouter) catalogProbeFor(cred domain.Credential) (catalogProbe, bool) {
+	if base := normalizeOpenAICompatBaseURL(credBaseURL(cred)); base != "" {
+		return catalogProbe{modelsURL: base + "/v1/models"}, true
+	}
+	catalogs := r.hostedCatalogs
+	if catalogs == nil {
+		catalogs = hostedModelCatalogs
+	}
+	probe, ok := catalogs[cred.ProviderID]
+	return probe, ok
+}
+
+func (r *BifrostRouter) discoverModels(ctx context.Context, creds []domain.Credential) discoveredCatalog {
 	// Query endpoints concurrently, bounded by a semaphore: latency is
 	// max(endpoint) up to the cap, not sum(endpoint) — one slow or dead
 	// server must not stack its timeout onto the others, and no single
 	// bundle can spawn unbounded outbound requests. Results keep
-	// credential order for determinism.
+	// credential order for determinism. Each goroutine writes only its own
+	// index of perCred / gapPerCred.
 	perCred := make([][]string, len(creds))
+	gapPerCred := make([]*domain.ModelDiscoveryGap, len(creds))
 	sem := make(chan struct{}, modelsDiscoveryConcurrency)
 	var wg sync.WaitGroup
 	for i, cred := range creds {
-		base := normalizeOpenAICompatBaseURL(credBaseURL(cred))
-		if base == "" {
+		// Deployment-mapped ids come first: they are config, not discovery,
+		// and stay listed even when the same credential's probe fails.
+		perCred[i] = deploymentMapModelIDs(cred)
+
+		probe, ok := r.catalogProbeFor(cred)
+		if !ok {
+			if len(perCred[i]) == 0 {
+				// Dispatch can route this credential but nothing can list
+				// its models: no catalog endpoint for the credential shape
+				// and no deployment map to read names from. Report the gap
+				// instead of letting the provider silently vanish.
+				gapPerCred[i] = &domain.ModelDiscoveryGap{
+					ProviderID: cred.ProviderID,
+					Reason:     domain.ModelDiscoveryNotEnumerable,
+				}
+			}
 			continue
 		}
 		wg.Add(1)
-		go func(i int, cred domain.Credential, base string) {
+		go func(i int, cred domain.Credential, probe catalogProbe) {
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()
@@ -319,28 +440,40 @@ func (r *BifrostRouter) discoverModels(ctx context.Context, creds []domain.Crede
 			// base_url (local-address blocking, HTTPS requirement, host
 			// allowlist) — discovery contacts the same customer-controlled
 			// URL and carries the credential's key, so it must not reach
-			// endpoints normal traffic would reject.
+			// endpoints normal traffic would reject. Hosted catalog URLs
+			// are compile-time constants, not customer input; the dialer
+			// still re-checks their resolved addresses before connect.
 			if err := r.validateCredentialEndpoints(ctx, cred); err != nil {
 				if r.logger != nil {
 					r.logger.Warn("model discovery blocked by endpoint policy, skipping",
 						zap.String("credential_id", cred.ID), zap.Error(err))
 				}
-				return
-			}
-			ids, err := fetchUpstreamModels(ctx, r.discoveryHTTP, base, cred.APIKey)
-			if err != nil {
-				if r.logger != nil {
-					r.logger.Warn("model discovery failed for endpoint, skipping",
-						zap.String("credential_id", cred.ID), zap.Error(err))
+				gapPerCred[i] = &domain.ModelDiscoveryGap{
+					ProviderID: cred.ProviderID,
+					Reason:     domain.ModelDiscoveryProbeFailed,
 				}
 				return
 			}
-			perCred[i] = ids
-		}(i, cred, base)
+			ids, err := fetchUpstreamModels(ctx, r.discoveryHTTP, probe, cred.APIKey)
+			if err != nil {
+				if r.logger != nil {
+					r.logger.Warn("model discovery failed for endpoint, skipping",
+						zap.String("credential_id", cred.ID),
+						zap.String("provider_id", string(cred.ProviderID)),
+						zap.Error(err))
+				}
+				gapPerCred[i] = &domain.ModelDiscoveryGap{
+					ProviderID: cred.ProviderID,
+					Reason:     domain.ModelDiscoveryProbeFailed,
+				}
+				return
+			}
+			perCred[i] = append(perCred[i], ids...)
+		}(i, cred, probe)
 	}
 	wg.Wait()
 
-	var out []domain.Model
+	var out discoveredCatalog
 	seen := make(map[string]bool)
 	for i, ids := range perCred {
 		for _, id := range ids {
@@ -348,15 +481,29 @@ func (r *BifrostRouter) discoverModels(ctx context.Context, creds []domain.Crede
 				continue
 			}
 			seen[id] = true
-			out = append(out, domain.Model{ID: id, Name: id, ProviderID: creds[i].ProviderID})
+			out.models = append(out.models, domain.Model{ID: id, Name: id, ProviderID: creds[i].ProviderID})
 		}
 	}
+	seenGaps := make(map[domain.ModelDiscoveryGap]bool)
+	for _, gap := range gapPerCred {
+		if gap == nil || seenGaps[*gap] {
+			continue
+		}
+		seenGaps[*gap] = true
+		out.gaps = append(out.gaps, *gap)
+	}
+	sort.Slice(out.gaps, func(i, j int) bool {
+		if out.gaps[i].ProviderID != out.gaps[j].ProviderID {
+			return out.gaps[i].ProviderID < out.gaps[j].ProviderID
+		}
+		return out.gaps[i].Reason < out.gaps[j].Reason
+	})
 	return out
 }
 
 // fetchUpstreamModels GETs an endpoint's OpenAI-shape model list.
-func fetchUpstreamModels(ctx context.Context, client *http.Client, baseURL, apiKey string) ([]string, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, baseURL+"/v1/models", nil)
+func fetchUpstreamModels(ctx context.Context, client *http.Client, probe catalogProbe, apiKey string) ([]string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, probe.modelsURL, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -368,13 +515,16 @@ func fetchUpstreamModels(ctx context.Context, client *http.Client, baseURL, apiK
 		req.Header.Set("Authorization", "Bearer "+apiKey)
 		req.Header.Set("x-api-key", apiKey)
 	}
+	for k, v := range probe.headers {
+		req.Header.Set(k, v)
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("upstream /v1/models returned status %d", resp.StatusCode)
+		return nil, fmt.Errorf("upstream models endpoint returned status %d", resp.StatusCode)
 	}
 	var parsed struct {
 		Data []struct {
@@ -390,7 +540,11 @@ func fetchUpstreamModels(ctx context.Context, client *http.Client, baseURL, apiK
 	}
 	ids := make([]string, 0, len(parsed.Data))
 	for _, m := range parsed.Data {
-		ids = append(ids, m.ID)
+		id := m.ID
+		if probe.stripIDPrefix != "" {
+			id = strings.TrimPrefix(id, probe.stripIDPrefix)
+		}
+		ids = append(ids, id)
 	}
 	return ids, nil
 }
