@@ -297,10 +297,46 @@ func (e *Engine) runLayer(ctx context.Context, req ExecuteRequest, plan *planner
 	wg.Wait()
 }
 
-// dispatch routes a node to its executor and returns its declared
-// outputs (already filtered to the node's `outputs` declaration so
-// downstream nodes get exactly what the workflow author requested).
+// dispatch routes a node to its executor, then scrubs every resolved secret
+// value out of what that executor produced.
+//
+// The redaction lives HERE, at the one point both runLayer and runLayerStream
+// funnel through, rather than at each executor — because a per-executor guard
+// is only as complete as the last person to remember it. That is not
+// hypothetical: runHTTP redacted its own error from the start, runCode and
+// runIfElsePython did not, and when they were fixed the secret simply left via
+// NodeState.Stdout/.Stderr instead, which ride in the same `result.nodes` map
+// and in every execution_state_change frame (#3198).
+//
+// Why it matters at all: code nodes get project secrets as a live
+// `secrets.NAME` namespace, so user code can print one or interpolate one into
+// a message that then raises. Before #3198 the scenario adapter discarded
+// engine errors entirely; now it re-throws them and the runner persists them
+// onto the user-visible run record.
 func (e *Engine) dispatch(ctx context.Context, req ExecuteRequest, node *dsl.Node, inputs map[string]any, ns *NodeState) (map[string]any, *NodeError) {
+	outputs, derr := e.dispatchNode(ctx, req, node, inputs, ns)
+	redactNodeSecrets(ns, derr, req.Workflow.Secrets)
+	return outputs, derr
+}
+
+// redactNodeSecrets scrubs resolved secret values from every string a node
+// hands back to a caller. Mutates in place: derr is the same pointer that
+// reaches runState.firstError and therefore the run's top-level error.
+func redactNodeSecrets(ns *NodeState, derr *NodeError, secrets map[string]string) {
+	if len(secrets) == 0 {
+		return
+	}
+	if ns != nil {
+		ns.Stdout = redactSecrets(ns.Stdout, secrets)
+		ns.Stderr = redactSecrets(ns.Stderr, secrets)
+	}
+	if derr != nil {
+		derr.Message = redactSecrets(derr.Message, secrets)
+		derr.Traceback = redactSecrets(derr.Traceback, secrets)
+	}
+}
+
+func (e *Engine) dispatchNode(ctx context.Context, req ExecuteRequest, node *dsl.Node, inputs map[string]any, ns *NodeState) (map[string]any, *NodeError) {
 	switch node.Type {
 	case dsl.ComponentEntry:
 		return e.runEntry(node, req)
@@ -391,12 +427,12 @@ func (e *Engine) runIfElsePython(ctx context.Context, node *dsl.Node, inputs map
 		Secrets:         secrets,
 	})
 	if err != nil {
-		return nil, &NodeError{Type: "code_runner_error", Message: redactSecrets(err.Error(), secrets)}
+		return nil, &NodeError{Type: "code_runner_error", Message: err.Error()}
 	}
 	ns.Stdout = res.Stdout
 	ns.Stderr = res.Stderr
 	if res.Error != nil {
-		return nil, codeNodeError(res.Error, secrets)
+		return nil, &NodeError{Type: res.Error.Type, Message: res.Error.Message, Traceback: res.Error.Traceback}
 	}
 	result, ok := res.Outputs["result"].(bool)
 	if !ok {
@@ -455,32 +491,14 @@ func (e *Engine) runCode(ctx context.Context, node *dsl.Node, inputs map[string]
 		Secrets:         secrets,
 	})
 	if err != nil {
-		return nil, &NodeError{Type: "code_runner_error", Message: redactSecrets(err.Error(), secrets)}
+		return nil, &NodeError{Type: "code_runner_error", Message: err.Error()}
 	}
 	ns.Stdout = res.Stdout
 	ns.Stderr = res.Stderr
 	if res.Error != nil {
-		return nil, codeNodeError(res.Error, secrets)
+		return nil, &NodeError{Type: res.Error.Type, Message: res.Error.Message, Traceback: res.Error.Traceback}
 	}
 	return res.Outputs, nil
-}
-
-// codeNodeError converts a code-runner failure into a NodeError with every
-// resolved secret value scrubbed from the message and traceback.
-//
-// Code nodes get project secrets as a live `secrets.NAME` namespace, so user
-// code can interpolate one into a URL, header, or formatted string; when that
-// call raises, the plaintext rides out in the exception. runHTTP already
-// defends the same class for its own errors — this is that guard for the code
-// path, which had `secrets` in hand and was not using it. It matters now
-// because the workflow-agent adapter re-throws `error.message` and the
-// scenario runner persists it onto the user-visible run record (#3198).
-func codeNodeError(e *codeblock.Error, secrets map[string]string) *NodeError {
-	return &NodeError{
-		Type:      e.Type,
-		Message:   redactSecrets(e.Message, secrets),
-		Traceback: redactSecrets(e.Traceback, secrets),
-	}
 }
 
 func (e *Engine) runHTTP(ctx context.Context, node *dsl.Node, inputs map[string]any, ns *NodeState, secrets map[string]string) (map[string]any, *NodeError) {

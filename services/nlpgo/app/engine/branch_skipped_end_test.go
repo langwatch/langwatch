@@ -31,8 +31,7 @@ import (
 
 // endBehindUntakenBranchWorkflow: entry -> gate -(true)-> end. The condition is
 // false, so `end` never runs.
-func endBehindUntakenBranchWorkflow(t *testing.T) *dsl.Workflow {
-	t.Helper()
+func endBehindUntakenBranchWorkflow() *dsl.Workflow {
 	return &dsl.Workflow{
 		Nodes: []dsl.Node{
 			{ID: "entry", Type: dsl.ComponentEntry, Data: dsl.Component{
@@ -63,7 +62,7 @@ func TestExecute_EndBehindUntakenBranchErrorsRatherThanEmptySuccess(t *testing.T
 	eng := New(Options{})
 
 	res, err := eng.Execute(context.Background(), ExecuteRequest{
-		Workflow: endBehindUntakenBranchWorkflow(t),
+		Workflow: endBehindUntakenBranchWorkflow(),
 		TraceID:  "t",
 	})
 	require.NoError(t, err, "the graph is valid — both planner guards pass")
@@ -90,7 +89,7 @@ func TestExecute_EndBehindUntakenBranchErrorsRatherThanEmptySuccess(t *testing.T
 // @scenario "A run whose condition reaches its End node still succeeds"
 func TestExecute_EndBehindTakenBranchStillSucceeds(t *testing.T) {
 	eng := New(Options{})
-	w := endBehindUntakenBranchWorkflow(t)
+	w := endBehindUntakenBranchWorkflow()
 	for i := range w.Nodes {
 		if w.Nodes[i].ID == "gate" {
 			w.Nodes[i].Data.Parameters = []dsl.Field{strParam("condition", "amount > 0")}
