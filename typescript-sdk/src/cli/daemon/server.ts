@@ -84,6 +84,13 @@ export interface DaemonServer {
  * 0700 by then, so nobody else can create a file inside it, and a foreign
  * directory has already thrown.) Everything left is an ownership or mode
  * problem, i.e. a path we can neither trust nor repair.
+ *
+ * "A corpse `cleanStaleSocket` will unlink" covers both shapes
+ * `socket-not-a-socket` can take inside a directory only we can write: a plain
+ * file, and a symlink — including a DANGLING one, which `identifyFile` resolves
+ * via `lstat` precisely so this claim stays true. It once did not: the dangling
+ * case identified nothing, so nothing was unlinked, and `listen()` walked into
+ * a permanent EEXIST at publish time.
  */
 const SQUATTED_SOCKET_PROBLEMS: ReadonlySet<string> = new Set([
   "socket-dir-not-a-directory",
@@ -148,10 +155,29 @@ export interface FileIdentity {
   ino: number;
 }
 
-/** What `filePath` points at right now, or null if nothing does. */
+/**
+ * What `filePath` points at right now, or null if nothing does.
+ *
+ * `stat` first, then `lstat`. The fallback is the DANGLING SYMLINK case, and it
+ * is load-bearing rather than defensive: a symlink whose target is gone is a
+ * name that exists (`link(2)` and `bind(2)` both fail EEXIST/EADDRINUSE on it)
+ * while `stat` reports nothing at all. With only the `stat` branch,
+ * `cleanStaleSocket` identified no corpse, unlinked nothing, and every daemon
+ * from then on died at `publishSocket` with EEXIST — which `daemon.ts` reads as
+ * "we lost a start race" and swallows in silence. One dangling link wedged the
+ * daemon permanently, with no output on any invocation, forever.
+ *
+ * Identifying the LINK ITSELF is the right answer for `unlinkIfSameFile` too:
+ * `unlink(2)` removes the link, never the target, so the link's own (dev, ino)
+ * is exactly the file that call deletes. And the two branches cannot be
+ * confused across time — a link that gains a target, or loses one, between the
+ * identify and the unlink reports a different inode and the guard declines.
+ */
 function identifyFile(filePath: string): FileIdentity | null {
   try {
-    const stat = fs.statSync(filePath, { throwIfNoEntry: false });
+    const stat =
+      fs.statSync(filePath, { throwIfNoEntry: false }) ??
+      fs.lstatSync(filePath, { throwIfNoEntry: false });
     return stat ? { dev: stat.dev, ino: stat.ino } : null;
   } catch {
     // A path we cannot even stat is certainly not one we may delete.
@@ -225,7 +251,9 @@ export async function cleanStaleSocket(socketPath: string): Promise<boolean> {
  * `.sock` suffix is REPLACED rather than appended to, to keep the bound path
  * inside sockaddr_un.sun_path: `isSocketPathUsable` budgets 100 bytes against
  * a real limit of 103 (macOS) / 107 (Linux), and a pid is at most three bytes
- * longer than the `.sock` it stands in for.
+ * longer than the `.sock` it stands in for — the allowance
+ * `MAX_STAGING_OVERHEAD_BYTES` (identity.ts) holds every path budget to, so
+ * that a shared path is only ever approved when this one fits as well.
  */
 export function stagingSocketPath(socketPath: string, pid: number): string {
   const base = socketPath.endsWith(".sock")
@@ -602,6 +630,7 @@ export function createDaemonServer(options: DaemonServerOptions): DaemonServer {
             cwd: frame.cwd,
             env: frame.env,
             colorLevel: frame.colorLevel,
+            bin: frame.bin,
             sink: (stream, chunk) => {
               send(
                 stream === "stdout"
@@ -660,12 +689,18 @@ export function createDaemonServer(options: DaemonServerOptions): DaemonServer {
     // The staging path is the one actually handed to bind(), so it is the one
     // that has to fit sockaddr_un.
     const stagingPath = stagingSocketPath(options.socketPath, process.pid);
-    if (
-      !isSocketPathUsable(options.socketPath) ||
-      !isSocketPathUsable(stagingPath)
-    ) {
+    // Name the path that ACTUALLY failed. The staging path is the longer of the
+    // two (a pid stands in for `.sock`), so it is the one that overflows first —
+    // and reporting the shared path there printed a path the reader can measure
+    // for themselves and find to be within the limit.
+    const tooLong = !isSocketPathUsable(options.socketPath)
+      ? options.socketPath
+      : !isSocketPathUsable(stagingPath)
+        ? stagingPath
+        : null;
+    if (tooLong !== null) {
       throw new Error(
-        `socket path is too long for a unix domain socket: ${options.socketPath}`,
+        `socket path is too long for a unix domain socket: ${tooLong}`,
       );
     }
 
@@ -712,6 +747,16 @@ export function createDaemonServer(options: DaemonServerOptions): DaemonServer {
     // shared path every client dials.
     secureSocketFile(stagingPath);
 
+    // Our identity, taken from the name only WE can hold, before the shared one
+    // is in play at all. Reading it back off the shared path after publishing
+    // looks equivalent and is not: anything that replaced that name in the gap
+    // would be recorded as ours, and `stop()` would later delete a stranger's
+    // live socket — the exact outage `unlinkIfSameFile` exists to prevent. The
+    // staging path is a hard link to the very inode we bound (and, in the
+    // rename fallback, becomes the shared name unchanged), so the identity is
+    // knowable with certainty here and merely probable there.
+    const mine = identifyFile(stagingPath);
+
     try {
       publishSocket(stagingPath, options.socketPath);
     } catch (error) {
@@ -724,7 +769,7 @@ export function createDaemonServer(options: DaemonServerOptions): DaemonServer {
       throw error;
     }
 
-    publishedSocket = identifyFile(options.socketPath);
+    publishedSocket = mine;
 
     // Only once we are actually serving: a daemon that lost the race to bind
     // must not install handlers it will never remove.

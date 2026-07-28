@@ -1,4 +1,5 @@
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
+import { execFileSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -9,6 +10,7 @@ import {
   isAutoSpawnEnabled,
   isDaemonDisabledByConfig,
   resolveColorLevel,
+  stdinCarriesData,
   type EligibilityInput,
 } from "../eligibility";
 
@@ -18,6 +20,7 @@ const piped = (overrides: Partial<EligibilityInput> = {}): EligibilityInput => (
   stdoutIsTty: false,
   stderrIsTty: false,
   stdinIsTty: false,
+  stdinCarriesData: false,
   platform: "darwin",
   ...overrides,
 });
@@ -85,6 +88,81 @@ describe("evaluateEligibility", () => {
     });
   });
 
+  /**
+   * The daemon is spawned with `stdio: "ignore"` (spawn.ts), so its fd 0 is
+   * /dev/null. A caller who is PIPING data in is therefore the one shape it can
+   * least serve — while being, on a TTY check alone, indistinguishable from the
+   * agent this whole feature exists for.
+   */
+  describe("given a caller whose stdin carries data", () => {
+    /** @scenario "A command reads the caller's standard input" */
+    it("refuses a piped stdin, which no terminal check would have caught", () => {
+      expect(
+        evaluateEligibility(
+          piped({
+            args: ["dataset", "records", "add", "my-ds", "--stdin"],
+            stdinCarriesData: true,
+          }),
+        ),
+      ).toEqual({ eligible: false, reason: "piped-stdin" });
+    });
+
+    it("refuses a piped stdin whatever the command is", () => {
+      // Served, `readStdin()` would resolve "" on the daemon's immediate EOF —
+      // and the SECOND such request would never settle at all, because
+      // process.stdin has already emitted `end`.
+      expect(
+        evaluateEligibility(piped({ stdinCarriesData: true })),
+      ).toEqual({ eligible: false, reason: "piped-stdin" });
+    });
+
+    it("refuses --stdin even when fd 0 could not be inspected", () => {
+      expect(
+        evaluateEligibility(
+          piped({ args: ["dataset", "records", "add", "my-ds", "--stdin"] }),
+        ),
+      ).toEqual({ eligible: false, reason: "reads-stdin" });
+    });
+
+    it("still serves the same command when nothing is piped in", () => {
+      expect(
+        evaluateEligibility(
+          piped({
+            args: ["dataset", "records", "add", "my-ds", "--file", "rows.json"],
+          }),
+        ),
+      ).toEqual({ eligible: true });
+    });
+  });
+
+  describe("when the command prompts on stdin", () => {
+    it("refuses push, whose conflict prompt would never be answered", () => {
+      expect(evaluateEligibility(piped({ args: ["push"] }))).toEqual({
+        eligible: false,
+        reason: "denied-command",
+      });
+    });
+
+    it("refuses prompt tag delete, which confirms by typing the tag name", () => {
+      expect(
+        evaluateEligibility(piped({ args: ["prompt", "tag", "delete", "prod"] })),
+      ).toEqual({ eligible: false, reason: "denied-command" });
+    });
+
+    it("keeps serving the tag commands that never prompt", () => {
+      expect(
+        evaluateEligibility(piped({ args: ["prompt", "tag", "list"] })),
+      ).toEqual({ eligible: true });
+    });
+
+    it("keeps serving a --tag VALUE, which the phrase rule exists to spare", () => {
+      // Denying the bare word `tag` would have taken this with it.
+      expect(
+        evaluateEligibility(piped({ args: ["pull", "--tag", "production"] })),
+      ).toEqual({ eligible: true });
+    });
+  });
+
   describe("when the command mutates identity or takes over stdio", () => {
     it.each([
       ["login"],
@@ -100,6 +178,7 @@ describe("evaluateEligibility", () => {
       ["daemon"],
       ["init-shell"],
       ["report"],
+      ["push"],
     ])("refuses %s", (command) => {
       expect(evaluateEligibility(piped({ args: [command] }))).toEqual({
         eligible: false,
@@ -174,9 +253,9 @@ describe("evaluateEligibility", () => {
     });
 
     // A global option's VALUE is a bare word too, so `-o json` used to read as
-    // the command `json` and reach the daemon — where commander renders the
-    // root help against the DAEMON's argv[1], not the caller's, so a caller who
-    // typed `lw` could be shown `langwatch` usage lines.
+    // the command `json` and reach the daemon, which then rendered the root
+    // help for an invocation there was nothing to warm for. (Which bin name
+    // that help carries is settled separately, by `ExecFrame.bin`.)
     it.each([
       [["-o", "json"]],
       [["--output", "yaml"]],
@@ -280,6 +359,63 @@ describe("resolveColorLevel", () => {
   describe("when NO_COLOR wins", () => {
     it("overrides FORCE_COLOR", () => {
       expect(resolveColorLevel({ NO_COLOR: "1", FORCE_COLOR: "3" })).toBe(0);
+    });
+  });
+});
+
+describe("stdinCarriesData", () => {
+  let dir: string;
+
+  beforeEach(() => {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), "lw-stdin-"));
+  });
+
+  afterEach(() => {
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  describe("given a descriptor the daemon cannot be handed", () => {
+    it("reports a redirected file as carrying data", () => {
+      const file = path.join(dir, "records.json");
+      fs.writeFileSync(file, "[]");
+      const fd = fs.openSync(file, "r");
+      try {
+        expect(stdinCarriesData(fd)).toBe(true);
+      } finally {
+        fs.closeSync(fd);
+      }
+    });
+
+    it("reports a pipe as carrying data", () => {
+      // The shape `cat records.json | langwatch …` actually hands fd 0. node
+      // has no mkfifo binding, and O_NONBLOCK is what keeps opening the read
+      // end from waiting for a writer that this test is not going to provide.
+      const fifo = path.join(dir, "fifo");
+      execFileSync("mkfifo", [fifo]);
+      const fd = fs.openSync(fifo, fs.constants.O_RDONLY | fs.constants.O_NONBLOCK);
+      try {
+        expect(stdinCarriesData(fd)).toBe(true);
+      } finally {
+        fs.closeSync(fd);
+      }
+    });
+  });
+
+  describe("given a descriptor the daemon reproduces exactly", () => {
+    it("reports /dev/null as carrying nothing — that IS the daemon's fd 0", () => {
+      const fd = fs.openSync("/dev/null", "r");
+      try {
+        expect(stdinCarriesData(fd)).toBe(false);
+      } finally {
+        fs.closeSync(fd);
+      }
+    });
+
+    it("reports a closed descriptor as carrying nothing rather than throwing", () => {
+      const fd = fs.openSync("/dev/null", "r");
+      fs.closeSync(fd);
+
+      expect(stdinCarriesData(fd)).toBe(false);
     });
   });
 });

@@ -52,6 +52,20 @@ export interface ExecFrame {
   env: Record<string, string>;
   /** Chalk colour level the caller's process would have resolved (0-3). */
   colorLevel: number;
+  /**
+   * The CALLER's `process.argv[1]` — the bin it was actually invoked as.
+   *
+   * The package ships two bin names for one file (`lw` and `langwatch`), and
+   * ONE daemon serves both: `resolveBuildId` stats the same symlink target
+   * either way, so whichever bin happened to spawn the daemon is the one whose
+   * `argv[1]` it holds forever. Without this field, `buildProgram()` titles
+   * usage and every commander error (the root sets `.showHelpAfterError()`)
+   * with the DAEMON's bin, so an `lw` caller is shown `Usage: langwatch …`.
+   *
+   * Optional so a client that predates the field still parses; `buildProgram`
+   * falls back to the serving process's own `argv[1]`, i.e. today's behaviour.
+   */
+  bin?: string;
 }
 
 /** Client -> daemon: cancel the in-flight request on this connection. */

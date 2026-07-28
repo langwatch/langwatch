@@ -195,3 +195,40 @@ describe("`langwatch help` command", () => {
     expect(process.exitCode).toBe(1);
   });
 });
+
+/**
+ * The package ships TWO bin names for one bundle — `lw` and `langwatch` — and
+ * one daemon serves both (`resolveBuildId` stats the same symlink target either
+ * way). So inside the daemon, `process.argv[1]` is whichever bin happened to
+ * spawn it and is a coin flip for everybody else: an `lw` caller whose daemon
+ * was started by `langwatch` was shown `Usage: langwatch …`, for `--help` and
+ * for every commander error, since the root sets `.showHelpAfterError()`.
+ */
+describe("the name usage and errors are titled with", () => {
+  const savedArgv1 = process.argv[1] ?? "";
+
+  afterEach(() => {
+    process.argv[1] = savedArgv1;
+  });
+
+  describe("given the caller's bin travels with the request", () => {
+    it("titles usage with the caller's bin, not the serving process's", () => {
+      expect(
+        buildProgram({ bin: "/usr/local/bin/lw" }).helpInformation(),
+      ).toContain("Usage: lw ");
+      expect(
+        buildProgram({ bin: "/usr/local/bin/langwatch" }).helpInformation(),
+      ).toContain("Usage: langwatch ");
+    });
+  });
+
+  describe("given no bin travels with it — every in-process invocation", () => {
+    it("falls back to the running process's own argv, as it always did", () => {
+      process.argv[1] = "/usr/local/bin/lw";
+      expect(buildProgram().helpInformation()).toContain("Usage: lw ");
+
+      process.argv[1] = "/usr/local/bin/langwatch";
+      expect(buildProgram().helpInformation()).toContain("Usage: langwatch ");
+    });
+  });
+});
