@@ -601,7 +601,13 @@ export const DashboardLayout = ({
 
   const user = session?.user;
   const currentRoute = findCurrentRoute(router.pathname);
-  const isDemoProject = publicEnv.data?.DEMO_PROJECT_SLUG === project?.slug;
+  // Requires BOTH sides present: an install with no demo project configured
+  // leaves DEMO_PROJECT_SLUG undefined, and `===` against an equally-undefined
+  // `project?.slug` would otherwise read as a match on any route that hasn't
+  // resolved a project yet.
+  const isDemoProject =
+    !!publicEnv.data?.DEMO_PROJECT_SLUG &&
+    publicEnv.data.DEMO_PROJECT_SLUG === project?.slug;
   const userIsPartOfTeam =
     publicPage ||
     // Personal-scope routes (/me/* and the caller's own Personal Workspace

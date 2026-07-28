@@ -704,6 +704,9 @@ importers:
       simple-statistics:
         specifier: ^7.9.2
         version: 7.9.2
+      testcontainers:
+        specifier: ^12.0.4
+        version: 12.0.4
       typescript:
         specifier: ^6.0.3
         version: 6.0.3

@@ -23,13 +23,18 @@ import { StoredObjectsService } from "./stored-objects.service";
  * StorageRegistry treats `azure-blob` URIs as an explicit error then.
  */
 function maybeAzureDriver(): AzureBlobDriver | undefined {
-  const accountName = env.AZURE_BLOB_ACCOUNT_NAME;
-  const accountKey = env.AZURE_BLOB_ACCOUNT_KEY;
+  // Trimmed to match resolveProjectStorageDestination exactly. The resolver
+  // mints `azure-blob://{trimmed account}/...` while this built the driver
+  // from the raw value, so a padded Kubernetes Secret passed validation and
+  // then addressed `https:// account .blob...` — a URI and an endpoint that
+  // disagree, on every stored-object and tiered-blob operation.
+  const accountName = env.AZURE_BLOB_ACCOUNT_NAME?.trim();
+  const accountKey = env.AZURE_BLOB_ACCOUNT_KEY?.trim();
   if (!accountName || !accountKey) return undefined;
   return new AzureBlobDriver({
     accountName,
     accountKey,
-    endpointBaseUrl: env.AZURE_BLOB_ENDPOINT,
+    endpointBaseUrl: env.AZURE_BLOB_ENDPOINT?.trim(),
   });
 }
 

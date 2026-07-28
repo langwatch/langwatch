@@ -1,7 +1,9 @@
+import fs from "node:fs";
+import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createEnv } from "@t3-oss/env-core";
 
-import { assertGatewaySecretsAllOrNone, createEnvConfig, gatewaySecretsSchema, rumSampleRatioSchema } from "../env-create.mjs";
+import { assertGatewaySecretsAllOrNone, createEnvConfig, gatewaySecretsSchema, rumSampleRatioSchema, storedObjectsBackendSchema } from "../env-create.mjs";
 
 // Regression for iter-110: gateway secrets set partially (e.g. only
 // LW_VIRTUAL_KEY_PEPPER, missing the two HMAC/JWT secrets) let the server
@@ -204,6 +206,90 @@ describe("rumSampleRatioSchema", () => {
       ["one", "1", 1],
     ])("honours %s", (_case, value, expected) => {
       expect(rumSampleRatioSchema.parse(value)).toBe(expected);
+    });
+  });
+});
+
+// Binds the spec scenarios "The env schema declares the Azure backend
+// variables as first-class keys" and "An unrecognized STORED_OBJECTS_BACKEND
+// value is rejected, not ignored" (AC37, issue #4133) to the real exported
+// schema — not an inline copy — so a mutation of the enum widening it back to
+// a free string fails here.
+describe("storedObjectsBackendSchema", () => {
+  describe("given the env-create source", () => {
+    /** @scenario "The env schema declares the Azure backend variables as first-class keys" */
+    it("declares STORED_OBJECTS_BACKEND and AZURE_BLOB_CONTAINER in both the schema and the runtime map", () => {
+      const source = fs.readFileSync(
+        path.join(__dirname, "..", "env-create.mjs"),
+        "utf-8",
+      );
+      // Both keys must be first-class env vars: declared in the zod server
+      // schema AND wired through runtimeEnv — otherwise application code
+      // would have to reach into process.env directly, which the repo bans.
+      // Assert the two DECLARATIONS, not how many times the name appears —
+      // a comment mentioning the variable twice would satisfy a count.
+      expect(source).toMatch(
+        /STORED_OBJECTS_BACKEND:\s*storedObjectsBackendSchema/,
+      );
+      expect(source).toMatch(/AZURE_BLOB_CONTAINER:\s*z\s*\n?\s*\.string\(\)|AZURE_BLOB_CONTAINER:\s*z\.string\(\)/);
+      expect(source).toMatch(
+        /STORED_OBJECTS_BACKEND:\s*process\.env\.STORED_OBJECTS_BACKEND/,
+      );
+      expect(source).toMatch(
+        /AZURE_BLOB_CONTAINER:\s*process\.env\.AZURE_BLOB_CONTAINER/,
+      );
+    });
+  });
+
+  describe("given a supported value", () => {
+    it.each([["s3"], ["azure"]])("accepts %s", (value) => {
+      const parsed = storedObjectsBackendSchema.safeParse(value);
+      expect(parsed.success).toBe(true);
+      expect(parsed.success && parsed.data).toBe(value);
+    });
+  });
+
+  describe("given no value", () => {
+    /** @scenario "Azure env vars alone never flip the write destination" */
+    it("is optional — undefined is valid, not defaulted to azure or s3", () => {
+      const parsed = storedObjectsBackendSchema.safeParse(undefined);
+      expect(parsed.success).toBe(true);
+      expect(parsed.success && parsed.data).toBeUndefined();
+    });
+  });
+
+  describe("given a value outside the supported set", () => {
+    /** @scenario "An unrecognized STORED_OBJECTS_BACKEND value is rejected, not ignored" */
+    it("fails validation rather than passing the value through untouched", () => {
+      const parsed = storedObjectsBackendSchema.safeParse("gcs");
+      expect(parsed.success).toBe(false);
+    });
+
+    /** @scenario "An unrecognized STORED_OBJECTS_BACKEND value is rejected, not ignored" */
+    it("startup fails via createEnv, naming the variable and the supported values", () => {
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+      try {
+        expect(() =>
+          createEnv({
+            clientPrefix: "VITE_PUBLIC_",
+            client: {},
+            server: { STORED_OBJECTS_BACKEND: storedObjectsBackendSchema },
+            runtimeEnv: { STORED_OBJECTS_BACKEND: "gcs" },
+            skipValidation: false,
+          }),
+        ).toThrow("Invalid environment variables");
+
+        const logged = errorSpy.mock.calls
+          .map((c: unknown[]) =>
+            c.map((a) => (typeof a === "object" ? JSON.stringify(a) : String(a))).join(" "),
+          )
+          .join("\n");
+        expect(logged).toMatch(/STORED_OBJECTS_BACKEND/);
+        expect(logged).toMatch(/s3/);
+        expect(logged).toMatch(/azure/);
+      } finally {
+        errorSpy.mockRestore();
+      }
     });
   });
 });

@@ -292,6 +292,30 @@ export const useOrganizationTeamProject = (
             ) ?? organizations.data[0])
           : undefined;
 
+  // `/me` and its sub-routes are the one place "no project slug in the URL"
+  // does NOT mean "organization-level work", it means the user's own
+  // personal workspace, the opposite of the ambient/shared team `selectAmbientTeam`
+  // exists to prefer. Checked BEFORE the localStorage-remembered-team lookup,
+  // not just added as a further fallback after it: a member who visited any
+  // organization-scoped page earlier in the session has a non-personal team
+  // id already persisted there, and that stale selection legitimately wins
+  // on THOSE pages (see the stickiness handling above) but must never win on
+  // /me itself, which is unambiguously about the personal workspace and
+  // cannot mean anything else. Left as a fallback-only check, that persisted
+  // selection matched before this was ever reached, and /me resolved to the
+  // shared team's first (or, if it holds no project yet, undefined) project,
+  // which then read every personal-scope feature (Langy chief among them) as
+  // running in a context that either belonged to someone else or did not
+  // exist. Gated on the same `/me` prefix DashboardLayout already uses for
+  // `isPersonalScopeRoute`, so every other caller (settings pages,
+  // project-slug pages, demo mode) is unaffected.
+  const isPersonalScopeRoute = router.pathname.startsWith("/me");
+  const ownPersonalTeam = isPersonalScopeRoute
+    ? organization?.teams.find(
+        (team) => team.isPersonal && team.ownerUserId === session.data?.user.id,
+      )
+    : undefined;
+
   const team = isDemo
     ? (organization?.teams.find((t) =>
         t.projects.some(
@@ -301,11 +325,13 @@ export const useOrganizationTeamProject = (
       selectAmbientTeam(organization?.teams ?? [])) // The team holding the demo project, else the ambient one
     : resolvedSlugMatch
       ? resolvedSlugMatch.team
-      : organization
-        ? (organization.teams.find(
-            (team) => team.id == localStorageTeamId && !team.isPersonal,
-          ) ?? selectAmbientTeam(organization.teams))
-        : undefined;
+      : ownPersonalTeam
+        ? ownPersonalTeam
+        : organization
+          ? (organization.teams.find(
+              (team) => team.id == localStorageTeamId && !team.isPersonal,
+            ) ?? selectAmbientTeam(organization.teams))
+          : undefined;
 
   // For demo mode, find the project with the demo slug
   const project = isDemo

@@ -6,8 +6,15 @@
  *
  *   1. BYOC: the per-project private dataplane bucket from
  *      `getS3ConfigForProject`. Tenant-owned; never silently bypassed.
- *   2. Global S3: `env.S3_BUCKET_NAME`, when set and non-empty.
- *   3. Local filesystem: `env.LANGWATCH_LOCAL_STORAGE_PATH` (or a
+ *   2. Azure: `env.STORED_OBJECTS_BACKEND === "azure"`, an explicit
+ *      operator toggle (issue #4133). AZURE_BLOB_* env presence alone
+ *      never selects this branch — only the toggle does; implicit
+ *      inference was rejected because deployment behavior must not
+ *      depend on which env vars happen to be set. Beats the global S3
+ *      bucket (an explicit choice beats a default) but never a BYOC
+ *      bucket (a tenant-owned bucket is never silently bypassed).
+ *   3. Global S3: `env.S3_BUCKET_NAME`, when set and non-empty.
+ *   4. Local filesystem: `env.LANGWATCH_LOCAL_STORAGE_PATH` (or a
  *      documented default). Single-replica only — fine for small
  *      self-host / hobbyist / air-gapped / pre-pilot installs, but
  *      operators of multi-pod deployments must configure S3 (the
@@ -33,7 +40,8 @@ import { getS3ConfigForProject } from "~/server/dataplane-s3";
 
 export type ProjectStorageDestination =
   | { kind: "s3"; bucket: string }
-  | { kind: "file"; root: string };
+  | { kind: "file"; root: string }
+  | { kind: "azure"; accountName: string; container: string };
 
 /**
  * Default local filesystem root used when neither a BYOC bucket nor
@@ -43,12 +51,67 @@ export type ProjectStorageDestination =
  */
 const DEFAULT_LOCAL_FS_ROOT = "/var/lib/langwatch/objects";
 
+/**
+ * Thrown when `STORED_OBJECTS_BACKEND=azure` is set but one or more of the
+ * three required Azure config vars is missing. Fails loud, naming exactly
+ * which var(s) are missing — no silent fallback to S3 or the local
+ * filesystem, which would risk writing a tenant's bytes to the wrong place
+ * (or the ephemeral container layer) without the operator noticing.
+ */
+export class AzureBackendMisconfiguredError extends Error {
+  readonly missingVariables: string[];
+
+  constructor(missingVariables: string[]) {
+    super(
+      `STORED_OBJECTS_BACKEND=azure requires ${missingVariables.join(", ")} to be set. ` +
+        "Refusing to silently fall back to S3 or the local filesystem.",
+    );
+    this.name = "AzureBackendMisconfiguredError";
+    this.missingVariables = missingVariables;
+  }
+}
+
+/**
+ * Resolves the azure destination from env, or throws
+ * `AzureBackendMisconfiguredError` naming every missing required var.
+ * Called only once `env.STORED_OBJECTS_BACKEND === "azure"` has already
+ * been checked by the caller.
+ */
+function resolveAzureDestination(): ProjectStorageDestination {
+  // Trim before the emptiness check, matching the global-S3 branch below: a
+  // whitespace-only value (trivially produced by a YAML block scalar or a
+  // padded Kubernetes secret) would otherwise pass as "set" and mint URIs
+  // with a blank account or container.
+  const accountName = env.AZURE_BLOB_ACCOUNT_NAME?.trim();
+  const accountKey = env.AZURE_BLOB_ACCOUNT_KEY?.trim();
+  const container = env.AZURE_BLOB_CONTAINER?.trim();
+
+  const missingVariables: string[] = [];
+  if (!accountName) missingVariables.push("AZURE_BLOB_ACCOUNT_NAME");
+  if (!accountKey) missingVariables.push("AZURE_BLOB_ACCOUNT_KEY");
+  if (!container) missingVariables.push("AZURE_BLOB_CONTAINER");
+
+  if (missingVariables.length > 0) {
+    throw new AzureBackendMisconfiguredError(missingVariables);
+  }
+
+  return {
+    kind: "azure",
+    accountName: accountName!,
+    container: container!,
+  };
+}
+
 export async function resolveProjectStorageDestination(
   projectId: string,
 ): Promise<ProjectStorageDestination> {
   const privateConfig = await getS3ConfigForProject(projectId);
   if (privateConfig?.bucket) {
     return { kind: "s3", bucket: privateConfig.bucket };
+  }
+
+  if (env.STORED_OBJECTS_BACKEND === "azure") {
+    return resolveAzureDestination();
   }
 
   const globalBucket = env.S3_BUCKET_NAME?.trim();

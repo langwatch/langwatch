@@ -13,13 +13,19 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ConfigFormCtx } from "~/features/automations/providers/types";
 
 vi.mock("@monaco-editor/react", () => ({ default: () => null }));
 vi.mock("~/components/ui/color-mode", () => ({
   useColorMode: () => ({ colorMode: "light" }),
 }));
+/** Channels the mocked listSlackChannels mutation has "already loaded". Tests
+ *  that care about the picker set this before rendering. */
+const listedChannels: { current: { id: string; name: string }[] | undefined } = {
+  current: undefined,
+};
+
 vi.mock("~/utils/api", () => ({
   api: {
     automation: {
@@ -29,7 +35,9 @@ vi.mock("~/utils/api", () => ({
       listSlackChannels: {
         useMutation: () => ({
           mutate: vi.fn(),
-          data: undefined,
+          data: listedChannels.current
+            ? { channels: listedChannels.current }
+            : undefined,
           isPending: false,
         }),
       },
@@ -325,6 +333,200 @@ describe("SlackConfigForm delivery method", () => {
           name: /use eval failure banner template/i,
         }),
       ).toBeEnabled();
+    });
+  });
+});
+
+describe("SlackConfigForm channel picker", () => {
+  afterEach(() => {
+    cleanup();
+    listedChannels.current = undefined;
+  });
+
+  describe("given a workspace whose channels have loaded", () => {
+    beforeEach(() => {
+      // A shared prefix ("support", "support-escalations") and a term that
+      // only bites late in the name ("signoff") are what a one-character
+      // search cannot separate — which is the bug this block pins.
+      listedChannels.current = [
+        { id: "C001", name: "alerts" },
+        { id: "C002", name: "build-status" },
+        { id: "C003", name: "release-signoff" },
+        { id: "C004", name: "support" },
+        { id: "C005", name: "support-escalations" },
+      ];
+    });
+
+    // Typed at a human cadence on purpose. The combobox resyncs the input
+    // element from a passive effect, so back-to-back synthetic keystrokes with
+    // no gap at all outrun React's effect flush and drop characters — a race no
+    // typist can win, and not the bug under test.
+    const typist = () => userEvent.setup({ delay: 10 });
+
+    describe("when the author types a channel name to search", () => {
+      it("keeps every typed character in the box", async () => {
+        const user = typist();
+        renderForm({ initial: botSlice({ channelId: "" }) });
+        const input = screen.getByPlaceholderText(/#alerts or c0123/i);
+
+        await user.click(input);
+        await user.type(input, "signoff");
+
+        expect(input).toHaveValue("signoff");
+      });
+
+      it("narrows the list by the whole search term, not just the last letter", async () => {
+        const user = typist();
+        renderForm({ initial: botSlice({ channelId: "" }) });
+        const input = screen.getByPlaceholderText(/#alerts or c0123/i);
+
+        await user.click(input);
+        await user.type(input, "signoff");
+
+        expect(screen.getByText("#release-signoff")).toBeInTheDocument();
+        expect(screen.queryByText("#support")).not.toBeInTheDocument();
+      });
+
+      // A long name is the case that broke: the box was rewritten on every
+      // keystroke, so only the last character ever survived.
+      it("keeps a long search term intact", async () => {
+        const user = typist();
+        renderForm({ initial: botSlice({ channelId: "" }) });
+        const input = screen.getByPlaceholderText(/#alerts or c0123/i);
+
+        await user.type(input, "#adhoc");
+
+        expect(input).toHaveValue("#adhoc");
+      });
+
+      it("carries the typed text into the slice on blur, so a channel that isn't listed still saves", async () => {
+        const user = typist();
+        const onChangeSpy = vi.fn();
+        renderForm({ initial: botSlice({ channelId: "" }), onChangeSpy });
+
+        await user.type(
+          screen.getByPlaceholderText(/#alerts or c0123/i),
+          "#adhoc",
+        );
+        await user.tab();
+
+        expect(onChangeSpy).toHaveBeenLastCalledWith(
+          expect.objectContaining({ channelId: "#adhoc" }),
+        );
+      });
+
+      it("carries the typed text into the slice on Enter", async () => {
+        const user = typist();
+        const onChangeSpy = vi.fn();
+        renderForm({ initial: botSlice({ channelId: "" }), onChangeSpy });
+
+        await user.type(
+          screen.getByPlaceholderText(/#alerts or c0123/i),
+          "#adhoc{Enter}",
+        );
+
+        expect(onChangeSpy).toHaveBeenLastCalledWith(
+          expect.objectContaining({ channelId: "#adhoc" }),
+        );
+      });
+    });
+
+    describe("when the author picks a channel from the list", () => {
+      it("stores the channel id and shows its name", async () => {
+        const user = userEvent.setup();
+        const onChangeSpy = vi.fn();
+        renderForm({ initial: botSlice({ channelId: "" }), onChangeSpy });
+        const input = screen.getByPlaceholderText(/#alerts or c0123/i);
+
+        await user.click(input);
+        await user.click(await screen.findByText("#release-signoff"));
+
+        expect(onChangeSpy).toHaveBeenLastCalledWith(
+          expect.objectContaining({ channelId: "C003" }),
+        );
+        expect(input).toHaveValue("#release-signoff");
+      });
+
+      // Enter means two things in this field: commit what was typed, and
+      // accept the highlighted suggestion. Both handlers fire on the same
+      // keypress, so the one that lands LAST decides what gets saved — a
+      // suggestion the author deliberately highlighted must beat the search
+      // text they typed to find it.
+      it("keeps the highlighted channel, not the search text, when Enter accepts a suggestion", async () => {
+        const user = typist();
+        const onChangeSpy = vi.fn();
+        renderForm({ initial: botSlice({ channelId: "" }), onChangeSpy });
+        const input = screen.getByPlaceholderText(/#alerts or c0123/i);
+
+        await user.click(input);
+        await user.type(input, "signoff");
+        await user.keyboard("{ArrowDown}{Enter}");
+
+        expect(onChangeSpy).toHaveBeenLastCalledWith(
+          expect.objectContaining({ channelId: "C003" }),
+        );
+        expect(input).toHaveValue("#release-signoff");
+      });
+    });
+
+    describe("when the author replaces a picked channel with a free-typed one", () => {
+      // The picked channel stays the combobox's selection until something
+      // moves it, so the list would keep a tick beside a channel that is no
+      // longer the field's value.
+      it("moves the tick off the channel it replaced", async () => {
+        const user = typist();
+        renderForm({ initial: botSlice({ channelId: "" }) });
+        const input = screen.getByPlaceholderText(/#alerts or c0123/i);
+
+        await user.click(input);
+        await user.click(await screen.findByText("#release-signoff"));
+        await user.clear(input);
+        await user.type(input, "#adhoc");
+        await user.tab();
+        await user.click(input);
+
+        const checked = Array.from(
+          document.querySelectorAll(
+            '[data-scope="combobox"][data-part="item"][data-state="checked"]',
+          ),
+        ).map((el) => el.textContent);
+
+        // The typed channel is the value, so it may carry the tick; the
+        // channel it replaced must not.
+        expect(checked).toEqual(["#adhoc"]);
+      });
+
+      // ...and moving that selection must not take the typed text with it:
+      // the combobox rewrites its input from the selection, so CLEARING the
+      // selection outright is exactly the move that blanks the box. This is
+      // the guard on that — it fails if the fix regresses to setSelectedId("").
+      it("keeps the typed channel in the box and in the slice", async () => {
+        const user = typist();
+        const onChangeSpy = vi.fn();
+        renderForm({ initial: botSlice({ channelId: "" }), onChangeSpy });
+        const input = screen.getByPlaceholderText(/#alerts or c0123/i);
+
+        await user.click(input);
+        await user.click(await screen.findByText("#release-signoff"));
+        await user.clear(input);
+        await user.type(input, "#adhoc");
+        await user.tab();
+
+        expect(input).toHaveValue("#adhoc");
+        expect(onChangeSpy).toHaveBeenLastCalledWith(
+          expect.objectContaining({ channelId: "#adhoc" }),
+        );
+      });
+    });
+
+    describe("given a saved automation whose channel id is already stored", () => {
+      it("shows the channel name rather than the raw id", async () => {
+        renderForm({ initial: botSlice({ channelId: "C003" }) });
+
+        expect(
+          await screen.findByDisplayValue("#release-signoff"),
+        ).toBeInTheDocument();
+      });
     });
   });
 });

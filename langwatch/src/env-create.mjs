@@ -37,6 +37,22 @@ export const rumSampleRatioSchema = z.preprocess(
   z.coerce.number().min(0).max(1).default(1).catch(1),
 );
 
+/**
+ * Explicit stored-objects write-destination toggle (issue #4133). Constrained
+ * to a known set of values — NOT a free string — so an unrecognized value
+ * (typo, stale config) fails loud at boot, naming the variable and the
+ * supported set, instead of silently falling through
+ * `resolveProjectStorageDestination`'s precedence chain as if unset.
+ *
+ * Deliberately does NOT default to anything: absence means "let the
+ * BYOC -> S3_BUCKET_NAME -> local-FS precedence decide", never "azure".
+ * AZURE_BLOB_* presence alone must never flip the destination — only this
+ * toggle does (issue #4133 rejected implicit env-presence inference).
+ *
+ * Exported so tests exercise the real schema rather than an inline copy.
+ */
+export const storedObjectsBackendSchema = z.enum(["s3", "azure"]).optional();
+
 /** @param {import('zod').ZodTypeAny} schema */
 const optionalIfBuildTime = (schema) => {
   return process.env.BUILD_TIME ? schema.optional() : schema;
@@ -315,12 +331,21 @@ export function createEnvConfig() {
       // service. Self-hosting operators running multi-pod deployments MUST
       // configure object storage instead — the local-FS path is dev-only.
       LANGWATCH_LOCAL_STORAGE_PATH: z.string().optional(),
-      // Azure Blob Storage — optional alternative to S3 for stored-objects.
-      // Set all three together; AZURE_BLOB_ENDPOINT only needs to be set for
+      // Explicit stored-objects write-destination toggle. "s3" is the
+      // implicit default (existing BYOC -> S3_BUCKET_NAME -> local-FS
+      // precedence); "azure" opts a deployment into the Azure Blob backend.
+      // See storedObjectsBackendSchema above and
+      // resolveProjectStorageDestination for the full precedence rules.
+      STORED_OBJECTS_BACKEND: storedObjectsBackendSchema,
+      // Azure Blob Storage — optional alternative to S3 for stored-objects,
+      // selected ONLY by STORED_OBJECTS_BACKEND=azure above (never inferred
+      // from these vars being present). Set all four together when using
+      // the azure backend; AZURE_BLOB_ENDPOINT only needs to be set for
       // emulator or sovereign-cloud deployments (e.g. Azurite, Azure Gov).
       AZURE_BLOB_ACCOUNT_NAME: z.string().optional(),
       AZURE_BLOB_ACCOUNT_KEY: z.string().optional(),
       AZURE_BLOB_ENDPOINT: z.string().optional(),
+      AZURE_BLOB_CONTAINER: z.string().optional(),
       DATASET_STORAGE_LOCAL: z.boolean().optional(),
       CREDENTIALS_SECRET: z.string().optional(),
       AZURE_AD_CLIENT_ID: z.string().optional(),
@@ -500,9 +525,11 @@ export function createEnvConfig() {
       S3_REGION: process.env.S3_REGION,
       S3_BUCKET_NAME: process.env.S3_BUCKET_NAME,
       LANGWATCH_LOCAL_STORAGE_PATH: process.env.LANGWATCH_LOCAL_STORAGE_PATH,
+      STORED_OBJECTS_BACKEND: process.env.STORED_OBJECTS_BACKEND,
       AZURE_BLOB_ACCOUNT_NAME: process.env.AZURE_BLOB_ACCOUNT_NAME,
       AZURE_BLOB_ACCOUNT_KEY: process.env.AZURE_BLOB_ACCOUNT_KEY,
       AZURE_BLOB_ENDPOINT: process.env.AZURE_BLOB_ENDPOINT,
+      AZURE_BLOB_CONTAINER: process.env.AZURE_BLOB_CONTAINER,
       DATASET_STORAGE_LOCAL:
         process.env.DATASET_STORAGE_LOCAL === "1" ||
         process.env.DATASET_STORAGE_LOCAL?.toLowerCase() === "true",
