@@ -13,6 +13,7 @@ import type {
   ExportableRun,
   SimulationRepository,
 } from "~/server/app-layer/simulations/repositories/simulation.repository";
+import { traced } from "~/server/app-layer/tracing";
 import {
   categorizeRunStatus,
   type RunStatusCategory,
@@ -49,6 +50,19 @@ const FILTER_TO_CATEGORY: Record<
 
 export class ScenarioRunExportService {
   constructor(private readonly repository: SimulationRepository) {}
+
+  /**
+   * Built from the same repository instance `SimulationRunService` already
+   * holds, so the export reads through exactly the store the run history does
+   * — and the API layer asks the app for the service instead of assembling one
+   * out of a repository it should not know about.
+   */
+  static create(repository: SimulationRepository): ScenarioRunExportService {
+    return traced(
+      new ScenarioRunExportService(repository),
+      "ScenarioRunExportService",
+    );
+  }
 
   /**
    * How many runs the sweep will visit. Progress counts visited runs rather

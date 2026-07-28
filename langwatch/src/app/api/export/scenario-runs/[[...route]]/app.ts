@@ -26,9 +26,7 @@ import {
   ScenarioRunExportForbiddenError,
   ScenarioRunExportUnauthenticatedError,
 } from "~/server/export/scenario-runs/errors";
-import { ScenarioRunExportService } from "~/server/export/scenario-runs/scenario-run-export.service";
 import { scenarioRunExportRequestSchema } from "~/server/export/scenario-runs/types";
-import type { NextRequest } from "~/types/next-stubs";
 
 const logger = createLogger("langwatch:api:export-scenario-runs");
 
@@ -42,9 +40,7 @@ secured
     async (c) => {
       const request = c.req.valid("json");
 
-      const session = await getServerAuthSession({
-        req: c.req.raw as NextRequest,
-      });
+      const session = await getServerAuthSession({ req: c.req.raw });
       if (!session) {
         throw new ScenarioRunExportUnauthenticatedError();
       }
@@ -93,9 +89,7 @@ secured
       const safeProjectId = request.projectId.replace(/[^\w.-]/g, "_");
       const fileName = `${safeProjectId} - Scenario Runs - ${today} - ${request.mode}.csv`;
 
-      const service = new ScenarioRunExportService(
-        getApp().simulations.runs.repository,
-      );
+      const service = getApp().simulations.export;
       const totalCount = await service.getTotalCount({ request });
 
       // CSV of repeated run-level values compresses ~9x, and the browser
