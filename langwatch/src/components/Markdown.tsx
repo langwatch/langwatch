@@ -172,10 +172,26 @@ export function isInternalHref(href: string): boolean {
  * ride the SPA router — a new tab or full load would tear down the
  * persistent panel mid-conversation.
  */
+/**
+ * Absolute as the browser sees it: an explicit `http(s)://`, or the
+ * protocol-relative `//host` form, which carries no scheme but still lands
+ * off-site.
+ */
+function isAbsoluteHref(href: string): boolean {
+  return /^https?:\/\//i.test(href) || href.startsWith("//");
+}
+
 function sameOriginSpaPath(href: string): string | null {
-  if (!/^https?:\/\//i.test(href)) return null;
+  // `//host/path` is an absolute destination wearing a relative coat — the
+  // browser resolves it against the page's own scheme. Borrow that scheme so a
+  // link to THIS instance still rides the SPA router, and one to anywhere else
+  // is recognised as external rather than falling through as "not absolute".
+  const absolute = href.startsWith("//")
+    ? `${window.location.protocol}${href}`
+    : href;
+  if (!/^https?:\/\//i.test(absolute)) return null;
   try {
-    const url = new URL(href);
+    const url = new URL(absolute);
     if (url.origin !== window.location.origin) return null;
     const path = url.pathname + url.search + url.hash;
     return isInternalHref(path) ? path : null;
@@ -223,8 +239,13 @@ function MarkdownLink({
   // own (Langy's platform links are absolute), in which case its path rides
   // the SPA router like any in-app link. Relative in-app paths SPA-navigate
   // so the surrounding page (and an open Langy panel) stays mounted.
+  //
+  // A protocol-relative `//evil.com` counts as absolute here. Testing only for
+  // `^https?://` left it in neither bucket — not SPA (the guard rejects it) and
+  // not external either — so it rendered as a bare anchor: same tab, no
+  // `rel="noopener noreferrer"`, and no signal that the link leaves LangWatch.
   const spaPath = isInternalHref(href) ? href : sameOriginSpaPath(href);
-  const isExternal = /^https?:\/\//i.test(href) && !spaPath;
+  const isExternal = isAbsoluteHref(href) && !spaPath;
 
   /** SPA-navigate an in-app destination; anything else gets a real navigation. */
   const navigate = () => {

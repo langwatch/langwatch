@@ -16,7 +16,7 @@
  *
  * Spec: specs/langy/langy-live-scenario-cards.feature
  */
-import { Badge, Box, HStack, Spinner, Text } from "@chakra-ui/react";
+import { Badge, chakra, HStack, Spinner, Text } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
 import { MessagePreview } from "~/components/suites/MessagePreview";
 import { getRunStatePollInterval } from "~/components/simulations/run-state-polling";
@@ -90,11 +90,11 @@ function LiveSimulationRunCard({
   // declared ABOVE the query: `refetchInterval` is evaluated synchronously
   // while `useQuery` runs, so `sseConnected` must already be bound by then
   // (the drawer, whose polling policy this mirrors, orders them the same way).
-  const [runUnresolvable, setRunUnresolvable] = useState(false);
+  const [isRunUnresolvable, setIsRunUnresolvable] = useState(false);
 
   const { isConnected: sseConnected } = useSimulationUpdateListener({
     projectId: project?.id ?? "",
-    enabled: !!project?.id && !isTerminal && !runUnresolvable,
+    enabled: !!project?.id && !isTerminal && !isRunUnresolvable,
     debounceMs: 300,
     filter: { scenarioRunId: runId },
     onStreamingEvent: handleStreamingEvent,
@@ -119,7 +119,7 @@ function LiveSimulationRunCard({
   }, [status]);
 
   useEffect(() => {
-    if (error) setRunUnresolvable(true);
+    if (error) setIsRunUnresolvable(true);
   }, [error]);
 
   // Drop optimistic streamed messages once the server state includes them.
@@ -191,68 +191,106 @@ export function LangySimulationRunReceipt({
   streamingMessages?: StreamingMessage[];
   onOpen: () => void;
 }) {
-  const statusConfig = status !== undefined ? SCENARIO_RUN_STATUS_CONFIG[status] : null;
-  const isRunning =
-    status !== undefined &&
-    getRunStatePollInterval({ status, sseConnected: false }) !== false;
-
   return (
     <LangyCapabilityCard
       tone="read"
       surface={surface}
       overline={overline}
-      title={
-        <HStack gap={2} align="center" flexWrap="wrap">
-          <Text textStyle="xs" fontWeight="640" color="fg" lineHeight="1.3">
-            {title || "Simulation run"}
-          </Text>
-          {statusConfig ? (
-            <Badge
-              size="sm"
-              variant="subtle"
-              colorPalette={statusConfig.colorPalette}
-            >
-              {isRunning ? <Spinner size="xs" color="currentColor" /> : null}
-              {statusConfig.label}
-            </Badge>
-          ) : (
-            <Spinner size="xs" color="fg.subtle" />
-          )}
-        </HStack>
-      }
+      title={<SimulationRunTitle title={title} status={status} />}
       projectSlug={projectSlug}
       resourceId={resourceId}
       platformUrl={platformUrl}
     >
       {messages ? (
-        <Box
-          as="button"
-          onClick={onOpen}
-          cursor="pointer"
-          textAlign="left"
-          width="full"
-          maxHeight="130px"
-          overflow="hidden"
-          position="relative"
-          aria-label={`View details for ${title || "simulation run"}`}
-          // Fade the preview's cut edge into the card ground instead of
-          // clipping a message blob mid-line.
-          _after={{
-            content: '""',
-            position: "absolute",
-            insetInline: 0,
-            bottom: 0,
-            height: "26px",
-            background: "linear-gradient(transparent, var(--chakra-colors-bg-subtle))",
-            pointerEvents: "none",
-          }}
-        >
-          <MessagePreview
-            messages={messages}
-            streamingMessages={streamingMessages}
-          />
-        </Box>
+        <SimulationRunPreview
+          messages={messages}
+          streamingMessages={streamingMessages}
+          title={title}
+          onOpen={onOpen}
+        />
       ) : null}
     </LangyCapabilityCard>
+  );
+}
+
+/**
+ * Name plus outcome — the card's status chrome, kept apart from the card
+ * assembly above. The outcome is spent ONCE here, as a small badge; a run
+ * still going shows a spinner inside it, and a run whose state has not landed
+ * yet shows the spinner alone rather than guessing a status.
+ */
+function SimulationRunTitle({
+  title,
+  status,
+}: {
+  title: string;
+  status?: ScenarioRunStatus;
+}) {
+  const statusConfig =
+    status !== undefined ? SCENARIO_RUN_STATUS_CONFIG[status] : null;
+  const isRunning =
+    status !== undefined &&
+    getRunStatePollInterval({ status, sseConnected: false }) !== false;
+
+  return (
+    <HStack gap={2} align="center" flexWrap="wrap">
+      <Text textStyle="xs" fontWeight="640" color="fg" lineHeight="1.3">
+        {title || "Simulation run"}
+      </Text>
+      {statusConfig ? (
+        <Badge size="sm" variant="subtle" colorPalette={statusConfig.colorPalette}>
+          {isRunning ? <Spinner size="xs" color="currentColor" /> : null}
+          {statusConfig.label}
+        </Badge>
+      ) : (
+        <Spinner size="xs" color="fg.subtle" />
+      )}
+    </HStack>
+  );
+}
+
+/**
+ * The conversation preview, as the card's one affordance: clicking anywhere on
+ * it opens the run. A real `<button>` rather than `<Box as="button">` so the
+ * native button props (`type`) are type-checked — this sits inside a chat, and
+ * a button that defaults to `submit` is a trap waiting for the first form
+ * ancestor.
+ */
+function SimulationRunPreview({
+  messages,
+  streamingMessages,
+  title,
+  onOpen,
+}: {
+  messages: NonNullable<ScenarioRunData["messages"]>;
+  streamingMessages?: StreamingMessage[];
+  title: string;
+  onOpen: () => void;
+}) {
+  return (
+    <chakra.button
+      type="button"
+      onClick={onOpen}
+      cursor="pointer"
+      textAlign="left"
+      width="full"
+      maxHeight="130px"
+      overflow="hidden"
+      position="relative"
+      aria-label={`View details for ${title || "simulation run"}`}
+      // Fade the preview's cut edge into the card ground instead of clipping a
+      // message blob mid-line.
+      _after={{
+        content: '""',
+        position: "absolute",
+        insetInline: 0,
+        bottom: 0,
+        height: "26px",
+        background: "linear-gradient(transparent, var(--chakra-colors-bg-subtle))",
+        pointerEvents: "none",
+      }}
+    >
+      <MessagePreview messages={messages} streamingMessages={streamingMessages} />
+    </chakra.button>
   );
 }

@@ -35,11 +35,17 @@ function renderLangyMarkdown(text: string) {
 
 // Same-origin stub for the guard's origin comparison — restored after each
 // test so the shared jsdom window never leaks a bare-object location.
+// `protocol` and `host` are carried too, not just `origin`: resolving a
+// protocol-relative `//host/path` borrows the page's scheme, so a stub missing
+// them silently resolves to `undefined//host` and every such link reads as
+// external.
 const realLocation = window.location;
+const STUB_ORIGIN = "https://app.langwatch.ai";
+const STUB_HOST = "app.langwatch.ai";
 
 beforeEach(() => {
   Object.defineProperty(window, "location", {
-    value: { origin: "https://app.langwatch.ai" },
+    value: { origin: STUB_ORIGIN, protocol: "https:", host: STUB_HOST },
     writable: true,
     configurable: true,
   });
@@ -111,6 +117,43 @@ describe("Feature: a resource in the agent's prose reads as a named link, never 
 
       fireEvent.click(screen.getByText("here"));
       expect(pushMock).not.toHaveBeenCalled();
+    });
+
+    /**
+     * A protocol-relative href carries no scheme, so a `^https?://` test calls
+     * it "not absolute" — while the guard separately refuses to treat it as
+     * in-app. Landing in neither bucket, it used to render as a bare anchor:
+     * off-site, in the same tab, with nothing telling the reader it left.
+     */
+    it("marks a bare protocol-relative href as leaving the app", () => {
+      renderLangyMarkdown("Go [away](//evil.example.com).");
+
+      const anchor = screen.getByText("away").closest("a")!;
+      expect(anchor.getAttribute("target")).toBe("_blank");
+      expect(anchor.getAttribute("rel")).toContain("noopener");
+    });
+
+    it("never SPA-pushes a bare protocol-relative href", () => {
+      renderLangyMarkdown("Go [away](//evil.example.com).");
+
+      fireEvent.click(screen.getByText("away"));
+      expect(pushMock).not.toHaveBeenCalled();
+    });
+
+    /**
+     * The same-origin case must still ride the SPA router: Langy writes its
+     * links absolute, and a `//this-host/path` form is the same destination as
+     * `/path` — treating every protocol-relative href as external would tear
+     * the panel down on a link to this very instance.
+     */
+    it("keeps a protocol-relative link to this instance in the SPA", () => {
+      renderLangyMarkdown(`Open [the run](//${STUB_HOST}/acme/simulations).`);
+
+      const anchor = screen.getByText("the run").closest("a")!;
+      expect(anchor.getAttribute("target")).not.toBe("_blank");
+
+      fireEvent.click(screen.getByText("the run"));
+      expect(pushMock).toHaveBeenCalledWith("/acme/simulations");
     });
   });
 });
