@@ -394,10 +394,16 @@ function SlackChannelField({
     list.data?.error && list.data.error !== "no_token"
       ? list.data.error
       : null;
+  // The API can report that the listing is partial (private channels were
+  // omitted because `groups:read` is missing, or the 2000-channel cap was hit).
+  // That is informational, not an error — render it separately so it never
+  // swallows a hard failure hint.
+  const isPartial = !!list.data?.partial && returnedError === null;
   const hint = list.isError
     ? `Couldn't load channels: ${list.error?.message ?? "request failed"}. You can still type the channel above.`
     : returnedError === "missing_scope"
-      ? "Add the channels:read scope to your app and reinstall it to pick from a list — you can still type the channel above."
+      // Missing `groups:read` means only public channels were listed.
+      ? "Add the groups:read scope to your app and reinstall it to see private channels as well — you can still type a private channel above."
       : returnedError
         ? "Couldn't load channels from Slack. Check the token, or type the channel above."
         : null;
@@ -493,6 +499,13 @@ function SlackChannelField({
           pt={1}
         >
           {hint}
+        </Text>
+      ) : null}
+      {isPartial && !hint ? (
+        <Text textStyle="xs" color="fg.muted" pt={1}>
+          Showing only the channels this app can read. It may be missing private
+          channels (install the Slack app with the `groups:read` scope to include
+          them) or a few channels if the workspace is very large.
         </Text>
       ) : null}
     </Field.Root>
@@ -930,7 +943,9 @@ function SlackBotFields({
               </List.Item>
               <List.Item>
                 <Text textStyle="xs" color="fg.muted">
-                  Invite the bot to the channel you post to.
+                  For private channels, invite the bot with ` /invite @LangWatch `
+                  ; public channels work without an invite (the app has
+                  `chat:write.public`).
                 </Text>
               </List.Item>
             </List.Root>

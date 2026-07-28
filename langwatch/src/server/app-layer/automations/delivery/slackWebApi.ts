@@ -139,6 +139,19 @@ interface SlackConversationsResponse {
 }
 
 /**
+ * The contract `listSlackChannels` returns to the client. In addition to the
+ * channels and a hard error, it carries `partial` so the UI can flag that the
+ * listing is a best-effort subset rather than every channel the token can see
+ * (e.g. private channels were omitted because `groups:read` is missing, or the
+ * page cap was hit on a very large workspace).
+ */
+interface ListChannelsResult {
+  channels: SlackChannel[];
+  error: string | null;
+  partial: boolean;
+}
+
+/**
  * Conversations per page. Slack's own guidance is to stay well under its 1000
  * ceiling — large pages routinely time out server-side — and a smaller page
  * keeps each response comfortably inside {@link CHANNEL_LIST_MAX_RESPONSE_BYTES}.
@@ -163,11 +176,12 @@ const CHANNEL_LIST_MAX_RESPONSE_BYTES = 1024 * 1024;
 async function listChannelsForTypes(
   token: string,
   types: string,
-): Promise<{ channels: SlackChannel[]; error: string | null }> {
+): Promise<{ channels: SlackChannel[]; error: string | null; partial: boolean }> {
   const collected: SlackChannel[] = [];
-  const done = (error: string | null) => ({
+  const done = (error: string | null, partial: boolean = false) => ({
     channels: [...collected].sort((a, b) => a.name.localeCompare(b.name)),
     error,
+    partial,
   });
 
   let cursor: string | undefined;
@@ -222,7 +236,7 @@ async function listChannelsForTypes(
     { pages: MAX_CHANNEL_PAGES, channels: collected.length },
     "Slack conversations.list page cap reached; returning a partial channel list",
   );
-  return done(null);
+  return done(null, true);
 }
 
 /**
@@ -238,12 +252,15 @@ async function listChannelsForTypes(
  */
 export async function listSlackChannels(
   token: string,
-): Promise<{ channels: SlackChannel[]; error: string | null }> {
+): Promise<ListChannelsResult> {
   const withPrivate = await listChannelsForTypes(
     token,
     "public_channel,private_channel",
   );
   if (withPrivate.error !== "missing_scope") return withPrivate;
   // Missing `groups:read` (private) — fall back to public channels only.
-  return listChannelsForTypes(token, "public_channel");
+  // The resulting list is incomplete by construction; mark it partial so the
+  // client can surface a hint that private channels were omitted.
+  const result = await listChannelsForTypes(token, "public_channel");
+  return { ...result, partial: true };
 }
