@@ -41,6 +41,12 @@ jobs:
       # and a subset does not need splitting.
       unit-shards: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && '[1,2,3,4]' || '[1]' }}
       integration-shards: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && '[1,2,3,4,5,6]' || '[1]' }}
+      # Coverage instrumentation costs ~45% of the run (measured: a unit subset
+      # goes 3.7s -> 6.6s with --coverage). Nothing gates on it — there is no
+      # codecov.yml, no codecov status check on PRs, and both uploads are
+      # fail_ci_if_error: false. So it runs where the trend line is actually
+      # read (main, merge queue) and not on every PR push.
+      coverage: ${{ github.event_name != 'pull_request' }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
       - uses: ./.github/actions/detect-changes
@@ -157,7 +163,7 @@ jobs:
         working-directory: langwatch
         run: pnpm start:prepare:files
 
-      - name: Run unit tests with coverage (shard ${{ matrix.shard }}/4)
+      - name: Run unit tests (shard ${{ matrix.shard }}/4)
         id: unit-tests
         working-directory: langwatch
         run: |
@@ -169,14 +175,18 @@ jobs:
           # tenth of the budget. The full sharded suite returns on
           # ready_for_review and in the merge queue, so nothing reaches main
           # having only had the subset.
+          COV=""
+          if [ "${{ needs.changes.outputs.coverage }}" = "true" ]; then
+            COV="--coverage --coverage.reporter=lcov --coverage.reporter=text"
+          fi
           if [ "${{ needs.changes.outputs.heavy }}" != "true" ]; then
             git fetch --no-tags --depth=1 origin main
             pnpm test:unit --run --changed origin/main --passWithNoTests \
               --reporter=default --reporter=./src/test-utils/shardFailureReporter.ts \
               --dangerouslyIgnoreUnhandledErrors
           else
-            pnpm test:unit --run --shard=${{ matrix.shard }}/4 \
-              --coverage --coverage.reporter=lcov --coverage.reporter=text \
+            # shellcheck disable=SC2086
+            pnpm test:unit --run --shard=${{ matrix.shard }}/4 $COV \
               --reporter=default --reporter=./src/test-utils/shardFailureReporter.ts \
               --dangerouslyIgnoreUnhandledErrors
           fi
@@ -308,7 +318,7 @@ jobs:
           done
           exit 1
 
-      - name: Run integration tests with coverage (shard ${{ matrix.shard }}/6)
+      - name: Run integration tests (shard ${{ matrix.shard }}/6)
         id: integration-tests
         working-directory: langwatch
         # Integration files run sequentially in a single long-lived fork worker
@@ -326,14 +336,18 @@ jobs:
           #
           # Draft: affected integration tests only, one runner (see test-unit).
           # The services are already up by this point either way.
+          COV=""
+          if [ "${{ needs.changes.outputs.coverage }}" = "true" ]; then
+            COV="--coverage --coverage.reporter=lcov --coverage.reporter=text"
+          fi
           if [ "${{ needs.changes.outputs.heavy }}" != "true" ]; then
             git fetch --no-tags --depth=1 origin main
             pnpm test:integration --changed origin/main --passWithNoTests \
               --reporter=default --reporter=json --reporter=./src/test-utils/shardFailureReporter.ts \
               --outputFile=test-results.json
           else
-            pnpm test:integration --shard=${{ matrix.shard }}/6 \
-              --coverage --coverage.reporter=lcov --coverage.reporter=text \
+            # shellcheck disable=SC2086
+            pnpm test:integration --shard=${{ matrix.shard }}/6 $COV \
               --reporter=default --reporter=json --reporter=./src/test-utils/shardFailureReporter.ts \
               --outputFile=test-results.json
           fi
