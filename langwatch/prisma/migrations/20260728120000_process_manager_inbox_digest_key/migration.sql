@@ -1,3 +1,19 @@
+-- IRREVERSIBLE: there is no safe down step.
+--
+-- Reversing means recreating the unique index on the RAW `sourceEventId`, and
+-- that can no longer be guaranteed to build: once this migration is live the
+-- store admits keys of any length, so a single row past the btree limit makes
+-- the reverse index creation fail — and the row that would break it is exactly
+-- the kind of row this migration exists to accept. Dropping `sourceEventKey`
+-- alone is also not a rollback: it removes the only uniqueness the inbox has,
+-- so the idempotency guarantee lapses silently rather than loudly.
+--
+-- To roll back the CODE, deploy the previous build and leave this schema in
+-- place — the added column and index are inert to it (it neither reads nor
+-- writes them), so no data step is needed. Undoing the SCHEMA is a manual,
+-- remediated operation: prune or truncate any row whose `sourceEventId`
+-- exceeds the btree limit first, then recreate the old index by hand.
+--
 -- The inbox's uniqueness moves off the raw source event id and onto a
 -- fixed-width digest of it.
 --
