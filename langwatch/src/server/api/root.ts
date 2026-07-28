@@ -8,7 +8,7 @@ import { ingestionSourcesRouter } from "@ee/governance/routers/ingestionSources"
 import { ingestionTemplatesRouter } from "@ee/governance/routers/ingestionTemplates";
 import { personalSessionsRouter } from "@ee/governance/routers/personalSessions";
 import { sessionPolicyRouter } from "@ee/governance/routers/sessionPolicy";
-import { createTRPCRouter } from "~/server/api/trpc";
+import { createTRPCRouter, mergeRouters } from "~/server/api/trpc";
 import { agentsRouter } from "./routers/agents";
 import { analyticsRouter } from "./routers/analytics";
 import { annotationRouter } from "./routers/annotation";
@@ -40,6 +40,7 @@ import { groupRouter } from "./routers/group";
 import { homeRouter } from "./routers/home";
 import { httpProxyRouter } from "./routers/httpProxy";
 import { integrationsChecksRouter } from "./routers/integrationsChecks";
+import { inviteRouter } from "./routers/invite";
 import { langyRouter } from "./routers/langy";
 import { langyEgressRouter } from "./routers/langyEgress";
 import { langyGithubRouter } from "./routers/langyGithub";
@@ -88,7 +89,9 @@ const coreRouters = {
   agents: agentsRouter,
   evaluators: evaluatorsRouter,
   httpProxy: httpProxyRouter,
-  organization: organizationRouter,
+  // Invite procedures live in their own router but keep their existing
+  // organization.* paths, so no caller changes.
+  organization: mergeRouters(organizationRouter, inviteRouter),
   project: projectRouter,
   team: teamRouter,
   traces: tracesRouter,

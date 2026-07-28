@@ -11,7 +11,7 @@ import {
   INVITE_NOT_READY_MESSAGE,
 } from "../../../invites/errors";
 import { createInnerTRPCContext } from "../../trpc";
-import { organizationRouter } from "../organization";
+import { inviteRouter } from "../invite";
 
 vi.mock("../../../../env.mjs", () => ({
   env: {
@@ -124,7 +124,7 @@ describe("organization.acceptInvite", () => {
       project: { findFirst: vi.fn().mockResolvedValue(null) },
       $transaction: transactionMock,
     };
-    return organizationRouter.createCaller(ctx);
+    return inviteRouter.createCaller(ctx);
   }
 
   describe("when invite status is PENDING", () => {

@@ -396,6 +396,18 @@ const t = initTRPC.context<typeof createTRPCContext>().create({
  */
 export const createTRPCRouter = t.router;
 
+/**
+ * Combine routers that share one namespace.
+ *
+ * Use this to split a large router across files without moving its procedures
+ * to a new path: the merged procedures keep the path of the key they are
+ * mounted under. To give a router its own namespace, mount it in `root.ts`
+ * instead.
+ *
+ * @see https://trpc.io/docs/server/merging-routers
+ */
+export const mergeRouters = t.mergeRouters;
+
 /** Reusable middleware that enforces users are logged in before running the procedure. */
 const enforceUserIsAuthed = t.middleware(({ ctx, next }) => {
   if (!ctx.session?.user) {
