@@ -82,6 +82,7 @@ describe("TraceUsageService", () => {
         expect(result).toBe(USAGE_UNKNOWN);
       });
 
+      /** @scenario An unknown count is never cached */
       it("does not cache the unknown", async () => {
         mockQueryTraceSummariesTotalUniq.mockResolvedValue(null);
         await service.getCurrentMonthCount({
@@ -132,6 +133,7 @@ describe("TraceUsageService", () => {
     });
 
     describe("when queryTraceSummariesTotalUniq returns null (ClickHouse unavailable)", () => {
+      /** @scenario A partial per-project breakdown is reported as unknown, not as zeros */
       it("reports the whole set as unknown, not a zeroed project", async () => {
         // One unreachable project makes the set untrustworthy: a caller
         // summing it against a cap, or ranking projects in an email, would be

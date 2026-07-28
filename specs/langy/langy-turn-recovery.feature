@@ -57,18 +57,33 @@ Feature: Langy recovers from a failed turn without making the user re-ask
     And Langy does not re-drive the turn on its own
     And the card never flickers away into a silent retry
 
-  # A rejected model call comes back with the provider's own explanation: an
-  # out-of-credits account, a model the plan does not include. That sentence is
-  # usually the whole fix, and hiding it behind "Something went wrong" leaves
-  # it unread, so the card names what the provider rejected.
+  # A rejected model call comes back with the provider's own explanation, and
+  # the card used to recite it: an out-of-credits account is a real fix that
+  # "Something went wrong" hides. It cost too much. A provider's error body is
+  # written for whoever holds the API key, and on a mediated call that is
+  # LangWatch — a rejected key comes back quoted inside that sentence, so the
+  # card was printing a platform credential to a customer. Masking it first is
+  # not a fix: matching credential shapes only catches the shapes enumerated.
   @unit
-  Scenario: A rejected model call shows the provider's own message on the card
+  Scenario: A rejected model call never recites the provider's own message
     Given Langy's model call is rejected by the provider
     When the turn fails and the error reaches the panel
     Then the card keeps the friendly reply-failed framing
-    And it includes the provider's own error message
+    And the provider's own sentence appears nowhere on it
     And it suggests trying again or picking a different model
-    But when no provider message was captured, the stock reply-failed copy stands
+
+  # Nothing actionable is lost, because the part a customer could act on was
+  # never the prose — it was which failure it was. The provider says that in a
+  # discriminant, a value from a set it enumerates, which cannot carry a key.
+  @unit
+  Scenario: An out-of-allowance model call is promoted by reason code, not by message
+    Given Langy's model call is rejected because the account has no allowance left
+      # "usage_limit_reached", "codex_plan_limit", "insufficient_quota" or
+      # "billing_hard_limit_reached", depending on which backend answered
+    When the turn fails and the error reaches the panel
+    Then the failure is promoted to the plan-limit card by its reason code
+    And the customer reads copy written by LangWatch for that case
+    And the provider's own sentence still appears nowhere
 
   # The flicker had a second cause independent of the worker-stopped loop: for the
   # kinds that DO auto-retry, the red card rendered for a single frame before the

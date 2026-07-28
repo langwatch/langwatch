@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { USAGE_UNKNOWN } from "../../../src/server/traces/usage-count";
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -754,6 +755,44 @@ describe("UsageLimitService", () => {
 
         expect(result).toBeNull();
         expect(notificationService.sendUsageLimitEmail).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the counting store cannot report the per-project breakdown", () => {
+      /** @scenario The usage-limit email is skipped rather than sent with zeros */
+      it("skips the email rather than sending one full of zeros", async () => {
+        // The per-project breakdown is the substance of this email. When the
+        // count was unknown it used to arrive as a list of zeros, so a message
+        // whose entire premise is "your usage is high" reached an admin saying
+        // every one of their projects had gone quiet. The threshold is still
+        // crossed on the next run, when the numbers are real.
+        const {
+          service,
+          organizationService,
+          notificationRepository,
+          usageService,
+          notificationService,
+        } = createService();
+        (
+          organizationService.findWithAdmins as ReturnType<typeof vi.fn>
+        ).mockResolvedValue(ORG_WITH_ADMIN);
+        (
+          organizationService.findProjectsWithName as ReturnType<typeof vi.fn>
+        ).mockResolvedValue([{ id: "proj_1", name: "Production" }]);
+        (
+          usageService.getCountByProjects as ReturnType<typeof vi.fn>
+        ).mockResolvedValue(USAGE_UNKNOWN);
+
+        await service.checkAndSendWarning({
+          organizationId: "org_1",
+          currentMonthMessagesCount: 9500,
+          maxMonthlyUsageLimit: 10000,
+        });
+
+        expect(notificationService.sendUsageLimitEmail).not.toHaveBeenCalled();
+        // No record either: recording a send that did not happen would put the
+        // organization into cooldown and suppress the real warning.
+        expect(notificationRepository.create).not.toHaveBeenCalled();
       });
     });
 

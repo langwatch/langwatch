@@ -62,11 +62,16 @@ Feature: Handled errors — what the customer actually reads
     Then fault is the only thing known about it, and the copy degrades to that
 
   @unit @bdd @handled-errors @presentation
-  Scenario: Server-authored prose travels only in the explicit channel
+  Scenario: An unrecognised code renders no prose at all
     Given a handled error carries prose in `meta.message`
-      # the deliberate opt-in, mirroring Go's Meta["message"]
     When the client has no registry entry for its code
-    Then that prose is shown as the description
+    Then no description is shown
+      # the client cannot say who wrote that sentence, whether it was meant
+      # for a customer, or whether it is an upstream body relayed through a
+      # hop it cannot see — and a provider writes the key it rejected into
+      # exactly this field
+    And the customer reads the server's remediation tip, or the generic
+      line and a trace id
     And no other field is treated as prose
 
   # ==========================================================================
