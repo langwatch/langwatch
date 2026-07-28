@@ -744,6 +744,54 @@ def test_swap_and_reconcile_disagreement_becomes_tie_with_informative_details():
     assert "variant_2 covers more ground" in result.details
 
 
+def test_swap_and_reconcile_disagreement_with_allow_tie_false_is_skipped():
+    """Disagreement under order swap, with ties explicitly disabled.
+
+    `_judge` already honours allow_tie=False by leaving "tie" out of the
+    winner enum, so neither individual call can return it. Reconciliation must
+    honour it too: returning "tie" from the disagreement branch would hand
+    back a value the settings forbid, and one that downstream aggregation
+    reads as real 0.5/0.5 evidence rather than as an absent verdict.
+
+    Skipped rather than defaulted to the first call's winner. The
+    order-sensitivity IS the finding — swap_and_reconcile exists to detect it
+    — so picking the original-order pick would return the artefact we just
+    demonstrated, silently."""
+    evaluator = SelectBestCompareEvaluator(
+        settings=SelectBestCompareSettings(
+            randomize_order=False, allow_tie=False
+        )
+    )
+    entry = _make_entry(num_candidates=3, row_index=0)
+
+    # Slot "A" is variant_0 in call 1 and variant_2 in call 2 — genuinely
+    # different real candidates, i.e. a real order-sensitive disagreement.
+    responses = [
+        _mock_completion_response("variant_0 is more concise", "A"),
+        _mock_completion_response("variant_2 covers more ground", "A"),
+    ]
+    with patch(
+        "langevals_langevals.select_best_compare.completion",
+        side_effect=responses,
+    ) as mock_completion, patch(
+        "langevals_langevals.select_best_compare.completion_cost",
+        return_value=0.0001,
+    ):
+        result = evaluator.evaluate(entry)
+
+    assert mock_completion.call_count == 2
+    assert result.status == "skipped"
+    # Never the forbidden value, and never a silent score either: 1.0 would
+    # read as a win for no candidate, 0.5 would be the ruled-out tie.
+    assert getattr(result, "label", None) != "tie"
+    assert getattr(result, "score", None) is None
+    assert result.details is not None
+    # Still has to say WHY it could not decide, naming both picks.
+    assert "variant_0" in result.details
+    assert "variant_2" in result.details
+    assert "does not establish a winner" in result.details
+
+
 def test_swap_and_reconcile_both_calls_tie_stays_tie():
     """Trivial agreement case worth its own explicit test: both directions
     independently return 'tie' -> the final verdict is a tie, not treated

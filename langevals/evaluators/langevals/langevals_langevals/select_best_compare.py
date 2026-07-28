@@ -285,6 +285,15 @@ class SelectBestCompareEvaluator(
         )
 
         winner_id = verdict["winner"]
+
+        # No winner at all — reconciliation found the verdict was order-
+        # dependent and ties are disabled, so there is nothing to report. This
+        # is skipped rather than scored: `score=1.0` would read as a win for
+        # `label=None`, and `score=0.5` would be the tie the settings ruled
+        # out. An absent verdict must contribute no evidence either way.
+        if winner_id is None:
+            return EvaluationResultSkipped(details=verdict["reasoning"])
+
         score = 0.5 if winner_id == "tie" else 1.0
 
         return SelectBestCompareResult(
@@ -345,15 +354,31 @@ class SelectBestCompareEvaluator(
             }
 
         # Disagreement: the verdict flipped when candidate order flipped.
-        # Don't guess which direction was right — score it a tie and explain
-        # concretely what each call picked.
+        # Don't guess which direction was right — say so, and let the caller
+        # decide what an unresolvable row means for them.
         details = (
             f"Order-sensitive verdict: original order picked {winner1} "
             f"({verdict1['reasoning']}); reversed order picked {winner2} "
-            f"({verdict2['reasoning']}). Treated as a tie because the "
-            f"verdict changed with candidate order."
+            f"({verdict2['reasoning']}). The verdict changed with candidate "
+            f"order, so this row does not establish a winner."
         )
-        return {"winner": "tie", "reasoning": details, "cost": total_cost}
+
+        # `allow_tie=False` means the caller does not accept "tie" as an
+        # answer, and `_judge` honours that by leaving it out of `winner_enum`.
+        # Returning it from here anyway would hand back a value the config
+        # forbids — and one that downstream aggregation reads as real 0.5/0.5
+        # evidence rather than as an absent verdict.
+        #
+        # Deliberately NOT "fall back to winner1": the disagreement IS the
+        # finding. Order-sensitivity is exactly what swap_and_reconcile exists
+        # to detect, so picking the original-order winner would return the
+        # artefact we just demonstrated, silently. "Could not determine" and
+        # "they tied" are different claims; only one of them is true here.
+        return {
+            "winner": "tie" if self.settings.allow_tie else None,
+            "reasoning": details,
+            "cost": total_cost,
+        }
 
     def _judge(
         self,
