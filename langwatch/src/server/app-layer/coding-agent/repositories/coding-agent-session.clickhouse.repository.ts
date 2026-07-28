@@ -596,12 +596,15 @@ export class CodingAgentSessionClickHouseRepository
       observe("error");
       throw error;
     }
-    // Timed around the read alone: decoding ~90 columns per row is the caller's
-    // cost, not the dedup scan's, and mixing it in would move the distribution
-    // with page size rather than with scan width.
+    // Timed around the read and its row deserialization, but NOT the mapping to
+    // domain rows. The `empty` outcome is the one ADR-071 sequencing step 3
+    // reads, and it carries no rows to deserialize, so it isolates the dedup
+    // scan's own floor from anything that scales with page size.
     observe(rows.length > 0 ? "hit" : "empty");
 
-    return rows.map(fromRecord);
+    return dedupToLatestPerSession(rows)
+      .map(fromRecord)
+      .sort((a, b) => b.startedAtMs - a.startedAtMs);
   }
 
   async upsertBatch(
@@ -692,6 +695,90 @@ const asNumberMap = (value: unknown): Record<string, number> =>
         ]),
       )
     : {};
+
+/**
+ * Collapse versions the IN-tuple could not separate.
+ *
+ * The dedup subquery matches `(TenantId, SessionId, max(UpdatedAt))`, so two
+ * versions of one session sharing that `max(UpdatedAt)` BOTH satisfy it and the
+ * session renders TWICE. Such versions differ in `StartedAt` — that is why they
+ * are both still there — so they differ in the RMT sort key and no merge ever
+ * collapses them (ADR-071 consequence 1). `getUsageTotals` reduces over this
+ * array, so a duplicate does not merely look wrong: it counts that session's
+ * cost, tokens and active time twice.
+ *
+ * `findLatestRecord` closes the identical tie with `ORDER BY … LIMIT 1`. A list
+ * read cannot — its own `ORDER BY` is the caller's sort — so the same ranking is
+ * applied per session here. Like the point read's, this is DEFENCE IN DEPTH:
+ * `nextVersionStamp` makes the tie unreachable while per-aggregate serialization
+ * holds, and this covers the residual where two writers resumed from the same
+ * committed version outside that window.
+ *
+ * Insertion order is not relied on — the caller re-sorts — so this only has to
+ * pick the right version, not preserve a position.
+ */
+function dedupToLatestPerSession(
+  records: Record<string, unknown>[],
+): Record<string, unknown>[] {
+  const bySession = new Map<string, Record<string, unknown>>();
+  for (const record of records) {
+    const sessionId = String(record.SessionId ?? "");
+    const incumbent = bySession.get(sessionId);
+    bySession.set(
+      sessionId,
+      incumbent === undefined ? record : preferredOf(incumbent, record),
+    );
+  }
+  return [...bySession.values()];
+}
+
+/**
+ * `findLatestRecord`'s ranking, key for key, applied in TypeScript.
+ *
+ * See that query's docblock for why each key is here and, in particular, why
+ * `StartedAt ASC` closes the ordering without being a progress signal. Ties on
+ * every key return the incumbent, so the result does not depend on read order.
+ */
+function preferredOf(
+  incumbent: Record<string, unknown>,
+  challenger: Record<string, unknown>,
+): Record<string, unknown> {
+  // A column absent from the record ranks as "no progress" rather than NaN,
+  // which would make every comparison against it false and the winner depend on
+  // argument order.
+  const msOf = (value: unknown) => {
+    const ms = parseClickHouseDateTimeMs(String(value ?? ""));
+    return Number.isFinite(ms) ? ms : 0;
+  };
+  const progressOf = (record: Record<string, unknown>) => ({
+    watermark: msOf(record.LastEventOccurredAt),
+    signals:
+      asNumber(record.ModelCalls) +
+      asNumber(record.ToolCalls) +
+      asNumber(record.Prompts),
+    units: Array.isArray(record.MetricSeries) ? record.MetricSeries.length : 0,
+    applied: Array.isArray(record.AppliedEventIds)
+      ? record.AppliedEventIds.length
+      : 0,
+    startedAt: msOf(record.StartedAt),
+  });
+  const held = progressOf(incumbent);
+  const next = progressOf(challenger);
+
+  if (held.watermark !== next.watermark) {
+    return next.watermark > held.watermark ? challenger : incumbent;
+  }
+  if (held.signals !== next.signals) {
+    return next.signals > held.signals ? challenger : incumbent;
+  }
+  if (held.units !== next.units) {
+    return next.units > held.units ? challenger : incumbent;
+  }
+  if (held.applied !== next.applied) {
+    return next.applied > held.applied ? challenger : incumbent;
+  }
+  return next.startedAt < held.startedAt ? challenger : incumbent;
+}
 
 /**
  * Decode one `JSONEachRow` record.

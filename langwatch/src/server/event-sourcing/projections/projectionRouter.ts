@@ -1197,6 +1197,22 @@ export class ProjectionRouter<
 
       for (const event of matching) {
         try {
+          // Kill switch, checked BEFORE the enqueue hooks so a killed
+          // subscriber does no work at all. Every other dispatch path has one;
+          // without it the enqueue filter — which DROPS events irreversibly,
+          // since subscriber fan-out is never replayed — could only be stopped
+          // by shipping a revert.
+          const disabled = await isComponentDisabled({
+            featureFlagService: this.featureFlagService,
+            aggregateType: this.aggregateType,
+            componentType: "subscriber",
+            componentName: name,
+            tenantId: event.tenantId,
+            customKey: subscriber.options?.killSwitch?.customKey,
+            logger: this.logger,
+          });
+          if (disabled) continue;
+
           // Enqueue-time filter (ADR-069 invariant 4): a declined event never
           // mints a job. A throw here is deliberately NOT caught as `false` —
           // it falls through to the catch below, so the failure is reported
@@ -1233,12 +1249,23 @@ export class ProjectionRouter<
           // the catch below, so a queue outage never inflates `staged` or
           // `referenced` — the outcome split stays an honest picture of what
           // the seam did.
+          // A reference is a DIFFERENT event type by construction, which is
+          // what the split means to an operator. Reference identity would count
+          // a `stage` that rebuilt the same event as "referenced".
           incrementEsSubscriberEnqueueTotal({
             pipelineName: this.pipelineName,
             subscriberName: name,
-            outcome: staged === event ? "staged" : "referenced",
+            outcome: staged.type === event.type ? "staged" : "referenced",
           });
         } catch (error) {
+          // The seam has no retry, so this job is gone. Count it: without this
+          // a thrown filter/stage/send moved no series at all, and a permanent
+          // drop looked exactly like a quiet day.
+          incrementEsSubscriberEnqueueTotal({
+            pipelineName: this.pipelineName,
+            subscriberName: name,
+            outcome: "failed",
+          });
           this.logger.error(
             {
               subscriberName: name,

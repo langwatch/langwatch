@@ -1,6 +1,8 @@
+import type { Fixed64 } from "@opentelemetry/otlp-transformer-next/build/esm/common/internal-types";
 import { z } from "zod";
 
 import { EventSchema } from "../../../domain/types";
+import { TraceRequestUtils } from "../utils/traceRequest.utils";
 import { logTraceContributionSchema } from "../../log-processing/schemas/logRecord";
 import { piiRedactionLevelSchema } from "./commands";
 import {
@@ -148,6 +150,15 @@ export function makeSpanReferencedEvent(
   if (!span || typeof span.spanId !== "string" || span.spanId.length === 0) {
     return event;
   }
+  // The resolving read is windowed on this value with `fallback: "none"`, so a
+  // reference that cannot state its span's start would be windowed on ingest
+  // time instead — permanently blind to any span that started outside the
+  // window, and unrecoverable by retry. Stage the full event instead: heavier
+  // on the scheduling plane, but it resolves without a store read at all.
+  const startTimeUnixMs = parseStartTimeUnixMs(span.startTimeUnixNano);
+  if (startTimeUnixMs === null) {
+    return event;
+  }
   return {
     id: event.id,
     version: SPAN_REFERENCED_EVENT_VERSION_LATEST,
@@ -161,25 +172,36 @@ export function makeSpanReferencedEvent(
       traceId: String(event.aggregateId),
       spanId: span.spanId,
       spanName: typeof span.name === "string" ? span.name : "",
-      startTimeUnixMs: parseStartTimeUnixMs(span.startTimeUnixNano),
+      startTimeUnixMs,
     },
     metadata: event.metadata,
   };
 }
 
 /**
- * ns→ms off the wire `startTimeUnixNano` (string or number), total: null on
- * anything unparseable or non-positive. Parsing a 19-digit ns string as a
- * double loses sub-microsecond precision, which is sub-millisecond after the
- * divide — well inside what partition windowing tolerates.
+ * ns→ms off the wire `startTimeUnixNano`, total: null on anything unparseable
+ * or non-positive.
+ *
+ * Delegates to the pipeline's canonical normalizer rather than re-deriving the
+ * shapes: `startTimeUnixNano` is a `Fixed64`, which off an OTLP/protobuf decode
+ * is a `{low, high}` Long — `parseOtlpBody` decodes without
+ * `toObject({longs: String})`, so the Long shape reaches here unchanged, and a
+ * string/number-only parse silently read it as "no start". The normalizer
+ * throws on an unrecognised shape; this seam must be TOTAL (ADR-069: a throw on
+ * the retry-less routing path permanently loses the job), so the throw is
+ * contained here and reported as null.
+ *
+ * Parsing a 19-digit ns value through a double loses sub-microsecond precision,
+ * which is sub-millisecond after the divide — well inside what partition
+ * windowing tolerates.
  */
 function parseStartTimeUnixMs(value: unknown): number | null {
-  const nano =
-    typeof value === "string" && /^\d+$/.test(value)
-      ? Number(value)
-      : typeof value === "number"
-        ? value
-        : Number.NaN;
+  let nano: number;
+  try {
+    nano = TraceRequestUtils.normalizeOtlpUnixNano(value as Fixed64);
+  } catch {
+    return null;
+  }
   if (!Number.isFinite(nano) || nano <= 0) return null;
   return Math.floor(nano / 1e6);
 }

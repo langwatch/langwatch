@@ -46,6 +46,7 @@ Document **important technical and architectural decisions** — context, trade-
 | [066](./066-projection-clickhouse-cached-store.md)                | `event_log` off the per-item hot path — read-back fold store + append coalescing            | Accepted                                          |
 | [068](./068-windowed-clickhouse-reads.md)                         | One windowed ClickHouse read with a measured fallback (`queryWindowed`)                      | Accepted                                          |
 | [069](./069-payload-cost-doctrine.md)                             | Payload cost is a scheduling input — extraction at ingest, byte bounds, memory by grant     | Accepted                                          |
+| [071](./071-coding-agent-session-immutable-storage-anchor.md)     | A storage anchor is immutable and platform-assigned — take the moving column out of the dedup scope | Accepted                                  |
 
 ## When to Write an ADR
 

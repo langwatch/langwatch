@@ -673,6 +673,48 @@ describe("CodingAgentSessionClickHouseRepository list-read dedup scope", () => {
     });
   });
 
+  describe("given two versions of one session tied on max(UpdatedAt)", () => {
+    describe("when the window is listed", () => {
+      /** @scenario a session whose earliest signal arrives late is listed once, up to date */
+      it("lists the session once, with the further-along version's totals", async () => {
+        // Both versions satisfy the IN-tuple: they share max(UpdatedAt) and
+        // differ in StartedAt, so the RMT never collapses them either. Without a
+        // per-session tiebreak the session renders twice and getUsageTotals adds
+        // its cost twice.
+        const tied = WINDOW_FROM + 30 * 60_000;
+        const { client } = listClient([
+          {
+            ...version({
+              sessionId: "tied",
+              startedAtMs: WINDOW_FROM + 10 * 60_000,
+              updatedAtMs: tied,
+              costUsd: 3,
+            }),
+            LastEventOccurredAt: chTime(WINDOW_FROM + 20 * 60_000),
+            ModelCalls: 2,
+          },
+          {
+            ...version({
+              sessionId: "tied",
+              startedAtMs: WINDOW_FROM + 5 * 60_000,
+              updatedAtMs: tied,
+              costUsd: 9,
+            }),
+            LastEventOccurredAt: chTime(WINDOW_FROM + 25 * 60_000),
+            ModelCalls: 5,
+          },
+        ]);
+
+        const listed = await listRecent(client);
+
+        expect(listed).toHaveLength(1);
+        // The version that applied the later event, not whichever came back
+        // first off the wire.
+        expect(listed[0]!.costUsd).toBeCloseTo(9);
+      });
+    });
+  });
+
   describe("given a session listed under a user narrowing", () => {
     describe("given another user's session sits in the same window", () => {
       describe("when the window is listed", () => {

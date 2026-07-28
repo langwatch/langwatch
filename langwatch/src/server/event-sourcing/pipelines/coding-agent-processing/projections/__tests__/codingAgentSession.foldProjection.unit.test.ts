@@ -55,6 +55,7 @@ function spanFactsEvent({
   startMs = 1_000,
   endMs = 2_000,
   statusCode = 0,
+  agent = "claude_code",
 }: {
   name: string;
   spanId: string;
@@ -63,6 +64,7 @@ function spanFactsEvent({
   startMs?: number;
   endMs?: number;
   statusCode?: number;
+  agent?: string;
 }): SpanFactsContributedEvent {
   return {
     tenantId: createTenantId("tenant-1"),
@@ -71,7 +73,7 @@ function spanFactsEvent({
       tenantId: "tenant-1",
       sessionId: SESSION_ID,
       sessionKeySource: "provider",
-      agent: "claude_code",
+      agent,
       occurredAt: startMs,
       traceId,
       spanId,
@@ -548,6 +550,9 @@ describe("read-back losslessness (ADR-066)", () => {
     });
   });
 
+});
+
+describe("coding-agent session fold, per-agent gating", () => {
   describe("when a Cowork session folds from events only", () => {
     /** @scenario a Cowork session is an agent session */
     it("folds the model call — tokens, model, cost — from the api_request event", () => {
@@ -606,6 +611,71 @@ describe("read-back losslessness (ADR-066)", () => {
       expect(state.toolResultBytes).toBe(2_048);
     });
 
+    /** @scenario a Cowork session is an agent session */
+    it("counts a turn once when the beta trace export also emits its span", () => {
+      const projection = makeProjection();
+      const modelFacts = {
+        model: "claude-fable-5",
+        input_tokens: 100,
+        output_tokens: 50,
+      };
+
+      // Cowork behind its beta trace-export flag: the SAME turn arrives twice,
+      // once as Claude Code's llm_request span and once as the api_request
+      // event Cowork folds its model calls from.
+      const afterSpan = projection.handleCodingAgentSessionSpanFactsContributed(
+        spanFactsEvent({
+          name: "claude_code.llm_request",
+          spanId: "cw-llm-1",
+          agent: "claude_cowork",
+          facts: modelFacts,
+        }),
+        initStateOf(projection),
+      );
+      const state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          agent: "claude_cowork",
+          facts: { "event.name": "claude_code.api_request", ...modelFacts },
+        }),
+        afterSpan,
+      );
+
+      expect(state.modelCalls).toBe(1);
+      expect(state.inputTokens).toBe(100);
+      expect(state.outputTokens).toBe(50);
+    });
+
+    /** @scenario a Cowork session is an agent session */
+    it("counts a tool run once when the beta trace export also emits its span", () => {
+      const projection = makeProjection();
+
+      const afterSpan = projection.handleCodingAgentSessionSpanFactsContributed(
+        spanFactsEvent({
+          name: "claude_code.tool",
+          spanId: "cw-tool-1",
+          agent: "claude_cowork",
+          facts: { tool_name: "Bash", duration_ms: 120 },
+        }),
+        initStateOf(projection),
+      );
+      const state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          agent: "claude_cowork",
+          timeMs: 2_000,
+          facts: {
+            "event.name": "claude_code.tool_result",
+            tool_name: "Bash",
+            success: "true",
+            duration_ms: 120,
+          },
+        }),
+        afterSpan,
+      );
+
+      expect(state.toolCalls).toBe(1);
+      expect(state.toolCounts).toEqual({ Bash: 1 });
+    });
+
     it("identifies the user from Cowork's account uuid", () => {
       const projection = makeProjection();
 
@@ -648,6 +718,34 @@ describe("read-back losslessness (ADR-066)", () => {
       expect(state.modelCalls).toBe(0);
       expect(state.inputTokens).toBe(0);
       expect(state.outputTokens).toBe(0);
+    });
+  });
+
+  describe("when a span-bearing agent's tool_result event contributes", () => {
+    /** @scenario re-delivered telemetry does not inflate a session */
+    it("folds result bytes only — the run itself arrives on the tool span", () => {
+      const projection = makeProjection();
+
+      const state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          agent: "claude_code",
+          facts: {
+            "event.name": "claude_code.tool_result",
+            tool_name: "Bash",
+            success: "true",
+            duration_ms: 120,
+            tool_result_size_bytes: 2_048,
+          },
+        }),
+        initStateOf(projection),
+      );
+
+      expect(state.toolResultBytes).toBe(2_048);
+      // The other half of the gate — untested until now, and the half that
+      // would double every Claude Code tool run if it regressed.
+      expect(state.toolCalls).toBe(0);
+      expect(state.toolCounts).toEqual({});
+      expect(state.steps).toEqual([]);
     });
   });
 });

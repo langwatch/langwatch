@@ -7,7 +7,11 @@ import type {
 import type { FeatureFlagServiceInterface } from "../../featureFlag/types";
 import type { AggregateType } from "../domain/aggregateType";
 
-export type KillSwitchComponentType = "projection" | "mapProjection" | "command";
+export type KillSwitchComponentType =
+  | "projection"
+  | "mapProjection"
+  | "command"
+  | "subscriber";
 
 /**
  * Generates a feature flag key for a component kill switch.

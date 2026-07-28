@@ -498,33 +498,65 @@ describe("codingAgentSpanFactsDispatch", () => {
         ]);
       });
 
-      it("falls back to ingest time when the wire span carried no parseable start", async () => {
-        const valid = rawSpanEvent({
-          name: "claude_code.tool",
-          spanId: "no-start",
-          attributes: { tool_name: "Bash" },
-        }) as SpanReceivedEvent;
+      /** @scenario work whose payload is not readable yet retries, never drops */
+      it("centers the read on the start even when the wire carried a protobuf Long", async () => {
+        const threeDays = 3 * 24 * 60 * 60 * 1000;
+        const startMs = 1_753_000_000_000;
         const base = rawSpanEvent({
-          name: "claude_code.tool",
-          spanId: "no-start",
-          attributes: { tool_name: "Bash" },
+          name: "claude_code.blocked_on_user",
+          spanId: "long-span-proto",
+          startMs,
+          endMs: startMs + threeDays,
         }) as SpanReceivedEvent;
+        // An OTLP/protobuf decode yields a {low, high} Long here, not a decimal
+        // string: `parseOtlpBody` decodes without `toObject({longs: String})`.
+        const nano = BigInt(startMs) * 1_000_000n;
         const span = base.data.span as { startTimeUnixNano?: unknown };
-        span.startTimeUnixNano = "not-a-timestamp";
-        const event = { ...base, occurredAt: 5_000 };
+        span.startTimeUnixNano = {
+          low: Number(nano & 0xffffffffn) | 0,
+          high: Number(nano >> 32n),
+          unsigned: false,
+        };
+        const event = { ...base, occurredAt: startMs + threeDays };
 
-        // Only the read HINT is under test; the stub's span content just has
-        // to be a well-formed store row (a garbage start can't normalize, so
-        // the store never holds one).
         const { subscriber, reads } = makeSubscriber(async () =>
-          normalizedFrom(valid),
+          normalizedFrom(event),
         );
         await subscriber.handle(
           makeSpanReferencedEvent(event) as TraceProcessingEvent,
           context,
         );
 
-        expect(reads[0]?.occurredAtMs).toBe(5_000);
+        expect(reads[0]?.occurredAtMs).toBe(startMs);
+      });
+    });
+
+    describe("when the wire span carried no usable start", () => {
+      /** @scenario work whose payload is not readable yet retries, never drops */
+      it("stages the full event rather than a reference the read could not resolve", async () => {
+        const base = rawSpanEvent({
+          name: "claude_code.tool",
+          spanId: "zero-start",
+          attributes: { tool_name: "Bash" },
+        }) as SpanReceivedEvent;
+        // A zero start is stored as 1970, so a reference for it would be
+        // windowed on ingest time and never find its own row.
+        const span = base.data.span as { startTimeUnixNano?: unknown };
+        span.startTimeUnixNano = "0";
+        const event = { ...base, occurredAt: 5_000 };
+
+        const { subscriber, dispatched, reads } = makeSubscriber(
+          async () => null,
+        );
+        await subscriber.handle(
+          makeSpanReferencedEvent(event) as TraceProcessingEvent,
+          context,
+        );
+
+        // No store read at all — the facts come off the staged payload.
+        expect(reads).toHaveLength(0);
+        expect(dispatched).toHaveLength(1);
+        expect(dispatched[0]!.facts.tool_name).toBe("Bash");
       });
     });
 

@@ -668,19 +668,28 @@ export const observeEsSubscriberDuration = ({
  * - `referenced` — a job carrying a claim-check reference instead of the
  *   payload was handed off.
  *
+ * - `failed` — the filter, the stage hook or the handoff threw. The routing
+ *   path has no retry, so this subscriber's job for this event is gone.
+ *
  * `staged` and `referenced` are counted only after the handoff succeeded: the
  * queue accepted the job, or (in the no-queue configuration) the handler ran
- * inline. A handoff that throws counts no outcome at all — it is reported as a
- * dispatch failure instead, so a queue outage cannot inflate either.
+ * inline. A handoff that throws counts `failed` instead, so a queue outage
+ * cannot inflate either.
  *
- * The outcomes therefore do not sum to "events routed"; the shortfall is
- * the failure count, which is the honest reading.
+ * The four outcomes therefore DO sum to "events routed to this subscriber",
+ * which is what makes `failed` readable as a rate: it is the only outcome that
+ * loses work, and it is otherwise invisible — a permanent drop that moved no
+ * series looked exactly like a quiet day.
  */
-type SubscriberEnqueueOutcome = "filtered" | "staged" | "referenced";
+type SubscriberEnqueueOutcome =
+  | "filtered"
+  | "staged"
+  | "referenced"
+  | "failed";
 register.removeSingleMetric("es_subscriber_enqueue_total");
 const esSubscriberEnqueueTotal = new Counter({
   name: "es_subscriber_enqueue_total",
-  help: "Event-sourcing subscriber fan-out outcomes decided at enqueue time (ADR-069): filtered before staging, or — once the handoff to the subscriber's lane succeeded — staged as a full event or referenced as a claim-check",
+  help: "Event-sourcing subscriber fan-out outcomes decided at enqueue time (ADR-069): filtered before staging, staged as a full event or referenced as a claim-check once the handoff succeeded, or failed — the retry-less routing path lost the job",
   labelNames: ["pipeline_name", "subscriber_name", "outcome"] as const,
 });
 

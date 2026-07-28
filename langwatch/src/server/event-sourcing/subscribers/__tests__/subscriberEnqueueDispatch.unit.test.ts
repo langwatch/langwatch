@@ -117,6 +117,50 @@ async function expectDispatchFailure(
 }
 
 describe("subscriber enqueue-time contract", () => {
+  describe("given a subscriber whose kill switch is flipped for the tenant", () => {
+    describe("when the event is dispatched", () => {
+      /** @scenario a subscriber can be stopped for one tenant without a deploy */
+      it("mints no job and runs neither enqueue hook", async () => {
+        const received: unknown[] = [];
+        let filterRan = false;
+        const before = {
+          filtered: await enqueueOutcomeCount("filtered"),
+          staged: await enqueueOutcomeCount("staged"),
+        };
+        const router = new ProjectionRouter<Event>(
+          aggregateType,
+          TEST_CONSTANTS.PIPELINE_NAME,
+          makeQueueManager(),
+          // The seam drops events irreversibly, so "off" has to be reachable at
+          // runtime; every other dispatch path already resolves this flag.
+          { isEnabled: async () => true } as never,
+        );
+        router.registerEventSubscriber({
+          name: "seamSubscriber",
+          eventTypes: [],
+          handle: async (event) => {
+            received.push(event);
+          },
+          options: {
+            enqueue: {
+              filter: () => {
+                filterRan = true;
+                return true;
+              },
+            },
+          },
+        });
+
+        await router.dispatch([makeEvent("evt-killed")], readContext);
+
+        expect(received).toHaveLength(0);
+        expect(filterRan).toBe(false);
+        expect(await enqueueOutcomeCount("filtered")).toBe(before.filtered);
+        expect(await enqueueOutcomeCount("staged")).toBe(before.staged);
+      });
+    });
+  });
+
   describe("given a subscriber with an enqueue filter", () => {
     describe("when the filter rejects the event", () => {
       /** @scenario a non-matching event never mints a job */
@@ -141,9 +185,10 @@ describe("subscriber enqueue-time contract", () => {
 
     describe("when the filter raises", () => {
       /** @scenario a subscriber that cannot decide relevance is reported, not read as declining */
-      it("reports the failure and counts neither outcome, so a raise is never mistaken for a decline", async () => {
+      it("reports the failure and counts it as failed, so a raise is never mistaken for a decline", async () => {
         const beforeFiltered = await enqueueOutcomeCount("filtered");
         const beforeStaged = await enqueueOutcomeCount("staged");
+        const beforeFailed = await enqueueOutcomeCount("failed");
         const received: unknown[] = [];
         const router = makeRouter({
           name: "seamSubscriber",
@@ -161,8 +206,10 @@ describe("subscriber enqueue-time contract", () => {
 
         expect(causes).toHaveLength(1);
         expect(received).toHaveLength(0);
-        // Neither counter moves: the shortfall against events routed is what
-        // makes a raising hook distinguishable from a declining one.
+        // A raise is its own outcome. It must not read as a decline, and it
+        // must not be silent either — the routing path has no retry, so this
+        // event's job is gone and only this counter says so.
+        expect(await enqueueOutcomeCount("failed")).toBe(beforeFailed + 1);
         expect(await enqueueOutcomeCount("filtered")).toBe(beforeFiltered);
         expect(await enqueueOutcomeCount("staged")).toBe(beforeStaged);
       });

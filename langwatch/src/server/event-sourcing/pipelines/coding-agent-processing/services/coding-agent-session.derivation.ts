@@ -464,15 +464,31 @@ export interface SpanFactsView {
 export function applySpanToCodingAgentSession({
   state,
   span,
+  agent,
 }: {
   state: CodingAgentSessionData;
   span: SpanFactsView;
+  /**
+   * The CONTRIBUTION's detected agent — the same gate
+   * `applyLogToCodingAgentSession` applies, mirrored onto the span side.
+   *
+   * A logs-only agent folds its model calls and tool runs from its LOG events,
+   * so folding the equivalent span too counts one turn twice. `logsOnly` says
+   * the agent's telemetry is events-only, but nothing stops it also exporting
+   * spans — Cowork does exactly that behind its beta trace-export flag — so the
+   * gate has to be enforced on both sides, not just declared.
+   */
+  agent?: string;
 }): CodingAgentSessionData {
   const attrs = span.attrs;
   const durationMs = Math.max(0, span.endTimeUnixMs - span.startTimeUnixMs);
+  const isLogsOnly = agent !== undefined && LOGS_ONLY_AGENT_IDS.has(agent);
 
   if (span.name === CLAUDE.SPAN.LLM_REQUEST) {
-    return foldModelCall(withIdentity(state, attrs), attrs, durationMs);
+    // Identity still rides the span; only the counted facts are the log's.
+    return isLogsOnly
+      ? withIdentity(state, attrs)
+      : foldModelCall(withIdentity(state, attrs), attrs, durationMs);
   }
 
   if (span.name === CLAUDE.SPAN.SUBAGENT_SPAWN) {
@@ -500,6 +516,10 @@ export function applySpanToCodingAgentSession({
   }
 
   if (span.name !== CLAUDE.SPAN.TOOL) return state;
+
+  // Same gate as the model call above: a logs-only agent folds its tool runs
+  // from `tool_result`, so the tool span would be the second count.
+  if (isLogsOnly) return withIdentity(state, attrs);
 
   return foldToolInvocation(withIdentity(state, attrs), {
     attrs,

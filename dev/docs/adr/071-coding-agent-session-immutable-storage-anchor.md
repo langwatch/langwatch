@@ -24,7 +24,7 @@ TTL IF(_retention_days > 0, toDateTime(StartedAt) + toIntervalDay(_retention_day
 `StartedAt` is not stable. The fold takes the **minimum** business time it has ever seen for the session:
 
 ```ts
-// codingAgentSession.foldProjection.ts:165-170
+// codingAgentSession.foldProjection.ts:247-252
 // The session starts when its earliest signal does. Spans refine this
 // below with their own start time, which can predate arrival order.
 startedAtMs:
@@ -136,9 +136,9 @@ The obvious reaction to this ADR is that `coding_agent_sessions` picked an idios
 
 | Table | Anchor (partition + sort key + TTL) | How it is derived | Direction it moves |
 |---|---|---|---|
-| `coding_agent_sessions` (00051:192-195) | `StartedAt` | `min(state.startedAtMs, occurredAt)` — `codingAgentSession.foldProjection.ts:165-170` | backwards |
-| `trace_analytics` (00039:189-192) | `OccurredAt` | `min(state.occurredAt, span.startTimeUnixMs)` — `span-timing.service.ts:36-38`, projected at `traceAnalytics.foldProjection.ts:302` | backwards |
-| `evaluation_analytics` (00041:135-138) | `OccurredAt` | `LastEventOccurredAt`, i.e. `max(prev, event.occurredAt)` — `abstractFoldProjection.ts:235-238`, projected at `evaluationAnalytics.foldProjection.ts:201` | forwards |
+| `coding_agent_sessions` (00051:192-195) | `StartedAt` | `min(state.startedAtMs, occurredAt)` — `codingAgentSession.foldProjection.ts:247-252` | backwards |
+| `trace_analytics` (00039:189-192) | `OccurredAt` | `min(state.occurredAt, span.startTimeUnixMs)` — `span-timing.service.ts:36-38`, projected at `traceAnalytics.foldProjection.ts:603` | backwards |
+| `evaluation_analytics` (00041:135-138) | `OccurredAt` | `LastEventOccurredAt`, i.e. `max(prev, event.occurredAt)` — `abstractFoldProjection.ts:235-238`, projected at `evaluationAnalytics.foldProjection.ts:252` | forwards |
 
 `span.startTimeUnixMs` and `event.occurredAt` are **producer-supplied**. Renaming the column fixes nothing.
 
@@ -147,7 +147,7 @@ The obvious reaction to this ADR is that `coding_agent_sessions` picked an idios
 Two honest differences, rather than flattening this into "same bug three times":
 
 - **`evaluation_analytics` moves forwards**, so consequence 3 *inverts*: its TTL deadline moves *away* from the row, which outlives the retention it was promised rather than dying early. Consequences 1, 2 and 4 apply unchanged — a version can drift out of a caller's window upwards just as well as downwards.
-- **`evaluation_analytics` already sets `eventOrdering: "acceptedAt"`** (`evaluationAnalytics.foldProjection.ts:301`). The codebase already refuses to trust producer business time for *ordering*, while still anchoring its *storage* on it. That inconsistency is the finding in one line.
+- **`evaluation_analytics` already sets `eventOrdering: "acceptedAt"`** (`evaluationAnalytics.foldProjection.ts:466`). The codebase already refuses to trust producer business time for *ordering*, while still anchoring its *storage* on it. That inconsistency is the finding in one line.
 
 #### The real axis: producer business time vs. platform accept time
 
@@ -224,6 +224,14 @@ We accept both. Neither is a wrong answer on an ordinary read once this change l
 - **A column that is a storage anchor and a displayed business value at the same time is a bug waiting for a late event.** Split them: the anchor is accept time (frozen business time is the interim step, not the target), the business value is free to move.
 - **Prune on the anchor, answer on the business value.** When the anchor is accept time and the caller asks in business time, bound accept time by `[businessFrom − maxLag, businessTo]` for partition pruning and apply the exact business-time predicate in the outer scope. The window prunes; the exact predicate is what is correct (ADR-068).
 - **A dedup subquery must never filter on a column that can move a row out of the caller's range.** The outer scope may be range-filtered for partition pruning; the inner `max(version)` scope must resolve the true latest. Both reads on this table now obey it and say why in their docblocks — `findLatestRecord` always did, and `findManyRecent`'s range filter was removed from its dedup scope in this change. Narrowings on **stable** columns (`TenantId`, `UserId`) stay in both scopes: they cannot move a version out of its group. **Not even an upper bound is safe on a moving column**, because a read-back miss re-stamps the anchor *forwards*, so "the latest version holds the smallest value" does not hold.
+- **A LIST read must collapse to one row per key itself.** The IN-tuple matches
+  `(key, max(version))`, so versions that TIE on the version column all satisfy
+  it and the key renders more than once — and versions that tie are exactly the
+  ones the RMT never collapses, because they differ in the sort key. A point read
+  closes this with `ORDER BY … LIMIT 1`; a list read cannot, since its own
+  `ORDER BY` is the caller's sort, so it applies the same ranking per key after
+  the read. Skipping it is not a cosmetic duplicate: any caller that reduces over
+  the list (`getUsageTotals` does) counts that key twice.
 - **A latest-version point read ends in a deterministic `ORDER BY … LIMIT 1`**, ranked by fold progress and closed by a stable key that makes the order total, even where a write-side version stamp already makes ties unreachable. The stamp is the mechanism; the tiebreak is the backstop, and it costs nothing because the IN-tuple has already cut the input to the tied rows. **The closing key buys determinism, not correctness** — do not justify it as picking the better-informed row unless the column it reads is itself a monotonic progress signal.
 - **`TenantId` is first in every scope, outer and inner.** Unchanged, restated because this ADR touches both scopes of two queries.
 
@@ -236,5 +244,5 @@ We accept both. Neither is a wrong answer on an ordinary read once this change l
 - [ADR-068](./068-windowed-clickhouse-reads.md) — windowed ClickHouse reads (the list read here is the counter-example; sequencing step 4 extends its discipline to the dedup-scope rule)
 - [ADR-015](./015-projection-replay-coordination.md) — replay coordination (the most likely vehicle for a re-key, if it ever happens)
 - `dev/docs/best_practices/clickhouse-queries.md` — IN-tuple dedup, version-stamp monotonicity, the `ORDER BY <version> DESC LIMIT 1` anti-pattern this tiebreak is not
-- **Same-class instances of the anchor defect** (recorded, not changed here): `00039_create_trace_analytics.sql:189-192` with `span-timing.service.ts:36-38`; `00041_create_evaluation_analytics.sql:135-138` with `evaluationAnalytics.foldProjection.ts:201` and `abstractFoldProjection.ts:235-238`
+- **Same-class instances of the anchor defect** (recorded, not changed here): `00039_create_trace_analytics.sql:189-192` with `span-timing.service.ts:36-38`; `00041_create_evaluation_analytics.sql:135-138` with `evaluationAnalytics.foldProjection.ts:252` and `abstractFoldProjection.ts:235-238`
 - **Accept time as the codebase already names it:** `foldProjection.types.ts:130-140` (`eventOrdering: "occurredAt" | "acceptedAt"`, the `(createdAt/EventTimestamp, EventId)` log cursor)
