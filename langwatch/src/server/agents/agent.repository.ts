@@ -11,6 +11,7 @@ import {
   type SignatureComponentConfig,
   signatureComponentSchema,
 } from "~/optimization_studio/types/dsl";
+import { dedentPythonCode } from "~/optimization_studio/utils/dedentPythonCode";
 
 /**
  * Agent types enum - matches ComponentType for signature/code/custom(workflow)/http
@@ -62,6 +63,52 @@ const validateConfig = (
   const schema = getConfigSchemaForType(type);
   return schema.parse(config);
 };
+
+/**
+ * Strips the leading indentation common to every line of a code agent's Python
+ * source.
+ *
+ * A block pasted into the editor can pick up a uniform indent (editor
+ * auto-indent on paste). Persisted that way it later crashes the code-block
+ * runner's `compile()` with IndentationError (issue #3013). Already-flush code
+ * and non-uniform indentation are returned byte-identical.
+ *
+ * Gated on the agent type, so no other config shape is walked or rewritten.
+ */
+const normalizeCodeConfig = (
+  type: AgentType,
+  config: AgentComponentConfig,
+): AgentComponentConfig => {
+  if (type !== "code") return config;
+
+  const codeConfig = config as CodeComponentConfig;
+  return {
+    ...codeConfig,
+    parameters: codeConfig.parameters.map((parameter) =>
+      // `code` is also a valid Field type, so `type` alone does not discriminate
+      // the code parameter from a field — the string value is what pins it.
+      parameter.identifier === "code" &&
+      parameter.type === "code" &&
+      typeof parameter.value === "string"
+        ? { ...parameter, value: dedentPythonCode(parameter.value) }
+        : parameter,
+    ),
+  };
+};
+
+/**
+ * Validates config for a write, then normalizes it.
+ *
+ * Normalization lives here rather than in any single route because every write
+ * path — the tRPC router, `POST`/`PATCH /api/agents`, `copyAgent`,
+ * `syncFromSource` and `pushToCopies` — funnels through this repository's
+ * write methods. Enforcing it at a higher altitude leaves every other caller
+ * persisting un-normalized configs, and `copyAgent` propagating them onward.
+ */
+const validateConfigForWrite = (
+  type: AgentType,
+  config: unknown,
+): AgentComponentConfig => normalizeCodeConfig(type, validateConfig(type, config));
 
 /**
  * Typed agent with parsed config matching DSL node data types.
@@ -244,14 +291,15 @@ export class AgentRepository {
 
   /**
    * Creates a new agent.
-   * Validates config matches the specified type's DSL schema.
+   * Validates config matches the specified type's DSL schema, and normalizes
+   * code-agent indentation.
    */
   async create(input: CreateAgentInput): Promise<TypedAgent> {
     // Validate type
     const type = agentTypeSchema.parse(input.type);
 
-    // Validate config matches type's DSL schema
-    const validatedConfig = validateConfig(type, input.config);
+    // Validate config matches type's DSL schema, then normalize it
+    const validatedConfig = validateConfigForWrite(type, input.config);
 
     const agent = await this.prisma.agent.create({
       data: {
@@ -273,7 +321,7 @@ export class AgentRepository {
   /**
    * Updates an existing agent.
    * Validates that the agent belongs to the specified project.
-   * Validates config if provided.
+   * Validates and normalizes config if provided.
    */
   async update(input: UpdateAgentInput): Promise<TypedAgent> {
     // Get existing agent to know its type for config validation
@@ -295,10 +343,10 @@ export class AgentRepository {
       ? agentTypeSchema.parse(input.data.type)
       : agentTypeSchema.parse(existing.type);
 
-    // Validate config if provided
+    // Validate and normalize config if provided
     let configToStore: Prisma.InputJsonValue | undefined;
     if (input.data.config) {
-      const validatedConfig = validateConfig(type, input.data.config);
+      const validatedConfig = validateConfigForWrite(type, input.data.config);
       configToStore = validatedConfig as unknown as Prisma.InputJsonValue;
     }
 
@@ -374,7 +422,7 @@ export class AgentRepository {
 
   /**
    * Updates only name and config of an agent (for pushToCopies / syncFromSource).
-   * config null is stored as Prisma.JsonNull.
+   * Validates and normalizes config; config null is stored as Prisma.JsonNull.
    */
   async updateNameAndConfig(
     agentId: string,
@@ -391,7 +439,10 @@ export class AgentRepository {
     const configToStore =
       data.config === null
         ? Prisma.JsonNull
-        : (validateConfig(type, data.config) as unknown as Prisma.InputJsonValue);
+        : (validateConfigForWrite(
+            type,
+            data.config,
+          ) as unknown as Prisma.InputJsonValue);
     await this.prisma.agent.update({
       where: { id: agentId, projectId },
       data: { name: data.name, config: configToStore },
