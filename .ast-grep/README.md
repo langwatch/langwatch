@@ -31,10 +31,23 @@ rules that apply to both file types are split into `_ts` / `_tsx` siblings.
 | `require-bdd-describe-context` + `-tsx` | nested `describe` that names a topic instead of a `given`/`when` condition | test files under `langwatch/**`, `typescript-sdk/**` |
 | `require-boolean-name-prefix` | `foo: boolean` without an `is`/`has`/`should`/`can`/`will` prefix or a domain-adjective equivalent | `langwatch/{src,ee}/**/*.ts` |
 | `require-fetch-timeout` + `-tsx` | `fetch(...)` with no `signal` — a hung peer hangs the caller | `langwatch/src/**`, `typescript-sdk/src/**` |
+| `no-test-without-assertion` + `-tsx` | a test whose inline body contains no `expect`/`assert` — passes unless the code throws | test files |
+| `use-action-based-test-name` + `-tsx` | `it("should …")`, and names carrying no behaviour (`works`, `renders`, `test`) | test files |
+| `no-tautological-assertion` + `-tsx` | `expect(X).toBe(X)` — an assertion that cannot fail | test files |
+| `no-empty-test` + `-tsx` | `it("…", () => {})` — always green, counts as coverage | test files |
 
-The last three were added because they were the three largest mechanically
-preventable clusters in a 50-PR sample of CodeRabbit comments — the BDD one
-alone accounted for 32 findings. Each rule that moves here should be **deleted**
+The BDD/boolean/fetch trio was added because they were the three largest
+mechanically preventable clusters in a 50-PR sample of CodeRabbit comments —
+the BDD one alone accounted for 32 findings. The four test-quality rules target
+the second-largest cluster (45 findings): tests that cannot fail. Measured
+across `src`, `ee` and `packages`: 171 `should`/vague names, 20 tautological
+assertions, 10 assertion-free tests.
+
+Biome covers the rest of the test surface — `noFocusedTests`,
+`noSkippedTests`, `noDuplicateTestHooks`, `noMisplacedAssertion`,
+`noExportsInTest`, `useTestHooksOnTop`, `noExcessiveNestedTestSuites` — scoped
+to test files in `langwatch/biome.jsonc`. Unscoped, `noFocusedTests` fires on
+any function named `fit(...)`, including a production zoom hook. Each rule that moves here should be **deleted**
 from `path_instructions` in `/.coderabbit.yaml`, or every violation gets
 reported twice, once deterministically and once probabilistically.
 

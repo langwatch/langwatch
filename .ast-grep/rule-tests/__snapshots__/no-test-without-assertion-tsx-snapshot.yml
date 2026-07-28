@@ -1,0 +1,26 @@
+id: no-test-without-assertion-tsx
+snapshots:
+  ? |
+    it("builds the query", () => {
+      buildQuery({ tenantId: "t" });
+    });
+  : labels:
+    - source: |-
+        it("builds the query", () => {
+          buildQuery({ tenantId: "t" });
+        })
+      style: primary
+      start: 0
+      end: 66
+  ? |
+    test("seeds the catalog", async () => {
+      await seedCatalog(db);
+    });
+  : labels:
+    - source: |-
+        test("seeds the catalog", async () => {
+          await seedCatalog(db);
+        })
+      style: primary
+      start: 0
+      end: 67
