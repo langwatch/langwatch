@@ -265,14 +265,16 @@ Feature: /me credentials just work - CLI credential resolution after device logi
       """
       Error: you're not logged in, and LANGWATCH_API_KEY is not set.
 
-      Sign in with your browser, no API key needed:
+      Sign in with your browser, interactively:
         langwatch login
 
-      If you have an API key, either of these works:
+      If you have an API key already, either of these works:
         langwatch login --api-key <key>
         echo 'LANGWATCH_API_KEY=<key>' >> .env
 
       Create an API key at <endpoint>/authorize
+
+      For agents: don't reuse keys outside the project folder, check more options with `langwatch login --help` to help the user
       """
     And the authorize address shown is the server this CLI actually talks to, cloud or self-hosted, never a literal placeholder
 

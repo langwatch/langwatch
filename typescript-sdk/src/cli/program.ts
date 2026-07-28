@@ -138,10 +138,16 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   // Top-level commands
   const loginCmd = program
     .command("login")
-    .description(
-      "Login to LangWatch. With no flags, asks where (cloud vs self-hosted) and how (AI tools vs project SDK). For CI/agents pass --device, --project, --api-key, or --token to skip prompts.",
+    // The summary is what the top-level `langwatch --help` listing shows;
+    // the description is what `langwatch login --help` itself opens with,
+    // where pointing at `login --help` would be circular.
+    .summary(
+      "Login to LangWatch. With no flags, asks where (cloud vs self-hosted) and how (AI tools vs project SDK). Check login --help for more options.",
     )
-    .option("--api-key <key>", "Set API key non-interactively (CI/agents that already have a project API key) — writes to .env")
+    .description(
+      "Login to LangWatch. With no flags, asks where (cloud vs self-hosted) and how (AI tools vs project SDK).",
+    )
+    .option("--api-key <key>", "Set API key non-interactively (CI/agents that already have a project API key), writes to .env")
     .option("--endpoint <url>", "Override the LangWatch control-plane URL for this login (self-hosted instances)")
     .option(
       "--device",
@@ -149,11 +155,11 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     )
     .option(
       "--project [slug]",
-      "Force project login: write a project SDK key to .env (for the SDK, `langwatch eval`, prompts). With a slug, resolves the key through your device login with no browser (headless/agents); without one, picks the project in the browser. The implicit default in non-TTY contexts.",
+      "Project login: mint a project SDK key via the browser and write it to .env (for the SDK, `langwatch eval`, prompts). Prefer this one if user is working on an agent project rather than trying to instrument their coding assistant.",
     )
     .option(
       "--token <token>",
-      "Set device-session token non-interactively (CI/agents that already have a pre-minted token from the dashboard) — writes to ~/.langwatch/config.json",
+      "Set device-session token non-interactively (CI/agents that already have a pre-minted token from the dashboard), writes to ~/.langwatch/config.json",
     )
     .option(
       "--browser <name>",

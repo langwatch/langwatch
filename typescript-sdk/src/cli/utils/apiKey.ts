@@ -243,21 +243,24 @@ function markPersonalProjectValidated(cfg: GovernanceConfig): void {
  * The human error block, line by line. Exported for tests.
  *
  * Shape: what is wrong, the browser sign-in as the primary fix, the API-key
- * alternative, then where a key is created. Command lines are indented two
- * spaces (the renderer colors them cyan by that prefix), and every line stays
- * under 80 columns so no terminal wraps a command mid-token.
+ * alternative, where a key is created, then the agent-facing guardrail.
+ * Command lines are indented two spaces (the renderer colors them cyan by
+ * that prefix), and no command line exceeds 80 columns, so no terminal wraps
+ * one mid-token.
  */
 export const missingCredentialsLines = (authUrl: string): string[] => [
   "Error: you're not logged in, and LANGWATCH_API_KEY is not set.",
   "",
-  "Sign in with your browser, no API key needed:",
+  "Sign in with your browser, interactively:",
   "  langwatch login",
   "",
-  "If you have an API key, either of these works:",
+  "If you have an API key already, either of these works:",
   "  langwatch login --api-key <key>",
   "  echo 'LANGWATCH_API_KEY=<key>' >> .env",
   "",
   `Create an API key at ${authUrl}`,
+  "",
+  "For agents: don't reuse keys outside the project folder, check more options with `langwatch login --help` to help the user",
 ];
 
 function reportMissingCredentials(endpoint: string): never {
@@ -272,7 +275,7 @@ function reportMissingCredentials(endpoint: string): never {
         code: "missing_api_key",
         kind: "missing_api_key",
         message:
-          "Not logged in and LANGWATCH_API_KEY is not set. Sign in with `langwatch login` (browser, no API key needed), pass `--api-key <key>`, or add LANGWATCH_API_KEY to your .env.",
+          "Not logged in and LANGWATCH_API_KEY is not set. Sign in interactively with `langwatch login`, pass `--api-key <key>`, or add LANGWATCH_API_KEY to your .env. Don't reuse keys outside the project folder; check more options with `langwatch login --help` to help the user.",
         httpStatus: 0,
         meta: { authUrl },
         isHandled: true,

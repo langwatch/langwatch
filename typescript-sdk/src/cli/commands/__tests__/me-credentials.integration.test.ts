@@ -368,7 +368,7 @@ describe("device session powers data commands with zero env vars", () => {
       "Error: you're not logged in, and LANGWATCH_API_KEY is not set.",
     );
     expect(result.stderr).toContain(
-      "Sign in with your browser, no API key needed:",
+      "Sign in with your browser, interactively:",
     );
     expect(result.stderr).toContain("  langwatch login");
   });
