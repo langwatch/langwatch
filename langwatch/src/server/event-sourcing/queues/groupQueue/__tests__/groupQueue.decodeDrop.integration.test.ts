@@ -639,13 +639,12 @@ describe.skipIf(!hasTestcontainers)(
         it("increments the drop counter with the transient-exhausted reason", async () => {
           const name = freshName();
           const groupId = `${TENANT}/transient-exhausted`;
-          // handleTransientDecode reads the attempt off the stagedJobId's own
-          // retry marker (`stagedJobAttempt`), not a live retry counter — the
-          // job body is exactly what it could not decode. So staging a job
-          // already marked at JOB_RETRY_CONFIG.maxAttempts - 1 = 24 hits the
-          // exhaustion branch on the FIRST claim, sidestepping ~2h of real
-          // exponential backoff (25 attempts, capped at 600s each) with no
-          // fake timers.
+          // handleTransientDecode takes the HIGHEST of (message header, group
+          // retry chain, legacy id segment). This fixture has neither of the
+          // first two — the body is exactly what it cannot decode — so a legacy
+          // `/r/24` marker decides, putting the job one rung from the end on its
+          // first claim. That sidesteps ~2h of real exponential backoff (25
+          // attempts, capped at 600s each) with no fake timers.
           const craftedStagedJobId = "victim/r/24";
 
           const flaky = new FlakyObjectStore(1); // one failure is all that's needed

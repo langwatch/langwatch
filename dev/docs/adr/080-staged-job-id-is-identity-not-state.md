@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-28
 
-**Status:** Proposed
+**Status:** Accepted
 
 **Relates to:** [ADR-026](./026-groupqueue-payload-envelope.md) (the envelope whose header this promotes to a control-flow input), [ADR-029](./029-groupqueue-content-addressed-payload-store.md) (the content hash the body must not perturb), [ADR-030](./030-groupqueue-blob-handling-hardening.md) §2 (the transient-versus-missing distinction whose fail-safe this relocates).
 
@@ -14,7 +14,7 @@ A GroupQueue staged job id is `<eventId>/<jobType>/<jobName>`. It names one job'
 
 Every retry appended a segment to it — `/r/<attempt>` on the normal ladder, `/r/<Date.now()>` on terminal exhaustion, `/p/<Date.now()>` on a poison park. A job that had been round the ladder therefore wore its whole history:
 
-```
+```text
 event_000649zPnIW3V0Ug6yVk9DECNYK3S/subscriber/pm:langyConversation/r/12/r/16/r/24/r/1785261278310
 ```
 

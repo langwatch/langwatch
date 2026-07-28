@@ -59,7 +59,7 @@ describe("job envelope retry attempt", () => {
 
   describe("given a job that has never been retried", () => {
     describe("when its attempt is read from the message", () => {
-      /** @scenario A job sent for the first time reads as its first attempt */
+      /** @scenario A job sent for the first time carries no attempt on its message */
       it("reports no attempt yet rather than inventing one", async () => {
         expect(readJobAttempt(await encodeGq2(jobData()))).toBeNull();
       });

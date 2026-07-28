@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { JOB_RETRY_CONFIG } from "../../shared";
-import { legacyStagedJobAttempt } from "../groupQueue";
+import { legacyStagedJobAttempt } from "../legacyStagedJobAttempt";
 import { readJobAttempt } from "../jobEnvelope";
 
 const BASE =
@@ -52,10 +52,15 @@ describe("legacyStagedJobAttempt", () => {
         expect(legacyStagedJobAttempt(`${BASE}/r/1785261278310`)).toBe(0);
       });
 
-      it("never reports more than the ladder has rungs", () => {
+      it("ignores a segment one past the ladder's last rung", () => {
+        // The real boundary: maxAttempts reads, maxAttempts + 1 does not, so a
+        // stamp can never be mistaken for a count no matter how small.
         expect(
-          legacyStagedJobAttempt(`${BASE}/r/1785261278310`),
-        ).toBeLessThanOrEqual(JOB_RETRY_CONFIG.maxAttempts);
+          legacyStagedJobAttempt(`${BASE}/r/${JOB_RETRY_CONFIG.maxAttempts}`),
+        ).toBe(JOB_RETRY_CONFIG.maxAttempts);
+        expect(
+          legacyStagedJobAttempt(`${BASE}/r/${JOB_RETRY_CONFIG.maxAttempts + 1}`),
+        ).toBe(0);
       });
     });
   });

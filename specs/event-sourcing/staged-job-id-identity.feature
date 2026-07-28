@@ -104,10 +104,11 @@ Feature: A staged job's id is its identity and its retry count rides on the mess
   Rule: The retry attempt travels on the message and is readable without the body
 
     @unit
-    Scenario: A job sent for the first time reads as its first attempt
+    Scenario: A job sent for the first time carries no attempt on its message
       Given a job that has never been retried
       When its attempt is read from the message
-      Then it reads as the first attempt
+      Then no attempt is reported
+      And the ladder counts it as the first attempt
 
     @unit
     Scenario: A retried job's attempt is readable without fetching its body
