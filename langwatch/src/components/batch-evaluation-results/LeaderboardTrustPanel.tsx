@@ -220,7 +220,7 @@ const buildResolutionCheck = (adequacy: SampleAdequacy): TrustCheck => {
     return {
       label: "How much this run settled",
       tone: "warn",
-      detail: `None of the ${totalPairs} variant pairs were separated — every score sits inside every other's margin of error. ${comparisonCount} comparisons was not enough to order these variants.`,
+      detail: `None of the ${totalPairs} variant pairs were separated — for every pair, the gap between the two scores is smaller than the uncertainty in that gap. ${comparisonCount} comparisons was not enough to order these variants.`,
     };
   }
 
@@ -230,7 +230,7 @@ const buildResolutionCheck = (adequacy: SampleAdequacy): TrustCheck => {
     detail:
       (separatedPairs === totalPairs
         ? `All ${totalPairs} variant pairs were separated, so the run establishes a full order. Based on ${comparisonCount} comparisons.`
-        : `${separatedPairs} of ${totalPairs} variant pairs were separated; the rest are within each other's margin of error. Based on ${comparisonCount} comparisons.`) +
+        : `${separatedPairs} of ${totalPairs} variant pairs were separated; for the rest, the gap between them is smaller than the uncertainty in that gap. Based on ${comparisonCount} comparisons.`) +
       multiplicityNote(adequacy),
   };
 };

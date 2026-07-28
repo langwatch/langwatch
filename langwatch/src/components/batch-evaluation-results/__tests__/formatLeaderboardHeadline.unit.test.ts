@@ -172,3 +172,35 @@ describe("formatLeaderboardHeadline", () => {
     });
   });
 });
+
+describe("formatLeaderboardHeadline — the mechanism it names must be the one used", () => {
+  describe("given a clear winner whose printed range overlaps a rival's", () => {
+    it("does not claim it cleared every margin of error", () => {
+      // Separation is decided on the uncertainty of the GAP, which is
+      // tighter than either printed margin. So a legitimate clear winner
+      // can fail to clear those margins — and this sentence asserted it
+      // had, which is a stronger claim than the one that was tested.
+      const headline = formatLeaderboardHeadline({
+        verdict: { kind: "clear-winner", leaderId: "a", tiedIds: ["a"] },
+        cheaperAlternative: null,
+        variantNames: { a: "warm", b: "premium" },
+      });
+
+      expect(headline.heading).toContain("Ship warm");
+      expect(headline.detail).not.toContain("margin of error");
+    });
+  });
+
+  describe("given a tie at the top", () => {
+    it("says the run did not separate them without naming the wrong test", () => {
+      const headline = formatLeaderboardHeadline({
+        verdict: { kind: "tie-at-top", leaderId: "a", tiedIds: ["a", "b"] },
+        cheaperAlternative: null,
+        variantNames: { a: "warm", b: "premium" },
+      });
+
+      expect(headline.detail).toContain("does not establish a winner");
+      expect(headline.detail).not.toContain("within each other's margin of error");
+    });
+  });
+});

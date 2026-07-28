@@ -67,8 +67,15 @@ export const formatLeaderboardHeadline = ({
     return {
       tone: "positive",
       heading: `Ship ${nameOf(verdict.leaderId!, variantNames)}`,
+      // Not "by more than the run's own margin of error". Separation is
+      // decided on the uncertainty of the GAP between two scores, which is
+      // tighter than either printed margin because both scores move together
+      // across resamples. A legitimate clear winner can therefore fail to
+      // clear those margins, and this sentence was asserting it had — a
+      // stronger claim than the one actually tested, in the heading a reader
+      // acts on.
       detail:
-        "It scores above every other variant by more than the run's own margin of error, so the ranking is not a coin flip.",
+        "The run separates it from every other variant: the gap to each of them is bigger than the uncertainty in that gap, so the ranking is not a coin flip.",
     };
   }
 
@@ -114,6 +121,6 @@ export const formatLeaderboardHeadline = ({
   return {
     tone: "caution",
     heading: "Too close to call",
-    detail: `${tiedNames} score within each other's margin of error, so this run does not establish a winner between them. Decide on cost, latency, or simplicity instead — or run more rows to separate them.`,
+    detail: `${tiedNames} are too close for this run to tell apart, so it does not establish a winner between them. Decide on cost, latency, or simplicity instead — or run more rows to separate them.`,
   };
 };
