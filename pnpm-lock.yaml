@@ -65,7 +65,7 @@ overrides:
   qs@>=6.11.1 <=6.15.1: '>=6.15.2'
   form-data@<4.0.6: '>=4.0.6'
   js-yaml@>=4.0.0 <4.2.0: '>=4.2.0 <5'
-  vite@<7.3.2: 8.0.16
+  vite@<7.0.0: 8.0.16
   vite@>=7.0.0 <7.3.5: '>=7.3.5 <8'
   vite@>=8.0.0 <8.0.16: '>=8.0.16'
 
@@ -5475,7 +5475,7 @@ packages:
     resolution: {integrity: sha512-EVkXzBjrPGM+cK8/ANWgBrkUCfJfb38/EfTSO8h7pWvKkyPkpWxvR7BkD2MyItMF62C97zAEoqdpUixwR/e+Rw==}
     peerDependencies:
       msw: ^2.4.9
-      vite: '>=7.3.5 <8'
+      vite: 8.0.16
     peerDependenciesMeta:
       msw:
         optional: true
@@ -10867,7 +10867,7 @@ packages:
       '@vitest/ui': 4.1.9
       happy-dom: '*'
       jsdom: '*'
-      vite: '>=7.3.5 <8'
+      vite: 8.0.16
     peerDependenciesMeta:
       '@edge-runtime/vm':
         optional: true
