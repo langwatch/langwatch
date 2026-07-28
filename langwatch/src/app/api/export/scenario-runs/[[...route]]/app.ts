@@ -20,6 +20,7 @@ import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import { getApp } from "~/server/app-layer/app";
 import { getServerAuthSession } from "~/server/auth";
+import { auditLog } from "~/server/auditLog";
 import { prisma } from "~/server/db";
 import { ScenarioRunExportService } from "~/server/export/scenario-runs/scenario-run-export.service";
 import { scenarioRunExportRequestSchema } from "~/server/export/scenario-runs/types";
@@ -64,11 +65,35 @@ secured
         "Starting scenario run export download",
       );
 
+      // A bulk export lifts a project's whole run history — full mode includes
+      // every conversation transcript — so the download has to be attributable
+      // to a user, not just permitted. Recorded before a byte is streamed.
+      await auditLog({
+        userId: session.user.id,
+        projectId: request.projectId,
+        action: "scenarioRuns.export",
+        targetKind: "project",
+        targetId: request.projectId,
+        args: {
+          mode: request.mode,
+          scenarioSetId: request.scenarioSetId,
+          scenarioId: request.scenarioId,
+          passFailStatus: request.passFailStatus,
+          startDate: request.startDate,
+          endDate: request.endDate,
+        },
+      });
+
       const exportId = crypto.randomUUID();
       const broadcast = getApp().broadcast;
 
       const today = new Date().toISOString().slice(0, 10);
-      const fileName = `${request.projectId} - Scenario Runs - ${today} - ${request.mode}.csv`;
+      // Content-Disposition's filename is a quoted-string. projectId is only
+      // constrained to `z.string()`, so a quote in it would close the quote and
+      // let the caller append parameters. Server-generated ids never contain
+      // one today, but nothing in the code enforces that.
+      const safeProjectId = request.projectId.replace(/[^\w.-]/g, "_");
+      const fileName = `${safeProjectId} - Scenario Runs - ${today} - ${request.mode}.csv`;
 
       const service = new ScenarioRunExportService(
         getApp().simulations.runs.repository,
@@ -83,7 +108,6 @@ secured
         "Content-Encoding": "gzip",
         Vary: "Accept-Encoding",
         "Content-Disposition": `attachment; filename="${fileName}"`,
-        "Transfer-Encoding": "chunked",
         "X-Export-Id": exportId,
         "X-Total-Runs": String(totalCount),
         "Access-Control-Expose-Headers":
@@ -96,6 +120,7 @@ secured
           try {
             for await (const { chunk, progress } of service.exportRuns({
               request,
+              signal: c.req.raw.signal,
             })) {
               controller.enqueue(encoder.encode(chunk));
               void broadcast.broadcastToTenant(

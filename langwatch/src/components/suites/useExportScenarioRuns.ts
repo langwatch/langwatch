@@ -32,6 +32,15 @@ export function useExportScenarioRuns({
 }) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  /**
+   * Runs visited so far, against the total the server reported in
+   * X-Total-Runs. Counted in runs rather than written rows because criteria
+   * mode emits several rows per run.
+   */
+  const [progress, setProgress] = useState<{ exported: number; total: number }>({
+    exported: 0,
+    total: 0,
+  });
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const openExportDialog = useCallback(() => setIsDialogOpen(true), []);
@@ -41,6 +50,7 @@ export function useExportScenarioRuns({
     abortControllerRef.current?.abort();
     abortControllerRef.current = null;
     setIsExporting(false);
+    setProgress({ exported: 0, total: 0 });
   }, []);
 
   const startExport = useCallback(
@@ -53,6 +63,7 @@ export function useExportScenarioRuns({
 
       setIsDialogOpen(false);
       setIsExporting(true);
+      setProgress({ exported: 0, total: 0 });
 
       const today = new Date().toISOString().split("T")[0];
       const fallbackFilename = `${projectId} - Scenario Runs - ${today} - ${mode}.csv`;
@@ -75,7 +86,12 @@ export function useExportScenarioRuns({
           if (!response.ok) {
             throw new Error(`Export failed: ${response.status}`);
           }
+          // The server knows the total before it streams a byte, so the bar
+          // has a denominator immediately rather than after the first chunk.
+          const total = Number(response.headers.get("X-Total-Runs") ?? "0");
+          setProgress({ exported: 0, total });
           const blob = await response.blob();
+          setProgress({ exported: total, total });
           if (blob.size === 0) {
             toaster.create({
               title: "Export produced no data",
@@ -117,6 +133,7 @@ export function useExportScenarioRuns({
     openExportDialog,
     closeExportDialog,
     isExporting,
+    progress,
     startExport,
     cancelExport,
   };

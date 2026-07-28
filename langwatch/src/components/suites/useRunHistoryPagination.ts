@@ -22,6 +22,12 @@ type PageData = {
 interface UseRunHistoryPaginationOptions {
   scenarioSetId?: string;
   startDateMs: number;
+  /**
+   * Upper bound of the selected period. Passed to the query so the list cannot
+   * show runs that a CSV export of the same period would exclude — the export
+   * scopes on both bounds.
+   */
+  endDateMs: number;
   /** While the SSE stream is connected, fallback freshness polling stops. */
   sseConnected?: boolean;
 }
@@ -29,6 +35,7 @@ interface UseRunHistoryPaginationOptions {
 export function useRunHistoryPagination({
   scenarioSetId,
   startDateMs,
+  endDateMs,
   sseConnected = false,
 }: UseRunHistoryPaginationOptions) {
   const { project } = useOrganizationTeamProject();
@@ -40,7 +47,7 @@ export function useRunHistoryPagination({
   useEffect(() => {
     setCursor(undefined);
     setPages([]);
-  }, [startDateMs]);
+  }, [startDateMs, endDateMs]);
 
   const {
     data: runDataResult,
@@ -54,6 +61,7 @@ export function useRunHistoryPagination({
       limit: 20,
       cursor,
       startDate: startDateMs,
+      endDate: endDateMs,
     },
     {
       enabled: !!project,

@@ -5,8 +5,15 @@
  * and a Group-by selector on the right.
  */
 
-import { Button, HStack, IconButton, NativeSelect, Text } from "@chakra-ui/react";
-import { Download, LayoutGrid, List } from "lucide-react";
+import {
+  Button,
+  HStack,
+  IconButton,
+  NativeSelect,
+  Spinner,
+  Text,
+} from "@chakra-ui/react";
+import { Download, LayoutGrid, List, X } from "lucide-react";
 import { RUN_GROUP_TYPES, type RunGroupType } from "./run-history-transforms";
 import type { ViewMode } from "./useRunHistoryStore";
 
@@ -40,6 +47,11 @@ type RunHistoryFiltersProps = {
   onExport?: () => void;
   /** Disables export when nothing would be written. */
   isExportDisabled?: boolean;
+  /** True while an export is streaming; swaps the button for progress + cancel. */
+  isExporting?: boolean;
+  /** Runs visited / total, shown while exporting. */
+  exportProgress?: { exported: number; total: number };
+  onCancelExport?: () => void;
 };
 
 export function RunHistoryFilters({
@@ -53,6 +65,9 @@ export function RunHistoryFilters({
   onViewModeChange,
   onExport,
   isExportDisabled = false,
+  isExporting = false,
+  exportProgress,
+  onCancelExport,
 }: RunHistoryFiltersProps) {
   return (
     <HStack gap={3} flexWrap="wrap" justifyContent="space-between">
@@ -95,7 +110,23 @@ export function RunHistoryFilters({
 
       {/* Right: export + view mode toggle + group-by selector */}
       <HStack gap={3}>
-        {onExport && (
+        {onExport && isExporting && (
+          <HStack gap={2} aria-live="polite">
+            <Spinner size="xs" />
+            <Text fontSize="sm" color="fg.muted" whiteSpace="nowrap">
+              {exportProgress?.total
+                ? `Exporting ${exportProgress.total.toLocaleString()} runs…`
+                : "Exporting…"}
+            </Text>
+            {onCancelExport && (
+              <Button size="xs" variant="ghost" onClick={onCancelExport}>
+                <X size={12} />
+                Cancel
+              </Button>
+            )}
+          </HStack>
+        )}
+        {onExport && !isExporting && (
           <Button
             size="sm"
             variant="outline"

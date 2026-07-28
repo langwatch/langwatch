@@ -63,10 +63,18 @@ export class ScenarioRunExportService {
     });
   }
 
+  /**
+   * @param signal - The client request's abort signal. Without it a cancelled
+   *   download keeps sweeping ClickHouse to exhaustion: `controller.enqueue`
+   *   only throws on the *next* chunk, so a large export would go on paging
+   *   long after nobody is reading it.
+   */
   async *exportRuns({
     request,
+    signal,
   }: {
     request: ScenarioRunExportRequest;
+    signal?: AbortSignal;
   }): AsyncGenerator<{
     chunk: string;
     progress: ScenarioRunExportProgress;
@@ -82,6 +90,14 @@ export class ScenarioRunExportService {
     let cursor: string | undefined;
 
     while (true) {
+      if (signal?.aborted) {
+        logger.info(
+          { projectId: request.projectId, visited, total },
+          "Scenario run export aborted by the client",
+        );
+        return;
+      }
+
       const page = await this.repository.findRunsForExport({
         projectId: request.projectId,
         scenarioSetId: request.scenarioSetId,

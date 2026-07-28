@@ -135,6 +135,7 @@ export function RunHistoryPanel({
 
   // Pagination
   const startDateMs = period.startDate.getTime();
+  const endDateMs = period.endDate.getTime();
   const {
     allRuns,
     allScenarioSetIds,
@@ -143,7 +144,12 @@ export function RunHistoryPanel({
     isLoading,
     error,
     refetch,
-  } = useRunHistoryPagination({ scenarioSetId, startDateMs, sseConnected });
+  } = useRunHistoryPagination({
+    scenarioSetId,
+    startDateMs,
+    endDateMs,
+    sseConnected,
+  });
 
   // CSV export, scoped to whatever this panel is currently showing.
   const {
@@ -151,6 +157,9 @@ export function RunHistoryPanel({
     openExportDialog,
     closeExportDialog,
     startExport,
+    isExporting,
+    progress: exportProgress,
+    cancelExport,
   } = useExportScenarioRuns({
     projectId: project?.id,
     scenarioSetId,
@@ -159,7 +168,7 @@ export function RunHistoryPanel({
       ? (filters.passFailStatus as "pass" | "fail" | "stalled")
       : undefined,
     startDate: startDateMs,
-    endDate: period.endDate.getTime(),
+    endDate: endDateMs,
   });
 
   // Fetch scenarios for filter options
@@ -444,6 +453,9 @@ export function RunHistoryPanel({
           onViewModeChange={setViewMode}
           onExport={openExportDialog}
           isExportDisabled={totals.runCount === 0}
+          isExporting={isExporting}
+          exportProgress={exportProgress}
+          onCancelExport={cancelExport}
         />
       </Box>
 
