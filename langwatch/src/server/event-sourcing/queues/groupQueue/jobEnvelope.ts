@@ -727,6 +727,74 @@ export function readJobRoutingMeta(value: string): JobRoutingMeta {
 }
 
 /**
+ * Reads the retry attempt from the header alone (envelope values) or via a full
+ * parse (legacy bare JSON). Never throws; an absent or unreadable attempt is
+ * null, which the caller reads as "this message cannot say".
+ *
+ * This exists so the retry count can live ON THE MESSAGE and still be legible
+ * to the one reader that cannot decode a message: when a job's body is held in
+ * a blob store that is temporarily unreachable, the ladder that decides whether
+ * to retry or give up has nothing but the value in hand. The header is plain
+ * inline JSON in front of the body, so it is readable with no blob I/O.
+ *
+ * GQ1 envelopes never lifted machinery into the header (`routingHeader` sets
+ * only the routing trio), so their attempt is inside the body and this reports
+ * null rather than guessing.
+ */
+export function readJobAttempt(value: string): number | null {
+  try {
+    const machinery = isEnvelope(value)
+      ? ((splitEnvelope(value).header.m ?? {}) as Record<string, unknown>)
+      : (JSON.parse(value) as Record<string, unknown>);
+    const attempt = machinery.__attempt;
+    // Reported verbatim: this is a reader, and one that silently reshapes what
+    // is stored cannot be used to check what was written. `__attempt` is lifted
+    // out of the payload by name, so a job whose payload carried that key could
+    // name a number past the budget — the ladder then treats it as already
+    // spent and retires the job, which is the fail-closed direction.
+    return typeof attempt === "number" && Number.isInteger(attempt) && attempt > 0
+      ? attempt
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The same value with its retry attempt stamped into the header, rewriting the
+ * HEADER ONLY.
+ *
+ * The body string is reused byte for byte, which is the whole point: the body
+ * is what the blob store content-addresses and what identical jobs share, so
+ * re-encoding it to change a counter would split that shared copy and churn the
+ * lease identity. Advancing an attempt is metadata, and costs no blob I/O.
+ *
+ * GQ1 and legacy bare JSON are returned unchanged. The asymmetry is worth
+ * naming: bare JSON's attempt is still READABLE by {@link readJobAttempt} (it
+ * is an ordinary body field), just not advanceable here — so for those the
+ * group's retry chain is what keeps the ladder finite.
+ */
+export function withJobAttempt({
+  value,
+  attempt,
+}: {
+  value: string;
+  attempt: number;
+}): string {
+  if (!value.startsWith(ENVELOPE_PREFIX_V2)) return value;
+  try {
+    const { header, body } = splitEnvelope(value);
+    return finalize(
+      ENVELOPE_PREFIX_V2,
+      { ...header, m: { ...(header.m ?? {}), __attempt: attempt } },
+      body,
+    );
+  } catch {
+    return value;
+  }
+}
+
+/**
  * The GQ1 offloaded-blob id from a parsed envelope header, or null for inline
  * bodies, GQ2 tiered refs, and legacy JSON. The retirement paths read it via
  * {@link readEnvelopeRetirement} so completion/restage pay a single parse.

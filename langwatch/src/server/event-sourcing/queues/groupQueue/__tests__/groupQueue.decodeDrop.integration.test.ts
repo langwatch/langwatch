@@ -630,18 +630,22 @@ describe.skipIf(!hasTestcontainers)(
 
     describe("given a staged job whose blob store stays unreachable for every retry attempt", () => {
       describe("when the job exhausts its retry budget", () => {
+        // One `@scenario` per JSDoc: the parity checker scans forward from the
+        // end of each annotation for the `it(` call, and only skips whole
+        // comment blocks — so in a single multi-line block every annotation but
+        // the last silently fails to bind.
         /** @scenario the transient retry ladder's terminal counts the job it gives up on */
+        /** @scenario A body that stays unreachable is given up on at the end of the ladder */
         it("increments the drop counter with the transient-exhausted reason", async () => {
           const name = freshName();
           const groupId = `${TENANT}/transient-exhausted`;
-          // handleTransientDecode derives the attempt number from the
-          // stagedJobId's own "/r/" suffix count
-          // (stagedJobId.match(/\/r\//g)), not from a live retry counter —
-          // so staging a job whose id already carries
-          // JOB_RETRY_CONFIG.maxAttempts - 1 = 24 markers hits the exhaustion
-          // branch on the FIRST claim. This sidesteps ~2h of real exponential
-          // backoff (25 attempts, capped at 600s each) with no fake timers.
-          const craftedStagedJobId = `victim${"/r/x".repeat(24)}`;
+          // handleTransientDecode takes the HIGHEST of (message header, group
+          // retry chain, legacy id segment). This fixture has neither of the
+          // first two — the body is exactly what it cannot decode — so a legacy
+          // `/r/24` marker decides, putting the job one rung from the end on its
+          // first claim. That sidesteps ~2h of real exponential backoff (25
+          // attempts, capped at 600s each) with no fake timers.
+          const craftedStagedJobId = "victim/r/24";
 
           const flaky = new FlakyObjectStore(1); // one failure is all that's needed
           const encodeTiered = new TieredBlobStore({
