@@ -42,11 +42,14 @@ Document **important technical and architectural decisions** — context, trade-
 | [049](./049-langy-projection-independent-reactions.md)            | Langy pilots projection-independent reactions                                               | Accepted                                          |
 | [050](./050-langy-versioned-prompts-and-dogfood-evals.md)         | Langy's prompts in the versioned prompt registry + dogfood scenarios/evals                  | Proposed                                          |
 | [057](./057-token-gated-trace-sharing.md)                         | Token-gated trace sharing (ShareLink)                                                       | Accepted                                          |
-| [079](./079-card-selection-is-deterministic.md)                    | Card selection is deterministic — the model supplies data, never presentation               | Proposed                                          |
 | [066](./066-projection-clickhouse-cached-store.md)                | `event_log` off the per-item hot path — read-back fold store + append coalescing            | Accepted                                          |
 | [068](./068-windowed-clickhouse-reads.md)                         | One windowed ClickHouse read with a measured fallback (`queryWindowed`)                      | Accepted                                          |
 | [069](./069-payload-cost-doctrine.md)                             | Payload cost is a scheduling input — extraction at ingest, byte bounds, memory by grant     | Accepted                                          |
 | [071](./071-coding-agent-session-immutable-storage-anchor.md)     | A storage anchor is immutable and platform-assigned — take the moving column out of the dedup scope | Accepted                                  |
+| [076](./076-langy-egress-enforcement.md)                          | Langy egress enforcement — monitor first, enforce last                                      | Accepted (implemented)                            |
+| [077](./077-langy-dual-stream.md)                                 | Langy dual-stream — raw token fast-path alongside the durable event-sourced stream          | Accepted                                          |
+| [078](./078-langy-user-turn-controls.md)                          | Langy user-initiated turn controls — stop for real, continue, resume-on-refresh             | Accepted                                          |
+| [079](./079-card-selection-is-deterministic.md)                   | Card selection is deterministic — the model supplies data, never presentation               | Accepted (amended 2026-07-22)                     |
 
 ## When to Write an ADR
 

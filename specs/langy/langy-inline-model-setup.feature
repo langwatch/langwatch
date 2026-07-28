@@ -38,6 +38,7 @@ Feature: Langy prompts for a model when the project has none configured
   # the user's open conversation with the onboarding grid — and because the
   # query is cached with no refetch trigger, nothing brought the transcript
   # back until a full page reload.
+  @integration
   Scenario: A failed model lookup does not masquerade as a missing model
     Given the project's model resolver fails to answer
     When the user opens the Langy panel

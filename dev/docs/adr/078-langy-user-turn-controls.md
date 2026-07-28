@@ -184,3 +184,15 @@ and the panel renders the final/stopped answer instead of reattaching to nothing
 3. **Continue depth.** V1 continues by re-driving against durable history. Reusing
    the ADR-048 handoff/`revive` machinery to resume the *same* opencode session
    (preserving in-memory context past a hard cancel) is a later enhancement.
+
+## References
+
+- [`specs/langy/langy-stop-and-resume.feature`](../../../specs/langy/langy-stop-and-resume.feature)
+  — the behavioural contract for stop / continue / resume.
+- `langwatch/prisma/migrations/20260722060000_langy_turn_status_text/migration.sql`
+  — drops the turn-status enum in favour of TEXT, driven by the `stopped` status
+  this ADR introduces. **Its comment cites this ADR as "ADR-058".** That number
+  predates the renumber that moved this document from 058 to 078; live ADR-058 is
+  now `058-full-stack-trace-correlation-browser-rum.md`, an unrelated subject.
+  Merged migrations are immutable in this repo even for comments, so the stale
+  pointer stays where it is and is corrected from here instead.

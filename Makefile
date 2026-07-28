@@ -21,7 +21,7 @@ help:
 	@echo "    make quickstart-help                non-interactive preset reference"
 	@echo "    make service svc=<name>             run a Go service (e.g. aigateway)"
 	@echo ""
-	@echo "  Local dev by hostname (thuishaven — ADR-048):"
+	@echo "  Local dev by hostname (thuishaven):"
 	@echo "    make haven install                  go install the haven binary (then run 'haven ...' directly)"
 	@echo "    make haven up                       start this worktree's stack (bootstraps itself; == pnpm dev:haven)"
 	@echo "    make haven status                   every stack + shared-server health, one shot"

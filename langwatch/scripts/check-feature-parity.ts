@@ -26,7 +26,21 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const REPO_ROOT = resolve(__dirname, "../..");
-const SPECS_ROOT = resolve(REPO_ROOT, "specs");
+
+/**
+ * Every tree that holds `.feature` files.
+ *
+ * `typescript-sdk/specs` is here because leaving it out made the whole tree
+ * INVISIBLE: its scenarios counted for nothing, and — worse — an `@scenario`
+ * annotation in `typescript-sdk/src` (which IS scanned) could never resolve
+ * against them, so binding one was reported as a typo. A spec tree the checker
+ * cannot see is the same "0/0, all bound ✓" trap a `.feature` file with no tags
+ * falls into, one directory up.
+ */
+const SPECS_ROOTS = [
+  resolve(REPO_ROOT, "specs"),
+  resolve(REPO_ROOT, "typescript-sdk/specs"),
+];
 
 /**
  * Test roots scanned for `@scenario` bindings. Every `.test.ts` /
@@ -115,6 +129,14 @@ const DEFAULT_PYTHON_TEST_ROOTS: string[] = [
  *     prevents the list from rotting.
  */
 const LEGACY_UNBOUND: string[] = [
+  // typescript-sdk/specs was invisible to this checker until its tree was
+  // added to SPECS_ROOTS above, so none of it has ever been bound. Tolerated
+  // here so making it VISIBLE is not gated on binding 37 scenarios at once;
+  // the point of the change is that a new binding can now resolve at all.
+  // `cli/daemon.feature` is deliberately NOT here — it is fully bound.
+  "typescript-sdk/specs/evaluation/evaluation-api.feature",
+  "typescript-sdk/specs/prompts/fetch-policy.feature",
+  "typescript-sdk/specs/telemetry/langy-live-events.feature",
   // The consolidated Langy/home corpus landed while feature parity was already
   // enforce-all, but its tests predate @scenario bindings. Keep the debt
   // explicit and file-scoped while #3338 drives this list back to empty; new
@@ -269,7 +291,9 @@ function walkFiles(root: string, predicate: (name: string) => boolean): string[]
 }
 
 function discoverFeatureFiles(): string[] {
-  const files = walkFiles(SPECS_ROOT, (n) => FEATURE_FILE_RE.test(n));
+  const files = SPECS_ROOTS.flatMap((root) =>
+    existsSync(root) ? walkFiles(root, (n) => FEATURE_FILE_RE.test(n)) : [],
+  );
   return files.map((f) => relative(REPO_ROOT, f)).sort();
 }
 
@@ -371,9 +395,33 @@ function isNextLineBatsTest(lines: string[], startLineIdx: number): boolean {
  *     t.Skip(promptSpansPendingMsg)
  *   }
  *
+ * Table-driven Go tests bind at SUBTEST granularity, which is where the
+ * behaviour actually lives — a top-level `func TestX` that hosts a dozen
+ * `t.Run` cases would otherwise force every scenario in the group onto one
+ * annotation. So a `t.Run("...", func(t *testing.T) {` line is an equally
+ * valid binding site:
+ *
+ *   // @scenario "Every span of a turn names the model the same way"
+ *   t.Run("substitutes the manager-held model id on model-call spans", func(t *testing.T) {
+ *
  * Same ANNOTATION_RE that handles TS — only the proximity check differs:
- * we require the next non-blank, non-comment token to be `func Test...`.
+ * we require the next non-blank, non-comment token to be `func Test...` or
+ * a `t.Run(...)` subtest declaration.
  */
+const GO_TEST_FUNC_RE =
+  /^func\s+Test[A-Za-z0-9_]*\s*\(\s*[A-Za-z_][A-Za-z0-9_]*\s+\*testing\.T\s*\)/;
+
+/**
+ * `t.Run("name", func(t *testing.T) {`. The subtest name may be a quoted
+ * literal, a backtick literal, or an expression (`tc.name`), so it is matched
+ * loosely up to the comma; the closure signature is what makes it a subtest.
+ * Kept to a single line (`[^\n]`) both because that is what gofmt produces and
+ * so the scan stays linear — an unbounded `[\s\S]*?` here would backtrack
+ * across the rest of the file on every non-match.
+ */
+const GO_SUBTEST_RE =
+  /^[A-Za-z_][A-Za-z0-9_]*\.Run\([^\n]*?,\s*func\s*\(\s*[A-Za-z_][A-Za-z0-9_]*\s+\*testing\.T\s*\)\s*\{/;
+
 function isFollowedByGoTestFunc(src: string, start: number): boolean {
   const len = src.length;
   let i = start;
@@ -396,7 +444,7 @@ function isFollowedByGoTestFunc(src: string, start: number): boolean {
       continue;
     }
     const rest = src.slice(i);
-    return /^func\s+Test[A-Za-z0-9_]*\s*\(\s*[A-Za-z_][A-Za-z0-9_]*\s+\*testing\.T\s*\)/.test(rest);
+    return GO_TEST_FUNC_RE.test(rest) || GO_SUBTEST_RE.test(rest);
   }
   return false;
 }

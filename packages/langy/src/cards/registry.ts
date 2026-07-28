@@ -53,7 +53,7 @@ import {
  *     ("this payload proves it is mine"). Conflating them breaks a deliberate
  *     binding the moment a real payload omits a field.
  *
- * ADR: dev/docs/adr/059-card-selection-is-deterministic.md
+ * ADR: dev/docs/adr/079-card-selection-is-deterministic.md
  */
 
 /**
