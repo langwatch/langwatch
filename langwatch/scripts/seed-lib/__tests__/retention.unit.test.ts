@@ -94,13 +94,13 @@ describe("applySeedRetention", () => {
         retentionDays: SEEDED_RETENTION_DAYS,
       }));
       const { prisma } = fakePrisma(seeded);
-      // waitForCacheRollover:true would hang the test for 65s if it fired; an
+      // shouldWaitForCacheRollover:true would hang the test for 65s if it fired; an
       // unchanged run must never reach it.
       const changed = await applySeedRetention({
         prisma,
         organizationId: "local-dev-organization",
         retentionDays: SEEDED_RETENTION_DAYS,
-        waitForCacheRollover: true,
+        shouldWaitForCacheRollover: true,
       });
       expect(changed).toBe(false);
     });
