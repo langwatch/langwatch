@@ -2,13 +2,15 @@ Feature: Payload cost governs the scheduling plane
   A subscriber that needs a small slice of a large event must not mint a job for
   every event it does not care about. The event is already in memory when it is
   routed; that is where an irrelevant event is discarded — so the job never
-  exists. The routing seam is shared by the whole fan-out, so only a cheap,
-  total predicate runs there; deriving the slice from a relevant event stays in
-  the subscriber's own lane until the event carries a cost-honest claim-check
-  (phase 2). Work waiting in a queue is cheap as a pointer and fatal as resident
-  memory; when the platform kills a worker for memory it did not choose to hold,
-  a shedding layer is missing. (ADR-069; phase 1 scenarios below are shipping,
-  the planned scenarios record phases 2–4.)
+  exists. The routing seam is shared by the whole fan-out, so only cheap, total
+  work runs there: a predicate that declines an event, or a field-pick that
+  turns a matched event into a small reference. Deriving the slice from the
+  payload stays in the subscriber's own lane, where the payload's canonical
+  store already holds it and a failure retries only that subscriber's job. Work
+  waiting in a queue is cheap as a pointer and fatal as resident memory; when
+  the platform kills a worker for memory it did not choose to hold, a shedding
+  layer is missing. (ADR-069; the scenarios below are shipping, the planned
+  scenarios record phases 2–4.)
 
   See dev/docs/adr/069-payload-cost-doctrine.md.
 
@@ -86,17 +88,52 @@ Feature: Payload cost governs the scheduling plane
     Then the routing attempt reports the failure
     And the event is not counted among those staged as a job
 
-  # --- Phases 2-4: the remaining ADR-069 invariants ---
+  # --- Claim-check staging: a matched event's job carries a reference ---
 
-  @planned
-  # Not yet implemented as of 2026-07-24 — ADR-069 phase 2: with the event
-  # carrying a cost-honest claim-check, the subscriber reads its slice from the
-  # reference instead of the full payload riding the queue.
+  @unit
   Scenario: a matched event's heavy payload travels as a claim-check, not inline
     Given an event the subscriber considers relevant whose payload is large
     When the event is routed to subscribers
     Then the staged job carries a reference to the payload, not the payload
-    And the handler reads only the small slice it needs through that reference
+    And the handler completes its work by reading the payload from its canonical store
+    And the reference preserves the identity the scheduler orders and dedups by
+
+  @unit
+  Scenario: a reference that cannot be resolved yet retries, never drops
+    Given a relevant event staged as a reference
+    And the referenced payload is not yet readable in its store
+    When the handler processes the job
+    Then the attempt fails into the queue's retry
+    And the job completes once the payload becomes readable
+
+  @unit
+  Scenario: a reference this build cannot read fails loudly, never half-parses
+    Given a staged reference carrying a schema version this build does not know
+    When the handler processes the job
+    Then the attempt fails into the queue's retry
+    And the job is never mistaken for another kind of payload
+
+  @unit
+  Scenario: an event that cannot be referenced stages whole
+    Given a relevant event missing the identity a reference needs
+    When the event is routed to subscribers
+    Then the staged job carries the full event
+    And the handler processes it to the same outcome as before references existed
+
+  # The stage hook shares the filter's seam and therefore the filter's sharp
+  # edge: the routing path has no retry, so a throw here loses this
+  # subscriber's job for this event. It is pinned separately because the
+  # tempting failure mode is the quiet one — falling back to staging the
+  # payload whole, which would hide a broken reference behind the very cost
+  # the claim-check exists to avoid.
+  @unit
+  Scenario: a raising claim-check stage is reported as a failure, not as a quiet full stage
+    Given a relevant event whose subscriber's claim-check stage raises
+    When the event is routed to subscribers
+    Then the routing attempt reports the failure
+    And the subscriber's handler never runs for that event
+
+  # --- Phases 2-4: the remaining ADR-069 invariants ---
 
   @planned
   # Not yet implemented as of 2026-07-24 — ADR-069 phase 2: offloaded payloads

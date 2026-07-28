@@ -1212,22 +1212,31 @@ export class ProjectionRouter<
             continue;
           }
 
+          // Claim-check staging (ADR-069): the subscriber may swap the staged
+          // payload for a small reference event mirroring the source event's
+          // scheduling identity. Total field-picks only — a throw fails into
+          // the routing retry like the filter's.
+          const staged = enqueue?.stage
+            ? (enqueue.stage(event) as EventType)
+            : event;
+
           const queue = queued
             ? this.queueManager.getSubscriberQueue(name)
             : undefined;
           if (queue) {
-            await queue.send(event);
+            await queue.send(staged);
           } else {
-            await this.handleSubscriber(subscriber, event);
+            await this.handleSubscriber(subscriber, staged);
           }
 
           // Counted only once the handoff succeeded. A failed send throws to
-          // the catch below, so a queue outage never inflates `staged` — the
-          // filtered/staged split stays an honest picture of what the seam did.
+          // the catch below, so a queue outage never inflates `staged` or
+          // `referenced` — the outcome split stays an honest picture of what
+          // the seam did.
           incrementEsSubscriberEnqueueTotal({
             pipelineName: this.pipelineName,
             subscriberName: name,
-            outcome: "staged",
+            outcome: staged === event ? "staged" : "referenced",
           });
         } catch (error) {
           this.logger.error(

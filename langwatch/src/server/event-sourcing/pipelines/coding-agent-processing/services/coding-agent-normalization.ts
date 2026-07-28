@@ -89,6 +89,12 @@ export function resolveConversationKey(
   for (const key of candidates) {
     const value = attrs[key];
     if (typeof value === "string" && value.length > 0) return value;
+    // The span-store read-back deserializes purely numeric attribute strings
+    // as numbers, so an agent whose session key is all digits must resolve
+    // to the same key on both the inline and the claim-check path.
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return String(value);
+    }
   }
   return null;
 }
