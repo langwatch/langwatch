@@ -111,10 +111,12 @@ const langyTurnProcedure = langyCreateProcedure.use(
       projectId: (input as { projectId: string }).projectId,
     });
     if (!rl.allowed) {
-      throw new TRPCError({
-        code: "TOO_MANY_REQUESTS",
-        message: "Too many messages. Please slow down.",
-      });
+      // Typed, not a bare TRPCError: ADR-045 names rate-limited as a handled
+      // condition, and only a handled error puts `data.error` on the wire. A
+      // raw TRPCError arrives with `data.error === null`, so the client's
+      // explainer cannot tell it from an internal crash and renders the generic
+      // "something went wrong" — telling a merely-throttled user Langy is broken.
+      throw new LangyRateLimitedError();
     }
     return next();
   },
@@ -333,10 +335,10 @@ async function acceptTurn({
   // object schemas, not the ZodEffects a refine produces.
   const idempotencyKey = input.idempotencyKey ?? input.requestId;
   if (!idempotencyKey) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: "idempotencyKey is required.",
-    });
+    const message = "idempotencyKey is required.";
+    // `meta.message` is the channel that survives serialize() (ADR-045) — the
+    // HandledError's own `message` is not put on the wire.
+    throw new ValidationError(message, { meta: { message } });
   }
   return getApp().langy.turns.startConversationTurn({
     projectId: input.projectId,
@@ -599,7 +601,11 @@ export const langyRouter = createTRPCRouter({
         userId: ctx.session.user.id,
         title: input.title,
       });
-      if (!detail) throw new TRPCError({ code: "NOT_FOUND" });
+      // Typed so the client renders its bespoke "Conversation not found — start
+      // a new chat to keep going" card. The bare TRPCError this replaces carried
+      // no code and no message at all, so the explainer fell through to the
+      // generic unknown treatment for a condition it already has copy for.
+      if (!detail) throw new LangyConversationNotFoundError(input.conversationId);
       return toDetailDto(detail);
     }),
 
@@ -925,7 +931,11 @@ export const langyRouter = createTRPCRouter({
           { projectId, conversationId, turnId, userId },
           "denied a langy turn-stream attach",
         );
-        throw new TRPCError({ code: "NOT_FOUND", message: "Turn not found." });
+        // Deliberately the same answer for "no such turn" and "not yours", so
+        // this cannot probe another user's conversation — but typed, so the
+        // client gets a coded payload instead of an untyped 404 it must render
+        // as an unknown failure.
+        throw new LangyConversationNotFoundError(conversationId);
       }
       // No Redis ⇒ no live buffer; the client falls back to the Postgres
       // conversation/message query.
