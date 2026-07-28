@@ -72,7 +72,9 @@ function makeDeps(over: Partial<LangyTurnServiceDeps> = {}) {
       status: LANGY_CONVERSATION_STATUS.IDLE,
     })),
     getPendingHandoff: vi.fn(async () => null),
-    getRunToken: vi.fn(async () => "rt-existing"),
+    // Typed to the real signature (Promise<string | null>) so the
+    // cannot-be-signed cases below can drive the null and empty branches.
+    getRunToken: vi.fn(async (): Promise<string | null> => "rt-existing"),
     acceptTurn,
     createConversation,
     consumeHandoff: vi.fn(async () => {}),
