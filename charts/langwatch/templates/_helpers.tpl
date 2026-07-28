@@ -947,28 +947,12 @@ podAffinity:
 {{- end -}}
 
 {{/*
-Ingress: validated + normalised `ingress.blockedPaths`, returned as a JSON array.
+Ingress: validated + normalised `ingress.blockedPaths`, as a JSON array.
+Consume with: {{- $blocked := include "langwatch.ingress.blockedPaths" . | fromJsonArray }}
 
-Both templates/ingress.yaml and templates/blackhole-service.yaml resolve the
-blocked prefixes through here so they can never disagree about whether the block
-is on. Consume it with:
-
-  {{- $blocked := include "langwatch.ingress.blockedPaths" . | fromJsonArray }}
-
-Normalisation is security-relevant, not cosmetic. A prefix that survives
-unvalidated silently degrades the block into decoration:
-
-  - a trailing slash ("/api/internal/") makes the nested-path guard's
-    segment test build "/api/internal//", which matches nothing, so a nested
-    application path sails past the guard and out-matches the blackhole;
-  - a missing leading slash ("api/internal") renders an Ingress the API server
-    rejects, after the guard has already gone dark;
-  - a bare "/" would blackhole the entire site;
-  - a non-list value (what plain `--set 'x=[]'` assigns — a two-character
-    STRING) is truthy, so the block half-renders and then fails deep inside a
-    range with an error naming neither the value nor the fix.
-
-Each of those is rejected here, by name, once.
+Validation is security-relevant: a trailing slash, a missing leading slash, a
+bare "/" or a non-list value each leave the block rendered but inert. Rejected
+here, once, by name, so both consuming templates agree.
 */}}
 {{- define "langwatch.ingress.blockedPaths" -}}
   {{- $normalised := list -}}

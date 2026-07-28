@@ -113,29 +113,25 @@ ingress:
 
 Things worth knowing before you change it:
 
-- **Blocked requests answer `503 Service Temporarily Unavailable`** on
-  ingress-nginx (measured on v1.11.3 — there is no upstream to forward to). The
-  exact code is controller-dependent and not specified by the Ingress API, but
-  every controller fails closed. Expect a low background rate in your ingress 5xx
-  metrics from internet scanners — that is the block working, not the app
-  faulting.
-- **In-cluster callers are unaffected.** The agent, the gateway and the chart's
-  CronJobs reach the app through its internal Service, never the ingress.
-- **It only covers this ingress.** If you publish the app another way — a
-  NodePort/LoadBalancer Service, or your own Ingress — restrict these paths
-  wherever that route terminates.
+- **Blocked requests answer 503** on ingress-nginx. The exact code is
+  controller-dependent (the Ingress API does not specify it) but every controller
+  fails closed. Expect a low background rate in your ingress 5xx metrics from
+  scanners — that is the block working, not the app faulting.
+- **In-cluster callers are unaffected** — the agent, gateway and CronJobs use the
+  internal Service.
+- **It covers this ingress only.** If you publish the app another way (NodePort,
+  LoadBalancer, your own Ingress), restrict these paths where that route ends.
 - **The chart refuses configurations that would defeat the block**, such as an
-  `ingress.hosts` path nested under a blocked prefix, which would out-match it.
-- **On the AWS load balancer controller (default `target-type: instance`) and GKE
-  Ingress without NEG**, a ClusterIP backend is rejected and the Ingress stops
-  reconciling. Set `alb.ingress.kubernetes.io/target-type: ip` (or the GKE NEG
-  equivalent), or empty `blockedPaths` and block the prefix at the load balancer.
-- **To disable it**, set `blockedPaths: []` in a values file, or
-  `--set-json 'ingress.blockedPaths=[]'`. Plain `--set` assigns a string and is
-  rejected.
-- **Running the gateway or Langy agent outside the cluster?** Their callbacks
-  arrive over the public ingress and will be blocked. Narrow the list to the
-  prefix you still need private rather than emptying it.
+  `ingress.hosts` path nested under a blocked prefix.
+- **AWS LBC (default `target-type: instance`) and GKE without NEG** reject a
+  ClusterIP backend and stop reconciling the Ingress. Set
+  `alb.ingress.kubernetes.io/target-type: ip` (or the NEG equivalent), or empty
+  `blockedPaths` and block at the load balancer instead.
+- **To disable**, set `blockedPaths: []` in a values file or use `--set-json`;
+  plain `--set` assigns a string and is rejected.
+- **Gateway or Langy agent running outside the cluster?** Their callbacks arrive
+  over the public ingress and will be blocked — narrow the list rather than
+  emptying it.
 
 ### Kubernetes Network Policies
 

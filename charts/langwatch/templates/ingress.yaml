@@ -1,29 +1,13 @@
 {{- if .Values.ingress.enabled }}
 {{- $blockedPaths := include "langwatch.ingress.blockedPaths" . | fromJsonArray }}
 {{- /*
-  Guard: an application path nested under a blocked prefix out-matches the
-  blackhole and routes the private control plane straight to the app, silently
-  undoing the block — the blocked path and the blackhole Service are both still
-  rendered, so nothing looks wrong. Refuse to render instead.
+  An app path nested under a blocked prefix out-matches the blackhole and
+  silently undoes the block, so refuse to render it. Matching is on
+  `/`-separated segments like `pathType: Prefix`, so the `/api/internal-status`
+  sibling — which the block does not cover — still renders.
 
-  The match is on `/`-separated segments, exactly like `pathType: Prefix`: a
-  bare `hasPrefix $blocked $path.path` would also reject `/api/internal-status`,
-  which the block genuinely does NOT cover and which is a legitimate app path.
-
-  Known limit: the comparison is on literal paths. A `pathType:
-  ImplementationSpecific` path written as a regex that happens to cover the same
-  URLs (`/api/internal(/|$)(.*)`) is neither equal to nor nested under the
-  prefix, so it passes the guard — and on ingress-nginx with `use-regex`, a
-  regex location beats the blackhole's prefix location. Installs that combine
-  `use-regex`/`rewrite-target` with blocked prefixes have to verify that
-  themselves.
-
-  Emptying `ingress.blockedPaths` disables the guard along with the block, so an
-  operator who knowingly opts out is never held up by it. Operators running the
-  gateway or the Langy agent OUTSIDE this release (see gateway.controlPlane and
-  langyagent.controlPlane) legitimately need part of `/api/internal` published,
-  and that is the case this guard will stop — narrow the list rather than
-  fighting it.
+  Literal paths only: a regex `ImplementationSpecific` path covering the same
+  URLs passes the guard, and beats the blackhole on nginx with `use-regex`.
 */ -}}
 {{- range $host := .Values.ingress.hosts }}
   {{- if not $host.http }}
@@ -71,17 +55,8 @@ spec:
     - host: {{ .host | quote }}
       http:
         paths:
-          {{- /*
-            Blocked prefixes come first and route to the no-endpoints blackhole
-            Service (see templates/blackhole-service.yaml). What carries the
-            block is longest-match: `/api/internal` is a longer match than the
-            app's catch-all `/`. Emitting first is a hedge for controllers that
-            derive rule priority from list position (the AWS load balancer
-            controller) rather than from match length.
-
-            See ingress.blockedPaths in values.yaml for the WHY and the
-            controller caveats — this is the only copy of that argument.
-          */}}
+          {{- /* Longest-match carries the block; emitting first hedges
+            controllers that rank by list position (AWS LBC). */}}
           {{- range $blockedPaths }}
           - path: {{ . | quote }}
             pathType: Prefix

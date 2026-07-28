@@ -1181,77 +1181,26 @@ ingress:
   ## @param ingress.labels [object] Additional labels for the Ingress and its blackhole Service.
   labels: {}
 
-  # Path prefixes this ingress must NEVER route to the app — a hard,
-  # on-by-default block at the edge. See SCOPE below for what that does and does
-  # not cover.
+  # Path prefixes this ingress must never route to the app. Everything under
+  # `/api/internal/*` is the private control plane (Langy + AI-gateway callbacks,
+  # shared-secret gated), and the app's catch-all `/` would otherwise publish it.
   #
-  # WHY: everything under `/api/internal/*` is the app's private control-plane
-  # surface (the Langy agent manager's callbacks in langy-internal.ts /
-  # langy-relay.ts, and the AI-gateway's usage callbacks in gateway-internal.ts).
-  # Each route's header says "Never expose publicly" and each is gated only by a
-  # single shared secret — a bearer token for Langy (LANGY_INTERNAL_SECRET), an
-  # HMAC signature for the gateway (LW_GATEWAY_INTERNAL_SECRET) — which is a last
-  # line of defence, not a reason to publish the surface. In-cluster callers (the
-  # agent manager, the gateway, the chart's own CronJobs) reach the app via the
-  # internal Service `{{ .Release.Name }}-app`, NOT via this ingress, so blocking
-  # these prefixes at the edge breaks nothing legitimate.
+  # Each prefix is routed to a Service with no endpoints, so the controller has
+  # nowhere to forward the request (503 on ingress-nginx). In-cluster callers use
+  # the internal Service and are unaffected. The chart refuses to render a config
+  # that would defeat the block — an `ingress.hosts` path nested under a prefix,
+  # or a malformed prefix — rather than shipping one that only looks protected.
   #
-  # HOW: for each prefix the chart renders an Ingress path (`pathType: Prefix`)
-  # pointing at a dedicated no-endpoints Service (`{{ .Release.Name }}-blackhole`).
-  # Nothing populates that Service's Endpoints, so the controller has nowhere to
-  # forward the request. What carries the block is longest-match — `/api/internal`
-  # is a longer match than the app's catch-all `/`. Blocked paths are also emitted
-  # ahead of the application's paths, which is a hedge for controllers that derive
-  # rule priority from list position (the AWS load balancer controller) rather
-  # than from match length.
+  # This covers THIS ingress only, not the app: an install that publishes the app
+  # another way needs its own restriction. To disable, set `[]` in a values file
+  # or `--set-json` (plain `--set` assigns a string and is rejected).
   #
-  # An application path nested under a blocked prefix (say `/api/internal/status`)
-  # out-matches the blackhole and silently undoes the block, so
-  # templates/ingress.yaml refuses to render that combination at all. Malformed
-  # prefixes are rejected the same way, by name: a trailing slash, a missing
-  # leading slash, a bare `/`, or a non-list value would each turn the block into
-  # decoration.
+  # `/api/cron`, `/metrics` and `/api/ops` are internal-only in the default
+  # topology but are NOT blocked by default — some installs drive cron
+  # externally, federate metrics, or run ops tooling from outside. Add them here
+  # if yours does not.
   #
-  # CONTROLLER SUPPORT: the exact response is controller-dependent — the Ingress
-  # API does not specify it. Verified against ingress-nginx v1.11.3: a blocked
-  # request gets nginx's own `503 Service Temporarily Unavailable`. What holds by
-  # construction rather than by any controller's goodwill is that there is
-  # nowhere to forward to, so every controller fails closed.
-  #
-  # Controllers that route to NODE PORTS rather than pod IPs — the AWS load
-  # balancer controller with its default `target-type: instance`, and GKE Ingress
-  # without NEG — reject a ClusterIP backend outright and stop reconciling the
-  # Ingress; on an upgrade that fails OPEN, because the load balancer keeps
-  # serving the rules it already had. On those controllers set
-  # `alb.ingress.kubernetes.io/target-type: ip` (or the GKE NEG equivalent), or
-  # empty this list and block the prefix at the load balancer instead.
-  #
-  # SCOPE: this covers traffic arriving through THIS ingress — the chart's public
-  # entrypoint — and is not a property of the application itself. An install that
-  # publishes the app by another route (an `app.service.type` of NodePort or
-  # LoadBalancer, as in examples/overlays/access-nodeport.yaml, or an Ingress the
-  # operator writes themselves against `{{ .Release.Name }}-app`) does not
-  # inherit these prefixes, and wants an equivalent restriction wherever that
-  # route terminates. The prefixes apply to EVERY host in `ingress.hosts`,
-  # including hosts an operator has pointed at some other backend.
-  #
-  # OPERATIONS: blocked requests answer 503 on ingress-nginx (see CONTROLLER
-  # SUPPORT), so probes against `/api/internal` show up in your ingress 5xx
-  # metrics. That is the block working, not the app faulting.
-  # If you run the gateway or the Langy agent OUTSIDE this release (see
-  # gateway.controlPlane / langyagent.controlPlane), those callbacks arrive over
-  # the public ingress and this block will stop them — narrow the list to the
-  # prefix you still need private rather than emptying it.
-  #
-  # Operators can extend this list, or set it to `[]` to (explicitly, knowingly)
-  # disable the block — note that plain `--set 'ingress.blockedPaths=[]'` assigns
-  # a STRING and is rejected; use `--set-json` or a values file.
-  #
-  # NOT blocked by default, though also internal-only in the default topology:
-  # `/api/cron/*` (some operators drive cron from an external scheduler),
-  # `/metrics` (bearer-token gated, and may be federated externally), and
-  # `/api/ops/*` (operator tooling gated by LANGWATCH_OPS_API_KEY). Add whichever
-  # of them your install keeps in-cluster.
+  # Full operator guide, including the AWS/GKE caveat: docs/self-hosting/security
   ## @param ingress.blockedPaths [array] Path prefixes this ingress hard-blocks by routing them to a no-endpoints blackhole Service. Defaults to ["/api/internal"], the private control-plane surface. Set to an empty list to disable.
   blockedPaths:
     - /api/internal
