@@ -169,7 +169,7 @@ describe("Prompts API", () => {
 
   // Authentication tests
   describe("Authentication", () => {
-    it("should return 401 with invalid API key", async () => {
+    it("returns 401 with invalid API key", async () => {
       const res = await app.request(`/api/prompts`, {
         headers: { "X-Auth-Token": "invalid-key" },
       });
@@ -183,7 +183,7 @@ describe("Prompts API", () => {
   // GET endpoints tests
   describe("GET endpoints", () => {
     describe("when there are no prompts", () => {
-      it("should get empty array for a project with no prompts", async () => {
+      it("gets empty array for a project with no prompts", async () => {
         const res = await app.request(`/api/prompts`, {
           headers: { "X-Auth-Token": testApiKey },
         });
@@ -217,7 +217,7 @@ describe("Prompts API", () => {
         });
       });
 
-      it("should get all prompts for a project", async () => {
+      it("gets all prompts for a project", async () => {
         const res = await app.request(`/api/prompts`, {
           headers: { "X-Auth-Token": testApiKey },
         });
@@ -230,7 +230,7 @@ describe("Prompts API", () => {
         expect(body[0].projectId).toBe(testProjectId);
       });
 
-      it("should get a single prompt by ID", async () => {
+      it("gets a single prompt by ID", async () => {
         const res = await app.request(`/api/prompts/${config.id}`, {
           headers: { "X-Auth-Token": testApiKey },
         });
@@ -300,7 +300,7 @@ describe("Prompts API", () => {
         });
       });
 
-      it("should return 404 for non-existent prompt ID (should work with handle as well)", async () => {
+      it("returns 404 for non-existent prompt ID (should work with handle as well)", async () => {
         const nonExistentId = `prompt_${nanoid()}`;
         const res = await app.request(`/api/prompts/${nonExistentId}`, {
           headers: { "X-Auth-Token": testApiKey },
@@ -320,7 +320,7 @@ describe("Prompts API", () => {
             });
           });
 
-          it("should get all versions for a prompt", async () => {
+          it("gets all versions for a prompt", async () => {
             const res = await app.request(
               `/api/prompts/${config.id}/versions`,
               {
@@ -346,7 +346,7 @@ describe("Prompts API", () => {
             });
           });
 
-          it("should get empty array for a prompt with no versions", async () => {
+          it("gets empty array for a prompt with no versions", async () => {
             const res = await app.request(
               `/api/prompts/${config.id}/versions`,
               {

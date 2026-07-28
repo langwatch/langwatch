@@ -106,7 +106,7 @@ describe("CLI E2E", () => {
 
   describe("sync", () => {
     describe("create local -> sync -> update local -> sync", () => {
-      it("should keep remote prompt up to date", async () => {
+      it("keeps remote prompt up to date", async () => {
         // Initialize project
         const initResult = cli.run("prompt init");
         expectCliResultSuccess(initResult);
@@ -267,7 +267,7 @@ describe("CLI E2E", () => {
       });
 
       describe("when user chooses to use remote version", () => {
-        it("should replace the local prompt with the remote version", async () => {
+        it("replaces the local prompt with the remote version", async () => {
           // Modify local file to create a real conflict
           localPromptFileManagement.updatePromptFile(promptHandle, {
             model: "openai/gpt-5",
@@ -300,7 +300,7 @@ describe("CLI E2E", () => {
       });
 
       describe("when user chooses to use local version", () => {
-        it("should replace the remote version with the local version", async () => {
+        it("replaces the remote version with the local version", async () => {
           // Modify local file to create a real conflict
           localPromptFileManagement.updatePromptFile(promptHandle, {
             model: "openai/gpt-5",
@@ -354,7 +354,7 @@ describe("CLI E2E", () => {
         expectCliResultSuccess(sync);
       });
 
-      it("should pull down the latest version from remote into materialized", async () => {
+      it("pulls down the latest version from remote into materialized", async () => {
         expect(
           materializedPromptFileManagement.getPromptFileContent(promptHandle),
         ).toMatchInlineSnapshot(`
@@ -376,7 +376,7 @@ describe("CLI E2E", () => {
       });
 
       describe("when remote is updated", () => {
-        it("should get the updated version", async () => {
+        it("gets the updated version", async () => {
           await langwatch.prompts.update(promptHandle, {
             commitMessage: "Updated via CLI sync",
             temperature: 0.8,
@@ -404,7 +404,7 @@ describe("CLI E2E", () => {
       });
 
       describe("when pegged to a version", () => {
-        it("should sync the correct version", async () => {
+        it("syncs the correct version", async () => {
           const addResult = await cli.runInteractive(
             `prompt add ${promptHandle}@0`,
             ["y"],

@@ -34,7 +34,7 @@ describe("Basic Span Ingestion E2E", () => {
     });
   };
 
-  it("should create and send a simple span successfully", async () => {
+  it("creates and send a simple span successfully", async () => {
     const tracer = createTestTracer("simple-span");
     const testIds = generateTestIds();
     let traceId: string;
@@ -73,7 +73,7 @@ describe("Basic Span Ingestion E2E", () => {
     expect((span as any).metrics).toBeTruthy();
   }, E2E_CONFIG.timeout);
 
-  it("should handle nested spans", async () => {
+  it("handles nested spans", async () => {
     const tracer = createTestTracer("nested-spans");
     const testIds = generateTestIds();
     let traceId: string;
@@ -103,7 +103,7 @@ describe("Basic Span Ingestion E2E", () => {
     expect(childSpanData!.type).toBe("llm");
   }, E2E_CONFIG.timeout);
 
-  it("should handle error scenarios", async () => {
+  it("handles error scenarios", async () => {
     const tracer = createTestTracer("error-handling");
     const testIds = generateTestIds();
     let traceId: string;

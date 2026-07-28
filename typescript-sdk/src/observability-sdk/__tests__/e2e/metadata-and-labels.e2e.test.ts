@@ -24,7 +24,7 @@ describe("Metadata and Labels E2E", () => {
   const setup = setupE2ETest();
 
   describe("SDK (OpenTelemetry span attributes)", () => {
-    it("should ingest user_id, thread_id, and customer_id", async () => {
+    it("ingests user_id, thread_id, and customer_id", async () => {
       const tracer = createTestTracer("metadata-ids");
       const testIds = generateTestIds();
       let traceId: string;
@@ -51,7 +51,7 @@ describe("Metadata and Labels E2E", () => {
       expectSpanAttributeWithTrace(trace, span, semconv.ATTR_LANGWATCH_CUSTOMER_ID, "test-customer-123");
     }, E2E_CONFIG.timeout);
 
-    it("should ingest labels", async () => {
+    it("ingests labels", async () => {
       const tracer = createTestTracer("metadata-labels");
       const testIds = generateTestIds();
       let traceId: string;
@@ -78,7 +78,7 @@ describe("Metadata and Labels E2E", () => {
       expect(traceLabels).toEqual(expect.arrayContaining(labels));
     }, E2E_CONFIG.timeout);
 
-    it("should ingest custom metadata", async () => {
+    it("ingests custom metadata", async () => {
       const tracer = createTestTracer("metadata-custom");
       const testIds = generateTestIds();
       let traceId: string;
@@ -110,7 +110,7 @@ describe("Metadata and Labels E2E", () => {
       expect(metadata.custom_sdk_ver).toBe("1.0.0");
     }, E2E_CONFIG.timeout);
 
-    it("should ingest gen_ai.conversation.id as thread_id", async () => {
+    it("ingests gen_ai.conversation.id as thread_id", async () => {
       const tracer = createTestTracer("metadata-conversation-id");
       const testIds = generateTestIds();
       let traceId: string;
@@ -175,7 +175,7 @@ describe("Metadata and Labels E2E", () => {
       });
     }
 
-    it("should accept traces with all metadata fields via REST API", async () => {
+    it("accepts traces with all metadata fields via REST API", async () => {
       const traceId = `trace-rest-${crypto.randomUUID().slice(0, 12)}`;
       const spanId = `span-rest-${crypto.randomUUID().slice(0, 12)}`;
       const threadId = `thread-rest-${crypto.randomUUID().slice(0, 8)}`;
@@ -196,7 +196,7 @@ describe("Metadata and Labels E2E", () => {
       expect(response.status).toBe(200);
     }, E2E_CONFIG.timeout);
 
-    it("should ingest REST API metadata and make it queryable", async () => {
+    it("ingests REST API metadata and make it queryable", async () => {
       const traceId = `trace-rest-${crypto.randomUUID().slice(0, 12)}`;
       const spanId = `span-rest-${crypto.randomUUID().slice(0, 12)}`;
       const threadId = `thread-rest-${crypto.randomUUID().slice(0, 8)}`;

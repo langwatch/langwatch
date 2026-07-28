@@ -2,7 +2,7 @@ import { describe, it } from "vitest";
 import { buildTimeseriesQuery } from "../aggregation-builder";
 
 describe("debug SQL", () => {
-  it("should log SQL for User Threads metrics (with pipeline)", () => {
+  it("logs SQL for User Threads metrics (with pipeline)", () => {
     const input = {
       projectId: "test-project",
       startDate: new Date("2024-01-02T00:00:00Z"),
