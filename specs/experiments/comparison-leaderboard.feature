@@ -199,6 +199,62 @@ Feature: Comparison leaderboard (Bradley-Terry ranking on the results page)
     When I view the cost tradeoff chart
     Then variant_2 reads as a comparable-quality, lower-cost alternative to variant_1
 
+  # ── All three metrics at once, and what they add up to ─────────────────
+  #
+  # Quality, cost and duration are the three things the decision turns on,
+  # so the trade-off chart carries all three rather than two at a time.
+  # The third rides on point size rather than a third spatial axis: depth
+  # in a perspective projection cannot be read accurately, and a confidence
+  # interval drawn into it could not be compared against another one at
+  # all — which would hide the single thing that decides whether a quality
+  # gap is real.
+  #
+  # Reading three metrics off a scatter is still work the reader should not
+  # have to do. Whether one variant beats another outright has an exact
+  # answer, so it is computed and stated, and the chart only confirms it.
+
+  Scenario: All three trade-off metrics are readable at once
+    Given the comparison's variants have different average cost and duration
+    When I view the trade-off chart
+    Then each variant's point is positioned by its Bradley-Terry score and one of cost or duration
+    And whichever of cost or duration is not on the axis is shown as the size of the point
+    And the chart says what the point size means
+
+  Scenario: The quality axis carries its uncertainty
+    Given the leaderboard has a confidence interval for each variant
+    When I view the trade-off chart
+    Then each point carries an error bar spanning that variant's confidence interval
+
+  Scenario: A variant beaten on every metric is named outright
+    Given variant_1 scores distinguishably higher than variant_2
+    And variant_1 costs meaningfully less than variant_2 and is meaningfully faster
+    When I view the trade-off chart
+    Then I am told variant_2 is beaten by variant_1 on quality, cost and speed
+    And I do not have to compare any points myself to learn that
+
+  Scenario: Dominance is never claimed from a quality difference the run cannot see
+    Given variant_1 and variant_2 have overlapping confidence intervals
+    And variant_1 costs meaningfully less than variant_2 and is meaningfully faster
+    When I view the trade-off chart
+    Then variant_2 is not described as beaten on quality
+    But variant_2 is still described as beaten on cost and speed
+
+  Scenario: A negligible cost or speed difference is not a win
+    Given variant_1 and variant_2 cost within a rounding error of each other
+    When I view the trade-off chart
+    Then neither is described as the cheaper of the two
+
+  Scenario: Dominance is only claimed over metrics the run actually recorded
+    Given no duration was recorded for any variant
+    When I view the trade-off chart
+    Then any dominance statement covers quality and cost only
+    And speed is not named as something either variant won or lost on
+
+  Scenario: A variant nothing beats outright is left for the reader to choose between
+    Given no variant is beaten on every metric by another
+    When I view the trade-off chart
+    Then I am told the field presents a genuine trade-off rather than a variant to drop
+
   Scenario: The leaderboard scales past a handful of variants
     Given the comparison has 10 variants
     When I open the expanded leaderboard

@@ -33,6 +33,7 @@ import { LeaderboardStep } from "./batch-evaluation-results/LeaderboardStep";
 import { LeaderboardTrustPanel } from "./batch-evaluation-results/LeaderboardTrustPanel";
 import { LeaderboardVerdictPanel } from "./batch-evaluation-results/LeaderboardVerdictPanel";
 import { ParetoScatterChart } from "./batch-evaluation-results/ParetoScatterChart";
+import { TradeoffSummaryLine } from "./batch-evaluation-results/TradeoffSummaryLine";
 import {
   DEFAULT_WARN_THRESHOLD,
   PairwiseLeaderboard,
@@ -240,13 +241,22 @@ export function ComparisonLeaderboardDrawer({
                 <>
                   Cost and latency are shown next to quality, never blended into
                   it — a single &quot;best overall&quot; number would hide the
-                  trade-off you are actually making. The grid below counts how
-                  often each variant beat each other one; click any cell to read
-                  the judge&apos;s own words for those rows.
+                  trade-off you are actually making. All three are on one chart:
+                  two as position, the third as point size. A variant that is no
+                  better on any of them is called out above, so you do not have
+                  to find it yourself. The grid below counts how often each
+                  variant beat each other one; click any cell to read the
+                  judge&apos;s own words for those rows.
                 </>
               }
             >
               <VStack align="stretch" gap={4}>
+                <TradeoffSummaryLine
+                  leaderboard={leaderboard}
+                  variantMetrics={variantMetrics}
+                  variantNames={variantNames}
+                />
+
                 <ParetoScatterChart
                   leaderboard={leaderboard}
                   variantMetrics={variantMetrics}

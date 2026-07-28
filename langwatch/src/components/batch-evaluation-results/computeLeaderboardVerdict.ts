@@ -48,7 +48,7 @@ const intervalsOverlap = (
  * difference, so it counts as "cannot separate" — the conservative
  * direction, and the one that avoids inventing a winner from thin data.
  */
-const areDistinguishable = (
+export const areDistinguishable = (
   a: BTLeaderboardEntry,
   b: BTLeaderboardEntry,
 ): boolean => {
@@ -134,7 +134,7 @@ export const computeLeaderboardVerdict = (
  * Low on purpose — this is a floor against "one row happened to record a
  * cost", not a statistical sample-size requirement.
  */
-const MIN_PRICED_ROWS = 5;
+export const MIN_PRICED_ROWS = 5;
 
 export type CheaperAlternative = {
   /** Cheapest variant among the tied set. May be the top-ranked one. */

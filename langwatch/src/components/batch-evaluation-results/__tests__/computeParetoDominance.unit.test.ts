@@ -1,0 +1,343 @@
+import { describe, expect, it } from "vitest";
+
+import {
+  computeParetoDominance,
+  TRADEOFF_NOISE_FLOOR,
+} from "../computeParetoDominance";
+
+/**
+ * Dominance is the one claim on the trade-off chart a reader acts on
+ * directly — "this variant is beaten outright, drop it". It is therefore
+ * held to the same standard as the verdict: never asserted from a
+ * difference the run cannot actually see.
+ *
+ * @see specs/experiments/comparison-leaderboard.feature
+ */
+
+const stats = (avg: number, count = 20) =>
+  ({
+    min: avg,
+    max: avg,
+    avg,
+    median: avg,
+    p75: avg,
+    p90: avg,
+    p95: avg,
+    p99: avg,
+    total: avg * count,
+    count,
+  }) as const;
+
+const entry = ({
+  variantId,
+  score,
+  scoreCI,
+  degenerate = false,
+}: {
+  variantId: string;
+  score: number;
+  scoreCI: [number, number] | null;
+  degenerate?: boolean;
+}) =>
+  ({
+    variantId,
+    wins: 5,
+    losses: 5,
+    matchups: 10,
+    winRate: 0.5,
+    strength: 1,
+    score,
+    scoreCI,
+    degenerate,
+  }) as any;
+
+const board = (entries: any[]) =>
+  ({
+    entries,
+    winMatrix: {},
+    comparisonCount: 60,
+    minMatchups: 60,
+    hasDegenerate: entries.some((e) => e.degenerate),
+    didConverge: true,
+    comparability: { identifiable: true, groups: [], dominates: [] },
+  }) as any;
+
+const metrics = (
+  byId: Record<string, { cost?: number | null; duration?: number | null; rows?: number }>,
+) =>
+  Object.fromEntries(
+    Object.entries(byId).map(([variantId, m]) => [
+      variantId,
+      {
+        variantId,
+        costStats:
+          m.cost === null || m.cost === undefined ? null : stats(m.cost, m.rows ?? 20),
+        durationStats:
+          m.duration === null || m.duration === undefined
+            ? null
+            : stats(m.duration, m.rows ?? 20),
+      },
+    ]),
+  ) as any;
+
+describe("computeParetoDominance", () => {
+  describe("given a variant beaten on quality, cost and speed", () => {
+    const leaderboard = board([
+      entry({ variantId: "a", score: 200, scoreCI: [150, 250] }),
+      entry({ variantId: "b", score: 10, scoreCI: [-40, 40] }),
+    ]);
+    const variantMetrics = metrics({
+      a: { cost: 0.001, duration: 1000 },
+      b: { cost: 0.01, duration: 5000 },
+    });
+
+    it("names the variant that beats it", () => {
+      const dominance = computeParetoDominance({ leaderboard, variantMetrics });
+
+      expect(dominance.dominatedBy.b).toEqual(["a"]);
+      expect(dominance.dominatedBy.a).toEqual([]);
+    });
+
+    it("lists every dimension the winner actually won on", () => {
+      const dominance = computeParetoDominance({ leaderboard, variantMetrics });
+      const edge = dominance.edges.find((e) => e.loserId === "b")!;
+
+      expect(edge.winnerId).toBe("a");
+      expect(edge.strictlyBetterOn).toEqual(["quality", "cost", "speed"]);
+    });
+
+    it("leaves only the winner on the front", () => {
+      expect(computeParetoDominance({ leaderboard, variantMetrics }).front).toEqual([
+        "a",
+      ]);
+    });
+  });
+
+  describe("given overlapping confidence intervals but a real cost and speed gap", () => {
+    // The quality difference is invisible to this run. Dominance still
+    // holds — a tie is "not worse" — but it must not be reported as a
+    // quality win, which is the claim a reader would act on hardest.
+    const leaderboard = board([
+      entry({ variantId: "a", score: 60, scoreCI: [20, 100] }),
+      entry({ variantId: "b", score: 50, scoreCI: [10, 90] }),
+    ]);
+    const variantMetrics = metrics({
+      a: { cost: 0.001, duration: 1000 },
+      b: { cost: 0.01, duration: 5000 },
+    });
+
+    it("still reports the variant as beaten outright", () => {
+      expect(
+        computeParetoDominance({ leaderboard, variantMetrics }).dominatedBy.b,
+      ).toEqual(["a"]);
+    });
+
+    it("does not count quality among the dimensions won", () => {
+      const edge = computeParetoDominance({
+        leaderboard,
+        variantMetrics,
+      }).edges.find((e) => e.loserId === "b")!;
+
+      expect(edge.strictlyBetterOn).toEqual(["cost", "speed"]);
+      expect(edge.strictlyBetterOn).not.toContain("quality");
+    });
+  });
+
+  describe("given a higher score the run cannot separate and no other advantage", () => {
+    it("claims no dominance at all", () => {
+      // Every dimension ties, so nothing is strictly better and there is
+      // nothing to drop. Reporting dominance here would be reading noise.
+      const leaderboard = board([
+        entry({ variantId: "a", score: 60, scoreCI: [20, 100] }),
+        entry({ variantId: "b", score: 50, scoreCI: [10, 90] }),
+      ]);
+      const variantMetrics = metrics({
+        a: { cost: 0.001, duration: 1000 },
+        b: { cost: 0.001, duration: 1000 },
+      });
+
+      const dominance = computeParetoDominance({ leaderboard, variantMetrics });
+
+      expect(dominance.edges).toEqual([]);
+      expect(dominance.front).toEqual(["a", "b"]);
+    });
+  });
+
+  describe("given a cost difference below the noise floor", () => {
+    // The gap is a fixed 2%, NOT derived from TRADEOFF_NOISE_FLOOR. Deriving
+    // it moves the fixture with the constant, so zeroing the floor made both
+    // costs identical and the test passed against a build with no floor at
+    // all — it asserted nothing. The precondition is asserted instead, so
+    // dropping the floor below 2% fails here loudly rather than silently
+    // turning this back into a no-op.
+    const TWO_PERCENT_APART = 1.02;
+
+    it("keeps a floor wide enough for this fixture to test", () => {
+      expect(TRADEOFF_NOISE_FLOOR).toBeGreaterThan(TWO_PERCENT_APART - 1);
+    });
+
+    it("does not treat it as cheaper", () => {
+      // No duration on purpose: an equal duration on both sides is itself
+      // decided by the floor, so leaving it in lets the speed comparison
+      // mask what this test is trying to observe about cost.
+      const leaderboard = board([
+        entry({ variantId: "a", score: 60, scoreCI: [20, 100] }),
+        entry({ variantId: "b", score: 50, scoreCI: [10, 90] }),
+      ]);
+      const variantMetrics = metrics({
+        a: { cost: 0.001 },
+        b: { cost: 0.001 * TWO_PERCENT_APART },
+      });
+
+      expect(
+        computeParetoDominance({ leaderboard, variantMetrics }).edges,
+      ).toEqual([]);
+    });
+  });
+
+  describe("given a genuine trade-off", () => {
+    it("reports no variant to drop", () => {
+      // a is better but dearer. That is the case the chart exists for, and
+      // the reader has to make the call.
+      const leaderboard = board([
+        entry({ variantId: "a", score: 200, scoreCI: [150, 250] }),
+        entry({ variantId: "b", score: 10, scoreCI: [-40, 40] }),
+      ]);
+      const variantMetrics = metrics({
+        a: { cost: 0.01, duration: 5000 },
+        b: { cost: 0.001, duration: 1000 },
+      });
+
+      const dominance = computeParetoDominance({ leaderboard, variantMetrics });
+
+      expect(dominance.edges).toEqual([]);
+      expect(dominance.front).toEqual(["a", "b"]);
+    });
+  });
+
+  describe("given no duration recorded anywhere", () => {
+    it("compares on quality and cost only", () => {
+      const leaderboard = board([
+        entry({ variantId: "a", score: 200, scoreCI: [150, 250] }),
+        entry({ variantId: "b", score: 10, scoreCI: [-40, 40] }),
+      ]);
+      const variantMetrics = metrics({
+        a: { cost: 0.001, duration: null },
+        b: { cost: 0.01, duration: null },
+      });
+
+      const dominance = computeParetoDominance({ leaderboard, variantMetrics });
+
+      expect(dominance.dimensions).toEqual(["quality", "cost"]);
+      expect(
+        dominance.edges.find((e) => e.loserId === "b")!.strictlyBetterOn,
+      ).toEqual(["quality", "cost"]);
+    });
+  });
+
+  describe("given a cost mean drawn from too few priced rows", () => {
+    it("does not compare on cost", () => {
+      // Same floor the cost recommendation uses. A mean over one row is
+      // not a cost, and dominance is a stronger claim than a suggestion.
+      const leaderboard = board([
+        entry({ variantId: "a", score: 200, scoreCI: [150, 250] }),
+        entry({ variantId: "b", score: 10, scoreCI: [-40, 40] }),
+      ]);
+      const variantMetrics = metrics({
+        a: { cost: 0.001, duration: 1000, rows: 1 },
+        b: { cost: 0.01, duration: 1000, rows: 1 },
+      });
+
+      const dominance = computeParetoDominance({ leaderboard, variantMetrics });
+
+      expect(dominance.dimensions).not.toContain("cost");
+      expect(
+        dominance.edges.find((e) => e.loserId === "b")!.strictlyBetterOn,
+      ).toEqual(["quality"]);
+    });
+  });
+
+  describe("given a missing confidence interval", () => {
+    it("treats quality as unreadable rather than as a win", () => {
+      // Absence of an interval is absence of evidence. Without this the
+      // raw score ordering would silently become the quality verdict.
+      const leaderboard = board([
+        entry({ variantId: "a", score: 200, scoreCI: null }),
+        entry({ variantId: "b", score: 10, scoreCI: null }),
+      ]);
+      const variantMetrics = metrics({
+        a: { cost: 0.001, duration: 1000 },
+        b: { cost: 0.001, duration: 1000 },
+      });
+
+      expect(
+        computeParetoDominance({ leaderboard, variantMetrics }).edges,
+      ).toEqual([]);
+    });
+  });
+
+  describe("given a degenerate variant", () => {
+    it("leaves it out of the comparison entirely", () => {
+      // It has no meaningful score, so it can neither dominate nor be
+      // dominated without the claim resting on a number that means nothing.
+      const leaderboard = board([
+        entry({ variantId: "a", score: 200, scoreCI: [150, 250] }),
+        entry({ variantId: "b", score: 10, scoreCI: [-40, 40] }),
+        entry({
+          variantId: "swept",
+          score: 900,
+          scoreCI: null,
+          degenerate: true,
+        }),
+      ]);
+      const variantMetrics = metrics({
+        a: { cost: 0.001, duration: 1000 },
+        b: { cost: 0.01, duration: 5000 },
+        swept: { cost: 0.0001, duration: 100 },
+      });
+
+      const dominance = computeParetoDominance({ leaderboard, variantMetrics });
+
+      expect(dominance.front).not.toContain("swept");
+      expect(dominance.edges.some((e) => e.winnerId === "swept")).toBe(false);
+      expect(dominance.edges.some((e) => e.loserId === "swept")).toBe(false);
+    });
+  });
+
+  describe("given three variants where one is beaten by two others", () => {
+    it("names every variant that beats it", () => {
+      const leaderboard = board([
+        entry({ variantId: "a", score: 200, scoreCI: [150, 250] }),
+        entry({ variantId: "b", score: 100, scoreCI: [60, 140] }),
+        entry({ variantId: "c", score: 10, scoreCI: [-40, 40] }),
+      ]);
+      const variantMetrics = metrics({
+        a: { cost: 0.001, duration: 1000 },
+        b: { cost: 0.002, duration: 2000 },
+        c: { cost: 0.01, duration: 5000 },
+      });
+
+      const dominance = computeParetoDominance({ leaderboard, variantMetrics });
+
+      expect(dominance.dominatedBy.c).toEqual(["a", "b"]);
+      expect(dominance.front).toEqual(["a"]);
+    });
+  });
+
+  describe("given no metrics at all", () => {
+    it("still compares on quality alone", () => {
+      const leaderboard = board([
+        entry({ variantId: "a", score: 200, scoreCI: [150, 250] }),
+        entry({ variantId: "b", score: 10, scoreCI: [-40, 40] }),
+      ]);
+
+      const dominance = computeParetoDominance({
+        leaderboard,
+        variantMetrics: {},
+      });
+
+      expect(dominance.dimensions).toEqual(["quality"]);
+      expect(dominance.dominatedBy.b).toEqual(["a"]);
+    });
+  });
+});
