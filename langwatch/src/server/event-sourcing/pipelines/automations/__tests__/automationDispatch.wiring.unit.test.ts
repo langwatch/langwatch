@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { InMemoryFoldCacheClient } from "~/server/event-sourcing/projections/foldCache/foldCacheClient";
 import { buildAutomationDispatchPorts } from "../automationDispatch.wiring";
 
 const {
@@ -80,7 +81,7 @@ describe("automation dispatch wiring smoke", () => {
       };
       const ports = buildAutomationDispatchPorts({
         prisma: prisma as never,
-        redis: null,
+        foldCacheClient: new InMemoryFoldCacheClient(),
         triggers: triggers as never,
         emailSuppressions: { filterSuppressed: filterSuppressedMock } as never,
         projects: {} as never,

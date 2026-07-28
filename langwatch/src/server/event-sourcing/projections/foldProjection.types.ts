@@ -201,7 +201,7 @@ export interface FoldProjectionOptions {
    *
    * Requires `eventLoaderUpTo` (auto-wired by EventSourcingService) — the
    * executor silently declines to re-fold without it. Pair the store with a
-   * RedisCachedFoldStore so a re-fold can only follow cache
+   * CachedFoldStore so a re-fold can only follow cache
    * expiry/eviction/restart rather than an ordinary event.
    *
    * @default false

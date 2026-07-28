@@ -1,5 +1,4 @@
 import type { PrismaClient } from "@prisma/client";
-import { Cluster, type Redis } from "ioredis";
 import { env } from "~/env.mjs";
 import { createOrUpdateQueueItems } from "~/server/api/routers/annotation";
 import { createManyDatasetRecords } from "~/server/api/routers/datasetRecord.utils";
@@ -13,8 +12,9 @@ import { TraceReadDerivationService } from "~/server/app-layer/traces/trace-read
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { EmailSuppressionService } from "~/server/app-layer/automations/emailSuppression.service";
 import { TraceSummaryStore } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.store";
+import { CachedFoldStore } from "~/server/event-sourcing/projections/cachedFoldStore";
+import type { FoldCacheClient } from "~/server/event-sourcing/projections/foldCache/foldCacheClient";
 import type { FoldProjectionStore } from "~/server/event-sourcing/projections/foldProjection.types";
-import { RedisCachedFoldStore } from "~/server/event-sourcing/projections/redisCachedFoldStore";
 import { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
 import { TraceService } from "~/server/traces/trace.service";
 import { sendRenderedSlackMessage } from "~/server/app-layer/automations/delivery/sendSlackWebhook";
@@ -67,7 +67,7 @@ export interface AutomationDispatchPorts {
 
 export function buildAutomationDispatchPorts({
   prisma,
-  redis,
+  foldCacheClient,
   triggers,
   emailSuppressions,
   projects,
@@ -76,7 +76,7 @@ export function buildAutomationDispatchPorts({
   traceSummaryRepository,
 }: {
   prisma: PrismaClient;
-  redis: Redis | Cluster | null;
+  foldCacheClient: FoldCacheClient;
   triggers: TriggerService;
   emailSuppressions: EmailSuppressionService;
   projects: ProjectService;
@@ -94,16 +94,15 @@ export function buildAutomationDispatchPorts({
   }
 
   // Shared trace fold store — dispatch re-reads it for the settle confirm.
-  // RedisCachedFoldStore takes a standalone `Redis` client; a Cluster
-  // client falls back to the uncached store.
+  // Composed exactly as the trace pipeline composes its own trace_summaries
+  // fold, over the same cache tier and the same key prefix, so this read sees
+  // what that writer wrote (ADR-077 §3).
   const traceSummaryStore: FoldProjectionStore<TraceSummaryData> =
-    redis && !(redis instanceof Cluster)
-      ? new RedisCachedFoldStore(
-          new TraceSummaryStore(traceSummaryRepository),
-          redis,
-          { keyPrefix: "trace_summaries" },
-        )
-      : new TraceSummaryStore(traceSummaryRepository);
+    new CachedFoldStore(
+      new TraceSummaryStore(traceSummaryRepository),
+      foldCacheClient,
+      { keyPrefix: "trace_summaries" },
+    );
 
   const traceReadDerivation = new TraceReadDerivationService(traces.spans);
 

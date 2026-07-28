@@ -77,6 +77,11 @@ import {
   PipelineRegistry,
 } from "../event-sourcing/pipelineRegistry";
 import { buildAutomationDispatchPorts } from "../event-sourcing/pipelines/automations/automationDispatch.wiring";
+import {
+  type FoldCacheClient,
+  InMemoryFoldCacheClient,
+  RedisFoldCacheClient,
+} from "../event-sourcing/projections/foldCache/foldCacheClient";
 import { createExperimentRunItemAppendStore } from "../event-sourcing/pipelines/experiment-run-processing/projections/experimentRunResultStorage.store";
 import {
   ExperimentRunStateRepositoryClickHouse,
@@ -329,6 +334,26 @@ export function initializeDefaultApp(options?: {
         clusterEndpoints: config.redisClusterEndpoints,
         db: config.redisDbIndex,
       });
+
+  // ADR-077 §3: which tier backs the fold cache is decided HERE and nowhere
+  // else. Every fold store downstream is composed over this one client, so the
+  // two sites that used to disagree about whether trace_summaries is cached
+  // cannot, and no pipeline or adapter can re-open the question.
+  //
+  // `RedisFoldCacheClient` takes `Redis | Cluster` and does not discriminate:
+  // the fold cache issues only single-key reads and writes, which a Cluster
+  // client routes to the owning slot. Topology therefore does not decide
+  // whether folds are cached, and that is deliberate — ADR-066 §5 makes this
+  // cache the read-your-write consistency layer rather than an accelerator, so
+  // the fold writers must keep it in every Redis topology.
+  //
+  // Without Redis there is no fleet to share a tier with — the event-sourcing
+  // queues are Redis — so the in-process map IS the shared tier, and it keeps
+  // read-your-write instead of reading through to a ClickHouse replica that may
+  // not have caught up.
+  const foldCacheClient: FoldCacheClient = redis
+    ? new RedisFoldCacheClient(redis)
+    : new InMemoryFoldCacheClient();
 
   const broadcast = new BroadcastService(redis);
   const projects = traced(
@@ -781,7 +806,7 @@ export function initializeDefaultApp(options?: {
   // start only where roleRunsWorkers() is true.
   const automationPorts = buildAutomationDispatchPorts({
     prisma,
-    redis: redis ?? null,
+    foldCacheClient,
     triggers,
     emailSuppressions,
     projects,
@@ -939,6 +964,7 @@ export function initializeDefaultApp(options?: {
     eventSourcing: es,
     repositories,
     redis: redis!,
+    foldCacheClient,
     broadcast,
     langy: {
       buffer: langyTokenBuffer,

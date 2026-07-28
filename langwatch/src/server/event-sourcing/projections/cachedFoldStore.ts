@@ -1,6 +1,5 @@
 import { performance } from "node:perf_hooks";
 import { createLogger } from "@langwatch/observability";
-import type { Redis } from "ioredis";
 import {
   incrementEsFoldCacheRedisError,
   incrementEsFoldCacheTotal,
@@ -9,6 +8,7 @@ import {
   observeEsFoldCacheGetDuration,
   observeEsFoldCacheStoreDuration,
 } from "~/server/metrics";
+import type { FoldCacheClient } from "./foldCache/foldCacheClient";
 import type { FoldProjectionStore } from "./foldProjection.types";
 import {
   decodeFoldCacheEntry,
@@ -16,9 +16,9 @@ import {
 } from "./foldCache/foldCacheEntry";
 import type { ProjectionStoreContext } from "./projectionStoreContext";
 
-const logger = createLogger("langwatch:event-sourcing:redis-cached-fold-store");
+const logger = createLogger("langwatch:event-sourcing:cached-fold-store");
 
-export interface RedisCachedFoldStoreOptions<State = unknown> {
+export interface CachedFoldStoreOptions<State = unknown> {
   keyPrefix: string;
   ttlSeconds?: number;
   /**
@@ -90,10 +90,20 @@ function readUpdatedAt<State>(state: State): number {
 }
 
 /**
- * Wraps a fold store with a Redis write-through cache.
+ * Wraps a fold store with a write-through cache tier.
  *
- * - `get()`: Redis first, durable store on miss.
+ * - `get()`: cache first, durable store on miss.
  * - `store()`: durable store first (throws on failure), then the cache.
+ *
+ * The tier arrives as a {@link FoldCacheClient}, so this class names no storage
+ * technology and issues no protocol of its own — which client backs it is the
+ * composition root's decision (ADR-077 §3), not a branch in here.
+ *
+ * Its telemetry still says "redis" (`es_fold_cache_redis_error_total`, the
+ * `redis` tier label on the get-duration histogram). Those names are a
+ * production contract — the Grafana rule "Fold Cache Redis Errors" fires on the
+ * counter — so they are deliberately left alone rather than renamed in step
+ * with the class.
  *
  * The entry also carries the ids of the events folded into it. Queue delivery
  * is at-least-once, so a fold job that fails after its state was stored is
@@ -107,20 +117,18 @@ function readUpdatedAt<State>(state: State): number {
  * and this wrapper reads it back on a cache miss — so a retry that reaches a
  * cold cache still recognises a batch it already committed, closing the
  * cold-cache redelivery double-count. An inner store without `getWithApplied`
- * keeps the pre-durable behaviour: eviction or Redis loss drops the set,
+ * keeps the pre-durable behaviour: eviction or cache loss drops the set,
  * degrading to a blind re-apply, not to something worse.
  */
-export class RedisCachedFoldStore<State>
-  implements FoldProjectionStore<State>
-{
+export class CachedFoldStore<State> implements FoldProjectionStore<State> {
   private readonly keyPrefix: string;
   private readonly ttlSeconds: number;
   private readonly updatedAtOf: (state: State) => number;
 
   constructor(
     private readonly inner: FoldProjectionStore<State>,
-    private readonly redis: Redis,
-    options: RedisCachedFoldStoreOptions<State>,
+    private readonly cache: FoldCacheClient,
+    options: CachedFoldStoreOptions<State>,
   ) {
     this.keyPrefix = options.keyPrefix;
     this.ttlSeconds = options.ttlSeconds ?? resolveFoldCacheTtlSeconds();
@@ -157,7 +165,7 @@ export class RedisCachedFoldStore<State>
     miss?: "absent" | "undecodable";
   }> {
     // The executor's read-window fallback re-reads moments after its windowed
-    // attempt already consulted the cache — a second Redis read is a
+    // attempt already consulted the cache — a second cache read is a
     // guaranteed miss that would double-count the cache and dedup metrics, so
     // the retry goes straight to the durable tier. Deliberately NO
     // dedup-unavailable accounting here: the windowed attempt already ran the
@@ -184,7 +192,7 @@ export class RedisCachedFoldStore<State>
     // of state that already holds it. A durable store that persists the set
     // next to its row can still answer, though — so only count dedup as
     // unavailable when even that came back empty. Named by reason so an incident
-    // can tell a cold cache from a Redis fault from a corrupt entry.
+    // can tell a cold cache from a cache-tier fault from a corrupt entry.
     const durable = await this.readDurable(aggregateId, context);
     if (isRetry && durable.appliedEventIds.length === 0) {
       incrementEsFoldDedupUnavailable(this.keyPrefix, cached.reason);
@@ -200,12 +208,12 @@ export class RedisCachedFoldStore<State>
     | { hit: true; state: State; appliedEventIds: string[]; legacy: boolean }
     | { hit: false; reason: "cache_miss" | "read_error" | "unreadable" }
   > {
-    const key = this.redisKey(aggregateId, context);
+    const key = this.cacheKey(aggregateId, context);
     const startedAt = performance.now();
 
     let raw: string | null;
     try {
-      raw = await this.redis.get(key);
+      raw = await this.cache.read(key);
     } catch (error) {
       incrementEsFoldCacheRedisError(this.keyPrefix, "get");
       incrementEsFoldCacheTotal(this.keyPrefix, "fallback_error");
@@ -289,7 +297,7 @@ export class RedisCachedFoldStore<State>
     const startedAt = performance.now();
 
     await this.inner.store(state, context);
-    await this.cache(state, aggregateId, context);
+    await this.writeToCache(state, aggregateId, context);
 
     observeEsFoldCacheStoreDuration(
       this.keyPrefix,
@@ -303,12 +311,12 @@ export class RedisCachedFoldStore<State>
    * genuinely there. What is lost is the read-your-writes window and the
    * applied-set, so it is counted rather than swallowed silently.
    */
-  private async cache(
+  private async writeToCache(
     state: State,
     aggregateId: string,
     context: ProjectionStoreContext,
   ): Promise<void> {
-    const key = this.redisKey(aggregateId, context);
+    const key = this.cacheKey(aggregateId, context);
 
     try {
       // The applied-event-id set is decided upstream and stamped on the context:
@@ -316,7 +324,7 @@ export class RedisCachedFoldStore<State>
       // resets it on a fresh delivery, at all four of its commit sites, before
       // store() runs. This tier is a dumb read/write cache (ADR-066), so it
       // persists that set verbatim — it does not re-read the cache to re-merge,
-      // which on the executor path was a guaranteed no-op (an extra Redis GET
+      // which on the executor path was a guaranteed no-op (an extra cache read
       // plus a full state decode). The only other caller, replay, writes a
       // fresh row carrying no set; an absent value is treated as empty, matching
       // that path's prior result.
@@ -327,7 +335,7 @@ export class RedisCachedFoldStore<State>
       });
 
       observeEsFoldCacheEntryBytes(this.keyPrefix, Buffer.byteLength(payload));
-      await this.redis.set(key, payload, "EX", this.ttlSeconds);
+      await this.cache.write(key, payload, this.ttlSeconds);
     } catch (error) {
       incrementEsFoldCacheRedisError(this.keyPrefix, "set");
       logger.warn(
@@ -337,7 +345,7 @@ export class RedisCachedFoldStore<State>
     }
   }
 
-  private redisKey(
+  private cacheKey(
     aggregateId: string,
     context: ProjectionStoreContext,
   ): string {

@@ -3,7 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createTenantId } from "../../domain/tenantId";
 import type { FoldProjectionStore } from "../foldProjection.types";
 import type { ProjectionStoreContext } from "../projectionStoreContext";
-import { RedisCachedFoldStore } from "../redisCachedFoldStore";
+import { CachedFoldStore } from "../cachedFoldStore";
+import { InMemoryFoldCacheClient } from "../foldCache/foldCacheClient";
 
 // Capture the wrapper's own logger so the TTL-floor clamp can be asserted to
 // warn (once), while leaving every other observability export intact.
@@ -93,18 +94,18 @@ async function dedupUnavailableCount(reason: string): Promise<number> {
   );
 }
 
-function createRedis() {
-  const values = new Map<string, { value: string; ttlSeconds: number }>();
-
+/**
+ * The cache tier as the store sees it. A spied `InMemoryFoldCacheClient` — the
+ * real implementation, so the assertions below are about the store's behaviour
+ * and not about a double's.
+ */
+function createCache() {
+  const client = new InMemoryFoldCacheClient();
   return {
-    values,
-    get: vi.fn(async (key: string) => values.get(key)?.value ?? null),
-    set: vi.fn(
-      async (key: string, value: string, _mode: string, ttlSeconds: number) => {
-        values.set(key, { value, ttlSeconds });
-        return "OK";
-      },
-    ),
+    values: client.entries,
+    read: vi.spyOn(client, "read"),
+    write: vi.spyOn(client, "write"),
+    client,
   };
 }
 
@@ -120,23 +121,23 @@ function createStore<
     typeof createInnerStore
   >,
 >(
-  redis: ReturnType<typeof createRedis>,
+  cache: ReturnType<typeof createCache>,
   inner: Inner = createInnerStore() as unknown as Inner,
 ) {
   return {
     inner,
-    store: new RedisCachedFoldStore<TestState>(inner.store, redis as never, {
+    store: new CachedFoldStore<TestState>(inner.store, cache.client, {
       keyPrefix: "test_table",
       ttlSeconds: 3_600,
     }),
   };
 }
 
-describe("RedisCachedFoldStore", () => {
+describe("CachedFoldStore", () => {
   describe("given a cached entry", () => {
     describe("when the fold reads state", () => {
       it("returns the cached state without reading the durable store", async () => {
-        const redis = createRedis();
+        const redis = createCache();
         const { store, inner } = createStore(redis);
 
         await store.store({ count: 5, UpdatedAt: 200 }, CONTEXT);
@@ -152,7 +153,7 @@ describe("RedisCachedFoldStore", () => {
     describe("when the fold reads state", () => {
       /** @scenario a cold cache recovers state from the store, not the event log */
       it("reads the durable store, which confirmation proves authoritative", async () => {
-        const redis = createRedis();
+        const redis = createCache();
         const { store, inner } = createStore(redis);
 
         const result = await store.get("agg-1", CONTEXT);
@@ -166,19 +167,19 @@ describe("RedisCachedFoldStore", () => {
   describe("given a context carrying bypassReadCache", () => {
     describe("when the executor's read-window fallback re-reads", () => {
       it("goes straight to the durable tier without touching Redis", async () => {
-        const redis = createRedis();
+        const redis = createCache();
         const { store, inner } = createStore(redis);
         // A cached entry exists — the bypass must skip it anyway: the retry
         // only happens because the windowed attempt just consulted the cache.
         await store.store({ count: 5, UpdatedAt: 200 }, CONTEXT);
-        redis.get.mockClear();
+        redis.read.mockClear();
 
         const result = await store.get("agg-1", {
           ...CONTEXT,
           bypassReadCache: true,
         });
 
-        expect(redis.get).not.toHaveBeenCalled();
+        expect(redis.read).not.toHaveBeenCalled();
         expect(result).toEqual({ count: 1, UpdatedAt: 100 });
         expect(inner.calls.get).toEqual(["agg-1"]);
       });
@@ -188,8 +189,8 @@ describe("RedisCachedFoldStore", () => {
   describe("given Redis is unreachable", () => {
     describe("when the fold reads state", () => {
       it("falls through to the durable store rather than failing the fold", async () => {
-        const redis = createRedis();
-        redis.get.mockRejectedValueOnce(new Error("connection lost"));
+        const redis = createCache();
+        redis.read.mockRejectedValueOnce(new Error("connection lost"));
         const { store, inner } = createStore(redis);
 
         const result = await store.get("agg-1", CONTEXT);
@@ -202,7 +203,7 @@ describe("RedisCachedFoldStore", () => {
 
   describe("when the fold stores state", () => {
     it("writes the durable store before caching", async () => {
-      const redis = createRedis();
+      const redis = createCache();
       const { store, inner } = createStore(redis);
 
       await store.store({ count: 5, UpdatedAt: 200 }, CONTEXT);
@@ -212,7 +213,7 @@ describe("RedisCachedFoldStore", () => {
     });
 
     it("caches under the configured TTL", async () => {
-      const redis = createRedis();
+      const redis = createCache();
       const { store } = createStore(redis);
 
       await store.store({ count: 5, UpdatedAt: 200 }, CONTEXT);
@@ -222,7 +223,7 @@ describe("RedisCachedFoldStore", () => {
 
 
     it("records the state version so confirmation has something to compare", async () => {
-      const redis = createRedis();
+      const redis = createCache();
       const { store } = createStore(redis);
 
       await store.store({ count: 5, UpdatedAt: 200 }, CONTEXT);
@@ -235,8 +236,8 @@ describe("RedisCachedFoldStore", () => {
   describe("given the durable write succeeded but caching fails", () => {
     describe("when the fold stores state", () => {
       it("does not fail the fold, because the state is already durable", async () => {
-        const redis = createRedis();
-        redis.set.mockRejectedValueOnce(new Error("OOM"));
+        const redis = createCache();
+        redis.write.mockRejectedValueOnce(new Error("OOM"));
         const { store, inner } = createStore(redis);
 
         await expect(
@@ -255,7 +256,7 @@ describe("RedisCachedFoldStore", () => {
   describe("given the context carries an applied-event-id set", () => {
     describe("when the state is stored", () => {
       it("persists the set verbatim so a redelivery can be recognised", async () => {
-        const redis = createRedis();
+        const redis = createCache();
         const { store } = createStore(redis);
 
         await store.store(
@@ -268,7 +269,7 @@ describe("RedisCachedFoldStore", () => {
       });
 
       it("does not re-read the cache to re-merge, even on a retry", async () => {
-        const redis = createRedis();
+        const redis = createCache();
         const { store } = createStore(redis);
 
         // The executor has already merged the retry's set into the context; the
@@ -279,15 +280,15 @@ describe("RedisCachedFoldStore", () => {
           { ...CONTEXT, appliedEventIds: ["e1", "e2"], deliveryAttempt: 2 },
         );
 
-        expect(redis.get).not.toHaveBeenCalled();
-        expect(redis.set).toHaveBeenCalledTimes(1);
+        expect(redis.read).not.toHaveBeenCalled();
+        expect(redis.write).toHaveBeenCalledTimes(1);
 
         const cached = await store.getWithApplied("agg-1", CONTEXT);
         expect(cached?.appliedEventIds).toEqual(["e1", "e2"]);
       });
 
       it("records an empty set when the context carries none", async () => {
-        const redis = createRedis();
+        const redis = createCache();
         const { store } = createStore(redis);
 
         // The replay path stores without stamping a set; absent is persisted as
@@ -303,7 +304,7 @@ describe("RedisCachedFoldStore", () => {
   describe("given an entry written before durability gating", () => {
     describe("when the fold reads state", () => {
       it("still returns the state, carrying no applied events", async () => {
-        const redis = createRedis();
+        const redis = createCache();
         const { store } = createStore(redis);
         redis.values.set(CACHE_KEY, {
           value: JSON.stringify({ count: 9, UpdatedAt: 300 }),
@@ -326,7 +327,7 @@ describe("RedisCachedFoldStore", () => {
       // was idle or blind.
       const before = await dedupUnavailableCount("cache_miss");
 
-      const redis = createRedis();
+      const redis = createCache();
       const { store } = createStore(redis);
       const result = await store.getWithApplied("agg-1", {
         ...CONTEXT,
@@ -340,7 +341,7 @@ describe("RedisCachedFoldStore", () => {
     it("does not count a fresh delivery, where a miss is unremarkable", async () => {
       const before = await dedupUnavailableCount("cache_miss");
 
-      const redis = createRedis();
+      const redis = createCache();
       const { store } = createStore(redis);
       await store.getWithApplied("agg-1", { ...CONTEXT, deliveryAttempt: 1 });
 
@@ -354,7 +355,7 @@ describe("RedisCachedFoldStore", () => {
       it("returns the durable set and does not count dedup unavailable", async () => {
         const before = await dedupUnavailableCount("cache_miss");
 
-        const redis = createRedis();
+        const redis = createCache();
         const inner = createDurableInnerStore({ appliedEventIds: ["e1", "e2"] });
         const { store } = createStore(redis, inner);
 
@@ -375,7 +376,7 @@ describe("RedisCachedFoldStore", () => {
       it("still counts dedup unavailable, preserving the blind-reapply signal", async () => {
         const before = await dedupUnavailableCount("cache_miss");
 
-        const redis = createRedis();
+        const redis = createCache();
         const inner = createDurableInnerStore({ appliedEventIds: [] });
         const { store } = createStore(redis, inner);
 
@@ -410,16 +411,16 @@ describe("RedisCachedFoldStore", () => {
       else process.env[ENV] = original;
     });
 
-    async function freshStore(redis: ReturnType<typeof createRedis>) {
-      const { RedisCachedFoldStore: Fresh } = await import(
-        "../redisCachedFoldStore"
+    async function freshStore(redis: ReturnType<typeof createCache>) {
+      const { CachedFoldStore: Fresh } = await import(
+        "../cachedFoldStore"
       );
-      return new Fresh<TestState>(createInnerStore().store, redis as never, {
+      return new Fresh<TestState>(createInnerStore().store, redis.client, {
         keyPrefix: "test_table",
       });
     }
 
-    async function ttlWrittenBy(redis: ReturnType<typeof createRedis>) {
+    async function ttlWrittenBy(redis: ReturnType<typeof createCache>) {
       const store = await freshStore(redis);
       await store.store({ count: 1, UpdatedAt: 1 }, CONTEXT);
       return redis.values.get(CACHE_KEY)?.ttlSeconds;
@@ -428,7 +429,7 @@ describe("RedisCachedFoldStore", () => {
     describe("when the override is below the replication-lag floor", () => {
       it("clamps the effective TTL up to the floor and warns", async () => {
         process.env[ENV] = "60";
-        const redis = createRedis();
+        const redis = createCache();
 
         // The write lands at the floor, not the configured 60 — the clamp acted.
         expect(await ttlWrittenBy(redis)).toBe(300);
@@ -437,14 +438,14 @@ describe("RedisCachedFoldStore", () => {
 
       it("warns only once even when several stores resolve a clamped TTL", async () => {
         process.env[ENV] = "30";
-        const { RedisCachedFoldStore: Fresh } = await import(
-          "../redisCachedFoldStore"
+        const { CachedFoldStore: Fresh } = await import(
+          "../cachedFoldStore"
         );
 
-        new Fresh<TestState>(createInnerStore().store, createRedis() as never, {
+        new Fresh<TestState>(createInnerStore().store, createCache().client, {
           keyPrefix: "test_table",
         });
-        new Fresh<TestState>(createInnerStore().store, createRedis() as never, {
+        new Fresh<TestState>(createInnerStore().store, createCache().client, {
           keyPrefix: "test_table",
         });
 
@@ -455,7 +456,7 @@ describe("RedisCachedFoldStore", () => {
     describe("when the override is above the floor", () => {
       it("honours the configured value and does not warn", async () => {
         process.env[ENV] = "600";
-        const redis = createRedis();
+        const redis = createCache();
 
         // Above the floor is passed through untouched — the override is respected.
         expect(await ttlWrittenBy(redis)).toBe(600);
@@ -466,7 +467,7 @@ describe("RedisCachedFoldStore", () => {
     describe("when the override is unset", () => {
       it("falls back to the default without warning", async () => {
         delete process.env[ENV];
-        const redis = createRedis();
+        const redis = createCache();
 
         expect(await ttlWrittenBy(redis)).toBe(300);
         expect(warnSpy).not.toHaveBeenCalled();

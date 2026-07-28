@@ -13,16 +13,15 @@
  *      Span-count-scaling collections (events[], span costs, scenario role
  *      maps) are deliberately NOT accumulated; they are derived from
  *      stored_spans at read time.
- *   3. `RedisCachedFoldStore` + `encodeFoldCacheEntry` — writes the entry at
+ *   3. `CachedFoldStore` + `encodeFoldCacheEntry` — writes the entry at
  *      `fold:<prefix>:<tenantId>:<traceId>`.
  *
- * Only boundaries are doubled: Redis (a string GET/SET map — the whole of the
- * store's Redis surface) and the durable ClickHouse fold store. Every module
+ * Only boundaries are doubled: the cache tier (the real InMemoryFoldCacheClient)
+ * and the durable ClickHouse fold store. Every module
  * whose behaviour the scenario describes is the real one, so a regression in
  * any of the three turns this red.
  */
 
-import type { Redis } from "ioredis";
 import { describe, expect, it } from "vitest";
 import {
   IO_PREVIEW_BYTES,
@@ -38,7 +37,8 @@ import {
 import { TraceSummaryFoldProjection } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.foldProjection";
 import type { SpanReceivedEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
 import type { FoldProjectionStore } from "../../foldProjection.types";
-import { RedisCachedFoldStore } from "../../redisCachedFoldStore";
+import { CachedFoldStore } from "../../cachedFoldStore";
+import { InMemoryFoldCacheClient } from "../foldCacheClient";
 import { decodeFoldCacheEntry } from "../foldCacheEntry";
 
 const TENANT_ID = createTenantId("tenant-fold-lean");
@@ -123,21 +123,6 @@ function makeSpanReceivedEvent({
   };
 }
 
-/** In-memory stand-in for the only Redis surface the store uses: GET / SET. */
-function createRedisDouble(): { redis: Redis; entries: Map<string, string> } {
-  const entries = new Map<string, string>();
-  const redis = {
-    async get(key: string) {
-      return entries.get(key) ?? null;
-    },
-    async set(key: string, value: string) {
-      entries.set(key, value);
-      return "OK";
-    },
-  } as unknown as Redis;
-  return { redis, entries };
-}
-
 describe("given a trace whose span carries a 1 MB output value", () => {
   describe("when all spans of the trace are folded into the trace summary", () => {
     /** @scenario Folding a trace with a 1 MB output keeps the Redis cache entry lean */
@@ -177,12 +162,10 @@ describe("given a trace whose span carries a 1 MB output value", () => {
           return null;
         },
       };
-      const { redis, entries } = createRedisDouble();
-      const store = new RedisCachedFoldStore<TraceSummaryData>(
-        durable,
-        redis,
-        { keyPrefix: KEY_PREFIX },
-      );
+      const cache = new InMemoryFoldCacheClient();
+      const store = new CachedFoldStore<TraceSummaryData>(durable, cache, {
+        keyPrefix: KEY_PREFIX,
+      });
       const projection = new TraceSummaryFoldProjection({ store: durable });
 
       let state = projection.init();
@@ -198,7 +181,7 @@ describe("given a trace whose span carries a 1 MB output value", () => {
       });
 
       const key = `fold:${KEY_PREFIX}:${String(TENANT_ID)}:${TRACE_ID}`;
-      const raw = entries.get(key);
+      const raw = cache.entries.get(key)?.value;
       expect(raw).toBeDefined();
       const cached = decodeFoldCacheEntry<TraceSummaryData>(raw!).state;
 
