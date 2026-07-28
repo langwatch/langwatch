@@ -161,12 +161,33 @@ describeHelm("Helm ServiceAccount surface for cloud identity", () => {
      * Contributor on the account for no functional gain.
      */
     it("never binds the storage identity to cron pods", () => {
+      // workloadIdentity, not the sharedKey default: under sharedKey no label
+      // is emitted anywhere, so asserting its absence on cron would prove
+      // nothing at all.
       const out = render([
+        "--set", "app.dataplane.enabled=true",
+        "--set", "app.dataplane.provider=azureBlob",
+        "--set", "app.dataplane.providers.azureBlob.authMode=workloadIdentity",
+        "--set", "app.dataplane.providers.azureBlob.accountName.value=acct",
+        "--set", "app.dataplane.providers.azureBlob.container.value=cont",
+        "--set", "app.storedObjects.localFilesystem.enabled=false",
         ...ALL_WORKLOADS,
         "--set", "global.serviceAccount.create=true",
       ]);
 
-      const cronSection = out.slice(out.indexOf("kind: CronJob"));
+      // The label must exist SOMEWHERE, or the negative assertions below are
+      // vacuous — and it must be on exactly the two storage consumers.
+      expect(
+        out.match(/^\s*azure\.workload\.identity\/use: "true"$/gm) ?? [],
+      ).toHaveLength(2);
+
+      // Locate the CronJob document explicitly. `indexOf` returning -1 with a
+      // bare slice would hand the assertions the final character of the
+      // manifest, which trivially contains neither string.
+      const cronIndex = out.indexOf("kind: CronJob");
+      expect(cronIndex).toBeGreaterThan(-1);
+      const cronSection = out.slice(cronIndex);
+
       expect(cronSection).not.toContain("serviceAccountName: t\n");
       expect(cronSection).not.toContain("azure.workload.identity/use");
     });
