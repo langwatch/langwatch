@@ -3,10 +3,35 @@
 - Status: proposed
 - Date: 2026-07-28
 - Supersedes: ADR-026 (reactor `shouldReact` predicate)
-- Builds on: ADR-052 (automations on the process-manager substrate), ADR-072,
+- Completes: ADR-052's deferred scope — *"`withReactor` remains available for
+  the unrelated plain reactors. Migrating those reactors, scenario execution,
+  Langy, topic clustering, caches, and observability are outside this
+  decision."*
+- Builds on: ADR-030 (best-effort vs stake-sensitive), ADR-035 (persist-class
+  debounce), ADR-052 (automations on the process-manager substrate), ADR-072,
   ADR-073
 
 ## Context
+
+**This decision finishes something already begun, rather than opening it.**
+ADR-030 drew the line in May 2026: reactors are acceptable for *best-effort*
+work (it names "UI broadcasts, fold sync, cache invalidations") and
+unacceptable for *stake-sensitive* work, "where a missed dispatch is either a
+customer-trust violation or data loss". It observed that the framework "makes
+no distinction between these two reactor classes" and that the default is
+"best-effort with silent failure, which is the wrong default for half the
+reactors we run."
+
+ADR-030 then built `.withOutbox` for the stake-sensitive half. ADR-035
+extended it so persist-class trigger actions rode the same staged path. ADR-052
+replaced that machinery with the process-manager substrate, deleted
+`.withOutbox`, moved the automation reactors to subscribers — and explicitly
+left the rest for later, in the sentence quoted above.
+
+This ADR is that "later". What it adds to ADR-030's split is the observation
+that best-effort versus stake-sensitive is not the only axis: some reactors
+write *derived state* rather than dispatching *work*, and for those the
+question is not retry but reproducibility.
 
 There are three ways to do work after an event today. Two of them are
 deliberate — an **event subscriber** (event-only, carried through GroupQueue,
@@ -45,12 +70,16 @@ a page nobody opened:
   spend the gateway never learns about, against a budget whose purpose is to
   stop spend.
 - **`governanceOcsfEventsSync`** writes the OCSF audit event stream
-  (`governanceOcsfEventsRepository.insertEvent`). Meanwhile
-  `specs/ai-gateway/governance/event-log-durability.feature` tells auditors that
-  "folds and read projections are derived from those events; the source of truth
-  is the event log". For this stream that is not true — it is derived by a
-  handler replay does not run, so it cannot be rebuilt from the event log it
-  claims to derive from.
+  (`governanceOcsfEventsRepository.insertEvent`). Two compliance specs asserted
+  the opposite of this: `folds.feature` called both governance streams "fold
+  projections … rebuildable at any time from the append-only event_log", and
+  `event-log-durability.feature` carried a `Rule: folds and reads are
+  rebuildable from event_log`. **No fold projection exists for either stream** —
+  there is a reactor and a repository. Every scenario in `folds.feature` was
+  also untagged, so none of it was enforced and the discrepancy went unnoticed.
+  Both files are corrected as part of this change: the rebuild scenarios are
+  retained and marked `@unimplemented`, because they are precisely the contract
+  Class C has to satisfy, and an auditor has already been told they hold.
 - **`billingMeterDispatch`** dispatches billing meter reads.
 
 Beyond correctness, reactors have grown private reimplementations of what the
@@ -62,15 +91,25 @@ a process manager, hand-rolled, with its timer living wherever the queue happens
 to keep it.
 
 Three substrates for one concern also means three places to fix anything: three
-retry stories, three dedup stories, three observability stories. The precedent
-for collapsing them already exists in-repo — `_originGuardedReactor.ts` and
-`_originGuardedSubscriber.ts` sit side by side today, single-sourcing their
-shared guard, because the same logic already had to be expressed both ways.
+retry stories, three dedup stories, three observability stories.
+
+None of this is speculative. ADR-052 already carried out the same conversion
+for automations: the `alertTrigger` / `evaluationAlertTrigger` reactors ADR-030
+was written about are now `traceAlertTriggerMatch.subscriber.ts` and
+`evaluationAlertTriggerMatch.subscriber.ts`. `_originGuardedReactor.ts` and
+`_originGuardedSubscriber.ts` still sit side by side, single-sourcing their
+shared guard, because during that migration the same logic had to be expressed
+both ways. What remains is the set ADR-052 listed and postponed.
 
 See the behavioural contracts this decision supports:
-[`specs/event-sourcing/post-event-work.feature`](../../../specs/event-sourcing/post-event-work.feature),
-[`specs/ai-gateway/governance/derived-governance-streams.feature`](../../../specs/ai-gateway/governance/derived-governance-streams.feature),
-[`specs/ai-gateway/budget-debit-durability.feature`](../../../specs/ai-gateway/budget-debit-durability.feature),
+[`specs/event-sourcing/post-event-work.feature`](../../../specs/event-sourcing/post-event-work.feature)
+(the substrate contract),
+[`specs/ai-gateway/governance/folds.feature`](../../../specs/ai-gateway/governance/folds.feature)
+and
+[`event-log-durability.feature`](../../../specs/ai-gateway/governance/event-log-durability.feature)
+(Class C's rebuild contract — both corrected in this change, see below),
+[`specs/ai-gateway/budgets.feature`](../../../specs/ai-gateway/budgets.feature)
+("spend must survive the thing that recorded it"), and
 [`specs/monitors/evaluation-dispatch-durability.feature`](../../../specs/monitors/evaluation-dispatch-durability.feature).
 
 ## Decision
@@ -178,19 +217,34 @@ both of which already exist.
   rather than a decision.
 - Projection conversion in Class C changes *when* rows appear: a projection is
   rebuilt on replay, so a replay over a governance window will re-derive the
-  OCSF and KPI streams. The repositories must therefore be idempotent on
-  `(tenantId, eventId)`, which is a precondition of the conversion rather than a
-  consequence of it.
+  OCSF and KPI streams. Each repository must therefore be idempotent on its own
+  natural event key **before** conversion — this is a precondition, not a
+  consequence. The keys already exist and differ per stream, so no new one is
+  invented here: the budget ledger collapses on
+  `(TenantId, BudgetId, GatewayRequestId)` via `ReplacingMergeTree`
+  (`specs/ai-gateway/budgets.feature`), and OCSF rows carry the span id or
+  log-record id as `event_id` (`folds.feature`). `governance_kpis` is the one
+  that needs work: it is an incrementing aggregate per
+  `(org, source, hour_bucket)`, so re-deriving it means recomputing the bucket
+  rather than re-applying a delta.
 
 ## References
 
 - [`specs/event-sourcing/post-event-work.feature`](../../../specs/event-sourcing/post-event-work.feature)
-- [`specs/ai-gateway/governance/derived-governance-streams.feature`](../../../specs/ai-gateway/governance/derived-governance-streams.feature)
-- [`specs/ai-gateway/budget-debit-durability.feature`](../../../specs/ai-gateway/budget-debit-durability.feature)
+- [`specs/ai-gateway/governance/folds.feature`](../../../specs/ai-gateway/governance/folds.feature)
+- [`specs/ai-gateway/governance/event-log-durability.feature`](../../../specs/ai-gateway/governance/event-log-durability.feature)
+- [`specs/ai-gateway/budgets.feature`](../../../specs/ai-gateway/budgets.feature)
 - [`specs/monitors/evaluation-dispatch-durability.feature`](../../../specs/monitors/evaluation-dispatch-durability.feature)
 - ADR-026 (reactor `shouldReact` predicate) — superseded
+- ADR-030 (transactional outbox for stake-sensitive reactor dispatch) — where
+  best-effort vs stake-sensitive was first drawn
+- ADR-035 (persist-class actions ride the settle stage) — the precedent for
+  moving a reactor's dispatch onto a durable staged path
+- ADR-049 (Langy projection-independent reactions) — the same move, made first
+  for one pipeline: reactions stop receiving a captured read projection as if it
+  were durable process state
 - ADR-052 (automations on the process-manager substrate) — the inbox/outbox
-  precedent
+  precedent, and the decision that deferred this one
 - ADR-072 (run aggregates are queries, not pipelines) — the `suite_runs` failure
 - ADR-073 (run execution on the process-manager substrate) — Class D's
   `scenarioExecution` is its step 2
