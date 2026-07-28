@@ -60,3 +60,21 @@ Feature: Coding-agent sessions
   Scenario: Cowork telemetry that shares Claude Code's event vocabulary is still Cowork
     When a session's events carry Claude Code's event names but declare the Cowork service
     Then the session is identified as Cowork, not Claude Code
+
+  Scenario: a session whose earliest signal arrives late is listed once, up to date
+    Given a session whose first telemetry to arrive was not its earliest
+    When the earlier signal arrives and moves the session's start time
+    And the project's sessions are listed for a period the session started before
+    Then the session appears once
+    And it shows its latest totals rather than the ones it had before that signal
+
+  Scenario: a late signal does not shorten how long a session is kept
+    Given a session near the end of the project's retention period
+    When a signal arrives reporting an earlier start than the session had
+    Then the session is still available for the rest of its retention period
+
+  Scenario: the most complete version of a session is the one that is read
+    Given two stored versions of one session that cannot be told apart by update time
+    When the session is read
+    Then the version that folded the most telemetry is returned
+    And reading it again returns that same version
