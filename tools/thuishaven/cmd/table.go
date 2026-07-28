@@ -197,11 +197,14 @@ var table = []commandSpec{
 			{long: "--rebuild", summary: "rebuild container images even when unchanged"},
 		},
 		run: func(ctx context.Context, d deps, inv invocation) error {
+			if err := rejectRemovedSelectionEnv(); err != nil {
+				return err
+			}
 			sel, err := d.orch.ResolveSelection(d.worktree, inv.args)
 			if err != nil {
 				return err
 			}
-			d.opts.Selection = applyLegacySelectionEnv(sel, &d.opts)
+			d.opts.Selection = sel
 			if inv.has("--watch") {
 				d.opts.ShouldGoWatch = true
 			}

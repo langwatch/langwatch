@@ -745,7 +745,7 @@ func (o *Orchestrator) PlayLaunch(ctx context.Context, number int, checkout, lwD
 	if err := o.sup.RunOnce(ctx, "seed", lwDir, seedShell("pnpm -s run prisma:seed", env), env); err != nil {
 		o.log.Warn("play seed failed (continuing)")
 	}
-	opts := PlanOptions{Selection: sel, ShouldStartWorkers: true, RepoRoot: checkout}
+	opts := PlanOptions{Selection: sel, RepoRoot: checkout}
 	o.sup.Supervise(ctx, o.planChildren(st, opts, lwDir, ""))
 	return nil
 }

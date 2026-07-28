@@ -72,7 +72,7 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, lwDir, la
 	// `workers` lane below — one Node process instead of two, saving its RAM.
 	// `haven up +workers` selects the standalone lane instead.
 	apiEnv := nodeEnv()
-	if opts.ShouldStartWorkers && !opts.Selection.Workers {
+	if !opts.Selection.Workers {
 		apiEnv = append(apiEnv, "WORKERS_IN_PROCESS=1")
 	}
 	out = append(out, Child{
@@ -99,7 +99,7 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, lwDir, la
 		langy.LogPath = logPath("langyagent")
 		out = append(out, langy)
 	}
-	if opts.ShouldStartWorkers && opts.Selection.Workers {
+	if opts.Selection.Workers {
 		out = append(out, Child{
 			// green, not red: workers are a healthy background lane, and a red
 			// prefix reads as an error even on ordinary info logs. Red (palette[5])

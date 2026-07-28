@@ -119,7 +119,9 @@ virtual-key traffic, fans out to providers via Bifrost, and reports usage back t
 the control plane. `pnpm dev` auto-starts it alongside vite + api when the Go
 toolchain is on PATH; the process appears as `gateway` in the concurrent output
 and reuses an existing listener on :5563 if another worktree already booted one.
-Set `LANGWATCH_SKIP_AIGATEWAY=1` to opt out (e.g. TS-only contributors). To run
+Set `LANGWATCH_SKIP_AIGATEWAY=1` to opt out (e.g. TS-only contributors) — that
+variable is for plain `pnpm dev`; under haven the equivalent is `haven up
+-gateway`, which sticks (`haven up` refuses the variable and says so). To run
 the gateway standalone:
 
 ```bash
@@ -143,7 +145,9 @@ is on PATH; the process appears as `nlpgo` in the concurrent output. It binds th
 port the app dials via `LANGWATCH_NLP_SERVICE` (default `:5561`, otherwise PORT+1)
 and reuses an existing listener if another worktree already booted one. When
 `LANGWATCH_NLP_SERVICE` points at an external host, no local engine is started.
-Set `LANGWATCH_SKIP_NLP=1` to opt out. To run it standalone:
+Set `LANGWATCH_SKIP_NLP=1` to opt out — that variable is for plain `pnpm dev`;
+under haven the equivalent is `haven up -nlp`, which sticks (`haven up` refuses
+the variable and says so). To run it standalone:
 
 ```bash
 make service svc=nlpgo       # run once

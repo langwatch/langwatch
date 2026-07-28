@@ -1,6 +1,13 @@
+@unit
 Feature: haven service selection
   Which services a worktree runs is a sticky, visible, per-worktree choice
   expressed as deltas on up — not an env-var incantation. See ADR-064.
+
+  # Bound by Go tests in tools/thuishaven (`go test ./...`): domain/selection_test.go
+  # (defaults, deltas, the status line), app/restart_test.go (reconcile, recovery,
+  # per-worktree stickiness), app/plan_test.go (the workers lane), and
+  # cmd/root_test.go (the removed env vars). The parity checker binds them by the
+  # `// @scenario` annotations above each test func.
 
   Background:
     Given a worktree with a registered haven stack
@@ -51,7 +58,14 @@ Feature: haven service selection
     Then the workers run as their own lane instead of in-process
     And the choice sticks like any other selection
 
-  Scenario: Legacy selection env vars bridge for one release
-    When the developer runs "LANGWATCH_SKIP_NLP=1 haven up"
-    Then nlp is skipped for this run only
-    And a warning prints the sticky equivalent "haven up -nlp"
+  Scenario: Removed selection env vars name their replacement
+    Given the developer still has "LANGWATCH_SKIP_NLP=1" set from before
+    When they run "haven up"
+    Then the command fails instead of starting a stack
+    And the error says the variable no longer selects services
+    And it names the one command that replaces it, "haven up -nlp"
+
+  Scenario: A variable haven never read as a selection does not block a stack
+    Given the developer sets "WORKERS_IN_PROCESS=1", which asks plain "pnpm dev" for a single process
+    When they run "haven up"
+    Then the stack starts normally

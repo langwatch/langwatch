@@ -106,7 +106,7 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 		// Mirror planChildren: a separate `workers` lane exists only when workers
 		// are requested AND not hosted in-process. Persist it so restart targets
 		// the workers' own group rather than the API's when they share a process.
-		HasStandaloneWorkers: opts.ShouldStartWorkers && opts.Selection.Workers,
+		HasStandaloneWorkers: opts.Selection.Workers,
 		LangyTier:            opts.LangyTier,
 		LangyImage:           opts.langyImageTag,
 	}
@@ -340,8 +340,7 @@ func (o *Orchestrator) prepareLangyContainer(ctx context.Context, repoRoot, imag
 func (o *Orchestrator) UpStub(ctx context.Context, p UpParams, echo func(ports []int)) error {
 	o.ensureDaemon(p.WorktreeDir)
 	st, cleanup, err := o.provision(ctx, p, PlanOptions{
-		Selection:          domain.Selection{Gateway: true, NLP: true, Langy: true},
-		ShouldStartWorkers: true,
+		Selection: domain.Selection{Gateway: true, NLP: true, Langy: true},
 	}, false)
 	if err != nil {
 		return err

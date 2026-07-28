@@ -187,7 +187,7 @@ func TestUpReconcilesRunningStack(t *testing.T) {
 	t.Run("given the stack is live and matches the selection", func(t *testing.T) {
 		t.Run("when up runs, it is a friendly no-op — nothing terminated, nothing provisioned", func(t *testing.T) {
 			store, sys, o := newFixture(true)
-			opts := PlanOptions{Selection: domain.SelectionFromStack(store.stacks[0]), ShouldStartWorkers: true}
+			opts := PlanOptions{Selection: domain.SelectionFromStack(store.stacks[0])}
 			proceed, err := o.reconcileRunningStack(params, opts)
 			if err != nil {
 				t.Fatalf("reconcile: %v", err)
@@ -206,7 +206,7 @@ func TestUpReconcilesRunningStack(t *testing.T) {
 			store, sys, o := newFixture(true)
 			desired := domain.SelectionFromStack(store.stacks[0])
 			desired.Langy = !desired.Langy
-			proceed, err := o.reconcileRunningStack(params, PlanOptions{Selection: desired, ShouldStartWorkers: true})
+			proceed, err := o.reconcileRunningStack(params, PlanOptions{Selection: desired})
 			if err != nil {
 				t.Fatalf("reconcile: %v", err)
 			}
@@ -222,7 +222,7 @@ func TestUpReconcilesRunningStack(t *testing.T) {
 	t.Run("given a matching live stack and -f", func(t *testing.T) {
 		t.Run("when up runs with force, the stack is replaced anyway", func(t *testing.T) {
 			store, sys, o := newFixture(true)
-			opts := PlanOptions{Selection: domain.SelectionFromStack(store.stacks[0]), ShouldStartWorkers: true, ShouldForce: true}
+			opts := PlanOptions{Selection: domain.SelectionFromStack(store.stacks[0]), ShouldForce: true}
 			proceed, err := o.reconcileRunningStack(params, opts)
 			if err != nil {
 				t.Fatalf("reconcile: %v", err)
@@ -239,7 +239,7 @@ func TestUpReconcilesRunningStack(t *testing.T) {
 	t.Run("given the registered stack's launcher already exited", func(t *testing.T) {
 		t.Run("when up runs, the stale entry is cleaned and provisioning proceeds", func(t *testing.T) {
 			store, sys, o := newFixture(false)
-			proceed, err := o.reconcileRunningStack(params, PlanOptions{ShouldStartWorkers: true})
+			proceed, err := o.reconcileRunningStack(params, PlanOptions{})
 			if err != nil {
 				t.Fatalf("a dead launcher must not block up: %v", err)
 			}
@@ -385,6 +385,48 @@ func TestPruneIdleDatabases(t *testing.T) {
 			if len(ch.dropped) != 0 || len(pg.dropped) != 0 {
 				t.Errorf("TTL 0 disables pruning, got ch=%v pg=%v", ch.dropped, pg.dropped)
 			}
+		})
+	})
+}
+
+// Selection is keyed by worktree directory, so two checkouts of the same repo
+// never inherit each other's choice — the whole point of making it sticky
+// rather than an env var the shell carries between them.
+//
+// @scenario "Selection is per-worktree"
+func TestSelectionIsPerWorktree(t *testing.T) {
+	store := &fakeStore{}
+	o := restartOrch(store, &fakeSystem{})
+
+	t.Run("given one worktree has added langy", func(t *testing.T) {
+		if _, err := o.ResolveSelection("/wt/a", []string{"+langy"}); err != nil {
+			t.Fatalf("ResolveSelection(/wt/a): %v", err)
+		}
+
+		t.Run("when a second worktree resolves its own selection", func(t *testing.T) {
+			other, err := o.ResolveSelection("/wt/b", nil)
+			if err != nil {
+				t.Fatalf("ResolveSelection(/wt/b): %v", err)
+			}
+
+			t.Run("it starts from the lean default, not the neighbour's choice", func(t *testing.T) {
+				if other.Langy {
+					t.Error("/wt/b inherited langy from /wt/a")
+				}
+			})
+		})
+
+		t.Run("when the first worktree resolves again with no deltas", func(t *testing.T) {
+			again, err := o.ResolveSelection("/wt/a", nil)
+			if err != nil {
+				t.Fatalf("ResolveSelection(/wt/a): %v", err)
+			}
+
+			t.Run("its own choice stuck", func(t *testing.T) {
+				if !again.Langy {
+					t.Error("/wt/a lost the langy it selected")
+				}
+			})
 		})
 	})
 }

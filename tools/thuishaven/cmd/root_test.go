@@ -7,8 +7,6 @@ import (
 	"regexp"
 	"strings"
 	"testing"
-
-	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
 func TestStripFlag(t *testing.T) {
@@ -258,22 +256,53 @@ func TestProcessOnlyKnobsAreDocumented(t *testing.T) {
 		}
 	}
 }
-// @scenario "Legacy selection env vars bridge for one release"
-func TestApplyLegacySelectionEnvIsOneShot(t *testing.T) {
-	t.Setenv("LANGWATCH_SKIP_NLP", "1")
-	t.Setenv("WORKERS_IN_PROCESS", "0")
-	opts := optionsFromEnv(t.TempDir())
-	sel := applyLegacySelectionEnv(domainDefaultSelection(), &opts)
-	if sel.NLP {
-		t.Error("LANGWATCH_SKIP_NLP=1 must skip nlp for this run")
-	}
-	if !sel.Workers {
-		t.Error("WORKERS_IN_PROCESS=0 must select the standalone workers lane for this run")
-	}
-	if !opts.ShouldStartWorkers {
-		t.Error("workers themselves stay on")
-	}
+
+// The selection env vars are gone, not quietly ignored: a stale export would
+// otherwise start services the developer believes they turned off, and `haven
+// status` would report a selection the env had overridden behind its back.
+//
+// @scenario "Removed selection env vars name their replacement"
+func TestRejectRemovedSelectionEnv(t *testing.T) {
+	t.Run("given a removed selection variable set to the value that used to apply", func(t *testing.T) {
+		for _, tc := range []struct{ name, value, wantHint string }{
+			{"LANGWATCH_SKIP_NLP", "1", "haven up -nlp"},
+			{"LANGWATCH_SKIP_AIGATEWAY", "1", "haven up -gateway"},
+			{"LANGWATCH_SKIP_LANGYAGENT", "1", "haven up -langy"},
+			{"WORKERS_IN_PROCESS", "0", "haven up +workers"},
+			{"START_WORKERS", "false", "haven up +workers"},
+		} {
+			t.Run("when up runs with "+tc.name, func(t *testing.T) {
+				t.Run("fails naming the sticky replacement", func(t *testing.T) {
+					t.Setenv(tc.name, tc.value)
+					err := rejectRemovedSelectionEnv()
+					if err == nil {
+						t.Fatalf("%s=%s was accepted; it no longer selects services", tc.name, tc.value)
+					}
+					if !strings.Contains(err.Error(), tc.wantHint) {
+						t.Errorf("error %q does not point at %q", err, tc.wantHint)
+					}
+				})
+			})
+		}
+	})
+
 }
 
-// domainDefaultSelection keeps the domain import local to the tests that need it.
-func domainDefaultSelection() domain.Selection { return domain.DefaultSelection() }
+// WORKERS_IN_PROCESS=1 is still how plain `pnpm dev` asks for a single process
+// outside haven, and it is what haven itself passes to the app child. Only the
+// values that used to steer haven's own selection are refused, so a checkout
+// carrying it can still start a stack.
+//
+// @scenario "A variable haven never read as a selection does not block a stack"
+func TestWorkersInProcessOneDoesNotBlockUp(t *testing.T) {
+	t.Run("given WORKERS_IN_PROCESS=1", func(t *testing.T) {
+		t.Run("when up runs", func(t *testing.T) {
+			t.Run("starts normally", func(t *testing.T) {
+				t.Setenv("WORKERS_IN_PROCESS", "1")
+				if err := rejectRemovedSelectionEnv(); err != nil {
+					t.Errorf("WORKERS_IN_PROCESS=1 must not block up: %v", err)
+				}
+			})
+		})
+	})
+}

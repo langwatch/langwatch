@@ -59,9 +59,6 @@ ENVIRONMENT
                                  worktree directory name, cached).
     LANGWATCH_LOCAL_TLD=test     Use a different TLD (default: localhost).
     LANGWATCH_GO_WATCH=1         Hot-reload the Go services via air (else go run).
-    LANGWATCH_SKIP_NLP=1         DEPRECATED (this run only) — use haven up -nlp.
-    LANGWATCH_SKIP_AIGATEWAY=1   DEPRECATED (this run only) — use haven up -gateway.
-    LANGWATCH_SKIP_LANGYAGENT=1  DEPRECATED (this run only) — use haven up -langy.
     HAVEN_BASELINE=1             Mark this stack as the shared default others fall
                                  back to for services they don't run themselves.
     HAVEN_TYPECHECK_SLOTS=N      Cap concurrent "haven typecheck" runs (default:
@@ -69,8 +66,6 @@ ENVIRONMENT
     HAVEN_TYPECHECK_MAX_RSS_MB   Kill a typecheck run over this RSS (default 6144
                                  = 6 GiB) or over 10 minutes wall-clock — a
                                  runaway tsgo shouldn't sit on a slot forever.
-    START_WORKERS=false          DEPRECATED (this run only) — no worker stack at all.
-    WORKERS_IN_PROCESS=0         DEPRECATED (this run only) — use haven up +workers.
     LANGWATCH_SEED=1             Seed the DB during up.
     HAVEN_IDLE_TTL=4h            Reap a stack whose heartbeat is older than this.
     HAVEN_DB_TTL=336h            Background-prune databases whose worktree has not

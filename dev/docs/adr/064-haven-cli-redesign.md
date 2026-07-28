@@ -168,9 +168,18 @@ follow-up optimisation.
 it say `+langy` once. The first `up` prints the selection and how to change
 it, so the lean default is discoverable rather than mysterious.
 
-The legacy selection env vars (`LANGWATCH_SKIP_*`, `START_WORKERS`,
-`WORKERS_IN_PROCESS`) are honoured for one release as *one-shot, non-sticky*
-overrides that print the sticky equivalent, then removed. Repo scripts
+The old selection env vars (`LANGWATCH_SKIP_*`, `START_WORKERS`,
+`WORKERS_IN_PROCESS=0`) are removed outright rather than bridged. A bridge is
+worse than either alternative here: honouring an env var makes `status` lie
+about the stack it just started, and ignoring one silently runs services the
+developer believes they turned off. So `up` refuses them and names the one
+command that replaces each — the same treatment removed command spellings get,
+and a one-time fix because the replacement is sticky. Only the values that used
+to change what ran are refused: `WORKERS_IN_PROCESS=1` is still how plain
+`pnpm dev` asks for a single process, and haven itself passes it to the app
+child, so it must not block a stack. `START_WORKERS=false` has no replacement —
+the worker stack is part of the app now, and `+workers` only moves it into its
+own lane. Repo scripts
 (`pnpm dev:haven`, `pnpm dev:workers:haven`) are rewritten to the new flags in
 the same change. Machine-level opt-outs of haven managing a shared server
 (`LANGWATCH_HAVEN_CH=0` and friends) are rare, deliberate, and stay env vars.
@@ -258,7 +267,7 @@ combined `all` stream and the per-service log groups follow it.
 | `pr --trusted` / `--allow-scripts`, `pr --force` | `--allow-scripts` only; `--allow-closed` |
 | `hmr pause` / `resume` | `hmr on` / `off` only |
 | `git --list` vs `switch --list` divergence | `--json` on `git`; `switch --list` stays (completion) |
-| selection env vars | sticky `up +svc` / `-svc` (one-release warning bridge) |
+| selection env vars | sticky `up +svc` / `-svc` (the env vars are refused, naming their replacement) |
 | `HAVEN_LANGY_REBUILD` | content-hashed images + `--rebuild` |
 
 ### haven play: an ephemeral PR sandbox

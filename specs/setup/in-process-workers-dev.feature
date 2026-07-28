@@ -9,7 +9,8 @@ Feature: In-process workers for local development
   # thing. Under haven (`pnpm dev:haven`) the default is INVERTED — single
   # process — because a laptop juggling several worktrees can't afford a second
   # Node process per stack; opt back out with `haven up +workers` (sticky,
-  # ADR-064; WORKERS_IN_PROCESS=0 bridges for one release). Production is
+  # ADR-064 — haven no longer reads WORKERS_IN_PROCESS=0 as a selection, it
+  # refuses it and names `+workers`). Production is
   # untouched — it always runs web and worker as separate deployments
   # (charts/langwatch/templates/{app,workers}) and never honours the flag.
   #

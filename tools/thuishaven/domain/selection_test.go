@@ -73,10 +73,20 @@ func TestSelectionFromStack(t *testing.T) {
 	}
 }
 
+// Describe is the line `haven status` prints for the current worktree, so an
+// unselected service has to carry the exact command that adds it — the report is
+// the only place the selection is discoverable.
+//
+// @scenario "Status shows the selection"
 func TestDescribeNamesTheDeltas(t *testing.T) {
 	got := DefaultSelection().Describe()
 	if !strings.Contains(got, "workers (in-process)") {
 		t.Errorf("Describe() = %q, want the in-process workers note", got)
+	}
+	for _, on := range []string{"app", "gateway", "nlp"} {
+		if !strings.Contains(got, on) {
+			t.Errorf("Describe() = %q, want the selected service %q named", got, on)
+		}
 	}
 	if !strings.Contains(got, "haven up +langy") {
 		t.Errorf("Describe() = %q, want the exact delta that adds langy", got)

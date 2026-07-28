@@ -208,13 +208,7 @@ func clickHouseLimits() domain.ClickHouseLimits {
 func optionsFromEnv(repoRoot string) app.PlanOptions {
 	return app.PlanOptions{
 		ShouldGoWatch: devEnv("LANGWATCH_GO_WATCH") == "1",
-		// Which services run is sticky selection now (ADR-064), not a wall of skip
-		// flags — the old LANGWATCH_SKIP_* / WORKERS_IN_PROCESS vars survive one
-		// release as one-shot overrides in applyLegacySelectionEnv. START_WORKERS is
-		// the one that has no sticky equivalent: it turns the worker stack off
-		// entirely, lane or in-process.
-		ShouldStartWorkers: devEnv("START_WORKERS") != "false" && devEnv("START_WORKERS") != "0",
-		ShouldSeed:         os.Getenv("LANGWATCH_SEED") == "1",
+		ShouldSeed:    os.Getenv("LANGWATCH_SEED") == "1",
 		// The langyagent worker's local isolation posture. Default (neither flag) is
 		// the sandboxed, production-like tier: the worker runs in colima with the
 		// per-worker UID sandbox on. LANGY_UNSAFE_CONTAINER relaxes the sandbox inside
@@ -228,34 +222,53 @@ func optionsFromEnv(repoRoot string) app.PlanOptions {
 	}
 }
 
-// applyLegacySelectionEnv honours the pre-ADR-064 selection env vars for one
-// release as one-shot, NON-sticky overrides, each printing its sticky
-// replacement. The env vars are removed a release later.
-func applyLegacySelectionEnv(sel domain.Selection, opts *app.PlanOptions) domain.Selection {
-	warn := func(envVar, sticky string) {
-		fmt.Fprintf(os.Stderr, "haven: %s is deprecated and applies to this run only — the sticky way is `%s`\n", envVar, sticky)
+// removedSelectionEnv are the pre-ADR-064 ways to choose services. Selection is
+// sticky and reported now, so honouring an env var would make `haven status`
+// lie about the stack it just started — and silently ignoring one would run
+// services the developer believes they turned off. They are refused with their
+// replacement instead, exactly like a removed command spelling.
+//
+// Only the values that used to change what ran are refused: WORKERS_IN_PROCESS=1
+// is still how `pnpm dev` (outside haven) asks for a single process, so a
+// checkout carrying it must not be blocked from starting a stack.
+var removedSelectionEnv = []struct {
+	name        string
+	applied     func(value string) bool
+	replacement string // the sticky command that does the same thing
+	note        string // said instead when nothing replaces it
+}{
+	{name: "LANGWATCH_SKIP_NLP", applied: isTrue, replacement: "haven up -nlp"},
+	{name: "LANGWATCH_SKIP_AIGATEWAY", applied: isTrue, replacement: "haven up -gateway"},
+	{name: "LANGWATCH_SKIP_LANGYAGENT", applied: isTrue, replacement: "haven up -langy"},
+	{name: "WORKERS_IN_PROCESS", applied: isFalse, replacement: "haven up +workers"},
+	{
+		name:    "START_WORKERS",
+		applied: isFalse,
+		note:    "the worker stack is part of the app now, and `haven up +workers` only moves it into its own lane",
+	},
+}
+
+func isTrue(v string) bool  { return v == "1" || v == "true" }
+func isFalse(v string) bool { return v == "0" || v == "false" }
+
+// rejectRemovedSelectionEnv fails `up` when a removed selection variable is still
+// set to the value that used to matter, naming the one command that replaces it.
+// The replacement is sticky, so this is a one-time fix per worktree.
+func rejectRemovedSelectionEnv() error {
+	for _, knob := range removedSelectionEnv {
+		v, ok := dotenvLookup(knob.name)
+		if !ok || !knob.applied(v) {
+			continue
+		}
+		if knob.replacement == "" {
+			return fmt.Errorf("%s=%s no longer does anything — %s", knob.name, v, knob.note)
+		}
+		return fmt.Errorf(
+			"%s=%s no longer selects services — the choice is sticky per worktree now: run `%s` once",
+			knob.name, v, knob.replacement,
+		)
 	}
-	if os.Getenv("LANGWATCH_SKIP_NLP") == "1" {
-		sel.NLP = false
-		warn("LANGWATCH_SKIP_NLP=1", "haven up -nlp")
-	}
-	if os.Getenv("LANGWATCH_SKIP_AIGATEWAY") == "1" {
-		sel.Gateway = false
-		warn("LANGWATCH_SKIP_AIGATEWAY=1", "haven up -gateway")
-	}
-	if os.Getenv("LANGWATCH_SKIP_LANGYAGENT") == "1" {
-		sel.Langy = false
-		warn("LANGWATCH_SKIP_LANGYAGENT=1", "haven up -langy")
-	}
-	if v := os.Getenv("WORKERS_IN_PROCESS"); v == "0" || v == "false" {
-		sel.Workers = true
-		warn("WORKERS_IN_PROCESS=0", "haven up +workers")
-	}
-	if v := os.Getenv("START_WORKERS"); v == "false" || v == "0" {
-		opts.ShouldStartWorkers = false
-		fmt.Fprintln(os.Stderr, "haven: START_WORKERS=false is deprecated and applies to this run only (no sticky equivalent — workers are part of the app by default)")
-	}
-	return sel
+	return nil
 }
 
 // resolveAgent turns agent mode on for AI drivers: explicit env, NO_COLOR, or a
