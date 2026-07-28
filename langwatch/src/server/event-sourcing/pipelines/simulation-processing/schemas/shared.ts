@@ -2,7 +2,11 @@ import { z } from "zod";
 
 /**
  * Status values stored in ClickHouse.
- * STALLED is computed at read time, not stored.
+ *
+ * `STALLED` is one of them: it used to be derived per read and never written,
+ * so the stored status and the displayed status disagreed by design. Since
+ * ADR-073 step 2 the `scenarioExecution` process writes it when a run's
+ * deadline fires.
  */
 export const SIMULATION_RUN_STATUS = [
   "PENDING",
@@ -11,6 +15,7 @@ export const SIMULATION_RUN_STATUS = [
   "FAILURE",
   "ERROR",
   "CANCELLED",
+  "STALLED",
 ] as const;
 export type SimulationRunStatus = (typeof SIMULATION_RUN_STATUS)[number];
 

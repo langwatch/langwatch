@@ -11,7 +11,6 @@ import type {
   ScenarioRunData,
   ScenarioSetData,
 } from "~/server/scenarios/scenario-event.types";
-import { resolveRunStatus } from "~/server/scenarios/stall-detection";
 import {
   type ClickHouseSimulationRunRow,
   mapClickHouseRowToScenarioRunData,
@@ -23,8 +22,11 @@ import {
 } from "../../clients/clickhouse/windowed-read";
 import type { SimulationRepository } from "./simulation.repository";
 import {
+  SIMULATION_FAILED_STATUSES,
   SIMULATION_RUNS_TABLE,
+  SIMULATION_TERMINAL_STATUSES,
   simulationRunDedupPredicate,
+  statusList,
 } from "./simulationRuns.sql";
 
 const TABLE_NAME = SIMULATION_RUNS_TABLE;
@@ -395,15 +397,15 @@ export class SimulationClickHouseRepository implements SimulationRepository {
         toString(count())                                               AS TotalCount,
         toString(max(BatchTotal))                                       AS ExpectedCount,
         toString(countIf(Status = 'SUCCESS'))                          AS PassCount,
-        toString(countIf(Status IN ('FAILED','FAILURE','ERROR','CANCELLED'))) AS FailCount,
+        toString(countIf(Status IN (${statusList(SIMULATION_FAILED_STATUSES)},'CANCELLED'))) AS FailCount,
         toString(countIf(Status IN ('IN_PROGRESS','PENDING')))         AS RunningCount,
         toString(toUnixTimestamp64Milli(max(UpdatedAt)))               AS LastUpdatedAt,
         toString(toUnixTimestamp64Milli(max(CreatedAt)))               AS LastRunAt,
         toString(toUnixTimestamp64Milli(
-          minIf(UpdatedAt, Status IN ('SUCCESS','FAILED','FAILURE','ERROR','CANCELLED'))
+          minIf(UpdatedAt, Status IN (${statusList(SIMULATION_TERMINAL_STATUSES)}))
         )) AS FirstCompletedAt,
         toString(toUnixTimestamp64Milli(
-          maxIf(UpdatedAt, Status NOT IN ('STALLED','IN_PROGRESS','PENDING'))
+          maxIf(UpdatedAt, Status IN (${statusList(SIMULATION_TERMINAL_STATUSES)}))
         )) AS AllCompletedAt,
         toString(toUnixTimestamp64Milli(min(StartedAt)))                AS MinStartedAt,
         toString(toUnixTimestamp64Milli(max(StartedAt)))                AS MaxStartedAt
@@ -516,7 +518,6 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       itemsByBatch.set(row.BatchRunId, list);
     }
 
-    const now = Date.now();
     let globalLastUpdatedAt = 0;
 
     const batches: BatchHistoryItem[] = pageRows.map((b) => {
@@ -525,21 +526,13 @@ export class SimulationClickHouseRepository implements SimulationRepository {
         globalLastUpdatedAt = lastUpdatedAt;
 
       const items = (itemsByBatch.get(b.BatchRunId) ?? []).map((r) => {
-        const baseStatus = mapStatus(r.Status);
         const durationMs =
           r.DurationMs != null ? parseInt(r.DurationMs, 10) : 0;
-        const perRunUpdatedAt = Number(r.UpdatedAt);
-        const hasFinished = r.FinishedAt != null && Number(r.FinishedAt) > 0;
-        const resolvedStatus = resolveRunStatus({
-          finishedStatus: hasFinished ? baseStatus : undefined,
-          lastEventTimestamp: perRunUpdatedAt,
-          now,
-        });
         return {
           scenarioRunId: r.ScenarioRunId,
           name: r.Name,
           description: r.Description,
-          status: resolvedStatus,
+          status: mapStatus(r.Status),
           durationInMs: durationMs,
           messagePreview: (r.MessagePreviewRoles ?? []).map((role, i) => ({
             role,
@@ -548,8 +541,12 @@ export class SimulationClickHouseRepository implements SimulationRepository {
         };
       });
 
+      // STALLED is a stored status since ADR-073 step 2, so a stalled run is
+      // already outside RunningCount's IN_PROGRESS/PENDING set. Subtracting it
+      // again — which is what the read-time derivation required — would take
+      // the same run off the count twice.
       const stalledCount = items.filter((i) => i.status === "STALLED").length;
-      const runningCount = Number(b.RunningCount) - stalledCount;
+      const runningCount = Number(b.RunningCount);
 
       const firstCompletedAt = Number(b.FirstCompletedAt);
       const allCompletedAt = Number(b.AllCompletedAt);
@@ -640,8 +637,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       },
     );
 
-    const now = Date.now();
-    const runs = rows.map((row) => mapClickHouseRowToScenarioRunData(row, now));
+    const runs = rows.map((row) => mapClickHouseRowToScenarioRunData(row));
     const lastUpdatedAt = runs.reduce(
       (max, r) => Math.max(max, r.timestamp),
       0,
@@ -704,8 +700,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       { tenantId: projectId, scenarioSetIds: expandSetIdFilter(scenarioSetId) },
     );
 
-    const now = Date.now();
-    return rows.map((row) => mapClickHouseRowToScenarioRunData(row, now));
+    return rows.map((row) => mapClickHouseRowToScenarioRunData(row));
   }
 
   async getRunDataForScenarioSet({
@@ -1212,7 +1207,6 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       },
     );
 
-    const now = Date.now();
-    return rows.map((row) => mapClickHouseRowToScenarioRunData(row, now));
+    return rows.map((row) => mapClickHouseRowToScenarioRunData(row));
   }
 }

@@ -14,15 +14,18 @@ import {
   scenarioExecutionWake,
 } from "./process-manager/scenarioExecution.process";
 import {
+  createScenarioExecutionExecuteRunHandler,
   createScenarioExecutionFailRunHandler,
   type ScenarioExecutionDispatchDeps,
 } from "./process-manager/scenarioExecutionIntentHandlers";
 import {
   INITIAL_SCENARIO_EXECUTION_STATE,
+  SCENARIO_EXECUTION_CONCURRENCY,
   SCENARIO_EXECUTION_INTENT_TYPES,
   SCENARIO_EXECUTION_LEASE_DURATION_MS,
   SCENARIO_EXECUTION_MAX_ATTEMPTS,
   SCENARIO_EXECUTION_PROCESS_NAME,
+  scenarioExecutionExecuteRunIntentSchema,
   scenarioExecutionFailRunIntentSchema,
 } from "./process-manager/scenarioExecutionProcess.types";
 import { SIMULATION_RUN_EVENT_TYPES } from "./schemas/constants";
@@ -53,10 +56,6 @@ export interface SimulationProcessingPipelineDeps {
     SimulationProcessingEvent,
     SimulationRunStateData
   >;
-  scenarioExecutionReactor: ReactorDefinition<
-    SimulationProcessingEvent,
-    SimulationRunStateData
-  >;
   traceMetricsSyncReactor: ReactorDefinition<
     SimulationProcessingEvent,
     SimulationRunStateData
@@ -66,7 +65,10 @@ export interface SimulationProcessingPipelineDeps {
     SimulationProcessingEvent,
     SimulationRunStateData
   >;
-  /** Terminal-write dependencies for the `scenarioExecution` process (ADR-073). */
+  /**
+   * Dispatch and terminal-write dependencies for the `scenarioExecution`
+   * process (ADR-073).
+   */
   scenarioExecutionDispatch: ScenarioExecutionDispatchDeps;
 }
 
@@ -74,9 +76,14 @@ export interface SimulationProcessingPipelineDeps {
  * The `scenarioExecution` process-manager topology, exported standalone so
  * tests can build the exact definition the runtime mounts.
  *
- * Every progress event re-arms the deadline; the terminal events clear it; a
- * fired wake writes the terminal state itself. See ADR-073 and
- * `scenarioExecution.process.ts`.
+ * `queued` enqueues the dispatch and arms a deadline; every progress event
+ * re-arms it; the terminal events clear it; a fired wake writes the terminal
+ * state itself. See ADR-073 and `scenarioExecution.process.ts`.
+ *
+ * The outbox is sized by the dispatch, not by the terminal write: the lease
+ * has to outlast a whole child process, and `concurrency` is what bounds how
+ * many children a worker holds — the job the pool's deleted `_pending` array
+ * used to do.
  */
 export function scenarioExecutionPM(
   dispatch: ScenarioExecutionDispatchDeps,
@@ -84,6 +91,11 @@ export function scenarioExecutionPM(
   return (pm) =>
     pm
       .state(INITIAL_SCENARIO_EXECUTION_STATE)
+      .intent(
+        SCENARIO_EXECUTION_INTENT_TYPES.EXECUTE_RUN,
+        scenarioExecutionExecuteRunIntentSchema,
+        createScenarioExecutionExecuteRunHandler(dispatch),
+      )
       .intent(
         SCENARIO_EXECUTION_INTENT_TYPES.FAIL_RUN,
         scenarioExecutionFailRunIntentSchema,
@@ -102,6 +114,8 @@ export function scenarioExecutionPM(
       .outbox({
         maxAttempts: SCENARIO_EXECUTION_MAX_ATTEMPTS,
         leaseDurationMs: SCENARIO_EXECUTION_LEASE_DURATION_MS,
+        concurrency: SCENARIO_EXECUTION_CONCURRENCY,
+        batchSize: SCENARIO_EXECUTION_CONCURRENCY,
       });
 }
 
@@ -149,11 +163,6 @@ export function createSimulationProcessingPipeline(
       "simulationRunState",
       "traceMetricsSync",
       deps.traceMetricsSyncReactor,
-    )
-    .withReactor(
-      "simulationRunState",
-      "scenarioExecution",
-      deps.scenarioExecutionReactor,
     );
 
   if (deps.customerIoSimulationSyncReactor) {

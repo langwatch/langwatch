@@ -13,10 +13,11 @@ import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import { getApp } from "~/server/app-layer/app";
+import { Verdict } from "~/server/scenarios/scenario-event.enums";
 import {
-  ScenarioRunStatus,
-  Verdict,
-} from "~/server/scenarios/scenario-event.enums";
+  type ScenarioFailureOutcome,
+  statusForFailureOutcome,
+} from "~/server/scenarios/scenario-failure-outcome";
 import {
   classifyScenarioInfraError,
   encodeScenarioError,
@@ -38,12 +39,22 @@ export interface FailureEventParams {
   name?: string;
   /** Scenario description/situation for display in UI */
   description?: string;
-  /** When true, writes CANCELLED status instead of ERROR */
-  cancelled?: boolean;
+  /**
+   * How the run ended. Decides the terminal status written: ERROR by default,
+   * CANCELLED when a user asked it to stop, STALLED when nothing reported on
+   * it for longer than it was allowed to stay quiet.
+   *
+   * One modelled field rather than a flag per outcome — see
+   * `scenario-failure-outcome.ts`.
+   */
+  outcome?: ScenarioFailureOutcome;
 }
 
-function buildFailureResults(params: { cancelled: boolean; error?: string }) {
-  if (params.cancelled) {
+function buildFailureResults(params: {
+  outcome: ScenarioFailureOutcome;
+  error?: string;
+}) {
+  if (params.outcome === "cancelled") {
     return {
       verdict: Verdict.INCONCLUSIVE,
       reasoning: "Cancelled by user",
@@ -98,8 +109,9 @@ export class ScenarioFailureHandler {
         },
       },
       async (span) => {
-        const { projectId, scenarioId, setId, batchRunId, error, name, description, cancelled } = params;
-        const status = cancelled ? ScenarioRunStatus.CANCELLED : ScenarioRunStatus.ERROR;
+        const { projectId, scenarioId, setId, batchRunId, error, name, description } = params;
+        const outcome = params.outcome ?? "error";
+        const status = statusForFailureOutcome(outcome);
         const scenarioRunId = params.scenarioRunId;
 
         if (!scenarioRunId) {
@@ -122,7 +134,7 @@ export class ScenarioFailureHandler {
             scenarioRunId,
             occurredAt: timestamp,
             status,
-            results: buildFailureResults({ cancelled: cancelled ?? false, error }),
+            results: buildFailureResults({ outcome, error }),
           });
           span.setAttribute("result.emitted_run_finished", true);
         } catch (err) {

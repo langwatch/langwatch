@@ -82,7 +82,7 @@ import {
   ExperimentRunStateRepositoryMemory,
 } from "../event-sourcing/pipelines/experiment-run-processing/repositories";
 import { LangyAnalyticsEventAppendStore } from "../event-sourcing/pipelines/langy-conversation-processing/projections/langyAnalyticsEvent.store";
-import type { ScenarioExecutionReactorHandle } from "../event-sourcing/pipelines/simulation-processing/reactors/scenarioExecution.reactor";
+import type { ScenarioExecutionDispatcherHandle } from "../scenarios/execution/execution-dispatcher";
 import {
   SimulationRunStateRepositoryClickHouse,
   SimulationRunStateRepositoryMemory,
@@ -274,10 +274,11 @@ import { traced } from "./tracing";
 import { UsageService } from "./usage/usage.service";
 
 /**
- * Late-bound handle for the scenario execution reactor.
+ * Late-bound handle the worker binds its scenario execution pool into, and
+ * that the `scenarioExecution` process outbox dispatches through (ADR-073).
  * Stored on globalForApp to survive hot-reload in dev (same as the App instance).
  */
-export function getScenarioExecutionHandle(): ScenarioExecutionReactorHandle | null {
+export function getScenarioExecutionHandle(): ScenarioExecutionDispatcherHandle | null {
   return (globalForApp as any).__scenarioExecutionHandle ?? null;
 }
 
@@ -1641,14 +1642,10 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         recordTriggerMatch: noop,
       } as AppCommands["automations"],
       scenarioExecutionHandle: {
-        reactor: {
-          name: "scenarioExecution",
-          options: { runIn: ["worker"] },
-          handle: async () => {
-            /* noop */
-          },
-        },
         setPool: () => {
+          /* noop */
+        },
+        execute: async () => {
           /* noop */
         },
       },

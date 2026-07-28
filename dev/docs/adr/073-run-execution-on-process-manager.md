@@ -110,15 +110,52 @@ the denominator gets the floor, which is the bound it had before. Being late
 to an undispatched run costs a stuck row; being early costs a healthy run its
 result, so the arithmetic is deliberately biased late.
 
-**Dispatch is at-most-once, on purpose.** `maxAttempts: 1` preserves the
-existing no-retry contract that `scenario-stalled-no-retry.unit.test.ts` pins:
-a scenario that fails is not re-run, because it costs money and may have
-already recorded messages. The intent handler therefore throws only for
-infrastructure faults, and records a terminal event for scenario-level
-failures. `leaseDurationMs` exceeds the child timeout so a live run is never
-double-spawned; if the worker dies the lease lapses, no terminal event ever
-arrives, and the deadline wake finalises the run. Crash recovery comes from
-the wake, not from redelivery.
+**Dispatch is at-most-once, on purpose** — a scenario that fails is not re-run,
+because it costs money and may have already recorded messages.
+
+> **CORRECTION (2026-07-28): `maxAttempts: 1` does not deliver this, and the
+> worked example below it was wrong.** `attempts` is incremented only by
+> `markDispatched` and `markFailed`; **leasing does not touch it**. A worker
+> hard-killed mid-child calls neither, so when the lease lapses the row is
+> re-leased with `attempts` unchanged and the handler sees `attempt = 1` again.
+> `maxAttempts` caps *handled* failures only. The claim that "if the worker
+> dies the lease lapses, no terminal event ever arrives, and the deadline wake
+> finalises the run" is therefore false in the order it matters: the outbox
+> redelivers at lease expiry, well before the progress deadline fires, and the
+> scenario **re-runs**. Every deploy that killed an in-flight run would re-bill
+> it.
+>
+> At-most-once has to be a property of **the work**, not of the attempt — which
+> is ADR-076's rule that dispatch identity is derived, never minted. The
+> implementation reads the run's own stored status back before spawning and
+> declines if it is no longer dispatchable. That holds across redelivery,
+> across a lease lapse, and across a process restart, none of which `attempts`
+> survives.
+>
+> **`maxAttempts` and `leaseDurationMs` are also per-process, not per-intent**
+> (`processRuntime.ts`). Setting `maxAttempts: 1` for the manager would
+> downgrade `failRun` from three attempts to one — on the write whose loss
+> leaves the run in exactly the non-terminal state this process exists to
+> prevent. Two intents with opposite retry needs cannot share one knob, so the
+> retry budget stays at 3 and `executeRun` is written never to throw after it
+> has dispatched. The long lease is shared too: a crashed `failRun` is now
+> invisible for the lease window rather than seconds. That is acceptable — the
+> run is already dead — but it is a consequence, not a free lunch.
+
+The intent handler throws only for infrastructure faults, and records a
+terminal event for scenario-level failures. `leaseDurationMs` exceeds the child
+timeout so a live run is never double-spawned.
+
+> **Deleting the drain costs deploy latency, and this ADR framed it as free.**
+> `drainInFlightRuns` emitted a terminal failure per in-flight run on graceful
+> shutdown — seconds. Without it a redeployed run waits out the full progress
+> deadline (~30 minutes) before anything writes its terminal state. The
+> paragraph below lists the drain among mechanisms "reconstructing durability
+> afterwards", which reads as redundant. It was not redundant; it was *faster*,
+> and only the hard-crash case was ever unhandled. This is a real regression on
+> the most common path — deploys — and should be weighed rather than assumed
+> away. Re-adding a shutdown hook that settles in-flight instances is the
+> obvious mitigation and does not conflict with anything here.
 
 **The pool stops being a queue.** With pending work held as outbox rows and
 concurrency bounded by the dispatcher, `ScenarioExecutionPool` keeps only its

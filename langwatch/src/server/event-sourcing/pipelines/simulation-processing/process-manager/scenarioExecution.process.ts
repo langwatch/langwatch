@@ -9,10 +9,14 @@ import type {
 import type { SimulationProcessingEvent } from "../schemas/events";
 import {
   dispatchDeadlineMsFor,
+  executeRunMessageKey,
+  failRunMessageKey,
   SCENARIO_CANCEL_DEADLINE_MS,
   SCENARIO_PROGRESS_DEADLINE_MS,
   scenarioExecutionEventViewSchema,
+  scenarioExecutionTargetSchema,
   type ScenarioExecutionState,
+  type scenarioExecutionExecuteRunIntentSchema,
   type scenarioExecutionFailRunIntentSchema,
 } from "./scenarioExecutionProcess.types";
 
@@ -21,44 +25,48 @@ import {
  * pipeline mounts these handlers; the runtime owns the manager, outbox and
  * wake workers.
  *
- * Its single job is liveness. A simulation run that stops producing events —
- * because the worker holding its child process was killed, OOMed, or
- * redeployed — must still reach a terminal state. Before this, that was
- * reconstructed by two cross-tenant ClickHouse sweeps that ran **only at
- * worker boot**, so the recovery bound was the deploy cadence rather than
- * anything a user could rely on.
+ * It carries the two guarantees the substrate supplies, one each:
  *
- * **The run's own progress events are the heartbeat.** Every one of them
- * re-arms `nextWakeAt`, so a run that keeps talking keeps pushing its own
- * deadline out, and a run that goes quiet has a wake fire against it. There is
- * no separate keep-alive to maintain, and no polling: the durable wake is the
- * whole mechanism.
+ * **Dispatch** is the leased outbox. A `queued` event enqueues an `executeRun`
+ * message; whichever worker leases it holds the child process for the whole
+ * lease. Pending work is a Postgres row rather than an array field on a pod,
+ * so a hard kill no longer loses it, and there is no wiring window in which a
+ * dispatch is silently dropped — the predecessor reactor logged
+ * "Execution pool not yet wired, skipping" and orphaned the run at QUEUED.
  *
- * It does NOT dispatch execution — that still runs through
- * `scenarioExecution.reactor.ts` and the in-process pool. Moving dispatch onto
- * the leased outbox is the second half of ADR-073 and is deliberately separate:
- * this half only adds a safety net and removes the weaker ones it replaces.
+ * **Liveness** is the durable wake. The run's own progress events are the
+ * heartbeat: every one of them re-arms `nextWakeAt`, so a run that keeps
+ * talking keeps pushing its own deadline out, and a run that goes quiet has a
+ * wake fire against it. When one fires the process writes the terminal state
+ * itself, as a stored `STALLED` — the read path no longer derives it, so what
+ * is stored and what is displayed cannot disagree.
+ *
+ * The two are deliberately not the same mechanism. Crash recovery comes from
+ * the wake, never from redelivering a dispatch, because a scenario costs money
+ * per run.
  */
 
 export type ScenarioExecutionIntents = {
+  executeRun: IntentSpec<typeof scenarioExecutionExecuteRunIntentSchema>;
   failRun: IntentSpec<typeof scenarioExecutionFailRunIntentSchema>;
 };
 
 type Ctx = ProcessHandlerContext<ScenarioExecutionIntents>;
 
 /**
- * Narrows a committed simulation event to identities. Mandatory here:
- * message-bearing events would otherwise persist conversation content into
- * process state and outbox rows.
+ * Narrows a committed simulation event to identities and the dispatch target.
+ * Mandatory here: message-bearing events would otherwise persist conversation
+ * content into process state and outbox rows.
  *
- * `batchTotal` is the one non-identity field that crosses: it is a bounded
- * integer, and {@link handleQueued} cannot size the dispatch deadline without
- * it. Anything wider stays on the far side of this narrowing.
+ * `batchTotal` is the one non-identity field beyond the target that crosses: it
+ * is a bounded integer, and {@link handleQueued} cannot size the dispatch
+ * deadline without it. Anything wider stays on the far side of this narrowing.
  */
 export function buildProcessEventView(event: SimulationProcessingEvent) {
   const data = event.data as Record<string, unknown>;
   const read = (key: string): string | null =>
     typeof data[key] === "string" ? (data[key] as string) : null;
+  const target = scenarioExecutionTargetSchema.safeParse(data.target);
 
   return {
     scenarioRunId: read("scenarioRunId"),
@@ -74,6 +82,7 @@ export function buildProcessEventView(event: SimulationProcessingEvent) {
       data.batchTotal >= 0
         ? data.batchTotal
         : null,
+    target: target.success ? target.data : null,
   };
 }
 
@@ -106,6 +115,7 @@ function withIdentities(
     scenarioId: state.scenarioId || view.scenarioId || "",
     batchRunId: state.batchRunId || view.batchRunId || "",
     setId: state.setId || view.scenarioSetId || "",
+    target: state.target ?? view.target,
   };
 }
 
@@ -147,10 +157,24 @@ const refreshDeadline: EventHandler<
   armed(withIdentities(state, payload, ctx), ctx, SCENARIO_PROGRESS_DEADLINE_MS);
 
 /**
- * A run entered the queue. The deadline it arms is derived from the batch it
- * queued with, not from a fixed window: a run waits behind its siblings for as
- * long as the batch takes, so a fixed window would declare the tail of a large
- * healthy batch dead. See {@link dispatchDeadlineMsFor}.
+ * The run is queued: enqueue its dispatch and arm the window it has to be
+ * picked up in.
+ *
+ * The dispatch is emitted here rather than by a handler beside the fold, which
+ * is the whole of ADR-073 step 2: the message is committed in the same
+ * transaction as the inbox row, so a worker that dies between "the event was
+ * consumed" and "the job was submitted" no longer loses the run.
+ *
+ * The window it arms is derived from the batch the run queued with rather than
+ * fixed: a run waits behind its siblings for as long as the batch takes, so a
+ * fixed window would declare the tail of a large healthy batch dead. See
+ * {@link dispatchDeadlineMsFor}.
+ *
+ * A run that has already settled — a `queued` redelivered after the run
+ * finished, which the fold guards against for the same reason — enqueues
+ * nothing. So does a run whose `queued` event carries no target: there is
+ * nothing to execute, and the armed deadline finalises it rather than the
+ * outbox retrying a dispatch that can never be built.
  */
 export const handleQueued: EventHandler<
   ScenarioExecutionState,
@@ -158,11 +182,28 @@ export const handleQueued: EventHandler<
   ScenarioExecutionIntents
 > = (state, payload, ctx) => {
   const view = scenarioExecutionEventViewSchema.parse(payload);
-  return armed(
-    withIdentities(state, payload, ctx),
+  const next = withIdentities(state, payload, ctx);
+  const evolution = armed(
+    next,
     ctx,
     dispatchDeadlineMsFor(view.batchTotal ?? 0),
   );
+  if (next.settled || !next.target) return evolution;
+
+  const scenarioRunId = next.scenarioRunId || ctx.key;
+  return {
+    ...evolution,
+    intents: [
+      ctx.intents.executeRun(executeRunMessageKey(scenarioRunId), {
+        projectId: ctx.projectId,
+        scenarioRunId,
+        scenarioId: next.scenarioId,
+        batchRunId: next.batchRunId,
+        setId: next.setId,
+        target: next.target,
+      }),
+    ],
+  };
 };
 
 export const handleStarted = refreshDeadline;
@@ -221,13 +262,16 @@ export const scenarioExecutionWake: WakeHandler<
     state: { ...state, settled: true },
     nextWakeAt: null,
     intents: [
-      ctx.intents.failRun(`fail:${scenarioRunId}`, {
+      ctx.intents.failRun(failRunMessageKey(scenarioRunId), {
         projectId: ctx.projectId,
         scenarioRunId,
         scenarioId: state.scenarioId,
         batchRunId: state.batchRunId,
         setId: state.setId,
-        cancelled: state.cancelRequested,
+        // A cancelled run reads as cancelled even when nobody honoured it;
+        // anything else that went quiet is a stall, and it is now stored
+        // rather than derived at read time.
+        outcome: state.cancelRequested ? "cancelled" : "stalled",
         reason: state.cancelRequested
           ? "Cancelled — no worker reported the run finished within the cancellation window"
           : "Scenario run stopped reporting progress — the worker executing it is no longer alive",
