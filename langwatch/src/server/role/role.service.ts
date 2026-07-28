@@ -1,4 +1,5 @@
-import type { Prisma, PrismaClient } from "@prisma/client";
+import { type Prisma, type PrismaClient, RoleBindingScopeType } from "@prisma/client";
+import { assertNoPersonalTeamScope } from "~/server/role-bindings/personal-team-scope";
 import {
   RoleDuplicateNameError,
   RoleInUseError,
@@ -19,7 +20,10 @@ import {
 export class RoleService {
   private readonly repository: RoleRepository;
 
+  private readonly prisma: PrismaClient | Prisma.TransactionClient;
+
   constructor(prisma: PrismaClient | Prisma.TransactionClient) {
+    this.prisma = prisma;
     this.repository = new RoleRepository(prisma);
   }
 
@@ -133,12 +137,18 @@ export class RoleService {
       throw new UserNotTeamMemberError();
     }
 
+    await assertNoPersonalTeamScope(this.prisma, [
+      { scopeType: RoleBindingScopeType.TEAM, scopeId: teamId },
+    ]);
     await this.repository.assignToUser(userId, teamId, customRoleId);
 
     return { success: true };
   }
 
   async removeRoleFromUser(userId: string, teamId: string) {
+    await assertNoPersonalTeamScope(this.prisma, [
+      { scopeType: RoleBindingScopeType.TEAM, scopeId: teamId },
+    ]);
     await this.repository.removeFromUser(userId, teamId);
     return { success: true };
   }

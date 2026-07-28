@@ -242,6 +242,25 @@ export class PrismaGroupRepository implements GroupRepository {
     return count === userIds.length;
   }
 
+  async anyScopeIsPersonalTeam(
+    scopes: Array<{ scopeType: RoleBindingScopeType; scopeId: string }>,
+  ): Promise<boolean> {
+    const teamIds = [
+      ...new Set(
+        scopes
+          .filter((scope) => scope.scopeType === RoleBindingScopeType.TEAM)
+          .map((scope) => scope.scopeId),
+      ),
+    ];
+    if (teamIds.length === 0) return false;
+
+    const personalTeam = await this.prisma.team.findFirst({
+      where: { id: { in: teamIds }, isPersonal: true },
+      select: { id: true },
+    });
+    return !!personalTeam;
+  }
+
   async validateScopeInOrganization({
     organizationId,
     scopeType,

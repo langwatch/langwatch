@@ -32,6 +32,7 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "@prisma/client";
+import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
 import {
   afterAll,
@@ -53,6 +54,7 @@ import { LicenseEnforcementRepository } from "../../../license-enforcement/licen
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
 import { prisma } from "../../../db";
+import { KSUID_RESOURCES } from "~/utils/constants";
 
 vi.mock("../../../auditLog", () => ({
   auditLog: vi.fn(() => Promise.resolve()),
@@ -415,6 +417,128 @@ describe("given a personal workspace beside a shared team in one organization", 
       await expect(ensureWorkspace()).resolves.toMatchObject({
         created: false,
         team: { id: personalTeamId },
+      });
+    });
+  });
+
+  // Role bindings are the general form of "who reaches this team". The team
+  // editor is one caller of many, so the invariant has to hold on the generic
+  // paths too, or an organization manager can grant access to a personal team
+  // without the editor's guard ever running.
+  describe("when a manager grants access to the personal team another way", () => {
+    const personalTeamScope = () => ({
+      scopeType: RoleBindingScopeType.TEAM,
+      scopeId: personalTeamId,
+    });
+
+    const ownerBindingsOnPersonalTeam = () =>
+      prisma.roleBinding.findMany({
+        where: {
+          organizationId,
+          scopeType: RoleBindingScopeType.TEAM,
+          scopeId: personalTeamId,
+        },
+        select: { userId: true, role: true },
+      });
+
+    /** @scenario Granting a role binding on a personal team is refused */
+    it("refuses roleBinding.create for a second user", async () => {
+      await expect(
+        callerAsOwner().roleBinding.create({
+          organizationId,
+          userId: colleagueUserId,
+          role: TeamUserRole.MEMBER,
+          ...personalTeamScope(),
+        }),
+      ).rejects.toMatchObject({
+        code: "FORBIDDEN",
+        message: expect.stringContaining("exactly one member"),
+      });
+
+      await expect(ownerBindingsOnPersonalTeam()).resolves.toEqual([
+        { userId: ownerUserId, role: TeamUserRole.ADMIN },
+      ]);
+    });
+
+    /** @scenario Granting a role binding on a personal team is refused */
+    it("refuses group.addBinding, which would make it multi-member by proxy", async () => {
+      const group = await prisma.group.create({
+        data: {
+          id: generate(KSUID_RESOURCES.GROUP).toString(),
+          organizationId,
+          name: `Everyone ${ns}`,
+          slug: `--everyone-${ns}`,
+        },
+      });
+
+      await expect(
+        callerAsOwner().group.addBinding({
+          organizationId,
+          groupId: group.id,
+          role: TeamUserRole.ADMIN,
+          ...personalTeamScope(),
+        }),
+      ).rejects.toMatchObject({
+        code: "FORBIDDEN",
+        message: expect.stringContaining("exactly one member"),
+      });
+
+      await expect(ownerBindingsOnPersonalTeam()).resolves.toEqual([
+        { userId: ownerUserId, role: TeamUserRole.ADMIN },
+      ]);
+    });
+
+    /** @scenario Removing the owner's binding on a personal team is refused */
+    it("refuses roleBinding.delete on the owner's own binding", async () => {
+      const binding = await prisma.roleBinding.findFirstOrThrow({
+        where: {
+          organizationId,
+          scopeType: RoleBindingScopeType.TEAM,
+          scopeId: personalTeamId,
+          userId: ownerUserId,
+        },
+        select: { id: true },
+      });
+
+      await expect(
+        callerAsOwner().roleBinding.delete({
+          organizationId,
+          bindingId: binding.id,
+        }),
+      ).rejects.toMatchObject({
+        code: "FORBIDDEN",
+        message: expect.stringContaining("exactly one member"),
+      });
+
+      await expect(ownerBindingsOnPersonalTeam()).resolves.toEqual([
+        { userId: ownerUserId, role: TeamUserRole.ADMIN },
+      ]);
+    });
+
+    /** @scenario Demoting the owner on their own personal team is refused */
+    it("refuses organization.updateTeamMemberRole demoting the owner", async () => {
+      await expect(
+        callerAsOwner().organization.updateTeamMemberRole({
+          teamId: personalTeamId,
+          userId: ownerUserId,
+          role: TeamUserRole.VIEWER,
+        }),
+      ).rejects.toMatchObject({
+        code: "FORBIDDEN",
+        message: expect.stringContaining("exactly one member"),
+      });
+
+      await expect(ownerBindingsOnPersonalTeam()).resolves.toEqual([
+        { userId: ownerUserId, role: TeamUserRole.ADMIN },
+      ]);
+    });
+
+    /** @scenario Removing the owner's binding on a personal team is refused */
+    it("leaves the workspace resolvable after every refusal", async () => {
+      await expect(ensureWorkspace()).resolves.toMatchObject({
+        created: false,
+        team: { id: personalTeamId },
+        project: { id: personalProjectId },
       });
     });
   });

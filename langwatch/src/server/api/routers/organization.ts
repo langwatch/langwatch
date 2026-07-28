@@ -1,3 +1,4 @@
+import { assertNoPersonalTeamScope } from "~/server/role-bindings/personal-team-scope";
 import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
 import {
   OrganizationUserRole,
@@ -1252,6 +1253,9 @@ export const organizationRouter = createTRPCRouter({
     .use(checkTeamPermission("organization:manage"))
     .mutation(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
+      await assertNoPersonalTeamScope(prisma, [
+        { scopeType: RoleBindingScopeType.TEAM, scopeId: input.teamId },
+      ]);
       const inputIsCustomRole = isCustomRole(input.role);
 
       if (inputIsCustomRole && input.customRoleId) {

@@ -1,3 +1,7 @@
+import {
+  PERSONAL_TEAM_MEMBERSHIP_REFUSAL,
+  PersonalTeamProtectedError,
+} from "~/server/app-layer/teams/team.service";
 import type {
   Group,
   GroupMembership,
@@ -41,6 +45,19 @@ export class ScopeNotInOrganizationError extends Error {
 
 export class GroupRestService {
   constructor(readonly repo: GroupRepository) {}
+
+  /**
+   * A personal team holds exactly its owner, which is why plan limits exempt
+   * it. A group binding would make it multi-member by proxy while it still
+   * counts as nobody's, so group bindings never point at one.
+   */
+  private async assertNoPersonalTeamScope(
+    scopes: Array<{ scopeType: RoleBindingScopeType; scopeId: string }>,
+  ): Promise<void> {
+    if (await this.repo.anyScopeIsPersonalTeam(scopes)) {
+      throw new PersonalTeamProtectedError(PERSONAL_TEAM_MEMBERSHIP_REFUSAL);
+    }
+  }
 
   async listByOrganization(params: {
     organizationId: string;
@@ -106,6 +123,8 @@ export class GroupRestService {
       scopeType: b.scopeType,
       scopeId: b.scopeId,
     }));
+
+    await this.assertNoPersonalTeamScope(bindingInputs);
 
     return this.repo.createAtomic({
       group: { id: groupId, organizationId, name, slug },
@@ -265,6 +284,8 @@ export class GroupRestService {
       );
     }
 
+    await this.assertNoPersonalTeamScope([{ scopeType, scopeId }]);
+
     return this.repo.createBinding({
       id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
       organizationId,
@@ -291,6 +312,7 @@ export class GroupRestService {
       organizationId,
     });
     if (!binding) throw new BindingNotFoundError("Binding not found");
+    await this.assertNoPersonalTeamScope([binding]);
 
     await this.repo.deleteBinding({ id: bindingId });
   }

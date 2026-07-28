@@ -9,6 +9,7 @@ import {
 import { checkOrganizationPermission } from "../rbac";
 import { PrismaRoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.prisma.repository";
 import { RoleBindingService } from "~/server/role-bindings/role-binding.service";
+import { assertNoPersonalTeamScope } from "~/server/role-bindings/personal-team-scope";
 import { RoleService } from "~/server/role/role.service";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { slugify } from "~/utils/slugify";
@@ -272,6 +273,7 @@ export const groupRouter = createTRPCRouter({
         });
 
         if (input.bindings?.length) {
+          await assertNoPersonalTeamScope(tx, input.bindings);
           await tx.roleBinding.createMany({
             data: input.bindings.map((b) => ({
               id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
@@ -323,6 +325,9 @@ export const groupRouter = createTRPCRouter({
         scopeType: input.scopeType,
         scopeId: input.scopeId,
       });
+      await assertNoPersonalTeamScope(ctx.prisma, [
+        { scopeType: input.scopeType, scopeId: input.scopeId },
+      ]);
 
       if (input.role === TeamUserRole.CUSTOM && input.customRoleId) {
         const roleService = new RoleService(ctx.prisma);
@@ -366,6 +371,7 @@ export const groupRouter = createTRPCRouter({
       if (!binding) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Binding not found" });
       }
+      await assertNoPersonalTeamScope(ctx.prisma, [binding]);
       await ctx.prisma.roleBinding.delete({ where: { id: input.bindingId } });
       return { success: true };
     }),

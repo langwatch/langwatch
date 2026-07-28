@@ -235,6 +235,33 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     When I rename the personal team
     Then the team is renamed successfully
 
+  # Team membership is really role bindings, written from the team editor, the
+  # member-role path, the role-binding API and groups. Only some of those share
+  # a code path, so the invariant is stated where the bindings are written
+  # rather than at any one editor.
+
+  @integration
+  Scenario: Granting a role binding on a personal team is refused
+    Given the organization has 1 personal team
+    And another member of the organization
+    When I grant that member a role on the personal team
+    Then the request fails with FORBIDDEN
+    And the personal team still has exactly its owner
+
+  @integration
+  Scenario: Removing the owner's binding on a personal team is refused
+    Given the organization has 1 personal team
+    When I remove the owner's binding on the personal team
+    Then the request fails with FORBIDDEN
+    And the owner still has a personal workspace
+
+  @integration
+  Scenario: Demoting the owner on their own personal team is refused
+    Given the organization has 1 personal team
+    When I change the owner's role on the personal team
+    Then the request fails with FORBIDDEN
+    And the personal team still has exactly its owner
+
   # Archiving a personal team cannot be undone by the owner: the uniqueness of
   # a personal team per (organization, owner) covers archived rows too, while
   # the workspace lookup skips them. The archived team keeps the slot, so
