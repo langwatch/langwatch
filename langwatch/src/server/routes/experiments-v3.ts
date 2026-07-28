@@ -9,7 +9,7 @@
  * - GET  /api/experiments/runs/:runId (poll run status)
  * - GET  /api/experiments/runs/:runId/results (per-row results)
  */
-import { validator as zValidator } from "~/server/api/validation";
+import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { ExperimentType } from "@prisma/client";
 import { Hono } from "hono";
@@ -24,6 +24,7 @@ import type { TypedAgent } from "~/server/agents/agent.repository";
 import type { Permission } from "~/server/api/rbac";
 import { hasProjectPermission } from "~/server/api/rbac";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
+import { validator as zValidator } from "~/server/api/validation";
 import {
   apiKeyCeilingDenialResponse,
   enforceApiKeyCeiling,
@@ -32,6 +33,10 @@ import {
 import { TokenResolver } from "~/server/api-key/token-resolver";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
+import {
+  ExperimentNotFoundError,
+  RunNotFoundError,
+} from "~/server/experiments/errors";
 import { ExperimentService } from "~/server/experiments/experiment.service";
 import { abortManager } from "~/server/experiments-v3/execution/abortManager";
 import { loadExecutionData } from "~/server/experiments-v3/execution/dataLoader";
@@ -349,7 +354,7 @@ secured.access(sessionAuth).post("/abort", async (c) => {
     (await abortManager.getRunningProjectId(runId)) ??
     (await runStateManager.getRunState(runId))?.projectId;
   if (!ownerProjectId || ownerProjectId !== projectId) {
-    return c.json({ error: "Run not found" }, { status: 404 });
+    throw new RunNotFoundError(runId);
   }
 
   logger.info({ projectId, runId }, "Requesting abort");
@@ -383,7 +388,7 @@ secured.access(apiKeyAuth).post("/:slug/run", async (c) => {
   });
 
   if (!experiment) {
-    return c.json({ error: "Experiment not found" }, { status: 404 });
+    throw new ExperimentNotFoundError(slug);
   }
 
   const parseResult = persistedEvaluationsV3StateSchema.safeParse(
@@ -394,9 +399,13 @@ secured.access(apiKeyAuth).post("/:slug/run", async (c) => {
       { slug, errors: parseResult.error.errors },
       "Invalid workbenchState",
     );
-    return c.json(
-      { error: "Invalid experiment configuration" },
-      { status: 400 },
+    // The stored workbench state no longer matches its schema. The customer
+    // did not type this and cannot repair it from the API, so it is ours:
+    // `fault: "platform"` keeps it out of the customer-error noise.
+    throw new HandledError(
+      "invalid_experiment_configuration",
+      "This experiment's saved configuration could not be read.",
+      { httpStatus: 400, fault: "platform", meta: { slug } },
     );
   }
 
@@ -586,7 +595,7 @@ secured.access(apiKeyAuth).get("/runs", async (c) => {
     });
 
   if (!experiment) {
-    return c.json({ error: "Experiment not found" }, { status: 404 });
+    throw new ExperimentNotFoundError(experimentSlug);
   }
 
   const offset = (page - 1) * pageSize;
@@ -623,12 +632,15 @@ secured.access(apiKeyAuth).get("/runs/:runId", async (c) => {
 
   const runState = await runStateManager.getRunState(runId);
 
+  // All three not-found branches raise the SAME code. From outside they are one
+  // answer — this run is not yours to read — and telling a caller which of them
+  // it was would confirm that the id exists in another project.
   if (!runState) {
-    return c.json({ error: "Run not found" }, { status: 404 });
+    throw new RunNotFoundError(runId);
   }
 
   if (runState.projectId !== project.id) {
-    return c.json({ error: "Run not found" }, { status: 404 });
+    throw new RunNotFoundError(runId);
   }
 
   // Same archive guard as /runs/:runId/results: a run whose owning
@@ -641,7 +653,7 @@ secured.access(apiKeyAuth).get("/runs/:runId", async (c) => {
       id: runState.experimentId,
     });
     if (!stillLive) {
-      return c.json({ error: "Run not found" }, { status: 404 });
+      throw new RunNotFoundError(runId);
     }
   }
 
@@ -761,13 +773,10 @@ secured.access(apiKeyAuth).get("/runs/:runId/results", async (c) => {
   }
 
   if (!experimentId) {
-    return c.json(
-      {
-        error:
-          "Run not found. Pass ?experimentSlug=<slug> if the run is older than 24h.",
-      },
-      { status: 404 },
-    );
+    // The remediation that used to be spelled out here — pass ?experimentSlug
+    // for a run older than the status cache — is the registry's copy for this
+    // code now, so every surface says it the same way.
+    throw new RunNotFoundError(runId);
   }
 
   try {
@@ -779,20 +788,20 @@ secured.access(apiKeyAuth).get("/runs/:runId/results", async (c) => {
     });
 
     if (!run) {
-      return c.json(
-        { error: "Run not found or results not yet available" },
-        { status: 404 },
-      );
+      throw new RunNotFoundError(runId);
     }
 
     markUsed();
     return c.json(run);
   } catch (error) {
+    // Only a genuine miss is a 404. This used to answer EVERY failure with
+    // "Run not found or results not yet available", so a ClickHouse outage
+    // told the caller their run did not exist — a wrong answer served with a
+    // status code that invites them to stop asking. Anything we cannot name
+    // goes up to the boundary, where it becomes a 500 and a trace id (ADR-045).
+    if (HandledError.isHandled(error)) throw error;
     logger.error({ error, runId }, "Failed to fetch run results");
-    return c.json(
-      { error: "Run not found or results not yet available" },
-      { status: 404 },
-    );
+    throw error;
   }
 });
 
