@@ -194,17 +194,17 @@ Feature: AI Gateway — transparent upstream error forwarding
 
   @bdd @error-transparency @integration
   Scenario: Provider 5xx answers count toward opening the circuit breaker
-    Given the provider answers requests with 5xx errors
-    When failures accumulate on the same credential
-    Then the circuit breaker records them as slot-health failures
-    So that a genuinely failing upstream is skipped instead of hammered
+    Given the provider answers every request with 5xx errors
+    When failures repeat on the same credential
+    Then later requests are answered 503 with error code "circuit_open" instead of waiting on the failing provider
+    And after the cooldown the gateway dials the provider again and recovers on its own
 
   @bdd @error-transparency @integration
   Scenario: A caller-abandoned request neither falls back nor moves the breaker
-    Given the caller disconnects or its request deadline expires mid-dispatch
-    When the attempt returns a bare context error
-    Then no fallback to the next credential is attempted
-    And the circuit breaker records neither a failure nor a success for the slot
+    Given a request is in flight to a provider credential
+    When the caller disconnects or its deadline expires before the provider answers
+    Then the gateway dials no further credential for that request
+    And later requests on that credential are answered exactly as if the abandoned request had never happened
 
   @bdd @error-transparency @integration
   Scenario: An open circuit breaker surfaces circuit_open, not internal_error
