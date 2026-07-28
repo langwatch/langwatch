@@ -1278,6 +1278,64 @@ describe("SerializedCodeAgentAdapter", () => {
       });
     });
 
+    /** @scenario a credential echoed back by the engine never reaches the customer */
+    it("never renders a credential the engine echoed back", async () => {
+      // Defence-in-depth: pattern-based redaction cannot catch a credential,
+      // only knowing the actual value can. This is what an upstream that
+      // quotes the rejected key back at us would produce.
+      const secretKey = "sk-live-abcdef0123456789";
+      mockFetch.mockImplementation(async () =>
+        herrResponse({
+          status: 401,
+          type: "unauthorized",
+          message: `rejected api key ${secretKey}`,
+        }),
+      );
+
+      const adapter = new SerializedCodeAgentAdapter(
+        { ...defaultConfig, secrets: { OTHER: "shh-9f3a2b7c4e" } },
+        nlpServiceUrl,
+        secretKey,
+      );
+      let captured: SerializedCodeAgentAdapterError | undefined;
+      try {
+        await adapter.call(defaultInput);
+      } catch (e) {
+        captured = e as SerializedCodeAgentAdapterError;
+      }
+
+      expect(captured).toBeInstanceOf(SerializedCodeAgentAdapterError);
+      expect(captured!.message).not.toMatch(/sk-live-abcdef0123456789/);
+      expect(captured!.rawDetail ?? "").not.toMatch(/sk-live-abcdef0123456789/);
+      expect(captured!.message).toMatch(/\[redacted\]/);
+    });
+
+    it("never renders a project secret the engine echoed back", async () => {
+      const projectSecret = "shh-9f3a2b7c4e";
+      mockFetch.mockImplementation(async () =>
+        engineFailureResponse({
+          type: "ValueError",
+          message: `bad value ${projectSecret}`,
+          traceback: `ValueError: bad value ${projectSecret}`,
+        }),
+      );
+
+      const adapter = new SerializedCodeAgentAdapter(
+        { ...defaultConfig, secrets: { TOKEN: projectSecret } },
+        nlpServiceUrl,
+        apiKey,
+      );
+      let captured: SerializedCodeAgentAdapterError | undefined;
+      try {
+        await adapter.call(defaultInput);
+      } catch (e) {
+        captured = e as SerializedCodeAgentAdapterError;
+      }
+
+      expect(captured!.message).not.toMatch(/shh-9f3a2b7c4e/);
+      expect(captured!.rawDetail ?? "").not.toMatch(/shh-9f3a2b7c4e/);
+    });
+
     describe("when the request never completes", () => {
       /** @scenario adapter labels a fetch failure as a network error */
       it("labels a fetch-time failure as a network error", async () => {

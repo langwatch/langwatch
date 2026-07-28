@@ -23,6 +23,7 @@ import {
   formatFetchError,
   formatHttpError,
   formatMalformedBodyError,
+  scrubKnownSecrets,
 } from "./format-execution-error";
 
 /** Timeout for NLP service requests (2 minutes) */
@@ -119,6 +120,42 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
   ) {
     super();
     this.name = "SerializedCodeAgentAdapter";
+  }
+
+  /**
+   * Every secret this adapter puts on the wire, so no failure path can render
+   * one back to the customer. See `scrubKnownSecrets`.
+   */
+  private get knownSecrets(): string[] {
+    return [this.apiKey, ...Object.values(this.config.secrets ?? {})];
+  }
+
+  /**
+   * Scrub a failure on its way out of the adapter.
+   *
+   * Applied at the single exit point rather than at each of the six throw
+   * sites, so a future seventh cannot forget it.
+   */
+  private scrubFailure(
+    error: SerializedCodeAgentAdapterError,
+  ): SerializedCodeAgentAdapterError {
+    const secrets = this.knownSecrets;
+    const message = scrubKnownSecrets(error.message, secrets);
+    const rawDetail =
+      error.rawDetail === undefined
+        ? undefined
+        : scrubKnownSecrets(error.rawDetail, secrets);
+    if (message === error.message && rawDetail === error.rawDetail) {
+      return error;
+    }
+    return new SerializedCodeAgentAdapterError(message, {
+      kind: error.kind,
+      source: error.source,
+      endpoint: error.endpoint,
+      httpStatus: error.httpStatus,
+      rawDetail,
+      cause: error.cause,
+    });
   }
 
   async call(input: AgentInput): Promise<string> {
@@ -437,7 +474,9 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
             );
           }
         } catch (error) {
-          if (error instanceof SerializedCodeAgentAdapterError) throw error;
+          if (error instanceof SerializedCodeAgentAdapterError) {
+            throw this.scrubFailure(error);
+          }
           // The abort timer stays armed once headers arrive, so it can fire
           // while the body is still streaming. That rejection surfaces here,
           // outside the fetch try — classify it as the timeout it is rather
@@ -456,12 +495,14 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
               "error.kind",
               "timeout" satisfies AdapterErrorKind,
             );
-            throw new SerializedCodeAgentAdapterError(
-              formatFetchError({
-                cause: error,
-                timedOutAfterMs: NLP_FETCH_TIMEOUT_MS,
-              }),
-              { kind: "timeout", source: "timeout", endpoint, cause: error },
+            throw this.scrubFailure(
+              new SerializedCodeAgentAdapterError(
+                formatFetchError({
+                  cause: error,
+                  timedOutAfterMs: NLP_FETCH_TIMEOUT_MS,
+                }),
+                { kind: "timeout", source: "timeout", endpoint, cause: error },
+              ),
             );
           }
           throw error;

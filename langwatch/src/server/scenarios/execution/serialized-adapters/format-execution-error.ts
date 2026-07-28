@@ -450,6 +450,29 @@ export function redactInternalAddresses(text: string): string {
 }
 
 /**
+ * Replace known secret values with a marker, literally.
+ *
+ * Defence-in-depth, independent of what the engine puts in its error text.
+ * The adapter puts a live provider credential (`workflow.api_key`) and the
+ * project's secrets into the outgoing request, and this error text is
+ * persisted onto a customer-visible run record. If any upstream ever echoes a
+ * rejected credential, or a validation error quotes the submitted value back,
+ * pattern-based redaction would not catch it — only knowing the actual values
+ * does.
+ *
+ * Short values are skipped: a one- or two-character "secret" would rewrite
+ * ordinary text and destroy the message.
+ */
+export function scrubKnownSecrets(text: string, secrets: string[]): string {
+  let out = text;
+  for (const secret of secrets) {
+    if (typeof secret !== "string" || secret.length < 8) continue;
+    out = out.split(secret).join("[redacted]");
+  }
+  return out;
+}
+
+/**
  * Format a fetch-time failure (DNS, connect, abort/timeout).
  *
  * The internal endpoint is intentionally absent from the message; it lives

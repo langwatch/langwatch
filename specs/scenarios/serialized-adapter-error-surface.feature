@@ -160,3 +160,9 @@ Feature: Serialized adapters surface user-vs-infra failures distinctly
     When the failure is rendered for the customer
     Then the harness frames and their internal server path are gone
     And the customer's own frame and exception line remain
+
+  @unit
+  Scenario: a credential echoed back by the engine never reaches the customer
+    Given the NLP engine's error text quotes the API key the adapter sent
+    When SerializedCodeAgentAdapter.call rejects
+    Then neither the message nor the raw detail contains the key
