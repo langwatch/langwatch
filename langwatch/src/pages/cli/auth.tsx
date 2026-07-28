@@ -41,6 +41,7 @@ import { setAttributionIfAbsent } from "~/utils/attribution";
 import { OnboardingContainer } from "~/features/onboarding/components/containers/OnboardingContainer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { resolveCliAuthProjects } from "./cliAuthProjects";
+import { FirstTraceRedirect } from "./FirstTraceRedirect";
 import { ScopeChipPicker } from "~/components/settings/ScopeChipPicker";
 
 /**
@@ -603,16 +604,19 @@ export default function CliAuthPage() {
                       updated. You can close this tab.
                     </StatusCard>
                   ) : (
-                    <StatusCard
-                      palette="green"
-                      icon={CheckCircle2}
-                      title="You're signed in!"
-                    >
-                      LangWatch CLI is now authorized for{" "}
-                      <strong>{action.organizationName}</strong> using the{" "}
-                      <code>{action.vkLabel}</code> personal key. You can close
-                      this tab and return to your terminal.
-                    </StatusCard>
+                    <>
+                      <StatusCard
+                        palette="green"
+                        icon={CheckCircle2}
+                        title="You're signed in!"
+                      >
+                        LangWatch CLI is now authorized for{" "}
+                        <strong>{action.organizationName}</strong> using the{" "}
+                        <code>{action.vkLabel}</code> personal key. You can
+                        close this tab and return to your terminal.
+                      </StatusCard>
+                      <FirstTraceRedirect />
+                    </>
                   )}
                 </>
               )}

@@ -131,6 +131,30 @@ export interface SlackChannel {
   isPrivate: boolean;
 }
 
+/**
+ * Why a channel listing is short of the workspace. A listing can succeed and
+ * still be incomplete, and the two are indistinguishable to the caller unless
+ * we say so — which is the whole reason this type exists.
+ *
+ *   - `page_cap` — the walk stopped before Slack ran out of channels. Slack
+ *     documents that "it's possible to receive fewer results than your
+ *     specified limit, even when there are additional results to retrieve", so
+ *     a page can carry a fraction of what we ask for. The real ceiling is
+ *     therefore well under `pages x limit`, varies by workspace, and cannot be
+ *     predicted from the page size — which is why the cap has to be reported
+ *     rather than reasoned about.
+ *   - `private_channels_hidden` — the app has no `groups:read`, so the listing
+ *     fell back to public channels only.
+ */
+export type SlackChannelListGap = "page_cap" | "private_channels_hidden";
+
+export interface SlackChannelListing {
+  channels: SlackChannel[];
+  error: string | null;
+  /** Empty when the listing covers the whole workspace. */
+  gaps: SlackChannelListGap[];
+}
+
 interface SlackConversationsResponse {
   ok: boolean;
   error?: string;
@@ -163,11 +187,19 @@ const CHANNEL_LIST_MAX_RESPONSE_BYTES = 1024 * 1024;
 async function listChannelsForTypes(
   token: string,
   types: string,
-): Promise<{ channels: SlackChannel[]; error: string | null }> {
+): Promise<SlackChannelListing> {
   const collected: SlackChannel[] = [];
-  const done = (error: string | null) => ({
+  // Sorting happens here, AFTER any truncation, so a capped walk yields a list
+  // that reads as alphabetical and complete while missing entries throughout.
+  // That is why a silent cap is so misleading: the holes look like absence, not
+  // truncation.
+  const done = (
+    error: string | null,
+    gaps: SlackChannelListGap[] = [],
+  ): SlackChannelListing => ({
     channels: [...collected].sort((a, b) => a.name.localeCompare(b.name)),
     error,
+    gaps,
   });
 
   let cursor: string | undefined;
@@ -222,7 +254,7 @@ async function listChannelsForTypes(
     { pages: MAX_CHANNEL_PAGES, channels: collected.length },
     "Slack conversations.list page cap reached; returning a partial channel list",
   );
-  return done(null);
+  return done(null, ["page_cap"]);
 }
 
 /**
@@ -238,12 +270,21 @@ async function listChannelsForTypes(
  */
 export async function listSlackChannels(
   token: string,
-): Promise<{ channels: SlackChannel[]; error: string | null }> {
+): Promise<SlackChannelListing> {
   const withPrivate = await listChannelsForTypes(
     token,
     "public_channel,private_channel",
   );
   if (withPrivate.error !== "missing_scope") return withPrivate;
-  // Missing `groups:read` (private) — fall back to public channels only.
-  return listChannelsForTypes(token, "public_channel");
+  // Missing `groups:read` (private) — fall back to public channels only. The
+  // retry succeeds, so without recording the gap the caller would see a clean
+  // listing and no reason to doubt it.
+  const publicOnly = await listChannelsForTypes(token, "public_channel");
+  // Only a listing that came back is missing something. If the retry failed too
+  // there is no list to be partial, and the error is the whole story.
+  if (publicOnly.error !== null) return publicOnly;
+  return {
+    ...publicOnly,
+    gaps: [...publicOnly.gaps, "private_channels_hidden"],
+  };
 }

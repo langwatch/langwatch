@@ -957,6 +957,108 @@ export class AiToolEntryService {
   }
 
   /**
+   * The exact row shape a starter tile materialises as - shared by
+   * {@link seedStarterPack} (admin one-click import) and
+   * {@link ensureDefaultCatalog} (zero-touch provisioning) so both paths
+   * create identical rows: org-wide scope, enabled, slug written verbatim
+   * from the pack so later imports recognise the tile.
+   */
+  private starterTileCreateData({
+    organizationId,
+    tile,
+    order,
+    actorUserId,
+  }: {
+    organizationId: string;
+    tile: (typeof STARTER_PACK_TILES)[number];
+    order: number;
+    actorUserId?: string | null;
+  }): Prisma.AiToolEntryCreateManyInput {
+    return {
+      organizationId,
+      scope: "organization",
+      scopeId: organizationId,
+      type: tile.type,
+      displayName: tile.displayName,
+      slug: tile.slug,
+      iconAsset: tile.iconAsset,
+      order,
+      enabled: true,
+      config: tile.config as Prisma.InputJsonValue,
+      createdById: actorUserId ?? null,
+      updatedById: actorUserId ?? null,
+    };
+  }
+
+  /**
+   * Zero-touch default provisioning: an org that has NEVER had a catalog
+   * entry gets the full standard set ({@link STARTER_PACK_TILES}) so a
+   * fresh signup's /me portal renders tiles instead of the empty state.
+   * Wired into onboarding (org creation) and lazily into the aiTools.list
+   * read path, so the very first portal load of a zero-row org already
+   * returns the catalog.
+   *
+   * Strictly narrower than {@link seedStarterPack}: it only acts on an
+   * org with ZERO AiToolEntry rows - enabled, disabled, and archived all
+   * count as rows. Any existing row means an admin (or a previous
+   * provisioning run) owns the catalog, so an org whose admin archived or
+   * disabled everything is respected and NOT re-seeded; the portal empty
+   * state stays reachable only as that curated-empty fallback.
+   *
+   * Concurrency: there is no unique constraint on (organizationId, slug),
+   * so two concurrent first-loads could both observe zero rows and
+   * double-insert. A transaction-scoped Postgres advisory lock keyed per
+   * org serialises provisioners and the zero-row check re-runs under the
+   * lock (same pattern as modelDefaults.repository.ts#lockScope). The
+   * count outside the transaction keeps the hot path - every list call
+   * on an already-provisioned org - to one indexed count query.
+   */
+  async ensureDefaultCatalog({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<{ hasSeeded: boolean; created: number }> {
+    const existingCount = await this.prisma.aiToolEntry.count({
+      where: { organizationId },
+    });
+    if (existingCount > 0) return { hasSeeded: false, created: 0 };
+
+    return await this.prisma.$transaction(
+      async (tx) => {
+        // $executeRaw, not $queryRaw: pg_advisory_xact_lock returns void,
+        // which $queryRaw fails to deserialize. The lock releases at
+        // commit / rollback.
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`ai-tool-default-catalog:${organizationId}`}, 0))`;
+        const countUnderLock = await tx.aiToolEntry.count({
+          where: { organizationId },
+        });
+        if (countUnderLock > 0) return { hasSeeded: false, created: 0 };
+
+        await tx.aiToolEntry.createMany({
+          data: STARTER_PACK_TILES.map((tile, index) =>
+            this.starterTileCreateData({
+              organizationId,
+              tile,
+              order: index,
+              // Platform-provisioned, not a user action.
+              actorUserId: null,
+            }),
+          ),
+        });
+        return { hasSeeded: true, created: STARTER_PACK_TILES.length };
+      },
+      // Waiting on the advisory lock counts toward the interactive-txn
+      // timeout; give a losing concurrent provisioner room to wait out
+      // the winner instead of aborting at Prisma's 5s default. maxWait is
+      // raised the same way dataset-lock.ts does it: the burst this lock
+      // exists for is several first-loads of one fresh org hitting the
+      // pool at once, and Prisma's 2s default can fail a provisioner on
+      // connection acquisition before it ever reaches the lock.
+      { timeout: 15_000, maxWait: 10_000 },
+    );
+  }
+
+  /**
    * Seed the documented starter pack onto an org's catalog (Phase 7
    * "fresh-org friction killer" per docs/ai-governance/personal-portal/
    * admin-catalog.mdx). Three-way idempotent merge:
@@ -1044,22 +1146,14 @@ export class AiToolEntryService {
       ),
       ...toCreate.map((tile, index) =>
         this.prisma.aiToolEntry.create({
-          data: {
+          data: this.starterTileCreateData({
             organizationId: input.organizationId,
-            scope: "organization",
-            scopeId: input.organizationId,
-            type: tile.type,
-            displayName: tile.displayName,
-            slug: tile.slug,
-            iconAsset: tile.iconAsset,
+            tile,
             // Append after any tiles the admin already created - keeps
             // their hand-curated order on top.
             order: existing.length + index,
-            enabled: true,
-            config: tile.config as Prisma.InputJsonValue,
-            createdById: input.actorUserId ?? null,
-            updatedById: input.actorUserId ?? null,
-          },
+            actorUserId: input.actorUserId,
+          }),
         }),
       ),
     ]);

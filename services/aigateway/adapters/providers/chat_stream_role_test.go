@@ -268,7 +268,7 @@ func TestChatStreamRole_ProviderSendsOwnRole_PassesThroughUntouched(t *testing.T
 		"data: [DONE]\n\n"
 
 	backend := openAISSEBackend(t, script)
-	router := newTestRouterForRole(t)
+	router := openAIRouter(t, "")
 
 	iter, err := router.DispatchStream(context.Background(), chatStreamRequest(), customEndpointCredential(backend.URL))
 	require.NoError(t, err)
@@ -296,7 +296,7 @@ func TestChatStreamRole_ProviderSendsOwnRole_PassesThroughUntouched(t *testing.T
 // @scenario "OpenAI-compatible providers inherit the role repair"
 func TestChatStreamRole_OpenAICompat_InheritsRepair(t *testing.T) {
 	backend := openAISSEBackend(t, openAICaptureScript())
-	router := newTestRouterForRole(t)
+	router := openAIRouter(t, "")
 
 	iter, err := router.DispatchStream(context.Background(), chatStreamRequest(), customEndpointCredential(backend.URL))
 	require.NoError(t, err)
@@ -404,15 +404,6 @@ func TestChatStreamRole_ChoiceWithoutDelta_NotGivenOne(t *testing.T) {
 	choice := chunk["choices"].([]any)[0].(map[string]any)
 	_, hasDelta := choice["delta"]
 	assert.False(t, hasDelta, "a delta object must never be invented on a chunk that had none")
-}
-
-// newTestRouterForRole builds a bare router for openai-compat dispatches.
-func newTestRouterForRole(t *testing.T) *BifrostRouter {
-	t.Helper()
-	router, err := NewBifrostRouter(context.Background(), BifrostOptions{Logger: zap.NewNop()})
-	require.NoError(t, err)
-	t.Cleanup(router.Close)
-	return router
 }
 
 // customEndpointCredential points a credential at a local OpenAI-compatible

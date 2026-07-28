@@ -105,6 +105,8 @@ import {
   PANEL_SUGGESTION_COUNT,
   selectLangySuggestions,
 } from "../logic/langyHomeSuggestions";
+import { navigateDedupKey, reserveNavigate } from "../logic/langyNavigateDedup";
+import { isInternalHref } from "../logic/spaLink";
 import {
   APP_HEADER_HEIGHT,
   FLOATING_PANEL_CSS_WIDTH,
@@ -690,6 +692,20 @@ function LangyPanel({
   // The text of the send in flight, held so a failure can hand it back.
   const lastSentTextRef = useRef<string | null>(null);
 
+  // Navigate instructions already acted on, keyed by turnId+href
+  // (`navigateDedupKey`) — `onTurnStream` yields bare entries with no id, so a
+  // stream-tail replay after a reconnect could hand the same instruction
+  // twice. Reset per turn in `onIds` below, mirroring `githubRedrivenRef`'s
+  // "a double-fire must not repeat the effect" shape.
+  const navigatedInstructionsRef = useRef<Set<string>>(new Set());
+
+  // `router` (from react-router underneath) gets a new identity on every
+  // route change; the transport below is memoised once (`[]`), so it reads
+  // through a ref the render keeps fresh rather than closing over a router
+  // that would go stale after the very first navigation.
+  const routerRef = useRef(router);
+  routerRef.current = router;
+
   // The custom transport (memoised once): starts the turn via the
   // `langy.createConversation` / `langy.continueConversation` tRPC mutations,
   // then bridges the `langy.onTurnStream` tRPC subscription into the
@@ -708,6 +724,27 @@ function LangyPanel({
           // The turn was dispatched: adopt the conversation + turn and enter the
           // `active` phase (which also clears the previous turn's live signals).
           useLangyStore.getState().beginTurn({ conversationId, turnId });
+          // A fresh turn — clear the previous turn's navigate dedup too.
+          navigatedInstructionsRef.current = new Set();
+        },
+        onNavigate: (entry) => {
+          // Internal-target guard, mirroring MessageContent's isInternalHref:
+          // even though the relay only ever resolves same-app relative hrefs,
+          // this is the last line of defence before router.push actually runs.
+          if (!isInternalHref(entry.href)) return;
+
+          const turnId = useLangyStore.getState().activeTurnId;
+          const key = navigateDedupKey({ turnId, href: entry.href });
+          if (
+            !reserveNavigate({ seen: navigatedInstructionsRef.current, key })
+          )
+            return;
+
+          // router.push ONLY — never window.location. A same-project SPA
+          // route change keeps ProjectLangyLayout (and this panel with it)
+          // mounted, so the in-flight response keeps streaming right through
+          // the move.
+          void routerRef.current.push(entry.href);
         },
         onSignal: (signal) => {
           const store = useLangyStore.getState();

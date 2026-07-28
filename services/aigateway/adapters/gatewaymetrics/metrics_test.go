@@ -462,7 +462,7 @@ func TestMiddleware_SkipsProbesAndScrapes(t *testing.T) {
 	r := New()
 	router := chi.NewRouter()
 	router.Use(Middleware(r))
-	for _, path := range []string{"/healthz", "/readyz", "/startupz", "/metrics"} {
+	for _, path := range []string{"/healthz", "/readyz", "/startupz", "/metrics", "/health"} {
 		router.Get(path, func(w http.ResponseWriter, _ *http.Request) {
 			// The gauge must stay flat even while the operational request
 			// is being served, so a drain watcher sees customer work only.
@@ -471,7 +471,7 @@ func TestMiddleware_SkipsProbesAndScrapes(t *testing.T) {
 		})
 	}
 
-	for _, path := range []string{"/healthz", "/readyz", "/startupz", "/metrics"} {
+	for _, path := range []string{"/healthz", "/readyz", "/startupz", "/metrics", "/health"} {
 		rec := httptest.NewRecorder()
 		router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
 		require.Equal(t, http.StatusOK, rec.Code)

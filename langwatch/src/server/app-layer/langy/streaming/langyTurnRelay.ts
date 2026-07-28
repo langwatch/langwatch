@@ -18,10 +18,30 @@
  * All state that must survive an instance restart is durable (runToken, the
  * turn, the dedup set); the relay instance itself is stateless beyond a cache.
  */
-import type { CliResultDigest, CliToolResult } from "@langwatch/langy";
+import {
+  cliToolResultPayload,
+  type CliResultDigest,
+  type CliToolResult,
+} from "@langwatch/langy";
 import { resolveCapabilityProgress } from "~/features/langy/components/capabilities/capabilityRegistry";
+import { env } from "~/env.mjs";
+import type { LangyResourceLinkStore } from "./langyResourceLinks";
+import {
+  extractPlatformUrl,
+  isPreciseResourceHref,
+  toRelativeSameOriginHref,
+} from "~/utils/platformHref";
 import { verifyFrame } from "./langyFrameAuth";
-import { LangyCliEnvelopeService } from "../execution/langy-cli-envelope.service";
+import {
+  LangyCliEnvelopeService,
+  type LangyToolFrame,
+} from "../execution/langy-cli-envelope.service";
+import {
+  isSoleLangwatchInvocation,
+  parseAllLangwatchCommands,
+  parseLangwatchCommand,
+  type LangwatchCommand,
+} from "../execution/langwatchCommand";
 import {
   langyAgentErrorFromErrorFrame,
   serializeLangyTurnError,
@@ -32,6 +52,91 @@ import {
   type LangyFrameEnvelope,
   type LangyRelayFrame,
 } from "./langyRelayFrame";
+
+/** The CLI grammar the agent uses to say WHICH resource to open — never an
+ * address. `langwatch navigate open <resourceId>`; the platform resolves
+ * where that resource actually lives from the link it already remembered
+ * having surfaced this turn (see `resourceLinks` below). */
+const NAVIGATE_RESOURCE = "navigate";
+const NAVIGATE_VERB = "open";
+
+/** The resource id a parsed invocation names, when it is `navigate open`. */
+function navigateResourceIdOf(
+  invocation: LangwatchCommand | null,
+): { resourceId: string } | null {
+  if (
+    !invocation ||
+    invocation.resource !== NAVIGATE_RESOURCE ||
+    invocation.verb !== NAVIGATE_VERB
+  ) {
+    return null;
+  }
+  const positionals = invocation.args._;
+  const resourceId = Array.isArray(positionals) ? positionals[0] : undefined;
+  return typeof resourceId === "string" && resourceId ? { resourceId } : null;
+}
+
+/**
+ * IDs a precise platform link legitimately opens BEYOND its path's primary
+ * resource, so `navigate open <id>` resolves for any of them. A scenario-run
+ * link opens the run in a drawer (`…?drawer.open=scenarioRunDetail&
+ * drawer.scenarioRunId={runId}`) whose digest primaryId is the parent batch,
+ * not the run; the run id rides the `drawer.scenarioRunId` query. (The legacy
+ * nested form carried it as `openRun` — read both so either resolves.)
+ */
+function nestedResourceIds(platformUrl: string): string[] {
+  const ids: string[] = [];
+  try {
+    const params = new URL(platformUrl).searchParams;
+    for (const key of ["drawer.scenarioRunId", "openRun"]) {
+      const value = params.get(key);
+      if (value) ids.push(value);
+    }
+  } catch {
+    /* non-absolute / malformed — the primaryId key still applies */
+  }
+  return ids;
+}
+
+/**
+ * Id fields an item legitimately answers to when the agent names it — the
+ * item's own identity plus the parent ids the platform echoes on it. Kept to
+ * a short allowlist so arbitrary payload strings never become navigate keys.
+ */
+const ITEM_ID_KEYS = ["id", "scenarioRunId", "batchRunId", "runId"] as const;
+
+/**
+ * Every `{id, href}` pair a payload's NESTED objects surface — a LIST returns
+ * many resources in one call, each carrying its own `platformUrl`. Without
+ * this, only the single-resource shape (digest primaryId + top-level link)
+ * was remembered, so "list runs" → "open the latest one" resolved nothing and
+ * the navigate silently dropped. Depth-capped defensive walk; only precise
+ * per-resource links qualify, and only allowlisted id fields key them.
+ */
+function collectItemPlatformLinks(
+  payload: unknown,
+): Array<{ id: string; href: string }> {
+  const links = new Map<string, string>();
+  const walk = (node: unknown, depth: number): void => {
+    if (!node || typeof node !== "object" || depth > 4) return;
+    if (Array.isArray(node)) {
+      for (const item of node) walk(item, depth + 1);
+      return;
+    }
+    const obj = node as Record<string, unknown>;
+    const href = typeof obj.platformUrl === "string" ? obj.platformUrl : null;
+    if (href && isPreciseResourceHref(href)) {
+      for (const id of nestedResourceIds(href)) links.set(id, href);
+      for (const key of ITEM_ID_KEYS) {
+        const value = obj[key];
+        if (typeof value === "string" && value) links.set(value, href);
+      }
+    }
+    for (const value of Object.values(obj)) walk(value, depth + 1);
+  };
+  walk(payload, 0);
+  return Array.from(links, ([id, href]) => ({ id, href }));
+}
 
 /** The slice of the token buffer the relay writes (the live edge). */
 export interface LangyRelayBuffer {
@@ -71,6 +176,11 @@ export interface LangyRelayBuffer {
   markEnd(a: { conversationId: string; turnId: string }): Promise<void>;
   markError(a: { conversationId: string; turnId: string; error: string }): Promise<void>;
   heartbeat(a: { conversationId: string; turnId: string }): Promise<void>;
+  appendNavigate(a: {
+    conversationId: string;
+    turnId: string;
+    href: string;
+  }): Promise<void>;
 }
 
 /** The slice of the conversation service the relay dispatches durable events through. */
@@ -160,6 +270,23 @@ export interface LangyTurnRelayDeps {
     conversationId: string;
     turnId: string;
   }): Promise<string | null>;
+  /**
+   * Per-conversation memory of "which platform address did a lookup surface for
+   * resource X". A `navigate` instruction resolves its destination from here.
+   * Conversation-scoped (not this relay instance) so a resource looked up in one
+   * turn resolves a navigate in a LATER turn — the relay itself is per-turn.
+   */
+  resourceLinks: LangyResourceLinkStore;
+  /**
+   * Verified server-side fallback when the link store misses: the platform
+   * looks the id up with the PROJECT's own access and computes the address
+   * itself (see langyNavigateFallback). Null = not resolvable here → the
+   * navigate drops. Optional so tests and non-navigating consumers stay thin.
+   */
+  resolveResourceUrl?: (a: {
+    projectId: string;
+    resourceId: string;
+  }) => Promise<string | null>;
   logger?: { warn(o: unknown, m: string): void; debug?(o: unknown, m: string): void };
 }
 
@@ -209,6 +336,11 @@ export class LangyTurnRelay {
    * with the reduced output and its digest, never "the agent ran bash".
    */
   private readonly cliEnvelope = LangyCliEnvelopeService.create();
+
+  // The platform's own link for every resource a lookup surfaced, keyed by the
+  // resource id, is remembered in `deps.resourceLinks` — a per-CONVERSATION
+  // Redis store, NOT an instance field. The relay is per-turn; a navigate in a
+  // later turn must still resolve a link a lookup surfaced in an earlier one.
 
   constructor(private readonly deps: LangyTurnRelayDeps) {}
 
@@ -404,8 +536,30 @@ export class LangyTurnRelay {
         });
         return { status: "applied" };
 
-      case "tool":
+      case "tool": {
+        // A SOLE `langwatch navigate open <resourceId>` call is not a lookup —
+        // it is the agent naming WHICH already-surfaced resource to open. It
+        // never becomes a visible tool card or a durable event (live-only,
+        // see `resourceLinks`); everything else goes through the normal path.
+        const invocation = this.soleNavigateInvocationOf(frame);
+        if (invocation) {
+          return this.applyNavigateTool(projectId, at, frame, invocation);
+        }
+
+        // The model sometimes CHAINS the navigate onto its lookup
+        // (`…get X --format json && langwatch navigate open X`). The chained
+        // call keeps its normal life — card, durable record; the other
+        // segments are real work — but each navigate segment still fires:
+        // the id comes from the command string and the address only ever
+        // from the link store, so compound stdout changes nothing here.
+        // (Remembering stays sole-invocation-gated — stdout provenance.)
+        if (frame.phase === "end" && !frame.isError) {
+          for (const chained of this.chainedNavigateInvocationsOf(frame)) {
+            await this.applyNavigateTool(projectId, at, frame, chained);
+          }
+        }
         return this.applyTool(projectId, at, frame);
+      }
 
       case "final":
         await this.deps.buffer.markEnd(at);
@@ -486,6 +640,28 @@ export class LangyTurnRelay {
       },
     });
 
+    // Remember this resource's platform link — the ONLY thing a later
+    // `navigate` instruction may resolve an address from. Only from a
+    // settled, successful call (so a resource the viewer's own access could
+    // not reach never lands here); only when the call was a SOLE plain
+    // `langwatch` invocation, so its stdout is provably the CLI's own output
+    // and not something the agent chained in (`langwatch trace get x; echo
+    // '{…forged…}'` must never seed a navigation target); and only when the
+    // link addresses this ONE resource rather than degrading to a surface's
+    // bare index (a scenario run whose set could not be resolved, say) — an
+    // index must never be cached as if it were the resource's own address.
+    if (frame.phase === "end" && !call.isError) {
+      const command = this.cliEnvelope.shellCommandOf({
+        id: frame.id,
+        name: frame.name,
+        phase: frame.phase,
+        ...(frame.input !== undefined ? { input: frame.input } : {}),
+      });
+      if (command && isSoleLangwatchInvocation(command)) {
+        await this.rememberResourceLink(at, call);
+      }
+    }
+
     // Live card first so it opens as promptly as the tokens flow…
     await this.deps.buffer.appendTool({
       ...at,
@@ -535,6 +711,133 @@ export class LangyTurnRelay {
         ...(call.isError && call.output !== undefined ? { errorText: call.output } : {}),
       });
     }
+    return { status: "applied" };
+  }
+
+  /**
+   * Cache a settled call's platform link under the conversation, keyed by the
+   * resource it named. Also keys it by any nested resource the URL addresses —
+   * a scenario-run link is `…/{batch}?openRun={runId}` whose `digest.primaryId`
+   * is the BATCH, but the user opens the RUN; without the extra key
+   * `navigate open <runId>` would miss the link that is literally its own
+   * address. Every id the link legitimately opens is a valid navigate target.
+   */
+  private async rememberResourceLink(
+    at: { conversationId: string; turnId: string },
+    call: LangyToolFrame,
+  ): Promise<void> {
+    if (!call.result) return;
+    const payload = cliToolResultPayload(call.result);
+
+    // Every nested item that carries its own precise link (a LIST surfaces
+    // many resources in one call), keyed by each id it answers to.
+    const links = new Map(
+      collectItemPlatformLinks(payload).map(({ id, href }) => [id, href]),
+    );
+
+    // The single-resource shape: the call's digest names the resource, the
+    // payload's top-level link addresses it.
+    const primaryId = call.digest?.primaryId;
+    const platformUrl = extractPlatformUrl(payload);
+    if (primaryId && platformUrl && isPreciseResourceHref(platformUrl)) {
+      links.set(primaryId, platformUrl);
+      for (const id of nestedResourceIds(platformUrl)) {
+        links.set(id, platformUrl);
+      }
+    }
+
+    if (links.size === 0) return;
+    await this.deps.resourceLinks.remember({
+      conversationId: at.conversationId,
+      links: Array.from(links, ([id, href]) => ({ id, href })),
+    });
+  }
+
+  /**
+   * Whether a tool frame is the dedicated `langwatch navigate open
+   * <resourceId>` call, and — if so — the resource id it named. Read straight
+   * off the parsed shell command, independent of whether the call itself
+   * settled successfully: the agent's ONLY input here is which resource, never
+   * an address, so there is nothing else to extract.
+   */
+  private shellCommandOfFrame(
+    frame: Extract<LangyRelayFrame, { type: "tool" }>,
+  ): string | null {
+    return this.cliEnvelope.shellCommandOf({
+      id: frame.id,
+      name: frame.name,
+      phase: frame.phase,
+      ...(frame.input !== undefined ? { input: frame.input } : {}),
+    });
+  }
+
+  /**
+   * The frame IS one plain `langwatch navigate open <resourceId>` call and
+   * nothing else — the shape the relay intercepts whole (invisible: no card,
+   * no durable record).
+   */
+  private soleNavigateInvocationOf(
+    frame: Extract<LangyRelayFrame, { type: "tool" }>,
+  ): { resourceId: string } | null {
+    const command = this.shellCommandOfFrame(frame);
+    if (!command || !isSoleLangwatchInvocation(command)) return null;
+    return navigateResourceIdOf(parseLangwatchCommand(command));
+  }
+
+  /**
+   * Navigate segments riding a COMPOUND command (`…get X && langwatch
+   * navigate open X`). The call itself stays on the normal tool path — only
+   * the navigation side-effect is read off the command string.
+   */
+  private chainedNavigateInvocationsOf(
+    frame: Extract<LangyRelayFrame, { type: "tool" }>,
+  ): Array<{ resourceId: string }> {
+    const command = this.shellCommandOfFrame(frame);
+    if (!command) return [];
+    return parseAllLangwatchCommands(command)
+      .map(navigateResourceIdOf)
+      .filter((inv): inv is { resourceId: string } => inv !== null);
+  }
+
+  /**
+   * Resolve a navigate instruction and push it to the live edge — NEVER to the
+   * durable log (see `LangyStreamEntry`'s `navigate` variant). Invisible on
+   * both counts when it can't resolve: no tool card (the agent naming a
+   * resource to open is not a lookup worth its own card) and no navigation
+   * (an unknown/unresolvable/inaccessible destination silently drops — the
+   * turn is otherwise unaffected).
+   */
+  private async applyNavigateTool(
+    projectId: string,
+    at: { conversationId: string; turnId: string },
+    frame: Extract<LangyRelayFrame, { type: "tool" }>,
+    invocation: { resourceId: string },
+  ): Promise<LangyRelayOutcome> {
+    if (frame.phase === "start" || frame.isError) return { status: "applied" };
+
+    // The conversation's remembered link first; on a miss, the platform's own
+    // verified lookup (project-scoped) — the cache is an optimization, not
+    // the source of truth for what the id addresses.
+    const platformUrl =
+      (await this.deps.resourceLinks.resolve({
+        conversationId: at.conversationId,
+        id: invocation.resourceId,
+      })) ??
+      (this.deps.resolveResourceUrl
+        ? await this.deps.resolveResourceUrl({
+            projectId,
+            resourceId: invocation.resourceId,
+          })
+        : null);
+    if (!platformUrl) return { status: "applied" }; // not resolvable in this project — drop
+
+    const href = toRelativeSameOriginHref({
+      url: platformUrl,
+      origin: env.BASE_HOST ?? "",
+    });
+    if (!href) return { status: "applied" }; // resolves outside the app — drop
+
+    await this.deps.buffer.appendNavigate({ ...at, href });
     return { status: "applied" };
   }
 

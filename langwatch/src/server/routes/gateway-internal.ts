@@ -271,6 +271,21 @@ function notImplemented(c: Context) {
 // ── routes ──────────────────────────────────────────────────────────────
 
 /**
+ * §4.7: connectivity probe for the gateway's public /health endpoint.
+ *
+ * The Go gateway's statusprobe monitor calls this on its own clock
+ * (default every 15s per gateway pod) and serves the cached verdict to
+ * the status page. Riding the signed channel is the point: a 200 proves
+ * not just that the app is up but that the shared HMAC secret matches,
+ * the misconfig where every pod looks green while every virtual-key
+ * resolve is refused. Body deliberately static; the gateway only reads
+ * the status code.
+ */
+secured.access(gatewayPolicy()).get("/health", (c) => {
+  return c.json({ status: "ok" });
+});
+
+/**
  * §4.1 — resolve a raw virtual key to a signed JWT + current revision.
  *
  * Request:  { key_presented: "vk-lw-01HZX...", gateway_node_id: "gw-eks-abc" }

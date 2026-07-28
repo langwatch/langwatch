@@ -94,6 +94,9 @@ var operationalPaths = map[string]bool{
 	"/healthz":  true,
 	"/readyz":   true,
 	"/startupz": true,
+	// The public status-page monitor's poll target. Same reasoning as the
+	// probes: it always answers and would dilute the error-rate ratio.
+	"/health": true,
 }
 
 // Middleware counts and times every request, and tracks how many are in

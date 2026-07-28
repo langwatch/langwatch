@@ -26,6 +26,7 @@ import {
 } from "../logic/langyFeedbackDirective";
 import { langyPlan } from "../logic/langyPlan";
 import { questionToolCardParts } from "../logic/langyQuestionTool";
+import { useSpaLinkClick } from "../logic/spaLink";
 import {
   foldReasoningTitles,
   stripReasoningTitles,
@@ -658,6 +659,8 @@ export function ProposalCard({
     return "var(--chakra-colors-purple-fg)";
   })();
 
+  const onOpenHrefClick = useSpaLinkClick(openHref ?? "");
+
   const triggerOpen = () => {
     if (onOpen) {
       onOpen();
@@ -814,28 +817,7 @@ export function ProposalCard({
             </Button>
           ) : openHref ? (
             <Button size="xs" variant="outline" colorPalette="green" asChild>
-              <a
-                href={openHref}
-                onClick={(e) => {
-                  // Keep the real anchor so cmd/ctrl/shift-click and middle-
-                  // click still open a new tab, and right-click still offers
-                  // "open in new tab". Intercept ONLY a plain left click on an
-                  // in-app link, and SPA-navigate it instead of full-reloading.
-                  if (!isInternalHref(openHref)) return;
-                  if (
-                    e.defaultPrevented ||
-                    e.button !== 0 ||
-                    e.metaKey ||
-                    e.ctrlKey ||
-                    e.shiftKey ||
-                    e.altKey
-                  ) {
-                    return;
-                  }
-                  e.preventDefault();
-                  void router.push(openHref);
-                }}
-              >
+              <a href={openHref} onClick={onOpenHrefClick}>
                 {openLabel}
                 <ArrowRight size={12} />
               </a>

@@ -18,7 +18,10 @@ import { platformUrl } from "../../shared/platform-url";
 
 function agentPlatformUrl({ projectSlug, agentId, agentType }: { projectSlug: string; agentId: string; agentType: string }): string {
   const drawer = agentType === "http" ? "agentHttpEditor" : "agentCodeEditor";
-  return platformUrl({ projectSlug, path: `/agents?drawer.open=${drawer}&drawer.agentId=${agentId}` });
+  return platformUrl({
+    projectSlug,
+    path: `/agents?drawer.open=${drawer}&drawer.agentId=${encodeURIComponent(agentId)}`,
+  });
 }
 import { ZodError } from "zod";
 import { handleAgentError } from "./error-handler";
@@ -177,9 +180,10 @@ secured.access(requires("project:view")).get(
         config: agent.config,
         createdAt: agent.createdAt,
         updatedAt: agent.updatedAt,
-        platformUrl: platformUrl({
+        platformUrl: agentPlatformUrl({
           projectSlug: project.slug,
-          path: `/agents`,
+          agentId: agent.id,
+          agentType: agent.type,
         }),
       });
     },
@@ -227,9 +231,10 @@ secured.access(requires("project:update")).patch(
         config: agent.config,
         createdAt: agent.createdAt,
         updatedAt: agent.updatedAt,
-        platformUrl: platformUrl({
+        platformUrl: agentPlatformUrl({
           projectSlug: project.slug,
-          path: `/agents`,
+          agentId: agent.id,
+          agentType: agent.type,
         }),
       });
     },
