@@ -228,6 +228,14 @@ may never *be* one.
 and the pipeline calls more than one of its methods, it is a layer-3 value that
 should be narrowed to the layer-4 ports actually used.
 
+> **Rule 2's narrowing test can never fire, because Rule 1 disarms it.** "…if
+> the pipeline calls more than one of its methods" assumes `pipeline.ts` calls
+> methods on its deps. After Rule 1 it does not — it only *constructs*; the
+> collaborators it builds are what call methods. Applied literally,
+> `broadcast: BroadcastService` passes the test while being exactly the layer-3
+> value the rule exists to catch. Restate it in terms of the methods reached
+> **through** the pipeline's constructions, not by the file itself.
+
 ### 3. Infrastructure resolves `Redis | Cluster` once — and `this.cached()` is a bug, not a policy
 
 The first draft listed `pipelineRegistry.cached()` as centralised policy worth
@@ -380,6 +388,30 @@ dispatch. Not one is "pipeline A needs pipeline B's handler":
 | topic clustering | topic clustering (self) | the three run-outcome commands |
 | billing | billing (self) | `reportUsageForMonth` |
 | EE ingestion pull | itself | the two run-outcome commands |
+
+> **Right conclusion, wrong mechanism — and a boundary this ADR never states.**
+> Step 4 proved the bus absorbs self-reference, with a test that registers the
+> real pipeline and asserts a `computeRunMetrics` job lands on its own queue.
+> But this section credits the fix to *moving the handler in* ("the only thing
+> that still has to be late is the lookup"). That is not what makes it work.
+> What makes it work is that `port()` **records without resolving**, and
+> `indexCommandClasses` runs as the **last** act of `register()`. The bus would
+> absorb self-reference even with the handler still injected; moving it in is a
+> Rule-1 consequence, not the enabling condition.
+>
+> **The boundary: the bus subsumes late binding to a *command*. It does not
+> subsume late binding to a *job*.** `registerJob` appears **zero** times in
+> `staticBuilder.ts` — jobs exist only on the runtime service, with no static
+> declaration for an identity-keyed command bus to key on. Three of the seven
+> `Deferred`s are job-shaped (`scheduleRetry`, `scheduleDeferred`, and
+> `datasetNormalize`'s enqueue), so §"Consequences"' promise of "one
+> late-binding mechanism instead of three" lands at **two**, not one — unless
+> jobs also become declarable on the builder, which is real scope this plan
+> currently hides.
+>
+> `scheduleRetry` therefore stays, and its named error is the right failure
+> mode: a missing retry lane should say so, not surface as
+> `undefined is not a function`.
 
 Self-reference is therefore not a separate problem, and the `Deferred` pattern is
 not inherent to it — it is an artefact of building the dispatching *handler*
