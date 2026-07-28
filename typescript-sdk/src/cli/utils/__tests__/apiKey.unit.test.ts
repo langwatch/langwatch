@@ -364,7 +364,10 @@ describe("resolveCredentials()", () => {
         // lines between sections, not just the presence of fragments. ANSI
         // codes are stripped so a color-forcing environment cannot skew it.
         const stderr = errorSpy.mock.calls
-          .map((c: unknown[]) => String(c[0]).replace(/\u001b\[[0-9;]*m/g, ""))
+          .map((c: unknown[]) =>
+            // eslint-disable-next-line no-control-regex -- intentional: stripping ANSI escape codes from chalk output
+            String(c[0]).replace(/\u001b\[[0-9;]*m/g, ""),
+          )
           .join("\n");
         expect(stderr).toBe(
           [
