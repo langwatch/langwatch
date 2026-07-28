@@ -3,7 +3,7 @@
  * @integration
  *
  * Verifies the bloom_filter skip-index on evaluation_runs.EvaluationId
- * (migration 00042):
+ * (migration 00057):
  *  - the migration attaches idx_evaluation_id to the table, and
  *  - the (TenantId, EvaluationId) point-lookup shapes still return the right
  *    rows, including the ScheduledAt resolve that bounds getByEvaluationId.
@@ -107,7 +107,7 @@ afterAll(async () => {
   await stopTestContainers();
 });
 
-describe("evaluation_runs EvaluationId skip-index (migration 00042)", () => {
+describe("evaluation_runs EvaluationId skip-index (migration 00057)", () => {
   it("attaches a bloom_filter index on EvaluationId", async () => {
     const ddl = await (
       await ch.query({
