@@ -54,6 +54,15 @@ Feature: Scenario infrastructure error surfacing and empty-response state
     And the message offers the timeout hint
 
   @unit
+  @integration
+  Scenario: The drawer tells the user it was their agent's code, not LangWatch
+    Given a run failed because the agent's Python code raised
+    When the run drawer renders the error
+    Then the title says the agent's code failed
+    And the agent's own exception is shown
+    And the drawer does not say the simulation timed out
+    And no raw traceback frame is shown
+
   @unit
   Scenario: A failure in the agent's own code is not reported as our infrastructure failing
     Given a scenario failed because the agent's Python code raised
