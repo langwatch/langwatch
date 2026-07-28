@@ -266,6 +266,43 @@ Feature: Comparison leaderboard (Bradley-Terry ranking on the results page)
     When I open the expanded leaderboard
     Then more variants show the low-sample-size warning than would at 3 variants
 
+  # ── Deciding whether two variants actually differ ──────────────────────
+  #
+  # Every claim in this feature — the winner, the tie set, what may be
+  # dropped, how much the run settled — reduces to one question asked of a
+  # pair. It is asked once, in one place, so the panels cannot disagree.
+  #
+  # It is asked of the DIFFERENCE between two scores, not of their two
+  # separate intervals. Every resample fits all variants together, so their
+  # errors move together; comparing the two intervals throws that pairing
+  # away and asks a strictly harder question than the one being posed. The
+  # result errs safe — it under-reports real differences — but under-
+  # reporting is still being wrong, and it is wrong in a way that reads as
+  # "we cannot tell you" when the run in fact could.
+
+  Scenario: Two variants are separated on the difference between them
+    Given the run resampled the leaderboard many times
+    When it decides whether two variants differ on quality
+    Then it asks whether the confidence interval of their score difference excludes zero
+    And not whether their two individual intervals happen to overlap
+
+  Scenario: A difference the run can see is not reported as a tie
+    Given two variants whose individual confidence intervals overlap
+    And whose score difference stays on one side of zero across the resamples
+    When I view the leaderboard
+    Then the run reports them as separated
+
+  Scenario: Every panel agrees on which pairs were separated
+    Given a leaderboard with several variants
+    When I read the verdict, the count of how much the run settled, and the trade-off summary
+    Then all three rest on the same answer for any given pair
+
+  Scenario: Without resamples the run falls back to comparing intervals
+    Given the bootstrap did not run
+    When it decides whether two variants differ on quality
+    Then it compares their individual intervals instead
+    And it never reports more separation than that fallback allows
+
   # ── Reading the verdict without reading the chart ──────────────────────
   #
   # Everything decision-relevant is already computed: the winner, the tie

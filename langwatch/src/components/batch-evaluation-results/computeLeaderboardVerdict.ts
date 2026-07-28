@@ -17,6 +17,7 @@
 
 import type { BTLeaderboard, BTLeaderboardEntry } from "./computeBTLeaderboard";
 import type { VariantMetrics } from "./computeVariantMetrics";
+import { areDistinguishable } from "./scoreSeparation";
 
 export type LeaderboardVerdict = {
   /**
@@ -34,42 +35,10 @@ export type LeaderboardVerdict = {
   tiedIds: string[];
 };
 
-/** Two intervals overlap unless one ends strictly before the other starts. */
-const intervalsOverlap = (
-  a: [number, number],
-  b: [number, number],
-): boolean => a[0] <= b[1] && b[0] <= a[1];
-
-/**
- * Whether the run separates these two variants.
- *
- * A missing interval means the bootstrap was disabled or the sample was too
- * small to produce one. That is an absence of evidence, not evidence of a
- * difference, so it counts as "cannot separate" — the conservative
- * direction, and the one that avoids inventing a winner from thin data.
- */
-export const areDistinguishable = (
-  a: BTLeaderboardEntry,
-  b: BTLeaderboardEntry,
-): boolean => {
-  if (!a.scoreCI || !b.scoreCI) return false;
-  // A non-finite bound is not evidence of a difference, and NaN in particular
-  // would masquerade as one: every comparison against NaN is false, so
-  // `intervalsOverlap` returns false and the negation reads "distinguishable".
-  // That produced a `clear-winner` on the same leaderboard where
-  // computeSampleAdequacy — which has always checked this — reported zero
-  // separated pairs, so the two panels contradicted each other on screen.
-  if (
-    ![...a.scoreCI, ...b.scoreCI].every((bound) => Number.isFinite(bound))
-  ) {
-    return false;
-  }
-  return !intervalsOverlap(a.scoreCI, b.scoreCI);
-};
-
 export const computeLeaderboardVerdict = (
   leaderboard: BTLeaderboard,
 ): LeaderboardVerdict => {
+  const differenceCI = leaderboard.scoreDifferenceCI;
   // Degenerate variants (no wins or no losses at all) have no meaningful
   // MLE score, so they cannot be crowned or used to unseat anyone.
   const ranked = leaderboard.entries.filter((entry) => !entry.degenerate);
@@ -109,7 +78,11 @@ export const computeLeaderboardVerdict = (
   // leader in by construction and yields the top clique in score order.
   const tied: BTLeaderboardEntry[] = [leader];
   for (const entry of ranked.slice(1)) {
-    if (tied.every((member) => !areDistinguishable(member, entry))) {
+    if (
+      tied.every(
+        (member) => !areDistinguishable({ a: member, b: entry, differenceCI }),
+      )
+    ) {
       tied.push(entry);
     }
   }

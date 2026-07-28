@@ -21,6 +21,9 @@ const leaderboard = (
   hasDegenerate: false,
   didConverge: true,
   comparability: { identifiable: true, groups: [], dominates: [] },
+  // No replicates, so separation falls back to comparing the marginal
+  // intervals — which is what these expectations were written against.
+  scoreDifferenceCI: null,
   ...overrides,
 });
 

@@ -17,43 +17,20 @@
  * across runs instead of trusting a projection.
  */
 
-import type { BTLeaderboard, BTLeaderboardEntry } from "./computeBTLeaderboard";
+import type { BTLeaderboard } from "./computeBTLeaderboard";
+import { areDistinguishable } from "./scoreSeparation";
 
 export type SampleAdequacy = {
   /** Head-to-head comparisons the judge resolved. */
   comparisonCount: number;
   /** Variants that could be placed on the scale at all. */
   rankedVariantCount: number;
-  /** Pairs among ranked variants whose intervals do not overlap. */
+  /** Pairs among ranked variants the run separated on quality. */
   separatedPairs: number;
   /** Every pair among ranked variants. */
   totalPairs: number;
   /** separatedPairs / totalPairs, or null when there are no pairs. */
   resolution: number | null;
-};
-
-const intervalsOverlap = (
-  a: [number, number],
-  b: [number, number],
-): boolean => a[0] <= b[1] && b[0] <= a[1];
-
-/**
- * A missing interval counts as "not separated", matching
- * computeLeaderboardVerdict: absence of evidence is not evidence of a
- * difference, and the conservative direction is the one that avoids
- * reporting resolution the run did not earn.
- */
-const isSeparated = (a: BTLeaderboardEntry, b: BTLeaderboardEntry): boolean => {
-  if (!a.scoreCI || !b.scoreCI) return false;
-  if (
-    !Number.isFinite(a.scoreCI[0]) ||
-    !Number.isFinite(a.scoreCI[1]) ||
-    !Number.isFinite(b.scoreCI[0]) ||
-    !Number.isFinite(b.scoreCI[1])
-  ) {
-    return false;
-  }
-  return !intervalsOverlap(a.scoreCI, b.scoreCI);
 };
 
 export const computeSampleAdequacy = (
@@ -62,11 +39,17 @@ export const computeSampleAdequacy = (
   const ranked = leaderboard.entries.filter((entry) => !entry.degenerate);
   const rankedVariantCount = ranked.length;
   const totalPairs = (rankedVariantCount * (rankedVariantCount - 1)) / 2;
+  const differenceCI = leaderboard.scoreDifferenceCI;
 
+  // The same test the verdict uses, from the same module. These two counted
+  // separation independently once and disagreed on screen: the verdict named
+  // a clear winner while this panel reported zero separated pairs.
   let separatedPairs = 0;
   for (let i = 0; i < ranked.length; i++) {
     for (let j = i + 1; j < ranked.length; j++) {
-      if (isSeparated(ranked[i]!, ranked[j]!)) separatedPairs++;
+      if (areDistinguishable({ a: ranked[i]!, b: ranked[j]!, differenceCI })) {
+        separatedPairs++;
+      }
     }
   }
 

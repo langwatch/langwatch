@@ -78,7 +78,31 @@ export type BTLeaderboard = {
    * 1957): scores are comparable only within a strongly connected component.
    */
   comparability: Comparability;
+  /**
+   * 95% CI of the DIFFERENCE between two scores, per ordered pair. Null when
+   * the bootstrap did not run.
+   *
+   * This is the statistic the separation question actually asks, and it is
+   * not recoverable from the per-variant intervals above. Every replicate
+   * re-fits the whole field at once, so two variants' replicate scores move
+   * together — a resample that happens to favour the field lifts both. The
+   * difference cancels that shared movement; comparing the two marginal
+   * intervals does not, and so tests a strictly stronger condition than
+   * "these two differ". The cost is real: intervals can overlap while every
+   * replicate still puts a ahead of b.
+   */
+  scoreDifferenceCI: ScoreDifferenceCI | null;
 };
+
+/**
+ * `scoreDifferenceCI[a][b]` is the 95% interval for (score of a) − (score of
+ * b). Keyed by variantId rather than index so consumers holding an entry can
+ * look a pair up without tracking the fit's ordering.
+ */
+export type ScoreDifferenceCI = Record<
+  string,
+  Record<string, [number, number]>
+>;
 
 export type BTLeaderboardOptions = {
   /**
@@ -126,6 +150,7 @@ export function computeBTLeaderboard({
       hasDegenerate: false,
       didConverge: true,
       comparability: { identifiable: true, groups: [], dominates: [] },
+      scoreDifferenceCI: null,
     };
   }
 
@@ -170,16 +195,20 @@ export function computeBTLeaderboard({
   });
 
   let scoreCI: Array<[number, number] | null> = new Array(n).fill(null);
+  let scoreDifferenceCI: ScoreDifferenceCI | null = null;
   if (opts.bootstrapSamples > 0 && usable.length > 1) {
-    scoreCI = bootstrapScoreCI({
+    const bootstrapped = bootstrapScoreCI({
       comparisons: usable,
       idx,
       n,
+      variantIds,
       samples: opts.bootstrapSamples,
       seed: opts.seed,
       maxIter: opts.maxIter,
       tol: opts.tol,
     });
+    scoreCI = bootstrapped.scoreCI;
+    scoreDifferenceCI = bootstrapped.differenceCI;
   }
 
   const score = strength.map((s) => 400 * Math.log10(s));
@@ -223,6 +252,7 @@ export function computeBTLeaderboard({
     hasDegenerate,
     didConverge: converged,
     comparability: computeComparability({ winMatrix, variantIds }),
+    scoreDifferenceCI,
   };
 }
 
@@ -437,6 +467,7 @@ function bootstrapScoreCI({
   comparisons,
   idx,
   n,
+  variantIds,
   samples,
   seed,
   maxIter,
@@ -445,11 +476,15 @@ function bootstrapScoreCI({
   comparisons: PairwiseComparison[];
   idx: Map<string, number>;
   n: number;
+  variantIds: string[];
   samples: number;
   seed: number;
   maxIter: number;
   tol: number;
-}): Array<[number, number] | null> {
+}): {
+  scoreCI: Array<[number, number] | null>;
+  differenceCI: ScoreDifferenceCI;
+} {
   const rand = mulberry32(seed);
   const m = comparisons.length;
   const scoreSamples: number[][] = Array.from({ length: n }, () => []);
@@ -491,13 +526,44 @@ function bootstrapScoreCI({
     }
   }
 
-  return scoreSamples.map((arr) => {
+  const scoreCI = scoreSamples.map((arr): [number, number] | null => {
     if (arr.length === 0) return null;
     const sorted = [...arr].sort((a, b) => a - b);
-    const lo = quantile(sorted, 0.025);
-    const hi = quantile(sorted, 0.975);
-    return [lo, hi];
+    return [quantile(sorted, 0.025), quantile(sorted, 0.975)];
   });
+
+  // The paired difference, computed from the SAME replicates. Replicate b of
+  // variant i and replicate b of variant j come from one resample and one
+  // fit, so subtracting them cancels whatever that resample did to the field
+  // as a whole. That is the entire reason this is worth keeping: the spread
+  // of the difference is smaller than the spread of either score whenever the
+  // two move together, which on a shared fit they always do.
+  const differenceCI: ScoreDifferenceCI = {};
+  for (const id of variantIds) differenceCI[id] = {};
+
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      const diffs: number[] = [];
+      for (let b = 0; b < samples; b++) {
+        const d = scoreSamples[i]![b]! - scoreSamples[j]![b]!;
+        // A replicate that produced a non-finite score for either variant
+        // says nothing about the gap between them. Dropping it is the only
+        // honest option; keeping it would poison every quantile.
+        if (Number.isFinite(d)) diffs.push(d);
+      }
+      if (diffs.length === 0) continue;
+      diffs.sort((a, b) => a - b);
+      const lo = quantile(diffs, 0.025);
+      const hi = quantile(diffs, 0.975);
+      differenceCI[variantIds[i]!]![variantIds[j]!] = [lo, hi];
+      // The mirrored pair, negated and reversed: CI(b − a) = −CI(a − b).
+      // Stored rather than derived so a consumer never has to know which
+      // way round it asked.
+      differenceCI[variantIds[j]!]![variantIds[i]!] = [-hi, -lo];
+    }
+  }
+
+  return { scoreCI, differenceCI };
 }
 
 function quantile(sorted: number[], q: number): number {

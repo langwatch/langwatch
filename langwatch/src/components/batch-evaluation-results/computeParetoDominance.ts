@@ -35,12 +35,14 @@
  * measurement, so they can neither beat nor be beaten on quality.
  */
 
-import type { BTLeaderboard, BTLeaderboardEntry } from "./computeBTLeaderboard";
-import {
-  areDistinguishable,
-  MIN_PRICED_ROWS,
-} from "./computeLeaderboardVerdict";
+import type {
+  BTLeaderboard,
+  BTLeaderboardEntry,
+  ScoreDifferenceCI,
+} from "./computeBTLeaderboard";
+import { MIN_PRICED_ROWS } from "./computeLeaderboardVerdict";
 import type { VariantMetrics } from "./computeVariantMetrics";
+import { areDistinguishable } from "./scoreSeparation";
 
 /**
  * Relative gap below which cost or speed counts as a tie.
@@ -96,11 +98,16 @@ const compareLowerIsBetter = (a: number, b: number): Comparison => {
   return a < b ? 1 : -1;
 };
 
-const compareQuality = (
-  a: BTLeaderboardEntry,
-  b: BTLeaderboardEntry,
-): Comparison => {
-  if (!areDistinguishable(a, b)) return 0;
+const compareQuality = ({
+  a,
+  b,
+  differenceCI,
+}: {
+  a: BTLeaderboardEntry;
+  b: BTLeaderboardEntry;
+  differenceCI: ScoreDifferenceCI | null;
+}): Comparison => {
+  if (!areDistinguishable({ a, b, differenceCI })) return 0;
   return a.score > b.score ? 1 : -1;
 };
 
@@ -142,7 +149,9 @@ export const computeParetoDominance = ({
     a: BTLeaderboardEntry,
     b: BTLeaderboardEntry,
   ): Comparison => {
-    if (dimension === "quality") return compareQuality(a, b);
+    if (dimension === "quality") {
+      return compareQuality({ a, b, differenceCI: leaderboard.scoreDifferenceCI });
+    }
     const read = dimension === "cost" ? costOf : speedOf;
     const aValue = read(a.variantId);
     const bValue = read(b.variantId);
