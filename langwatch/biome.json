@@ -114,7 +114,6 @@
 						"noUnreachable": "off",
 						"noUnreachableSuper": "off"
 					},
-					"nursery": {},
 					"style": {
 						"useConst": "error",
 						"useSpreadOverApply": "error"

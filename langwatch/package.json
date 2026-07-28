@@ -18,6 +18,7 @@
     "build:client": "NODE_ENV=production vite build",
     "tool:analytics-parity-check": "NODE_ENV=development pnpm --filter @langwatch/analytics-parity-check",
     "lint": "pnpm exec biome check src/ ee/ --max-diagnostics=1000",
+    "lint:plugins": "pnpm exec biome lint --only=plugin --max-diagnostics=none ./src ./ee",
     "lint:fix": "pnpm exec biome check src/ ee/ --write --max-diagnostics=1000",
     "check:feature-parity": "tsx scripts/check-feature-parity.ts",
     "format": "pnpm exec biome format src/ ee/ --write",

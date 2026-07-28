@@ -374,6 +374,44 @@ jobs:
           workdir: langwatch
           biome_flags: "./src ./ee --max-diagnostics=1000"
 
+      # The gate below can only fail if the plugin still matches something. A
+      # GritQL pattern that drifts — a renamed node kind, a regex that stopped
+      # anchoring — compiles fine, matches nothing, reports "No fixes applied"
+      # and is green forever, which is indistinguishable from a clean repo.
+      # This is the plugin's `SCANNED_FILE_FLOOR`: run it over a file of
+      # deliberate violations and require it to *fail* before believing the
+      # pass it reports on real code.
+      #
+      # The fixture lives outside ./src and ./ee, so the gate below never sees
+      # it — do not move it in, and do not add it to biome.json's ignores.
+      - name: Self-test the analyzer plugins
+        working-directory: langwatch
+        env:
+          # One diagnostic per deliberate violation in the fixture. A floor
+          # rather than an equality so adding a violation doesn't fail the
+          # build; raise it when you add a pattern to the plugin.
+          PLUGIN_FIXTURE_FLOOR: "18"
+        run: |
+          fixture=biome-plugins/__tests__/no-raw-error-toast.fixtures.tsx
+          set +e
+          output=$(biome lint --only=plugin --max-diagnostics=none --colors=off "$fixture" 2>&1)
+          status=$?
+          set -e
+          echo "$output"
+          if [ "$status" -eq 0 ]; then
+            echo "FAIL: no-raw-error-toast.grit flagged nothing in its own violation fixture."
+            echo "Its patterns have drifted — 'Enforce analyzer plugins' can no longer fail."
+            exit 1
+          fi
+          # One header line per diagnostic: `path:line:col plugin ━━━…`.
+          found=$(printf '%s\n' "$output" | grep -cE '^[^ ]+:[0-9]+:[0-9]+ plugin ' || true)
+          if [ "$found" -lt "$PLUGIN_FIXTURE_FLOOR" ]; then
+            echo "FAIL: the plugin flagged $found of the $PLUGIN_FIXTURE_FLOOR violations in $fixture."
+            echo "Some patterns still match and some no longer do; the gate is partially blind."
+            exit 1
+          fi
+          echo "PASS: the plugin flagged $found violations in its own fixture."
+
       # The gate: every event, every line, nothing suppressed.
       #
       # Scoped to the analyzer plugins rather than the whole ruleset on purpose.
