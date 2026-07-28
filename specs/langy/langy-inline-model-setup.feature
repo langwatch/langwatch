@@ -32,3 +32,14 @@ Feature: Langy prompts for a model when the project has none configured
     When the user opens the Langy panel
     Then the panel shows its normal empty state
     And no model setup prompt is shown
+
+  # An errored resolver reports isLoading false with no data, exactly like a
+  # project that has no model. Reading that as "no model configured" replaced
+  # the user's open conversation with the onboarding grid — and because the
+  # query is cached with no refetch trigger, nothing brought the transcript
+  # back until a full page reload.
+  Scenario: A failed model lookup does not masquerade as a missing model
+    Given the project's model resolver fails to answer
+    When the user opens the Langy panel
+    Then the inline model setup is not shown
+    And the conversation surface is left intact

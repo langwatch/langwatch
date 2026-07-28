@@ -135,6 +135,7 @@ const resolvedDefaultRef = {
   current: {
     data: undefined as { model: string | null } | undefined,
     isLoading: false,
+    isError: false,
   },
 };
 const refetchResolvedDefault = vi.fn(() => {
@@ -143,6 +144,7 @@ const refetchResolvedDefault = vi.fn(() => {
   resolvedDefaultRef.current = {
     data: { model: "gpt-5-mini" },
     isLoading: false,
+    isError: false,
   };
   return Promise.resolve({ data: resolvedDefaultRef.current.data });
 });
@@ -226,6 +228,15 @@ vi.mock("~/utils/api", () => ({
         useQuery: () => ({
           data: resolvedDefaultRef.current.data,
           isLoading: resolvedDefaultRef.current.isLoading,
+          // The panel gates on isSuccess, not on !isLoading: an ERRORED query
+          // also reports isLoading false with data undefined, and reading that
+          // as "no model configured" replaced the whole conversation with the
+          // provider-onboarding grid. Mirror react-query's own relationship
+          // between the three so this mock cannot drift from that contract.
+          isSuccess:
+            !resolvedDefaultRef.current.isLoading &&
+            !resolvedDefaultRef.current.isError,
+          isError: resolvedDefaultRef.current.isError,
           refetch: refetchResolvedDefault,
         }),
       },
@@ -289,7 +300,11 @@ function renderPanel() {
 
 beforeEach(() => {
   projectRef.current = { id: "project-demo", slug: "demo" };
-  resolvedDefaultRef.current = { data: undefined, isLoading: false };
+  resolvedDefaultRef.current = {
+    data: undefined,
+    isLoading: false,
+    isError: false,
+  };
   refetchResolvedDefault.mockClear();
   lastOnComplete.current = null;
   currentDrawerRef.current = undefined;
@@ -384,6 +399,28 @@ describe("Feature: Langy prompts for a model when the project has none configure
             "Just type away, or start with one of these.",
           ),
         ).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("given the project's model resolver fails to answer", () => {
+    describe("when the user opens the Langy panel", () => {
+      /** @scenario "A failed model lookup does not masquerade as a missing model" */
+      it("does not show the setup prompt for what is really a failed lookup", async () => {
+        // react-query reports an errored query as isLoading false with data
+        // undefined - indistinguishable from "no model" unless success is
+        // checked explicitly.
+        resolvedDefaultRef.current = {
+          data: undefined,
+          isLoading: false,
+          isError: true,
+        };
+
+        renderPanel();
+
+        await waitFor(() => {
+          expect(screen.queryByTestId("model-provider-screen")).toBeNull();
+        });
       });
     });
   });
