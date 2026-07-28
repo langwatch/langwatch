@@ -854,6 +854,244 @@ describe("ClickHouseTraceService", () => {
         // — proof the helper descended to a single id before giving up.
         expect(mockClickHouseQuery).toHaveBeenCalledTimes(5);
       });
+
+      it("descends all the way to single ids when every larger chunk OOMs", async () => {
+        const traceIds = Array.from({ length: 30 }, (_, i) => `trace-${i}`);
+
+        mockClickHouseQuery
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve([{ total: String(traceIds.length) }]),
+          })
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve(traceIds.map((id) => ({ TraceId: id }))),
+          })
+          // Every read of more than one id OOMs; single ids succeed. The helper
+          // must therefore walk 25 -> 12 -> 6 -> 3 -> 1 rather than giving up at
+          // the first split, which is the "down to a single id" claim the doc
+          // comment makes and the one-level tests above never exercise.
+          .mockImplementation(
+            (args: { query_params?: { pageTraceIds?: string[] } }) => {
+              const ids = args.query_params?.pageTraceIds ?? [];
+              if (ids.length > 1) {
+                return Promise.reject(new Error("MEMORY_LIMIT_EXCEEDED"));
+              }
+              return Promise.resolve({
+                json: () => Promise.resolve(ids.map((id) => makeSummaryRow(id))),
+              });
+            },
+          );
+
+        const service = new ClickHouseTraceService({
+          project: { findUnique: mockPrismaFindUnique },
+        } as never);
+
+        const result = await service.getAllTracesForProject(
+          { ...baseInput, pageSize: 30 } as GetAllTracesForProjectInput,
+          protections,
+        );
+
+        expect(result).not.toBeNull();
+        expect(result!.groups.flat()).toHaveLength(30);
+
+        const chunkSizes = mockClickHouseQuery.mock.calls
+          .map((call) => call[0].query_params?.pageTraceIds?.length)
+          .filter((n): n is number => typeof n === "number");
+        // The descent bottomed out at 1, and every id was served by exactly one
+        // single-id read (25 from the first chunk, 5 from the second).
+        expect(chunkSizes).toContain(1);
+        expect(chunkSizes.filter((n) => n === 1)).toHaveLength(30);
+        // Intermediate levels really were visited, not skipped.
+        expect(chunkSizes).toContain(12);
+        expect(chunkSizes).toContain(6);
+        expect(chunkSizes).toContain(3);
+      });
+
+      it("stops bisecting once the work budget is spent instead of grinding every chunk", async () => {
+        // The regime the budget exists for: server-wide memory pressure, where
+        // a chunk fails at 25 but succeeds once small. Nothing aborts early, so
+        // every chunk pays a full recursion tree — 12 chunks x 17 runs = 204
+        // sequential queries at an instance that just reported it was OOM.
+        const traceIds = Array.from({ length: 300 }, (_, i) => `trace-${i}`);
+
+        mockClickHouseQuery
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve([{ total: String(traceIds.length) }]),
+          })
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve(traceIds.map((id) => ({ TraceId: id }))),
+          })
+          .mockImplementation(
+            (args: { query_params?: { pageTraceIds?: string[] } }) => {
+              const ids = args.query_params?.pageTraceIds ?? [];
+              if (ids.length > 3) {
+                return Promise.reject(new Error("MEMORY_LIMIT_EXCEEDED"));
+              }
+              return Promise.resolve({
+                json: () => Promise.resolve(ids.map((id) => makeSummaryRow(id))),
+              });
+            },
+          );
+
+        const service = new ClickHouseTraceService({
+          project: { findUnique: mockPrismaFindUnique },
+        } as never);
+
+        // Uncapped this call SUCCEEDS after grinding all 300 ids. The budget is
+        // what turns it back into the fast failure that protected the instance
+        // before bisection existed — so `rejects` here IS the fix, and it flips
+        // to a resolved page the moment the cap is removed.
+        await expect(
+          service.getAllTracesForProject(
+            { ...baseInput, pageSize: 300 } as GetAllTracesForProjectInput,
+            protections,
+          ),
+        ).rejects.toThrow("MEMORY_LIMIT_EXCEEDED");
+
+        // Total work stays under the documented ceiling:
+        //   ceil(300/25) baseline chunks + MAX_BISECT_RETRIES + count + IDs.
+        // Uncapped this is 206, so the bound fails without the budget.
+        expect(mockClickHouseQuery.mock.calls.length).toBeLessThanOrEqual(
+          12 + 100 + 2,
+        );
+      });
+
+      it("runs the two halves sequentially so a retry never doubles memory pressure", async () => {
+        const traceIds = Array.from({ length: 25 }, (_, i) => `trace-${i}`);
+        let inFlight = 0;
+        let maxInFlight = 0;
+
+        mockClickHouseQuery
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve([{ total: String(traceIds.length) }]),
+          })
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve(traceIds.map((id) => ({ TraceId: id }))),
+          })
+          .mockImplementation(
+            async (args: { query_params?: { pageTraceIds?: string[] } }) => {
+              const ids = args.query_params?.pageTraceIds ?? [];
+              inFlight += 1;
+              maxInFlight = Math.max(maxInFlight, inFlight);
+              try {
+                // Yield the microtask queue so overlapping calls would actually
+                // observe each other; a Promise.all refactor lands here at 2.
+                await new Promise((resolve) => setTimeout(resolve, 0));
+                if (ids.length > 12) {
+                  throw new Error("MEMORY_LIMIT_EXCEEDED");
+                }
+                return {
+                  json: () =>
+                    Promise.resolve(ids.map((id) => makeSummaryRow(id))),
+                };
+              } finally {
+                inFlight -= 1;
+              }
+            },
+          );
+
+        const service = new ClickHouseTraceService({
+          project: { findUnique: mockPrismaFindUnique },
+        } as never);
+
+        const result = await service.getAllTracesForProject(
+          { ...baseInput, pageSize: 25 } as GetAllTracesForProjectInput,
+          protections,
+        );
+
+        expect(result).not.toBeNull();
+        // Load-bearing safety property, called out in the helper's comment and
+        // otherwise untested: a Promise.all refactor would stay green without it.
+        expect(maxInFlight).toBe(1);
+      });
+
+      it("re-throws a non-OOM error raised inside the bisection, without descending further", async () => {
+        const traceIds = Array.from({ length: 25 }, (_, i) => `trace-${i}`);
+
+        mockClickHouseQuery
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve([{ total: String(traceIds.length) }]),
+          })
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve(traceIds.map((id) => ({ TraceId: id }))),
+          })
+          // full list OOMs, the 25-id chunk OOMs, then the bisected lower half
+          // fails for an unrelated reason — the guard's non-OOM arm in the
+          // RECURSIVE position, which the top-level test can't reach.
+          .mockRejectedValueOnce(new Error("MEMORY_LIMIT_EXCEEDED"))
+          .mockRejectedValueOnce(new Error("MEMORY_LIMIT_EXCEEDED"))
+          .mockRejectedValueOnce(new Error("SYNTAX_ERROR"));
+
+        const service = new ClickHouseTraceService({
+          project: { findUnique: mockPrismaFindUnique },
+        } as never);
+
+        await expect(
+          service.getAllTracesForProject(
+            { ...baseInput, pageSize: 25 } as GetAllTracesForProjectInput,
+            protections,
+          ),
+        ).rejects.toThrow("SYNTAX_ERROR");
+        // count, IDs, full-list OOM, chunk OOM, lower-half SYNTAX_ERROR — and
+        // nothing after it: the upper half is never attempted.
+        expect(mockClickHouseQuery).toHaveBeenCalledTimes(5);
+      });
+
+      it("bisects on the translated query_memory_exceeded the resilient client actually raises", async () => {
+        const { QueryMemoryExceededError } = await import(
+          "~/server/app-layer/traces/errors"
+        );
+        const traceIds = Array.from({ length: 25 }, (_, i) => `trace-${i}`);
+        const summaryRows = traceIds.map((id) => makeSummaryRow(id));
+
+        mockClickHouseQuery
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve([{ total: String(traceIds.length) }]),
+          })
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve(traceIds.map((id) => ({ TraceId: id }))),
+          })
+          // Production never surfaces a raw Error carrying the ClickHouse
+          // fragment any more: every read path runs through
+          // translateClickHouseQueryError, which hands back this handled error
+          // with the driver detail buried in `reasons`. The other bisection
+          // tests reach the fallback via the legacy string-match arm, so this
+          // is the only one that proves the feature fires in prod.
+          .mockRejectedValueOnce(
+            new QueryMemoryExceededError({
+              reasons: [new Error("Code: 241. DB::Exception: ...")],
+            }),
+          )
+          .mockRejectedValueOnce(
+            new QueryMemoryExceededError({
+              reasons: [new Error("Code: 241. DB::Exception: ...")],
+            }),
+          )
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve(summaryRows.slice(0, 12)),
+          })
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve(summaryRows.slice(12)),
+          })
+          .mockResolvedValueOnce({ json: () => Promise.resolve([]) });
+
+        const service = new ClickHouseTraceService({
+          project: { findUnique: mockPrismaFindUnique },
+        } as never);
+
+        const result = await service.getAllTracesForProject(
+          { ...baseInput, pageSize: 25 } as GetAllTracesForProjectInput,
+          protections,
+        );
+
+        expect(result).not.toBeNull();
+        expect(result!.groups.flat()).toHaveLength(25);
+        expect(
+          mockClickHouseQuery.mock.calls[4]![0].query_params.pageTraceIds,
+        ).toHaveLength(12);
+        expect(
+          mockClickHouseQuery.mock.calls[5]![0].query_params.pageTraceIds,
+        ).toHaveLength(13);
+      });
     });
 
     describe("when ClickHouse MEMORY_LIMIT_EXCEEDED on evaluations query", () => {
@@ -1223,6 +1461,75 @@ describe("ClickHouseTraceService", () => {
         expect(traces).toHaveLength(30);
         for (const trace of traces!) {
           expect(trace.spans).toHaveLength(1);
+        }
+      });
+
+      it("keeps the span scan window identical across every bisected chunk", async () => {
+        const TWO_DAYS_MS = 2 * 24 * 60 * 60 * 1000;
+        // Deliberately far from the summary rows' own OccurredAt (Date.now()):
+        // if the window were still derived from a chunk's matched rows, the
+        // span reads would land near now instead of on this list-wide range.
+        const RESOLVED_FROM_MS = 1_000_000;
+        const RESOLVED_TO_MS = 2_000_000;
+        const traceIds = Array.from({ length: 30 }, (_, i) => `trace-${i}`);
+
+        mockClickHouseQuery
+          .mockResolvedValueOnce({
+            json: () =>
+              Promise.resolve([
+                { fromMs: RESOLVED_FROM_MS, toMs: RESOLVED_TO_MS },
+              ]),
+          })
+          .mockImplementation(
+            (args: {
+              query: string;
+              query_params?: { traceIds?: string[] };
+            }) => {
+              const ids = args.query_params?.traceIds ?? [];
+              const isSpanRead = args.query.includes("stored_spans");
+              // Chunks above 12 OOM, so the 25-id chunk bisects; the halves
+              // then run their own span reads. Pre-fix each of those derived a
+              // window from its own summary rows.
+              if (!isSpanRead && ids.length > 12) {
+                return Promise.reject(new Error("MEMORY_LIMIT_EXCEEDED"));
+              }
+              return Promise.resolve({
+                json: () =>
+                  Promise.resolve(
+                    isSpanRead
+                      ? ids.map((id) => makeSpanRow(id, `${id}-s`))
+                      : ids.map((id) => makeSummaryRow(id)),
+                  ),
+              });
+            },
+          );
+
+        const service = new ClickHouseTraceService({
+          project: { findUnique: mockPrismaFindUnique },
+        } as never);
+
+        const traces = await service.getTracesWithSpans(
+          "proj_123",
+          traceIds,
+          protections,
+        );
+
+        expect(traces).toHaveLength(30);
+
+        const spanCalls = mockClickHouseQuery.mock.calls
+          .map((call) => call[0])
+          .filter((args) => args.query.includes("stored_spans"));
+        // More than one chunk ran, so "identical" is a real constraint here.
+        expect(spanCalls.length).toBeGreaterThan(1);
+        for (const spanCall of spanCalls) {
+          // Chunk-INVARIANT: bisecting changes how many span reads happen,
+          // never which rows they are allowed to see. Derived per chunk, the
+          // narrowest of these would have collapsed toward a single trace's
+          // OccurredAt and silently dropped spans outside it.
+          expect(spanCall.query_params.fromMs).toBe(
+            RESOLVED_FROM_MS - TWO_DAYS_MS,
+          );
+          expect(spanCall.query_params.toMs).toBe(RESOLVED_TO_MS + TWO_DAYS_MS);
         }
       });
     });
