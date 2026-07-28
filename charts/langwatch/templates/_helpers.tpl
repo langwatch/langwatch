@@ -266,13 +266,24 @@ app.kubernetes.io/instance: {{ .Release.Name }}
         {{- $errors = append $errors "app.dataplane.providers.awsS3.keySalt.secretKeyRef.name is set but key is empty" }}
       {{- end }}
     {{- end }}
-  {{- else if eq .Values.app.dataplane.provider "azureBlob" }}
+  {{- end }}
+
+  {{/* Azure settings are validated whenever they are EMITTED — when azureBlob
+       is the active provider OR when legacyAzureRead keeps them alive across an
+       Azure->S3 migration. That is deliberately the same condition the env
+       emission uses, because validating only the active-provider case let a
+       migration install render green with authMode=workloadIdentity and no
+       ServiceAccount: the pod then never received an injected token and every
+       read of a historical azure-blob:// object failed at runtime instead of at
+       deploy time. Validate exactly what you emit. */}}
+  {{- if or (eq .Values.app.dataplane.provider "azureBlob") .Values.app.dataplane.legacyAzureRead }}
+    {{- $azureWhy := ternary "app.dataplane.provider is azureBlob" "app.dataplane.legacyAzureRead is true" (eq .Values.app.dataplane.provider "azureBlob") }}
     {{- if .Values.app.dataplane.providers.azureBlob.accountName.secretKeyRef.name }}
       {{- if empty .Values.app.dataplane.providers.azureBlob.accountName.secretKeyRef.key }}
         {{- $errors = append $errors "app.dataplane.providers.azureBlob.accountName.secretKeyRef.name is set but key is empty" }}
       {{- end }}
     {{- else if empty .Values.app.dataplane.providers.azureBlob.accountName.value }}
-      {{- $errors = append $errors "app.dataplane.provider is azureBlob but providers.azureBlob.accountName is not configured" }}
+      {{- $errors = append $errors (printf "%s but providers.azureBlob.accountName is not configured" $azureWhy) }}
     {{- end }}
 
     {{- $azureAuthMode := .Values.app.dataplane.providers.azureBlob.authMode | default "sharedKey" }}
@@ -288,7 +299,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
           {{- $errors = append $errors "app.dataplane.providers.azureBlob.accountKey.secretKeyRef.name is set but key is empty" }}
         {{- end }}
       {{- else if empty .Values.app.dataplane.providers.azureBlob.accountKey.value }}
-        {{- $errors = append $errors "app.dataplane.provider is azureBlob with authMode sharedKey but providers.azureBlob.accountKey is not configured" }}
+        {{- $errors = append $errors (printf "%s with authMode sharedKey but providers.azureBlob.accountKey is not configured" $azureWhy) }}
       {{- end }}
     {{- else }}
       {{- if or .Values.app.dataplane.providers.azureBlob.accountKey.value .Values.app.dataplane.providers.azureBlob.accountKey.secretKeyRef.name }}
@@ -317,7 +328,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
         {{- $errors = append $errors "app.dataplane.providers.azureBlob.container.secretKeyRef.name is set but key is empty" }}
       {{- end }}
     {{- else if empty .Values.app.dataplane.providers.azureBlob.container.value }}
-      {{- $errors = append $errors "app.dataplane.provider is azureBlob but providers.azureBlob.container is not configured" }}
+      {{- $errors = append $errors (printf "%s but providers.azureBlob.container is not configured" $azureWhy) }}
     {{- end }}
   {{- end }}
 {{- end }}
@@ -1367,7 +1378,11 @@ mode, so no other install gains a label.
 */}}
 {{- define "langwatch.cloudIdentityPodLabels" -}}
 {{- $dp := .Values.app.dataplane | default dict -}}
-{{- if and $dp.enabled (eq ($dp.provider | default "") "azureBlob") -}}
+{{/* legacyAzureRead counts as "Azure is in use": after an Azure->S3 migration
+     the active provider is awsS3, but the pod still resolves reads of
+     historical azure-blob:// objects and so still needs an injected token.
+     Gating on the active provider alone stranded exactly those objects. */}}
+{{- if and $dp.enabled (or (eq ($dp.provider | default "") "azureBlob") $dp.legacyAzureRead) -}}
 {{- $azure := (($dp.providers | default dict).azureBlob | default dict) -}}
 {{- if eq ($azure.authMode | default "sharedKey") "workloadIdentity" -}}
 azure.workload.identity/use: "true"
