@@ -1,6 +1,7 @@
 import { LANGY_CONVERSATION_STATUS } from "@langwatch/langy";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  LangyAgentUnavailableError,
   LangyConversationNotOwnedError,
   LangyModelNotAllowedError,
   LangyModelNotConfiguredError,
@@ -127,6 +128,7 @@ function makeDeps(over: Partial<LangyTurnServiceDeps> = {}) {
       commit,
       abort,
       findAllByConversation,
+      getRunToken: conversations.getRunToken,
     },
   };
 }
@@ -701,6 +703,50 @@ describe("when a follow-up turn depends on what an earlier turn created", () => 
     expect(result).toMatchObject({ conversationId: "conv-1" });
     expect(mocks.dispatch).toHaveBeenCalledOnce();
     expect(dispatchedOf(mocks.dispatch).historySeed).toBeUndefined();
+  });
+});
+
+/**
+ * The runToken is the HMAC key the worker signs every frame with, and the relay
+ * verifies against. It must never degrade to a sentinel: an empty key is
+ * publicly computable, and the relay maps "no token" to a rejection, so a turn
+ * signed with "" emits nothing and never terminates — a silent hang.
+ */
+describe("when the conversation's runToken cannot be resolved", () => {
+  /** @scenario A turn that cannot be signed is refused instead of hanging */
+  it("refuses the turn when the runToken read fails", async () => {
+    const { deps, mocks } = makeDeps();
+    mocks.getRunToken.mockRejectedValue(new Error("postgres unavailable"));
+
+    await expect(
+      LangyTurnService.create(deps).startConversationTurn(input()),
+    ).rejects.toBeInstanceOf(LangyAgentUnavailableError);
+
+    expect(mocks.dispatch).not.toHaveBeenCalled();
+  });
+
+  /** @scenario A conversation carrying no runToken cannot start an unsignable turn */
+  it("refuses the turn when the conversation carries no runToken", async () => {
+    const { deps, mocks } = makeDeps();
+    mocks.getRunToken.mockResolvedValue(null);
+
+    await expect(
+      LangyTurnService.create(deps).startConversationTurn(input()),
+    ).rejects.toBeInstanceOf(LangyAgentUnavailableError);
+
+    expect(mocks.dispatch).not.toHaveBeenCalled();
+  });
+
+  /** @scenario The worker is never handed an empty signing key */
+  it("never dispatches a turn with a falsy runToken", async () => {
+    const { deps, mocks } = makeDeps();
+    mocks.getRunToken.mockResolvedValue("");
+
+    await expect(
+      LangyTurnService.create(deps).startConversationTurn(input()),
+    ).rejects.toBeInstanceOf(LangyAgentUnavailableError);
+
+    expect(mocks.dispatch).not.toHaveBeenCalled();
   });
 });
 

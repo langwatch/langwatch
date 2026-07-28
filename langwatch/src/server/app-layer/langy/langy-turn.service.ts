@@ -553,10 +553,33 @@ export class LangyTurnService {
             }),
       ]);
 
-      const runToken =
-        runTokenResult.status === "fulfilled"
-          ? (runTokenResult.value ?? "")
-          : "";
+      // The runToken IS the frame-signing key. It must never degrade to a
+      // sentinel: `hexDecode("")` is an empty HMAC key, which is both publicly
+      // computable and — because the relay maps "no token" to null and rejects
+      // (`langyTurnRelay.handle` → `no-run-token`) — guarantees every frame this
+      // worker signs is dropped. The turn would run to completion, emit nothing,
+      // and never reach a terminal state: a silent hang with no error surfaced.
+      // Fail the turn instead, so sign-side and verify-side can never disagree.
+      if (runTokenResult.status === "rejected") {
+        logger.error(
+          {
+            error: runTokenResult.reason,
+            projectId,
+            conversationId: conversation.id,
+            turnId,
+          },
+          "could not read the langy runToken; refusing to start an unsignable turn",
+        );
+        throw new LangyAgentUnavailableError("Agent request failed");
+      }
+      const runToken = runTokenResult.value;
+      if (!runToken) {
+        logger.error(
+          { projectId, conversationId: conversation.id, turnId },
+          "langy conversation has no runToken; refusing to start an unsignable turn",
+        );
+        throw new LangyAgentUnavailableError("Agent request failed");
+      }
 
       // The project's Langy allowlist is the ONLY runnable-set gate, and it
       // covers the effective model on BOTH paths — a per-send override and
