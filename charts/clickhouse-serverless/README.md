@@ -179,15 +179,42 @@ This creates two users: `analyst` with read-only access to all databases, and `e
 | `serviceAccount.automountServiceAccountToken` | Mount the SA token; ClickHouse/Keeper need no Kubernetes API access. Also set on the pod specs so policies that inspect the pod (not the SA) accept it. | `false` |
 | `serviceAccount.annotations` | ServiceAccount annotations (e.g. IRSA role ARN) | `{}` |
 
+### Scratch volumes
+
+Writable `emptyDir`s for the paths touched outside the data PVC, so the pods can
+run with a read-only root filesystem. Bounded so a runaway pod is evicted on its
+own quota instead of filling the node.
+
+| Name | Description | Default |
+|------|-------------|---------|
+| `scratch.logsSizeLimit` | Size cap for `/var/log/clickhouse-server` and `/var/log/clickhouse-keeper` | `2Gi` |
+| `scratch.tmpSizeLimit` | Size cap for `/tmp` on the server, Keeper, and the backup/restore Jobs | `1Gi` |
+
 ## Pod Security
 
 ClickHouse, Keeper, and the backup/restore Jobs run non-root (uid 101) with a
 read-only root filesystem, `RuntimeDefault` seccomp, dropped capabilities, no
-privilege escalation, and no mounted ServiceAccount token. The paths ClickHouse
-writes at runtime (server logs, the pid directory, `/tmp`, and the rendered
-`config.d`/`users.d`) are `emptyDir` volumes; data stays on the PVC, so the
-image layer is never writable. This clears Pod Security Admission `restricted`
-and Gatekeeper / Kyverno policies, including "read-only root on every container".
+privilege escalation, and no mounted ServiceAccount token. The paths written at
+runtime outside the data volume — server logs, `/tmp`, and the rendered
+`config.d`/`users.d` — are `emptyDir` volumes; everything else ClickHouse
+writes (`preprocessed_configs`, `status`, `uuid`, `format_schemas`,
+`user_files`, `tmp`, `access`) lives under `/var/lib/clickhouse` on the PVC, so
+the image layer is never writable. Keeper is the same: its state, raft log and
+preprocessed configs derive from `log_storage_path` and land on its PVC.
+
+The log and `/tmp` scratch volumes are size-bounded (`scratch.logsSizeLimit`,
+`scratch.tmpSizeLimit`) so a pod in an error loop is evicted on its own quota
+rather than filling the node's ephemeral storage.
+
+Under the LangWatch umbrella chart this clears Pod Security Admission
+`restricted` and the equivalent Gatekeeper / Kyverno policies, including
+"read-only root on every container".
+
+**Installing this chart standalone:** the preflight Secret-check Job is enabled
+by default and deliberately runs without `readOnlyRootFilesystem`, because
+`kubectl` writes a discovery cache. A cluster with a no-exceptions read-only-root
+constraint will deny it — set `preflight.enabled: false`. The umbrella chart
+already disables it (`clickhouse.preflight.enabled: false`).
 
 ## Deployment Modes
 

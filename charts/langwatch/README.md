@@ -128,14 +128,18 @@ For a complete installation guide, visit the [documentation](https://docs.langwa
 
 ### Pod security
 
-Every pod (PostgreSQL, Redis, and ClickHouse included) runs read-only-root,
-non-root, with dropped capabilities, `RuntimeDefault` seccomp, no mounted SA
-token, and resource requests/limits on every container. That clears Pod
-Security Admission `restricted` and Gatekeeper / Kyverno policies as shipped.
-On clusters that enforce them, add `examples/overlays/strict-admission.yaml`,
-which turns off the three features that can't comply: the token-using preflight
-hook, the upstream Prometheus subchart, and the custom-metrics gateway HPA. Full
-details in [Security → Pod Security](https://docs.langwatch.ai/self-hosting/security#pod-security).
+Every LangWatch pod and every bundled datastore (PostgreSQL, Redis, ClickHouse,
+Keeper) runs read-only-root, non-root at both pod and container level, with
+dropped capabilities, `RuntimeDefault` seccomp, no mounted SA token, and
+resource requests/limits on every container.
+
+A default install does **not** clear Pod Security Admission `restricted` on its
+own: two bundled components can't comply. On clusters that enforce it, add
+`examples/overlays/strict-admission.yaml`, which turns off the upstream
+Prometheus subchart and the Langy assistant (whose manager must run as root to
+give each worker its own UID — never force it non-root), plus the
+custom-metrics gateway HPA. Full details in
+[Security → Pod Security](https://docs.langwatch.ai/self-hosting/security#pod-security).
 
 ### Regenerate this table
 
