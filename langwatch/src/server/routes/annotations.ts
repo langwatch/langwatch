@@ -32,14 +32,17 @@ const AUTH_REASON =
 const annotationsViewAuth = handlerManagedAuth({
   reason: AUTH_REASON,
   permissions: ["annotations:view"],
+  credential: "apiKey",
 });
 const annotationsCreateAuth = handlerManagedAuth({
   reason: AUTH_REASON,
   permissions: ["annotations:create"],
+  credential: "apiKey",
 });
 const annotationsManageAuth = handlerManagedAuth({
   reason: AUTH_REASON,
   permissions: ["annotations:manage"],
+  credential: "apiKey",
 });
 
 const secured = createServiceApp({ basePath: "/api" });

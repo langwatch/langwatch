@@ -49,7 +49,8 @@ secured
     // out from the code: trace collection is gated by `traces:create`, which
     // was previously discoverable only by reading the handler.
     permissions: ["traces:create"],
-  }))
+  credential: "apiKey",
+}))
   .post(
     "/collector",
     bodyLimit({ maxSize: 10 * 1024 * 1024 }), // 10MB

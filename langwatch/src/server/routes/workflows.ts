@@ -45,7 +45,8 @@ secured
     handlerManagedAuth({
       reason: "user session validated in-handler via getServerAuthSession",
       permissions: ["workflows:manage"],
-    }),
+  credential: "session",
+}),
   )
   .post("/code-completion", async (c) => {
     const body = await c.req.json();
@@ -132,7 +133,8 @@ secured
     handlerManagedAuth({
       reason: "user session validated in-handler via getServerAuthSession",
       permissions: ["workflows:manage"],
-    }),
+  credential: "session",
+}),
   )
   .post(
     "/post_event",

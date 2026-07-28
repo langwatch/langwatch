@@ -44,10 +44,12 @@ const AUTH_REASON = "project API key / public share resolved in-handler";
 const tracesViewAuth = handlerManagedAuth({
   reason: AUTH_REASON,
   permissions: ["traces:view"],
+  credential: "apiKey",
 });
 const tracesShareAuth = handlerManagedAuth({
   reason: AUTH_REASON,
   permissions: ["traces:share"],
+  credential: "apiKey",
 });
 
 const secured = createServiceApp({ basePath: "/api" });

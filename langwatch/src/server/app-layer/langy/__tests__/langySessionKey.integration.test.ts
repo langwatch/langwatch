@@ -286,7 +286,7 @@ describe("Langy session key (caller-scoped)", () => {
         });
         expect(resolved).not.toBeNull();
 
-        const required = await experimentRoutePermissions();
+        const required = experimentRoutePermissions();
         // Guard the guard: an empty list would make the loop below vacuous.
         expect(required).toContain("experiments:view");
 

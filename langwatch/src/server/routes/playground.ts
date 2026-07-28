@@ -28,7 +28,8 @@ secured.access(
   handlerManagedAuth({
     reason: "user session validated in-handler via getServerAuthSession",
     permissions: ["playground:manage"],
-  }),
+  credential: "session",
+}),
 ).post("/playground", async (c) => {
   const session = await getServerAuthSession({ req: c.req.raw as any });
   if (!session) {

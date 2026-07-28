@@ -71,12 +71,32 @@ const logger = createLogger("langwatch:auth-cli");
 
 const secured = createServiceApp({ basePath: "/api/auth/cli" });
 
+const CLI_REASON = "CLI device-flow / user session validated in-handler";
+
+// The device flow authenticates the CALLER and gates on no RBAC permission.
 const CLI_POLICY = handlerManagedAuth({
-  reason: "CLI device-flow / user session validated in-handler",
-  // The device flow authenticates the CALLER; it is not gated on an RBAC
-  // permission. Individual handlers that then act on a project do their own
-  // checks against the resolved user.
+  reason: CLI_REASON,
   permissions: [],
+  credential: "session",
+});
+// Routes that DO check a permission once the caller is resolved declare it,
+// rather than hiding behind the base policy's empty list.
+const cliIngestionSourcesAuth = handlerManagedAuth({
+  reason: CLI_REASON,
+  permissions: ["ingestionSources:view"],
+  credential: "session",
+});
+const cliActivityMonitorAuth = handlerManagedAuth({
+  reason: CLI_REASON,
+  permissions: ["activityMonitor:view"],
+  credential: "session",
+});
+// `/approve` mints a credential usable outside the UI, so it requires a
+// write-capable project permission — a view-only member cannot extract one.
+const cliApproveAuth = handlerManagedAuth({
+  reason: CLI_REASON,
+  permissions: ["project:update"],
+  credential: "session",
 });
 
 // ---------------------------------------------------------------------------
@@ -1059,7 +1079,7 @@ async function ensureGovernancePermissionOr403(
   );
 }
 
-secured.access(CLI_POLICY).get("/governance/ingest/sources", async (c: Context) => {
+secured.access(cliIngestionSourcesAuth).get("/governance/ingest/sources", async (c: Context) => {
   const tokenRecord = await validateAccessToken(c.req.header("Authorization"));
   if (!tokenRecord) {
     return c.json(
@@ -1103,7 +1123,7 @@ secured.access(CLI_POLICY).get("/governance/ingest/sources", async (c: Context) 
   });
 });
 
-secured.access(CLI_POLICY).get("/governance/ingest/sources/:id/events", async (c: Context) => {
+secured.access(cliActivityMonitorAuth).get("/governance/ingest/sources/:id/events", async (c: Context) => {
   const tokenRecord = await validateAccessToken(c.req.header("Authorization"));
   if (!tokenRecord) {
     return c.json(
@@ -1163,7 +1183,7 @@ secured.access(CLI_POLICY).get("/governance/ingest/sources/:id/events", async (c
   return c.json({ events });
 });
 
-secured.access(CLI_POLICY).get("/governance/ingest/sources/:id/health", async (c: Context) => {
+secured.access(cliActivityMonitorAuth).get("/governance/ingest/sources/:id/health", async (c: Context) => {
   const tokenRecord = await validateAccessToken(c.req.header("Authorization"));
   if (!tokenRecord) {
     return c.json(
@@ -1495,7 +1515,7 @@ const approveRequestSchema = z.object({
   project_id: z.string().optional(),
 });
 
-secured.access(CLI_POLICY).post("/approve", async (c: Context) => {
+secured.access(cliApproveAuth).post("/approve", async (c: Context) => {
   const session = await getServerAuthSession({ req: c.req.raw as any });
   if (!session?.user) {
     return c.json(

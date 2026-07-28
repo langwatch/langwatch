@@ -52,16 +52,22 @@ Feature: Per-session caller-scoped Langy key
     Then the run starts
     And Langy still cannot delete my evaluations
 
-  Scenario: Langy is never refused a part of the product I can already use myself
-    Given a part of the project I can see and use
-    When I ask Langy to work with it on my behalf
+  Scenario: Langy is never refused something it is meant to be able to do for me
+    Given a task Langy is trusted to do on my behalf, on data I can already reach
+    When I ask Langy to do it
     Then Langy is not turned away for lacking permission
 
-  Scenario: Langy stays out of what it is not trusted with, even when I could do it
-    Given I can delete my own prompts and read my project's secrets
-    When I ask Langy to do either
+  Scenario: Langy cannot delete my work, even though I can
+    Given I can delete my own prompts
+    When I ask Langy to delete one
     Then Langy cannot, and says so
-    And nothing in my project is changed
+    And the prompt is still there
+
+  Scenario: Langy cannot read my project's secrets, even though I can
+    Given I can read my project's secrets
+    When I ask Langy what a secret's value is
+    Then Langy cannot, and says so
+    And no secret value appears in its answer
 
   # ---------------------------------------------------------------------------
   # Guardrails

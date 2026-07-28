@@ -40,6 +40,7 @@ const secured = createServiceApp({ basePath: "/api/export/traces" });
 secured.access(handlerManagedAuth({
   reason: "user session + traces:view enforced in-handler",
   permissions: ["traces:view"],
+  credential: "session",
 })).post("/download", zValidator("json", exportRequestSchema), async (c) => {
   const request = c.req.valid("json");
 

@@ -328,6 +328,7 @@ const ingestAuth = handlerManagedAuth({
     "ingestion source bearer secret resolved in-handler via authIngestionSource",
   // Per-source bearer secret, not an RBAC permission.
   permissions: [],
+  credential: "internal",
 });
 
 /**

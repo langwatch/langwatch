@@ -98,6 +98,7 @@ const AUTH_REASON = "project API key resolved in-handler";
 const catalogueAuth = handlerManagedAuth({
   reason: "public evaluator catalogue; no project data returned",
   permissions: [],
+  credential: "apiKey",
 });
 // Every other legacy route runs or records an evaluation.
 //
@@ -109,6 +110,7 @@ const catalogueAuth = handlerManagedAuth({
 const legacyEvaluationAuth = handlerManagedAuth({
   reason: AUTH_REASON,
   permissions: ["evaluations:manage"],
+  credential: "apiKey",
 });
 
 /**

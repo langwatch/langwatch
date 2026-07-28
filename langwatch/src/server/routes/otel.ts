@@ -267,7 +267,11 @@ export function peekCustomerTraceIds(
 
 // ── POST /traces ─────────────────────────────────────────────────────
 
-secured.access(handlerManagedAuth({ reason: AUTH_REASON, permissions: ["traces:create"] })).post("/traces", async (c) => {
+secured.access(handlerManagedAuth({
+    reason: AUTH_REASON,
+    permissions: ["traces:create"],
+    credential: "apiKey",
+  })).post("/traces", async (c) => {
   const tracer = getLangWatchTracer("langwatch.otel.traces");
 
   return tracer.withActiveSpan(
@@ -417,7 +421,11 @@ secured.access(handlerManagedAuth({ reason: AUTH_REASON, permissions: ["traces:c
 
 // ── POST /logs ───────────────────────────────────────────────────────
 
-secured.access(handlerManagedAuth({ reason: AUTH_REASON, permissions: ["traces:create"] })).post("/logs", async (c) => {
+secured.access(handlerManagedAuth({
+    reason: AUTH_REASON,
+    permissions: ["traces:create"],
+    credential: "apiKey",
+  })).post("/logs", async (c) => {
   const tracer = getLangWatchTracer("langwatch.otel.logs");
 
   return tracer.withActiveSpan(
@@ -540,7 +548,11 @@ secured.access(handlerManagedAuth({ reason: AUTH_REASON, permissions: ["traces:c
 
 // ── POST /metrics ────────────────────────────────────────────────────
 
-secured.access(handlerManagedAuth({ reason: AUTH_REASON, permissions: ["traces:create"] })).post("/metrics", async (c) => {
+secured.access(handlerManagedAuth({
+    reason: AUTH_REASON,
+    permissions: ["traces:create"],
+    credential: "apiKey",
+  })).post("/metrics", async (c) => {
   const tracer = getLangWatchTracer("langwatch.otel.metrics");
 
   return tracer.withActiveSpan(

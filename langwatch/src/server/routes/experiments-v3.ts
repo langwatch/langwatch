@@ -60,6 +60,7 @@ const secured = createServiceApp({ basePath: "/api/experiments" });
 const sessionAuth = handlerManagedAuth({
   reason: "user session validated in-handler via getServerAuthSession",
   permissions: ["evaluations:manage"],
+  credential: "session",
 });
 // The read endpoints (runs list / status / results) and the run endpoint gate
 // on different grains, so they declare separately: a single shared policy
@@ -68,11 +69,13 @@ const apiKeyAuthRead = handlerManagedAuth({
   reason:
     "project API key resolved in-handler via TokenResolver + enforceApiKeyCeiling",
   permissions: ["evaluations:view"],
+  credential: "session",
 });
 const apiKeyAuthRun = handlerManagedAuth({
   reason:
     "project API key resolved in-handler via TokenResolver + enforceApiKeyCeiling",
   permissions: ["evaluations:create"],
+  credential: "session",
 });
 
 // Backward-compat aliases: redirect old /api/evaluations/v3/... paths to new /api/experiments/...

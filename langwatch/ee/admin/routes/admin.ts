@@ -41,6 +41,7 @@ const adminAuth = handlerManagedAuth({
   reason: "super-admin session validated in-handler via isAdmin",
   // Gated by super-admin identity, not by an RBAC permission.
   permissions: [],
+  credential: "session",
 });
 
 const ALLOWED_RESOURCES = new Set([

@@ -34,7 +34,7 @@ describe("Langy permission coverage", () => {
   describe("given every permission the mounted API routes demand", () => {
     describe("when the policy says Langy should be able to hold it", () => {
       it("is granted by the candidate list, so no Langy tool is refused a permission it should have", async () => {
-        const demanded = await permissionsDemandedByRoutes();
+        const demanded = permissionsDemandedByRoutes();
         const granted = new Set<string>(LANGY_CANDIDATE_PERMISSIONS);
 
         const missing: string[] = [];
@@ -84,7 +84,7 @@ describe("Langy permission coverage", () => {
   describe("given the experiment surface that regressed", () => {
     describe("when its routes are read out of the registry", () => {
       it("demands only permissions the Langy key carries", async () => {
-        const demanded = await permissionsDemandedByRoutes();
+        const demanded = permissionsDemandedByRoutes();
 
         const experimentRoutePermissions = [...demanded.entries()]
           .filter(([, routes]) =>

@@ -133,27 +133,29 @@ const IN_ROUTE_REASON =
 const analyticsViewAuth = handlerManagedAuth({
   reason: IN_ROUTE_REASON,
   permissions: ["analytics:view"],
+  credential: "apiKey",
 });
 const experimentsManageAuth = handlerManagedAuth({
   reason: IN_ROUTE_REASON,
   permissions: ["experiments:manage"],
+  credential: "apiKey",
 });
 const workflowsManageAuth = handlerManagedAuth({
   reason: IN_ROUTE_REASON,
   permissions: ["workflows:manage"],
+  credential: "apiKey",
 });
 const tracesCreateAuth = handlerManagedAuth({
   reason: IN_ROUTE_REASON,
   permissions: ["traces:create"],
+  credential: "apiKey",
 });
 const triggersManageAuth = handlerManagedAuth({
   reason: IN_ROUTE_REASON,
   permissions: ["triggers:manage"],
+  credential: "apiKey",
 });
 
-// =============================================
-// POST /api/analytics
-// =============================================
 secured
   .access(analyticsViewAuth)
   .post("/analytics", authMiddleware, requireAnalyticsView, async (c) => {
@@ -229,7 +231,8 @@ secured
   .access(handlerManagedAuth({
       reason: "demo endpoint validates X-Auth-Token in-handler",
       permissions: [],
-    }))
+  credential: "apiKey",
+}))
   .post("/demo/hotel_bot", async (c) => {
     const authToken = c.req.header("x-auth-token");
     if (!authToken) {
@@ -521,7 +524,8 @@ secured
       reason: "user session validated in-handler via getServerAuthSession",
       // OAuth authorize step; no RBAC permission gates it.
       permissions: [],
-    }),
+  credential: "session",
+}),
   )
   .post("/mcp/authorize", async (c) => {
     const session = await getServerAuthSession({ req: c.req.raw as any });

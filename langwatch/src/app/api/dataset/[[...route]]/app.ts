@@ -146,6 +146,7 @@ const directUploadSessionAuth = handlerManagedAuth({
   // authorizeDirectUpload resolves the caller and the target dataset; it does
   // not gate on a standalone RBAC permission.
   permissions: [],
+  credential: "both",
 });
 
 // datasetServiceMiddleware runs AFTER the access chain (which authenticates and

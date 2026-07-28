@@ -51,7 +51,26 @@ export type AccessPolicy =
        * `handlerManagedAuth` for why the optional version was a defect.
        */
       readonly permissions: readonly Permission[];
+      /**
+       * What kind of credential reaches this route:
+       *
+       *   apiKey   — a project/personal API key (what SDKs, the CLI and the
+       *              Langy assistant carry)
+       *   session  — a browser session cookie only
+       *   both     — either is accepted
+       *   internal — a shared secret or signature, not a user credential
+       *
+       * Mandatory for the same reason `permissions` is. It exists so that
+       * "can an API key even reach this route?" is a property of the route
+       * rather than a curated list of paths kept somewhere else — the audits
+       * that need the answer were maintaining their own path lists, which
+       * silently misclassify a route the moment one is added or renamed.
+       */
+      readonly credential: HandlerCredential;
     };
+
+/** @see the `credential` field on the handler-managed policy. */
+export type HandlerCredential = "apiKey" | "session" | "both" | "internal";
 
 /**
  * Require a specific RBAC permission at the app's scope. The secured app
@@ -131,8 +150,11 @@ export function internalSecret(reason: string): AccessPolicy {
 export function handlerManagedAuth({
   reason,
   permissions,
+  credential,
 }: {
   reason: string;
+  /** Which credential reaches this route. @see the policy type. */
+  credential: HandlerCredential;
   /**
    * The RBAC permissions this handler enforces for itself — `[]` when it gates
    * on something that is not an RBAC permission (an internal secret, a raw
@@ -148,7 +170,21 @@ export function handlerManagedAuth({
   permissions: readonly Permission[];
 }): AccessPolicy {
   assertReason(reason, "handlerManagedAuth");
-  return { kind: "handlerManaged", reason, permissions };
+  return { kind: "handlerManaged", reason, permissions, credential };
+}
+
+/**
+ * Can a caller holding an API key reach this route at all?
+ *
+ * The question every "what can a key-bearing client do?" audit actually wants.
+ * Non-handler-managed policies are reachable by key: the secured-app builder
+ * authenticates them by key or session alike.
+ */
+export function isApiKeyReachable(policy: AccessPolicy): boolean {
+  if (policy.kind === "handlerManaged") {
+    return policy.credential === "apiKey" || policy.credential === "both";
+  }
+  return policy.kind !== "public" && policy.kind !== "internal";
 }
 
 /**
