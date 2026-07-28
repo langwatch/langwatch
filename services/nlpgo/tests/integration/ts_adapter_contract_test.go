@@ -67,8 +67,13 @@ func TestSync_TSAdapterContract_UserCodeFailureShape(t *testing.T) {
 	defer stack.close()
 
 	fixture := loadTSFixture(t)
-	recorded, ok := fixture["userCodeRaises"]
-	require.True(t, ok, "fixture lost its userCodeRaises case")
+	// The stdlib-only recording, not the httpx one: CI runners ship python3
+	// with no third-party packages, so importing httpx here would raise
+	// ModuleNotFoundError and this guard would assert against the wrong
+	// failure. The httpx recording stays in the fixture for the TS replay,
+	// where it is the authentic customer-report shape from #3439.
+	recorded, ok := fixture["userCodeRaisesStdlib"]
+	require.True(t, ok, "fixture lost its userCodeRaisesStdlib case")
 
 	// The TS adapter's headline capability rests on this being 200: it reads
 	// `status: "error"` off a SUCCESSFUL response. If this ever becomes a
@@ -76,9 +81,8 @@ func TestSync_TSAdapterContract_UserCodeFailureShape(t *testing.T) {
 	require.Equal(t, 200, recorded.Status,
 		"fixture claims a non-200; the adapter's 200 branch would be dead")
 
-	code := "import httpx\n" +
-		"def execute(input):\n" +
-		"    raise httpx.TimeoutException(\"The read operation timed out\")\n"
+	code := "def execute(input):\n" +
+		"    raise ValueError(\"the read operation timed out\")\n"
 	body := codeWorkflow("ts-adapter-contract", "code_agent", code,
 		map[string]any{"input": "hello"}, nil, []string{"output"}, nil)
 

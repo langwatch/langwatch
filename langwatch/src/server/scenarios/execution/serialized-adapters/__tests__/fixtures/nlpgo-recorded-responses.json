@@ -5,7 +5,9 @@
     "execute_flow payload to /go/studio/execute_sync, and paste status + body here.",
     "Every one of these came back HTTP 200 -- a failed run is NOT a non-2xx.",
     "These fixtures exist because hand-written mocks encoded a FastAPI {detail}",
-    "contract the engine never served, and CI stayed green for months (lw#3439)."
+    "contract the engine never served, and CI stayed green for months (lw#3439).",
+    "userCodeRaisesStdlib uses a stdlib-only exception on purpose: the Go drift",
+    "guard replays it, and CI runners have python3 but no third-party packages."
   ],
   "userCodeRaises": {
     "status": 200,
@@ -28,6 +30,19 @@
       "error": {
         "type": "invalid_workflow",
         "message": "dsl: parse workflow: json: cannot unmarshal string into Go struct field Workflow.nodes of type []dsl.Node"
+      }
+    }
+  },
+  "userCodeRaisesStdlib": {
+    "status": 200,
+    "body": {
+      "trace_id": "stdlibProof",
+      "status": "error",
+      "error": {
+        "node_id": "code_agent",
+        "type": "ValueError",
+        "message": "the read operation timed out",
+        "traceback": "Traceback (most recent call last):\n  File \"/tmp/nlpgo-codeblock-858415804/runner.py\", line 143, in main\n    result = _invoke_user_entrypoint(module_globals, inputs)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/nlpgo-codeblock-858415804/runner.py\", line 234, in _invoke_user_entrypoint\n    return execute(**inputs)\n           ^^^^^^^^^^^^^^^^^\n  File \"<code-block>\", line 2, in execute\nValueError: the read operation timed out\n"
       }
     }
   }
