@@ -14,6 +14,8 @@
  * Spec: specs/settings/user-avatar.feature
  */
 
+import { HandledError } from "@langwatch/handled-error";
+
 /** The stored-object "purpose" tag for user avatars. */
 export const AVATAR_PURPOSE = "user_avatar";
 
@@ -33,8 +35,14 @@ export const AVATAR_MAX_BYTES = 8 * 1024 * 1024;
  * Upper bound on the raw `data:` URL length we accept, so an oversized payload
  * is rejected before the regex scans it or any Buffer is allocated. base64
  * inflates bytes by 4/3; the extra 256 covers the `data:<type>;base64,` prefix
- * and any incidental whitespace. Used both here and by the tRPC input schema
- * (`user.setAvatar`) as a first-line `.max()` guard.
+ * and any incidental whitespace.
+ *
+ * Enforced here and nowhere else on purpose. `user.setAvatar`'s input schema
+ * used to carry the same number as a `.max()`, which meant zod always won the
+ * race and an oversized photo came back as the anonymous `validation_error`
+ * instead of `avatar_image_too_large` — the specific code both halves of this
+ * check are supposed to answer with. The guard below runs before the regex or
+ * any Buffer allocation, so it costs the schema nothing to stay out of it.
  */
 export const AVATAR_MAX_DATA_URL_LENGTH =
   Math.ceil(AVATAR_MAX_BYTES / 3) * 4 + 256;
@@ -53,25 +61,100 @@ export const AVATAR_ALLOWED_MEDIA_TYPES = [
 
 export type AvatarMediaType = (typeof AVATAR_ALLOWED_MEDIA_TYPES)[number];
 
-export type AvatarValidationCode =
+/**
+ * Why the payload was unreadable. A machine sub-classifier for logs and tests,
+ * never prose: all three read the same to a customer ("pick another file"), and
+ * telling them the magic bytes disagreed with the declared MIME type is not
+ * something they can act on.
+ */
+export type AvatarUnreadableReason =
   | "invalid_data_url"
-  | "invalid_type"
   | "empty"
-  | "file_too_large"
   | "content_mismatch";
 
 /**
  * Thrown by {@link parseAvatarDataUrl} for any caller-fixable problem with the
- * uploaded payload. The tRPC layer maps this to a BAD_REQUEST with a message
- * the settings UI can show verbatim.
+ * uploaded payload. Catch the family with `AvatarValidationError.is(err)`.
+ *
+ * Handled errors, so they cross the tRPC boundary as their code and the
+ * settings UI renders the registry's copy — `message` here is server copy for a
+ * log line. Before this it was a bespoke `Error` with a parallel `code` field
+ * that the router flattened into a BAD_REQUEST carrying the raw message, which
+ * is the second code system ADR-045 exists to prevent.
+ *
+ * One subclass per code rather than a code argument, matching every other
+ * handled error in the codebase — and matching what `codes.unit.test.ts` can
+ * see, since it reads declared codes and cannot follow a constructor argument.
  */
-export class AvatarValidationError extends Error {
-  constructor(
-    readonly code: AvatarValidationCode,
-    message: string,
-  ) {
-    super(message);
-    this.name = "AvatarValidationError";
+export abstract class AvatarValidationError extends HandledError {}
+
+/** Payload is over {@link AVATAR_MAX_BYTES}, before or after decoding. */
+export class AvatarTooLargeError extends AvatarValidationError {
+  declare readonly code: "avatar_image_too_large";
+
+  constructor() {
+    super("avatar_image_too_large", "Avatar data URL is over the ceiling", {
+      meta: { maxBytes: AVATAR_MAX_BYTES },
+      httpStatus: 400,
+      fault: "customer",
+    });
+    this.name = "AvatarTooLargeError";
+  }
+}
+
+/** A real image, but not one of {@link AVATAR_ALLOWED_MEDIA_TYPES}. */
+export class AvatarTypeUnsupportedError extends AvatarValidationError {
+  declare readonly code: "avatar_image_type_unsupported";
+
+  constructor(mediaType: string) {
+    super(
+      "avatar_image_type_unsupported",
+      `Avatar declared an unsupported media type: ${mediaType}`,
+      {
+        meta: { allowed: [...AVATAR_ALLOWED_MEDIA_TYPES] },
+        httpStatus: 400,
+        fault: "customer",
+      },
+    );
+    this.name = "AvatarTypeUnsupportedError";
+  }
+}
+
+/** Not a readable image: malformed data URL, empty, or mismatched bytes. */
+export class AvatarUnreadableError extends AvatarValidationError {
+  declare readonly code: "avatar_image_unreadable";
+
+  constructor(reason: AvatarUnreadableReason, message: string) {
+    super("avatar_image_unreadable", message, {
+      meta: { reason },
+      httpStatus: 400,
+      fault: "customer",
+    });
+    this.name = "AvatarUnreadableError";
+  }
+}
+
+/**
+ * The caller changed their photo too many times in a short window.
+ *
+ * Not an {@link AvatarValidationError} — nothing is wrong with the payload,
+ * and the remedy is time rather than a different file — but handled all the
+ * same: "you did this too often, wait and retry" is a cause we can name and an
+ * action the caller can take, which is exactly the bar ADR-045 sets. As a bare
+ * TRPCError it reached the customer as the generic unknown state.
+ *
+ * `fault: "customer"` because the caller's own rate is what tripped it; the
+ * 429 is the limiter working, not an incident.
+ */
+export class AvatarRateLimitedError extends HandledError {
+  declare readonly code: "avatar_rate_limited";
+
+  constructor() {
+    super("avatar_rate_limited", "Too many avatar updates for this user", {
+      httpStatus: 429,
+      fault: "customer",
+    });
+    this.name = "AvatarRateLimitedError";
   }
 }
 
@@ -139,45 +222,39 @@ export function parseAvatarDataUrl(dataUrl: string): {
   // Buffer is decoded — so a huge user-controlled string can't allocate memory
   // just to be rejected. The precise decoded-size check still runs below.
   if (trimmed.length > AVATAR_MAX_DATA_URL_LENGTH) {
-    throw new AvatarValidationError(
-      "file_too_large",
-      `Image is too large (max ${Math.round(AVATAR_MAX_BYTES / 1024 / 1024)} MB).`,
-    );
+    throw new AvatarTooLargeError();
   }
 
   const match = DATA_URL_RE.exec(trimmed);
   if (!match) {
-    throw new AvatarValidationError(
+    throw new AvatarUnreadableError(
       "invalid_data_url",
-      "Expected a base64-encoded image data URL.",
+      "Avatar payload is not a base64 image data URL",
     );
   }
 
   const mediaType = match[1]!.toLowerCase();
   if (!isAllowedMediaType(mediaType)) {
-    throw new AvatarValidationError(
-      "invalid_type",
-      `Unsupported image type "${mediaType}". Allowed: ${AVATAR_ALLOWED_MEDIA_TYPES.join(", ")}.`,
-    );
+    throw new AvatarTypeUnsupportedError(mediaType);
   }
 
   // Strip any embedded whitespace/newlines the encoder may have inserted so
   // the byte-length check reflects real decoded size, not base64 padding.
   const bytes = Buffer.from(match[2]!.replace(/\s+/g, ""), "base64");
   if (bytes.length === 0) {
-    throw new AvatarValidationError("empty", "The image is empty.");
+    throw new AvatarUnreadableError(
+      "empty",
+      "Avatar payload decoded to zero bytes",
+    );
   }
   if (bytes.length > AVATAR_MAX_BYTES) {
-    throw new AvatarValidationError(
-      "file_too_large",
-      `Image is too large (max ${Math.round(AVATAR_MAX_BYTES / 1024 / 1024)} MB).`,
-    );
+    throw new AvatarTooLargeError();
   }
 
   if (!MAGIC_BYTE_CHECKS[mediaType](bytes)) {
-    throw new AvatarValidationError(
+    throw new AvatarUnreadableError(
       "content_mismatch",
-      `The file's content doesn't match its declared type (${mediaType}).`,
+      `Avatar bytes do not match the declared media type: ${mediaType}`,
     );
   }
 

@@ -32,7 +32,12 @@ interface InviteOutcome {
     AcceptInviteStatus,
     "success" | "already-accepted" | "error"
   >;
-  errorMessage: string | null;
+  /**
+   * The failure itself, not a string lifted off it. The page renders it through
+   * the code-keyed registry, which needs the whole payload (code, meta, tips,
+   * trace id) — `error.message` is the code slug since #5984.
+   */
+  error: unknown;
 }
 const inviteOutcomes = new Map<string, InviteOutcome>();
 const outcomeListeners = new Set<() => void>();
@@ -70,7 +75,8 @@ export type AcceptInviteStatus =
 
 export interface UseAcceptInviteOnceResult {
   status: AcceptInviteStatus;
-  errorMessage: string | null;
+  /** The failure, for the page to explain via `~/features/errors`. */
+  error: unknown;
 }
 
 export interface UseAcceptInviteOnceOptions {
@@ -112,7 +118,7 @@ export function useAcceptInviteOnce({
     onSuccess: (data, variables) => {
       recordInviteOutcome(variables.inviteCode, {
         status: "success",
-        errorMessage: null,
+        error: null,
       });
       toaster.create({
         title: "Invite Accepted",
@@ -128,17 +134,17 @@ export function useAcceptInviteOnce({
       if (error.message === INVITE_ALREADY_ACCEPTED_MESSAGE) {
         recordInviteOutcome(variables.inviteCode, {
           status: "already-accepted",
-          errorMessage: null,
+          error: null,
         });
         hardRedirect("/");
         return;
       }
       recordInviteOutcome(variables.inviteCode, {
         status: "error",
-        errorMessage: error.message,
+        error,
       });
-      // Real failure (expired invite, email mismatch, …). The page renders
-      // `errorMessage` inline; also capture for observability.
+      // Real failure (expired invite, email mismatch, …). The page explains
+      // the error inline; also capture for observability.
       captureException(toError(error), {
         tags: { source: "useAcceptInviteOnce" },
       });
@@ -164,8 +170,7 @@ export function useAcceptInviteOnce({
 
   return {
     status: deriveStatus(mutation, shouldTrigger, storedOutcome),
-    errorMessage:
-      mutation.error?.message ?? storedOutcome?.errorMessage ?? null,
+    error: mutation.error ?? storedOutcome?.error ?? null,
   };
 }
 

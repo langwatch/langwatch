@@ -44,7 +44,8 @@ describe("parseAvatarDataUrl", () => {
   });
 
   describe("when the string is not a base64 image data URL", () => {
-    it("throws an invalid_data_url validation error", () => {
+    /** @scenario The server refuses a payload it cannot read as an image */
+    it("throws avatar_image_unreadable with an invalid_data_url reason", () => {
       expect(() => parseAvatarDataUrl("https://example.com/photo.png")).toThrow(
         AvatarValidationError,
       );
@@ -57,7 +58,8 @@ describe("parseAvatarDataUrl", () => {
   });
 
   describe("when the image type is not allowed", () => {
-    it("throws an invalid_type validation error", () => {
+    /** @scenario The server refuses an image type it does not accept */
+    it("throws avatar_image_type_unsupported", () => {
       try {
         parseAvatarDataUrl("data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=");
         throw new Error("expected parseAvatarDataUrl to throw");
@@ -69,7 +71,7 @@ describe("parseAvatarDataUrl", () => {
   });
 
   describe("when the decoded payload is empty", () => {
-    it("throws an empty validation error", () => {
+    it("throws avatar_image_unreadable with an empty reason", () => {
       try {
         parseAvatarDataUrl("data:image/png;base64,");
         throw new Error("expected parseAvatarDataUrl to throw");
@@ -80,7 +82,7 @@ describe("parseAvatarDataUrl", () => {
   });
 
   describe("when the payload exceeds the maximum size", () => {
-    it("throws a file_too_large validation error", () => {
+    it("throws avatar_image_too_large", () => {
       const tooBig = Buffer.alloc(AVATAR_MAX_BYTES + 1, 0).toString("base64");
       try {
         parseAvatarDataUrl(`data:image/png;base64,${tooBig}`);
@@ -103,6 +105,7 @@ describe("parseAvatarDataUrl", () => {
   });
 
   describe("when the decoded bytes don't match the declared type", () => {
+    /** @scenario Bytes that contradict the declared image type are refused as unusable */
     it("throws a content_mismatch validation error for non-image bytes", () => {
       const plainTextAsPng = `data:image/png;base64,${Buffer.from(
         "hello world, this is not an image",

@@ -9,6 +9,7 @@ import { api } from "~/utils/api";
 
 import {
   CacheRuleForm,
+  type CacheRuleFormComplaint,
   type CacheRuleFormState,
   emptyFormState,
   fromWire,
@@ -47,9 +48,12 @@ export function CacheRuleEditDrawer({ rule, onOpenChange, onSaved }: Props) {
   });
 
   const [state, setState] = useState<CacheRuleFormState>(emptyFormState());
+  const [fieldComplaint, setFieldComplaint] =
+    useState<CacheRuleFormComplaint | null>(null);
 
   useEffect(() => {
     if (rule) {
+      setFieldComplaint(null);
       setState(
         fromWire({
           name: rule.name,
@@ -70,9 +74,19 @@ export function CacheRuleEditDrawer({ rule, onOpenChange, onSaved }: Props) {
 
   const handleSubmit = async () => {
     if (!organization || !rule) return;
-    const error = validateForm(state);
-    if (error) {
-      toaster.create({ title: error, type: "error" });
+    // A complaint, not an error: `validateForm` is a pure local function
+    // returning copy this form wrote about state it can see, and none of it
+    // ever crossed a wire. That is exactly the case ADR-018 still lets
+    // `toaster.create` handle — calling it an error would read as a caught
+    // rejection, which has to go through `showErrorToast` instead.
+    const complaint = validateForm(state);
+    // One that names an input is marked on that input; one about the
+    // relationship between several has no single home, so it keeps the toast.
+    setFieldComplaint(complaint?.field ? complaint : null);
+    if (complaint) {
+      if (!complaint.field) {
+        toaster.create({ title: complaint.message, type: "error" });
+      }
       return;
     }
     try {
@@ -104,7 +118,14 @@ export function CacheRuleEditDrawer({ rule, onOpenChange, onSaved }: Props) {
           <Drawer.CloseTrigger />
         </Drawer.Header>
         <Drawer.Body>
-          <CacheRuleForm state={state} onChange={setState} />
+          <CacheRuleForm
+            state={state}
+            onChange={(next) => {
+              setState(next);
+              setFieldComplaint(null);
+            }}
+            complaint={fieldComplaint}
+          />
         </Drawer.Body>
         <Drawer.Footer>
           <HStack width="full">

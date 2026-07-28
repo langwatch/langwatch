@@ -14,8 +14,8 @@ import { AlertTriangle, CheckCircle2, Mail, TrendingUp } from "lucide-react";
 import { useState } from "react";
 import { formatBudgetUsd } from "~/components/gateway/formatBudgetUsd";
 import MyLayout from "~/components/me/MyLayout";
-import { toaster } from "~/components/ui/toaster";
 import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
+import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
 import { api } from "~/utils/api";
@@ -80,20 +80,19 @@ function RequestBudgetIncreasePage() {
     },
     onError: (err) => {
       setSubmitState("idle");
-      // The wire message is the failure's code, never prose (#5984). This one
-      // code has copy of its own because we know exactly what to tell the user.
-      if (err.message === "no_admin_found") {
-        toaster.create({
-          title: "No organization admin is configured",
-          description: "Contact LangWatch support to configure an admin.",
-          type: "error",
-          duration: 7000,
-        });
-        return;
-      }
-      // No toast: the alert below reports this same failure and stays until
-      // the next attempt, and it carries the way out — the admin's address.
-      // A toast on top of it says the same thing twice, then leaves.
+      // One report for every outcome. A failure we can name — an org with no
+      // administrator, for one — arrives as a handled error and takes its
+      // words from the code-keyed registry; anything else degrades to the
+      // fallback title plus a copyable error id. This used to branch on
+      // `err.message === "no_admin_found"`, a slug the router hand-wrote and
+      // this page string-matched: a second code system, invisible to the
+      // registry, and the exact thing ADR-045 exists to prevent.
+      showErrorToast({
+        error: err,
+        fallbackTitle: "Couldn't send your request",
+      });
+      // The alert below outlives the toast, and it carries the way out — the
+      // admin's address — so it stays up until the next attempt.
       setSendFailed(true);
     },
   });

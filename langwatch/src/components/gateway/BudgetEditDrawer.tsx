@@ -46,6 +46,8 @@ export function BudgetEditDrawer({
   const [description, setDescription] = useState("");
   const [limitUsd, setLimitUsd] = useState("");
   const [onBreach, setOnBreach] = useState<"BLOCK" | "WARN">("BLOCK");
+  // Names one input, so it lives on that input. See BudgetCreateDrawer.
+  const [limitError, setLimitError] = useState<string | null>(null);
 
   useEffect(() => {
     if (budget) {
@@ -53,6 +55,7 @@ export function BudgetEditDrawer({
       setDescription(budget.description ?? "");
       setLimitUsd(budget.limitUsd);
       setOnBreach(budget.onBreach);
+      setLimitError(null);
     }
   }, [budget]);
 
@@ -78,12 +81,10 @@ export function BudgetEditDrawer({
       toaster.create({ title: "Name and limit are required", type: "error" });
       return;
     }
+    setLimitError(null);
     const parsed = Number.parseFloat(limitUsd);
     if (!Number.isFinite(parsed) || parsed <= 0) {
-      toaster.create({
-        title: "Limit must be a positive number",
-        type: "error",
-      });
+      setLimitError("Enter a positive amount, like 1000.00.");
       return;
     }
     try {
@@ -159,7 +160,7 @@ export function BudgetEditDrawer({
                 {budget?.window.toLowerCase()} (immutable after create)
               </Text>
             </Field.Root>
-            <Field.Root required>
+            <Field.Root required invalid={!!limitError}>
               <Field.Label>
                 Limit (USD)
                 <FieldInfoTooltip
@@ -169,9 +170,13 @@ export function BudgetEditDrawer({
               </Field.Label>
               <Input
                 value={limitUsd}
-                onChange={(e) => setLimitUsd(e.target.value)}
+                onChange={(e) => {
+                  setLimitUsd(e.target.value);
+                  setLimitError(null);
+                }}
                 inputMode="decimal"
               />
+              {limitError && <Field.ErrorText>{limitError}</Field.ErrorText>}
               <Field.HelperText>
                 Raising the limit does not reset the window. Lowering it may
                 cause the budget to enter breach immediately if current spend
