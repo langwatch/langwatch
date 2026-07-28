@@ -37,7 +37,11 @@ import {
 import { ImpersonationService } from "../impersonation.service";
 
 const secured = createServiceApp({ basePath: "/api" });
-const adminAuth = handlerManagedAuth("super-admin session validated in-handler via isAdmin");
+const adminAuth = handlerManagedAuth({
+  reason: "super-admin session validated in-handler via isAdmin",
+  // Gated by super-admin identity, not by an RBAC permission.
+  permissions: [],
+});
 
 const ALLOWED_RESOURCES = new Set([
   "user",

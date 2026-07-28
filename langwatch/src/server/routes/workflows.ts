@@ -42,9 +42,10 @@ const secured = createServiceApp({ basePath: "/api/workflows" });
 
 secured
   .access(
-    handlerManagedAuth(
-      "user session validated in-handler via getServerAuthSession",
-    ),
+    handlerManagedAuth({
+      reason: "user session validated in-handler via getServerAuthSession",
+      permissions: ["workflows:manage"],
+    }),
   )
   .post("/code-completion", async (c) => {
     const body = await c.req.json();
@@ -128,9 +129,10 @@ secured
 
 secured
   .access(
-    handlerManagedAuth(
-      "user session validated in-handler via getServerAuthSession",
-    ),
+    handlerManagedAuth({
+      reason: "user session validated in-handler via getServerAuthSession",
+      permissions: ["workflows:manage"],
+    }),
   )
   .post(
     "/post_event",

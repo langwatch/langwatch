@@ -20,6 +20,7 @@ import type { Permission } from "~/server/api/rbac";
 import { enforceApiKeyCeiling } from "~/server/api-key/auth-middleware";
 import { LANGY_SESSION_API_KEY_NAME } from "~/server/api-key/reserved-names";
 import { TokenResolver } from "~/server/api-key/token-resolver";
+import { experimentRoutePermissions } from "./helpers/routePermissions";
 import { prisma } from "../../../db";
 import {
   LangySessionKeyScopeError,
@@ -58,48 +59,6 @@ const EXPERIMENTER_ROLE_PERMISSIONS = [
   "experiments:view",
   "evaluations:manage",
 ];
-
-// The `/api/experiments` routes that authenticate by USER SESSION rather than
-// by API key. Langy reaches the surface with a key, so it never calls these —
-// and `/execute` legitimately demands `evaluations:manage`, which the Langy key
-// must never hold. Excluded by path so the rest of the surface can be read
-// straight off the registry.
-const SESSION_ONLY_EXPERIMENT_ROUTES = [
-  "/api/experiments/execute",
-  "/api/experiments/abort",
-];
-
-/**
- * The permissions the API-key-reachable experiment routes actually demand,
- * read from the ROUTE REGISTRY rather than hardcoded.
- *
- * Hardcoding them would have missed the second half of this bug entirely: the
- * run route asked `evaluations:manage`, a grain no least-privilege key can
- * hold, and a fixed list in the test would have happily kept asserting the
- * grain we wished for instead of the one the route enforces. Reading the
- * registry means changing a route's `requires(...)` — or its declared
- * handler-managed permissions — re-points this test at the new grain, so
- * coarsening one back fails HERE, against a real minted key.
- */
-async function experimentRoutePermissions(): Promise<string[]> {
-  await import("~/server/api-router");
-  const { allRegisteredRoutes } = await import(
-    "~/server/api/security/route-registry"
-  );
-  const { policyPermissions } = await import(
-    "~/server/api/security/access-policy"
-  );
-
-  const permissions = new Set<string>();
-  for (const route of allRegisteredRoutes()) {
-    if (!route.path.startsWith("/api/experiments")) continue;
-    if (SESSION_ONLY_EXPERIMENT_ROUTES.includes(route.path)) continue;
-    for (const permission of policyPermissions(route.policy)) {
-      permissions.add(permission);
-    }
-  }
-  return [...permissions].sort();
-}
 
 describe("Langy session key (caller-scoped)", () => {
   const ns = `langy-session-${nanoid(8)}`;

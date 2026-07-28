@@ -21,36 +21,14 @@
  * A new route requiring a new permission fails here until someone decides,
  * naming the route and the permission, rather than reaching a user as a 403.
  *
- * Requires: nothing beyond module loading — the registry is populated as a
- * side effect of importing the composed router.
+ * Runs in the UNIT lane: this reads the in-memory route registry and needs no
+ * database. A drift guard is worth most when it runs often.
  */
 import { describe, expect, it } from "vitest";
 
-import { policyPermissions } from "~/server/api/security/access-policy";
-import { allRegisteredRoutes } from "~/server/api/security/route-registry";
 import { LANGY_CANDIDATE_PERMISSIONS } from "../langyApiKey";
 import { classifyForLangy } from "../langyPermissionPolicy";
-
-/** The registry fills as the app modules load, so the router comes first. */
-const loadRouter = async (): Promise<void> => {
-  await import("~/server/api-router");
-};
-
-/**
- * Every permission the mounted API demands, mapped to the routes demanding it
- * so a failure can name the endpoint rather than just the permission string.
- */
-async function permissionsDemandedByRoutes(): Promise<Map<string, string[]>> {
-  await loadRouter();
-  const demanded = new Map<string, string[]>();
-  for (const route of allRegisteredRoutes()) {
-    for (const permission of policyPermissions(route.policy)) {
-      const where = `${route.method} ${route.path}`;
-      demanded.set(permission, [...(demanded.get(permission) ?? []), where]);
-    }
-  }
-  return demanded;
-}
+import { permissionsDemandedByRoutes } from "./helpers/routePermissions";
 
 describe("Langy permission coverage", () => {
   describe("given every permission the mounted API routes demand", () => {
@@ -81,8 +59,6 @@ describe("Langy permission coverage", () => {
 
     describe("when the policy says Langy must never hold it", () => {
       it("is absent from the candidate list, so widening the list cannot quietly cross a line the policy drew", async () => {
-        await loadRouter();
-
         const wrongly: string[] = [];
         for (const permission of LANGY_CANDIDATE_PERMISSIONS) {
           const verdict = classifyForLangy(permission);

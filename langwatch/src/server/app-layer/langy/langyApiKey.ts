@@ -65,7 +65,7 @@ const tracer = getLangWatchTracer("langwatch.langy.api-key");
 // rights it must not have, to buy a create it should already have had. When a
 // Langy write is refused for a permission this list already contains, look at
 // the route's `requires(...)` first.
-export const LANGY_CANDIDATE_PERMISSIONS: Permission[] = [
+export const LANGY_CANDIDATE_PERMISSIONS: readonly Permission[] = Object.freeze([
   "project:view",
   "traces:view",
   "traces:create",
@@ -113,7 +113,7 @@ export const LANGY_CANDIDATE_PERMISSIONS: Permission[] = [
   // Langy must never hold; RUNNING an experiment is gated by the evaluations
   // family above, not this one.
   "experiments:view",
-];
+]);
 
 // A leaked Langy session key auto-expires after this window. Sized to comfortably
 // outlast a single chat turn / worker idle lifetime (the worker is short-lived)
@@ -401,7 +401,7 @@ export async function mintLangySessionApiKey({
           organizationId,
           projectId,
           ...(project?.teamId ? { teamId: project.teamId } : {}),
-          permissions: LANGY_CANDIDATE_PERMISSIONS,
+          permissions: [...LANGY_CANDIDATE_PERMISSIONS],
         },
       );
       span.setAttribute("langy.permission.held", held.length);

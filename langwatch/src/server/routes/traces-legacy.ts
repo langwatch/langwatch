@@ -38,6 +38,18 @@ const tokenResolver = TokenResolver.create(prisma);
 
 const AUTH_REASON = "project API key / public share resolved in-handler";
 
+// Split by grain: the reads and the share/unshare pair are different powers,
+// and `traces:share` creates PUBLIC links — exactly the sort of thing that must
+// be legible in the registry rather than buried in a handler.
+const tracesViewAuth = handlerManagedAuth({
+  reason: AUTH_REASON,
+  permissions: ["traces:view"],
+});
+const tracesShareAuth = handlerManagedAuth({
+  reason: AUTH_REASON,
+  permissions: ["traces:share"],
+});
+
 const secured = createServiceApp({ basePath: "/api" });
 
 /**
@@ -81,7 +93,7 @@ async function authenticateRequest(c: Context, permission: Permission) {
 }
 
 // ---------- GET /api/trace/:id ----------
-secured.access(handlerManagedAuth(AUTH_REASON)).get("/trace/:id", async (c) => {
+secured.access(tracesViewAuth).get("/trace/:id", async (c) => {
   const auth = await authenticateRequest(c, "traces:view");
   if ("error" in auth) {
     return c.json({ message: auth.error }, auth.status);
@@ -156,7 +168,7 @@ secured.access(handlerManagedAuth(AUTH_REASON)).get("/trace/:id", async (c) => {
 
 // ---------- POST /api/trace/:id/share ----------
 secured
-  .access(handlerManagedAuth(AUTH_REASON))
+  .access(tracesShareAuth)
   .post("/trace/:id/share", async (c) => {
     const auth = await authenticateRequest(c, "traces:share");
     if ("error" in auth) {
@@ -178,7 +190,7 @@ secured
 
 // ---------- POST /api/trace/:id/unshare ----------
 secured
-  .access(handlerManagedAuth(AUTH_REASON))
+  .access(tracesShareAuth)
   .post("/trace/:id/unshare", async (c) => {
     const auth = await authenticateRequest(c, "traces:share");
     if ("error" in auth) {
@@ -224,7 +236,7 @@ const paramsSchema = getAllForProjectInput
   });
 
 secured
-  .access(handlerManagedAuth(AUTH_REASON))
+  .access(tracesViewAuth)
   .post("/trace/search", async (c) => {
     const auth = await authenticateRequest(c, "traces:view");
     if ("error" in auth) {
@@ -318,7 +330,7 @@ secured
 
 // ---------- GET /api/thread/:id ----------
 secured
-  .access(handlerManagedAuth(AUTH_REASON))
+  .access(tracesViewAuth)
   .get("/thread/:id", async (c) => {
     const auth = await authenticateRequest(c, "traces:view");
     if ("error" in auth) {

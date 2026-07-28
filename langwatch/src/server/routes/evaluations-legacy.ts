@@ -94,6 +94,23 @@ const tokenResolver = TokenResolver.create(prisma);
 
 const AUTH_REASON = "project API key resolved in-handler";
 
+// The static evaluator catalogue: no project data, so no permission.
+const catalogueAuth = handlerManagedAuth({
+  reason: "public evaluator catalogue; no project data returned",
+  permissions: [],
+});
+// Every other legacy route runs or records an evaluation.
+//
+// NOTE: these ask for `evaluations:manage` on what are append/create actions —
+// the same over-coarse grain that `POST /api/experiments/:slug/run` had, which
+// refuses any least-privilege key holding only `evaluations:create`. Declaring
+// it here does not fix it; it makes it VISIBLE, which is the precondition.
+// Tracked separately rather than widened in this change.
+const legacyEvaluationAuth = handlerManagedAuth({
+  reason: AUTH_REASON,
+  permissions: ["evaluations:manage"],
+});
+
 /**
  * Authenticates via the unified API-key + legacy-key path and enforces the given
  * permission ceiling. Returns either a `{ project, markUsed }` context on
@@ -149,7 +166,7 @@ const secured = createServiceApp({ basePath: "/api" });
 
 // ---------- GET /api/evaluations/list ----------
 secured
-  .access(handlerManagedAuth(AUTH_REASON))
+  .access(catalogueAuth)
   .get("/evaluations/list", async (c) => {
     const evaluators = Object.fromEntries(
       Object.entries(AVAILABLE_EVALUATORS)
@@ -179,7 +196,7 @@ secured
 
 // ---------- POST /api/evaluations/batch/log_results ----------
 secured
-  .access(handlerManagedAuth(AUTH_REASON))
+  .access(legacyEvaluationAuth)
   .post(
     "/evaluations/batch/log_results",
     bodyLimit({ maxSize: 20 * 1024 * 1024 }),
@@ -301,7 +318,7 @@ secured
 
 // ---------- POST /api/evaluations/:evaluator/evaluate ----------
 secured
-  .access(handlerManagedAuth(AUTH_REASON))
+  .access(legacyEvaluationAuth)
   .post(
     "/evaluations/:evaluator/evaluate",
     bodyLimit({ maxSize: 30 * 1024 * 1024 }),
@@ -313,7 +330,7 @@ secured
 
 // ---------- POST /api/evaluations/:evaluator/:subpath/evaluate ----------
 secured
-  .access(handlerManagedAuth(AUTH_REASON))
+  .access(legacyEvaluationAuth)
   .post(
     "/evaluations/:evaluator/:subpath/evaluate",
     bodyLimit({ maxSize: 30 * 1024 * 1024 }),
@@ -325,7 +342,7 @@ secured
 
 // ---------- POST /api/guardrails/:evaluator/evaluate ----------
 secured
-  .access(handlerManagedAuth(AUTH_REASON))
+  .access(legacyEvaluationAuth)
   .post(
     "/guardrails/:evaluator/evaluate",
     bodyLimit({ maxSize: 30 * 1024 * 1024 }),
@@ -337,7 +354,7 @@ secured
 
 // ---------- POST /api/dataset/evaluate ----------
 secured
-  .access(handlerManagedAuth(AUTH_REASON))
+  .access(legacyEvaluationAuth)
   .post("/dataset/evaluate", async (c) => {
     const auth = await authenticateRequest(c, "evaluations:manage");
     if ("error" in auth) {

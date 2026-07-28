@@ -57,21 +57,23 @@ import type { NextRequestShim as any } from "./types";
 const logger = createLogger("langwatch:experiments-v3");
 
 const secured = createServiceApp({ basePath: "/api/experiments" });
-const sessionAuth = handlerManagedAuth(
-  "user session validated in-handler via getServerAuthSession",
-  { permissions: ["evaluations:manage"] },
-);
+const sessionAuth = handlerManagedAuth({
+  reason: "user session validated in-handler via getServerAuthSession",
+  permissions: ["evaluations:manage"],
+});
 // The read endpoints (runs list / status / results) and the run endpoint gate
 // on different grains, so they declare separately: a single shared policy
 // would report the coarser of the two for routes that only read.
-const apiKeyAuthRead = handlerManagedAuth(
-  "project API key resolved in-handler via TokenResolver + enforceApiKeyCeiling",
-  { permissions: ["evaluations:view"] },
-);
-const apiKeyAuthRun = handlerManagedAuth(
-  "project API key resolved in-handler via TokenResolver + enforceApiKeyCeiling",
-  { permissions: ["evaluations:create"] },
-);
+const apiKeyAuthRead = handlerManagedAuth({
+  reason:
+    "project API key resolved in-handler via TokenResolver + enforceApiKeyCeiling",
+  permissions: ["evaluations:view"],
+});
+const apiKeyAuthRun = handlerManagedAuth({
+  reason:
+    "project API key resolved in-handler via TokenResolver + enforceApiKeyCeiling",
+  permissions: ["evaluations:create"],
+});
 
 // Backward-compat aliases: redirect old /api/evaluations/v3/... paths to new /api/experiments/...
 // Python SDK still calls the old routes until it is updated in a follow-up.

@@ -28,7 +28,10 @@ const logger = createLogger("langwatch:api:dataset:generate");
 const secured = createServiceApp({ basePath: "/api/dataset" });
 
 secured.access(
-  handlerManagedAuth("user session validated in-handler via getServerAuthSession"),
+  handlerManagedAuth({
+    reason: "user session validated in-handler via getServerAuthSession",
+    permissions: ["datasets:manage"],
+  }),
 ).post("/generate", async (c) => {
   const session = await getServerAuthSession({ req: c.req.raw as any });
   if (!session) {

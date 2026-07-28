@@ -108,7 +108,10 @@ function scenarioGenerateTimeoutMs(): number {
 const secured = createServiceApp({ basePath: "/api/scenario" });
 
 secured.access(
-  handlerManagedAuth("user session validated in-handler via getServerAuthSession"),
+  handlerManagedAuth({
+    reason: "user session validated in-handler via getServerAuthSession",
+    permissions: ["scenarios:manage"],
+  }),
 ).post("/generate", async (c) => {
   const session = await getServerAuthSession({ req: c.req.raw as any });
   if (!session) {

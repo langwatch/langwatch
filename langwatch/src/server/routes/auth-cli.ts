@@ -71,9 +71,13 @@ const logger = createLogger("langwatch:auth-cli");
 
 const secured = createServiceApp({ basePath: "/api/auth/cli" });
 
-const CLI_POLICY = handlerManagedAuth(
-  "CLI device-flow / user session validated in-handler",
-);
+const CLI_POLICY = handlerManagedAuth({
+  reason: "CLI device-flow / user session validated in-handler",
+  // The device flow authenticates the CALLER; it is not gated on an RBAC
+  // permission. Individual handlers that then act on a project do their own
+  // checks against the resolved user.
+  permissions: [],
+});
 
 // ---------------------------------------------------------------------------
 // Constants — tunable via env if a customer ever needs longer windows.

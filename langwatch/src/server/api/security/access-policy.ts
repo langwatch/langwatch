@@ -46,16 +46,11 @@ export type AccessPolicy =
       readonly kind: "handlerManaged";
       readonly reason: string;
       /**
-       * The permissions the handler enforces for itself. Optional, because a
-       * handler-managed route may gate on something that is not an RBAC
-       * permission at all — but when it DOES check one, declaring it here is
-       * what keeps the route's real requirement visible to the registry.
-       * Without it a handler-enforced grain is invisible to every audit that
-       * reads the registry, which is how `POST /api/experiments/:slug/run`
-       * sat on `evaluations:manage` — a grain no least-privilege key can hold
-       * — without anything noticing.
+       * The RBAC permissions the handler enforces for itself; `[]` when it
+       * gates on something that is not an RBAC permission. Mandatory — see
+       * `handlerManagedAuth` for why the optional version was a defect.
        */
-      readonly permissions?: readonly Permission[];
+      readonly permissions: readonly Permission[];
     };
 
 /**
@@ -133,14 +128,27 @@ export function internalSecret(reason: string): AccessPolicy {
  * unaccounted-for endpoint. Prefer a real `requires(...)` / `internalSecret(...)`
  * strategy when the auth can be expressed as middleware.
  */
-export function handlerManagedAuth(
-  reason: string,
-  options: { permissions?: readonly Permission[] } = {},
-): AccessPolicy {
+export function handlerManagedAuth({
+  reason,
+  permissions,
+}: {
+  reason: string;
+  /**
+   * The RBAC permissions this handler enforces for itself — `[]` when it gates
+   * on something that is not an RBAC permission (an internal secret, a raw
+   * session check, a signature).
+   *
+   * REQUIRED, and that is the entire point. When it was optional, omitting it
+   * and having nothing to declare were the same value, so a self-enforcing RBAC
+   * route contributed nothing to the registry and every audit that reads the
+   * registry walked straight past it. Writing `[]` is a claim; leaving it out
+   * was an absence, and absence is what let `POST /api/experiments/:slug/run`
+   * sit on a grain no least-privilege key could hold.
+   */
+  permissions: readonly Permission[];
+}): AccessPolicy {
   assertReason(reason, "handlerManagedAuth");
-  return options.permissions
-    ? { kind: "handlerManaged", reason, permissions: options.permissions }
-    : { kind: "handlerManaged", reason };
+  return { kind: "handlerManaged", reason, permissions };
 }
 
 /**
@@ -156,7 +164,7 @@ export function policyPermissions(policy: AccessPolicy): readonly Permission[] {
     case "projectPermission":
       return [policy.permission];
     case "handlerManaged":
-      return policy.permissions ?? [];
+      return policy.permissions;
     case "anyAuthenticated":
     case "public":
     case "internal":

@@ -43,7 +43,13 @@ const secured = createServiceApp({ basePath: "/api" });
 
 // POST /api/collector
 secured
-  .access(handlerManagedAuth("ingestion API key resolved in-handler"))
+  .access(handlerManagedAuth({
+    reason: "ingestion API key resolved in-handler",
+    // Declared because this is the route it took a colleague "ages" to work
+    // out from the code: trace collection is gated by `traces:create`, which
+    // was previously discoverable only by reading the handler.
+    permissions: ["traces:create"],
+  }))
   .post(
     "/collector",
     bodyLimit({ maxSize: 10 * 1024 * 1024 }), // 10MB

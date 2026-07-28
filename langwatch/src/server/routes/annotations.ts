@@ -26,6 +26,22 @@ const tokenResolver = TokenResolver.create(prisma);
 const AUTH_REASON =
   "project API key resolved in-handler via TokenResolver + enforceApiKeyCeiling";
 
+// One policy per GRAIN, not one per file. A single shared policy would report
+// the same requirement for a read and a delete, which is worse than reporting
+// nothing: an audit reading the registry would believe it had the answer.
+const annotationsViewAuth = handlerManagedAuth({
+  reason: AUTH_REASON,
+  permissions: ["annotations:view"],
+});
+const annotationsCreateAuth = handlerManagedAuth({
+  reason: AUTH_REASON,
+  permissions: ["annotations:create"],
+});
+const annotationsManageAuth = handlerManagedAuth({
+  reason: AUTH_REASON,
+  permissions: ["annotations:manage"],
+});
+
 const secured = createServiceApp({ basePath: "/api" });
 
 /**
@@ -72,7 +88,7 @@ async function authenticateRequest(
 }
 
 // ---------- GET /api/annotations ----------
-secured.access(handlerManagedAuth(AUTH_REASON)).get("/annotations", async (c) => {
+secured.access(annotationsViewAuth).get("/annotations", async (c) => {
   const auth = await authenticateRequest(c, "annotations:view");
   if ("error" in auth) {
     return c.json({ message: auth.error }, auth.status);
@@ -102,7 +118,7 @@ secured.access(handlerManagedAuth(AUTH_REASON)).get("/annotations", async (c) =>
 });
 
 // ---------- GET|DELETE|PATCH /api/annotations/:id ----------
-secured.access(handlerManagedAuth(AUTH_REASON)).get("/annotations/:id", async (c) => {
+secured.access(annotationsViewAuth).get("/annotations/:id", async (c) => {
   const auth = await authenticateRequest(c, "annotations:view");
   if ("error" in auth) {
     return c.json({ message: auth.error }, auth.status);
@@ -137,7 +153,7 @@ secured.access(handlerManagedAuth(AUTH_REASON)).get("/annotations/:id", async (c
   }
 });
 
-secured.access(handlerManagedAuth(AUTH_REASON)).delete("/annotations/:id", async (c) => {
+secured.access(annotationsManageAuth).delete("/annotations/:id", async (c) => {
   const auth = await authenticateRequest(c, "annotations:manage");
   if ("error" in auth) {
     return c.json({ message: auth.error }, auth.status);
@@ -166,7 +182,7 @@ secured.access(handlerManagedAuth(AUTH_REASON)).delete("/annotations/:id", async
   }
 });
 
-secured.access(handlerManagedAuth(AUTH_REASON)).patch("/annotations/:id", async (c) => {
+secured.access(annotationsManageAuth).patch("/annotations/:id", async (c) => {
   const auth = await authenticateRequest(c, "annotations:manage");
   if ("error" in auth) {
     return c.json({ message: auth.error }, auth.status);
@@ -228,7 +244,7 @@ secured.access(handlerManagedAuth(AUTH_REASON)).patch("/annotations/:id", async 
 });
 
 // ---------- GET|POST /api/annotations/trace/:trace ----------
-secured.access(handlerManagedAuth(AUTH_REASON)).get("/annotations/trace/:trace", async (c) => {
+secured.access(annotationsViewAuth).get("/annotations/trace/:trace", async (c) => {
   const auth = await authenticateRequest(c, "annotations:view");
   if ("error" in auth) {
     return c.json({ message: auth.error }, auth.status);
@@ -258,7 +274,7 @@ secured.access(handlerManagedAuth(AUTH_REASON)).get("/annotations/trace/:trace",
   }
 });
 
-secured.access(handlerManagedAuth(AUTH_REASON)).post("/annotations/trace/:trace", async (c) => {
+secured.access(annotationsCreateAuth).post("/annotations/trace/:trace", async (c) => {
   // `:create` (not `:manage`) — same fix as evaluators' POST route. Creating
   // is a lesser privilege than update/delete, and LANGY_CANDIDATE_PERMISSIONS
   // only ever grants annotations:create, never :manage. PATCH/DELETE above

@@ -37,7 +37,10 @@ const secured = createServiceApp({ basePath: "/api/export/traces" });
  * subscription can relay them to the client. The export ID is returned
  * in the X-Export-Id response header.
  */
-secured.access(handlerManagedAuth("user session + traces:view enforced in-handler")).post("/download", zValidator("json", exportRequestSchema), async (c) => {
+secured.access(handlerManagedAuth({
+  reason: "user session + traces:view enforced in-handler",
+  permissions: ["traces:view"],
+})).post("/download", zValidator("json", exportRequestSchema), async (c) => {
   const request = c.req.valid("json");
 
   // Authenticate

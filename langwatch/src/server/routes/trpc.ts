@@ -151,10 +151,18 @@ const handler = async (c: Context) => {
 };
 
 secured.access(
-  handlerManagedAuth("tRPC enforces per-procedure RBAC internally"),
+  handlerManagedAuth({
+      reason: "tRPC enforces per-procedure RBAC internally",
+      // Per-procedure, via checkProjectPermission — not visible at route level.
+      permissions: [],
+    }),
 ).get("/trpc/*", handler);
 secured.access(
-  handlerManagedAuth("tRPC enforces per-procedure RBAC internally"),
+  handlerManagedAuth({
+      reason: "tRPC enforces per-procedure RBAC internally",
+      // Per-procedure, via checkProjectPermission — not visible at route level.
+      permissions: [],
+    }),
 ).post("/trpc/*", handler);
 
 export const app = secured.hono;

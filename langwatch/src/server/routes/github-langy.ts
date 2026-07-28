@@ -172,7 +172,7 @@ function publicGithubErrorMessage(): string {
 }
 
 secured
-  .access(handlerManagedAuth(INSTALL_HANDLER_AUTH_REASON))
+  .access(handlerManagedAuth({ reason: INSTALL_HANDLER_AUTH_REASON, permissions: [] }))
   .get("/github-langy/install", async (c) => {
     if (!installConfigured()) {
       return c.json(
