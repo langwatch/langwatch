@@ -1,0 +1,173 @@
+Feature: Workflow agent surfaces End-node misconfiguration instead of an empty reply
+  As someone running a scenario against a workflow agent
+  I want a topology mistake in my workflow to come back as a readable error
+  So that I can fix the workflow instead of staring at a blank agent turn
+
+  # Context (#3198): a workflow used as a scenario agent that never reaches an
+  # End node finishes with `{status: "success", result: {}}`. The scenario then
+  # shows an empty agent reply with nothing to act on.
+  #
+  # Two distinct halves, both of which have to hold for the symptom to be gone:
+  #
+  #   1. The engine (services/nlpgo) must refuse to finish a full run that can
+  #      never produce a result — whether the End node is absent entirely or
+  #      present but not wired to anything upstream.
+  #   2. The scenario adapter (SerializedWorkflowAgentAdapter) must surface the
+  #      engine's error envelope. /go/studio/execute_sync answers 200 with
+  #      `{status: "error", error: {...}}` for engine-level failures, so an
+  #      adapter that only checks `response.ok` reads the error as a success
+  #      with a null result and returns "".
+  #
+  # Out of scope (tracked separately):
+  #   - Automatic best-guess output fallback when no End node exists — the issue
+  #     offers it as an alternative to the error, and the error was chosen.
+
+  # ============================================================================
+  # AC #1 — topology-invalid workflows are rejected with a specific message
+  # ============================================================================
+
+  @unit
+  Scenario: A full run with no End node at all is rejected before any node executes
+    Given a workflow with an entry node and a code node but no End node
+    When the engine plans a full run of that workflow
+    Then planning fails with a missing-End-node error
+    And the error message says the workflow has no End node
+
+  @unit
+  Scenario: A full run whose End node has no wired inputs is rejected
+    Given a workflow with an entry node, a code node, and an End node with no inbound edge
+    When the engine plans a full run of that workflow
+    Then planning fails with an unwired-End-node error
+    And the error message says the End node has no wired inputs
+
+  @unit
+  Scenario: A full run whose End node is wired only to an unreachable node is rejected
+    Given a workflow whose End node is fed by a node that is not reachable from the entry node
+    When the engine plans a full run of that workflow
+    Then planning fails with an unwired-End-node error
+
+  @unit
+  Scenario: A run-until-here plan may legitimately stop before the End node
+    Given a workflow with an entry node and a code node but no End node
+    When the engine plans a run that stops at the code node
+    Then planning succeeds
+
+  @unit
+  Scenario: A single-component run may legitimately have no End node
+    Given a workflow with an entry node and a code node but no End node
+    When the engine plans a single-component run
+    Then planning succeeds
+
+  @unit
+  Scenario: A single-component run is not rejected for an unwired End node
+    Given a workflow with an entry node, a code node, and an End node with no inbound edge
+    When the engine plans a single-component run
+    Then planning succeeds
+
+  @integration
+  Scenario: The execute_sync API answers a workflow with an unwired End node with an error envelope
+    Given a workflow with an entry node and an End node that has no inbound edge
+    When it is submitted to the execute_sync API as a full run
+    Then the response carries an error status
+    And the response error message says the End node has no wired inputs
+
+  # ============================================================================
+  # AC #1 (defence in depth) — finalize never reports an empty success
+  # ============================================================================
+
+  @unit
+  Scenario: A full run that reaches finalize with no End node errors instead of succeeding
+    Given a full run whose state has no End node
+    When the run is finalized
+    Then the result carries an error status
+    And the error says the workflow has no End node
+
+  @unit
+  Scenario: A full run whose End node produced no output errors instead of succeeding
+    Given a full run whose End node was never executed
+    When the run is finalized
+    Then the result carries an error status
+    And the error says the run never reached its End node
+
+  @unit
+  Scenario: A full run takes its result from an End node that did produce output
+    Given a full run with two End nodes where only the second one executed
+    When the run is finalized
+    Then the result carries a success status
+    And the result is the output of the End node that executed
+
+  @unit
+  Scenario: A partial run with no End node still finalizes as a success
+    Given a partial run whose state has no End node
+    When the run is finalized
+    Then the result carries a success status
+
+  # ============================================================================
+  # AC #2 — the scenario adapter surfaces the engine's error, never an empty reply
+  # ============================================================================
+
+  @unit
+  Scenario: The workflow agent throws when the engine answers 200 with an error status
+    Given the engine answers with HTTP 200 and an error envelope naming the missing End node
+    When the workflow agent is called
+    Then the agent call throws
+    And the thrown error message contains the engine's error message
+
+  @unit
+  Scenario: The workflow agent does not return an empty string for an engine error
+    Given the engine answers with HTTP 200, an error envelope, and a null result
+    When the workflow agent is called
+    Then the agent call throws rather than returning an empty string
+
+  @unit
+  Scenario: The workflow agent names the engine error type when the envelope carries no message
+    Given the engine answers with HTTP 200 and an error envelope with no message
+    When the workflow agent is called
+    Then the agent call throws
+    And the thrown error message contains the engine's error type
+
+  @unit
+  Scenario: The workflow agent surfaces the engine error message on a non-2xx response
+    Given the engine answers with HTTP 400 and an error envelope naming the missing End node
+    When the workflow agent is called
+    Then the agent call throws
+    And the thrown error message contains the engine's error message
+
+  @unit
+  Scenario: A successful engine response is still returned unchanged
+    Given the engine answers with HTTP 200, a success status, and a mapped output
+    When the workflow agent is called
+    Then the agent returns the mapped output
+
+  # --- AC Coverage Map ---
+  # Issue #3198 AC #1: "no END node (or an END node with no wired inputs) returns
+  #   a 4xx-class response with detail identifying the specific misconfiguration" →
+  #   Scenario "A full run with no End node at all is rejected before any node executes"
+  #   Scenario "A full run whose End node has no wired inputs is rejected"
+  #   Scenario "A full run whose End node is wired only to an unreachable node is rejected"
+  #   Scenario "The execute_sync API answers a workflow with an unwired End node with an error envelope"
+  #   NOTE ON THE LITERAL STATUS CODE: nlpgo reports engine-level failures as HTTP
+  #   200 with `{status: "error", error: {type, message}}`, not as a 4xx. That is
+  #   deliberate and is NOT changed here: the herr 4xx envelope
+  #   (pkg/herr/http.go toErrorBody) only exposes `Meta["message"]` and renders a
+  #   non-herr wrapped cause as `{"type":"unknown","message":"unknown"}`, so moving
+  #   these errors to a 400 would DROP the very detail the AC asks for. The 200
+  #   envelope carries the message verbatim; AC #2 is what makes it visible.
+  # Issue #3198 AC #2: "SerializedWorkflowAgentAdapter surfaces the precheck message
+  #   unchanged; no uninterpretable result reaches the user" →
+  #   Scenario "The workflow agent throws when the engine answers 200 with an error status"
+  #   Scenario "The workflow agent does not return an empty string for an engine error"
+  #   Scenario "The workflow agent names the engine error type when the envelope carries no message"
+  #   Scenario "The workflow agent surfaces the engine error message on a non-2xx response"
+  # Issue #3198 AC #4: "Happy path unchanged" →
+  #   Scenario "A successful engine response is still returned unchanged"
+  #   Scenario "A run-until-here plan may legitimately stop before the End node"
+  #   Scenario "A single-component run may legitimately have no End node"
+  #   Scenario "A single-component run is not rejected for an unwired End node"
+  #   Scenario "A partial run with no End node still finalizes as a success"
+  #   Scenario "A full run takes its result from an End node that did produce output"
+  # Issue #3198 AC #3: "END node produces no output for the configured
+  #   scenarioOutputField returns the existing field-not-found message" → already
+  #   implemented and covered by the pre-existing
+  #   workflow-agent.adapter.unit.test.ts "scenario output field" tests; no new
+  #   scenario added here.
