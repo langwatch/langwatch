@@ -228,6 +228,74 @@ test_access_ingress() {
   # the ingress while the blackhole Service disappears would route to a
   # nonexistent backend, which the Service-name assertion alone would miss.
   assert_not_contains "blockedPaths=[] removes blocked path" "$no_block" "path: /api/internal"
+
+  # An application path nested under a blocked prefix out-matches the blackhole
+  # and routes the private control plane straight to the app — the block is
+  # still rendered, so nothing looks wrong, but it no longer blocks. The chart
+  # refuses to render that combination rather than ship a silent bypass.
+  # Each render is captured with `&& rc=0 || rc=$?` so a non-zero helm exit is
+  # the assertion, not a `set -e` abort of the whole suite.
+  local nested_out nested_rc
+  nested_out=$(tmpl --set autogen.enabled=true \
+    -f "${OVERLAYS}/size-prod.yaml" \
+    -f "${OVERLAYS}/access-ingress.yaml" \
+    --set-json 'ingress.hosts=[{"host":"lw.example.com","http":{"paths":[{"path":"/api/internal/status","pathType":"Prefix"},{"path":"/","pathType":"ImplementationSpecific"}]}}]') \
+    && nested_rc=0 || nested_rc=$?
+  if [[ "$nested_rc" -ne 0 ]]; then
+    pass "Nested app path under a blocked prefix refuses to render"
+  else
+    fail "Nested app path under a blocked prefix should refuse to render (helm exited 0)"
+  fi
+  # Fail for the right reason: any template error would trip the exit-code check
+  # above, so pin the guard's own diagnostic.
+  assert_contains "Nested-path failure names the bypass" "$nested_out" \
+    "would out-match the blackhole and re-expose the private control plane"
+
+  # An app path equal to the blocked prefix is the same bypass without the
+  # nesting, and the guard's equality arm has to catch it.
+  local exact_rc
+  tmpl --set autogen.enabled=true \
+    -f "${OVERLAYS}/size-prod.yaml" \
+    -f "${OVERLAYS}/access-ingress.yaml" \
+    --set-json 'ingress.hosts=[{"host":"lw.example.com","http":{"paths":[{"path":"/api/internal","pathType":"Prefix"}]}}]' \
+    > /dev/null && exact_rc=0 || exact_rc=$?
+  if [[ "$exact_rc" -ne 0 ]]; then
+    pass "App path equal to a blocked prefix refuses to render"
+  else
+    fail "App path equal to a blocked prefix should refuse to render (helm exited 0)"
+  fi
+
+  # …but the guard matches on `/`-separated segments, exactly like
+  # `pathType: Prefix`. `/api/internal-status` is a sibling, NOT nested: the
+  # block does not cover it, so rejecting it would break a legitimate app path.
+  # A naive `hasPrefix` guard passes every assertion above and fails this one.
+  local sibling_out sibling_rc
+  sibling_out=$(tmpl --set autogen.enabled=true \
+    -f "${OVERLAYS}/size-prod.yaml" \
+    -f "${OVERLAYS}/access-ingress.yaml" \
+    --set-json 'ingress.hosts=[{"host":"lw.example.com","http":{"paths":[{"path":"/api/internal-status","pathType":"Prefix"},{"path":"/","pathType":"ImplementationSpecific"}]}}]') \
+    && sibling_rc=0 || sibling_rc=$?
+  if [[ "$sibling_rc" -eq 0 ]]; then
+    pass "Sibling path outside the blocked prefix still renders"
+  else
+    fail "Sibling path /api/internal-status should render (helm exited ${sibling_rc})"
+  fi
+  assert_contains "Sibling path routed to the app" "$sibling_out" "path: /api/internal-status"
+
+  # Emptying blockedPaths opts out of the guard too, so an operator who
+  # knowingly disables the block is not held up by a path it no longer covers.
+  local optout_rc
+  tmpl --set autogen.enabled=true \
+    -f "${OVERLAYS}/size-prod.yaml" \
+    -f "${OVERLAYS}/access-ingress.yaml" \
+    --set-json 'ingress.blockedPaths=[]' \
+    --set-json 'ingress.hosts=[{"host":"lw.example.com","http":{"paths":[{"path":"/api/internal/status","pathType":"Prefix"}]}}]' \
+    > /dev/null && optout_rc=0 || optout_rc=$?
+  if [[ "$optout_rc" -eq 0 ]]; then
+    pass "blockedPaths=[] disables the guard along with the block"
+  else
+    fail "blockedPaths=[] should disable the guard (helm exited ${optout_rc})"
+  fi
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
