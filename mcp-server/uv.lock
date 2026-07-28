@@ -969,7 +969,7 @@ wheels = [
 
 [[package]]
 name = "langwatch"
-version = "0.26.0"
+version = "1.0.0"
 source = { editable = "../python-sdk" }
 dependencies = [
     { name = "attrs" },
@@ -993,6 +993,7 @@ dependencies = [
     { name = "retry" },
     { name = "tenacity" },
     { name = "termcolor" },
+    { name = "tqdm" },
 ]
 
 [package.metadata]
@@ -1024,6 +1025,7 @@ requires-dist = [
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.11.1" },
     { name = "tenacity", specifier = ">=8.0.0" },
     { name = "termcolor", specifier = ">=3.0.1" },
+    { name = "tqdm", specifier = ">=4.62.0" },
 ]
 provides-extras = ["langchain", "dspy", "litellm", "dev", "tests"]
 

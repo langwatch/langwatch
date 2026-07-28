@@ -86,6 +86,15 @@ override-dependencies = [
     "nltk>=3.10.0",
 ]
 
+# Transitive-dependency security floors. These only raise a lower bound, so a
+# consumer that caps below them surfaces as a resolution error rather than being
+# silently forced onto an incompatible version.
+constraint-dependencies = [
+    "pillow>=12.3.0",  # security: pillow advisories (#1615-#1620, #1672-#1678)
+    "pyasn1>=0.6.4",  # security: pyasn1 advisories (#1699, #1700)
+    "setuptools>=83.0.0",  # security: setuptools advisory (#1698)
+]
+
 [tool.uv.workspace]
 members = [
     "langevals_core",
