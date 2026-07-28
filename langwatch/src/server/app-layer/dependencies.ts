@@ -10,6 +10,7 @@ import type { RetentionPolicyCache } from "../data-retention/retentionPolicyCach
 import type { RetroactiveUpdateService } from "../data-retention/retroactive/retroactiveUpdate.service";
 import type { EventSourcing } from "../event-sourcing/eventSourcing";
 import type { AppCommands } from "../event-sourcing/pipelineRegistry";
+import type { AnnotationService } from "../annotations/annotation.service";
 import type { ExperimentService } from "../experiments/experiment.service";
 import type { EmailSuppressionService } from "./automations/emailSuppression.service";
 import type { TriggerService } from "./automations/trigger.service";
@@ -127,6 +128,7 @@ export interface AppDependencies {
     feedbackPrompt: LangyFeedbackPromptService;
   };
   experiments: ExperimentService;
+  annotations: AnnotationService;
   triggers: TriggerService;
   /** Wraps `testFireTrigger(deps, input)` with the composition-time
    *  `{baseHost, notifier}` bag already bound — the router only needs

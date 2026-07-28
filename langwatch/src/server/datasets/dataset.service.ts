@@ -1083,6 +1083,23 @@ export class DatasetService {
   }
 
   /**
+   * Inserts already-built records into a dataset addressed by id.
+   *
+   * Distinct from {@link batchCreateRecords}, which resolves a dataset by slug,
+   * validates entry keys against the column schema and mints its own ids. This
+   * is the seam for callers that already hold a `datasetId` and fully-formed
+   * records — today the automations "add to dataset" action, whose records were
+   * built from a trigger's own column mapping.
+   */
+  async createRecordsForDatasetId(params: {
+    datasetId: string;
+    projectId: string;
+    datasetRecords: DatasetRecordInput[];
+  }): Promise<void> {
+    await createManyDatasetRecords(params);
+  }
+
+  /**
    * Batch deletes records from a dataset.
    *
    * @throws {DatasetNotFoundError} if dataset not found

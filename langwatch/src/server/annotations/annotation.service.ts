@@ -1,11 +1,30 @@
 import type { Annotation, PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
+import { z } from "zod";
 import {
   AnnotationRepository,
   type CreateAnnotationInput,
   type DeleteAnnotationInput,
   type UpdateAnnotationInput,
 } from "./annotation.repository";
+
+/**
+ * An annotator is addressed over the wire as a single prefixed string, so a
+ * queue and a user can share one field. The id keeps every character after the
+ * prefix — ids contain hyphens of their own.
+ */
+const annotatorReferenceSchema = z.string().transform((annotator, ctx) => {
+  if (annotator.startsWith("queue-") && annotator.length > 6) {
+    return { type: "queue" as const, id: annotator.slice(6) };
+  }
+  if (annotator.startsWith("user-") && annotator.length > 5) {
+    return { type: "user" as const, id: annotator.slice(5) };
+  }
+  ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Invalid annotator" });
+  return z.NEVER;
+});
+
+type AnnotatorReference = z.infer<typeof annotatorReferenceSchema>;
 
 export class AnnotationService {
   constructor(private readonly repository: AnnotationRepository) {}
@@ -120,6 +139,66 @@ export class AnnotationService {
         code: "BAD_REQUEST",
         message: "One or more annotators are not available in this project",
       });
+    }
+  }
+
+  /**
+   * Assigns each trace to each annotator, creating the queue item or re-opening
+   * an existing one. Cross-tenant references are rejected before anything is
+   * written, so a bad annotator in the batch assigns nothing.
+   */
+  async enqueueTracesForAnnotators({
+    traceIds,
+    projectId,
+    annotators,
+    userId,
+  }: {
+    traceIds: string[];
+    projectId: string;
+    annotators: string[];
+    userId: string;
+  }): Promise<void> {
+    const parsedAnnotators: AnnotatorReference[] = annotators.map(
+      (annotator) => {
+        const parsed = annotatorReferenceSchema.safeParse(annotator);
+        if (!parsed.success) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Invalid annotator",
+          });
+        }
+        return parsed.data;
+      },
+    );
+
+    await this.assertAnnotatorReferences({
+      projectId,
+      queueIds: parsedAnnotators
+        .filter((annotator) => annotator.type === "queue")
+        .map((annotator) => annotator.id),
+      userIds: parsedAnnotators
+        .filter((annotator) => annotator.type === "user")
+        .map((annotator) => annotator.id),
+    });
+
+    for (const traceId of traceIds) {
+      for (const annotator of parsedAnnotators) {
+        if (annotator.type === "queue") {
+          await this.repository.upsertQueueItemForQueue({
+            projectId,
+            traceId,
+            annotationQueueId: annotator.id,
+            createdByUserId: userId,
+          });
+        } else {
+          await this.repository.upsertQueueItemForUser({
+            projectId,
+            traceId,
+            userId: annotator.id,
+            createdByUserId: userId,
+          });
+        }
+      }
     }
   }
 }

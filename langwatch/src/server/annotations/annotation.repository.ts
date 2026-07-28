@@ -150,4 +150,78 @@ export class AnnotationRepository {
       where: { id: { in: queueIds }, projectId },
     });
   }
+
+  /**
+   * Puts a trace on a queue's worklist, re-opening it (`doneAt: null`) when the
+   * pair already exists so a re-assignment revives a completed item.
+   */
+  async upsertQueueItemForQueue({
+    projectId,
+    traceId,
+    annotationQueueId,
+    createdByUserId,
+  }: {
+    projectId: string;
+    traceId: string;
+    annotationQueueId: string;
+    createdByUserId: string;
+  }): Promise<void> {
+    await this.prisma.annotationQueueItem.upsert({
+      where: {
+        projectId: projectId,
+        traceId_annotationQueueId_projectId: {
+          traceId: traceId,
+          annotationQueueId: annotationQueueId,
+          projectId: projectId,
+        },
+      },
+      create: {
+        annotationQueueId: annotationQueueId,
+        traceId: traceId,
+        projectId: projectId,
+        createdByUserId: createdByUserId,
+      },
+      update: {
+        annotationQueueId: annotationQueueId,
+        doneAt: null,
+      },
+    });
+  }
+
+  /**
+   * Puts a trace on one user's personal worklist, re-opening it (`doneAt:
+   * null`) when the pair already exists.
+   */
+  async upsertQueueItemForUser({
+    projectId,
+    traceId,
+    userId,
+    createdByUserId,
+  }: {
+    projectId: string;
+    traceId: string;
+    userId: string;
+    createdByUserId: string;
+  }): Promise<void> {
+    await this.prisma.annotationQueueItem.upsert({
+      where: {
+        projectId: projectId,
+        traceId_userId_projectId: {
+          traceId: traceId,
+          userId: userId,
+          projectId: projectId,
+        },
+      },
+      create: {
+        userId: userId,
+        traceId: traceId,
+        projectId: projectId,
+        createdByUserId: createdByUserId,
+      },
+      update: {
+        userId: userId,
+        doneAt: null,
+      },
+    });
+  }
 }

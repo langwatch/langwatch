@@ -27,9 +27,6 @@ import {
 } from "./utils/killSwitch";
 import type { PrismaClient } from "@prisma/client";
 import type { Cluster, Redis } from "ioredis";
-import { createOrUpdateQueueItems } from "~/server/api/routers/annotation";
-import { createManyDatasetRecords } from "~/server/api/routers/datasetRecord.utils";
-import { getProtectionsForProject } from "~/server/api/utils";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import { DatasetRepository } from "~/server/datasets/dataset.repository";
 import {
@@ -40,7 +37,6 @@ import { registerDatasetNormalizeEnqueue } from "~/server/datasets/dataset-norma
 import { getDatasetStorage } from "~/server/datasets/dataset-storage";
 import { featureFlagService } from "~/server/featureFlag";
 import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
-import { TraceService } from "~/server/traces/trace.service";
 import { queryBillableEventsTotal } from "../../../ee/billing/services/billableEventsQuery";
 import type { UsageReportingService } from "../../../ee/billing/services/usageReportingService";
 import type { TriggerService } from "../app-layer/automations/trigger.service";
@@ -84,7 +80,7 @@ import { TraceReadDerivationService } from "../app-layer/traces/trace-read-deriv
 import type { TraceSummaryService } from "../app-layer/traces/trace-summary.service";
 import type { TraceSummaryData } from "../app-layer/traces/types";
 import type { RetentionPolicyResolver } from "../data-retention/retentionPolicyResolver";
-import type { AutomationDispatchPorts } from "../event-sourcing/pipelines/automations/automationDispatch.wiring";
+import type { AutomationDispatchPorts } from "../event-sourcing/pipelines/automations/automationDispatch.adapter";
 import { createEvaluationAlertTriggerMatchHandler } from "../event-sourcing/pipelines/automations/subscribers/evaluationAlertTriggerMatch.subscriber";
 import { createGraphTriggerActivityHandler } from "../event-sourcing/pipelines/automations/subscribers/graphTriggerActivity.subscriber";
 import { createLangyEffectPorts } from "../event-sourcing/pipelines/langy-conversation-processing/process-manager/langyEffectPorts";

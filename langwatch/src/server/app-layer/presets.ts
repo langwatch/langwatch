@@ -76,7 +76,9 @@ import {
   type AppCommands,
   PipelineRegistry,
 } from "../event-sourcing/pipelineRegistry";
-import { buildAutomationDispatchPorts } from "../event-sourcing/pipelines/automations/automationDispatch.wiring";
+import { buildAutomationDispatchPorts } from "../event-sourcing/pipelines/automations/automationDispatch.adapter";
+import { AnnotationService } from "../annotations/annotation.service";
+import { createAutomationDispatchCollaborators } from "./automations/automation-dispatch.composition";
 import {
   type FoldCacheClient,
   InMemoryFoldCacheClient,
@@ -599,6 +601,7 @@ export function initializeDefaultApp(options?: {
     new PrismaScheduledJobRepository(prisma),
     redis,
   );
+  const annotations = AnnotationService.create({ prisma });
   const emailSuppressions = new EmailSuppressionService(
     new PrismaEmailSuppressionRepository(prisma),
     new PrismaEmailSuppressionNameLookupRepository(prisma),
@@ -804,16 +807,19 @@ export function initializeDefaultApp(options?: {
   // registry composes (triggerSettlement + graphAlertSweep). Built on every
   // role — registration is passive shape; the outbox/wake worker loops
   // start only where roleRunsWorkers() is true.
-  const automationPorts = buildAutomationDispatchPorts({
-    prisma,
-    foldCacheClient,
-    triggers,
-    emailSuppressions,
-    projects,
-    evaluations: { runs: evaluations.runs },
-    traces: { spans: spanStorage },
-    traceSummaryRepository: repositories.traceSummaryFold,
-  });
+  const automationPorts = buildAutomationDispatchPorts(
+    createAutomationDispatchCollaborators({
+      prisma,
+      foldCacheClient,
+      triggers,
+      annotations,
+      emailSuppressions,
+      projects,
+      evaluationRuns: evaluations.runs,
+      spanStorage,
+      traceSummaryRepository: repositories.traceSummaryFold,
+    }),
+  );
 
   // ADR-044 Phase 1: the generic calendar scheduler. No cron infra. A
   // worker-only in-process loop that sleeps until the soonest due
@@ -1281,6 +1287,7 @@ export function initializeDefaultApp(options?: {
     traces,
     evaluations,
     experiments,
+    annotations,
     triggers,
     triggerTemplates,
     emailSuppressions,
@@ -1463,6 +1470,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     },
     dspySteps: { steps: new DspyStepService(new NullDspyStepRepository()) },
     experiments: ExperimentService.create(testPrisma),
+    annotations: AnnotationService.create({ prisma: testPrisma }),
     triggers: new TriggerService(new NullTriggerRepository()),
     emailSuppressions: new EmailSuppressionService(
       new NullEmailSuppressionRepository(),

@@ -31,6 +31,7 @@ export class App {
   readonly commands: AppCommands;
   readonly langy: AppDependencies["langy"];
   readonly experiments: AppDependencies["experiments"];
+  readonly annotations: AppDependencies["annotations"];
   readonly triggers: AppDependencies["triggers"];
   readonly triggerTemplates: AppDependencies["triggerTemplates"];
   readonly emailSuppressions: AppDependencies["emailSuppressions"];
@@ -65,6 +66,7 @@ export class App {
   constructor(deps: AppDependencies) {
     this.config = deps.config;
     this.experiments = deps.experiments;
+    this.annotations = deps.annotations;
     this.triggers = deps.triggers;
     this.triggerTemplates = deps.triggerTemplates;
     this.emailSuppressions = deps.emailSuppressions;
