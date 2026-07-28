@@ -89,20 +89,21 @@ type ScenarioFormProps = {
 };
 
 /**
- * The two modes, each with the explanation you get before committing to it —
- * picking a type changes what the rest of the form is asking for, so the
- * difference belongs on hover rather than after the click.
+ * The two modes. One line each: hover is a nudge, not the documentation —
+ * the (i) beside "Attack" carries the full explanation, and every field below
+ * has its own. A paragraph here would make the tooltip the thing you have to
+ * read to pick, which is the opposite of what a tooltip is for.
  */
 const TYPES = [
   {
     redTeam: false,
     label: "Standard scenario",
-    help: "A simulated user who is trying to get something done talks to your agent, and a judge checks the conversation against your criteria. This is the normal way to test behaviour.",
+    help: "A cooperative user talks to your agent, judged against your criteria.",
   },
   {
     redTeam: true,
     label: "Red team",
-    help: "A simulated attacker drives the conversation instead of a cooperative user, working across many turns to make your agent do something it should refuse. Your criteria become the lines it must not cross. Only run this against agents you own or have permission to test.",
+    help: "An attacker tries to break your criteria. Only test agents you own.",
   },
 ];
 
