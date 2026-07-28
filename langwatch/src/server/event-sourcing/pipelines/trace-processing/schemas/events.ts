@@ -2,8 +2,8 @@ import type { Fixed64 } from "@opentelemetry/otlp-transformer-next/build/esm/com
 import { z } from "zod";
 
 import { EventSchema } from "../../../domain/types";
-import { TraceRequestUtils } from "../utils/traceRequest.utils";
 import { logTraceContributionSchema } from "../../log-processing/schemas/logRecord";
+import { TraceRequestUtils } from "../utils/traceRequest.utils";
 import { piiRedactionLevelSchema } from "./commands";
 import {
   ANNOTATION_ADDED_EVENT_TYPE,

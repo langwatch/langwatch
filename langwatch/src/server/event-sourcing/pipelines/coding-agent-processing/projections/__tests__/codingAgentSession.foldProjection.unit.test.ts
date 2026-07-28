@@ -575,7 +575,11 @@ describe("read-back losslessness (ADR-066)", () => {
     it("recognises a sub-agent it has already seen and still reads the prior call's context", () => {
       const projection = makeProjection();
       const modelCall = (facts: Record<string, string | number>) =>
-        spanFactsEvent({ name: "claude_code.llm_request", spanId: "llm", facts });
+        spanFactsEvent({
+          name: "claude_code.llm_request",
+          spanId: "llm",
+          facts,
+        });
 
       let state = projection.apply(
         projection.init(),
@@ -594,7 +598,10 @@ describe("read-back losslessness (ADR-066)", () => {
       // A third call from a sub-agent already counted, whose cache creation
       // dwarfs the previous call's context — a rebuild, but only if the fold
       // still knows what that context was.
-      const third = modelCall({ agent_id: "sub-a", cache_creation_tokens: 5_000 });
+      const third = modelCall({
+        agent_id: "sub-a",
+        cache_creation_tokens: 5_000,
+      });
 
       const next = projection.apply(recover(state), third);
 
@@ -654,7 +661,10 @@ describe("read-back losslessness (ADR-066)", () => {
           facts: { tool_name: tool },
         });
 
-      let state = projection.apply(projection.init(), toolAt("t1", "Read", 3_000));
+      let state = projection.apply(
+        projection.init(),
+        toolAt("t1", "Read", 3_000),
+      );
       state = projection.apply(state, toolAt("t2", "Bash", 5_000));
 
       // Spans are batched on the wire, so this one lands last despite having

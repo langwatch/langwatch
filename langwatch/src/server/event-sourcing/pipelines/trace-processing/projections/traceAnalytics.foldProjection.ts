@@ -831,10 +831,17 @@ function applyLogContribution({
     // Worse, the result depends on whether the log or the span folds first, so
     // one trace can report two different latencies.
     //
-    // Nor can the sentinel simply move to `spanCount`: a synthetic span
-    // increments the count without seeding timing, so `spanCount > 0` breaks the
-    // synthetic-then-real ordering, and `spanCount > 0 && occurredAt > 0` breaks
-    // log-then-synthetic-then-real.
+    // Nor can the sentinel simply move to `spanCount`. A span whose timestamps
+    // are unusable still increments the count — `SpanTimingService` early-returns
+    // on `!isValidTimestamp(...)` while `applySpanToAnalytics` goes on to
+    // `spanCount + 1` — so `spanCount > 0` reads as "timing seeded" when it is
+    // not, and the next real span computes `min(0, start) = 0`. Pairing it as
+    // `spanCount > 0 && occurredAt > 0` fixes that but still misreads
+    // log-then-unusable-span-then-real, where the log has set `occurredAt` and
+    // the count is non-zero yet no span has seeded the baseline.
+    //
+    // (Synthetic spans are NOT part of this: `applySpanToAnalytics` returns
+    // before the increment for them, so they leave both signals untouched.)
     //
     // The real fix is a storage anchor that is separate from the timing
     // baseline — a distinct state field, persisted or derived on read-back —

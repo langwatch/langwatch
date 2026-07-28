@@ -69,6 +69,7 @@ describe("FoldProjectionExecutor declared read window", () => {
 
   describe("given the fold declares a read window", () => {
     describe("when the windowed read hits", () => {
+      /** @scenario a declared read window bounds the store read */
       it("bounds the store read to occurredAt ± widthMs and reads once", async () => {
         const { fold, store } = makeFold({ readWindow: { widthMs: WIDTH_MS } });
         (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({
@@ -99,6 +100,7 @@ describe("FoldProjectionExecutor declared read window", () => {
     });
 
     describe("when the windowed read misses a row that exists outside the window", () => {
+      /** @scenario a windowed miss retries unwindowed before treating the aggregate as new */
       it("retries once without the window and folds onto the recovered state", async () => {
         const { fold, store } = makeFold({ readWindow: { widthMs: WIDTH_MS } });
         (store.get as ReturnType<typeof vi.fn>).mockImplementation(
@@ -128,6 +130,7 @@ describe("FoldProjectionExecutor declared read window", () => {
     });
 
     describe("when the aggregate is genuinely new", () => {
+      /** @scenario a genuinely new aggregate still starts empty */
       it("confirms the miss unwindowed and starts from an empty state", async () => {
         const { fold, store } = makeFold({ readWindow: { widthMs: WIDTH_MS } });
 
@@ -144,6 +147,7 @@ describe("FoldProjectionExecutor declared read window", () => {
     });
 
     describe("when the folded event has no usable business time", () => {
+      /** @scenario an event without a usable business time reads unbounded */
       it("reads unbounded", async () => {
         const { fold, store } = makeFold({ readWindow: { widthMs: WIDTH_MS } });
 
@@ -241,6 +245,7 @@ describe("FoldProjectionExecutor declared read window", () => {
     });
 
     describe("when the store found a row but refused it as undecodable", () => {
+      /** @scenario a row the store found but refused is not read again unwindowed */
       it("does not re-read unwindowed, because a wider scope finds the same row", async () => {
         const { fold, store } = makeFold({ readWindow: { widthMs: WIDTH_MS } });
         const getWithApplied = vi.fn().mockResolvedValue({
@@ -265,6 +270,7 @@ describe("FoldProjectionExecutor declared read window", () => {
 
   describe("given the fold declares no read window", () => {
     describe("when an event is folded", () => {
+      /** @scenario a fold without a declared window reads unbounded */
       it("reads once without a window and never retries a miss", async () => {
         const { fold, store } = makeFold();
 

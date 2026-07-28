@@ -4,7 +4,6 @@ import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
 import { FoldProjectionExecutor } from "~/server/event-sourcing/projections/foldProjectionExecutor";
 import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
 import type { TraceProcessingEvent } from "../../schemas/events";
-import { createSpanReceivedEvent } from "./fixtures/trace-summary-test.fixtures";
 import {
   projectAnalyticsStateToRow,
   TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
@@ -14,6 +13,7 @@ import {
   traceAnalyticsStateFromRow,
 } from "../traceAnalytics.foldProjection";
 import { TraceAnalyticsStore } from "../traceAnalytics.store";
+import { createSpanReceivedEvent } from "./fixtures/trace-summary-test.fixtures";
 
 /**
  * Read-back round-trip for the slim trace fold (ADR-066). `fromRow` is the
