@@ -3,13 +3,14 @@ import type {
   HandledErrorFault,
   NodeErrorCode,
   SerializedHandledError,
+  SerializedReason,
 } from "@langwatch/handled-error";
 
 import type { AppErrorCode } from "./codes";
 import {
   type HandledErrorShape,
   handledShapeFromSerialized,
-  readAuthoredMessage,
+  readAuthoredMessageOfUnhandled,
   readHandledError,
   safeProse,
 } from "./readHandledError";
@@ -57,6 +58,63 @@ const str = (
 ): string => {
   const value = error.meta[key];
   return typeof value === "string" && value.length > 0 ? value : fallback;
+};
+
+/**
+ * Whether any code in the error's reason chain (depth-first, nested included)
+ * is one of `codes`.
+ *
+ * This is the ONLY way copy is allowed to vary on what an upstream said. A
+ * reason code is a discriminant — a value from a set the emitter enumerates —
+ * so matching one is a fact, and it selects a sentence written here. Sniffing
+ * an upstream's message string instead would be both unreliable (providers
+ * reword their prose) and unsafe (that string is the one carrying key
+ * material). Same rule `promoteCodexAgentError` follows for Langy.
+ */
+const hasReasonCode = (
+  reasons: readonly SerializedReason[],
+  codes: ReadonlySet<string>,
+): boolean =>
+  reasons.some(
+    (reason) =>
+      codes.has(reason.code) ||
+      codes.has(reason.kind) ||
+      hasReasonCode(reason.reasons ?? [], codes),
+  );
+
+/**
+ * The provider discriminants meaning "this account has nothing left to spend"
+ * — a plan allowance, a prepaid balance, a hard billing cap.
+ *
+ * They share one remediation, which is why they share one sentence: retrying
+ * cannot work, and the customer has to go to the provider. This is the case
+ * that made reciting provider prose tempting in the first place ("Your credit
+ * balance is too low" beats "try again"), and naming the discriminants is how
+ * we keep that meaning without carrying the sentence that came with it.
+ */
+const PROVIDER_ALLOWANCE_REASONS: ReadonlySet<string> = new Set([
+  "usage_limit_reached",
+  "codex_plan_limit",
+  "insufficient_quota",
+  "billing_hard_limit_reached",
+]);
+
+/**
+ * Looks a label up in one of the tables below, without trusting the key.
+ *
+ * Every key passed here comes from `meta` — a field name, a `fieldErrors`
+ * key — so a bare index reaches `Object.prototype`: `"constructor"` resolves
+ * to `Object`, which is truthy, and the copy rendered "There's a problem with
+ * function Object() { [native code] }". Same hazard `explainHandledError`
+ * guards `code` against, and the same fix.
+ */
+const label = (
+  map: Record<string, string>,
+  key: string,
+): string | undefined => {
+  if (!Object.hasOwn(map, key)) return undefined;
+  const value = map[key];
+  return typeof value === "string" ? value : undefined;
 };
 
 const presentations = {
@@ -109,6 +167,33 @@ const presentations = {
     describe: () => "Refresh the page to reconnect.",
   },
 
+  // ---- workflows ----
+  workflow_not_found: {
+    title: "Workflow not found",
+    describe: () => "It may have been deleted. Reload to see the current list.",
+  },
+  published_workflow_version_not_found: {
+    title: "That published version is missing",
+    describe: () => "Publish the workflow again, then run it.",
+  },
+  workflow_execution_failed: {
+    // fault: platform. The execution engine is our own infra, so this is an
+    // incident on our side — never dressed up as something the customer
+    // configured wrong. The engine's statusText stays in the server log.
+    title: "The workflow couldn't run",
+    describe: () => "We've been notified. Try running it again in a moment.",
+  },
+
+  // ---- agent-submitted reports ----
+  agent_report_rate_limited: {
+    // The reader here is usually a coding agent's operator on the CLI or MCP,
+    // mid-report — so the copy says plainly that the report was not filed and
+    // that waiting fixes it.
+    title: "Too many reports just now",
+    describe: () =>
+      "This one wasn't sent. Wait a few minutes, then report it again.",
+  },
+
   // ---- evaluations & experiments ----
   evaluation_not_found: { title: "Evaluation not found" },
   evaluator_not_found: { title: "Evaluator not found" },
@@ -142,9 +227,9 @@ const presentations = {
     describe: (error) => {
       // meta.field is the wire identifier ("candidate_a_id"); the error class
       // documents it as something to translate, not to render.
-      const label = EVALUATOR_FIELD_LABELS[str(error, "field", "")];
-      return label
-        ? `Map a value to ${label} before running this evaluator.`
+      const field = label(EVALUATOR_FIELD_LABELS, str(error, "field", ""));
+      return field
+        ? `Map a value to ${field} before running this evaluator.`
         : "Map all of its required fields before running it.";
     },
   },
@@ -152,8 +237,39 @@ const presentations = {
     title: "That's too much text for this evaluator",
     describe: () => "Shorten the input and try again.",
   },
-  experiment_not_found: { title: "Experiment not found" },
-  dspy_step_not_found: { title: "Optimization step not found" },
+  experiment_not_found: {
+    title: "Experiment not found",
+    describe: () => "It may have been deleted. Reload to see the current list.",
+  },
+  invalid_experiment_configuration: {
+    // fault: platform. The saved workbench state stopped matching its schema,
+    // which nobody typed and nobody can repair through the API — so the copy
+    // does not ask the customer to check their input.
+    title: "This experiment can't be read",
+    describe: () =>
+      "Its saved setup couldn't be loaded. Open it in the workbench and save it again, or contact support.",
+  },
+  run_not_found: {
+    title: "Run not found",
+    // Covers "never existed", "belongs to another project" and "its experiment
+    // was archived" alike — the caller can act on all three the same way, and
+    // distinguishing them out loud would confirm which run ids exist.
+    //
+    // The retention line is the actionable half: a run polled more than a day
+    // after it finished is gone from the status cache rather than missing, and
+    // the results endpoint can still find it given the experiment slug.
+    describe: () =>
+      "It may have been archived, or it finished long enough ago that its status is no longer cached. Results stay available from its experiment.",
+  },
+  dspy_step_not_found: {
+    title: "Optimization step not found",
+    describe: () =>
+      "It may have been removed along with its run. Reload to see the current steps.",
+  },
+  prompt_not_found: {
+    title: "Prompt not found",
+    describe: () => "It may have been deleted. Reload to see the current list.",
+  },
   system_prompt_required: {
     title: "A system prompt is required",
     describe: () => "Add one before running this.",
@@ -185,16 +301,201 @@ const presentations = {
     describe: () => "It doesn't include the required scope.",
   },
 
+  // ==========================================================================
+  // Avatar upload. One set of codes for both halves of the same check: the
+  // browser rejects the file before it is ever encoded (`processAvatarImage`)
+  // and the server rejects the payload as a backstop (`parseAvatarDataUrl`).
+  // The customer is doing one thing — picking a photo — so they read one
+  // sentence per outcome, whichever side caught it.
+  // ==========================================================================
+  avatar_image_unreadable: {
+    // Covers "not an image", a decode failure, zero bytes, and bytes whose
+    // signature contradicts the declared type. All four are one action for the
+    // customer; `meta.reason` keeps them apart for logs and tests.
+    title: "That file isn't a usable image",
+    describe: () => "Pick a different photo and try again.",
+  },
+  avatar_image_too_large: {
+    title: "That photo is too large",
+    describe: (error) => {
+      const maxBytes = error.meta.maxBytes;
+      return typeof maxBytes === "number"
+        ? `Pick one under ${Math.round(maxBytes / 1024 / 1024)} MB.`
+        : "Pick a smaller one.";
+    },
+  },
+  avatar_image_type_unsupported: {
+    title: "That image type isn't supported",
+    describe: (error) => {
+      // `meta.allowed` is our own list of media types, not customer input —
+      // rendered as the extensions someone recognises rather than as MIME.
+      const allowed = error.meta.allowed;
+      const names = Array.isArray(allowed)
+        ? allowed
+            .filter((type): type is string => typeof type === "string")
+            .map((type) => type.replace(/^image\//, "").toUpperCase())
+        : [];
+      return names.length > 0
+        ? `Use ${listLabels(names)}.`
+        : "Use a PNG, JPEG, WebP or GIF.";
+    },
+  },
+  avatar_rate_limited: {
+    title: "Too many photo changes just now",
+    describe: () => "Wait a few minutes, then upload a new one.",
+  },
+  avatar_image_processing_failed: {
+    // The browser's canvas failed, not the file. A different photo usually
+    // won't help, so the advice is to try elsewhere.
+    title: "Your browser couldn't prepare that photo",
+    describe: () => "Try another browser, or a different image.",
+  },
+
+  // ---- model providers (Codex / OpenAI account) ----
+  codex_auth_failed: {
+    // Raised while connecting or refreshing "Sign in with your OpenAI account"
+    // (CodexAuthError). fault is provider — the failure is on OpenAI's side or
+    // in the sign-in round trip, not the customer's input — so the copy points
+    // at retrying the connection rather than fixing a field.
+    title: "OpenAI sign-in didn't go through",
+    describe: () =>
+      "Codex couldn't reach or verify your OpenAI account. Connect it again to continue.",
+  },
+
+  model_provider_anchor_required: {
+    // Reader is an API/SDK caller (or our own form) that omitted the handle
+    // saying WHERE to act. `meta.requires` narrows it: deleting by provider
+    // name is the legacy project-shaped contract, so only a project will do.
+    // The title has to hold for BOTH branches below: only one of them is
+    // about a project, and the other offers an organization instead.
+    title: "Choose where this applies",
+    describe: (error) =>
+      str(error, "requires", "") === "project"
+        ? "Removing a provider by name needs a project. Pick one and try again."
+        : "Choose a project or an organization, then try again.",
+  },
+  model_provider_scopes_required: {
+    title: "Choose where this provider applies",
+    describe: () =>
+      "A provider added outside a project needs at least one scope, so pick the teams or projects it covers.",
+  },
+  missing_provider: {
+    // fault: customer — a configuration choice they can change, so the copy
+    // names it rather than apologising.
+    //
+    // Relayed: the analysis side answers with this when the model behind the
+    // request has no provider it can use for the job. Distinct from
+    // `no_provider_configured`, which means nothing is connected at all —
+    // here something is, and it is the wrong thing.
+    title: "This model's provider can't be used here",
+    describe: () =>
+      "Pick a different default model in your project's model settings, then try again.",
+  },
+  model_not_configured: {
+    // Distinct from `no_provider_configured` (nothing connected at all) and
+    // from `llm_model_not_set` (a workflow node with an empty field): here a
+    // provider exists but nothing has chosen which model to use.
+    title: "Choose a model first",
+    describe: () =>
+      "Nothing has a model set yet. Pick one in your project's model settings, then try again.",
+  },
+  model_provider_disabled: {
+    title: "This model provider is turned off",
+    describe: () =>
+      "Turn it back on in your project's model settings, or pick a different provider.",
+  },
+  model_provider_scope_forbidden: {
+    // Deliberate refusal, not a mistake to correct: the provider is managed
+    // above where this person can act, so the copy points at who can.
+    title: "You can't change this provider here",
+    describe: () =>
+      "It's managed outside this project. Ask an admin on your team to change it.",
+  },
+  model_provider_not_found: {
+    // Also covers "exists but not in your scopes" — the service answers the
+    // same either way on purpose, so the copy must not imply the row is gone
+    // when it may simply not be yours.
+    title: "Model provider not found",
+    describe: () =>
+      "It may have been removed, or it isn't available here. Reload to see the current list.",
+  },
+
   // ---- access, org & limits ----
-  project_not_found: { title: "Project not found" },
-  organization_not_found_for_team: { title: "Organization not found" },
+  project_not_found: {
+    title: "Project not found",
+    describe: () =>
+      "It may have been deleted, or it isn't shared with you. Reload to see the projects you can open.",
+  },
+  organization_not_found_for_team: {
+    title: "Organization not found",
+    describe: () =>
+      "This team isn't attached to an organization you can see. Reload to see the current list.",
+  },
+  organization_not_found: {
+    title: "Organization not found",
+    describe: () =>
+      "It may have been deleted, or it isn't shared with you. Reload to see the ones you can open.",
+  },
+  no_admin_configured: {
+    // fault: platform. Nobody using the app can fix this — an administrator
+    // has to exist before the action is possible — so the copy names who to
+    // go to rather than offering a retry that cannot work.
+    title: "No administrator is set up",
+    describe: () =>
+      "Ask whoever set up LangWatch here to add one, then try again.",
+  },
+  license_key_invalid: {
+    title: "That license key isn't valid",
+    describe: () =>
+      "Check the key you pasted, or ask your account team for a new one.",
+  },
+  license_expired: {
+    title: "Your license has expired",
+    describe: () => "Renew it to carry on, or talk to your account team.",
+  },
   malformed_custom_role_permissions: {
     title: "This role's permissions are invalid",
     describe: () => "Edit the role and save it again.",
   },
+  custom_role_not_found: {
+    title: "Custom role not found",
+    describe: () => "It may have been deleted. Reload to see the current list.",
+  },
+  team_not_found: {
+    title: "Team not found",
+    describe: () => "It may have been deleted. Reload to see the current list.",
+  },
+  team_membership_not_found: {
+    title: "That person isn't on this team",
+    describe: () =>
+      "They may have been removed since this page loaded. Reload to see who's on it.",
+  },
   lite_member_restricted: {
     title: "Your account doesn't include this",
     describe: () => "Ask an admin on your team to upgrade your access.",
+  },
+  already_organization_member: {
+    // An invite form takes several addresses at once, so the address has to be
+    // in the sentence — "one of these is already a member" is not an answer.
+    title: "They're already on your team",
+    describe: (error) => {
+      const email = str(error, "email", "");
+      return email
+        ? `${email} is already a member. Change their role from the members list instead.`
+        : "Change their role from the members list instead.";
+    },
+  },
+  project_permission_denied: {
+    // Names the permission when the server sent one: "ask an admin for access"
+    // is an errand with no address, whereas "ask an admin for `datasets:manage`"
+    // is a message they can forward as-is.
+    title: "You don't have access to this",
+    describe: (error) => {
+      const permission = str(error, "permission", "");
+      return permission
+        ? `Ask an organization admin to grant you "${permission}" on this project.`
+        : "Ask an organization admin to grant you access to this project.";
+    },
   },
   cannot_impersonate_admin: {
     // A deliberate denial, not a mistake to correct: admin-to-admin
@@ -227,7 +528,11 @@ const presentations = {
   },
   rum_payload_invalid: {
     title: "That telemetry report couldn't be read",
-    describe: () => "The browser sent a body this endpoint doesn't recognise.",
+    // The old line restated the title in HTTP vocabulary and left the reader
+    // with nothing to do. A mismatched payload shape is almost always an old
+    // SDK, so say that.
+    describe: () =>
+      "Update the LangWatch browser SDK to the latest version, then try again.",
   },
   rum_payload_too_large: {
     title: "That telemetry report is too big",
@@ -241,6 +546,38 @@ const presentations = {
   scenario_set_limit_exceeded: {
     title: "You've hit the simulation set limit",
     describe: () => "Delete an existing set, or upgrade your plan.",
+  },
+  // ---- billing ----
+  billing_customer_email_required: {
+    title: "Add a billing email first",
+    describe: () =>
+      "Billing needs an email address on the account before this can go through.",
+  },
+  billing_plan_price_missing: {
+    // fault: platform. The plan the customer picked has no price set up on our
+    // side, so there is nothing for them to correct — and telling them to
+    // "check their input" would send them hunting for a field that isn't wrong.
+    title: "This plan isn't ready to buy yet",
+    describe: () =>
+      "We've been notified. Contact support if you need it sooner.",
+  },
+  seat_billing_unavailable: {
+    // fault: provider. The payment provider didn't answer. Nothing was
+    // charged, and saying so is the first thing anyone wants to know.
+    title: "Seat billing is unavailable right now",
+    describe: () => "Nothing was charged. Try again in a moment.",
+  },
+  subscription_sync_failed: {
+    // fault: platform. Our copy of the plan is behind the payment provider's;
+    // it usually catches up on its own, so the action is to wait and reload.
+    title: "Your plan details are out of date",
+    describe: () =>
+      "We've been notified, and this usually catches up on its own. Reload in a few minutes.",
+  },
+  usage_report_failed: {
+    // fault: platform. Reporting usage is ours to get right.
+    title: "Couldn't build that usage report",
+    describe: () => "We've been notified. Try again in a moment.",
   },
   subscription_service_unavailable: {
     // Not a blip: this is raised only when a Stripe-dependent action runs on a
@@ -262,15 +599,91 @@ const presentations = {
     describe: () =>
       "It may have been archived. Reload to see the current list.",
   },
+  ingestion_source_cap_reached: {
+    title: "You've hit the limit for ingestion sources",
+    describe: () =>
+      "Archive one you no longer use, or upgrade your plan to raise the limit.",
+  },
 
   // ---- datasets ----
   dataset_name_taken: {
     title: "That name is taken",
     describe: () => "Pick a different name for this dataset.",
   },
+  dataset_column_type_change_unsupported: {
+    // Customer fault in the ADR-045 sense: they asked for something the format
+    // can't do, and there is a way to get where they were going.
+    title: "That column's type can't be changed",
+    describe: () =>
+      "Add a new column with the type you need, then move the values across.",
+  },
+  dataset_not_ready: {
+    // A state, not a breakage — the rows are still being prepared. Waiting is
+    // a real action, so this is not the "we've been notified" shape.
+    title: "This dataset isn't ready yet",
+    describe: () => "It's still being prepared. Wait a moment, then try again.",
+  },
+  dataset_stale_columns: {
+    title: "This dataset's columns have changed",
+    describe: () =>
+      "Reload to pick up the current columns, then make your change again.",
+  },
+  export_failed: {
+    // fault: platform. The export ran on our side and did not finish, so the
+    // copy has to say nothing was changed — an export that half-worked is the
+    // thing a customer will assume otherwise.
+    title: "That export didn't finish",
+    describe: () =>
+      "Nothing was changed. Try again, or export a smaller slice.",
+  },
+
+  // ---- shared trace links (ADR-057) ----
+  // The first five answer the anonymous share surface, so the reader is a
+  // recipient who did nothing wrong and cannot fix the link — the copy points
+  // them back at whoever shared it. `share_link_not_found` deliberately reads
+  // the same whether the token never existed, sharing was switched off, or the
+  // trace is gone: the server collapses all three so a prober learns nothing,
+  // and the copy must not undo that by hinting which happened.
+  share_link_not_found: {
+    title: "This shared link isn't available",
+    describe: () =>
+      "It may have been removed, or sharing has been turned off. Ask whoever shared it for a new link.",
+  },
+  share_link_forbidden: {
+    // 401, not 403: the viewer is invited to sign in rather than told the link
+    // is dead. Copy works for the anonymous prober and the wrong-account member
+    // alike.
+    title: "You need access to view this",
+    describe: () =>
+      "This link is limited to certain people. Sign in with an account that can see it.",
+  },
+  share_link_expired: {
+    title: "This shared link has expired",
+    describe: () => "Ask whoever shared it for a new link.",
+  },
+  share_link_exhausted: {
+    title: "This shared link has already been viewed",
+    describe: () =>
+      "It was set to open a limited number of times. Ask whoever shared it for a new link.",
+  },
+  share_read_rate_limited: {
+    title: "This shared trace is busy right now",
+    describe: () =>
+      "It's being opened a lot at the moment. Wait a few seconds, then refresh.",
+  },
+  // The one sharer-facing code here: raised when someone tries to mint a trace
+  // link while the project has sharing switched off.
+  trace_sharing_disabled: {
+    title: "Sharing is turned off for this project",
+    describe: () =>
+      "Ask a project admin to turn on trace sharing before creating a link.",
+  },
 
   // ---- suites (run plans) ----
-  suite_not_found: { title: "Run plan not found" },
+  suite_not_found: {
+    title: "Run plan not found",
+    describe: () => "It may have been deleted. Reload to see the current list.",
+  },
   suite_name_taken: {
     title: "That name is already taken",
     describe: () => "Pick a different name for this run plan.",
@@ -293,6 +706,16 @@ const presentations = {
   },
 
   // ---- automations & notifications ----
+  template_not_found: {
+    title: "Template not found",
+    describe: () => "It may have been deleted. Reload to see the current list.",
+  },
+  template_immutable: {
+    // A refusal by design, so no retry is offered — only the way around it.
+    title: "This template can't be edited",
+    describe: () =>
+      "It's one of the built-in ones. Duplicate it, then edit your copy.",
+  },
   template_validation_error: {
     title: "This template isn't valid",
     // The parser's position is the whole value of this error — the customer
@@ -327,11 +750,18 @@ const presentations = {
   },
   notification_delivery_error: {
     title: "We couldn't deliver that notification",
-    // The one registry entry that prefers the server's words to its own. The
-    // provider knows why it rejected the message and `explainSlackPostError`
-    // turns that into real remediation ("invite the bot with /invite
-    // @LangWatch"); "check the destination and try again" is what is left when
-    // that sentence is thrown away.
+    // The one registry entry that prefers the server's words to its own — and
+    // they are still OUR words. `explainSlackPostError` is a switch over the
+    // Slack error codes we recognise that returns a sentence written here, in
+    // this repo, for that code ("the bot isn't in that channel. Invite it with
+    // /invite @LangWatch"); Slack's own prose never reaches `customerMessage`,
+    // and an unrecognised code returns null so this falls through to the line
+    // below. Structured error for a known cause, in other words, authored the
+    // same as every other entry — it just happens to be authored next to the
+    // delivery adapter, which is the only place that knows the code list.
+    //
+    // Clamped like any server-authored sentence; nothing to scrub, because
+    // nothing here originated with the provider.
     describe: (error) =>
       safeProse(str(error, "message", "")) ||
       "Check the destination and try again.",
@@ -412,8 +842,12 @@ const presentations = {
   },
   langy_agent_errored: {
     title: "Langy's reply failed",
+    // When the provider's own sentence was captured, Langy's card replaces
+    // this line with it (`langyErrorExplainer`) — an out-of-credits account
+    // needs that sentence, not this one. This is the copy for when there is
+    // nothing more specific to say.
     describe: () =>
-      "Langy hit an error while writing this reply. Your message is safe, so try again.",
+      "Langy hit an error while writing this reply. Your message is safe — try again.",
   },
   langy_agent_session_lost: {
     title: "Langy lost its place",
@@ -426,9 +860,12 @@ const presentations = {
       "An update interrupted this reply. Nothing was lost, so send your message again.",
   },
   langy_worker_stopped: {
-    title: "Langy's worker stopped",
+    // "Worker" is ours, not the customer's — see `copywriting.md`. The
+    // neighbouring `langy_worker_spawn_failed` already proves the same fact
+    // can be told without it.
+    title: "Langy stopped mid-reply",
     describe: () =>
-      "Langy's worker stopped before it could finish. Nothing you did is wrong and your message is safe, so try again.",
+      "Langy stopped before it could finish. Nothing you did is wrong and your message is safe, so try again.",
   },
   langy_worker_spawn_failed: {
     title: "Langy couldn't start up",
@@ -436,13 +873,25 @@ const presentations = {
       "Langy failed to get going for this reply. Nothing was lost, so try again in a moment.",
   },
   langy_credential_resolution: {
-    title: "Couldn't verify your access",
+    // One of three codes that all used to read "Couldn't verify your access"
+    // while giving contradictory advice. The headline has to agree with the
+    // remediation, or the customer picks the wrong one of the three: this is
+    // the only one a fresh sign-in fixes.
+    title: "Your sign-in needs refreshing",
     describe: () => "Sign out and back in, then try again.",
   },
   langy_model_not_configured: {
     title: "Choose a model for Langy",
     describe: () =>
       "Langy needs a model to run. Pick one in your project's model settings, then try again.",
+  },
+  langy_codex_plan_limit: {
+    // fault: provider. The limit belongs to the customer's OpenAI plan, not to
+    // anything LangWatch meters — so the copy must not read like our own
+    // `resource_limit_exceeded`, whose fix is upgrading with us.
+    title: "You've reached your OpenAI plan's limit",
+    describe: () =>
+      "Codex runs on your OpenAI account, and it has no allowance left for now. Wait for it to reset, or raise the limit with OpenAI.",
   },
   langy_model_not_allowed: {
     title: "That model isn't available here",
@@ -477,6 +926,22 @@ const presentations = {
       "Langy's outbound network policy for this project is misconfigured, so it can't run safely. Ask a workspace admin to review it.",
   },
 
+  // ---- AI-assisted features ----
+  ai_call_failed: {
+    // fault: provider. The model was asked and didn't answer usably. Switching
+    // model is the action that actually changes the outcome; "we've been
+    // notified" would be both wrong and useless here.
+    title: "That model call didn't go through",
+    describe: () => "Try again in a moment, or pick a different model.",
+  },
+  ai_query_provider_error: {
+    // fault: provider. Same shape as above, but the reader is mid-search, so
+    // rephrasing is the first thing worth trying.
+    title: "Couldn't turn that into a search",
+    describe: () =>
+      "The model didn't return something we could use. Rephrase it, or pick a different model.",
+  },
+
   // ---- validation ----
   validation_error: {
     title: "Check your input",
@@ -489,8 +954,8 @@ const presentations = {
       const fieldErrors = error.meta.fieldErrors;
       if (fieldErrors && typeof fieldErrors === "object") {
         const labels = Object.keys(fieldErrors)
-          .map((field) => USER_VISIBLE_FIELDS[field])
-          .filter((label): label is string => !!label);
+          .map((field) => label(USER_VISIBLE_FIELDS, field))
+          .filter((entry): entry is string => !!entry);
         if (labels.length > 0) {
           return `There's a problem with ${listLabels(labels)}.`;
         }
@@ -510,9 +975,9 @@ const presentations = {
     // and, when a route raises it alone, an error in its own right.
     title: "Check your input",
     describe: (error) => {
-      const label = USER_VISIBLE_FIELDS[str(error, "field", "")];
-      return label
-        ? `There's a problem with ${label}.`
+      const field = label(USER_VISIBLE_FIELDS, str(error, "field", ""));
+      return field
+        ? `There's a problem with ${field}.`
         : "Some of the values aren't valid.";
     },
   },
@@ -540,6 +1005,15 @@ const presentations = {
     title: "This API key has been revoked",
     describe: () => "Generate a new one in settings.",
   },
+  codex_session_expired: {
+    // The gateway's own code for a dead Codex OAuth session (401). Langy has a
+    // richer inline card for the same failure (`langy_codex_session_expired`
+    // with a "Sign in to Codex" action); this is the plain registry copy for
+    // when the gateway proxies the code to any other surface.
+    title: "Your OpenAI session expired",
+    describe: () =>
+      "Codex runs on your OpenAI account, and its sign-in has expired. Sign in again to keep using it.",
+  },
   budget_exceeded: {
     title: "You've reached your spending limit",
     describe: () => "Raise the limit in settings to keep going.",
@@ -559,6 +1033,13 @@ const presentations = {
   guardrail_blocked: {
     title: "Blocked by a guardrail",
     describe: () => "This request didn't pass one of your configured policies.",
+  },
+  guardrail_upstream_unavailable: {
+    // 503 from the guardrail evaluator itself, not a policy decision: the
+    // request was neither allowed nor blocked, so the copy must not imply the
+    // customer's content was refused.
+    title: "Guardrails are temporarily unavailable",
+    describe: () => "This request wasn't checked. Try again in a moment.",
   },
   policy_violation: {
     title: "Blocked by a policy",
@@ -581,8 +1062,11 @@ const presentations = {
     describe: () => "We'll retry automatically. Try again shortly.",
   },
   auth_upstream_unavailable: {
-    title: "Couldn't verify your access",
-    describe: () => "Try again in a moment.",
+    // 503: the check itself didn't run. Nothing is wrong with the account, so
+    // the copy must not read like a credential problem — the customer would
+    // go and rotate a perfectly good key.
+    title: "Access checks are temporarily unavailable",
+    describe: () => "Nothing changed on your account. Try again in a moment.",
   },
 
   // ---- NLP engine ----
@@ -642,10 +1126,38 @@ const presentations = {
     // the detail here is literally a list of our env vars — the operator finds
     // them in the service logs, where they belong. This is the clearest case
     // in the registry of a code whose meta must never be rendered.
-    describe: () => "This one's on us — we've been notified.",
+    describe: () => "We've been notified. Try again in a moment.",
   },
 
   // ---- Langy agent ----
+  llm_upstream_error: {
+    // A mediated model call whose failure body was the PROVIDER's, not our
+    // gateway's typed envelope.
+    //
+    // This entry used to recite the provider's own sentence from `meta.message`
+    // on the theory that it is "client-facing by design — the same text the
+    // SDK shows the caller". That reasoning has a hole big enough to drive a
+    // credential through: it is client-facing to whoever OWNS the key, and on a
+    // LangWatch-managed provider the caller is US. OpenAI answers a bad key
+    // with `Incorrect API key provided: sk-proj-…`, so reciting that body puts
+    // a PLATFORM credential on a customer's screen, and then into whatever they
+    // paste into a support thread. Masking it first is not a fix — a
+    // shape-matching scrubber only masks the shapes someone enumerated, and the
+    // key that leaks is the one whose shape they missed.
+    //
+    // So the prose is gone and the discriminant does the work. The proxy
+    // captures the provider's own `error.type` as a typed reason next to this
+    // code (llmproxy.go), which is a value from a small known set rather than
+    // free text — it cannot smuggle a key, and the ones we recognise map to
+    // copy written here. Everything else gets the generic line: a failure we
+    // cannot name is exactly the ADR-045 "unknown" case, and a trace id serves
+    // the customer better than a sentence we cannot vouch for.
+    title: "The model provider rejected that",
+    describe: (error) =>
+      hasReasonCode(error.reasons, PROVIDER_ALLOWANCE_REASONS)
+        ? "Your account with this model provider has no allowance left. Check its billing or usage limits, or pick a model from a different provider."
+        : "Try again, or pick a different model.",
+  },
   agent_error: {
     title: "Something went wrong mid-answer",
     describe: () => "Try asking again.",
@@ -655,10 +1167,18 @@ const presentations = {
     describe: () => "Wait for the current reply to finish.",
   },
   credentials_required: {
-    title: "Couldn't verify your access",
-    describe: () => "Try again. This usually resolves itself.",
+    // A race the platform resolves on the retry, not anything the customer
+    // got wrong — so the headline says "not ready yet" rather than borrowing
+    // `langy_credential_resolution`'s "verify your access", which would send
+    // someone off to sign out for a failure that clears by itself.
+    title: "Langy wasn't quite ready",
+    describe: () => "Send that again. This usually resolves itself.",
   },
-  invalid_conversation_id: { title: "Conversation not found" },
+  invalid_conversation_id: {
+    title: "Conversation not found",
+    describe: () =>
+      "This conversation link isn't one we can open. Start a new chat to keep going.",
+  },
   opencode_session_not_found: {
     title: "The session was lost",
     describe: () => "Start a new message to continue.",
@@ -697,7 +1217,10 @@ const presentations = {
     title: "That's too large to send",
     describe: () => "Try again with less data.",
   },
-  not_found: { title: "Not found" },
+  not_found: {
+    title: "Not found",
+    describe: () => "It may have been deleted. Reload to see the current list.",
+  },
   unauthorized: {
     title: "You're not signed in",
     describe: () => "Sign in again to continue.",
@@ -912,6 +1435,21 @@ const USER_VISIBLE_FIELDS: Record<string, string> = {
   value: "the value",
   label: "the label",
   title: "the title",
+  // Fields our own forms own. Leaving these out meant every server rejection
+  // on a password change, a team picker or an avatar upload degraded to the
+  // anonymous "Some of the values aren't valid." — which is the one sentence
+  // that cannot tell the customer where to look.
+  currentPassword: "your current password",
+  newPassword: "the new password",
+  confirmPassword: "the confirmation",
+  teamId: "the team",
+  limitUsd: "the spending limit",
+  imageDataUrl: "the photo",
+  // Admin impersonation. The reader is a LangWatch admin, so these are the
+  // words that screen uses.
+  userIdToImpersonate: "the account to impersonate",
+  reason: "the reason",
+  resource: "the resource",
 };
 
 /** Joins labels into "a", "a and b", "a, b and c". */
@@ -1025,15 +1563,23 @@ export function explainHandledError(
         humanized ||
         FAULT_TITLES[error.fault] ||
         UNKNOWN_ERROR_PRESENTATION.title,
-      // `meta.message` is the deliberate opt-in channel for server-authored
-      // prose (it mirrors Go's `Meta["message"]`). It is the only place the
-      // server is allowed to put a sentence, so it is the only place we look
-      // — and even here it is only a sentence's worth, because the payload
-      // does not always originate with us. See `safeProse`.
+      // Deliberately empty, even though `meta.message` may well hold a
+      // sentence.
       //
-      // Left empty when there is none: the callers fall back to the server's
-      // first remediation tip, which was written for exactly this case.
-      description: safeProse(str(error, "message", "")),
+      // An unrecognised code is, by definition, the branch least able to vouch
+      // for what is in that sentence: this client has no entry for the code, so
+      // it does not know which service minted it, whether the prose was
+      // authored for a customer, or whether it is a provider body relayed
+      // through a hop we cannot see. Rendering it anyway is how an upstream's
+      // words — and anything they quote — end up inside LangWatch's own error
+      // chrome without a single person having read them.
+      //
+      // Empty is not a loss. The callers fall back to the server's first
+      // remediation tip, which WAS written for this case, and failing that to
+      // the generic line plus a trace id — the ADR-045 "unknown" path, working
+      // exactly as intended. The fix for a code that lands here often is to
+      // give it a registry entry, not to recite whatever it arrived with.
+      description: "",
       isRegistered: false,
     };
   }
@@ -1071,39 +1617,23 @@ export function explainSerializedError(
  */
 export function explainAnyError(error: unknown): ErrorExplanation {
   const handled = readHandledError(error);
-  if (handled) return explainHandledError(handled);
-
-  const authored = readAuthoredMessage(error);
-  return authored
-    ? { ...UNKNOWN_ERROR_PRESENTATION, description: authored }
-    : UNKNOWN_ERROR_PRESENTATION;
+  return handled ? explainHandledError(handled) : explainUnhandledError(error);
 }
 
 /**
- * The whole explanation as one string, for slots that can only take text —
- * a `title=` tooltip, a state field typed `string`, an aria-label.
+ * The last two branches, for a caller that has already established there is no
+ * handled payload.
  *
- * Prefer `HandledErrorAlert` or `showErrorToast` wherever a component can be
- * rendered: they show the remediation tips, the docs link and the error id,
- * all of which are lost here. This exists so the awkward slots have something
- * better than `error.message`, not as a general-purpose escape hatch.
+ * Split out so `resolveErrorCopy` can reach them without re-parsing the error
+ * it just parsed. Passing a handled error here would render the generic
+ * unknown state over copy the registry has — use {@link explainAnyError}
+ * unless you have the `null` from `readHandledError` in hand.
  */
-export function describeError({
-  error,
-  fallbackTitle,
-}: {
-  error: unknown;
-  fallbackTitle?: string;
-}): string {
-  const explanation = explainAnyError(error);
-
-  const title = explanation.isRegistered
-    ? explanation.title
-    : (fallbackTitle ?? explanation.title);
-
-  return explanation.description
-    ? `${title}. ${explanation.description}`
-    : title;
+export function explainUnhandledError(error: unknown): ErrorExplanation {
+  const authored = readAuthoredMessageOfUnhandled(error);
+  return authored
+    ? { ...UNKNOWN_ERROR_PRESENTATION, description: authored }
+    : UNKNOWN_ERROR_PRESENTATION;
 }
 
 /** Copy for a failure with no handled payload at all. See ADR-045. */

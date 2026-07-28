@@ -7,6 +7,7 @@ import { isManagedProvider } from "../../../ee/managed-providers/managedBedrockC
 import { KEY_CHECK, MASKED_KEY_PLACEHOLDER } from "../../utils/constants";
 import type { CustomModelsInput } from "./customModel.schema";
 import { toLegacyCompatibleCustomModels } from "./customModel.schema";
+import { ModelProviderNotFoundError } from "./errors";
 import {
   assertCanManageAllScopes,
   canReadAnyScope,
@@ -124,10 +125,7 @@ type AdvancedGatewayInput = {
  */
 function assertRowCarriesScopes(row: { id: string; scopes: unknown[] }): void {
   if (row.scopes.length === 0) {
-    throw new TRPCError({
-      code: "NOT_FOUND",
-      message: "Model provider not found",
-    });
+    throw new ModelProviderNotFoundError();
   }
 }
 
@@ -504,10 +502,7 @@ export class ModelProviderService {
     // row in the caller's project instead of erroring; surface
     // NOT_FOUND so the client can refetch and retry.
     if (id && !existingProvider) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "Model provider not found",
-      });
+      throw new ModelProviderNotFoundError();
     }
 
     // Resolve input scope set. Callers may pass `scopes: [...]` directly,
@@ -739,10 +734,7 @@ export class ModelProviderService {
               ? await this.repository.findByProvider(provider, projectId)
               : null;
       if (!existing) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Model provider not found",
-        });
+        throw new ModelProviderNotFoundError();
       }
       assertRowCarriesScopes(existing);
       await assertCanManageAllScopes(
@@ -787,10 +779,7 @@ export class ModelProviderService {
   ): Promise<ModelProviderWithScopes> {
     const existing = await this.repository.findById(id, projectId);
     if (!existing) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "Model provider not found",
-      });
+      throw new ModelProviderNotFoundError();
     }
     const readable = await canReadAnyScope(
       ctx,
@@ -800,10 +789,7 @@ export class ModelProviderService {
       })),
     );
     if (!readable) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "Model provider not found",
-      });
+      throw new ModelProviderNotFoundError();
     }
     return existing;
   }

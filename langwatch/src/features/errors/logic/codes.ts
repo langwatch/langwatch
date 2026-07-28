@@ -74,6 +74,7 @@ export const APP_ERROR_CODES = [
   "missing_annotator",
   "missing_slack_bot_token",
   "missing_slack_webhook",
+  "model_provider_not_found",
   "notification_delivery_error",
   "organization_not_found_for_team",
   "project_not_found",
