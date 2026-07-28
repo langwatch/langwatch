@@ -103,7 +103,11 @@ function LiveSimulationRunCard({
   const { data, error } = api.scenarios.getRunState.useQuery(
     { projectId: project?.id ?? "", scenarioRunId: runId },
     {
-      enabled: !!project?.id,
+      // `!isRunUnresolvable` matters as much as `retry: false`: with no status
+      // to key off, `getRunStatePollInterval` hands back the FAST cadence, so
+      // a deleted or foreign run would re-poll every 3s forever behind the
+      // fallback card — once per dead card in the conversation.
+      enabled: !!project?.id && !isRunUnresolvable,
       // An unknown run is a fallback, never a retry storm.
       retry: false,
       // Finished runs never change — stop polling entirely. Live runs poll
@@ -228,9 +232,11 @@ function SimulationRunTitle({
 }) {
   const statusConfig =
     status !== undefined ? SCENARIO_RUN_STATUS_CONFIG[status] : null;
-  const isRunning =
-    status !== undefined &&
-    getRunStatePollInterval({ status, sseConnected: false }) !== false;
+  // Completion, NOT polling cadence. The two part company on `STALLED`: it is
+  // a finished state to a reader, but stays pollable because new events can
+  // still revive it. Deriving the spinner from the cadence put a "still
+  // working" spinner next to the `stalled` badge.
+  const isRunning = statusConfig?.isComplete === false;
 
   return (
     <HStack gap={2} align="center" flexWrap="wrap">

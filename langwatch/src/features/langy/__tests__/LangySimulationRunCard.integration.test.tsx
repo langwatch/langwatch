@@ -30,6 +30,13 @@ function lastListenerEnabled(): boolean {
   return mockUpdateListener.mock.calls.at(-1)?.[0]?.enabled ?? false;
 }
 
+/** The query options of the LAST render — the polling gate. */
+function lastQueryOptions(): { enabled?: boolean } | undefined {
+  return mockUseQuery.mock.calls.at(-1)?.[1] as
+    | { enabled?: boolean }
+    | undefined;
+}
+
 /**
  * The boundary stub has to keep the ONE behaviour of the real client that the
  * card depends on: TanStack evaluates `refetchInterval` SYNCHRONOUSLY while
@@ -233,6 +240,40 @@ describe("Feature: the run card renders the platform's live state for the run it
       // `isTerminal` never flips on an error (only a terminal STATUS does),
       // so the gate has to read the error itself.
       expect(lastListenerEnabled()).toBe(false);
+    });
+
+    /**
+     * Disabling only the SSE listener still left the query polling: with no
+     * status to key off, the shared policy hands back the FAST cadence, so a
+     * deleted run re-fetched every 3s forever behind the fallback card — once
+     * per dead card in the conversation.
+     */
+    it("stops polling for the run instead of retrying it forever", () => {
+      mockUseQuery.mockReturnValue({
+        data: undefined,
+        error: { message: "NOT_FOUND" },
+      });
+      renderCard({ scenarioRunId: RUN_ID, name: "Envelope snapshot" });
+
+      expect(lastQueryOptions()?.enabled).toBe(false);
+    });
+  });
+
+  describe("given a run that stalled", () => {
+    /**
+     * `STALLED` is a finished state to a reader but stays pollable, because
+     * new events can still revive it. Deriving the spinner from the polling
+     * cadence therefore painted a "still working" spinner next to the badge.
+     */
+    it("shows no running spinner beside the stalled badge", () => {
+      mockUseQuery.mockReturnValue({
+        data: runData({ status: ScenarioRunStatus.STALLED }),
+        error: null,
+      });
+      const { container } = renderCard({ scenarioRunId: RUN_ID });
+
+      expect(screen.getByText(/stalled/i)).toBeDefined();
+      expect(container.querySelectorAll(".chakra-spinner")).toHaveLength(0);
     });
   });
 
