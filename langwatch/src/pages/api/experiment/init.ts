@@ -93,10 +93,7 @@ export default async function handler(
       "invalid init data received",
     );
     // TODO: should it be a warning instead of exception on sentry? here and all over our APIs
-    captureException(
-      toError(error),
-      { extra: { projectId: project.id } },
-    );
+    captureException(toError(error), { extra: { projectId: project.id } });
 
     const validationError = fromZodError(error as ZodError);
     return res.status(400).json({ error: validationError.message });

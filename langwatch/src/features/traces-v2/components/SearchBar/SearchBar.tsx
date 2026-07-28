@@ -29,10 +29,9 @@ import { ActiveSearchEditor } from "./ActiveSearchEditor";
 import { AiErrorDetails, hasAiErrorDetails } from "./ErrorBannerDetail";
 import { editorStyles } from "./editorStyles";
 import { FloatingAiBar } from "./FloatingAiBar";
-import { setFilterChipLabels } from "./filterHighlight";
 import { FloatingLangyBar } from "./FloatingLangyBar";
+import { setFilterChipLabels } from "./filterHighlight";
 import { PlaceholderEditor, searchBarPlaceholder } from "./PlaceholderEditor";
-import { useAskLangyFromSearch } from "./useAskLangyFromSearch";
 import {
   ClearButton,
   type SearchBarStatus,
@@ -45,6 +44,7 @@ import {
   TokenValuePicker,
   type TokenValuePickerAnchor,
 } from "./TokenValuePicker";
+import { useAskLangyFromSearch } from "./useAskLangyFromSearch";
 import type { ValueResolver } from "./useFilterEditor";
 import { useFloatRect } from "./useFloatRect";
 import { useGlobalAiShortcut } from "./useGlobalAiShortcut";
@@ -475,7 +475,10 @@ export const SearchBar: React.FC = () => {
                 editorFocused &&
                 !suggestionOpen &&
                 !askAiNeedsProviderPrimer && (
-                  <SearchSubmitHint anchorX={cursorAnchorX} askLabel={askLabel} />
+                  <SearchSubmitHint
+                    anchorX={cursorAnchorX}
+                    askLabel={askLabel}
+                  />
                 )}
             </Box>
 

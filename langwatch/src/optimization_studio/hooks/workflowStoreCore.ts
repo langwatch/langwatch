@@ -13,11 +13,11 @@ import { nanoid } from "nanoid";
 import { LlmConfigInputTypes } from "../../types";
 import { snakeCaseToPascalCase } from "../../utils/stringCasing";
 import {
-  LATEST_SPEC_VERSION,
   type BaseComponent,
   type Component,
   type Entry,
   type Field,
+  LATEST_SPEC_VERSION,
   type Workflow,
 } from "../types/dsl";
 import { rewriteCodeSignature } from "../utils/codeSignature";

@@ -61,7 +61,7 @@ export function useRunScenario({
               window.open(
                 "/settings/model-providers",
                 "_blank",
-                "noopener,noreferrer"
+                "noopener,noreferrer",
               ),
           },
         });
@@ -69,18 +69,23 @@ export function useRunScenario({
       }
 
       try {
-        const { setId: returnedSetId, batchRunId: returnedBatchRunId } = await runMutation.mutateAsync({
-          projectId,
-          scenarioId,
-          target: { type: target.type, referenceId: target.id },
-          setId,
-          batchRunId,
-        });
+        const { setId: returnedSetId, batchRunId: returnedBatchRunId } =
+          await runMutation.mutateAsync({
+            projectId,
+            scenarioId,
+            target: { type: target.type, referenceId: target.id },
+            setId,
+            batchRunId,
+          });
 
         setIsPolling(true);
         const result = await pollForScenarioRun(
           utils.scenarios.getBatchRunData.fetch,
-          { projectId, scenarioSetId: returnedSetId, batchRunId: returnedBatchRunId },
+          {
+            projectId,
+            scenarioSetId: returnedSetId,
+            batchRunId: returnedBatchRunId,
+          },
         );
 
         if (result.success) {
@@ -91,7 +96,11 @@ export function useRunScenario({
           });
         } else if (result.error === "run_error") {
           const runResult = result.scenarioRunId
-            ? { scenarioRunId: result.scenarioRunId, setId: returnedSetId, batchRunId: returnedBatchRunId }
+            ? {
+                scenarioRunId: result.scenarioRunId,
+                setId: returnedSetId,
+                batchRunId: returnedBatchRunId,
+              }
             : null;
           toaster.create({
             title: "Scenario run failed",
@@ -120,7 +129,15 @@ export function useRunScenario({
         setIsPolling(false);
       }
     },
-    [projectId, projectSlug, hasEnabledProviders, runMutation, onRunComplete, onRunFailed, utils],
+    [
+      projectId,
+      projectSlug,
+      hasEnabledProviders,
+      runMutation,
+      onRunComplete,
+      onRunFailed,
+      utils,
+    ],
   );
 
   return {

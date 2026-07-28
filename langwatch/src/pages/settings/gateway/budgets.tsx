@@ -131,8 +131,8 @@ function BudgetsPage() {
                 <EmptyState.Title>No budgets yet</EmptyState.Title>
                 <EmptyState.Description>
                   Hierarchical budgets enforce a spend ceiling across
-                  organization, team, project, virtual-key, or principal.
-                  Create one to start governing cost.
+                  organization, team, project, virtual-key, or principal. Create
+                  one to start governing cost.
                 </EmptyState.Description>
                 {canCreate && (
                   <Button
@@ -147,217 +147,235 @@ function BudgetsPage() {
             </EmptyState.Root>
           ) : (
             <VStack align="stretch" gap={4}>
-            {!spendAvailable && (
-              <Alert.Root status="warning" data-testid="budget-spend-unavailable">
-                <Alert.Indicator />
-                <Alert.Content>
-                  <Alert.Title>Spend figures are unavailable</Alert.Title>
-                  <Alert.Description>
-                    Spend cannot be totalled right now, so these budgets are
-                    not stopping or warning about anything.
-                  </Alert.Description>
-                </Alert.Content>
-              </Alert.Root>
-            )}
-            <Card.Root width="full" overflow="hidden">
-              <Card.Body paddingY={0} paddingX={0}>
-            <Table.Root variant="line" size="md" width="full">
-              <Table.Header>
-                <Table.Row>
-                  <Table.ColumnHeader>Name</Table.ColumnHeader>
-                  <Table.ColumnHeader>Scope</Table.ColumnHeader>
-                  <Table.ColumnHeader>Window</Table.ColumnHeader>
-                  <Table.ColumnHeader>Spent / Limit</Table.ColumnHeader>
-                  <Table.ColumnHeader>
-                    <Tooltip
-                      content={
-                        <Text fontSize="xs">
-                          WARN: emits 402-equivalent warning header +
-                          audit event, request proceeds.{"\n"}BLOCK: the
-                          gateway returns HTTP 402 and refuses to
-                          dispatch once the limit is crossed.
-                        </Text>
-                      }
-                    >
-                      <Text as="span">On breach</Text>
-                    </Tooltip>
-                  </Table.ColumnHeader>
-                  <Table.ColumnHeader>Resets</Table.ColumnHeader>
-                  <Table.ColumnHeader></Table.ColumnHeader>
-                </Table.Row>
-              </Table.Header>
-              <Table.Body>
-                {rows.map((b) => {
-                  const spent = Number.parseFloat(b.spentUsd);
-                  const limit = Number.parseFloat(b.limitUsd);
-                  const pct = limit > 0 ? Math.min(100, (spent / limit) * 100) : 0;
-                  return (
-                    <Table.Row
-                      key={b.id}
-                      cursor="pointer"
-                      _hover={{ bg: "bg.subtle" }}
-                      onClick={() =>
-                        void router.push(
-                          `/settings/gateway/budgets/${b.id}`,
-                        )
-                      }
-                    >
-                      <Table.Cell>
-                        <VStack align="start" gap={0}>
-                          <Link
-                            href={`/settings/gateway/budgets/${b.id}`}
-                          >
-                            <Text fontWeight="medium">{b.name}</Text>
-                          </Link>
-                          {b.description && (
-                            <Text fontSize="xs" color="fg.muted">
-                              {b.description}
-                            </Text>
-                          )}
-                        </VStack>
-                      </Table.Cell>
-                      <Table.Cell>
-                        <VStack align="start" gap={1}>
-                          <ScopeCell
-                            scopeType={b.scopeType}
-                            scopeTarget={b.scopeTarget ?? null}
-                            projectSlug={project?.slug ?? null}
-                          />
-                          {b.unreachableByAnyKey && (
-                            <Tooltip
-                              content="Traffic is attributed to the project a key is scoped to. No active key is scoped so that its traffic reaches this budget, so it will stay at zero and never stop a request."
-                            >
-                              <Badge
-                                colorPalette="orange"
-                                variant="subtle"
-                                fontSize="2xs"
-                                data-testid="budget-unreachable-badge"
-                              >
-                                <TriangleAlert size={10} /> No key sends
-                                traffic here
-                              </Badge>
-                            </Tooltip>
-                          )}
-                        </VStack>
-                      </Table.Cell>
-                      <Table.Cell>
-                        <Badge variant="subtle" colorPalette="gray">
-                          {b.window.toLowerCase()}
-                        </Badge>
-                      </Table.Cell>
-                      <Table.Cell minWidth="220px">
-                        {!b.spendAvailable ? (
-                          <HStack fontSize="xs">
-                            <Text color="fg.muted">Unavailable</Text>
-                            <Text color="fg.muted">
-                              / {formatBudgetUsd(limit)}
-                            </Text>
-                          </HStack>
-                        ) : (
-                        <VStack align="stretch" gap={1}>
-                          <HStack fontSize="xs">
-                            <Text fontWeight="medium">
-                              {formatBudgetUsd(spent)}
-                            </Text>
-                            <Text color="fg.muted">/ {formatBudgetUsd(limit)}</Text>
-                            <Spacer />
-                            <Badge
-                              variant="outline"
-                              colorPalette={
-                                pct >= 100
-                                  ? "red"
-                                  : pct >= 80
-                                    ? "orange"
-                                    : "green"
-                              }
-                              fontSize="2xs"
-                            >
-                              {pct.toFixed(0)}%
-                            </Badge>
-                          </HStack>
-                          <Progress.Root
-                            value={pct}
-                            size="xs"
-                            colorPalette={
-                              pct >= 100 ? "red" : pct >= 80 ? "orange" : "green"
+              {!spendAvailable && (
+                <Alert.Root
+                  status="warning"
+                  data-testid="budget-spend-unavailable"
+                >
+                  <Alert.Indicator />
+                  <Alert.Content>
+                    <Alert.Title>Spend figures are unavailable</Alert.Title>
+                    <Alert.Description>
+                      Spend cannot be totalled right now, so these budgets are
+                      not stopping or warning about anything.
+                    </Alert.Description>
+                  </Alert.Content>
+                </Alert.Root>
+              )}
+              <Card.Root width="full" overflow="hidden">
+                <Card.Body paddingY={0} paddingX={0}>
+                  <Table.Root variant="line" size="md" width="full">
+                    <Table.Header>
+                      <Table.Row>
+                        <Table.ColumnHeader>Name</Table.ColumnHeader>
+                        <Table.ColumnHeader>Scope</Table.ColumnHeader>
+                        <Table.ColumnHeader>Window</Table.ColumnHeader>
+                        <Table.ColumnHeader>Spent / Limit</Table.ColumnHeader>
+                        <Table.ColumnHeader>
+                          <Tooltip
+                            content={
+                              <Text fontSize="xs">
+                                WARN: emits 402-equivalent warning header +
+                                audit event, request proceeds.{"\n"}BLOCK: the
+                                gateway returns HTTP 402 and refuses to dispatch
+                                once the limit is crossed.
+                              </Text>
                             }
                           >
-                            <Progress.Track>
-                              <Progress.Range />
-                            </Progress.Track>
-                          </Progress.Root>
-                        </VStack>
-                        )}
-                      </Table.Cell>
-                      <Table.Cell>
-                        <Badge
-                          colorPalette={b.onBreach === "BLOCK" ? "red" : "yellow"}
-                        >
-                          {b.onBreach.toLowerCase()}
-                        </Badge>
-                      </Table.Cell>
-                      <Table.Cell>
-                        {b.window === "TOTAL" ? (
-                          <Text fontSize="xs" color="fg.muted">
-                            never
-                          </Text>
-                        ) : (
-                          <Tooltip
-                            content={new Date(b.resetsAt).toLocaleString()}
-                          >
-                            <Text fontSize="xs">
-                              {formatTimeAgo(new Date(b.resetsAt).getTime())}
-                            </Text>
+                            <Text as="span">On breach</Text>
                           </Tooltip>
-                        )}
-                      </Table.Cell>
-                      <Table.Cell
-                        onClick={(e) => e.stopPropagation()}
-                        cursor="default"
-                      >
-                        <Menu.Root>
-                          <Menu.Trigger asChild>
-                            <Button variant="ghost" size="xs" aria-label="Actions">
-                              <MoreVertical size={14} />
-                            </Button>
-                          </Menu.Trigger>
-                          <Menu.Content>
-                            <Menu.Item
-                              value="details"
-                              onClick={() =>
-                                void router.push(
-                                  `/settings/gateway/budgets/${b.id}`,
-                                )
-                              }
+                        </Table.ColumnHeader>
+                        <Table.ColumnHeader>Resets</Table.ColumnHeader>
+                        <Table.ColumnHeader></Table.ColumnHeader>
+                      </Table.Row>
+                    </Table.Header>
+                    <Table.Body>
+                      {rows.map((b) => {
+                        const spent = Number.parseFloat(b.spentUsd);
+                        const limit = Number.parseFloat(b.limitUsd);
+                        const pct =
+                          limit > 0 ? Math.min(100, (spent / limit) * 100) : 0;
+                        return (
+                          <Table.Row
+                            key={b.id}
+                            cursor="pointer"
+                            _hover={{ bg: "bg.subtle" }}
+                            onClick={() =>
+                              void router.push(
+                                `/settings/gateway/budgets/${b.id}`,
+                              )
+                            }
+                          >
+                            <Table.Cell>
+                              <VStack align="start" gap={0}>
+                                <Link
+                                  href={`/settings/gateway/budgets/${b.id}`}
+                                >
+                                  <Text fontWeight="medium">{b.name}</Text>
+                                </Link>
+                                {b.description && (
+                                  <Text fontSize="xs" color="fg.muted">
+                                    {b.description}
+                                  </Text>
+                                )}
+                              </VStack>
+                            </Table.Cell>
+                            <Table.Cell>
+                              <VStack align="start" gap={1}>
+                                <ScopeCell
+                                  scopeType={b.scopeType}
+                                  scopeTarget={b.scopeTarget ?? null}
+                                  projectSlug={project?.slug ?? null}
+                                />
+                                {b.unreachableByAnyKey && (
+                                  <Tooltip content="Traffic is attributed to the project a key is scoped to. No active key is scoped so that its traffic reaches this budget, so it will stay at zero and never stop a request.">
+                                    <Badge
+                                      colorPalette="orange"
+                                      variant="subtle"
+                                      fontSize="2xs"
+                                      data-testid="budget-unreachable-badge"
+                                    >
+                                      <TriangleAlert size={10} /> No key sends
+                                      traffic here
+                                    </Badge>
+                                  </Tooltip>
+                                )}
+                              </VStack>
+                            </Table.Cell>
+                            <Table.Cell>
+                              <Badge variant="subtle" colorPalette="gray">
+                                {b.window.toLowerCase()}
+                              </Badge>
+                            </Table.Cell>
+                            <Table.Cell minWidth="220px">
+                              {!b.spendAvailable ? (
+                                <HStack fontSize="xs">
+                                  <Text color="fg.muted">Unavailable</Text>
+                                  <Text color="fg.muted">
+                                    / {formatBudgetUsd(limit)}
+                                  </Text>
+                                </HStack>
+                              ) : (
+                                <VStack align="stretch" gap={1}>
+                                  <HStack fontSize="xs">
+                                    <Text fontWeight="medium">
+                                      {formatBudgetUsd(spent)}
+                                    </Text>
+                                    <Text color="fg.muted">
+                                      / {formatBudgetUsd(limit)}
+                                    </Text>
+                                    <Spacer />
+                                    <Badge
+                                      variant="outline"
+                                      colorPalette={
+                                        pct >= 100
+                                          ? "red"
+                                          : pct >= 80
+                                            ? "orange"
+                                            : "green"
+                                      }
+                                      fontSize="2xs"
+                                    >
+                                      {pct.toFixed(0)}%
+                                    </Badge>
+                                  </HStack>
+                                  <Progress.Root
+                                    value={pct}
+                                    size="xs"
+                                    colorPalette={
+                                      pct >= 100
+                                        ? "red"
+                                        : pct >= 80
+                                          ? "orange"
+                                          : "green"
+                                    }
+                                  >
+                                    <Progress.Track>
+                                      <Progress.Range />
+                                    </Progress.Track>
+                                  </Progress.Root>
+                                </VStack>
+                              )}
+                            </Table.Cell>
+                            <Table.Cell>
+                              <Badge
+                                colorPalette={
+                                  b.onBreach === "BLOCK" ? "red" : "yellow"
+                                }
+                              >
+                                {b.onBreach.toLowerCase()}
+                              </Badge>
+                            </Table.Cell>
+                            <Table.Cell>
+                              {b.window === "TOTAL" ? (
+                                <Text fontSize="xs" color="fg.muted">
+                                  never
+                                </Text>
+                              ) : (
+                                <Tooltip
+                                  content={new Date(
+                                    b.resetsAt,
+                                  ).toLocaleString()}
+                                >
+                                  <Text fontSize="xs">
+                                    {formatTimeAgo(
+                                      new Date(b.resetsAt).getTime(),
+                                    )}
+                                  </Text>
+                                </Tooltip>
+                              )}
+                            </Table.Cell>
+                            <Table.Cell
+                              onClick={(e) => e.stopPropagation()}
+                              cursor="default"
                             >
-                              <Eye size={14} /> Details
-                            </Menu.Item>
-                            {canUpdate && (
-                              <Menu.Item
-                                value="edit"
-                                onClick={() => setEditing(b)}
-                              >
-                                <Pencil size={14} /> Edit
-                              </Menu.Item>
-                            )}
-                            {canDelete && (
-                              <Menu.Item
-                                value="archive"
-                                onClick={() => setArchiving(b)}
-                              >
-                                <Archive size={14} /> Archive
-                              </Menu.Item>
-                            )}
-                          </Menu.Content>
-                        </Menu.Root>
-                      </Table.Cell>
-                    </Table.Row>
-                  );
-                })}
-              </Table.Body>
-            </Table.Root>
-              </Card.Body>
-            </Card.Root>
+                              <Menu.Root>
+                                <Menu.Trigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="xs"
+                                    aria-label="Actions"
+                                  >
+                                    <MoreVertical size={14} />
+                                  </Button>
+                                </Menu.Trigger>
+                                <Menu.Content>
+                                  <Menu.Item
+                                    value="details"
+                                    onClick={() =>
+                                      void router.push(
+                                        `/settings/gateway/budgets/${b.id}`,
+                                      )
+                                    }
+                                  >
+                                    <Eye size={14} /> Details
+                                  </Menu.Item>
+                                  {canUpdate && (
+                                    <Menu.Item
+                                      value="edit"
+                                      onClick={() => setEditing(b)}
+                                    >
+                                      <Pencil size={14} /> Edit
+                                    </Menu.Item>
+                                  )}
+                                  {canDelete && (
+                                    <Menu.Item
+                                      value="archive"
+                                      onClick={() => setArchiving(b)}
+                                    >
+                                      <Archive size={14} /> Archive
+                                    </Menu.Item>
+                                  )}
+                                </Menu.Content>
+                              </Menu.Root>
+                            </Table.Cell>
+                          </Table.Row>
+                        );
+                      })}
+                    </Table.Body>
+                  </Table.Root>
+                </Card.Body>
+              </Card.Root>
             </VStack>
           )}
         </Box>

@@ -359,9 +359,7 @@ export function BatchTargetCell({
           </Button>
         </Tooltip>
       )}
-      {targetOutput.traceId && (
-        <TraceIdPeek traceId={targetOutput.traceId} />
-      )}
+      {targetOutput.traceId && <TraceIdPeek traceId={targetOutput.traceId} />}
       {/* Copy button */}
       {rawOutput && (
         <Tooltip

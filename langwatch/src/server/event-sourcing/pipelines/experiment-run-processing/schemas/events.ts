@@ -171,8 +171,9 @@ export type ExperimentRunProcessingEvent =
   | ExperimentRunCompletedEvent;
 
 export {
-	isEvaluatorResultEvent, isExperimentRunCompletedEvent,
-	isExperimentRunStartedEvent, isTargetResultEvent,
-	isTraceMetricsComputedEvent
+  isEvaluatorResultEvent,
+  isExperimentRunCompletedEvent,
+  isExperimentRunStartedEvent,
+  isTargetResultEvent,
+  isTraceMetricsComputedEvent,
 } from "./typeGuards";
-

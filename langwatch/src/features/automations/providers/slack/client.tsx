@@ -15,6 +15,17 @@ import {
   useListCollection,
   VStack,
 } from "@chakra-ui/react";
+import {
+  SLACK_BOT_TOKEN_KEPT,
+  type SlackActionParams,
+  type SlackDeliveryMethod,
+  type SlackPreview,
+  type SlackTemplateType,
+  slackDeliveryMethodOf,
+} from "@langwatch/automations/providers/slack";
+import type { SavedTriggerRow } from "@langwatch/automations/providers/types";
+import { defaultsForSourceKind } from "@langwatch/automations/templating/defaults";
+import { filterVariablesForCadence } from "@langwatch/automations/templating/exampleContext";
 import { ExternalLink } from "lucide-react";
 import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import { FaSlack } from "react-icons/fa";
@@ -31,8 +42,6 @@ import {
   TemplateDisclosure,
 } from "~/features/automations/editors/templateAuthoring";
 import { describeError } from "~/features/errors";
-import { defaultsForSourceKind } from "@langwatch/automations/templating/defaults";
-import { filterVariablesForCadence } from "@langwatch/automations/templating/exampleContext";
 import { api } from "~/utils/api";
 import { TestFireButton } from "../TestFireButton";
 import type {
@@ -40,15 +49,6 @@ import type {
   NotifyClientDef,
   SummaryIdentity,
 } from "../types";
-import type { SavedTriggerRow } from "@langwatch/automations/providers/types";
-import {
-  SLACK_BOT_TOKEN_KEPT,
-  slackDeliveryMethodOf,
-  type SlackActionParams,
-  type SlackDeliveryMethod,
-  type SlackPreview,
-  type SlackTemplateType,
-} from "@langwatch/automations/providers/slack";
 import {
   findTemplateOptionBySource,
   pickDefaultSlackBlockKitTemplateId,
@@ -403,9 +403,7 @@ function SlackChannelField({
   const canLoad =
     typedToken.length > 0 || slice.botTokenAlreadySet || !!automationId;
   const returnedError =
-    list.data?.error && list.data.error !== "no_token"
-      ? list.data.error
-      : null;
+    list.data?.error && list.data.error !== "no_token" ? list.data.error : null;
   // A listing can succeed and still be short of the workspace. Saying nothing
   // is the worst option: the author scrolls a list that looks complete, doesn't
   // find their channel, and concludes the integration is broken.
@@ -786,7 +784,9 @@ function SlackConfigForm({
                   // reset effect above sees a consistent pair and leaves it
                   // alone.
                   ctx.setNotificationCadence(
-                    option.cadenceFit === "digest" ? "5min_digest" : "immediate",
+                    option.cadenceFit === "digest"
+                      ? "5min_digest"
+                      : "immediate",
                   );
                   onChange({
                     ...slice,
@@ -954,8 +954,8 @@ function SlackBotFields({
             <List.Root as="ol" gap={1} paddingLeft={4}>
               <List.Item>
                 <Text textStyle="xs" color="fg.muted">
-                  Create the app with &ldquo;From a manifest&rdquo; and paste the
-                  copied manifest — it sets the permissions for you.
+                  Create the app with &ldquo;From a manifest&rdquo; and paste
+                  the copied manifest — it sets the permissions for you.
                 </Text>
               </List.Item>
               <List.Item>

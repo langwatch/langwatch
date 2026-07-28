@@ -1,14 +1,18 @@
+import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { Organization, PrismaClient, Project } from "@prisma/client";
 import type { MiddlewareHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-import type { Permission } from "~/server/api/rbac";
-import { HandledError } from "@langwatch/handled-error";
 import { handledErrorResponseBody } from "~/app/api/middleware/error-handler";
+import type { Permission } from "~/server/api/rbac";
 import { resolveApiKeyPermission } from "~/server/rbac/role-binding-resolver";
 import { getTokenType } from "./api-key-token.utils";
 import { ApiKeyPermissionDeniedError } from "./errors";
-import { type OrgResolvedToken, type ResolvedToken, TokenResolver } from "./token-resolver";
+import {
+  type OrgResolvedToken,
+  type ResolvedToken,
+  TokenResolver,
+} from "./token-resolver";
 
 const logger = createLogger("langwatch:api:unified-auth");
 const permissionLogger = createLogger("langwatch:api:api-key-ceiling");
@@ -238,7 +242,10 @@ export function createOrgAuthMiddleware({
     } catch (error) {
       orgLogger.error({ ...diag, error }, "Database error during org auth");
       return c.json(
-        { error: "Internal Server Error", message: "Authentication service error" },
+        {
+          error: "Internal Server Error",
+          message: "Authentication service error",
+        },
         500,
       );
     }
@@ -251,7 +258,8 @@ export function createOrgAuthMiddleware({
       return c.json(
         {
           error: "Unauthorized",
-          message: "Invalid credentials. Organization-level endpoints require an admin API key created in Settings > API Keys. Project API keys cannot be used here.",
+          message:
+            "Invalid credentials. Organization-level endpoints require an admin API key created in Settings > API Keys. Project API keys cannot be used here.",
         },
         401,
       );
@@ -308,7 +316,11 @@ export type AuthDiagnostics = {
 };
 
 export function collectAuthDiagnostics(c: {
-  req: { path: string; method: string; header: (name: string) => string | undefined };
+  req: {
+    path: string;
+    method: string;
+    header: (name: string) => string | undefined;
+  };
 }): AuthDiagnostics {
   const get = (name: string) => c.req.header(name) ?? null;
   const xAuthToken = c.req.header("x-auth-token");

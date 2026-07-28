@@ -1,13 +1,13 @@
 import { Button, HStack, VStack } from "@chakra-ui/react";
 
 import { HandledErrorAlert } from "~/features/errors";
+import { signOut } from "~/utils/auth-client";
+import { useRouter } from "~/utils/compat/next-router";
+import { hardRedirect } from "~/utils/hardRedirect";
 import { LoadingScreen } from "../../components/LoadingScreen";
 import { SetupLayout } from "../../components/SetupLayout";
-import { useRequiredSession } from "../../hooks/useRequiredSession";
 import { useAcceptInviteOnce } from "../../hooks/useAcceptInviteOnce";
-import { useRouter } from "~/utils/compat/next-router";
-import { signOut } from "~/utils/auth-client";
-import { hardRedirect } from "~/utils/hardRedirect";
+import { useRequiredSession } from "../../hooks/useRequiredSession";
 
 export default function Accept() {
   const router = useRouter();

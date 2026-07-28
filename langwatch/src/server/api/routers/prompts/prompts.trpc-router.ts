@@ -1,6 +1,7 @@
 import { PromptScope } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import { afterPromptCreated } from "~/../ee/billing/nurturing/hooks/promptCreation";
 import { nodeDatasetSchema } from "~/optimization_studio/types/dsl";
 import {
   handleSchema,
@@ -11,7 +12,6 @@ import {
   responseFormatSchema,
   runtimeParametersSchema,
 } from "~/prompts/schemas";
-import { afterPromptCreated } from "~/../ee/billing/nurturing/hooks/promptCreation";
 import { enforceLicenseLimit } from "~/server/license-enforcement";
 import { hoistSystemMessage, PromptService } from "~/server/prompt-config";
 import { TagValidationError } from "~/server/prompt-config/repositories/llm-config-tag.repository";

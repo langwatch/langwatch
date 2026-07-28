@@ -34,10 +34,7 @@ const {
     captureExceptionSpy: vi.fn(),
     mockState: {
       handlers: {} as {
-        onSuccess?: (
-          data: unknown,
-          variables: { inviteCode: string },
-        ) => void;
+        onSuccess?: (data: unknown, variables: { inviteCode: string }) => void;
         onError?: (
           error: { message: string },
           variables: { inviteCode: string },
@@ -79,7 +76,7 @@ vi.mock("~/utils/hardRedirect", () => ({
 
 vi.mock("~/utils/posthogErrorCapture", () => ({
   captureException: captureExceptionSpy,
-  toError: vi.fn((e) => e instanceof Error ? e : new Error(String(e))),
+  toError: vi.fn((e) => (e instanceof Error ? e : new Error(String(e)))),
 }));
 
 import {

@@ -704,7 +704,9 @@ describe("<ScenarioFormDrawer/>", () => {
 
         // Open agent type selector
         await user.click(screen.getByTestId("create-agent-button"));
-        expect(screen.getByTestId("agent-type-selector-drawer")).toBeInTheDocument();
+        expect(
+          screen.getByTestId("agent-type-selector-drawer"),
+        ).toBeInTheDocument();
 
         // Close without completing (cancellation path)
         await user.click(screen.getByTestId("close-agent-selector"));

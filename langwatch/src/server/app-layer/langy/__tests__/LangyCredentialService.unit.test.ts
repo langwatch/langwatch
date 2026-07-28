@@ -37,12 +37,10 @@ const { mintLangySessionApiKey, LangySessionKeyScopeError } = vi.hoisted(() => {
     }
   }
   return {
-    mintLangySessionApiKey: vi
-      .fn()
-      .mockResolvedValue({
-        token: "sk-lw-test-langy-token",
-        apiKeyId: "key-1",
-      }),
+    mintLangySessionApiKey: vi.fn().mockResolvedValue({
+      token: "sk-lw-test-langy-token",
+      apiKeyId: "key-1",
+    }),
     LangySessionKeyScopeError,
   };
 });
@@ -144,7 +142,8 @@ describe("LangyCredentialService", () => {
         // is a raw, haven-assigned loopback port the worker process cannot reach,
         // so the stable LANGWATCH_ENDPOINT hostname must win — otherwise the relay
         // is silently disabled and the turn stalls with no live edge and no error.
-        process.env.LANGWATCH_ENDPOINT = "https://app.stack.langwatch.localhost";
+        process.env.LANGWATCH_ENDPOINT =
+          "https://app.stack.langwatch.localhost";
         const prisma = makePrisma({
           projectSecret: {
             findFirst: vi
@@ -658,7 +657,9 @@ describe("resolveWorkerCallbackUrl", () => {
 
     it("falls back to LANGWATCH_API_URL when the endpoint is absent", () => {
       expect(
-        resolveWorkerCallbackUrl({ LANGWATCH_API_URL: "http://127.0.0.1:41001" }),
+        resolveWorkerCallbackUrl({
+          LANGWATCH_API_URL: "http://127.0.0.1:41001",
+        }),
       ).toBe("http://127.0.0.1:41001");
     });
 
@@ -689,7 +690,9 @@ describe("resolveWorkerGatewayBaseUrl", () => {
         }),
       ).toBe("https://gateway.slug.langwatch.localhost");
       expect(
-        resolveWorkerGatewayBaseUrl({ LW_GATEWAY_BASE_URL: "http://127.0.0.1:45000" }),
+        resolveWorkerGatewayBaseUrl({
+          LW_GATEWAY_BASE_URL: "http://127.0.0.1:45000",
+        }),
       ).toBe("http://127.0.0.1:45000");
     });
 

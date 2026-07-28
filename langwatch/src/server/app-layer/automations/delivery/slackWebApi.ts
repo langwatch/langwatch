@@ -1,6 +1,6 @@
-import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
 import type { SlackPayload } from "@langwatch/automations/templating/renderSlack";
 import { createLogger } from "@langwatch/observability";
+import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
 import { sendHttpDestination } from "./httpDestination";
 
 const logger = createLogger("langwatch:triggers:slackWebApi");

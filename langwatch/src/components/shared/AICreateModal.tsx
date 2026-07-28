@@ -424,7 +424,8 @@ function InspirationChips({
   return (
     <Box>
       <Text fontSize="sm" color="fg.muted" mb={2}>
-        Need inspiration? Pick a pattern and {assistantName} takes it from there.
+        Need inspiration? Pick a pattern and {assistantName} takes it from
+        there.
       </Text>
       <HStack gap={2} flexWrap="wrap">
         {templates.map((template) => (

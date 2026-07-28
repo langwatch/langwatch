@@ -114,9 +114,9 @@ vi.mock("../OrganizationUserRoleField", () => ({
 }));
 
 vi.mock("../GroupBindingInputRow", async () => {
-  const actual = await vi.importActual<typeof import("../GroupBindingInputRow")>(
-    "../GroupBindingInputRow",
-  );
+  const actual = await vi.importActual<
+    typeof import("../GroupBindingInputRow")
+  >("../GroupBindingInputRow");
   return {
     ...actual,
     BindingInputRow: ({
@@ -284,9 +284,7 @@ describe("<MemberDetailDialog/>", () => {
 
       renderDialog();
 
-      fireEvent.click(
-        screen.getByRole("button", { name: /remove binding/i }),
-      );
+      fireEvent.click(screen.getByRole("button", { name: /remove binding/i }));
       fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
 
       await vi.waitFor(() => {

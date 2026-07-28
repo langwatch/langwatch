@@ -240,7 +240,10 @@ export const transformBatchEvaluationData = (
     targetColumns = targets.map((target) => ({
       id: target.id,
       name: target.name,
-      type: target.type === "custom" ? "custom" : (target.type as BatchTargetColumn["type"]),
+      type:
+        target.type === "custom"
+          ? "custom"
+          : (target.type as BatchTargetColumn["type"]),
       promptId: target.promptId,
       promptVersion: target.promptVersion,
       agentId: target.agentId,
@@ -465,7 +468,11 @@ export const transformBatchEvaluationData = (
     targetColumns,
     evaluatorIds: Array.from(evaluatorMap.keys()),
     evaluatorNames: Object.fromEntries(evaluatorMap),
-    comparisonColumns: detectComparisonColumns(evaluations, targetColumns, rows),
+    comparisonColumns: detectComparisonColumns(
+      evaluations,
+      targetColumns,
+      rows,
+    ),
     rows,
   };
 };
@@ -581,7 +588,8 @@ const detectComparisonColumns = (
   // the label-shape filter below) made an all-tie bucket with no resolvable
   // candidate ids wrongly fall back to a hardcoded 2-variant slice, silently
   // dropping any 3rd+ variant.
-  const isLegacySlotLabel = (v: string): v is "A" | "B" => v === "A" || v === "B";
+  const isLegacySlotLabel = (v: string): v is "A" | "B" =>
+    v === "A" || v === "B";
 
   // Also treat any evaluator whose type or display name looks like a
   // comparison judge as one, even if this row's label doesn't match a known
@@ -661,7 +669,9 @@ const detectComparisonColumns = (
 
     // Snapshot the judge's own view of who it compared. Authoritative: it
     // names every candidate even when only one of them ever wins.
-    for (const id of readCandidateIds((ev.inputs ?? {}) as Record<string, unknown>)) {
+    for (const id of readCandidateIds(
+      (ev.inputs ?? {}) as Record<string, unknown>,
+    )) {
       const resolved = resolveToTargetId(id) ?? id;
       if (!bucket.candidateIds.includes(resolved)) {
         bucket.candidateIds.push(resolved);

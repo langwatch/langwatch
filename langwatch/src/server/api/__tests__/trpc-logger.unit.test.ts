@@ -1,6 +1,6 @@
+import { HandledError } from "@langwatch/handled-error";
 import { TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
-import { HandledError } from "@langwatch/handled-error";
 import { handleTrpcCallLogging } from "../trpc";
 
 function createMockLog() {

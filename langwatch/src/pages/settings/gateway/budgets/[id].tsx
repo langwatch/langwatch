@@ -160,8 +160,8 @@ function BudgetDetailPage() {
                   <Alert.Content>
                     <Alert.Title>Spend figures are unavailable</Alert.Title>
                     <Alert.Description>
-                      Spend cannot be totalled right now, so this budget is
-                      not stopping or warning about anything.
+                      Spend cannot be totalled right now, so this budget is not
+                      stopping or warning about anything.
                     </Alert.Description>
                   </Alert.Content>
                 </Alert.Root>
@@ -185,40 +185,40 @@ function BudgetDetailPage() {
               <Section title="Utilization">
                 <VStack align="stretch" gap={2}>
                   {!budget.spendAvailable ? (
-                  <HStack>
-                    <Text fontWeight="medium" fontSize="2xl" color="fg.muted">
-                      Unavailable
-                    </Text>
-                    <Text color="fg.muted">/ {formatBudgetUsd(limit)}</Text>
-                  </HStack>
+                    <HStack>
+                      <Text fontWeight="medium" fontSize="2xl" color="fg.muted">
+                        Unavailable
+                      </Text>
+                      <Text color="fg.muted">/ {formatBudgetUsd(limit)}</Text>
+                    </HStack>
                   ) : (
-                  <>
-                  <HStack>
-                    <Text fontWeight="medium" fontSize="2xl">
-                      {formatBudgetUsd(spent)}
-                    </Text>
-                    <Text color="fg.muted">/ {formatBudgetUsd(limit)}</Text>
-                    <Spacer />
-                    <Badge
-                      colorPalette={
-                        pct >= 100 ? "red" : pct >= 80 ? "orange" : "green"
-                      }
-                    >
-                      {pct.toFixed(1)}% used
-                    </Badge>
-                  </HStack>
-                  <Progress.Root
-                    value={pct}
-                    size="sm"
-                    colorPalette={
-                      pct >= 100 ? "red" : pct >= 80 ? "orange" : "green"
-                    }
-                  >
-                    <Progress.Track>
-                      <Progress.Range />
-                    </Progress.Track>
-                  </Progress.Root>
-                  </>
+                    <>
+                      <HStack>
+                        <Text fontWeight="medium" fontSize="2xl">
+                          {formatBudgetUsd(spent)}
+                        </Text>
+                        <Text color="fg.muted">/ {formatBudgetUsd(limit)}</Text>
+                        <Spacer />
+                        <Badge
+                          colorPalette={
+                            pct >= 100 ? "red" : pct >= 80 ? "orange" : "green"
+                          }
+                        >
+                          {pct.toFixed(1)}% used
+                        </Badge>
+                      </HStack>
+                      <Progress.Root
+                        value={pct}
+                        size="sm"
+                        colorPalette={
+                          pct >= 100 ? "red" : pct >= 80 ? "orange" : "green"
+                        }
+                      >
+                        <Progress.Track>
+                          <Progress.Range />
+                        </Progress.Track>
+                      </Progress.Root>
+                    </>
                   )}
                   <HStack fontSize="xs" color="fg.muted">
                     <Text>

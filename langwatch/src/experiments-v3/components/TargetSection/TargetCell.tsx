@@ -8,13 +8,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type { SerializedHandledError } from "@langwatch/handled-error";
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   LuCheck,
   LuCircleAlert,
@@ -34,8 +28,8 @@ import { useEvaluationsV3Store } from "../../hooks/useEvaluationsV3Store";
 import { useCodeEvaluatorIds } from "../../hooks/useEvaluatorName";
 import { useOpenEvaluatorEditor } from "../../hooks/useOpenEvaluatorEditor";
 import { useTargetName } from "../../hooks/useTargetName";
-import { isComparisonEvaluator } from "../../types";
 import type { EvaluatorConfig, TargetConfig } from "../../types";
+import { isComparisonEvaluator } from "../../types";
 import { formatLatency } from "../../utils/computeAggregates";
 import { evaluatorHasMissingMappings } from "../../utils/mappingValidation";
 import { EvaluatorChip } from "../TargetSection/EvaluatorChip";
@@ -596,4 +590,3 @@ export function TargetCellContent({
     </>
   );
 }
-

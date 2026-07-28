@@ -148,7 +148,10 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
       // scope-aware read gate recognises them as an org viewer (required
       // for `canReadAnyScope` to return true on org-scoped rows).
       const teamAMember = await prisma.user.create({
-        data: { name: "Team A Member", email: `team-a-member-${ns}@example.com` },
+        data: {
+          name: "Team A Member",
+          email: `team-a-member-${ns}@example.com`,
+        },
       });
       teamAMemberUserId = teamAMember.id;
       await prisma.organizationUser.create({
@@ -194,7 +197,9 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
       await prisma.modelProvider
         .deleteMany({
           where: {
-            scopes: { some: { scopeType: "PROJECT", scopeId: { in: projectIds } } },
+            scopes: {
+              some: { scopeType: "PROJECT", scopeId: { in: projectIds } },
+            },
           },
         })
         .catch(() => {});
@@ -288,7 +293,9 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
                 provider: "anthropic",
                 enabled: true,
                 customKeys: { ANTHROPIC_API_KEY: `sk-ant-${ns}` },
-                scopes: [{ scopeType: "ORGANIZATION", scopeId: organizationId }],
+                scopes: [
+                  { scopeType: "ORGANIZATION", scopeId: organizationId },
+                ],
               },
               ctxFor(teamAAdminUserId),
             ),
@@ -312,7 +319,9 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
                 provider: "gemini",
                 enabled: true,
                 customKeys: { GEMINI_API_KEY: `sk-gem-${ns}` },
-                scopes: [{ scopeType: "ORGANIZATION", scopeId: organizationId }],
+                scopes: [
+                  { scopeType: "ORGANIZATION", scopeId: organizationId },
+                ],
               },
               ctxFor(teamAMemberUserId),
             ),
@@ -503,9 +512,7 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
               provider: "cerebras",
               enabled: true,
               customKeys: { CEREBRAS_API_KEY: `sk-cer-${ns}` },
-              scopes: [
-                { scopeType: "ORGANIZATION", scopeId: organizationId },
-              ],
+              scopes: [{ scopeType: "ORGANIZATION", scopeId: organizationId }],
             },
             ctxFor(orgAdminUserId),
           );
@@ -548,9 +555,7 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
               provider: "xai",
               enabled: true,
               customKeys: { XAI_API_KEY: `sk-xai-${ns}` },
-              scopes: [
-                { scopeType: "ORGANIZATION", scopeId: organizationId },
-              ],
+              scopes: [{ scopeType: "ORGANIZATION", scopeId: organizationId }],
             },
             ctxFor(orgAdminUserId),
           );

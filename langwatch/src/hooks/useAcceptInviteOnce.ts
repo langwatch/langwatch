@@ -1,10 +1,9 @@
 import { useEffect, useSyncExternalStore } from "react";
-
+import { toaster } from "~/components/ui/toaster";
 import { INVITE_ALREADY_ACCEPTED_MESSAGE } from "~/server/invites/errors";
 import { api } from "~/utils/api";
 import { hardRedirect } from "~/utils/hardRedirect";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
-import { toaster } from "~/components/ui/toaster";
 
 /**
  * Module-scoped set of invite codes that have already had a `mutate` call
@@ -28,10 +27,7 @@ const submittedInviteCodes = new Set<string>();
  * terminal state.
  */
 interface InviteOutcome {
-  status: Extract<
-    AcceptInviteStatus,
-    "success" | "already-accepted" | "error"
-  >;
+  status: Extract<AcceptInviteStatus, "success" | "already-accepted" | "error">;
   /**
    * The failure itself, not a string lifted off it. The page renders it through
    * the code-keyed registry, which needs the whole payload (code, meta, tips,

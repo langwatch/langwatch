@@ -2,7 +2,6 @@ import { createLogger } from "@langwatch/observability";
 import { HTTPException } from "hono/http-exception";
 import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi/zod";
-import { validator as zValidator } from "~/server/api/validation";
 import { z } from "zod";
 import { afterPromptCreated } from "~/../ee/billing/nurturing/hooks/promptCreation";
 import { badRequestSchema, successSchema } from "~/app/api/shared/schemas";
@@ -11,6 +10,7 @@ import {
   versionSchema,
 } from "~/prompts/schemas/field-schemas";
 import { requires, type SecuredApp } from "~/server/api/security";
+import { validator as zValidator } from "~/server/api/validation";
 import { prisma } from "~/server/db";
 import { ShorthandParseError } from "~/server/prompt-config/errors";
 import { parsePromptShorthand } from "~/server/prompt-config/parsePromptShorthand";

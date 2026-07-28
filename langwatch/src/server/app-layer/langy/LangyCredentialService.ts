@@ -1,11 +1,9 @@
+import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { z } from "zod";
-
-import type { Session } from "~/server/auth";
 import { getApp } from "~/server/app-layer";
-import { LANGY_GITHUB_ENABLED } from "./langyGithub.enabled";
-import { HandledError } from "@langwatch/handled-error";
+import type { Session } from "~/server/auth";
 import { parseVirtualKeyConfig } from "~/server/gateway/virtualKey.config";
 import { ProjectRepository } from "~/server/projects/project.repository";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
@@ -13,6 +11,7 @@ import {
   LangySessionKeyScopeError,
   mintLangySessionApiKey,
 } from "./langyApiKey";
+import { LANGY_GITHUB_ENABLED } from "./langyGithub.enabled";
 import { provisionLangyVirtualKey } from "./langyVirtualKey";
 
 const logger = createLogger("langwatch:langy:credentials");
@@ -405,11 +404,10 @@ export class LangyCredentialService {
     let githubRepoScopeKey: string | undefined;
     if (LANGY_GITHUB_ENABLED) {
       try {
-        const minted =
-          await getApp().langy.githubInstallations.mintTurnToken({
-            organizationId: project.organizationId,
-            ...(repositoryFullName ? { repositoryFullName } : {}),
-          });
+        const minted = await getApp().langy.githubInstallations.mintTurnToken({
+          organizationId: project.organizationId,
+          ...(repositoryFullName ? { repositoryFullName } : {}),
+        });
         if (minted) {
           githubToken = minted.token;
           githubRepoScopeKey = minted.repoScopeKey;
