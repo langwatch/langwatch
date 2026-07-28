@@ -197,6 +197,19 @@ describe("readHandledError", () => {
 
       expect(result?.docsUrl).toBeUndefined();
     });
+
+    /**
+     * The local Mintlify origin is accepted only by a runtime that is itself a
+     * local development client — it is not a constant member of the allowlist,
+     * because that put `http://localhost:3000` in every production bundle and
+     * `docsUrl` comes from a customer-configured upstream.
+     *
+     * Asserted in `readHandledError.docsOrigin.unit.test.ts` rather than here:
+     * the runtime is a property of the whole suite, so that file pins it with
+     * `@vitest-environment node` instead of inheriting whatever this one has.
+     * The other half — that a contributor's local docs still resolve — is
+     * `docsUrl.unit.test.ts`, which drives `getDocsBaseUrl` by explicit inputs.
+     */
   });
 
   describe("given a handled error from a REST route", () => {

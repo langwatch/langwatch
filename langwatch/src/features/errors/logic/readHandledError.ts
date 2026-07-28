@@ -286,21 +286,35 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /**
- * The origins a docs link may point at.
+ * The origins a docs link may point at, for the runtime asking.
  *
  * Derived from the same helper that BUILDS them (`utils/docsUrl`), so the
  * allowlist cannot drift from what the server actually sends: the canonical
- * docs site, and the local Mintlify a developer runs against a localhost app.
- * Both inputs are passed explicitly so each branch is pinned without reading
- * `window.location` or the build mode — this list has to hold every origin the
- * server might send, not the one this particular bundle would build.
+ * docs site, plus whatever THIS runtime would link to — which is the local
+ * Mintlify on :3000 only in a development build served from a local host.
+ *
+ * The local origin is deliberately not a constant member. Pinning both branches
+ * unconditionally put `http://localhost:3000` in the allowlist of every
+ * production bundle, and `docsUrl` is attacker-reachable: it is parsed off an
+ * upstream body with a bare `z.string()` (see `safeDocsUrl` below), so a
+ * customer-configured endpoint could hand a production browser a "Read the
+ * docs" link pointing at a service on the viewer's own machine. A developer
+ * needs their local docs to resolve; nobody else does, and the two runtimes can
+ * be told apart, so they are.
+ *
+ * Computed per call rather than once at module load: it is a two-element Set
+ * built beside a `new URL()` parse that already dominates it, and a value
+ * captured at import time would be pinned to whenever the bundle first
+ * evaluated this module.
  */
-const DOCS_ORIGINS = new Set(
-  [
-    getDocsBaseUrl({ hostname: "app.langwatch.ai", isDev: false }),
-    getDocsBaseUrl({ hostname: "localhost", isDev: true }),
-  ].map((base) => new URL(base).origin),
-);
+function docsOrigins(): Set<string> {
+  return new Set(
+    [
+      getDocsBaseUrl({ hostname: "app.langwatch.ai", isDev: false }),
+      getDocsBaseUrl(),
+    ].map((base) => new URL(base).origin),
+  );
+}
 
 /**
  * A docs link, or nothing.
@@ -325,7 +339,7 @@ function safeDocsUrl(value: unknown): string | undefined {
   try {
     // Absolute-only, deliberately: a relative link would resolve against
     // whatever page the error happened on and go somewhere arbitrary.
-    return DOCS_ORIGINS.has(new URL(value).origin) ? value : undefined;
+    return docsOrigins().has(new URL(value).origin) ? value : undefined;
   } catch {
     return undefined;
   }
