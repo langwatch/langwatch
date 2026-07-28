@@ -111,6 +111,30 @@ export const experimentResultsCommand = async ({
       evaluationsByRow.set(key, list);
     }
 
+    // Evaluations that belong to no dataset entry.
+    //
+    // The dataset is one entry per (row, target), and the join below walks it.
+    // A Comparison evaluator judges the whole field of targets in a single
+    // verdict, so its result is recorded against the comparison itself rather
+    // than any one target — leaving it with no (row, target) pair to attach
+    // to. Walking the dataset alone therefore drops it without a word, which
+    // is how a real four-way run reported 240 of its 300 evaluations while the
+    // run summary still advertised the comparison.
+    //
+    // These are keyed by row instead, and follow whichever rows survive the
+    // filter and limit below.
+    const datasetKeys = new Set(
+      results.dataset.map((entry) => rowKey(entry.index, entry.targetId)),
+    );
+    const rowIndependentEvaluations = results.evaluations.filter(
+      (evaluation) => {
+        if (evaluatorFilter && evaluation.evaluator !== evaluatorFilter) {
+          return false;
+        }
+        return !datasetKeys.has(rowKey(evaluation.index, evaluation.targetId));
+      },
+    );
+
     // Determine evaluator columns to show
     const evaluatorNames = evaluatorFilter
       ? [evaluatorFilter]
@@ -133,11 +157,21 @@ export const experimentResultsCommand = async ({
     const truncated = rows.length > limit;
     rows = rows.slice(0, limit);
 
+    // Carry a row-independent evaluation only when its row is still on screen,
+    // so a verdict never describes a row the caller cannot see.
+    const shownIndices = new Set(rows.map((row) => row.entry.index));
+    const shownRowIndependent = rowIndependentEvaluations.filter((evaluation) =>
+      shownIndices.has(evaluation.index),
+    );
+
     return {
       data: {
         ...results,
         dataset: rows.map((row) => row.entry),
-        evaluations: rows.flatMap((row) => row.evaluations),
+        evaluations: [
+          ...rows.flatMap((row) => row.evaluations),
+          ...shownRowIndependent,
+        ],
         meta: {
           totalMatching,
           truncated,
