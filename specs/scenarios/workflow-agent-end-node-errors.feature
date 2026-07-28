@@ -157,6 +157,31 @@ Feature: Workflow agent surfaces End-node misconfiguration instead of an empty r
   # AC #2 — the scenario adapter surfaces the engine's error, never an empty reply
   # ============================================================================
 
+  # These three run the real adapter against a real engine over real HTTP, with
+  # nothing stubbed between them. The unit scenarios below stub the engine's
+  # response, so they prove the adapter reads an envelope correctly but not
+  # that the engine emits the envelope they describe — if the engine ever
+  # stopped answering this way, only these would notice.
+  @integration
+  Scenario: A workflow agent whose End node is unwired reports a readable failure
+    Given a workflow agent whose End node has no inbound edge
+    When the scenario calls the agent
+    Then the agent turn fails
+    And the failure names the End node's missing wiring
+
+  @integration
+  Scenario: A workflow agent with no End node reports a readable failure
+    Given a workflow agent whose workflow has no End node
+    When the scenario calls the agent
+    Then the agent turn fails
+    And the failure says the workflow has no End node
+
+  @integration
+  Scenario: A well-formed workflow agent still returns its End node output
+    Given a workflow agent whose End node is wired to the entry node
+    When the scenario calls the agent
+    Then the agent returns the End node's output
+
   @unit
   Scenario: The workflow agent throws when the engine answers 200 with an error status
     Given the engine answers with HTTP 200 and an error envelope naming the missing End node
@@ -206,6 +231,9 @@ Feature: Workflow agent surfaces End-node misconfiguration instead of an empty r
   #   envelope carries the message verbatim; AC #2 is what makes it visible.
   # Issue #3198 AC #2: "SerializedWorkflowAgentAdapter surfaces the precheck message
   #   unchanged; no uninterpretable result reaches the user" →
+  #   Scenario "A workflow agent whose End node is unwired reports a readable failure"
+  #   Scenario "A workflow agent with no End node reports a readable failure"
+  #   Scenario "A well-formed workflow agent still returns its End node output"
   #   Scenario "The workflow agent throws when the engine answers 200 with an error status"
   #   Scenario "The workflow agent does not return an empty string for an engine error"
   #   Scenario "The workflow agent names the engine error type when the envelope carries no message"
