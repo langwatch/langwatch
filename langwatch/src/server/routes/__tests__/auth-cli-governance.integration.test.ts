@@ -483,7 +483,7 @@ describe("GET /api/auth/cli/governance/*", () => {
 
       // Mint a live key via the service so we can verify it appears in the list
       const service = IngestionKeyService.create(prisma);
-      const result = await service.ensureForPersonalProject({
+      await service.ensureForPersonalProject({
         userId: INGEST_KEY_USER,
         organizationId: INGEST_KEY_ORG,
         sourceType: "codex",
