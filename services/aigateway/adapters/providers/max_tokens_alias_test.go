@@ -70,9 +70,11 @@ func TestBuildChatRequest_AbsentOrNullMaxTokensStaysNil(t *testing.T) {
 	}
 }
 
+// @scenario "a malformed max_tokens is rejected, not silently un-capped"
 // A malformed cap must fail the request, not silently un-cap it. This
 // mirrors the strictness of max_completion_tokens, which is typed *int and
 // already rejects non-integer values at unmarshal.
+// Spec: specs/ai-gateway/openai-param-compat.feature
 func TestBuildChatRequest_MalformedMaxTokensRejected(t *testing.T) {
 	for name, body := range map[string][]byte{
 		"string":  []byte(`{"model":"m","messages":[],"max_tokens":"five"}`),
