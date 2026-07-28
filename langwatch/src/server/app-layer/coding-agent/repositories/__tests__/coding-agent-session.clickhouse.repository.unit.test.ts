@@ -388,17 +388,22 @@ describe("CodingAgentSessionClickHouseRepository point-read tiebreak", () => {
     });
 
     describe("when every progress signal is identical and only the start time differs", () => {
-      it("returns the version with the EARLIER start time, which is the better-informed one", async () => {
-        // StartedAt is min(occurredAt) and only ever moves backwards, so the
-        // smallest value belongs to the version that saw the earliest signal.
-        const result = await read(
-          tiedVersions(
-            { StartedAt: "2026-07-24 11:30:00.000", Commits: 1 },
-            { StartedAt: "2026-07-24 09:00:00.000", Commits: 9 },
-          ),
-        );
+      it("resolves the fully-tied case the same way whichever order the rows arrive in", async () => {
+        // StartedAt is the last-resort key that makes the ordering TOTAL, and
+        // nothing more. WHICH of the two it lands on carries no meaning:
+        // StartedAt can be re-stamped FORWARDS when a read-back miss re-runs
+        // init() (ADR-071), so its direction is not a progress signal. What is
+        // pinned here is that the pick is deterministic — ASC, and identical
+        // under the opposite insertion order rather than whatever the scan
+        // happened to emit first.
+        const later = { StartedAt: "2026-07-24 11:30:00.000", Commits: 1 };
+        const earlier = { StartedAt: "2026-07-24 09:00:00.000", Commits: 9 };
+
+        const result = await read(tiedVersions(later, earlier));
+        const reversed = await read(tiedVersions(earlier, later));
 
         expect(result?.row.commits).toBe(9);
+        expect(reversed?.row.commits).toBe(9);
       });
     });
   });

@@ -383,12 +383,21 @@ export class CodingAgentSessionClickHouseRepository
    *   4. `length(AppliedEventIds) DESC` — more deliveries absorbed. After the
    *      others because the watermark is reset per fresh delivery, so it
    *      saturates and discriminates weakly.
-   *   5. `StartedAt ASC` — a total order for the fully-tied case, and the
-   *      correct direction: StartedAt is `min(occurredAt)` over the session's
-   *      contributions and only ever DECREASES as earlier signals land late, so
-   *      the smallest is the best-informed. Reading the two array lengths costs
-   *      only their offsets columns; every other key is a scalar already in the
-   *      row.
+   *   5. `StartedAt ASC` — a deterministic last-resort tie-break, and nothing
+   *      more. It is here only to make the ordering TOTAL so the fully-tied
+   *      case resolves the same way on every execution instead of arbitrarily.
+   *      It is explicitly NOT a correctness or progress signal, and ASC is
+   *      chosen for stability rather than because a smaller value is better
+   *      informed: `StartedAt` is a `min(occurredAt)` only while a live
+   *      aggregate keeps reading its own state back, and a read-back miss
+   *      re-runs `init()` (`startedAtMs: 0`), re-stamping it from the next
+   *      event's `occurredAt` — which can be LARGER than the value already
+   *      persisted. So it moves in both directions and its direction carries no
+   *      information about which version folded more (ADR-071; the same reason
+   *      no bound on it is safe inside a dedup scope).
+   *
+   * Reading the two array lengths costs only their offsets columns; every other
+   * key is a scalar already in the row.
    */
   private async findLatestRecord({
     tenantId,
