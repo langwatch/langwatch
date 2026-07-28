@@ -28,6 +28,8 @@ import {
   redactStorageUrisInText,
 } from "../../../stored-objects/project-storage-destination";
 import { isDispatchError } from "~/server/event-sourcing/queues/dispatchError";
+import { generate } from "@langwatch/ksuid";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import type {
   DeduplicationConfig,
   EventSourcedQueueDefinition,
@@ -51,7 +53,9 @@ import {
   type DecodeFailureReason,
   PayloadTooLargeError,
   readEnvelopeDescriptor,
+  readJobAttempt,
   readJobRoutingMeta,
+  withJobAttempt,
 } from "./jobEnvelope";
 import {
   gqGroupAttemptReadFailuresTotal,
@@ -95,6 +99,49 @@ import { type ObjectStore, TransientBlobStoreError } from "./tieredBlobStore";
 export const GROUP_ATTEMPT_TTL_SECONDS = Math.ceil(
   (JOB_RETRY_CONFIG.maxBackoffMs / 1000) * 3,
 );
+
+/**
+ * The retry count off a staged job id left over from before ADR-076, when the
+ * ladder appended `/r/<n>` to the id and read the count back by counting the
+ * segments.
+ *
+ * READ-ONLY, and only as a last resort. A job part-way up the unreadable-body
+ * ladder at deploy time recorded its count nowhere else — that path re-staged
+ * the value unmodified and never wrote the group's chain — so without this it
+ * would come back with a fresh budget and a fail-safe would reset mid-flight.
+ * Nothing writes this shape any more: a legacy id is a value to interpret on
+ * the way out, not a format to keep alive.
+ */
+/**
+ * A field off an untrusted payload, when it is actually a usable string.
+ *
+ * The queue's payloads are `Record<string, unknown>` by design — it routes for
+ * every pipeline and does not know their shapes — so the machinery fields it
+ * DOES read have to be checked rather than asserted. Anything that is not a
+ * non-empty string reads as absent.
+ */
+function nonEmptyString(value: unknown): string | undefined {
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+export function legacyStagedJobAttempt(stagedJobId: string): number {
+  let highest = 0;
+  for (const [, digits] of stagedJobId.matchAll(/\/r\/(\d+)(?=\/|$)/g)) {
+    const value = Number(digits);
+    // The terminal restage stamped a wall clock under this same marker. Reading
+    // one as an attempt would vault past the budget and discard a job that
+    // still had rungs left, so anything outside the ladder's range is not a
+    // count.
+    if (
+      Number.isInteger(value) &&
+      value > highest &&
+      value <= JOB_RETRY_CONFIG.maxAttempts
+    ) {
+      highest = value;
+    }
+  }
+  return highest;
+}
 
 /**
  * Configuration for the group queue.
@@ -878,9 +925,11 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     // A re-staged sibling carries no __attempt of its own, so fall back to the
     // group's chain counter rather than reading it as a fresh delivery.
     const attempt = Math.max(jobAttempt, await this.readGroupAttempt(groupId));
-    const pipelineName = (jobData.__pipelineName as string) ?? "unknown";
-    const jobType = (jobData.__jobType as string) ?? "unknown";
-    const jobName = (jobData.__jobName as string) ?? "unknown";
+    // Checked, not asserted: these become Prometheus label values, and `??`
+    // would let a non-string through to be stringified into one.
+    const pipelineName = nonEmptyString(jobData.__pipelineName) ?? "unknown";
+    const jobType = nonEmptyString(jobData.__jobType) ?? "unknown";
+    const jobName = nonEmptyString(jobData.__jobName) ?? "unknown";
     const routingLabels = {
       queue_name: this.queueName,
       pipeline_name: pipelineName,
@@ -1030,6 +1079,15 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         ...drainedSiblings.map((sibling) => sibling.jobDataJson),
       ],
     });
+    // Idempotent so an outcome path can stop the beat at the moment it decides
+    // (see the retry path) while the `finally` still guarantees it is stopped
+    // on every other exit.
+    let heartbeatStopped = false;
+    const stopHeartbeat = (): void => {
+      if (heartbeatStopped) return;
+      heartbeatStopped = true;
+      clearInterval(heartbeat);
+    };
     this.activeJobCount++;
 
     try {
@@ -1293,7 +1351,10 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                 const backoffMs = retryBackoffMsFor({ attempt, error: err });
                 gqRetryAttempt.observe(routingLabels, attempt);
                 gqRetryBackoffMilliseconds.observe(routingLabels, backoffMs);
-                const newStagedJobId = `${stagedJobId}/r/${attempt}`;
+                // The job keeps the id it was dispatched under (ADR-076). Its
+                // staging member was removed at claim time, so re-staging under
+                // the same id inserts one that is genuinely absent.
+                const newStagedJobId = stagedJobId;
                 // If the retry re-encode fails (transient blob-store down,
                 // payload-too-large from a state-bloat regression), the retry
                 // can't proceed and the job is DISCARDED. Retire the old lease
@@ -1346,6 +1407,24 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                   groupId,
                   attempt: attempt + 1,
                 });
+                // STOP THE HEARTBEAT BEFORE THE RE-STAGE IS ISSUED, not after
+                // it returns (ADR-076).
+                //
+                // The re-stage sets the active key's TTL to the backoff window;
+                // a heartbeat REFRESH sets it to the full activeTtlSec and
+                // pushes the group's ready score out to match. The two travel
+                // the same connection and are served in send order, so a beat
+                // that fires while the re-stage is in flight has already been
+                // sent BEHIND it, and would stretch a sub-second backoff into a
+                // multi-minute stall. Clearing the interval here is what makes
+                // that impossible: a tick issues its REFRESH synchronously, so
+                // once this returns no further REFRESH can be sent.
+                //
+                // This used to be handled by the id: the re-stage rotated the
+                // active key to a NEW id, so a late beat naming the old one no
+                // longer matched. With the id reused that guard is gone, and
+                // ordering is the whole protection.
+                stopHeartbeat();
                 const restaged = await this.scripts.retryRestage({
                   groupId,
                   stagedJobId,
@@ -1476,7 +1555,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       // spans into the same trace.
       await otelContext.with(ROOT_CONTEXT, executeWithSpan);
     } finally {
-      clearInterval(heartbeat);
+      stopHeartbeat();
       this.activeJobCount--;
       const jobDurationMs = performance.now() - jobStartTime;
       gqJobDurationMilliseconds.observe(routingLabels, jobDurationMs);
@@ -1739,8 +1818,9 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         ? originalScore
         : (this.score?.(payload) ?? Date.now());
 
-    // Re-stage with a new ID
-    const newStagedJobId = `${stagedJobId}/r/${Date.now()}`;
+    // Re-stage under the id the job was dispatched under (ADR-076), so the
+    // staged job an operator inspects is named by the id its producer knows.
+    const newStagedJobId = stagedJobId;
     const jobDataJson = await this.blobLifecycle.encode({
       jobData: {
         ...(payload as Record<string, unknown>),
@@ -1950,7 +2030,10 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       typeof originalScore === "number" ? originalScore : Date.now();
     await this.scripts.restageAndBlock({
       groupId,
-      newStagedJobId: `${stagedJobId}/p/${Date.now()}`,
+      // Parked under the id it was dispatched under (ADR-076). This used to
+      // append a wall-clock marker, which made a parked job impossible to find
+      // by the id its producer knows and grew the value on every park.
+      newStagedJobId: stagedJobId,
       score,
       jobDataJson,
       errorMessage,
@@ -1976,9 +2059,17 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
    * unreachable — not gone. Re-stage the SAME envelope with backoff so the job
    * retries instead of dropping to replay; the value is still valid and its lease
    * identity is unchanged, so there is no re-encode or identity churn. The
-   * restage renews that lease before returning. Bounded by the
-   * `/r/` retry suffixes already in the stagedJobId, so a misclassified permanent
-   * failure still terminates at the fail-safe (ADR-030 §2).
+   * restage renews that lease before returning.
+   *
+   * The ladder is bounded by a count this path can reach WITHOUT the body it
+   * cannot read (ADR-076): the attempt on the message's header, the group's
+   * retry chain, and — only for a job staged before that change, where neither
+   * can answer — a legacy retry segment on the id. It takes the highest of the
+   * three, because a redelivery can overwrite the waiting job's message with a
+   * fresh attempt-1 envelope, and it WRITES the chain on every rung, because a
+   * message that cannot carry an attempt would otherwise never advance and a
+   * misclassified permanent failure would retry forever instead of terminating
+   * at the fail-safe (ADR-030 §2).
    */
   private async handleTransientDecode({
     groupId,
@@ -1991,7 +2082,12 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     jobDataJson: string;
     err: TransientBlobStoreError;
   }): Promise<void> {
-    const attempt = (stagedJobId.match(/\/r\//g)?.length ?? 0) + 1;
+    const attempt =
+      Math.max(
+        readJobAttempt(jobDataJson) ?? 0,
+        await this.readGroupAttempt(groupId),
+        legacyStagedJobAttempt(stagedJobId),
+      ) + 1;
     if (attempt >= JOB_RETRY_CONFIG.maxAttempts) {
       // The retry ladder is out of rungs. This is a discard like any other, and
       // it used to claim replay would recover it — it does not (#5538).
@@ -2012,12 +2108,17 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       return;
     }
     const backoffMs = getBackoffMs(attempt);
+    // Advance BOTH carriers. The header rewrite reuses the body string byte for
+    // byte, so the content hash and the lease identity are untouched — a value
+    // whose machinery does not live in the header comes back unchanged, and the
+    // chain below is then the only thing keeping the ladder finite.
+    await this.recordGroupAttempt({ groupId, attempt });
     await this.scripts.retryRestage({
       groupId,
       stagedJobId,
-      newStagedJobId: `${stagedJobId}/r/${attempt}`,
+      newStagedJobId: stagedJobId,
       dispatchAfterMs: Date.now() + backoffMs,
-      jobDataJson,
+      jobDataJson: withJobAttempt({ value: jobDataJson, attempt }),
       backoffMs,
     });
     this.logger.warn(
@@ -2043,9 +2144,19 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
    */
   private generateStagedJobId(payload: Payload): string {
     const p = payload as Record<string, unknown>;
-    const baseId = (p.id as string) ?? crypto.randomUUID();
-    const jobType = p.__jobType as string | undefined;
-    const jobName = p.__jobName as string | undefined;
+    // Every field here is `unknown` — the payload is a caller's object, and this
+    // id becomes a Redis key. A cast would only silence the compiler: `??`
+    // catches null/undefined but not a number or an object, either of which
+    // would stringify into a malformed key (`[object Object]/subscriber/…`).
+    // So each part is CHECKED, and anything that is not a usable string is
+    // treated as absent.
+    //
+    // `p.id` is the event id this job was sent for. The fallback stands in for
+    // one, so it is a KSUID like every other id the platform mints — and being
+    // k-sortable it keeps the Redis key ordering the real ids already have.
+    const baseId = nonEmptyString(p.id) ?? generate(KSUID_RESOURCES.EVENT).toString();
+    const jobType = nonEmptyString(p.__jobType);
+    const jobName = nonEmptyString(p.__jobName);
     if (jobType && jobName) {
       return `${baseId}/${jobType}/${jobName}`;
     }

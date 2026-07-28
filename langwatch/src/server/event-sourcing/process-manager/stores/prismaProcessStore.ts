@@ -5,9 +5,11 @@ import {
   type ProcessManagerOutbox,
 } from "@prisma/client";
 
-import { nanoid } from "nanoid";
+import { generate } from "@langwatch/ksuid";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import type { JsonValue } from "../json";
 import type { ProcessRef } from "../processManager.types";
+import { deriveInboxKey } from "./inboxKey";
 import type {
   CommitResult,
   DueWake,
@@ -126,10 +128,10 @@ export class PrismaProcessStore implements ProcessStore {
           const duplicate = await tx.processManagerInbox.findUnique({
             where: {
               projectId: commit.ref.projectId,
-              processName_projectId_sourceEventId: {
+              processName_projectId_sourceEventKey: {
                 processName: commit.ref.processName,
                 projectId: commit.ref.projectId,
-                sourceEventId: commit.sourceEventId,
+                sourceEventKey: deriveInboxKey(commit.sourceEventId),
               },
             },
             select: { id: true },
@@ -167,7 +169,7 @@ export class PrismaProcessStore implements ProcessStore {
           const inserted = await tx.processManagerInstance.createMany({
             data: [
               {
-                id: nanoid(),
+                id: generate(KSUID_RESOURCES.PROCESS_MANAGER_INSTANCE).toString(),
                 ...refWhere(commit.ref),
                 ...instanceData,
               },
@@ -214,10 +216,11 @@ export class PrismaProcessStore implements ProcessStore {
           const inbox = await tx.processManagerInbox.createMany({
             data: [
               {
-                id: nanoid(),
+                id: generate(KSUID_RESOURCES.PROCESS_MANAGER_INBOX).toString(),
                 ...refWhere(commit.ref),
                 tenantId: commit.tenantId,
                 sourceEventId: commit.sourceEventId,
+                sourceEventKey: deriveInboxKey(commit.sourceEventId),
                 consumedAt: asDate(commit.now),
               },
             ],
@@ -234,7 +237,7 @@ export class PrismaProcessStore implements ProcessStore {
           const inserted = await tx.processManagerOutbox.createMany({
             data: [
               {
-                id: nanoid(),
+                id: generate(KSUID_RESOURCES.PROCESS_MANAGER_OUTBOX).toString(),
                 ...refWhere(commit.ref),
                 tenantId: commit.tenantId,
                 userId: message.userId ?? null,
@@ -296,7 +299,9 @@ export class PrismaProcessStore implements ProcessStore {
     if (params.processNames && params.processNames.length === 0) return [];
     const now = asDate(params.now);
     const leasedUntil = asDate(params.now + params.leaseDurationMs);
-    const leaseBatchToken = nanoid();
+    const leaseBatchToken = generate(
+      KSUID_RESOURCES.PROCESS_MANAGER_OUTBOX,
+    ).toString();
     const processNameFilter = params.processNames
       ? Prisma.sql`AND "processName" IN (${Prisma.join([...params.processNames])})`
       : Prisma.empty;

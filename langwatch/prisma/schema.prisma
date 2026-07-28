@@ -3130,15 +3130,23 @@ model ProcessManagerInstance {
 
 /// Idempotency marker for a source event consumed by a process definition.
 model ProcessManagerInbox {
-  id            String   @id @default(nanoid())
-  processName   String
-  projectId     String
-  processKey    String
-  tenantId      String
-  sourceEventId String
-  consumedAt    DateTime @db.Timestamptz(3)
+  id             String   @id @default(nanoid())
+  processName    String
+  projectId      String
+  processKey     String
+  tenantId       String
+  /// The raw source event id, kept UNINDEXED for diagnostics. A caller composes
+  /// this and its length is that domain's business, so it must never carry a
+  /// btree constraint — see `sourceEventKey`.
+  sourceEventId  String
+  /// The fixed-width digest of `sourceEventId` the uniqueness is enforced on,
+  /// derived by the store (`stores/inboxKey.ts`). Postgres cannot index a btree
+  /// row past ~2704 bytes; keying on a digest makes the constraint the same
+  /// width no matter what any pipeline concatenates into an idempotency key.
+  sourceEventKey String
+  consumedAt     DateTime @db.Timestamptz(3)
 
-  @@unique([processName, projectId, sourceEventId])
+  @@unique([processName, projectId, sourceEventKey])
   @@index([processName, projectId, processKey, consumedAt])
 }
 

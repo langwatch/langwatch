@@ -1420,15 +1420,22 @@ refreshGroupKeyTtl(groupJobsKey, groupDataKey, nowMs)
 local readyKey = keyPrefix .. "ready"
 addToReadyOrParked(readyKey, groupId, dispatchAfterMs, false)
 
--- 4. Rotate the active key to the NEW staged-job id with a TTL matching the
---    backoff period. While the key exists the group is locked (preserves FIFO
+-- 4. Set the active key to the staged-job id with a TTL matching the backoff
+--    period. While the key exists the group is locked (preserves FIFO
 --    ordering); when it expires the dispatcher picks up the retry on its next
---    poll. Rotating the VALUE (not just EXPIRE-ing the old one) invalidates
---    the retired job id: the worker's activeKey heartbeat interval is still
---    armed for a few awaits after this eval returns (blob transfer, audit
---    write), and a late REFRESH matching the old id would reset this TTL to
---    the full activeTtlSec and push the ready score out with it — delaying
---    the retry by up to activeTtlSec instead of the backoff.
+--    poll.
+--
+--    THIS TTL IS WHAT MAKES THE BACKOFF REAL, and nothing here defends it.
+--    A REFRESH from the worker's heartbeat would reset it to the full
+--    activeTtlSec and push the ready score out with it, delaying the retry by
+--    up to activeTtlSec instead of the backoff. This used to be prevented
+--    here: the re-stage rotated the active key to a NEW id, so a late beat
+--    naming the retired id no longer matched. Since ADR-076 the id is reused,
+--    so newStagedJobId equals stagedJobId and this write invalidates nothing.
+--    The ONLY protection is that the caller stops the heartbeat before issuing
+--    this script (stopHeartbeat() in groupQueue.ts, ordered ahead of
+--    retryRestage on the same connection). Do not move that call later on the
+--    assumption that this line still guards it.
 redis.call("SET", activeKey, newStagedJobId, "EX", retryTtlSec)
 
 -- 5. Bump this slot's expiry score in lockstep with the activeKey TTL so the
