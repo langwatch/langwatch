@@ -24,6 +24,7 @@ function rawSpanEvent({
   startMs = 1_000,
   endMs = 2_000,
   statusCode = 0,
+  resourceAttributes = {},
 }: {
   name: string;
   spanId: string;
@@ -32,6 +33,7 @@ function rawSpanEvent({
   endMs?: number;
   /** OTLP status: 0 UNSET, 1 OK, 2 ERROR. */
   statusCode?: number;
+  resourceAttributes?: Record<string, string>;
 }): TraceProcessingEvent {
   return {
     tenantId: createTenantId("tenant-1"),
@@ -56,7 +58,12 @@ function rawSpanEvent({
         events: [],
         links: [],
       },
-      resource: { attributes: [] },
+      resource: {
+        attributes: Object.entries(resourceAttributes).map(([key, value]) => ({
+          key,
+          value: { stringValue: value },
+        })),
+      },
       instrumentationScope: { name: "com.anthropic.claude_code.tracing" },
     },
   } as unknown as TraceProcessingEvent;
@@ -155,6 +162,29 @@ describe("codingAgentSpanFactsDispatch", () => {
       );
 
       expect(dispatched).toHaveLength(0);
+    });
+  });
+
+  describe("when a Cowork session's span arrives (beta trace export)", () => {
+    /** @scenario Cowork telemetry that shares Claude Code's event vocabulary is still Cowork */
+    it("labels the contribution claude_cowork from the resource service", async () => {
+      const { subscriber, dispatched } = makeSubscriber();
+
+      // Claude Code's span name and scope; only resource service.name says
+      // cowork. The label must follow the service, not the runtime.
+      await subscriber.handle(
+        rawSpanEvent({
+          name: "claude_code.llm_request",
+          spanId: "s-cw",
+          attributes: { "gen_ai.conversation.id": "cw-sess-1" },
+          resourceAttributes: { "service.name": "cowork" },
+        }),
+        context,
+      );
+
+      expect(dispatched).toHaveLength(1);
+      expect(dispatched[0]!.agent).toBe("claude_cowork");
+      expect(dispatched[0]!.sessionId).toBe("cw-sess-1");
     });
   });
 });
