@@ -326,15 +326,38 @@ EXEMPT_WORKLOADS=(
   "charts/langyagent/templates/deployment.yaml:langyagent.chartManaged"
 )
 
-# Assert one workload template carries the full hardened posture.
+# Assert one workload template carries the full hardened posture on EVERY
+# container it renders, not merely somewhere in the document. Extra helm flags
+# may follow the template path (some workloads only render when a feature is on).
 assert_workload_hardened() {
-  local tpl="$1" out
-  out=$(tmpl_only "$tpl" --set autogen.enabled=true) || {
+  local tpl="$1"; shift
+  local out
+  out=$(tmpl_only "$tpl" "$@") || {
     fail "hardening: could not render $tpl"; return
   }
 
-  assert_contains "hardening[$tpl]: read-only root"        "$out" "readOnlyRootFilesystem: true"
-  assert_contains "hardening[$tpl]: privilege esc off"     "$out" "allowPrivilegeEscalation: false"
+  # One `image:` line per container, so this is the container count and the
+  # per-field counts below scale with it automatically as containers are added.
+  local containers ro ape
+  containers=$(count_matches "$out" "^[[:space:]]*image:")
+  if (( containers == 0 )); then
+    fail "hardening[$tpl]: rendered no containers"; return
+  fi
+
+  ro=$(count_matches "$out" "readOnlyRootFilesystem: true")
+  if (( ro == containers )); then
+    pass "hardening[$tpl]: read-only root on all $containers container(s)"
+  else
+    fail "hardening[$tpl]: read-only root on $ro of $containers container(s)"
+  fi
+
+  ape=$(count_matches "$out" "allowPrivilegeEscalation: false")
+  if (( ape == containers )); then
+    pass "hardening[$tpl]: privilege escalation off on all $containers container(s)"
+  else
+    fail "hardening[$tpl]: privilege escalation off on $ape of $containers container(s)"
+  fi
+
   assert_contains "hardening[$tpl]: RuntimeDefault seccomp" "$out" "type: RuntimeDefault"
   assert_contains "hardening[$tpl]: SA token not mounted"  "$out" "automountServiceAccountToken: false"
   assert_not_contains "hardening[$tpl]: not writable-root" "$out" "readOnlyRootFilesystem: false"
@@ -349,17 +372,16 @@ assert_workload_hardened() {
   fi
 
   # runAsNonRoot must appear at BOTH pod and container level: Kubernetes
-  # inherits the pod-level value, but some Gatekeeper flavours of
-  # k8sreadonlyrootfilesystem read the container-level field directly and deny
-  # pods that only carry it on the pod. Regression guard for the customer
-  # report where pod-level alone tripped their constraint — so this asserts
-  # TWO occurrences, which a pod-level-only regression cannot satisfy.
+  # inherits the pod-level value, but some Gatekeeper constraints read the
+  # container-level field directly and deny pods that only carry it on the pod.
+  # Expect one per container plus at least one pod-level declaration, so a
+  # pod-level-only regression cannot satisfy it.
   local nr
   nr=$(count_matches "$out" "runAsNonRoot: true")
-  if (( nr >= 2 )); then
-    pass "hardening[$tpl]: runAsNonRoot at pod + container level"
+  if (( nr >= containers + 1 )); then
+    pass "hardening[$tpl]: runAsNonRoot at pod + all $containers container(s)"
   else
-    fail "hardening[$tpl]: expected runAsNonRoot at pod AND container level, found $nr occurrence(s)"
+    fail "hardening[$tpl]: expected >= $((containers + 1)) runAsNonRoot (pod + each container), found $nr"
   fi
 }
 
@@ -368,8 +390,36 @@ test_pod_security() {
 
   local tpl
   for tpl in "${HARDENED_WORKLOADS[@]}"; do
-    assert_workload_hardened "$tpl"
+    assert_workload_hardened "$tpl" --set autogen.enabled=true
   done
+
+  # Keeper and the backup/restore Jobs render only when replication and backup
+  # are switched on, so the default pass above never sees them — they were
+  # hardened with nothing asserting it, and the ClickHouse live e2e only checks
+  # that the CronJob objects exist, never that a Job runs. Cover them here.
+  local ch_full_flags=(--set autogen.enabled=true
+                       --set clickhouse.replicas=3
+                       --set clickhouse.backup.enabled=true
+                       --set clickhouse.objectStorage.bucket=test
+                       --set clickhouse.objectStorage.region=us-east-1)
+  for tpl in "charts/clickhouse/templates/keeper-statefulset.yaml" \
+             "charts/clickhouse/templates/backup-cronjobs.yaml"; do
+    assert_workload_hardened "$tpl" "${ch_full_flags[@]}"
+  done
+
+  # The backup Jobs talk to S3, so they must carry the chart's ServiceAccount
+  # rather than falling through to the namespace default, which would miss an
+  # IRSA annotation set on the chart SA.
+  local backup_out
+  backup_out=$(tmpl_only "charts/clickhouse/templates/backup-cronjobs.yaml" "${ch_full_flags[@]}")
+  assert_contains "hardening: backup Jobs use the chart ServiceAccount" "$backup_out" "serviceAccountName:"
+
+  # Scratch volumes are bounded so a pod in an error loop is evicted on its own
+  # quota instead of filling the node's ephemeral storage.
+  local ch_sts
+  ch_sts=$(tmpl_only "charts/clickhouse/templates/statefulset.yaml" "${ch_full_flags[@]}")
+  assert_contains "hardening: clickhouse scratch volumes are bounded" "$ch_sts" "sizeLimit:"
+  assert_contains "hardening: backup Job scratch is bounded" "$backup_out" "sizeLimit:"
 
   local def
   def=$(tmpl --set autogen.enabled=true)
