@@ -72,34 +72,34 @@ Feature: Workflow agent surfaces End-node misconfiguration instead of an empty r
     And the response error message says the End node has no wired inputs
 
   # ============================================================================
-  # AC #1 (defence in depth) — finalize never reports an empty success
+  # AC #1 (defence in depth) — a run never reports an empty success
   # ============================================================================
 
   @unit
-  Scenario: A full run that reaches finalize with no End node errors instead of succeeding
-    Given a full run whose state has no End node
-    When the run is finalized
+  Scenario: A full run that gets past the checks with no End node still errors
+    Given a full run of a workflow with no End node
+    When the run completes
     Then the result carries an error status
     And the error says the workflow has no End node
 
   @unit
   Scenario: A full run whose End node produced no output errors instead of succeeding
-    Given a full run whose End node was never executed
-    When the run is finalized
+    Given a full run whose End node never executed
+    When the run completes
     Then the result carries an error status
     And the error says the run never reached its End node
 
   @unit
   Scenario: A full run takes its result from an End node that did produce output
     Given a full run with two End nodes where only the second one executed
-    When the run is finalized
+    When the run completes
     Then the result carries a success status
     And the result is the output of the End node that executed
 
   @unit
-  Scenario: A partial run with no End node still finalizes as a success
-    Given a partial run whose state has no End node
-    When the run is finalized
+  Scenario: A partial run with no End node still succeeds
+    Given a partial run of a workflow with no End node
+    When the run completes
     Then the result carries a success status
 
   # A deliberate behaviour change, called out under Deployment Impact on the PR.
@@ -205,10 +205,26 @@ Feature: Workflow agent surfaces End-node misconfiguration instead of an empty r
   #   Scenario "A run-until-here plan may legitimately stop before the End node"
   #   Scenario "A single-component run may legitimately have no End node"
   #   Scenario "A single-component run is not rejected for an unwired End node"
-  #   Scenario "A partial run with no End node still finalizes as a success"
+  #   Scenario "A partial run with no End node still succeeds"
   #   Scenario "A full run takes its result from an End node that did produce output"
-  # Issue #3198 AC #3: "END node produces no output for the configured
-  #   scenarioOutputField returns the existing field-not-found message" → already
-  #   implemented and covered by the pre-existing
-  #   workflow-agent.adapter.unit.test.ts "scenario output field" tests; no new
-  #   scenario added here.
+  #   Scenario "A run whose condition reaches its End node still succeeds"
+  # BEHAVIOUR CHANGE, not an AC — a full run whose only End node is skipped at
+  #   run time by an untaken branch previously returned an empty success and now
+  #   errors. Deliberate (an empty result IS the reported bug on this surface),
+  #   flagged under Deployment Impact on the PR, and pinned so it stops being an
+  #   unstated side effect →
+  #   Scenario "A full run whose only End node is skipped by an untaken branch errors"
+  # NOT one of #3198's ACs — surfacing engine errors is what makes an unredacted
+  #   code-node traceback customer-visible, so the redaction has to land in the
+  #   same change or this fix opens a secret-exfiltration path →
+  #   Scenario "A code node that raises with a secret in the message does not leak it"
+  #   Scenario "An if/else condition node that raises with a secret does not leak it"
+  # Issue #3198 AC #3: "a workflow that runs to completion but where the END node
+  #   produces no output for the configured scenarioOutputField returns a 400 with
+  #   the existing 'field not found' message rather than a 500" → the BEHAVIOUR is
+  #   already implemented and covered by the pre-existing
+  #   workflow-agent.adapter.unit.test.ts "scenario output field" tests, which
+  #   assert `Scenario output field "X" not found in agent output. Available
+  #   fields: ...`. It THROWS rather than returning a 400 — the same status-code
+  #   deviation as AC #1, for the same reason, recorded here rather than left
+  #   silent. No new scenario added.

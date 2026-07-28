@@ -16,7 +16,7 @@ import (
 // (e.g. a future entrypoint that skips the planner), finalize must return
 // an explicit missing_end_node error rather than a silent empty success.
 //
-// @scenario "A full run that reaches finalize with no End node errors instead of succeeding"
+// @scenario "A full run that gets past the checks with no End node still errors"
 func TestFinalize_RequireEndWithNoEndNodeErrors(t *testing.T) {
 	w := &dsl.Workflow{
 		Nodes: []dsl.Node{
@@ -39,7 +39,7 @@ func TestFinalize_RequireEndWithNoEndNodeErrors(t *testing.T) {
 // partial run (requireEnd=false, e.g. execute_component / run-until-here)
 // with no End node must finalize as success, not the missing_end_node error.
 //
-// @scenario "A partial run with no End node still finalizes as a success"
+// @scenario "A partial run with no End node still succeeds"
 func TestFinalize_RequireEndFalseAllowsNoEndNode(t *testing.T) {
 	w := &dsl.Workflow{Nodes: []dsl.Node{{ID: "code", Type: dsl.ComponentCode}}}
 	state := newRunState(w)
