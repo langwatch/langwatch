@@ -51,9 +51,17 @@ ENVIRONMENT
 
     These describe ONE run rather than one machine, so they are read from the
     process environment only: LANGWATCH_SLUG, HAVEN_BASELINE, LANGWATCH_SEED,
-    HAVEN_SEED_TRACES, HAVEN_STUB, HAVEN_AGENT, NO_COLOR, FORCE_COLOR. Every
-    worktree shares one .env, so pinning a slug or a baseline marker there would
-    apply it to all of them, and a seed flag would re-seed on every up.
+    HAVEN_SEED_TRACES, HAVEN_STUB, HAVEN_AGENT, NO_COLOR, FORCE_COLOR,
+    HAVEN_TRUSTED_REPO_ROOT, HAVEN_UNTRUSTED_CHECKOUT. Every worktree shares one
+    .env, so pinning a slug or a baseline marker there would apply it to all of
+    them, and a seed flag would re-seed on every up.
+
+    The last two are set by haven for its own children and are deliberately NOT
+    read from .env: they carry a trust decision into a process whose cwd is an
+    unreviewed PR checkout, and that checkout has a .env of its own.
+    HAVEN_TRUSTED_REPO_ROOT names the checkout haven reads its own source from
+    when it re-invokes itself; HAVEN_UNTRUSTED_CHECKOUT=1 tells up to install
+    without lifecycle scripts.
 
     LANGWATCH_SLUG=<slug>        Pin this worktree's slug (else the sanitised
                                  worktree directory name, cached).

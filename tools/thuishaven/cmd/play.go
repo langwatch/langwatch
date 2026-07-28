@@ -174,11 +174,14 @@ func startPlayLaunch(number int, checkout, slug string) (playChild, error) {
 	if err := os.MkdirAll(filepath.Dir(logPath), 0o755); err != nil {
 		return playChild{}, err
 	}
-	argv := selfArgv(checkout, "play-launch")
+	// haven's own source comes from the trusted checkout, never from `checkout`:
+	// that is the PR's tree, and it contains a cmd/haven of its own.
+	root := trustedRepoRoot()
+	argv := selfArgv(root, "play-launch")
 	argv = append(argv, strconv.Itoa(number))
 	cmd := exec.Command(argv[0], argv[1:]...)
 	cmd.Dir = checkout
-	cmd.Env = os.Environ()
+	cmd.Env = childEnvWithTrustedRoot(root)
 	// Owner-only: the combined log captures seed output (admin password, tokens).
 	f, ferr := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
 	if ferr != nil {

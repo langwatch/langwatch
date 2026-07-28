@@ -150,7 +150,7 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 		IdleTTL:                  envDuration("HAVEN_IDLE_TTL", 4*time.Hour),
 		DBIdleTTL:                envDuration("HAVEN_DB_TTL", 14*24*time.Hour),
 		HeartbeatEvery:           30 * time.Second,
-		DaemonArgv:               selfArgv(worktree, "daemon"),
+		DaemonArgv:               selfArgv(trustedRepoRoot(), "daemon"),
 		IsAgent:                  isAgent,
 		ShouldManageClickHouse:   devEnv("LANGWATCH_HAVEN_CH") != "0",
 		ShouldStopClickHouseIdle: devEnv("LANGWATCH_HAVEN_CH_STOP_IDLE") == "1",
@@ -172,7 +172,7 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 			GroupRSS:     sys.GroupRSS,
 			TotalMemory:  sys.TotalMemory,
 		}),
-		params:   app.UpParams{WorktreeDir: worktree, LwDir: lwDir, Branch: gitBranch(worktree), ExplicitSlug: os.Getenv("LANGWATCH_SLUG"), IsBaseline: os.Getenv("HAVEN_BASELINE") == "1", IsLinkedWorktree: gitIsLinkedWorktree(worktree)},
+		params:   app.UpParams{WorktreeDir: worktree, LwDir: lwDir, Branch: gitBranch(worktree), ExplicitSlug: os.Getenv("LANGWATCH_SLUG"), IsBaseline: os.Getenv("HAVEN_BASELINE") == "1", IsLinkedWorktree: gitIsLinkedWorktree(worktree), UntrustedCheckout: os.Getenv("HAVEN_UNTRUSTED_CHECKOUT") == "1"},
 		opts:     optionsFromEnv(worktree),
 		worktree: worktree,
 		lwDir:    lwDir,
@@ -296,13 +296,55 @@ func havenHome() string {
 }
 
 // selfArgv builds how to re-invoke haven for the daemon: the installed/built
-// binary directly, or `go run ./cmd/haven` under the ephemeral `go run` binary.
+// binary directly, or `go run <repoRoot>/cmd/haven` under the ephemeral `go run`
+// binary.
+//
+// repoRoot must be the TRUSTED checkout haven's own source is read from, never
+// the directory the child will run in. `haven play` and `haven pr` deliberately
+// set a child's cwd to an unreviewed PR checkout, and a relative "./cmd/haven"
+// resolves against that cwd — which would compile and run the PR's own copy of
+// the orchestrator, with the docker socket, the overlay writer and teardown, and
+// before any install-time guard could matter.
 func selfArgv(repoRoot, subcommand string) []string {
 	exe, err := os.Executable()
 	if err == nil && !strings.Contains(exe, "go-build") && !strings.HasPrefix(exe, os.TempDir()) {
 		return []string{exe, subcommand}
 	}
-	return []string{"go", "run", "./cmd/haven", subcommand}
+	return []string{"go", "run", goRunPackage(repoRoot), subcommand}
+}
+
+// goRunPackage resolves haven's own package against the trusted repo root. It
+// must never return a relative path when a root is known: `go run` resolves a
+// relative package against the child's working directory, and both `haven play`
+// and `haven pr` set that to an unreviewed PR checkout containing its own
+// cmd/haven.
+func goRunPackage(repoRoot string) string {
+	if repoRoot == "" {
+		return "./cmd/haven"
+	}
+	return filepath.Join(repoRoot, "cmd", "haven")
+}
+
+// trustedRepoRoot answers "whose haven source may this process re-invoke".
+//
+// It is not derived from cwd on a re-invoked process: `haven play` and `haven pr`
+// point a child's cwd at an unreviewed PR checkout, so cwd there is exactly the
+// thing that must not be trusted. The parent hands the root down explicitly
+// through the process environment (never through .env — that file lives in the
+// checkout being sandboxed); only a first invocation falls back to cwd.
+func trustedRepoRoot() string {
+	if v := os.Getenv("HAVEN_TRUSTED_REPO_ROOT"); v != "" {
+		return v
+	}
+	cwd, _ := os.Getwd()
+	return gitTopLevel(cwd)
+}
+
+// childEnvWithTrustedRoot is the environment for a haven child that will run with
+// its cwd inside an untrusted checkout, carrying the trusted root forward so the
+// child (and the daemon it may spawn) keeps resolving haven's source from it.
+func childEnvWithTrustedRoot(repoRoot string) []string {
+	return append(os.Environ(), "HAVEN_TRUSTED_REPO_ROOT="+repoRoot)
 }
 
 func gitTopLevel(dir string) string {
@@ -348,10 +390,18 @@ func gitIsLinkedWorktree(dir string) bool {
 // whole provision/supervise pipeline runs there (haven derives everything from
 // cwd). Foreground: it blocks supervising the stack until the user stops it,
 // inheriting stdio so the stack banner + logs stream through.
-func runHavenUpIn(ctx context.Context, dir string) error {
-	argv := selfArgv(dir, "up")
+func runHavenUpIn(ctx context.Context, dir string, untrustedCheckout bool) error {
+	// dir is a PR worktree, which for a fork PR is unreviewed code: haven's own
+	// source must still come from the trusted checkout, and the child must carry
+	// that root forward rather than re-deriving it from its cwd.
+	root := trustedRepoRoot()
+	argv := selfArgv(root, "up")
 	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
 	cmd.Dir = dir
+	cmd.Env = childEnvWithTrustedRoot(root)
+	if untrustedCheckout {
+		cmd.Env = append(cmd.Env, "HAVEN_UNTRUSTED_CHECKOUT=1")
+	}
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
@@ -450,7 +500,8 @@ func startDetachedUp(d deps, rest []string) (detachedStack, error) {
 	if err := os.MkdirAll(filepath.Dir(logPath), 0o755); err != nil {
 		return detachedStack{}, err
 	}
-	argv := selfArgv(d.worktree, "up")
+	root := trustedRepoRoot()
+	argv := selfArgv(root, "up")
 	for _, a := range rest {
 		if a != "-d" && a != "--detach" {
 			argv = append(argv, a)
@@ -458,7 +509,7 @@ func startDetachedUp(d deps, rest []string) (detachedStack, error) {
 	}
 	cmd := exec.Command(argv[0], argv[1:]...)
 	cmd.Dir = d.worktree
-	cmd.Env = os.Environ()
+	cmd.Env = childEnvWithTrustedRoot(root)
 	// Owner-only: the detached log captures seed output, which includes the
 	// admin password and access tokens.
 	f, ferr := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)

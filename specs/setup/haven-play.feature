@@ -91,6 +91,33 @@ Feature: haven play, a throwaway PR sandbox
     Then it passes --ignore-scripts
     And codegen still runs explicitly afterwards
 
+  # This repo copies the developer's own .env files into every new worktree, so a
+  # sandbox that took the default would run unreviewed code with their live
+  # provider keys and auth secrets — the one thing the banner promises it does not
+  # do. The sandbox supplies its own connection settings and needs nothing else.
+  @unit
+  Scenario: The sandbox never inherits the developer's env files
+    Given the developer's checkout holds .env files with real credentials
+    When a play sandbox's checkout is created
+    Then the repo's checkout hooks do not run for it
+    And no .env file the developer owns is left in the sandbox
+    And the repo's own tracked example env files are untouched
+
+  @unit
+  Scenario: A working PR checkout still gets the env files it has always had
+    Given the developer runs "haven pr" rather than "haven play"
+    When the worktree is created
+    Then the repo's checkout hooks run as normal
+
+  # `go run ./cmd/haven` resolves against the child's working directory, and the
+  # sandbox sets that to the PR's own tree, which contains a cmd/haven of its own.
+  @unit
+  Scenario: The sandbox launcher runs haven's own code, never the PR's
+    Given haven is running from source rather than an installed binary
+    When it backgrounds the sandbox launcher
+    Then it runs haven built from the developer's own checkout
+    And the child is told which checkout that is, so anything it spawns agrees
+
   @unit
   Scenario: Agent mode never prompts about trust
     Given an untrusted author on the PR

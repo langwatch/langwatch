@@ -803,10 +803,60 @@ func EnsurePlayCheckout(ctx context.Context, repoRoot string, number int, checko
 		fmt.Printf("↺ reusing play checkout %s: refreshing to PR head\n", checkout)
 		// The sandbox is ephemeral by contract, so local edits are discarded, not
 		// stashed - nothing in a play checkout is ever the developer's own work.
-		return refreshPRWorktree(ctx, checkout, number, true)
+		if err := refreshPRWorktree(ctx, checkout, number, true); err != nil {
+			return err
+		}
+		return StripInheritedEnvFiles(checkout)
 	}
 	fmt.Printf("→ PR #%d → %s\n", number, checkout)
-	return ensurePRWorktree(ctx, repoRoot, number, PlayBranch(number), checkout)
+	if err := ensurePRWorktree(ctx, repoRoot, number, PlayBranch(number), checkout, false); err != nil {
+		return err
+	}
+	// Belt and braces over disabling the hook: the sweep also covers a refresh, a
+	// checkout left behind by an older haven, and any future hook that copies
+	// secrets in by another route.
+	return StripInheritedEnvFiles(checkout)
+}
+
+// playEnvDirs mirrors the directories .githooks/post-checkout copies .env files
+// into, plus the repo root.
+var playEnvDirs = []string{".", "langwatch", "langwatch_nlp", "langevals", "python-sdk", "typescript-sdk", "mcp-server"}
+
+// StripInheritedEnvFiles removes every untracked .env* file from a play checkout.
+//
+// A sandbox runs code nobody has reviewed. The developer's .env files carry live
+// provider keys, Stripe and auth secrets, and shared-dev connection strings that
+// the stack's own overlay never supplies, so inheriting them would hand all of it
+// to the PR — while the sandbox banner promises nothing is shared. Tracked files
+// (.env.example and friends) are part of the tree and stay.
+func StripInheritedEnvFiles(checkout string) error {
+	for _, dir := range playEnvDirs {
+		matches, err := filepath.Glob(filepath.Join(checkout, dir, ".env*"))
+		if err != nil {
+			return fmt.Errorf("scanning %s for inherited env files: %w", dir, err)
+		}
+		for _, path := range matches {
+			info, statErr := os.Stat(path)
+			if statErr != nil || info.IsDir() {
+				continue
+			}
+			rel, relErr := filepath.Rel(checkout, path)
+			if relErr != nil || gitTracksFile(checkout, rel) {
+				continue
+			}
+			if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+				return fmt.Errorf("removing inherited %s from the play sandbox: %w", rel, err)
+			}
+		}
+	}
+	return nil
+}
+
+// gitTracksFile reports whether the checkout tracks this path. Untracked .env
+// files are the developer's own; tracked ones are the repo's.
+func gitTracksFile(checkout, rel string) bool {
+	cmd := exec.Command("git", "-C", checkout, "ls-files", "--error-unmatch", rel)
+	return cmd.Run() == nil
 }
 
 // PlayDisclosure is the upfront data-loss disclosure `haven play` prints
@@ -816,7 +866,8 @@ func PlayDisclosure(number int) string {
 		"haven play pr-%d: an EPHEMERAL sandbox.\n"+
 			"  Everything it creates is destroyed when you quit the view (q) or the process exits:\n"+
 			"  databases and their volumes, containers, the checkout, and the hostname.\n"+
-			"  Nothing is shared with your worktrees; nothing survives.\n",
+			"  It gets its own databases and hostnames, and none of your .env files.\n"+
+			"  It still runs the PR's code on this machine, as you.\n",
 		number)
 }
 

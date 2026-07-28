@@ -45,6 +45,11 @@ type UpParams struct {
 	ExplicitSlug     string // from LANGWATCH_SLUG; wins over the derived/cached slug
 	IsBaseline       bool   // this stack is the shared default others fall back to
 	IsLinkedWorktree bool   // a `git worktree add` checkout, not the primary clone
+	// UntrustedCheckout marks a checkout whose package.json is not this repo's
+	// own — a fork PR under `haven pr`. It suppresses install lifecycle scripts,
+	// which would otherwise run fork-authored code with the developer's
+	// environment before a single service starts.
+	UntrustedCheckout bool
 }
 
 // resolveSlug applies the precedence: explicit > cache > derived (then cached).
@@ -250,10 +255,12 @@ func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) err
 	endRegistration()
 	fmt.Printf("  %s\n\n", opts.Selection.Describe())
 
-	// Stale dependencies install themselves before anything needs them. This is
-	// the developer's own worktree, so lifecycle scripts (the repo's postinstall)
-	// run as normal; only untrusted checkouts suppress them.
-	if err := o.ensureDeps(ctx, p.LwDir, true); err != nil {
+	// Stale dependencies install themselves before anything needs them. Lifecycle
+	// scripts (the repo's postinstall) run for the developer's own worktree and
+	// are suppressed for an untrusted one — `haven pr` sanitises the fork install
+	// it runs itself, and reaches this path immediately afterwards, so the two
+	// have to agree or the guard is void.
+	if err := o.ensureDeps(ctx, p.LwDir, !p.UntrustedCheckout); err != nil {
 		return err
 	}
 	// DOTENV_CONFIG_QUIET drops dotenv v17's promo line for any one-shot script
