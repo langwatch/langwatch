@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  allKindIntents,
   kindIntentForQuery,
   SURFACE_PATH_FOR_KIND,
 } from "../logic/langyContextKindIntent";
@@ -94,15 +95,16 @@ describe("kindIntentForQuery", () => {
 
 describe("SURFACE_PATH_FOR_KIND", () => {
   describe("when a browse intent needs a destination", () => {
-    it("maps every revealable kind to a project surface", () => {
-      expect(SURFACE_PATH_FOR_KIND).toEqual({
-        trace: "traces",
-        dataset: "datasets",
-        prompt: "prompts",
-        evaluation: "evaluations",
-        scenario: "simulations",
-        experiment: "evaluations",
-      });
+    it("sends every kind the palette can offer somewhere real", () => {
+      // The property that matters, not the literal table: a "browse X" row the
+      // user can pick must have somewhere to go. Every kind in the vocabulary
+      // (which is what the palette offers from) needs a destination, and a
+      // destination has to be a single URL segment — `/<project>/<surface>`.
+      for (const intent of allKindIntents(new Set())) {
+        const surface = SURFACE_PATH_FOR_KIND[intent.kind];
+        expect(surface).toBeTruthy();
+        expect(surface).not.toContain("/");
+      }
     });
   });
 });

@@ -86,7 +86,7 @@ export default function SettingsLayout({
   children,
   isSubscription,
 }: PropsWithChildren<{ isSubscription?: boolean }>) {
-  const { project, hasPermission } = useOrganizationTeamProject({
+  const { hasPermission } = useOrganizationTeamProject({
     redirectToOnboarding: false,
   });
   const publicEnv = usePublicEnv();
@@ -241,6 +241,9 @@ export default function SettingsLayout({
               <MenuLink href="/ops/foundry" includePath="/ops/foundry">
                 The Foundry
               </MenuLink>
+              <MenuLink href="/ops/blobs" includePath="/ops/blobs">
+                Payload store
+              </MenuLink>
               <MenuLink href="/ops/dejaview" includePath="/ops/dejaview">
                 Deja View
               </MenuLink>
@@ -278,6 +281,12 @@ export default function SettingsLayout({
                 includePath="/ops/backoffice/subscriptions"
               >
                 Subscriptions
+              </MenuLink>
+              <MenuLink
+                href="/ops/backoffice/bug-reports"
+                includePath="/ops/backoffice/bug-reports"
+              >
+                Bug Reports
               </MenuLink>
             </NavSection>
           )}

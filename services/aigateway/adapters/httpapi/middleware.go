@@ -8,8 +8,8 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/langwatch/langwatch/pkg/clog"
+	"github.com/langwatch/langwatch/pkg/customertracebridge"
 	"github.com/langwatch/langwatch/pkg/herr"
-	"github.com/langwatch/langwatch/services/aigateway/adapters/customertracebridge"
 	"github.com/langwatch/langwatch/services/aigateway/app"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
@@ -110,6 +110,19 @@ func CustomerTraceMiddleware() func(http.Handler) http.Handler {
 			ctx = customertracebridge.WithClientSessionID(ctx, clientSessionIDFromHeaders(r.Header))
 
 			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
+}
+
+// DispatchMetaMiddleware seeds the request context with the accumulator the
+// dispatch pipeline writes response metadata into. The non-streaming path
+// commits the response header block as soon as its first keep-alive byte goes
+// out, which happens while dispatch is still running, so it has to be able to
+// read the metadata accumulated so far rather than waiting for the result.
+func DispatchMetaMiddleware() func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			next.ServeHTTP(w, r.WithContext(app.NewDispatchMetaContext(r.Context())))
 		})
 	}
 }

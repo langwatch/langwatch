@@ -195,4 +195,76 @@ describe("better-auth config", () => {
       expect(google.clientSecret).toBe("google-client-secret");
     });
   });
+
+  describe("SSO precedence — re-login must not overwrite an uploaded avatar", () => {
+    // A user-uploaded avatar (User.image) must survive later SSO sign-ins.
+    // better-auth's `mapProfileToUser` runs only on user *create*; it overwrites
+    // profile fields on subsequent sign-ins ONLY if a provider opts in (e.g.
+    // `overrideUserInfoOnSignIn: true`). Lock that no provider ever does — the
+    // check is name-agnostic so any future override/update-user-info flag set to
+    // `true` trips it. Spec: specs/settings/user-avatar.feature
+    const overrideFlags = (config: unknown): string[] =>
+      Object.entries(config as Record<string, unknown>)
+        .filter(([k, v]) => /override|updateuserinfo/i.test(k) && v === true)
+        .map(([k]) => k);
+
+    const noSocialEnv = {
+      GOOGLE_CLIENT_ID: undefined,
+      GOOGLE_CLIENT_SECRET: undefined,
+      GITHUB_CLIENT_ID: undefined,
+      GITHUB_CLIENT_SECRET: undefined,
+      GITLAB_CLIENT_ID: undefined,
+      GITLAB_CLIENT_SECRET: undefined,
+      AZURE_AD_CLIENT_ID: undefined,
+      AZURE_AD_CLIENT_SECRET: undefined,
+      AZURE_AD_TENANT_ID: undefined,
+    };
+
+    it.each([
+      ["google", "google", { GOOGLE_CLIENT_ID: "id", GOOGLE_CLIENT_SECRET: "secret" }],
+      ["github", "github", { GITHUB_CLIENT_ID: "id", GITHUB_CLIENT_SECRET: "secret" }],
+      ["gitlab", "gitlab", { GITLAB_CLIENT_ID: "id", GITLAB_CLIENT_SECRET: "secret" }],
+      [
+        "microsoft",
+        "azure-ad",
+        {
+          AZURE_AD_CLIENT_ID: "id",
+          AZURE_AD_CLIENT_SECRET: "secret",
+          AZURE_AD_TENANT_ID: "tenant",
+        },
+      ],
+    ])("social provider %s never overwrites profile info on sign-in", async (
+      _label,
+      provider,
+      creds,
+    ) => {
+      const { buildSocialProviders } = await import("../index");
+      const providers = buildSocialProviders({
+        ...noSocialEnv,
+        NEXTAUTH_PROVIDER: provider,
+        ...creds,
+      } as Parameters<typeof buildSocialProviders>[0]);
+      const built = Object.values(providers);
+      expect(built).toHaveLength(1);
+      expect(overrideFlags(built[0])).toEqual([]);
+    });
+
+    it("generic-oauth (auth0/okta) never overwrites profile info on sign-in", async () => {
+      const { buildGenericOAuthConfigs } = await import("../index");
+      const configs = buildGenericOAuthConfigs({
+        NEXTAUTH_PROVIDER: "auth0",
+        AUTH0_CLIENT_ID: "id",
+        AUTH0_CLIENT_SECRET: "secret",
+        AUTH0_ISSUER: "tenant.us.auth0.com",
+        OKTA_CLIENT_ID: undefined,
+        OKTA_CLIENT_SECRET: undefined,
+        OKTA_ISSUER: undefined,
+        NEXTAUTH_URL: "http://localhost:3000",
+      });
+      expect(configs.length).toBeGreaterThan(0);
+      for (const config of configs) {
+        expect(overrideFlags(config)).toEqual([]);
+      }
+    });
+  });
 });

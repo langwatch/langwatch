@@ -2,86 +2,79 @@ import { describe, expect, it, vi } from "vitest";
 import { hasLangyAccess } from "../langyAccessGate";
 
 describe("hasLangyAccess", () => {
-  it("lets verified LangWatch staff bypass the rollout flag", async () => {
-    const isEnabled = vi.fn().mockResolvedValue(false);
+  describe("when the rollout flag is off", () => {
+    it("denies access", async () => {
+      const isEnabled = vi.fn().mockResolvedValue(false);
 
-    await expect(
-      hasLangyAccess({
-        user: {
-          id: "staff-1",
-          email: "aryan@langwatch.ai",
-          emailVerified: true,
-        },
-        flags: { isEnabled },
-      }),
-    ).resolves.toBe(true);
+      await expect(
+        hasLangyAccess({
+          user: { id: "customer-1" },
+          projectId: "project-1",
+          flags: { isEnabled },
+        }),
+      ).resolves.toBe(false);
 
-    expect(isEnabled).not.toHaveBeenCalled();
-  });
-
-  it("denies non-staff when the rollout flag is off", async () => {
-    const isEnabled = vi.fn().mockResolvedValue(false);
-
-    await expect(
-      hasLangyAccess({
-        user: { id: "customer-1", email: "user@example.com" },
+      expect(isEnabled).toHaveBeenCalledWith("release_langy_enabled", {
+        distinctId: "customer-1",
         projectId: "project-1",
-        flags: { isEnabled },
-      }),
-    ).resolves.toBe(false);
-
-    expect(isEnabled).toHaveBeenCalledWith("release_langy_enabled", {
-      distinctId: "customer-1",
-      projectId: "project-1",
+      });
     });
   });
 
-  it("allows an explicitly flagged non-staff user", async () => {
-    const isEnabled = vi.fn().mockResolvedValue(true);
+  describe("when the rollout flag is on", () => {
+    it("grants access", async () => {
+      const isEnabled = vi.fn().mockResolvedValue(true);
 
-    await expect(
-      hasLangyAccess({
-        user: { id: "customer-2", email: "user@example.com" },
+      await expect(
+        hasLangyAccess({
+          user: { id: "customer-2" },
+          organizationId: "org-1",
+          flags: { isEnabled },
+        }),
+      ).resolves.toBe(true);
+
+      expect(isEnabled).toHaveBeenCalledWith("release_langy_enabled", {
+        distinctId: "customer-2",
         organizationId: "org-1",
-        flags: { isEnabled },
-      }),
-    ).resolves.toBe(true);
-
-    expect(isEnabled).toHaveBeenCalledWith("release_langy_enabled", {
-      distinctId: "customer-2",
-      organizationId: "org-1",
+      });
     });
   });
 
-  it("does NOT treat an unverified @langwatch.ai email as staff", async () => {
-    const isEnabled = vi.fn().mockResolvedValue(false);
+  describe("given a verified @langwatch.ai address", () => {
+    // Langy access is flag-only: the staff bypass that used to short-circuit
+    // this gate was removed so the flag is a real kill switch rather than one
+    // with a hole in it. Pin that a LangWatch address still goes through the
+    // flag, so reintroducing an identity bypass fails here.
+    it("evaluates the flag instead of bypassing it", async () => {
+      const isEnabled = vi.fn().mockResolvedValue(false);
 
-    // No emailVerified — the very case self-hosted email signups land in, so it
-    // must fall through to the (off) rollout flag, not the staff bypass.
-    await expect(
-      hasLangyAccess({
-        user: { id: "impostor-1", email: "attacker@langwatch.ai" },
-        flags: { isEnabled },
-      }),
-    ).resolves.toBe(false);
+      await expect(
+        hasLangyAccess({
+          user: { id: "staff-1" },
+          flags: { isEnabled },
+        }),
+      ).resolves.toBe(false);
 
-    expect(isEnabled).toHaveBeenCalledOnce();
+      expect(isEnabled).toHaveBeenCalledOnce();
+    });
   });
 
-  it("evaluates the flag user-scoped when no project or org is given", async () => {
-    const isEnabled = vi.fn().mockResolvedValue(false);
+  describe("given neither a project nor an organization", () => {
+    it("evaluates the flag at user scope only", async () => {
+      const isEnabled = vi.fn().mockResolvedValue(false);
 
-    // The GitHub install route has neither a projectId nor an organizationId in
-    // hand, so the gate evaluates at user scope only.
-    await expect(
-      hasLangyAccess({
-        user: { id: "customer-3", email: "user@example.com" },
-        flags: { isEnabled },
-      }),
-    ).resolves.toBe(false);
+      // The GitHub install route has neither a projectId nor an organizationId
+      // in hand, so the gate evaluates at user scope only.
+      await expect(
+        hasLangyAccess({
+          user: { id: "customer-3" },
+          flags: { isEnabled },
+        }),
+      ).resolves.toBe(false);
 
-    expect(isEnabled).toHaveBeenCalledWith("release_langy_enabled", {
-      distinctId: "customer-3",
+      expect(isEnabled).toHaveBeenCalledWith("release_langy_enabled", {
+        distinctId: "customer-3",
+      });
     });
   });
 });

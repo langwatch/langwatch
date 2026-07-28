@@ -5,7 +5,7 @@ import { useRouter } from "~/utils/compat/next-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { KSUID_RESOURCES } from "../../utils/constants";
 import { type UseFormReturn, useWatch } from "react-hook-form";
-import { getComplexProps, setFlowCallbacks, useDrawer, useDrawerParams } from "../../hooks/useDrawer";
+import { clearFlowCallbacks, getComplexProps, setFlowCallbacks, useDrawer, useDrawerParams } from "../../hooks/useDrawer";
 import { AgentTypeSelectorDrawer } from "../agents/AgentTypeSelectorDrawer";
 import { checkCompoundLimits } from "../../hooks/useCompoundLicenseCheck";
 import { useLicenseEnforcement } from "../../hooks/useLicenseEnforcement";
@@ -492,7 +492,10 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
       {/* Agent Type Selector Drawer */}
       <AgentTypeSelectorDrawer
         open={agentTypeSelectorOpen}
-        onClose={() => setAgentTypeSelectorOpen(false)}
+        onClose={() => {
+          setAgentTypeSelectorOpen(false);
+          clearFlowCallbacks();
+        }}
       />
 
       {/* Prompt Creation Drawer */}

@@ -66,9 +66,7 @@ export function FlatTurnView({
     ROLE_ICONS[sourceRole] ??
     (turn.kind === "user" ? LuUser : LuBot);
   const label =
-    visuals.bubbleLabel ??
-    ROLE_LABELS[sourceRole] ??
-    sourceRole.toUpperCase();
+    visuals.bubbleLabel ?? ROLE_LABELS[sourceRole] ?? sourceRole.toUpperCase();
 
   return (
     <FlatBody

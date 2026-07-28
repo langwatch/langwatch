@@ -5,6 +5,7 @@ import {
   commandValidationError,
   reportCommandError,
 } from "../../utils/errorOutput";
+import type { CommandResult } from "../../utils/output";
 import { createDatasetService } from "./service-factory";
 import { handleDatasetCommandError } from "./error-handler";
 
@@ -14,14 +15,12 @@ import { handleDatasetCommandError } from "./error-handler";
 export const recordsDeleteCommand = async (
   slugOrId: string,
   recordIds: string[],
-  options?: { format?: string },
-): Promise<void> => {
+): Promise<CommandResult | void> => {
   checkApiKey();
 
   if (recordIds.length === 0) {
     reportCommandError({
       error: commandValidationError("At least one record ID is required."),
-      format: options?.format,
     });
     process.exit(1);
   }
@@ -38,9 +37,13 @@ export const recordsDeleteCommand = async (
       `Deleted ${result.deletedCount} record${result.deletedCount !== 1 ? "s" : ""} from "${chalk.cyan(slugOrId)}"`,
     );
 
-    if (options?.format === "json") {
-      console.log(JSON.stringify(result, null, 2));
-    }
+    return {
+      data: result,
+      table: () => {
+        // Nothing further to print: the spinner line above was the whole
+        // human output before the migration, and stays so.
+      },
+    };
   } catch (error) {
     handleDatasetCommandError({ spinner, error, context: "delete records" });
   }

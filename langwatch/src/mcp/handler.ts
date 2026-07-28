@@ -26,6 +26,7 @@ import { prisma } from "../server/db";
 import { connection as redis } from "../server/redis";
 import { decrypt, encrypt } from "../utils/encryption";
 import { registerGovernanceMcpTools } from "./governance-tools";
+import { registerOAuthClient } from "./oauthClientRegistry";
 
 const logger = createLogger("langwatch:mcp");
 
@@ -101,6 +102,10 @@ function createRateLimiter({
         }
       }
     },
+    /** Drop every tracked entry (for testing). */
+    clear() {
+      entries.clear();
+    },
   };
 }
 
@@ -149,6 +154,8 @@ export interface McpHandler {
   isMcpRoute: (pathname: string) => boolean;
   /** Clear the in-memory OAuth token cache (for testing). */
   clearTokenCache: () => void;
+  /** Clear the in-memory OAuth/auth-failure rate limiter state (for testing). */
+  clearRateLimiters: () => void;
   /** Close all active sessions (for graceful shutdown). */
   closeAllSessions: () => void;
 }
@@ -731,13 +738,27 @@ export function createMcpHandler(): McpHandler {
     }
 
     // Generate a client_id — we don't restrict which clients can use the
-    // OAuth flow, so any registration succeeds. The real authorization
-    // happens at the consent page where the user picks a project.
+    // OAuth flow, so any registration succeeds. What DOES matter is binding
+    // this client_id to the redirect_uris it registered with, so /mcp/authorize
+    // can reject a request that later shows up with a different one.
     const clientId = `mcp_${randomUUID().replace(/-/g, "")}`;
+    const clientName =
+      typeof body.client_name === "string" ? body.client_name : "MCP Client";
+
+    try {
+      await registerOAuthClient({
+        clientId,
+        client: { redirectUris: body.redirect_uris, clientName },
+      });
+    } catch (err) {
+      logger.error({ error: err }, "Failed to persist OAuth client registration");
+      sendJson(res, 500, { error: "server_error" });
+      return;
+    }
 
     sendJson(res, 201, {
       client_id: clientId,
-      client_name: body.client_name ?? "MCP Client",
+      client_name: clientName,
       redirect_uris: body.redirect_uris,
       grant_types: ["authorization_code"],
       response_types: ["code"],
@@ -796,6 +817,28 @@ export function createMcpHandler(): McpHandler {
       return;
     }
 
+    // RFC 6749 §4.1.3: redirect_uri MUST be present here and MUST be
+    // identical to the one used at the authorization request. §3.2.1: a
+    // public client (this one — token_endpoint_auth_method "none") MUST
+    // include client_id. Both are re-checked against what /mcp/authorize
+    // bound to the code below, once it's decoded.
+    const redirectUriParam = params.redirect_uri;
+    if (!redirectUriParam) {
+      sendJson(res, 400, {
+        error: "invalid_request",
+        error_description: "redirect_uri is required",
+      });
+      return;
+    }
+    const clientIdParam = params.client_id;
+    if (!clientIdParam) {
+      sendJson(res, 400, {
+        error: "invalid_request",
+        error_description: "client_id is required",
+      });
+      return;
+    }
+
     // Look up auth code from Redis
     if (!redis) {
       sendJson(res, 500, { error: "server_error" });
@@ -831,6 +874,8 @@ export function createMcpHandler(): McpHandler {
       userId?: string;
       codeChallenge: string;
       codeChallengeMethod: string;
+      redirectUri: string;
+      clientId: string;
       expiresAt: number;
     };
     try {
@@ -839,6 +884,25 @@ export function createMcpHandler(): McpHandler {
       sendJson(res, 400, {
         error: "invalid_grant",
         error_description: "Corrupted authorization code",
+      });
+      return;
+    }
+
+    // Bind the exchange to the exact client_id + redirect_uri /mcp/authorize
+    // validated and recorded for this code — a code minted for one client's
+    // registered URI must never be redeemable against a different one.
+    if (stored.redirectUri !== redirectUriParam) {
+      sendJson(res, 400, {
+        error: "invalid_grant",
+        error_description:
+          "redirect_uri does not match the authorization request",
+      });
+      return;
+    }
+    if (stored.clientId !== clientIdParam) {
+      sendJson(res, 400, {
+        error: "invalid_grant",
+        error_description: "client_id does not match the authorization request",
       });
       return;
     }
@@ -1336,6 +1400,11 @@ export function createMcpHandler(): McpHandler {
     oauthTokens.clear();
   }
 
+  function clearRateLimiters(): void {
+    oauthRateLimiter.clear();
+    authFailRateLimiter.clear();
+  }
+
   function closeAllSessions(): void {
     clearInterval(reaper);
     for (const [id, session] of sessions) {
@@ -1352,6 +1421,7 @@ export function createMcpHandler(): McpHandler {
     handleRequest,
     isMcpRoute,
     clearTokenCache,
+    clearRateLimiters,
     closeAllSessions,
   };
 }

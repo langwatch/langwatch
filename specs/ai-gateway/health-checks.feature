@@ -4,6 +4,9 @@ Feature: Gateway health checks
   # (/healthz, /readyz, /startupz) implemented in the Go gateway
   # service. Out of scope for the TS parity check — verified via Go
   # tests in services/aigateway/.
+  #
+  # The public status-page endpoint (GET /health) is a separate surface
+  # with different consequences, see gateway-health.feature.
 
   Kubernetes uses three probe endpoints to distinguish transient
   dependency hiccups from a dead pod. Each has distinct semantics.
@@ -28,39 +31,34 @@ Feature: Gateway health checks
       Then the probe times out
       And kubernetes will kill the pod
 
-  Rule: /readyz gates traffic on real dependencies
+  Rule: /readyz gates traffic on pod state, never on dependencies
+
+    # Deliberately dependency-free, two hard lessons deep. An
+    # `auth_cache_warm` readiness check dead-locked cold starts: K8s
+    # would not route traffic until /readyz went 200, but the cache
+    # could only warm from routed traffic (see the note in
+    # services/aigateway/deps.go). And a `control_plane_reachable`
+    # readiness check would turn a control-plane blip into a total
+    # gateway outage: every pod would drop from the load balancer at
+    # once, killing exactly the warm-cache traffic the auth cache's
+    # stale-while-error machinery is designed to keep serving.
+    # Dependency health is reported on the public GET /health
+    # status-page endpoint instead (gateway-health.feature), where a
+    # red verdict informs a status page rather than gating traffic.
 
     @integration @unimplemented
-    Scenario: all dependencies healthy returns 200 with each check reported
-      Given the control plane responds 200 to /api/health
-      And the auth cache has observed at least one revision
-      And redis (if configured) responds PONG
+    Scenario: readyz reflects only pod lifecycle
+      Given the control plane is unreachable
+      And the pod is not draining
       When I GET "/readyz"
       Then the response status is 200
-      And the response JSON has "checks.control_plane_reachable" == "ok"
-      And the response JSON has "checks.auth_cache_warm" == "ok"
+      And warm-cache traffic keeps serving through the blip
 
     @integration @unimplemented
-    Scenario: control plane 5xx flips readyz to 503
-      Given the control plane returns 503 to /api/health
-      When I GET "/readyz"
-      Then the response status is 503
-      And the JSON body contains "checks.control_plane_reachable" with an error detail
-      And kubernetes removes this pod from the service endpoints
-      And the pod is NOT killed (liveness still passes)
-
-    @integration @unimplemented
-    Scenario: auth cache cold flips readyz to 503
-      Given the gateway has just started and no resolve-key / changes poll has returned yet
-      When I GET "/readyz"
-      Then the response status is 503
-      And the JSON body contains "checks.auth_cache_warm" with "auth cache has not observed any revision yet"
-
-    @integration @unimplemented
-    Scenario: readyz is cheap (<50ms) even when all dependencies are healthy
+    Scenario: readyz is cheap (<50ms) and makes no upstream calls
       When I GET "/readyz" 10 times sequentially
       Then every response completes within 50ms
-      And the cumulative upstream control-plane calls are ≤ 10
+      And the cumulative upstream control-plane calls are 0
 
   Rule: /startupz blocks until initial warmup completes
 

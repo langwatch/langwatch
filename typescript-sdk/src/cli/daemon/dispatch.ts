@@ -16,6 +16,7 @@ import {
   collectForwardedEnv,
   evaluateEligibility,
   isAutoSpawnEnabled,
+  isDaemonDisabledByConfig,
   resolveColorLevel,
 } from "./eligibility";
 import { isSocketPathUsable, resolveBuildId, resolveIdentity } from "./identity";
@@ -43,6 +44,7 @@ export async function runCli(argv: string[]): Promise<void> {
   const eligibility = evaluateEligibility({
     args,
     env: process.env,
+    daemonDisabledByConfig: isDaemonDisabledByConfig(process.env),
     stdoutIsTty: Boolean(process.stdout.isTTY),
     stderrIsTty: Boolean(process.stderr.isTTY),
     stdinIsTty: Boolean(process.stdin.isTTY),
@@ -113,5 +115,9 @@ export async function runCli(argv: string[]): Promise<void> {
  */
 async function runInProcess(argv: string[]): Promise<void> {
   const { buildProgram } = await import("../program.js");
-  buildProgram().parse(argv);
+  // parseAsync + await: a rejected action promise (e.g. an invalid --jq
+  // expression surfacing from printResult outside a command's try/catch)
+  // must become this call's rejection — a clean exit — not an unhandled
+  // rejection with a raw stack.
+  await buildProgram().parseAsync(argv);
 }

@@ -40,6 +40,9 @@ const result = await Bun.build({
   // Bytecode compilation moves parse time from run-time to build-time — this is
   // most of the startup win, so it is not optional.
   compile: { outfile, ...(target ? { target } : {}), bytecode: true },
+  // Minification shrinks the embedded bundle (and therefore the binary) and
+  // is safe to combine with bytecode compilation.
+  minify: true,
   // Mirrors tsup.config.ts. `__CLI_VERSION__` is a bare identifier in
   // src/cli/program.ts; without this define the binary COMPILES FINE and then
   // dies at runtime with `ReferenceError: __CLI_VERSION__ is not defined` on
@@ -47,7 +50,7 @@ const result = await Bun.build({
   define: {
     __CLI_VERSION__: JSON.stringify(packageJson.version),
   },
-  // @langwatch/cli-cards is a source-only workspace package (the typed
+  // @langwatch/langy/cards is a source-only workspace package (the typed
   // domain-error / card contract). It must be inlined, exactly as tsup does
   // via `noExternal`, or the binary cannot resolve it at runtime. Bun bundles
   // all imports by default, so this is implicit — verify a fresh binary with

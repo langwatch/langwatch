@@ -59,7 +59,10 @@ func (s Stack) OverlayEnv() []string {
 		"GATEWAY_CONTROL_PLANE_URL=" + apiInternal,
 		"LW_GATEWAY_BASE_URL=" + apiInternal,
 		"LW_GATEWAY_PUBLIC_URL=" + gw.URL,
-		"LW_GATEWAY_INTERNAL_URL=" + gw.URL,
+		// Same loopback principle as LANGWATCH_API_URL above: the control
+		// plane's server-side gateway calls (codex assists) must not depend
+		// on Node trusting the portless CA.
+		fmt.Sprintf("LW_GATEWAY_INTERNAL_URL=http://127.0.0.1:%d", gw.Port),
 		fmt.Sprintf("REDIS_DB_INDEX=%d", s.RedisDB),
 		// Pretty, human-readable console logging for the Go services (clog reads
 		// LOG_FORMAT; the TS app's pino is already pretty in dev via NODE_ENV). Haven
@@ -165,6 +168,12 @@ func (s Stack) observabilityEnv() []string {
 		"OTEL_METRICS_ENABLED=true",
 		"LOG_OTEL_LEVEL=debug",
 		"OTEL_RESOURCE_ATTRIBUTES=" + ObservabilityWorktreeAttr + "=" + s.Slug,
+		// Browser telemetry (ADR-058). Tied to the collector rather than flagged
+		// separately: the app proxies the browser's OTLP to the same endpoint, so
+		// without a collector the exporter would post to a route with nowhere to
+		// forward to. The frontend half of a trace is exactly what a developer
+		// debugging their own worktree wants, so it is on whenever the stack is.
+		"RUM_ENABLED=true",
 	}
 	// The Grafana base URL, so the app can build clickable trace/log deep links.
 	// Loopback: the link is followed by the developer's own browser on this machine.

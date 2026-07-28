@@ -30,11 +30,7 @@ import {
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import type { PlanInfo } from "../../../../../ee/licensing/planInfo";
 
-// Skip when running with testcontainers only (no PostgreSQL)
-// TEST_CLICKHOUSE_URL indicates testcontainers mode without full infrastructure
-const isTestcontainersOnly = !!process.env.TEST_CLICKHOUSE_URL;
-
-describe.skipIf(isTestcontainersOnly)(
+describe(
   "project.create plan limit enforcement",
   () => {
     const testNamespace = `proj-limit-${nanoid(8)}`;
@@ -255,7 +251,7 @@ describe.skipIf(isTestcontainersOnly)(
 // Regression: BetterAuth uses RoleBinding for team membership — TeamUser is never populated.
 // A user must be able to create a project with only a RoleBinding, no TeamUser row.
 // Previously project.create checked teamUser.findFirst which always returned null, causing a 403.
-describe.skipIf(isTestcontainersOnly)(
+describe(
   "project.create with RoleBinding-only membership (no TeamUser)",
   () => {
     const testNamespace = `proj-rb-${nanoid(8)}`;

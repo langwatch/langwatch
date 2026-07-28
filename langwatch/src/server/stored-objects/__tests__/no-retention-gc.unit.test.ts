@@ -89,6 +89,13 @@ const SCAN_ALLOWLIST: ReadonlyArray<RegExp> = [
   // clickhouse/metrics.ts lists stored_objects in MONITORED_TABLES for the
   // ops size gauges. Audited: read-only system.parts aggregation.
   /^src\/server\/clickhouse\/metrics\.ts$/,
+  // storage.ts and dataset-storage.ts mention the STORED_OBJECTS_BACKEND
+  // env toggle (issue #4133) in comments and a config-error message —
+  // matched by this scan only because the var name contains
+  // "stored_objects". Audited: destination selection only, no
+  // delete/update/truncate on the table.
+  /^src\/server\/storage\.ts$/,
+  /^src\/server\/datasets\/dataset-storage\.ts$/,
 ];
 
 function isAllowlisted(rel: string): boolean {

@@ -22,6 +22,7 @@ import { Box, Button, Flex, HStack, Portal, Text } from "@chakra-ui/react";
 import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTraceExplorerTourPreference } from "../hooks/useTraceExplorerTourPreference";
 import { useOnboardingStore } from "../store/onboardingStore";
 import type { Spotlight, SpotlightContext } from "./spotlights";
 import { TRACE_EXPLORER_SPOTLIGHTS } from "./spotlights";
@@ -105,6 +106,43 @@ export function measureAnchor(anchor: string): AnchorRect | null {
     width: rect.width,
     height: rect.height,
   };
+}
+
+/**
+ * True when an anchor's left edge sits at or beyond the right viewport edge,
+ * i.e. it is still parked off-screen by an entrance animation (the drawer, or
+ * Langy's companion ride, slides in from the right). A zero-rect (jsdom) reads
+ * as on-screen. `left` carries `scrollX`, so subtract it back for the check.
+ */
+export function isAnchorParkedOffscreen(
+  rect: AnchorRect,
+  viewportWidth: number,
+  scrollX: number,
+): boolean {
+  return rect.left - scrollX >= viewportWidth;
+}
+
+/**
+ * The spotlight ring may only be PLACED once its anchor has settled: on
+ * screen (not parked off the right by an entrance ride) and holding the same
+ * rect as the previous frame. Placing on a transient off-screen rect would
+ * strand the fixed ring and its full-viewport scrim off the visible screen.
+ * Spec: the drawer companion ride, specs/langy/langy-panel-layout.feature.
+ */
+export function isAnchorSettled(
+  next: AnchorRect | null,
+  previous: AnchorRect | null,
+  viewportWidth: number,
+  scrollX: number,
+): boolean {
+  if (next === null || previous === null) return false;
+  if (isAnchorParkedOffscreen(next, viewportWidth, scrollX)) return false;
+  return (
+    next.top === previous.top &&
+    next.left === previous.left &&
+    next.width === previous.width &&
+    next.height === previous.height
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -458,6 +496,7 @@ export function HighlightRing({
  * the filter sidebar's descriptor list.
  */
 export function SpotlightOverlay(): React.ReactElement | null {
+  const { dismiss: persistDismissal } = useTraceExplorerTourPreference();
   const spotlightsActive = useOnboardingStore((s) => s.spotlightsActive);
   const currentSpotlightId = useOnboardingStore((s) => s.currentSpotlightId);
   const setSpotlightsActive = useOnboardingStore((s) => s.setSpotlightsActive);
@@ -585,11 +624,12 @@ export function SpotlightOverlay(): React.ReactElement | null {
   }, [resolved?.id]);
 
   const handleDismiss = useCallback(() => {
+    persistDismissal();
     setSpotlightsActive(false);
     setCurrentSpotlightId(null);
     writeSpotlightFragment(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [persistDismissal, setCurrentSpotlightId, setSpotlightsActive]);
 
   if (!spotlightsActive || !resolved || !anchorRect) return null;
 

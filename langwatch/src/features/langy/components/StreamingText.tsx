@@ -59,6 +59,13 @@ export function StreamingText({ text }: { text: string }) {
       {settledText}
       {animatedWords.map((word, tailIndex) => {
         const index = firstAnimatedWord + tailIndex;
+        // A newline run renders as PLAIN inline text, never inside the
+        // animated inline-block: an inline-block's baseline is its LAST line
+        // box, so a span holding "word\n" parks the word one line above the
+        // rest of the sentence — multi-line prose read as scrambled.
+        if (word.includes("\n")) {
+          return <chakra.span key={index}>{word}</chakra.span>;
+        }
         const isNew = index >= batchStart;
         const delay = isNew
           ? Math.min((index - batchStart) * WORD_STAGGER_S, MAX_BATCH_DELAY_S)
@@ -81,12 +88,14 @@ export function StreamingText({ text }: { text: string }) {
 }
 
 /**
- * Split text into word segments, each carrying its trailing whitespace so
- * `inline-block` spans don't collapse spacing. Append-only, so index keys are
+ * Split text into word segments, each carrying its trailing SAME-LINE
+ * whitespace so `inline-block` spans don't collapse spacing. Whitespace runs
+ * containing a newline are their own tokens — they must render outside the
+ * inline-block spans (see the render above). Append-only, so index keys are
  * stable across streamed growth.
  */
 function splitWords(text: string): string[] {
-  const matches = text.match(/\S+\s*|\s+/g);
+  const matches = text.match(/[^\S\n]*\n\s*|\S+[^\S\n]*|[^\S\n]+/g);
   return matches ?? [];
 }
 

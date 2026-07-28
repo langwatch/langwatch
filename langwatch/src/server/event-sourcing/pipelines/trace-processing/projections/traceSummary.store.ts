@@ -73,17 +73,19 @@ export class TraceSummaryStore
     aggregateId: string,
     context: ProjectionStoreContext,
   ): Promise<TraceSummaryData | null> {
-    // When the executor knows the processed event's occurredAt, pass it as a
-    // partition-prune hint: trace_summaries is partitioned by toYearWeek
-    // (OccurredAt) and this read otherwise has no time predicate, so it
-    // cold-scans every partition (incl. S3 tier). findByTraceId narrows to a
-    // ±2-day window around the hint and falls back to an unbounded read if the
-    // window misses, so correctness is unchanged.
+    // `context.readWindow` — computed by the executor from the fold's declared
+    // `options.readWindow` — bounds this read so trace_summaries (partitioned
+    // by toYearWeek(OccurredAt)) prunes partitions instead of cold-scanning
+    // them all (incl. S3 tier). Passed through verbatim, and the repository
+    // applies it verbatim (no internal fallback on this path): the EXECUTOR
+    // retries a windowed miss without the window, which lands on the
+    // repository's resolve-OccurredAt path — so correctness never depends on
+    // the width, and no layer runs a second recovery ladder.
     return await this.repo.findByTraceId(
       String(context.tenantId),
       aggregateId,
-      context.occurredAtMs !== undefined
-        ? { occurredAtMs: context.occurredAtMs }
+      context.readWindow !== undefined
+        ? { window: context.readWindow }
         : undefined,
     );
   }

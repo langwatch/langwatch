@@ -41,7 +41,9 @@ import (
 	"sync"
 
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
+	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -86,6 +88,27 @@ type TenantRouter struct {
 	// through a field so tests can stub the OTLP exporter without
 	// standing up a real HTTPS endpoint.
 	newProcessor func(endpoint, apiKey string) (sdktrace.SpanProcessor, error)
+
+	// ops is the OPTIONAL fallback for spans that never acquired a tenant
+	// api_key: the service's own operational telemetry (startup, health,
+	// background work). Nil preserves the historical behavior — untenanted
+	// spans are dropped. Configured via Options.OpsEndpoint.
+	ops sdktrace.SpanProcessor
+	// opsResource replaces the span's resource on the ops path. The
+	// provider's resource deliberately excludes LangWatch's internal-origin
+	// marker (it reaches customer projects through the per-tenant route), so
+	// ops spans re-stamp the full internal identity here — and tracetest's
+	// SpanStub is the SDK's only public way to rebuild a sealed
+	// ReadOnlySpan with a different resource.
+	opsResource *resource.Resource
+}
+
+// WithOpsFallback routes untenanted spans to an operational processor,
+// re-resourced with the service's internal identity.
+func (r *TenantRouter) WithOpsFallback(proc sdktrace.SpanProcessor, res *resource.Resource) *TenantRouter {
+	r.ops = proc
+	r.opsResource = res
+	return r
 }
 
 // NewTenantRouter constructs a router that exports to `endpoint`
@@ -159,10 +182,12 @@ func (r *TenantRouter) OnEnd(s sdktrace.ReadOnlySpan) {
 	ident := identFor(s.SpanContext())
 	v, ok := r.spanAuth.LoadAndDelete(ident)
 	if !ok {
+		r.opsEnd(s)
 		return
 	}
 	apiKey, _ := v.(string)
 	if apiKey == "" {
+		r.opsEnd(s)
 		return
 	}
 	proc, err := r.processorFor(apiKey)
@@ -195,6 +220,25 @@ func (r *TenantRouter) processorFor(apiKey string) (sdktrace.SpanProcessor, erro
 	return actual.(sdktrace.SpanProcessor), nil
 }
 
+// opsEnd forwards an untenanted span to the ops pipeline (when configured),
+// rebuilt with the internal-identity resource — and stripped to the
+// operational skeleton (name, kind, timing, status). A span can be key-less
+// for two reasons: it IS operational, or it is a customer-path span whose
+// goroutine lost the context carrying the tenant key. The router cannot tell
+// them apart, so the ops copy fails closed on content: no attributes, events,
+// or links ever cross onto the internal collector from this path.
+func (r *TenantRouter) opsEnd(s sdktrace.ReadOnlySpan) {
+	if r.ops == nil {
+		return
+	}
+	stub := tracetest.SpanStubFromReadOnlySpan(s)
+	stub.Resource = r.opsResource
+	stub.Attributes = nil
+	stub.Events = nil
+	stub.Links = nil
+	r.ops.OnEnd(stub.Snapshot())
+}
+
 // ForceFlush flushes every per-tenant processor. Callers that need
 // at-most-N-tenant ordering must serialize their own; this fans out
 // in undefined order.
@@ -206,6 +250,11 @@ func (r *TenantRouter) ForceFlush(ctx context.Context) error {
 		}
 		return true
 	})
+	if r.ops != nil {
+		if err := r.ops.ForceFlush(ctx); err != nil {
+			errs = append(errs, err)
+		}
+	}
 	return errors.Join(errs...)
 }
 
@@ -218,5 +267,10 @@ func (r *TenantRouter) Shutdown(ctx context.Context) error {
 		}
 		return true
 	})
+	if r.ops != nil {
+		if err := r.ops.Shutdown(ctx); err != nil {
+			errs = append(errs, err)
+		}
+	}
 	return errors.Join(errs...)
 }

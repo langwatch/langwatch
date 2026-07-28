@@ -9,8 +9,20 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
+
+// The header's translate hook dispatches through tRPC; these tests pin
+// container chrome, so stub it to the identity passthrough.
+vi.mock("../../../hooks/useTextTranslation", () => ({
+  useTextTranslation: ({ texts }: { texts: Record<string, string> }) => ({
+    displayTexts: texts,
+    isActive: false,
+    isLoading: false,
+    toggle: () => undefined,
+  }),
+}));
+
 import { IOViewer } from "../IOViewer";
 
 afterEach(cleanup);

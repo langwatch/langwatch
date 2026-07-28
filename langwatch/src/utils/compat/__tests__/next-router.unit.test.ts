@@ -13,18 +13,26 @@ const { resolvePathname, buildUrl } = await vi.importActual<
 describe("resolvePathname()", () => {
   describe("when path matches a project route", () => {
     it("converts /my-project/messages to /[project]/messages", () => {
-      expect(resolvePathname("/my-project/messages")).toBe("/[project]/messages");
+      expect(resolvePathname("/my-project/messages")).toBe(
+        "/[project]/messages",
+      );
     });
 
     it("converts /my-project/analytics to /[project]/analytics", () => {
       expect(resolvePathname("/my-project/analytics")).toBe(
-        "/[project]/analytics"
+        "/[project]/analytics",
       );
     });
 
     it("converts /my-project/evaluations to /[project]/evaluations", () => {
       expect(resolvePathname("/my-project/evaluations")).toBe(
-        "/[project]/evaluations"
+        "/[project]/evaluations",
+      );
+    });
+
+    it("converts /my-project/online-evaluations to /[project]/online-evaluations", () => {
+      expect(resolvePathname("/my-project/online-evaluations")).toBe(
+        "/[project]/online-evaluations",
       );
     });
   });
@@ -32,13 +40,13 @@ describe("resolvePathname()", () => {
   describe("when path matches a nested project route", () => {
     it("converts /my-project/analytics/custom/123 to /[project]/analytics/custom/[id]", () => {
       expect(resolvePathname("/my-project/analytics/custom/123")).toBe(
-        "/[project]/analytics/custom/[id]"
+        "/[project]/analytics/custom/[id]",
       );
     });
 
     it("converts /my-project/messages/trace-abc/traceDetails to /[project]/messages/[trace]/[openTab]", () => {
       expect(
-        resolvePathname("/my-project/messages/trace-abc/traceDetails")
+        resolvePathname("/my-project/messages/trace-abc/traceDetails"),
       ).toBe("/[project]/messages/[trace]/[openTab]");
     });
   });
@@ -56,7 +64,7 @@ describe("resolvePathname()", () => {
   describe("when path matches a catch-all route", () => {
     it("converts /settings/models/foo to /settings/[[...path]]", () => {
       expect(resolvePathname("/settings/models/foo")).toBe(
-        "/settings/[[...path]]"
+        "/settings/[[...path]]",
       );
     });
   });
@@ -64,7 +72,7 @@ describe("resolvePathname()", () => {
   describe("when path has no match", () => {
     it("returns the path unchanged", () => {
       expect(resolvePathname("/unknown/deeply/nested")).toBe(
-        "/unknown/deeply/nested"
+        "/unknown/deeply/nested",
       );
     });
   });
@@ -94,7 +102,7 @@ describe("buildUrl()", () => {
           pathname: "/my-project/messages",
           query: { project: "my-project", view: "table" },
         },
-        new Set(["project"])
+        new Set(["project"]),
       );
       expect(result).toBe("/my-project/messages?view=table");
     });
@@ -118,9 +126,7 @@ describe("buildUrl()", () => {
           openTab: "traceDetails",
         },
       });
-      expect(result).toBe(
-        "/inbox-narrator/messages/abc-123/traceDetails"
-      );
+      expect(result).toBe("/inbox-narrator/messages/abc-123/traceDetails");
     });
 
     it("resolves [[...path]] catch-all from array query value", () => {
@@ -156,7 +162,7 @@ describe("buildUrl()", () => {
     it("strips route param keys from query string", () => {
       const result = buildUrl(
         "?project=inbox-narrator&view=table&drawer.open=traceDetails",
-        new Set(["project"])
+        new Set(["project"]),
       );
       expect(result).toBe("?view=table&drawer.open=traceDetails");
     });
@@ -164,7 +170,7 @@ describe("buildUrl()", () => {
     it("strips multiple route param keys", () => {
       const result = buildUrl(
         "?project=inbox-narrator&trace=abc&view=table",
-        new Set(["project", "trace"])
+        new Set(["project", "trace"]),
       );
       expect(result).toBe("?view=table");
     });
@@ -188,10 +194,10 @@ describe("buildUrl()", () => {
             scenarioId: "scenario_001",
           },
         },
-        new Set(["project", "path"])
+        new Set(["project", "path"]),
       );
       expect(result).toBe(
-        "/my-project/simulations/run-plans/great-run-plan?scenarioId=scenario_001"
+        "/my-project/simulations/run-plans/great-run-plan?scenarioId=scenario_001",
       );
     });
 
@@ -209,10 +215,10 @@ describe("buildUrl()", () => {
             newFilter: "value",
           },
         },
-        new Set(["project", "path"])
+        new Set(["project", "path"]),
       );
       expect(result).toBe(
-        "/my-project/simulations/run-plans/great-run-plan?startDate=2026-01-14&newFilter=value"
+        "/my-project/simulations/run-plans/great-run-plan?startDate=2026-01-14&newFilter=value",
       );
       // path and project should NOT appear in the query string
       expect(result).not.toContain("path=");
@@ -224,7 +230,7 @@ describe("buildUrl()", () => {
     it("strips path from query string", () => {
       const result = buildUrl(
         "?path=run-plans&path=great-run-plan&scenarioId=scenario_001",
-        new Set(["project", "path"])
+        new Set(["project", "path"]),
       );
       expect(result).toBe("?scenarioId=scenario_001");
     });
@@ -243,7 +249,7 @@ describe("buildUrl()", () => {
             view: "table",
           },
         },
-        new Set(["project", "trace"])
+        new Set(["project", "trace"]),
       );
       expect(result).toBe("/inbox-narrator/messages?view=table");
     });

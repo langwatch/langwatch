@@ -27,11 +27,12 @@ import {
   Target,
 } from "lucide-react";
 import { useState } from "react";
-import { parseSuiteTargets } from "~/server/suites/types";
-import { getSuiteSetId } from "~/server/suites/suite-set-id";
-import { useNow } from "~/hooks/useNow";
-import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import type { Period } from "~/components/PeriodSelector";
+import { SetupWithAgentButton } from "~/components/SetupWithAgentButton";
+import { useNow } from "~/hooks/useNow";
+import { getSuiteSetId } from "~/server/suites/suite-set-id";
+import { parseSuiteTargets } from "~/server/suites/types";
+import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import { RunHistoryPanel, type RunHistoryStats } from "./RunHistoryPanel";
 
 type SuiteDetailPanelProps = {
@@ -90,7 +91,13 @@ export function SuiteDetailPanel({
               <Pencil size={14} />
               Edit
             </Button>
-            <Button size="sm" colorPalette="blue" onClick={onRun} disabled={isRunning} loading={isRunning}>
+            <Button
+              size="sm"
+              colorPalette="blue"
+              onClick={onRun}
+              disabled={isRunning}
+              loading={isRunning}
+            >
               <Play size={14} />
               Run
             </Button>
@@ -142,7 +149,10 @@ export function SuiteDetailPanel({
               {liveStats.lastActivityTimestamp && (
                 <StatPill
                   icon={<Clock size={14} />}
-                  value={formatTimeAgoCompact(liveStats.lastActivityTimestamp, now)}
+                  value={formatTimeAgoCompact(
+                    liveStats.lastActivityTimestamp,
+                    now,
+                  )}
                   label=""
                   colorScheme="gray"
                 />
@@ -255,9 +265,12 @@ export function SuiteEmptyState({ onNewSuite }: { onNewSuite: () => void }) {
           <EmptyState.Description>
             Select a run plan from the sidebar or create a new one
           </EmptyState.Description>
-          <Button colorPalette="blue" onClick={onNewSuite}>
-            <Plus size={16} /> New Run Plan
-          </Button>
+          <HStack gap={2}>
+            <Button colorPalette="blue" onClick={onNewSuite}>
+              <Plus size={16} /> New Run Plan
+            </Button>
+            <SetupWithAgentButton surface="simulations" size="md" />
+          </HStack>
         </EmptyState.Content>
       </EmptyState.Root>
     </Center>

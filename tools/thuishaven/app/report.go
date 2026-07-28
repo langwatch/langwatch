@@ -76,7 +76,7 @@ func (o *Orchestrator) Doctor() error {
 		fmt.Printf("%s managed redis — %s\n", ok(rdsOK), detail)
 	}
 	live, rss := o.stackFootprint()
-	fmt.Printf("     stacks running: %d (%d live, ~%s RAM)   tld: .%s\n", len(o.store.Stacks()), live, humanBytes(int64(rss)), o.cfg.Naming.TLD)
+	fmt.Printf("     stacks running: %d (%d live, ~%s RAM)   tld: .%s\n", len(o.store.Stacks()), live, domain.HumanBytes(int64(rss)), o.cfg.Naming.TLD)
 	return nil
 }
 

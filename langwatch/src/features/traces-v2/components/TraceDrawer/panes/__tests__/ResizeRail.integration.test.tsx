@@ -32,7 +32,10 @@ afterEach(cleanup);
 // they're not part of the DOM standard yet. The component already
 // no-ops on throw, so stubbing them with vi is unnecessary, but we
 // stub here to silence the harmless warning that would otherwise log.
-type Capturable = { setPointerCapture?: unknown; releasePointerCapture?: unknown };
+type Capturable = {
+  setPointerCapture?: unknown;
+  releasePointerCapture?: unknown;
+};
 function patchPointerCapture(el: Element | null) {
   if (!el) return;
   const target = el as unknown as Capturable;

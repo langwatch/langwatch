@@ -90,10 +90,6 @@ export class GroupQueueDispatcher {
     this.shutdownRequested = true;
   }
 
-  isRunning(): boolean {
-    return this.running;
-  }
-
   async waitUntilStopped(): Promise<void> {
     while (this.running) {
       await new Promise((resolve) => setTimeout(resolve, 50));

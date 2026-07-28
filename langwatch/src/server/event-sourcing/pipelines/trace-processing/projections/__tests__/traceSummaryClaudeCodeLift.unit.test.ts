@@ -4,11 +4,12 @@
  * `codex.conversation_starts`), and the gemini / gen_ai.* defensive lift.
  *
  * The claude_code model-call triplet (api_request / api_request_body /
- * api_response_body) is trapped at ingest and converted into a gen_ai span
- * (see claude-code-log-to-span.unit.test.ts) — it NO LONGER lifts model /
- * cost / tokens / output through the log fold. The "does NOT lift a converted
- * api_request" case below pins that: even if one ever reached the log path it
- * must be a no-op so cost/tokens can never be double-counted.
+ * api_response_body) does NOT lift model / cost / tokens / output through the
+ * log fold: Claude Code's own SDK spans carry that (computeSpanCost +
+ * accumulateTokens on the SPAN fold), and the coding-agent session pipeline
+ * owns the session-grain totals (ADR-056). The "does NOT lift an api_request"
+ * case below pins that the log fold stays a no-op for these, so cost/tokens
+ * can never be double-counted from the log path.
  *
  * The top-level column mirror (langwatch.* lift -> Models /
  * TotalPromptTokenCount / TotalCompletionTokenCount) stays live for the

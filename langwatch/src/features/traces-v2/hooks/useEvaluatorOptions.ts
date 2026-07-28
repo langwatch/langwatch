@@ -28,6 +28,7 @@ export function useEvaluatorOptions(): {
     const facet = data?.find((f) => f.key === "evaluator");
     if (facet && facet.kind === "categorical") {
       for (const tv of facet.topValues) {
+        if (nameByKey.has(tv.value)) continue;
         const label = tv.label || tv.value;
         options.push({ value: tv.value, label });
         nameByKey.set(tv.value, label);

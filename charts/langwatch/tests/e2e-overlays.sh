@@ -307,7 +307,7 @@ test_size_overlays() {
   min_out=$(tmpl --set autogen.enabled=true \
     -f "${OVERLAYS}/size-minimal.yaml" \
     -f "${OVERLAYS}/access-nodeport.yaml")
-  assert_not_contains "minimal: workers disabled" "$min_out" "name: ${RELEASE}-workers"
+  assert_not_contains "minimal: workers disabled" "$min_out" "# Source: langwatch/templates/workers/deployment.yaml"
   assert_contains "minimal: app replicas 1" "$min_out" "replicas: 1"
 
   # size-prod: 2 app replicas, PDB
@@ -316,7 +316,7 @@ test_size_overlays() {
     -f "${OVERLAYS}/size-prod.yaml" \
     -f "${OVERLAYS}/access-ingress.yaml")
   assert_contains "prod: has PodDisruptionBudget" "$prod_out" "kind: PodDisruptionBudget"
-  assert_contains "prod: workers deployed" "$prod_out" "name: ${RELEASE}-workers"
+  assert_contains "prod: workers deployed" "$prod_out" "# Source: langwatch/templates/workers/deployment.yaml"
 
   # size-ha: 3 replicas, ClickHouse replicated
   local ha_out

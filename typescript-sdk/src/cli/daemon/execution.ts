@@ -7,11 +7,26 @@
  */
 
 import { AsyncLocalStorage } from "node:async_hooks";
+import { StringDecoder } from "node:string_decoder";
 
 import chalk from "chalk";
 
+import { AGENT_MODE_ENV_VARS } from "../utils/output";
+import { currentOutputScope, withOutputScope } from "../utils/errorOutput";
+
+/** Set membership test for the strip rule in `applyWindow`. */
+const AGENT_MODE_ENV_VAR_SET: ReadonlySet<string> = new Set(AGENT_MODE_ENV_VARS);
+
 export type OutputStream = "stdout" | "stderr";
 export type OutputSink = (stream: OutputStream, chunk: Buffer) => void;
+
+/** ANSI SGR (colour/style) sequences — everything chalk emits. */
+// eslint-disable-next-line no-control-regex -- matching the ESC control char is the whole point
+const SGR_PATTERN = /\u001B\[[0-9;]*m/g;
+
+/** A trailing PARTIAL SGR: ESC, or ESC[ + parameters with no `m` yet. */
+// eslint-disable-next-line no-control-regex -- matching the ESC control char is the whole point
+const PARTIAL_SGR_AT_END = /\u001B(?:\[[0-9;]*)?$/;
 
 /**
  * Thrown by the patched `process.exit` to unwind the command's stack.
@@ -52,6 +67,20 @@ export function isDaemonExitSignal(error: unknown): error is DaemonExitSignal {
 export class ExecutionContext {
   private finished = false;
   private code: number | null = null;
+  /** Trailing partial SGR sequences held back per stream (see `stripSgr`). */
+  private readonly pendingEscape: Record<OutputStream, Buffer | null> = {
+    stdout: null,
+    stderr: null,
+  };
+  /**
+   * Per-stream UTF-8 decoders for the colour-stripping path: a multibyte
+   * character split across two writes must survive the split, which
+   * `chunk.toString("utf8")` per write would not (each half decodes to U+FFFD).
+   */
+  private readonly decoders: Record<OutputStream, StringDecoder> = {
+    stdout: new StringDecoder("utf8"),
+    stderr: new StringDecoder("utf8"),
+  };
 
   constructor(
     readonly id: string,
@@ -60,12 +89,53 @@ export class ExecutionContext {
 
   write(stream: OutputStream, chunk: Buffer): void {
     if (this.finished) return;
+    // Agent mode turns colour off per request (utils/errorOutput.ts
+    // disableOutputColor): chalk.level is process-global and cannot be scoped
+    // to one request, so the request's bytes have their SGR (colour/style)
+    // sequences stripped here instead of touching it.
+    const scope = currentOutputScope();
+    if (scope && !scope.hasColor) {
+      chunk = this.stripSgr({ stream, chunk });
+    }
     this.sink(stream, chunk);
+  }
+
+  /**
+   * Strip SGR sequences, holding back a trailing PARTIAL one (ESC, or
+   * ESC[ + parameters with no terminating `m` yet) and prepending it to the
+   * next chunk on the same stream — an escape split across two writes would
+   * otherwise leak half of it to the caller. A partial left dangling at
+   * finalize is never a complete sequence, so nothing visible is lost.
+   */
+  private stripSgr({ stream, chunk }: { stream: OutputStream; chunk: Buffer }): Buffer {
+    // SGR sequences are pure ASCII, so the held-back partial decodes safely on
+    // its own; the chunk goes through the stream's StringDecoder so a
+    // multibyte character split across writes is reassembled, not corrupted.
+    const held = this.pendingEscape[stream];
+    let text =
+      (held === null ? "" : held.toString("utf8")) +
+      this.decoders[stream].write(chunk);
+    this.pendingEscape[stream] = null;
+
+    const partial = PARTIAL_SGR_AT_END.exec(text);
+    if (partial) {
+      this.pendingEscape[stream] = Buffer.from(partial[0], "utf8");
+      text = text.slice(0, -partial[0].length);
+    }
+    return Buffer.from(text.replace(SGR_PATTERN, ""), "utf8");
   }
 
   /** Record the exit status and silence further output. Idempotent. */
   finalize(code: number): void {
     if (this.finished) return;
+    // Flush any bytes the decoders are still holding (a multibyte character
+    // truncated by the stream's end surfaces as U+FFFD, exactly as a terminal
+    // would render it). A dangling partial SGR is NOT flushed — it is never a
+    // complete sequence, so nothing visible is lost.
+    for (const stream of ["stdout", "stderr"] as const) {
+      const rest = this.decoders[stream].end();
+      if (rest) this.sink(stream, Buffer.from(rest, "utf8"));
+    }
     this.finished = true;
     this.code = code;
   }
@@ -81,12 +151,19 @@ export class ExecutionContext {
 
 const storage = new AsyncLocalStorage<ExecutionContext>();
 
-/** Run `fn` with `context` as the ambient execution context. */
+/**
+ * Run `fn` with `context` as the ambient execution context.
+ *
+ * Also enters a fresh output scope (utils/errorOutput.ts withOutputScope), so
+ * the request's `--format`/`--agent` context lives in the same async scope as
+ * its stdout/stderr routing and two concurrent requests cannot clobber each
+ * other's error format or colour.
+ */
 export function withExecutionContext<T>(
   context: ExecutionContext,
   fn: () => T,
 ): T {
-  return storage.run(context, fn);
+  return storage.run(context, () => withOutputScope(fn));
 }
 
 export function currentExecutionContext(): ExecutionContext | undefined {
@@ -239,8 +316,19 @@ export class ExecutionWindow {
    * Wait until the process globals match `request`, then return a release
    * function. Rejects if the globals cannot be applied (e.g. the caller's cwd
    * was deleted), which the server turns into a clean in-process fallback.
+   *
+   * `signal` aborts the WAIT: a queued waiter whose client has already
+   * cancelled (or whose request timed out) is removed from the queue rather
+   * than being admitted — and wedging the window — long after anyone stopped
+   * listening for it.
    */
-  async acquire(request: WindowRequest): Promise<() => void> {
+  async acquire({
+    request,
+    signal,
+  }: {
+    request: WindowRequest;
+    signal?: AbortSignal;
+  }): Promise<() => void> {
     const key = windowKey(request);
 
     // Queue behind anyone already waiting, even on a key match — otherwise a
@@ -250,7 +338,23 @@ export class ExecutionWindow {
     }
 
     return new Promise<() => void>((resolve, reject) => {
-      this.queue.push({ key, request, resolve, reject });
+      const waiter: Waiter = { key, request, resolve, reject };
+      this.queue.push(waiter);
+      if (!signal) return;
+
+      const onAbort = (): void => {
+        const index = this.queue.indexOf(waiter);
+        // Already admitted: the abort arrived too late, the release function
+        // owns the lifecycle now.
+        if (index === -1) return;
+        this.queue.splice(index, 1);
+        reject(new Error("request cancelled while queued"));
+      };
+      if (signal.aborted) {
+        onAbort();
+        return;
+      }
+      signal.addEventListener("abort", onAbort, { once: true });
     });
   }
 
@@ -259,6 +363,13 @@ export class ExecutionWindow {
       this.applyWindow(request);
       this.activeKey = key;
     }
+    // chalk.level is re-applied on every admission, not only on a window
+    // switch: it is process-global mutable state, so this is cheap insurance
+    // against ANY mid-request mutation leaking into the next caller on a
+    // reused window. (Agent mode no longer mutates it — daemon-served
+    // requests strip colour at the sink instead, see ExecutionContext.write —
+    // but the in-process path and third-party code still can.)
+    chalk.level = request.colorLevel as typeof chalk.level;
     this.inflight++;
     let released = false;
     return () => {
@@ -322,9 +433,16 @@ export class ExecutionWindow {
       else process.env[key] = value;
     }
     // The caller's LANGWATCH_* variables are authoritative: a variable the
-    // daemon inherited but the caller does not have must not be visible.
+    // daemon inherited but the caller does not have must not be visible. The
+    // same goes for the agent-mode markers (utils/output.ts
+    // AGENT_MODE_ENV_VARS): a daemon auto-spawned BY an agent inherits e.g.
+    // CLAUDECODE=1 into its baseline, and a later HUMAN caller must not be
+    // misread as an agent (compact JSON, no spinners) because of it.
     for (const key of Object.keys(process.env)) {
-      if (key.startsWith("LANGWATCH_") && !(key in request.env)) {
+      if (
+        (key.startsWith("LANGWATCH_") || AGENT_MODE_ENV_VAR_SET.has(key)) &&
+        !(key in request.env)
+      ) {
         delete process.env[key];
       }
     }

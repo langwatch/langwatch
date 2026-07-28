@@ -2,7 +2,6 @@ import { createLogger } from "@langwatch/observability";
 
 import { definePipeline } from "../../pipeline/staticBuilder";
 import { toSafeFailureDiagnostic } from "../../process-manager/failureDiagnostic";
-import type { AppendStore } from "../../projections/mapProjection.types";
 import { RecordTriggerMatchCommand } from "./commands/recordTriggerMatch.command";
 import {
   GRAPH_ALERT_SWEEP_INTERVAL_MS,
@@ -42,10 +41,9 @@ import {
   webhookDeliveryPruneWake,
 } from "./process-manager/webhookDeliveryPrune.process";
 import {
-  createAutomationAuditMapProjection,
-  type AutomationAuditRecord,
-} from "./projections/automationAudit.mapProjection";
-import { TRIGGER_MATCH_RECORDED_EVENT_TYPE } from "./schemas/constants";
+  TRIGGER_MATCH_COALESCE_MAX_BATCH,
+  TRIGGER_MATCH_RECORDED_EVENT_TYPE,
+} from "./schemas/constants";
 import type { AutomationEvent } from "./schemas/events";
 
 const logger = createLogger("langwatch:triggers:automations-pipeline");
@@ -86,7 +84,6 @@ function runWebhookDeliveryPruneWithTriggerSettlementRetention(
  *  topology itself (states, intents, evolve/wake handlers, outbox tuning)
  *  is defined inline below, ADR-052 "Approved builder API". */
 export interface AutomationsPipelineDeps {
-  automationAuditStore: AppendStore<AutomationAuditRecord>;
   dispatch: TriggerSettlementDispatchDeps;
   sweep: GraphAlertSweepDeps;
   prune: WebhookDeliveryPruneDeps;
@@ -96,12 +93,12 @@ export function createAutomationsPipeline(deps: AutomationsPipelineDeps) {
   return definePipeline<AutomationEvent>()
     .withName("automations")
     .withAggregateType("trigger")
-    .withMapProjection(
-      "automationAudit",
-      createAutomationAuditMapProjection({ store: deps.automationAuditStore }),
-    )
     .withCommand("recordTriggerMatch", RecordTriggerMatchCommand, {
       serializeByAggregate: true,
+      // ADR-066 pillar 2: a hot trigger appends one match per trace. Coalesce a
+      // backed-up trigger's matches into one multi-row insert instead of one
+      // tiny insert per match.
+      coalesceMaxBatch: TRIGGER_MATCH_COALESCE_MAX_BATCH,
     })
     .withProcessManager("triggerSettlement", (pm) =>
       pm

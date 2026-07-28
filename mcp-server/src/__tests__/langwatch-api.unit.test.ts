@@ -502,6 +502,61 @@ describe("langwatch-api", () => {
       );
     });
 
+    // A validation failure names the offending field AND the values it would
+    // have taken, in `reasons[].meta`. Dropping that leaves the message's own
+    // advice ("pick one of the types in this error's expected list") naming a
+    // list the caller was never given.
+    describe("when the failure carries the values it would have accepted", () => {
+      const rejectedTypeBody = {
+        error: "validation_error",
+        message:
+          "Unknown evaluator type. Pick one of the types in this error's expected list and retry.",
+        reasons: [
+          {
+            code: "schema_failure",
+            kind: "schema_failure",
+            meta: {
+              field: "config.evaluatorType",
+              expected: ["ragas/response_relevancy", "langevals/llm_boolean"],
+              received: "ragas/answer_relevancy",
+            },
+          },
+        ],
+      };
+
+      /** @scenario A rejection over MCP carries the accepted types */
+      it("keeps the reasons on the error", async () => {
+        const { createEvaluator } = await import(
+          "../langwatch-api-evaluators.js"
+        );
+        mockErrorResponse(422, JSON.stringify(rejectedTypeBody));
+
+        const error = await createEvaluator({
+          name: "Relevancy",
+          config: { evaluatorType: "ragas/answer_relevancy" },
+        }).catch((e) => e);
+
+        expect(error.reasons).toEqual(rejectedTypeBody.reasons);
+      });
+
+      it("names the rejected field and the accepted values in the message", async () => {
+        const { createEvaluator } = await import(
+          "../langwatch-api-evaluators.js"
+        );
+        mockErrorResponse(422, JSON.stringify(rejectedTypeBody));
+
+        const error = await createEvaluator({
+          name: "Relevancy",
+          config: { evaluatorType: "ragas/answer_relevancy" },
+        }).catch((e) => e);
+
+        expect(error.message).toContain("config.evaluatorType");
+        expect(error.message).toContain("ragas/response_relevancy");
+        expect(error.message).toContain("langevals/llm_boolean");
+        expect(error.message).toContain("ragas/answer_relevancy");
+      });
+    });
+
     it("parses the tRPC shape using `code` instead of `error`", async () => {
       const { searchTraces } = await import("../langwatch-api.js");
       const body = {

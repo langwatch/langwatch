@@ -2,6 +2,7 @@ import { Box, Flex } from "@chakra-ui/react";
 import { motion } from "motion/react";
 import type React from "react";
 import { useCallback, useEffect, useRef } from "react";
+import type { TraceListCursor } from "../../stores/filterStore";
 import { useRefreshUIStore } from "../../stores/refreshUIStore";
 import { RefreshProgressBar } from "../TracesPage/RefreshProgressBar";
 import { ColumnEducationDialog } from "./ColumnEducationDialog";
@@ -11,7 +12,6 @@ import {
   releaseTraceTableScrollElement,
   setTraceTableScrollElement,
 } from "./scrollContext";
-import type { TraceListCursor } from "../../stores/filterStore";
 
 interface TraceTableLayoutProps {
   totalHits: number;

@@ -30,12 +30,12 @@ func TestTraceStreamWrapper_AccumulatesChunksIntoResponseBody(t *testing.T) {
 	stub := newChunkedStub(chunks)
 	captured := newCapturedEnd()
 	wrapper := &traceStreamWrapper{
-		inner:   stub,
-		end:     captured.End,
-		bundle:  &domain.Bundle{ProjectID: "proj_test"},
-		req:     &domain.Request{Type: domain.RequestTypeMessages, Resolved: &domain.ResolvedModel{ModelID: "claude-haiku-4-5"}},
-		meta:    &Meta{},
-		spanCtx: context.Background(),
+		inner:            stub,
+		end:              captured.End,
+		bundle:           &domain.Bundle{ProjectID: "proj_test"},
+		req:              &domain.Request{Type: domain.RequestTypeMessages, Resolved: &domain.ResolvedModel{ModelID: "claude-haiku-4-5"}},
+		gatewayRequestID: "",
+		spanCtx:          context.Background(),
 	}
 	for wrapper.Next(context.Background()) {
 		// Caller would normally read Chunk() and forward to the writer.
@@ -60,12 +60,12 @@ func TestTraceStreamWrapper_CapsBodyAtResponseBodyCap(t *testing.T) {
 	stub := newChunkedStub([][]byte{huge})
 	captured := newCapturedEnd()
 	wrapper := &traceStreamWrapper{
-		inner:   stub,
-		end:     captured.End,
-		bundle:  &domain.Bundle{ProjectID: "proj_test"},
-		req:     &domain.Request{Type: domain.RequestTypeChat, Resolved: &domain.ResolvedModel{ModelID: "gpt-5"}},
-		meta:    &Meta{},
-		spanCtx: context.Background(),
+		inner:            stub,
+		end:              captured.End,
+		bundle:           &domain.Bundle{ProjectID: "proj_test"},
+		req:              &domain.Request{Type: domain.RequestTypeChat, Resolved: &domain.ResolvedModel{ModelID: "gpt-5"}},
+		gatewayRequestID: "",
+		spanCtx:          context.Background(),
 	}
 	for wrapper.Next(context.Background()) {
 		_ = wrapper.Chunk()
@@ -83,12 +83,12 @@ func TestTraceStreamWrapper_AccumulatorCapsCumulativeChunks(t *testing.T) {
 	stub := newChunkedStub([][]byte{half, tail})
 	captured := newCapturedEnd()
 	wrapper := &traceStreamWrapper{
-		inner:   stub,
-		end:     captured.End,
-		bundle:  &domain.Bundle{ProjectID: "proj_test"},
-		req:     &domain.Request{Type: domain.RequestTypeChat, Resolved: &domain.ResolvedModel{ModelID: "gpt-5"}},
-		meta:    &Meta{},
-		spanCtx: context.Background(),
+		inner:            stub,
+		end:              captured.End,
+		bundle:           &domain.Bundle{ProjectID: "proj_test"},
+		req:              &domain.Request{Type: domain.RequestTypeChat, Resolved: &domain.ResolvedModel{ModelID: "gpt-5"}},
+		gatewayRequestID: "",
+		spanCtx:          context.Background(),
 	}
 	for wrapper.Next(context.Background()) {
 		_ = wrapper.Chunk()
@@ -108,12 +108,12 @@ func TestTraceStreamWrapper_CaptureOncePerChunk(t *testing.T) {
 	stub := newChunkedStub(chunks)
 	captured := newCapturedEnd()
 	wrapper := &traceStreamWrapper{
-		inner:   stub,
-		end:     captured.End,
-		bundle:  &domain.Bundle{ProjectID: "proj_test"},
-		req:     &domain.Request{Type: domain.RequestTypeChat, Resolved: &domain.ResolvedModel{ModelID: "gpt-5"}},
-		meta:    &Meta{},
-		spanCtx: context.Background(),
+		inner:            stub,
+		end:              captured.End,
+		bundle:           &domain.Bundle{ProjectID: "proj_test"},
+		req:              &domain.Request{Type: domain.RequestTypeChat, Resolved: &domain.ResolvedModel{ModelID: "gpt-5"}},
+		gatewayRequestID: "",
+		spanCtx:          context.Background(),
 	}
 	for wrapper.Next(context.Background()) {
 		_ = wrapper.Chunk()

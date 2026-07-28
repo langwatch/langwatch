@@ -21,6 +21,7 @@ import Head from "~/utils/compat/next-head";
 
 import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import MyLayout from "~/components/me/MyLayout";
+import { AvatarUploadControl } from "~/components/me/avatar/AvatarUploadControl";
 import { HomePagePicker } from "~/components/me/HomePagePicker";
 import { PersonalOtlpEndpointPanel } from "~/components/me/PersonalOtlpEndpointPanel";
 import {
@@ -205,7 +206,10 @@ function MySettingsPage() {
         </HStack>
 
         <SectionCard title="Profile">
-          <VStack align="stretch" gap={3}>
+          <VStack align="stretch" gap={4}>
+            {ctx.organizationId && (
+              <AvatarUploadControl organizationId={ctx.organizationId} />
+            )}
             <Field label="Name" value={ctx.fullName} />
             <Field
               label="Email"

@@ -1,5 +1,19 @@
 import { generate } from "@langwatch/ksuid";
 import type { HandledError } from "@langwatch/handled-error";
+import { createLogger } from "@langwatch/observability";
+import {
+  LANGY_CONVERSATION_TURN_EVENT_TYPES,
+  cursorHasReachedEvent,
+  langyConversationTurnEventSchema,
+  type LangyConversationTurnWireEvent,
+  type LangyEventCursor,
+} from "@langwatch/langy";
+import {
+  createTenantId,
+  type TenantId,
+} from "~/server/event-sourcing/domain/tenantId";
+import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
+import { REHYDRATION_WINDOW_MS } from "~/server/event-sourcing/stores/rehydrationWindow";
 import {
   langyAgentErrorFromErrorFrame,
   serializeLangyTurnError,
@@ -25,9 +39,8 @@ import type {
   LangyToolCallFailedEventData,
   LangyToolCallInitiatedEventData,
   LangyToolCallSucceededEventData,
-} from "~/server/event-sourcing/pipelines/langy-conversation-processing";
-import { langyJsonValueSchema } from "~/server/event-sourcing/pipelines/langy-conversation-processing";
-import { LANGY_CONVERSATION_STATUS } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/constants";
+} from "@langwatch/langy";
+import { LANGY_CONVERSATION_STATUS, langyJsonValueSchema } from "@langwatch/langy";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import {
   LangyConversationNotFoundError,
@@ -50,6 +63,59 @@ import {
 
 export type { LangyConversationRepository as LangyConversationReadRepository } from "./repositories/langy-conversation.repository";
 
+/**
+ * Narrow read port over the canonical event log, for the tail read (ADR-059).
+ * Structurally satisfied by `EventStore.getEventsOccurredSince` — the service
+ * never sees appends, pagination internals, or other aggregates. The explicit
+ * lower bound is what lets ClickHouse prune weekly partitions instead of
+ * cold-scanning a long conversation's whole history on every tail fetch.
+ */
+export interface LangyConversationEventsReader {
+  getEventsOccurredSince(
+    aggregateId: string,
+    context: { tenantId: TenantId },
+    aggregateType: "langy_conversation",
+    occurredAtFromMs: number,
+  ): Promise<readonly LangyConversationProcessingEvent[]>;
+}
+
+/**
+ * Hard ceiling on one tail response. A conversation's whole event set is
+ * inherently small (a turn is a handful of transitions), so a tail this long
+ * means something is wrong — the client gets the truncated flag and the next
+ * fetch continues from the returned cursor, and we log rather than silently
+ * cap.
+ */
+const CONVERSATION_EVENT_TAIL_LIMIT = 1_000;
+
+/**
+ * How long a read will wait out the dispatch window — the gap between a
+ * create command being ACCEPTED and its projection row landing.
+ *
+ * 1.5s was not enough. A turn that has to wake a cold worker takes far longer
+ * than the projector's usual few hundred milliseconds, and the read landed a
+ * beat before the row did — so the reader was told their conversation did not
+ * exist, and then it did.
+ */
+const DISPATCH_LAG_ATTEMPTS = 12;
+const DISPATCH_LAG_RETRY_MS = 400;
+/**
+ * How many attempts may pass with NO pending handoff before we conclude the id
+ * is simply unknown.
+ *
+ * It cannot be zero, which is the second half of the same bug: the handoff row
+ * is written by the very dispatch we are waiting on, so a read that arrives
+ * before IT lands found no evidence, took the fast path, and returned "not
+ * found" without ever retrying. A couple of beats of grace is the difference
+ * between "no create is in flight" and "the create is a few milliseconds
+ * younger than this read".
+ */
+const DISPATCH_HANDOFF_GRACE_ATTEMPTS = 3;
+
+const conversationServiceLogger = createLogger(
+  "langwatch:langy:conversation-service",
+);
+
 /** List-item shape the sidebar renders. Named for the domain, not the column. */
 export type ConversationListItem = {
   id: string;
@@ -64,12 +130,27 @@ export type ConversationListItem = {
 export type ConversationDetail = ConversationListItem & {
   status: string;
   /**
+   * The turn in flight right now, or null when none is (`CurrentTurnId` on the
+   * fold — set at `agent_turn_accepted`, cleared by the turn's terminal).
+   *
+   * The durable answer to "which turn would a Stop stop?" (ADR-058). A browser
+   * tab only learns a turn id from its own send, so a turn it merely adopted —
+   * another tab's, or one rejoined after a refresh — had no id to stop with.
+   * The record has always known; nobody read it back.
+   */
+  currentTurnId: string | null;
+  /**
    * Why the last turn failed, when it did (`agent_response_failed` sets it on the
    * fold). DURABLE, unlike the browser's `useChat` error — which is why a refresh
    * after a failed turn used to leave the user's question sitting there with no
    * answer and no explanation at all.
    */
   lastError: string | null;
+  /**
+   * The projection's event cursor (ADR-059): the snapshot position the client
+   * seeds its local fold from before folding the durable tail.
+   */
+  eventCursor: LangyEventCursor | null;
 };
 
 export interface ConversationListPage {
@@ -130,6 +211,27 @@ function turnMessageId(turnId: string): string {
 }
 
 /**
+ * Module-level (not a method) so the traced() proxy in presets.ts never wraps
+ * it: it is sync and its results are spread/mapped — an async wrapper would
+ * silently turn them into Promises.
+ */
+function toListItem(
+  row: LangyConversationRow,
+  userId: string,
+): ConversationListItem {
+  return {
+    id: row.id,
+    title: row.title,
+    isShared: row.isShared,
+    isOwn: row.userId === userId,
+    lastActivityAt: new Date(
+      row.lastActivityAtMs > 0 ? row.lastActivityAtMs : row.createdAtMs,
+    ),
+    messageCount: row.messageCount,
+  };
+}
+
+/**
  * Langy application service. Reads come from the Postgres operational
  * projection; writes remain event-sourcing commands.
  */
@@ -138,22 +240,54 @@ export class LangyConversationService {
     private readonly repository: LangyConversationRepository,
     private readonly commands: LangyConversationCommands,
     private readonly messages: LangyMessageRepository = new NullLangyMessageRepository(),
+    private readonly events: LangyConversationEventsReader | null = null,
   ) {}
 
-  private toListItem(
-    row: LangyConversationRow,
-    userId: string,
-  ): ConversationListItem {
-    return {
-      id: row.id,
-      title: row.title,
-      isShared: row.isShared,
-      isOwn: row.userId === userId,
-      lastActivityAt: new Date(
-        row.lastActivityAtMs > 0 ? row.lastActivityAtMs : row.createdAtMs,
-      ),
-      messageCount: row.messageCount,
-    };
+  /**
+   * The visibility read, tolerant of the DISPATCH window.
+   *
+   * A conversation whose create was just accepted has a pending handoff —
+   * written synchronously at dispatch — before its projection row lands, so
+   * "missing row + pending handoff" means NOT YET, never "never". In that
+   * window this retries briefly instead of reporting the very lie the
+   * `getById` doc below spends three paragraphs on: the panel used to render
+   * "conversation not found" moments before the same conversation's turn was
+   * accepted. A miss with NO handoff stays an immediate not-found — an
+   * unknown id must not grow a probe-friendly delay, and the retried read
+   * still enforces visibility, so the handoff's existence never widens
+   * access.
+   */
+  private async findVisibleToleratingDispatchLag({
+    id,
+    projectId,
+    userId,
+  }: {
+    id: string;
+    projectId: string;
+    userId: string;
+  }) {
+    for (let attempt = 0; attempt <= DISPATCH_LAG_ATTEMPTS; attempt++) {
+      const row = await this.repository.findVisibleById({
+        id,
+        projectId,
+        userId,
+      });
+      if (row) return row;
+
+      // Re-asked every beat, not once up front: the handoff row lands on the
+      // same dispatch we are waiting for, so "no handoff yet" early on means
+      // "too soon to tell", not "no such conversation".
+      const handoff = await this.repository
+        .findPendingHandoff({ projectId, conversationId: id })
+        .catch(() => null);
+      if (!handoff && attempt >= DISPATCH_HANDOFF_GRACE_ATTEMPTS) return null;
+
+      if (attempt === DISPATCH_LAG_ATTEMPTS) return null;
+      await new Promise((resolve) =>
+        setTimeout(resolve, DISPATCH_LAG_RETRY_MS),
+      );
+    }
+    return null;
   }
 
   /**
@@ -186,16 +320,106 @@ export class LangyConversationService {
     projectId: string;
     userId: string;
   }): Promise<ConversationDetail> {
-    const row = await this.repository.findVisibleById({
+    const row = await this.findVisibleToleratingDispatchLag({
       id,
       projectId,
       userId,
     });
     if (!row) throw new LangyConversationNotFoundError(id);
     return {
-      ...this.toListItem(row, userId),
+      ...toListItem(row, userId),
       status: row.status,
+      currentTurnId: row.currentTurnId,
       lastError: row.lastError,
+      eventCursor: row.eventCursor ?? null,
+    };
+  }
+
+  /**
+   * The conversation's durable TURN events strictly after a cursor — the tail
+   * the browser folds locally with the shared reducer (ADR-059 §2/§3).
+   *
+   * Authorized exactly like `getById` (owner-or-shared, reported as not-found
+   * so it cannot probe), and restricted to the TURN vocabulary
+   * (`LANGY_CONVERSATION_TURN_EVENT_TYPES`): those payloads carry no
+   * server-only fields, so the wire schema is secure by construction — spine
+   * events (which carry `runToken` / handoff tokens) never enter this read.
+   *
+   * Served from a partition-pruned storage read: the cursor's `acceptedAt` is
+   * the event's ACCEPT time, storage's lower bound is on OCCURRED time, and an
+   * event accepted after the cursor may have occurred earlier (delayed relays,
+   * replays) — so the floor sits a full rehydration window below the cursor.
+   * Still strictly filtered by the shared cursor comparator in memory; the
+   * bound only exists so ClickHouse skips the weekly partitions a long
+   * conversation left behind.
+   */
+  async getEventsAfter({
+    projectId,
+    conversationId,
+    userId,
+    after,
+  }: {
+    projectId: string;
+    conversationId: string;
+    userId: string;
+    after: LangyEventCursor;
+  }): Promise<{
+    events: LangyConversationTurnWireEvent[];
+    /** Position of the last returned event; `after` when the tail is empty. */
+    cursor: LangyEventCursor;
+    /** True when the tail was cut at the ceiling — fetch again from `cursor`. */
+    truncated: boolean;
+  }> {
+    const visible = await this.findVisibleToleratingDispatchLag({
+      id: conversationId,
+      projectId,
+      userId,
+    });
+    if (!visible) throw new LangyConversationNotFoundError(conversationId);
+
+    // No event store configured (event sourcing disabled) means there are no
+    // durable events at all — an empty tail is the honest answer.
+    if (!this.events) return { events: [], cursor: after, truncated: false };
+
+    const all = await this.events.getEventsOccurredSince(
+      conversationId,
+      { tenantId: createTenantId(projectId) },
+      "langy_conversation",
+      Math.max(0, after.acceptedAt - REHYDRATION_WINDOW_MS),
+    );
+
+    const turnTypes: readonly string[] = LANGY_CONVERSATION_TURN_EVENT_TYPES;
+    const tail = all.filter(
+      (event) =>
+        turnTypes.includes(event.type) && !cursorHasReachedEvent(after, event),
+    );
+
+    const truncated = tail.length > CONVERSATION_EVENT_TAIL_LIMIT;
+    if (truncated) {
+      conversationServiceLogger.warn(
+        { projectId, conversationId, tailLength: tail.length },
+        "Langy event tail exceeded the response ceiling — serving a truncated page",
+      );
+    }
+    const page = truncated
+      ? tail.slice(0, CONVERSATION_EVENT_TAIL_LIMIT)
+      : tail;
+
+    const events = page.map((event) =>
+      langyConversationTurnEventSchema.parse({
+        id: event.id,
+        createdAt: event.createdAt,
+        occurredAt: event.occurredAt,
+        type: event.type,
+        data: event.data,
+      }),
+    );
+
+    const last = events.at(-1);
+    return {
+      events,
+      cursor: last ? { acceptedAt: last.createdAt, eventId: last.id } : after,
+      truncated,
     };
   }
 
@@ -238,7 +462,7 @@ export class LangyConversationService {
       userId,
       limit,
     });
-    return rows.map((r) => this.toListItem(r, userId));
+    return rows.map((r) => toListItem(r, userId));
   }
 
   /**
@@ -276,7 +500,7 @@ export class LangyConversationService {
         : last.cursorActivityAtMs;
 
     return {
-      items: pageRows.map((row) => this.toListItem(row, userId)),
+      items: pageRows.map((row) => toListItem(row, userId)),
       nextCursor:
         hasMore && last
           ? { lastActivityAtMs: rawCursorActivity, id: last.id }
@@ -451,7 +675,12 @@ export class LangyConversationService {
         lastActivityAt,
         messageCount: importedMessages.length,
         status: LANGY_CONVERSATION_STATUS.IDLE,
+        // An import runs no turn — there is nothing in flight to stop.
+        currentTurnId: null,
         lastError: null,
+        // The fork's projection has not landed yet, so there is no snapshot
+        // position to seed from — the client folds from the start.
+        eventCursor: null,
       },
       messages: importedMessages,
     };
@@ -718,6 +947,28 @@ export class LangyConversationService {
    * place, so the durable body is identical to the relay's and never carries raw
    * agent prose (`LastError` is a vetted domain error, rendered on history load).
    */
+  /**
+   * True when the (projectId, conversationId, turnId) triple names a turn that
+   * was really accepted under this conversation in this project. The durable
+   * result-ingest route checks this before writing: unlike the relay (which
+   * verifies an HMAC over the conversation's runToken), that route has only
+   * the shared bearer, so without this cross-check a caller who holds the
+   * secret could forge a result into any tenant's conversation, and a benign
+   * projectId/conversationId mix-up in the multiplexing manager would write
+   * one tenant's output into another's with nothing to catch it.
+   */
+  async turnExists({
+    projectId,
+    conversationId,
+    turnId,
+  }: {
+    projectId: string;
+    conversationId: string;
+    turnId: string;
+  }): Promise<boolean> {
+    return this.repository.turnExists({ projectId, conversationId, turnId });
+  }
+
   async ingestAgentTurnResult({
     projectId,
     conversationId,
@@ -854,7 +1105,10 @@ export class LangyConversationService {
     conversationId: string;
     turnId: string;
     parts: LangyMessagePart[];
-    outcome?: "completed" | "failed";
+    // `stopped` is a user-initiated stop carrying the partial answer (ADR-058);
+    // it shares agent_responded's turn-terminal slot with completed/failed, so a
+    // stop racing a natural finish collapses to exactly one terminal.
+    outcome?: "completed" | "failed" | "stopped";
     error?: string | null;
   }): Promise<{ messageId: string }> {
     const messageId = turnMessageId(turnId);
@@ -957,7 +1211,8 @@ export class LangyConversationService {
     commands: LangyConversationCommands,
     repository: LangyConversationRepository,
     messages?: LangyMessageRepository,
+    events?: LangyConversationEventsReader | null,
   ): LangyConversationService {
-    return new LangyConversationService(repository, commands, messages);
+    return new LangyConversationService(repository, commands, messages, events);
   }
 }

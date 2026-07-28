@@ -8,7 +8,7 @@
  * Both were already Hono apps in App Router route.ts files.
  */
 import type { OpenAIResponsesProviderOptions } from "@ai-sdk/openai";
-import { zValidator } from "@hono/zod-validator";
+import { validator as zValidator } from "~/server/api/validation";
 import { createLogger } from "@langwatch/observability";
 import { generateText } from "ai";
 import { streamSSE } from "hono/streaming";

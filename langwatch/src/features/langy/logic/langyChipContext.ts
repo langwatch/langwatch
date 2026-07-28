@@ -96,6 +96,30 @@ export function describeChipContext(
         ...(chip.ref ? { payload: chip.ref } : {}),
       };
 
+    case "workflow":
+      return {
+        action: "Langy will read this workflow and how it is wired up.",
+        ...(chip.ref ? { payload: chip.ref } : {}),
+      };
+
+    case "agent":
+      return {
+        action: "Langy will read this agent's configuration.",
+        ...(chip.ref ? { payload: chip.ref } : {}),
+      };
+
+    case "automation":
+      return {
+        action: "Langy will read this automation — what fires it and what it does.",
+        ...(chip.ref ? { payload: chip.ref } : {}),
+      };
+
+    case "annotation":
+      return {
+        action: "Langy will read this annotation and what it is attached to.",
+        ...(chip.ref ? { payload: chip.ref } : {}),
+      };
+
     case "project":
       return {
         action: "Langy always works in the project you have open.",

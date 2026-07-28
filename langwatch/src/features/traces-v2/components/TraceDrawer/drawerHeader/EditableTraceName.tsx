@@ -70,15 +70,17 @@ export function EditableTraceName({
       setIsEditing(false);
     },
     onError: (error) => {
-      // The server attaches the serialised HandledError to error.data so
-      // we can show the rich message + meta — falls back to error.message
-      // for unhandled cases.
-      const dErr = error.data?.domainError;
-      const meta = (dErr?.meta ?? {}) as Record<string, unknown>;
+      // The server sends only the handled error's code + meta — never
+      // server-authored prose (ADR-045) — so the copy is written here. A
+      // too-long name is the one case worth spelling out, using the limit the
+      // server reported; everything else gets one calm generic line.
+      const meta = (error.data?.error?.meta ?? {}) as Record<string, unknown>;
       const description =
         typeof meta.field === "string" && typeof meta.maxLength === "number"
-          ? `${error.message} (got ${String(meta.receivedLength ?? "?")} chars)`
-          : error.message;
+          ? `Trace names are limited to ${meta.maxLength} characters (you used ${String(
+              meta.receivedLength ?? "?",
+            )}).`
+          : "That name couldn't be saved. Try again.";
       toaster.error({
         title: "Couldn't rename trace",
         description,

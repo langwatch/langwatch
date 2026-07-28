@@ -6,6 +6,7 @@
  * in exactly one place.
  */
 import { EVENTREF_ATTR_PREFIX } from "~/server/app-layer/traces/lean-for-projection";
+import type { NormalizedAttributes } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 
 /** One decoded eventref pointer ready to fetch from event_log. */
 export interface EventRefEntry {
@@ -20,7 +21,7 @@ export interface EventRefEntry {
 /** Result of splitting a span's attributes into preview attrs + eventref pointers. */
 export interface ParsedSpanEventRefs {
   /** Non-reserved attributes (previews and regular attrs), reserved keys removed. */
-  cleanedAttrs: Record<string, string>;
+  cleanedAttrs: NormalizedAttributes;
   /** Well-formed eventref pointers to resolve. */
   eventrefEntries: EventRefEntry[];
   /** attrKeys whose eventref carried no usable eventId — caller warns + keeps preview. */
@@ -28,7 +29,7 @@ export interface ParsedSpanEventRefs {
 }
 
 /** True when the attribute map carries at least one eventref pointer. */
-export function hasEventRefs(attributes: Record<string, string>): boolean {
+export function hasEventRefs(attributes: NormalizedAttributes): boolean {
   return Object.keys(attributes).some((key) =>
     key.startsWith(EVENTREF_ATTR_PREFIX),
   );
@@ -44,9 +45,9 @@ export function hasEventRefs(attributes: Record<string, string>): boolean {
  *   sits in `cleanedAttrs` under the non-reserved IO key).
  */
 export function parseSpanEventRefs(
-  attrs: Record<string, string>,
+  attrs: NormalizedAttributes,
 ): ParsedSpanEventRefs {
-  const cleanedAttrs: Record<string, string> = {};
+  const cleanedAttrs: NormalizedAttributes = {};
   const eventrefEntries: EventRefEntry[] = [];
   const missingEventIdKeys: string[] = [];
 
@@ -54,14 +55,25 @@ export function parseSpanEventRefs(
     if (key.startsWith(EVENTREF_ATTR_PREFIX)) {
       const attrKey = key.slice(EVENTREF_ATTR_PREFIX.length);
       try {
-        const ref = JSON.parse(value) as { field?: string; eventId?: string };
+        const decoded = typeof value === "string" ? JSON.parse(value) : value;
+        if (
+          typeof decoded !== "object" ||
+          decoded === null ||
+          Array.isArray(decoded)
+        ) {
+          continue;
+        }
+        const ref = decoded as { field?: unknown; eventId?: unknown };
         if (typeof ref.eventId !== "string" || ref.eventId.length === 0) {
           missingEventIdKeys.push(attrKey);
           continue;
         }
         eventrefEntries.push({
           attrKey,
-          field: ref.field ?? attrKey,
+          field:
+            typeof ref.field === "string" && ref.field.length > 0
+              ? ref.field
+              : attrKey,
           eventId: ref.eventId,
         });
       } catch {

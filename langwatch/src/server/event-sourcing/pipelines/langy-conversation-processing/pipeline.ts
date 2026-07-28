@@ -3,6 +3,11 @@ import type { AppendStore } from "../../projections/mapProjection.types";
 import type { StateProjectionStore } from "../../projections/stateProjection.types";
 import type { EventSubscriberDefinition } from "../../subscribers/eventSubscriber.types";
 import {
+  langyConversationProcess,
+  LANGY_CONVERSATION_PROCESS_NAME,
+} from "~/server/event-sourcing/pipelines/langy-conversation-processing/process-manager";
+import type { LangyEffectPorts } from "~/server/event-sourcing/pipelines/langy-conversation-processing/process-manager";
+import {
   ArchiveConversationCommand,
   ConsumeTurnHandoffCommand,
   RecordMessageCommand,
@@ -20,22 +25,18 @@ import {
   UpdateConversationMetadataCommand,
   UpdatePlanCommand,
 } from "./commands";
-import {
-  type LangyMessageProjectionRecord,
-  LangyMessageOperationalMapProjection,
-} from "./projections/langyMessageOperational.mapProjection";
+import { LangyMessageOperationalMapProjection } from "./projections/langyMessageOperational.mapProjection";
 import {
   type LangyAnalyticsEventProjectionRecord,
   LangyAnalyticsEventMapProjection,
 } from "./projections/langyAnalyticsEvent.mapProjection";
-import {
-  type LangyConversationStateData,
-  LangyConversationStateFoldProjection,
-} from "./projections/langyConversationState.foldProjection";
-import {
-  type LangyConversationTurnData,
-  LangyConversationTurnFoldProjection,
-} from "./projections/langyConversationTurn.foldProjection";
+import { LangyConversationStateFoldProjection } from "./projections/langyConversationState.foldProjection";
+import type {
+  LangyConversationStateData,
+  LangyConversationTurnData,
+  LangyMessageProjectionRecord,
+} from "@langwatch/langy";
+import { LangyConversationTurnFoldProjection } from "./projections/langyConversationTurn.foldProjection";
 import type { LangyConversationProcessingEvent } from "./schemas/events";
 
 export interface LangyConversationProcessingPipelineDeps {
@@ -51,6 +52,11 @@ export interface LangyConversationProcessingPipelineDeps {
   langyAnalyticsEventProjectionStore: AppendStore<LangyAnalyticsEventProjectionRecord>;
   /** Live consumers are independent from projection state and replay. */
   subscribers?: EventSubscriberDefinition<LangyConversationProcessingEvent>[];
+  /**
+   * Effect ports the conversation process manager dispatches into. Only the
+   * effects are injected -- the process topology is declared on this pipeline.
+   */
+  langyProcessPorts: LangyEffectPorts;
 }
 
 /**
@@ -124,6 +130,10 @@ export function createLangyConversationProcessingPipeline(
   }
 
   return builder
+    .withProcessManager(
+      LANGY_CONVERSATION_PROCESS_NAME,
+      langyConversationProcess(deps.langyProcessPorts),
+    )
     .withCommand("createConversation", CreateConversationCommand)
     .withCommand("forkConversation", ForkConversationCommand)
     .withCommand("recordMessage", RecordMessageCommand)

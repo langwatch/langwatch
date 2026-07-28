@@ -1,6 +1,9 @@
 package domain
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 // Bundle is the resolved virtual-key configuration used for the request lifecycle.
 type Bundle struct {
@@ -65,16 +68,58 @@ type BundleConfig struct {
 	// ProjectOTLPToken is the auth token for AI trace export into TraceProjectID.
 	ProjectOTLPToken string
 
+	// MirrorTier is the ADR-061 mirror fidelity resolved for this VK's
+	// organization ("content" | "structural" | "skip" | ""). Non-skip only for
+	// Langy virtual keys — the control-plane materialiser leaves it empty for
+	// ordinary customer VKs, so their gen_ai spans are never mirrored. When
+	// non-skip, the customer trace bridge emits a SECOND gen_ai span into the
+	// mirror project at the tier's fidelity (see pkg/customertracebridge).
+	MirrorTier string
+
 	// VKDisplayPrefix is the VK's public display prefix (e.g. "vk-lw-…").
 	// Carried so rule matchers can target VKs by prefix without leaking the
 	// secret. Sourced from the control-plane config payload.
 	VKDisplayPrefix string
 
-	// VKTags carries VK-level labels honored by cache rule matchers
-	// (vk_tags). Currently always empty — the schema doesn't store tags
-	// yet — but plumbed end-to-end so future tag wiring is a one-line add
-	// in the control-plane materialiser.
+	// VKTags carries the VK's operator-assigned tags (config.metadata.tags
+	// on the control plane). Consumed by cache rule matchers (vk_tags) and
+	// stamped on customer spans as langwatch.labels so the Trace Explorer
+	// can filter gateway traffic by tag.
 	VKTags []string
+}
+
+// AllowsModel reports whether a model ID satisfies models_allowed. An
+// empty allowlist allows everything. Entries are either a literal model
+// ID or a trailing-"*" prefix pattern.
+func (c BundleConfig) AllowsModel(model string) bool {
+	if len(c.AllowedModels) == 0 {
+		return true
+	}
+	for _, pattern := range c.AllowedModels {
+		if ModelPatternMatches(pattern, model) {
+			return true
+		}
+	}
+	return false
+}
+
+// ModelPatternMatches applies one models_allowed entry to a model ID.
+func ModelPatternMatches(pattern, model string) bool {
+	if pattern == model {
+		return true
+	}
+	if ModelPatternIsWildcard(pattern) {
+		return strings.HasPrefix(model, strings.TrimSuffix(pattern, "*"))
+	}
+	return false
+}
+
+// ModelPatternIsWildcard reports whether a models_allowed entry is a
+// pattern rather than a concrete model ID. Callers that surface the
+// allowlist to users (GET /v1/models) must not present a wildcard as if
+// it were a model a client can request.
+func ModelPatternIsWildcard(pattern string) bool {
+	return strings.HasSuffix(pattern, "*")
 }
 
 // ModelAlias maps a friendly name to a provider + model.

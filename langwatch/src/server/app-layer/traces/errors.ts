@@ -48,6 +48,12 @@ export class QueryTimeoutError extends HandledError {
       `Query timed out (${(durationMs / 1000).toFixed(1)}s)`,
       {
         httpStatus: 504,
+        // A 504 from our own datastore is our problem, not the caller's —
+        // same reasoning as `ClickHouseUnavailableError` below. `fault`
+        // defaults to `"customer"`, which would log this at warn and (since
+        // it now drives evaluation skip-vs-error) let a slow-query regression
+        // surface as a benign customer skip.
+        fault: "platform",
         meta: { durationMs, ...(hint ? { hint } : {}) },
         // The call-site hint (when given) leads; registry tips follow.
         tips: [...(hint ? [hint] : []), ...(base.tips ?? [])],

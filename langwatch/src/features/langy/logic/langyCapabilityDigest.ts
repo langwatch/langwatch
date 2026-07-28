@@ -22,7 +22,7 @@ import {
   cliResultDigestSchema,
   extractDigest,
   type CliResultDigest,
-} from "@langwatch/cli-cards";
+} from "@langwatch/langy";
 import { parseLangwatchCommand } from "~/server/app-layer/langy/execution/langwatchCommand";
 
 /** The typed tool name the CLI envelope records calls under. */

@@ -146,20 +146,20 @@ describe("PATCH /:traceId/metadata", () => {
 
   describe("when called with an empty metadata object", () => {
     /** @scenario PATCH endpoint rejects empty metadata object */
-    it("returns 400", async () => {
+    it("returns 422", async () => {
       const res = await patchMetadata("trace-abc", {});
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(422);
       expect(mockRecordSpan).not.toHaveBeenCalled();
     });
   });
 
   describe("when called with an oversized metadata value", () => {
     /** @scenario PATCH endpoint rejects oversized metadata values */
-    it("returns 400 for values exceeding 4KB", async () => {
+    it("returns 422 for values exceeding 4KB", async () => {
       const res = await patchMetadata("trace-abc", {
         big_value: "x".repeat(4097),
       });
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(422);
       expect(mockRecordSpan).not.toHaveBeenCalled();
     });
   });

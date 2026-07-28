@@ -398,6 +398,8 @@ describe("output validation", () => {
         code: "internal_error",
         // Deprecated back-compat alias of `code` (see ErrorResponseBody.kind).
         kind: "internal_error",
+        // The Go envelope's name for the same value (see ErrorResponseBody.type).
+        type: "internal_error",
         message: "An unknown error occurred",
       });
     });

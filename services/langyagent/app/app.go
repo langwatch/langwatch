@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"errors"
+	"hash/fnv"
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -15,12 +16,54 @@ import (
 	"github.com/langwatch/langwatch/services/langyagent/domain"
 	"github.com/langwatch/langwatch/services/langyagent/internal/frames"
 	"github.com/langwatch/langwatch/services/langyagent/internal/telemetry"
+	langyotel "github.com/langwatch/langwatch/services/langyagent/otel"
 )
 
 // errStreamConsumerCrashed unblocks the handler when the SSE stream goroutine
 // panics. Its message is user-safe (surfaced as an ndjson error event) and
 // carries no internals — the stack is logged by the goroutine's recover.
 var errStreamConsumerCrashed = errors.New("stream ended unexpectedly")
+
+// wakingLangyStatuses are the cold pre-first-frame lines: this worker has never
+// answered, so the wait really is a boot. Varied by turn (see readyStatusFor)
+// because one phrase repeated under every conversation start reads as a looping
+// machine.
+var wakingLangyStatuses = []string{
+	"Waking Langy up…",
+	"Giving Langy a pep talk…",
+	"Poking Langy…",
+}
+
+// reachingLangyStatuses are the warm-worker pre-first-frame lines: the worker
+// has answered before, so the wait is a round-trip, not a boot.
+var reachingLangyStatuses = []string{
+	"Paging Langy…",
+	"Pinging Langy…",
+	"Getting Langy's attention…",
+	"Nudging Langy…",
+}
+
+// readyStatusFor words the pre-first-frame status by the transition actually
+// happening: resuming a checkpointed turn (ADR-048), waking a worker that has
+// never answered, or reaching one that has. Lines rotate deterministically off
+// the turn id — stable for a re-drive of the same turn, different across turns.
+func readyStatusFor(req ChatRequest, worker Worker) string {
+	if req.ResumeToken != "" {
+		return "Picking up where it left off…"
+	}
+	if !worker.HasServedTurn() {
+		return wakingLangyStatuses[statusIndexOf(req.TurnID, len(wakingLangyStatuses))]
+	}
+	return reachingLangyStatuses[statusIndexOf(req.TurnID, len(reachingLangyStatuses))]
+}
+
+// statusIndexOf maps a turn id onto [0, n) with FNV-1a — cheap, deterministic,
+// and evenly spread, which is all a copy rotation needs.
+func statusIndexOf(turnID string, n int) int {
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(turnID))
+	return int(h.Sum32() % uint32(n)) //nolint:gosec // bounded by n
+}
 
 // App is the langyagent application. It composes the worker pool and the
 // telemetry seam. All fields are injected via Options so tests can swap any
@@ -73,7 +116,14 @@ type ChatRequest struct {
 	ConversationID string
 	Prompt         string
 	System         string
-	Credentials    domain.Credentials
+	// HistorySeed is the control plane's conversation-so-far block (transcript +
+	// resource memory). It rides every dispatch; the WORKER folds it in ahead of
+	// the prompt only on its session's first message (see Worker.PostMessage),
+	// so a fresh session continues the conversation while a warm session's
+	// requests keep a byte-stable, provider-cacheable prefix. Empty for a
+	// brand-new conversation.
+	HistorySeed string
+	Credentials domain.Credentials
 	// ResumeToken (ADR-048) is an opaque, worker-authored checkpoint from a prior
 	// turn that handed off on shutdown. Threaded into PostMessage so opencode
 	// resumes from it; empty on a normal cold start.
@@ -204,12 +254,26 @@ func (a *App) driveTurn(ctx context.Context, req ChatRequest, worker Worker) {
 	// Pin the turn's trace context on the worker's telemetry-relay entry BEFORE
 	// the prompt is posted, so every span the worker exports during this turn —
 	// and every mediated LLM call it makes — is stitched under this turn's trace.
-	// With telemetry off this is the remote (control-plane) span context; still
-	// valid, still the right parent.
-	if sc := turnSpan.SpanContext(); sc.IsValid() {
-		worker.SetTurnTraceContext(sc)
-	}
+	// With telemetry off this is the remote (control-plane) span context. When
+	// even that is absent (noop tracers on both processes, dev without an OTLP
+	// endpoint), the turn MINTS its identity: without one, worker spans keep
+	// their own trace ids, the customer turn root is never forwarded, and the
+	// gateway's gen_ai span roots a standalone trace duplicating the turn.
 	start := time.Now()
+	// How the turn ended, when it ended in an error: set by every failing
+	// branch below, read by the deferred customer turn-span forward so the
+	// customer trace shows the failure (status + message), and mirrored onto
+	// the internal turn span. Nil means the turn completed (or handed off).
+	var failure *domain.TurnFailure
+	sc := turnSpan.SpanContext()
+	if !sc.IsValid() {
+		sc = langyotel.MintSpanContext()
+	}
+	worker.SetTurnTraceContext(sc)
+	// The customer's copy of the turn span, emitted when the turn ends:
+	// the real root under which the worker's re-parented spans and the
+	// gateway's retold LLM spans already sit.
+	defer func() { worker.ForwardTurnSpan(sc, start, time.Now(), failure) }()
 
 	// The per-turn relay push. Disabled (no runToken/endpoint/secret) ⇒ nil stream:
 	// the turn still runs + finalizes, it just has no live edge.
@@ -222,16 +286,14 @@ func (a *App) driveTurn(ctx context.Context, req ChatRequest, worker Worker) {
 	// LLM request the worker prepares its tools (measured at 10s+ on a cold
 	// home) and produces NO frames — the panel would sit on an escalating
 	// "Starting up…" that reads as a hang. The wording names the transition the
-	// manager actually knows: a resume from a shutdown handoff (ADR-048) is
-	// picking a checkpointed turn back up; everything else is a cold workspace
-	// coming to life. Emitted BEFORE onFirstFrame is wired, so time-to-first-
+	// manager actually knows (readyStatusFor): a resume from a shutdown handoff
+	// (ADR-048) is picking a checkpointed turn back up, a worker that has never
+	// answered is waking up, and a warm worker gets a short reaching-Langy line
+	// that varies by turn — one phrase repeated under every message reads as a
+	// looping machine. Emitted BEFORE onFirstFrame is wired, so time-to-first-
 	// frame keeps meaning the agent's own first output; the client clears the
 	// status the moment real output arrives.
-	readyStatus := "Setting up a fresh workspace…"
-	if req.ResumeToken != "" {
-		readyStatus = "Picking up where it left off…"
-	}
-	if f, err := frames.Status(readyStatus); err == nil {
+	if f, err := frames.Status(readyStatusFor(req, worker)); err == nil {
 		_ = sink.Emit(f)
 	}
 	// Mark time-to-first-frame (the agent's first output) on the turn span, so the
@@ -269,17 +331,25 @@ func (a *App) driveTurn(ctx context.Context, req ChatRequest, worker Worker) {
 		errCh <- err
 	}()
 
-	if err := worker.PostMessage(ctx, req.System, req.Prompt, req.ResumeToken); err != nil {
+	// Records the turn's terminal failure (for the customer turn span) and
+	// pushes the matching terminal error frame in one move, so the two
+	// surfaces can never disagree about how the turn ended.
+	failTurn := func(message, code string) {
+		failure = &domain.TurnFailure{Code: code, Message: message}
+		emitError(ctx, sink, message, code)
+	}
+
+	if err := worker.PostMessage(ctx, req.System, req.Prompt, req.HistorySeed, req.ResumeToken); err != nil {
 		cancelStream()
 		<-errCh // the stream consumer has now fully returned.
 		if errors.Is(err, domain.ErrSessionNotFound) {
 			a.pool.KillSessionVanished(req.ConversationID)
-			emitError(ctx, sink, "the session ended — please retry", "session_not_found")
+			failTurn("the session ended — please retry", "session_not_found")
 			a.turnObserved(ctx, start, "session-not-found", req.Intent)
 			return
 		}
 		clog.Get(ctx).Error("post message failed", zap.Error(err))
-		emitError(ctx, sink, "the agent could not start the turn", "post_error")
+		failTurn("the agent could not start the turn", "post_error")
 		a.turnObserved(ctx, start, "post-error", req.Intent)
 		return
 	}
@@ -290,7 +360,7 @@ func (a *App) driveTurn(ctx context.Context, req ChatRequest, worker Worker) {
 	// letting it fall through would emit a SUCCESS final for a turn we stopped).
 	if message, code, tripped := githubGate.Tripped(); tripped {
 		clog.Get(ctx).Info("github gate stopped the turn", zap.String("code", code))
-		emitError(ctx, sink, message, code)
+		failTurn(message, code)
 		a.turnObserved(ctx, start, "github-gate", req.Intent)
 		return
 	}
@@ -314,9 +384,20 @@ func (a *App) driveTurn(ctx context.Context, req ChatRequest, worker Worker) {
 		// across every wire.
 		clog.Get(ctx).Warn("agent reported turn error", zap.Error(streamErr))
 		var reasons []error
+		failureMessage := "the agent hit an error before finishing"
 		if llmErr, ok := worker.LastLLMError(); ok {
 			reasons = append(reasons, llmErr)
+			// The captured cause's message is the provider's own error text
+			// (client-facing by design) — the trace should name the real
+			// failure, not the generic wrapper.
+			if m, _ := llmErr.Meta["message"].(string); m != "" {
+				failureMessage = m
+			}
+		} else {
+			clog.Get(ctx).Warn("agent error carried no captured LLM cause")
 		}
+		failure = &domain.TurnFailure{Code: "agent_error", Message: failureMessage}
+		turnSpan.RecordError(streamErr)
 		he := herr.NewLight(ctx, domain.ErrAgentError,
 			herr.M{"message": "the agent hit an error before finishing"}, reasons...)
 		f, mErr := frames.ErrorFromHerr(he)
@@ -333,7 +414,7 @@ func (a *App) driveTurn(ctx context.Context, req ChatRequest, worker Worker) {
 		// `worker_stopped` code into a final "Langy's worker stopped" state (never
 		// the raw prose, and never a client auto-retry into the dead worker).
 		clog.Get(ctx).Warn("stream events ended with error", zap.Error(streamErr))
-		emitError(ctx, sink, "the worker stopped before finishing", "worker_stopped")
+		failTurn("the worker stopped before finishing", "worker_stopped")
 		a.turnObserved(ctx, start, "stream-error", req.Intent)
 	default:
 		emitFinal(ctx, sink)

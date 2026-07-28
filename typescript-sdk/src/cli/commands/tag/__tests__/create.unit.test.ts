@@ -45,7 +45,8 @@ describe("tagCreateCommand", () => {
     it("prints confirmation message", async () => {
       mockCreateTag.mockResolvedValue({ name: "canary", createdAt: new Date().toISOString() });
 
-      await tagCreateCommand("canary");
+      const result = await tagCreateCommand("canary");
+      result?.table();
 
       expect(console.log).toHaveBeenCalledWith(expect.stringContaining("Created tag: canary"));
     });

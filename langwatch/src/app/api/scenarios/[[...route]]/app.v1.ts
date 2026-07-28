@@ -1,7 +1,8 @@
 import { createLogger } from "@langwatch/observability";
 import type { Scenario } from "@prisma/client";
 import { describeRoute } from "hono-openapi";
-import { resolver, validator as zValidator } from "hono-openapi/zod";
+import { resolver } from "hono-openapi/zod";
+import { validator as zValidator } from "~/server/api/validation";
 import { z } from "zod";
 import { badRequestSchema } from "~/app/api/shared/schemas";
 import { requires, type SecuredApp } from "~/server/api/security";
@@ -133,7 +134,16 @@ export function registerScenarioRoutes(
   },
 );
 
-  secured.access(requires("scenarios:manage")).post(
+  // Creating asks for `scenarios:create`, not `scenarios:manage`.
+  //
+  // Nobody loses access: `:manage` implies `:create` through the RBAC
+  // hierarchy, so every role and key that could create a scenario yesterday
+  // still can. What changes is that access granted at the CREATE grain now
+  // works — it used to be a permission the product would issue and then refuse
+  // to honour, which is how an assistant scoped to exactly "read and create"
+  // ended up unable to create anything. A viewer is unaffected: they keep the
+  // read routes and are declined the write, as before.
+  secured.access(requires("scenarios:create")).post(
   "/",
   resourceLimitMiddleware("scenarios"),
   describeRoute({
@@ -176,7 +186,9 @@ export function registerScenarioRoutes(
   },
 );
 
-  secured.access(requires("scenarios:manage")).put(
+  // `:update` for the same reason as `:create` above — `:manage` still implies
+  // it, so no existing caller changes.
+  secured.access(requires("scenarios:update")).put(
   "/:id",
   describeRoute({
     description: "Update an existing scenario",
@@ -232,6 +244,10 @@ export function registerScenarioRoutes(
   },
 );
 
+  // Archiving deliberately still asks for `:manage`. Create and update were
+  // refined because access issued at that grain was being refused; nothing is
+  // asking to destroy scenarios at a finer grain, and the destructive verb is
+  // the wrong place to widen who qualifies.
   secured.access(requires("scenarios:manage")).delete(
   "/:id",
   describeRoute({

@@ -8,7 +8,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Bot, Check, Terminal, Users } from "lucide-react";
+import { Bot, Check, Terminal } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
 import {
@@ -22,13 +22,14 @@ import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { api } from "~/utils/api";
 
 /**
- * /me Trace Ingest section — tile-grid for IngestionTemplate v1 catalog.
+ * /me Trace Ingest section, the tile-grid for the IngestionTemplate
+ * catalog.
  *
  * Tile metadata comes from `api.ingestionTemplates.list` (server is the
- * source of truth — admin can disable / org-author / archive). v1
- * platform-published rows are seeded by Sergey's seeders. Per-template
- * iconography is resolved client-side from a slug map since v1 platform
- * defaults ship with iconAsset=NULL.
+ * source of truth: admin can disable / org-author / archive). The
+ * platform ships NO default templates, so the whole section renders only
+ * when the org has at least one template of its own. A heading over an
+ * empty grid would read as a broken section on every fresh org's /me.
  *
  * Install fires `api.ingestionKey.install` mutation. The plaintext
  * sk-lw- token is shown ONCE in the drawer and stored in component state
@@ -38,7 +39,9 @@ import { api } from "~/utils/api";
  *
  * raw_otlp_advanced is rendered as a SEPARATE static tile (no
  * IngestionTemplate row, no install). It deep-links to
- * /me/configure#otlp — the BYO-OTLP fallback discovery card.
+ * /me/configure#otlp, the BYO-OTLP fallback discovery card. It renders
+ * only alongside real templates; the personal OTLP endpoint stays
+ * reachable via /me/configure regardless.
  *
  * The platform's coding assistants (claude_code, codex, cursor, gemini,
  * opencode) never appear in this grid because they are not seeded as
@@ -46,23 +49,13 @@ import { api } from "~/utils/api";
  * setup and the receiver converts their OTLP logs into canonical gen_ai
  * spans. Their entry points live on the AiToolsPortal "$ langwatch
  * <tool>" tiles. The grid simply renders whatever
- * `api.ingestionTemplates.list` returns (claude_cowork + any org-authored
- * templates) plus the raw_otlp_advanced discovery card — no slug filter.
+ * `api.ingestionTemplates.list` returns (org-authored templates) plus
+ * the raw_otlp_advanced discovery card, with no slug filter.
  *
  * Per the no-leak invariant in catalog.feature: this component MUST
  * NOT render under /[project] chrome — only on /me. Embedding lives on
  * /me/index.tsx.
  */
-const TILE_META: Record<
-  string,
-  { icon: ReactNode; subtitle: string }
-> = {
-  claude_cowork: {
-    icon: <Users size={20} />,
-    subtitle: "Multi-agent Claude sessions",
-  },
-};
-
 const FALLBACK_ICON = <Bot size={20} />;
 
 export function TraceIngestSection() {
@@ -120,6 +113,18 @@ export function TraceIngestSection() {
 
   /** Connected ingestion keys, keyed by the source they were minted for. */
   const keyBySourceType = new Map(keys.map((k) => [k.sourceType, k]));
+
+  // No templates, no section: the platform ships no defaults, so most
+  // orgs have nothing to install here. Rendering nothing (not even
+  // load skeletons) while the list is in flight keeps /me from flashing
+  // a section that then disappears, and only a SUCCESSFUL empty list
+  // hides the section for good. A failed list is NOT an empty catalog:
+  // it falls through to the normal render (heading, grid, raw-OTLP
+  // fallback card) rather than silently hiding the section. Installed
+  // sources keep ingesting regardless: the receiver keys on the
+  // IngestionSource, not on a listed template.
+  if (!templatesQuery.isSuccess && !templatesQuery.isError) return null;
+  if (templatesQuery.isSuccess && templates.length === 0) return null;
   const openTemplate = openSlug
     ? templates.find((t) => t.slug === openSlug) ?? null
     : null;
@@ -199,35 +204,23 @@ export function TraceIngestSection() {
           Trace Ingest
         </Heading>
         <Text color="fg.muted" fontSize="sm">
-          Connect your tools to flow traces into your personal workspace.
-          Templates pre-shape upstream spans into the LangWatch canonical
-          gen_ai.* form so cost, tokens, and model populate automatically.
+          Connect your tools so their traces land in your personal workspace,
+          with cost, tokens, and model filled in for you.
         </Text>
       </VStack>
 
       <SimpleGrid columns={{ base: 1, md: 2, lg: 4 }} gap={3}>
-        {templatesQuery.isLoading
-          ? Array.from({ length: 3 }).map((_, idx) => (
-              <TileSkeleton key={`skeleton-${idx}`} />
-            ))
-          : templates.map((t) => {
-              const connected = keyBySourceType.has(t.sourceType);
-              const meta = TILE_META[t.slug] ?? {
-                icon: FALLBACK_ICON,
-                subtitle: t.description ?? t.sourceType,
-              };
-              return (
-                <InstallTile
-                  key={t.id}
-                  slug={t.slug}
-                  label={t.displayName}
-                  subtitle={meta.subtitle}
-                  icon={meta.icon}
-                  installed={connected}
-                  onClick={() => handleTileClick(t.sourceType, t.id, t.slug)}
-                />
-              );
-            })}
+        {templates.map((t) => (
+          <InstallTile
+            key={t.id}
+            slug={t.slug}
+            label={t.displayName}
+            subtitle={t.description ?? t.sourceType}
+            icon={FALLBACK_ICON}
+            installed={keyBySourceType.has(t.sourceType)}
+            onClick={() => handleTileClick(t.sourceType, t.id, t.slug)}
+          />
+        ))}
         <RawOtlpAdvancedTile />
       </SimpleGrid>
 
@@ -340,19 +333,6 @@ function InstallTile({
         </VStack>
       </HStack>
     </Box>
-  );
-}
-
-function TileSkeleton() {
-  return (
-    <Box
-      borderWidth="1px"
-      borderColor="border.muted"
-      borderRadius="md"
-      padding={3}
-      height="76px"
-      backgroundColor="bg.subtle"
-    />
   );
 }
 

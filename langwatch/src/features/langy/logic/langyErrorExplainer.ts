@@ -1,13 +1,13 @@
 import {
-  readHandledError,
   type HandledErrorShape,
+  readHandledError,
 } from "~/features/automations/logic/errorExplainer";
 
 /**
  * Langy error explainer (ADR-045).
  *
  * The platform serializes handled `HandledError`s to `{ code, kind, meta,
- * httpStatus, traceId, spanId, reasons }` — over tRPC as `error.data.domainError`, and (new in
+ * httpStatus, traceId, spanId, reasons }` — over tRPC as `error.data.error`, and (new in
  * this PR) over the chat stream as a JSON-encoded string in the error part.
  * This module turns either into a keyed presentation the UI renders:
  *
@@ -23,11 +23,18 @@ import {
  * gets one calm generic message plus a trace id.
  */
 
-export type LangyErrorRender = "card" | "inline" | "suppress";
+export type LangyErrorRender =
+  | "card"
+  | "inline"
+  | "suppress"
+  // A transient composer-level notice, not a message-history card: rendered as a
+  // dismissable box attached above the composer, leaving the user's draft in
+  // place (ADR-058). Used for "one turn at a time" — a wait, not a turn failure.
+  | "composer-notice";
 
 export interface LangyErrorAction {
   label: string;
-  kind: "connect-github" | "configure-model" | "retry";
+  kind: "connect-github" | "configure-model" | "reconnect-codex" | "retry";
 }
 
 /** One serialized reason from the HandledError chain (recursive). */
@@ -45,6 +52,16 @@ export interface LangyErrorPresentation {
   action?: LangyErrorAction;
   /** Present for unknown/unhandled errors so support can correlate. */
   traceId?: string;
+  /**
+   * The raw domain code, shown under the message on the GENERIC cards only.
+   *
+   * A card that says "Something went wrong" and nothing else is unactionable
+   * for everyone: support cannot correlate it and a developer cannot tell
+   * `clickhouse_unavailable` (your local stack is down) from a genuine bug.
+   * The bespoke cases do not set this — their copy already names the problem,
+   * and a code under prose that already explains itself is just noise.
+   */
+  code?: string;
   /** Renderable domain metadata, surfaced under the message when present. */
   meta?: Record<string, unknown>;
   /** The reason chain, surfaced under the message for debugging when present. */
@@ -93,7 +110,71 @@ export const KNOWN_LANGY_ERROR_KINDS = [
   "langy_egress_misconfigured",
   "langy_insufficient_scope",
   "langy_turn_in_progress",
+  // Codex (the sign-in-with-OpenAI provider): the OAuth session died and the
+  // user must re-authenticate, or their ChatGPT plan's usage limit refused
+  // the turn. Promoted off the agent-errored reason chain — see
+  // promoteCodexAgentError. Spec: specs/model-providers/codex-account-provider.feature
+  "langy_codex_session_expired",
+  "langy_codex_plan_limit",
 ] as const;
+
+/**
+ * The gateway's typed codex failures ride the received reason chain of a
+ * `langy_agent_errored` (herr ⇄ HandledError, one model across the wire).
+ * Promote them to their own kinds by EXACT reason-code match — never by
+ * sniffing message strings — so the panel renders the re-authenticate card /
+ * the plan-limit explanation instead of a generic "reply failed".
+ */
+export function promoteCodexAgentError(
+  domain: LangyDomainError,
+): LangyDomainError {
+  if (domain.code !== "langy_agent_errored") return domain;
+  const flat: LangySerializedReason[] = [];
+  const walk = (reasons?: LangySerializedReason[]) => {
+    for (const reason of reasons ?? []) {
+      flat.push(reason);
+      walk(reason.reasons);
+    }
+  };
+  walk(domain.reasons);
+  if (flat.some((reason) => reason.kind === "codex_session_expired")) {
+    return { ...domain, code: "langy_codex_session_expired" };
+  }
+  if (
+    flat.some(
+      (reason) =>
+        reason.kind === "usage_limit_reached" ||
+        reason.kind === "codex_plan_limit",
+    )
+  ) {
+    return { ...domain, code: "langy_codex_plan_limit" };
+  }
+  return domain;
+}
+
+/**
+ * The first server-authored prose message in the error's reason chain
+ * (depth-first). `meta.message` is the ADR-045 prose channel: the langyagent
+ * proxy captures the model provider's own error text there when a mediated
+ * LLM call fails (llmproxy.go), and the platform serializers carry it through
+ * — so this is the "credit balance too low" the user actually needs to see.
+ */
+export function firstReasonMessage(
+  reasons: LangySerializedReason[] | undefined,
+): string | null {
+  for (const reason of reasons ?? []) {
+    const message = reason.meta?.message;
+    if (typeof message === "string" && message.length > 0) return message;
+    const nested = firstReasonMessage(reason.reasons);
+    if (nested) return nested;
+  }
+  return null;
+}
+
+/** Ends a provider message with terminal punctuation so copy can follow it. */
+function asSentence(message: string): string {
+  return /[.!?…]$/.test(message.trim()) ? message.trim() : `${message.trim()}.`;
+}
 
 function parseReasons(value: unknown): LangySerializedReason[] | undefined {
   if (!Array.isArray(value)) return undefined;
@@ -163,17 +244,45 @@ export function readLangyStreamError(
   };
 }
 
-/** Read a Langy domain error off a tRPC client error (`error.data.domainError`). */
+/**
+ * Resolve the domain error behind a LIVE turn failure. Three roads, in order:
+ * a turn-START rejection carries it on the tRPC error (`error.data.error`); a
+ * mid-turn failure rides the stream's terminal entry as a JSON message; and
+ * when the stream itself died with no typed payload (a genuinely broken
+ * connection), the turn's real, classified failure is usually already on the
+ * DURABLE record: naming it beats a generic apology whose cause the server
+ * knew all along. Only when all three come up empty does the caller fall back
+ * to the unknown card.
+ */
+export function resolveLiveTurnError({
+  error,
+  durableLastError,
+}: {
+  error: { message: string } & object;
+  durableLastError: string | null | undefined;
+}): LangyDomainError {
+  return (
+    readLangyTrpcError(error) ??
+    readLangyStreamError(error.message) ??
+    (durableLastError ? readLangyStreamError(durableLastError) : null) ?? {
+      code: "unknown",
+      meta: error.message ? { error: error.message } : {},
+      httpStatus: 500,
+    }
+  );
+}
+
+/** Read a Langy domain error off a tRPC client error (`error.data.error`). */
 export function readLangyTrpcError(err: unknown): LangyDomainError | null {
   const domain = readHandledError(err);
   if (!domain) return null;
   const serialized = (
     err as {
       data?: {
-        domainError?: { traceId?: unknown; reasons?: unknown };
+        error?: { traceId?: unknown; reasons?: unknown };
       };
     }
-  )?.data?.domainError;
+  )?.data?.error;
   const traceId = serialized?.traceId;
   return {
     ...domain,
@@ -183,8 +292,9 @@ export function readLangyTrpcError(err: unknown): LangyDomainError | null {
 }
 
 export function explainLangyError(
-  domain: LangyDomainError,
+  received: LangyDomainError,
 ): LangyErrorPresentation {
+  const domain = promoteCodexAgentError(received);
   // Always carried through for debugging, regardless of the matched case.
   const debug = {
     meta: Object.keys(domain.meta).length > 0 ? domain.meta : undefined,
@@ -273,19 +383,27 @@ export function explainLangyError(
         ...debug,
       };
 
-    case "langy_agent_errored":
+    case "langy_agent_errored": {
       // The agent reported its own failure — usually the model call was
       // rejected upstream. Honest copy: the reply failed; nothing crashed and
       // nothing was lost. Deterministic, so no auto-retry — the user decides.
+      //
+      // When the reason chain carries the provider's own message (captured by
+      // the langyagent LLM proxy — provider-facing text, safe to show), the
+      // card says it: "Something went wrong" for an out-of-credits account is
+      // unactionable, the provider's sentence is the whole fix.
+      const providerMessage = firstReasonMessage(domain.reasons);
       return {
         kind: domain.code,
         title: "Langy's reply failed",
-        description:
-          "Langy hit an error while writing this reply. Your message is safe — try again.",
+        description: providerMessage
+          ? `The model provider rejected this reply: ${asSentence(providerMessage)} Your message is safe. Try again, or pick a different model from the composer.`
+          : "Langy hit an error while writing this reply. Your message is safe — try again.",
         render: "card",
         action: { label: "Try again", kind: "retry" },
         ...debug,
       };
+    }
 
     case "langy_worker_spawn_failed":
       // The manager tried to start a worker for this turn and it never came up.
@@ -364,9 +482,9 @@ export function explainLangyError(
       };
 
     case "langy_model_not_allowed":
-      // The picked override isn't on the project's Langy allowlist. Deterministic
-      // — the identical request fails again — so no retry; the meta.model is
-      // surfaced so the user sees which one was rejected.
+      // Deterministic — the identical request fails again — so no retry. The
+      // allowlist is the only runnable-set gate: any model on it runs, so the
+      // fix is picking an allowed model or changing the configuration.
       return {
         kind: domain.code,
         title: "That model isn't available here",
@@ -401,15 +519,45 @@ export function explainLangyError(
         ...debug,
       };
 
+    case "langy_codex_session_expired":
+      // The stored OpenAI session could not be refreshed. A setup step, not a
+      // fault: the fix is signing in again (the action opens the inline Codex
+      // sign-in), or picking another configured model from the composer.
+      return {
+        kind: domain.code,
+        title: "Your OpenAI session expired",
+        description:
+          "Codex runs on your OpenAI account, and its sign-in has expired. Sign in again to keep using it, or pick another model from the composer.",
+        render: "card",
+        action: { label: "Sign in to Codex", kind: "reconnect-codex" },
+        ...debug,
+      };
+
+    case "langy_codex_plan_limit":
+      // OpenAI's plan limit refused the turn. Deterministic until the window
+      // resets, so the useful moves are waiting or switching models; retry is
+      // still offered for after the reset.
+      return {
+        kind: domain.code,
+        title: "Your OpenAI plan hit its usage limit",
+        description:
+          "Codex usage counts against your ChatGPT plan, and OpenAI says the limit is reached for now. Pick another model from the composer to keep going, or try again after the limit resets.",
+        render: "card",
+        action: { label: "Try again", kind: "retry" },
+        ...debug,
+      };
+
     case "langy_turn_in_progress":
       // One turn at a time per conversation. A retry would just 409 again, so
       // there's no retry action — the answer is to wait for the reply to finish.
+      // It is a WAIT, not a turn failure, so it rides above the composer as a
+      // dismissable notice that keeps the user's draft — not a red history card.
       return {
         kind: domain.code,
         title: "Langy is still replying",
         description:
           "There's already a response in progress for this conversation. Wait for it to finish before sending another message.",
-        render: "card",
+        render: "composer-notice",
         ...debug,
       };
 
@@ -418,24 +566,39 @@ export function explainLangyError(
         kind: "unknown",
         title: "Something went wrong",
         description:
-          "Langy hit an unexpected error. Try again — if it keeps happening, share the id below with support.",
+          "Langy hit an unexpected error. Try again — if it keeps happening, share the details below with support.",
         render: "card",
         action: { label: "Try again", kind: "retry" },
         traceId: domain.traceId,
+        code: domain.code,
         ...debug,
       };
 
-    default:
+    default: {
       // A handled kind we don't have bespoke copy for yet: still useful, never
-      // a raw string, and its meta + reasons are surfaced for debugging.
+      // a raw string, and its meta + reasons are surfaced for debugging. A
+      // server-authored sentence in `meta.message` wins over the stock line —
+      // that is the only channel carrying prose (ADR-045), and it is how a
+      // proxied Go herr explains itself before we write copy for its code.
+      // The reason chain's first message is the fallback: the same channel,
+      // one hop deeper.
+      const authored = domain.meta?.message;
+      const authoredText =
+        typeof authored === "string" && authored.length > 0
+          ? authored
+          : firstReasonMessage(domain.reasons);
       return {
         kind: domain.code,
         title: "Langy couldn't finish that",
-        description: "The request was rejected. Try rephrasing or start again.",
+        description:
+          authoredText ??
+          "The request was rejected. Try rephrasing or start again.",
         render: "card",
         action: { label: "Try again", kind: "retry" },
         traceId: domain.traceId,
+        code: domain.code,
         ...debug,
       };
+    }
   }
 }

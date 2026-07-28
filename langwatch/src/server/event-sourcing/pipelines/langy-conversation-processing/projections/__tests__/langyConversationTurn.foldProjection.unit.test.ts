@@ -6,14 +6,14 @@ import {
   LANGY_CONVERSATION_EVENT_VERSIONS,
   LANGY_CONVERSATION_TURN_STATUS,
   LANGY_TURN_TOOL_CALL_STATUS,
-} from "../../schemas/constants";
+} from "@langwatch/langy";
 import type { LangyConversationProcessingEvent } from "../../schemas/events";
 import {
-  LangyConversationTurnFoldProjection,
   type LangyConversationTurnData,
   makeConversationTurnKey,
   parseConversationTurnKey,
-} from "../langyConversationTurn.foldProjection";
+} from "@langwatch/langy";
+import { LangyConversationTurnFoldProjection } from "../langyConversationTurn.foldProjection";
 
 const noopStore: StateProjectionStore<LangyConversationTurnData> = {
   store: async () => {},
@@ -232,6 +232,34 @@ describe("LangyConversationTurnFoldProjection", () => {
         );
         expect(state.Status).toBe(LANGY_CONVERSATION_TURN_STATUS.FAILED);
         expect(state.Error).toBe("model timeout");
+      });
+    });
+
+    describe("when the user stops the turn mid-answer", () => {
+      /** @scenario A stopped turn keeps the words Langy had already written */
+      it("marks the turn stopped, keeps the partial answer, and is not an error", () => {
+        const state = fold.apply(
+          running,
+          event(
+            "AGENT_RESPONDED",
+            LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_RESPONDED,
+            {
+              messageId: "a1",
+              role: "assistant",
+              parts: [{ type: "text", text: "here is what I had so f" }],
+              outcome: "stopped",
+            },
+            2000,
+          ),
+        );
+        // A stop is its own terminal: the partial stays, it renders distinctly
+        // from a clean completion, and it is never a red error (ADR-058).
+        expect(state.Status).toBe(LANGY_CONVERSATION_TURN_STATUS.STOPPED);
+        expect(state.AnswerParts).toEqual([
+          { type: "text", text: "here is what I had so f" },
+        ]);
+        expect(state.EndedAt).toBe(2000);
+        expect(state.Error).toBeNull();
       });
     });
 

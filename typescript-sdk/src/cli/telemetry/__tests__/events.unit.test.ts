@@ -368,7 +368,7 @@ describe("createCommandEvents()", () => {
           [ATTR.event]: LANGWATCH_EVENTS.error,
           [ATTR.errorKind]: "dataset_not_found",
           [ATTR.errorStatus]: 404,
-          [ATTR.errorIsDomain]: true,
+          [ATTR.errorIsHandled]: true,
           [ATTR.error]: "Dataset not found: ds_42",
         });
       });
@@ -393,7 +393,7 @@ describe("createCommandEvents()", () => {
         await events.flush();
 
         expect(emittedRecords()[0]).toMatchObject({
-          [ATTR.errorIsDomain]: false,
+          [ATTR.errorIsHandled]: false,
           [ATTR.errorStatus]: 500,
         });
       });

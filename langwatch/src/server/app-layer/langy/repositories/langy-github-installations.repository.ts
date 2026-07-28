@@ -48,6 +48,19 @@ export interface LangyGithubInstallationsRepository {
 
   upsert(input: UpsertLangyGithubInstallationInput): Promise<void>;
 
+  /**
+   * Atomically claims `installationId` for `input.organizationId`, or reports
+   * who already holds it. The unique index on `installationId` — not a
+   * read-then-write check the caller does itself — is what makes this
+   * race-safe: two concurrent callers racing for the same fresh installation
+   * id can never both see "absent" and both write, because only one `create`
+   * can win the unique constraint. The loser always observes the winner's
+   * committed row here, never a stale null.
+   */
+  insertOrGetExisting(
+    input: UpsertLangyGithubInstallationInput,
+  ): Promise<{ wasInserted: boolean; row: LangyGithubInstallationRow }>;
+
   setRepositories(params: {
     installationId: string;
     repositorySelection: string;
@@ -77,6 +90,15 @@ export class NullLangyGithubInstallationsRepository
     return null;
   }
   async upsert(): Promise<void> {}
+  async insertOrGetExisting(
+    input: UpsertLangyGithubInstallationInput,
+  ): Promise<{ wasInserted: boolean; row: LangyGithubInstallationRow }> {
+    const now = new Date();
+    return {
+      wasInserted: true,
+      row: { ...input, suspendedAt: null, createdAt: now, updatedAt: now },
+    };
+  }
   async setRepositories(): Promise<void> {}
   async setSuspended(): Promise<void> {}
   async deleteByInstallationId(): Promise<number> {

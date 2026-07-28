@@ -31,10 +31,13 @@ import {
   handlerManagedAuth,
   publicEndpoint,
 } from "~/server/api/security";
+import { hasOrganizationPermission } from "~/server/api/rbac";
 import { getApp } from "~/server/app-layer";
 import { hasLangyAccess } from "~/server/app-layer/langy/langyAccessGate";
+import { LangyGithubInstallationConflictError } from "~/server/app-layer/langy/langy-github-installations.service";
 import { auditLog } from "~/server/auditLog";
 import { getServerAuthSession } from "~/server/auth";
+import { prisma } from "~/server/db";
 import {
   consumeGithubInstallNonce,
   registerGithubInstallNonce,
@@ -207,6 +210,19 @@ secured
         { status: 403 },
       );
     }
+    // Same permission the tRPC surface demands: connecting the App grants
+    // Langy repository access for every project underneath, so membership
+    // alone is not enough. Still ahead of the rollout gate, matching the
+    // probe-resistant ordering documented in langyGithub.ts.
+    if (
+      !(await hasOrganizationPermission(
+        { prisma, session },
+        organizationId,
+        "langy:manage",
+      ))
+    ) {
+      return c.json({ error: "Forbidden" }, { status: 403 });
+    }
     // Same authoritative gate as Langy's tRPC surface so the GitHub install
     // cannot become a rollout bypass. Forward organizationId so an org-scoped
     // rollout rule resolves the same way it does on the tRPC surface.
@@ -281,6 +297,19 @@ secured
       return setupError(c, state, "Not a member of this organization", 403);
     }
 
+    // Re-check the connect permission too: the caller's role may have been
+    // lowered between /install and GitHub's redirect back here, and recording
+    // the installation is the write the permission exists to gate.
+    if (
+      !(await hasOrganizationPermission(
+        { prisma, session },
+        state.organizationId,
+        "langy:manage",
+      ))
+    ) {
+      return setupError(c, state, "Forbidden", 403);
+    }
+
     // Re-check the Langy gate before persisting anything. The install may have
     // begun while the flag was on; if the rollout was disabled (or the caller's
     // access revoked) in between, the internal-only boundary must still hold, so
@@ -310,7 +339,32 @@ secured
           organizationId: state.organizationId,
         }));
     } catch (err) {
-      logger.warn({ err }, "github installation record failed");
+      // A cross-tenant takeover attempt (installation already owned by another
+      // org) is a security event, not an ordinary failure: audit it against the
+      // acting user/org so it is visible, but still return the generic message
+      // so the caller learns nothing about whether the installation id exists.
+      if (err instanceof LangyGithubInstallationConflictError) {
+        logger.warn(
+          {
+            installationId: err.installationId,
+            attemptedOrganizationId: err.attemptedOrganizationId,
+            userId: state.userId,
+          },
+          "blocked cross-tenant github installation rebind attempt",
+        );
+        try {
+          await auditLog({
+            userId: state.userId,
+            organizationId: state.organizationId,
+            action: "langy.github.install.rejected_cross_tenant",
+            args: { installationId: err.installationId },
+          });
+        } catch (auditErr) {
+          logger.warn({ err: auditErr }, "audit log write failed after blocked rebind");
+        }
+      } else {
+        logger.warn({ err }, "github installation record failed");
+      }
       const publicMsg = publicGithubErrorMessage();
       return state.mode === "popup"
         ? popupHtml(c, popupErrorHtml(publicMsg), 502)

@@ -22,12 +22,16 @@ import { createServiceApp, internalSecret } from "~/server/api/security";
 import { getApp } from "~/server/app-layer/app";
 import { connection } from "~/server/redis";
 import { createLangyFrameDedup } from "~/server/app-layer/langy/streaming/langyFrameDedup";
+import { resolveNavigateFallbackUrl } from "~/server/app-layer/langy/streaming/langyNavigateFallback";
+import { createLangyResourceLinkStore } from "~/server/app-layer/langy/streaming/langyResourceLinks";
 import { createLangyTokenBuffer } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
+import { createLangyTurnHandoffStore } from "~/server/app-layer/langy/streaming/langyTurnHandoff";
 import { LangyTurnRelay } from "~/server/app-layer/langy/streaming/langyTurnRelay";
 import { createLogger } from "@langwatch/observability";
+import { getLangyRelayFramesCounter } from "~/server/metrics";
 import { verifyLangyInternalSecret } from "./langy-internal";
 
-const logger = createLogger("langwatch:langy-relay");
+const logger = createLogger("langwatch:langy:relay");
 
 const secured = createServiceApp({
   basePath: "/api/internal/langy",
@@ -62,11 +66,27 @@ secured.access(relayPolicy()).post("/relay/frames", async (c) => {
   const body = c.req.raw.body;
   if (!body) return c.json({ error: "missing body" }, 400);
 
+  const handoffStore = createLangyTurnHandoffStore({ redis: connection });
   const relay = new LangyTurnRelay({
     conversations: getApp().langy.conversations,
     buffer: createLangyTokenBuffer({ redis: connection }),
     reserveFrameNonce: createLangyFrameDedup({ redis: connection })
       .reserveFrameNonce,
+    // Authenticate frames against the synchronous per-turn handoff token first
+    // (the exact one the worker signs with), so a first turn whose RunToken
+    // projection is still landing isn't dropped as no-run-token. Empty token
+    // (legacy conversation) falls through to the projection.
+    readHandoffRunToken: async ({ projectId, conversationId, turnId }) => {
+      const handoff = await handoffStore.read({ conversationId, turnId });
+      // The handoff key is conversation+turn scoped, but conversation identity
+      // is project-scoped (`@@unique([projectId, ConversationId])`). Refuse a
+      // handoff stashed under a different project so a colliding conversation
+      // id can never hand this stream another tenant's runToken.
+      if (!handoff || handoff.projectId !== projectId) return null;
+      return handoff.runToken || null;
+    },
+    resourceLinks: createLangyResourceLinkStore({ redis: connection }),
+    resolveResourceUrl: resolveNavigateFallbackUrl,
     logger,
   });
 
@@ -97,10 +117,25 @@ secured.access(relayPolicy()).post("/relay/frames", async (c) => {
     if (tail) await applyLine(relay, tail, tally);
   } catch (error) {
     logger.warn(
-      { error: error instanceof Error ? error.message : String(error) },
+      {
+        error: error instanceof Error ? error.message : String(error),
+        ...(relay.pinnedTurn ?? {}),
+      },
       "relay stream read error — connection closed mid-turn",
     );
   }
+
+  // One summary per stream, not one log per frame: the tally is the useful
+  // shape (throughput + duplicate/rejection rates) and the pinned ids make it
+  // attributable. The counters make the same rates graphable fleet-wide.
+  getLangyRelayFramesCounter("applied").inc(tally.applied);
+  getLangyRelayFramesCounter("duplicate").inc(tally.duplicate);
+  getLangyRelayFramesCounter("rejected").inc(tally.rejected);
+  if (tally.terminal) getLangyRelayFramesCounter("terminal").inc();
+  logger.info(
+    { ...tally, ...(relay.pinnedTurn ?? {}) },
+    "langy relay stream closed",
+  );
 
   return c.json(tally, 200);
 });

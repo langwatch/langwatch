@@ -1,4 +1,7 @@
-import { createTraceAlertTriggerMatchHandler } from "@ee/governance/subscribers/traceAlertTriggerMatch.subscriber";
+import {
+  type EnterprisePipelineSetConfig,
+  registerEnterprisePipelineSet,
+} from "@ee/event-sourcing/pipelineSet";
 import {
   createGatewayBudgetSyncReactor,
   type GatewayBudgetSyncReactorDeps,
@@ -11,6 +14,12 @@ import {
   createGovernanceOcsfEventsSyncReactor,
   type GovernanceOcsfEventsSyncReactorDeps,
 } from "@ee/governance/reactors/governanceOcsfEventsSync.reactor";
+import { createTraceAlertTriggerMatchHandler } from "@ee/governance/subscribers/traceAlertTriggerMatch.subscriber";
+import type {
+  LangyConversationStateData,
+  LangyConversationTurnData,
+  LangyMessageProjectionRecord,
+} from "@langwatch/langy";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
 import type { Cluster, Redis } from "ioredis";
@@ -18,7 +27,6 @@ import { createOrUpdateQueueItems } from "~/server/api/routers/annotation";
 import { createManyDatasetRecords } from "~/server/api/routers/datasetRecord.utils";
 import { getProtectionsForProject } from "~/server/api/utils";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
-import { resolveClaudeTurnLogCap } from "~/server/app-layer/traces/claude-code-log-to-span";
 import { DatasetRepository } from "~/server/datasets/dataset.repository";
 import {
   createDatasetNormalizeHandler,
@@ -31,8 +39,12 @@ import { createStoredObjectsService } from "~/server/stored-objects/stored-objec
 import { TraceService } from "~/server/traces/trace.service";
 import { queryBillableEventsTotal } from "../../../ee/billing/services/billableEventsQuery";
 import type { UsageReportingService } from "../../../ee/billing/services/usageReportingService";
+import type { TriggerService } from "../app-layer/automations/trigger.service";
 import type { BillingCheckpointService } from "../app-layer/billing/billingCheckpoint.service";
 import type { BroadcastService } from "../app-layer/broadcast/broadcast.service";
+import type { CodingAgentSessionRepository } from "../app-layer/coding-agent/repositories/coding-agent-session.repository";
+import type { CodingAgentTraceSessionRepository } from "../app-layer/coding-agent/repositories/coding-agent-trace-session.repository";
+import type { SessionMetricSeriesRepository } from "../app-layer/coding-agent/repositories/session-metric-series.repository";
 import { getAzureSafetyEnvFromProject } from "../app-layer/evaluations/azure-safety-env.server";
 import type { EvaluationCostRecorder } from "../app-layer/evaluations/evaluation-cost.recorder";
 import type { EvaluationExecutionService } from "../app-layer/evaluations/evaluation-execution.service";
@@ -40,15 +52,26 @@ import { offloadInputsIfOversized } from "../app-layer/evaluations/evaluation-in
 import type { EvaluationRunService } from "../app-layer/evaluations/evaluation-run.service";
 import type { EvaluationAnalyticsRepository } from "../app-layer/evaluations/repositories/evaluation-analytics.repository";
 import type { EvaluationAnalyticsRollupRepository } from "../app-layer/evaluations/repositories/evaluation-analytics-rollup.repository";
+import type { LangyTitleGenerator } from "../app-layer/langy/langy-title-generation.service";
+import {
+  mintLangySessionApiKeyForUser,
+  revokeLangySessionApiKey,
+} from "../app-layer/langy/langyApiKey";
+import type { LangyWorkerPort } from "../app-layer/langy/langyWorker";
+import type { LangyTurnAdmissionRepository } from "../app-layer/langy/repositories/langy-turn-admission.repository";
+import type { LangyTokenBuffer } from "../app-layer/langy/streaming/langyTokenBuffer";
+import type { LangyTurnHandoffStore } from "../app-layer/langy/streaming/langyTurnHandoff";
+import {
+  createAgentTurnLivenessSubscriber,
+  createLangyConversationUpdateBroadcastSubscriber,
+  createLangyTurnAdmissionLifecycleSubscriber,
+} from "../app-layer/langy/subscribers";
 import type { CanonicalLogRecordRepository } from "../app-layer/logs/repositories/canonical-log-record.repository";
 import type { MetricDataPointRepository } from "../app-layer/metrics/repositories/metric-data-point.repository";
 import type { MonitorService } from "../app-layer/monitors/monitor.service";
 import type { OrganizationService } from "../app-layer/organizations/organization.service";
 import type { ProjectService } from "../app-layer/projects/project.service";
-import type {
-  LogRecordStorageRepository,
-  StoredLogRecordRow,
-} from "../app-layer/traces/repositories/log-record-storage.repository";
+import { createRateLimitedBootstrap } from "../app-layer/topic-clustering/topicClusteringBootstrapGate";
 import type { TraceAnalyticsRepository } from "../app-layer/traces/repositories/trace-analytics.repository";
 import type { TraceAnalyticsRollupRepository } from "../app-layer/traces/repositories/trace-analytics-rollup.repository";
 import type { TraceSummaryRepository } from "../app-layer/traces/repositories/trace-summary.repository";
@@ -56,22 +79,38 @@ import type { SpanStorageService } from "../app-layer/traces/span-storage.servic
 import { TraceReadDerivationService } from "../app-layer/traces/trace-read-derivation.service";
 import type { TraceSummaryService } from "../app-layer/traces/trace-summary.service";
 import type { TraceSummaryData } from "../app-layer/traces/types";
-import type { TriggerService } from "../app-layer/automations/trigger.service";
-import type { AutomationAuditRepository } from "../app-layer/automations/repositories/automation-audit.repository";
+import { getClickHouseClientForProject } from "../clickhouse/clickhouseClient";
+import type { RetentionPolicyResolver } from "../data-retention/retentionPolicyResolver";
 import type { AutomationDispatchPorts } from "../event-sourcing/pipelines/automations/automationDispatch.wiring";
 import { createEvaluationAlertTriggerMatchHandler } from "../event-sourcing/pipelines/automations/subscribers/evaluationAlertTriggerMatch.subscriber";
 import { createGraphTriggerActivityHandler } from "../event-sourcing/pipelines/automations/subscribers/graphTriggerActivity.subscriber";
-import { getClickHouseClientForProject } from "../clickhouse/clickhouseClient";
-import type { RetentionPolicyResolver } from "../data-retention/retentionPolicyResolver";
+import { createLangyEffectPorts } from "../event-sourcing/pipelines/langy-conversation-processing/process-manager/langyEffectPorts";
+import type {
+  TopicClusteringOutcomeCommands,
+  TopicClusteringRunPort,
+} from "../event-sourcing/pipelines/topic-clustering-processing/process-manager";
 import { type CommandDispatcher, Deferred } from "./deferred";
+import { createTenantId } from "./domain/tenantId";
 import type { EventSourcing } from "./eventSourcing";
 import { mapCommands } from "./mapCommands";
 import type { StaticPipelineDefinition } from "./pipeline/staticBuilder.types";
+import { createAutomationsPipeline } from "./pipelines/automations/pipeline";
 import { ReportUsageForMonthCommand } from "./pipelines/billing-reporting/commands/reportUsageForMonth.command";
 import {
   BILLING_REPORTING_PIPELINE_NAME,
   createBillingReportingPipeline,
 } from "./pipelines/billing-reporting/pipeline";
+import { createBlobMaintenancePipeline } from "./pipelines/blob-maintenance/pipeline";
+import { createCodingAgentProcessingPipeline } from "./pipelines/coding-agent-processing/pipeline";
+import type { CodingAgentSessionState } from "./pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
+import { CodingAgentSessionStore } from "./pipelines/coding-agent-processing/projections/codingAgentSession.store";
+import {
+  CodingAgentTraceSessionAppendStore,
+  SessionMetricSeriesAppendStore,
+} from "./pipelines/coding-agent-processing/projections/stores";
+import { createCodingAgentLogFactsDispatchSubscriber } from "./pipelines/coding-agent-processing/subscribers/codingAgentLogFactsDispatch.subscriber";
+import { createCodingAgentMetricFactsDispatchSubscriber } from "./pipelines/coding-agent-processing/subscribers/codingAgentMetricFactsDispatch.subscriber";
+import { createCodingAgentSpanFactsDispatchSubscriber } from "./pipelines/coding-agent-processing/subscribers/codingAgentSpanFactsDispatch.subscriber";
 import { ExecuteEvaluationCommand } from "./pipelines/evaluation-processing/commands/executeEvaluation.command";
 import {
   createEvaluationProcessingPipeline,
@@ -88,6 +127,8 @@ import type { ExperimentRunStateData } from "./pipelines/experiment-run-processi
 import { createExperimentRunStateFoldStore } from "./pipelines/experiment-run-processing/projections/experimentRunState.store";
 import type { ExperimentRunStateRepository } from "./pipelines/experiment-run-processing/repositories/experimentRunState.repository";
 import type { ComputeExperimentRunMetricsCommandData } from "./pipelines/experiment-run-processing/schemas/commands";
+import { createLangyConversationProcessingPipeline } from "./pipelines/langy-conversation-processing/pipeline";
+import type { LangyAnalyticsEventProjectionRecord } from "./pipelines/langy-conversation-processing/projections/langyAnalyticsEvent.mapProjection";
 import { resolveLogCommandShardCount as resolveCanonicalLogCommandShardCount } from "./pipelines/log-processing/canonicalLog";
 import { createLogProcessingPipeline } from "./pipelines/log-processing/pipeline";
 import { CanonicalLogAppendStore } from "./pipelines/log-processing/projections/stores";
@@ -113,59 +154,25 @@ import { createTraceMetricsSyncReactor } from "./pipelines/simulation-processing
 import type { SimulationRunStateRepository } from "./pipelines/simulation-processing/repositories/simulationRunState.repository";
 import type { ComputeRunMetricsCommandData } from "./pipelines/simulation-processing/schemas/commands";
 import { SIMULATION_PROJECTION_VERSIONS } from "./pipelines/simulation-processing/schemas/constants";
-import { createLangyConversationProcessingPipeline } from "./pipelines/langy-conversation-processing/pipeline";
-import { type LangyConversationStateData } from "./pipelines/langy-conversation-processing/projections/langyConversationState.foldProjection";
-import type { LangyConversationTurnData } from "./pipelines/langy-conversation-processing/projections/langyConversationTurn.foldProjection";
-import type { LangyMessageProjectionRecord } from "./pipelines/langy-conversation-processing/projections/langyMessageOperational.mapProjection";
-import type { LangyAnalyticsEventProjectionRecord } from "./pipelines/langy-conversation-processing/projections/langyAnalyticsEvent.mapProjection";
-import type { LangyTitleGenerator } from "../app-layer/langy/langy-title-generation.service";
-import type { LangyWorkerPort } from "../app-layer/langy/langyWorker";
-import {
-  mintLangySessionApiKeyForUser,
-  revokeLangySessionApiKey,
-} from "../app-layer/langy/langyApiKey";
-import {
-  createLangyEffectPorts,
-  createLangyIntentHandlers,
-  LANGY_OUTBOX_LEASE_DURATION_MS,
-} from "../app-layer/langy/process-manager/langyEffectPorts";
-import {
-  createLangyProcessSubscriber,
-  langyConversationProcessDefinition,
-  LANGY_CONVERSATION_PROCESS_NAME,
-} from "../app-layer/langy/process-manager";
-import type { LangyTokenBuffer } from "../app-layer/langy/streaming/langyTokenBuffer";
-import type { LangyTurnHandoffStore } from "../app-layer/langy/streaming/langyTurnHandoff";
-import {
-  createAgentTurnLivenessSubscriber,
-  createLangyConversationUpdateBroadcastSubscriber,
-  createLangyTurnAdmissionLifecycleSubscriber,
-} from "../app-layer/langy/subscribers";
-import type { LangyTurnAdmissionRepository } from "../app-layer/langy/repositories/langy-turn-admission.repository";
-import {
-  OutboxDispatcherService,
-  ProcessManagerService,
-  ProcessOutboxWorker,
-  type ProcessStore,
-} from "./process-manager";
 import { createSuiteRunProcessingPipeline } from "./pipelines/suite-run-processing/pipeline";
 import type { SuiteRunStateData } from "./pipelines/suite-run-processing/projections/suiteRunState.foldProjection";
 import type { SuiteRunStateRepository } from "./pipelines/suite-run-processing/repositories/suiteRunState.repository";
 import { SUITE_RUN_PROJECTION_VERSIONS } from "./pipelines/suite-run-processing/schemas/constants";
-import { resolveLogCommandShardCount } from "./pipelines/trace-processing/commands/logCommandGroupKey";
+import { createTopicClusteringProcessingPipeline } from "./pipelines/topic-clustering-processing/pipeline";
+import type { TopicClusteringRunHistoryData } from "./pipelines/topic-clustering-processing/projections/topicClusteringRunHistory.foldProjection";
+import type { TopicClusteringRunStatusData } from "./pipelines/topic-clustering-processing/projections/topicClusteringRunStatus.foldProjection";
+import type { TopicModelData } from "./pipelines/topic-clustering-processing/projections/topicModel.foldProjection";
 import { resolveSpanCommandShardCount } from "./pipelines/trace-processing/commands/spanCommandGroupKey";
 import {
   createTraceProcessingPipeline,
   type TraceProcessingPipelineDeps,
 } from "./pipelines/trace-processing/pipeline";
 import type { DerivedTraceEvent } from "./pipelines/trace-processing/projections/services/trace-events.derivation";
-import { LogRecordAppendStore } from "./pipelines/trace-processing/projections/logRecordStorage.store";
 import { SpanAppendStore } from "./pipelines/trace-processing/projections/spanStorage.store";
 import type { TraceAnalyticsData } from "./pipelines/trace-processing/projections/traceAnalytics.foldProjection";
 import { TraceAnalyticsStore } from "./pipelines/trace-processing/projections/traceAnalytics.store";
 import { TraceAnalyticsRollupAppendStore } from "./pipelines/trace-processing/projections/traceAnalyticsRollup.store";
 import { TraceSummaryStore } from "./pipelines/trace-processing/projections/traceSummary.store";
-import { createClaudeCodeSpanSyncReactor } from "./pipelines/trace-processing/reactors/claudeCodeSpanSync.reactor";
 import { createCustomEvaluationSyncReactor } from "./pipelines/trace-processing/reactors/customEvaluationSync.reactor";
 import { createEvaluationTriggerReactor } from "./pipelines/trace-processing/reactors/evaluationTrigger.reactor";
 import { createExperimentMetricsSyncReactor } from "./pipelines/trace-processing/reactors/experimentMetricsSync.reactor";
@@ -180,46 +187,16 @@ import { createProjectMetadataReactor } from "./pipelines/trace-processing/react
 import { createSimulationMetricsSyncReactor } from "./pipelines/trace-processing/reactors/simulationMetricsSync.reactor";
 import { createSpanStorageBroadcastReactor } from "./pipelines/trace-processing/reactors/spanStorageBroadcast.reactor";
 import { createTraceUpdateBroadcastReactor } from "./pipelines/trace-processing/reactors/traceUpdateBroadcast.reactor";
-import type {
-  RecordSpanCommandData,
-  ResolveOriginCommandData,
-} from "./pipelines/trace-processing/schemas/commands";
+import type { ResolveOriginCommandData } from "./pipelines/trace-processing/schemas/commands";
+import type { ProcessStore } from "./process-manager";
 import type { FoldProjectionStore } from "./projections/foldProjection.types";
 import type { AppendStore } from "./projections/mapProjection.types";
-import type { StateProjectionStore } from "./projections/stateProjection.types";
-import { createTenantId } from "./domain/tenantId";
 import { RedisCachedFoldStore } from "./projections/redisCachedFoldStore";
 import { RepositoryFoldStore } from "./projections/repositoryFoldStore";
-import { createAutomationsPipeline } from "./pipelines/automations/pipeline";
-import { AutomationAuditAppendStore } from "./pipelines/automations/projections/automationAudit.store";
+import type { StateProjectionStore } from "./projections/stateProjection.types";
+import { BlobSweeper } from "./queues/groupQueue/blobSweeper";
 
 const logger = createLogger("langwatch:event-sourcing:pipeline-registry");
-
-function mergeClaudeLogRows(
-  rows: StoredLogRecordRow[],
-  limit?: number,
-): StoredLogRecordRow[] {
-  const deduped = new Map<string, StoredLogRecordRow>();
-  for (const row of rows) {
-    // Legacy rows preserve OTLP insertion order while canonical rows are
-    // key-sorted (stableStringify), so sort keys before serialising or the
-    // same record can produce two different keys and slip past dedup.
-    const key = [
-      row.traceId,
-      row.spanId,
-      row.timeUnixMs,
-      row.scopeName,
-      JSON.stringify(Object.fromEntries(Object.entries(row.attributes).sort())),
-    ].join("\0");
-    deduped.set(key, row);
-  }
-  const sorted = [...deduped.values()].sort(
-    (left, right) => left.timeUnixMs - right.timeUnixMs,
-  );
-  return typeof limit === "number" && limit > 0
-    ? sorted.slice(0, limit)
-    : sorted;
-}
 
 /**
  * Creates an in-memory setTimeout-based fallback for deferred job processing.
@@ -278,8 +255,12 @@ export interface PipelineRepositories {
   experimentRunState: ExperimentRunStateRepository;
   /** Primary replica for read-after-write consistency. */
   traceSummaryFold: TraceSummaryRepository;
-  logRecordStorage: LogRecordStorageRepository;
   canonicalLogStorage: CanonicalLogRecordRepository;
+  /** ADR-056: the session-aggregate row + the (trace → session) map. */
+  codingAgentSession: CodingAgentSessionRepository;
+  codingAgentTraceSession: CodingAgentTraceSessionRepository;
+  /** ADR-056 §5: converged per-series metric totals per session. */
+  sessionMetricSeries: SessionMetricSeriesRepository;
   metricDataPointStorage: MetricDataPointRepository;
   /** ADR-034 Phase 1: per-span rollup repository (app-side, replaces the MV). */
   traceAnalyticsRollup: TraceAnalyticsRollupRepository;
@@ -289,7 +270,6 @@ export interface PipelineRepositories {
   evaluationAnalyticsRollup: EvaluationAnalyticsRollupRepository;
   /** ADR-034 Phase 6: slim per-evaluation analytics repository. */
   evaluationAnalytics: EvaluationAnalyticsRepository;
-  automationAudit: AutomationAuditRepository;
   experimentRunItemStorage: AppendStore<ClickHouseExperimentRunResultRecord>;
   /** Direct Postgres operational projection; deliberately bypasses Redis. */
   langyConversationState: StateProjectionStore<LangyConversationStateData>;
@@ -299,8 +279,18 @@ export interface PipelineRepositories {
   langyMessageStorage: AppendStore<LangyMessageProjectionRecord>;
   /** Content-free ClickHouse event-grain analytics. */
   langyAnalyticsEventStorage: AppendStore<LangyAnalyticsEventProjectionRecord>;
-  /** Durable process inbox, state, and outbox persistence. */
-  langyProcessStore: ProcessStore;
+  /**
+   * Durable process inbox, state, and outbox persistence — SHARED across
+   * every process manager (the ProcessManager* tables are generic; each
+   * domain's dispatcher scopes its leases via `processNames`).
+   */
+  processStore: ProcessStore;
+  /** Per-project topic clustering run status (ADR-051, Postgres). */
+  topicClusteringRunStatus: StateProjectionStore<TopicClusteringRunStatusData>;
+  /** Per-project topic clustering run history (audit; bounded). */
+  topicClusteringRunHistory: StateProjectionStore<TopicClusteringRunHistoryData>;
+  /** Write-through topic model store (the Topic table + cursor row). */
+  topicModel: StateProjectionStore<TopicModelData>;
   /** Postgres-authoritative logical-send receipts and active-turn claims. */
   langyTurnAdmission: LangyTurnAdmissionRepository;
 }
@@ -315,8 +305,12 @@ export interface PipelineRegistryDeps {
     handoffStore: Pick<LangyTurnHandoffStore, "read" | "stash">;
     worker: Pick<LangyWorkerPort, "dispatch">;
     titleGenerator: LangyTitleGenerator;
-    runsWorkers: boolean;
   };
+  topicClustering: {
+    /** Runs one clustering page (the ADR-051 effect's domain function). */
+    runPort: TopicClusteringRunPort;
+  };
+  enterprisePipelines: EnterprisePipelineSetConfig;
   projects: ProjectService;
   monitors: MonitorService;
   triggers: TriggerService;
@@ -357,6 +351,16 @@ export interface PipelineRegistryDeps {
 export class PipelineRegistry {
   constructor(private readonly deps: PipelineRegistryDeps) {}
 
+  /**
+   * ADR-051: the trace pipeline's projectMetadata reactor bootstraps a
+   * project's clustering schedule on its first real trace, but the topic
+   * clustering pipeline (whose command it dispatches) registers later —
+   * late-bound like the other cross-pipeline dispatchers.
+   */
+  private readonly bootstrapTopicClustering = new Deferred<
+    (projectId: string) => Promise<void>
+  >("bootstrapTopicClustering");
+
   private cached<State>(
     inner: FoldProjectionStore<State>,
     keyPrefix: string,
@@ -385,27 +389,34 @@ export class PipelineRegistry {
     });
     const automationPipeline = this.deps.eventSourcing.register(
       createAutomationsPipeline({
-        automationAuditStore: new AutomationAuditAppendStore(
-          this.deps.repositories.automationAudit,
-        ),
         dispatch: automationPorts.settlementDeps,
         sweep: {
           decideSweepCandidates: automationPorts.decideSweepCandidates,
           evaluateGraphTrigger: automationPorts.evaluateGraphTrigger,
           deleteDispatchedBefore: (params) =>
-            this.deps.repositories.langyProcessStore.deleteDispatchedBefore(
-              params,
-            ),
+            this.deps.repositories.processStore.deleteDispatchedBefore(params),
         },
         prune: {
           pruneExpired: automationPorts.pruneWebhookDeliveries,
           deleteDispatchedBefore: (params) =>
-            this.deps.repositories.langyProcessStore.deleteDispatchedBefore(
-              params,
-            ),
+            this.deps.repositories.processStore.deleteDispatchedBefore(params),
         },
       }),
     );
+    // Queue-infrastructure maintenance. Registered unconditionally: the runtime
+    // only arms the schedule where `roleRunsWorkers` holds, so on web this is
+    // inert shape rather than a second fleet sweeping the same keyspace.
+    const blobSweeper = new BlobSweeper({ redis: this.deps.redis });
+    this.deps.eventSourcing.register(
+      createBlobMaintenancePipeline({
+        cleanup: {
+          sweep: () => blobSweeper.sweep(),
+          deleteDispatchedBefore: (params) =>
+            this.deps.repositories.processStore.deleteDispatchedBefore(params),
+        },
+      }),
+    );
+
     const automationCommands = mapCommands(automationPipeline.commands);
     const evalPipeline = this.registerEvaluationPipeline({
       automations: {
@@ -419,8 +430,25 @@ export class PipelineRegistry {
         graphActivityHandler,
       },
     });
-    const metricPipeline = this.registerMetricPipeline();
-    const logPipeline = this.registerLogPipeline();
+    // Registered BEFORE the metric, log and trace pipelines: their
+    // coding-agent dispatch subscribers close over this pipeline's
+    // contribution commands.
+    const codingAgentPipeline = this.registerCodingAgentPipeline();
+    const codingAgentCommands = mapCommands(codingAgentPipeline.commands);
+    const metricPipeline = this.registerMetricPipeline({
+      subscribers: [
+        createCodingAgentMetricFactsDispatchSubscriber({
+          contributeMetricFacts: codingAgentCommands.contributeMetricFacts,
+        }),
+      ],
+    });
+    const logPipeline = this.registerLogPipeline({
+      subscribers: [
+        createCodingAgentLogFactsDispatchSubscriber({
+          contributeLogFacts: codingAgentCommands.contributeLogFacts,
+        }),
+      ],
+    });
     const {
       pipeline: tracePipeline,
       simComputeRunMetrics,
@@ -437,6 +465,11 @@ export class PipelineRegistry {
         }),
         graphActivityHandler,
       },
+      codingAgentSubscribers: [
+        createCodingAgentSpanFactsDispatchSubscriber({
+          contributeSpanFacts: codingAgentCommands.contributeSpanFacts,
+        }),
+      ],
     });
     const suiteRunPipeline = this.registerSuiteRunPipeline();
     const { pipeline: simulationPipeline, scenarioExecutionHandle } =
@@ -449,8 +482,14 @@ export class PipelineRegistry {
     const experimentRunPipeline = this.registerExperimentRunPipeline({
       wireExperimentDeps,
     });
-    const { pipeline: langyConversationPipeline, processOutboxWorker } =
+    const { pipeline: langyConversationPipeline } =
       this.registerLangyConversationPipeline();
+    const { pipeline: topicClusteringPipeline } =
+      this.registerTopicClusteringPipeline();
+    const enterprisePipelines = registerEnterprisePipelineSet({
+      ...this.deps.enterprisePipelines,
+      eventSourcing: this.deps.eventSourcing,
+    });
     const billingPipeline = this.registerBillingReportingPipeline();
 
     logger.info("All pipelines registered");
@@ -459,21 +498,79 @@ export class PipelineRegistry {
       traces: mapCommands(tracePipeline.commands),
       metrics: mapCommands(metricPipeline.commands),
       logs: mapCommands(logPipeline.commands),
+      codingAgents: mapCommands(codingAgentPipeline.commands),
       evaluations: mapCommands(evalPipeline.commands),
       experimentRuns: mapCommands(experimentRunPipeline.commands),
       simulations: mapCommands(simulationPipeline.commands),
       suiteRuns: mapCommands(suiteRunPipeline.commands),
       langy: mapCommands(langyConversationPipeline.commands),
+      topicClustering: mapCommands(topicClusteringPipeline.commands),
+      ...enterprisePipelines.commands,
       billing: mapCommands(billingPipeline.commands),
       automations: automationCommands,
       /** Late-bind the execution pool for scenario execution reactor. */
       scenarioExecutionHandle,
-      // Starting and notifying are private composition concerns so a web role
-      // cannot accidentally start the worker. App shutdown only needs stop().
-      processOutboxWorker: {
-        stop: () => processOutboxWorker.stop(),
-      },
     };
+  }
+
+  /**
+   * ADR-051: topic clustering scheduling as a builder-mounted process
+   * manager (ADR-052) — the pipeline declares the whole topology (events,
+   * projection, commands, process manager, outbox tuning); the shared
+   * ProcessRuntime owns the manager, outbox and wake workers. The registry
+   * only injects executor dependencies and late-binds the outcome commands,
+   * which are this same pipeline's own write surface and exist only after
+   * `.build()`.
+   */
+  private registerTopicClusteringPipeline() {
+    let outcomeCommands: TopicClusteringOutcomeCommands | null = null;
+
+    const pipeline = this.deps.eventSourcing.register(
+      createTopicClusteringProcessingPipeline({
+        topicClusteringRunStatusStore:
+          this.deps.repositories.topicClusteringRunStatus,
+        topicClusteringRunHistoryStore:
+          this.deps.repositories.topicClusteringRunHistory,
+        topicModelStore: this.deps.repositories.topicModel,
+        dispatch: {
+          runPort: this.deps.topicClustering.runPort,
+          commands: () => {
+            if (!outcomeCommands) {
+              throw new Error(
+                "Topic clustering outcome commands used before the pipeline finished registering",
+              );
+            }
+            return outcomeCommands;
+          },
+        },
+      }),
+    );
+
+    const commands = mapCommands(pipeline.commands);
+    outcomeCommands = {
+      recordClusteringRunStarted: (args) =>
+        commands.recordClusteringRunStarted(args),
+      recordClusteringRunCompleted: (args) =>
+        commands.recordClusteringRunCompleted(args),
+      recordClusteringRunFailed: (args) =>
+        commands.recordClusteringRunFailed(args),
+    };
+    // Level-triggered bootstrap: the projectMetadata reactor asks on every
+    // real ingest, and this claim keeps that to one commit per project per
+    // window. See createRateLimitedBootstrap for why re-asking is safe.
+    this.bootstrapTopicClustering.resolve(
+      createRateLimitedBootstrap({
+        redis: this.deps.redis,
+        bootstrap: (projectId) =>
+          commands.requestClustering({
+            tenantId: projectId,
+            occurredAt: Date.now(),
+            trigger: "bootstrap",
+          }),
+      }),
+    );
+
+    return { pipeline };
   }
 
   /** Langy writes its low-latency operational projections directly to Postgres. */
@@ -497,10 +594,6 @@ export class PipelineRegistry {
       }) => Promise<void>
     >("langyGenerateTitle");
 
-    const processManager = new ProcessManagerService({
-      definition: langyConversationProcessDefinition,
-      store: this.deps.repositories.langyProcessStore,
-    });
     const effectPorts = createLangyEffectPorts({
       handoffStore: this.deps.langy.handoffStore,
       worker: this.deps.langy.worker,
@@ -511,31 +604,17 @@ export class PipelineRegistry {
           projectId,
           organizationId,
         }),
-      revokeSessionKey: ({ apiKeyId }) =>
+      revokeSessionKey: ({ apiKeyId, projectId }) =>
         revokeLangySessionApiKey({
           prisma: this.deps.prisma,
           apiKeyId,
+          projectId,
         }).then(() => undefined),
       titleGenerator: this.deps.langy.titleGenerator,
       saveTitle: (args) => saveTitle.fn(args),
+      failTurn: { failTurn: (args) => failTurn.fn(args) },
+      markError: (args) => this.deps.langy.buffer.markError(args),
     });
-    const outboxDispatcher = new OutboxDispatcherService({
-      store: this.deps.repositories.langyProcessStore,
-      handlers: createLangyIntentHandlers({ ports: effectPorts }),
-      logger,
-      processNames: [LANGY_CONVERSATION_PROCESS_NAME],
-      // The lease MUST outlive the slowest accepted dispatch, or a healthy
-      // long-running turn loses its lease mid-flight and a second instance
-      // re-delivers it concurrently (the completing handler is then fenced
-      // out and the message never retires). The generic 30s default is unsafe
-      // against the 60s dispatch budget.
-      leaseDurationMs: LANGY_OUTBOX_LEASE_DURATION_MS,
-    });
-    const processOutboxWorker = new ProcessOutboxWorker({
-      dispatcher: outboxDispatcher,
-      logger,
-    });
-
     const conversationReader = {
       read: async ({
         projectId,
@@ -560,10 +639,6 @@ export class PipelineRegistry {
       },
     };
 
-    const processSubscriber = createLangyProcessSubscriber({
-      processManager,
-      notifyOutbox: () => processOutboxWorker.notify(),
-    });
     const livenessSubscriber = createAgentTurnLivenessSubscriber({
       buffer: this.deps.langy.buffer,
       conversations: conversationReader,
@@ -589,8 +664,8 @@ export class PipelineRegistry {
         langyMessageProjectionStore: this.deps.repositories.langyMessageStorage,
         langyAnalyticsEventProjectionStore:
           this.deps.repositories.langyAnalyticsEventStorage,
+        langyProcessPorts: effectPorts,
         subscribers: [
-          processSubscriber,
           livenessSubscriber,
           broadcastSubscriber,
           admissionLifecycleSubscriber,
@@ -619,13 +694,19 @@ export class PipelineRegistry {
         model: args.model,
       }),
     );
-    if (this.deps.langy.runsWorkers) {
-      processOutboxWorker.start();
-    }
-    return { pipeline, processOutboxWorker };
+    // The outbox worker, dispatcher and process service are owned by
+    // ProcessRuntime now that the process is declared on the pipeline; the
+    // registry no longer constructs or starts them.
+    return { pipeline };
   }
 
-  private registerMetricPipeline() {
+  private registerMetricPipeline({
+    subscribers,
+  }: {
+    subscribers: Parameters<
+      typeof createMetricProcessingPipeline
+    >[0]["subscribers"];
+  }) {
     const repository = this.deps.repositories.metricDataPointStorage;
     return this.deps.eventSourcing.register(
       createMetricProcessingPipeline({
@@ -639,11 +720,49 @@ export class PipelineRegistry {
         metricCommandShardCount: resolveMetricCommandShardCount(
           process.env.METRIC_PROCESSING_SHARDS,
         ),
+        subscribers,
       }),
     );
   }
 
-  private registerLogPipeline() {
+  /**
+   * ADR-056: the session-aggregate pipeline. Contribution commands are its
+   * write surface; the session fold and the (trace → session) map are its
+   * projections. The dispatch subscribers that feed it mount on the source
+   * pipelines and close over this pipeline's commands, so this registers
+   * first.
+   */
+  private registerCodingAgentPipeline() {
+    return this.deps.eventSourcing.register(
+      createCodingAgentProcessingPipeline({
+        // Read-through store (ADR-066): Redis is the warm read tier; on a miss
+        // the store reads its own last committed state back from
+        // coding_agent_sessions (store.get() → findBySessionId → decode row).
+        // The delivery path never reads event_log. Same wiring as trace_summaries.
+        codingAgentSessionStore: this.cached<CodingAgentSessionState>(
+          new CodingAgentSessionStore(
+            this.deps.repositories.codingAgentSession,
+          ),
+          "coding_agent_sessions",
+        ),
+        codingAgentTraceSessionAppendStore:
+          new CodingAgentTraceSessionAppendStore(
+            this.deps.repositories.codingAgentTraceSession,
+          ),
+        sessionMetricSeriesAppendStore: new SessionMetricSeriesAppendStore(
+          this.deps.repositories.sessionMetricSeries,
+        ),
+      }),
+    );
+  }
+
+  private registerLogPipeline({
+    subscribers,
+  }: {
+    subscribers: Parameters<
+      typeof createLogProcessingPipeline
+    >[0]["subscribers"];
+  }) {
     return this.deps.eventSourcing.register(
       createLogProcessingPipeline({
         canonicalLogAppendStore: new CanonicalLogAppendStore(
@@ -652,6 +771,7 @@ export class PipelineRegistry {
         logCommandShardCount: resolveCanonicalLogCommandShardCount(
           process.env.LOG_PROCESSING_SHARDS,
         ),
+        subscribers,
       }),
     );
   }
@@ -742,10 +862,12 @@ export class PipelineRegistry {
     evalPipeline,
     traceSummaryStore,
     automations,
+    codingAgentSubscribers,
   }: {
     evalPipeline: ReturnType<PipelineRegistry["registerEvaluationPipeline"]>;
     traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
     automations: TraceProcessingPipelineDeps["automations"];
+    codingAgentSubscribers: TraceProcessingPipelineDeps["subscribers"];
   }) {
     const evalCommands = mapCommands(evalPipeline.commands);
 
@@ -759,11 +881,6 @@ export class PipelineRegistry {
     const simComputeRunMetrics = new Deferred<
       CommandDispatcher<ComputeRunMetricsCommandData>
     >("simComputeRunMetrics");
-    // recordSpan is a command of the trace pipeline itself, so the claude
-    // span-sync reactor that dispatches it is wired after registration.
-    const recordSpanDispatch = new Deferred<
-      CommandDispatcher<RecordSpanCommandData>
-    >("recordSpan");
 
     const originGateReactor = createOriginGateReactor({
       scheduleDeferred: scheduleDeferred.fn,
@@ -788,51 +905,10 @@ export class PipelineRegistry {
       hasRedis: !!this.deps.eventSourcing.redisConnection,
     });
 
-    const claudeCodeSpanSyncReactor = createClaudeCodeSpanSyncReactor({
-      getMarkedClaudeCodeLogs: async (
-        tenantId,
-        traceId,
-        occurredAtMs,
-        limit,
-      ) => {
-        const [canonical, legacy] = await Promise.all([
-          this.deps.repositories.canonicalLogStorage.getMarkedClaudeCodeLogsByTrace(
-            { tenantId, traceId, occurredAtMs, limit },
-          ),
-          this.deps.repositories.logRecordStorage.getMarkedClaudeCodeLogsByTrace(
-            tenantId,
-            traceId,
-            occurredAtMs,
-            limit,
-          ),
-        ]);
-        return mergeClaudeLogRows([...canonical, ...legacy], limit);
-      },
-      countMarkedClaudeCodeLogs: async (tenantId, traceId, occurredAtMs) => {
-        const [canonical, legacy] = await Promise.all([
-          this.deps.repositories.canonicalLogStorage.countMarkedClaudeCodeLogsByTrace(
-            { tenantId, traceId, occurredAtMs },
-          ),
-          this.deps.repositories.logRecordStorage.countMarkedClaudeCodeLogsByTrace(
-            tenantId,
-            traceId,
-            occurredAtMs,
-          ),
-        ]);
-        return canonical + legacy;
-      },
-      // Per-turn conversion cap (env LANGWATCH_CLAUDE_TURN_LOG_CAP, default
-      // CLAUDE_TURN_LOG_CAP). Bounds how many of a pathological turn's marked
-      // logs the span-sync reactor folds in one pass so a runaway turn can't
-      // seize the worker; the root span is marked truncated when the cap bites.
-      turnLogCap: resolveClaudeTurnLogCap(
-        process.env.LANGWATCH_CLAUDE_TURN_LOG_CAP,
-      ),
-      recordSpan: recordSpanDispatch.fn,
-    });
-
     const projectMetadataReactor = createProjectMetadataReactor({
       projects: this.deps.projects,
+      bootstrapTopicClustering: (projectId) =>
+        this.bootstrapTopicClustering.fn(projectId),
     });
 
     const simulationMetricsSyncReactor = createSimulationMetricsSyncReactor({
@@ -890,10 +966,6 @@ export class PipelineRegistry {
         traceAnalyticsRollupAppendStore: new TraceAnalyticsRollupAppendStore(
           this.deps.repositories.traceAnalyticsRollup,
         ),
-        // CUTOVER ONLY — see TraceProcessingPipelineDeps.logRecordAppendStore.
-        logRecordAppendStore: new LogRecordAppendStore(
-          this.deps.repositories.logRecordStorage,
-        ),
         // Redis cache is the slim fold's ONLY warm read path — its store's
         // get() returns null by design (lossy row, no read-back), and on a
         // cache miss the fold's refoldOnStoreMiss option rebuilds state from
@@ -913,7 +985,6 @@ export class PipelineRegistry {
         simulationMetricsSyncReactor,
         experimentMetricsSyncReactor,
         spanStorageBroadcastReactor,
-        claudeCodeSpanSyncReactor,
         gatewayBudgetSyncReactor,
         // ADR-022: Wire BlobStore so RecordSpanCommand can reconstitute
         // oversized commands and best-effort delete the transient S3 spool.
@@ -924,23 +995,15 @@ export class PipelineRegistry {
         spanCommandShardCount: resolveSpanCommandShardCount(
           process.env.TRACE_SPAN_PROCESSING_SHARDS,
         ),
-        // Log-command sharding fan-out, ON by default (4 lanes; env
-        // TRACE_LOG_PROCESSING_SHARDS tunes it, 1 disables). Lets one Claude
-        // Code turn's recordLog commands drain in parallel across
-        // `traceId:<shard>` GroupQueue groups; the fold and the
-        // claude-span-sync reactor stay per-trace.
-        logCommandShardCount: resolveLogCommandShardCount(
-          process.env.TRACE_LOG_PROCESSING_SHARDS,
-        ),
         governanceKpisSyncReactor,
         governanceOcsfEventsSyncReactor,
+        subscribers: codingAgentSubscribers,
       }),
     );
 
     // Resolve self-referencing commands now that the pipeline is registered
     const traceCommands = mapCommands(tracePipeline.commands);
     resolveOrigin.resolve(traceCommands.resolveOrigin);
-    recordSpanDispatch.resolve(traceCommands.recordSpan);
 
     // Wire the deferred origin resolution queue (BullMQ-backed, survives process restart).
     // After 5 min, dispatches resolveOrigin command → OriginResolvedEvent → fold → reactor.
@@ -1281,6 +1344,14 @@ export interface ReactorMetadata {
   afterProjection: string;
 }
 
+export interface EventSubscriberMetadata {
+  subscriberName: string;
+  pipelineName: string;
+  aggregateType: string;
+  /** The event types this subscriber reacts to — its transition triggers. */
+  eventTypes: readonly string[];
+}
+
 export interface DejaViewProjection {
   projectionName: string;
   eventTypes: readonly string[];
@@ -1334,6 +1405,72 @@ export function getReactorMetadata(): ReactorMetadata[] {
         afterProjection: projectionName,
       }),
     );
+  });
+}
+
+/**
+ * Event subscribers registered on each pipeline — live consumers of committed
+ * events that carry no projection state. This is the DejaView-facing view of
+ * the `.withEventSubscriber` / `.withSubscriber({ events })` seam; the
+ * process-manager runtime's generated `pm:<name>` subscribers are internal
+ * plumbing and are not part of the static definition, so they are not listed.
+ */
+export function getEventSubscriberMetadata(): EventSubscriberMetadata[] {
+  return getDefinitions().flatMap((def) => {
+    const { name: pipelineName, aggregateType } = def.metadata;
+    return Array.from(def.eventSubscribers.values()).map((definition) => ({
+      subscriberName: definition.name,
+      pipelineName,
+      aggregateType,
+      eventTypes: definition.eventTypes,
+    }));
+  });
+}
+
+export interface ProcessManagerMetadata {
+  processName: string;
+  pipelineName: string;
+  aggregateType: string;
+  /** Event types that drive the machine's transitions. */
+  eventTypes: readonly string[];
+  /**
+   * Intent types the machine can emit — its cross-aggregate commands, dispatched
+   * through the transactional outbox.
+   */
+  intentTypes: string[];
+  /**
+   * True for a fixed-interval singleton (one instance, project `__global__`);
+   * false for a per-aggregate machine keyed by aggregate id.
+   */
+  scheduled: boolean;
+  /** Fixed wake interval in ms for a scheduled singleton, else null. */
+  everyMs: number | null;
+  /** True when the machine computes its own wake-ups from within `evolve`. */
+  hasWake: boolean;
+}
+
+/**
+ * The process-manager state machines mounted across the pipelines.
+ *
+ * The machine itself is implicit in each manager's `evolve` — there is no
+ * declared state set or transition table — so what is introspectable is the
+ * definition surface: which event types trigger it, which intents it can emit,
+ * and how it wakes. The per-aggregate *position* in the machine lives in the
+ * persisted instance, read separately by ref.
+ */
+export function getProcessManagerMetadata(): ProcessManagerMetadata[] {
+  return getDefinitions().flatMap((def) => {
+    const { name: pipelineName, aggregateType } = def.metadata;
+    return Array.from(def.processManagers.values()).map(({ config }) => ({
+      processName: config.name,
+      pipelineName,
+      aggregateType,
+      eventTypes: config.eventTypes,
+      intentTypes: Object.keys(config.intents ?? {}),
+      scheduled: Boolean(config.schedule),
+      everyMs: config.schedule?.everyMs ?? null,
+      hasWake: Boolean(config.onWake),
+    }));
   });
 }
 

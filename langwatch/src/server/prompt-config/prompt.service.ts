@@ -14,6 +14,7 @@ import {
   type outputsSchema,
   type promptingTechniqueSchema,
 } from "~/prompts/schemas/field-schemas";
+import { describeLocalFileUpdate } from "./describe-local-file-update";
 import { SchemaVersion } from "./enums";
 import {
   HandleGenerationError,
@@ -33,6 +34,7 @@ import {
 } from "./repositories";
 import { PromptTagAssignmentRepository, TagValidationError } from "./repositories/llm-config-tag.repository";
 import {
+  diffRuntimeParameters,
   type getLatestConfigVersionSchema,
   LATEST_SCHEMA_VERSION,
   type LatestConfigVersionSchema,
@@ -95,7 +97,9 @@ export type VersionedPrompt = {
   authorId: string | null;
   author?: {
     id: string;
-    name: string;
+    name: string | null;
+    email: string | null;
+    image: string | null;
   } | null;
   inputs: LatestConfigVersionSchema["configData"]["inputs"];
   outputs: LatestConfigVersionSchema["configData"]["outputs"];
@@ -1144,12 +1148,19 @@ export class PromptService {
         return { action: "up_to_date", prompt: existingPrompt };
       } else {
         // Content differs - create new version
+        const allDifferences = [
+          ...(comparison.differences ?? []),
+          ...diffRuntimeParameters({
+            localParameters: params.parameters,
+            remoteParameters: existingPrompt.parameters,
+          }),
+        ];
         const updatedPrompt = await this.updatePrompt({
           idOrHandle: existingPrompt.id,
           projectId,
           data: {
             authorId,
-            commitMessage: commitMessage ?? "Updated from local file",
+            commitMessage: commitMessage ?? describeLocalFileUpdate(allDifferences),
             ...this.transformToDbFormat(resolvedConfigData),
             schemaVersion: SchemaVersion.V1_0,
             parameters: params.parameters,
@@ -1311,7 +1322,9 @@ export class PromptService {
       author: config.latestVersion.author
         ? {
             id: config.latestVersion.author.id,
-            name: config.latestVersion.author.name,
+            name: config.latestVersion.author.name ?? null,
+            email: config.latestVersion.author.email ?? null,
+            image: config.latestVersion.author.image ?? null,
           }
         : null,
       updatedAt: config.updatedAt,

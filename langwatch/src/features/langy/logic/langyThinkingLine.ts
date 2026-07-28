@@ -101,6 +101,16 @@ export function runningTool(
   return running ?? null;
 }
 
+/** Has any tool call on this turn already finished, well or badly? */
+export function settledTool(message: ThinkingMessage | undefined): boolean {
+  return !!message?.parts?.some(
+    (part) =>
+      typeof part.type === "string" &&
+      part.type.startsWith("tool-") &&
+      (part.state === "output-available" || part.state === "output-error"),
+  );
+}
+
 /** Has the model actually produced any prose yet? */
 export function hasTokens(message: ThinkingMessage | undefined): boolean {
   return !!message?.parts?.some(
@@ -162,7 +172,16 @@ export function langyThinkingLine({
     return { text: "Thinking…", tone: "working", allowWhimsy: false };
   }
 
-  // 4. NOTHING HAS HAPPENED. No tool, no token, no reasoning. We are waiting on
+  // 4. THE TURN IS BETWEEN STEPS. Nothing is running right now, but tool calls
+  //    have already SETTLED on this turn — so the worker demonstrably started,
+  //    and the startup ladder below would be a plain lie ("Starting up…" under
+  //    four completed actions). The model is choosing its next move, which is
+  //    the same state as case 3 and reads the same way.
+  if (settledTool(last)) {
+    return { text: "Thinking…", tone: "working", allowWhimsy: true };
+  }
+
+  // 5. NOTHING HAS HAPPENED. No tool, no token, no reasoning. We are waiting on
   //    a worker that has not started, and we must not pretend otherwise.
   //    Escalate with time: silence is normal for a moment, then it isn't, then
   //    it's a fault.

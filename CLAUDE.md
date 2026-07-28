@@ -19,6 +19,38 @@ If no feature file exists for your task, create one before writing code.
 
 `make quickstart` is the single entry point. It asks what you're working on and starts only the services you need, overriding only the URLs whose services are local. Your `langwatch/.env` is the source of truth for everything else.
 
+### Running with no container runtime
+
+Nothing in the day-to-day loop needs Docker or colima. If you run ClickHouse,
+Postgres and Redis natively (brew, or a LaunchAgent), point `.env` at them and
+set these three, and `pnpm dev:haven` brings up the whole application stack,
+everything except the observability container, with no container runtime
+installed at all:
+
+```bash
+LANGWATCH_HAVEN_CH=0          # use .env CLICKHOUSE_URL instead of a managed container
+LANGWATCH_HAVEN_OBS=0         # skip the LGTM telemetry stack
+LANGY_UNSAFE_HOST_ACCESS=1    # run the langyagent worker on the host, not in colima
+```
+
+haven resolves its own knobs from `langwatch/.env` (then `.env.portless`) as
+well as the shell, so these travel with the worktree; an exported variable still
+wins for a single run. Postgres and Redis stay haven-managed either way: it
+starts them through brew, not a container.
+
+Tests follow the same rule. `pnpm test:unit` never needed a container, and
+`pnpm test:integration` runs against native services when
+`LANGWATCH_TEST_CLICKHOUSE_URL`, `LANGWATCH_TEST_REDIS_URL` and
+`LANGWATCH_TEST_DATABASE_URL` are set, using dedicated test databases so dev
+data is untouched (`specs/ci/no-docker-integration-tests.feature`). Suites that
+need several mutually isolated ClickHouse endpoints ask
+`startTestClickHouseEndpoints` for them rather than starting their own
+containers. `CI=1` disables the native mode and forces testcontainers, so locally
+use `pnpm test:integration <path> --watch=false` and never `CI=1`.
+
+What still wants a container: `make observability` (the Grafana LGTM stack) and
+the sandboxed/container langy tiers. Both are opt-in.
+
 ### Local dev by hostname — thuishaven / portless (recommended)
 
 Stop juggling ports. Opt in with `pnpm dev:haven` and traffic routes through
@@ -169,6 +201,11 @@ specs/               # BDD feature specs
 | Shared types in `types.ts` | Colocate unless truly shared |
 | Duplicating Zod + TS types | When you need both validation AND types, use Zod only with `infer`. For internal constants (no external input), `as const` is sufficient |
 | Skipping test run after edits | Always run tests after any code change to catch regressions immediately |
+| Running `npx vitest` / `npm exec vitest` directly | Always go through the package scripts: `pnpm test:unit run <path>`, `pnpm test:integration run <path>`. Only they carry the repo's RAM guardrails (`pool: "vmThreads"`, `maxWorkers: "50%"`, `vmMemoryLimit: "512MB"`; integration adds `pool: "forks"` + `fileParallelism: false`) |
+| Hand-rolling a throwaway `vitest.*.config.ts` (in `/tmp` or a worktree) | Never. A bare config inherits none of the guardrails above, so vitest defaults to the `forks` pool at `availableParallelism - 1` workers (10 on an 11-core laptop) at ~200-500MB each — several GB per run, multiplied by every parallel agent worktree. Use an existing config |
+| Writing a jsdom config because the repo "has no jsdom environment" | It is per-file on purpose — neither config declares a global `environment`; 515 test files set `// @vitest-environment jsdom` in a docblock. Add the docblock to your test file |
+| Reaching for `--maxWorkers=1` to be gentle on RAM | It serializes the run so it stays resident far longer, overlapping every other agent's run. Scope the run down instead — pass a narrower path |
+| Leaving a killed vitest run behind | Interrupting vitest orphans its forked workers (they reparent to `ppid 1` and keep holding RAM). After an interrupted run, sweep with `pkill -f "vitest/dist/workers"` |
 | Writing tests in the incorrect order | Outside-In TDD: integration tests first, then unit tests |
 | Defining BDD specs on the end of the TODO list | BDD specs should come before any other tasks to guide them, not the other way around |
 | `gh pr edit --body` | Use `gh api repos/OWNER/REPO/pulls/N -X PATCH -f body="..."` (avoids Projects classic deprecation warning) |
@@ -187,7 +224,11 @@ specs/               # BDD feature specs
 | Hono routes calling repositories directly | Routes must go through a service layer — never instantiate or import from repositories. Business logic (validation, guards) belongs in the service, not the route |
 | Using `list` or `get` for repository methods | Repositories use `findAll`/`findById`. Services use `getAll`/`getById`. Routes call services only |
 | Setting up a Monitor / sleep that *can* take more than 5 minutes | Anthropic's prompt cache TTL is 5min, so any wait that crosses it forces an uncached re-read of the full conversation on wake-up (slower + double-pays for tokens). Cap each poll cycle at **4.5 min (270s)** — re-check, then re-arm. If the work is obviously hours away (long deploy, overnight run), don't sit on a Monitor at all — drop it and hand control back to the user |
-| Using inline `import("...")` anywhere | Never use inline `import()` — always use top-level `import` / `import type` statements |
+| Using inline `import("...")` anywhere | Never use inline `import()` — always use top-level `import` / `import type` statements. **One exception: the CLI startup path** (`typescript-sdk/src/cli/**` and `typescript-sdk/tsup.config.ts`), where lazy `import()` is load-bearing — it is what keeps commander, chalk, zod, js-yaml, the command modules and the command catalog off the boot graph and the cold start at ~30ms. There, defer at the seam (command actions, format branches) and keep the boot graph pinned by `src/cli/__tests__/index-boot.unit.test.ts`. Everywhere else the ban stands |
+| Running `pnpm typecheck` and assuming the TypeScript is checked | `tsconfig.tsgo.json` excludes `**/*.test.ts`, `**/*.test.tsx` and `**/__tests__/**`, so `pnpm typecheck` never looks at a test file. CI runs `pnpm typecheck` **and** `pnpm typecheck:tests` as separate steps in the same job. Use `pnpm typecheck:all`, which is both, or a change confined to a test file will typecheck clean locally and fail CI |
+| Assuming `go build`, `go test` and `gofmt` are enough before pushing Go | Run `golangci-lint run ./services/aigateway/... ./services/nlpgo/... ./pkg/... ./cmd/... ./tools/migrationorder/...`, which is exactly what `go-ci / lint` runs. It catches a class the other three never will, most often `misspell` (it enforces US spelling, so `behaviour`, `unrecognised`, `labelled` and `funnelled` all fail even though the repo's prose uses British forms), `nolintlint` (a `//nolint` for a code already in the global `gosec.excludes` is flagged as unused) and `testifylint`. The pinned version is in `.golangci.yml`; `golangci-lint run --fix` handles misspell and nolintlint automatically |
+| Rewriting `assert.Equal(t, 1.0, ...)` to `assert.InEpsilon` because testifylint's `float-compare` says so | Check whether the expectation can be zero first. `InEpsilon` divides by the expected value, so it returns false even for `InEpsilon(0.0, 0.0)`, and a counter assertion meaning "this did not move" becomes one that always fails. For Prometheus counters, which are exact integers in a float64, `assert.Equal` is correct and `float-compare` is a false positive; `.golangci.yml` scopes an exclusion to `adapters/gatewaymetrics/*_test.go` rather than contorting the assertions |
+| Running only the root `pnpm install` in a fresh clone or worktree | Install twice: once at the repo root, then again inside `langwatch/`. The root `pnpm-workspace.yaml` lists only `packages/*` and deliberately leaves `langwatch/` out, because it is its own workspace and treating it as a peer would double-install React and Next. Skip the second install and `pnpm start:prepare:files` fails with `ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command "prisma" not found`, which reads like a broken toolchain but is just a missing `langwatch/node_modules` |
 
 ## TypeScript
 

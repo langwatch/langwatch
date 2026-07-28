@@ -53,8 +53,8 @@ export const getGreeting = ({
 
 /**
  * The clock's read of the day, resolved client-side after mount (so SSR and
- * first paint agree on "morning" and never mismatch hydration). Shared by the
- * greeting and the page's time-of-day aura.
+ * first paint agree on "morning" and never mismatch hydration). Feeds the
+ * greeting.
  */
 export function useTimeOfDay(): TimeOfDay {
   const [timeOfDay, setTimeOfDay] = useState<TimeOfDay>("morning");

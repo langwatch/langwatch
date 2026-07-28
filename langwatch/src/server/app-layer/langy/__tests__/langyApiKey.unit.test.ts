@@ -47,6 +47,7 @@ const prisma = {
 // The full candidate surface, in declaration order — used to assert the "all
 // permissions held" case grants exactly this set.
 const ALL_CANDIDATES = [
+  "project:view",
   "traces:view",
   "traces:create",
   "traces:update",
@@ -69,8 +70,6 @@ const ALL_CANDIDATES = [
   "prompts:create",
   "prompts:update",
   "triggers:view",
-  "triggers:create",
-  "triggers:update",
   "workflows:view",
   "workflows:create",
   "workflows:update",
@@ -193,6 +192,168 @@ describe("mintLangySessionApiKey", () => {
     });
   });
 
+  // The key asks for `scenarios:create`, so a user who can manage scenarios
+  // must come out holding it — `:manage` implies `:create` through the RBAC
+  // hierarchy, and the key is what the ROUTE then checks against.
+  describe("given a user who can manage a resource", () => {
+    describe("when a session key is minted", () => {
+      it("carries the finer grants that management implies", async () => {
+        // What `batchProjectPermissions` returns for a manage-holder: every
+        // candidate in that family, resolved through the hierarchy.
+        batchProjectPermissions.mockImplementation(
+          (_ctx: unknown, args: { permissions: string[] }) =>
+            Promise.resolve(
+              args.permissions.filter((p) => p.startsWith("scenarios:")),
+            ),
+        );
+
+        await mintLangySessionApiKey({
+          prisma,
+          session: SESSION,
+          projectId: "proj-1",
+          organizationId: "org-1",
+        });
+
+        const arg = apiKeyCreate.mock.calls[0]![0] as Record<string, any>;
+        expect(arg.permissions).toContain("scenarios:create");
+      });
+
+      it("never reaches past the write grain to management itself", async () => {
+        batchProjectPermissions.mockImplementation(
+          (_ctx: unknown, args: { permissions: string[] }) =>
+            Promise.resolve(args.permissions),
+        );
+
+        await mintLangySessionApiKey({
+          prisma,
+          session: SESSION,
+          projectId: "proj-1",
+          organizationId: "org-1",
+        });
+
+        const arg = apiKeyCreate.mock.calls[0]![0] as Record<string, any>;
+        // `:manage` implies `:delete`. Langy must not be able to destroy a
+        // user's work, however much access that user has.
+        expect(
+          (arg.permissions as string[]).filter(
+            (p) => p.endsWith(":manage") || p.endsWith(":delete"),
+          ),
+        ).toEqual([]);
+      });
+    });
+  });
+
+  describe("given a user who can only view that resource", () => {
+    describe("when a session key is minted", () => {
+      it("asks for the view and never the write", async () => {
+        const held = new Set(["scenarios:view"]);
+        batchProjectPermissions.mockImplementation(
+          (_ctx: unknown, args: { permissions: string[] }) =>
+            Promise.resolve(args.permissions.filter((p) => held.has(p))),
+        );
+
+        await mintLangySessionApiKey({
+          prisma,
+          session: SESSION,
+          projectId: "proj-1",
+          organizationId: "org-1",
+        });
+
+        const arg = apiKeyCreate.mock.calls[0]![0] as Record<string, any>;
+        expect(arg.permissions).toEqual(["scenarios:view"]);
+      });
+    });
+  });
+
+  // The candidate list bounds what Langy can EVER touch. Widening it to reach
+  // the write tier must not have widened it into administration.
+  describe("given an admin who holds everything in the organization", () => {
+    describe("when a session key is minted", () => {
+      it("never asks for administration, secrets, or public trace sharing", async () => {
+        // The user holds literally every permission asked about.
+        batchProjectPermissions.mockImplementation(
+          (_ctx: unknown, args: { permissions: string[] }) =>
+            Promise.resolve(args.permissions),
+        );
+
+        await mintLangySessionApiKey({
+          prisma,
+          session: SESSION,
+          projectId: "proj-1",
+          organizationId: "org-1",
+        });
+
+        const arg = apiKeyCreate.mock.calls[0]![0] as Record<string, any>;
+        const families = new Set(
+          (arg.permissions as string[]).map((p) => p.split(":")[0]),
+        );
+        for (const forbidden of [
+          "organization",
+          "team",
+          "secrets",
+          "governance",
+          "virtualKeys",
+          "gatewayBudgets",
+          "apiKeys",
+        ]) {
+          expect(families.has(forbidden)).toBe(false);
+        }
+        expect(arg.permissions).not.toContain("traces:share");
+        expect(arg.permissions).not.toContain("traces:manage");
+      });
+
+      // `project` is the one family Langy reaches outside its nine, and only to
+      // READ: the project-shaped surfaces (agents, model providers, model
+      // defaults) have no family of their own. The writes in that family are
+      // the credential surface — `project:update` stores model-provider keys,
+      // `project:manage` regenerates the project's API key — so the candidate
+      // list must never reach past the view.
+      it("reads the project but never writes to it", async () => {
+        batchProjectPermissions.mockImplementation(
+          (_ctx: unknown, args: { permissions: string[] }) =>
+            Promise.resolve(args.permissions),
+        );
+
+        await mintLangySessionApiKey({
+          prisma,
+          session: SESSION,
+          projectId: "proj-1",
+          organizationId: "org-1",
+        });
+
+        const arg = apiKeyCreate.mock.calls[0]![0] as Record<string, any>;
+        const projectPermissions = (arg.permissions as string[]).filter((p) =>
+          p.startsWith("project:"),
+        );
+        expect(projectPermissions).toEqual(["project:view"]);
+      });
+
+      // Every other family Langy can write creates DATA — a row, inert until
+      // something reads it. A trigger is a standing instruction that keeps
+      // acting on its own, and it is durable, so it outlives the session key
+      // that created it. Authoring one is a decision that stays with a person.
+      it("reads triggers but can never create one", async () => {
+        batchProjectPermissions.mockImplementation(
+          (_ctx: unknown, args: { permissions: string[] }) =>
+            Promise.resolve(args.permissions),
+        );
+
+        await mintLangySessionApiKey({
+          prisma,
+          session: SESSION,
+          projectId: "proj-1",
+          organizationId: "org-1",
+        });
+
+        const arg = apiKeyCreate.mock.calls[0]![0] as Record<string, any>;
+        const triggerPermissions = (arg.permissions as string[]).filter((p) =>
+          p.startsWith("triggers:"),
+        );
+        expect(triggerPermissions).toEqual(["triggers:view"]);
+      });
+    });
+  });
+
   describe("given a user who holds none of Langy's permissions", () => {
     describe("when a session key is minted", () => {
       it("throws LangySessionKeyScopeError and never mints a key", async () => {
@@ -235,10 +396,12 @@ describe("revokeLangySessionApiKey", () => {
           id: "k1",
           name: "Langy session",
           revokedAt: null,
+          // The PROJECT-scoped binding the mint gave it — the tenant anchor.
+          roleBindings: [{ id: "rb1" }],
         });
 
         await expect(
-          revokeLangySessionApiKey({ prisma: p, apiKeyId: "k1" }),
+          revokeLangySessionApiKey({ prisma: p, apiKeyId: "k1", projectId: "p1" }),
         ).resolves.toBe("revoked");
 
         expect(p.apiKey.update).toHaveBeenCalledWith({
@@ -258,11 +421,37 @@ describe("revokeLangySessionApiKey", () => {
           id: "k2",
           name: "Production ingestion key",
           revokedAt: null,
+          roleBindings: [{ id: "rb2" }],
         });
 
         await expect(
-          revokeLangySessionApiKey({ prisma: p, apiKeyId: "k2" }),
+          revokeLangySessionApiKey({ prisma: p, apiKeyId: "k2", projectId: "p1" }),
         ).resolves.toBe("refused");
+
+        expect(p.apiKey.update).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given a Langy session key scoped to a DIFFERENT project", () => {
+    describe("when a caller holding the internal secret targets it by id", () => {
+      it("refuses as not-found so a cross-tenant id is never confirmed", async () => {
+        // The Prisma binding filter finds no PROJECT-scoped binding for this
+        // project, so the select returns an empty roleBindings array.
+        const p = keyPrisma({
+          id: "k5",
+          name: "Langy session",
+          revokedAt: null,
+          roleBindings: [],
+        });
+
+        await expect(
+          revokeLangySessionApiKey({
+            prisma: p,
+            apiKeyId: "k5",
+            projectId: "other-project",
+          }),
+        ).resolves.toBe("not_found");
 
         expect(p.apiKey.update).not.toHaveBeenCalled();
       });
@@ -276,15 +465,24 @@ describe("revokeLangySessionApiKey", () => {
           id: "k3",
           name: "Langy session",
           revokedAt: new Date(),
+          roleBindings: [{ id: "rb3" }],
         });
         await expect(
-          revokeLangySessionApiKey({ prisma: already, apiKeyId: "k3" }),
+          revokeLangySessionApiKey({
+            prisma: already,
+            apiKeyId: "k3",
+            projectId: "p1",
+          }),
         ).resolves.toBe("already_revoked");
         expect(already.apiKey.update).not.toHaveBeenCalled();
 
         const gone = keyPrisma(null);
         await expect(
-          revokeLangySessionApiKey({ prisma: gone, apiKeyId: "k4" }),
+          revokeLangySessionApiKey({
+            prisma: gone,
+            apiKeyId: "k4",
+            projectId: "p1",
+          }),
         ).resolves.toBe("not_found");
         expect(gone.apiKey.update).not.toHaveBeenCalled();
       });

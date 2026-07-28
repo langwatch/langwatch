@@ -5,12 +5,7 @@ const MAX_CONTENT_DEPTH = 6;
 const INLINE_VALUE_MAX_CHARS = 96;
 const LEAF_LENGTH = 80;
 
-export type AttributeFormat =
-  | "leaf"
-  | "chat"
-  | "json"
-  | "json-string"
-  | "text";
+export type AttributeFormat = "leaf" | "chat" | "json" | "json-string" | "text";
 
 export const KNOWN_CHAT_ROLES: ReadonlySet<string> = new Set([
   "user",

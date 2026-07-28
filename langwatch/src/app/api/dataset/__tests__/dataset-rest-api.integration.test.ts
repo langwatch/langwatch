@@ -1005,7 +1005,11 @@ describe("Feature: Dataset REST API", () => {
 
         expect(res.status).toBe(422);
         const body = await res.json();
-        expect(body.message).toMatch(/batch size|1000/i);
+        // The constraint is named in the reason, not concatenated into the
+        // sentence — see specs/features/domain-error-contract.feature.
+        expect(body.error).toBe("validation_error");
+        expect(body.reasons[0].meta.field).toBe("entries");
+        expect(body.reasons[0].meta.message).toMatch(/batch size|1000/i);
       });
     });
   });

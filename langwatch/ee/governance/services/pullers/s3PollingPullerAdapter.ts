@@ -96,6 +96,7 @@ export class S3PollingPullerAdapter
       client,
       config,
       startAfter: cursor ?? undefined,
+      signal: options.signal,
     });
     if (listed.length === 0) {
       return { events: [], cursor, errorCount: 0 };
@@ -117,7 +118,12 @@ export class S3PollingPullerAdapter
         return { events, cursor: lastSuccessfulKey, errorCount };
       }
       try {
-        const body = await this.readObject({ client, config, key });
+        const body = await this.readObject({
+          client,
+          config,
+          key,
+          signal: options.signal,
+        });
         const parsed = this.parseBody({ body, config });
         for (const raw of parsed) {
           try {
@@ -200,10 +206,12 @@ export class S3PollingPullerAdapter
     client,
     config,
     startAfter,
+    signal,
   }: {
     client: S3Client;
     config: S3PollingConfig;
     startAfter?: string;
+    signal?: AbortSignal;
   }): Promise<string[]> {
     const keys: string[] = [];
     let continuationToken: string | undefined;
@@ -218,6 +226,7 @@ export class S3PollingPullerAdapter
           StartAfter: continuationToken ? undefined : startAfter,
           MaxKeys: 1000,
         }),
+        { abortSignal: signal },
       );
       const contents: _Object[] = response.Contents ?? [];
       for (const obj of contents) {
@@ -238,19 +247,29 @@ export class S3PollingPullerAdapter
     client,
     config,
     key,
+    signal,
   }: {
     client: S3Client;
     config: S3PollingConfig;
     key: string;
+    signal?: AbortSignal;
   }): Promise<string> {
     const response = await client.send(
       new GetObjectCommand({ Bucket: config.bucket, Key: key }),
+      { abortSignal: signal },
     );
     const stream = response.Body;
     if (!stream) throw new Error(`empty body for s3://${config.bucket}/${key}`);
     let totalBytes = 0;
     const chunks: Buffer[] = [];
     for await (const chunk of stream as AsyncIterable<Uint8Array>) {
+      // The SDK's abortSignal covers the request, not the draining of an
+      // already-open body. A slow trickle would otherwise outlive the deadline.
+      if (signal?.aborted) {
+        throw new Error(
+          `aborted while reading s3://${config.bucket}/${key}`,
+        );
+      }
       const buffer = Buffer.from(chunk);
       totalBytes += buffer.length;
       if (totalBytes > MAX_BYTES_PER_FILE) {

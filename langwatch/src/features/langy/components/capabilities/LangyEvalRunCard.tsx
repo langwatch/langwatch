@@ -6,6 +6,7 @@
  * result reports — and links through to the run. Read-only.
  */
 import { Badge, HStack, Text, VStack } from "@chakra-ui/react";
+import { extractPlatformUrl } from "~/utils/platformHref";
 import { useCapabilityData } from "../../hooks/useCapabilityData";
 import {
   extractPrimaryId,
@@ -78,6 +79,7 @@ export function LangyEvalRunCard({
       }
       projectSlug={projectSlug}
       resourceId={id}
+      platformUrl={extractPlatformUrl(output)}
     >
       {lines.length > 0 ? (
         <VStack align="stretch" gap={0.5}>

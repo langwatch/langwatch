@@ -30,7 +30,6 @@ import { useMemo, useState } from "react";
 import AiGatewayLayout from "~/components/gateway/AiGatewayLayout";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import { GatewayErrorPanel } from "~/components/gateway/GatewayErrorPanel";
-import { isLangyManagedVk } from "~/components/gateway/langyVk";
 import { VirtualKeyCreateDrawer } from "~/components/gateway/VirtualKeyCreateDrawer";
 import { VirtualKeyEditDrawer } from "~/components/gateway/VirtualKeyEditDrawer";
 import { VirtualKeySecretReveal } from "~/components/gateway/VirtualKeySecretReveal";
@@ -130,7 +129,6 @@ function VirtualKeysPage() {
   const [revoking, setRevoking] = useState<{
     id: string;
     name: string;
-    purpose: "user" | "langy";
   } | null>(null);
   const [statusTab, setStatusTab] = useState<"active" | "revoked">("active");
 
@@ -320,18 +318,6 @@ function VirtualKeysPage() {
                                   >
                                     {vk.name}
                                   </Link>
-                                  {isLangyManagedVk(vk) && (
-                                    <Tooltip content="Auto-provisioned by LangWatch for the Langy in-product assistant. You can edit its model, fallbacks, budget, and rate limits like any other virtual key. Revoking it will break Langy until you create a new one.">
-                                      <Badge
-                                        variant="subtle"
-                                        colorPalette="purple"
-                                        fontSize="2xs"
-                                        data-testid="langy-vk-badge"
-                                      >
-                                        auto-managed
-                                      </Badge>
-                                    </Tooltip>
-                                  )}
                                 </HStack>
                                 {vk.description && (
                                   <Text fontSize="xs" color="fg.muted">
@@ -476,7 +462,6 @@ function VirtualKeysPage() {
                                           setRevoking({
                                             id: vk.id,
                                             name: vk.name,
-                                            purpose: vk.purpose,
                                           })
                                         }
                                       >
@@ -548,15 +533,7 @@ function VirtualKeysPage() {
           if (!open) setRevoking(null);
         }}
         title={`Revoke ${revoking?.name ?? "virtual key"}?`}
-        message={
-          // The Langy VK is technically revocable like any other VK, but
-          // revoking it stops the in-product assistant cold. Lead with the
-          // Langy-specific consequence before the generic 401 warning so
-          // someone clicking through doesn't accidentally break Langy.
-          revoking && isLangyManagedVk(revoking)
-            ? "This is the auto-provisioned Langy virtual key. Revoking it will stop the in-product assistant from working until a new one is provisioned (it'll be re-created automatically on the next chat). Clients using this secret directly start receiving 401s within ~60 seconds. This cannot be undone — revoked keys are never reactivated."
-            : "Clients using this key start receiving 401s within ~60 seconds. This cannot be undone — revoked keys are never reactivated."
-        }
+        message="Clients using this key start receiving 401s within ~60 seconds. This cannot be undone — revoked keys are never reactivated."
         confirmLabel="Revoke key"
         tone="danger"
         loading={revokeMutation.isPending}

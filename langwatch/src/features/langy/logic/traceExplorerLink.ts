@@ -1,5 +1,7 @@
 /**
- * Carrying the agent's trace search into the Trace Explorer.
+ * Carrying the agent's trace search into the Trace Explorer — and, for the
+ * follow-up chips, into the automation drawer as an alert's subject
+ * (`buildAutomationHref`). One reader, one quoting rule, every destination.
  *
  * When Langy answers "34 traces errored overnight", the user's next move is to
  * go look at them. That link has exactly one job and it is easy to get subtly
@@ -136,6 +138,26 @@ export function parseTraceSearchCommand(command: string): TraceSearchQuery {
 }
 
 /**
+ * The Explorer's fragment for this search: the default lens, plus whatever
+ * survived of the query and the window. Shared by every link out of a trace
+ * search, so the Explorer behind a drawer and the Explorer behind the card's
+ * own button are always showing the same result set.
+ */
+function explorerFragment(search: TraceSearchQuery): string {
+  const fragmentParams = new URLSearchParams();
+  const query = search.query?.trim();
+  if (query) fragmentParams.set("q", asFreeTextTerm(query));
+  if (search.startDate !== undefined && search.endDate !== undefined) {
+    fragmentParams.set("from", String(search.startDate));
+    fragmentParams.set("to", String(search.endDate));
+  }
+  const fragmentQuery = fragmentParams.toString();
+  return fragmentQuery
+    ? `${TRACE_EXPLORER_LENS}?${fragmentQuery}`
+    : TRACE_EXPLORER_LENS;
+}
+
+/**
  * The deep link into the Trace Explorer, carrying the agent's query.
  *
  * With a `traceId`, the link ALSO opens that trace's drawer on arrival — the
@@ -160,17 +182,7 @@ export function buildTraceExplorerHref({
 }): string | null {
   if (!projectSlug) return null;
 
-  const fragmentParams = new URLSearchParams();
-  const query = search.query?.trim();
-  if (query) fragmentParams.set("q", asFreeTextTerm(query));
-  if (search.startDate !== undefined && search.endDate !== undefined) {
-    fragmentParams.set("from", String(search.startDate));
-    fragmentParams.set("to", String(search.endDate));
-  }
-  const fragmentQuery = fragmentParams.toString();
-  const fragment = fragmentQuery
-    ? `${TRACE_EXPLORER_LENS}?${fragmentQuery}`
-    : TRACE_EXPLORER_LENS;
+  const fragment = explorerFragment(search);
 
   const drawerParams = new URLSearchParams();
   if (traceId) {
@@ -185,6 +197,43 @@ export function buildTraceExplorerHref({
   const drawerQuery = drawerParams.toString();
 
   return `/${projectSlug}/traces${drawerQuery ? `?${drawerQuery}` : ""}#${fragment}`;
+}
+
+/**
+ * Open the automation drawer with the agent's search as the alert's SUBJECT.
+ *
+ * `initialFilterQuery` is the drawer's existing ADR-043 seed — the exact prop
+ * the Trace Explorer's own Automate button passes (`AutomateButton.tsx`,
+ * `initialSource: "trace"` + the current filter text), riding the same
+ * `drawer.*` URL params every drawer opens from (`CurrentDrawer` spreads them
+ * as props). The free text goes in as a quoted liqe literal, so what was free
+ * text to the CLI stays free text to the automation's matcher — the same
+ * fidelity rule `q` obeys on the Explorer link.
+ *
+ * Null without a query: a bare search has no subject to alert on, and the
+ * caller must offer plain navigation instead of a carried label that lies.
+ *
+ * Lands on the Trace Explorer carrying the same fragment as every other link
+ * out of the search, so behind the drawer — and after it closes — the user is
+ * looking at the very traces the alert would match.
+ */
+export function buildAutomationHref({
+  projectSlug,
+  search,
+}: {
+  projectSlug?: string | null;
+  search: TraceSearchQuery;
+}): string | null {
+  if (!projectSlug) return null;
+  const query = search.query?.trim();
+  if (!query) return null;
+
+  const drawerParams = new URLSearchParams();
+  drawerParams.set("drawer.open", "automation");
+  drawerParams.set("drawer.initialSource", "trace");
+  drawerParams.set("drawer.initialFilterQuery", asFreeTextTerm(query));
+
+  return `/${projectSlug}/traces?${drawerParams.toString()}#${explorerFragment(search)}`;
 }
 
 /**

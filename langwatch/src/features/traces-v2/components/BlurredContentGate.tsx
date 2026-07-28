@@ -1,8 +1,8 @@
 import { Box, Button, Text, VStack } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
 import { Lock } from "lucide-react";
-import { memo } from "react";
 import type { ReactNode } from "react";
+import { memo } from "react";
 
 import { Link } from "~/components/ui/link";
 

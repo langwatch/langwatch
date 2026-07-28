@@ -76,8 +76,12 @@ model User {
   // auto-detection. When set, wins over auto-detected persona destination.
   // Spec: specs/ai-gateway/governance/persona-home-content.feature
   lastHomePath             String?
+  // User-level dismissal for automatic Traces Explorer tours. A single
+  // dismissal applies across projects, browsers, and devices.
+  // Spec: specs/traces-v2/tour-visibility-and-persistence.feature
+  tracesExplorerTourDismissedAt DateTime?
   Annotation               Annotation[]
-  publicShares             PublicShare[]
+  shareLinks               ShareLink[]
   Workflow                 Workflow[]
   WorkflowVersion          WorkflowVersion[]
   annotationQueues         AnnotationQueueMembers[]
@@ -243,6 +247,12 @@ model Organization {
   ssoDomain              String?              @unique
   ssoProvider            String?
   presenceEnabled        Boolean              @default(true)
+  /// Org-level trace-sharing kill switch. Off = trace share links cannot be
+  /// created in ANY project of this org, and existing links stop resolving —
+  /// the org toggle is the global switch, the per-project
+  /// `Project.traceSharingEnabled` scopes the kill to a single project (mirrors
+  /// `presenceEnabled`). Effective sharing = org AND project. ADR-039.
+  traceSharingEnabled    Boolean              @default(true)
   /// Org-configurable contact surfaced to users in CLI "contact your
   /// admin" messages and the in-app budget-exceeded banner. Free text:
   /// accepts an email, a URL (internal ticketing system), or any other
@@ -380,7 +390,7 @@ model Project {
   TriggerSent              TriggerSent[]
   WebhookDelivery          WebhookDelivery[]
   annotationScores         AnnotationScore[]
-  publicShares             PublicShare[]
+  shareLinks               ShareLink[]
   workflows                Workflow[]
   WorkflowVersion          WorkflowVersion[]
   AnnotationQueue          AnnotationQueue[]
@@ -576,6 +586,12 @@ model Cost {
   @@index([projectId, createdAt])
 }
 
+/// PROJECTION of the topic-clustering event stream (ADR-051): topics are
+/// `topics_recorded` events; this table is written ONLY by
+/// TopicModelFoldProjection (cursor: TopicModelProjection) and is
+/// rebuildable by replay. Kept named `Topic` because it is the domain
+/// entity every surface reads — the `*Projection` suffix is reserved for
+/// cursor/read-model tables.
 model Topic {
   id        String  @id @default(nanoid())
   projectId String
@@ -589,6 +605,12 @@ model Topic {
   centroid               Json
   p95Distance            Float
   automaticallyGenerated Boolean @default(true)
+
+  /// The `topics_recorded` event that recorded this topic (its id in the
+  /// event log). Null means the row predates event ownership and has not
+  /// been seeded onto the stream yet; the projection sets it on every row
+  /// it writes.
+  lastEventId String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
@@ -1193,7 +1215,13 @@ model LangyConversationTurnProjection {
   projectId         String
   ConversationId    String                    @map("conversationId")
   TurnId            String                    @map("turnId")
-  Status            LangyProjectionTurnStatus @map("status")
+  /// LangyConversationTurnStatus. Deliberately TEXT, not a Postgres enum: this
+  /// is a PROJECTION — one writer (the fold), rebuildable from the event log,
+  /// and nothing queries or indexes on it. An enum bought no selectivity here,
+  /// only typo protection, and charged a migration for every new status that
+  /// Postgres then could not remove. The one definition lives in
+  /// `LANGY_CONVERSATION_TURN_STATUS`; the repository validates against it.
+  Status            String                    @map("status")
   /// LangyMessagePart[] — the user question that opened the turn.
   QuestionParts     Json                      @map("questionParts")
   /// LangyMessagePart[] — the agent's whole final answer.
@@ -1239,13 +1267,6 @@ enum LangyProjectionTitleSource {
   derived
   auto
   user
-}
-
-enum LangyProjectionTurnStatus {
-  pending
-  running
-  completed
-  failed
 }
 
 model ProjectSecret {
@@ -1341,9 +1362,15 @@ model AnnotationScore {
   @@index([projectId])
 }
 
-enum PublicShareResourceTypes {
+enum ShareResourceType {
   TRACE
   THREAD
+}
+
+enum ShareVisibility {
+  PUBLIC
+  ORGANIZATION
+  PROJECT
 }
 
 model AnnotationQueue {
@@ -1410,19 +1437,33 @@ model AnnotationQueueItem {
   @@index([annotationQueueId, doneAt])
 }
 
-model PublicShare {
-  id           String                   @id @default(nanoid())
-  resourceType PublicShareResourceTypes
+model ShareLink {
+  id           String            @id @default(nanoid())
+  // Secret capability. A bare 32-char high-entropy nanoid for new links —
+  // deliberately unprefixed, see ADR-039; legacy rows carry their old
+  // bare-nanoid id here (see migration backfill). The token — not the
+  // resource id — is what authorizes an anonymous read.
+  token        String            @unique
+  resourceType ShareResourceType
   resourceId   String
+  // Optional surrounding conversation to show alongside the trace.
+  threadId     String?
   projectId    String
-  project      Project                  @relation(fields: [projectId], references: [id])
+  project      Project           @relation(fields: [projectId], references: [id])
   userId       String?
-  user         User?                    @relation(fields: [userId], references: [id])
+  user         User?             @relation(fields: [userId], references: [id])
+
+  visibility ShareVisibility @default(PUBLIC)
+  // null = never expires.
+  expiresAt  DateTime?
+  // null = unlimited views; 1 = single view.
+  maxViews   Int?
+  viewCount  Int             @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
 
-  @@unique([projectId, resourceType, resourceId])
+  @@index([projectId, resourceType, resourceId])
   @@index([userId])
 }
 
@@ -3134,6 +3175,121 @@ model ProcessManagerOutbox {
   @@index([status, nextAttemptAt, leasedUntil])
 }
 
+/// Per-project topic clustering run status (ADR-051): the rebuildable
+/// operational read model behind the settings page. One row per project;
+/// folded from run_completed/run_failed events, never written directly.
+model TopicClusteringRunProjection {
+  /// KSUID (`topicrun_…`), generated by the repository on first upsert.
+  id        String @id
+  projectId String
+
+  LastRequestedAt        Float?  @map("lastRequestedAt")
+  LastRequestTrigger     String? @map("lastRequestTrigger")
+  LastRunAt              Float?  @map("lastRunAt")
+  /// completed | skipped | failed
+  LastRunOutcome         String? @map("lastRunOutcome")
+  LastRunMode            String? @map("lastRunMode")
+  LastRunSkippedReason       String? @map("lastRunSkippedReason")
+  LastRunError               String? @map("lastRunError")
+  LastRunErrorCode           String? @map("lastRunErrorCode")
+  /// True when the customer can resolve the failure (credentials, quota).
+  LastRunErrorUserActionable Boolean @default(false) @map("lastRunErrorUserActionable")
+  LastRunTracesProcessed Int     @default(0) @map("lastRunTracesProcessed")
+  LastRunTopicsCount     Int     @default(0) @map("lastRunTopicsCount")
+  LastRunSubtopicsCount  Int     @default(0) @map("lastRunSubtopicsCount")
+  LastRunPages           Int     @default(0) @map("lastRunPages")
+  InProgressRunId        String? @map("inProgressRunId")
+  InProgressTraces       Int     @default(0) @map("inProgressTraces")
+  InProgressPages        Int     @default(0) @map("inProgressPages")
+  /// Business time the in-progress run opened; bounds how long the read
+  /// model may report it as running (mirrors the process's stale-run guard).
+  InProgressStartedAt    Float?  @map("inProgressStartedAt")
+
+  CreatedAt         Float  @map("createdAt")
+  UpdatedAt         Float  @map("updatedAt")
+  /// Business time of the latest applied event.
+  OccurredAt        Float  @map("occurredAt")
+  /// Event-log acceptance time. Together with lastEventId this is the cursor.
+  AcceptedAt        Float  @map("acceptedAt")
+  LastEventId       String @map("lastEventId")
+  ProjectionVersion String @map("projectionVersion")
+
+  @@unique([projectId])
+}
+
+/// Cursor row for the topic-model projection (ADR-051). The model itself is
+/// the `Topic` table, written through by the projection; this row only
+/// records how far the fold has applied the event log.
+model TopicModelProjection {
+  /// KSUID (`topicmodel_…`), generated by the repository on first upsert.
+  id        String @id
+  projectId String
+
+  CreatedAt         Float  @map("createdAt")
+  UpdatedAt         Float  @map("updatedAt")
+  /// Business time of the latest applied event.
+  OccurredAt        Float  @map("occurredAt")
+  /// Event-log acceptance time. Together with lastEventId this is the cursor.
+  AcceptedAt        Float  @map("acceptedAt")
+  LastEventId       String @map("lastEventId")
+  ProjectionVersion String @map("projectionVersion")
+
+  @@unique([projectId])
+}
+
+/// Per-project topic clustering run history (audit read model, ADR-051).
+/// One row per project; `runs` is the bounded newest-first entry list.
+/// Rebuildable by replaying the event log.
+model TopicClusteringRunHistoryProjection {
+  /// KSUID (`topicrunhist_…`), generated by the repository on first upsert.
+  id        String @id
+  projectId String
+
+  Runs Json @map("runs")
+
+  CreatedAt         Float  @map("createdAt")
+  UpdatedAt         Float  @map("updatedAt")
+  /// Business time of the latest applied event.
+  OccurredAt        Float  @map("occurredAt")
+  /// Event-log acceptance time. Together with lastEventId this is the cursor.
+  AcceptedAt        Float  @map("acceptedAt")
+  LastEventId       String @map("lastEventId")
+  ProjectionVersion String @map("projectionVersion")
+
+  @@unique([projectId])
+}
+
+/// Rebuildable per-source pull checkpoint and operator-facing run status.
+model IngestionPullRunProjection {
+  id        String @id
+  sourceId  String @unique
+  projectId String
+
+  Enabled           Boolean @default(false) @map("enabled")
+  Cron              String? @map("cron")
+  Cursor            String? @map("cursor")
+  LastRunAt         Float?  @map("lastRunAt")
+  LastRunOutcome    String? @map("lastRunOutcome")
+  LastRunEventCount Int     @default(0) @map("lastRunEventCount")
+  LastRunError      String? @map("lastRunError")
+  LastRunErrorCode  String? @map("lastRunErrorCode")
+  ConsecutiveErrors Int     @default(0) @map("consecutiveErrors")
+
+  /// Identity of the run whose outcome this row reflects. Outcomes from a
+  /// superseded run arrive with a smaller value and are ignored, so a late
+  /// completion cannot regress Cursor or the status fields.
+  LastRunScheduledFor Float? @map("lastRunScheduledFor")
+
+  CreatedAt         Float  @map("createdAt")
+  UpdatedAt         Float  @map("updatedAt")
+  OccurredAt        Float  @map("occurredAt")
+  AcceptedAt        Float  @map("acceptedAt")
+  LastEventId       String @map("lastEventId")
+  ProjectionVersion String @map("projectionVersion")
+
+  @@index([projectId])
+}
+
 // ============================================================================
 // Langy assistant
 // ============================================================================
@@ -3196,4 +3352,27 @@ model ScheduledJob {
   // One schedule per target — makes upsertForTarget / claim a clean
   // conditional update keyed on the target identity.
   @@unique([targetType, targetId])
+}
+
+// Issue reports sent by customers' coding agents through `langwatch report`
+// (CLI) or the MCP report tool. A global support inbox, read only from the
+// admin backoffice: no tenancy column on purpose. `linkedProjectId` is
+// informational (resolved from an optional API key at intake, kept without an
+// FK so reports outlive project deletion).
+model BugReport {
+  id               String   @id @default(nanoid())
+  createdAt        DateTime @default(now()) @db.Timestamptz(3)
+  source           String
+  kind             String
+  title            String
+  summary          String?
+  sessionData      String?
+  sessionTruncated Boolean  @default(false)
+  agent            String?
+  contactEmail     String?
+  cliVersion       String?
+  linkedProjectId  String?
+  metadata         Json?
+
+  @@index([createdAt])
 }

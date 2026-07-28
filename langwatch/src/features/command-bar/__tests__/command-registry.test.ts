@@ -6,6 +6,7 @@ import {
   supportCommands,
   themeCommands,
   allStaticCommands,
+  topLevelNavigationCommands,
 } from "../command-registry";
 
 describe("command-registry", () => {
@@ -72,6 +73,13 @@ describe("command-registry", () => {
       );
       expect(settings).toBeDefined();
       expect(settings?.path).toBe("/settings");
+    });
+
+    it("keeps both evaluation workflows in top-level navigation", () => {
+      const ids = topLevelNavigationCommands.map((command) => command.id);
+      expect(ids).toContain("nav-online-evaluations");
+      expect(ids).toContain("nav-experiments");
+      expect(ids).not.toContain("nav-evaluations");
     });
   });
 

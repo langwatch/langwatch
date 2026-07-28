@@ -80,16 +80,17 @@ describe("listModelProvidersCommand()", () => {
     });
   });
 
-  describe("when format is json", () => {
-    it("outputs raw JSON", async () => {
+  describe("when a machine format is requested", () => {
+    it("returns the raw provider map as the payload instead of printing", async () => {
       const providers = { openai: { provider: "openai", enabled: true, customKeys: {} } };
       mockList.mockResolvedValue(providers);
 
-      await listModelProvidersCommand({ format: "json" });
+      const result = await listModelProvidersCommand();
 
-      expect(console.log).toHaveBeenCalledWith(
-        JSON.stringify(providers, null, 2),
-      );
+      // The command no longer decides the format — it hands the payload to
+      // the output port, which renders json/yaml/agents/--jq from this value.
+      expect(result?.data).toEqual(providers);
+      expect(console.log).not.toHaveBeenCalled();
     });
   });
 

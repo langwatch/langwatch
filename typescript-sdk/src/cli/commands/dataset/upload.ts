@@ -3,6 +3,7 @@ import { basename } from "path";
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
 import { checkApiKey } from "../../utils/apiKey";
+import type { CommandResult } from "../../utils/output";
 import { createDatasetService } from "./service-factory";
 import { handleDatasetCommandError } from "./error-handler";
 
@@ -18,7 +19,7 @@ export const uploadCommand = async (
   slugOrId: string,
   filePath: string,
   options?: { ifExists?: string },
-): Promise<void> => {
+): Promise<CommandResult | void> => {
   checkApiKey();
 
   if (!filePath) {
@@ -67,17 +68,25 @@ export const uploadCommand = async (
       spinner.succeed(
         `Dataset "${chalk.cyan(result.dataset.name)}" ready with ${recordCount} record${recordCount !== 1 ? "s" : ""}`,
       );
-      console.log();
-      console.log(`  ${chalk.bold("Slug:")}    ${result.dataset.slug}`);
-      console.log(`  ${chalk.bold("ID:")}      ${result.dataset.id}`);
-      if (result.dataset.platformUrl) {
-        console.log(`  ${chalk.bold("View:")}    ${chalk.underline(result.dataset.platformUrl)}`);
-      }
     } else {
       spinner.succeed(
         `Uploaded ${filename} to "${chalk.cyan(slugOrId)}" (${recordCount} record${recordCount !== 1 ? "s" : ""})`,
       );
     }
+
+    return {
+      data: result,
+      table: () => {
+        if (result.dataset) {
+          console.log();
+          console.log(`  ${chalk.bold("Slug:")}    ${result.dataset.slug}`);
+          console.log(`  ${chalk.bold("ID:")}      ${result.dataset.id}`);
+          if (result.dataset.platformUrl) {
+            console.log(`  ${chalk.bold("View:")}    ${chalk.underline(result.dataset.platformUrl)}`);
+          }
+        }
+      },
+    };
   } catch (error) {
     handleDatasetCommandError({ spinner, error, context: "upload file" });
   }

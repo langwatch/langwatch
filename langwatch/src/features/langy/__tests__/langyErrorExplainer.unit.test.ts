@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
-  KNOWN_LANGY_ERROR_KINDS,
   explainLangyError,
-  readLangyStreamError,
+  KNOWN_LANGY_ERROR_KINDS,
   type LangyDomainError,
+  readLangyStreamError,
+  resolveLiveTurnError,
 } from "../logic/langyErrorExplainer";
 
 /**
@@ -53,6 +54,10 @@ describe("KNOWN_LANGY_ERROR_KINDS", () => {
       "langy_egress_misconfigured",
       "langy_insufficient_scope",
       "langy_turn_in_progress",
+      // Codex (sign-in-with-OpenAI): dead OAuth session / ChatGPT plan limit,
+      // promoted off the agent-errored reason chain by exact reason code.
+      "langy_codex_session_expired",
+      "langy_codex_plan_limit",
     ]);
   });
 
@@ -69,6 +74,150 @@ describe("KNOWN_LANGY_ERROR_KINDS", () => {
 });
 
 describe("explainLangyError", () => {
+  describe("given an agent failure whose reason chain carries a dead codex session", () => {
+    describe("when the failure is explained", () => {
+      it("promotes to the session-expired card with the sign-in action", () => {
+        const presentation = explainLangyError(
+          domain({
+            code: "langy_agent_errored",
+            reasons: [
+              {
+                kind: "provider_error",
+                reasons: [{ kind: "codex_session_expired" }],
+              },
+            ],
+          }),
+        );
+        expect(presentation.kind).toBe("langy_codex_session_expired");
+        expect(presentation.title).toBe("Your OpenAI session expired");
+        expect(presentation.action).toEqual({
+          label: "Sign in to Codex",
+          kind: "reconnect-codex",
+        });
+      });
+    });
+  });
+
+  describe("given an agent failure whose reason chain carries the plan limit", () => {
+    describe("when the failure is explained", () => {
+      it("promotes to the plan-limit card suggesting another model", () => {
+        const presentation = explainLangyError(
+          domain({
+            code: "langy_agent_errored",
+            reasons: [{ kind: "usage_limit_reached" }],
+          }),
+        );
+        expect(presentation.kind).toBe("langy_codex_plan_limit");
+        expect(presentation.description).toContain("another model");
+        expect(presentation.action).toEqual({
+          label: "Try again",
+          kind: "retry",
+        });
+      });
+    });
+  });
+
+  describe("given an agent failure with unrelated reasons", () => {
+    describe("when the failure is explained", () => {
+      it("keeps the generic reply-failed card", () => {
+        const presentation = explainLangyError(
+          domain({
+            code: "langy_agent_errored",
+            reasons: [{ kind: "rate_limited" }],
+          }),
+        );
+        expect(presentation.kind).toBe("langy_agent_errored");
+      });
+    });
+  });
+
+  describe("given a model outside the project's Langy allowlist", () => {
+    describe("when the refusal is explained", () => {
+      it("keeps the allowlist refusal on the settings action", () => {
+        const presentation = explainLangyError(
+          domain({
+            code: "langy_model_not_allowed",
+            meta: { model: "evil/model" },
+          }),
+        );
+
+        expect(presentation.title).toBe("That model isn't available here");
+        expect(presentation.action).toEqual({
+          label: "Configure model",
+          kind: "configure-model",
+        });
+      });
+    });
+  });
+
+  describe("given an agent failure whose reason chain carries the provider's message", () => {
+    describe("when the failure is explained", () => {
+      /** @scenario A rejected model call shows the provider's own message on the card */
+      it("shows the provider's own message on the card, inside the friendly framing", () => {
+        // The langyagent LLM proxy captures the model provider's error body
+        // (an out-of-credits Anthropic account, the codex backend rejecting a
+        // model) with the prose in meta.message — the one channel the card is
+        // allowed to read (ADR-045). The same text the playground shows.
+        const providerMessage =
+          "Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.";
+        const presentation = explainLangyError(
+          domain({
+            code: "langy_agent_errored",
+            reasons: [
+              {
+                kind: "llm_upstream_error",
+                meta: { message: providerMessage, http_status: 400 },
+              },
+            ],
+          }),
+        );
+
+        expect(presentation.kind).toBe("langy_agent_errored");
+        expect(presentation.title).toBe("Langy's reply failed");
+        expect(presentation.description).toBe(
+          `The model provider rejected this reply: ${providerMessage} Your message is safe. Try again, or pick a different model from the composer.`,
+        );
+        expect(presentation.action).toEqual({
+          label: "Try again",
+          kind: "retry",
+        });
+      });
+
+      it("reads the message from a NESTED reason too", () => {
+        const presentation = explainLangyError(
+          domain({
+            code: "langy_agent_errored",
+            reasons: [
+              {
+                kind: "provider_error",
+                reasons: [
+                  {
+                    kind: "llm_upstream_error",
+                    meta: { message: "model overloaded" },
+                  },
+                ],
+              },
+            ],
+          }),
+        );
+        expect(presentation.description).toContain("model overloaded");
+      });
+    });
+  });
+
+  describe("given an agent failure with no captured cause", () => {
+    describe("when the failure is explained", () => {
+      it("keeps the stock reply-failed copy", () => {
+        const presentation = explainLangyError(
+          domain({ code: "langy_agent_errored" }),
+        );
+        expect(presentation.description).toBe(
+          "Langy hit an error while writing this reply. Your message is safe — try again.",
+        );
+      });
+    });
+  });
+
   describe("given the turn stopped because GitHub is not connected", () => {
     it("suppresses the red card and offers the connect-github action", () => {
       // The panel keys on exactly this shape (render suppress + connect-github)
@@ -167,7 +316,10 @@ describe("explainLangyError", () => {
       expect(presentation.title).toBe("Langy's worker stopped");
       expect(presentation.description).toContain("safe");
       expect(presentation.render).toBe("card");
-      expect(presentation.action).toEqual({ label: "Try again", kind: "retry" });
+      expect(presentation.action).toEqual({
+        label: "Try again",
+        kind: "retry",
+      });
     });
   });
 
@@ -195,14 +347,16 @@ describe("explainLangyError", () => {
   });
 
   describe("given a turn is already streaming for the conversation", () => {
-    it("tells the user to wait and offers no retry (a retry would 409 again)", () => {
+    it("tells the user to wait, offers no retry, and rides above the composer", () => {
       const presentation = explainLangyError(
         domain({ code: "langy_turn_in_progress", httpStatus: 409 }),
       );
 
       expect(presentation.title).toBe("Langy is still replying");
       expect(presentation.action).toBeUndefined();
-      expect(presentation.render).toBe("card");
+      // A wait, not a turn failure: a dismissable notice attached above the
+      // composer that keeps the user's draft — not a red history card (ADR-058).
+      expect(presentation.render).toBe("composer-notice");
     });
   });
 
@@ -246,6 +400,61 @@ describe("readLangyStreamError", () => {
   describe("given a legacy plain-string error", () => {
     it("returns null so the caller can fall back", () => {
       expect(readLangyStreamError("manager responded 503")).toBeNull();
+    });
+  });
+});
+
+describe("resolveLiveTurnError", () => {
+  const typedStreamError = JSON.stringify({
+    code: "langy_agent_errored",
+    httpStatus: 502,
+    meta: {},
+    reasons: [
+      {
+        kind: "llm_upstream_error",
+        meta: { http_status: 429, message: "The usage limit has been reached" },
+        reasons: [{ kind: "usage_limit_reached" }],
+      },
+    ],
+  });
+
+  describe("given the failure rode the stream's terminal entry", () => {
+    describe("when the live message carries the typed payload", () => {
+      it("resolves the typed domain error from it", () => {
+        const domain = resolveLiveTurnError({
+          error: new Error(typedStreamError),
+          durableLastError: null,
+        });
+
+        expect(domain.code).toBe("langy_agent_errored");
+      });
+    });
+  });
+
+  describe("given the live stream died with no typed payload", () => {
+    describe("when the turn's failure is already on the durable record", () => {
+      /** @scenario "A genuinely dead stream still names the durable failure" */
+      it("reads the durable record instead of settling for unknown", () => {
+        const domain = resolveLiveTurnError({
+          error: new Error("SSE Error"),
+          durableLastError: typedStreamError,
+        });
+
+        expect(domain.code).toBe("langy_agent_errored");
+        expect(explainLangyError(domain).kind).toBe("langy_codex_plan_limit");
+      });
+    });
+
+    describe("when the durable record is empty too", () => {
+      it("falls back to unknown", () => {
+        const domain = resolveLiveTurnError({
+          error: new Error("SSE Error"),
+          durableLastError: null,
+        });
+
+        expect(domain.code).toBe("unknown");
+        expect(domain.meta).toEqual({ error: "SSE Error" });
+      });
     });
   });
 });

@@ -9,7 +9,7 @@
  * and delegates all domain logic to ExportService.
  */
 
-import { zValidator } from "@hono/zod-validator";
+import { validator as zValidator } from "~/server/api/validation";
 import { createLogger } from "@langwatch/observability";
 import crypto from "crypto";
 import { hasProjectPermission } from "~/server/api/rbac";

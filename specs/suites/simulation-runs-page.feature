@@ -131,6 +131,47 @@ Feature: Runs Page — Unified Navigation & URL Routing
     And the main panel shows the all-runs view
 
   # ============================================================================
+  # Date Window & View State Survive Sidebar Navigation
+  # ============================================================================
+  #
+  # The date window and the filter/group-by controls describe what the user is
+  # looking at, not which set they picked. Widening to 90 days to reach an older
+  # run and then clicking that run's set must not snap the window back to the
+  # 30-day default, which hides the very run the user was reaching for.
+
+  @unit
+  Scenario: Widened date window survives clicking a set in the sidebar
+    Given I am on the simulations page with "Last 90 days" selected
+    When I click an external set in the sidebar
+    Then the set opens with "Last 90 days" still selected
+    And older runs stay visible in the list
+
+  @unit
+  Scenario: Custom start and end dates survive clicking a set in the sidebar
+    Given I am on the simulations page with a custom start and end date selected
+    When I click an external set in the sidebar
+    Then the set opens with the same custom start and end date
+
+  @unit
+  Scenario: Filters and group-by survive clicking a set in the sidebar
+    Given I am on the simulations page filtered to failed runs grouped by scenario
+    When I click a run plan in the sidebar
+    Then the run plan opens with the same filter and grouping applied
+
+  @unit
+  Scenario: Returning to All Runs keeps the widened date window
+    Given I am viewing a set with "Last 90 days" selected
+    When I click "All Runs" in the sidebar
+    Then the all-runs view opens with "Last 90 days" still selected
+
+  @unit
+  Scenario: An open run drawer does not follow the sidebar to another set
+    Given I have a run detail drawer open on the simulations page
+    When I click a different set in the sidebar
+    Then the drawer closes because its run belongs to the previous selection
+    And the date window is still the one I had selected
+
+  # ============================================================================
   # SDK Compatibility
   # ============================================================================
 

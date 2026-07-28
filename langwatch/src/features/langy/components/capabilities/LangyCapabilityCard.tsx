@@ -11,13 +11,14 @@
  * Every bespoke card (Traces, Metrics, EvalRun, Dataset, Scenario, resource
  * results) composes THIS shell so the whole kit stays one visual system.
  */
-import { Box, chakra, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import {
   ArrowUpRight,
   BarChart3,
   Bot,
   Boxes,
   Check,
+  CheckSquare,
   Coins,
   Cpu,
   Database,
@@ -27,8 +28,8 @@ import {
   Key,
   KeyRound,
   LayoutDashboard,
-  MessagesSquare,
   type LucideIcon,
+  MessagesSquare,
   Network,
   RadioTower,
   ShieldCheck,
@@ -41,6 +42,9 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
+import { toRelativeSameOriginHref } from "~/utils/platformHref";
+import { LangySpaAnchor } from "../LangySpaAnchor";
+import { useSpaLinkClick } from "../../logic/spaLink";
 import { langyThinkingShimmerStyles } from "../langyShimmer";
 import type {
   CapabilityIconName,
@@ -57,10 +61,12 @@ const SURFACE_ICON: Record<CapabilitySurface, LucideIcon> = {
   analytics: BarChart3,
   experiments: FlaskConical,
   evaluations: ShieldCheck,
+  evaluators: CheckSquare,
   datasets: Database,
   prompts: FileText,
   dashboards: LayoutDashboard,
   simulations: MessagesSquare,
+  scenarios: MessagesSquare,
   agents: Bot,
   automations: Zap,
   workflows: Workflow,
@@ -120,6 +126,7 @@ export function LangyCapabilityCard({
   deepLink,
   projectSlug,
   resourceId,
+  platformUrl,
   icon,
 }: {
   tone: CapabilityTone;
@@ -135,10 +142,20 @@ export function LangyCapabilityCard({
   deepLink?: boolean;
   projectSlug?: string | null;
   resourceId?: string | null;
+  /**
+   * The platform's own link for the resource this card shows (from the CLI
+   * result's `platformUrl`), when the call carried one. Preferred over the
+   * rebuilt `buildSurfaceHref` — it is the only thing that can address a
+   * composite resource (e.g. a scenario run) a plain `surface/resourceId`
+   * path cannot express. A foreign link (not this instance) is never adopted.
+   */
+  platformUrl?: string | null;
   /** Overline icon override, when the surface icon isn't right for the resource. */
   icon?: CapabilityIconName;
 }) {
   const { color, Icon } = toneOverline(tone, surface, icon);
+  const showDeepLink = deepLink ?? true;
+  const hasActions = actions !== undefined && actions !== null;
 
   return (
     <VStack
@@ -184,14 +201,15 @@ export function LangyCapabilityCard({
 
       {children}
 
-      {(deepLink ?? true) || actions ? (
+      {showDeepLink || hasActions ? (
         <HStack gap={2} justify="space-between" align="center" flexWrap="wrap">
           <Box>{actions}</Box>
-          {(deepLink ?? true) ? (
+          {showDeepLink ? (
             <CapabilityDeepLinkChip
               surface={surface}
               projectSlug={projectSlug}
               resourceId={resourceId}
+              platformUrl={platformUrl}
             />
           ) : null}
         </HStack>
@@ -204,23 +222,48 @@ export function LangyCapabilityCard({
  * "Open in <surface>" chip — the deep link out of the chat into the surface a
  * capability touched. Hidden entirely when there's no project slug to build a
  * valid path from, so it never renders a dead link.
+ *
+ * Prefers the platform's OWN link (`platformUrl`, from the CLI result) over
+ * the rebuilt `buildSurfaceHref` approximation: it is the only thing that can
+ * address a composite resource (a scenario run's set+batch+run) a plain
+ * `surface/resourceId` path cannot express, and it is the single source of
+ * truth for where a resource actually lives. Adopted only when it resolves to
+ * THIS instance (compared against `window.location.origin` — `BASE_HOST`
+ * isn't exposed to the client bundle); a foreign link falls back to the
+ * rebuilt href instead of being rendered as the card's open action.
+ *
+ * Every href this chip can produce is same-app (a stripped `platformUrl` or
+ * `buildSurfaceHref`'s always-relative path), so a plain left-click always
+ * rides the SPA router — the click keeps the Langy panel mounted instead of a
+ * full page reload. cmd/ctrl/shift/alt-click and non-left clicks keep the
+ * native anchor behaviour (new tab, "open in new tab", etc).
+ *
+ * @see specs/langy/langy-agent-driven-navigation.feature
  */
 export function CapabilityDeepLinkChip({
   surface,
   projectSlug,
   resourceId,
+  platformUrl,
   label,
 }: {
   surface: CapabilitySurface;
   projectSlug?: string | null;
   resourceId?: string | null;
+  platformUrl?: string | null;
   /** Override the default "Open in <surface>" copy. */
   label?: string;
 }) {
-  const href = buildSurfaceHref({ surface, projectSlug, resourceId });
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const preciseHref = platformUrl
+    ? toRelativeSameOriginHref({ url: platformUrl, origin })
+    : null;
+  const href =
+    preciseHref ?? buildSurfaceHref({ surface, projectSlug, resourceId });
+  const onClick = useSpaLinkClick(href ?? "");
   if (!href) return null;
   return (
-    <chakra.a
+    <LangySpaAnchor
       href={href}
       display="inline-flex"
       alignItems="center"
@@ -230,10 +273,11 @@ export function CapabilityDeepLinkChip({
       color="orange.solid"
       marginLeft="auto"
       _hover={{ textDecoration: "underline" }}
+      onClick={onClick}
     >
       {label ?? `Open in ${SURFACE_LABEL[surface]}`}
       <ArrowUpRight size={12} />
-    </chakra.a>
+    </LangySpaAnchor>
   );
 }
 
@@ -274,12 +318,13 @@ export function CapabilityRow({
   primary: ReactNode;
   secondary?: ReactNode;
 }) {
+  const hasSecondary = secondary !== undefined && secondary !== null;
   const body = (
     <VStack align="stretch" gap={0} flex={1} minWidth={0}>
       <Text textStyle="xs" color="fg" truncate>
         {primary}
       </Text>
-      {secondary ? (
+      {hasSecondary ? (
         <Text textStyle="2xs" color="fg.muted" truncate>
           {secondary}
         </Text>
@@ -289,7 +334,7 @@ export function CapabilityRow({
 
   if (href) {
     return (
-      <chakra.a
+      <LangySpaAnchor
         href={href}
         display="flex"
         alignItems="center"
@@ -301,7 +346,7 @@ export function CapabilityRow({
       >
         {body}
         <ArrowUpRight size={12} color="var(--chakra-colors-fg-subtle)" />
-      </chakra.a>
+      </LangySpaAnchor>
     );
   }
   return (

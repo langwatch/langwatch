@@ -9,9 +9,8 @@ import {
   Text,
 } from "@chakra-ui/react";
 import { BarChart2 } from "lucide-react";
-import { useRouter } from "~/utils/compat/next-router";
-import { useCallback } from "react";
 import qs from "qs";
+import { Fragment, useCallback } from "react";
 import {
   CustomGraph,
   type CustomGraphInput,
@@ -21,6 +20,7 @@ import GraphsLayout from "~/components/GraphsLayout";
 import { Link } from "~/components/ui/link";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { useRouter } from "~/utils/compat/next-router";
 import { AnalyticsHeader } from "../../../components/analytics/AnalyticsHeader";
 import { withPermissionGuard } from "../../../components/WithPermissionGuard";
 import { getEvaluatorDefinitions } from "../../../server/evaluations/getEvaluator";
@@ -51,7 +51,7 @@ const aggregatePassFailTrend: CustomGraphInput = {
   graphType: "stacked_bar",
   series: [
     {
-      name: "Evaluations",
+      name: "Online evaluations",
       metric: "evaluations.evaluation_runs",
       aggregation: "cardinality",
       key: "",
@@ -257,7 +257,7 @@ const renderGridItems = (
     }
 
     return (
-      <>
+      <Fragment key={check.id}>
         <GridItem colSpan={1} display="inline-grid">
           <Card.Root>
             <Card.Header>
@@ -335,7 +335,7 @@ const renderGridItems = (
             </Card.Root>
           </GridItem>
         )}
-      </>
+      </Fragment>
     );
   });
 };
@@ -349,6 +349,16 @@ function EvaluationsContent() {
     },
     { enabled: !!project },
   );
+  const selectedEvaluationId =
+    typeof router.query.evaluationId === "string"
+      ? router.query.evaluationId
+      : undefined;
+  const selectedEvaluation = checks.data?.find(
+    (check) => check.id === selectedEvaluationId,
+  );
+  const visibleChecks = selectedEvaluation
+    ? [selectedEvaluation]
+    : (checks.data ?? []);
 
   const handleGraphClick = useCallback(
     (params: {
@@ -397,7 +407,8 @@ function EvaluationsContent() {
         }
       } else if (isCategoryEvaluator && params.groupKey) {
         // For category evaluators, filter by label
-        filterParams[`evaluation_label.${params.evaluatorId}`] = params.groupKey;
+        filterParams[`evaluation_label.${params.evaluatorId}`] =
+          params.groupKey;
       }
 
       // Add date range filter if provided (for bar chart drill-down)
@@ -433,18 +444,33 @@ function EvaluationsContent() {
             <Alert.Title>No online evaluations yet</Alert.Title>
             <Alert.Description>
               <Text as="span">
-                The evaluation results will be displayed here. Setup evaluations
-                for your project to see the results. Click{" "}
+                Online evaluation results will be displayed here.{" "}
               </Text>
-              <Link href={`/${project?.slug}/evaluations`}>here</Link>
-              <Text as="span"> to get started.</Text>
+              <Link href={`/${project?.slug}/online-evaluations`}>
+                Set up an online evaluation
+              </Link>
+              <Text as="span"> to see results for your project.</Text>
+            </Alert.Description>
+          </Alert.Content>
+        </Alert.Root>
+      )}
+      {selectedEvaluation && (
+        <Alert.Root colorPalette="blue" marginBottom={6}>
+          <Alert.Indicator />
+          <Alert.Content>
+            <Alert.Title>{selectedEvaluation.name}</Alert.Title>
+            <Alert.Description>
+              Showing analytics for this online evaluation.{" "}
+              <Link href={`/${project?.slug}/analytics/evaluations`}>
+                View all online evaluations
+              </Link>
             </Alert.Description>
           </Alert.Content>
         </Alert.Root>
       )}
       <HStack alignItems="start" gap={4}>
         <SimpleGrid templateColumns="repeat(4, 1fr)" gap={5} width="100%">
-          {checks.data && checks.data.length > 0 && (
+          {visibleChecks.length > 0 && !selectedEvaluation && (
             <>
               <GridItem colSpan={1} display="inline-grid">
                 <Card.Root>
@@ -468,15 +494,15 @@ function EvaluationsContent() {
               </GridItem>
             </>
           )}
-          {checks.data
+          {visibleChecks.length > 0
             ? renderGridItems(
-              [...checks.data].sort((a, b) => {
-                // Enabled items first (true > false when comparing booleans)
-                if (a.enabled === b.enabled) return 0;
-                return a.enabled ? -1 : 1;
-              }),
-              handleGraphClick,
-            )
+                [...visibleChecks].sort((a, b) => {
+                  // Enabled items first (true > false when comparing booleans)
+                  if (a.enabled === b.enabled) return 0;
+                  return a.enabled ? -1 : 1;
+                }),
+                handleGraphClick,
+              )
             : null}
         </SimpleGrid>
         <Box padding={3}>

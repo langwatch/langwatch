@@ -192,7 +192,7 @@ function httpStatusToTRPCCode(httpStatus: number): TRPCErrorCode {
 /**
  * Wraps any thrown value as a `TRPCError` whose `cause` is preserved when the
  * value is a `HandledError`. The shared `errorFormatter` in `trpc.ts` serialises
- * that cause as `error.data.domainError = { code, meta, traceId, spanId, … }` so the
+ * that cause as `error.data.error = { code, meta, traceId, spanId, … }` so the
  * client gets the full structured payload — that is the "incredibly good error
  * handling" surface (see ADR-036 follow-up).
  */

@@ -187,6 +187,16 @@ export function deriveSkills(repoRoot: string): GeneratedSkill[] {
 
 const isMain = import.meta.url === `file://${process.argv[1]}`;
 if (isMain) {
+  // The published @langwatch/server artifact ships the committed catalogue and
+  // deliberately excludes Dockerfile.langyagent (nothing to derive from). The
+  // committed output IS the catalogue there; only a tree that can regenerate
+  // does. A tree with neither still fails loudly below.
+  if (!fs.existsSync(DOCKERFILE) && fs.existsSync(OUT)) {
+    console.log(
+      "Dockerfile.langyagent not in this tree (published artifact) — keeping the committed Langy skill catalogue.",
+    );
+    process.exit(0);
+  }
   const skills = deriveSkills(REPO_ROOT);
   fs.writeFileSync(OUT, JSON.stringify(skills, null, 2) + "\n");
   const counts = skills.reduce<Record<string, number>>((acc, s) => {

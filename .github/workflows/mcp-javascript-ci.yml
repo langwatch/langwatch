@@ -27,12 +27,17 @@ jobs:
       - uses: ./.github/actions/detect-changes
         id: detect
         with:
+          # push-strategy diff + no release-please-manifest entry: the
+          # integration step spends real LLM money (Anthropic), so it must
+          # not run on pushes or release PRs that touched nothing under
+          # mcp-server/. A release PR still matches via
+          # mcp-server/CHANGELOG.md.
+          push-strategy: diff
           filters: |
             relevant:
               - 'mcp-server/**'
               - '.github/workflows/mcp-javascript-ci.yml'
               - '.github/actions/setup-pnpm-node/**'
-              - '.github/.release-please-manifest.json'
 
   typecheck:
     needs: changes

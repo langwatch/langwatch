@@ -4,7 +4,7 @@ import type {
   StateProjectionStore,
   StoredProjection,
 } from "~/server/event-sourcing/projections/stateProjection.types";
-import type { LangyConversationStateData } from "~/server/event-sourcing/pipelines/langy-conversation-processing/projections/langyConversationState.foldProjection";
+import type { LangyConversationStateData } from "@langwatch/langy";
 
 type Row = Prisma.LangyConversationProjectionGetPayload<object>;
 

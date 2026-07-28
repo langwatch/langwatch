@@ -1,8 +1,10 @@
 /**
  * @vitest-environment jsdom
  *
- * Integration tests for LangyPanel conversation history.
- * Spec: specs/langy/langy-baseline.feature
+ * Integration tests for LangyPanel conversation history, the turn failures it
+ * must not swallow, and stopping a turn.
+ * Specs: specs/langy/langy-baseline.feature,
+ *        specs/langy/langy-stop-and-resume.feature
  *
  * Boundary mocks: useOrganizationTeamProject (project context),
  * @ai-sdk/react useChat (no real streaming), and the ~/utils/api tRPC surface
@@ -61,6 +63,15 @@ interface Scenario {
   failList: boolean;
   /** When set, the list query stays in `loading` until `gate` resolves. */
   slowList: { gate: Promise<void> } | null;
+  /**
+   * What the DURABLE record says about a turn in flight, per conversation —
+   * `langy.messages`'s `isTurnInFlight` / `inFlightTurnId`. A turn is in flight
+   * whenever this is set, and `turnId` is null to model the window between a
+   * message being sent and its turn being accepted on the record.
+   */
+  turnInFlightById: Record<string, { turnId: string | null }>;
+  /** Reject the stop mutation, to model a request that never lands. */
+  failStop: boolean;
 }
 
 const scenarioRef: { current: Scenario } = {
@@ -69,6 +80,8 @@ const scenarioRef: { current: Scenario } = {
     messagesById: {},
     failList: false,
     slowList: null,
+    turnInFlightById: {},
+    failStop: false,
   },
 };
 
@@ -85,6 +98,14 @@ const spies = {
   deleteMutation:
     vi.fn<(variables: { projectId: string; conversationId: string }) => void>(),
   listInvalidate: vi.fn<(input: unknown) => void>(),
+  stopMutation:
+    vi.fn<
+      (variables: {
+        projectId: string;
+        conversationId: string;
+        turnId: string;
+      }) => void
+    >(),
 };
 
 // Invalidation channel: utils.langy.list.invalidate() bumps a version every
@@ -106,6 +127,14 @@ const projectRef = {
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({ project: projectRef.current }),
+}));
+
+// The minimised affordance is flag-gated (LangySidecar reads
+// release_ui_langy_peek_dock_enabled). This suite is about conversation
+// history, not the closed state, so pin the flag off (the classic launcher) —
+// the same render path this suite had before the flag landed.
+vi.mock("~/hooks/useFeatureFlag", () => ({
+  useFeatureFlag: () => ({ enabled: false, isLoading: false }),
 }));
 
 vi.mock("~/components/ui/toaster", () => ({
@@ -133,6 +162,7 @@ const chatRef = {
   setMessages: vi.fn(),
   clearError: vi.fn(),
   regenerate: vi.fn(),
+  error: null as Error | null,
 };
 
 vi.mock("@ai-sdk/react", () => ({
@@ -142,7 +172,7 @@ vi.mock("@ai-sdk/react", () => ({
     stop: chatRef.stop,
     status: chatRef.status,
     setMessages: chatRef.setMessages,
-    error: null,
+    error: chatRef.error,
     clearError: chatRef.clearError,
     regenerate: chatRef.regenerate,
   }),
@@ -452,6 +482,13 @@ vi.mock("~/utils/api", async () => {
           return useScenarioInfiniteListQuery(input, enabled);
         },
       },
+      modelsAllowed: {
+        useQuery: () => ({
+          data: { modelsAllowed: null },
+          isLoading: false,
+          isError: false,
+        }),
+      },
       messages: {
         useQuery: (
           input: { projectId: string; conversationId: string },
@@ -468,7 +505,11 @@ vi.mock("~/utils/api", async () => {
                 createdAtMs: 0,
               })),
               lastError: null,
-              isTurnInFlight: false,
+              isTurnInFlight:
+                input.conversationId in scenarioRef.current.turnInFlightById,
+              inFlightTurnId:
+                scenarioRef.current.turnInFlightById[input.conversationId]
+                  ?.turnId ?? null,
             }),
             opts?.enabled !== false,
           ),
@@ -498,21 +539,19 @@ vi.mock("~/utils/api", async () => {
           isPending: false,
         }),
       },
-      forkConversation: {
+      stopTurn: {
         useMutation: () => ({
           mutateAsync: async (variables: {
             projectId: string;
             conversationId: string;
-          }) => ({
-            id: `${variables.conversationId}-fork`,
-            title: "Forked chat",
-            isShared: false,
-            isOwn: true,
-            messageCount: 0,
-            lastActivityAtMs: 0,
-            status: "idle",
-          }),
-          isPending: false,
+            turnId: string;
+          }) => {
+            spies.stopMutation(variables);
+            if (scenarioRef.current.failStop) {
+              throw new Error("stop request did not land");
+            }
+            return { stopped: true };
+          },
         }),
       },
       recordFeedback: {
@@ -622,6 +661,8 @@ function installScenario(scenario: {
   messagesById: Record<string, ApiMessage[]>;
   failList?: boolean;
   slowList?: { resolveLater: () => void };
+  turnInFlightById?: Record<string, { turnId: string | null }>;
+  failStop?: boolean;
 }) {
   let openGate: () => void = () => undefined;
   const gate = scenario.slowList
@@ -636,6 +677,8 @@ function installScenario(scenario: {
     messagesById: scenario.messagesById,
     failList: scenario.failList ?? false,
     slowList: gate === null ? null : { gate },
+    turnInFlightById: scenario.turnInFlightById ?? {},
+    failStop: scenario.failStop ?? false,
   };
   return spies;
 }
@@ -647,13 +690,13 @@ function renderPanel() {
 }
 
 /**
- * The recents dropdown is re-parented onto the header title button. Chakra's
- * combobox supplies that trigger's accessible name ("Toggle suggestions"), so
- * tests address the control by that name instead of its changing visible title.
- * Conversations are only in the DOM while the menu is open.
+ * History is its own icon control in the header rail. Activating it swaps the
+ * panel BODY to the full-height recents list (RecentChatsView), so
+ * conversations are only in the DOM while that view is showing — the rows are
+ * ordinary list items, not combobox options.
  */
 const recentsTrigger = () =>
-  screen.findByRole("button", { name: "Toggle suggestions" });
+  screen.findByRole("button", { name: "Recent chats" });
 
 async function openHistory() {
   await userEvent.click(await recentsTrigger());
@@ -661,8 +704,8 @@ async function openHistory() {
 
 function recentOption(pattern: RegExp): HTMLElement | undefined {
   return screen
-    .queryAllByRole("option")
-    .find((option) => pattern.test(option.textContent ?? ""));
+    .queryAllByRole("listitem")
+    .find((row) => pattern.test(row.textContent ?? ""));
 }
 
 async function findRecentOption(pattern: RegExp): Promise<HTMLElement> {
@@ -672,6 +715,24 @@ async function findRecentOption(pattern: RegExp): Promise<HTMLElement> {
     expect(option).toBeDefined();
   });
   return option!;
+}
+
+/**
+ * Open a conversation from the list. The row is a CONTAINER holding two sibling
+ * controls — the title (which opens the chat) and the ⋯ (row actions) — so the
+ * click has to land on the title button, not on the row itself.
+ */
+async function openRecentOption(pattern: RegExp): Promise<void> {
+  const row = await findRecentOption(pattern);
+  // The title button is the row's other control — everything except the ⋯.
+  const titleButton = within(row)
+    .getAllByRole("button")
+    .find(
+      (button) =>
+        button.getAttribute("aria-label") !== "Conversation actions",
+    );
+  expect(titleButton).toBeDefined();
+  await userEvent.click(titleButton!);
 }
 
 async function deleteRecentOption(option: HTMLElement): Promise<void> {
@@ -697,19 +758,39 @@ beforeEach(() => {
   chatRef.setMessages.mockReset();
   chatRef.clearError.mockReset();
   chatRef.regenerate.mockReset();
+  chatRef.error = null;
   (toaster.create as Mock).mockReset();
   spies.listQuery.mockReset();
   spies.deleteMutation.mockReset();
   spies.listInvalidate.mockReset();
+  spies.stopMutation.mockReset();
   scenarioRef.current = {
     conversations: [],
     messagesById: {},
     failList: false,
     slowList: null,
+    turnInFlightById: {},
+    failStop: false,
   };
   // These suites exercise an OPEN panel; a closed panel deliberately never
   // fetches the recents list (see useLangyConversationListQuery).
-  useLangyStore.setState({ isOpen: true });
+  //
+  // The conversation pointer is cleared explicitly because the store is a module
+  // SINGLETON and the pointer is now durable: without this, a conversation
+  // selected in one test is restored by the next one's mount (which is the
+  // correct product behaviour, and exactly why the test has to opt out of it).
+  useLangyStore.setState({
+    isOpen: true,
+    activeConversationId: null,
+    activeConversationScope: null,
+    historyLoadConversationId: null,
+    // The turn phase is on the same singleton: a test that leaves a turn active
+    // would hand the next one a composer stuck on Stop.
+    turnPhase: "idle",
+    activeTurnId: null,
+    settledTurnId: null,
+    backendSawTurnInFlight: false,
+  });
 });
 
 afterEach(() => {
@@ -762,8 +843,8 @@ describe("LangyPanel conversation history", () => {
         installScenario({ conversations, messagesById });
         renderPanel();
         await openHistory();
-        const list = await screen.findByRole("listbox");
-        const items = within(list).getAllByRole("option");
+        const list = await screen.findByRole("list", { name: "Recent chats" });
+        const items = within(list).getAllByRole("listitem");
         expect(items[0]).toHaveTextContent("Newest chat");
         expect(items[1]).toHaveTextContent("Older chat");
       });
@@ -785,7 +866,7 @@ describe("LangyPanel conversation history", () => {
         await openHistory();
 
         await waitFor(() => {
-          expect(screen.getAllByRole("option")).toHaveLength(30);
+          expect(screen.getAllByRole("listitem")).toHaveLength(30);
         });
         expect(recentOption(/Needle archive/i)).toBeUndefined();
 
@@ -796,7 +877,7 @@ describe("LangyPanel conversation history", () => {
         );
 
         await waitFor(() => {
-          expect(screen.getAllByRole("option")).toHaveLength(35);
+          expect(screen.getAllByRole("listitem")).toHaveLength(35);
         });
         expect(recentOption(/Needle archive/i)).toBeDefined();
       });
@@ -830,9 +911,8 @@ describe("LangyPanel conversation history", () => {
         installScenario({ conversations, messagesById });
         renderPanel();
         await openHistory();
-        const olderItem = await findRecentOption(/Older chat/i);
         chatRef.setMessages.mockClear();
-        await userEvent.click(olderItem);
+        await openRecentOption(/Older chat/i);
         await waitFor(() => {
           const lastCall =
             chatRef.setMessages.mock.calls[
@@ -904,7 +984,7 @@ describe("LangyPanel conversation history", () => {
         installScenario({ conversations, messagesById });
         renderPanel();
         await openHistory();
-        await userEvent.click(await findRecentOption(/Newest chat/i));
+        await openRecentOption(/Newest chat/i);
         await waitFor(() => {
           expect(useLangyStore.getState().activeConversationId).toBe(
             "conv-new",
@@ -928,7 +1008,7 @@ describe("LangyPanel conversation history", () => {
         chatRef.status = "streaming";
         renderPanel();
         await openHistory();
-        await userEvent.click(await findRecentOption(/Newest chat/i));
+        await openRecentOption(/Newest chat/i);
         await waitFor(() => {
           expect(useLangyStore.getState().activeConversationId).toBe(
             "conv-new",
@@ -947,7 +1027,7 @@ describe("LangyPanel conversation history", () => {
         installScenario({ conversations, messagesById });
         renderPanel();
         await openHistory();
-        await userEvent.click(await findRecentOption(/Newest chat/i));
+        await openRecentOption(/Newest chat/i);
         await waitFor(() => {
           const lastCall =
             chatRef.setMessages.mock.calls[
@@ -989,8 +1069,8 @@ describe("LangyPanel conversation history", () => {
         });
         renderPanel();
         await openHistory();
-        const list = await screen.findByRole("listbox");
-        const items = within(list).getAllByRole("option");
+        const list = await screen.findByRole("list", { name: "Recent chats" });
+        const items = within(list).getAllByRole("listitem");
         expect(items).toHaveLength(1);
         expect(items[0]).toHaveTextContent("My only chat");
       });
@@ -998,8 +1078,8 @@ describe("LangyPanel conversation history", () => {
   });
 
   describe("given the panel re-mounts in the same project", () => {
-    describe("when no explicit conversation is requested", () => {
-      it("returns to a fresh state instead of restoring a prior selection", async () => {
+    describe("when a conversation was open before the remount", () => {
+      it("restores it, so a refresh comes back to what the user left", async () => {
         const conversations = [
           makeConv("conv-a", "A", "2026-05-09T10:00:00.000Z"),
           makeConv("conv-b", "B", "2026-05-10T10:00:00.000Z"),
@@ -1012,11 +1092,7 @@ describe("LangyPanel conversation history", () => {
 
         const { unmount } = renderPanel();
         await openHistory();
-        await userEvent.click(
-          // The option's a11y name folds in the row's "Delete conversation"
-          // button label, so anchor only the start.
-          await findRecentOption(/^B/),
-        );
+        await openRecentOption(/^B/);
         await waitFor(() => {
           const passed = chatRef.setMessages.mock.calls[
             chatRef.setMessages.mock.calls.length - 1
@@ -1026,14 +1102,16 @@ describe("LangyPanel conversation history", () => {
         unmount();
         chatRef.setMessages.mockClear();
 
+        // A refresh, in effect: the store is a singleton holding the durable
+        // pointer, and the panel re-enters the SAME project.
         renderPanel();
         await waitFor(() => {
           const passed = chatRef.setMessages.mock.calls[
             chatRef.setMessages.mock.calls.length - 1
           ]?.[0] as UIMessageLike[] | undefined;
-          expect(passed).toEqual([]);
+          expect(passed?.[0]?.parts?.[0]?.text).toBe("from B");
         });
-        expect(useLangyStore.getState().activeConversationId).toBeNull();
+        expect(useLangyStore.getState().activeConversationId).toBe("conv-b");
       });
     });
   });
@@ -1109,7 +1187,9 @@ describe("LangyPanel conversation history", () => {
           "Recent conversations aren't loading",
         );
         expect(toaster.create).not.toHaveBeenCalled();
-        expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+        expect(
+          screen.queryByRole("list", { name: "Recent chats" }),
+        ).not.toBeInTheDocument();
 
         // Dismissal hides the card for the rest of the outage.
         fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
@@ -1177,6 +1257,130 @@ describe("LangyPanel conversation history", () => {
           ).not.toBeInTheDocument(),
         );
       });
+    });
+  });
+});
+
+/**
+ * The failure the panel used to swallow.
+ *
+ * The error card, the recovering line and the GitHub connect card all lived
+ * INSIDE the `isEmpty ? <EmptyState/> : …` else-branch, so a turn that failed
+ * before any message reached the engine — the first send of a fresh chat —
+ * rendered the empty state and absolutely nothing else. The user's turn 500'd
+ * and the panel said nothing at all.
+ */
+describe("LangyPanel turn failures", () => {
+  describe("given a turn failed before any message reached the thread", () => {
+    describe("when the panel renders an empty conversation", () => {
+      it("still shows the failure instead of a silent empty state", async () => {
+        installScenario({ conversations: [], messagesById: {} });
+        chatRef.messages = [];
+        chatRef.error = new Error("Internal Server Error");
+
+        renderPanel();
+
+        // SOMETHING must say it broke. A failure may never be quieter than a
+        // success, and an empty thread is exactly when it used to be.
+        const card = await screen.findByRole("alert");
+        expect(card.textContent).toBeTruthy();
+      });
+    });
+  });
+});
+
+/**
+ * Stop, for a turn this tab did not start.
+ * Spec: specs/langy/langy-stop-and-resume.feature (§1)
+ *
+ * A tab only learns a turn id from its OWN send, so a turn adopted from the
+ * durable record — started in another tab, or rejoined after a refresh — used
+ * to render a Stop button with nothing behind it: the click moved the control
+ * to a disabled "Stopping" spinner and dispatched no request at all, while the
+ * agent kept running and kept spending. These tests drive the real panel, so
+ * they fail on the panel's WIRING, not just on the resolver's arithmetic.
+ */
+describe("LangyPanel stopping a turn", () => {
+  const conversations = [
+    makeConv("conv-live", "Live chat", "2026-05-10T10:00:00.000Z"),
+  ];
+  const messagesById = {
+    "conv-live": [{ id: "m1", role: "user" as const, text: "do the thing" }],
+  };
+
+  const stopButton = () => screen.findByRole("button", { name: "Stop" });
+
+  async function openLiveConversation(): Promise<void> {
+    renderPanel();
+    await openHistory();
+    await openRecentOption(/Live chat/i);
+  }
+
+  describe("given the durable record names the turn in flight", () => {
+    describe("when this tab never started that turn", () => {
+      /** @scenario Stopping a turn another tab started really stops it */
+      it("dispatches the stop against the turn the record names", async () => {
+        installScenario({
+          conversations,
+          messagesById,
+          turnInFlightById: { "conv-live": { turnId: "turn-from-other-tab" } },
+        });
+
+        await openLiveConversation();
+        await userEvent.click(await stopButton());
+
+        await waitFor(() => {
+          expect(spies.stopMutation).toHaveBeenCalledWith({
+            projectId: "project-demo",
+            conversationId: "conv-live",
+            turnId: "turn-from-other-tab",
+          });
+        });
+        // Only now may the control claim a stop is under way.
+        expect(
+          await screen.findByRole("button", { name: "Stopping" }),
+        ).toBeDisabled();
+      });
+    });
+  });
+
+  describe("given a turn is in flight but the record cannot name it yet", () => {
+    /** @scenario Stop says nothing it cannot back up */
+    it("dispatches nothing and refuses to show it is stopping", async () => {
+      installScenario({
+        conversations,
+        messagesById,
+        turnInFlightById: { "conv-live": { turnId: null } },
+      });
+
+      await openLiveConversation();
+      await userEvent.click(await stopButton());
+
+      expect(spies.stopMutation).not.toHaveBeenCalled();
+      // The lie under test: a "Stopping" spinner with no request behind it.
+      expect(
+        screen.queryByRole("button", { name: "Stopping" }),
+      ).not.toBeInTheDocument();
+      expect(await stopButton()).toBeEnabled();
+      expect(toaster.create).toHaveBeenCalled();
+    });
+  });
+
+  describe("given the stop request never lands", () => {
+    /** @scenario A stop that never reached the backend hands the control back */
+    it("hands the control back rather than spinning on a stop nobody is doing", async () => {
+      installScenario({
+        conversations,
+        messagesById,
+        turnInFlightById: { "conv-live": { turnId: "turn-from-other-tab" } },
+        failStop: true,
+      });
+
+      await openLiveConversation();
+      await userEvent.click(await stopButton());
+
+      await waitFor(() => expect(spies.stopMutation).toHaveBeenCalled());
+      expect(await stopButton()).toBeEnabled();
     });
   });
 });

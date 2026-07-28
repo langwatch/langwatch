@@ -1,7 +1,10 @@
 import type { z, ZodTypeAny } from "zod";
 
 import type { Event } from "../domain/types";
-import type { ProcessIntent } from "../process-manager/processManager.types";
+import type {
+  ProcessEventEnvelope,
+  ProcessIntent,
+} from "../process-manager/processManager.types";
 import type { DeduplicationStrategy } from "../queues/queue.types";
 
 /** Shared delivery descriptor for lightweight subscribers. */
@@ -66,7 +69,18 @@ export interface ProcessEvolution<State> {
 export interface ProcessHandlerContext<
   Intents extends Record<string, IntentSpec<any>>,
 > {
+  /**
+   * The instant the input refers to: the event's `occurredAt`, or the slot a
+   * wake was scheduled for. May be arbitrarily far in the past when the
+   * subscriber backed up or the fleet was down.
+   */
   at: number;
+  /**
+   * Wall-clock at which this input is actually being handled. Schedule from
+   * `Math.max(at, now)`, never from `at` alone, or a lagged input writes a
+   * `nextWakeAt` that is already behind the present.
+   */
+  now: number;
   key: string;
   projectId: string;
   intents: IntentFactories<Intents>;
@@ -100,11 +114,30 @@ export interface ProcessManagerConfig<
   handlers: Record<string, EventHandler<State, unknown, Intents>>;
   eventTypes: readonly string[];
   onWake?: WakeHandler<State, Intents>;
+  /**
+   * Narrows a committed event to the payload the process is allowed to see.
+   * Defaults to the raw `event.data`.
+   *
+   * Any domain whose events carry customer content MUST supply this. The
+   * payload is persisted verbatim into process state and outbox rows, so the
+   * default is only safe for events that are already identities-and-flags.
+   * Building the narrowed view here is the boundary — the process never sees
+   * prompts, parts, tool output, titles, or tokens at all.
+   */
+  toPayload?: (event: E) => ProcessEventEnvelope["payload"];
   intents: Intents;
   outbox?: {
     maxAttempts?: number;
     leaseDurationMs?: number;
     retryDelayMs?: (params: { attempt: number }) => number;
+    /** In-flight dispatches per loop. Default 1 (sequential). */
+    concurrency?: number;
+    /**
+     * Messages leased per drain. Bound it to roughly `concurrency` when
+     * dispatches are slow (minutes, not seconds), or leased-but-waiting
+     * messages sit invisible behind the in-flight ones for the whole lease.
+     */
+    batchSize?: number;
   };
   schedule?: { everyMs: number };
   readonly _eventType?: E;

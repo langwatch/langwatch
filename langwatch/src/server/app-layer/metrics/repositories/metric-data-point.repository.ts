@@ -15,6 +15,14 @@ export interface MetricDataPointBulkWrite {
   retentionDays?: number;
 }
 
+/** One series' total over a window, with the label set that identifies it. */
+export interface SeriesTotalByPointAttribute {
+  metricName: string;
+  /** Sum of the delta-converged rollup buckets — the series' total. */
+  total: number;
+  pointAttributes: Record<string, string>;
+}
+
 export interface MetricDataPointRepository {
   ensureDataPoint(args: MetricDataPointWrite): Promise<void>;
   ensureDataPoints(args: MetricDataPointBulkWrite): Promise<void>;
@@ -25,6 +33,21 @@ export interface MetricDataPointRepository {
   queryUsageEstimates(
     query: MetricUsageEstimateQuery,
   ): Promise<MetricUsageEstimate[]>;
+  /**
+   * Totals for every series whose point-attribute set carries
+   * `attributeKey = attributeValue`, summed from the 30-second rollups
+   * (delta-converged, so the sum IS the total regardless of the source
+   * temporality). This is the session-keyed read coding agents need: their
+   * metrics carry no exemplars, so they can never correlate to a trace, but
+   * `session.id` rides the datapoint attributes.
+   */
+  getSeriesTotalsByPointAttribute(args: {
+    tenantId: string;
+    attributeKey: string;
+    attributeValue: string;
+    /** Partition-pruning lower bound for the rollup scan. */
+    fromMs: number;
+  }): Promise<SeriesTotalByPointAttribute[]>;
 }
 
 export class NullMetricDataPointRepository implements MetricDataPointRepository {
@@ -45,6 +68,15 @@ export class NullMetricDataPointRepository implements MetricDataPointRepository 
   async queryUsageEstimates(
     _query: MetricUsageEstimateQuery,
   ): Promise<MetricUsageEstimate[]> {
+    return [];
+  }
+
+  async getSeriesTotalsByPointAttribute(_args: {
+    tenantId: string;
+    attributeKey: string;
+    attributeValue: string;
+    fromMs: number;
+  }): Promise<SeriesTotalByPointAttribute[]> {
     return [];
   }
 }

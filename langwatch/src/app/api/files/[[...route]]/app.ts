@@ -2,10 +2,17 @@ import { Readable } from "node:stream";
 import type { MiddlewareHandler } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { anyAuthenticated, createServiceApp } from "~/server/api/security";
+import { LiteMemberRestrictedError } from "~/server/app-layer/permissions/errors";
 import { requireProjectPermission } from "~/server/auth/permissions";
 import { prisma } from "~/server/db";
 import { rateLimit } from "~/server/rateLimit";
-import { isReadbackSafe } from "~/server/stored-objects/safe-media-types";
+import {
+  jsonResponse,
+  rateLimitedResponse,
+  safeMediaType,
+  sanitizeFilenameSegment,
+  STORED_OBJECT_RESPONSE_BASE_HEADERS as FILES_RESPONSE_BASE_HEADERS,
+} from "~/server/stored-objects/media-response";
 import {
   resolveStoredObjectOwner,
   StoredObjectOwnerLookupUnavailableError,
@@ -24,27 +31,6 @@ const secured = createServiceApp<{ Variables: DualAuthVariables }>({
 });
 
 /**
- * Resolves the Content-Type header for a stored-object response.
- *
- * Returns the requested mediaType when it is in the shared SAFE_MEDIA_TYPES
- * allowlist (see `safe-media-types.ts`). Anything else is coerced to
- * application/octet-stream to neutralize MIME sniffing and stored-XSS
- * primitives (an attacker can't trick a browser into interpreting their
- * payload as text/html or application/javascript).
- *
- * The allowlist is the single source of truth shared with the ingest-path
- * extractor — widen it in safe-media-types.ts and both surfaces update.
- */
-function safeMediaType(mediaType: string): string {
-  return isReadbackSafe(mediaType) ? mediaType : "application/octet-stream";
-}
-
-function sanitizeFilenameSegment(id: string): string {
-  // RFC 6266 — keep ASCII, replace anything else with _; quote with double quotes.
-  return id.replace(/[^A-Za-z0-9._-]/g, "_").slice(0, 128);
-}
-
-/**
  * Per-project rate limit on the read endpoint.
  *
  * 120 requests / minute / project covers the realistic in-app render
@@ -55,31 +41,44 @@ function sanitizeFilenameSegment(id: string): string {
 const FILES_RATE_LIMIT_WINDOW_SECONDS = 60;
 const FILES_RATE_LIMIT_MAX = 120;
 
-/**
- * Common headers we attach to every files-route response. Static — never
- * vary by row, never echo user content. See AC9 + AC11 + the
- * security-reviewer pass on PR #4058.
- */
-const FILES_RESPONSE_BASE_HEADERS: Readonly<Record<string, string>> = {
-  "X-Content-Type-Options": "nosniff",
-  "Content-Security-Policy": "default-src 'none'; sandbox",
-  "Referrer-Policy": "no-referrer",
-};
 
-function jsonResponse(body: unknown, status: number): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: {
-      "Content-Type": "application/json",
-      ...FILES_RESPONSE_BASE_HEADERS,
-    },
-  });
+/**
+ * Stored objects are shared by several features, and which permission guards
+ * a read depends on what the object IS: trace media requires `traces:view`,
+ * scenario media requires `scenarios:view` — the two are separate permission
+ * categories and a custom role can hold one without the other.
+ */
+const FILE_VIEW_PERMISSIONS = ["traces:view", "scenarios:view"] as const;
+
+export function requiredPermissionForPurpose(
+  purpose: string,
+): (typeof FILE_VIEW_PERMISSIONS)[number] {
+  return purpose === "trace_content" ? "traces:view" : "scenarios:view";
 }
 
 /**
- * Checks that the caller (API key or session user) is allowed to read a file
- * owned by `ownerProjectId`. Throws HTTPException(403) or HTTPException(401)
- * on failure; returns void on success.
+ * True only for the denial shapes `requireProjectPermission` documents
+ * (LiteMemberRestrictedError, or its plain-Error denial message). Anything
+ * else — a dropped database connection, a Prisma fault — is an
+ * infrastructure failure that must bubble up as a 5xx, never be masked as
+ * a 403.
+ */
+function isPermissionDenial(err: unknown): boolean {
+  if (err instanceof LiteMemberRestrictedError) return true;
+  return (
+    err instanceof Error &&
+    err.message === "You do not have permission to access this project resource"
+  );
+}
+
+/**
+ * Checks that the caller (API key or session user) is allowed to read files
+ * owned by `ownerProjectId` AT ALL. Runs BEFORE the row is read so a foreign
+ * claim is always 403 regardless of row existence (no 403-vs-404 oracle);
+ * because the object's purpose is not known yet, a session user passes with
+ * ANY of the file-view permissions — the purpose-specific gate runs after
+ * the read (`authorizeFilePurpose`). Throws HTTPException(403)/(401) on
+ * failure; returns void on success.
  */
 async function authorizeFileRead({
   apiKeyProjectId,
@@ -95,18 +94,53 @@ async function authorizeFileRead({
       throw new HTTPException(403, { message: "forbidden" });
     }
   } else if (userId) {
-    try {
-      await requireProjectPermission({
-        userId,
-        projectId: ownerProjectId,
-        permission: "scenarios:view",
-        prisma,
-      });
-    } catch {
-      throw new HTTPException(403, { message: "forbidden" });
+    for (const permission of FILE_VIEW_PERMISSIONS) {
+      try {
+        await requireProjectPermission({
+          userId,
+          projectId: ownerProjectId,
+          permission,
+          prisma,
+        });
+        return;
+      } catch (err) {
+        if (!isPermissionDenial(err)) throw err;
+        // denied this category — try the next one
+      }
     }
+    throw new HTTPException(403, { message: "forbidden" });
   } else {
     throw new HTTPException(401, { message: "unauthenticated" });
+  }
+}
+
+/**
+ * Purpose-specific authorization, applied once the row (and so its purpose)
+ * is known: `trace_content` objects require `traces:view`, everything else
+ * (the scenario purposes) requires `scenarios:view`. API-key callers are
+ * project-scoped full readers on this legacy-key surface and were already
+ * pinned to the owning project in `authorizeFileRead`.
+ */
+async function authorizeFilePurpose({
+  userId,
+  ownerProjectId,
+  purpose,
+}: {
+  userId: string | undefined;
+  ownerProjectId: string;
+  purpose: string;
+}): Promise<void> {
+  if (!userId) return;
+  try {
+    await requireProjectPermission({
+      userId,
+      projectId: ownerProjectId,
+      permission: requiredPermissionForPurpose(purpose),
+      prisma,
+    });
+  } catch (err) {
+    if (!isPermissionDenial(err)) throw err;
+    throw new HTTPException(403, { message: "forbidden" });
   }
 }
 
@@ -225,16 +259,7 @@ async function handleFileRead(
     max: FILES_RATE_LIMIT_MAX,
   });
   if (!rl.allowed) {
-    return new Response(JSON.stringify({ error: "rate_limited" }), {
-      status: 429,
-      headers: {
-        "Content-Type": "application/json",
-        "Retry-After": String(
-          Math.max(1, Math.ceil((rl.resetAt - Date.now()) / 1000)),
-        ),
-        ...FILES_RESPONSE_BASE_HEADERS,
-      },
-    });
+    return rateLimitedResponse(rl.resetAt);
   }
 
   // Step 2: resolve the owning project.
@@ -301,6 +326,14 @@ async function handleFileRead(
   if (!result) {
     return jsonResponse({ status: "not_found" }, 404);
   }
+
+  // Step 4.5: purpose gate — now that the row is known, enforce the
+  // permission category the object's purpose maps to.
+  await authorizeFilePurpose({
+    userId,
+    ownerProjectId: authorizedProjectId,
+    purpose: result.row.purpose,
+  });
 
   if (!("stream" in result)) {
     return jsonResponse({ status: "missing" }, 404);

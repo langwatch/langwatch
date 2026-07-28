@@ -509,7 +509,10 @@ describe("Feature: Personal usage REST API", () => {
             }),
           },
         );
-        expect(res.status).toBe(400);
+        // 422: the window failed the query SCHEMA, so the validation boundary
+        // reports it as unprocessable with the offending fields attached. 400
+        // stays for a request the parser could not read at all.
+        expect(res.status).toBe(422);
         const body = await res.json();
         expect(JSON.stringify(body)).toContain("provided together");
       });
@@ -543,7 +546,7 @@ describe("Feature: Personal usage REST API", () => {
               }),
             },
           );
-          expect(res.status).toBe(400);
+          expect(res.status).toBe(422);
           const body = await res.json();
           expect(JSON.stringify(body)).toContain("before");
         });

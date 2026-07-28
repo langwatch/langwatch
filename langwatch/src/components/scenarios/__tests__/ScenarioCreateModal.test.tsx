@@ -178,19 +178,19 @@ describe("<ScenarioCreateModal/>", () => {
       ).toBeInTheDocument();
     });
 
-    it("presents Langy as an editable drafting step while keeping manual setup", () => {
+    it("presents AI drafting as an editable step while keeping manual setup", () => {
       render(<ScenarioCreateModal open={true} onClose={vi.fn()} />, {
         wrapper: Wrapper,
       });
 
       const dialog = getDialogContent();
-      expect(within(dialog).getByText("with Langy")).toBeInTheDocument();
+      expect(within(dialog).getByText("with AI")).toBeInTheDocument();
       expect(
         within(dialog).getByText("What should this simulation prove?"),
       ).toBeInTheDocument();
-      expect(within(dialog).getByText("Draft with Langy")).toBeInTheDocument();
+      expect(within(dialog).getByText("Draft with AI")).toBeInTheDocument();
       // The manual path is a first-class peer of the assistant, offered as a
-      // toggle right beside "With Langy" — not a buried "set up manually" link.
+      // toggle right beside "With AI" — not a buried "set up manually" link.
       expect(
         within(dialog).getByRole("button", { name: "Build it myself" }),
       ).toBeInTheDocument();

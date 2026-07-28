@@ -50,7 +50,8 @@ func Trace(begin BeginSpanFunc, end EndSpanFunc) Interceptor {
 		Sync: func(next DispatchFunc) DispatchFunc {
 			return func(ctx context.Context, call *Call) (*domain.Response, error) {
 				spanCtx, tp := begin(ctx, call.Bundle.Config.TraceProjectID, call.Request.Type)
-				call.Meta.CustomerTraceparent = tp
+				call.Meta.Update(func(m *Meta) { m.CustomerTraceparent = tp })
+				gatewayRequestID := call.Meta.GatewayRequestID()
 				internalModel, internalProviderID := internalTraceMetadata(call.Bundle.Config, call.Request.Model)
 
 				resp, err := next(spanCtx, call)
@@ -68,10 +69,13 @@ func Trace(begin BeginSpanFunc, end EndSpanFunc) Interceptor {
 							InternalProviderID: internalProviderID,
 							RequestType:        call.Request.Type,
 							VirtualKeyID:       call.Bundle.VirtualKeyID,
-							GatewayRequestID:   call.Meta.GatewayRequestID,
+							VKTags:             call.Bundle.Config.VKTags,
+							GatewayRequestID:   gatewayRequestID,
 							RequestBody:        call.Request.Body,
 							UpstreamStatusCode: status,
 							UpstreamErrorType:  errType,
+							MirrorTier:         call.Bundle.Config.MirrorTier,
+							MirrorSourceOrgID:  call.Bundle.OrganizationID,
 						})
 					}
 					return nil, err
@@ -86,9 +90,12 @@ func Trace(begin BeginSpanFunc, end EndSpanFunc) Interceptor {
 						Usage:              resp.Usage,
 						RequestType:        call.Request.Type,
 						VirtualKeyID:       call.Bundle.VirtualKeyID,
-						GatewayRequestID:   call.Meta.GatewayRequestID,
+						VKTags:             call.Bundle.Config.VKTags,
+						GatewayRequestID:   gatewayRequestID,
 						RequestBody:        call.Request.Body,
 						ResponseBody:       resp.Body,
+						MirrorTier:         call.Bundle.Config.MirrorTier,
+						MirrorSourceOrgID:  call.Bundle.OrganizationID,
 					})
 				}
 				return resp, nil
@@ -97,7 +104,8 @@ func Trace(begin BeginSpanFunc, end EndSpanFunc) Interceptor {
 		Stream: func(next StreamFunc) StreamFunc {
 			return func(ctx context.Context, call *Call) (domain.StreamIterator, error) {
 				spanCtx, tp := begin(ctx, call.Bundle.Config.TraceProjectID, call.Request.Type)
-				call.Meta.CustomerTraceparent = tp
+				call.Meta.Update(func(m *Meta) { m.CustomerTraceparent = tp })
+				gatewayRequestID := call.Meta.GatewayRequestID()
 				internalModel, internalProviderID := internalTraceMetadata(call.Bundle.Config, call.Request.Model)
 
 				iter, err := next(spanCtx, call)
@@ -115,10 +123,13 @@ func Trace(begin BeginSpanFunc, end EndSpanFunc) Interceptor {
 							InternalProviderID: internalProviderID,
 							RequestType:        call.Request.Type,
 							VirtualKeyID:       call.Bundle.VirtualKeyID,
-							GatewayRequestID:   call.Meta.GatewayRequestID,
+							VKTags:             call.Bundle.Config.VKTags,
+							GatewayRequestID:   gatewayRequestID,
 							RequestBody:        call.Request.Body,
 							UpstreamStatusCode: status,
 							UpstreamErrorType:  errType,
+							MirrorTier:         call.Bundle.Config.MirrorTier,
+							MirrorSourceOrgID:  call.Bundle.OrganizationID,
 						})
 					}
 					return nil, err
@@ -131,7 +142,7 @@ func Trace(begin BeginSpanFunc, end EndSpanFunc) Interceptor {
 					end:                end,
 					bundle:             call.Bundle,
 					req:                call.Request,
-					meta:               call.Meta,
+					gatewayRequestID:   gatewayRequestID,
 					spanCtx:            spanCtx,
 					internalModel:      internalModel,
 					internalProviderID: internalProviderID,
@@ -175,7 +186,7 @@ type traceStreamWrapper struct {
 	end                EndSpanFunc
 	bundle             *domain.Bundle
 	req                *domain.Request
-	meta               *Meta
+	gatewayRequestID   string
 	spanCtx            context.Context
 	internalModel      string
 	internalProviderID domain.ProviderID
@@ -265,11 +276,14 @@ func (w *traceStreamWrapper) onClose() {
 				Usage:              w.inner.Usage(),
 				RequestType:        w.req.Type,
 				VirtualKeyID:       w.bundle.VirtualKeyID,
-				GatewayRequestID:   w.meta.GatewayRequestID,
+				VKTags:             w.bundle.Config.VKTags,
+				GatewayRequestID:   w.gatewayRequestID,
 				RequestBody:        w.req.Body,
 				ResponseBody:       body,
 				UpstreamStatusCode: status,
 				UpstreamErrorType:  errType,
+				MirrorTier:         w.bundle.Config.MirrorTier,
+				MirrorSourceOrgID:  w.bundle.OrganizationID,
 			})
 			return nil
 		})

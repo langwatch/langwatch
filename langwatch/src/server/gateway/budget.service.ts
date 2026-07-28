@@ -15,11 +15,29 @@ import type {
 import { Prisma } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 
+import { createLogger } from "@langwatch/observability";
+
 import { GatewayAuditAdapter } from "./auditLog.repository";
 import { serializeRowForAudit } from "./auditSerializer";
 import { GatewayBudgetClickHouseRepository } from "./budget.clickhouse.repository";
+import {
+  type BudgetScopeReach,
+  resolveBudgetScopeReach,
+} from "./budgetScopeReach";
 import { nextResetAt, shouldResetBudget } from "./budgetWindow";
 import { ChangeEventRepository } from "./changeEvent.repository";
+
+const logger = createLogger("langwatch:gateway:budget-service");
+
+export type BudgetListWithHealth = {
+  budgets: GatewayBudget[];
+  /**
+   * False when spend could not be totalled. Consumers must say so rather
+   * than render the untotalled figure as if it were real spend.
+   */
+  spendAvailable: boolean;
+  scopeReach: Map<string, BudgetScopeReach>;
+};
 
 export type BudgetScope =
   | { kind: "ORGANIZATION"; organizationId: string }
@@ -98,6 +116,10 @@ export type BudgetDetail = {
     occurredAt: Date;
     virtualKey: { name: string; displayPrefix: string } | null;
   }>;
+  /** False when spend could not be totalled, so `spentUsd` is not real spend. */
+  spendAvailable: boolean;
+  /** True when no active key can produce traffic this budget matches. */
+  unreachableByAnyKey: boolean;
 };
 
 export type BudgetCheckDecision = "allow" | "soft_warn" | "hard_block";
@@ -205,23 +227,112 @@ export class GatewayBudgetService {
     budgets: GatewayBudget[],
     organizationId: string,
   ): Promise<GatewayBudget[]> {
-    if (!this.chRepo || budgets.length === 0) return budgets;
+    const { budgets: decorated } = await this.applyClickHouseSpendWithHealth(
+      budgets,
+      organizationId,
+    );
+    return decorated;
+  }
+
+  /**
+   * As applyClickHouseSpend, but also reports whether the returned spend
+   * figures came from the ledger at all.
+   *
+   * `GatewayBudget.spentUsd` in Postgres has had no writer since the ledger
+   * cutover, so falling back to it renders a confident `$0.00 / $X, 0%` on
+   * a budget that is in reality not being totalled and not being enforced.
+   * Callers must surface `spendAvailable: false` rather than show that zero
+   * as a spend figure.
+   */
+  private async applyClickHouseSpendWithHealth(
+    budgets: GatewayBudget[],
+    organizationId: string,
+  ): Promise<{ budgets: GatewayBudget[]; spendAvailable: boolean }> {
+    if (budgets.length === 0) return { budgets, spendAvailable: true };
+    if (!this.chRepo) return { budgets, spendAvailable: false };
+
     const projects = await this.prisma.project.findMany({
       where: { team: { organizationId }, archivedAt: null },
       select: { id: true },
     });
-    if (projects.length === 0) return budgets;
+    // No project means nothing has ever been able to emit a ledger row, so
+    // zero is the true total rather than a missing one.
+    if (projects.length === 0) return { budgets, spendAvailable: true };
+
     const tenantIds = projects.map((p) => p.id);
-    const spends = await this.chRepo.getSpendForBudgetsAcrossTenants(
-      tenantIds,
-      budgets,
-    );
+    let spends;
+    try {
+      spends = await this.chRepo.getSpendForBudgetsAcrossTenants(
+        tenantIds,
+        budgets,
+      );
+    } catch (error) {
+      logger.error(
+        { organizationId, budgetCount: budgets.length, error },
+        "failed to read gateway budget spend totals",
+      );
+      return { budgets, spendAvailable: false };
+    }
+
     const spendByBudget = new Map(spends.map((s) => [s.budgetId, s.spentUsd]));
-    return budgets.map((b) => {
-      const ch = spendByBudget.get(b.id);
-      if (ch === undefined) return b;
-      return { ...b, spentUsd: new Prisma.Decimal(ch) };
+    return {
+      spendAvailable: true,
+      budgets: budgets.map((b) => {
+        const ch = spendByBudget.get(b.id);
+        if (ch === undefined) return b;
+        return { ...b, spentUsd: new Prisma.Decimal(ch) };
+      }),
+    };
+  }
+
+  /**
+   * Budgets for the organization's list view, with the two health signals
+   * the view cannot render honestly without: whether spend could be totalled
+   * at all, and which budgets no active key can ever spend against.
+   */
+  async listWithHealth(organizationId: string): Promise<BudgetListWithHealth> {
+    const rows = await this.prisma.gatewayBudget.findMany({
+      where: { organizationId, archivedAt: null },
+      orderBy: [{ scopeType: "asc" }, { createdAt: "desc" }],
     });
+    return await this.decorateWithHealth(rows, organizationId);
+  }
+
+  /** As listWithHealth, for the budgets that apply to one project. */
+  async listForProjectWithHealth(
+    projectId: string,
+  ): Promise<BudgetListWithHealth> {
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      include: { team: true },
+    });
+    if (!project) {
+      return { budgets: [], spendAvailable: true, scopeReach: new Map() };
+    }
+    const rows = await this.prisma.gatewayBudget.findMany({
+      where: {
+        organizationId: project.team.organizationId,
+        archivedAt: null,
+        OR: [
+          { scopeType: "ORGANIZATION", scopeId: project.team.organizationId },
+          { scopeType: "TEAM", scopeId: project.teamId },
+          { scopeType: "PROJECT", scopeId: project.id },
+        ],
+      },
+      orderBy: [{ scopeType: "asc" }, { createdAt: "desc" }],
+    });
+    return await this.decorateWithHealth(rows, project.team.organizationId);
+  }
+
+  private async decorateWithHealth(
+    rows: GatewayBudget[],
+    organizationId: string,
+  ): Promise<BudgetListWithHealth> {
+    const [{ budgets, spendAvailable }, scopeReach] = await Promise.all([
+      this.applyClickHouseSpendWithHealth(rows, organizationId),
+      resolveBudgetScopeReach(this.prisma, organizationId, rows),
+    ]);
+    return { budgets, spendAvailable, scopeReach };
   }
 
   async get(id: string, organizationId: string): Promise<GatewayBudget | null> {
@@ -243,8 +354,13 @@ export class GatewayBudgetService {
     id: string,
     organizationId: string,
   ): Promise<BudgetDetail | null> {
-    const budget = await this.get(id, organizationId);
-    if (!budget) return null;
+    const row = await this.prisma.gatewayBudget.findFirst({
+      where: { id, organizationId },
+    });
+    if (!row) return null;
+    const { budgets, spendAvailable, scopeReach } =
+      await this.decorateWithHealth([row], organizationId);
+    const budget = budgets[0] ?? row;
 
     const scopeTarget = await this.resolveScopeTarget(budget);
 
@@ -282,7 +398,13 @@ export class GatewayBudgetService {
       }));
     }
 
-    return { budget, scopeTarget, recentLedger };
+    return {
+      budget,
+      scopeTarget,
+      recentLedger,
+      spendAvailable,
+      unreachableByAnyKey: scopeReach.get(budget.id)?.reachable === false,
+    };
   }
 
   /**
@@ -459,6 +581,28 @@ export class GatewayBudgetService {
           code: "BAD_REQUEST",
           message:
             "projectId does not belong to this organization — PROJECT budgets must scope a project inside the budget's org.",
+        });
+      }
+    }
+    // Cross-org + product-managed guard for VIRTUAL_KEY budgets. The scope id
+    // is request-supplied, so without the org check a caller could budget
+    // another tenant's key; and a product-managed VK (purpose != USER — the
+    // Langy VK) is not the customer's to constrain: a $0.01 BLOCK budget on it
+    // would deny every Langy turn, the same "customer breaks a product-managed
+    // credential" class the by-id mutation guards already close. Not-found
+    // rather than forbidden, so the response never confirms the id exists.
+    if (input.scope.kind === "VIRTUAL_KEY") {
+      const vk = await this.prisma.virtualKey.findFirst({
+        where: {
+          id: input.scope.virtualKeyId,
+          organizationId: input.organizationId,
+        },
+        select: { purpose: true },
+      });
+      if (!vk || vk.purpose !== "USER") {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Virtual key not found.",
         });
       }
     }

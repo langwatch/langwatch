@@ -125,12 +125,8 @@ type resolvedOTel struct {
 // OTEL_SAMPLE_RATIO environment variable.
 const UnsetSampleRatio = 0
 
-// DefaultNonLocalSampleRatio is the trace sample ratio applied outside local
-// development when the operator did not choose one.
-const DefaultNonLocalSampleRatio = 0.1
-
 // Resolve reconciles the official OpenTelemetry environment variables with
-// the deprecated LangWatch names and the environment-aware defaults, then
+// the deprecated LangWatch names and the service defaults, then
 // validates the result. Call exactly once from LoadConfig, after Hydrate and
 // after SampleRatioSet is stamped; every telemetry accessor below requires it.
 //
@@ -138,7 +134,7 @@ const DefaultNonLocalSampleRatio = 0.1
 // span: a conflicting or out-of-range value is not discoverable from inside
 // the running service, so the only place it can be caught is the place it is
 // read.
-func (o *OTel) Resolve(environment string) error {
+func (o *OTel) Resolve() error {
 	baseEndpoint, err := o.resolveBaseEndpoint()
 	if err != nil {
 		return err
@@ -147,7 +143,7 @@ func (o *OTel) Resolve(environment string) error {
 	if err != nil {
 		return err
 	}
-	sampler, err := o.resolveSampler(environment)
+	sampler, err := o.resolveSampler()
 	if err != nil {
 		return err
 	}
@@ -254,8 +250,8 @@ var officialSamplerKinds = map[string]struct {
 }
 
 // resolveSampler reconciles OTEL_TRACES_SAMPLER(+ARG) with the deprecated
-// OTEL_SAMPLE_RATIO and the environment-aware default.
-func (o *OTel) resolveSampler(environment string) (otelsetup.SamplerChoice, error) {
+// OTEL_SAMPLE_RATIO and the full-sampling default.
+func (o *OTel) resolveSampler() (otelsetup.SamplerChoice, error) {
 	legacySet := o.SampleRatioSet || o.SampleRatio != UnsetSampleRatio
 	if kind := strings.ToLower(strings.TrimSpace(o.TracesSampler)); kind != "" {
 		if legacySet {
@@ -301,13 +297,13 @@ func (o *OTel) resolveSampler(environment string) (otelsetup.SamplerChoice, erro
 		return otelsetup.SamplerChoice{ParentBased: true, Ratio: o.SampleRatio}, nil
 	}
 
-	// Environment-aware default: trace everything on a laptop, a tenth of
-	// requests everywhere else.
-	ratio := DefaultNonLocalSampleRatio
-	if environment == "local" {
-		ratio = 1.0
-	}
-	return otelsetup.SamplerChoice{ParentBased: true, Ratio: ratio}, nil
+	// Default: parent-based, sample everything — the OTel spec default
+	// (parentbased_always_on), in every environment. A lowered default is
+	// indistinguishable from a broken exporter on quiet services, and on the
+	// multi-tenant customer path (nlpgo) anything less than full sampling
+	// silently drops customer trace data. Operators opt into downsampling
+	// explicitly with OTEL_TRACES_SAMPLER(+_ARG).
+	return otelsetup.SamplerChoice{ParentBased: true, Ratio: 1.0}, nil
 }
 
 // validRatio rejects ratios outside [0,1]. NaN needs the explicit check:

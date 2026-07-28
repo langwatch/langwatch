@@ -3,7 +3,7 @@ import * as path from "path";
 import * as yaml from "js-yaml";
 import chalk from "chalk";
 import type { PromptsConfig, LocalPromptConfig, MaterializedPrompt, PromptsLock } from "../types";
-import { localPromptConfigSchema } from "../types";
+import { localPromptConfigSchema } from "../types-prompt";
 import { PromptConverter } from "@/cli/utils/promptConverter";
 import { PromptFileNotFoundError } from "./errors/prompt-not-found.error";
 import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";

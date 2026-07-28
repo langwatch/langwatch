@@ -55,11 +55,13 @@ Feature: Langy suggests the next step after a result
       And the lens is locked to the search Langy ran
       And nothing is saved until I choose the suggestion
 
+    # The graph builder filters on fields only — a free-text search has nowhere
+    # to go there, so the offer must not pretend to bring it along.
     @integration
-    Scenario: The traces card suggests graphing the search
-      When Langy searches for traces and finds some
-      Then the traces card offers to graph those traces
-      And choosing it opens the graph builder with that search already applied as the graph's filters
+    Scenario: The graphing offer never claims to carry what the graph cannot hold
+      When Langy searches traces for the words "checkout failed"
+      Then the traces card still offers the Analytics surface
+      But the offer reads as opening the surface, not as graphing that search
 
     @integration
     Scenario: The traces card suggests adding the traces to a dataset
@@ -69,9 +71,15 @@ Feature: Langy suggests the next step after a result
 
     @integration
     Scenario: The traces card suggests alerting on the search
-      When Langy searches for traces and finds some
+      When Langy searches traces for the words "checkout failed"
       Then the traces card offers to set up an alert for that search
-      And choosing it opens the automation flow with that search already applied as the alert's filters
+      And choosing it opens the automation flow with that search already set as the alert's subject
+      And nothing is created until I act there
+
+    @integration
+    Scenario: A search with nothing to carry still offers the alert surface honestly
+      When Langy searches traces with neither a filter nor a search term
+      Then the alert offer reads as opening the surface, not as alerting on that search
 
   Rule: A suggestion only appears when it can actually be carried out
 
@@ -87,10 +95,10 @@ Feature: Langy suggests the next step after a result
       Then the traces card does not offer to add traces to a dataset
 
     @unit
-    Scenario: A filter Langy used that the traces view cannot express is dropped, not mistranslated
-      When Langy searches traces using a filter the traces view has no equivalent for
-      Then the suggestion carries across only the filters the traces view can express
-      And it never invents a filter the user did not ask for
+    Scenario: Carried text is never mistranslated into a filter
+      When Langy searches traces for text that happens to look like a field filter
+      Then the destination receives it as the same free text Langy searched for
+      And it never becomes a filter the user did not ask for
 
   Rule: A single trace offers the next steps on that one trace
 

@@ -158,7 +158,6 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
         /** @scenario Delete an organization-scoped provider from a project settings view */
         it("removes the row and its scope grants instead of 404ing", async () => {
           const created = await repo().create({
-            projectId: projectAId,
             name: `OpenAI Org ${ns}`,
             provider: "openai",
             enabled: true,
@@ -186,7 +185,6 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
         /** @scenario Delete a provider scoped only to a sibling project in the same org */
         it("removes the row", async () => {
           const created = await repo().create({
-            projectId: siblingProjectId,
             name: `OpenAI Sibling ${ns}`,
             provider: "anthropic",
             enabled: true,
@@ -210,7 +208,6 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
         /** @scenario Deleting a provider from a different organization is not found */
         it("rejects as NOT_FOUND and leaves the row intact", async () => {
           const created = await repo().create({
-            projectId: otherProjectId,
             name: `OpenAI Other ${ns}`,
             provider: "openai",
             enabled: true,
@@ -236,7 +233,6 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
         /** @scenario Deleting a provider removes its stored credentials */
         it("leaves no row with that provider id", async () => {
           const created = await repo().create({
-            projectId: projectAId,
             name: `OpenAI Keyed ${ns}`,
             provider: "groq",
             enabled: true,

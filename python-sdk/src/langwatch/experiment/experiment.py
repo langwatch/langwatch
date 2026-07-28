@@ -9,11 +9,11 @@ import threading
 import time
 import traceback
 import httpx
-import pandas as pd
 from opentelemetry import trace, context as otel_context
 from opentelemetry.trace import Span
 from pydantic import BaseModel, Field
 from typing import (
+    TYPE_CHECKING,
     Any,
     Callable,
     Dict,
@@ -29,6 +29,9 @@ from typing import (
     Union,
     cast,
 )
+
+if TYPE_CHECKING:
+    import pandas as pd
 
 from tenacity import retry, stop_after_attempt, wait_exponential
 from tqdm.auto import tqdm
@@ -55,6 +58,17 @@ import urllib.parse
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 
 _tracer = trace.get_tracer(__name__)
+
+
+def _is_dataframe(obj: object) -> bool:
+    """True when obj is a pandas DataFrame, without importing pandas.
+
+    Checked via sys.modules so plain iterables never pull pandas in: if
+    pandas was never imported, obj cannot be a DataFrame (pandas is an
+    optional dependency of the SDK).
+    """
+    pd = sys.modules.get("pandas")
+    return pd is not None and isinstance(obj, pd.DataFrame)
 
 
 @dataclass
@@ -276,6 +290,10 @@ class Experiment:
 
     def _fetch_results_as_df(self, retries: int = 5, delay: float = 3.0) -> pd.DataFrame:
         """Fetch per-row results from the platform and build a DataFrame."""
+        # Imported lazily so importing langwatch.experiment does not require
+        # pandas; it is only needed when reading per-row results back.
+        import pandas as pd
+
         endpoint = langwatch.get_endpoint()
         api_key = langwatch.get_api_key() or ""
 
@@ -380,6 +398,9 @@ class Experiment:
 
     def _build_run_result(self) -> ExperimentRunResult:
         """Build an ExperimentRunResult from the current results DataFrame."""
+        # Imported lazily so importing langwatch.experiment does not require
+        # pandas; this path only runs on DataFrames built from fetched results.
+        import pandas as pd
         run_url = self._run_url or ""
         df = self.results
 
@@ -556,7 +577,7 @@ class Experiment:
             progress_bar = tqdm(total=total_, desc="Evaluating")
 
             # Supports direct pandas df being passed in
-            if isinstance(iterable, pd.DataFrame):
+            if _is_dataframe(iterable):
                 iterable = cast(Iterable[ItemT], iterable.iterrows())  # type: ignore
 
             with ThreadPoolExecutor(max_workers=threads) as executor:
@@ -662,7 +683,7 @@ class Experiment:
                 total_ = len(cast(Sized, iterable))
             progress_bar = tqdm(total=total_, desc="Evaluating")
 
-            if isinstance(iterable, pd.DataFrame):
+            if _is_dataframe(iterable):
                 iterable = cast(Iterable[ItemT], iterable.iterrows())  # type: ignore
 
             self._async_semaphore = asyncio.Semaphore(concurrency)

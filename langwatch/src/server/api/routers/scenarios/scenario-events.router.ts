@@ -4,6 +4,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
+import { startScenarioTabPresence } from "~/server/scenarios/browser-tab/scenario-tab-presence";
 import type {
   BatchRunDataResult,
   ScenarioRunData,
@@ -403,23 +404,62 @@ export const scenarioEventsRouter = createTRPCRouter({
     }),
 
   onSimulationUpdate: protectedProcedure
-    .input(z.object({ projectId: z.string() }))
+    .input(
+      z.object({
+        projectId: z.string(),
+        // Present only on a tab the SDK opened. While the subscription lives,
+        // that tab is offered runs started on the same machine instead of the
+        // SDK opening yet another browser tab.
+        tabKey: z.string().min(1).max(200).optional(),
+        tabId: z.string().min(1).max(200).optional(),
+      }),
+    )
     .use(checkProjectPermission("scenarios:view"))
     .subscription(async function* (opts) {
-      const { projectId } = opts.input;
+      const { projectId, tabKey, tabId } = opts.input;
       const emitter = getApp().broadcast.getTenantEmitter(projectId);
 
       logger.info({ projectId }, "Simulation SSE subscription started");
 
-      for await (const eventArgs of on(emitter, "simulation_updated", {
-        // @ts-expect-error - signal is not typed
-        signal: opts.signal,
-      })) {
-        logger.debug(
-          { projectId, event: eventArgs[0] },
-          "Simulation SSE event received",
-        );
-        yield eventArgs[0];
+      const presence =
+        tabKey && tabId
+          ? await startScenarioTabPresence({ projectId, tabKey, tabId })
+          : null;
+
+      if (presence?.parkedNavigate) {
+        // Same envelope the broadcast path emits, so the client has one shape
+        // to parse.
+        yield {
+          event: JSON.stringify(presence.parkedNavigate),
+          timestamp: Date.now(),
+        };
+      }
+
+      // tRPC v10 callers leave `opts.signal` undefined, so the request's own
+      // signal rides in on the context. Without it a disconnected client keeps
+      // this generator suspended, its emitter listener attached, and its tab
+      // registered forever.
+      const signal =
+        opts.ctx.signal ??
+        // @ts-expect-error - tRPC v10 does not type `signal` on procedure opts
+        (opts.signal as AbortSignal | undefined);
+
+      try {
+        for await (const eventArgs of on(emitter, "simulation_updated", {
+          signal,
+        })) {
+          logger.debug(
+            { projectId, event: eventArgs[0] },
+            "Simulation SSE event received",
+          );
+          yield eventArgs[0];
+        }
+      } catch (error) {
+        // A disconnect aborts the wait; that is the normal end of a
+        // subscription, not something to surface as a stream error.
+        if ((error as { name?: string })?.name !== "AbortError") throw error;
+      } finally {
+        await presence?.stop();
       }
     }),
 });

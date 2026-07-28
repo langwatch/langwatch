@@ -40,6 +40,47 @@ const egressHostPatternSchema = z
 export const langyEgressAllowlistSchema = z.array(egressHostPatternSchema);
 
 /**
+ * The ADR-061 mirror fidelity for a turn's organization. Threaded through the
+ * credentials envelope into the worker signature exactly like the egress
+ * allow-list; the Go relay reads it to decide what of the turn reaches
+ * LangWatch's own mirror project.
+ *
+ *   content    — the full turn INCLUDING prompts, completions and tool payloads.
+ *   structural — the operational shape with no content.
+ *   skip       — no mirror at all.
+ */
+export type LangyMirrorTier = "content" | "structural" | "skip";
+
+/**
+ * Resolves the mirror tier for a turn.
+ *
+ * SEAM: the per-organization policy store (a Postgres row cached in Redis, the
+ * same shape as the data-privacy policy service) will resolve the tier per org
+ * HERE when it lands. Until then every customer organization resolves to the
+ * deployment default — `content` — with ONE mandatory exception below.
+ *
+ * Mandatory self-skip: a turn whose OWN project is the mirror project must never
+ * mirror into itself — the one genuine self-ingest loop, excluded by
+ * construction regardless of any future per-org policy. The mirror endpoint +
+ * key live only on the Go manager and cannot name a project id from the TS side,
+ * so the self-check compares the turn's `projectId` against an explicit
+ * `LANGY_MIRROR_PROJECT_ID` (the mirror project's own id).
+ *
+ * SHIP-GATE: content-by-default is gated on a customer-facing-terms (DPA)
+ * review before it is enabled in production — see ADR-061 §3 and the PR body.
+ */
+export function resolveLangyMirrorTier(
+  { projectId }: { projectId: string },
+  env: Record<string, string | undefined> = process.env,
+): LangyMirrorTier {
+  const mirrorProjectId = env.LANGY_MIRROR_PROJECT_ID?.trim();
+  if (mirrorProjectId && mirrorProjectId === projectId) {
+    return "skip";
+  }
+  return "content";
+}
+
+/**
  * The Langy worker hands `gatewayBaseUrl` straight to OpenCode as
  * `OPENAI_BASE_URL`, so it must point at the gateway's OpenAI-compatible
  * surface — the `/v1` prefix under which `/responses` and `/chat/completions`
@@ -203,6 +244,14 @@ export type LangyCredentials = {
    * floor ∪ this list. The *presence* of the list is the enforcement mode.
    */
   egressAllowlist?: string[];
+  /**
+   * The ADR-061 mirror tier resolved for this turn's organization. Rides the
+   * envelope into the worker signature (like `egressAllowlist`), so the Go relay
+   * mirrors the turn into LangWatch's own project at the fidelity the tier
+   * allows. Absent on a manager with no mirror configured is harmless — the
+   * manager mirrors nothing without a destination.
+   */
+  mirrorTier?: LangyMirrorTier;
 };
 
 /**
@@ -403,6 +452,29 @@ export class LangyCredentialService {
   }
 
   /**
+   * `getModelsAllowed` keyed on the project alone, resolving the organization
+   * server-side so a caller can neither supply nor mismatch it.
+   *
+   * This is what the composer's model picker reads. It used to pull the whole
+   * customer-facing virtual-key listing and pick the Langy row out of it —
+   * which stopped working, by design, once product-managed keys were dropped
+   * from that listing. Returning just the allowlist also means the UI never
+   * receives the rest of the VK row to begin with.
+   */
+  async getModelsAllowedForProject(
+    projectId: string,
+  ): Promise<string[] | null> {
+    const project = await new ProjectRepository(
+      this.prisma,
+    ).findForLangyCredentials(projectId);
+    if (!project) return null;
+    return this.getModelsAllowed({
+      projectId,
+      organizationId: project.organizationId,
+    });
+  }
+
+  /**
    * Returns the `modelsAllowed` array on the project's Langy VK. Null means
    * "no allowlist set" — every eligible model is allowed (the gateway is the
    * final allowlist in that case). Used by the Langy turn path to validate the
@@ -464,6 +536,22 @@ export class LangyCredentialService {
    * disabling enforcement — a stray non-array or a bad host pattern must not
    * quietly open egress.
    */
+  /**
+   * Resolves the ADR-061 mirror tier for a turn's organization. Async and on the
+   * service (which already holds `this.prisma`) because this is the SEAM the
+   * future per-org policy store — a Postgres row cached in Redis — reads from;
+   * v1 delegates to the pure {@link resolveLangyMirrorTier} (deployment default
+   * `content`, with the mandatory self-skip). Never throws: a resolver failure
+   * must not fail a turn, and the manager mirrors nothing without a destination.
+   */
+  async resolveMirrorTier({
+    projectId,
+  }: {
+    projectId: string;
+  }): Promise<LangyMirrorTier> {
+    return resolveLangyMirrorTier({ projectId });
+  }
+
   async getEgressAllowlist({
     projectId,
   }: {

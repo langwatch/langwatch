@@ -14,6 +14,8 @@ import type { Annotation } from "@prisma/client";
 import { useRouter } from "~/utils/compat/next-router";
 import { useMemo, useState } from "react";
 import { ChevronDown, Edit, MessageCircle, MoreVertical } from "react-feather";
+import { LangyContextTarget } from "~/features/langy/components/LangyContextTarget";
+import { traceContextChip } from "~/features/langy/logic/langyContextChips";
 import { TraceIdPeek } from "~/features/traces-v2/components/TraceIdPeek";
 import { useAnnotationQueues } from "~/hooks/useAnnotationQueues";
 import { useDrawer } from "~/hooks/useDrawer";
@@ -54,6 +56,7 @@ export type AnnotationWithUser = Annotation & {
   user?: {
     name: string | null;
     id: string;
+    image?: string | null;
   };
 };
 
@@ -67,7 +70,7 @@ type GroupedAnnotation = {
 export type UnifiedQueueItem = {
   id: string;
   doneAt: Date | null;
-  createdByUser: { name: string | null; id: string } | null;
+  createdByUser: { name: string | null; id: string; image?: string | null } | null;
   createdAt: Date;
   traceId: string;
   trace?: Trace;
@@ -123,6 +126,7 @@ export const AnnotationsTable = ({
         ? {
             name: item.createdByUser.name,
             id: item.createdByUser.id,
+            image: item.createdByUser.image ?? null,
           }
         : null,
       createdAt: item.createdAt ? new Date(item.createdAt) : new Date(),
@@ -428,9 +432,16 @@ export const AnnotationsTable = ({
                     ) : allQueueItems.length > 0 ? (
                       allQueueItems.map((item: UnifiedQueueItem) => {
                         return (
+                          // Armed, the row can be handed to Langy. The resource
+                          // a queue item IS about is its trace, and that is the
+                          // chip id the trace drawer this row opens derives —
+                          // so pointing at the row and opening it is one chip.
+                          <LangyContextTarget
+                            key={item.id}
+                            target={traceContextChip(item.traceId)}
+                          >
                           <Table.Row
                             cursor="pointer"
-                            key={item.id}
                             onClick={() =>
                               handleTraceClick(
                                 item.traceId,
@@ -595,6 +606,7 @@ export const AnnotationsTable = ({
                               </HStack>
                             </Table.Cell>
                           </Table.Row>
+                          </LangyContextTarget>
                         );
                       })
                     ) : (

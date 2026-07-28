@@ -6,6 +6,7 @@ import type { TriggerContext } from "../../pipeline/processManagerDefinition";
 import type { FoldProjectionStore } from "../../projections/foldProjection.types";
 import type { AppendStore } from "../../projections/mapProjection.types";
 import type { ReactorDefinition } from "../../reactors/reactor.types";
+import type { EventSubscriberDefinition } from "../../subscribers/eventSubscriber.types";
 import {
   AddAnnotationCommand,
   BulkSyncAnnotationsCommand,
@@ -13,11 +14,6 @@ import {
 } from "./commands/annotationCommands";
 import { AssignTopicCommand } from "./commands/assignTopicCommand";
 import { ChangeTraceNameCommand } from "./commands/changeTraceNameCommand";
-import {
-  clampLogShardCount,
-  logCommandGroupKey,
-} from "./commands/logCommandGroupKey";
-import { RecordLogCommand } from "./commands/recordLogCommand";
 import { RecordLogContributionCommand } from "./commands/recordLogContributionCommand";
 import { RecordMetricCorrelationCommand } from "./commands/recordMetricCorrelationCommand";
 import {
@@ -29,7 +25,6 @@ import {
   clampSpanShardCount,
   spanCommandGroupKey,
 } from "./commands/spanCommandGroupKey";
-import { LogRecordStorageMapProjection } from "./projections/logRecordStorage.mapProjection";
 import { SpanStorageMapProjection } from "./projections/spanStorage.mapProjection";
 import {
   type TraceAnalyticsData,
@@ -40,32 +35,17 @@ import {
   type TraceAnalyticsRollupRow,
 } from "./projections/traceAnalyticsRollup.mapProjection";
 import { TraceSummaryFoldProjection } from "./projections/traceSummary.foldProjection";
-import type {
-  RecordLogCommandData,
-  RecordSpanCommandData,
-} from "./schemas/commands";
+import type { RecordSpanCommandData } from "./schemas/commands";
 import {
   ORIGIN_RESOLVED_EVENT_TYPE,
   SPAN_RECEIVED_EVENT_TYPE,
 } from "./schemas/constants";
 import type { TraceProcessingEvent } from "./schemas/events";
-import type { NormalizedLogRecord } from "./schemas/logRecords";
 import type { NormalizedSpan } from "./schemas/spans";
 import { TraceRequestUtils } from "./utils/traceRequest.utils";
 
 export interface TraceProcessingPipelineDeps {
   spanAppendStore: AppendStore<NormalizedSpan>;
-  /**
-   * CUTOVER ONLY. Canonical logs replace this path, and nothing in this build
-   * sends `recordLog` — but during a rolling deploy an old instance still can,
-   * and the `recordLog` command stays registered to accept it. Without this
-   * projection those commands append a `log_record_received` event that no
-   * projection consumes, so the record reaches neither `stored_log_records`
-   * nor canonical `log_records`. Migration 00049 retains the legacy table on
-   * exactly this promise. Remove together with `recordLog`, the legacy table
-   * and this store once no pre-cutover instance can be running.
-   */
-  logRecordAppendStore: AppendStore<NormalizedLogRecord>;
   /** ADR-034 Phase 1: per-span rollup writer (app-side, replaces the MV). */
   traceAnalyticsRollupAppendStore: AppendStore<TraceAnalyticsRollupRow>;
   traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
@@ -107,7 +87,6 @@ export interface TraceProcessingPipelineDeps {
     ) => Promise<void>;
   };
   spanStorageBroadcastReactor: ReactorDefinition<TraceProcessingEvent>;
-  claudeCodeSpanSyncReactor: ReactorDefinition<TraceProcessingEvent>;
   customerIoTraceSyncReactor?: ReactorDefinition<
     TraceProcessingEvent,
     TraceSummaryData
@@ -130,15 +109,6 @@ export interface TraceProcessingPipelineDeps {
    * spanCommandGroupKey.ts.
    */
   spanCommandShardCount?: number;
-  /**
-   * Number of GroupQueue shards for `recordLog` commands. `1` (default) keeps
-   * the historic per-trace group key; `> 1` spreads one Claude Code turn's log
-   * records across `traceId:<shard>` groups so a turn that streams thousands of
-   * log records drains in parallel instead of FIFO'ing behind one worker. The
-   * trace-summary fold and the claude-span-sync reactor are unaffected - both
-   * run on their own aggregate-keyed queue. See logCommandGroupKey.ts.
-   */
-  logCommandShardCount?: number;
   governanceKpisSyncReactor?: ReactorDefinition<
     TraceProcessingEvent,
     TraceSummaryData
@@ -151,6 +121,8 @@ export interface TraceProcessingPipelineDeps {
     TraceProcessingEvent,
     TraceSummaryData
   >;
+  /** Cross-pipeline dispatchers (e.g. coding-agent span-facts, ADR-056). */
+  subscribers?: EventSubscriberDefinition<TraceProcessingEvent>[];
 }
 
 /**
@@ -188,14 +160,6 @@ export function createTraceProcessingPipeline(
       "traceAnalyticsRollup",
       new TraceAnalyticsRollupMapProjection({
         store: deps.traceAnalyticsRollupAppendStore,
-      }),
-    )
-    // CUTOVER ONLY — drains `recordLog` commands still in flight from
-    // pre-canonical instances. See logRecordAppendStore on the deps above.
-    .withMapProjection(
-      "logRecordStorage",
-      new LogRecordStorageMapProjection({
-        store: deps.logRecordAppendStore,
       }),
     )
     .withReactor("traceSummary", "originGate", deps.originGateReactor)
@@ -249,11 +213,6 @@ export function createTraceProcessingPipeline(
       "spanStorage",
       "spanStorageBroadcast",
       deps.spanStorageBroadcastReactor,
-    )
-    .withReactor(
-      "traceSummary",
-      "claudeCodeSpanSync",
-      deps.claudeCodeSpanSyncReactor,
     );
 
   if (deps.customerIoTraceSyncReactor) {
@@ -296,6 +255,10 @@ export function createTraceProcessingPipeline(
     );
   }
 
+  for (const subscriber of deps.subscribers ?? []) {
+    builder = builder.withEventSubscriber(subscriber.name, subscriber);
+  }
+
   // Span-command sharding: when the shard count is > 1, install a getGroupKey
   // that spreads a trace's recordSpan commands across `traceId:<shard>`
   // GroupQueue groups so a hot trace drains in parallel instead of one span at a
@@ -328,34 +291,6 @@ export function createTraceProcessingPipeline(
     };
   }
 
-  // Log-command sharding: when the shard count is > 1, install a getGroupKey
-  // that spreads a trace's recordLog commands across `traceId:<shard>`
-  // GroupQueue groups so one Claude Code turn that streams thousands of log
-  // records drains in parallel instead of FIFO'ing behind one worker. When
-  // disabled (the default), install NO getGroupKey - the command falls back to
-  // getAggregateId, byte-identical to the historic per-trace key. The count is
-  // clamped defensively so a caller constructing the pipeline directly can't
-  // explode the number of groups. The command handler reads no trace state and
-  // the emitted log_record_received event still carries aggregateId = traceId,
-  // so the trace-summary fold and the claude-span-sync reactor (each on its own
-  // aggregate-keyed queue) are unaffected and the turn's tool-output join stays
-  // intact. See logCommandGroupKey.ts and
-  // specs/claude/telemetry-turn-bounding.feature.
-  const logCommandShardCount = clampLogShardCount(
-    deps.logCommandShardCount ?? 1,
-  );
-  const recordLogOptions: {
-    getGroupKey?: (payload: RecordLogCommandData) => string;
-  } = {};
-  if (logCommandShardCount > 1) {
-    recordLogOptions.getGroupKey = (payload) =>
-      logCommandGroupKey({
-        traceId: payload.traceId,
-        spanId: payload.spanId,
-        shardCount: logCommandShardCount,
-      });
-  }
-
   // ADR-022: When blobStore is provided, inject it into a pre-constructed
   // RecordSpanCommand instance so the worker can reconstitute oversized commands
   // (S3 spool fetch + best-effort delete). Falls back to zero-arg construction
@@ -372,7 +307,6 @@ export function createTraceProcessingPipeline(
 
   return recordSpanBuilder
     .withCommand("assignTopic", AssignTopicCommand)
-    .withCommand("recordLog", RecordLogCommand, recordLogOptions)
     .withCommand("recordLogContribution", RecordLogContributionCommand)
     .withCommand("recordMetricCorrelation", RecordMetricCorrelationCommand)
     .withCommand("resolveOrigin", ResolveOriginCommand)

@@ -46,8 +46,11 @@ export function sseErrorFrame(err: unknown): Record<string, unknown> {
   if (handled) {
     return {
       type: "error",
-      message: handled.message,
-      domainError: handled.serialize(),
+      // The code, never the handled error's own message — that is server copy
+      // and can name internal configuration (ADR-045). The client keys its
+      // presentation off `error.code` via the explainers.
+      message: handled.code,
+      error: handled.serialize(),
     };
   }
   if (err instanceof TRPCError && err.code !== "INTERNAL_SERVER_ERROR") {
@@ -148,6 +151,12 @@ secured.access(
     session,
     permissionChecked: false,
     publiclyShared: false,
+    // Subscriptions await an event that may never come; without this they stay
+    // suspended after the browser is gone, holding their emitter listener and
+    // skipping their own cleanup. Closing the stream cannot interrupt a
+    // pending `await` from the outside, so the signal has to reach the
+    // procedure itself.
+    signal: raw.signal,
   });
 
   // Create caller and resolve the procedure

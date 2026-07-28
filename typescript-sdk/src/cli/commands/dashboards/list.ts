@@ -4,8 +4,14 @@ import { DashboardsApiService } from "@/client-sdk/services/dashboards/dashboard
 import { checkApiKey } from "../../utils/apiKey";
 import { formatTable, formatRelativeTime } from "../../utils/formatting";
 import { failSpinner } from "../../utils/spinnerError";
+import type { CommandResult } from "../../utils/output";
 
-export const listDashboardsCommand = async (options?: { format?: string }): Promise<void> => {
+/**
+ * Returns the listing rather than printing it: the output port renders it in
+ * whatever format the caller asked for (utils/output.ts). The `table` closure
+ * is the human form, byte-identical to what this command printed before.
+ */
+export const listDashboardsCommand = async (): Promise<CommandResult | void> => {
   checkApiKey();
 
   const service = new DashboardsApiService();
@@ -19,45 +25,45 @@ export const listDashboardsCommand = async (options?: { format?: string }): Prom
       `Found ${dashboards.length} dashboard${dashboards.length !== 1 ? "s" : ""}`,
     );
 
-    if (options?.format === "json") {
-      console.log(JSON.stringify(result, null, 2));
-      return;
-    }
+    return {
+      data: result,
+      table: () => {
+        if (dashboards.length === 0) {
+          console.log();
+          console.log(chalk.gray("No dashboards found."));
+          console.log(chalk.gray("Create one with:"));
+          console.log(chalk.cyan('  langwatch dashboard create "My Dashboard"'));
+          return;
+        }
 
-    if (dashboards.length === 0) {
-      console.log();
-      console.log(chalk.gray("No dashboards found."));
-      console.log(chalk.gray("Create one with:"));
-      console.log(chalk.cyan('  langwatch dashboard create "My Dashboard"'));
-      return;
-    }
+        console.log();
 
-    console.log();
+        const tableData = dashboards.map((d) => ({
+          Name: d.name,
+          ID: d.id,
+          Graphs: String(d.graphCount),
+          Updated: formatRelativeTime(d.updatedAt),
+        }));
 
-    const tableData = dashboards.map((d) => ({
-      Name: d.name,
-      ID: d.id,
-      Graphs: String(d.graphCount),
-      Updated: formatRelativeTime(d.updatedAt),
-    }));
+        formatTable({
+          data: tableData,
+          headers: ["Name", "ID", "Graphs", "Updated"],
+          colorMap: {
+            Name: chalk.cyan,
+            ID: chalk.green,
+          },
+        });
 
-    formatTable({
-      data: tableData,
-      headers: ["Name", "ID", "Graphs", "Updated"],
-      colorMap: {
-        Name: chalk.cyan,
-        ID: chalk.green,
+        console.log();
+        console.log(
+          chalk.gray(
+            `Use ${chalk.cyan("langwatch dashboard get <id>")} to view dashboard details`,
+          ),
+        );
       },
-    });
-
-    console.log();
-    console.log(
-      chalk.gray(
-        `Use ${chalk.cyan("langwatch dashboard get <id>")} to view dashboard details`,
-      ),
-    );
+    };
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch dashboards", format: options?.format });
+    failSpinner({ spinner, error, action: "fetch dashboards" });
     process.exit(1);
   }
 };

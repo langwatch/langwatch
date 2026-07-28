@@ -2,9 +2,38 @@ import { describe, it, expect, vi } from "vitest";
 import type { ClickHouseClient } from "@clickhouse/client";
 import {
   SimulationClickHouseRepository,
-  buildStartedAtWindowForPage,
+  startedAtBoundsForPage,
+  buildStartedAtWindowClause,
 } from "../simulation.clickhouse.repository";
+import type { WindowFragment } from "../../../clients/clickhouse/windowed-read";
 import { DEFAULT_SET_ID } from "~/server/scenarios/internal-set-id";
+
+/** A windowed-read fragment carrying the page's [min, max] StartedAt bounds. */
+function windowFragment(fromMs: number, toMs: number): WindowFragment {
+  return {
+    fromMs,
+    toMs,
+    params: { fromMs, toMs },
+    sqlFor: (column) =>
+      `AND ${column} >= fromUnixTimestamp64Milli({fromMs:Int64}) ` +
+      `AND ${column} <= fromUnixTimestamp64Milli({toMs:Int64})`,
+  };
+}
+
+/** Reads the windowed-read outcome counter straight off the prom registry, for
+ *  the simulation_runs table — a spy on a destructured copy would pass
+ *  regardless. */
+async function simulationOutcomeCount(outcome: string): Promise<number> {
+  const { register } = await import("prom-client");
+  const metric = await register
+    .getSingleMetric("clickhouse_windowed_read_total")
+    ?.get();
+  return (
+    metric?.values.find(
+      (v) => v.labels.table === "simulation_runs" && v.labels.outcome === outcome,
+    )?.value ?? 0
+  );
+}
 
 function makeMockClient(rows: unknown[] = []): ClickHouseClient {
   const jsonFn = vi.fn().mockResolvedValue(rows);
@@ -181,48 +210,147 @@ describe("SimulationClickHouseRepository", () => {
     });
   });
 
-  describe("buildStartedAtWindowForPage()", () => {
+  describe("startedAtBoundsForPage()", () => {
     it("spans the min and max StartedAt across the page rows", () => {
-      const { whereClause, params } = buildStartedAtWindowForPage([
+      const bounds = startedAtBoundsForPage([
         { MinStartedAt: "3000", MaxStartedAt: "5000" },
         { MinStartedAt: "1000", MaxStartedAt: "9000" },
       ]);
-      expect(whereClause).toContain("StartedAt >=");
-      expect(whereClause).toContain("StartedAt <=");
-      expect(params.minStartedAtMs).toBe("1000");
-      expect(params.maxStartedAtMs).toBe("9000");
+      expect(bounds).toEqual({ minMs: 1000, maxMs: 9000 });
     });
 
     it("handles a single row", () => {
-      const { params } = buildStartedAtWindowForPage([
+      const bounds = startedAtBoundsForPage([
         { MinStartedAt: "1500", MaxStartedAt: "1500" },
       ]);
-      expect(params.minStartedAtMs).toBe("1500");
-      expect(params.maxStartedAtMs).toBe("1500");
+      expect(bounds).toEqual({ minMs: 1500, maxMs: 1500 });
     });
 
-    it("returns an empty clause for an empty page (fall back to unbounded)", () => {
-      const result = buildStartedAtWindowForPage([]);
-      expect(result.whereClause).toBe("");
-      expect(result.params).toEqual({});
+    it("returns null for an empty page (no hint — unbounded read)", () => {
+      expect(startedAtBoundsForPage([])).toBeNull();
     });
 
-    it("ignores non-finite and non-positive bounds", () => {
-      const result = buildStartedAtWindowForPage([
-        { MinStartedAt: "not-a-number", MaxStartedAt: "0" },
-        { MinStartedAt: "", MaxStartedAt: "NaN" },
-      ]);
-      expect(result.whereClause).toBe("");
-      expect(result.params).toEqual({});
+    it("returns null when all bounds are non-finite or non-positive", () => {
+      expect(
+        startedAtBoundsForPage([
+          { MinStartedAt: "not-a-number", MaxStartedAt: "0" },
+          { MinStartedAt: "", MaxStartedAt: "NaN" },
+        ]),
+      ).toBeNull();
     });
 
     it("still bounds when some rows have invalid values but others are valid", () => {
-      const { params } = buildStartedAtWindowForPage([
+      const bounds = startedAtBoundsForPage([
         { MinStartedAt: "0", MaxStartedAt: "invalid" },
         { MinStartedAt: "2000", MaxStartedAt: "4000" },
       ]);
-      expect(params.minStartedAtMs).toBe("2000");
-      expect(params.maxStartedAtMs).toBe("4000");
+      expect(bounds).toEqual({ minMs: 2000, maxMs: 4000 });
+    });
+  });
+
+  describe("buildStartedAtWindowClause()", () => {
+    describe("when given a windowed fragment", () => {
+      it("emits the byte-identical StartedAt predicate with String bounds", () => {
+        const { whereClause, params } = buildStartedAtWindowClause(
+          windowFragment(1000, 9000),
+        );
+        expect(whereClause).toBe(
+          "AND StartedAt >= fromUnixTimestamp64Milli(toUInt64({minStartedAtMs:String})) " +
+            "AND StartedAt <= fromUnixTimestamp64Milli(toUInt64({maxStartedAtMs:String}))",
+        );
+        expect(params).toEqual({
+          minStartedAtMs: "1000",
+          maxStartedAtMs: "9000",
+        });
+      });
+    });
+
+    describe("when given a null (unbounded) fragment", () => {
+      it("emits an empty clause with no params", () => {
+        expect(buildStartedAtWindowClause(null)).toEqual({
+          whereClause: "",
+          params: {},
+        });
+      });
+    });
+  });
+
+  describe("getBatchHistoryForScenarioSet() step-2 windowed read", () => {
+    function makeRepoCapturing(minStartedAt: string, maxStartedAt: string) {
+      const { client, getCapturedQueries } = makeMockClientWithQueryCapture({
+        rowsForQuery: (query) => {
+          if (query.includes("count(DISTINCT BatchRunId)")) {
+            return [{ TotalBatchCount: "1" }];
+          }
+          if (query.includes("AS MinStartedAt")) {
+            return [
+              {
+                BatchRunId: "batch-1",
+                TotalCount: "1",
+                PassCount: "1",
+                FailCount: "0",
+                RunningCount: "0",
+                LastUpdatedAt: "5000",
+                LastRunAt: "5000",
+                FirstCompletedAt: "5000",
+                AllCompletedAt: "5000",
+                MinStartedAt: minStartedAt,
+                MaxStartedAt: maxStartedAt,
+              },
+            ];
+          }
+          // step 2 (preview columns) — rows irrelevant to the assertions
+          return [];
+        },
+      });
+      const repo = new SimulationClickHouseRepository(
+        vi.fn().mockResolvedValue(client),
+      );
+      const step2Query = () =>
+        getCapturedQueries().find((q) =>
+          q.query.includes("MessagePreviewRoles"),
+        );
+      return { repo, step2Query };
+    }
+
+    describe("when the page carries a StartedAt range", () => {
+      it("bounds step 2 with the byte-identical window and records a hit", async () => {
+        const before = await simulationOutcomeCount("hit");
+        const { repo, step2Query } = makeRepoCapturing("1000", "9000");
+
+        await repo.getBatchHistoryForScenarioSet({
+          projectId: "project-1",
+          scenarioSetId: "set-1",
+        });
+
+        const step2 = step2Query();
+        expect(step2?.query).toContain(
+          "AND StartedAt >= fromUnixTimestamp64Milli(toUInt64({minStartedAtMs:String}))",
+        );
+        expect(step2?.query).toContain(
+          "AND StartedAt <= fromUnixTimestamp64Milli(toUInt64({maxStartedAtMs:String}))",
+        );
+        expect(step2?.params.minStartedAtMs).toBe("1000");
+        expect(step2?.params.maxStartedAtMs).toBe("9000");
+        expect(await simulationOutcomeCount("hit")).toBe(before + 1);
+      });
+    });
+
+    describe("when the page has no usable StartedAt (provisional/zero)", () => {
+      it("runs step 2 unbounded and records it as unwindowed", async () => {
+        const before = await simulationOutcomeCount("unwindowed");
+        const { repo, step2Query } = makeRepoCapturing("0", "0");
+
+        await repo.getBatchHistoryForScenarioSet({
+          projectId: "project-1",
+          scenarioSetId: "set-1",
+        });
+
+        const step2 = step2Query();
+        expect(step2?.query).not.toContain("minStartedAtMs");
+        expect(step2?.params.minStartedAtMs).toBeUndefined();
+        expect(await simulationOutcomeCount("unwindowed")).toBe(before + 1);
+      });
     });
   });
 });

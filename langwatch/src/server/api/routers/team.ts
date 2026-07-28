@@ -23,6 +23,7 @@ import {
   hasOrganizationPermission,
 } from "../rbac";
 import { TeamService, TEAM_ROLE_PRIORITY } from "~/server/teams/team.service";
+import { assertUsersInOrganization } from "~/server/organizations/assertUsersInOrganization";
 
 // Reusable schema for team member role validation
 const teamMemberRoleSchema = z
@@ -219,6 +220,11 @@ export const teamRouter = createTRPCRouter({
         throw new TRPCError({ code: "NOT_FOUND", message: "Team not found" });
       }
       const { organizationId } = teamRecord;
+      await assertUsersInOrganization(
+        prisma,
+        organizationId,
+        input.members.map((member) => member.userId),
+      );
 
       // Validate custom roles belong to this org
       if (input.members.some((m) => isCustomRole(m.role))) {
@@ -406,6 +412,12 @@ export const teamRouter = createTRPCRouter({
         slugify(input.name, { lower: true, strict: true }) +
         "-" +
         teamNanoId.substring(0, 6);
+
+      await assertUsersInOrganization(
+        prisma,
+        input.organizationId,
+        input.members.map((member) => member.userId),
+      );
 
       return await prisma.$transaction(async (tx) => {
         const team = await tx.team.create({

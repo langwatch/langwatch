@@ -1,8 +1,4 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-  CLAUDE_CODE_KIND_ATTR,
-  CLAUDE_CODE_LOG_RETENTION_DAYS,
-} from "~/server/app-layer/traces/claude-code-log-to-span";
 import type { CanonicalLogRecord } from "~/server/event-sourcing/pipelines/log-processing/schemas/logRecord";
 import { CanonicalLogRecordClickHouseRepository } from "../canonical-log-record.clickhouse.repository";
 
@@ -90,61 +86,24 @@ describe("CanonicalLogRecordClickHouseRepository", () => {
     expect(usage).not.toHaveProperty("BodyJson");
   });
 
-  describe("given a log record the Claude Code span fold consumes", () => {
-    function insertSpy() {
-      return vi.fn<(args: { table: string; values: unknown[] }) => Promise<void>>(
-        async () => undefined,
-      );
-    }
-
-    function retentionStampedFor(
-      insert: ReturnType<typeof insertSpy>,
-    ): unknown {
-      const raw = insert.mock.calls[0]![0].values[0] as Record<string, unknown>;
-      return raw._retention_days;
-    }
-
-    it("caps its retention to the claude-fold floor, not the caller's value", async () => {
-      const insert = insertSpy();
-      const repository = new CanonicalLogRecordClickHouseRepository(
-        async () => ({ insert }) as never,
-      );
-      const folded = record();
-      folded.attributeKeys = [...folded.attributeKeys, CLAUDE_CODE_KIND_ATTR];
-
-      await repository.ensureLogRecord(folded, 49);
-
-      // Folded logs are duplicated by the spans they become, so they must not
-      // inherit trace retention. Regression guard for the canonical cutover:
-      // the legacy repository capped these and the canonical one initially
-      // did not, which would have retained every folded log for the full term.
-      expect(retentionStampedFor(insert)).toBe(CLAUDE_CODE_LOG_RETENTION_DAYS);
-    });
-
-    it("stamps the floor rather than taking the lower of the two", async () => {
-      const insert = insertSpy();
-      const repository = new CanonicalLogRecordClickHouseRepository(
-        async () => ({ insert }) as never,
-      );
-      const folded = record();
-      folded.attributeKeys = [...folded.attributeKeys, CLAUDE_CODE_KIND_ATTR];
-
-      // 0 is "retain indefinitely". Min-ing against it would keep a
-      // fold-intermediate log forever, so the floor is stamped unconditionally.
-      await repository.ensureLogRecord(folded, 0);
-
-      expect(retentionStampedFor(insert)).toBe(CLAUDE_CODE_LOG_RETENTION_DAYS);
-    });
-
-    it("leaves a record outside the fold on the caller's retention", async () => {
-      const insert = insertSpy();
+  describe("given a coding-agent log record", () => {
+    it("stamps it on the caller's retention like any other", async () => {
+      const insert = vi.fn<
+        (args: { table: string; values: unknown[] }) => Promise<void>
+      >(async () => undefined);
       const repository = new CanonicalLogRecordClickHouseRepository(
         async () => ({ insert }) as never,
       );
 
       await repository.ensureLogRecord(record(), 49);
 
-      expect(retentionStampedFor(insert)).toBe(49);
+      // A claude_code record once expired after a day, because a reactor
+      // copied it into spans and the row was disposable once converted. That
+      // converter is retired (ADR-056): the record IS the Terminal
+      // transcript's content, so nothing here shortens its retention — it
+      // rides the caller's, exactly like every other log.
+      const raw = insert.mock.calls[0]![0].values[0] as Record<string, unknown>;
+      expect(raw._retention_days).toBe(49);
     });
   });
 
@@ -167,7 +126,7 @@ describe("CanonicalLogRecordClickHouseRepository", () => {
     expect(insert.mock.calls[1]![0].values).toHaveLength(2);
   });
 
-  it("bounds Claude reconstruction reads by time and limit", async () => {
+  it("bounds a trace's log read by time and limit", async () => {
     const query = vi.fn<
       (args: {
         query: string;
@@ -178,7 +137,7 @@ describe("CanonicalLogRecordClickHouseRepository", () => {
       async () => ({ query }) as never,
     );
 
-    await repository.getMarkedClaudeCodeLogsByTrace({
+    await repository.getLogsByTraceId({
       tenantId: "project_test",
       traceId: "b".repeat(32),
       occurredAtMs: 1_700_000_000_000,

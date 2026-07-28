@@ -1,4 +1,4 @@
-import { LANGY_CONVERSATION_EVENT_TYPES } from "./constants";
+import { LANGY_CONVERSATION_EVENT_TYPES } from "@langwatch/langy";
 import type {
   LangyAgentResponseFailedEvent,
   LangyAgentTurnAcceptedEvent,

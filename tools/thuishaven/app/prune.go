@@ -99,7 +99,7 @@ func (o *Orchestrator) Prune(ctx context.Context, repoRoot string, shouldAct boo
 			if shouldAct {
 				verb = "reclaimed    "
 			}
-			fmt.Printf("  %s %-30s %8s  %v\n", verb, filepath.Base(wt.Dir), humanBytes(wtBytes), hits)
+			fmt.Printf("  %s %-30s %8s  %v\n", verb, filepath.Base(wt.Dir), domain.HumanBytes(wtBytes), hits)
 		}
 		if len(dropped) > 0 {
 			dbVerb := "would drop database"
@@ -114,9 +114,9 @@ func (o *Orchestrator) Prune(ctx context.Context, repoRoot string, shouldAct boo
 
 	fmt.Printf("\n%d worktree(s) with reclaimable disk, %d skipped (up/dirty).\n", reclaimed, skipped)
 	if shouldAct {
-		fmt.Printf("Reclaimed ~%s.\n", humanBytes(total))
+		fmt.Printf("Reclaimed ~%s.\n", domain.HumanBytes(total))
 	} else {
-		fmt.Printf("Would reclaim ~%s. Re-run with --yes to act.\n", humanBytes(total))
+		fmt.Printf("Would reclaim ~%s. Re-run with --yes to act.\n", domain.HumanBytes(total))
 	}
 	return nil
 }
@@ -192,16 +192,3 @@ func (o *Orchestrator) liveWorktreeDirs() map[string]bool {
 }
 
 func zapErr(err error) zap.Field { return zap.Error(err) }
-
-func humanBytes(b int64) string {
-	const unit = 1024
-	if b < unit {
-		return fmt.Sprintf("%dB", b)
-	}
-	div, exp := int64(unit), 0
-	for n := b / unit; n >= unit; n /= unit {
-		div *= unit
-		exp++
-	}
-	return fmt.Sprintf("%.1f%cB", float64(b)/float64(div), "KMGTPE"[exp])
-}

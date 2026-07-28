@@ -1,4 +1,5 @@
 import type { ClickHouseClient } from "@clickhouse/client";
+import { compareOrdinal } from "../utils/compareOrdinal";
 
 /** ClickHouse event_log row shape. */
 export interface ClickHouseEventRow {
@@ -171,7 +172,7 @@ export function compareEventPositions(
   if (left.timestamp !== right.timestamp) {
     return left.timestamp - right.timestamp;
   }
-  return left.eventId.localeCompare(right.eventId);
+  return compareOrdinal(left.eventId, right.eventId);
 }
 
 /** Return the latest canonical position from a non-empty collection. */

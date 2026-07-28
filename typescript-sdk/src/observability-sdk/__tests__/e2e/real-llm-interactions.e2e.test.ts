@@ -151,8 +151,9 @@ describe("Real LLM Interactions E2E", () => {
     expect(span!.name).toBe("streaming-generation");
     expect(span!.type).toBe("llm");
     expectSpanAttribute(span!, "test.scenario", "streaming");
-    // ClickHouse stores all span attributes as strings
-    expectSpanAttribute(span!, "langwatch.gen_ai.streaming", "true");
+    // ClickHouse stores span attributes JSON-encoded in a Map(String, String);
+    // the read path decodes them, so a boolean arrives back as a boolean.
+    expectSpanAttribute(span!, "langwatch.gen_ai.streaming", true);
     expect(span!.input).toBeTruthy();
     expect(span!.output).toBeTruthy();
   }, E2E_CONFIG.timeout);

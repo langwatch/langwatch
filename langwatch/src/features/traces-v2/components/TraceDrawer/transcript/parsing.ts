@@ -1,4 +1,4 @@
-import { audioPartToMediaData } from "~/components/traces/audioParts";
+import { mediaPartToMediaData } from "~/shared/traces/mediaParts";
 import type { ChatMessage, ContentBlock } from "./types";
 
 /**
@@ -170,6 +170,90 @@ export function coerceToChatMessages(data: unknown): ChatMessage[] | null {
     }
   }
   return null;
+}
+
+/**
+ * Translatable text leaves of a chat conversation: per-message plain prose
+ * and `{type:"text"}` part texts — exactly the pieces the chat renderer
+ * displays as natural language. Roles, tool calls, thinking blocks and
+ * structured payloads are left alone; translating those would corrupt the
+ * transcript (and its chat coercion). Keys are `${msgIdx}` for string
+ * content and `${msgIdx}.${partIdx}` for array parts, consumed by
+ * `applyChatTextLeaves`.
+ */
+export function collectChatTextLeaves(
+  messages: ChatMessage[],
+): Record<string, string> {
+  const leaves: Record<string, string> = {};
+  messages.forEach((message, msgIdx) => {
+    const content = message.content;
+    if (typeof content === "string") {
+      // Only string content the renderer shows as plain prose — a string
+      // that parses into typed blocks (thinking/tool JSON) stays intact.
+      const blocks = parseContentBlocks(content);
+      if (blocks.length === 1 && blocks[0]!.kind === "text") {
+        leaves[`${msgIdx}`] = content;
+      }
+      return;
+    }
+    if (!Array.isArray(content)) return;
+    content.forEach((part, partIdx) => {
+      if (typeof part === "string") {
+        if (part.length > 0) leaves[`${msgIdx}.${partIdx}`] = part;
+        return;
+      }
+      if (!part || typeof part !== "object") return;
+      if (part.type === "text" && typeof part.text === "string") {
+        if (part.text.length > 0) {
+          leaves[`${msgIdx}.${partIdx}`] = part.text;
+        }
+      }
+    });
+  });
+  return leaves;
+}
+
+/**
+ * Rebuild the conversation with translated leaves spliced back into the
+ * positions `collectChatTextLeaves` took them from; everything else is
+ * carried over untouched, so the result coerces to chat exactly like the
+ * original.
+ */
+export function applyChatTextLeaves(
+  messages: ChatMessage[],
+  texts: Record<string, string>,
+): ChatMessage[] {
+  return messages.map((message, msgIdx) => {
+    if (typeof message.content === "string") {
+      const whole = texts[`${msgIdx}`];
+      return whole !== undefined && whole !== message.content
+        ? { ...message, content: whole }
+        : message;
+    }
+    if (!Array.isArray(message.content)) return message;
+    let changed = false;
+    const parts = message.content.map((part, partIdx) => {
+      const text = texts[`${msgIdx}.${partIdx}`];
+      if (text === undefined) return part;
+      if (typeof part === "string") {
+        if (text === part) return part;
+        changed = true;
+        return text;
+      }
+      if (
+        part &&
+        typeof part === "object" &&
+        part.type === "text" &&
+        typeof part.text === "string" &&
+        part.text !== text
+      ) {
+        changed = true;
+        return { ...part, text };
+      }
+      return part;
+    });
+    return changed ? { ...message, content: parts } : message;
+  });
 }
 
 /**
@@ -392,14 +476,21 @@ export function parseContentBlocks(
       }
       case "input_audio":
       case "audio":
-      case "file": {
-        // OpenAI Realtime `input_audio`, AG-UI `audio`, and AI-SDK `file`
-        // audio parts render as an inline player, not a raw-JSON dump. The
-        // canonical decoder routes an audio `file` (mediaType "audio/…") to
-        // the same audio shape the legacy RenderInputOutput path uses, closing
-        // the both-UIs parity gap. A non-audio `file` resolves to null and
-        // falls through to the raw block below, unchanged.
-        const media = audioPartToMediaData(obj);
+      case "file":
+      case "binary":
+      case "image_url":
+      case "image":
+      case "video":
+      case "document": {
+        // Every media-part shape renders as real media, not a raw-JSON dump:
+        // OpenAI Realtime `input_audio`, AG-UI `audio`/`video`/`document`
+        // sources, AI-SDK `file`/`image`, OpenAI `image_url`, and the
+        // externalized `binary` references the ingest-side extractor mints.
+        // The canonical decoder maps each to the MediaPart vocabulary (audio
+        // player, inline image, video, attachment chip). A part it cannot
+        // resolve (e.g. provider-hosted file_id with no bytes) falls through
+        // to the raw block below, unchanged.
+        const media = mediaPartToMediaData(obj);
         if (media) {
           out.push({ kind: "media", part: media });
           break;

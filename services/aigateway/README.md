@@ -97,7 +97,7 @@ Every proxied response includes:
 
 - `X-LangWatch-Gateway-Version` — build version of the running gateway.
 - `X-LangWatch-Gateway-Request-Id` — gateway-minted ID for debit idempotency.
-- `X-LangWatch-Budget-Warning` — present when budget thresholds are breached.
+- `X-LangWatch-Budget-Warning` — `<scope>:<pct>` for every applicable budget at or past 80% of its limit, comma-separated. Present on streaming and non-streaming responses alike.
 - `X-LangWatch-Fallback-Count` — number of provider fallbacks attempted.
 - `X-LangWatch-Cache-Mode` — cache override decision (`respect`, `disable`, or `force`).
 

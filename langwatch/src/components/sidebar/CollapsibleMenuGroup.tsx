@@ -17,9 +17,10 @@ import { ICON_SIZE, MENU_ITEM_HEIGHT, SideMenuLink } from "./SideMenuLink";
 export type CollapsibleMenuChild = {
   icon: React.ComponentType<{ size?: string | number; color?: string }>;
   label: string;
-  href: string;
+  href?: string;
   isActive: boolean;
   beta?: string | boolean;
+  unavailableReason?: string;
 };
 
 export type CollapsibleMenuGroupProps = {
@@ -156,7 +157,7 @@ export const CollapsibleMenuGroup = ({
           >
             {children.map((child) => (
               <CollapsibleMenuChildItem
-                key={child.href}
+                key={child.label}
                 {...child}
                 project={project}
                 showLabel={showLabel}
@@ -182,6 +183,7 @@ const CollapsibleMenuChildItem = ({
   project,
   showLabel = true,
   beta,
+  unavailableReason,
 }: CollapsibleMenuChildItemProps) => {
   return (
     <SideMenuLink
@@ -192,6 +194,7 @@ const CollapsibleMenuChildItem = ({
       project={project}
       showLabel={showLabel}
       beta={beta}
+      unavailableReason={unavailableReason}
     />
   );
 };

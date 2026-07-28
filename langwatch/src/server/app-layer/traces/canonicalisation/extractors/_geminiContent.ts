@@ -8,6 +8,7 @@
  */
 
 import { isNonEmptyString, isRecord } from "./_guards";
+import { isReplyTextPart } from "./_parts";
 
 export const safeStringify = (value: unknown): string | null => {
   try {
@@ -71,6 +72,7 @@ export const convertGeminiContent = ({
     if (!isRecord(part)) continue;
 
     if (typeof part.text === "string") {
+      if (!isReplyTextPart(part)) continue;
       texts.push(part.text);
       continue;
     }

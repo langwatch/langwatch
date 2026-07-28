@@ -11,6 +11,7 @@ import { api } from "../utils/api";
 import {
   filterMaskedApiKeys,
   hasUserEnteredNewApiKey,
+  hasUserModifiedAnyCredential,
   hasUserModifiedNonApiKeyFields,
 } from "../utils/modelProviderHelpers";
 import {
@@ -24,7 +25,15 @@ export type FormSnapshot = {
   provider: MaybeStoredModelProvider;
   /** Human-readable label the user typed (or the humanized default). */
   name: string;
+  /**
+   * Tenant anchor for the write. A provider belongs to an organization
+   * and reaches the scopes attached to it, so the organization is always
+   * the answer and the project is the narrower handle when there is one.
+   * An organization on the agent-governance track has none, and the write
+   * path takes either.
+   */
   projectId: string | undefined;
+  organizationId: string | undefined;
   isUsingEnvVars: boolean | undefined;
   customKeys: Record<string, string>;
   initialKeys: Record<string, unknown>;
@@ -111,7 +120,8 @@ export function useProviderFormSubmit({
       try {
         await updateMutation.mutateAsync({
           id: snapshot.provider.id,
-          projectId: snapshot.projectId ?? "",
+          projectId: snapshot.projectId,
+          organizationId: snapshot.organizationId,
           provider: snapshot.provider.provider,
           enabled: newEnabled,
           customKeys: snapshot.provider.customKeys as any,
@@ -144,6 +154,7 @@ export function useProviderFormSubmit({
     const {
       provider,
       projectId,
+      organizationId,
       isUsingEnvVars,
       customKeys,
       initialKeys,
@@ -238,24 +249,20 @@ export function useProviderFormSubmit({
       const userEnteredNewKey = hasUserEnteredNewApiKey(customKeys);
       if (!isUsingEnvVars) {
         // When editing an existing provider, the stored key is shown masked.
-        // Strip the masked placeholders, then keep the result only if something
-        // actually changed versus the stored values. If nothing changed (the
-        // common case of opening the drawer and saving without re-entering the
-        // key), send `undefined` so the server preserves the stored credentials
-        // instead of validating a partial object (e.g. just an empty base URL)
-        // against the provider's required-key schema and rejecting the save.
-        // A genuine change — a new key, a cleared key, or an edited field —
-        // still goes through.
-        const filtered = filterMaskedApiKeys(customKeys);
-        const hasRealChange = Object.entries(filtered).some(([key, value]) => {
-          const current = (value ?? "").trim();
-          const stored =
-            typeof initialKeys[key] === "string"
-              ? (initialKeys[key] as string).trim()
-              : "";
-          return current !== stored;
+        // Decide whether anything changed by ignoring those placeholders — an
+        // untouched key must not count as an edit — but send the form as the
+        // customer left it, placeholders included: each one tells the server
+        // to keep the credential already on file. Sending the stripped object
+        // instead reads as "this provider has no key", and editing any other
+        // field (a base URL, most often) overwrites the stored key out of
+        // existence. When nothing changed, send `undefined` so the save is a
+        // no-op for credentials rather than a partial object validated
+        // against the provider's schema.
+        const hasRealChange = hasUserModifiedAnyCredential({
+          customKeys,
+          initialKeys,
         });
-        customKeysToSend = hasRealChange ? filtered : undefined;
+        customKeysToSend = hasRealChange ? { ...customKeys } : undefined;
       } else if (userEnteredNewKey || hasNonApiKeyChanges) {
         customKeysToSend = userEnteredNewKey
           ? { ...customKeys }
@@ -309,7 +316,8 @@ export function useProviderFormSubmit({
       }
       await updateMutation.mutateAsync({
         id: provider.id,
-        projectId: projectId ?? "",
+        projectId,
+        organizationId,
         provider: provider.provider,
         name: trimmedName === "" ? undefined : trimmedName,
         enabled: true,

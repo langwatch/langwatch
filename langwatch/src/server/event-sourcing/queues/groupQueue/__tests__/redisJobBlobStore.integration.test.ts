@@ -8,10 +8,10 @@ import { RedisJobBlobStore } from "../redisJobBlobStore";
 // dedicated hash-tagged prefix so it never touches the shared dev stack's keys.
 const QUEUE_NAME = "{test/blobstore}";
 const BLOB_PREFIX = `${QUEUE_NAME}:gq:blob:`;
-// GQ1 has no refcount, so a staged-but-not-yet-dispatched job (long retry
+// GQ1 has no shared lifecycle, so a staged-but-not-yet-dispatched job (long retry
 // backoff, paused pipeline, delayed schedule) sees no read between put and TTL
 // tick-down — the backstop must comfortably outlive that residence, so it's
-// 7 days, not 4. GQ2 (content-addressed, refcounted) uses the shorter 4-day
+// 7 days, not 4. GQ2 (content-addressed, leased) uses the shorter 4-day
 // number.
 const GQ1_SEVEN_DAYS_SECONDS = 7 * 24 * 60 * 60;
 
@@ -68,6 +68,35 @@ describe("RedisJobBlobStore", () => {
         const ttl = await redis.ttl(`${BLOB_PREFIX}proj/fresh`);
         expect(ttl).toBeGreaterThan(GQ1_SEVEN_DAYS_SECONDS - 60);
         expect(ttl).toBeLessThanOrEqual(GQ1_SEVEN_DAYS_SECONDS);
+      });
+    });
+  });
+
+  describe("given repeated writes for the same content id", () => {
+    describe("when the blob keys are inspected", () => {
+      it("keeps one content-addressed blob", async () => {
+        await store.put({ id: "proj/shared", data: Buffer.from("same") });
+        await store.put({ id: "proj/shared", data: Buffer.from("same") });
+
+        expect(await redis.keys(`${BLOB_PREFIX}proj/shared`)).toEqual([
+          `${BLOB_PREFIX}proj/shared`,
+        ]);
+      });
+    });
+  });
+
+  describe("given a blob whose holder dies without another access", () => {
+    describe("when the lease-sized backstop elapses", () => {
+      it("reclaims the blob without a release call", async () => {
+        await store.put({
+          id: "proj/crashed",
+          data: Buffer.from("orphan"),
+          ttlSeconds: 1,
+        });
+
+        await expect
+          .poll(() => store.peek({ id: "proj/crashed" }), { timeout: 2_000 })
+          .toBeNull();
       });
     });
   });

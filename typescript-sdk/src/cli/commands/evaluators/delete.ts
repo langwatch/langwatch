@@ -3,11 +3,15 @@ import { createSpinner } from "../../utils/spinner";
 import { EvaluatorsApiService } from "@/client-sdk/services/evaluators";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
+import type { CommandResult } from "../../utils/output";
 
+/**
+ * Returns the archival outcome rather than printing it: the output port renders
+ * it in whatever format the caller asked for (utils/output.ts).
+ */
 export const deleteEvaluatorCommand = async (
   idOrSlug: string,
-  options?: { format?: string },
-): Promise<void> => {
+): Promise<CommandResult | void> => {
   checkApiKey();
 
   const service = new EvaluatorsApiService();
@@ -37,10 +41,6 @@ export const deleteEvaluatorCommand = async (
     deleteSpinner.succeed(
       `Archived evaluator "${chalk.cyan(evaluatorName)}"`,
     );
-
-    if (options?.format === "json") {
-      console.log(JSON.stringify({ id: evaluatorId, name: evaluatorName, archived: true }, null, 2));
-    }
   } catch (error) {
     failSpinner({
       spinner: deleteSpinner,
@@ -49,4 +49,11 @@ export const deleteEvaluatorCommand = async (
     });
     process.exit(1);
   }
+
+  return {
+    data: { id: evaluatorId, name: evaluatorName, archived: true },
+    table: () => {
+      // The spinner's success line is the human output.
+    },
+  };
 };

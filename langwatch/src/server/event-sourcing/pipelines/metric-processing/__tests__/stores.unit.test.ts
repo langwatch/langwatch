@@ -20,6 +20,7 @@ function makeRepository() {
     recomputeAffectedRollups: vi.fn(async () => {}),
     recomputeAffectedRollupsMany: vi.fn(async () => {}),
     queryUsageEstimates: async () => [],
+    getSeriesTotalsByPointAttribute: async () => [],
   } satisfies MetricDataPointRepository;
   return calls;
 }

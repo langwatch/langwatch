@@ -65,7 +65,8 @@ describe("tagAssignCommand", () => {
       mockGet.mockResolvedValue({ version: 5, versionId: "cm_abc123" });
       mockAssignTag.mockResolvedValue({});
 
-      await tagAssignCommand("my-prompt", "production");
+      const result = await tagAssignCommand("my-prompt", "production");
+      result?.table();
 
       expect(console.log).toHaveBeenCalledWith(
         expect.stringContaining("Assigned tag 'production' to my-prompt"),

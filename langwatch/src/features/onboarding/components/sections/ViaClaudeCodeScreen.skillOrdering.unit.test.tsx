@@ -15,7 +15,11 @@ import { PromptList, SkillList, TRACING_SKILL_ID } from "./ViaClaudeCodeScreen";
 
 const TRACING_LABEL = "Add LangWatch tracing to your code";
 // The default-first skill in the shared list — used as the ordering anchor.
-const DEFAULT_FIRST_LABEL = "Set up evaluations for your agent";
+// Read off `SKILLS[0]` in the component. It said "Set up evaluations for your
+// agent", which that list has not contained since experiments and online
+// evaluations were separated, so every case here failed on a missing element
+// rather than on the ordering it exists to check.
+const DEFAULT_FIRST_LABEL = "Run experiments for your agent";
 
 afterEach(cleanup);
 

@@ -1,6 +1,10 @@
 import { useEffect } from "react";
 import { api } from "~/utils/api";
 import { LIVE_REFETCH_MS } from "../constants/freshness";
+import {
+  asSharedQueryResult,
+  useSharedTrace,
+} from "../context/SharedTraceContext";
 import { useDrawerStore } from "../stores/drawerStore";
 import { useSseStatusStore } from "../stores/sseStatusStore";
 import { useTraceQueryArgs } from "./useTraceQueryArgs";
@@ -11,6 +15,7 @@ import { useTraceQueryArgs } from "./useTraceQueryArgs";
 const PROMPTS_PENDING_REFETCH_MS = 8_000;
 
 export function useTraceHeader() {
+  const shared = useSharedTrace();
   const { isLive, isReady, queryArgs } = useTraceQueryArgs();
   const occurredAtMs = useDrawerStore((s) => s.occurredAtMs);
   const backfillOccurredAtMs = useDrawerStore((s) => s.backfillOccurredAtMs);
@@ -30,7 +35,7 @@ export function useTraceHeader() {
   // trace is older than the window, the interval falls away and the
   // query goes back to its normal staleTime caching behaviour.
   const query = api.tracesV2.header.useQuery(queryArgs, {
-    enabled: isReady,
+    enabled: isReady && !shared,
     staleTime: 300_000,
     cacheTime: 1_800_000,
     keepPreviousData: true,
@@ -69,5 +74,6 @@ export function useTraceHeader() {
     }
   }, [occurredAtMs, resolvedTimestamp, backfillOccurredAtMs]);
 
+  if (shared) return asSharedQueryResult(shared.header) as unknown as typeof query;
   return query;
 }

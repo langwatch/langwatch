@@ -129,6 +129,11 @@ if (
         // Truncate ioredis db.statement to command + first key
         // (avoid logging content + large attributes)
         "@opentelemetry/instrumentation-ioredis": {
+          // Redis calls are only interesting as part of some larger operation.
+          // Without this, the connection pool's `connect`/`auth`/`info` and the
+          // queue dispatcher's blocking `brpop`/`xread` — none of which have a
+          // parent — each became a root span, burying real traces in noise.
+          requireParentSpan: true,
           dbStatementSerializer: (
             cmdName: string,
             cmdArgs: Array<string | Buffer | number | unknown[]>,
