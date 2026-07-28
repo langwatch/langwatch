@@ -52,10 +52,15 @@ spec:
         spec:
           # The cron pod only curls the app over HTTP: it never calls the
           # Kubernetes API and never touches object storage — the app does
-          # that work on its behalf. So it gets neither the SA token nor the
-          # storage ServiceAccount and workload-identity label the app and
+          # that work on its behalf. So it is deliberately NOT given the
+          # storage ServiceAccount or the workload-identity label the app and
           # workers carry; a Blob-capable federated token here would hand
           # every cron image storage access it has no use for.
+          #
+          # Kube-API token mounting is a separate question and stays operator
+          # controlled by the global setting below — turning it on grants the
+          # namespace default ServiceAccount's token, which is not a storage
+          # credential.
           automountServiceAccountToken: {{ $root.Values.global.automountServiceAccountToken }}
           # Pod security context
           securityContext:
