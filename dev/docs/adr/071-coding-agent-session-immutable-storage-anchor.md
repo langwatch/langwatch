@@ -1,4 +1,4 @@
-# ADR-071: `coding_agent_sessions` has a mutable storage anchor — freeze it in the writer, defer the re-key
+# ADR-071: `coding_agent_sessions` has a mutable storage anchor — take it out of the list read now, freeze it in the writer next, defer the re-key
 
 **Date:** 2026-07-28
 
@@ -57,16 +57,15 @@ Near the boundary, a background merge deletes the true-latest row and leaves a s
 
 **This is not hypothetical.** It is the root cause of the CI flake fixed in PR #6127: a fixture backdating `StartedAt` by exactly `retentionDays` parked the row on the TTL boundary, and a background merge deleted the true-latest version. It was proven with `OPTIMIZE TABLE … FINAL`. In production the fuse is the retention period (308 days by default, 00051:190), which is why it has not been seen there.
 
-### Consequence 4 — the one that is wrong *today*, at any age
+### Consequence 4 — a wrong answer at any age, and the one this change fixes
 
-The claim that "reads still return the right row because the repository dedups by `(TenantId, SessionId) + max(UpdatedAt)`" holds for the **point** read and fails for the **list** read.
+The claim that "reads still return the right row because the repository dedups by `(TenantId, SessionId) + max(UpdatedAt)`" held for the **point** read and failed for the **list** read.
 
-The point read is safe *because it was deliberately built to be*. Its inner dedup subquery is unwindowed (`coding-agent-session.clickhouse.repository.ts:376-382`), and the docblock above it explains exactly why: windowing it too would let a session whose latest version drifted outside the window read back as a stale in-window version.
+The point read is safe *because it was deliberately built to be*. Its inner dedup subquery is unwindowed (`findLatestRecord` in `coding-agent-session.clickhouse.repository.ts`), and the docblock above it explains exactly why: windowing it too would let a session whose latest version drifted outside the window read back as a stale in-window version.
 
-`findManyRecent` applies the same `StartedAt` range filter to **both** scopes — outer *and* inner:
+`findManyRecent` applied the same `StartedAt` range filter to **both** scopes — outer *and* inner:
 
 ```sql
--- coding-agent-session.clickhouse.repository.ts:466-473
 AND (TenantId, SessionId, UpdatedAt) IN (
   SELECT TenantId, SessionId, max(UpdatedAt)
   FROM coding_agent_sessions
@@ -76,11 +75,23 @@ AND (TenantId, SessionId, UpdatedAt) IN (
 )
 ```
 
-So when a session's latest version backdates `StartedAt` **out** of the requested window while an older version remains **inside** it, the subquery computes `max(UpdatedAt)` over the older versions only, and the list renders the session **at a start time it never had, with stale totals**. No fallback catches it: the result is non-null and looks fine.
+So when a session's latest version backdated `StartedAt` **out** of the requested window while an older version remained **inside** it, the subquery computed `max(UpdatedAt)` over the older versions only, and the list rendered the session **at a start time it never had, with stale totals**. No fallback caught it: the result is non-null and looks fine.
 
-This is reachable without any TTL involvement and without a week boundary. A day-bounded view is enough: a session whose first telemetry to arrive is a log from 00:10 today writes `StartedAt = today 00:10`; the 23:50 span from yesterday then arrives and moves it to yesterday, outside "today" — and today's list keeps showing the first version forever.
+This was reachable without any TTL involvement and without a week boundary. A day-bounded view is enough: a session whose first telemetry to arrive is a log from 00:10 today writes `StartedAt = today 00:10`; the 23:50 span from yesterday then arrives and moves it to yesterday, outside "today" — and today's list kept showing the first version forever.
 
-**This is the consequence that justifies acting.** The other three are storage hygiene with long fuses; this one is a wrong answer on a normal day.
+#### Fixed here, not deferred
+
+The `StartedAt` bound is **removed from the inner dedup subquery**, which now carries only `TenantId` and the optional `UserId` narrowing. The outer scope keeps its full `BETWEEN`, so the read still prunes partitions — but it now judges the **true** latest version rather than whichever version the window happened to admit:
+
+- latest **inside** the window → the dedup resolves it, the outer admits it: correct row, correct totals;
+- latest drifted **below** the window (the bug case) → the dedup resolves it, and the outer `BETWEEN` then excludes it. The session **leaves the window** instead of rendering stale — which is the honest answer, because its start time is no longer in the period that was asked for;
+- latest **after** the window → excluded, as before.
+
+**No bound belongs on the dedup scope, not even an upper one.** The tempting half-fix keeps `StartedAt <= {to}`, reasoning that the latest version always holds the smallest value because the fold takes a `Math.min`. That reasoning is wrong, for the same reason recorded under "What 'freeze' means concretely" below: a read-back store miss re-runs `init()` and re-stamps `startedAtMs` from the next event's `occurredAt`, which can be **larger** than the value already persisted. "Latest is smallest" does not hold, so any bound on the dedup scope can hide the true latest.
+
+**The cost, stated plainly.** The inner subquery no longer prunes to the window, so it scans this tenant's sessions across partitions instead of the window's weeks. It reads only sort-key columns plus `UpdatedAt` — no heavy columns — and groups to one row per session, so it stays a compact scan, and the outer scope still prunes. It is nonetheless a real cost increase on this read, and it is what a correct answer costs while the anchor moves. Sequencing step 3 below — freezing the writer — removes the cause and lets the pruning bound come back to the dedup scope safely.
+
+Regression cover is in `coding-agent-session.clickhouse.repository.unit.test.ts`: its fake client executes *both* scopes off the SQL the repository emitted, so putting the range filter back into the dedup subquery makes the drifted session reappear with stale totals and fails the suite.
 
 ## Decision
 
@@ -90,14 +101,14 @@ This is reachable without any TTL involvement and without a week boundary. A day
 
 The reasoning is that **all four consequences are caused by the column moving, not by which column is in the key.** Freeze the anchor at the source and every one of them stops for rows written afterwards — with no new table, no backfill, and no swap:
 
-| Consequence | Fixed by re-keying the table? | Fixed by freezing the writer? |
-|---|---|---|
-| 1. Orphaned versions | Yes | Yes — versions share a sort key again, so RMT collapses them |
-| 2. Cross-partition orphans | Yes | Yes — every version of a session lands in one partition |
-| 3. TTL deadline moves | Only if the anchor also changes | Yes — the deadline is set once |
-| 4. List read returns a stale version | **No** — the list filters `StartedAt` because it is the partition key; a re-key alone leaves it mutable | Yes — no version can be in-window while another is out |
+| Consequence | Fixed by re-keying the table? | Fixed by freezing the writer? | Fixed by the read change shipping here? |
+|---|---|---|---|
+| 1. Orphaned versions | Yes | Yes — versions share a sort key again, so RMT collapses them | No — storage residue, not a read |
+| 2. Cross-partition orphans | Yes | Yes — every version of a session lands in one partition | No |
+| 3. TTL deadline moves | Only if the anchor also changes | Yes — the deadline is set once | No |
+| 4. List read returns a stale version | **No** — the list filters `StartedAt` because it is the partition key; a re-key alone leaves it mutable | Yes — no version can be in-window while another is out | **Yes — the dedup scope stops filtering on the moving column** |
 
-Re-keying alone does not fix the consequence that actually bites. Freezing does, and it is the cheap half.
+Re-keying alone does not fix the consequence that actually bites. Freezing does, and it is the cheap half. The read change closes that one consequence **now**, at the cost of an unwindowed dedup scan, without waiting for either — and the freeze is what lets that scan go back to being pruned.
 
 ### What "freeze" means concretely
 
@@ -158,10 +169,11 @@ That sequencing is right, and one hazard is worth recording because it is the ob
 ## Sequencing and risk
 
 1. **Now, and shipping with this ADR — the point read's tiebreak.** `findLatestRecord` ended in `LIMIT 1` with no `ORDER BY`, so two versions sharing `max(UpdatedAt)` resolved arbitrarily. It now orders by how far each version's fold got: the progress watermark, then span/log accumulator total, then converged metric-unit count (the only progress signal a metric-only session has), then applied-id count, then `StartedAt ASC` — smallest is best-informed, because it is the minimum. This is **defence in depth, not a live bug fix**: `nextVersionStamp` already makes a tie unreachable while per-aggregate serialization holds. Reversible, no migration, no behaviour change when there is no tie. Matches the fix applied to the two sibling analytics repositories.
-2. **Next — freeze the writer.** `StartedAt` becomes first-observed; add `EarliestSignalAt` for the business truth; point the session view and list display/sort at it. One additive migration, one fold change, one read-path change. **This is the change that closes consequences 1-4.** Reversible in the sense that reverting stops the freeze — it does not un-write frozen rows, and does not need to.
-3. **Then — audit the other range-filtered dedup scopes.** Consequence 4 is a *pattern*, not one query: any read that puts a mutable column in an IN-tuple dedup subquery has it. `findManyRecent` is the instance found here. This is what ADR-068's windowed-read discipline should be extended to say.
-4. **Not now — ADR-066 step 2** (`MetricSeries` out of the fold). Independent, number-changing, its own validation.
-5. **Deferred indefinitely — the table re-key.** Recorded as the correct end state so nobody re-derives it, and priced above so nobody under-estimates it.
+2. **Now, and shipping with this ADR — the list read's dedup scope.** `findManyRecent`'s inner `max(UpdatedAt)` subquery no longer filters on `StartedAt`; only the outer scope does. **This closes consequence 4** — the wrong answer — ahead of the freeze rather than behind it, because it needs no migration and no writer change. It costs an unwindowed dedup scan per list read (compact: sort-key columns plus `UpdatedAt`, one group row per session) until step 3 makes the pruning bound safe again. Reversible, no migration.
+3. **Next — freeze the writer.** `StartedAt` becomes first-observed; add `EarliestSignalAt` for the business truth; point the session view and list display/sort at it. One additive migration, one fold change, one read-path change. **This is the change that closes consequences 1-3**, and it is what lets step 2's dedup scope take its pruning bound back. Reversible in the sense that reverting stops the freeze — it does not un-write frozen rows, and does not need to.
+4. **Then — audit the other range-filtered dedup scopes.** Consequence 4 is a *pattern*, not one query: any read that puts a mutable column in an IN-tuple dedup subquery has it. `findManyRecent` was the instance found here and is fixed; the sweep for others is not done. This is what ADR-068's windowed-read discipline should be extended to say.
+5. **Not now — ADR-066 step 2** (`MetricSeries` out of the fold). Independent, number-changing, its own validation.
+6. **Deferred indefinitely — the table re-key.** Recorded as the correct end state so nobody re-derives it, and priced above so nobody under-estimates it.
 
 **The triggers that would change the deferral** — any one is sufficient:
 
@@ -170,13 +182,18 @@ That sequencing is right, and one hazard is worth recording because it is the ob
 - **The table stops being one bounded row per session.** The cost analysis above rests on it being an aggregate. If it grows a heavy column, the backfill arithmetic changes and so does the balance.
 - **A re-key becomes free.** If `coding_agent_sessions` is rebuilt for another reason (a projection-version replay per ADR-015, a retention-policy change forcing a TTL anchor move), take the new key in the same rewrite. This is the most likely path to it ever happening.
 
-**The risk of deferring**, stated plainly: consequence 3 keeps its 308-day fuse on rows written before the freeze, and consequences 1 and 2 leave a bounded legacy orphan population that ages out at TTL rather than being cleaned up. We accept both. Neither is a wrong answer on the read path once the freeze lands, because the freeze also closes consequence 4 — which is the only one that returns wrong data today.
+**The risk of deferring**, stated plainly. The justification is no longer "the freeze closes consequence 4" — consequence 4 is closed here, in the read, and the deferral has to stand on what is left. It does, but the accounting differs per item:
+
+- **Deferring the re-key (indefinitely)** leaves consequences 1 and 2: a bounded orphan population, O(distinct `StartedAt` values) per session rather than O(writes), which ages out at TTL instead of being cleaned up. That is **storage hygiene on an aggregate table** — no read returns a wrong answer because of it — and the orphan-ratio trigger above is what would reopen the decision if the bound turns out to be wrong.
+- **Deferring the freeze (to the next step, not indefinitely)** leaves consequence 3: rows near their retention deadline can have the true-latest version deleted by a merge while a stale one survives, and the read then returns the stale one. That **is** a wrong answer — the honest statement is that consequence 4 was the only one wrong on an *ordinary* day, not the only one capable of being wrong at all. Its fuse is a full retention period (308 days by default), which is why it has only ever been observed in a test fixture that backdated a row onto the boundary. It also leaves the list read paying an unwindowed dedup scan, which exists only because the anchor still moves.
+
+We accept both. Nothing on the deferred list is a live wrong answer once this change lands; what remains is a legacy orphan population that expires on its own, and one fuse measured in a retention period whose fix is the very next step rather than an open-ended one.
 
 ## Rules
 
 - **No mutable column in a ReplacingMergeTree sort key, a `PARTITION BY`, or a TTL anchor.** If a fold derives a value that can change (a min, a max, a first-seen that can be revised), that value is a **payload column**, not a storage anchor. A storage anchor is written once.
 - **A column that is a storage anchor and a displayed business value at the same time is a bug waiting for a late event.** Split them: the anchor is frozen, the business value is free to move.
-- **A dedup subquery must never filter on a column that can move a row out of the caller's range.** The outer scope may be range-filtered for partition pruning; the inner `max(version)` scope must resolve the true latest. `findLatestRecord` gets this right and says why; `findManyRecent` does not.
+- **A dedup subquery must never filter on a column that can move a row out of the caller's range.** The outer scope may be range-filtered for partition pruning; the inner `max(version)` scope must resolve the true latest. Both reads on this table now obey it and say why in their docblocks — `findLatestRecord` always did, and `findManyRecent`'s range filter was removed from its dedup scope in this change. Narrowings on **stable** columns (`TenantId`, `UserId`) stay in both scopes: they cannot move a version out of its group. **Not even an upper bound is safe on a moving column**, because a read-back miss re-stamps the anchor *forwards*, so "the latest version holds the smallest value" does not hold.
 - **A latest-version point read ends in a deterministic `ORDER BY … LIMIT 1`**, ranked by fold progress, even where a write-side version stamp already makes ties unreachable. The stamp is the mechanism; the tiebreak is the backstop, and it costs nothing because the IN-tuple has already cut the input to the tied rows.
 - **`TenantId` is first in every scope, outer and inner.** Unchanged, restated because this ADR touches both scopes of two queries.
 

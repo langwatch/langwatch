@@ -20,6 +20,7 @@ process.env.TZ = "Asia/Kolkata";
  */
 import { describe, expect, it, vi } from "vitest";
 import type { ClickHouseClient } from "@clickhouse/client";
+import { parseClickHouseDateTimeMs } from "~/server/clickhouse/dateTime";
 import type { CodingAgentSessionRow } from "~/server/event-sourcing/pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
 import { CodingAgentSessionClickHouseRepository } from "../coding-agent-session.clickhouse.repository";
 
@@ -398,6 +399,285 @@ describe("CodingAgentSessionClickHouseRepository point-read tiebreak", () => {
         );
 
         expect(result?.row.commits).toBe(9);
+      });
+    });
+  });
+});
+
+/**
+ * ClickHouse renders DateTime64 without a timezone suffix, and `fromRecord`
+ * reads it back as UTC via `parseClickHouseDateTimeMs`. Formatting in UTC is
+ * what keeps the fixture's millisecond round-trip exact.
+ *
+ * This deliberately does NOT use the local-time getters. This suite forces a
+ * non-UTC zone, so local formatting would offset every fixture by that zone and
+ * silently stop the round-trip being exact — which is invisible while the
+ * assertions only care which row came back, and a trap the moment one asserts a
+ * timestamp.
+ */
+function chTime(ms: number): string {
+  const at = new Date(ms);
+  const pad = (value: number, width = 2) => String(value).padStart(width, "0");
+  return (
+    `${at.getUTCFullYear()}-${pad(at.getUTCMonth() + 1)}-${pad(at.getUTCDate())} ` +
+    `${pad(at.getUTCHours())}:${pad(at.getUTCMinutes())}:${pad(at.getUTCSeconds())}.` +
+    `${pad(at.getUTCMilliseconds(), 3)}`
+  );
+}
+
+/**
+ * Parses exactly as the repository does. A bare `new Date(str)` would read
+ * ClickHouse's zone-less DateTime64 as LOCAL time, and this suite forces a
+ * non-UTC zone — so the fake would disagree with production about which rows
+ * fall inside the requested window, and the window assertions would be
+ * measuring the fake's bug rather than the repository's behaviour.
+ */
+const millis = (value: unknown): number =>
+  parseClickHouseDateTimeMs(String(value));
+
+/**
+ * Splits the emitted list query into its two scopes: the inner
+ * `max(UpdatedAt)` dedup subquery, and everything outside it.
+ */
+function splitScopes(query: string): { inner: string; outer: string } {
+  const open = query.indexOf("(", query.indexOf("IN ("));
+  let depth = 0;
+  let close = open;
+  for (let index = open; index < query.length; index++) {
+    if (query[index] === "(") depth++;
+    else if (query[index] === ")" && --depth === 0) {
+      close = index;
+      break;
+    }
+  }
+  return {
+    inner: query.slice(open + 1, close),
+    outer: query.slice(0, open) + query.slice(close + 1),
+  };
+}
+
+const boundsStartedAt = (scope: string): boolean =>
+  /StartedAt\s+BETWEEN/i.test(scope);
+const narrowsToUser = (scope: string): boolean => /UserId\s*=/i.test(scope);
+
+/** Applies whichever predicates the repository actually put in this scope. */
+function inScope(
+  row: Record<string, unknown>,
+  scope: string,
+  params: Record<string, unknown>,
+): boolean {
+  if (row.TenantId !== params.tenantId) return false;
+  if (narrowsToUser(scope) && row.UserId !== params.userId) return false;
+  if (!boundsStartedAt(scope)) return true;
+  const startedAt = millis(row.StartedAt);
+  return startedAt >= Number(params.from) && startedAt <= Number(params.to);
+}
+
+/**
+ * A client that ANSWERS the list read by executing both scopes off the SQL the
+ * repository sent, rather than replaying the fixture.
+ *
+ * A passthrough mock would return whatever rows it was handed, so windowing the
+ * inner dedup subquery — the ADR-071 consequence-4 bug — would still look
+ * correct. Here the inner's predicates decide which version wins
+ * `max(UpdatedAt)`, so putting the range filter back changes the ANSWER: the
+ * drifted session reappears as its stale in-window version.
+ */
+function listClient(rows: Array<Record<string, unknown>>): {
+  client: ClickHouseClient;
+  lastQuery: () => string;
+} {
+  let sent = "";
+  const client = {
+    query: async (args: {
+      query: string;
+      query_params: Record<string, unknown>;
+    }) => {
+      sent = args.query;
+      const { inner, outer } = splitScopes(args.query);
+
+      const latest = new Map<string, number>();
+      for (const row of rows) {
+        if (!inScope(row, inner, args.query_params)) continue;
+        const key = `${String(row.TenantId)}\u0000${String(row.SessionId)}`;
+        latest.set(
+          key,
+          Math.max(latest.get(key) ?? -Infinity, millis(row.UpdatedAt)),
+        );
+      }
+
+      const selected = rows
+        .filter((row) => inScope(row, outer, args.query_params))
+        .filter(
+          (row) =>
+            latest.get(`${String(row.TenantId)}\u0000${String(row.SessionId)}`) ===
+            millis(row.UpdatedAt),
+        )
+        .sort((left, right) => millis(right.StartedAt) - millis(left.StartedAt))
+        .slice(0, Number(args.query_params.limit));
+
+      return { json: async () => selected };
+    },
+  } as unknown as ClickHouseClient;
+
+  return { client, lastQuery: () => sent };
+}
+
+const WINDOW_FROM = new Date("2026-07-24T00:00:00.000Z").getTime();
+const WINDOW_TO = new Date("2026-07-24T23:59:59.999Z").getTime();
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** One persisted version of a session. Only the read's own columns matter. */
+function version({
+  sessionId,
+  startedAtMs,
+  updatedAtMs,
+  costUsd,
+  userId = "user-1",
+}: {
+  sessionId: string;
+  startedAtMs: number;
+  updatedAtMs: number;
+  costUsd: number;
+  userId?: string;
+}): Record<string, unknown> {
+  return {
+    TenantId: "tenant-1",
+    SessionId: sessionId,
+    UserId: userId,
+    StartedAt: chTime(startedAtMs),
+    UpdatedAt: chTime(updatedAtMs),
+    CostUsd: costUsd,
+  };
+}
+
+const listRecent = (
+  client: ClickHouseClient,
+  userId?: string,
+): Promise<CodingAgentSessionRow[]> =>
+  new CodingAgentSessionClickHouseRepository(async () => client).findManyRecent({
+    tenantId: "tenant-1",
+    fromMs: WINDOW_FROM,
+    toMs: WINDOW_TO,
+    limit: 50,
+    ...(userId !== undefined ? { userId } : {}),
+  });
+
+describe("CodingAgentSessionClickHouseRepository list-read dedup scope", () => {
+  describe("given a windowed list read", () => {
+    describe("when the query is emitted", () => {
+      it("bounds StartedAt on the outer scope only, so the dedup resolves the true latest version", async () => {
+        const { client, lastQuery } = listClient([]);
+
+        await listRecent(client);
+
+        const { inner, outer } = splitScopes(lastQuery());
+        expect(boundsStartedAt(outer)).toBe(true);
+        expect(boundsStartedAt(inner)).toBe(false);
+      });
+
+      it("keeps the tenant and the user narrowing in both scopes, which cannot move a row out of its dedup group", async () => {
+        const { client, lastQuery } = listClient([]);
+
+        await listRecent(client, "user-1");
+
+        const { inner, outer } = splitScopes(lastQuery());
+        expect(narrowsToUser(inner)).toBe(true);
+        expect(narrowsToUser(outer)).toBe(true);
+        expect(inner).toContain("TenantId = {tenantId:String}");
+        expect(outer).toContain("TenantId = {tenantId:String}");
+      });
+    });
+  });
+
+  describe("given a session whose true latest version backdated StartedAt out of the window", () => {
+    describe("when the window is listed", () => {
+      it("omits the session entirely rather than rendering its stale in-window version", async () => {
+        // v1 landed inside the window; v2 — the true latest — moved StartedAt
+        // a day earlier, so the session no longer starts in this window. A
+        // dedup scope filtered on StartedAt would never see v2 and would hand
+        // the outer scope v1's stale totals under a start time that no longer
+        // exists.
+        const { client } = listClient([
+          version({
+            sessionId: "drifted",
+            startedAtMs: WINDOW_FROM + 10 * 60_000,
+            updatedAtMs: WINDOW_FROM + 10 * 60_000,
+            costUsd: 1,
+          }),
+          version({
+            sessionId: "drifted",
+            startedAtMs: WINDOW_FROM - DAY_MS,
+            updatedAtMs: WINDOW_FROM + 20 * 60_000,
+            costUsd: 2,
+          }),
+          version({
+            sessionId: "steady",
+            startedAtMs: WINDOW_FROM + 60 * 60_000,
+            updatedAtMs: WINDOW_FROM + 60 * 60_000,
+            costUsd: 7,
+          }),
+        ]);
+
+        const listed = await listRecent(client);
+
+        expect(listed.map((row) => row.sessionId)).toEqual(["steady"]);
+      });
+    });
+  });
+
+  describe("given a session whose true latest version is inside the window", () => {
+    describe("when an older version of it sits outside the window", () => {
+      it("returns the latest version's totals, not the out-of-window one's", async () => {
+        // The mirror case: a read-back miss re-ran init() and re-stamped
+        // StartedAt FORWARD, into the window. The unwindowed dedup must still
+        // resolve v2, and the outer scope must still admit it.
+        const { client } = listClient([
+          version({
+            sessionId: "readmitted",
+            startedAtMs: WINDOW_FROM - DAY_MS,
+            updatedAtMs: WINDOW_FROM + 10 * 60_000,
+            costUsd: 1,
+          }),
+          version({
+            sessionId: "readmitted",
+            startedAtMs: WINDOW_FROM + 30 * 60_000,
+            updatedAtMs: WINDOW_FROM + 40 * 60_000,
+            costUsd: 5,
+          }),
+        ]);
+
+        const listed = await listRecent(client);
+
+        expect(listed).toHaveLength(1);
+        expect(listed[0]!.costUsd).toBeCloseTo(5);
+      });
+    });
+  });
+
+  describe("given a session listed under a user narrowing", () => {
+    describe("when another user's session drifted into the same window", () => {
+      it("still lists only the requesting user's sessions", async () => {
+        const { client } = listClient([
+          version({
+            sessionId: "mine",
+            startedAtMs: WINDOW_FROM + 10 * 60_000,
+            updatedAtMs: WINDOW_FROM + 10 * 60_000,
+            costUsd: 3,
+            userId: "user-1",
+          }),
+          version({
+            sessionId: "theirs",
+            startedAtMs: WINDOW_FROM + 20 * 60_000,
+            updatedAtMs: WINDOW_FROM + 20 * 60_000,
+            costUsd: 4,
+            userId: "user-2",
+          }),
+        ]);
+
+        const listed = await listRecent(client, "user-1");
+
+        expect(listed.map((row) => row.sessionId)).toEqual(["mine"]);
       });
     });
   });

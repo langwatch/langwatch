@@ -475,14 +475,40 @@ export class CodingAgentSessionClickHouseRepository
   }
 
   /**
-   * A project's sessions in a period, newest first. StartedAt is both the
-   * partition filter and the sort; the IN-tuple dedup keeps one version per
-   * session even when a late signal shifted StartedAt between versions.
+   * A project's sessions in a period, newest first. `StartedAt` bounds the
+   * OUTER scope only — it is the partition key and the sort, so the bound is
+   * what prunes this read to the caller's weeks.
+   *
+   * The inner dedup subquery is deliberately UNWINDOWED, the same discipline
+   * `findLatestRecord` applies to the point read (ADR-071 consequence 4).
+   * `StartedAt` moves: the fold takes `min(state.startedAtMs, occurredAt)`, so
+   * a late-arriving earlier signal backdates it. Range-filtering the inner
+   * scope on that moving column drops the true latest version out of the
+   * `max(UpdatedAt)` group whenever it has drifted past the window edge, and
+   * the group then resolves to a STALE in-window version which the outer scope
+   * happily returns — wrong start time, stale totals, non-null so no fallback
+   * catches it. Unwindowed, the inner resolves the true latest and the outer
+   * `BETWEEN` judges THAT: a session whose real start has drifted below the
+   * window correctly leaves the window instead of rendering stale.
+   *
+   * No bound belongs on the inner scope, not even an upper one. "The latest
+   * version always holds the smallest `StartedAt`, because the fold takes a
+   * min" is false: a read-back store miss re-runs `init()` and re-stamps
+   * `startedAtMs` from the next event's `occurredAt`, which can be LARGER than
+   * the value already persisted. Any bound can therefore hide the true latest.
+   *
+   * The cost is real and worth stating: the inner no longer prunes to the
+   * window, so it scans this tenant's sessions across partitions. It touches
+   * only sort-key columns plus `UpdatedAt` — no heavy columns — and groups to
+   * one row per session, so it stays a compact scan, and the outer scope still
+   * prunes. ADR-071's sequenced "freeze the writer" step makes `StartedAt`
+   * immutable and lets the pruning bound come back here safely.
    *
    * `userId`, when given, narrows to the agent-reported identity — folded
-   * into BOTH the outer filter and the dedup subquery so the two agree on
-   * which rows are in scope. Omitted for personal-workspace usage, where the
-   * personal project already isolates the user.
+   * into BOTH scopes so the two agree on which rows are in scope. Unlike the
+   * range filter it is safe there: it is a stable column, so it cannot move a
+   * version out of the dedup group. Omitted for personal-workspace usage,
+   * where the personal project already isolates the user.
    */
   async findManyRecent({
     tenantId,
@@ -518,7 +544,6 @@ export class CodingAgentSessionClickHouseRepository
             FROM ${TABLE_NAME}
             WHERE TenantId = {tenantId:String}
               ${userFilter}
-              AND StartedAt BETWEEN fromUnixTimestamp64Milli({from:Int64}) AND fromUnixTimestamp64Milli({to:Int64})
             GROUP BY TenantId, SessionId
           )
         ORDER BY StartedAt DESC
