@@ -155,34 +155,31 @@ spec:
             {{- toYaml . | nindent 12 }}
             {{- end }}
 
-          # Probe the worker metrics server (port 2999) rather than just PID 1
-          # liveness — this catches a wedged event loop, not only a dead
-          # process. When a metrics API key is configured the endpoint requires
-          # `Authorization: Bearer <key>` (same key Prometheus scrapes with, see
-          # prometheus.yaml), so the probe must send it or it gets 401 and the
-          # pod crash-loops. The header is only emitted when the key is set as a
-          # plain value; a bare (unauthenticated) endpoint answers 200 either way.
+          # Probe the worker's HTTP listener (the metrics server port, 2999)
+          # rather than just PID 1 liveness — an answered request proves the
+          # event loop is turning, which `kill -0 1` cannot tell us.
+          #
+          # The probe targets /healthz, NOT /metrics. /metrics is fail-closed in
+          # production: with no METRICS_API_KEY (the default —
+          # app.telemetry.metrics.enabled is false, so the env var is never
+          # emitted) it answers 500 to every caller, which would crash-loop the
+          # workers on a stock install. And an httpGet probe cannot read a
+          # Secret, so a key delivered via secretKeyRef could never be put in a
+          # rendered Authorization header anyway — that install would 401.
+          # /healthz is unauthenticated by design and carries no telemetry, so
+          # no bearer token is copied into this podspec.
+          # See specs/server/worker-liveness-probe.feature.
           startupProbe:
             httpGet:
-              path: /metrics
+              path: /healthz
               port: 2999
-              {{- if include "langwatch.metricsApiKey" . }}
-              httpHeaders:
-                - name: Authorization
-                  value: "Bearer {{ include "langwatch.metricsApiKey" . }}"
-              {{- end }}
             failureThreshold: 12
             periodSeconds: 10
             timeoutSeconds: 5
           livenessProbe:
             httpGet:
-              path: /metrics
+              path: /healthz
               port: 2999
-              {{- if include "langwatch.metricsApiKey" . }}
-              httpHeaders:
-                - name: Authorization
-                  value: "Bearer {{ include "langwatch.metricsApiKey" . }}"
-              {{- end }}
             periodSeconds: 30
             timeoutSeconds: 5
             failureThreshold: 3

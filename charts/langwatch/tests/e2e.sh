@@ -367,7 +367,9 @@ test_app() {
 # ─────────────────────────────────────────────────────────────────────────────
 # SUITE: Workers health check
 # Upgrades the release to enable workers and verifies the pod reaches Ready.
-# Workers have no HTTP endpoint — reaching Running state is the health signal.
+# The worker serves one HTTP listener (the metrics port, 2999): /metrics behind
+# the bearer gate, and the unauthenticated /healthz the kubelet probes. Reaching
+# Ready therefore proves the startupProbe passed, not merely that PID 1 exists.
 # ─────────────────────────────────────────────────────────────────────────────
 test_workers() {
   sep; info "Suite: workers health check"
@@ -380,9 +382,51 @@ test_workers() {
     --wait --timeout "${TIMEOUT}s"
   pass "helm upgrade (workers deployed)"
 
-  # Workers pod should be ready
+  # Workers pod should be ready. This is now a real assertion about the probe:
+  # the pod only goes Ready once the startupProbe's HTTP GET succeeds.
   wait_pod_ready "app.kubernetes.io/name=${RELEASE}-workers" 180
   pass "Workers pod ready"
+
+  # ── the liveness probe contract ─────────────────────────────────────────
+  # Regression guard for the CrashLoopBackOff class: probing /metrics instead
+  # of /healthz crash-loops BOTH a stock install (production + no
+  # METRICS_API_KEY ⇒ the endpoint fails closed with 500) and a secretKeyRef
+  # install (an httpGet probe cannot read a Secret ⇒ 401). Assert the live
+  # Deployment probes the unauthenticated liveness path and carries no
+  # credentials, then prove the endpoint really answers that way in-cluster.
+  local startup_path liveness_path
+  startup_path=$(kc get deploy "${RELEASE}-workers" \
+    -o jsonpath='{.spec.template.spec.containers[0].startupProbe.httpGet.path}')
+  liveness_path=$(kc get deploy "${RELEASE}-workers" \
+    -o jsonpath='{.spec.template.spec.containers[0].livenessProbe.httpGet.path}')
+  assert_eq "Workers startupProbe path is /healthz" "$startup_path" "/healthz"
+  assert_eq "Workers livenessProbe path is /healthz" "$liveness_path" "/healthz"
+
+  # No bearer token copied out of the Secret into the podspec, where anyone
+  # with `get deploy` could read it.
+  local probe_headers
+  probe_headers=$(kc get deploy "${RELEASE}-workers" \
+    -o jsonpath='{.spec.template.spec.containers[0].startupProbe.httpGet.httpHeaders}')
+  assert_eq "Workers startupProbe sends no auth header" "$probe_headers" ""
+
+  # Ask the worker the same question the kubelet asks: unauthenticated GET on
+  # the liveness path. `node -e` rather than curl/wget — the app image is a
+  # Node image and is not guaranteed to ship either.
+  local probe_status
+  probe_status=$(kc exec "deploy/${RELEASE}-workers" -- node -e \
+    'require("http").get({host:"127.0.0.1",port:2999,path:"/healthz"},r=>{console.log(r.statusCode);r.resume();}).on("error",()=>console.log("ERR"))' \
+    2>/dev/null | tr -d '\r\n')
+  assert_eq "Worker /healthz answers 200 unauthenticated" "$probe_status" "200"
+
+  # …and confirm WHY the probe cannot use /metrics in this configuration: the
+  # e2e release sets no metrics API key, so the bearer gate fails closed. If
+  # this ever stops being 500, the constraint that forced /healthz has changed
+  # and the probe design should be revisited.
+  local metrics_status
+  metrics_status=$(kc exec "deploy/${RELEASE}-workers" -- node -e \
+    'require("http").get({host:"127.0.0.1",port:2999,path:"/metrics"},r=>{console.log(r.statusCode);r.resume();}).on("error",()=>console.log("ERR"))' \
+    2>/dev/null | tr -d '\r\n')
+  assert_eq "Worker /metrics fails closed without a key" "$metrics_status" "500"
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
