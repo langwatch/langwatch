@@ -61,7 +61,7 @@ Feature: Experiment run totals are derived from its items
   Scenario: A trace repriced upwards reports the newer figure
     Given an experiment run whose trace has been priced
     When further spans arrive and the trace is repriced higher
-    When the user opens the run
+    And the user opens the run
     Then the run reports the newer figure
     And it reports the same figure however many times the run is read
 
