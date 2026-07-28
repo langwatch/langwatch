@@ -31,6 +31,7 @@ const ORG_ID = `org-vkab-${suffix}`;
 const TEAM_OWNER_ID = `team-vkab-owner-${suffix}`;
 const TEAM_OTHER_ID = `team-vkab-other-${suffix}`;
 const PROJECT_TRACE_ID = `proj-vkab-trace-${suffix}`;
+const PROJECT_OTHER_ID = `proj-vkab-other-${suffix}`;
 const ADMIN_ID = `usr-vkab-admin-${suffix}`;
 const TRACE_ADMIN_ID = `usr-vkab-traceadmin-${suffix}`;
 const PLAIN_ID = `usr-vkab-plain-${suffix}`;
@@ -74,6 +75,17 @@ describe("virtual key access boundaries (real PG)", () => {
         slug: `vkab-trace-${suffix}`,
         teamId: TEAM_OWNER_ID,
         apiKey: `key-vkab-${suffix}`,
+        language: "en",
+        framework: "openai",
+      },
+    });
+    await prisma.project.create({
+      data: {
+        id: PROJECT_OTHER_ID,
+        name: "sibling-private",
+        slug: `vkab-other-${suffix}`,
+        teamId: TEAM_OTHER_ID,
+        apiKey: `key-vkab-other-${suffix}`,
         language: "en",
         framework: "openai",
       },
@@ -126,7 +138,9 @@ describe("virtual key access boundaries (real PG)", () => {
     await prisma.organizationUser.deleteMany({
       where: { organizationId: ORG_ID },
     });
-    await prisma.project.deleteMany({ where: { id: PROJECT_TRACE_ID } });
+    await prisma.project.deleteMany({
+      where: { id: { in: [PROJECT_TRACE_ID, PROJECT_OTHER_ID] } },
+    });
     await prisma.team.deleteMany({
       where: { id: { in: [TEAM_OWNER_ID, TEAM_OTHER_ID] } },
     });
@@ -231,6 +245,57 @@ describe("virtual key access boundaries (real PG)", () => {
           scopes: [{ scopeType: "ORGANIZATION", scopeId: ORG_ID }],
         }),
       ).rejects.toMatchObject({ code: "NOT_FOUND" });
+    });
+
+    it("binds an existing key's preview to its stored ownership, ignoring injected scopes", async () => {
+      // A sibling team's project budget that must never surface through
+      // another key's preview.
+      const siblingBudgetId = `gb-vkab-sibling-${suffix}`;
+      await prisma.gatewayBudget.create({
+        data: {
+          id: siblingBudgetId,
+          name: "sibling project cap",
+          organizationId: ORG_ID,
+          scopeType: "PROJECT",
+          scopeId: PROJECT_OTHER_ID,
+          window: "MONTH",
+          limitUsd: "50.00",
+          onBreach: "BLOCK",
+          createdById: ADMIN_ID,
+          resetsAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        },
+      });
+      // An org-scoped key: visible to every member by design, which is
+      // exactly why its preview must not honor caller-supplied scopes.
+      const orgKey = await callerFor(ADMIN_ID).virtualKeys.create({
+        organizationId: ORG_ID,
+        name: `vkab-orgkey-${suffix}`,
+        scopes: [{ scopeType: "ORGANIZATION", scopeId: ORG_ID }],
+        traceProjectId: PROJECT_TRACE_ID,
+      });
+
+      const rows = await callerFor(PLAIN_ID).virtualKeys.applicableBudgets({
+        organizationId: ORG_ID,
+        virtualKeyId: orgKey.virtualKey.id,
+        scopes: [{ scopeType: "PROJECT", scopeId: PROJECT_OTHER_ID }],
+      });
+      expect(rows.map((r) => r.id)).not.toContain(siblingBudgetId);
+    });
+  });
+
+  describe("given a manager choosing where a key's traces land", () => {
+    it("refuses a destination project the caller does not manage", async () => {
+      // Team A's admin, Team B's private project: tenancy passes, the
+      // manage grant does not, and before this boundary the debits would
+      // have landed in (and drained) the sibling team's project budget.
+      await expect(
+        callerFor(TRACE_ADMIN_ID).virtualKeys.create({
+          organizationId: ORG_ID,
+          name: `vkab-crossteam-${suffix}`,
+          scopes: [{ scopeType: "TEAM", scopeId: TEAM_OWNER_ID }],
+          traceProjectId: PROJECT_OTHER_ID,
+        }),
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
   });
 

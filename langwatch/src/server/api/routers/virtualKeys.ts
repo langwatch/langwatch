@@ -367,13 +367,14 @@ export const virtualKeysRouter = createTRPCRouter({
       // Authorization first, before any budget data is touched. This
       // resolver answers with budget names, limits, live spend and (for
       // a principal) their name, so knowing an organization id must not
-      // be enough to call it:
-      //   - for an existing key (edit drawer), the caller must be able
-      //     to SEE that key: membership-based visibility, the same rule
-      //     list/get apply;
-      //   - for a draft (create drawer), the caller must hold
-      //     virtualKeys:manage on every draft scope, the exact boundary
-      //     `create` will hold them to when they submit.
+      // be enough to call it.
+      //
+      // For an existing key (edit drawer): the caller must be able to
+      // SEE the key (the list/get visibility rule), and resolution binds
+      // to the key's STORED ownership. The caller-supplied scopes,
+      // destination and principal are ignored: honoring them would let
+      // anyone who can see an org-wide key read a sibling team's budget
+      // names and spend by injecting that team's scope into the input.
       if (input.virtualKeyId) {
         const vk = await ctx.prisma.virtualKey.findFirst({
           where: {
@@ -382,6 +383,8 @@ export const virtualKeysRouter = createTRPCRouter({
           },
           select: {
             id: true,
+            traceProjectId: true,
+            principalUserId: true,
             scopes: { select: { scopeType: true, scopeId: true } },
           },
         });
@@ -401,12 +404,27 @@ export const virtualKeysRouter = createTRPCRouter({
         ) {
           throw new TRPCError({ code: "NOT_FOUND" });
         }
-      } else {
-        await assertCanManageAllScopes(
-          { prisma: ctx.prisma, session: ctx.session },
-          input.scopes,
+        return resolveApplicableBudgetsForDraftKey(
+          ctx.prisma,
+          {
+            organizationId: input.organizationId,
+            virtualKeyId: vk.id,
+            scopes: vk.scopes as { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }[],
+            traceProjectId: vk.traceProjectId,
+            principalUserId: vk.principalUserId,
+          },
+          chRepoOrUndefined(),
         );
       }
+      // For a draft (create drawer): the caller must hold
+      // virtualKeys:manage on every draft scope AND on the chosen trace
+      // destination, the exact boundary `create` will hold them to when
+      // they submit; previewing a target's budgets must not be cheaper
+      // than creating a key against it.
+      await assertCanManageAllScopes(
+        { prisma: ctx.prisma, session: ctx.session },
+        input.scopes,
+      );
       await assertScopesBelongToOrg(
         ctx.prisma,
         input.organizationId,
@@ -417,7 +435,13 @@ export const virtualKeysRouter = createTRPCRouter({
         input.organizationId,
         input.traceProjectId,
       );
-      // The target ids are still pinned to the organization: even an
+      if (input.traceProjectId) {
+        await assertCanManageAllScopes(
+          { prisma: ctx.prisma, session: ctx.session },
+          [{ scopeType: "PROJECT", scopeId: input.traceProjectId }],
+        );
+      }
+      // The principal id is still pinned to the organization: even an
       // authorized caller must not resolve another tenant's rows.
       if (input.principalUserId) {
         const membership = await ctx.prisma.organizationUser.findFirst({
@@ -439,7 +463,7 @@ export const virtualKeysRouter = createTRPCRouter({
         ctx.prisma,
         {
           organizationId: input.organizationId,
-          virtualKeyId: input.virtualKeyId ?? null,
+          virtualKeyId: null,
           scopes: input.scopes,
           traceProjectId: input.traceProjectId ?? null,
           principalUserId: input.principalUserId ?? null,
@@ -483,6 +507,16 @@ export const virtualKeysRouter = createTRPCRouter({
         input.organizationId,
         input.traceProjectId,
       );
+      // The destination routes traces AND budget debits into that
+      // project, so choosing it needs the same manage grant the old
+      // PROJECT scope enforced; tenancy alone would let a team manager
+      // point a key at a sibling team's project and consume its budget.
+      if (input.traceProjectId) {
+        await assertCanManageAllScopes(
+          { prisma: ctx.prisma, session: ctx.session },
+          [{ scopeType: "PROJECT", scopeId: input.traceProjectId }],
+        );
+      }
       const vkProjectId = await resolveVkProjectId(
         ctx.prisma,
         input.organizationId,
@@ -560,6 +594,14 @@ export const virtualKeysRouter = createTRPCRouter({
           input.organizationId,
           input.traceProjectId,
         );
+        // Re-pointing the destination is the same decision as choosing
+        // it at create: it needs manage on the target project.
+        if (input.traceProjectId) {
+          await assertCanManageAllScopes(
+            { prisma: ctx.prisma, session: ctx.session },
+            [{ scopeType: "PROJECT", scopeId: input.traceProjectId }],
+          );
+        }
       }
       const vkProjectId = await resolveVkProjectId(
         ctx.prisma,
