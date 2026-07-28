@@ -1,4 +1,8 @@
-@unimplemented
+# ADR-050 is WIRED as of #5881: the turn service resolves its system override
+# through the registry when LANGY_PROMPT_PROJECT_ID names the project holding
+# the rows, and falls back to the in-repo text otherwise. The feature-level
+# @unimplemented tag this file carried was written when the loader had no
+# caller; scenarios still lacking an executable binding are tagged individually.
 Feature: Langy's prompts are stored and versioned in the prompt registry
   As the owner of the Langy in-product assistant
   I want Langy's agent-definition doc and per-turn override stored as versioned
@@ -28,6 +32,7 @@ Feature: Langy's prompts are stored and versioned in the prompt registry
     And the failure is logged, not surfaced to the user
     And the turn is not blocked
 
+  @unimplemented
   Scenario: An empty or blank registry prompt is treated as a miss
     Given a Langy prompt row exists but its prompt text is blank
     When a Langy turn starts
@@ -43,6 +48,7 @@ Feature: Langy's prompts are stored and versioned in the prompt registry
     Then Langy uses the production-tagged registry text
     And a draft version that is not tagged production is not used
 
+  @unimplemented
   Scenario: Editing the prompt in the registry changes Langy without a redeploy
     Given the Langy prompt has a production version in the registry
     When a new version is created and promoted to production
@@ -53,6 +59,7 @@ Feature: Langy's prompts are stored and versioned in the prompt registry
   # Seeding the current prompts as version 1
   # ---------------------------------------------------------------------------
 
+  @unimplemented
   Scenario: Seeding inserts the current prompts as version 1
     Given the internal LangWatch system project has no Langy prompt rows
     When the Langy prompt seed is run for that project
@@ -60,11 +67,13 @@ Feature: Langy's prompts are stored and versioned in the prompt registry
     And the per-turn override is stored as version 1 of "langy-turn-override"
     And each version 1 is promoted to production
 
+  @unimplemented
   Scenario: Re-seeding unchanged prompts is a no-op
     Given the Langy prompts are already seeded at their current text
     When the Langy prompt seed is run again
     Then no new versions are created
 
+  @unimplemented
   Scenario: Re-seeding changed prompts adds a new version and re-promotes it
     Given the Langy prompts are seeded and the in-repo text has since changed
     When the Langy prompt seed is run again

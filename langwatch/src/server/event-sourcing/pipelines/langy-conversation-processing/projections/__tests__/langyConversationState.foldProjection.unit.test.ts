@@ -227,7 +227,7 @@ describe("LangyConversationStateFoldProjection", () => {
         // The conversation spine reads a stop as a non-failed terminal: the
         // partial counts as a message, the turn clears, and it lands IDLE so the
         // next message just works — the stopped-ness lives on the turn doc, not
-        // here (ADR-058).
+        // here (ADR-072).
         expect(state.MessageCount).toBe(2);
         expect(state.Status).toBe(LANGY_CONVERSATION_STATUS.IDLE);
         expect(state.CurrentTurnId).toBeNull();

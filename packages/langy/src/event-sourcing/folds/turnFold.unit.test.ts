@@ -72,7 +72,7 @@ describe("foldLangyConversationTurn", () => {
     });
   });
 
-  describe("when the user stops the turn mid-answer (ADR-058)", () => {
+  describe("when the user stops the turn mid-answer (ADR-072)", () => {
     it("keeps the partial answer, reads stopped, and carries no error", () => {
       const state = fold([accepted(), responded("stopped")]);
       expect(state.Status).toBe(LANGY_CONVERSATION_TURN_STATUS.STOPPED);

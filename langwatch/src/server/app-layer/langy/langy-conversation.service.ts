@@ -133,7 +133,7 @@ export type ConversationDetail = ConversationListItem & {
    * The turn in flight right now, or null when none is (`CurrentTurnId` on the
    * fold — set at `agent_turn_accepted`, cleared by the turn's terminal).
    *
-   * The durable answer to "which turn would a Stop stop?" (ADR-058). A browser
+   * The durable answer to "which turn would a Stop stop?" (ADR-072). A browser
    * tab only learns a turn id from its own send, so a turn it merely adopted —
    * another tab's, or one rejoined after a refresh — had no id to stop with.
    * The record has always known; nobody read it back.
@@ -1086,7 +1086,7 @@ export class LangyConversationService {
     conversationId: string;
     turnId: string;
     parts: LangyMessagePart[];
-    // `stopped` is a user-initiated stop carrying the partial answer (ADR-058);
+    // `stopped` is a user-initiated stop carrying the partial answer (ADR-072);
     // it shares agent_responded's turn-terminal slot with completed/failed, so a
     // stop racing a natural finish collapses to exactly one terminal.
     outcome?: "completed" | "failed" | "stopped";

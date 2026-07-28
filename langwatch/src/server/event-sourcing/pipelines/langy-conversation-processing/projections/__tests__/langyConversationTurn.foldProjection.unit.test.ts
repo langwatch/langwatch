@@ -253,7 +253,7 @@ describe("LangyConversationTurnFoldProjection", () => {
           ),
         );
         // A stop is its own terminal: the partial stays, it renders distinctly
-        // from a clean completion, and it is never a red error (ADR-058).
+        // from a clean completion, and it is never a red error (ADR-072).
         expect(state.Status).toBe(LANGY_CONVERSATION_TURN_STATUS.STOPPED);
         expect(state.AnswerParts).toEqual([
           { type: "text", text: "here is what I had so f" },

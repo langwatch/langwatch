@@ -372,7 +372,7 @@ describe("the card binding, given the catalog and feature map are the sources of
 
 /**
  * The command's name is the PRIOR; the card stamped on the result envelope at
- * the command boundary is the DECISION (ADR-059 §1/§3). `withDecidedCard` is
+ * the command boundary is the DECISION (ADR-073 §1/§3). `withDecidedCard` is
  * where the panel stops arguing with it.
  */
 describe("withDecidedCard, given a result whose card was decided by its shape", () => {

@@ -146,7 +146,7 @@ Feature: Langy's view of a conversation is the recorded conversation itself
   # The composer follows the recorded turn, not a lucky cache
   # ===========================================================================
 
-  # ADR-058 made the composer's availability a state machine; here that state
+  # ADR-072 made the composer's availability a state machine; here that state
   # becomes a DERIVATION of the recorded turn — with one honest exception: the
   # instant between clicking Send and the backend accepting the turn, where an
   # optimistic pending marker covers the gap and reconciles against the record.

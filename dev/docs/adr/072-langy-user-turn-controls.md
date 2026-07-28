@@ -1,4 +1,4 @@
-# ADR-058: Langy user-initiated turn controls — stop for real, continue, resume-on-refresh
+# ADR-072: Langy user-initiated turn controls — stop for real, continue, resume-on-refresh
 
 **Date:** 2026-07-21
 

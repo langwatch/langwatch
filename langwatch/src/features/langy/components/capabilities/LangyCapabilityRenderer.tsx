@@ -123,7 +123,7 @@ function claimsNothing(result: CliToolResult): boolean {
  * required the envelope's card to equal it. A promotion's defining property is
  * that the two differ, so every promotion failed the check and the call
  * dropped out of the capability stream entirely — the mechanism could only
- * ever remove a card, never improve one. See ADR-059 §1, and the spec rule
+ * ever remove a card, never improve one. See ADR-073 §1, and the spec rule
  * "The card a result was stamped with is the card that renders".
  */
 export function capabilityRenderFor(call: CapabilityToolCall): {
