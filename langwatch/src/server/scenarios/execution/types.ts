@@ -225,6 +225,17 @@ export type RedTeamStrategyName = z.infer<typeof RedTeamStrategySchema>;
 export const RED_TEAM_MAX_TURNS = 50;
 export const RED_TEAM_DEFAULT_TURNS = 50;
 
+/**
+ * Upper bounds on the free-text fields, because every one of them is
+ * re-embedded into the attacker's prompt on every turn of every run: an
+ * unbounded objective is a multi-megabyte string paid for fifty times over,
+ * and the row that holds it is written once. The limits are far above any
+ * human-written value — an objective is a sentence, a plan is a few
+ * paragraphs — so they bound abuse without bounding use.
+ */
+export const RED_TEAM_MAX_TARGET_LENGTH = 2_000;
+export const RED_TEAM_MAX_PLAN_LENGTH = 10_000;
+
 /** Optional tuning knobs, all with SDK-supplied defaults. */
 export const RedTeamConfigSchema = z.object({
   /**
@@ -239,13 +250,13 @@ export const RedTeamConfigSchema = z.object({
    * A ready-made phased plan. Skips the planner model call entirely. Crescendo
    * only — GOAT never generates a plan, so the SDK ignores this for it.
    */
-  attackPlan: z.string().optional(),
+  attackPlan: z.string().max(RED_TEAM_MAX_PLAN_LENGTH).optional(),
   /**
    * Overrides the prompt used to WRITE the plan (not the plan itself).
    * Placeholders: {target}, {description}, {totalTurns}, {phase1End},
    * {phase2End}, {phase3End}. Crescendo only, same reason as attackPlan.
    */
-  metapromptTemplate: z.string().optional(),
+  metapromptTemplate: z.string().max(RED_TEAM_MAX_PLAN_LENGTH).optional(),
   successScore: z.number().min(0).max(10).optional(),
   successConfirmTurns: z.number().int().min(1).optional(),
   injectionProbability: z.number().min(0).max(1).optional(),
@@ -260,7 +271,7 @@ export const ScenarioConfigSchema = z.object({
   labels: z.array(z.string()),
   // Present only for red-team scenarios; null/absent means a standard run.
   redTeamStrategy: RedTeamStrategySchema.nullish(),
-  redTeamTarget: z.string().nullish(),
+  redTeamTarget: z.string().max(RED_TEAM_MAX_TARGET_LENGTH).nullish(),
   redTeamTotalTurns: z.number().int().min(1).max(RED_TEAM_MAX_TURNS).nullish(),
   redTeamConfig: RedTeamConfigSchema.nullish(),
 });

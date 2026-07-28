@@ -50,11 +50,42 @@ Feature: Red Team Scenarios
     When a GOAT scenario is saved with an attack plan or planning prompt
     Then it is rejected rather than accepted and silently ignored
 
-  @unit @unimplemented
+  # The rule above is what makes this one necessary. Switching strategy hides
+  # the planner inputs, and hiding an input is not the same as clearing it: the
+  # rejection then names a field the editor no longer shows, so Save stops
+  # working with nothing on screen to explain it.
+  @integration
+  Scenario: Switching to a strategy that ignores the planner clears it
+    Given I am editing a red-team scenario with an attack plan
+    When I switch the strategy to one that does not plan
+    Then the attack plan is cleared
+    And the scenario can be saved
+
+  # Every rejection has to be visible where the user is looking, and the press
+  # itself has to be answered. A save that stops happening, silently, is
+  # indistinguishable from a broken button.
+  @integration
+  Scenario: A rejected save says what is wrong
+    Given I am editing a red-team scenario
+    When I enter a turn count above the maximum and save
+    Then the scenario is not saved
+    And the turn count is reported as the reason
+
+  @unit
   Scenario: Turn count is bounded
     Given a red-team scenario configuration
     When the turn count is above the allowed maximum
     Then the configuration is rejected
+    And a run prepared from a stored count above the maximum is held to it
+
+  # These are re-embedded into the attacker's prompt on every turn of a run
+  # that can be fifty turns long, so an unbounded value is written once and
+  # paid for fifty times.
+  @unit
+  Scenario: Free-text attack settings are bounded
+    When a scenario is saved with an objective, attack plan, or planning prompt
+      past its length limit
+    Then the request is rejected
 
   @integration @unimplemented
   Scenario: A standard scenario carries no red-team configuration
@@ -92,6 +123,33 @@ Feature: Red Team Scenarios
     When the attack is cleared
     Then the scenario has no strategy, objective, turn count, or tuning
 
+  # The editor and the CLI both clear all four fields together; only a
+  # hand-written REST call can clear the strategy alone. The row it leaves
+  # behind is a trap: re-enabling red team months later brings back an
+  # objective and an attack plan nobody chose.
+  @unit
+  Scenario: Clearing the strategy clears the whole attack
+    Given a red-team scenario exists
+    When only the strategy is cleared
+    Then the objective, turn count, and tuning are cleared with it
+
+  # A tuning knob lives in one JSON column, so a write replaces all of it.
+  # Sending the one setting a caller wants to change would delete the rest and
+  # answer 200.
+  @unit
+  Scenario: Changing one attack setting leaves the others alone
+    Given a red-team scenario with several attack settings
+    When one setting is changed from the CLI
+    Then the other settings are still on the scenario
+
+  # A rule about a scenario's final state cannot be asked of a partial update:
+  # the objective the strategy needs may already be stored.
+  @unit
+  Scenario: Changing strategy on a configured scenario does not resend the objective
+    Given a red-team scenario with an objective exists
+    When only the strategy is changed
+    Then the change is accepted
+
   @unit
   Scenario: An objective of only whitespace is refused
     When a scenario is created with an objective of only spaces
@@ -103,6 +161,17 @@ Feature: Red Team Scenarios
     Given a red-team scenario exists
     When a run is prepared for it
     Then the run configuration carries the strategy, objective, and turn count
+
+  # Falling back to defaults keeps one drifted record from taking a run down.
+  # Doing it silently is the problem: the attack then runs on defaults while
+  # the editor still shows the settings that were chosen, and the only symptom
+  # is behaviour that does not match the screen.
+  @unit
+  Scenario: A stored attack setting that no longer validates is reported
+    Given a red-team scenario whose stored tuning is no longer valid
+    When a run is prepared for it
+    Then the run continues on default tuning
+    And the fallback is recorded rather than passing unremarked
 
   # ============================================================================
   # Execution

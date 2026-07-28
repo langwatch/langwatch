@@ -23,6 +23,8 @@ import { z } from "zod";
 import {
   RED_TEAM_DEFAULT_TURNS,
   RED_TEAM_MAX_TURNS,
+  RedTeamConfigSchema,
+  RedTeamStrategySchema,
 } from "~/server/scenarios/execution/types";
 import { redTeamStateIssue } from "~/server/scenarios/red-team-input";
 import { Tooltip } from "../ui/tooltip";
@@ -41,20 +43,15 @@ export const scenarioFormSchema = z.object({
   labels: z.array(z.string()),
   // Red-team configuration. Null strategy = a standard scenario; the form
   // shows the attack section only once a strategy is picked.
-  redTeamStrategy: z.enum(["goat", "crescendo"]).nullish(),
+  //
+  // The schemas come from the execution contract rather than being written out
+  // again here. A re-declared copy is a copy that drifts: the editor would go
+  // on accepting a value the API had started rejecting, and the only symptom
+  // is a save that fails after the user has finished typing.
+  redTeamStrategy: RedTeamStrategySchema.nullish(),
   redTeamTarget: z.string().nullish(),
   redTeamTotalTurns: z.number().int().min(1).max(RED_TEAM_MAX_TURNS).nullish(),
-  redTeamConfig: z
-    .object({
-      scoreResponses: z.boolean().optional(),
-      detectRefusals: z.boolean().optional(),
-      attackPlan: z.string().optional(),
-      metapromptTemplate: z.string().optional(),
-      successScore: z.number().min(0).max(10).optional(),
-      successConfirmTurns: z.number().int().min(1).optional(),
-      injectionProbability: z.number().min(0).max(1).optional(),
-    })
-    .nullish(),
+  redTeamConfig: RedTeamConfigSchema.nullish(),
   })
   .superRefine((values, ctx) => {
     // Same rule the API enforces, surfaced on the field rather than as a
@@ -70,6 +67,14 @@ export const scenarioFormSchema = z.object({
 });
 
 export type ScenarioFormData = z.infer<typeof scenarioFormSchema>;
+
+/**
+ * Every field the form owns, from the schema itself so the list cannot fall
+ * behind it. `superRefine` wraps the object, hence the `.innerType()`.
+ */
+const SCENARIO_FORM_FIELDS = Object.keys(
+  scenarioFormSchema.innerType().shape,
+) as (keyof ScenarioFormData)[];
 
 /**
  * Initial data passed to ScenarioFormDrawer via complexProps when creating
@@ -228,15 +233,23 @@ export function ScenarioForm({
   }, [isRedTeam, onIsRedTeamChange]);
 
   // Reset form when defaultValues change (using ref to track previous serialized values)
+  //
+  // Keyed on every field the form owns, derived from the schema rather than
+  // hand-listed. The old list named four, so the red-team fields could change
+  // without the form noticing — masked today only because the drawer remounts
+  // on `key={scenarioId}`, which is another component's implementation detail
+  // to be depending on. Deriving it means a field added to the schema is
+  // covered by construction.
+  //
+  // Still the fields and not the whole row: `updatedAt` and `lastUpdatedById`
+  // change on every write, and keying on those would reset the form for
+  // metadata churn that changes nothing the user typed.
   const prevDefaultsRef = useRef<string | null>(null);
   useEffect(() => {
     const currentDefaults = defaultValues
-      ? JSON.stringify([
-          defaultValues.name,
-          defaultValues.situation,
-          defaultValues.criteria,
-          defaultValues.labels,
-        ])
+      ? JSON.stringify(
+          SCENARIO_FORM_FIELDS.map((field) => defaultValues[field]),
+        )
       : null;
     if (currentDefaults !== prevDefaultsRef.current) {
       prevDefaultsRef.current = currentDefaults;

@@ -20,6 +20,14 @@ tuning cost or writing a custom strategy in code are not.
 |---|---|---|
 | `target` | ✅ | "What should the attacker try to do?", with OWASP presets |
 | `totalTurns` | ✅ | "Turns", defaults to 50 |
+
+Three of these are bounded by the platform where the SDK leaves them open —
+`target`, `attackPlan` and `metapromptTemplate` by length, `totalTurns` at 50.
+All four values are re-read on every turn of a run that can be fifty turns
+long, so an unbounded one is written once and paid for fifty times. The limits
+sit well above anything a person writes; see `RED_TEAM_MAX_*` in
+`execution/types.ts`.
+
 | `model` | ✅ | reuses the scenario's simulator model — an attacker *is* a user simulator |
 | `scoreResponses` | ✅ | "Adaptive scoring" |
 | `detectRefusals` | ✅ | same toggle — the docs' fast recipe moves them together |

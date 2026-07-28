@@ -14,12 +14,17 @@ import { Prisma } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import {
+  RED_TEAM_MAX_PLAN_LENGTH,
+  RED_TEAM_MAX_TARGET_LENGTH,
+} from "../execution/types";
+import {
   mergeRedTeamState,
+  normalizeRedTeamWrite,
   redTeamFields,
   redTeamStateIssue,
-  toPrismaRedTeamWrite,
   touchesRedTeam,
 } from "../red-team-input";
+import { toPrismaRedTeamWrite } from "../red-team-prisma";
 
 const schema = z.object(redTeamFields);
 
@@ -196,6 +201,81 @@ describe("the red-team write contract", () => {
       expect(touchesRedTeam({ redTeamTotalTurns: 12 })).toBe(true);
       // An explicit clear still counts as mentioning it.
       expect(touchesRedTeam({ redTeamStrategy: null })).toBe(true);
+    });
+  });
+
+  describe("given a write that clears only the strategy", () => {
+    /** @scenario Clearing the attack turns the scenario back into a standard one */
+    it("clears the rest of the attack with it", () => {
+      // The editor and `--standard` both send all four. Over raw REST this
+      // used to validate and leave the objective, the budget and the stored
+      // config behind — so re-enabling red team months later resurrected an
+      // objective and an attack plan nobody had chosen, and picking GOAT then
+      // 400d on a planner setting the user never set.
+      expect(normalizeRedTeamWrite({ redTeamStrategy: null })).toEqual({
+        redTeamStrategy: null,
+        redTeamTarget: null,
+        redTeamTotalTurns: null,
+        redTeamConfig: null,
+      });
+    });
+
+    it("leaves a field the same request set explicitly", () => {
+      expect(
+        normalizeRedTeamWrite({
+          redTeamStrategy: null,
+          redTeamTarget: "keep this on the row",
+        }).redTeamTarget,
+      ).toBe("keep this on the row");
+    });
+
+    it("leaves every other write untouched", () => {
+      expect(normalizeRedTeamWrite({ redTeamTotalTurns: 12 })).toEqual({
+        redTeamTotalTurns: 12,
+      });
+      expect(normalizeRedTeamWrite({ redTeamStrategy: "goat" })).toEqual({
+        redTeamStrategy: "goat",
+      });
+      // Absent is not the same as null: a rename must not clear the attack.
+      // Assigned first because callers pass a whole write body, not a literal
+      // of red-team keys — that is the shape the guard has to hold for.
+      const rename = { name: "Renamed" };
+      expect(normalizeRedTeamWrite(rename)).toEqual({ name: "Renamed" });
+    });
+  });
+
+  describe("given free text far longer than anyone would type", () => {
+    /**
+     * Each of these is re-embedded into the attacker's prompt on every turn of
+     * a run that can be fifty turns long, so an unbounded value is written
+     * once and paid for fifty times.
+     */
+    it("refuses an objective past the cap", () => {
+      expect(
+        schema.safeParse({
+          redTeamTarget: "x".repeat(RED_TEAM_MAX_TARGET_LENGTH + 1),
+        }).success,
+      ).toBe(false);
+      expect(
+        schema.safeParse({
+          redTeamTarget: "x".repeat(RED_TEAM_MAX_TARGET_LENGTH),
+        }).success,
+      ).toBe(true);
+    });
+
+    it("refuses an attack plan and a planning prompt past the cap", () => {
+      expect(
+        schema.safeParse({
+          redTeamConfig: { attackPlan: "x".repeat(RED_TEAM_MAX_PLAN_LENGTH + 1) },
+        }).success,
+      ).toBe(false);
+      expect(
+        schema.safeParse({
+          redTeamConfig: {
+            metapromptTemplate: "x".repeat(RED_TEAM_MAX_PLAN_LENGTH + 1),
+          },
+        }).success,
+      ).toBe(false);
     });
   });
 

@@ -9,11 +9,17 @@
  * a red-team scenario, answered 201, and persisted a standard one. Nothing
  * failed; the attack configuration was simply gone.
  *
+ * Deliberately free of any `@prisma/client` value import: `ScenarioForm.tsx`
+ * imports `redTeamStateIssue` from here so the editor enforces the same rules
+ * as the API, and a value-level Prisma import would drag the client runtime
+ * into the browser bundle to do it. The Prisma translation lives next door in
+ * `red-team-prisma.ts`, which only the server routes import.
+ *
  * @see specs/scenarios/red-team-scenarios.feature
  */
-import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import {
+  RED_TEAM_MAX_TARGET_LENGTH,
   RED_TEAM_MAX_TURNS,
   RedTeamConfigSchema,
   RedTeamStrategySchema,
@@ -30,8 +36,18 @@ export const redTeamFields = {
   /**
    * Trimmed before the length check: a target of spaces would pass `min(1)`
    * and give the attack planner nothing to aim at.
+   *
+   * The upper bound matters more than it looks — this string is re-embedded
+   * into the attacker's prompt on every one of up to fifty turns, so an
+   * unbounded objective is written once and paid for fifty times per run.
+   * `RedTeamConfigSchema` bounds the two planner fields for the same reason.
    */
-  redTeamTarget: z.string().trim().min(1).nullish(),
+  redTeamTarget: z
+    .string()
+    .trim()
+    .min(1)
+    .max(RED_TEAM_MAX_TARGET_LENGTH)
+    .nullish(),
   redTeamTotalTurns: z
     .number()
     .int()
@@ -40,19 +56,6 @@ export const redTeamFields = {
     .nullish(),
   redTeamConfig: RedTeamConfigSchema.nullish(),
 };
-
-/**
- * Prisma distinguishes "SQL NULL" from "JSON null" on a Json column, so an
- * explicit null has to be spelled `Prisma.DbNull` rather than passed straight
- * through. Omitting the key entirely (undefined) leaves the column untouched.
- */
-export function toPrismaRedTeamConfig(
-  value: RedTeamConfig | null | undefined,
-): { redTeamConfig?: Prisma.InputJsonValue | typeof Prisma.DbNull } {
-  if (value === undefined) return {};
-  if (value === null) return { redTeamConfig: Prisma.DbNull };
-  return { redTeamConfig: value };
-}
 
 /**
  * The rules that only make sense against a scenario's *final* state, so they
@@ -109,12 +112,53 @@ export interface RedTeamInput {
 
 
 /**
+ * Clearing the strategy clears the whole attack.
+ *
+ * The editor and `scenario update --standard` both send all four fields as
+ * null, so this only ever fires for a hand-written REST call — but the row it
+ * leaves behind is a trap either way. `{ redTeamStrategy: null }` on its own
+ * validates fine and keeps the objective, the turn budget and the stored
+ * config; re-enable red team a month later and a stale objective and a stale
+ * attack plan come back with it, and picking GOAT then 400s on a planner
+ * setting the user never chose. There is no such thing as an attack
+ * configuration with no strategy, so it does not get to persist as one.
+ *
+ * The spread order lets an explicit value in the same request win: clearing
+ * the strategy while deliberately keeping the objective stays expressible.
+ */
+export function normalizeRedTeamWrite<T extends object>(
+  body: T,
+): T & Partial<RedTeamInput> {
+  // `T extends object` rather than `Partial<RedTeamInput>`: callers pass a
+  // whole write body, most of which is not red-team, and constraining to an
+  // all-optional type would reject exactly those — a body of only `name` has
+  // no property in common with it.
+  const write = body as T & Partial<RedTeamInput>;
+  if (!("redTeamStrategy" in write) || write.redTeamStrategy !== null) {
+    return write;
+  }
+  return {
+    redTeamTarget: null,
+    redTeamTotalTurns: null,
+    redTeamConfig: null,
+    ...write,
+  };
+}
+
+/**
  * Merge a partial write over what is stored.
  *
  * `??` is wrong here: it treats an explicit `null` as "not supplied", so a
  * request clearing the objective merges the OLD objective back in, passes the
  * pairing check, and then writes the null anyway — the exact silent downgrade
  * the check exists to stop. Presence of the key is the signal, not its value.
+ *
+ * The signal is presence, which means a key sent as an *explicit* `undefined`
+ * reads as "supplied" and merges `undefined` over the stored value — enough to
+ * fail the pairing check on a request that changed nothing. Zod does not
+ * materialise absent `.nullish()` keys, so nothing reaches this from a parsed
+ * body; a caller hand-building the object (`mutate({ redTeamTarget: undefined })`)
+ * would. Omit the key instead of spelling it `undefined`.
  */
 export function mergeRedTeamState(
   body: Partial<RedTeamInput>,
@@ -138,24 +182,4 @@ export function touchesRedTeam(body: Partial<RedTeamInput>): boolean {
     "redTeamTotalTurns" in body ||
     "redTeamConfig" in body
   );
-}
-
-/**
- * Turns parsed input into the columns a Prisma write takes, dropping keys the
- * caller did not supply so an update never clears a field it was not asked to.
- */
-export function toPrismaRedTeamWrite(input: RedTeamInput) {
-  const { redTeamConfig, ...rest } = input;
-  return {
-    ...(rest.redTeamStrategy !== undefined && {
-      redTeamStrategy: rest.redTeamStrategy,
-    }),
-    ...(rest.redTeamTarget !== undefined && {
-      redTeamTarget: rest.redTeamTarget,
-    }),
-    ...(rest.redTeamTotalTurns !== undefined && {
-      redTeamTotalTurns: rest.redTeamTotalTurns,
-    }),
-    ...toPrismaRedTeamConfig(redTeamConfig),
-  };
 }

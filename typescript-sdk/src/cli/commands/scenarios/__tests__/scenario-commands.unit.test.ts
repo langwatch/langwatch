@@ -56,6 +56,7 @@ const makeScenario = (overrides: Partial<ScenarioResponse> = {}): ScenarioRespon
   redTeamStrategy: null,
   redTeamTarget: null,
   redTeamTotalTurns: null,
+  redTeamConfig: null,
   platformUrl: "https://app.langwatch.ai/proj-1/scenarios/scenario_abc123",
   ...overrides,
 });
@@ -218,13 +219,15 @@ describe("createScenarioCommand()", () => {
 
 describe("updateScenarioCommand()", () => {
   let mockUpdate: ReturnType<typeof vi.fn>;
+  let mockGetOne: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
     mockUpdate = vi.fn();
+    mockGetOne = vi.fn();
     vi.mocked(ScenariosApiService).mockImplementation(function () { return ({
       getAll: vi.fn(),
-      get: vi.fn(),
+      get: mockGetOne,
       create: vi.fn(),
       update: mockUpdate,
       delete: vi.fn(),
@@ -252,6 +255,60 @@ describe("updateScenarioCommand()", () => {
 
       expect(mockUpdate).toHaveBeenCalledWith("scenario_abc123", {
         criteria: ["Criterion 1", "Criterion 2"],
+      });
+    });
+
+    it("does not read the scenario back first", async () => {
+      // The read exists only to protect the config column. Paying for it on
+      // every rename would be a round trip for nothing.
+      mockUpdate.mockResolvedValue(makeScenario());
+
+      await updateScenarioCommand("scenario_abc123", { name: "Renamed" });
+
+      expect(mockGetOne).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when turning scoring off on a configured scenario", () => {
+    /** @scenario Changing one attack setting leaves the others alone */
+    it("keeps the settings it was not asked about", async () => {
+      // `redTeamConfig` is one JSONB column, so a write replaces all of it.
+      // Sending just the scoring knobs destroyed the attack plan and the
+      // stop-early score somebody had set in the editor, and answered 200.
+      mockGetOne.mockResolvedValue(
+        makeScenario({
+          redTeamStrategy: "crescendo",
+          redTeamTarget: "extract credentials",
+          redTeamConfig: { successScore: 7, attackPlan: "Turns 1-10: warm up." },
+        }),
+      );
+      mockUpdate.mockResolvedValue(makeScenario());
+
+      await updateScenarioCommand("scenario_abc123", { redTeamScoring: false });
+
+      expect(mockGetOne).toHaveBeenCalledWith("scenario_abc123");
+      expect(mockUpdate).toHaveBeenCalledWith("scenario_abc123", {
+        redTeamConfig: {
+          successScore: 7,
+          attackPlan: "Turns 1-10: warm up.",
+          scoreResponses: false,
+          detectRefusals: false,
+        },
+      });
+    });
+  });
+
+  describe("when switching strategy on an already-configured scenario", () => {
+    it("sends the strategy without demanding the objective again", async () => {
+      // The objective is already on the row; the API merges before it checks.
+      mockUpdate.mockResolvedValue(makeScenario());
+
+      await updateScenarioCommand("scenario_abc123", {
+        redTeamStrategy: "goat",
+      });
+
+      expect(mockUpdate).toHaveBeenCalledWith("scenario_abc123", {
+        redTeamStrategy: "goat",
       });
     });
   });

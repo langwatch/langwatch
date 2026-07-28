@@ -8283,6 +8283,15 @@ export interface operations {
                         redTeamStrategy: string | null;
                         redTeamTarget: string | null;
                         redTeamTotalTurns: number | null;
+                        redTeamConfig: {
+                            scoreResponses?: boolean;
+                            detectRefusals?: boolean;
+                            attackPlan?: string;
+                            metapromptTemplate?: string;
+                            successScore?: number;
+                            successConfirmTurns?: number;
+                            injectionProbability?: number;
+                        } | null;
                         /** Format: uri */
                         platformUrl: string;
                     }[];
@@ -8386,6 +8395,15 @@ export interface operations {
                         redTeamStrategy: string | null;
                         redTeamTarget: string | null;
                         redTeamTotalTurns: number | null;
+                        redTeamConfig: {
+                            scoreResponses?: boolean;
+                            detectRefusals?: boolean;
+                            attackPlan?: string;
+                            metapromptTemplate?: string;
+                            successScore?: number;
+                            successConfirmTurns?: number;
+                            injectionProbability?: number;
+                        } | null;
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -8467,6 +8485,15 @@ export interface operations {
                         redTeamStrategy: string | null;
                         redTeamTarget: string | null;
                         redTeamTotalTurns: number | null;
+                        redTeamConfig: {
+                            scoreResponses?: boolean;
+                            detectRefusals?: boolean;
+                            attackPlan?: string;
+                            metapromptTemplate?: string;
+                            successScore?: number;
+                            successConfirmTurns?: number;
+                            injectionProbability?: number;
+                        } | null;
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -8582,6 +8609,15 @@ export interface operations {
                         redTeamStrategy: string | null;
                         redTeamTarget: string | null;
                         redTeamTotalTurns: number | null;
+                        redTeamConfig: {
+                            scoreResponses?: boolean;
+                            detectRefusals?: boolean;
+                            attackPlan?: string;
+                            metapromptTemplate?: string;
+                            successScore?: number;
+                            successConfirmTurns?: number;
+                            injectionProbability?: number;
+                        } | null;
                         /** Format: uri */
                         platformUrl: string;
                     };

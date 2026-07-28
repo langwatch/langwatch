@@ -9,11 +9,12 @@ import { ScenarioNotFoundError } from "~/server/scenarios/errors";
 import { type RedTeamConfig } from "~/server/scenarios/execution/types";
 import {
   mergeRedTeamState,
+  normalizeRedTeamWrite,
   redTeamFields,
   redTeamStateIssue,
-  toPrismaRedTeamConfig,
   touchesRedTeam,
 } from "~/server/scenarios/red-team-input";
+import { toPrismaRedTeamConfig } from "~/server/scenarios/red-team-prisma";
 import { ScenarioService } from "~/server/scenarios/scenario.service";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { checkProjectPermission } from "../../rbac";
@@ -56,12 +57,13 @@ export const scenarioCrudRouter = createTRPCRouter({
   create: protectedProcedure
     .input(createScenarioSchema)
     .use(checkProjectPermission("scenarios:manage"))
-    .mutation(async ({ ctx, input }) => {
-      logger.info({ projectId: input.projectId }, "Creating scenario");
+    .mutation(async ({ ctx, input: rawInput }) => {
+      logger.info({ projectId: rawInput.projectId }, "Creating scenario");
 
       // Enforce scenario limit before creation
-      await enforceLicenseLimit(ctx, input.projectId, "scenarios");
+      await enforceLicenseLimit(ctx, rawInput.projectId, "scenarios");
 
+      const input = normalizeRedTeamWrite(rawInput);
       const createIssue = redTeamStateIssue(input);
       if (createIssue) {
         throw new TRPCError({ code: "BAD_REQUEST", message: createIssue.message });
@@ -145,12 +147,13 @@ export const scenarioCrudRouter = createTRPCRouter({
   update: protectedProcedure
     .input(updateScenarioSchema)
     .use(checkProjectPermission("scenarios:manage"))
-    .mutation(async ({ ctx, input }) => {
+    .mutation(async ({ ctx, input: rawInput }) => {
       logger.info(
-        { projectId: input.projectId, scenarioId: input.id },
+        { projectId: rawInput.projectId, scenarioId: rawInput.id },
         "Updating scenario",
       );
 
+      const input = normalizeRedTeamWrite(rawInput);
       const { id, projectId, redTeamConfig, ...data } = input;
       const service = ScenarioService.create(ctx.prisma);
 
@@ -160,12 +163,22 @@ export const scenarioCrudRouter = createTRPCRouter({
       // out.
       if (touchesRedTeam(input)) {
         const existing = await service.getById({ id, projectId });
+        // A missing row is a missing row. Merging against nothing produces an
+        // all-undefined state, and the pairing check would answer for it —
+        // reporting "needs an attack objective" for a scenario that does not
+        // exist, which sends the caller looking for the wrong bug.
+        if (!existing) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Scenario not found",
+          });
+        }
         const updateIssue = redTeamStateIssue(
           mergeRedTeamState(input, {
-            redTeamStrategy: existing?.redTeamStrategy,
-            redTeamTarget: existing?.redTeamTarget,
-            redTeamTotalTurns: existing?.redTeamTotalTurns,
-            redTeamConfig: existing?.redTeamConfig as RedTeamConfig | null,
+            redTeamStrategy: existing.redTeamStrategy,
+            redTeamTarget: existing.redTeamTarget,
+            redTeamTotalTurns: existing.redTeamTotalTurns,
+            redTeamConfig: existing.redTeamConfig as RedTeamConfig | null,
           }),
         );
         if (updateIssue) {

@@ -193,6 +193,66 @@ describe("the scenarios REST API", () => {
     });
   });
 
+  describe("given an update that clears only the strategy", () => {
+    /** @scenario Clearing the strategy clears the whole attack */
+    it("clears the rest of the attack with it", async () => {
+      // The editor and `--standard` both send all four, so only a
+      // hand-written call reaches this. The half-cleared row it used to leave
+      // behind resurrected a stale objective and a stale attack plan the next
+      // time red team was switched on.
+      getById.mockResolvedValue(scenarioRow(ATTACK));
+
+      await put("scenario_1", { redTeamStrategy: null });
+
+      expect(update).toHaveBeenCalledWith(
+        "scenario_1",
+        "project_test",
+        expect.objectContaining({
+          redTeamStrategy: null,
+          redTeamTarget: null,
+          redTeamTotalTurns: null,
+          redTeamConfig: Prisma.DbNull,
+        }),
+      );
+    });
+
+    it("keeps a field the same request set explicitly", async () => {
+      getById.mockResolvedValue(scenarioRow(ATTACK));
+
+      await put("scenario_1", {
+        redTeamStrategy: null,
+        redTeamTarget: "keep this on the row",
+      });
+
+      const [, , data] = update.mock.calls[0] as [
+        string,
+        string,
+        Record<string, unknown>,
+      ];
+      expect(data.redTeamTarget).toBe("keep this on the row");
+    });
+  });
+
+  describe("given a caller reading a scenario back", () => {
+    it("reports the tuning as well as the strategy", async () => {
+      // Write-only tuning means a caller can set `scoreResponses` and never
+      // see what else is on the row — so it cannot change one setting without
+      // guessing at the rest and overwriting them.
+      const res = await post({
+        name: "n",
+        situation: "s",
+        criteria: [],
+        ...ATTACK,
+      });
+      const body = (await res.json()) as Record<string, unknown>;
+
+      expect(body.redTeamConfig).toEqual({
+        scoreResponses: false,
+        detectRefusals: false,
+      });
+    });
+  });
+
   describe("given an objective of only whitespace", () => {
     /** @scenario An objective of only whitespace is refused */
     it("is rejected, and nothing is stored", async () => {

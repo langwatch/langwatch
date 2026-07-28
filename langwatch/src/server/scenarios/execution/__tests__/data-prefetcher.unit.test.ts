@@ -23,7 +23,32 @@ import {
   type SuiteModelFetcher,
   type WorkflowVersionFetcher,
 } from "../data-prefetcher";
-import type { ExecutionContext, LiteLLMParams, TargetConfig } from "../types";
+import {
+  RED_TEAM_MAX_TURNS,
+  type ExecutionContext,
+  type TargetConfig,
+  type LiteLLMParams,
+} from "../types";
+
+/**
+ * A stable spy on the module logger, so the tests below can assert that a
+ * fallback announced itself. Silently degrading is the failure mode they
+ * exist to catch, and "it logged" is the only observable difference.
+ */
+const { loggerWarn } = vi.hoisted(() => ({ loggerWarn: vi.fn() }));
+vi.mock("@langwatch/observability", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("@langwatch/observability")>();
+  return {
+    ...actual,
+    createLogger: () => ({
+      debug: vi.fn(),
+      info: vi.fn(),
+      warn: loggerWarn,
+      error: vi.fn(),
+    }),
+  };
+});
 
 // Mock only env.mjs since it's a module-level import
 vi.mock("~/env.mjs", () => ({
@@ -199,6 +224,80 @@ describe("prefetchScenarioData", () => {
         expect(result.success).toBe(true);
         if (!result.success) return;
         expect(result.data.scenario.redTeamStrategy ?? null).toBeNull();
+      });
+    });
+
+    describe("given a stored config that no longer validates", () => {
+      /**
+       * Falling back to SDK defaults is right — one drifted JSONB blob should
+       * not take a run down. Doing it silently is not: the attack then runs on
+       * defaults while the editor still shows the settings the user picked,
+       * and the only symptom is behaviour that does not match the screen.
+       */
+      it("keeps the run alive and says so", async () => {
+        loggerWarn.mockClear();
+        const deps = createMockDeps({
+          promptFetcher: {
+            getPromptByIdOrHandle: vi.fn().mockResolvedValue(redTeamPrompt),
+          },
+          scenarioFetcher: {
+            getById: vi.fn().mockResolvedValue({
+              ...defaultScenario,
+              redTeamStrategy: "crescendo",
+              redTeamTarget: "extract the override code",
+              // One bad field used to drop the whole object, including the
+              // six good ones next to it.
+              redTeamConfig: { successScore: 99, injectionProbability: 0.25 },
+            }),
+          },
+        });
+        const target: TargetConfig = { type: "prompt", referenceId: "prompt_123" };
+
+        const result = await prefetchScenarioData(defaultContext, target, deps);
+
+        expect(result.success).toBe(true);
+        if (!result.success) return;
+        expect(result.data.scenario.redTeamConfig ?? null).toBeNull();
+        expect(loggerWarn).toHaveBeenCalledWith(
+          expect.objectContaining({ scenarioId: defaultScenario.id }),
+          expect.stringContaining("did not validate"),
+        );
+      });
+    });
+
+    describe("given a stored turn budget above the cap", () => {
+      /**
+       * Every write path caps this, so such a row is hand-edited or predates
+       * the cap. The child process parses its payload and would reject it
+       * outright; clamping keeps an old record runnable without billing for a
+       * budget nobody could have set through the product.
+       */
+      it("clamps to the maximum rather than failing or billing for it", async () => {
+        loggerWarn.mockClear();
+        const deps = createMockDeps({
+          promptFetcher: {
+            getPromptByIdOrHandle: vi.fn().mockResolvedValue(redTeamPrompt),
+          },
+          scenarioFetcher: {
+            getById: vi.fn().mockResolvedValue({
+              ...defaultScenario,
+              redTeamStrategy: "crescendo",
+              redTeamTarget: "extract the override code",
+              redTeamTotalTurns: 5000,
+            }),
+          },
+        });
+        const target: TargetConfig = { type: "prompt", referenceId: "prompt_123" };
+
+        const result = await prefetchScenarioData(defaultContext, target, deps);
+
+        expect(result.success).toBe(true);
+        if (!result.success) return;
+        expect(result.data.scenario.redTeamTotalTurns).toBe(RED_TEAM_MAX_TURNS);
+        expect(loggerWarn).toHaveBeenCalledWith(
+          expect.objectContaining({ storedTurns: 5000 }),
+          expect.stringContaining("out of range"),
+        );
       });
     });
   });

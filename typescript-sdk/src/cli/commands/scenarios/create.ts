@@ -6,6 +6,7 @@ import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
 import {
   RedTeamOptionError,
+  redTeamConfigPatch,
   toRedTeamBody,
   type RedTeamCliOptions,
 } from "./red-team-options";
@@ -22,7 +23,11 @@ export const createScenarioCommand = async (
 
   let redTeam;
   try {
-    redTeam = toRedTeamBody(options);
+    redTeam = toRedTeamBody(options, { mode: "create" });
+    // Nothing stored to merge over on a new scenario, so the patch is the
+    // whole config.
+    const configPatch = redTeamConfigPatch(options);
+    if (configPatch) redTeam.redTeamConfig = configPatch;
   } catch (error) {
     if (error instanceof RedTeamOptionError) {
       console.error(chalk.red(error.message));

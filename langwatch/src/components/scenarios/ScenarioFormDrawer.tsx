@@ -9,7 +9,7 @@ import {
 import { generate } from "@langwatch/ksuid";
 import type { Scenario } from "@prisma/client";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { type UseFormReturn, useWatch } from "react-hook-form";
+import { type FieldErrors, type UseFormReturn, useWatch } from "react-hook-form";
 import {
   applyHandledErrorToForm,
   FormServerError,
@@ -418,6 +418,30 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
     [project?.id, project?.slug, formInstance, utils, openDrawer, scenario],
   );
 
+  /**
+   * Say why the save did not happen.
+   *
+   * `handleSubmit` swallows an invalid form: the callback never runs and, with
+   * no second argument, nothing else does either — the button is pressed and
+   * the drawer sits there. Every field renders its own message, but the field
+   * can be scrolled off, or inside the collapsed Advanced section, so the
+   * press needs an answer of its own.
+   */
+  const reportInvalid = useCallback(
+    (errors: FieldErrors<ScenarioFormData>) => {
+      const messages = Object.values(errors)
+        .map((error) => (error as { message?: string } | undefined)?.message)
+        .filter((message): message is string => !!message);
+      toaster.create({
+        title: "Check the highlighted fields",
+        description: messages[0] ?? "Some values need fixing before saving.",
+        type: "warning",
+        meta: { closable: true },
+      });
+    },
+    [],
+  );
+
   const confirmRunWithModels = useCallback(async () => {
     const form = formInstance;
     const target = pendingRunTarget;
@@ -459,7 +483,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         void router.push(
           `/${project.slug}/simulations?pendingBatch=${batchRunId}`,
         );
-      })();
+      }, reportInvalid)();
     } catch (error) {
       showErrorToast({ error, fallbackTitle: "Couldn't run scenario" });
     }
@@ -474,6 +498,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
     router,
     runSimulatorModel,
     runJudgeModel,
+    reportInvalid,
   ]);
   const handleSaveWithoutRunning = useCallback(async () => {
     const form = formInstance;
@@ -492,8 +517,8 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
       } catch {
         // Error already handled by mutation onError callback
       }
-    })();
-  }, [handleSave, scenario, formInstance, onClose]);
+    }, reportInvalid)();
+  }, [handleSave, scenario, formInstance, onClose, reportInvalid]);
   const setFormRef = useCallback((form: UseFormReturn<ScenarioFormData>) => {
     setFormInstance(form);
   }, []);

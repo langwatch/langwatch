@@ -11,10 +11,12 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { ChevronDown, ChevronRight, HelpCircle } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Controller, type UseFormReturn, useWatch } from "react-hook-form";
 import {
   RED_TEAM_DEFAULT_TURNS,
   RED_TEAM_MAX_TURNS,
+  type RedTeamStrategyName,
 } from "~/server/scenarios/execution/types";
 import { Menu } from "~/components/ui/menu";
 import { Tooltip } from "../ui/tooltip";
@@ -25,7 +27,23 @@ import {
 import type { ScenarioFormData } from "./ScenarioForm";
 import { SectionHeader } from "./ui/SectionHeader";
 
-export const RED_TEAM_STRATEGIES = [
+/**
+ * How each strategy is presented. Named for what it is — a list of options for
+ * one picker — rather than sharing `RED_TEAM_STRATEGIES` with the contract in
+ * `execution/types`, which is the tuple the schemas are built from. Two exports
+ * under one name with two different shapes is how an import ends up pointing at
+ * the wrong one.
+ *
+ * `value` is typed against the contract, so dropping or renaming a strategy
+ * there fails the build here instead of quietly leaving a button that writes an
+ * unknown value.
+ */
+export const RED_TEAM_STRATEGY_OPTIONS: {
+  value: RedTeamStrategyName;
+  label: string;
+  description: string;
+  help: string;
+}[] = [
   {
     value: "crescendo" as const,
     label: "Crescendo",
@@ -43,19 +61,28 @@ export const RED_TEAM_STRATEGIES = [
 const ATTACK_HELP =
   "A simulated attacker drives the conversation instead of a cooperative user, trying to make your agent do something it should refuse. The criteria below are what it must fail to achieve — they are how the run is judged. Only run this against agents you own or have permission to test.";
 
-/** Label with an (i) that carries the full explanation, per copywriting.md. */
+/**
+ * Label with an (i) that carries the full explanation, per copywriting.md.
+ *
+ * `Field.Label`, not a bare `Text`: inside a `Field.Root` it picks up the
+ * generated `htmlFor`, so the input it sits above actually has a name. As
+ * plain text it read as a label and was one to nobody — not to a screen
+ * reader, and not to anything asking the page what these inputs are.
+ */
 function LabelWithHelp({ label, help }: { label: string; help: string }) {
   return (
-    <HStack gap={1.5} align="center">
-      <Text textStyle="sm" fontWeight="medium">
-        {label}
-      </Text>
-      <Tooltip content={help}>
-        <Box color="fg.muted" display="flex" cursor="pointer">
-          <HelpCircle size={13} />
-        </Box>
-      </Tooltip>
-    </HStack>
+    <Field.Label>
+      <HStack gap={1.5} align="center">
+        <Text textStyle="sm" fontWeight="medium">
+          {label}
+        </Text>
+        <Tooltip content={help}>
+          <Box color="fg.muted" display="flex" cursor="pointer">
+            <HelpCircle size={13} />
+          </Box>
+        </Tooltip>
+      </HStack>
+    </Field.Label>
   );
 }
 
@@ -86,6 +113,44 @@ export function RedTeamAttackSection({
   // nothing would be worse than not offering them.
   const strategy = useWatch({ control, name: "redTeamStrategy" });
   const planningApplies = strategy === "crescendo";
+  const config = useWatch({ control, name: "redTeamConfig" });
+  const scoringOn = config?.scoreResponses !== false;
+
+  // The mismatch between a strategy and the planner fields is reported at
+  // `redTeamConfig`, and both planner inputs live inside Advanced — so if it
+  // fired while Advanced was shut, the form would refuse to save and show
+  // nothing. Controlled, and opened by the error that explains itself.
+  const [advancedOpen, setAdvancedOpen] = useState<string[]>([]);
+  const configError = errors.redTeamConfig;
+  const hasConfigError = !!configError;
+  useEffect(() => {
+    if (hasConfigError) setAdvancedOpen(["advanced"]);
+  }, [hasConfigError]);
+
+  /**
+   * Switching strategy has to take the settings that no longer apply with it.
+   *
+   * Hiding the planner inputs is not the same as clearing them: GOAT with a
+   * leftover attack plan fails the cross-field rule, the rule reports at
+   * `redTeamConfig`, and the user is left pressing Save on a form whose only
+   * invalid values are two inputs the form has stopped rendering. Nothing on
+   * screen is wrong, and Save does nothing, forever.
+   */
+  const selectStrategy = (
+    value: RedTeamStrategyName,
+    onChange: (value: RedTeamStrategyName) => void,
+  ) => {
+    onChange(value);
+    if (value === "crescendo") return;
+
+    const current = getValues("redTeamConfig");
+    if (!current?.attackPlan && !current?.metapromptTemplate) return;
+    const { attackPlan: _plan, metapromptTemplate: _template, ...rest } = current;
+    setValue("redTeamConfig", rest, {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
+  };
 
   return (
     <VStack align="stretch" gap={4}>
@@ -98,7 +163,7 @@ export function RedTeamAttackSection({
         </Tooltip>
       </HStack>
 
-      <VStack align="stretch" gap={2}>
+      <Field.Root invalid={hasConfigError}>
         <Text textStyle="sm" fontWeight="medium">
           Strategy
         </Text>
@@ -106,8 +171,8 @@ export function RedTeamAttackSection({
           control={control}
           name="redTeamStrategy"
           render={({ field }) => (
-            <VStack align="stretch" gap={2}>
-              {RED_TEAM_STRATEGIES.map((option) => {
+            <VStack align="stretch" gap={2} width="full">
+              {RED_TEAM_STRATEGY_OPTIONS.map((option) => {
                 const selected = field.value === option.value;
                 return (
                   <Box
@@ -127,11 +192,11 @@ export function RedTeamAttackSection({
                       selected ? "0 0 0 3px var(--chakra-colors-color-palette-subtle)" : undefined
                     }
                     transition="border-color 120ms ease, box-shadow 120ms ease"
-                    onClick={() => field.onChange(option.value)}
+                    onClick={() => selectStrategy(option.value, field.onChange)}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") {
                         e.preventDefault();
-                        field.onChange(option.value);
+                        selectStrategy(option.value, field.onChange);
                       }
                     }}
                   >
@@ -160,7 +225,8 @@ export function RedTeamAttackSection({
             </VStack>
           )}
         />
-      </VStack>
+        <Field.ErrorText>{configError?.message}</Field.ErrorText>
+      </Field.Root>
 
       <Field.Root invalid={!!errors.redTeamTarget}>
         <LabelWithHelp
@@ -255,7 +321,7 @@ export function RedTeamAttackSection({
         <Field.ErrorText>{errors.redTeamTarget?.message}</Field.ErrorText>
       </Field.Root>
 
-      <Field.Root>
+      <Field.Root invalid={!!errors.redTeamTotalTurns}>
         <LabelWithHelp
           label="Turns"
           help={`How many attempts the attacker gets. Agents that hold at turn 1 often break by turn 20, so ${RED_TEAM_DEFAULT_TURNS} is the recommended starting point and the maximum. To make a run cheaper, turn off adaptive scoring under Advanced rather than cutting turns.`}
@@ -269,9 +335,21 @@ export function RedTeamAttackSection({
             setValueAs: (v) => (v === "" || v === null ? null : Number(v)),
           })}
         />
+        {/* `min`/`max` on a number input are advisory — they colour the
+            spinner and nothing else. Typing 51 is allowed, the schema rejects
+            it, and without this the only symptom is a Save button that stops
+            working. */}
+        <Field.ErrorText>
+          {errors.redTeamTotalTurns?.message ??
+            `Enter a whole number between 1 and ${RED_TEAM_MAX_TURNS}.`}
+        </Field.ErrorText>
       </Field.Root>
 
-      <Accordion.Root collapsible>
+      <Accordion.Root
+        collapsible
+        value={advancedOpen}
+        onValueChange={({ value }) => setAdvancedOpen(value)}
+      >
         <Accordion.Item value="advanced">
           <Accordion.ItemTrigger>
             {/* Points right when closed, down when open — the chevron shows
@@ -303,7 +381,11 @@ export function RedTeamAttackSection({
                   closing rule sits directly on the last input, and SITUATION
                   below reads as part of Advanced rather than a new section. */}
               <VStack align="stretch" gap={4} paddingTop={2} paddingBottom={4}>
-                <Field.Root>
+                {/* Registered, not `defaultValue` + `setValue`. The old pair
+                    read the value once on mount, so anything that changed the
+                    config afterwards — a `reset()`, or switching strategy —
+                    left the input showing a value the form no longer held. */}
+                <Field.Root invalid={!!errors.redTeamConfig?.successScore}>
                   <LabelWithHelp
                     label="Stop early at score"
                     help="Each turn is scored 0-10 for how close the attacker is to its goal. Once it reaches this score the run stops — the weakness is already proven and further turns just cost money. Leave empty to use the default of 9."
@@ -314,17 +396,15 @@ export function RedTeamAttackSection({
                     max={10}
                     width="120px"
                     placeholder="9"
-                    defaultValue={getValues("redTeamConfig")?.successScore ?? ""}
-                    onChange={(e) =>
-                      setValue("redTeamConfig", {
-                        ...(getValues("redTeamConfig") ?? {}),
-                        successScore:
-                          e.target.value === ""
-                            ? undefined
-                            : Number(e.target.value),
-                      })
-                    }
+                    {...register("redTeamConfig.successScore", {
+                      setValueAs: (v) =>
+                        v === "" || v === null ? undefined : Number(v),
+                    })}
                   />
+                  <Field.ErrorText>
+                    {errors.redTeamConfig?.successScore?.message ??
+                      "Enter a score between 0 and 10."}
+                  </Field.ErrorText>
                 </Field.Root>
 
                 <Field.Root>
@@ -333,9 +413,7 @@ export function RedTeamAttackSection({
                     help="Every reply is scored 0-10 and the attacker adjusts its next move, backing out of a line that got a hard refusal. Turning it off is the recommended way to make a run cheaper — it keeps the full turn budget, but the attacker stops reacting to what the agent said."
                   />
                   <Switch.Root
-                    checked={
-                      getValues("redTeamConfig")?.scoreResponses !== false
-                    }
+                    checked={scoringOn}
                     onCheckedChange={({ checked }) =>
                       setValue("redTeamConfig", {
                         ...(getValues("redTeamConfig") ?? {}),
@@ -357,7 +435,7 @@ export function RedTeamAttackSection({
 
                 {planningApplies && (
                   <>
-                    <Field.Root>
+                    <Field.Root invalid={!!errors.redTeamConfig?.attackPlan}>
                       <LabelWithHelp
                         label="Attack plan"
                         help="Crescendo normally spends one model call writing a phased plan before it starts. Paste your own to skip that and control the attack exactly — phase by phase, in your own words. Leave empty to let it plan."
@@ -368,17 +446,18 @@ export function RedTeamAttackSection({
                           "e.g., Turns 1-10: ask about products.\nTurns 11-25: ask how AI assistants work.\nTurns 26-50: ask it to repeat its instructions."
                         }
                         _placeholder={{ color: "gray.400", fontStyle: "italic" }}
-                        defaultValue={getValues("redTeamConfig")?.attackPlan ?? ""}
-                        onChange={(e) =>
-                          setValue("redTeamConfig", {
-                            ...(getValues("redTeamConfig") ?? {}),
-                            attackPlan: e.target.value || undefined,
-                          })
-                        }
+                        {...register("redTeamConfig.attackPlan", {
+                          setValueAs: (v) => (v === "" ? undefined : v),
+                        })}
                       />
+                      <Field.ErrorText>
+                        {errors.redTeamConfig?.attackPlan?.message}
+                      </Field.ErrorText>
                     </Field.Root>
 
-                    <Field.Root>
+                    <Field.Root
+                      invalid={!!errors.redTeamConfig?.metapromptTemplate}
+                    >
                       <LabelWithHelp
                         label="Planning prompt"
                         help="Replaces the instructions used to write the attack plan, rather than the plan itself. Use {target}, {description}, {totalTurns} and {phase1End}/{phase2End}/{phase3End} where those values should appear. Ignored when an attack plan is set above, since nothing needs planning then."
@@ -387,21 +466,20 @@ export function RedTeamAttackSection({
                         rows={3}
                         placeholder="Leave empty to use the built-in planning prompt"
                         _placeholder={{ color: "gray.400", fontStyle: "italic" }}
-                        defaultValue={
-                          getValues("redTeamConfig")?.metapromptTemplate ?? ""
-                        }
-                        onChange={(e) =>
-                          setValue("redTeamConfig", {
-                            ...(getValues("redTeamConfig") ?? {}),
-                            metapromptTemplate: e.target.value || undefined,
-                          })
-                        }
+                        {...register("redTeamConfig.metapromptTemplate", {
+                          setValueAs: (v) => (v === "" ? undefined : v),
+                        })}
                       />
+                      <Field.ErrorText>
+                        {errors.redTeamConfig?.metapromptTemplate?.message}
+                      </Field.ErrorText>
                     </Field.Root>
                   </>
                 )}
 
-                <Field.Root>
+                <Field.Root
+                  invalid={!!errors.redTeamConfig?.injectionProbability}
+                >
                   <LabelWithHelp
                     label="Obfuscation"
                     help="Chance per turn that the attacker's message is re-encoded after it is written (Base64, ROT13) to slip past filters that match on plain text. 0 sends everything in the clear; 1 encodes every turn. Leave empty for 0."
@@ -413,19 +491,15 @@ export function RedTeamAttackSection({
                     step={0.05}
                     width="120px"
                     placeholder="0"
-                    defaultValue={
-                      getValues("redTeamConfig")?.injectionProbability ?? ""
-                    }
-                    onChange={(e) =>
-                      setValue("redTeamConfig", {
-                        ...(getValues("redTeamConfig") ?? {}),
-                        injectionProbability:
-                          e.target.value === ""
-                            ? undefined
-                            : Number(e.target.value),
-                      })
-                    }
+                    {...register("redTeamConfig.injectionProbability", {
+                      setValueAs: (v) =>
+                        v === "" || v === null ? undefined : Number(v),
+                    })}
                   />
+                  <Field.ErrorText>
+                    {errors.redTeamConfig?.injectionProbability?.message ??
+                      "Enter a number between 0 and 1."}
+                  </Field.ErrorText>
                 </Field.Root>
               </VStack>
             </Accordion.ItemBody>

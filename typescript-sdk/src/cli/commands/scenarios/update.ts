@@ -7,6 +7,8 @@ import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
 import {
   RedTeamOptionError,
+  mergeRedTeamConfig,
+  redTeamConfigPatch,
   toRedTeamBody,
   type RedTeamCliOptions,
 } from "./red-team-options";
@@ -24,7 +26,7 @@ export const updateScenarioCommand = async (
 
   let redTeam;
   try {
-    redTeam = toRedTeamBody(options);
+    redTeam = toRedTeamBody(options, { mode: "update" });
   } catch (error) {
     if (error instanceof RedTeamOptionError) {
       console.error(chalk.red(error.message));
@@ -37,6 +39,20 @@ export const updateScenarioCommand = async (
   const spinner = createSpinner(`Updating scenario "${id}"...`).start();
 
   try {
+    // `redTeamConfig` is one JSONB column and a write replaces all of it, so
+    // sending the one knob this flag owns would delete every other setting on
+    // the scenario — the attack plan, the stop-early score, the obfuscation
+    // rate — and report success. Read first, merge, then write. Only when the
+    // flag was actually passed; a rename should not pay for the round trip.
+    const configPatch = redTeamConfigPatch(options);
+    if (configPatch) {
+      const existing = await service.get(id);
+      redTeam.redTeamConfig = mergeRedTeamConfig(
+        configPatch,
+        existing.redTeamConfig,
+      );
+    }
+
     const body: UpdateScenarioBody = {};
     if (options.name !== undefined) body.name = options.name;
     if (options.situation !== undefined) body.situation = options.situation;

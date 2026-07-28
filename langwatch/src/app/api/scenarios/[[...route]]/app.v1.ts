@@ -5,11 +5,15 @@ import { resolver } from "hono-openapi/zod";
 import { z } from "zod";
 import {
   mergeRedTeamState,
+  normalizeRedTeamWrite,
   redTeamFields,
   redTeamStateIssue,
-  toPrismaRedTeamWrite,
 } from "~/server/scenarios/red-team-input";
-import type { RedTeamConfig } from "~/server/scenarios/execution/types";
+import { toPrismaRedTeamWrite } from "~/server/scenarios/red-team-prisma";
+import {
+  RedTeamConfigSchema,
+  type RedTeamConfig,
+} from "~/server/scenarios/execution/types";
 import { badRequestSchema } from "~/app/api/shared/schemas";
 import { requires, type SecuredApp } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
@@ -40,6 +44,13 @@ const scenarioResponseSchema = z.object({
   redTeamStrategy: z.string().nullable(),
   redTeamTarget: z.string().nullable(),
   redTeamTotalTurns: z.number().nullable(),
+  /**
+   * Read back as well as written. Without it the tuning knobs are write-only
+   * over REST, so a client that set `scoreResponses: false` has no way to see
+   * what else is on the row — and no way to change one knob without guessing
+   * at the rest and overwriting it.
+   */
+  redTeamConfig: RedTeamConfigSchema.nullable(),
 });
 
 const scenarioResponseWithPlatformUrlSchema = scenarioResponseSchema.extend({
@@ -72,6 +83,12 @@ function toScenarioResponse(scenario: Scenario) {
     redTeamStrategy: scenario.redTeamStrategy,
     redTeamTarget: scenario.redTeamTarget,
     redTeamTotalTurns: scenario.redTeamTotalTurns,
+    // A stored config that no longer parses is reported as absent rather than
+    // failing the read: the row is still a perfectly good scenario, and a
+    // listing should not 500 because one JSONB blob drifted.
+    redTeamConfig:
+      RedTeamConfigSchema.nullish().catch(null).parse(scenario.redTeamConfig) ??
+      null,
   };
 }
 
@@ -219,7 +236,38 @@ export function registerScenarioRoutes(
         201,
       );
     },
-  );
+  }),
+  zValidator("json", createScenarioSchema),
+  async (c) => {
+    const project = c.get("project");
+    const body = normalizeRedTeamWrite(c.req.valid("json"));
+
+    logger.info({ projectId: project.id }, "Creating scenario");
+
+    const issue = redTeamStateIssue(body);
+    if (issue) {
+      return c.json({ error: issue.message, field: issue.field }, 400);
+    }
+
+    const service = getService();
+    const scenario = await service.create({
+      projectId: project.id,
+      name: body.name,
+      situation: body.situation,
+      criteria: body.criteria,
+      labels: body.labels,
+      ...toPrismaRedTeamWrite(body),
+    });
+
+    return c.json({
+      ...toScenarioResponse(scenario),
+      platformUrl: platformUrl({
+        projectSlug: project.slug,
+        path: `/simulations/scenarios?drawer.open=scenarioEditor&drawer.scenarioId=${scenario.id}`,
+      }),
+    }, 201);
+  },
+);
 
   // `:update` for the same reason as `:create` above — `:manage` still implies
   // it, so no existing caller changes.
@@ -292,7 +340,52 @@ export function registerScenarioRoutes(
         }),
       });
     },
-  );
+  }),
+  zValidator("json", updateScenarioSchema),
+  async (c) => {
+    const project = c.get("project");
+    const { id } = c.req.param();
+    const body = normalizeRedTeamWrite(c.req.valid("json"));
+
+    logger.info(
+      { projectId: project.id, scenarioId: id },
+      "Updating scenario",
+    );
+
+    const service = getService();
+    const existing = await service.getById({ id, projectId: project.id });
+    if (!existing) {
+      return c.json({ error: "Scenario not found" }, 404);
+    }
+
+    const merged = mergeRedTeamState(body, {
+      redTeamStrategy: existing.redTeamStrategy,
+      redTeamTarget: existing.redTeamTarget,
+      redTeamTotalTurns: existing.redTeamTotalTurns,
+      redTeamConfig: existing.redTeamConfig as RedTeamConfig | null,
+    });
+    const updateIssue = redTeamStateIssue(merged);
+    if (updateIssue) {
+      return c.json({ error: updateIssue.message, field: updateIssue.field }, 400);
+    }
+
+    const scenario = await service.update(id, project.id, {
+      ...(body.name !== undefined && { name: body.name }),
+      ...(body.situation !== undefined && { situation: body.situation }),
+      ...(body.criteria !== undefined && { criteria: body.criteria }),
+      ...(body.labels !== undefined && { labels: body.labels }),
+      ...toPrismaRedTeamWrite(body),
+    });
+
+    return c.json({
+      ...toScenarioResponse(scenario),
+      platformUrl: platformUrl({
+        projectSlug: project.slug,
+        path: `/simulations/scenarios?drawer.open=scenarioEditor&drawer.scenarioId=${scenario.id}`,
+      }),
+    });
+  },
+);
 
   // Archiving deliberately still asks for `:manage`. Create and update were
   // refined because access issued at that grain was being refused; nothing is

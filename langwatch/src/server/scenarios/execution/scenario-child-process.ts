@@ -26,6 +26,13 @@
 
 import * as ScenarioRunner from "@langwatch/scenario";
 import { type TracerProvider, trace } from "@opentelemetry/api";
+import { RED_TEAM_DEFAULT_TURNS, type ChildProcessJobData } from "./types";
+import { parseChildProcessJobData } from "./child-process-payload";
+import { createModelFromParams } from "./model.factory";
+import { createAdapter } from "./serialized-adapter.registry";
+import { RemoteSpanJudgeAgent } from "./remote-span-judge-agent";
+import { createTraceApiSpanQuery } from "./trace-api-span-query";
+import { SerializedHttpAgentAdapter } from "./serialized-adapters/http-agent.adapter";
 import { bridgeTraceIdFromAdapterToJudge } from "./bridge-trace-id";
 import { createChildProcessLogger } from "./child-logger";
 import { createModelFromParams } from "./model.factory";
@@ -68,6 +75,12 @@ async function main(): Promise<void> {
   await executeScenario(jobData);
 }
 
+/**
+ * Parses the scenario configuration, rather than casting it — see
+ * `parseChildProcessJobData` for what is validated and what is not. A turn
+ * budget past the cap is now a loud failure before the first model call
+ * instead of fifty billed ones.
+ */
 async function readJobDataFromStdin(): Promise<ChildProcessJobData> {
   return new Promise((resolve, reject) => {
     let data = "";
@@ -78,7 +91,7 @@ async function readJobDataFromStdin(): Promise<ChildProcessJobData> {
     });
     process.stdin.on("end", () => {
       try {
-        resolve(JSON.parse(data) as ChildProcessJobData);
+        resolve(parseChildProcessJobData(data));
       } catch (error) {
         reject(new Error(`Failed to parse job data: ${error}`));
       }
@@ -251,11 +264,16 @@ function buildRedTeamAgent({
   if (!scenario.redTeamStrategy || !scenario.redTeamTarget) return null;
 
   const totalTurns = scenario.redTeamTotalTurns ?? RED_TEAM_DEFAULT_TURNS;
+  // Stored config first, so the three fields this function owns cannot be
+  // overwritten by it. The other order happened to be safe only because
+  // `RedTeamConfigSchema` is a stripping `z.object` on every write path today
+  // — a cross-file invariant nothing states and nothing checks. Precedence
+  // belongs where you can see it.
   const config = {
+    ...(scenario.redTeamConfig ?? {}),
     target: scenario.redTeamTarget,
     totalTurns,
     model,
-    ...(scenario.redTeamConfig ?? {}),
   };
 
   const agent =
