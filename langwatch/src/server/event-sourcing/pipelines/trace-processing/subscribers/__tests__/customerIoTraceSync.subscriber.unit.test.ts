@@ -4,9 +4,9 @@ import type { ProjectService } from "~/server/app-layer/projects/project.service
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { EventSubscriberContext } from "~/server/event-sourcing/subscribers/eventSubscriber.types";
 import type { FoldProjectionStore } from "~/server/event-sourcing/projections/foldProjection.types";
+import { CIO_SYNC_DEBOUNCE_TTL_MS } from "../../../shared/nurtureSync";
 import type { TraceProcessingEvent } from "../../schemas/events";
 import {
-  CIO_SYNC_DEBOUNCE_TTL_MS,
   type CustomerIoTraceSyncSubscriberDeps,
   createCustomerIoTraceSyncSubscriber,
 } from "../customerIoTraceSync.subscriber";

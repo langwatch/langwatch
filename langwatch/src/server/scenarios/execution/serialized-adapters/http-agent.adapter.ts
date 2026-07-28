@@ -24,6 +24,12 @@ import type { HttpAgentData } from "../types";
  * Truncate a response body for log inclusion. Long bodies are useless in
  * CloudWatch and explode log volume; the prefix is enough to spot the
  * upstream's failure mode.
+ *
+ * The preview is emitted at `debug` and never above it: the body belongs to
+ * the customer's own agent, so at `info`/`warn` it would put their content
+ * into the platform's log retention. Status, latency and upstream request id
+ * say what went wrong without quoting them, and the thrown error still carries
+ * the body to the scenario result — where the customer expects to read it.
  */
 const RESPONSE_BODY_PREVIEW_CHARS = 512;
 
@@ -48,8 +54,29 @@ function redactUrlForLogs(url: string): string {
   }
 }
 
-/** Header names (lowercase) whose values must be redacted in logs and errors. */
-const SENSITIVE_HEADERS = new Set(["authorization", "x-api-key"]);
+/**
+ * Header names (lowercase) whose VALUES are safe to write to a log.
+ *
+ * This is an allow-list, not a deny-list, and it has to be: the header a
+ * credential arrives under is chosen by the user. `AUTH_STRATEGIES.api_key`
+ * emits `{ [auth.header]: auth.value }` with a user-supplied header NAME, and
+ * `config.headers` lets a target add arbitrary pairs on top. A target
+ * configured with `X-Auth-Token`, `apikey` or `Cookie` would have its secret
+ * written verbatim on every call — including the `info` line on SUCCESS — for
+ * as long as the deny-list failed to guess that name.
+ *
+ * Only two classes of name are listed: content negotiation, which by
+ * convention never carries credentials, and the W3C trace-context headers this
+ * adapter injects itself. Everything else logs its key with a `[REDACTED]`
+ * value, so an operator can still see WHICH headers were sent without the
+ * platform having to predict what a customer will call its secret.
+ */
+const LOGGABLE_HEADERS = new Set([
+  "content-type",
+  "accept",
+  "traceparent",
+  "tracestate",
+]);
 
 /** Maximum body length to include in error messages before truncating. */
 const ERROR_BODY_LIMIT_CHARS = 2048;
@@ -66,9 +93,9 @@ function redactHeaders(
 ): Record<string, string> {
   const redacted: Record<string, string> = {};
   for (const [key, value] of Object.entries(headers)) {
-    redacted[key] = SENSITIVE_HEADERS.has(key.toLowerCase())
-      ? "[REDACTED]"
-      : value;
+    redacted[key] = LOGGABLE_HEADERS.has(key.toLowerCase())
+      ? value
+      : "[REDACTED]";
   }
   return redacted;
 }
@@ -196,11 +223,20 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
           method,
           statusCode: response.status,
           durationMs,
-          responseBodyPreview: previewResponseBody(responseBody),
+          responseBodyLength: responseBody.length,
           requestId: upstreamRequestId,
           headers: redactedHeaders,
         },
         "http call failed",
+      );
+      this.logger.debug(
+        {
+          url: loggedUrl,
+          method,
+          statusCode: response.status,
+          responseBodyPreview: previewResponseBody(responseBody),
+        },
+        "http call failed, response body preview",
       );
       throw new Error(
         `HTTP ${response.status}: ${response.statusText} from ${loggedUrl} (request-id: ${

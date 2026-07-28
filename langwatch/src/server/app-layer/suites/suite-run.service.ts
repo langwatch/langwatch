@@ -1,13 +1,12 @@
-import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import type { QueueRunCommandData } from "~/server/event-sourcing/pipelines/simulation-processing/schemas/commands";
 import {
   deriveBatchRunId,
   deriveScenarioRunId,
   generateBatchRunId,
+  generateScenarioRunId,
 } from "~/server/scenarios/scenario.ids";
 import { getSuiteSetId } from "~/server/suites/suite-set-id";
-import { KSUID_RESOURCES } from "~/utils/constants";
 import { traced } from "../tracing";
 
 const logger = createLogger("langwatch:suite-run:service");
@@ -151,7 +150,7 @@ export class SuiteRunService {
                   targetReferenceId: target.referenceId,
                   repeat,
                 })
-              : generate(KSUID_RESOURCES.SCENARIO_RUN).toString(),
+              : generateScenarioRunId(),
           });
         }
       }

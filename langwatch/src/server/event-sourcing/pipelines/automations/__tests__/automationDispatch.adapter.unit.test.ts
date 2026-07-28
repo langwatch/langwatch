@@ -40,6 +40,7 @@ const collaborators = () => {
     createRecordsForDatasetId: vi.fn().mockResolvedValue(undefined),
     deriveEvents: vi.fn().mockResolvedValue([]),
     updateLastRunAt: vi.fn().mockResolvedValue(undefined),
+    getTimeseries: vi.fn().mockResolvedValue({ currentPeriod: [] }),
   };
   const heartbeat = {
     deps: { heartbeatDeps: true },
@@ -52,6 +53,7 @@ const collaborators = () => {
     triggers: { updateLastRunAt: spies.updateLastRunAt },
     projects: {},
     evaluationRuns: {},
+    analytics: { getTimeseries: spies.getTimeseries },
     emailSuppressions: { filterSuppressed: spies.filterSuppressed },
     customGraphs: {},
     webhookDeliveries: {
@@ -174,6 +176,29 @@ describe("automation dispatch adapter", () => {
         "trigger-1",
         "project-1",
       );
+    });
+
+    /**
+     * The timeseries read used to be resolved through `getAnalyticsService()`
+     * inside the adapter, which made it the one collaborator no test could
+     * substitute. It arrives as a collaborator now, so this asserts the port
+     * delegates to whatever the composition root supplied.
+     */
+    it("reads timeseries through the injected analytics collaborator", async () => {
+      const { collaborators: c, spies } = collaborators();
+      const ports = buildAutomationDispatchPorts(c);
+
+      await ports.evaluateGraphTrigger({
+        triggerId: "trigger-1",
+        projectId: "project-1",
+        reason: "heartbeat-absence",
+      });
+
+      const { deps } = evaluateGraphTriggerMock.mock.calls.at(-1)![0];
+      const input = { projectId: "project-1", series: [] };
+      await deps.getTimeseries(input);
+
+      expect(spies.getTimeseries).toHaveBeenCalledWith(input);
     });
   });
 

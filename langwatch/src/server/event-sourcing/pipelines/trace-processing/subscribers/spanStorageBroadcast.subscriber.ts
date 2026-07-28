@@ -1,3 +1,18 @@
+/**
+ * NOT WIRED — nothing constructs this factory, and this file is inert.
+ *
+ * The live path is still `../reactors/spanStorageBroadcast.reactor.ts`, built
+ * in `pipelineRegistry.registerTracePipeline()` and mounted by
+ * `trace-processing/pipeline.ts` as
+ * `.withReactor("spanStorage", "spanStorageBroadcast", deps.spanStorageBroadcastReactor)`.
+ *
+ * It stays inert because ADR-077 has not reached trace-processing yet (it is
+ * migration step 7, last), so the pipeline cannot yet build its own
+ * subscribers from a `BroadcastService` it holds. Mounting it is then one line
+ * — `.withEventSubscriber("spanStorageBroadcast", …)` — with the reactor and
+ * its `Deps` member deleted in the same change.
+ */
+
 import { createLogger } from "@langwatch/observability";
 import type { BroadcastService } from "../../../../app-layer/broadcast/broadcast.service";
 import type { EventSubscriberDefinition } from "../../../subscribers/eventSubscriber.types";

@@ -1,3 +1,18 @@
+/**
+ * NOT WIRED — nothing constructs this factory, and this file is inert.
+ *
+ * Customer.io nurture has no live path at all. The reactor this replaces never
+ * ran either, and has since been deleted, so there is nothing else to read for
+ * "what actually happens today": nothing does. See the note in
+ * `pipelineRegistry.registerAll()` for the counting-strategy question that has
+ * to be settled first.
+ *
+ * Mounting it, once that lands, is one line on
+ * `trace-processing/pipeline.ts`:
+ * `.withEventSubscriber("customerIoTraceSync", createCustomerIoTraceSyncSubscriber({…}))`,
+ * built from the pipeline's own `Deps` per ADR-077 Rule 1.
+ */
+
 import { createLogger } from "@langwatch/observability";
 import type { NurturingService } from "@ee/billing/nurturing/nurturing.service";
 import type { ProjectService } from "~/server/app-layer/projects/project.service";
@@ -10,6 +25,10 @@ import type {
   EventSubscriberDefinition,
 } from "../../../subscribers/eventSubscriber.types";
 import {
+  CIO_SYNC_DEBOUNCE_TTL_MS,
+  nurtureFireAndForget,
+} from "../../shared/nurtureSync";
+import {
   ORIGIN_RESOLVED_EVENT_TYPE,
   SPAN_RECEIVED_EVENT_TYPE,
 } from "../schemas/constants";
@@ -18,17 +37,6 @@ import type { TraceProcessingEvent } from "../schemas/events";
 const logger = createLogger(
   "langwatch:trace-processing:customer-io-trace-sync-subscriber",
 );
-
-/**
- * Debounce window shared by all three Customer.io nurture subscribers.
- *
- * Single-sourced here, mirroring the arrangement the reactors had
- * (`CIO_REACTOR_DEBOUNCE_TTL_MS` lived on the trace reactor and the evaluation
- * and simulation reactors imported it). The value and the dedup keys are
- * carried over verbatim so nurture counts keep the same frequency across the
- * ADR-075 conversion.
- */
-export const CIO_SYNC_DEBOUNCE_TTL_MS = 300_000;
 
 export interface CustomerIoTraceSyncSubscriberDeps {
   projects: ProjectService;
@@ -118,8 +126,8 @@ export function createCustomerIoTraceSyncSubscriber(
 
         if (!firstMessage) {
           // First trace — fire immediately, fire-and-forget
-          void deps.nurturing
-            .identifyUser({
+          nurtureFireAndForget({
+            promise: deps.nurturing.identifyUser({
               userId,
               traits: {
                 has_traces: true,
@@ -127,16 +135,13 @@ export function createCustomerIoTraceSyncSubscriber(
                 sdk_framework: sdkFramework,
                 first_trace_at: traceOccurredAt,
               },
-            })
-            .catch((error) => {
-              logger.error(
-                { projectId, error },
-                "Failed to identify user for first trace",
-              );
-              captureException(toError(error));
-            });
-          void deps.nurturing
-            .trackEvent({
+            }),
+            logger,
+            projectId,
+            what: "identify user for first trace",
+          });
+          nurtureFireAndForget({
+            promise: deps.nurturing.trackEvent({
               userId,
               event: "first_trace_integrated",
               properties: {
@@ -144,30 +149,24 @@ export function createCustomerIoTraceSyncSubscriber(
                 sdk_framework: sdkFramework,
                 project_id: projectId,
               },
-            })
-            .catch((error) => {
-              logger.error(
-                { projectId, error },
-                "Failed to track first_trace_integrated event",
-              );
-              captureException(toError(error));
-            });
+            }),
+            logger,
+            projectId,
+            what: "track first_trace_integrated event",
+          });
         } else {
           // Subsequent trace — debounced by the dedup window, fire-and-forget
-          void deps.nurturing
-            .identifyUser({
+          nurtureFireAndForget({
+            promise: deps.nurturing.identifyUser({
               userId,
               traits: {
                 last_trace_at: traceOccurredAt,
               },
-            })
-            .catch((error) => {
-              logger.error(
-                { projectId, error },
-                "Failed to identify user for trace update",
-              );
-              captureException(toError(error));
-            });
+            }),
+            logger,
+            projectId,
+            what: "identify user for trace update",
+          });
         }
       } catch (error) {
         // Class B is lossy by contract: never throw back into the queue, so a

@@ -1,7 +1,10 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 import { CANCELLATION_CHANNEL } from "~/server/scenarios/cancellation-channel";
 import type { SimulationProcessingEvent } from "../../schemas/events";
-import { createCancellationBroadcastSubscriber } from "../cancellationBroadcast.subscriber";
+import {
+  createCancellationBroadcastSubscriber,
+  type CancellationBroadcastSubscriberDeps,
+} from "../cancellationBroadcast.subscriber";
 
 vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
@@ -33,8 +36,14 @@ function createEvent(
 const context = { tenantId: "project-1", aggregateId: "run-1" };
 
 describe("createCancellationBroadcastSubscriber", () => {
-  let publisher: { publish: ReturnType<typeof vi.fn> };
-  let readBatchRunId: ReturnType<typeof vi.fn>;
+  // Typed against the dep signatures rather than `ReturnType<typeof vi.fn>`,
+  // which is `Mock<Constructable | Procedure>` and assignable to neither —
+  // it passes at runtime and fails `typecheck:tests`.
+  type Publisher = NonNullable<CancellationBroadcastSubscriberDeps["publisher"]>;
+  type ReadBatchRunId = CancellationBroadcastSubscriberDeps["readBatchRunId"];
+
+  let publisher: { publish: Mock<Publisher["publish"]> };
+  let readBatchRunId: Mock<ReadBatchRunId>;
 
   beforeEach(() => {
     publisher = { publish: vi.fn().mockResolvedValue(1) };

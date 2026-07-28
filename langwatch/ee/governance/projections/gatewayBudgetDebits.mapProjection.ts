@@ -1,15 +1,16 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import type { GatewayBudgetLedgerStatus } from "@prisma/client";
-import { CanonicalizeSpanAttributesService } from "~/server/app-layer/traces/canonicalisation";
-import { SpanNormalizationPipelineService } from "~/server/app-layer/traces/span-normalization.service";
+import {
+  spanCostService,
+  spanNormalizationPipelineService,
+  spanStatusService,
+} from "@ee/governance/services/spanDerivation.composition";
 import {
   type SpanReceivedEvent,
   spanReceivedEventSchema,
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
 import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
-import { SpanCostService } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/span-cost.service";
-import { SpanStatusService } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/span-status.service";
 import {
   AbstractMapProjection,
   type MapEventHandlers,
@@ -35,6 +36,47 @@ export const GATEWAY_VIRTUAL_KEY_ID_ATTR = "langwatch.virtual_key_id";
 export const GATEWAY_REQUEST_ID_ATTR = "langwatch.gateway_request_id";
 
 /**
+ * The ModelProvider the gateway actually dispatched to. Absent on gateways
+ * that predate the field, in which case only unfiltered budgets accrue:
+ * attributing an unknown dispatch to a provider-filtered budget would be a
+ * guess, and a guess here silently mis-bills a governance control.
+ */
+export const GATEWAY_MODEL_PROVIDER_ID_ATTR = "langwatch.model_provider_id";
+
+/**
+ * Cheap pre-normalisation gate on the RAW OTLP span: does it carry a gateway
+ * virtual-key marker at all?
+ *
+ * Sibling of `isGovernanceOriginWireSpan` in `governanceSpanFacts.ts`, and for
+ * the same reason. Normalisation is not cheap — it opens a tracer
+ * span and runs every canonicalisation extractor over the whole attribute
+ * set, prompts and completions included — and gateway traffic is a small
+ * fraction of the span stream. Every consumer of a gateway span runs this
+ * first so a non-gateway span costs one attribute-array scan and nothing
+ * more.
+ *
+ * **Presence, not value.** The gateway stamps this key literally, so presence
+ * is a total superset of "is gateway traffic"; the type and emptiness checks
+ * that actually decide belong after normalisation, where they can be exact.
+ * Deliberately defensive for the same reason the governance gate is: this
+ * reads wire data behind a Zod-typed cast, and it is also used as an ADR-069
+ * enqueue filter, a seam with no retry — so a missing/!array `attributes`, a
+ * null entry or a non-object entry all read as "not gateway" rather than
+ * throwing a job away.
+ */
+export function spanCarriesGatewayVirtualKeyId(span: unknown): boolean {
+  if (typeof span !== "object" || span === null) return false;
+  const attributes = (span as { attributes?: unknown }).attributes;
+  if (!Array.isArray(attributes)) return false;
+  return attributes.some(
+    (attribute) =>
+      typeof attribute === "object" &&
+      attribute !== null &&
+      (attribute as { key?: unknown }).key === GATEWAY_VIRTUAL_KEY_ID_ATTR,
+  );
+}
+
+/**
  * One gateway request's spend, derived from the single span the gateway emits
  * for it, before the budgets it applies to are known.
  *
@@ -58,6 +100,12 @@ export interface GatewayBudgetDebitRecord {
   tokensOutput: number;
   /** Resolved model, `"unknown"` when the span names none. */
   model: string;
+  /**
+   * ModelProvider the request was dispatched to, or null when the gateway
+   * did not say. Decides which provider-filtered budgets this spend counts
+   * against — see {@link GATEWAY_MODEL_PROVIDER_ID_ATTR}.
+   */
+  providerKey: string | null;
   status: GatewayBudgetLedgerStatus;
   durationMs: number;
   /**
@@ -68,13 +116,6 @@ export interface GatewayBudgetDebitRecord {
    */
   occurredAt: Date;
 }
-
-const spanNormalizationPipelineService = new SpanNormalizationPipelineService(
-  new CanonicalizeSpanAttributesService(),
-);
-
-const spanCostService = new SpanCostService();
-const spanStatusService = new SpanStatusService();
 
 const spanEvents = [spanReceivedEventSchema] as const;
 
@@ -108,10 +149,25 @@ export function deriveLedgerStatus(
 
 /**
  * Derive one gateway request's debit facts from an already-normalized span.
+ * Exported for tests, which exercise the derivation without a queue.
  *
- * Exported so the `virtualKeyLastUsed` subscriber recognises a gateway span
- * with exactly the same test this projection applies — the two must never
- * disagree about what counts as gateway traffic.
+ * **This gate and the `virtualKeyLastUsed` subscriber's differ on purpose,
+ * and only after the point where they must agree.** Both start from
+ * {@link spanCarriesGatewayVirtualKeyId} — one shared raw-wire predicate, so
+ * neither can decide a span is worth normalising when the other would not.
+ * Past that they answer different questions:
+ *
+ *  - the subscriber asks *"was a virtual key used?"*, which a VK id alone
+ *    answers, and stamps `lastUsedAt` on the strength of it;
+ *  - this asks *"did a billable gateway request complete?"*, which needs a
+ *    `GATEWAY_REQUEST_ID_ATTR` as well, because that id IS the ledger's
+ *    natural key — a debit without one cannot be deduped against a replay,
+ *    so writing it would double-charge the budget on the next rebuild.
+ *
+ * So a span carrying a VK id and no request id touches `lastUsedAt` and
+ * debits nothing, which is the correct reading of both facts rather than a
+ * disagreement to reconcile. Do not "unify" them by relaxing the request-id
+ * requirement here; that trades a correct silence for a double charge.
  */
 export function deriveGatewayDebitRecord(
   span: NormalizedSpan,
@@ -130,6 +186,8 @@ export function deriveGatewayDebitRecord(
   // mirror.
   const tokens = spanCostService.extractTokenMetrics(span);
 
+  const providerKey = span.spanAttributes[GATEWAY_MODEL_PROVIDER_ID_ATTR];
+
   return {
     tenantId: span.tenantId,
     traceId: span.traceId,
@@ -139,6 +197,10 @@ export function deriveGatewayDebitRecord(
     tokensInput: tokens.promptTokens,
     tokensOutput: tokens.completionTokens,
     model: spanCostService.extractModelsFromSpan(span)[0] ?? "unknown",
+    providerKey:
+      typeof providerKey === "string" && providerKey !== ""
+        ? providerKey
+        : null,
     status: deriveLedgerStatus(span),
     durationMs: Math.round(span.durationMs),
     occurredAt: new Date(span.startTimeUnixMs),
@@ -206,16 +268,22 @@ export class GatewayBudgetDebitsMapProjection
   mapTraceSpanReceived(
     event: SpanReceivedEvent,
   ): GatewayBudgetDebitRecord | null {
+    // Non-gateway spans — the overwhelming majority of the span stream — are
+    // rejected on the RAW wire span, before normalisation. Returning null
+    // after normalising is NOT cheap: it runs every canonicalisation
+    // extractor over the whole attribute set, prompts and completions
+    // included, for every span in the product to derive a record that is
+    // then thrown away. The raw scan costs one array walk instead. Mirrors
+    // `isGovernanceOriginWireSpan` in the two sibling projections and the
+    // subscriber's enqueue filter, which is the same predicate.
+    if (!spanCarriesGatewayVirtualKeyId(event.data.span)) return null;
+
     const span = spanNormalizationPipelineService.normalizeSpanReceived(
       event.tenantId,
       event.data.span,
       event.data.resource,
       event.data.instrumentationScope,
     );
-    // Non-gateway spans map to null and never reach the store. This is the
-    // overwhelming majority of the span stream, and `null` is the cheapest
-    // possible outcome short of never staging the job at all — see the
-    // enqueue-filter note in the ADR-075 conversion report.
     return deriveGatewayDebitRecord(span);
   }
 }

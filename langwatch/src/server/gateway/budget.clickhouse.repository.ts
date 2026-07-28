@@ -147,6 +147,32 @@ export type LedgerEventRow = {
   occurredAt: Date;
 };
 
+/** One `BudgetDebitRow` in the column shape `gateway_budget_ledger_events` holds. */
+function toLedgerRecord(r: BudgetDebitRow) {
+  return {
+    TenantId: r.tenantId,
+    BudgetId: r.budgetId,
+    Scope: scopeToClickHouse(r.scope),
+    ScopeId: r.scopeId,
+    Window: windowToClickHouse(r.window),
+    VirtualKeyId: r.virtualKeyId,
+    ProviderCredentialId: r.providerCredentialId ?? "",
+    ProviderKey: r.providerKey ?? "",
+    GatewayRequestId: r.gatewayRequestId,
+    AmountUSD: r.amountUsd,
+    TokensInput: r.tokensInput,
+    TokensOutput: r.tokensOutput,
+    TokensCacheRead: r.tokensCacheRead,
+    TokensCacheWrite: r.tokensCacheWrite,
+    Model: r.model,
+    ProviderSlot: r.providerSlot ?? "",
+    DurationMS: r.durationMs ?? 0,
+    Status: r.status.toLowerCase(),
+    OccurredAt: r.occurredAt.getTime(),
+    EventTimestamp: Date.now(),
+  };
+}
+
 export class GatewayBudgetClickHouseRepository {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
@@ -205,33 +231,10 @@ export class GatewayBudgetClickHouseRepository {
       return { inserted: false };
     }
 
-    const records = rows.map((r) => ({
-      TenantId: r.tenantId,
-      BudgetId: r.budgetId,
-      Scope: scopeToClickHouse(r.scope),
-      ScopeId: r.scopeId,
-      Window: windowToClickHouse(r.window),
-      VirtualKeyId: r.virtualKeyId,
-      ProviderCredentialId: r.providerCredentialId ?? "",
-      ProviderKey: r.providerKey ?? "",
-      GatewayRequestId: r.gatewayRequestId,
-      AmountUSD: r.amountUsd,
-      TokensInput: r.tokensInput,
-      TokensOutput: r.tokensOutput,
-      TokensCacheRead: r.tokensCacheRead,
-      TokensCacheWrite: r.tokensCacheWrite,
-      Model: r.model,
-      ProviderSlot: r.providerSlot ?? "",
-      DurationMS: r.durationMs ?? 0,
-      Status: r.status.toLowerCase(),
-      OccurredAt: r.occurredAt.getTime(),
-      EventTimestamp: Date.now(),
-    }));
-
     try {
       await client.insert({
         table: EVENTS_TABLE,
-        values: records,
+        values: rows.map(toLedgerRecord),
         format: "JSONEachRow",
         clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
       });
@@ -244,6 +247,81 @@ export class GatewayBudgetClickHouseRepository {
     }
 
     return { inserted: true };
+  }
+
+  /**
+   * Batch form of {@link insertDebit}, spanning MANY gateway requests of one
+   * tenant. Used by the `gatewayBudgetDebits` projection's `bulkAppend`, which
+   * is how a replay rebuilds a window: without it a rebuild issues one probe
+   * and one awaited INSERT per gateway span, which is how a rebuild turns into
+   * a ClickHouse parts problem.
+   *
+   * The replay guard is preserved exactly, only widened: `insertDebit` probes
+   * for one `GatewayRequestId` and returns whether it wrote; this probes for
+   * every request id in the batch at once and returns the ids it actually
+   * wrote, so a caller can still tell a first write from a replay that found
+   * the ledger intact. Request ids already in the ledger are dropped from the
+   * insert rather than the whole batch being skipped — a rebuild over a window
+   * with a few lost debits writes exactly those.
+   *
+   * Rows for one request id are written together, as `insertDebit` requires,
+   * because a gateway request is one write covering every applicable budget.
+   */
+  async insertDebits(
+    rows: BudgetDebitRow[],
+  ): Promise<{ insertedGatewayRequestIds: string[] }> {
+    if (rows.length === 0) return { insertedGatewayRequestIds: [] };
+    const tenantId = rows[0]!.tenantId;
+    if (rows.some((r) => r.tenantId !== tenantId)) {
+      throw new Error(
+        "GatewayBudgetClickHouseRepository.insertDebits: rows span multiple tenants",
+      );
+    }
+
+    const gatewayRequestIds = [...new Set(rows.map((r) => r.gatewayRequestId))];
+    const client = await this.resolveClient(tenantId);
+    const probe = await client.query({
+      query: `SELECT DISTINCT GatewayRequestId FROM ${EVENTS_TABLE} WHERE TenantId = {tenantId:String} AND GatewayRequestId IN {gatewayRequestIds:Array(String)}`,
+      query_params: { tenantId, gatewayRequestIds },
+      format: "JSONEachRow",
+    });
+    const alreadyLedgered = new Set(
+      ((await probe.json()) as Array<{ GatewayRequestId: string }>).map(
+        (row) => row.GatewayRequestId,
+      ),
+    );
+
+    const toInsert = rows.filter(
+      (r) => !alreadyLedgered.has(r.gatewayRequestId),
+    );
+    if (toInsert.length === 0) {
+      logger.debug(
+        { tenantId, batchSize: rows.length, requests: gatewayRequestIds.length },
+        "skipping replay batch — every gateway_request_id already in ledger",
+      );
+      return { insertedGatewayRequestIds: [] };
+    }
+
+    try {
+      await client.insert({
+        table: EVENTS_TABLE,
+        values: toInsert.map(toLedgerRecord),
+        format: "JSONEachRow",
+        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+      });
+    } catch (error) {
+      logger.error(
+        { tenantId, count: toInsert.length, error },
+        "failed to insert gateway budget ledger events",
+      );
+      throw error;
+    }
+
+    return {
+      insertedGatewayRequestIds: [
+        ...new Set(toInsert.map((r) => r.gatewayRequestId)),
+      ],
+    };
   }
 
   /**

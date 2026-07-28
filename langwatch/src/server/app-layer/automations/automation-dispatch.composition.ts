@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 
 import { env } from "~/env.mjs";
+import { getAnalyticsService } from "~/server/app-layer/analytics";
 // LAYERING DEBT — the one import in this file that points upward.
 // `getProtectionsForProject` resolves a project's data-privacy redaction
 // policy; it has nothing to do with tRPC and only lives under `api/` for
@@ -87,6 +88,15 @@ export function createAutomationDispatchCollaborators({
     evaluationRuns,
     emailSuppressions,
     annotations,
+
+    // The process-wide analytics singleton — the SAME instance the tRPC and
+    // Hono analytics routes get, so the custom-graph threshold evaluator reads
+    // through the same 30s timeseries cache rather than warming a second one.
+    // Resolved here because resolution is layer 0's job: the adapter that
+    // consumes this is `port: (args) => collaborator.method(args)` and nothing
+    // else, so it can no longer reach for a locator, and a test can substitute
+    // this the way it substitutes every other collaborator.
+    analytics: getAnalyticsService(),
 
     // Composed exactly as the trace pipeline composes its own trace_summaries
     // fold — same cache tier, same key prefix — so the settle confirm reads

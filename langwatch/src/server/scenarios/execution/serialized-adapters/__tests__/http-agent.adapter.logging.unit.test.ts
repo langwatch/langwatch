@@ -112,26 +112,34 @@ describe("SerializedHttpAgentAdapter — logging (lw#3593)", () => {
   });
 
   describe("given the upstream returns 503 with a body", () => {
+    function mock503() {
+      mockSsrfSafeFetch.mockResolvedValue({
+        ok: false,
+        status: 503,
+        statusText: "Service Unavailable",
+        headers: new Headers({ "content-type": "text/plain" }),
+        json: vi.fn(),
+        text: vi.fn().mockResolvedValue("upstream busy"),
+      } as unknown as Awaited<ReturnType<typeof ssrfSafeFetch>>);
+    }
+
+    function makeAdapter() {
+      return new SerializedHttpAgentAdapter(
+        defaultConfig,
+        logger as unknown as ConstructorParameters<
+          typeof SerializedHttpAgentAdapter
+        >[1],
+      );
+    }
+
     describe("when the adapter executes a request", () => {
-      /** @scenario HTTP adapter logs non-2xx responses with body preview */
-      it("emits a warn entry with statusCode and a responseBodyPreview", async () => {
-        mockSsrfSafeFetch.mockResolvedValue({
-          ok: false,
-          status: 503,
-          statusText: "Service Unavailable",
-          headers: new Headers({ "content-type": "text/plain" }),
-          json: vi.fn(),
-          text: vi.fn().mockResolvedValue("upstream busy"),
-        } as unknown as Awaited<ReturnType<typeof ssrfSafeFetch>>);
+      /** @scenario HTTP adapter logs non-2xx responses without quoting the body */
+      it("emits a warn entry with statusCode but no body preview", async () => {
+        mock503();
 
-        const adapter = new SerializedHttpAgentAdapter(
-          defaultConfig,
-          logger as unknown as ConstructorParameters<
-            typeof SerializedHttpAgentAdapter
-          >[1],
+        await expect(makeAdapter().call(defaultInput)).rejects.toThrow(
+          /HTTP 503/,
         );
-
-        await expect(adapter.call(defaultInput)).rejects.toThrow(/HTTP 503/);
 
         expect(logger.warn).toHaveBeenCalledWith(
           expect.objectContaining({
@@ -139,9 +147,40 @@ describe("SerializedHttpAgentAdapter — logging (lw#3593)", () => {
             method: "POST",
             statusCode: 503,
             durationMs: expect.any(Number),
-            responseBodyPreview: expect.stringContaining("upstream busy"),
           }),
           "http call failed",
+        );
+
+        const warnFields = logger.warn.mock.calls[0]?.[0] as Record<
+          string,
+          unknown
+        >;
+        expect(warnFields).not.toHaveProperty("responseBodyPreview");
+        expect(JSON.stringify(warnFields)).not.toContain("upstream busy");
+      });
+
+      /** @scenario HTTP adapter keeps the response body preview at debug level */
+      it("emits the body preview at debug level only", async () => {
+        mock503();
+
+        await expect(makeAdapter().call(defaultInput)).rejects.toThrow(
+          /HTTP 503/,
+        );
+
+        expect(logger.debug).toHaveBeenCalledWith(
+          expect.objectContaining({
+            statusCode: 503,
+            responseBodyPreview: expect.stringContaining("upstream busy"),
+          }),
+          "http call failed, response body preview",
+        );
+      });
+
+      it("still surfaces the body in the thrown error the customer reads", async () => {
+        mock503();
+
+        await expect(makeAdapter().call(defaultInput)).rejects.toThrow(
+          /upstream busy/,
         );
       });
     });

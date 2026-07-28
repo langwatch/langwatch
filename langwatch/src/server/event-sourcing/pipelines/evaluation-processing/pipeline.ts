@@ -45,10 +45,6 @@ export interface EvaluationProcessingPipelineDeps {
       context: { tenantId: string },
     ) => Promise<void>;
   };
-  customerIoEvaluationSyncReactor?: ReactorDefinition<
-    EvaluationProcessingEvent,
-    EvaluationRunData
-  >;
 }
 
 /**
@@ -114,13 +110,6 @@ export function createEvaluationProcessingPipeline(
         deps.automations.graphActivityHandler(event, context),
     });
 
-  if (deps.customerIoEvaluationSyncReactor) {
-    builder = builder.withReactor(
-      "evaluationRun",
-      "customerIoEvaluationSync",
-      deps.customerIoEvaluationSyncReactor,
-    );
-  }
 
   return builder
     .withCommandInstance(

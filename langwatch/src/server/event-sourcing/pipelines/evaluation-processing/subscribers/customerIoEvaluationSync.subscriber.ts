@@ -1,3 +1,18 @@
+/**
+ * NOT WIRED — nothing constructs this factory, and this file is inert.
+ *
+ * Customer.io nurture has no live path at all. The reactor this replaces never
+ * ran either, and has since been deleted, so there is nothing else to read for
+ * "what actually happens today": nothing does. See the note in
+ * `pipelineRegistry.registerAll()` for the counting-strategy question that has
+ * to be settled first.
+ *
+ * Mounting it, once that lands, is one line on
+ * `evaluation-processing/pipeline.ts`:
+ * `.withEventSubscriber("customerIoEvaluationSync", createCustomerIoEvaluationSyncSubscriber({…}))`,
+ * built from the pipeline's own `Deps` per ADR-077 Rule 1.
+ */
+
 import { createLogger } from "@langwatch/observability";
 import type { NurturingService } from "@ee/billing/nurturing/nurturing.service";
 import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
@@ -9,7 +24,11 @@ import type {
   EventSubscriberContext,
   EventSubscriberDefinition,
 } from "../../../subscribers/eventSubscriber.types";
-import { CIO_SYNC_DEBOUNCE_TTL_MS } from "../../trace-processing/subscribers/customerIoTraceSync.subscriber";
+import {
+  CIO_SYNC_DEBOUNCE_TTL_MS,
+  nurtureFireAndForget,
+  priorNurtureCount,
+} from "../../shared/nurtureSync";
 import {
   EVALUATION_COMPLETED_EVENT_TYPE,
   EVALUATION_REPORTED_EVENT_TYPE,
@@ -129,69 +148,57 @@ export function createCustomerIoEvaluationSyncSubscriber(
           );
           return;
         }
-        // The evaluationRun fold commits before this subscriber's job runs, so
-        // the current evaluation is already counted — subtract 1 for the prior
-        // count.
-        const existingCount = Math.max(0, rawCount - 1);
+        const existingCount = priorNurtureCount(rawCount);
         const isFirstEvaluation = existingCount === 0;
 
         if (isFirstEvaluation) {
           // Fire-and-forget: do not block the subscriber's lane
-          void deps.nurturing
-            .identifyUser({
+          nurtureFireAndForget({
+            promise: deps.nurturing.identifyUser({
               userId,
               traits: {
                 has_evaluations: true,
                 evaluation_count: 1,
                 first_evaluation_at: now,
               },
-            })
-            .catch((error) => {
-              logger.error(
-                { projectId, error },
-                "Failed to identify user for first evaluation",
-              );
-              captureException(toError(error));
-            });
-          void deps.nurturing
-            .trackEvent({
+            }),
+            logger,
+            projectId,
+            what: "identify user for first evaluation",
+          });
+          nurtureFireAndForget({
+            promise: deps.nurturing.trackEvent({
               userId,
               event: "first_evaluation_created",
               properties: {
                 evaluation_type: evaluation.evaluatorType,
                 project_id: projectId,
               },
-            })
-            .catch((error) => {
-              logger.error(
-                { projectId, error },
-                "Failed to track first_evaluation_created event",
-              );
-              captureException(toError(error));
-            });
+            }),
+            logger,
+            projectId,
+            what: "track first_evaluation_created event",
+          });
         } else {
           const newCount = existingCount + 1;
           // Fire-and-forget: do not block the subscriber's lane
-          void deps.nurturing
-            .identifyUser({
+          nurtureFireAndForget({
+            promise: deps.nurturing.identifyUser({
               userId,
               traits: {
                 evaluation_count: newCount,
                 last_evaluation_at: now,
               },
-            })
-            .catch((error) => {
-              logger.error(
-                { projectId, error },
-                "Failed to identify user for evaluation update",
-              );
-              captureException(toError(error));
-            });
+            }),
+            logger,
+            projectId,
+            what: "identify user for evaluation update",
+          });
         }
 
         // Track evaluation_ran for every evaluation (first and subsequent)
-        void deps.nurturing
-          .trackEvent({
+        nurtureFireAndForget({
+          promise: deps.nurturing.trackEvent({
             userId,
             event: "evaluation_ran",
             properties: {
@@ -199,14 +206,11 @@ export function createCustomerIoEvaluationSyncSubscriber(
               score: evaluation.score,
               passed: evaluation.passed,
             },
-          })
-          .catch((error) => {
-            logger.error(
-              { projectId, error },
-              "Failed to track evaluation_ran event",
-            );
-            captureException(toError(error));
-          });
+          }),
+          logger,
+          projectId,
+          what: "track evaluation_ran event",
+        });
       } catch (error) {
         // Class B is lossy by contract: never throw back into the queue.
         logger.error(

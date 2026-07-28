@@ -127,15 +127,65 @@ describe("InMemoryFoldCacheClient", () => {
         expect(durable.reads).toEqual([]);
       });
 
-      it("records the TTL the store asked for", async () => {
-        const client = new InMemoryFoldCacheClient();
+      it("serves the entry while it is inside its TTL", async () => {
+        vi.useFakeTimers();
+        try {
+          const client = new InMemoryFoldCacheClient();
 
-        await client.write("fold:k", "payload", 300);
+          await client.write("fold:k", "payload", 300);
+          vi.advanceTimersByTime(299_000);
 
-        expect(client.entries.get("fold:k")).toEqual({
-          value: "payload",
-          ttlSeconds: 300,
-        });
+          expect(await client.read("fold:k")).toBe("payload");
+        } finally {
+          vi.useRealTimers();
+        }
+      });
+    });
+
+    /**
+     * The TTL is a correctness invariant, not housekeeping (ADR-066 §5): a
+     * miss is authoritative because it means the last write is at least a TTL
+     * old and has therefore settled. A tier that never expires would hand dev
+     * and every integration run a cache that never falls through to the
+     * store's ClickHouse read-back, and a `Map` that grows for the process
+     * lifetime.
+     */
+    describe("when an entry is read after its TTL has passed", () => {
+      it("misses, so the read falls through to the durable store", async () => {
+        vi.useFakeTimers();
+        try {
+          const durable = createDurableStore();
+          const client = new InMemoryFoldCacheClient();
+          const store = new CachedFoldStore<TraceSummaryish>(
+            durable.store,
+            client,
+            { keyPrefix: "trace_summaries", ttlSeconds: 300 },
+          );
+
+          await store.store({ spanCount: 3, UpdatedAt: 10 }, CONTEXT);
+          vi.advanceTimersByTime(301_000);
+          const read = await store.get("trace-1", CONTEXT);
+
+          expect(read).toEqual({ spanCount: 3, UpdatedAt: 10 });
+          expect(durable.reads).toEqual(["trace-1"]);
+        } finally {
+          vi.useRealTimers();
+        }
+      });
+
+      it("drops the expired entry rather than holding it for the process lifetime", async () => {
+        vi.useFakeTimers();
+        try {
+          const client = new InMemoryFoldCacheClient();
+
+          await client.write("fold:k", "payload", 300);
+          vi.advanceTimersByTime(301_000);
+          await client.read("fold:k");
+
+          expect(client.entries.has("fold:k")).toBe(false);
+        } finally {
+          vi.useRealTimers();
+        }
       });
     });
   });

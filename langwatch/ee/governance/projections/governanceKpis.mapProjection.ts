@@ -73,14 +73,15 @@
  */
 
 import type { GovernanceKpiContribution } from "@ee/governance/services/governanceKpis.clickhouse.repository";
-import { CanonicalizeSpanAttributesService } from "~/server/app-layer/traces/canonicalisation";
-import { SpanNormalizationPipelineService } from "~/server/app-layer/traces/span-normalization.service";
+import {
+  spanCostService,
+  spanNormalizationPipelineService,
+} from "@ee/governance/services/spanDerivation.composition";
 import {
   AbstractMapProjection,
   type MapEventHandlers,
 } from "~/server/event-sourcing/projections/abstractMapProjection";
 import type { AppendStore } from "~/server/event-sourcing/projections/mapProjection.types";
-import { SpanCostService } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/span-cost.service";
 import {
   type SpanReceivedEvent,
   spanReceivedEventSchema,
@@ -90,12 +91,6 @@ import {
   isGovernanceOriginWireSpan,
   readGovernanceSpanFacts,
 } from "./governanceSpanFacts";
-
-const spanNormalizationPipelineService = new SpanNormalizationPipelineService(
-  new CanonicalizeSpanAttributesService(),
-);
-
-const spanCostService = new SpanCostService();
 
 const spanEvents = [spanReceivedEventSchema] as const;
 

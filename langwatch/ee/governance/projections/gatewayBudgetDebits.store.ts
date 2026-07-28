@@ -1,27 +1,36 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { createLogger } from "@langwatch/observability";
-import type { PrismaClient } from "@prisma/client";
-import type { AppendStore } from "~/server/event-sourcing/projections/mapProjection.types";
+import type {
+  GatewayBudgetDebitService,
+  ResolvedGatewayBudgetDebit,
+} from "@ee/governance/services/gatewayBudgetDebit.service";
+import type {
+  AppendStore,
+  BulkAppendContext,
+} from "~/server/event-sourcing/projections/mapProjection.types";
 import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
-import type {
-  BudgetDebitRow,
-  GatewayBudgetClickHouseRepository,
-} from "~/server/gateway/budget.clickhouse.repository";
-import type {
-  ApplicableScopes,
-  GatewayBudgetRepository,
-} from "~/server/gateway/budget.repository";
+import type { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import type { ChangeEventRepository } from "~/server/gateway/changeEvent.repository";
+import {
+  assertRecordsTenant,
+  assertRecordTenant,
+} from "./assertRecordTenant";
 import type { GatewayBudgetDebitRecord } from "./gatewayBudgetDebits.mapProjection";
 
 const logger = createLogger(
   "langwatch:governance:gateway-budget-debits-store",
 );
 
+const STORE_NAME = "GatewayBudgetDebitsAppendStore";
+
 export interface GatewayBudgetDebitsAppendStoreDeps {
-  prisma: PrismaClient;
-  budgetRepository: GatewayBudgetRepository;
+  /**
+   * Decides which budgets a request may move and shapes the rows that move
+   * them (ADR-077 layer 3). Kept out of this store on purpose: a store that
+   * also authorises needs four "and"s to describe.
+   */
+  debits: GatewayBudgetDebitService;
   budgetCHRepository: GatewayBudgetClickHouseRepository;
   /**
    * Feed the Go gateway long-polls for cache invalidation. See
@@ -33,22 +42,16 @@ export interface GatewayBudgetDebitsAppendStoreDeps {
 
 /**
  * Write side of the ADR-075 Class C `gatewayBudgetDebits` map projection:
- * resolves which budgets a gateway request debits and appends one ClickHouse
- * ledger row per budget.
- *
- * The projection's `map` is pure, so every read this needs — the virtual key,
- * its project's org/team, the applicable budgets — happens here, which is also
- * where a failure is recoverable: the map job retries, and a debit that
- * survives neither the job nor its retries is re-derived by replay because the
- * derivation now lives on the replay path.
+ * appends the resolved ClickHouse ledger rows and tells the gateway when
+ * spend actually moved.
  *
  * **This store throws.** The reactor it replaces caught everything and logged
  * "failed to fold gateway trace into CH budget ledger", so a ClickHouse blip
  * silently deleted spend that had already been incurred. A projection store
  * that swallows an I/O failure re-creates exactly the hole this conversion
  * exists to close. Conditions that are genuinely "nothing to debit" — a span
- * from a deleted key, a key from another org, a key no budget covers — return
- * cleanly and are not errors.
+ * from a deleted key, a key from another org, a key no budget covers — resolve
+ * to null in {@link GatewayBudgetDebitService} and are not errors.
  */
 export class GatewayBudgetDebitsAppendStore
   implements AppendStore<GatewayBudgetDebitRecord>
@@ -57,98 +60,61 @@ export class GatewayBudgetDebitsAppendStore
 
   async append(
     record: GatewayBudgetDebitRecord,
-    _context: ProjectionStoreContext,
+    context: ProjectionStoreContext,
   ): Promise<void> {
-    const { tenantId: projectId, virtualKeyId, gatewayRequestId } = record;
-
-    const vk = await this.deps.prisma.virtualKey.findUnique({
-      where: { id: virtualKeyId },
-      select: { id: true, organizationId: true, principalUserId: true },
+    assertRecordTenant({
+      store: STORE_NAME,
+      recordTenantId: record.tenantId,
+      contextTenantId: context.tenantId,
     });
-    if (!vk) {
-      logger.warn(
-        { projectId, virtualKeyId, gatewayRequestId },
-        "gateway span references unknown VK — no budget to debit",
-      );
-      return;
-    }
+    const debit = await this.deps.debits.resolve(record);
+    if (!debit) return;
 
-    const project = await this.deps.prisma.project.findUnique({
-      where: { id: projectId },
-      select: {
-        id: true,
-        teamId: true,
-        team: { select: { organizationId: true } },
-      },
-    });
-    if (!project?.team) {
-      logger.warn(
-        { projectId, virtualKeyId },
-        "project missing team relation — no budget scope to resolve",
-      );
-      return;
-    }
-
-    // Cross-tenant guard: post-collapse VKs carry organizationId only, so the
-    // trace's tenant project must live under the same org before its spend is
-    // allowed to move that org's budgets.
-    if (project.team.organizationId !== vk.organizationId) {
-      logger.warn(
-        { projectId, virtualKeyId, gatewayRequestId },
-        "gateway span references cross-tenant VK — refusing to debit",
-      );
-      return;
-    }
-
-    const scopes: ApplicableScopes = {
-      organizationId: project.team.organizationId,
-      teamId: project.teamId,
-      projectId: project.id,
-      virtualKeyId: vk.id,
-      principalUserId: vk.principalUserId,
-    };
-    const budgets = await this.deps.budgetRepository.applicableForRequest(
-      scopes,
+    const { inserted } = await this.deps.budgetCHRepository.insertDebit(
+      debit.rows,
     );
-    if (budgets.length === 0) return;
+    if (inserted) await this.notifyGateway(debit);
+  }
 
-    const rows: BudgetDebitRow[] = budgets.map((budget) => ({
-      tenantId: projectId,
-      budgetId: budget.id,
-      scope: budget.scopeType,
-      scopeId: budget.scopeId,
-      window: budget.window,
-      virtualKeyId: vk.id,
-      gatewayRequestId,
-      amountUsd: record.amountUsd,
-      tokensInput: record.tokensInput,
-      tokensOutput: record.tokensOutput,
-      // Carried over from the reactor as literal zeros. The per-span cache
-      // counts ARE available (`SpanCostService.extractCacheTokens`), but
-      // populating columns the ledger has always written as 0 would move
-      // numbers on the usage page as a side effect of a durability change.
-      // Filling them is a separate, deliberate change — it does not touch
-      // AmountUSD and so cannot move a budget.
-      tokensCacheRead: 0,
-      tokensCacheWrite: 0,
-      model: record.model,
-      durationMs: record.durationMs,
-      status: record.status,
-      occurredAt: record.occurredAt,
-    }));
+  /**
+   * Batch form for the replay path.
+   *
+   * Rebuilding a window is the operation this projection exists for — the
+   * store's own contract is that a debit lost to a failed handler is
+   * "re-derived by replay" — so it is the one path that must not degrade into
+   * a per-row write. `replayMapProjection` buffers a tenant's records and
+   * flushes them here; resolving and inserting them one at a time would cost
+   * three Postgres reads and one awaited ClickHouse INSERT per gateway span,
+   * which is how a rebuild turns into a ClickHouse parts problem.
+   *
+   * The `inserted` gate survives the widening, per request id: only requests
+   * whose rows were actually written notify the gateway, so a replay over an
+   * intact ledger emits nothing and a replay that repairs lost debits emits
+   * exactly one change per repaired request.
+   */
+  async bulkAppend(
+    records: GatewayBudgetDebitRecord[],
+    context: BulkAppendContext,
+  ): Promise<void> {
+    if (records.length === 0) return;
+    assertRecordsTenant({
+      store: STORE_NAME,
+      records,
+      contextTenantId: context.tenantId,
+    });
 
-    const { inserted } =
-      await this.deps.budgetCHRepository.insertDebit(rows);
+    const debits = await this.deps.debits.resolveMany(records);
+    if (debits.length === 0) return;
 
-    if (inserted) {
-      await this.notifyGateway({
-        organizationId: project.team.organizationId,
-        projectId,
-        virtualKeyId: vk.id,
-        gatewayRequestId,
-        budgetIds: budgets.map((b) => b.id),
-        amountUsd: record.amountUsd,
-      });
+    const { insertedGatewayRequestIds } =
+      await this.deps.budgetCHRepository.insertDebits(
+        debits.flatMap((debit) => debit.rows),
+      );
+    if (insertedGatewayRequestIds.length === 0) return;
+
+    const inserted = new Set(insertedGatewayRequestIds);
+    for (const debit of debits) {
+      if (inserted.has(debit.gatewayRequestId)) await this.notifyGateway(debit);
     }
   }
 
@@ -179,32 +145,25 @@ export class GatewayBudgetDebitsAppendStore
    * logged and swallowed: the ledger row is already committed, and throwing
    * would retry the whole map job — re-probing ClickHouse — to re-send a hint.
    */
-  private async notifyGateway(input: {
-    organizationId: string;
-    projectId: string;
-    virtualKeyId: string;
-    gatewayRequestId: string;
-    budgetIds: string[];
-    amountUsd: string;
-  }): Promise<void> {
+  private async notifyGateway(debit: ResolvedGatewayBudgetDebit): Promise<void> {
     try {
       await this.deps.changeEvents.append({
-        organizationId: input.organizationId,
-        projectId: input.projectId,
+        organizationId: debit.organizationId,
+        projectId: debit.projectId,
         kind: "BUDGET_UPDATED",
         payload: {
-          gatewayRequestId: input.gatewayRequestId,
-          virtualKeyId: input.virtualKeyId,
-          budgetIds: input.budgetIds,
-          amountUsd: input.amountUsd,
+          gatewayRequestId: debit.gatewayRequestId,
+          virtualKeyId: debit.virtualKeyId,
+          budgetIds: debit.budgetIds,
+          amountUsd: debit.amountUsd,
         },
       });
     } catch (error) {
       logger.warn(
         {
-          projectId: input.projectId,
-          virtualKeyId: input.virtualKeyId,
-          gatewayRequestId: input.gatewayRequestId,
+          projectId: debit.projectId,
+          virtualKeyId: debit.virtualKeyId,
+          gatewayRequestId: debit.gatewayRequestId,
           error,
         },
         "failed to emit BUDGET_UPDATED — gateway caches evict on bundle TTL instead",

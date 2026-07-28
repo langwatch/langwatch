@@ -1,4 +1,4 @@
-import { getAnalyticsService } from "~/server/app-layer/analytics";
+import type { AnalyticsService } from "~/server/app-layer/analytics";
 import type { AutomationCustomGraphService } from "~/server/app-layer/automations/custom-graph.service";
 import {
   consumeEmailCapSlot,
@@ -56,6 +56,8 @@ export interface AutomationDispatchCollaborators {
   triggers: TriggerService;
   projects: ProjectService;
   evaluationRuns: EvaluationRunService;
+  /** ADR-034 timeseries reads, for the custom-graph threshold evaluator. */
+  analytics: Pick<AnalyticsService, "getTimeseries">;
   emailSuppressions: Pick<EmailSuppressionService, "filterSuppressed">;
   customGraphs: Pick<AutomationCustomGraphService, "getById">;
   webhookDeliveries: Pick<WebhookDeliveryService, "record" | "pruneExpired">;
@@ -165,8 +167,14 @@ function settlementDispatchPorts({
 function graphTriggerEvaluationPorts(
   collaborators: AutomationDispatchCollaborators,
 ): GraphTriggerEvaluationDeps {
-  const { baseHost, triggers, projects, customGraphs, graphTriggerSent } =
-    collaborators;
+  const {
+    baseHost,
+    triggers,
+    projects,
+    customGraphs,
+    graphTriggerSent,
+    analytics,
+  } = collaborators;
   const notifierDeps = graphAlertNotifierPorts(collaborators);
 
   return {
@@ -175,7 +183,7 @@ function graphTriggerEvaluationPorts(
     loadTrigger: (params) => triggers.getById(params),
     loadCustomGraph: (params) => customGraphs.getById(params),
     loadProject: (projectId) => projects.getById(projectId),
-    getTimeseries: (input) => getAnalyticsService().getTimeseries(input),
+    getTimeseries: (input) => analytics.getTimeseries(input),
     updateLastRunAt: ({ triggerId, projectId }) =>
       triggers.updateLastRunAt(triggerId, projectId),
     notifier: {

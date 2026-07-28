@@ -157,14 +157,14 @@ export function createExperimentRunProcessingPipeline(
       }),
     );
 
-  const withCommands = builder
+  let withCommands = builder
     .withCommand("startExperimentRun", StartExperimentRunCommand)
     .withCommand("recordTargetResult", RecordTargetResultCommand)
     .withCommand("recordEvaluatorResult", RecordEvaluatorResultCommand)
     .withCommand("completeExperimentRun", CompleteExperimentRunCommand);
 
   if (deps.experimentRunExecutionEffects !== null) {
-    withCommands.withProcessManager(
+    withCommands = withCommands.withProcessManager(
       EXPERIMENT_RUN_EXECUTION_PROCESS_NAME,
       experimentRunExecutionPM({
         // The terminal write is this pipeline's own command, bound here rather

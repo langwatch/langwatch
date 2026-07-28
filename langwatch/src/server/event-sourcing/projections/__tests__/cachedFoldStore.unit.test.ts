@@ -109,6 +109,16 @@ function createCache() {
   };
 }
 
+/**
+ * The TTL the store handed the cache tier on its last write. Read off the
+ * `write` call rather than off the entry the client kept, because the TTL the
+ * store resolves is what this file is asserting about — how the client then
+ * chooses to represent expiry is the client's business.
+ */
+function ttlPassedToCache(cache: ReturnType<typeof createCache>) {
+  return cache.write.mock.calls.at(-1)?.[2];
+}
+
 const TENANT = createTenantId("tenant-1");
 const CONTEXT: ProjectionStoreContext = {
   aggregateId: "agg-1",
@@ -218,7 +228,7 @@ describe("CachedFoldStore", () => {
 
       await store.store({ count: 5, UpdatedAt: 200 }, CONTEXT);
 
-      expect(redis.values.get(CACHE_KEY)?.ttlSeconds).toBe(3_600);
+      expect(ttlPassedToCache(redis)).toBe(3_600);
     });
 
 
@@ -423,7 +433,7 @@ describe("CachedFoldStore", () => {
     async function ttlWrittenBy(redis: ReturnType<typeof createCache>) {
       const store = await freshStore(redis);
       await store.store({ count: 1, UpdatedAt: 1 }, CONTEXT);
-      return redis.values.get(CACHE_KEY)?.ttlSeconds;
+      return ttlPassedToCache(redis);
     }
 
     describe("when the override is below the replication-lag floor", () => {

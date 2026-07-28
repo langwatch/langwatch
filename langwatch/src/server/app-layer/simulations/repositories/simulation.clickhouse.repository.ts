@@ -281,7 +281,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
          FROM ${TABLE_NAME}
          WHERE TenantId = {tenantId:String}
            ${dateFilter.whereClause}
-           ${simulationRunDedupPredicate(`TenantId = {tenantId:String} ${dateFilter.whereClause}`)}
+           ${simulationRunDedupPredicate({ tenantIdParam: "tenantId", filters: dateFilter.whereClause })}
        )
        WHERE ArchivedAt IS NULL
        GROUP BY NormalizedSetId
@@ -369,7 +369,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
          AND ScenarioSetId IN ({scenarioSetIds:Array(String)})
          ${dateFilter.whereClause}
          AND ArchivedAt IS NULL
-         ${simulationRunDedupPredicate(`TenantId = {tenantId:String} AND ScenarioSetId IN ({scenarioSetIds:Array(String)}) ${dateFilter.whereClause}`)}`,
+         ${simulationRunDedupPredicate({ tenantIdParam: "tenantId", filters: `AND ScenarioSetId IN ({scenarioSetIds:Array(String)}) ${dateFilter.whereClause}` })}`,
       {
         tenantId: projectId,
         scenarioSetIds: expandSetIdFilter(scenarioSetId),
@@ -414,7 +414,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
          AND ScenarioSetId IN ({scenarioSetIds:Array(String)})
          ${dateFilter.whereClause}
          AND ArchivedAt IS NULL
-         ${simulationRunDedupPredicate(`TenantId = {tenantId:String} AND ScenarioSetId IN ({scenarioSetIds:Array(String)}) ${dateFilter.whereClause}`)}
+         ${simulationRunDedupPredicate({ tenantIdParam: "tenantId", filters: `AND ScenarioSetId IN ({scenarioSetIds:Array(String)}) ${dateFilter.whereClause}` })}
        GROUP BY BatchRunId
        ${combinedHaving}
        ORDER BY LastRunAt DESC, BatchRunId ASC
@@ -498,7 +498,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
          AND BatchRunId IN ({batchRunIds:Array(String)})
          AND ArchivedAt IS NULL
          ${startedAtWindow.whereClause}
-         ${simulationRunDedupPredicate("TenantId = {tenantId:String} AND ScenarioSetId IN ({scenarioSetIds:Array(String)}) AND BatchRunId IN ({batchRunIds:Array(String)})")}
+         ${simulationRunDedupPredicate({ tenantIdParam: "tenantId", filters: "AND ScenarioSetId IN ({scenarioSetIds:Array(String)}) AND BatchRunId IN ({batchRunIds:Array(String)})" })}
        ORDER BY CreatedAt ASC`,
           {
             tenantId: projectId,
@@ -665,7 +665,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
          AND ScenarioSetId IN ({scenarioSetIds:Array(String)})
          ${dateFilter.whereClause}
          AND ArchivedAt IS NULL
-         ${simulationRunDedupPredicate(`TenantId = {tenantId:String} AND ScenarioSetId IN ({scenarioSetIds:Array(String)}) ${dateFilter.whereClause}`)}`,
+         ${simulationRunDedupPredicate({ tenantIdParam: "tenantId", filters: `AND ScenarioSetId IN ({scenarioSetIds:Array(String)}) ${dateFilter.whereClause}` })}`,
       {
         tenantId: projectId,
         scenarioSetIds: expandSetIdFilter(scenarioSetId),
@@ -748,7 +748,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
          AND ScenarioSetId IN ({scenarioSetIds:Array(String)})
          ${dateFilter.whereClause}
          AND ArchivedAt IS NULL
-         ${simulationRunDedupPredicate(`TenantId = {tenantId:String} AND ScenarioSetId IN ({scenarioSetIds:Array(String)}) ${dateFilter.whereClause}`)}
+         ${simulationRunDedupPredicate({ tenantIdParam: "tenantId", filters: `AND ScenarioSetId IN ({scenarioSetIds:Array(String)}) ${dateFilter.whereClause}` })}
        GROUP BY BatchRunId
        ${combinedHaving}
        ORDER BY MaxCreatedAt DESC, BatchRunId ASC
@@ -859,7 +859,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
        WHERE TenantId = {tenantId:String}
          ${dateFilter.whereClause}
          AND ArchivedAt IS NULL
-         ${simulationRunDedupPredicate(`TenantId = {tenantId:String} ${dateFilter.whereClause}`)}
+         ${simulationRunDedupPredicate({ tenantIdParam: "tenantId", filters: dateFilter.whereClause })}
        GROUP BY BatchRunId
        ${combinedHaving}
        ORDER BY MaxCreatedAt DESC, BatchRunId ASC
@@ -1037,7 +1037,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
            WHERE TenantId = {tenantId:String}
              ${wherePredicate}
              ${dateFilter.whereClause}
-             ${simulationRunDedupPredicate(`TenantId = {tenantId:String} ${wherePredicate} ${dateFilter.whereClause}`)}
+             ${simulationRunDedupPredicate({ tenantIdParam: "tenantId", filters: `${wherePredicate} ${dateFilter.whereClause}` })}
          )
          WHERE ArchivedAt IS NULL
          GROUP BY NormalizedSetId, BatchRunId
@@ -1080,9 +1080,10 @@ export class SimulationClickHouseRepository implements SimulationRepository {
               WHERE TenantId = {tenantId:String}
                 AND ScenarioSetId IN ({scenarioSetIds:Array(String)})
                 AND ArchivedAt IS NULL
-                ${simulationRunDedupPredicate(
-                  "TenantId = {tenantId:String} AND ScenarioSetId IN ({scenarioSetIds:Array(String)})",
-                )}
+                ${simulationRunDedupPredicate({
+                  tenantIdParam: "tenantId",
+                  filters: "AND ScenarioSetId IN ({scenarioSetIds:Array(String)})",
+                })}
               LIMIT ${RUN_ID_CAP}`,
       query_params: { tenantId: projectId, scenarioSetIds },
       format: "JSONEachRow",

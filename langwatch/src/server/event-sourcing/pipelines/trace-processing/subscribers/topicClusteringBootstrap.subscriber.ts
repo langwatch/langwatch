@@ -1,10 +1,26 @@
+/**
+ * NOT WIRED — nothing constructs this factory, and this file is inert.
+ *
+ * The live path is still the fused one: the ADR-051 bootstrap runs inside
+ * `../reactors/projectMetadata.reactor.ts` via its `bootstrapTopicClustering`
+ * dep, which `pipelineRegistry.registerTracePipeline()` supplies from the
+ * rate-limited `Deferred` resolved in `registerTopicClusteringPipeline()`. The
+ * split this file describes has not happened in the running system.
+ *
+ * It stays inert because ADR-075 Class A needs the fold-bound
+ * `withSubscriber({ fold })` form this file is written against, and ADR-077
+ * has not reached trace-processing yet (it is migration step 7, last). Mounting
+ * it is then one line — `.withSubscriber(x.name, x.spec)` — at which point the
+ * bootstrap comes out of the projectMetadata reactor in the same change.
+ */
+
 import { createLogger } from "@langwatch/observability";
 
 import type { ProjectService } from "~/server/app-layer/projects/project.service";
 
-import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
 // The subscriber spec shape, single-sourced with the other traceSummary
 // subscribers rather than restated here.
+import { isRealIngest } from "../reactors/_originGuardedReactor";
 import type { TraceSummarySubscriber } from "../reactors/_originGuardedSubscriber";
 
 const logger = createLogger(
@@ -42,21 +58,6 @@ export interface TopicClusteringBootstrapSubscriberDeps {
    * per claim window.
    */
   bootstrapTopicClustering: (projectId: string) => Promise<void>;
-}
-
-/**
- * Sample traces (seeded from the empty-state "Seed sample traces" path; every
- * span carries `langwatch.origin = "sample"`) are not real ingest. The reactor
- * this replaces skipped them wholesale, so a project whose only traces are
- * seeded samples has never been given a clustering schedule — preserved here
- * rather than quietly widened, because widening it would schedule daily
- * clustering runs for every project that clicked "seed sample traces" once.
- *
- * Reads fold state, so it cannot move to the enqueue seam: it stays in the
- * handler, where a sample trace costs one job that returns immediately.
- */
-function isRealIngest(state: TraceSummaryData): boolean {
-  return state.attributes?.["langwatch.origin"] !== "sample";
 }
 
 /**
@@ -103,6 +104,13 @@ export function createTopicClusteringBootstrapSubscriber(
       handler: async (_event, context) => {
         const tenantId = context.tenantId;
 
+        // The reactor this replaces skipped sample traces wholesale, so a
+        // project whose only traces are seeded samples has never been given a
+        // clustering schedule — preserved rather than quietly widened, because
+        // widening it would schedule daily clustering runs for every project
+        // that clicked "seed sample traces" once. Reads fold state, so it
+        // cannot move to the enqueue seam: it stays in the handler, where a
+        // sample trace costs one job that returns immediately.
         if (!isRealIngest(context.state)) return;
 
         // Fail FORWARD on a read failure, and skip only on a definite answer.

@@ -18,16 +18,33 @@ export const SIMULATION_RUNS_TABLE = "simulation_runs" as const;
  * avoiding the per-row dedup anti-pattern which materializes ALL columns
  * per granule (~8K rows).
  *
- * @param whereFilters - The same WHERE filters from the outer query,
- *   duplicated here for partition pruning in the inner subquery.
+ * THE TENANT PREDICATE IS EMITTED HERE, not passed in. The inner subquery is
+ * a full read of `simulation_runs` in its own right — it decides which
+ * (run, version) tuples the outer query is allowed to see — so a caller that
+ * forgot to repeat `TenantId =` inside it would dedup a tenant's runs against
+ * every tenant's rows. Every caller happened to remember, which is precisely
+ * the kind of invariant that holds until someone adds the tenth query. The
+ * shape now makes forgetting impossible: the tenant binding is named, and the
+ * caller's own filters are appended after it.
+ *
+ * @param tenantIdParam - Name of the ClickHouse query parameter carrying the
+ *   tenant id, bound in the same call's `query_params`.
+ * @param filters - The rest of the outer query's WHERE filters, repeated here
+ *   for partition pruning in the inner subquery. Each must start with `AND`.
  *
  * @see dev/docs/best_practices/clickhouse-queries.md — "Safe Pattern: IN-Tuple Dedup"
  */
-export function simulationRunDedupPredicate(whereFilters: string): string {
+export function simulationRunDedupPredicate({
+  tenantIdParam,
+  filters = "",
+}: {
+  tenantIdParam: string;
+  filters?: string;
+}): string {
   return `AND (TenantId, ScenarioSetId, BatchRunId, ScenarioRunId, UpdatedAt) IN (
     SELECT TenantId, ScenarioSetId, BatchRunId, ScenarioRunId, max(UpdatedAt)
     FROM ${SIMULATION_RUNS_TABLE}
-    WHERE ${whereFilters}
+    WHERE TenantId = {${tenantIdParam}:String} ${filters}
     GROUP BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
   )`;
 }

@@ -12,6 +12,17 @@
  * governance streams be STATELESS map projections over `span_received`
  * rather than handlers hanging off the trace-summary fold.
  *
+ * The gate below is only as trustworthy as that stamp, so the reserved
+ * namespace has to be unwritable from OUTSIDE the receiver — otherwise a
+ * project API key could assert `langwatch.origin.kind` and an arbitrary
+ * `ingestion_source.id` and inject rows into an auditor-facing stream.
+ * `@ee/governance/services/reservedOriginAttrs` owns that guarantee: the
+ * receiver strips-then-stamps, and the general OTLP route
+ * (`src/server/routes/otel.ts`) — the only other entry point that accepts
+ * caller-chosen span attributes — strips without stamping. The REST
+ * `/api/collector` path cannot reach the namespace at all: it builds span
+ * attributes from a closed key set (`collectorSpan.utils.ts`).
+ *
  * Two gates live here on purpose:
  *
  *  - {@link isGovernanceOriginWireSpan} runs on the RAW OTLP span, before

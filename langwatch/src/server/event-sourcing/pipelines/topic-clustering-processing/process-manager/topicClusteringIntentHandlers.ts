@@ -11,6 +11,7 @@ import type {
 } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import type { ClusteringPageOutcome } from "~/server/app-layer/topic-clustering/clustering";
 import { classifyClusteringError } from "~/server/app-layer/topic-clustering/clustering-error";
+import { boundClusteringErrorMessage } from "~/server/app-layer/topic-clustering/clustering-error-excerpt";
 
 import type { TopicClusteringRunIntent } from "./topicClusteringProcess.types";
 
@@ -103,8 +104,18 @@ interface PageContext {
   attempt: number;
 }
 
+/**
+ * The text of a failure, bounded before it reaches a log line or — far more
+ * consequentially — the event log. `recordClusteringRunFailed` persists this
+ * string, so an unbounded message is an unbounded durable row; the excerpt it
+ * quotes has already had the request echo stripped upstream
+ * (`clustering-error-excerpt.ts`), and this is the bound that holds for the
+ * failures that never went through that path.
+ */
 function errorText(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+  return boundClusteringErrorMessage(
+    error instanceof Error ? error.message : String(error),
+  );
 }
 
 /**

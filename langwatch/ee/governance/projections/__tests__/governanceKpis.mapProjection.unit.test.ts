@@ -33,7 +33,7 @@ import {
   type TestSpanReceivedEventOptions,
 } from "~/server/event-sourcing/pipelines/trace-processing/projections/__tests__/fixtures/trace-summary-test.fixtures";
 import type { SpanReceivedEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
-import { createGovernanceKpisProjection } from "../governanceProjections";
+import { createGovernanceKpisProjection } from "../governanceProjections.composition";
 import { GovernanceKpisMapProjection } from "../governanceKpis.mapProjection";
 import { GovernanceKpisAppendStore } from "../governanceKpis.store";
 import { ReplacingMergeTreeDouble } from "./replacingMergeTree.double";

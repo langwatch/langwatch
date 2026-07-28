@@ -20,6 +20,12 @@ import type {
   BulkAppendContext,
 } from "~/server/event-sourcing/projections/mapProjection.types";
 import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
+import {
+  assertRecordsTenant,
+  assertRecordTenant,
+} from "./assertRecordTenant";
+
+const STORE_NAME = "GovernanceKpisAppendStore";
 
 export class GovernanceKpisAppendStore
   implements AppendStore<GovernanceKpiContribution>
@@ -30,16 +36,26 @@ export class GovernanceKpisAppendStore
 
   async append(
     record: GovernanceKpiContribution,
-    _context: ProjectionStoreContext,
+    context: ProjectionStoreContext,
   ): Promise<void> {
+    assertRecordTenant({
+      store: STORE_NAME,
+      recordTenantId: record.tenantId,
+      contextTenantId: context.tenantId,
+    });
     await this.repository.insertContribution(record);
   }
 
   async bulkAppend(
     records: GovernanceKpiContribution[],
-    _context: BulkAppendContext,
+    context: BulkAppendContext,
   ): Promise<void> {
     if (records.length === 0) return;
+    assertRecordsTenant({
+      store: STORE_NAME,
+      records,
+      contextTenantId: context.tenantId,
+    });
     await this.repository.insertContributions(records);
   }
 }

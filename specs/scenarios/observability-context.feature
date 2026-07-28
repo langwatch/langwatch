@@ -42,12 +42,20 @@ Feature: Scenario worker logs carry the parent's logger context
       with fields {url, method, statusCode, durationMs}
 
   @unit
-  Scenario: HTTP adapter logs non-2xx responses with body preview
+  Scenario: HTTP adapter logs non-2xx responses without quoting the body
     Given a SerializedHttpAgentAdapter pointed at a server that returns 503
       with response body "upstream busy"
     When the adapter executes a request
     Then the logger receives an "http call failed" warn entry
-      with fields {url, method, statusCode, durationMs, responseBodyPreview}
+      with fields {url, method, statusCode, durationMs}
+      and the warn entry carries no preview of the response body
+
+  @unit
+  Scenario: HTTP adapter keeps the response body preview at debug level
+    Given a SerializedHttpAgentAdapter pointed at a server that returns 503
+      with response body "upstream busy"
+    When the adapter executes a request
+    Then the response body preview is emitted at debug level only
       and the preview contains "upstream busy"
 
   @unit

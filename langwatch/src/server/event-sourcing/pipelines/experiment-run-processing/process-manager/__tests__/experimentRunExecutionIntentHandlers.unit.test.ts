@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi, type Mock } from "vitest";
 
 import type { IntentContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 
@@ -34,9 +34,22 @@ type CompleteRun = ExperimentRunExecutionDispatchDeps["completeRun"];
 type SignalStop = ExperimentRunExecutionDispatchDeps["signalStop"];
 type MarkRunFailed = ExperimentRunExecutionDispatchDeps["markRunFailed"];
 
+/**
+ * Overrides are typed as mocks, not as the plain dep signatures. Spreading
+ * `Partial<ExperimentRunExecutionDispatchDeps>` widens each member to
+ * `Mock | plain function`, and `.mock` does not exist on that union — so the
+ * assertions below stop compiling under `typecheck:tests` while passing at
+ * runtime.
+ */
+type MockedDispatchDeps = {
+  completeRun: Mock<CompleteRun>;
+  signalStop: Mock<SignalStop>;
+  markRunFailed: Mock<MarkRunFailed>;
+};
+
 function makeDeps(
-  overrides: Partial<ExperimentRunExecutionDispatchDeps> = {},
-) {
+  overrides: Partial<MockedDispatchDeps> = {},
+): MockedDispatchDeps {
   return {
     completeRun: vi.fn<CompleteRun>(async () => undefined),
     signalStop: vi.fn<SignalStop>(async () => undefined),

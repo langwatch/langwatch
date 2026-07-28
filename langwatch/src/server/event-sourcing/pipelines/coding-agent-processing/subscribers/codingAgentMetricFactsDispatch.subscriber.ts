@@ -51,7 +51,10 @@ export function createCodingAgentMetricFactsDispatchSubscriber(deps: {
       // vocabulary maps arrives as one today.
       if (point.valueType === "none") return;
 
-      const attributes = parsePointAttributes(point.pointAttributesJson);
+      const attributes = parsePointAttributes({
+        json: point.pointAttributesJson,
+        pointId: point.pointId,
+      });
       if (attributes === null) return;
       const sessionKey = resolveConversationKey(attributes);
       if (sessionKey === null) return;
@@ -77,7 +80,10 @@ export function createCodingAgentMetricFactsDispatchSubscriber(deps: {
           // from the Claude Code runtime it reuses; without it a session's
           // metric contribution could first-writer-win the fold's agent to
           // claude_code while its log contributions say claude_cowork.
-          serviceName: serviceNameFromResource(point.resourceAttributesJson),
+          serviceName: serviceNameFromResource({
+            json: point.resourceAttributesJson,
+            pointId: point.pointId,
+          }),
         }),
         occurredAt: point.timeUnixMs,
         seriesId: isDelta ? point.pointId : point.seriesId,
@@ -110,23 +116,45 @@ function liftScalarAttributes(
  * writes (`[{key, value: {type, value}}]`), so parsing means flattening the
  * typed wrappers back to scalars — never treating the JSON as a flat object.
  */
-function parsePointAttributes(
-  json: string,
-): Record<string, string | number | boolean> | null {
+function parsePointAttributes({
+  json,
+  pointId,
+}: {
+  json: string;
+  pointId: string;
+}): Record<string, string | number | boolean> | null {
   if (!json) return null;
   try {
     return scalarsFromCanonicalAttributes(JSON.parse(json));
   } catch (error) {
     // Written by our own preparation — should be unreachable, but a
     // dispatcher must never poison the queue over one point.
-    logger.warn({ error }, "unparseable metric point attributes; skipping");
+    //
+    // The error's NAME and the point id, never the error itself: V8 builds
+    // `SyntaxError.message` by quoting ~10 characters of the input it choked
+    // on, so serialising the error copies a slice of the customer's metric
+    // attributes into our logs. The point id is the better pointer — the
+    // canonical row is still there to read.
+    logger.warn(
+      {
+        errorName: error instanceof Error ? error.name : typeof error,
+        pointId,
+      },
+      "unparseable metric point attributes; skipping",
+    );
     return null;
   }
 }
 
 /** Resource-level service.name off the point's canonical KeyValue JSON. */
-function serviceNameFromResource(json: string): string | null {
-  const resource = parsePointAttributes(json);
+function serviceNameFromResource({
+  json,
+  pointId,
+}: {
+  json: string;
+  pointId: string;
+}): string | null {
+  const resource = parsePointAttributes({ json, pointId });
   const serviceName = resource?.["service.name"];
   return typeof serviceName === "string" && serviceName.length > 0
     ? serviceName

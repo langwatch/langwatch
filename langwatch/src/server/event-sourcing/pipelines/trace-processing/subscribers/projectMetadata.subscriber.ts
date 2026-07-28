@@ -1,10 +1,25 @@
+/**
+ * NOT WIRED — nothing constructs this factory, and this file is inert.
+ *
+ * The live path is still `../reactors/projectMetadata.reactor.ts`, built in
+ * `pipelineRegistry.registerTracePipeline()` and mounted by
+ * `trace-processing/pipeline.ts` as
+ * `.withReactor("traceSummary", "projectMetadata", deps.projectMetadataReactor)`.
+ *
+ * It stays inert because ADR-075 Class A needs the fold-bound
+ * `withSubscriber({ fold })` form this file is written against, and ADR-077
+ * has not reached trace-processing yet (it is migration step 7, last). Mounting
+ * it is then one line — `.withSubscriber(x.name, x.spec)` — with the reactor
+ * and its `Deps` member deleted in the same change.
+ */
+
 import { createLogger } from "@langwatch/observability";
 
 import type { ProjectService } from "~/server/app-layer/projects/project.service";
 
-import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
 // The subscriber spec shape, single-sourced with the other traceSummary
 // subscribers rather than restated here.
+import { isRealIngest } from "../reactors/_originGuardedReactor";
 import type { TraceSummarySubscriber } from "../reactors/_originGuardedSubscriber";
 
 const logger = createLogger(
@@ -16,20 +31,6 @@ export const PROJECT_METADATA_DEBOUNCE_MS = 60_000;
 
 export interface ProjectMetadataSubscriberDeps {
   projects: ProjectService;
-}
-
-/**
- * Sample traces (seeded from the empty-state "Seed sample traces" path; every
- * span carries `langwatch.origin = "sample"`) are not a real first ingest.
- * Flipping `firstMessage` / `integrated` on them would prematurely dismiss the
- * empty-state onboarding card even though the user hasn't connected their own
- * app yet. Skip entirely — a real trace will trigger this again.
- *
- * This reads fold state, so it cannot move to the enqueue seam: it stays in
- * the handler, where a sample trace costs one job that returns immediately.
- */
-function isRealFirstIngest(state: TraceSummaryData): boolean {
-  return state.attributes?.["langwatch.origin"] !== "sample";
 }
 
 /**
@@ -74,7 +75,10 @@ export function createProjectMetadataSubscriber(
         const tenantId = context.tenantId;
         const attrs = context.state.attributes ?? {};
 
-        if (!isRealFirstIngest(context.state)) return;
+        // Reads fold state, so it cannot move to the enqueue seam: it stays in
+        // the handler, where a sample trace costs one job that returns
+        // immediately.
+        if (!isRealIngest(context.state)) return;
 
         try {
           const project = await deps.projects.getById(tenantId);

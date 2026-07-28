@@ -1,6 +1,9 @@
 import { createLogger } from "@langwatch/observability";
 
 import type { IntentExecutor } from "~/server/event-sourcing/pipeline/processManagerDefinition";
+// The error is declared beside the dispatcher that throws it, so the thrower
+// does not depend on this module — its catcher.
+import { ScenarioExecutorUnavailableError } from "~/server/scenarios/execution/execution-dispatcher";
 import type { ScenarioFailureOutcome } from "~/server/scenarios/scenario-failure-outcome";
 
 import type {
@@ -21,23 +24,6 @@ export interface ScenarioExecutionJob {
   batchRunId: string;
   setId: string;
   target: ScenarioExecutionTarget;
-}
-
-/**
- * Thrown when this process cannot execute anything at all — no pool has been
- * wired into it yet.
- *
- * This is the one failure the dispatch handler is allowed to propagate. Its
- * predecessor logged "Execution pool not yet wired, skipping" and returned,
- * which dropped the job and orphaned the run at QUEUED. Throwing leaves the
- * outbox row pending so the dispatch is retried, which is the whole point of
- * moving dispatch onto the outbox.
- */
-export class ScenarioExecutorUnavailableError extends Error {
-  constructor(message = "No scenario executor is wired on this process") {
-    super(message);
-    this.name = "ScenarioExecutorUnavailableError";
-  }
 }
 
 /** What the terminal write and the dispatch need from the scenario domain. */

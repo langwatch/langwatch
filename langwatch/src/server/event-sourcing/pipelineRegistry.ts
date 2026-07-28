@@ -2,18 +2,15 @@ import {
   type EnterprisePipelineSetConfig,
   registerEnterprisePipelineSet,
 } from "@ee/event-sourcing/pipelineSet";
-import { GatewayBudgetDebitsMapProjection } from "@ee/governance/projections/gatewayBudgetDebits.mapProjection";
-import {
-  GatewayBudgetDebitsAppendStore,
-  type GatewayBudgetDebitsAppendStoreDeps,
-} from "@ee/governance/projections/gatewayBudgetDebits.store";
 import { createVirtualKeyLastUsedSubscriber } from "@ee/governance/subscribers/virtualKeyLastUsed.subscriber";
 import {
+  createGatewayBudgetDebitsProjection,
   createGovernanceKpisProjection,
   createGovernanceOcsfEventsProjection,
+  type GatewayBudgetDebitsProjectionDeps,
   type GovernanceKpisProjectionDeps,
   type GovernanceOcsfEventsProjectionDeps,
-} from "@ee/governance/projections/governanceProjections";
+} from "@ee/governance/projections/governanceProjections.composition";
 import { createTraceAlertTriggerMatchHandler } from "@ee/governance/subscribers/traceAlertTriggerMatch.subscriber";
 import type {
   LangyConversationStateData,
@@ -297,7 +294,7 @@ export interface PipelineRegistryDeps {
   costRecorder: EvaluationCostRecorder;
   billingCheckpoints: BillingCheckpointService;
   usageReportingService?: UsageReportingService;
-  gatewayBudgetSync?: GatewayBudgetDebitsAppendStoreDeps;
+  gatewayBudgetSync?: GatewayBudgetDebitsProjectionDeps;
   /**
    * ADR-022: BlobStore for RecordSpanCommand spool reconstitution.
    * When provided, the trace-processing pipeline wires it into RecordSpanCommand
@@ -331,11 +328,19 @@ export class PipelineRegistry {
   >("bootstrapTopicClustering");
 
   registerAll() {
-    // TODO: Customer.io reactors are implemented but not yet registered.
-    // Counting strategy needs to be finalised (per-event ClickHouse queries)
-    // before enabling.
-    // See: customerIoTraceSyncReactor, customerIoEvaluationSyncReactor,
-    //      customerIoSimulationSyncReactor
+    // TODO: Customer.io nurture sync is implemented and registered nowhere, so
+    // no generation of it runs today. The counting strategy (per-event
+    // ClickHouse queries) still has to be finalised before it is switched on.
+    //
+    // The ADR-075 subscribers are now the only implementation — the reactors
+    // they replaced are gone — and none of them is constructed here:
+    //   trace-processing/subscribers/customerIoTraceSync.subscriber.ts
+    //   evaluation-processing/subscribers/customerIoEvaluationSync.subscriber.ts
+    //   simulation-processing/subscribers/customerIoSimulationSync.subscriber.ts
+    //
+    // Switching it on means each pipeline building its own from its `Deps` and
+    // mounting it with `.withEventSubscriber` (ADR-077 Rule 1) — not this file
+    // constructing three more handlers.
 
     const traceSummaryStore = new CachedFoldStore<TraceSummaryData>(
       new TraceSummaryStore(this.deps.repositories.traceSummaryFold),
@@ -458,7 +463,12 @@ export class PipelineRegistry {
       ...enterprisePipelines.commands,
       billing: mapCommands(billingPipeline.commands),
       automations: automationCommands,
-      /** Late-bind the execution pool for scenario execution reactor. */
+      /**
+       * Late-bind the execution pool that the `scenarioExecution` process
+       * outbox dispatches into (ADR-073). Worker startup calls `setPool` once
+       * the pool exists; until then a dispatch throws
+       * `ScenarioExecutorUnavailableError` and the outbox row stays pending.
+       */
       scenarioExecutionHandle,
     };
   }
@@ -740,9 +750,7 @@ export class PipelineRegistry {
     // `lastUsedAt` touch is a best-effort side effect on Prisma, not derived
     // state, so it becomes a subscriber.
     const gatewayBudgetDebitsProjection = this.deps.gatewayBudgetSync
-      ? new GatewayBudgetDebitsMapProjection({
-          store: new GatewayBudgetDebitsAppendStore(this.deps.gatewayBudgetSync),
-        })
+      ? createGatewayBudgetDebitsProjection(this.deps.gatewayBudgetSync)
       : undefined;
 
     const virtualKeyLastUsedSubscriber = this.deps.gatewayBudgetSync

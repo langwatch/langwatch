@@ -14,11 +14,30 @@
 
 import { createLogger } from "@langwatch/observability";
 
-import { ScenarioExecutorUnavailableError } from "~/server/event-sourcing/pipelines/simulation-processing/process-manager/scenarioExecutionIntentHandlers";
-
 import type { ExecutionJobData, ScenarioExecutionPool } from "./execution-pool";
 
 const logger = createLogger("langwatch:scenarios:execution-dispatcher");
+
+/**
+ * Thrown when this process cannot execute anything at all — no pool has been
+ * wired into it yet.
+ *
+ * This is the one failure the `scenarioExecution` dispatch intent handler is
+ * allowed to propagate. Its predecessor logged "Execution pool not yet wired,
+ * skipping" and returned, which dropped the job and orphaned the run at
+ * QUEUED. Throwing leaves the outbox row pending so the dispatch is retried,
+ * which is the whole point of moving dispatch onto the outbox.
+ *
+ * Declared here, beside the only thing that throws it, rather than beside the
+ * handler that catches it — the dispatcher is the lower layer and must not
+ * depend on its caller's module.
+ */
+export class ScenarioExecutorUnavailableError extends Error {
+  constructor(message = "No scenario executor is wired on this process") {
+    super(message);
+    this.name = "ScenarioExecutorUnavailableError";
+  }
+}
 
 /** What a worker binds its pool into, and what the outbox handler calls. */
 export interface ScenarioExecutionDispatcherHandle {

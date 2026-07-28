@@ -65,17 +65,35 @@ export class RedisFoldCacheClient implements FoldCacheClient {
  * deployment this client and each pod would serve its own stale view — so the
  * composition root picks it only on the no-Redis branch, never as a fallback.
  *
+ * **It expires entries, because the interface says entries expire.** Redis
+ * `SET … EX` is not an optimisation this implementation may skip: a permanent
+ * hit means dev and every integration run never once take the store's
+ * ClickHouse read-back path, so a bug there is invisible until production —
+ * and the `Map` grows for the process lifetime. Expiry is enforced lazily on
+ * read (there is no sweep timer; a client used by tests must not hold one),
+ * which is the same shape Redis has from a caller's point of view: a key past
+ * its TTL is simply not there.
+ *
  * Being a real implementation rather than a no-op double, it is also what tests
  * exercise the store's hit, miss and TTL paths with.
  */
 export class InMemoryFoldCacheClient implements FoldCacheClient {
-  readonly entries = new Map<string, { value: string; ttlSeconds: number }>();
+  readonly entries = new Map<string, { value: string; expiresAt: number }>();
 
   async read(key: string): Promise<string | null> {
-    return this.entries.get(key)?.value ?? null;
+    const entry = this.entries.get(key);
+    if (!entry) return null;
+    if (entry.expiresAt <= Date.now()) {
+      this.entries.delete(key);
+      return null;
+    }
+    return entry.value;
   }
 
   async write(key: string, value: string, ttlSeconds: number): Promise<void> {
-    this.entries.set(key, { value, ttlSeconds });
+    this.entries.set(key, {
+      value,
+      expiresAt: Date.now() + ttlSeconds * 1000,
+    });
   }
 }

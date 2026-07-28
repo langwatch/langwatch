@@ -2,8 +2,7 @@
 
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
-import { CanonicalizeSpanAttributesService } from "~/server/app-layer/traces/canonicalisation";
-import { SpanNormalizationPipelineService } from "~/server/app-layer/traces/span-normalization.service";
+import { spanNormalizationPipelineService } from "@ee/governance/services/spanDerivation.composition";
 import { SPAN_RECEIVED_EVENT_TYPE } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
 import type {
   SpanReceivedEvent,
@@ -11,7 +10,10 @@ import type {
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
 import type { EventSubscriberDefinition } from "~/server/event-sourcing/subscribers/eventSubscriber.types";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
-import { GATEWAY_VIRTUAL_KEY_ID_ATTR } from "../projections/gatewayBudgetDebits.mapProjection";
+import {
+  GATEWAY_VIRTUAL_KEY_ID_ATTR,
+  spanCarriesGatewayVirtualKeyId,
+} from "../projections/gatewayBudgetDebits.mapProjection";
 
 const logger = createLogger(
   "langwatch:governance:virtual-key-last-used-subscriber",
@@ -34,27 +36,25 @@ export interface VirtualKeyLastUsedSubscriberDeps {
  * key marker?
  *
  * ADR-069 gives the enqueue seam no retry, so a throw here permanently loses
- * the job rather than reading as "not relevant" — hence array guards and
- * equality checks only, no decoding and no normalization. It reads the RAW
- * OTLP attribute list because canonicalisation is neither cheap nor total;
- * the gateway stamps this key literally, so the raw scan and the handler's
- * normalized read agree on gateway traffic.
+ * the job rather than reading as "not relevant" — which is why the scan it
+ * delegates to reads the RAW OTLP attribute list with array guards and
+ * equality checks only, no decoding and no normalization.
  *
  * Without it every span in the product mints a job for a write that concerns
  * only gateway traffic. With it, an irrelevant event costs nothing.
+ *
+ * The scan itself is `spanCarriesGatewayVirtualKeyId`, shared verbatim with
+ * the `gatewayBudgetDebits` projection, which applies it for the same reason
+ * one level along: neither half of this split can decide a span is worth
+ * normalising when the other would not. What they do AFTER normalising
+ * differs on purpose — see `deriveGatewayDebitRecord`'s docstring.
  */
 export function spanCarriesVirtualKeyMarker(event: TraceProcessingEvent): boolean {
   if (event.type !== SPAN_RECEIVED_EVENT_TYPE) return false;
-  const attributes = (event as SpanReceivedEvent).data?.span?.attributes;
-  if (!Array.isArray(attributes)) return false;
-  return attributes.some(
-    (attribute) => attribute?.key === GATEWAY_VIRTUAL_KEY_ID_ATTR,
+  return spanCarriesGatewayVirtualKeyId(
+    (event as SpanReceivedEvent).data?.span,
   );
 }
-
-const spanNormalizationPipelineService = new SpanNormalizationPipelineService(
-  new CanonicalizeSpanAttributesService(),
-);
 
 /**
  * ADR-075 Class C (the split half): touch `VirtualKey.lastUsedAt` when a

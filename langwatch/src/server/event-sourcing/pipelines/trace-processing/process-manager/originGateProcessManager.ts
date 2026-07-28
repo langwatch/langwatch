@@ -1,3 +1,20 @@
+/**
+ * NOT WIRED — nothing mounts this applier, and this file is inert.
+ *
+ * The live path is still `../reactors/originGate.reactor.ts`, built in
+ * `pipelineRegistry.registerTracePipeline()` against a `scheduleDeferred`
+ * `Deferred` and mounted by `trace-processing/pipeline.ts` as
+ * `.withReactor("traceSummary", "originGate", deps.originGateReactor)`. The
+ * deferred re-check therefore still runs on a delayed reactor job, not on a
+ * durable process deadline.
+ *
+ * It stays inert because ADR-077 has not reached trace-processing yet (it is
+ * migration step 7, last): mounting it means the pipeline owning its own
+ * `.withProcessManager(ORIGIN_GATE_PROCESS_NAME, originGatePM(deps.dispatch))`
+ * and binding `resolveOrigin` through the command bus, which is exactly what
+ * step 7 does. The reactor and the `Deferred` go in that same change.
+ */
+
 import type { ProcessManagerApplier } from "~/server/event-sourcing/pipeline/processBuilder";
 
 import {

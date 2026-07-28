@@ -84,6 +84,24 @@ export function passesTraceOriginGuards(
 }
 
 /**
+ * Whether this trace counts as a project actually being used.
+ *
+ * Sample traces (seeded from the empty-state "Seed sample traces" path; every
+ * span carries `langwatch.origin = "sample"`) are not real ingest. Treating
+ * them as such would prematurely dismiss the empty-state onboarding card while
+ * the user has not connected their own app yet, and would schedule daily topic
+ * clustering for every project that clicked "seed sample traces" once.
+ *
+ * Pure and fold-state-only, so it is safe both pre-enqueue (`shouldReact`) and
+ * inside a handler. Single-sourced here — like `passesTraceOriginGuards` above
+ * — so the projectMetadata reactor and the two subscribers that ask the same
+ * question cannot drift apart, and so a fix can never miss a stale duplicate.
+ */
+export function isRealIngest(foldState: TraceSummaryData): boolean {
+  return foldState.attributes?.["langwatch.origin"] !== "sample";
+}
+
+/**
  * An extra pure guard, ANDed with the origin guards. Must be synchronous and
  * side-effect free: it runs pre-enqueue via `shouldReact` on the fold's hot
  * path. Guards needing IO belong in `handle`.

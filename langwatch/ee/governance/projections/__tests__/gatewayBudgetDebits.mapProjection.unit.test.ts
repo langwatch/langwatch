@@ -8,7 +8,8 @@
  * second, different set of debits.
  */
 
-import { describe, expect, it } from "vitest";
+import { spanNormalizationPipelineService } from "@ee/governance/services/spanDerivation.composition";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createSpanReceivedEvent,
   type TestSpanReceivedEventOptions,
@@ -16,6 +17,7 @@ import {
 import {
   type GatewayBudgetDebitRecord,
   GatewayBudgetDebitsMapProjection,
+  spanCarriesGatewayVirtualKeyId,
 } from "../gatewayBudgetDebits.mapProjection";
 
 const noopStore = {
@@ -54,9 +56,42 @@ function gatewaySpan(
 }
 
 describe("GatewayBudgetDebitsMapProjection", () => {
+  afterEach(() => vi.restoreAllMocks());
+
   describe("given a span that carries no gateway markers", () => {
     it("derives no debit", () => {
       expect(mapRecord({ attributes: PRICED })).toBeNull();
+    });
+
+    /**
+     * The whole span stream passes through here, and normalisation is not
+     * free: it opens a tracer span and runs every canonicalisation extractor
+     * over the full attribute set, prompts and completions included. A
+     * non-gateway span must be rejected on the raw wire attributes, before
+     * any of that runs — returning null afterwards has already paid the bill.
+     */
+    it("never normalises it", () => {
+      const normalize = vi.spyOn(
+        spanNormalizationPipelineService,
+        "normalizeSpanReceived",
+      );
+
+      mapRecord({ attributes: PRICED });
+
+      expect(normalize).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a span that does carry a gateway virtual key", () => {
+    it("normalises it, so the raw gate cannot be starving the derivation", () => {
+      const normalize = vi.spyOn(
+        spanNormalizationPipelineService,
+        "normalizeSpanReceived",
+      );
+
+      mapRecord(gatewaySpan());
+
+      expect(normalize).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -183,6 +218,36 @@ describe("GatewayBudgetDebitsMapProjection", () => {
       expect(first?.gatewayRequestId).toBe("grq_A");
       expect(second?.gatewayRequestId).toBe("grq_B");
       expect(first?.amountUsd).toBe(second?.amountUsd);
+    });
+  });
+
+  /**
+   * The gate is also the subscriber's ADR-069 enqueue filter, a seam with no
+   * retry: a throw there loses the job outright rather than reading as "not
+   * relevant". So it has to survive whatever the wire hands it.
+   */
+  describe("given the raw gate is handed malformed wire data", () => {
+    it("reads it as not-gateway instead of throwing", () => {
+      for (const span of [
+        undefined,
+        null,
+        "not-a-span",
+        {},
+        { attributes: null },
+        { attributes: "nope" },
+        { attributes: [null, undefined, "x", 7] },
+        { attributes: [{ notAKey: 1 }] },
+      ]) {
+        expect(spanCarriesGatewayVirtualKeyId(span)).toBe(false);
+      }
+    });
+
+    it("recognises the marker by key alone, whatever the value looks like", () => {
+      expect(
+        spanCarriesGatewayVirtualKeyId({
+          attributes: [{ key: "langwatch.virtual_key_id", value: undefined }],
+        }),
+      ).toBe(true);
     });
   });
 

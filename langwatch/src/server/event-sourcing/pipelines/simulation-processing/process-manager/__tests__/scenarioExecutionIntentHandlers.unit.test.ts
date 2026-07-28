@@ -2,10 +2,11 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { IntentContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 
+import { ScenarioExecutorUnavailableError } from "~/server/scenarios/execution/execution-dispatcher";
+
 import {
   createScenarioExecutionExecuteRunHandler,
   createScenarioExecutionFailRunHandler,
-  ScenarioExecutorUnavailableError,
   type ScenarioExecutionDispatchDeps,
 } from "../scenarioExecutionIntentHandlers";
 import type {

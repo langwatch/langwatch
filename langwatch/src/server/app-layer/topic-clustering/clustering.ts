@@ -14,6 +14,7 @@ import {
   CLUSTERING_ERROR_CODES,
   ClusteringError,
 } from "./clustering-error";
+import { clusteringErrorExcerpt } from "./clustering-error-excerpt";
 import { getClickHouseClientForProject } from "../../clickhouse/clickhouseClient";
 import { prisma } from "../../db";
 import { getProjectEmbeddingsModel } from "../../embeddings";
@@ -983,15 +984,12 @@ const postToTopicClustering = async (opts: {
     });
 
     if (!response.ok) {
-      let body = await response.text();
-      try {
-        body = JSON.stringify(JSON.parse(body), null, 2)
-          .split("\n")
-          .slice(0, 10)
-          .join("\n");
-      } catch {
-        /* this is just a safe json parse fallback */
-      }
+      // Bounded in BYTES and with the request echo stripped, because this
+      // message is logged AND recorded on the run's failure event. A pydantic
+      // 422 quotes the value it rejected — which for us is a trace's own
+      // text — and the previous line-bound let a single long line through
+      // whole. See clustering-error-excerpt.ts.
+      const body = clusteringErrorExcerpt(await response.text());
       // Ours by default. The body often quotes an upstream provider error,
       // but quoting is not evidence — attributing a 5xx to the customer's
       // credentials on the strength of the text inside it is how this used to

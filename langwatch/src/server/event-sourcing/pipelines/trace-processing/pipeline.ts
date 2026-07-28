@@ -86,10 +86,6 @@ export interface TraceProcessingPipelineDeps {
     ) => Promise<void>;
   };
   spanStorageBroadcastReactor: ReactorDefinition<TraceProcessingEvent>;
-  customerIoTraceSyncReactor?: ReactorDefinition<
-    TraceProcessingEvent,
-    TraceSummaryData
-  >;
   /**
    * ADR-075 Class C: gateway spend is derived state, so it is a projection and
    * a replay rebuilds it. Absent when ClickHouse is disabled.
@@ -115,10 +111,6 @@ export interface TraceProcessingPipelineDeps {
    */
   spanCommandShardCount?: number;
   governanceKpisProjection?: MapProjectionDefinition<any, TraceProcessingEvent>;
-  retentionOrphanSweepReactor?: ReactorDefinition<
-    TraceProcessingEvent,
-    TraceSummaryData
-  >;
   governanceOcsfEventsProjection?: MapProjectionDefinition<
     any,
     TraceProcessingEvent
@@ -212,13 +204,6 @@ export function createTraceProcessingPipeline(
       deps.spanStorageBroadcastReactor,
     );
 
-  if (deps.customerIoTraceSyncReactor) {
-    builder = builder.withReactor(
-      "traceSummary",
-      "customerIoTraceSync",
-      deps.customerIoTraceSyncReactor,
-    );
-  }
 
   if (deps.gatewayBudgetDebitsProjection) {
     builder = builder.withMapProjection(
@@ -245,14 +230,6 @@ export function createTraceProcessingPipeline(
     builder = builder.withMapProjection(
       "governanceOcsfEvents",
       deps.governanceOcsfEventsProjection,
-    );
-  }
-
-  if (deps.retentionOrphanSweepReactor) {
-    builder = builder.withReactor(
-      "traceSummary",
-      "retentionOrphanSweep",
-      deps.retentionOrphanSweepReactor,
     );
   }
 

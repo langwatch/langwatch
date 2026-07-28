@@ -65,6 +65,7 @@ import {
   type FailureEventParams,
   ScenarioFailureHandler,
 } from "./scenario-failure-handler";
+import { classifyScenarioInfraError } from "./scenario-infra-error";
 
 // ============================================================================
 // Dependency Interfaces (Dependency Inversion Principle)
@@ -378,14 +379,23 @@ export async function executeScenarioRun(
       await handleCancelledJobResult(jobData, result.error, deps);
     } else {
       getJobProcessingCounter("scenario", "failed").inc();
+      // The classified code, not the raw failure text. `result.error` is
+      // whatever the runner or its stderr produced, which is the simulated
+      // conversation and the judge's verdict about it — customer content that
+      // must not land in the platform's own log retention. The code is enough
+      // to tell an operator why the run died; the raw text stays at debug.
       jobLogger.warn(
         {
           success: false,
-          error: result.error,
+          errorCode: classifyScenarioInfraError(result.error).code,
           totalDurationMs,
           childDurationMs,
         },
         "Scenario job completed with failure",
+      );
+      jobLogger.debug(
+        { error: result.error },
+        "Scenario job failure, raw runner error",
       );
       await handleFailedJobResult(jobData, result.error, deps);
     }
@@ -413,7 +423,7 @@ async function spawnScenarioChildProcess(
     });
 
     const log = (
-      level: "info" | "warn" | "error",
+      level: "debug" | "info" | "warn" | "error",
       message: string,
       extra?: Record<string, unknown>,
     ) => {
@@ -490,20 +500,32 @@ async function spawnScenarioChildProcess(
       });
     }, CHILD_PROCESS.TIMEOUT_MS);
 
+    // The child's output is CUSTOMER CONTENT, not our diagnostics. Its own
+    // pino logger writes to stdout — including the judge's `reasoning`, which
+    // is verdict text about the simulated conversation — and its structured
+    // result line carries the same. Re-emitting those lines at `info`/`warn`
+    // copied every one of them verbatim into the platform's log retention.
+    //
+    // So the raw stream is forwarded at `debug` and nowhere else, and the
+    // result line is read from the accumulated `stdout` at close (see
+    // `parseChildProcessResult`) rather than by re-emitting lines as they
+    // arrive. Everything an operator needs at `info` — spawn, pid, exit code,
+    // classified failure reason — is logged by this file in its own words.
     child.stdout?.on("data", (data: Buffer) => {
       const chunk = data.toString();
       stdout += chunk;
       const lines = chunk.trim().split("\n");
       for (const line of lines) {
-        if (line) log("info", line);
+        if (line) log("debug", line);
       }
     });
 
     child.stderr?.on("data", (data: Buffer) => {
-      stderr += data.toString();
-      const lines = data.toString().trim().split("\n");
+      const chunk = data.toString();
+      stderr += chunk;
+      const lines = chunk.trim().split("\n");
       for (const line of lines) {
-        if (line) log("warn", line);
+        if (line) log("debug", line);
       }
     });
 
@@ -533,10 +555,15 @@ async function spawnScenarioChildProcess(
           childResult?.error && childResult.error.trim().length > 0
             ? childResult.error
             : `Child process exited with code ${code}: ${stderr}`;
+        // Exit code + classified reason is what an operator needs, and neither
+        // quotes the child. The raw stderr is an unbounded, unsanitised stream
+        // (it can carry the conversation the run was about), so it stays at
+        // debug.
         log("error", `Child process exited with code ${code}`, {
           exitCode: code,
-          stderr,
+          errorCode: classifyScenarioInfraError(error).code,
         });
+        log("debug", "Child process stderr", { exitCode: code, stderr });
         resolve({
           success: false,
           error,

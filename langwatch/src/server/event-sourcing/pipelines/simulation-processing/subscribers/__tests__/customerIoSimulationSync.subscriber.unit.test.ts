@@ -7,7 +7,7 @@ import {
   type CustomerIoSimulationSyncSubscriberDeps,
   createCustomerIoSimulationSyncSubscriber,
 } from "../customerIoSimulationSync.subscriber";
-import { CIO_SYNC_DEBOUNCE_TTL_MS } from "../../../trace-processing/subscribers/customerIoTraceSync.subscriber";
+import { CIO_SYNC_DEBOUNCE_TTL_MS } from "../../../shared/nurtureSync";
 
 // Suppress logger output
 vi.mock("@langwatch/observability", () => ({

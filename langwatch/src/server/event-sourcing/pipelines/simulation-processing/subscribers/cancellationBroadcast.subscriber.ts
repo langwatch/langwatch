@@ -1,3 +1,18 @@
+/**
+ * NOT WIRED — nothing constructs this factory, and this file is inert.
+ *
+ * The live path is still `../reactors/cancellationBroadcast.reactor.ts`, which
+ * `simulation-processing/pipeline.ts` constructs inline and mounts as
+ * `.withReactor("simulationRunState", "cancellationBroadcast", …)`.
+ *
+ * It stays inert on one missing dep, not on the layering: a subscriber has no
+ * fold state, so the `BatchRunId` the reactor reads off `simulationRunState`
+ * has to arrive as the injected `readBatchRunId` port below, and nothing
+ * supplies one yet. Mounting it is then one line —
+ * `.withEventSubscriber("cancellationBroadcast", …)` — with the reactor
+ * deleted in the same change.
+ */
+
 import { createLogger } from "@langwatch/observability";
 import type { CancellationPublisher } from "../../../../scenarios/cancellation-channel";
 import { publishCancellation } from "../../../../scenarios/cancellation-channel";

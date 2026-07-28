@@ -713,13 +713,7 @@ export class ProjectionRouter<
             }
             if (toApply.length === 0) return;
 
-            const firstContext = await this.buildStoreContext(toApply[0]!);
-            const contexts = toApply.map((event) => ({
-              ...firstContext,
-              aggregateId: String(event.aggregateId),
-              // Per-event tenantId keeps the executor's cross-tenant guard honest.
-              tenantId: event.tenantId,
-            }));
+            const contexts = await this.buildStoreContexts(toApply);
             const mapped = await withMetrics({
               fn: () =>
                 this.mapExecutor.executeBatch(mapProj, toApply, contexts),
@@ -2226,6 +2220,42 @@ export class ProjectionRouter<
    * Centralising it ensures every store sees the same shape — and any new
    * context field (e.g. process role, trace correlation) lands in one place.
    */
+  /**
+   * Per-event store contexts for a batch.
+   *
+   * EVERY field is derived from its own event, `retentionPolicy` included.
+   * It used to be resolved once from event 0 and spread across the batch
+   * while `aggregateId` and `tenantId` were re-derived — and it is the field
+   * that decides how long the written row SURVIVES, so a batch that ever
+   * spanned tenants would stamp the first tenant's retention onto another
+   * tenant's rows and the mistake would outlive the batch that made it.
+   *
+   * Batches are single-tenant today (grouped upstream), which is exactly why
+   * memoising the resolve per tenant costs one lookup in the real case while
+   * making the invariant local instead of assumed.
+   */
+  private async buildStoreContexts(
+    events: EventType[],
+  ): Promise<ProjectionStoreContext[]> {
+    const retentionByTenant = new Map<string, ResolvedRetention | null>();
+    const contexts: ProjectionStoreContext[] = [];
+    for (const event of events) {
+      const tenantKey = String(event.tenantId);
+      let retentionPolicy = retentionByTenant.get(tenantKey);
+      if (retentionPolicy === undefined) {
+        retentionPolicy = await this.resolveRetention(event.tenantId);
+        retentionByTenant.set(tenantKey, retentionPolicy);
+      }
+      contexts.push({
+        aggregateId: String(event.aggregateId),
+        // Per-event tenantId keeps the executor's cross-tenant guard honest.
+        tenantId: event.tenantId,
+        retentionPolicy,
+      });
+    }
+    return contexts;
+  }
+
   private async buildStoreContext(
     event: EventType,
     key?: string,
