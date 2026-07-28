@@ -1212,14 +1212,16 @@ ingress:
   # leading slash, a bare `/`, or a non-list value would each turn the block into
   # decoration.
   #
-  # CONTROLLER SUPPORT: the response to a blocked request is not specified by the
-  # Ingress API and differs by controller — ingress-nginx swaps a no-endpoints
-  # upstream for its default backend and answers 404; Traefik and the AWS load
-  # balancer controller answer 503. All of them fail closed, which is the property
-  # that matters. Controllers that route to NODE PORTS rather than pod IPs — the
-  # AWS load balancer controller with its default `target-type: instance`, and GKE
-  # Ingress without NEG — reject a ClusterIP backend outright and stop reconciling
-  # the Ingress; on an upgrade that fails OPEN, because the load balancer keeps
+  # CONTROLLER SUPPORT: the exact response is controller-dependent — the Ingress
+  # API does not specify it. Verified against ingress-nginx v1.11.3: a blocked
+  # request gets nginx's own `503 Service Temporarily Unavailable`. What holds by
+  # construction rather than by any controller's goodwill is that there is
+  # nowhere to forward to, so every controller fails closed.
+  #
+  # Controllers that route to NODE PORTS rather than pod IPs — the AWS load
+  # balancer controller with its default `target-type: instance`, and GKE Ingress
+  # without NEG — reject a ClusterIP backend outright and stop reconciling the
+  # Ingress; on an upgrade that fails OPEN, because the load balancer keeps
   # serving the rules it already had. On those controllers set
   # `alb.ingress.kubernetes.io/target-type: ip` (or the GKE NEG equivalent), or
   # empty this list and block the prefix at the load balancer instead.
@@ -1233,9 +1235,9 @@ ingress:
   # route terminates. The prefixes apply to EVERY host in `ingress.hosts`,
   # including hosts an operator has pointed at some other backend.
   #
-  # OPERATIONS: blocked requests answer 404 or 503 depending on the controller
-  # (see CONTROLLER SUPPORT), so probes against `/api/internal` show up in your
-  # ingress error-rate metrics. That is the block working, not the app faulting.
+  # OPERATIONS: blocked requests answer 503 on ingress-nginx (see CONTROLLER
+  # SUPPORT), so probes against `/api/internal` show up in your ingress 5xx
+  # metrics. That is the block working, not the app faulting.
   # If you run the gateway or the Langy agent OUTSIDE this release (see
   # gateway.controlPlane / langyagent.controlPlane), those callbacks arrive over
   # the public ingress and this block will stop them — narrow the list to the

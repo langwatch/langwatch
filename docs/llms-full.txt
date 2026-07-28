@@ -53290,8 +53290,8 @@ clickhouse:
 #
 # `/api/internal` is hard-blocked at the edge by default (ingress.blockedPaths)
 # so the private control plane is never internet-reachable. Blocked requests
-# answer 404 or 503 depending on your controller. See the Security guide for the
-# opt-out, the AWS/GKE caveat, and what the block does not cover.
+# answer 503 on ingress-nginx. See the Security guide for the opt-out, the
+# AWS/GKE caveat, and what the block does not cover.
 ingress:
   enabled: true
   className: nginx
@@ -55692,11 +55692,12 @@ ingress:
 
 Things worth knowing before you change it:
 
-- **Blocked requests answer 404 or 503**, depending on your controller
-  (ingress-nginx serves its default-backend 404; Traefik and the AWS load
-  balancer controller answer 503). All fail closed. Expect a low background rate
-  in your ingress error metrics from internet scanners — that is the block
-  working, not the app faulting.
+- **Blocked requests answer `503 Service Temporarily Unavailable`** on
+  ingress-nginx (measured on v1.11.3 — there is no upstream to forward to). The
+  exact code is controller-dependent and not specified by the Ingress API, but
+  every controller fails closed. Expect a low background rate in your ingress 5xx
+  metrics from internet scanners — that is the block working, not the app
+  faulting.
 - **In-cluster callers are unaffected.** The agent, the gateway and the chart's
   CronJobs reach the app through its internal Service, never the ingress.
 - **It only covers this ingress.** If you publish the app another way — a
