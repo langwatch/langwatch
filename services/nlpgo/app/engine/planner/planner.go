@@ -135,6 +135,33 @@ func (e *MissingEndNodeError) Error() string {
 	return "planner: " + MissingEndNodeMessage
 }
 
+// UnwiredEndNodeMessage is the customer-facing explanation for a workflow
+// whose End node exists but has no wired path from the Entry node. Distinct
+// from MissingEndNodeMessage because the fix is different: the author does
+// not need to add a node, they need to connect the one they already have.
+// The Studio canvas makes this the likelier of the two mistakes — leaving
+// the End node dangling is easier than deleting it (#3198).
+const UnwiredEndNodeMessage = "End node has no wired inputs; connect a node's output to the End node so the run produces a result"
+
+// UnreachedEndNodeMessage is the engine-side twin of the two messages above,
+// for a run that planned fine but still finished without its End node
+// producing anything — a branch that skipped it, or any future entrypoint
+// that bypasses these planner guards. It lives here so the whole End-node
+// vocabulary has one home and the strings cannot drift apart (#3198).
+const UnreachedEndNodeMessage = "workflow finished without reaching its End node, so it produced no result; check that the End node is wired and reachable on every branch"
+
+// UnwiredEndNodeError signals a full-run workflow whose End node is present
+// but not reachable from the Entry node, so reachability scoping drops it
+// from the plan and the run finalizes with an empty result — the same #3198
+// symptom as a missing End node, from a different author mistake. Carries no
+// fields for the same reason MissingEndNodeError doesn't: the problem is a
+// missing connection, not a specific offending node.
+type UnwiredEndNodeError struct{}
+
+func (e *UnwiredEndNodeError) Error() string {
+	return "planner: " + UnwiredEndNodeMessage
+}
+
 // Option tunes how New constructs the Plan. Functional options keep the
 // common case (`planner.New(w)`) clean while allowing callers like
 // engine.Engine to opt into reachability scoping.
@@ -178,7 +205,10 @@ func AllowMissingEnd() Option {
 //     untilNodeID when provided) — disconnected nodes never enter the
 //     plan. Mirrors Python's `find_reachable_nodes` /
 //     `find_path_until_node` in studio/parser.py.
-//  7. Layered topological sort (Kahn's algorithm with stable ordering)
+//  7. Unwired End node (full runs only): step 5 asks whether an End node
+//     EXISTS; this asks whether one made it into the plan. It has to run
+//     after step 6 because that is what drops a dangling End — issue #3198.
+//  8. Layered topological sort (Kahn's algorithm with stable ordering)
 //
 // Errors short-circuit at the first failure so the caller surfaces a
 // single root cause to the customer.
@@ -286,7 +316,31 @@ func New(w *dsl.Workflow, opts ...Option) (*Plan, error) {
 		allowed = path
 	}
 
-	// 7. Layered topo sort. We seed with the input ordering of Nodes
+	// 7. Unwired End node. Step 5 only established that an End node exists
+	// somewhere in the node table; step 6 is what decides whether it will
+	// ever be dispatched. An End node the author dropped on the canvas but
+	// never connected is not reachable from Entry, so it is absent from
+	// `allowed`, never executes, and the run finalizes with an empty result
+	// — the same #3198 symptom as having no End node at all.
+	//
+	// Only meaningful when reachability scoping actually ran: allowed==nil
+	// is the "no Entry node" legacy fallback that includes every node, so
+	// there is no plan-membership signal to judge against. The partial-run
+	// shapes are exempt for the same reason as in step 5.
+	if o.untilNodeID == "" && !o.endOptional && allowed != nil {
+		endInPlan := false
+		for id := range allowed {
+			if nodeIDs[id] == dsl.ComponentEnd {
+				endInPlan = true
+				break
+			}
+		}
+		if !endInPlan {
+			return nil, &UnwiredEndNodeError{}
+		}
+	}
+
+	// 8. Layered topo sort. We seed with the input ordering of Nodes
 	// to keep results stable across runs; a stable order helps both
 	// debugging and integration-test diffs against Python output.
 	layers := layerize(w.Nodes, children, parents, allowed)

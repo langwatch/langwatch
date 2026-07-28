@@ -1150,6 +1150,12 @@ type runState struct {
 	states     map[string]*NodeState
 	firstError *NodeError
 	endNodeID  string
+	// endNodeIDs lists every End node in the workflow, in node order.
+	// endNodeID above is just the first of them, which is fine for the
+	// single-End shape but not for a branching workflow where the End that
+	// actually ran is not the first one declared — finalize resolves the
+	// result across all of them (#3198).
+	endNodeIDs []string
 	totalCost  float64
 	// edgesByTarget indexes Edge entries by their target node id so
 	// resolveInputs can rename outputs.<source_name> → inputs.<target_name>
@@ -1173,14 +1179,32 @@ func newRunState(w *dsl.Workflow) *runState {
 	for i := range w.Nodes {
 		n := &w.Nodes[i]
 		r.nodes[n.ID] = n
-		if n.Type == dsl.ComponentEnd && r.endNodeID == "" {
-			r.endNodeID = n.ID
+		if n.Type == dsl.ComponentEnd {
+			if r.endNodeID == "" {
+				r.endNodeID = n.ID
+			}
+			r.endNodeIDs = append(r.endNodeIDs, n.ID)
 		}
 	}
 	for _, e := range w.Edges {
 		r.edgesByTarget[e.Target] = append(r.edgesByTarget[e.Target], e)
 	}
 	return r
+}
+
+// endOutputs returns the outputs recorded against the first End node that
+// actually executed, and whether any End node executed at all. Keying off
+// endNodeID alone would report an empty success for a branching workflow
+// whose taken branch ends at a later-declared End node (#3198).
+func (r *runState) endOutputs() (map[string]any, bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, id := range r.endNodeIDs {
+		if outs, ok := r.outputs[id]; ok {
+			return outs, true
+		}
+	}
+	return nil, false
 }
 
 func (r *runState) recordOutputs(id string, outputs map[string]any) {
@@ -1366,11 +1390,21 @@ func finalize(state *runState, traceID string, started time.Time, ctxErr error, 
 		res.Error = &NodeError{Type: "missing_end_node", Message: planner.MissingEndNodeMessage}
 		return res
 	}
+	endOutputs, endRan := state.endOutputs()
+	// An End node that exists but never ran is the other half of #3198: the
+	// planner's presence check is satisfied, so the guard above stays quiet,
+	// yet nothing was recorded against the End node and the old code fell
+	// straight through to an empty `success`. Reject it on a full run — a
+	// partial run (execute_component, "run until here") stops before the End
+	// by design, so requireEnd is false and the happy path proceeds.
+	if requireEnd && !endRan {
+		res.Status = "error"
+		res.Error = &NodeError{Type: "unreached_end_node", Message: planner.UnreachedEndNodeMessage}
+		return res
+	}
 	res.Status = "success"
-	if state.endNodeID != "" {
-		if outs, ok := state.outputs[state.endNodeID]; ok {
-			res.Result = outs
-		}
+	if endRan {
+		res.Result = endOutputs
 	}
 	if res.Result == nil {
 		res.Result = map[string]any{}

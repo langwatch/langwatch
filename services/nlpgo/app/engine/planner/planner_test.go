@@ -125,6 +125,7 @@ func TestPlan_RejectsDuplicateNodeID(t *testing.T) {
 	assert.Equal(t, "A", dup.NodeID)
 }
 
+// @scenario "A full run with no End node at all is rejected before any node executes"
 func TestPlan_RejectsWorkflowWithNoEndNode(t *testing.T) {
 	// A full run of a workflow with an Entry but no End node must be
 	// rejected — issue #3198 (it otherwise finalizes as an empty success).
@@ -150,6 +151,103 @@ func TestPlan_AcceptsWorkflowWithEndNode(t *testing.T) {
 	assert.NotNil(t, p)
 }
 
+// unwiredEndWorkflow is the shape the Studio canvas produces when an author
+// drops an End node but never connects anything to it: the node exists, so a
+// presence-only guard is satisfied, but reachability scoping drops it from the
+// plan and the run finalizes with an empty result — issue #3198.
+func unwiredEndWorkflow() *dsl.Workflow {
+	return &dsl.Workflow{
+		Nodes: []dsl.Node{
+			{ID: "entry", Type: dsl.ComponentEntry},
+			{ID: "code", Type: dsl.ComponentCode},
+			{ID: "end", Type: dsl.ComponentEnd},
+		},
+		Edges: []dsl.Edge{
+			{ID: "e1", Source: "entry", Target: "code"},
+		},
+	}
+}
+
+// @scenario "A full run whose End node has no wired inputs is rejected"
+func TestPlan_RejectsWorkflowWithUnwiredEndNode(t *testing.T) {
+	_, err := planner.New(unwiredEndWorkflow())
+	require.Error(t, err)
+	var unwired *planner.UnwiredEndNodeError
+	require.ErrorAs(t, err, &unwired, "expected UnwiredEndNodeError, got %T: %v", err, err)
+	assert.Contains(t, err.Error(), planner.UnwiredEndNodeMessage)
+}
+
+// @scenario "A full run whose End node is wired only to an unreachable node is rejected"
+func TestPlan_RejectsEndNodeFedOnlyByUnreachableNode(t *testing.T) {
+	// The End node HAS an inbound edge, so an "does it have any parent"
+	// check would pass — but its only feeder is an orphan chain that never
+	// runs, so the End is still never dispatched.
+	w := &dsl.Workflow{
+		Nodes: []dsl.Node{
+			{ID: "entry", Type: dsl.ComponentEntry},
+			{ID: "wired", Type: dsl.ComponentCode},
+			{ID: "orphan", Type: dsl.ComponentCode},
+			{ID: "end", Type: dsl.ComponentEnd},
+		},
+		Edges: []dsl.Edge{
+			{ID: "e1", Source: "entry", Target: "wired"},
+			{ID: "e2", Source: "orphan", Target: "end"},
+		},
+	}
+	_, err := planner.New(w)
+	require.Error(t, err)
+	var unwired *planner.UnwiredEndNodeError
+	require.ErrorAs(t, err, &unwired, "expected UnwiredEndNodeError, got %T: %v", err, err)
+}
+
+func TestPlan_AcceptsEndNodeReachableViaOneOfSeveralBranches(t *testing.T) {
+	// Only one of the two End nodes is wired. That is a valid workflow: the
+	// run terminates at the reachable End, so the guard must not fire.
+	w := &dsl.Workflow{
+		Nodes: []dsl.Node{
+			{ID: "entry", Type: dsl.ComponentEntry},
+			{ID: "orphan_end", Type: dsl.ComponentEnd},
+			{ID: "end", Type: dsl.ComponentEnd},
+		},
+		Edges: []dsl.Edge{
+			{ID: "e1", Source: "entry", Target: "end"},
+		},
+	}
+	p, err := planner.New(w)
+	require.NoError(t, err, "a reachable End node satisfies the guard")
+	assert.NotNil(t, p)
+}
+
+func TestPlan_UnwiredEndGuardSkippedWithoutEntryNode(t *testing.T) {
+	// No Entry node means reachability scoping is off (allowed == nil, the
+	// legacy "include every node" fallback), so there is no plan-membership
+	// signal to judge the End node by. The guard must not fire on a shape it
+	// cannot actually evaluate.
+	w := &dsl.Workflow{
+		Nodes: []dsl.Node{
+			{ID: "code", Type: dsl.ComponentCode},
+			{ID: "end", Type: dsl.ComponentEnd},
+		},
+	}
+	p, err := planner.New(w)
+	require.NoError(t, err)
+	assert.NotNil(t, p)
+}
+
+// @scenario "A single-component run is not rejected for an unwired End node"
+func TestPlan_AllowMissingEnd_UnwiredEndDoesNotTripGuard(t *testing.T) {
+	p, err := planner.New(unwiredEndWorkflow(), planner.AllowMissingEnd())
+	require.NoError(t, err, "AllowMissingEnd must exempt the unwired-End guard too")
+	assert.NotNil(t, p)
+}
+
+func TestPlan_WithUntilNode_UnwiredEndDoesNotTripGuard(t *testing.T) {
+	p, err := planner.New(unwiredEndWorkflow(), planner.WithUntilNode("code"))
+	require.NoError(t, err, "an until-node partial plan legitimately excludes the End node")
+	assert.NotNil(t, p)
+}
+
+// @scenario "A run-until-here plan may legitimately stop before the End node"
 func TestPlan_WithUntilNode_NoEndNodeDoesNotTripGuard(t *testing.T) {
 	// A "Run until here" partial plan intentionally stops before the End,
 	// so a workflow with no End node must NOT trip the missing-End guard.
@@ -169,6 +267,7 @@ func TestPlan_WithUntilNode_NoEndNodeDoesNotTripGuard(t *testing.T) {
 	assert.NotNil(t, p)
 }
 
+// @scenario "A single-component run may legitimately have no End node"
 func TestPlan_AllowMissingEnd_NoEndNodeDoesNotTripGuard(t *testing.T) {
 	// execute_component runs a single node; the engine sets AllowMissingEnd
 	// so a workflow with no End node still plans (the End is irrelevant to a
