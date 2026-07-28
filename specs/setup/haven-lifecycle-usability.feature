@@ -8,6 +8,7 @@ Feature: haven lifecycle usability
   Background:
     Given a worktree with a registered haven stack
 
+  @unit
   Scenario: Down keeps the databases, always
     Given the stack's launcher is running
     When the developer runs "haven down"
@@ -22,6 +23,7 @@ Feature: haven lifecycle usability
     Then the launcher's process group is SIGKILLed with no graceful wait
     And the databases still exist
 
+  @unit
   Scenario: The daemon prunes databases idle past the TTL
     Given a slug whose databases were last used longer ago than the idle TTL
     And no stack is registered for that slug
@@ -30,6 +32,7 @@ Feature: haven lifecycle usability
     And the protected main database is never dropped
     And a slug with a registered stack is never pruned
 
+  @unit
   Scenario: Up on an already-running stack reconciles
     Given the stack's launcher is running
     When the developer runs "haven up" in the same worktree
@@ -38,12 +41,14 @@ Feature: haven lifecycle usability
     And "haven up -f" restarts even a matching stack
     And there is never a refusal
 
+  @unit
   Scenario: Restarting one service bounces only that service
     Given the stack's launcher is running
     When the developer runs "haven restart nlp"
     Then only the nlp service's process group is terminated
     And the supervisor restarts it
 
+  @unit
   Scenario: Restarting with no service named bounces every supervised child
     When the developer runs "haven restart"
     Then every locally-run service is bounced
