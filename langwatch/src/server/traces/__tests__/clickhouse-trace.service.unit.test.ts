@@ -1160,6 +1160,11 @@ describe("ClickHouseTraceService", () => {
         const traceIds = Array.from({ length: 30 }, (_, i) => `trace-${i}`);
 
         mockClickHouseQuery
+          // OccurredAt sort-key resolve (light seek that bounds the reads below)
+          .mockResolvedValueOnce({
+            json: () =>
+              Promise.resolve([{ fromMs: 1_000_000, toMs: 2_000_000 }]),
+          })
           // full-list summary — OOM, drops to fixed-size batches
           .mockRejectedValueOnce(new Error("MEMORY_LIMIT_EXCEEDED"))
           // first 25-trace batch summary — STILL OOMs, triggers bisection
