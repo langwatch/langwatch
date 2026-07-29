@@ -14,9 +14,7 @@ describe("graphicsQualityOverrideStore", () => {
       const { useGraphicsQualityOverrideStore } = await import(
         "../graphicsQualityOverrideStore"
       );
-      expect(useGraphicsQualityOverrideStore.getState().override).toBe(
-        "auto",
-      );
+      expect(useGraphicsQualityOverrideStore.getState().override).toBe("auto");
     });
   });
 
@@ -36,9 +34,7 @@ describe("graphicsQualityOverrideStore", () => {
       const { useGraphicsQualityOverrideStore } = await import(
         "../graphicsQualityOverrideStore"
       );
-      expect(useGraphicsQualityOverrideStore.getState().override).toBe(
-        "auto",
-      );
+      expect(useGraphicsQualityOverrideStore.getState().override).toBe("auto");
     });
   });
 
@@ -48,9 +44,7 @@ describe("graphicsQualityOverrideStore", () => {
         "../graphicsQualityOverrideStore"
       );
       useGraphicsQualityOverrideStore.getState().setOverride("off");
-      expect(useGraphicsQualityOverrideStore.getState().override).toBe(
-        "off",
-      );
+      expect(useGraphicsQualityOverrideStore.getState().override).toBe("off");
     });
 
     it("persists the choice so a later load picks it up", async () => {

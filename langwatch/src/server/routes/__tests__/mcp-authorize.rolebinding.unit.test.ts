@@ -52,9 +52,11 @@ const { mockPrisma, mockRedis, SESSION } = vi.hoisted(() => {
       groupMembership: { findMany: vi.fn().mockResolvedValue([]) },
       // … but has a TEAM-scoped ADMIN RoleBinding (project:view is granted).
       roleBinding: {
-        findMany: vi.fn().mockResolvedValue([
-          { role: "ADMIN", customRoleId: null, scopeType: "TEAM" },
-        ]),
+        findMany: vi
+          .fn()
+          .mockResolvedValue([
+            { role: "ADMIN", customRoleId: null, scopeType: "TEAM" },
+          ]),
       },
       customRole: { findUnique: vi.fn().mockResolvedValue(null) },
       // Legacy fallback must find nothing — the whole point is the user has no

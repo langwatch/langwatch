@@ -44,8 +44,7 @@ export function CopyableInputWithPrefix({
       transition="all 0.2s ease"
       _hover={{
         borderColor: "gray.300",
-        boxShadow:
-          "0 8px 40px rgba(0,0,0,0.08)",
+        boxShadow: "0 8px 40px rgba(0,0,0,0.08)",
       }}
     >
       <Box
@@ -67,7 +66,13 @@ export function CopyableInputWithPrefix({
         {getMaskedValue()}
       </Box>
 
-      <HStack position="absolute" top="50%" right={2} transform="translateY(-50%)" gap="0.5">
+      <HStack
+        position="absolute"
+        top="50%"
+        right={2}
+        transform="translateY(-50%)"
+        gap="0.5"
+      >
         {showVisibilityToggle && (
           <Tooltip
             content={isVisible ? "Hide" : "Show"}
@@ -106,11 +111,7 @@ export function CopyableInputWithPrefix({
             <Clipboard size={14} />
           </IconButton>
         </Tooltip>
-        <Tooltip
-          content={`Copy with env prefix`}
-          openDelay={0}
-          showArrow
-        >
+        <Tooltip content={`Copy with env prefix`} openDelay={0} showArrow>
           <IconButton
             size="xs"
             variant="ghost"

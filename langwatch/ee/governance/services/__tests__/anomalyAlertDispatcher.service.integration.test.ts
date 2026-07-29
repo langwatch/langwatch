@@ -48,9 +48,15 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await prisma.anomalyAlert.deleteMany({ where: { organizationId } }).catch(() => {});
-  await prisma.anomalyRule.deleteMany({ where: { organizationId } }).catch(() => {});
-  await prisma.organization.deleteMany({ where: { slug: `--c3-${ns}` } }).catch(() => {});
+  await prisma.anomalyAlert
+    .deleteMany({ where: { organizationId } })
+    .catch(() => {});
+  await prisma.anomalyRule
+    .deleteMany({ where: { organizationId } })
+    .catch(() => {});
+  await prisma.organization
+    .deleteMany({ where: { slug: `--c3-${ns}` } })
+    .catch(() => {});
 });
 
 async function seedRuleAndAlert({
@@ -96,7 +102,10 @@ async function seedRuleAndAlert({
 type FetchCall = { url: string; headers: Record<string, string>; body: string };
 
 function makeFetchSpy(
-  responder: (call: FetchCall, callIndex: number) => {
+  responder: (
+    call: FetchCall,
+    callIndex: number,
+  ) => {
     status: number;
     statusText?: string;
   },
@@ -124,7 +133,9 @@ describe("AnomalyAlertDispatcherService.dispatchAlert", () => {
     it("POSTs JSON body with alert payload to the configured webhook", async () => {
       const { rule, alert } = await seedRuleAndAlert({
         destinationConfig: {
-          destinations: [{ type: "webhook", url: "https://hooks.example.com/lw" }],
+          destinations: [
+            { type: "webhook", url: "https://hooks.example.com/lw" },
+          ],
         },
       });
 
@@ -229,14 +240,18 @@ describe("AnomalyAlertDispatcherService.dispatchAlert", () => {
     it("retries on transient 5xx and reports succeeded once a retry returns 200", async () => {
       const { rule, alert } = await seedRuleAndAlert({
         destinationConfig: {
-          destinations: [{ type: "webhook", url: "https://flaky.example.com/x" }],
+          destinations: [
+            { type: "webhook", url: "https://flaky.example.com/x" },
+          ],
         },
       });
 
       let n = 0;
       const { fetchImpl, calls } = makeFetchSpy(() => {
         n += 1;
-        return n === 1 ? { status: 503, statusText: "Try again" } : { status: 200 };
+        return n === 1
+          ? { status: 503, statusText: "Try again" }
+          : { status: 200 };
       });
       const dispatcher = AnomalyAlertDispatcherService.create(fetchImpl);
 
@@ -250,7 +265,9 @@ describe("AnomalyAlertDispatcherService.dispatchAlert", () => {
     it("does NOT retry on 4xx (config error, not transient)", async () => {
       const { rule, alert } = await seedRuleAndAlert({
         destinationConfig: {
-          destinations: [{ type: "webhook", url: "https://wrong.example.com/x" }],
+          destinations: [
+            { type: "webhook", url: "https://wrong.example.com/x" },
+          ],
         },
       });
 

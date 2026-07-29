@@ -1,5 +1,5 @@
 import { nanoid } from "nanoid";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { connection } from "~/server/redis";
 import { abortManager } from "../abortManager";
 

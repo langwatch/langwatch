@@ -64,7 +64,7 @@ describe("ioPreviewWillRenderFor", () => {
     });
 
     describe("when only the output is present", () => {
-      it("renders", () => {
+      it("renders the preview", () => {
         expect(
           ioPreviewWillRenderFor(row({ input: null, output: "hello" }), false),
         ).toBe(true);

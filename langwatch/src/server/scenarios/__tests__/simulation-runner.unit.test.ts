@@ -6,8 +6,8 @@
  * @see specs/scenarios/scenario-job-id-uniqueness.feature
  */
 
-import { describe, expect, it } from "vitest";
 import { generate } from "@langwatch/ksuid";
+import { describe, expect, it } from "vitest";
 import { KSUID_RESOURCES } from "~/utils/constants";
 
 // Test KSUID generation patterns directly
@@ -81,4 +81,3 @@ describe("KSUID resource patterns", () => {
     });
   });
 });
-

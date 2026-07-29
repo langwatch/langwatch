@@ -1,5 +1,5 @@
-import { useRouter } from "~/utils/compat/next-router";
 import { useMemo } from "react";
+import { useRouter } from "~/utils/compat/next-router";
 
 export interface MinimalProject {
   id: string;

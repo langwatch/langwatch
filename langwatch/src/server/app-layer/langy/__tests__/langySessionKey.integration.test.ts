@@ -20,12 +20,12 @@ import type { Permission } from "~/server/api/rbac";
 import { enforceApiKeyCeiling } from "~/server/api-key/auth-middleware";
 import { LANGY_SESSION_API_KEY_NAME } from "~/server/api-key/reserved-names";
 import { TokenResolver } from "~/server/api-key/token-resolver";
-import { experimentRoutePermissions } from "./helpers/routePermissions";
 import { prisma } from "../../../db";
 import {
   LangySessionKeyScopeError,
   mintLangySessionApiKey,
 } from "../langyApiKey";
+import { experimentRoutePermissions } from "./helpers/routePermissions";
 
 // This suite only needs Postgres — every harness (CI's testcontainers, native
 // local services) provides that, so it runs unconditionally. It used to carry
@@ -252,7 +252,9 @@ describe("Langy session key (caller-scoped)", () => {
         const customRole = await prisma.customRole.findUnique({
           where: { id: binding.customRoleId! },
         });
-        const permissions = (customRole!.permissions as string[]).slice().sort();
+        const permissions = (customRole!.permissions as string[])
+          .slice()
+          .sort();
 
         // Exactly the held subset — nothing the human can't already do.
         expect(permissions).toEqual(EXPECTED_HELD_SUBSET);

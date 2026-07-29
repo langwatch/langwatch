@@ -12,7 +12,10 @@ import { parseIssuerUrl } from "../index";
 describe("parseIssuerUrl", () => {
   describe("when given a URL with https scheme", () => {
     it("parses without modification", () => {
-      const url = parseIssuerUrl("https://tenant.us.auth0.com/", "AUTH0_ISSUER");
+      const url = parseIssuerUrl(
+        "https://tenant.us.auth0.com/",
+        "AUTH0_ISSUER",
+      );
       expect(url.host).toBe("tenant.us.auth0.com");
       expect(url.protocol).toBe("https:");
     });
@@ -41,9 +44,9 @@ describe("parseIssuerUrl", () => {
 
   describe("when given a genuinely unparseable input", () => {
     it("throws a descriptive error mentioning the env var name", () => {
-      expect(() => parseIssuerUrl("not a url at all !!!", "AUTH0_ISSUER")).toThrow(
-        /Invalid AUTH0_ISSUER.*not a url at all/,
-      );
+      expect(() =>
+        parseIssuerUrl("not a url at all !!!", "AUTH0_ISSUER"),
+      ).toThrow(/Invalid AUTH0_ISSUER.*not a url at all/);
     });
 
     it("includes a hint about the expected format", () => {

@@ -24,9 +24,7 @@ function renderWithChakra(ui: React.ReactElement) {
 describe("CriteriaInput", () => {
   describe("when empty", () => {
     it("shows 'Add the first criteria' button", async () => {
-      renderWithChakra(
-        <CriteriaInput value={[]} onChange={vi.fn()} />,
-      );
+      renderWithChakra(<CriteriaInput value={[]} onChange={vi.fn()} />);
 
       await waitFor(() => {
         expect(screen.getByText("Add the first criteria")).toBeInTheDocument();
@@ -37,9 +35,7 @@ describe("CriteriaInput", () => {
   describe("when clicking add and saving", () => {
     it("saves criterion on Save click", async () => {
       const onChange = vi.fn();
-      renderWithChakra(
-        <CriteriaInput value={[]} onChange={onChange} />,
-      );
+      renderWithChakra(<CriteriaInput value={[]} onChange={onChange} />);
 
       await waitFor(() => {
         expect(screen.getByText("Add the first criteria")).toBeInTheDocument();
@@ -110,12 +106,7 @@ describe("CriteriaInput", () => {
     });
 
     it("shows 'Add criteria' button below the list", async () => {
-      renderWithChakra(
-        <CriteriaInput
-          value={["first"]}
-          onChange={vi.fn()}
-        />,
-      );
+      renderWithChakra(<CriteriaInput value={["first"]} onChange={vi.fn()} />);
 
       await waitFor(() => {
         expect(screen.getByText("Add criteria")).toBeInTheDocument();

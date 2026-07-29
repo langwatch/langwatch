@@ -93,6 +93,9 @@ func StampInternalGenAI(ctx context.Context, params domain.AITraceParams) {
 	if params.GatewayRequestID != "" {
 		attrs = append(attrs, attribute.String(customertracebridge.AttrGatewayReqID, params.GatewayRequestID))
 	}
+	if params.ModelProviderID != "" {
+		attrs = append(attrs, attribute.String(customertracebridge.AttrModelProviderID, params.ModelProviderID))
+	}
 	if params.UpstreamErrorType != "" {
 		attrs = append(attrs, attribute.String(AttrErrorType, params.UpstreamErrorType))
 	}

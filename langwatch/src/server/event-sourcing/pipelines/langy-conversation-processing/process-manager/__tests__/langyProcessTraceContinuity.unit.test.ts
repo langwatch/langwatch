@@ -22,28 +22,21 @@ import {
   expect,
   it,
 } from "vitest";
-
+import { buildProcessManager } from "~/server/event-sourcing/pipeline/processBuilder";
+import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
 import {
   InMemoryProcessStore,
-  ProcessManagerService,
+  OutboxDispatcherService,
   type ProcessRef,
 } from "~/server/event-sourcing/process-manager";
-import { OutboxDispatcherService } from "~/server/event-sourcing/process-manager";
-import type { EventSubscriberContext } from "~/server/event-sourcing/subscribers/eventSubscriber.types";
-
-import { buildProcessManager } from "~/server/event-sourcing/pipeline/processBuilder";
 import {
   buildIntentHandlers,
   ProcessRuntime,
 } from "~/server/event-sourcing/process-manager/processRuntime";
-
-import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
+import type { EventSubscriberContext } from "~/server/event-sourcing/subscribers/eventSubscriber.types";
 import { langyConversationProcess } from "../langyConversationProcess";
+import { LANGY_CONVERSATION_PROCESS_NAME } from "../langyConversationProcess.types";
 import { createStubLangyEffectPorts } from "../langyEffectPorts";
-import {
-  LANGY_CONVERSATION_PROCESS_NAME,
-  type LangyConversationProcessState,
-} from "../langyConversationProcess.types";
 import {
   agentTurnAcceptedEvent,
   CONVERSATION_ID,
@@ -66,7 +59,8 @@ function buildLangyManager(ports = createStubLangyEffectPorts().ports) {
   });
 }
 
-const W3C_TRACEPARENT_REGEX = /^00-([a-f0-9]{32})-([a-f0-9]{16})-([0-9a-f]{2})$/;
+const W3C_TRACEPARENT_REGEX =
+  /^00-([a-f0-9]{32})-([a-f0-9]{16})-([0-9a-f]{2})$/;
 
 const ref: ProcessRef = {
   processName: LANGY_CONVERSATION_PROCESS_NAME,
@@ -116,18 +110,21 @@ describe("Langy process trace continuity", () => {
   function generatedSubscriber(ports = createStubLangyEffectPorts().ports) {
     const runtime = new ProcessRuntime({ store, consumersEnabled: false });
     const definition = buildLangyManager(ports);
-    const { subscribers } = runtime.registerPipeline<LangyConversationProcessingEvent>({
-      pipelineName: "langy-conversation-processing",
-      processManagers: new Map([[LANGY_CONVERSATION_PROCESS_NAME, definition]]),
-    });
+    const { subscribers } =
+      runtime.registerPipeline<LangyConversationProcessingEvent>({
+        pipelineName: "langy-conversation-processing",
+        processManagers: new Map([
+          [LANGY_CONVERSATION_PROCESS_NAME, definition],
+        ]),
+      });
     const subscriber = subscribers[0];
     if (!subscriber) throw new Error("runtime generated no subscriber");
     return subscriber;
   }
 
-  async function handleStartedTurnInsideProducerSpan(
-    subscriber: { handle: (event: any, context: any) => Promise<void> },
-  ): Promise<{ producerTraceId: string }> {
+  async function handleStartedTurnInsideProducerSpan(subscriber: {
+    handle: (event: any, context: any) => Promise<void>;
+  }): Promise<{ producerTraceId: string }> {
     const tracer = trace.getTracer("test");
     return await tracer.startActiveSpan(
       "langy.queue.consume",
@@ -187,7 +184,9 @@ describe("Langy process trace continuity", () => {
       // so the dispatch window has to be read against the same clock.
       const report = await dispatcher.runOnce({ now: Date.now() + 1 });
 
-      expect(report.dispatched).toEqual([`process:${CONVERSATION_ID}:dispatch:turn_1`]);
+      expect(report.dispatched).toEqual([
+        `process:${CONVERSATION_ID}:dispatch:turn_1`,
+      ]);
       expect(calls.dispatchedTurns).toEqual([
         {
           projectId: PROJECT_ID,

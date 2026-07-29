@@ -4,8 +4,9 @@
  * Integration tests for cascade archive functionality.
  * Tests the cascading archive/delete behavior for workflows, evaluators, and agents.
  */
-import { beforeAll, afterAll, describe, expect, it, vi } from "vitest";
+
 import { nanoid } from "nanoid";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { getTestUser } from "../../../../utils/testUtils";
 import { prisma } from "../../../db";
 import { appRouter } from "../../root";
@@ -13,7 +14,8 @@ import { createInnerTRPCContext } from "../../trpc";
 
 // Mock license enforcement to avoid limits during tests
 vi.mock("../../../license-enforcement", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../../license-enforcement")>();
+  const actual =
+    await importOriginal<typeof import("../../../license-enforcement")>();
   return {
     ...actual,
     enforceLicenseLimit: vi.fn(),
@@ -48,15 +50,23 @@ describe("Cascade Archive", () => {
       await prisma.monitor.delete({ where: { id, projectId } }).catch(() => {});
     }
     for (const id of createdEvaluatorIds) {
-      await prisma.evaluator.delete({ where: { id, projectId } }).catch(() => {});
+      await prisma.evaluator
+        .delete({ where: { id, projectId } })
+        .catch(() => {});
     }
     for (const id of createdAgentIds) {
       await prisma.agent.delete({ where: { id, projectId } }).catch(() => {});
     }
     for (const id of createdWorkflowIds) {
-      await prisma.workflow.update({ where: { id, projectId }, data: { currentVersionId: null } }).catch(() => {});
-      await prisma.workflowVersion.deleteMany({ where: { workflowId: id, projectId } }).catch(() => {});
-      await prisma.workflow.delete({ where: { id, projectId } }).catch(() => {});
+      await prisma.workflow
+        .update({ where: { id, projectId }, data: { currentVersionId: null } })
+        .catch(() => {});
+      await prisma.workflowVersion
+        .deleteMany({ where: { workflowId: id, projectId } })
+        .catch(() => {});
+      await prisma.workflow
+        .delete({ where: { id, projectId } })
+        .catch(() => {});
     }
   });
 
@@ -190,10 +200,7 @@ describe("Cascade Archive", () => {
         `${testNamespace}-eval-with-monitor`,
         workflow.id,
       );
-      await createTestMonitor(
-        `${testNamespace}-linked-monitor`,
-        evaluator.id,
-      );
+      await createTestMonitor(`${testNamespace}-linked-monitor`, evaluator.id);
 
       const result = await caller.workflow.getRelatedEntities({
         projectId,
@@ -333,9 +340,7 @@ describe("Cascade Archive", () => {
     });
 
     it("returns linked workflow", async () => {
-      const workflow = await createTestWorkflow(
-        `${testNamespace}-eval-parent`,
-      );
+      const workflow = await createTestWorkflow(`${testNamespace}-eval-parent`);
       const evaluator = await createTestEvaluator(
         `${testNamespace}-eval-child`,
         workflow.id,

@@ -1,9 +1,9 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
-import { register } from "prom-client";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
-import { GroupQueueMetricsCollector } from "../metricsCollector";
+import { register } from "prom-client";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { gqOldestPendingAgeMilliseconds } from "../metrics";
+import { GroupQueueMetricsCollector } from "../metricsCollector";
 import type { GroupStagingScripts } from "../scripts";
 
 const QUEUE = "test-queue";

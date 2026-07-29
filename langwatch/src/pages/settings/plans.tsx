@@ -1,6 +1,6 @@
 import { Spinner } from "@chakra-ui/react";
-import SettingsLayout from "../../components/SettingsLayout";
 import { PlansComparisonPage } from "../../components/plans/PlansComparisonPage";
+import SettingsLayout from "../../components/SettingsLayout";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";

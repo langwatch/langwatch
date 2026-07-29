@@ -1,5 +1,5 @@
 import type { ServerModelProviderKey } from "~/hooks/useModelProviderFields";
-import type { Docs, IconData } from "../shared/types";
+import type { IconData } from "../shared/types";
 
 export type ModelProviderKey =
   | "anthropic"

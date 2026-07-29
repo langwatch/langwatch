@@ -31,9 +31,11 @@ describe("collectRemoteSpans()", () => {
 
   describe("when spans are available", () => {
     it("returns a collector populated with user agent spans", async () => {
-      const querySpans = vi.fn().mockResolvedValue([
-        createTestSpan({ name: "my-agent-llm-call", span_id: "span1" }),
-      ]);
+      const querySpans = vi
+        .fn()
+        .mockResolvedValue([
+          createTestSpan({ name: "my-agent-llm-call", span_id: "span1" }),
+        ]);
 
       const collector = await collectRemoteSpans({
         ...defaultParams,
@@ -133,9 +135,9 @@ describe("collectRemoteSpans()", () => {
       const spans = collector.getSpansForThread(threadId);
       expect(spans.length).toBe(1);
       expect(spans[0]!.name).toBe("langwatch.span_collection.error");
-      expect(spans[0]!.attributes["langwatch.span_collection.error.reason"]).toBe(
-        "Connection refused",
-      );
+      expect(
+        spans[0]!.attributes["langwatch.span_collection.error.reason"],
+      ).toBe("Connection refused");
     });
   });
 
@@ -206,10 +208,8 @@ describe("collectRemoteSpans()", () => {
       const tool = spans.find((s) => s.name === "tool_call.lookup_order");
       expect(tool).toBeDefined();
       expect(tool!.parentSpanContext?.spanId).toBe("parent_llm_span");
-      expect(tool!.attributes["input"]).toBe(
-        JSON.stringify({ order_id: "1234" }),
-      );
-      expect(tool!.attributes["output"]).toBe(
+      expect(tool!.attributes.input).toBe(JSON.stringify({ order_id: "1234" }));
+      expect(tool!.attributes.output).toBe(
         JSON.stringify({ status: "shipped", tracking: "TRACK-5678" }),
       );
     });

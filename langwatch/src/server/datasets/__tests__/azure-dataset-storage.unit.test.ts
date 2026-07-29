@@ -38,7 +38,11 @@ vi.mock("~/server/stored-objects/azure-blob-driver", () => ({
 import { ObjectNotFoundError } from "~/server/stored-objects/errors";
 import { AzureDatasetStorage } from "../azure-dataset-storage";
 import { CHUNK_MAX_BYTES } from "../dataset-chunking";
-import { ChunkTooLargeError, MissingChunkError, StagedUploadNotFoundError } from "../errors";
+import {
+  ChunkTooLargeError,
+  MissingChunkError,
+  StagedUploadNotFoundError,
+} from "../errors";
 
 function toReadable(text: string): Readable {
   return Readable.from([Buffer.from(text, "utf-8")]);
@@ -104,7 +108,9 @@ describe("AzureDatasetStorage", () => {
       /** @scenario "Datasets round-trip through Azure Blob when azure is the configured backend" */
       it("throws MissingChunkError instead of silently truncating", async () => {
         driverGet.mockRejectedValueOnce(
-          new ObjectNotFoundError("azure-blob://lwacct/lw-container/datasets/p1/d1/chunk-00000.jsonl"),
+          new ObjectNotFoundError(
+            "azure-blob://lwacct/lw-container/datasets/p1/d1/chunk-00000.jsonl",
+          ),
         );
 
         await expect(
@@ -144,7 +150,12 @@ describe("AzureDatasetStorage", () => {
           records: [{ a: 1 }, { a: 2 }],
         });
 
-        expect(offset).toEqual({ index: 2, startRow: 0, endRow: 2, byteSize: expect.any(Number) });
+        expect(offset).toEqual({
+          index: 2,
+          startRow: 0,
+          endRow: 2,
+          byteSize: expect.any(Number),
+        });
         const [uri] = driverPut.mock.calls[0]!;
         expect(uri).toBe(
           "azure-blob://lwacct/lw-container/datasets/p1/d1/chunk-00002.jsonl",
@@ -228,7 +239,9 @@ describe("AzureDatasetStorage", () => {
       /** @scenario "Datasets round-trip through Azure Blob when azure is the configured backend" */
       it("streamStaged throws StagedUploadNotFoundError", async () => {
         driverGet.mockRejectedValueOnce(
-          new ObjectNotFoundError("azure-blob://lwacct/lw-container/staging/p1/missing"),
+          new ObjectNotFoundError(
+            "azure-blob://lwacct/lw-container/staging/p1/missing",
+          ),
         );
 
         await expect(
@@ -241,7 +254,9 @@ describe("AzureDatasetStorage", () => {
 
       it("headStagedObjectSize throws StagedUploadNotFoundError", async () => {
         driverHead.mockRejectedValueOnce(
-          new ObjectNotFoundError("azure-blob://lwacct/lw-container/staging/p1/missing"),
+          new ObjectNotFoundError(
+            "azure-blob://lwacct/lw-container/staging/p1/missing",
+          ),
         );
 
         await expect(

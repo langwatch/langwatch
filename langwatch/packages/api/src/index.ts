@@ -4,7 +4,8 @@
 
 export { createService, ServiceBuilder, VersionBuilder } from "./builder.js";
 export { createErrorHandler, formatError } from "./errors.js";
-export { tracerMiddleware, loggerMiddleware } from "./middleware.js";
+export { loggerMiddleware, tracerMiddleware } from "./middleware.js";
+
 import type { Hono } from "hono";
 import { handle } from "hono/vercel";
 
@@ -19,23 +20,23 @@ export {
   type TypedSSEStream,
 } from "./sse.js";
 export {
-  VERSION_LATEST,
-  VERSION_PREVIEW,
-  isDateVersion,
-  httpStatusText,
   type BaseApp,
   type DateVersion,
   type EndpointConfig,
   type EndpointRegistration,
   type Handler,
   type HttpMethod,
+  httpStatusText,
+  isDateVersion,
   type ServiceConfig,
+  VERSION_LATEST,
+  VERSION_PREVIEW,
   type VersionStatus,
 } from "./types.js";
 export {
-  resolveVersions,
-  resolveRequestVersion,
   type ResolvedEndpoint,
   type ResolvedVersion,
+  resolveRequestVersion,
+  resolveVersions,
   type VersionDefinition,
 } from "./versioning.js";

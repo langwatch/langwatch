@@ -1,5 +1,3 @@
-import { AlertType, TriggerAction } from "@prisma/client";
-import { describe, expect, it } from "vitest";
 import { filterBlockKit } from "@langwatch/automations/templating/blockKitAllowlist";
 import { renderLiquid } from "@langwatch/automations/templating/engine";
 import { EXAMPLE_MATCHES } from "@langwatch/automations/templating/exampleContext";
@@ -9,6 +7,9 @@ import {
   buildTemplateContext,
   type GraphAlertTemplateContext,
 } from "@langwatch/automations/templating/templateContext";
+import { AlertType, TriggerAction } from "@prisma/client";
+import { describe, expect, it } from "vitest";
+import { SERVER_PROVIDERS } from "~/server/app-layer/automations/providers/registry";
 import {
   ACTION_PROVIDERS,
   CLIENT_PROVIDERS,
@@ -18,7 +19,6 @@ import {
   SLACK_BLOCK_KIT_TEMPLATES,
   type SlackBlockKitTemplateOption,
 } from "../slack/templates/registry";
-import { SERVER_PROVIDERS } from "~/server/app-layer/automations/providers/registry";
 
 /**
  * The provider system enforces two invariants here. Failures mean the
@@ -168,7 +168,8 @@ describe("provider registry parity", () => {
       buildReportTemplateContext({
         trigger: { id: "rep_2", name: "Weekly latency report" },
         report: {
-          sourceLabel: sourceKind === "dashboard" ? "Dashboard" : "Custom graph",
+          sourceLabel:
+            sourceKind === "dashboard" ? "Dashboard" : "Custom graph",
           scheduleLabel: "every Monday at 09:00 (UTC)",
           sourceKind,
         },
@@ -325,9 +326,10 @@ describe("provider registry parity", () => {
           unknown
         >,
       graph_alert_history_table: () =>
-        graphAlertContextFor(
-          "graph_alert_history_table",
-        ) as unknown as Record<string, unknown>,
+        graphAlertContextFor("graph_alert_history_table") as unknown as Record<
+          string,
+          unknown
+        >,
       trace_card_rich: () =>
         richTraceContext as unknown as Record<string, unknown>,
       eval_failure_rich: () =>
@@ -351,34 +353,33 @@ describe("provider registry parity", () => {
     };
 
     describe("when a modern-suite template (ADR-041) renders against a complete example", () => {
-      it.each(Object.keys(modernExamples))(
-        "%s renders valid, allowlist-surviving Block Kit with no missing variables",
-        async (id) => {
-          const template = SLACK_BLOCK_KIT_TEMPLATES.find((t) => t.id === id);
-          expect(template).toBeDefined();
-          const { output, missingVariables } = await renderLiquid({
-            template: template!.source,
-            context: modernExamples[id]!(),
-          });
-          const blocks = JSON.parse(output) as unknown[];
-          expect(Array.isArray(blocks)).toBe(true);
-          expect(blocks.length).toBeGreaterThan(0);
-          // No dangling references — the author (or preview) sees a clean bill.
-          expect(missingVariables).toEqual([]);
-          // Every modern template survives the allowlist non-empty: the gated
-          // hero block (alert / card / data_visualization / data_table) is
-          // stripped by default, and the template degrades to its surrounding
-          // allowlisted header / section / rich_text / context fallback.
-          const survivors = filterBlockKit(blocks);
-          expect(survivors.length).toBeGreaterThan(0);
-          // The gated hero is indeed dropped on the default (webhook) path.
-          if (template!.gatedBlock) {
-            expect(
-              survivors.some((b) => b.type === template!.gatedBlock),
-            ).toBe(false);
-          }
-        },
-      );
+      it.each(
+        Object.keys(modernExamples),
+      )("%s renders valid, allowlist-surviving Block Kit with no missing variables", async (id) => {
+        const template = SLACK_BLOCK_KIT_TEMPLATES.find((t) => t.id === id);
+        expect(template).toBeDefined();
+        const { output, missingVariables } = await renderLiquid({
+          template: template!.source,
+          context: modernExamples[id]!(),
+        });
+        const blocks = JSON.parse(output) as unknown[];
+        expect(Array.isArray(blocks)).toBe(true);
+        expect(blocks.length).toBeGreaterThan(0);
+        // No dangling references — the author (or preview) sees a clean bill.
+        expect(missingVariables).toEqual([]);
+        // Every modern template survives the allowlist non-empty: the gated
+        // hero block (alert / card / data_visualization / data_table) is
+        // stripped by default, and the template degrades to its surrounding
+        // allowlisted header / section / rich_text / context fallback.
+        const survivors = filterBlockKit(blocks);
+        expect(survivors.length).toBeGreaterThan(0);
+        // The gated hero is indeed dropped on the default (webhook) path.
+        if (template!.gatedBlock) {
+          expect(survivors.some((b) => b.type === template!.gatedBlock)).toBe(
+            false,
+          );
+        }
+      });
     });
   });
 });

@@ -26,8 +26,9 @@
  *
  * Spec: specs/settings/user-avatar.feature
  */
-import type { PrismaClient } from "@prisma/client";
+
 import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
+import type { PrismaClient } from "@prisma/client";
 import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
 import {
   AVATAR_OWNER_KIND,
@@ -68,7 +69,9 @@ export class UserAvatarService {
     this.ensureWorkspaceProject =
       deps.ensureWorkspaceProject ??
       (async (args) => {
-        const workspace = await new PersonalWorkspaceService(this.prisma).ensure({
+        const workspace = await new PersonalWorkspaceService(
+          this.prisma,
+        ).ensure({
           userId: args.userId,
           organizationId: args.organizationId,
           displayName: args.displayName ?? undefined,

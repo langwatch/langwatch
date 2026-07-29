@@ -8,6 +8,7 @@ vi.mock("~/utils/encryption", () => ({
   encrypt: (s: string) => `enc(${s})`,
   decrypt: (s: string) => s.replace(/^enc\(/, "").replace(/\)$/, ""),
 }));
+
 import { buildGraphAlertTemplateContext } from "@langwatch/automations/templating/templateContext";
 import {
   dispatchGraphAlertAction,
@@ -84,9 +85,10 @@ function makeDeps() {
   // Returns a 2xx by default — individual tests override to exercise the
   // retry/terminal classification the dispatcher applies via
   // assertWebhookDelivered.
-  const sendWebhook = vi.fn(
-    async (_payload: unknown) => ({ status: 200, body: "ok" }),
-  );
+  const sendWebhook = vi.fn(async (_payload: unknown) => ({
+    status: 200,
+    body: "ok",
+  }));
   // Pass-through suppression by default — individual tests override to
   // exercise the ADR-031 unsubscribe gate.
   const filterSuppressedRecipients = vi.fn(
@@ -94,9 +96,10 @@ function makeDeps() {
   );
   // Under both ADR-031 caps by default — individual tests override to
   // exercise the exhausted branches.
-  const consumeEmailCapSlot = vi.fn(
-    async (_params: { dedupKey: string }) => ({ allowed: true, count: 1 }),
-  );
+  const consumeEmailCapSlot = vi.fn(async (_params: { dedupKey: string }) => ({
+    allowed: true,
+    count: 1,
+  }));
   const consumeTenantEmailCapSlot = vi.fn(
     async (_params: { dedupKey: string; recipientCount: number }) => ({
       allowed: true,
@@ -104,8 +107,8 @@ function makeDeps() {
     }),
   );
   const claims = new Set<string>();
-  const isRecipientSent = vi.fn(
-    async ({ traceId }: { traceId: string }) => claims.has(traceId),
+  const isRecipientSent = vi.fn(async ({ traceId }: { traceId: string }) =>
+    claims.has(traceId),
   );
   const recordRecipientSent = vi.fn(
     async ({ traceId }: { traceId: string }) => {
@@ -335,11 +338,8 @@ describe("dispatchGraphAlertAction", () => {
       });
 
       it("consumes the project daily cap by surviving recipient count", async () => {
-        const {
-          deps,
-          filterSuppressedRecipients,
-          consumeTenantEmailCapSlot,
-        } = makeDeps();
+        const { deps, filterSuppressedRecipients, consumeTenantEmailCapSlot } =
+          makeDeps();
         filterSuppressedRecipients.mockResolvedValueOnce(["a@example.com"]);
 
         await dispatchGraphAlertAction({ deps, input: makeEmailInput() });
@@ -358,8 +358,12 @@ describe("dispatchGraphAlertAction", () => {
 
     describe("when the trigger is over its hourly cap", () => {
       it("skips the send, never consults the daily cap, and reports the fire as consumed", async () => {
-        const { deps, sendEmail, consumeEmailCapSlot, consumeTenantEmailCapSlot } =
-          makeDeps();
+        const {
+          deps,
+          sendEmail,
+          consumeEmailCapSlot,
+          consumeTenantEmailCapSlot,
+        } = makeDeps();
         consumeEmailCapSlot.mockResolvedValueOnce({
           allowed: false,
           count: 101,

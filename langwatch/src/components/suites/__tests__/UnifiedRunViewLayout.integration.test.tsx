@@ -16,7 +16,6 @@ import {
   RunHistoryFilters,
   type RunHistoryFilterValues,
 } from "../RunHistoryFilters";
-import type { RunGroupType } from "../run-history-transforms";
 import { availableGroupByOptions } from "../run-history-transforms";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (

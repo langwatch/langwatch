@@ -93,11 +93,7 @@ describe("sharedTrace output schema", () => {
     const shared = sharedTraceDtoSchema.shape;
     const sections: Array<[string, string[], string[]]> = [
       ["header", keysOf(traceHeaderSchema), keysOf(shared.header)],
-      [
-        "spanTree",
-        keysOf(spanTreeNodeSchema),
-        keysOf(shared.spanTree.element),
-      ],
+      ["spanTree", keysOf(spanTreeNodeSchema), keysOf(shared.spanTree.element)],
       ["spansFull", keysOf(spanDetailSchema), keysOf(shared.spansFull.element)],
       ["resources", keysOf(traceResourceInfoSchema), keysOf(shared.resources)],
       [

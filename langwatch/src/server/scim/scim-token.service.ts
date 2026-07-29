@@ -1,5 +1,5 @@
-import crypto from "crypto";
 import type { PrismaClient } from "@prisma/client";
+import crypto from "crypto";
 
 /**
  * Manages SCIM bearer tokens: generation, hashing, and verification.

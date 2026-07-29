@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   canAutoRecover,
   isMutatingLangyTool,
@@ -92,6 +92,10 @@ export function useLangyTurnRecovery({
    * Identity of THIS failure. A new value means a new failure arrived (useChat
    * mints a fresh Error per failure, so its reference is the natural identity);
    * the same value across renders must not re-arm the timer.
+   *
+   * NOT the whole identity on its own — see `handledFailureRef`. The same Error
+   * object can be RECLASSIFIED, so what the hook has already handled is the
+   * pair (kind, id).
    */
   errorId: unknown;
   /** Did the failed turn already run a project-mutating tool? */
@@ -104,10 +108,50 @@ export function useLangyTurnRecovery({
   // between one user message and the next, so a bounded policy really is bounded
   // per question — `reset()` starts a new one.
   const attemptsUsedRef = useRef(0);
-  const handledErrorRef = useRef<unknown>(null);
+  /**
+   * The failure this hook has already acted on, as the PAIR (kind, id) — never
+   * the id alone.
+   *
+   * A failure's kind is not fixed at the moment its Error is minted. The panel
+   * derives the kind through `resolveLiveTurnError`, whose last road reads the
+   * turn's classification off the DURABLE record — which arrives on the history
+   * poll, seconds after the stream died. So one and the same Error object is
+   * first explained as `unknown` and then, when the poll lands, as
+   * `langy_worker_restarting`: the kind moves under a stable identity.
+   *
+   * Keyed on the id alone, the short-circuit below swallowed that: the second
+   * pass returned early, so a failure the policy would have auto-recovered was
+   * never armed at all (and, the other way round, a timer armed for the first
+   * kind would have fired on the first kind's budget). Two fields rather than a
+   * `${kind}:${id}` composite on purpose — stringifying the id would collapse
+   * two distinct Errors carrying the same message into one identity.
+   */
+  const handledFailureRef = useRef<{ kind: string; id: unknown } | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onRetryRef = useRef(onRetry);
   onRetryRef.current = onRetry;
+  // The one input that arrives LATE by construction, so it is read TWICE and is
+  // deliberately kept out of the effect's dep array.
+  //
+  // The caller derives it from the engine's messages (`turnHadSideEffects`), and
+  // those are replaced wholesale whenever the 3s `langy.messages` poll lands —
+  // well inside this hook's 1500/4000ms waits. As a dep it therefore re-ran the
+  // effect mid-wait for the SAME failure, and the re-run could only make things
+  // worse: the effect's own short-circuit treats an already-handled (kind, id)
+  // as nothing to do, so with a cleanup attached the re-render killed the armed
+  // timer and re-armed nothing. Read off a ref, a mid-flight history poll cannot
+  // disturb a retry that is already scheduled.
+  //
+  // The arming-time read is therefore NOT the safety check — it cannot be. When
+  // the timer arms, the evidence that this turn already mutated the project may
+  // still be in flight, and `canAutoRecover` opens with `sideEffectsObserved`
+  // for a reason: re-driving a turn that opened a PR can open a second one. So
+  // the ref is read again inside the timer callback, immediately before the
+  // retry fires, and a turn revealed as mutating in the meantime falls through
+  // to the error card exactly as an arming-time rejection would. Arming is the
+  // early exit; the callback is the invariant.
+  const sideEffectsObservedRef = useRef(sideEffectsObserved);
+  sideEffectsObservedRef.current = sideEffectsObserved;
 
   const [pending, setPending] = useState<{
     kind: string;
@@ -122,7 +166,7 @@ export function useLangyTurnRecovery({
   const reset = useCallback(() => {
     clearTimer();
     attemptsUsedRef.current = 0;
-    handledErrorRef.current = null;
+    handledFailureRef.current = null;
     setPending(null);
   }, [clearTimer]);
 
@@ -132,18 +176,25 @@ export function useLangyTurnRecovery({
     // the user sends something new, so a policy of "2 attempts" stays 2.
     if (!errorKind || !enabled) {
       clearTimer();
-      handledErrorRef.current = null;
+      handledFailureRef.current = null;
       setPending(null);
       return;
     }
 
-    // Same failure we already armed a timer for — don't re-arm on every render.
-    if (handledErrorRef.current === errorId) return;
-    handledErrorRef.current = errorId;
+    // Same failure, same classification: we already decided what to do with it,
+    // so don't re-arm on every render. A CHANGED kind is a different decision
+    // even on the same Error object — see `handledFailureRef`.
+    const handled = handledFailureRef.current;
+    if (handled && handled.id === errorId && handled.kind === errorKind) return;
+    handledFailureRef.current = { kind: errorKind, id: errorId };
 
     const attemptsUsed = attemptsUsedRef.current;
     if (
-      !canAutoRecover({ kind: errorKind, attemptsUsed, sideEffectsObserved })
+      !canAutoRecover({
+        kind: errorKind,
+        attemptsUsed,
+        sideEffectsObserved: sideEffectsObservedRef.current,
+      })
     ) {
       // Terminal kind, exhausted budget, or a turn that already changed
       // something: the caller falls through to the error card.
@@ -159,6 +210,20 @@ export function useLangyTurnRecovery({
     setPending({ kind: errorKind, attempt });
     timerRef.current = setTimeout(() => {
       clearTimer();
+      // LAST-MOMENT SAFETY RE-READ. Everything else the policy weighs was
+      // settled when the timer armed; this one was not. The evidence that the
+      // dead turn already ran a project-mutating tool rides in on the history
+      // poll, which lands INSIDE this wait, so a turn that looked inert at
+      // arming time can be known to have opened a PR by the time the timer
+      // fires. Re-driving it then is the exact thing `canAutoRecover`'s
+      // `sideEffectsObserved` guard exists to prevent — a second PR, a second
+      // prompt — so abandon the retry and hand the decision to the user via the
+      // card, the same landing as an arming-time rejection. No attempt is
+      // charged, because none was made.
+      if (sideEffectsObservedRef.current) {
+        setPending(null);
+        return;
+      }
       attemptsUsedRef.current = attempt;
       setPending(null);
       // `regenerate` clears useChat's error and flips status to "submitted", so
@@ -166,8 +231,22 @@ export function useLangyTurnRecovery({
       onRetryRef.current();
     }, policy.delayMs(attempt));
 
-    return clearTimer;
-  }, [errorKind, errorId, sideEffectsObserved, enabled, clearTimer]);
+    // NO CLEANUP, on purpose. An armed timer belongs to the FAILURE (identified
+    // by kind + `errorId`), not to this effect instance, and every way a retry
+    // can legitimately be cancelled already clears it by hand: the failure
+    // clearing or the hook being disabled (the first branch), a NEW failure
+    // arriving — including the same Error reclassified — or one that turns out
+    // to be terminal (both above), late-arriving side-effect evidence (the
+    // callback's own re-read), `reset()` when the conversation changes, and the
+    // unmount effect below.
+    //
+    // Returning `clearTimer` here instead is what wedged the panel: React runs
+    // the previous cleanup on ANY dep change, so a re-render killed the pending
+    // timer and then hit the same-failure short-circuit above, which re-arms
+    // nothing. `pending` stayed set forever — `isRecovering` permanently true,
+    // the retry never fired, and the error card stayed suppressed behind a
+    // recovering line that could only be escaped by sending a new message.
+  }, [errorKind, errorId, enabled, clearTimer]);
 
   // Unmount must never leave a timer holding a stale `regenerate`.
   useEffect(() => clearTimer, [clearTimer]);
@@ -190,24 +269,42 @@ export function useLangyTurnRecovery({
       sideEffectsObserved,
     });
 
-  if (!pending) {
+  // MEMOISED so the handle is as stable as the state behind it.
+  //
+  // This is now belt-and-braces rather than load-bearing, and the history is
+  // the reason it stays. The panel used to thread this object into
+  // `useCallback` deps (the choices card's `onChoiceSelect`), so a fresh object
+  // literal per render minted a fresh callback per render — a changed prop on
+  // every `memo(MessageContent)` in the column, and a streaming turn re-rendered
+  // every message in the conversation on every token. That callback has since
+  // moved to an implementation-ref, so today nothing reads this identity; the
+  // panel only reads properties off it.
+  //
+  // A hook that hands out an OBJECT owes callers a stable one anyway: the
+  // caller cannot see the difference until it costs them a render storm, and
+  // this panel has already paid that bill once. Dropping the memo would make
+  // the next `[recovery]` dep array — or the next time it is passed to a memo'd
+  // child — a silent regression instead of a non-event.
+  return useMemo(() => {
+    if (!pending) {
+      return {
+        isRecovering: false,
+        willAutoRecover,
+        message: null,
+        attempt: 0,
+        attempts: errorKind ? langyRecoveryPolicy(errorKind).attempts : 0,
+        reset,
+      };
+    }
+
+    const policy = langyRecoveryPolicy(pending.kind);
     return {
-      isRecovering: false,
+      isRecovering: true,
       willAutoRecover,
-      message: null,
-      attempt: 0,
-      attempts: errorKind ? langyRecoveryPolicy(errorKind).attempts : 0,
+      message: policy.recoveringMessage,
+      attempt: pending.attempt,
+      attempts: policy.attempts,
       reset,
     };
-  }
-
-  const policy = langyRecoveryPolicy(pending.kind);
-  return {
-    isRecovering: true,
-    willAutoRecover,
-    message: policy.recoveringMessage,
-    attempt: pending.attempt,
-    attempts: policy.attempts,
-    reset,
-  };
+  }, [pending, willAutoRecover, errorKind, reset]);
 }

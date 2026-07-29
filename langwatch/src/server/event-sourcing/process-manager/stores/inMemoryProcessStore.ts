@@ -146,7 +146,10 @@ export class InMemoryProcessStore implements ProcessStore {
     for (const message of this.messages.values()) {
       if (leased.length >= params.limit) break;
       if (message.status !== "pending") continue;
-      if (params.processNames && !params.processNames.includes(message.processName))
+      if (
+        params.processNames &&
+        !params.processNames.includes(message.processName)
+      )
         continue;
       if (message.nextAttemptAt > params.now) continue;
       if (message.leasedUntil > params.now) continue;
@@ -220,7 +223,10 @@ export class InMemoryProcessStore implements ProcessStore {
     for (const [key, message] of this.messages) {
       if (message.processName !== params.processName) continue;
       if (message.status !== "dispatched") continue;
-      if (message.dispatchedAt === null || message.dispatchedAt >= params.before)
+      if (
+        message.dispatchedAt === null ||
+        message.dispatchedAt >= params.before
+      )
         continue;
       this.messages.delete(key);
       deleted++;

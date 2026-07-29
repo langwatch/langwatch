@@ -12,9 +12,9 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { RunRow } from "../RunRow";
 import { cssRulesForElement } from "~/utils/emotionTestCss";
-import { makeScenarioRunData, makeBatchRun, makeSummary } from "./test-helpers";
+import { RunRow } from "../RunRow";
+import { makeBatchRun, makeScenarioRunData, makeSummary } from "./test-helpers";
 
 vi.mock("../usePrefetchRunState", () => ({
   usePrefetchRunState: () => vi.fn(),
@@ -80,12 +80,8 @@ describe("<RunRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(
-        screen.getByText(/Angry refund request/),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByText(/Policy violation/),
-      ).toBeInTheDocument();
+      expect(screen.getByText(/Angry refund request/)).toBeInTheDocument();
+      expect(screen.getByText(/Policy violation/)).toBeInTheDocument();
     });
 
     it("displays target name in scenario x target format in list view", () => {
@@ -178,7 +174,11 @@ describe("<RunRow/>", () => {
       render(
         <RunRow
           batchRun={makeBatchRun()}
-          summary={makeSummary({ passedCount: 2, failedCount: 1, passRate: 67 })}
+          summary={makeSummary({
+            passedCount: 2,
+            failedCount: 1,
+            passRate: 67,
+          })}
           isExpanded={false}
           onToggle={vi.fn()}
           resolveTargetName={() => "Prod Agent"}
@@ -273,7 +273,11 @@ describe("<RunRow/>", () => {
       render(
         <RunRow
           batchRun={makeBatchRun()}
-          summary={makeSummary({ passedCount: 8, failedCount: 2, passRate: 80 })}
+          summary={makeSummary({
+            passedCount: 8,
+            failedCount: 2,
+            passRate: 80,
+          })}
           isExpanded={false}
           onToggle={vi.fn()}
           resolveTargetName={() => "Prod Agent"}
@@ -290,7 +294,11 @@ describe("<RunRow/>", () => {
       const { container } = render(
         <RunRow
           batchRun={makeBatchRun()}
-          summary={makeSummary({ passedCount: 8, failedCount: 2, passRate: 80 })}
+          summary={makeSummary({
+            passedCount: 8,
+            failedCount: 2,
+            passRate: 80,
+          })}
           isExpanded={false}
           onToggle={vi.fn()}
           resolveTargetName={() => "Prod Agent"}
@@ -301,7 +309,9 @@ describe("<RunRow/>", () => {
 
       const header = container.querySelector('[data-testid="run-row-header"]');
       expect(header).toBeInTheDocument();
-      const metrics = header?.querySelector('[data-testid="run-metrics-summary"]');
+      const metrics = header?.querySelector(
+        '[data-testid="run-metrics-summary"]',
+      );
       expect(metrics).toBeInTheDocument();
     });
   });
@@ -365,7 +375,9 @@ describe("<RunRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.queryByText("Checkout Flow, Login Flow")).not.toBeInTheDocument();
+      expect(
+        screen.queryByText("Checkout Flow, Login Flow"),
+      ).not.toBeInTheDocument();
     });
   });
 

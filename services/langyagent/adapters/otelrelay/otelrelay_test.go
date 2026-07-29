@@ -65,6 +65,7 @@ func protoBatch(t *testing.T) []byte {
 }
 
 func TestRelayTraces(t *testing.T) {
+	// @scenario "Forwarded traces land in the customer's project"
 	t.Run("when a registered worker exports a span batch during a turn", func(t *testing.T) {
 		relay := startRelay(t)
 		ingest := startIngest(t)
@@ -135,6 +136,7 @@ func TestRelayTraces(t *testing.T) {
 		}
 	})
 
+	// @scenario "An unknown routing token is rejected"
 	t.Run("when the routing token is unknown", func(t *testing.T) {
 		relay := startRelay(t)
 		ingest := startIngest(t)
@@ -151,6 +153,7 @@ func TestRelayTraces(t *testing.T) {
 		}
 	})
 
+	// @scenario "A dead worker's routing token stops working"
 	t.Run("when the worker was unregistered", func(t *testing.T) {
 		relay := startRelay(t)
 		ingest := startIngest(t)
@@ -377,6 +380,8 @@ func TestForwardTurnSpanFailure(t *testing.T) {
 // and sweep any worker-supplied claim of it on every other turn: a bare model
 // name is indistinguishable from paid API usage, so the discriminator is the
 // provider/auth mode, never the model string.
+//
+// @scenario "Codex-plan usage appears as bundled cost"
 func TestRelayTracesCodexNonBillable(t *testing.T) {
 	// A model-call span (carries gen_ai.provider.name, as opencode's Responses
 	// spans do) plus a tool span that must never receive a cost stamp.

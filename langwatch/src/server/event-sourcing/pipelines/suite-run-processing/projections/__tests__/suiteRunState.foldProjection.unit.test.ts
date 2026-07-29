@@ -6,13 +6,13 @@ import {
   SUITE_RUN_EVENT_VERSIONS,
 } from "../../schemas/constants";
 import type {
-  SuiteRunStartedEvent,
-  SuiteRunItemStartedEvent,
   SuiteRunItemCompletedEvent,
+  SuiteRunItemStartedEvent,
+  SuiteRunStartedEvent,
 } from "../../schemas/events";
 import {
-  SuiteRunStateFoldProjection,
   type SuiteRunStateData,
+  SuiteRunStateFoldProjection,
 } from "../suiteRunState.foldProjection";
 
 const noopStore: FoldProjectionStore<SuiteRunStateData> = {
@@ -121,7 +121,10 @@ describe("suiteRunState fold projection", () => {
     it("increments CompletedCount for SUCCESS status", () => {
       let state = projection.init();
       state = projection.apply(state, createStartedEvent({ total: 3 }));
-      state = projection.apply(state, createItemCompletedEvent({ status: "SUCCESS" }));
+      state = projection.apply(
+        state,
+        createItemCompletedEvent({ status: "SUCCESS" }),
+      );
 
       expect(state.CompletedCount).toBe(1);
       expect(state.FailedCount).toBe(0);
@@ -131,7 +134,10 @@ describe("suiteRunState fold projection", () => {
     it("increments FailedCount for FAILURE status", () => {
       let state = projection.init();
       state = projection.apply(state, createStartedEvent({ total: 3 }));
-      state = projection.apply(state, createItemCompletedEvent({ status: "FAILURE" }));
+      state = projection.apply(
+        state,
+        createItemCompletedEvent({ status: "FAILURE" }),
+      );
 
       expect(state.CompletedCount).toBe(0);
       expect(state.FailedCount).toBe(1);
@@ -141,7 +147,10 @@ describe("suiteRunState fold projection", () => {
     it("increments FailedCount for ERROR status", () => {
       let state = projection.init();
       state = projection.apply(state, createStartedEvent({ total: 3 }));
-      state = projection.apply(state, createItemCompletedEvent({ status: "ERROR" }));
+      state = projection.apply(
+        state,
+        createItemCompletedEvent({ status: "ERROR" }),
+      );
 
       expect(state.FailedCount).toBe(1);
     });
@@ -149,16 +158,22 @@ describe("suiteRunState fold projection", () => {
     it("computes PassRateBps from verdict", () => {
       let state = projection.init();
       state = projection.apply(state, createStartedEvent({ total: 3 }));
-      state = projection.apply(state, createItemCompletedEvent({
-        scenarioRunId: "run-1",
-        status: "SUCCESS",
-        verdict: "success",
-      }));
-      state = projection.apply(state, createItemCompletedEvent({
-        scenarioRunId: "run-2",
-        status: "SUCCESS",
-        verdict: "failure",
-      }));
+      state = projection.apply(
+        state,
+        createItemCompletedEvent({
+          scenarioRunId: "run-1",
+          status: "SUCCESS",
+          verdict: "success",
+        }),
+      );
+      state = projection.apply(
+        state,
+        createItemCompletedEvent({
+          scenarioRunId: "run-2",
+          status: "SUCCESS",
+          verdict: "failure",
+        }),
+      );
 
       expect(state.PassedCount).toBe(1);
       expect(state.GradedCount).toBe(2);
@@ -168,10 +183,13 @@ describe("suiteRunState fold projection", () => {
     it("sets PassRateBps to null when no verdicts", () => {
       let state = projection.init();
       state = projection.apply(state, createStartedEvent({ total: 1 }));
-      state = projection.apply(state, createItemCompletedEvent({
-        status: "SUCCESS",
-        verdict: undefined,
-      }));
+      state = projection.apply(
+        state,
+        createItemCompletedEvent({
+          status: "SUCCESS",
+          verdict: undefined,
+        }),
+      );
 
       expect(state.PassRateBps).toBeNull();
     });
@@ -179,14 +197,20 @@ describe("suiteRunState fold projection", () => {
     it("derives final status SUCCESS when all items pass", () => {
       let state = projection.init();
       state = projection.apply(state, createStartedEvent({ total: 2 }));
-      state = projection.apply(state, createItemCompletedEvent({
-        scenarioRunId: "run-1",
-        status: "SUCCESS",
-      }));
-      state = projection.apply(state, createItemCompletedEvent({
-        scenarioRunId: "run-2",
-        status: "SUCCESS",
-      }));
+      state = projection.apply(
+        state,
+        createItemCompletedEvent({
+          scenarioRunId: "run-1",
+          status: "SUCCESS",
+        }),
+      );
+      state = projection.apply(
+        state,
+        createItemCompletedEvent({
+          scenarioRunId: "run-2",
+          status: "SUCCESS",
+        }),
+      );
 
       expect(state.Status).toBe("SUCCESS");
       expect(state.FinishedAt).toBe(4000);
@@ -195,14 +219,20 @@ describe("suiteRunState fold projection", () => {
     it("derives final status FAILURE when any item fails", () => {
       let state = projection.init();
       state = projection.apply(state, createStartedEvent({ total: 2 }));
-      state = projection.apply(state, createItemCompletedEvent({
-        scenarioRunId: "run-1",
-        status: "SUCCESS",
-      }));
-      state = projection.apply(state, createItemCompletedEvent({
-        scenarioRunId: "run-2",
-        status: "FAILURE",
-      }));
+      state = projection.apply(
+        state,
+        createItemCompletedEvent({
+          scenarioRunId: "run-1",
+          status: "SUCCESS",
+        }),
+      );
+      state = projection.apply(
+        state,
+        createItemCompletedEvent({
+          scenarioRunId: "run-2",
+          status: "FAILURE",
+        }),
+      );
 
       expect(state.Status).toBe("FAILURE");
       expect(state.FinishedAt).toBe(4000);
@@ -211,9 +241,12 @@ describe("suiteRunState fold projection", () => {
     it("stays IN_PROGRESS when not all items are done", () => {
       let state = projection.init();
       state = projection.apply(state, createStartedEvent({ total: 3 }));
-      state = projection.apply(state, createItemCompletedEvent({
-        status: "SUCCESS",
-      }));
+      state = projection.apply(
+        state,
+        createItemCompletedEvent({
+          status: "SUCCESS",
+        }),
+      );
 
       expect(state.Status).toBe("IN_PROGRESS");
       expect(state.FinishedAt).toBeNull();

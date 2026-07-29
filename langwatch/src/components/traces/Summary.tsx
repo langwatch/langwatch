@@ -1,9 +1,9 @@
 import { Alert, Box, HStack, Skeleton, VStack } from "@chakra-ui/react";
-import { useRouter } from "~/utils/compat/next-router";
 import numeral from "numeral";
 import qs from "qs";
 import React, { type PropsWithChildren } from "react";
 import { HelpCircle } from "react-feather";
+import { useRouter } from "~/utils/compat/next-router";
 import { getTotalTokensDisplay } from "~/utils/getTotalTokensDisplay";
 import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
 import { availableFilters } from "../../server/filters/registry";

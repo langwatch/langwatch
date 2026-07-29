@@ -3,9 +3,11 @@ package httpapi
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
 
@@ -224,4 +226,119 @@ func TestRouter_BudgetWarning_ListsEveryScopeOverTheThreshold(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	assert.Equal(t, "organization:84,virtual_key:99", resp.Header.Get(budgetWarningHeader))
+}
+
+// dialRecorder records which credential each dispatch used, so
+// chain-filtering tests can assert who was dialed off a real HTTP round
+// trip. dispatchFn runs on the server goroutine while the test goroutine
+// reads the result, so the recording is mutex-guarded and read through a
+// snapshot accessor rather than a raw slice.
+type dialRecorder struct {
+	mu     sync.Mutex
+	dialed []string
+}
+
+func (r *dialRecorder) record(id string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.dialed = append(r.dialed, id)
+}
+
+func (r *dialRecorder) snapshot() []string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return append([]string(nil), r.dialed...)
+}
+
+func recordingProvider(rec *dialRecorder) app.ProviderRouter {
+	return &mockStreamProvider{
+		mockProvider: mockProvider{
+			dispatchFn: func(_ context.Context, _ *domain.Request, cred domain.Credential) (*domain.Response, error) {
+				rec.record(cred.ID)
+				return successResponse(), nil
+			},
+		},
+	}
+}
+
+// A provider-filtered budget constrains one vendor, not the request: with a
+// second provider in reach the call succeeds over the wire, the exhausted
+// vendor is skipped, and the warning header names the filtered budget so the
+// caller hears WHY the routing changed (contract §4.6).
+func TestRouter_FilteredBudget_BreachedProviderIsRoutedAround(t *testing.T) {
+	rec := &dialRecorder{}
+	bundle := testBundle()
+	bundle.Credentials = []domain.Credential{
+		{ID: "mp_primary", ProviderID: domain.ProviderOpenAI, APIKey: "sk-1"},
+		{ID: "mp_secondary", ProviderID: domain.ProviderOpenAI, APIKey: "sk-2"},
+	}
+	bundle.Config.Fallback.MaxAttempts = 2
+	bundle.Config.Budget.Scopes = []domain.BudgetScope{{
+		ID: "gb_primary", Scope: "virtual_key", ScopeID: "vk-test|provider:mp_primary",
+		ProviderKey: "mp_primary", Window: "day",
+		LimitMicroUSD: 25_000_000, SpentMicroUSD: 25_000_000, OnBreach: "block",
+	}}
+	srv := budgetServer(t, bundle, 0, recordingProvider(rec))
+
+	resp := chatCall(t, srv, false)
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Equal(t, []string{"mp_secondary"}, rec.snapshot())
+	assert.Equal(t, "virtual_key/mp_primary:100", resp.Header.Get(budgetWarningHeader))
+}
+
+// When the provider-filtered breach leaves nothing to dispatch to, the 402
+// envelope must name the budget that emptied the chain: the caller is
+// otherwise left guessing which of up to six budget dimensions to raise.
+func TestRouter_FilteredBudget_EmptyChainReturns402NamingTheBudget(t *testing.T) {
+	bundle := testBundle()
+	bundle.Config.Budget.Scopes = []domain.BudgetScope{{
+		ID: "gb_only", Scope: "virtual_key", ScopeID: "vk-test|provider:cred-1",
+		ProviderKey: "cred-1", Window: "day",
+		LimitMicroUSD: 25_000_000, SpentMicroUSD: 26_000_000, OnBreach: "block",
+	}}
+	srv := budgetServer(t, bundle, 0, fastProvider())
+
+	resp := chatCall(t, srv, false)
+
+	require.Equal(t, http.StatusPaymentRequired, resp.StatusCode)
+	var envelope struct {
+		Error struct {
+			Type    string         `json:"type"`
+			Message string         `json:"message"`
+			Meta    map[string]any `json:"meta"`
+		} `json:"error"`
+	}
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&envelope))
+	assert.Equal(t, "budget_exceeded", envelope.Error.Type)
+	assert.Equal(t, "gb_only", envelope.Error.Meta["budget_id"])
+	assert.Equal(t, "cred-1", envelope.Error.Meta["budget_provider"])
+	assert.Contains(t, envelope.Error.Message, "cred-1",
+		"the message must say which provider's allowance ran out")
+}
+
+// The plain unfiltered 402 now names its budget too: scope and window ride
+// the envelope meta so the admin knows which allowance to raise.
+func TestRouter_Budget_402NamesTheBlockedBudget(t *testing.T) {
+	bundle := testBundle()
+	bundle.Config.Budget.Scopes = []domain.BudgetScope{{
+		ID: "gb_project", Scope: "project", ScopeID: "proj-test", Window: "month",
+		LimitMicroUSD: 100_000_000, SpentMicroUSD: 100_000_000, OnBreach: "block",
+	}}
+	srv := budgetServer(t, bundle, 0, fastProvider())
+
+	resp := chatCall(t, srv, false)
+
+	require.Equal(t, http.StatusPaymentRequired, resp.StatusCode)
+	var envelope struct {
+		Error struct {
+			Message string         `json:"message"`
+			Meta    map[string]any `json:"meta"`
+		} `json:"error"`
+	}
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&envelope))
+	assert.Equal(t, "gb_project", envelope.Error.Meta["budget_id"])
+	assert.Equal(t, "project", envelope.Error.Meta["budget_scope"])
+	assert.Equal(t, "month", envelope.Error.Meta["budget_window"])
+	assert.Contains(t, envelope.Error.Message, "project spending limit")
 }

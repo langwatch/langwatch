@@ -11,13 +11,13 @@ export const useSimulationRouter = () => {
     batchRunId: string;
     scenarioRunId: string;
   }) => {
-    router.push(
+    void router.push(
       `/${project?.slug}/simulations/${ids.scenarioSetId}/${ids.batchRunId}/${ids.scenarioRunId}`,
     );
   };
 
   const goToSimulationSet = (simulationBatchId: string) => {
-    router.push(`/${project?.slug}/simulations/${simulationBatchId}`);
+    void router.push(`/${project?.slug}/simulations/${simulationBatchId}`);
   };
 
   const goToSimulationBatchRuns = (
@@ -28,18 +28,18 @@ export const useSimulationRouter = () => {
     },
   ) => {
     if (options?.replace) {
-      router.replace(
+      void router.replace(
         `/${project?.slug}/simulations/${scenarioSetId}/${simulationBatchId}`,
       );
     } else {
-      router.push(
+      void router.push(
         `/${project?.slug}/simulations/${scenarioSetId}/${simulationBatchId}`,
       );
     }
   };
 
   const goToSimulationSets = () => {
-    router.push(`/${project?.slug}/simulations`);
+    void router.push(`/${project?.slug}/simulations`);
   };
 
   return {

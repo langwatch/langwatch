@@ -11,11 +11,8 @@ import { Cpu, Plus, Sparkles, Waypoints } from "lucide-react";
 import { useEffect, useMemo } from "react";
 import { LANGY_SKILLS, type LangySkill } from "~/shared/langy/langySkills";
 import {
-} from "../logic/langyContextKindIntent";
-import {
   absorbContextTarget,
   type LangyContextTarget,
-  type LangyRevealableKind,
   useLangyContextTargetStore,
 } from "../stores/langyContextTargetStore";
 import type { LangyContextChip } from "../stores/langyStore";
@@ -48,22 +45,40 @@ import type { LangyContextChip } from "../stores/langyStore";
 
 export type PaletteMode = "context" | "skills";
 
-/** Everything the palette needs to introduce itself. */
+/**
+ * Everything the palette needs to introduce itself.
+ *
+ * TWO empty states, because there are two ways to end up with no rows and they
+ * are not the same question. `nothing` is "there was never anything here" — an
+ * index route with no drawer and no page targets offers `#` an empty list
+ * before a single key is typed, and answering that with "nothing matches" is a
+ * reply to a search the reader never ran. `noMatch` is the real no-match.
+ */
 const MODE_CHROME: Record<
   PaletteMode,
-  { title: string; sigil: string; placeholder: string; empty: string }
+  {
+    title: string;
+    sigil: string;
+    placeholder: string;
+    /** Nothing to offer at all, whatever the reader types. */
+    nothing: string;
+    /** Rows exist; this query matched none of them. */
+    noMatch: string;
+  }
 > = {
   context: {
     title: "Context",
     sigil: "#",
     placeholder: "Reference something on this page…  (Esc to cancel)",
-    empty: "Nothing on this page matches that.",
+    nothing: "Nothing on this page can be referenced yet.",
+    noMatch: "Nothing on this page matches that.",
   },
   skills: {
     title: "Skills",
     sigil: "/",
     placeholder: "Pick a skill for Langy to use…  (Esc to cancel)",
-    empty: "No skill matches that.",
+    nothing: "No skills are available here.",
+    noMatch: "No skill matches that.",
   },
 };
 
@@ -141,7 +156,6 @@ export function LangyComposerPalette({
   onQueryChange,
   onPickChip,
   onPickSkill,
-  onKindIntent,
   onClose,
 }: {
   mode: PaletteMode;
@@ -152,11 +166,6 @@ export function LangyComposerPalette({
   onPickChip: (id: string) => void;
   /** A skill picked from `/` — the composer drops its question into the draft. */
   onPickSkill?: (skill: LangySkill) => void;
-  /** `#trace`-style kind intents: reveal targets here, or browse the surface. */
-  onKindIntent?: (intent: {
-    kind: LangyRevealableKind;
-    action: "reveal" | "browse";
-  }) => void;
   onClose: () => void;
 }) {
   // The registry of things mounted on the page (only populated while the panel
@@ -200,13 +209,14 @@ export function LangyComposerPalette({
     // ENTIRE list, so `#` read as a command menu that happened to be filed
     // under a different key. The real fix for a page with nothing to pick is
     // for the page to offer its things, not for this list to change subject.
-    const rows = filtered;
+    // (What such a page shows the reader is `chrome.nothing` — see below.)
+    //
     // Sorted into group order BEFORE the collection is built, so the order the
     // eye reads and the order ↑/↓ walks are the same order. Grouped rendering
     // over an unsorted collection is how a palette ends up jumping between
     // headings as you arrow through it.
     const order = GROUP_ORDER[mode];
-    const sorted = [...rows].sort(
+    const sorted = [...filtered].sort(
       (a, b) => order.indexOf(a.group) - order.indexOf(b.group),
     );
     return createListCollection({
@@ -242,14 +252,6 @@ export function LangyComposerPalette({
       if (target) absorbContextTarget(target);
       onClose();
       return;
-    }
-    if (value.startsWith("intent:")) {
-      const [, action, kind] = value.split(":");
-      onKindIntent?.({
-        kind: kind as LangyRevealableKind,
-        action: action as "reveal" | "browse",
-      });
-      onClose();
     }
   };
 
@@ -355,8 +357,16 @@ export function LangyComposerPalette({
             }}
           >
             <Combobox.Empty paddingX={2} paddingY={3}>
-              <Text textStyle="xs" color="fg.muted">
-                {chrome.empty}
+              <Text
+                textStyle="xs"
+                color="fg.muted"
+                data-testid="langy-palette-empty"
+              >
+                {/* Which of the two emptinesses this is. `items` is the whole
+                    offer before any filtering, so an empty one means the page
+                    had nothing to give — telling that reader "nothing matches
+                    that" answers a search they never ran. */}
+                {items.length === 0 ? chrome.nothing : chrome.noMatch}
               </Text>
             </Combobox.Empty>
 

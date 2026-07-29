@@ -8,7 +8,7 @@ Feature: Langy draws model-shaped data as derived cards, stamped by the relay
   # The RELAY extracts it, salvages the JSON (transport-tolerant), validates it
   # against the card kind's schema (boundary-strict), and stamps it as a typed
   # part in the durable event stream — the same one decision point every card
-  # already inherits (ADR-059 card determinism, ADR-060). The browser never
+  # already inherits (ADR-079 card determinism, ADR-060). The browser never
   # parses fences out of text; time travel replays the same stamped part.
   #
   # Companion specs:

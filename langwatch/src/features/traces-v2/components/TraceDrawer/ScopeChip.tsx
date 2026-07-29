@@ -16,7 +16,7 @@ interface ScopeChipProps {
  * loud chip.
  */
 export function ScopeChip({ scope }: ScopeChipProps) {
-  if (!scope || !scope.name) return null;
+  if (!scope?.name) return null;
   const label = scope.version ? `${scope.name} v${scope.version}` : scope.name;
   return (
     <Tooltip
@@ -65,7 +65,7 @@ function TooltipRow({ label, value }: { label: string; value: string }) {
 
 /** Standalone scope display used in expandable sections. */
 export function ScopeBlock({ scope }: { scope: InstrumentationScope | null }) {
-  if (!scope || !scope.name) {
+  if (!scope?.name) {
     return (
       <Text textStyle="xs" color="fg.subtle">
         No instrumentation scope reported.

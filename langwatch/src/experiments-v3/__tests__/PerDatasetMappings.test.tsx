@@ -9,7 +9,7 @@
  * 3. The useEvaluationMappings hook returns correct data reactively
  */
 
-import { act, cleanup, renderHook } from "@testing-library/react";
+import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { useEvaluationMappings } from "../hooks/useEvaluationMappings";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";

@@ -20,19 +20,19 @@
  * @see https://github.com/langwatch/langwatch/issues/5294
  */
 
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { ClickHouseClient } from "@clickhouse/client";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { wrapWithDefaultSettings } from "~/server/clickhouse/safeClickhouseClient";
 import {
-  getTestClickHouseClient,
   cleanupTestData,
+  getTestClickHouseClient,
 } from "../../../event-sourcing/__tests__/integration/testContainers";
-import { buildTimeseriesQuery } from "../aggregation-builder";
-import { resetParamCounter } from "../filter-translator";
 import type { FlattenAnalyticsMetricsEnum } from "../../registry";
 import type { AggregationTypes } from "../../types";
-import { seedSpans } from "./test-utils/clickhouse-fixtures";
-import { wrapWithDefaultSettings } from "~/server/clickhouse/safeClickhouseClient";
+import { buildTimeseriesQuery } from "../aggregation-builder";
+import { resetParamCounter } from "../filter-translator";
 import { deleteEvaluationRunsByTenant } from "./test-utils/clickhouse-cleanup";
+import { seedSpans } from "./test-utils/clickhouse-fixtures";
 
 const TENANT_ID = "test-eval-passed-score-only-5294";
 
@@ -78,9 +78,7 @@ async function runGroupKeys(
     format: "JSONEachRow",
   });
   const rows = (await result.json()) as Row[];
-  return rows
-    .filter((r) => r["period"] === "current")
-    .map((r) => r["group_key"]);
+  return rows.filter((r) => r.period === "current").map((r) => r.group_key);
 }
 
 describe("evaluation_passed groupBy on score-only / non-processed rows", () => {

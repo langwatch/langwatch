@@ -1,9 +1,9 @@
-import { TriggerAction } from "@prisma/client";
 import {
-  type SlackActionParams,
   SLACK_BOT_TOKEN_KEPT,
+  type SlackActionParams,
   slackDeliveryMethodOf,
 } from "@langwatch/automations/providers/slack";
+import { TriggerAction } from "@prisma/client";
 import { decrypt, encrypt } from "~/utils/encryption";
 import { MissingSlackBotTokenError } from "../../errors";
 import type { PersistActionParamsArgs, ServerDef } from "../types";

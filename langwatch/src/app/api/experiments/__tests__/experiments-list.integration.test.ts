@@ -14,8 +14,7 @@ describe.skipIf(process.env.CI)("GET /api/experiments", () => {
   let project: Project;
   const created: Experiment[] = [];
 
-  const getBaseUrl = () =>
-    process.env.TEST_BASE_URL ?? "http://localhost:5560";
+  const getBaseUrl = () => process.env.TEST_BASE_URL ?? "http://localhost:5560";
 
   beforeAll(async () => {
     project = await getTestProject("experiments-list-test");

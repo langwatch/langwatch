@@ -90,7 +90,7 @@ Override the Secret/key names via `secrets.existingSecretName` and
 | `networkPolicy.ingressFrom`   | Which pods may call the agent (default: `app.kubernetes.io/name: langwatch`) |
 | `networkPolicy.allowExternalHttps` | Allow egress :443 to anywhere (OpenCode update/telemetry); tighten once pinned |
 | `networkPolicy.privateExcept` / `privateExceptV6` | Private/link-local/CGNAT CIDRs carved out of the `:443`-to-anywhere rule so a worker cannot pivot to internal services. Includes `100.64.0.0/10` (EKS CGNAT). Append your cluster's CIDR if it lives outside RFC1918 |
-| `egress.fqdnFloor` / `requireTls` / `enforceFloor` / `sniCrossCheck` / `cilium.enabled` | ADR-043 per-worker L7 egress adapter: operator FQDN floor + enforcement toggles. Stock posture is monitor-only; `cilium.enabled` ships a bypass-proof datapath `toFQDNs` policy |
+| `egress.fqdnFloor` / `requireTls` / `enforceFloor` / `sniCrossCheck` / `egress.cilium.enabled` | ADR-076 per-worker L7 egress adapter: operator FQDN floor + enforcement toggles. Stock posture is monitor-only for destination decisions; `egress.cilium.enabled` ships a bypass-proof datapath `toFQDNs` policy |
 | `nodeSelector` / `affinity` / `tolerations` | Node placement. Opt-in **public-subnet** pinning is a defence-in-depth wall (a node with no route to private RDS/ElastiCache). Needs a Terraform-side node group; see Network policy below |
 
 ## Probes
@@ -143,7 +143,7 @@ which the RFC1918 ranges do NOT cover. **If your service CIDR or a VPC CIDR live
 outside RFC1918, append it to `privateExcept`.** The metadata service over plain
 `:80` (IMDSv2) is denied by default-deny — there is no `:80` egress rule at all.
 
-**FQDN egress (ADR-043).** FQDN bounding ("only github/npm/…") is enforced at L7
+**FQDN egress (ADR-076).** FQDN bounding ("only GitHub/npm/…") is enforced at L7
 by the per-worker egress adapter (worker tools egress via `HTTPS_PROXY`), tuned
 by `egress.*`. For bypass-proof datapath FQDN egress on a Cilium CNI, set
 `egress.cilium.enabled: true` (renders a `CiliumNetworkPolicy` enforcing the same

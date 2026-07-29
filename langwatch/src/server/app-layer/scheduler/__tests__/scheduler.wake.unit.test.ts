@@ -1,6 +1,6 @@
+import { createLogger } from "@langwatch/observability";
 import type { Redis } from "ioredis";
 import { describe, expect, it, vi } from "vitest";
-import { createLogger } from "@langwatch/observability";
 import { SchedulerRegistry } from "../scheduler.registry";
 import { SchedulerService } from "../scheduler.service";
 import type { ScheduledJobRepository } from "../scheduler.types";
@@ -100,8 +100,8 @@ describe("SchedulerService cross-pod wake (best-effort Redis)", () => {
       try {
         // Let the loop settle into its long sleep after the first scan.
         await new Promise((r) => setTimeout(r, 30));
-        const scansBefore = (repo.findDue as ReturnType<typeof vi.fn>).mock.calls
-          .length;
+        const scansBefore = (repo.findDue as ReturnType<typeof vi.fn>).mock
+          .calls.length;
 
         // A published wake arrives on the subscriber → loop re-scans now.
         fake.emitMessage("scheduler:wake");

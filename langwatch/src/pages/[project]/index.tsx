@@ -1,5 +1,5 @@
-import { useRouter } from "~/utils/compat/next-router";
 import { useEffect } from "react";
+import { useRouter } from "~/utils/compat/next-router";
 import { getSafeReturnToPath } from "~/utils/getSafeReturnToPath";
 import { HomePage } from "../../components/home/HomePage";
 

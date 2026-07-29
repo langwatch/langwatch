@@ -29,7 +29,11 @@ describe("InMemoryProcessStore outbox retention", () => {
         now: T0,
       });
       const oldLease = (
-        await store.leaseDueMessages({ now: T0, limit: 10, leaseDurationMs: 100 })
+        await store.leaseDueMessages({
+          now: T0,
+          limit: 10,
+          leaseDurationMs: 100,
+        })
       )[0]!;
       await store.markDispatched({
         identity: oldLease,

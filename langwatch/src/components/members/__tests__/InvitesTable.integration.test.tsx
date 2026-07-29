@@ -9,9 +9,9 @@
  * - Pending approval requests display a badge
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type { INVITE_STATUS, OrganizationUserRole } from "@prisma/client";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { INVITE_STATUS, OrganizationUserRole } from "@prisma/client";
 import type { RouterOutputs } from "~/utils/api";
 import { InvitesTable } from "../InvitesTable";
 

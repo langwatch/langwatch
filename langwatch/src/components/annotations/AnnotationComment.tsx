@@ -14,10 +14,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type { AnnotationScoreDataType } from "@prisma/client";
-import Link from "~/utils/compat/next-link";
-import { useSession } from "~/utils/auth-client";
 import { useEffect, useState } from "react";
-
 import { ChevronDown, MoreVertical, Trash2 } from "react-feather";
 import {
   type UseFormSetValue,
@@ -27,9 +24,11 @@ import {
 import { useAnnotationCommentStore } from "~/hooks/useAnnotationCommentStore";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { useSession } from "~/utils/auth-client";
+import Link from "~/utils/compat/next-link";
 import { RandomColorAvatar } from "../RandomColorAvatar";
-import { UserAvatar } from "../UserAvatar";
 import { ScoreReasonModal } from "../ScoreReasonModal";
+import { UserAvatar } from "../UserAvatar";
 import { Checkbox, CheckboxGroup } from "../ui/checkbox";
 import { Menu } from "../ui/menu";
 import { Popover } from "../ui/popover";

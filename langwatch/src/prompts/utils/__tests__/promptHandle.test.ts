@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
-  NEW_PROMPT_TITLE,
   getDisplayHandle,
   getPromptFolder,
+  NEW_PROMPT_TITLE,
 } from "../promptHandle";
 
 describe("getDisplayHandle", () => {

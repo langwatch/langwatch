@@ -41,7 +41,6 @@ export const LITELLM_PARAMETER_TRANSLATION: Record<string, string> = {
   reasoning_effort: "reasoning_effort",
 };
 
-
 /**
  * Translates a parameter name to LiteLLM's expected format.
  *

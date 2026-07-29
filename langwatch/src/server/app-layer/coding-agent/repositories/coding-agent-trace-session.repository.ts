@@ -113,6 +113,17 @@ export class CodingAgentTraceSessionClickHouseRepository
    * a keyed seek, and the caller usually has no timestamp yet — this read is
    * how it FINDS one (the mapping's OccurredAt seeds the session read's
    * partition hint).
+   *
+   * The closing `ORDER BY` is not decoration (ADR-071 sequencing step 4). A
+   * tie on `max(UpdatedAt)` is not merely possible here, it is the normal case
+   * for the shape that matters: one trace can map to a provider session key
+   * and — from a span that carried no `gen_ai.conversation.id` — to a
+   * trace-id fallback, and `ensure` stamps ONE `now` across a whole batch, so
+   * both rows land on the same `UpdatedAt` and both satisfy the IN-tuple. A
+   * bare `LIMIT 1` then picks arbitrarily, and picking the fallback resolves
+   * the trace to an empty single-trace pseudo-session — the drawer opens the
+   * wrong session. So a real mapping outranks the fallback first, and the
+   * remaining keys only make the order total.
    */
   async findByTraceId({
     tenantId,
@@ -140,6 +151,7 @@ export class CodingAgentTraceSessionClickHouseRepository
               AND TraceId = {traceId:String}
             GROUP BY TenantId, TraceId
           )
+        ORDER BY SessionId != TraceId DESC, OccurredAt DESC, SessionId ASC
         LIMIT 1
       `,
       query_params: { tenantId, traceId },

@@ -45,8 +45,7 @@ vi.mock("~/hooks/useFeatureFlag", () => ({
     const rule = gate.rule;
     const matches =
       rule !== null &&
-      (rule.projectId === undefined ||
-        rule.projectId === options?.projectId) &&
+      (rule.projectId === undefined || rule.projectId === options?.projectId) &&
       (rule.organizationId === undefined ||
         rule.organizationId === options?.organizationId);
     return { enabled: matches, isLoading: false };
@@ -56,7 +55,9 @@ vi.mock("~/hooks/useFeatureFlag", () => ({
 // Mutable so a later describe block can swap in an unresolved-project shape
 // without a second vi.mock (hoisting only allows one factory per module).
 const context = {
-  project: { id: "project-1", slug: "acme" } as { id: string; slug: string } | undefined,
+  project: { id: "project-1", slug: "acme" } as
+    | { id: string; slug: string }
+    | undefined,
   demoProjectSlug: "not-this-project" as string | undefined,
 };
 

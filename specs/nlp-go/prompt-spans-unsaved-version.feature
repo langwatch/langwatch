@@ -76,7 +76,10 @@ Feature: Prompt spans — unsaved/applied prompt version (draft) carries the bas
   # Trace-UI consumption — draft flag drives "Open with unsaved edits" label
   # ============================================================================
 
-  @integration @v1
+    # @unimplemented: the integration test that bound this was skipped from the
+    # day it landed and was removed with the other 22 permanently-skipped suites.
+    # Marked honestly rather than left bound to a test that never ran.
+  @integration @v1 @unimplemented
   Scenario: trace drawer surfaces the draft state on the "Open in Prompts" affordance
     Given a draft execution has produced a Prompt.compile span with "langwatch.prompt.draft" = true
     When I open the trace details drawer for the resulting LLM span

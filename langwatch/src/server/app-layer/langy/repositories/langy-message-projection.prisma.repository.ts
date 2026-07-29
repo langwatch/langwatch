@@ -1,7 +1,7 @@
+import type { LangyMessageProjectionRecord } from "@langwatch/langy";
 import type { Prisma } from "@prisma/client";
 import type { AppendStore } from "~/server/event-sourcing/projections/mapProjection.types";
 import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
-import type { LangyMessageProjectionRecord } from "@langwatch/langy";
 
 type Row = Prisma.LangyMessageProjectionGetPayload<object>;
 
@@ -12,7 +12,9 @@ type MessageProjectionPrismaClient = {
 };
 
 /** Append-only Postgres adapter for operational message rows. */
-export class PrismaLangyMessageProjectionRepository implements AppendStore<LangyMessageProjectionRecord> {
+export class PrismaLangyMessageProjectionRepository
+  implements AppendStore<LangyMessageProjectionRecord>
+{
   constructor(private readonly prisma: MessageProjectionPrismaClient) {}
 
   async append(

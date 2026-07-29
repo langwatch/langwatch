@@ -1,12 +1,12 @@
-import { describe, expect, it } from "vitest";
 import { OrganizationUserRole } from "@prisma/client";
+import { describe, expect, it } from "vitest";
 import {
-  isViewOnlyPermission,
-  isViewOnlyCustomRole,
   classifyMemberType,
+  getRoleChangeType,
   isFullMember,
   isLiteMember,
-  getRoleChangeType,
+  isViewOnlyCustomRole,
+  isViewOnlyPermission,
 } from "../member-classification";
 
 /**
@@ -59,7 +59,7 @@ describe("isViewOnlyPermission", () => {
 describe("isViewOnlyCustomRole", () => {
   it("returns true when all permissions are view-only", () => {
     expect(
-      isViewOnlyCustomRole(["project:view", "analytics:view", "traces:view"])
+      isViewOnlyCustomRole(["project:view", "analytics:view", "traces:view"]),
     ).toBe(true);
   });
 
@@ -69,25 +69,25 @@ describe("isViewOnlyCustomRole", () => {
 
   it("returns false when any permission is manage", () => {
     expect(isViewOnlyCustomRole(["project:view", "project:manage"])).toBe(
-      false
+      false,
     );
   });
 
   it("returns false when any permission is create", () => {
     expect(isViewOnlyCustomRole(["project:view", "project:create"])).toBe(
-      false
+      false,
     );
   });
 
   it("returns false when any permission is update", () => {
     expect(isViewOnlyCustomRole(["project:view", "project:update"])).toBe(
-      false
+      false,
     );
   });
 
   it("returns false when any permission is delete", () => {
     expect(isViewOnlyCustomRole(["project:view", "project:delete"])).toBe(
-      false
+      false,
     );
   });
 
@@ -105,32 +105,32 @@ describe("classifyMemberType", () => {
     /** @scenario ADMIN role users count as Full Member */
     it("returns FullMember for ADMIN role", () => {
       expect(classifyMemberType(OrganizationUserRole.ADMIN, undefined)).toBe(
-        "FullMember"
+        "FullMember",
       );
     });
 
     it("returns FullMember for ADMIN role even with view-only permissions", () => {
       expect(
-        classifyMemberType(OrganizationUserRole.ADMIN, ["project:view"])
+        classifyMemberType(OrganizationUserRole.ADMIN, ["project:view"]),
       ).toBe("FullMember");
     });
 
     /** @scenario MEMBER role users count as Full Member */
     it("returns FullMember for MEMBER role", () => {
       expect(classifyMemberType(OrganizationUserRole.MEMBER, undefined)).toBe(
-        "FullMember"
+        "FullMember",
       );
     });
 
     it("returns FullMember for MEMBER role even with view-only permissions", () => {
       expect(
-        classifyMemberType(OrganizationUserRole.MEMBER, ["project:view"])
+        classifyMemberType(OrganizationUserRole.MEMBER, ["project:view"]),
       ).toBe("FullMember");
     });
 
     it("returns LiteMember for EXTERNAL role with no permissions (Lite Member)", () => {
       expect(classifyMemberType(OrganizationUserRole.EXTERNAL, undefined)).toBe(
-        "LiteMember"
+        "LiteMember",
       );
     });
   });
@@ -139,7 +139,7 @@ describe("classifyMemberType", () => {
     /** @scenario Custom role with only view permissions counts as Lite Member */
     it("returns LiteMember for view-only permissions", () => {
       expect(
-        classifyMemberType(OrganizationUserRole.EXTERNAL, ["project:view"])
+        classifyMemberType(OrganizationUserRole.EXTERNAL, ["project:view"]),
       ).toBe("LiteMember");
     });
 
@@ -149,7 +149,7 @@ describe("classifyMemberType", () => {
           "project:view",
           "analytics:view",
           "traces:view",
-        ])
+        ]),
       ).toBe("LiteMember");
     });
 
@@ -159,7 +159,7 @@ describe("classifyMemberType", () => {
         classifyMemberType(OrganizationUserRole.EXTERNAL, [
           "project:view",
           "project:manage",
-        ])
+        ]),
       ).toBe("FullMember");
     });
 
@@ -169,7 +169,7 @@ describe("classifyMemberType", () => {
         classifyMemberType(OrganizationUserRole.EXTERNAL, [
           "project:view",
           "project:create",
-        ])
+        ]),
       ).toBe("FullMember");
     });
 
@@ -179,7 +179,7 @@ describe("classifyMemberType", () => {
         classifyMemberType(OrganizationUserRole.EXTERNAL, [
           "project:view",
           "project:update",
-        ])
+        ]),
       ).toBe("FullMember");
     });
 
@@ -189,7 +189,7 @@ describe("classifyMemberType", () => {
         classifyMemberType(OrganizationUserRole.EXTERNAL, [
           "project:view",
           "project:delete",
-        ])
+        ]),
       ).toBe("FullMember");
     });
 
@@ -199,13 +199,13 @@ describe("classifyMemberType", () => {
         classifyMemberType(OrganizationUserRole.EXTERNAL, [
           "traces:view",
           "traces:share",
-        ])
+        ]),
       ).toBe("FullMember");
     });
 
     it("returns LiteMember for empty permissions array", () => {
       expect(classifyMemberType(OrganizationUserRole.EXTERNAL, [])).toBe(
-        "LiteMember"
+        "LiteMember",
       );
     });
   });
@@ -225,14 +225,14 @@ describe("isFullMember", () => {
       isFullMember(OrganizationUserRole.EXTERNAL, [
         "project:view",
         "project:manage",
-      ])
+      ]),
     ).toBe(true);
   });
 
   it("returns false for EXTERNAL with view-only permissions", () => {
-    expect(
-      isFullMember(OrganizationUserRole.EXTERNAL, ["project:view"])
-    ).toBe(false);
+    expect(isFullMember(OrganizationUserRole.EXTERNAL, ["project:view"])).toBe(
+      false,
+    );
   });
 
   it("returns false for EXTERNAL with no permissions", () => {
@@ -254,14 +254,14 @@ describe("isLiteMember", () => {
       isLiteMember(OrganizationUserRole.EXTERNAL, [
         "project:view",
         "project:manage",
-      ])
+      ]),
     ).toBe(false);
   });
 
   it("returns true for EXTERNAL with view-only permissions", () => {
-    expect(
-      isLiteMember(OrganizationUserRole.EXTERNAL, ["project:view"])
-    ).toBe(true);
+    expect(isLiteMember(OrganizationUserRole.EXTERNAL, ["project:view"])).toBe(
+      true,
+    );
   });
 
   it("returns true for EXTERNAL with no permissions", () => {
@@ -281,8 +281,8 @@ describe("getRoleChangeType", () => {
           OrganizationUserRole.ADMIN,
           undefined,
           OrganizationUserRole.MEMBER,
-          undefined
-        )
+          undefined,
+        ),
       ).toBe("no-change");
     });
 
@@ -292,8 +292,8 @@ describe("getRoleChangeType", () => {
           OrganizationUserRole.MEMBER,
           undefined,
           OrganizationUserRole.ADMIN,
-          undefined
-        )
+          undefined,
+        ),
       ).toBe("no-change");
     });
 
@@ -303,8 +303,8 @@ describe("getRoleChangeType", () => {
           OrganizationUserRole.EXTERNAL,
           undefined,
           OrganizationUserRole.EXTERNAL,
-          ["project:view"]
-        )
+          ["project:view"],
+        ),
       ).toBe("no-change");
     });
 
@@ -314,8 +314,8 @@ describe("getRoleChangeType", () => {
           OrganizationUserRole.EXTERNAL,
           ["project:manage"],
           OrganizationUserRole.MEMBER,
-          undefined
-        )
+          undefined,
+        ),
       ).toBe("no-change");
     });
 
@@ -325,8 +325,8 @@ describe("getRoleChangeType", () => {
           OrganizationUserRole.EXTERNAL,
           ["project:view"],
           OrganizationUserRole.EXTERNAL,
-          ["project:view", "analytics:view"]
-        )
+          ["project:view", "analytics:view"],
+        ),
       ).toBe("no-change");
     });
 
@@ -336,8 +336,8 @@ describe("getRoleChangeType", () => {
           OrganizationUserRole.EXTERNAL,
           ["project:manage"],
           OrganizationUserRole.EXTERNAL,
-          ["project:update"]
-        )
+          ["project:update"],
+        ),
       ).toBe("no-change");
     });
   });
@@ -349,8 +349,8 @@ describe("getRoleChangeType", () => {
           OrganizationUserRole.EXTERNAL,
           undefined,
           OrganizationUserRole.MEMBER,
-          undefined
-        )
+          undefined,
+        ),
       ).toBe("lite-to-full");
     });
 
@@ -360,8 +360,8 @@ describe("getRoleChangeType", () => {
           OrganizationUserRole.EXTERNAL,
           undefined,
           OrganizationUserRole.ADMIN,
-          undefined
-        )
+          undefined,
+        ),
       ).toBe("lite-to-full");
     });
 
@@ -371,8 +371,8 @@ describe("getRoleChangeType", () => {
           OrganizationUserRole.EXTERNAL,
           ["project:view"],
           OrganizationUserRole.EXTERNAL,
-          ["project:view", "project:manage"]
-        )
+          ["project:view", "project:manage"],
+        ),
       ).toBe("lite-to-full");
     });
 
@@ -382,8 +382,8 @@ describe("getRoleChangeType", () => {
           OrganizationUserRole.EXTERNAL,
           undefined,
           OrganizationUserRole.EXTERNAL,
-          ["project:create"]
-        )
+          ["project:create"],
+        ),
       ).toBe("lite-to-full");
     });
 
@@ -393,8 +393,8 @@ describe("getRoleChangeType", () => {
           OrganizationUserRole.EXTERNAL,
           [],
           OrganizationUserRole.EXTERNAL,
-          ["project:update"]
-        )
+          ["project:update"],
+        ),
       ).toBe("lite-to-full");
     });
   });
@@ -406,8 +406,8 @@ describe("getRoleChangeType", () => {
           OrganizationUserRole.MEMBER,
           undefined,
           OrganizationUserRole.EXTERNAL,
-          undefined
-        )
+          undefined,
+        ),
       ).toBe("full-to-lite");
     });
 
@@ -417,8 +417,8 @@ describe("getRoleChangeType", () => {
           OrganizationUserRole.ADMIN,
           undefined,
           OrganizationUserRole.EXTERNAL,
-          undefined
-        )
+          undefined,
+        ),
       ).toBe("full-to-lite");
     });
 
@@ -428,8 +428,8 @@ describe("getRoleChangeType", () => {
           OrganizationUserRole.MEMBER,
           undefined,
           OrganizationUserRole.EXTERNAL,
-          ["project:view"]
-        )
+          ["project:view"],
+        ),
       ).toBe("full-to-lite");
     });
 
@@ -439,8 +439,8 @@ describe("getRoleChangeType", () => {
           OrganizationUserRole.EXTERNAL,
           ["project:manage"],
           OrganizationUserRole.EXTERNAL,
-          ["project:view"]
-        )
+          ["project:view"],
+        ),
       ).toBe("full-to-lite");
     });
 
@@ -450,8 +450,8 @@ describe("getRoleChangeType", () => {
           OrganizationUserRole.EXTERNAL,
           ["project:update"],
           OrganizationUserRole.EXTERNAL,
-          undefined
-        )
+          undefined,
+        ),
       ).toBe("full-to-lite");
     });
   });

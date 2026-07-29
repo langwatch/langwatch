@@ -455,9 +455,7 @@ function translateEvaluationPassedFilter(
   const paramName = genParamName("evalPassed");
 
   // Convert string values to UInt8 (boolean in CH)
-  const passedValues = values.map((v) =>
-    v === "true" || v === "1" ? 1 : 0,
-  );
+  const passedValues = values.map((v) => (v === "true" || v === "1" ? 1 : 0));
 
   const params: Record<string, unknown> = { [paramName]: passedValues };
   let evaluatorCondition = "";

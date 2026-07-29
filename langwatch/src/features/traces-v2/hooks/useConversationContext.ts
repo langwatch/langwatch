@@ -112,5 +112,12 @@ export function useConversationContext(
         idx >= 0 && idx < turns.length - 1 ? (turns[idx + 1] ?? null) : null,
       isLoading: false,
     };
-  }, [project?.id, query.data, query.isLoading, conversationId, traceId, shared]);
+  }, [
+    project?.id,
+    query.data,
+    query.isLoading,
+    conversationId,
+    traceId,
+    shared,
+  ]);
 }

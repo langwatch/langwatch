@@ -624,7 +624,9 @@ describe("mintStorageUri (BYOC bucket selection — observed through the inserte
       // Digest computed independently from the input bytes, not read off the
       // row under test — otherwise a wrong sha256 would move both sides of
       // the comparison together and the assertion would still pass.
-      const expectedSha256 = createHash("sha256").update(TEST_BYTES).digest("hex");
+      const expectedSha256 = createHash("sha256")
+        .update(TEST_BYTES)
+        .digest("hex");
       expect(insertedRow.sha256).toBe(expectedSha256);
       expect(putUri).toBe(
         `azure-blob://lwacct/lw-container/${PROJECT_ID}/${expectedSha256}`,

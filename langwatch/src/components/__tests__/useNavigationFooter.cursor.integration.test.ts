@@ -5,8 +5,8 @@
  * prevPage() in cursor-based pagination mode always jumps to page 1
  * instead of navigating to the previous page.
  */
-import { renderHook, act } from "@testing-library/react";
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { act, renderHook } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 let mockQuery: Record<string, string | undefined> = {};
 const mockPush = vi.fn().mockImplementation(({ query }) => {

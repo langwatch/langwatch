@@ -43,7 +43,7 @@ function createQueueDefinition(
   },
 ): EventSourcedQueueDefinition<TestPayload> {
   return {
-    name: `{test/gq/${crypto.randomUUID().slice(0, 8)}}`,
+    name: `{test/gqpoison/${crypto.randomUUID().slice(0, 8)}}`,
     groupKey: (p) => p.groupId,
     ...overrides,
   };
@@ -66,7 +66,12 @@ describe.skipIf(!hasTestcontainers)(
 
     afterEach(async () => {
       await Promise.all(queues.map((q) => q.close().catch(() => {})));
-      await redis.flushall();
+      // Scoped to this suite's own namespace, never flushdb(). flushdb empties
+      // the whole logical database, so it does not just reset this suite — it
+      // deletes whatever another suite has in flight in the same database.
+      // The failure then lands over there, in a file that never called it.
+      const keys = await redis.keys("{test/gqpoison/*");
+      if (keys.length > 0) await redis.del(...keys);
     });
 
     afterAll(async () => {
@@ -312,8 +317,9 @@ describe.skipIf(!hasTestcontainers)(
           // Park the claim AFTER its strike lands in Redis but BEFORE
           // processWithRetries adds the group to the in-flight set, so close()'s
           // sweep snapshot runs against a set that does not yet hold the group.
-          const realRecordStrike =
-            internals.scripts.recordClaimStrike.bind(internals.scripts);
+          const realRecordStrike = internals.scripts.recordClaimStrike.bind(
+            internals.scripts,
+          );
           let gatedOnce = false;
           vi.spyOn(internals.scripts, "recordClaimStrike").mockImplementation(
             async (groupId: string) => {
@@ -484,7 +490,9 @@ describe.skipIf(!hasTestcontainers)(
           );
           await vi.waitFor(
             async () => {
-              expect(await redis.get(failStreakKey(name, "group-a"))).toBeNull();
+              expect(
+                await redis.get(failStreakKey(name, "group-a")),
+              ).toBeNull();
             },
             { timeout: 5000, interval: 50 },
           );

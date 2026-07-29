@@ -9,11 +9,10 @@
  * - "evaluator throws an exception mid-execution"
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-
-import type { Command } from "../../..";
 import type { EvaluationCostRecorder } from "../../../../app-layer/evaluations/evaluation-cost.recorder";
 import type { EvaluationExecutionService } from "../../../../app-layer/evaluations/evaluation-execution.service";
 import type { MonitorService } from "../../../../app-layer/monitors/monitor.service";
+import type { Command } from "../../..";
 import { createTenantId } from "../../../domain/tenantId";
 import { ExecuteEvaluationCommand } from "../commands/executeEvaluation.command";
 import type { ExecuteEvaluationCommandData } from "../schemas/commands";
@@ -136,7 +135,9 @@ describe("Feature: ExecuteEvaluationCommand — error propagation", () => {
           },
         });
 
-        const events = await command.handle(buildCommand("azure/content_safety"));
+        const events = await command.handle(
+          buildCommand("azure/content_safety"),
+        );
 
         expect(events).toHaveLength(1);
         const eventData = events[0]?.data as unknown as {
@@ -159,7 +160,9 @@ describe("Feature: ExecuteEvaluationCommand — error propagation", () => {
           },
         });
 
-        const events = await command.handle(buildCommand("azure/content_safety"));
+        const events = await command.handle(
+          buildCommand("azure/content_safety"),
+        );
 
         const eventData = events[0]?.data as unknown as {
           error?: string | null;
@@ -179,7 +182,9 @@ describe("Feature: ExecuteEvaluationCommand — error propagation", () => {
           executionError: new Error("boom"),
         });
 
-        const events = await command.handle(buildCommand("azure/content_safety"));
+        const events = await command.handle(
+          buildCommand("azure/content_safety"),
+        );
 
         const eventData = events[0]?.data as unknown as {
           status: string;

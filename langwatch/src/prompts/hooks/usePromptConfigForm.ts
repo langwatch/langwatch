@@ -202,7 +202,8 @@ export const usePromptConfigForm = ({
 
     disableOnChangeRef.current = true;
     const currentRuntimeParameters = methods.getValues("version.parameters");
-    const nextRuntimeParameters = parsedInitialValues?.version?.parameters ?? {};
+    const nextRuntimeParameters =
+      parsedInitialValues?.version?.parameters ?? {};
     if (!isEqual(currentRuntimeParameters, nextRuntimeParameters)) {
       methods.setValue("version.parameters", nextRuntimeParameters);
     }

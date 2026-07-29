@@ -14,7 +14,7 @@ function createMockLogger() {
 }
 
 describe('setupObservability Integration - Error Handling', () => {
-  it('should log and return no-op shutdown if NodeSDK init fails', async () => {
+  it('logs and return no-op shutdown if NodeSDK init fails', async () => {
     const logger = createMockLogger();
     // Pass an invalid resource to force NodeSDK to throw
     const handle = setupObservability({
@@ -30,7 +30,7 @@ describe('setupObservability Integration - Error Handling', () => {
     await expect(handle.shutdown()).resolves.toBeUndefined();
   });
 
-  it('should throw if throwOnSetupError is true', () => {
+  it('throws if throwOnSetupError is true', () => {
     const logger = createMockLogger();
     // Pass an invalid resource to force NodeSDK to throw
     const call = () => setupObservability({

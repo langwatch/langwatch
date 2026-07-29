@@ -8,10 +8,10 @@
  *
  * @see specs/features/suites/cancel-queued-running-jobs.feature
  */
-import { describe, expect, it, vi, beforeEach } from "vitest";
-import { ScenarioRunStatus } from "../scenario-event.enums";
-import { ScenarioCancellationService } from "../cancellation";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CancellationServiceDeps } from "../cancellation";
+import { ScenarioCancellationService } from "../cancellation";
+import { ScenarioRunStatus } from "../scenario-event.enums";
 
 function createMockDeps(): {
   deps: CancellationServiceDeps;
@@ -29,7 +29,12 @@ function createMockDeps(): {
     dispatchFinishRun: mockDispatchFinishRun,
   };
 
-  return { deps, mockGetRunsForBatch, mockDispatchCancelRequested, mockDispatchFinishRun };
+  return {
+    deps,
+    mockGetRunsForBatch,
+    mockDispatchCancelRequested,
+    mockDispatchFinishRun,
+  };
 }
 
 const defaultJobParams = {
@@ -42,9 +47,17 @@ const defaultJobParams = {
 
 describe("ScenarioCancellationService", () => {
   describe("cancelJob()", () => {
-    function stubRunStatus(mock: ReturnType<typeof vi.fn>, status: ScenarioRunStatus) {
+    function stubRunStatus(
+      mock: ReturnType<typeof vi.fn>,
+      status: ScenarioRunStatus,
+    ) {
       mock.mockResolvedValue([
-        { scenarioRunId: "run1", scenarioId: "sc1", batchRunId: "batch1", status },
+        {
+          scenarioRunId: "run1",
+          scenarioId: "sc1",
+          batchRunId: "batch1",
+          status,
+        },
       ]);
     }
 
@@ -53,7 +66,11 @@ describe("ScenarioCancellationService", () => {
       let mockDispatchCancelRequested: ReturnType<typeof vi.fn>;
 
       beforeEach(async () => {
-        const { deps, mockGetRunsForBatch, mockDispatchCancelRequested: cancelFn } = createMockDeps();
+        const {
+          deps,
+          mockGetRunsForBatch,
+          mockDispatchCancelRequested: cancelFn,
+        } = createMockDeps();
         mockDispatchCancelRequested = cancelFn;
         stubRunStatus(mockGetRunsForBatch, ScenarioRunStatus.SUCCESS);
 
@@ -76,7 +93,12 @@ describe("ScenarioCancellationService", () => {
       let mockDispatchFinishRun: ReturnType<typeof vi.fn>;
 
       beforeEach(async () => {
-        const { deps, mockGetRunsForBatch, mockDispatchCancelRequested: cancelFn, mockDispatchFinishRun: finishFn } = createMockDeps();
+        const {
+          deps,
+          mockGetRunsForBatch,
+          mockDispatchCancelRequested: cancelFn,
+          mockDispatchFinishRun: finishFn,
+        } = createMockDeps();
         mockDispatchCancelRequested = cancelFn;
         mockDispatchFinishRun = finishFn;
         stubRunStatus(mockGetRunsForBatch, ScenarioRunStatus.QUEUED);
@@ -117,7 +139,12 @@ describe("ScenarioCancellationService", () => {
       let mockDispatchFinishRun: ReturnType<typeof vi.fn>;
 
       beforeEach(async () => {
-        const { deps, mockGetRunsForBatch, mockDispatchCancelRequested: cancelFn, mockDispatchFinishRun: finishFn } = createMockDeps();
+        const {
+          deps,
+          mockGetRunsForBatch,
+          mockDispatchCancelRequested: cancelFn,
+          mockDispatchFinishRun: finishFn,
+        } = createMockDeps();
         mockDispatchCancelRequested = cancelFn;
         mockDispatchFinishRun = finishFn;
         stubRunStatus(mockGetRunsForBatch, ScenarioRunStatus.IN_PROGRESS);
@@ -149,7 +176,11 @@ describe("ScenarioCancellationService", () => {
       let mockDispatchCancelRequested: ReturnType<typeof vi.fn>;
 
       beforeEach(async () => {
-        const { deps, mockGetRunsForBatch, mockDispatchCancelRequested: cancelFn } = createMockDeps();
+        const {
+          deps,
+          mockGetRunsForBatch,
+          mockDispatchCancelRequested: cancelFn,
+        } = createMockDeps();
         mockDispatchCancelRequested = cancelFn;
         mockGetRunsForBatch.mockResolvedValue([]);
 
@@ -173,13 +204,32 @@ describe("ScenarioCancellationService", () => {
       let mockDispatchCancelRequested: ReturnType<typeof vi.fn>;
 
       beforeEach(async () => {
-        const { deps, mockGetRunsForBatch, mockDispatchCancelRequested: cancelFn } = createMockDeps();
+        const {
+          deps,
+          mockGetRunsForBatch,
+          mockDispatchCancelRequested: cancelFn,
+        } = createMockDeps();
         mockDispatchCancelRequested = cancelFn;
 
         mockGetRunsForBatch.mockResolvedValue([
-          { scenarioRunId: "run1", scenarioId: "sc1", batchRunId: "batch1", status: ScenarioRunStatus.PENDING },
-          { scenarioRunId: "run2", scenarioId: "sc2", batchRunId: "batch1", status: ScenarioRunStatus.IN_PROGRESS },
-          { scenarioRunId: "run3", scenarioId: "sc3", batchRunId: "batch1", status: ScenarioRunStatus.SUCCESS },
+          {
+            scenarioRunId: "run1",
+            scenarioId: "sc1",
+            batchRunId: "batch1",
+            status: ScenarioRunStatus.PENDING,
+          },
+          {
+            scenarioRunId: "run2",
+            scenarioId: "sc2",
+            batchRunId: "batch1",
+            status: ScenarioRunStatus.IN_PROGRESS,
+          },
+          {
+            scenarioRunId: "run3",
+            scenarioId: "sc3",
+            batchRunId: "batch1",
+            status: ScenarioRunStatus.SUCCESS,
+          },
         ]);
 
         const service = new ScenarioCancellationService(deps);
@@ -208,7 +258,12 @@ describe("ScenarioCancellationService", () => {
       it("returns zero cancelled count", async () => {
         const { deps, mockGetRunsForBatch } = createMockDeps();
         mockGetRunsForBatch.mockResolvedValue([
-          { scenarioRunId: "run1", scenarioId: "sc1", batchRunId: "batch1", status: ScenarioRunStatus.SUCCESS },
+          {
+            scenarioRunId: "run1",
+            scenarioId: "sc1",
+            batchRunId: "batch1",
+            status: ScenarioRunStatus.SUCCESS,
+          },
         ]);
 
         const service = new ScenarioCancellationService(deps);

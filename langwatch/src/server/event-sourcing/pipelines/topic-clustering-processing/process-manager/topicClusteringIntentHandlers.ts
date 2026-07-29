@@ -1,16 +1,14 @@
 import { createLogger } from "@langwatch/observability";
-
-import {
-  incrementTopicClusteringPageTotal,
-  observeTopicClusteringPageDuration,
-} from "~/server/metrics";
-
+import type { ClusteringPageOutcome } from "~/server/app-layer/topic-clustering/clustering";
+import { classifyClusteringError } from "~/server/app-layer/topic-clustering/clustering-error";
 import type {
   IntentContext,
   IntentExecutor,
 } from "~/server/event-sourcing/pipeline/processManagerDefinition";
-import type { ClusteringPageOutcome } from "~/server/app-layer/topic-clustering/clustering";
-import { classifyClusteringError } from "~/server/app-layer/topic-clustering/clustering-error";
+import {
+  incrementTopicClusteringPageTotal,
+  observeTopicClusteringPageDuration,
+} from "~/server/metrics";
 
 import type { TopicClusteringRunIntent } from "./topicClusteringProcess.types";
 
@@ -163,7 +161,14 @@ async function recordClusteringFailure(params: {
   const errorMessage = errorText(params.error);
   const classified = classifyClusteringError(params.error);
   logger.error(
-    { projectId, runId, page, attempt, error: errorMessage, errorCode: classified.code },
+    {
+      projectId,
+      runId,
+      page,
+      attempt,
+      error: errorMessage,
+      errorCode: classified.code,
+    },
     "Clustering page failed on final attempt; recording run_failed",
   );
   try {

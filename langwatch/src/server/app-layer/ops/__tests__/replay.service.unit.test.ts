@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
+import { createReplayRuntime } from "~/server/event-sourcing/replay/replayPreset";
+import type { ReplayProgress } from "~/server/event-sourcing/replay/types";
 import { LOCK_REFRESH_INTERVAL_MS, ReplayService } from "../replay.service";
 import {
   IDLE_STATUS,
@@ -6,8 +8,6 @@ import {
   type ReplayRepository,
   type ReplayStatus,
 } from "../repositories/replay.repository";
-import { createReplayRuntime } from "~/server/event-sourcing/replay/replayPreset";
-import type { ReplayProgress } from "~/server/event-sourcing/replay/types";
 
 vi.mock("~/env.mjs", () => ({
   env: { REDIS_URL: "redis://unit-test" },
@@ -83,9 +83,7 @@ function stubRuntime(
   } satisfies StubbedRuntime);
 }
 
-function stubStateRuntime(
-  replay: StubbedRuntime["service"]["replay"],
-) {
+function stubStateRuntime(replay: StubbedRuntime["service"]["replay"]) {
   const replayOptimized = vi.fn();
   mockedCreateReplayRuntime.mockReturnValue({
     projections: [],
@@ -102,7 +100,10 @@ function stubStateRuntime(
         definition: {} as never,
       },
     ],
-    service: { replay, replayOptimized } as unknown as StubbedRuntime["service"],
+    service: {
+      replay,
+      replayOptimized,
+    } as unknown as StubbedRuntime["service"],
     close: vi.fn(async () => undefined),
   } satisfies StubbedRuntime);
   return { replayOptimized };
@@ -187,7 +188,11 @@ describe("ops ReplayService", () => {
           // silent drain wait / ClickHouse load longer than the interval.
           stubRuntime(async () => {
             await runGate;
-            return { aggregatesReplayed: 1000, totalEvents: 5000, batchErrors: 0 };
+            return {
+              aggregatesReplayed: 1000,
+              totalEvents: 5000,
+              batchErrors: 0,
+            };
           });
 
           const { runId } = await service.startReplay({
@@ -239,7 +244,11 @@ describe("ops ReplayService", () => {
 
           stubRuntime(async () => {
             await runGate;
-            return { aggregatesReplayed: 1000, totalEvents: 5000, batchErrors: 0 };
+            return {
+              aggregatesReplayed: 1000,
+              totalEvents: 5000,
+              batchErrors: 0,
+            };
           });
 
           await service.startReplay({
@@ -290,7 +299,11 @@ describe("ops ReplayService", () => {
 
           stubRuntime(async () => {
             await runGate;
-            return { aggregatesReplayed: 1000, totalEvents: 5000, batchErrors: 0 };
+            return {
+              aggregatesReplayed: 1000,
+              totalEvents: 5000,
+              batchErrors: 0,
+            };
           });
 
           await service.startReplay({
@@ -341,7 +354,11 @@ describe("ops ReplayService", () => {
             // Callback-silent phase: nothing emits until the gate opens.
             await progressGate;
             callbacks?.onProgress?.(buildProgress());
-            return { aggregatesReplayed: 1000, totalEvents: 5000, batchErrors: 0 };
+            return {
+              aggregatesReplayed: 1000,
+              totalEvents: 5000,
+              batchErrors: 0,
+            };
           });
 
           await service.startReplay({
@@ -404,7 +421,11 @@ describe("ops ReplayService", () => {
             await progressGate;
             callbacks?.onProgress?.(buildProgress());
             hasResumedAfterAbort = true;
-            return { aggregatesReplayed: 2000, totalEvents: 10000, batchErrors: 0 };
+            return {
+              aggregatesReplayed: 2000,
+              totalEvents: 10000,
+              batchErrors: 0,
+            };
           });
 
           await service.startReplay({

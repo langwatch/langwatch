@@ -15,7 +15,7 @@ import {
 import { Edit, Key, MoreVertical, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
-import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
 import { ProjectSelector } from "../../components/DashboardLayout";
 import SettingsLayout from "../../components/SettingsLayout";
@@ -68,10 +68,7 @@ export default function SecretsPage() {
       setNewSecretValue("");
       await utils.secrets.list.invalidate();
     } catch (error) {
-      toaster.create({
-        title: error instanceof Error ? error.message : "Failed to create secret",
-        type: "error",
-      });
+      showErrorToast({ error, fallbackTitle: "Couldn't create the secret" });
     }
   };
 
@@ -85,10 +82,7 @@ export default function SecretsPage() {
       setSecretToDelete(null);
       await utils.secrets.list.invalidate();
     } catch (error) {
-      toaster.create({
-        title: error instanceof Error ? error.message : "Failed to delete secret",
-        type: "error",
-      });
+      showErrorToast({ error, fallbackTitle: "Couldn't delete the secret" });
     }
   };
 
@@ -104,10 +98,7 @@ export default function SecretsPage() {
       setUpdateValue("");
       await utils.secrets.list.invalidate();
     } catch (error) {
-      toaster.create({
-        title: error instanceof Error ? error.message : "Failed to update secret",
-        type: "error",
-      });
+      showErrorToast({ error, fallbackTitle: "Couldn't update the secret" });
     }
   };
 
@@ -125,9 +116,7 @@ export default function SecretsPage() {
               content="Add a new secret for use in code blocks"
               disabled={false}
             >
-              <PageLayout.HeaderButton
-                onClick={() => setIsAddDialogOpen(true)}
-              >
+              <PageLayout.HeaderButton onClick={() => setIsAddDialogOpen(true)}>
                 <Plus /> Add Secret
               </PageLayout.HeaderButton>
             </Tooltip>
@@ -251,7 +240,7 @@ export default function SecretsPage() {
                     value={newSecretName}
                     onChange={(e) =>
                       setNewSecretName(
-                        e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, "")
+                        e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, ""),
                       )
                     }
                   />
@@ -295,9 +284,7 @@ export default function SecretsPage() {
         >
           <Dialog.Content bg="bg">
             <Dialog.Header>
-              <Dialog.Title>
-                Delete {secretToDelete?.name ?? ""}?
-              </Dialog.Title>
+              <Dialog.Title>Delete {secretToDelete?.name ?? ""}?</Dialog.Title>
             </Dialog.Header>
             <Dialog.Body>
               <Text>

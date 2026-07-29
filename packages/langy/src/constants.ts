@@ -175,7 +175,7 @@ export type LangyTitleSource =
  * agent has not started (init default); `running` = the agent is working;
  * `completed`/`failed`/`stopped` = terminal. A turn reaches exactly one terminal.
  *
- * `stopped` is a user-initiated stop (ADR-058): the agent was mid-answer and the
+ * `stopped` is a user-initiated stop (ADR-078): the agent was mid-answer and the
  * user halted it, so the turn keeps the partial answer it had written and renders
  * distinctly from both a clean `completed` and a red `failed` — it is the anchor
  * for the Continue affordance. It is the render-doc face of an `agent_responded`

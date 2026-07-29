@@ -35,9 +35,12 @@ func Root(ctx context.Context, _ []string) error {
 		return err
 	}
 
-	// The egress guard (ADR-043): per-worker outbound forward-proxy enforcement
+	// The egress guard (ADR-076): per-worker outbound forward-proxy enforcement
 	// (require-TLS / throttle / floor ∪ allow-list / SNI cross-check), monitor-
-	// first. Stock posture is monitor-only until an operator/customer opts in.
+	// first for *destination* decisions: the floor ∪ allow-list verdict only
+	// observes and flags until an operator/customer opts in. Require-TLS is a
+	// separate, always-on rung — EgressRequireTLS defaults to true, so cleartext
+	// forwards and non-:443 CONNECTs are refused with no opt-in.
 	// The pool consults it around each worker's lifecycle behind this seam.
 	mgr := startEgressAdapter(cfg, deps.Logger)
 

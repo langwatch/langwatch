@@ -185,9 +185,7 @@ describe("AGENT_GOVERNANCE signup then adding a model provider (real DB)", () =>
       // Exactly what the hook does with no localStorage team and no
       // project slug in the URL, which is the case on /settings/*.
       const ambientTeam = selectAmbientTeam(teams);
-      const ambientProject = ambientTeam
-        ? ambientTeam.projects[0]
-        : undefined;
+      const ambientProject = ambientTeam ? ambientTeam.projects[0] : undefined;
 
       expect(ambientTeam?.isPersonal).toBe(false);
       expect(ambientProject).toBeUndefined();

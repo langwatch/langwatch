@@ -9,19 +9,20 @@ vi.mock("~/server/metrics", async (importOriginal) => {
     incrementEsReactorTotal: vi.fn(),
   };
 });
+
 import type { Event } from "../../domain/types";
 import type { ReactorDefinition } from "../../reactors/reactor.types";
-import { ReplayDeferralError } from "../replayMarkerCheck";
 import {
+  createMockAppendStore,
   createMockFoldProjectionDefinition,
   createMockFoldProjectionStore,
   createMockMapProjectionDefinition,
-  createMockAppendStore,
   createMockQueueManager,
   createTestEvent,
   createTestTenantId,
   TEST_CONSTANTS,
 } from "../../services/__tests__/testHelpers";
+import { ReplayDeferralError } from "../replayMarkerCheck";
 
 describe("ProjectionRouter", () => {
   const tenantId = createTestTenantId();
@@ -83,8 +84,12 @@ describe("ProjectionRouter", () => {
       it("only sends matching events to the fold queue", async () => {
         const mockSendBatch = vi.fn().mockResolvedValue(undefined);
         const queueManager = createMockQueueManager();
-        (queueManager.hasProjectionQueues as ReturnType<typeof vi.fn>).mockReturnValue(true);
-        (queueManager.getProjectionQueue as ReturnType<typeof vi.fn>).mockReturnValue({
+        (
+          queueManager.hasProjectionQueues as ReturnType<typeof vi.fn>
+        ).mockReturnValue(true);
+        (
+          queueManager.getProjectionQueue as ReturnType<typeof vi.fn>
+        ).mockReturnValue({
           sendBatch: mockSendBatch,
         });
 
@@ -126,8 +131,12 @@ describe("ProjectionRouter", () => {
       it("skips fold queue entirely when no events match", async () => {
         const mockSendBatch = vi.fn().mockResolvedValue(undefined);
         const queueManager = createMockQueueManager();
-        (queueManager.hasProjectionQueues as ReturnType<typeof vi.fn>).mockReturnValue(true);
-        (queueManager.getProjectionQueue as ReturnType<typeof vi.fn>).mockReturnValue({
+        (
+          queueManager.hasProjectionQueues as ReturnType<typeof vi.fn>
+        ).mockReturnValue(true);
+        (
+          queueManager.getProjectionQueue as ReturnType<typeof vi.fn>
+        ).mockReturnValue({
           sendBatch: mockSendBatch,
         });
 
@@ -198,9 +207,9 @@ describe("ProjectionRouter", () => {
           tenantId,
         );
 
-        await expect(
-          router.dispatch([event], { tenantId }),
-        ).rejects.toThrow(AggregateError);
+        await expect(router.dispatch([event], { tenantId })).rejects.toThrow(
+          AggregateError,
+        );
 
         // The succeeding projection should still have been attempted
         expect(successStore.get).toHaveBeenCalled();
@@ -243,9 +252,9 @@ describe("ProjectionRouter", () => {
           tenantId,
         );
 
-        await expect(
-          router.dispatch([event], { tenantId }),
-        ).rejects.toThrow(AggregateError);
+        await expect(router.dispatch([event], { tenantId })).rejects.toThrow(
+          AggregateError,
+        );
 
         // Map projection should still have been dispatched
         expect(mapStore.append).toHaveBeenCalled();
@@ -338,9 +347,9 @@ describe("ProjectionRouter", () => {
           tenantId,
         );
 
-        await expect(
-          router.dispatch([event], { tenantId }),
-        ).rejects.toThrow(AggregateError);
+        await expect(router.dispatch([event], { tenantId })).rejects.toThrow(
+          AggregateError,
+        );
 
         expect(reactorHandle).not.toHaveBeenCalled();
       });
@@ -381,9 +390,9 @@ describe("ProjectionRouter", () => {
           tenantId,
         );
 
-        await expect(
-          router.dispatch([event], { tenantId }),
-        ).rejects.toThrow(AggregateError);
+        await expect(router.dispatch([event], { tenantId })).rejects.toThrow(
+          AggregateError,
+        );
 
         // The succeeding projection should still have been attempted
         expect(successStore.append).toHaveBeenCalled();
@@ -410,7 +419,9 @@ describe("ProjectionRouter", () => {
 
         router.registerFoldProjection(fold);
 
-        const reactorHandle = vi.fn().mockRejectedValue(new Error("reactor boom"));
+        const reactorHandle = vi
+          .fn()
+          .mockRejectedValue(new Error("reactor boom"));
         const reactor: ReactorDefinition<Event> = {
           name: "failing-reactor",
           handle: reactorHandle,
@@ -423,16 +434,18 @@ describe("ProjectionRouter", () => {
           tenantId,
         );
 
-        await expect(
-          router.dispatch([event], { tenantId }),
-        ).rejects.toThrow(AggregateError);
+        await expect(router.dispatch([event], { tenantId })).rejects.toThrow(
+          AggregateError,
+        );
 
         expect(reactorHandle).toHaveBeenCalled();
       });
     });
 
     describe("when a reactor declares a shouldReact predicate", () => {
-      const setupRouterWithFold = (queueManager: ReturnType<typeof createMockQueueManager>) => {
+      const setupRouterWithFold = (
+        queueManager: ReturnType<typeof createMockQueueManager>,
+      ) => {
         const router = new ProjectionRouter(
           TEST_CONSTANTS.AGGREGATE_TYPE,
           TEST_CONSTANTS.PIPELINE_NAME,
@@ -583,7 +596,9 @@ describe("ProjectionRouter", () => {
 
     describe("when a reactor queue send fails", () => {
       it("throws AggregateError", async () => {
-        const mockSend = vi.fn().mockRejectedValue(new Error("queue send failed"));
+        const mockSend = vi
+          .fn()
+          .mockRejectedValue(new Error("queue send failed"));
         const queueManager = createMockQueueManager({
           hasReactorQueues: true,
           getReactorQueue: vi.fn().mockReturnValue({ send: mockSend }),
@@ -617,9 +632,9 @@ describe("ProjectionRouter", () => {
           tenantId,
         );
 
-        await expect(
-          router.dispatch([event], { tenantId }),
-        ).rejects.toThrow(AggregateError);
+        await expect(router.dispatch([event], { tenantId })).rejects.toThrow(
+          AggregateError,
+        );
       });
     });
 
@@ -688,7 +703,9 @@ describe("ProjectionRouter", () => {
 
         router.registerFoldProjection(fold);
 
-        const reactorHandle = vi.fn().mockRejectedValue(new Error("inline fallback boom"));
+        const reactorHandle = vi
+          .fn()
+          .mockRejectedValue(new Error("inline fallback boom"));
         const reactor: ReactorDefinition<Event> = {
           name: "fallback-failing-reactor",
           handle: reactorHandle,
@@ -701,9 +718,9 @@ describe("ProjectionRouter", () => {
           tenantId,
         );
 
-        await expect(
-          router.dispatch([event], { tenantId }),
-        ).rejects.toThrow(AggregateError);
+        await expect(router.dispatch([event], { tenantId })).rejects.toThrow(
+          AggregateError,
+        );
 
         expect(reactorHandle).toHaveBeenCalled();
       });
@@ -782,9 +799,9 @@ describe("ProjectionRouter", () => {
           tenantId,
         );
 
-        await expect(
-          router.dispatch([event], { tenantId }),
-        ).rejects.toThrow(AggregateError);
+        await expect(router.dispatch([event], { tenantId })).rejects.toThrow(
+          AggregateError,
+        );
 
         expect(reactorHandle).not.toHaveBeenCalled();
       });
@@ -804,9 +821,9 @@ describe("ProjectionRouter", () => {
           handle: vi.fn(),
         };
 
-        expect(() => router.registerMapReactor("non-existent", reactor)).toThrow(
-          /map "non-existent" — map not found/,
-        );
+        expect(() =>
+          router.registerMapReactor("non-existent", reactor),
+        ).toThrow(/map "non-existent" — map not found/);
       });
     });
   });
@@ -901,14 +918,19 @@ describe("ProjectionRouter", () => {
       );
     }
 
-    function batchFold(store: ReturnType<typeof createMockFoldProjectionStore>) {
+    function batchFold(
+      store: ReturnType<typeof createMockFoldProjectionStore>,
+    ) {
       return createMockFoldProjectionDefinition("my-fold", {
         store,
         eventTypes: [TEST_CONSTANTS.EVENT_TYPE_1],
         init: () => ({ count: 0, LastEventOccurredAt: 0 }),
         apply: (s: any, e: any) => ({
           count: s.count + 1,
-          LastEventOccurredAt: Math.max(s.LastEventOccurredAt, e.occurredAt ?? 0),
+          LastEventOccurredAt: Math.max(
+            s.LastEventOccurredAt,
+            e.occurredAt ?? 0,
+          ),
         }),
       });
     }
@@ -941,7 +963,12 @@ describe("ProjectionRouter", () => {
           makeBatchEvent("e3", 3000),
         ];
 
-        await (router as any).processFoldProjectionBatch("my-fold", fold, events, { tenantId });
+        await (router as any).processFoldProjectionBatch(
+          "my-fold",
+          fold,
+          events,
+          { tenantId },
+        );
 
         // The expensive fold load/store happens once — the O(n) win.
         expect(store.get).toHaveBeenCalledTimes(1);
@@ -978,7 +1005,12 @@ describe("ProjectionRouter", () => {
           makeBatchEvent("e3", 3000),
         ];
 
-        await (router as any).processFoldProjectionBatch("my-fold", fold, events, { tenantId });
+        await (router as any).processFoldProjectionBatch(
+          "my-fold",
+          fold,
+          events,
+          { tenantId },
+        );
 
         expect(seen).toEqual(["e1", "e3"]);
       });
@@ -1008,7 +1040,12 @@ describe("ProjectionRouter", () => {
           makeBatchEvent("second", 2000),
         ];
 
-        await (router as any).processFoldProjectionBatch("my-fold", fold, events, { tenantId });
+        await (router as any).processFoldProjectionBatch(
+          "my-fold",
+          fold,
+          events,
+          { tenantId },
+        );
 
         expect(seen).toEqual(["first", "second", "third"]);
       });

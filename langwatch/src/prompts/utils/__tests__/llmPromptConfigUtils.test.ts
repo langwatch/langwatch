@@ -1,7 +1,9 @@
 /* eslint-disable @typescript-eslint/no-empty-function */
 import { PromptScope } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
+import { formSchema } from "~/prompts/schemas/form-schema";
 import type { VersionedPrompt } from "~/server/prompt-config";
+import { buildDefaultFormValues } from "../buildDefaultFormValues";
 import {
   formValuesToTriggerSaveVersionParams,
   nodeDataToLocalPromptConfig,
@@ -10,8 +12,6 @@ import {
   versionedPromptToPromptConfigFormValues,
   versionedPromptToPromptConfigFormValuesWithSystemMessage,
 } from "../llmPromptConfigUtils";
-import { buildDefaultFormValues } from "../buildDefaultFormValues";
-import { formSchema } from "~/prompts/schemas/form-schema";
 
 describe("safeOptimizationStudioNodeDataToPromptConfigFormInitialValues", () => {
   describe("when LLM value is an object", () => {

@@ -47,7 +47,11 @@ describe("createPromptEditorCallbacks()", () => {
           versionId: "version-1",
           inputs: [{ identifier: "input", type: "str" }],
           outputs: [
-            { identifier: "output", type: "json_schema", json_schema: jsonSchema },
+            {
+              identifier: "output",
+              type: "json_schema",
+              json_schema: jsonSchema,
+            },
           ],
         });
 
@@ -130,7 +134,11 @@ describe("createPromptEditorCallbacks()", () => {
           version: 2,
           versionId: "version-2",
           outputs: [
-            { identifier: "output", type: "json_schema", json_schema: jsonSchema },
+            {
+              identifier: "output",
+              type: "json_schema",
+              json_schema: jsonSchema,
+            },
           ],
         });
 

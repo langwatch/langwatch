@@ -1,10 +1,10 @@
-import type { ComponentType } from "react";
 import type { NotificationCadence } from "@langwatch/automations/cadences";
 import type {
   SavedTriggerRow,
   SharedDef,
   TemplateDraft,
 } from "@langwatch/automations/providers/types";
+import type { ComponentType } from "react";
 
 /**
  * Client-side halves of the automation provider system: the UI definition

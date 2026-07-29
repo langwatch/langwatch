@@ -196,7 +196,7 @@ describe("the local turn projection", () => {
   });
 
   describe("terminal detection", () => {
-    it("treats stopped as terminal — a stop settles the turn (ADR-058)", () => {
+    it("treats stopped as terminal — a stop settles the turn (ADR-078)", () => {
       const state = applyLangyTurnEvents(initialLangyTurnProjection, [
         responded({ id: "e1", createdAt: 100, outcome: "stopped" }),
       ]);

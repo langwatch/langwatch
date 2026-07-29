@@ -1,4 +1,4 @@
-import { Hono, type MiddlewareHandler } from "hono";
+import type { Hono, MiddlewareHandler } from "hono";
 
 import {
   buildEndpointMiddlewareStack,
@@ -11,9 +11,9 @@ import type {
   VersionStatus,
 } from "./types.js";
 import {
+  type ResolvedEndpoint,
   VERSION_LATEST,
   VERSION_PREVIEW,
-  type ResolvedEndpoint,
 } from "./versioning.js";
 
 type ProviderMap<TProject> = Record<

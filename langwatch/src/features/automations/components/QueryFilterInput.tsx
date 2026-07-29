@@ -96,10 +96,14 @@ export function QueryFilterInput({
     if (!showDropdown) return;
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setSelectedIndex(navigateSuggestion({ ui, direction: "down" }).selectedIndex);
+      setSelectedIndex(
+        navigateSuggestion({ ui, direction: "down" }).selectedIndex,
+      );
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
-      setSelectedIndex(navigateSuggestion({ ui, direction: "up" }).selectedIndex);
+      setSelectedIndex(
+        navigateSuggestion({ ui, direction: "up" }).selectedIndex,
+      );
     } else if (e.key === "Enter" || e.key === "Tab") {
       e.preventDefault();
       const row = highlightedRow(ui);

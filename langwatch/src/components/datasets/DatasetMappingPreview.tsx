@@ -16,7 +16,6 @@ import { ErrorBoundary } from "react-error-boundary";
 import { Edit2 } from "react-feather";
 import { useDebouncedCallback } from "use-debounce";
 import type { Trace } from "~/server/tracer/types";
-import { Checkbox } from "../../components/ui/checkbox";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type {
   DatasetColumns,

@@ -7,8 +7,8 @@
 import type { Readable } from "node:stream";
 import { redactStorageUri } from "./project-storage-destination";
 import type { StorageDriver } from "./storage-driver";
-import { getUriScheme } from "./uri";
 import type { UriScheme } from "./uri";
+import { getUriScheme } from "./uri";
 
 /**
  * Routes storage operations to the correct driver by extracting the URI scheme.

@@ -1,11 +1,11 @@
 import type { PrismaClient } from "@prisma/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  type AuditLogFn,
   CannotImpersonateAdminError,
   CannotImpersonateDeactivatedUserError,
   ImpersonationService,
   UserToImpersonateNotFoundError,
-  type AuditLogFn,
 } from "../impersonation.service";
 
 /**
@@ -170,7 +170,9 @@ describe("ImpersonationService", () => {
           .catch((e) => e);
 
         expect(err).toBeInstanceOf(CannotImpersonateDeactivatedUserError);
-        expect((err as CannotImpersonateDeactivatedUserError).httpStatus).toBe(400);
+        expect((err as CannotImpersonateDeactivatedUserError).httpStatus).toBe(
+          400,
+        );
         expect(prisma.session.update).not.toHaveBeenCalled();
       });
     });
@@ -228,4 +230,3 @@ describe("ImpersonationService", () => {
     });
   });
 });
-

@@ -16,7 +16,11 @@
  * Spec: specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature
  *       (@audit-uniform)
  */
-import { OrganizationUserRole, RoleBindingScopeType, TeamUserRole } from "@prisma/client";
+import {
+  OrganizationUserRole,
+  RoleBindingScopeType,
+  TeamUserRole,
+} from "@prisma/client";
 import { nanoid } from "nanoid";
 import { beforeAll, describe, expect, it } from "vitest";
 
@@ -36,7 +40,9 @@ interface CapturedTool {
   name: string;
   description: string;
   schema: unknown;
-  cb: (args: any) => Promise<{ content: Array<{ type: string; text: string }> }>;
+  cb: (
+    args: any,
+  ) => Promise<{ content: Array<{ type: string; text: string }> }>;
 }
 
 function mockMcpServer(): {
@@ -187,7 +193,10 @@ describe("governance MCP tools — audit-uniform contract", () => {
         where: {
           organizationId: ORG_ID,
           action: "gateway.ingestion_template.created",
-          metadata: { path: ["displayName"], equals: `Should not persist ${suffix}` },
+          metadata: {
+            path: ["displayName"],
+            equals: `Should not persist ${suffix}`,
+          },
         },
       });
       expect(noLeak).toBeNull();

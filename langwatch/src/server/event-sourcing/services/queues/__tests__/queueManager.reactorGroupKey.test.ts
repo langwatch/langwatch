@@ -57,7 +57,9 @@ describe("QueueManager.initializeReactorQueues with hierarchical group keys", ()
         vi.fn(),
       );
 
-      const entry = globalJobRegistry.get("test-pipeline:reactor:evaluationTrigger");
+      const entry = globalJobRegistry.get(
+        "test-pipeline:reactor:evaluationTrigger",
+      );
       const event = createTestEvent(
         TEST_CONSTANTS.AGGREGATE_ID,
         aggregateType,
@@ -95,7 +97,9 @@ describe("QueueManager.initializeReactorQueues with hierarchical group keys", ()
         vi.fn(),
       );
 
-      const entry = globalJobRegistry.get("test-pipeline:reactor:spanStorageBroadcast");
+      const entry = globalJobRegistry.get(
+        "test-pipeline:reactor:spanStorageBroadcast",
+      );
       const event = createTestEvent(
         TEST_CONSTANTS.AGGREGATE_ID,
         aggregateType,
@@ -121,8 +125,10 @@ describe("QueueManager.initializeReactorQueues with hierarchical group keys", ()
         globalJobRegistry,
       });
 
-      const customGroupKeyFn = (payload: { event: Event; foldState: unknown }) =>
-        `custom:${(payload.event as any).data?.runId}`;
+      const customGroupKeyFn = (payload: {
+        event: Event;
+        foldState: unknown;
+      }) => `custom:${(payload.event as any).data?.runId}`;
 
       manager.initializeReactorQueues(
         {
@@ -137,9 +143,15 @@ describe("QueueManager.initializeReactorQueues with hierarchical group keys", ()
         vi.fn(),
       );
 
-      const entry = globalJobRegistry.get("test-pipeline:reactor:customReactor");
+      const entry = globalJobRegistry.get(
+        "test-pipeline:reactor:customReactor",
+      );
       const event = {
-        ...createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, aggregateType, tenantId),
+        ...createTestEvent(
+          TEST_CONSTANTS.AGGREGATE_ID,
+          aggregateType,
+          tenantId,
+        ),
         data: { runId: "run-42" },
       };
 
@@ -187,8 +199,12 @@ describe("QueueManager.initializeReactorQueues with hierarchical group keys", ()
       );
       const payload = { event, foldState: {} };
 
-      const evalTriggerEntry = globalJobRegistry.get("test-pipeline:reactor:evaluationTrigger");
-      const customSyncEntry = globalJobRegistry.get("test-pipeline:reactor:customEvalSync");
+      const evalTriggerEntry = globalJobRegistry.get(
+        "test-pipeline:reactor:evaluationTrigger",
+      );
+      const customSyncEntry = globalJobRegistry.get(
+        "test-pipeline:reactor:customEvalSync",
+      );
 
       const evalKey = evalTriggerEntry?.groupKeyFn(payload);
       const syncKey = customSyncEntry?.groupKeyFn(payload);

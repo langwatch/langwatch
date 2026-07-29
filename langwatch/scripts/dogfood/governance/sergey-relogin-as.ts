@@ -13,9 +13,9 @@
  */
 import { spawn } from "node:child_process";
 import { setTimeout as wait } from "node:timers/promises";
+import { PersonalVirtualKeyService } from "@ee/governance/services/personalVirtualKey.service";
 import { PrismaClient } from "@prisma/client";
 import { approveDeviceCode } from "~/server/routes/auth-cli";
-import { PersonalVirtualKeyService } from "@ee/governance/services/personalVirtualKey.service";
 
 interface Args {
   email: string;
@@ -58,7 +58,9 @@ async function main() {
     user.id,
   );
   if (!orgRows[0]) {
-    throw new Error("no Organization row joined to this user's OrganizationUser");
+    throw new Error(
+      "no Organization row joined to this user's OrganizationUser",
+    );
   }
   const org = orgRows[0];
   const organizationId = org.id;
@@ -105,7 +107,7 @@ async function main() {
     buf += c;
     process.stdout.write(c);
     const m = buf.match(/user_code=([A-Z0-9-]+)/i);
-    if (m && m[1] && !userCode) userCode = m[1];
+    if (m?.[1] && !userCode) userCode = m[1];
   });
   child.stderr.setEncoding("utf8");
   child.stderr.on("data", (c) => process.stderr.write(c));
@@ -186,7 +188,9 @@ async function main() {
       base_url: "http://localhost:5563",
     },
   });
-  console.error(`[relogin] approved, waiting for poll → saveConfig → shell-rc prompt`);
+  console.error(
+    `[relogin] approved, waiting for poll → saveConfig → shell-rc prompt`,
+  );
 
   // The CLI polls control-plane on dc.interval (typically 5s). Wait
   // for the ceremony output ("Gateway:" + "Dashboard:" lines, which
@@ -219,7 +223,9 @@ async function main() {
     new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 10000)),
   ]);
   if (!exited) {
-    console.error(`[relogin] CLI did not exit within 10s of stdin-close, SIGKILL`);
+    console.error(
+      `[relogin] CLI did not exit within 10s of stdin-close, SIGKILL`,
+    );
     child.kill("SIGKILL");
   }
   await redis.quit();

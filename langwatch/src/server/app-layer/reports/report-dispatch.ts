@@ -1,16 +1,7 @@
-import type { Project, Trigger } from "@prisma/client";
-import { Cron } from "croner";
-import type { ScheduledJobFire } from "~/server/app-layer/scheduler/scheduler.types";
-import { extractReportFromTriggerRow } from "~/server/app-layer/automations/report.builder";
-import type { ReportSource } from "~/server/app-layer/automations/report.builder";
-import { decryptSlackBotToken } from "~/server/app-layer/automations/providers/slack/server";
 import {
   type SlackActionParams,
   slackDeliveryMethodOf,
 } from "@langwatch/automations/providers/slack";
-import type { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
-import type { sendRenderedSlackMessage } from "~/server/app-layer/automations/delivery/sendSlackWebhook";
-import type { postSlackChatMessage } from "~/server/app-layer/automations/delivery/slackWebApi";
 import { REPORT_TRIGGER_DEFAULTS } from "@langwatch/automations/templating/defaults";
 import { renderTriggerEmail } from "@langwatch/automations/templating/renderEmail";
 import {
@@ -23,6 +14,15 @@ import {
   type ReportTraceRow,
 } from "@langwatch/automations/templating/templateContext";
 import { createLogger } from "@langwatch/observability";
+import type { Project, Trigger } from "@prisma/client";
+import { Cron } from "croner";
+import type { sendRenderedSlackMessage } from "~/server/app-layer/automations/delivery/sendSlackWebhook";
+import type { postSlackChatMessage } from "~/server/app-layer/automations/delivery/slackWebApi";
+import { decryptSlackBotToken } from "~/server/app-layer/automations/providers/slack/server";
+import type { ReportSource } from "~/server/app-layer/automations/report.builder";
+import { extractReportFromTriggerRow } from "~/server/app-layer/automations/report.builder";
+import type { ScheduledJobFire } from "~/server/app-layer/scheduler/scheduler.types";
+import type { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
 
 const logger = createLogger("langwatch:report-dispatch");
 
@@ -173,7 +173,7 @@ export async function dispatchScheduledReport({
     projectId: fire.projectId,
     triggerId: fire.targetId,
   });
-  if (!trigger || !trigger.active || trigger.deleted) {
+  if (!trigger?.active || trigger.deleted) {
     logger.info(
       { triggerId: fire.targetId, projectId: fire.projectId },
       "Report trigger missing/inactive — skipping scheduled fire",

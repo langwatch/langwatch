@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { prepareMetricDataPoints } from "../canonicalMetric";
-import { prepare, requestForMetric } from "./fixtures/canonical-metric.fixtures";
+import {
+  prepare,
+  requestForMetric,
+} from "./fixtures/canonical-metric.fixtures";
 
 const a = { key: "a", value: { stringValue: "one" } };
 const b = { key: "b", value: { intValue: "2" } };

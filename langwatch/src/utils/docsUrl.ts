@@ -49,9 +49,13 @@ const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "0.0.0.0"]);
 export function getDocsBaseUrl({
   hostname,
   isDev,
-}: { hostname?: string; isDev?: boolean } = {}): string {
+}: {
+  hostname?: string;
+  isDev?: boolean;
+} = {}): string {
   const inBrowser = typeof window !== "undefined";
-  const resolvedHostname = hostname ?? (inBrowser ? window.location.hostname : undefined);
+  const resolvedHostname =
+    hostname ?? (inBrowser ? window.location.hostname : undefined);
   const resolvedIsDev = isDev ?? (inBrowser ? import.meta.env.DEV : false);
   if (resolvedIsDev && resolvedHostname && LOCAL_HOSTS.has(resolvedHostname)) {
     return LOCAL_DOCS_URL;

@@ -18,15 +18,9 @@
  * the panel, the composer, the store, the fold — is real.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  act,
-  cleanup,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { LANGY_CONVERSATION_EVENT_TYPES } from "@langwatch/langy";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // ---------------------------------------------------------------------------
@@ -191,12 +185,12 @@ vi.mock("@paper-design/shaders-react", () => ({
 
 vi.mock("~/utils/api", async () => {
   const React = await import("react");
+  const { createTrpcUtils, idleQuery, withFallback } = await import(
+    "./support/langyApiMock"
+  );
 
   /** A minimal, `enabled`-honouring stand-in for a tRPC query. */
-  const useSnapshotQuery = <TData,>(
-    resolve: () => TData,
-    enabled: boolean,
-  ) => {
+  const useSnapshotQuery = <TData,>(resolve: () => TData, enabled: boolean) => {
     const version = React.useSyncExternalStore(
       (notify: () => void) => {
         historyListeners.add(notify);
@@ -236,58 +230,7 @@ vi.mock("~/utils/api", async () => {
     };
   };
 
-  const trpcUtils = {
-    langy: {
-      list: {
-        getData: () => undefined,
-        setData: () => undefined,
-        getInfiniteData: () => undefined,
-        setInfiniteData: () => undefined,
-        cancel: () => Promise.resolve(),
-        invalidate: () => Promise.resolve(),
-      },
-      messages: { invalidate: () => Promise.resolve() },
-      detail: { setData: () => undefined },
-    },
-    langyGithub: { getInstallStatus: { invalidate: () => Promise.resolve() } },
-  };
-
-  const idleQuery = () => ({
-    data: undefined,
-    isLoading: false,
-    isInitialLoading: false,
-    isFetching: false,
-    isPreviousData: false,
-    isFetched: true,
-    isError: false,
-    error: null,
-    refetch: () => Promise.resolve(),
-  });
-  const noopMutation = () => ({
-    mutate: () => undefined,
-    mutateAsync: () => Promise.resolve(),
-    isPending: false,
-  });
-  // Every router this suite does not care about answers settled-idle.
-  const routerProxy: unknown = new Proxy(
-    {},
-    {
-      get: (_target, prop) => {
-        if (prop === "useQuery" || prop === "useInfiniteQuery")
-          return idleQuery;
-        if (prop === "useMutation") return noopMutation;
-        if (prop === "useSubscription") return () => undefined;
-        return routerProxy;
-      },
-    },
-  );
-
-  /** Explicit procedures win; anything else on the router is inert. */
-  const withFallback = (explicit: Record<string, unknown>) =>
-    new Proxy(explicit, {
-      get: (target, prop) =>
-        prop in target ? target[prop as string] : (routerProxy as never),
-    });
+  const trpcUtils = createTrpcUtils();
 
   const explicitApi: Record<string, unknown> = {
     langy: withFallback({
@@ -312,23 +255,26 @@ vi.mock("~/utils/api", async () => {
           input: { projectId: string; conversationId: string },
           opts?: { enabled?: boolean },
         ) =>
-          useSnapshotQuery(() => {
-            const snapshot = snapshotRef.current;
-            return {
-              messages: snapshot.messages.map((message) => ({
-                id: message.id,
-                role: message.role,
-                parts: [{ type: "text", text: message.text }],
-                createdAtMs: 0,
-              })),
-              lastError: null,
-              isTurnInFlight: snapshot.isTurnInFlight,
-              inFlightTurnId: snapshot.inFlightTurnId,
-              shouldAskFeedback: false,
-              eventCursor: snapshot.eventCursor,
-              currentTurnId: snapshot.currentTurnId,
-            };
-          }, opts?.enabled !== false && !!input.conversationId),
+          useSnapshotQuery(
+            () => {
+              const snapshot = snapshotRef.current;
+              return {
+                messages: snapshot.messages.map((message) => ({
+                  id: message.id,
+                  role: message.role,
+                  parts: [{ type: "text", text: message.text }],
+                  createdAtMs: 0,
+                })),
+                lastError: null,
+                isTurnInFlight: snapshot.isTurnInFlight,
+                inFlightTurnId: snapshot.inFlightTurnId,
+                shouldAskFeedback: false,
+                eventCursor: snapshot.eventCursor,
+                currentTurnId: snapshot.currentTurnId,
+              };
+            },
+            opts?.enabled !== false && !!input.conversationId,
+          ),
       },
       stopTurn: {
         useMutation: () => ({ mutateAsync: () => Promise.resolve() }),
@@ -348,7 +294,9 @@ vi.mock("~/utils/api", async () => {
         useQuery: () => ({ data: { providers: [] }, isLoading: false }),
       },
     },
-    virtualKeys: { list: { useQuery: () => ({ data: undefined, isLoading: false }) } },
+    virtualKeys: {
+      list: { useQuery: () => ({ data: undefined, isLoading: false }) },
+    },
     langyGithub: {
       getInstallStatus: {
         useQuery: () => ({ data: undefined, isLoading: false, isError: true }),
@@ -402,7 +350,11 @@ const composerField = (): HTMLTextAreaElement => {
 };
 
 /** A recorded step, in the wire shape the tail read serves. */
-const recordedAccepted = (o: { id: string; createdAt: number; turnId: string }) => ({
+const recordedAccepted = (o: {
+  id: string;
+  createdAt: number;
+  turnId: string;
+}) => ({
   id: o.id,
   createdAt: o.createdAt,
   occurredAt: o.createdAt,
@@ -464,7 +416,11 @@ describe("given a turn I stopped partway is on the record", () => {
       snapshotRef.current = {
         messages: [
           { id: "m1", role: "user", text: "summarise last night's failures" },
-          { id: "m2", role: "assistant", text: "I got as far as the retriever" },
+          {
+            id: "m2",
+            role: "assistant",
+            text: "I got as far as the retriever",
+          },
         ],
         isTurnInFlight: false,
         inFlightTurnId: null,
@@ -504,9 +460,7 @@ describe("given a turn I stopped partway is on the record", () => {
       );
       expect(useLangyStore.getState().turnPhase).toBe("idle");
       expect(await screen.findByLabelText("Send")).toBeTruthy();
-      expect(
-        screen.getByText("I got as far as the retriever"),
-      ).toBeTruthy();
+      expect(screen.getByText("I got as far as the retriever")).toBeTruthy();
     });
   });
 });
@@ -548,15 +502,13 @@ describe("given a conversation with the composer ready", () => {
       // with the overlay rather than opening a second turn, and the question is
       // still in the conversation exactly once.
       act(() => {
-        useLangyStore
-          .getState()
-          .applyTurnEvents([
-            recordedAccepted({
-              id: "event-1",
-              createdAt: 2_000,
-              turnId: "turn-sent",
-            }),
-          ]);
+        useLangyStore.getState().applyTurnEvents([
+          recordedAccepted({
+            id: "event-1",
+            createdAt: 2_000,
+            turnId: "turn-sent",
+          }),
+        ]);
       });
 
       const store = useLangyStore.getState();

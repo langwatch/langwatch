@@ -1,20 +1,20 @@
-import { describe, it, expect, beforeEach } from "vitest";
 import { register } from "prom-client";
+import { beforeEach, describe, expect, it } from "vitest";
 
 // Import to trigger metric registration
 import {
-  gqJobsDelayedTotal,
+  gqBlockedGroups,
+  gqGroupsBlockedTotal,
   gqJobDelayMilliseconds,
-  gqRetryAttempt,
-  gqRetryBackoffMilliseconds,
   gqJobDurationMilliseconds,
-  gqOldestPendingAgeMilliseconds,
   gqJobsCompletedTotal,
-  gqJobsRetriedTotal,
+  gqJobsDelayedTotal,
   gqJobsExhaustedTotal,
   gqJobsNonRetryableTotal,
-  gqGroupsBlockedTotal,
-  gqBlockedGroups,
+  gqJobsRetriedTotal,
+  gqOldestPendingAgeMilliseconds,
+  gqRetryAttempt,
+  gqRetryBackoffMilliseconds,
 } from "../metrics";
 
 const routingLabels = {
@@ -46,16 +46,12 @@ describe("GroupQueue metrics", () => {
     });
 
     it("registers gq_retry_backoff_milliseconds histogram", () => {
-      const metric = register.getSingleMetric(
-        "gq_retry_backoff_milliseconds",
-      );
+      const metric = register.getSingleMetric("gq_retry_backoff_milliseconds");
       expect(metric).toBeDefined();
     });
 
     it("registers gq_job_duration_milliseconds histogram", () => {
-      const metric = register.getSingleMetric(
-        "gq_job_duration_milliseconds",
-      );
+      const metric = register.getSingleMetric("gq_job_duration_milliseconds");
       expect(metric).toBeDefined();
     });
 
@@ -100,8 +96,7 @@ describe("GroupQueue metrics", () => {
     it("records retry attempt with routing labels", async () => {
       gqRetryAttempt.observe(routingLabels, 3);
 
-      const lines =
-        await register.getSingleMetricAsString("gq_retry_attempt");
+      const lines = await register.getSingleMetricAsString("gq_retry_attempt");
       expect(lines).toContain('pipeline_name="test-pipeline"');
       expect(lines).toContain('job_name="traceSummary"');
     });
@@ -187,10 +182,7 @@ describe("GroupQueue metrics", () => {
   describe("when oldest pending age is set", () => {
     it("sets gauge value without throwing", () => {
       expect(() =>
-        gqOldestPendingAgeMilliseconds.set(
-          { queue_name: "test-queue" },
-          1500,
-        ),
+        gqOldestPendingAgeMilliseconds.set({ queue_name: "test-queue" }, 1500),
       ).not.toThrow();
     });
 

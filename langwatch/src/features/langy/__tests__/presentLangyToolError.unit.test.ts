@@ -116,7 +116,11 @@ describe("presentLangyToolError", () => {
         isHandled: true,
       });
 
-    const atLimit = limitFailure({ limitType: "scenarios", current: 3, max: 3 });
+    const atLimit = limitFailure({
+      limitType: "scenarios",
+      current: 3,
+      max: 3,
+    });
 
     it("says the plan ran out, not that the access did", () => {
       expect(present(atLimit).message).toBe(

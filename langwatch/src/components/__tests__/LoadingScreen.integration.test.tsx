@@ -41,7 +41,9 @@ const setReducedMotion = (reduce: boolean) => {
 };
 
 const ghost = () =>
-  document.body.querySelector("[data-loading-screen-ghost]") as HTMLElement | null;
+  document.body.querySelector(
+    "[data-loading-screen-ghost]",
+  ) as HTMLElement | null;
 
 const renderScreen = () =>
   render(<LoadingScreen />, {
@@ -69,7 +71,9 @@ describe("the loading screen leaving", () => {
 
   afterEach(() => {
     cleanup();
-    document.body.querySelectorAll("[data-loading-screen-ghost]").forEach((n) => n.remove());
+    document.body
+      .querySelectorAll("[data-loading-screen-ghost]")
+      .forEach((n) => n.remove());
     vi.restoreAllMocks();
   });
 

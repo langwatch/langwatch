@@ -1,9 +1,9 @@
 import {
+  type UseMutationOptions,
+  type UseQueryOptions,
   useMutation,
   useQuery,
   useQueryClient,
-  type UseMutationOptions,
-  type UseQueryOptions,
 } from "@tanstack/react-query";
 import {
   adminClient,
@@ -83,11 +83,7 @@ export function useAdminUpdate<T>(
 
 export function useAdminCreate<T>(
   resource: ResourceName,
-  options?: UseMutationOptions<
-    DataResult<T>,
-    Error,
-    Record<string, unknown>
-  >,
+  options?: UseMutationOptions<DataResult<T>, Error, Record<string, unknown>>,
 ) {
   const qc = useQueryClient();
   return useMutation<DataResult<T>, Error, Record<string, unknown>>({

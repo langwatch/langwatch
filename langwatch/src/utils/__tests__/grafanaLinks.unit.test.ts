@@ -1,8 +1,8 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-  grafanaTraceUrl,
-  grafanaLogsUrlByTrace,
   grafanaLinksForTrace,
+  grafanaLogsUrlByTrace,
+  grafanaTraceUrl,
 } from "../grafanaLinks";
 
 const TRACE_ID = "0af7651916cd43dd8448eb211c80319c";
@@ -25,12 +25,17 @@ describe("grafanaTraceUrl", () => {
       });
       const { parsed, panes } = panesOf(url);
 
-      expect(parsed.origin + parsed.pathname).toBe("http://127.0.0.1:3000/explore");
+      expect(parsed.origin + parsed.pathname).toBe(
+        "http://127.0.0.1:3000/explore",
+      );
       expect(parsed.searchParams.get("schemaVersion")).toBe("1");
 
       const pane = panes.lw;
       expect(pane.datasource).toBe("tempo");
-      expect(pane.queries[0].datasource).toEqual({ type: "tempo", uid: "tempo" });
+      expect(pane.queries[0].datasource).toEqual({
+        type: "tempo",
+        uid: "tempo",
+      });
       expect(pane.queries[0].queryType).toBe("traceql");
       expect(pane.queries[0].query).toBe(TRACE_ID);
     });
@@ -51,7 +56,9 @@ describe("grafanaTraceUrl", () => {
 
   describe("when the base URL already has a trailing slash", () => {
     it("does not double the slash before /explore", () => {
-      const url = grafanaTraceUrl(TRACE_ID, { baseUrl: "http://127.0.0.1:3000/" });
+      const url = grafanaTraceUrl(TRACE_ID, {
+        baseUrl: "http://127.0.0.1:3000/",
+      });
       expect(url).not.toBeNull();
       expect(new URL(url!).pathname).toBe("/explore");
     });
@@ -60,19 +67,28 @@ describe("grafanaTraceUrl", () => {
   describe("when the base URL is malformed (a bare host with no scheme)", () => {
     it("fails closed to null instead of throwing on the error path", () => {
       // A bad GRAFANA_BASE_URL must not turn a handled error into a second throw.
-      expect(grafanaTraceUrl(TRACE_ID, { baseUrl: "127.0.0.1:3000" })).toBeNull();
-      expect(grafanaLogsUrlByTrace(TRACE_ID, { baseUrl: "127.0.0.1:3000" })).toBeNull();
+      expect(
+        grafanaTraceUrl(TRACE_ID, { baseUrl: "127.0.0.1:3000" }),
+      ).toBeNull();
+      expect(
+        grafanaLogsUrlByTrace(TRACE_ID, { baseUrl: "127.0.0.1:3000" }),
+      ).toBeNull();
     });
   });
 });
 
 describe("grafanaLogsUrlByTrace", () => {
   it("targets the Loki datasource with a LogQL filter on the trace id", () => {
-    const url = grafanaLogsUrlByTrace(TRACE_ID, { baseUrl: "http://127.0.0.1:3000" });
+    const url = grafanaLogsUrlByTrace(TRACE_ID, {
+      baseUrl: "http://127.0.0.1:3000",
+    });
     const { panes } = panesOf(url);
 
     expect(panes.lw.datasource).toBe("loki");
-    expect(panes.lw.queries[0].datasource).toEqual({ type: "loki", uid: "loki" });
+    expect(panes.lw.queries[0].datasource).toEqual({
+      type: "loki",
+      uid: "loki",
+    });
     expect(panes.lw.queries[0].expr).toContain(TRACE_ID);
     expect(panes.lw.queries[0].expr).toContain("trace_id");
   });

@@ -7,11 +7,10 @@ import {
   getUserPermissionsAtScope,
   permissionLabelToRole,
   permissionsSummary,
-  roleToPermissionLabel,
   roleSummary,
   rolesAtOrBelow,
+  roleToPermissionLabel,
   scopeLabel,
-  type PermissionMode,
 } from "./utils";
 
 describe("rolesAtOrBelow()", () => {
@@ -341,9 +340,9 @@ describe("scopeLabel()", () => {
 
   describe("when scopeType is TEAM with name", () => {
     it("returns 'Team: Engineering'", () => {
-      expect(
-        scopeLabel({ scopeType: "TEAM", scopeName: "Engineering" }),
-      ).toBe("Team: Engineering");
+      expect(scopeLabel({ scopeType: "TEAM", scopeName: "Engineering" })).toBe(
+        "Team: Engineering",
+      );
     });
   });
 
@@ -437,7 +436,10 @@ describe("bindingsToSelections()", () => {
     permissionCategories: [
       { key: "traces", accessLevels: ["read", "write"] as readonly string[] },
       { key: "cost", accessLevels: ["read"] as readonly string[] },
-      { key: "scenarios", accessLevels: ["read", "write"] as readonly string[] },
+      {
+        key: "scenarios",
+        accessLevels: ["read", "write"] as readonly string[],
+      },
     ],
     selectionsFromPermissions: (perms: string[]) => {
       const sel: Record<string, string> = {};
@@ -447,7 +449,13 @@ describe("bindingsToSelections()", () => {
     },
     getTeamRolePermissions: (role: string) => {
       if (role === "MEMBER") return ["traces:view", "scenarios:view"];
-      if (role === "ADMIN") return ["traces:view", "traces:create", "scenarios:view", "scenarios:manage"];
+      if (role === "ADMIN")
+        return [
+          "traces:view",
+          "traces:create",
+          "scenarios:view",
+          "scenarios:manage",
+        ];
       return [];
     },
   };
@@ -455,10 +463,19 @@ describe("bindingsToSelections()", () => {
   describe("when permissionMode is 'readonly' (legacy)", () => {
     it("sets all categories to read", () => {
       const result = bindingsToSelections(
-        { permissionMode: "readonly", roleBindings: [{ role: "VIEWER", customRoleId: null, customRolePermissions: null }] },
+        {
+          permissionMode: "readonly",
+          roleBindings: [
+            { role: "VIEWER", customRoleId: null, customRolePermissions: null },
+          ],
+        },
         fakeDeps,
       );
-      expect(result).toEqual({ traces: "read", cost: "read", scenarios: "read" });
+      expect(result).toEqual({
+        traces: "read",
+        cost: "read",
+        scenarios: "read",
+      });
     });
   });
 
@@ -477,11 +494,13 @@ describe("bindingsToSelections()", () => {
       const result = bindingsToSelections(
         {
           permissionMode: "restricted",
-          roleBindings: [{
-            role: "CUSTOM",
-            customRoleId: "cr-1",
-            customRolePermissions: ["traces:view", "traces:create"],
-          }],
+          roleBindings: [
+            {
+              role: "CUSTOM",
+              customRoleId: "cr-1",
+              customRolePermissions: ["traces:view", "traces:create"],
+            },
+          ],
         },
         fakeDeps,
       );
@@ -494,11 +513,17 @@ describe("bindingsToSelections()", () => {
       const result = bindingsToSelections(
         {
           permissionMode: "restricted",
-          roleBindings: [{ role: "VIEWER", customRoleId: null, customRolePermissions: null }],
+          roleBindings: [
+            { role: "VIEWER", customRoleId: null, customRolePermissions: null },
+          ],
         },
         fakeDeps,
       );
-      expect(result).toEqual({ traces: "read", cost: "read", scenarios: "read" });
+      expect(result).toEqual({
+        traces: "read",
+        cost: "read",
+        scenarios: "read",
+      });
     });
   });
 
@@ -507,7 +532,9 @@ describe("bindingsToSelections()", () => {
       const result = bindingsToSelections(
         {
           permissionMode: "restricted",
-          roleBindings: [{ role: "MEMBER", customRoleId: null, customRolePermissions: null }],
+          roleBindings: [
+            { role: "MEMBER", customRoleId: null, customRolePermissions: null },
+          ],
         },
         fakeDeps,
       );
@@ -520,11 +547,17 @@ describe("bindingsToSelections()", () => {
       const result = bindingsToSelections(
         {
           permissionMode: "all",
-          roleBindings: [{ role: "ADMIN", customRoleId: null, customRolePermissions: null }],
+          roleBindings: [
+            { role: "ADMIN", customRoleId: null, customRolePermissions: null },
+          ],
         },
         fakeDeps,
       );
-      expect(result).toEqual({ traces: "write", cost: "read", scenarios: "write" });
+      expect(result).toEqual({
+        traces: "write",
+        cost: "read",
+        scenarios: "write",
+      });
     });
   });
 });
@@ -536,9 +569,7 @@ describe("getUserPermissionsAtScope()", () => {
     return ["project:view"];
   };
 
-  const orgProjects = [
-    { id: "proj-1", teamId: "team-1" },
-  ];
+  const orgProjects = [{ id: "proj-1", teamId: "team-1" }];
 
   describe("when isServiceKey is true", () => {
     it("returns ADMIN permissions regardless of bindings", () => {
@@ -558,7 +589,9 @@ describe("getUserPermissionsAtScope()", () => {
   describe("when no bindings match the scope", () => {
     it("returns empty array", () => {
       const result = getUserPermissionsAtScope({
-        myBindings: [{ scopeType: "PROJECT", scopeId: "other-proj", role: "ADMIN" }],
+        myBindings: [
+          { scopeType: "PROJECT", scopeId: "other-proj", role: "ADMIN" },
+        ],
         scopeType: "PROJECT",
         scopeId: "proj-1",
         organizationId: "org-1",
@@ -588,7 +621,9 @@ describe("getUserPermissionsAtScope()", () => {
   describe("when exact scope matches", () => {
     it("returns permissions for the matched role", () => {
       const result = getUserPermissionsAtScope({
-        myBindings: [{ scopeType: "PROJECT", scopeId: "proj-1", role: "MEMBER" }],
+        myBindings: [
+          { scopeType: "PROJECT", scopeId: "proj-1", role: "MEMBER" },
+        ],
         scopeType: "PROJECT",
         scopeId: "proj-1",
         organizationId: "org-1",
@@ -603,7 +638,9 @@ describe("getUserPermissionsAtScope()", () => {
   describe("when org-level binding covers a project scope", () => {
     it("falls back to the org binding", () => {
       const result = getUserPermissionsAtScope({
-        myBindings: [{ scopeType: "ORGANIZATION", scopeId: "org-1", role: "ADMIN" }],
+        myBindings: [
+          { scopeType: "ORGANIZATION", scopeId: "org-1", role: "ADMIN" },
+        ],
         scopeType: "PROJECT",
         scopeId: "proj-1",
         organizationId: "org-1",

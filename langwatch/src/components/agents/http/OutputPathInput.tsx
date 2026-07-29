@@ -1,4 +1,4 @@
-import { Field, Input, Text, VStack } from "@chakra-ui/react";
+import { Input, Text, VStack } from "@chakra-ui/react";
 
 export type OutputPathInputProps = {
   value: string;

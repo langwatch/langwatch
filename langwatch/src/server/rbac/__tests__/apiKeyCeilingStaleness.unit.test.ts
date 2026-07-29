@@ -14,7 +14,10 @@
  */
 import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
-import { resolveApiKeyPermission, type ScopeRef } from "../role-binding-resolver";
+import {
+  resolveApiKeyPermission,
+  type ScopeRef,
+} from "../role-binding-resolver";
 
 const ORG = "org_1";
 const TEAM = "team_1";
@@ -89,9 +92,9 @@ describe("resolveApiKeyPermission, given a key minted before an access change", 
 
   describe("when the user's access has since been reduced", () => {
     it("refuses the write the key was minted for", async () => {
-      await expect(allows(["scenarios:view"], "scenarios:manage")).resolves.toBe(
-        false,
-      );
+      await expect(
+        allows(["scenarios:view"], "scenarios:manage"),
+      ).resolves.toBe(false);
     });
 
     it("still allows what the user can still do", async () => {

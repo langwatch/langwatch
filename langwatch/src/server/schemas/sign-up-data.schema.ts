@@ -1,18 +1,12 @@
 import { z } from "zod";
-import {
-  ATTRIBUTION_FIELDS,
-  type AttributionField,
-} from "~/utils/attribution";
+import { ATTRIBUTION_FIELDS, type AttributionField } from "~/utils/attribution";
 
 const attributionShape = ATTRIBUTION_FIELDS.reduce(
   (acc, field) => {
     acc[field] = z.string().optional().nullable();
     return acc;
   },
-  {} as Record<
-    AttributionField,
-    z.ZodNullable<z.ZodOptional<z.ZodString>>
-  >,
+  {} as Record<AttributionField, z.ZodNullable<z.ZodOptional<z.ZodString>>>,
 );
 
 /**

@@ -1,29 +1,29 @@
+import { generate } from "@langwatch/ksuid";
 import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
-import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
 import { z } from "zod";
-import { KSUID_RESOURCES } from "~/utils/constants";
-import { getApp } from "~/server/app-layer/app";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import {
-  assertEnterprisePlan,
-  isCustomRole,
-  ENTERPRISE_FEATURE_ERRORS,
-} from "../enterprise";
+import { getApp } from "~/server/app-layer/app";
+import { assertUsersInOrganization } from "~/server/organizations/assertUsersInOrganization";
+import { TEAM_ROLE_PRIORITY, TeamService } from "~/server/teams/team.service";
+import { KSUID_RESOURCES } from "~/utils/constants";
+import { captureException } from "~/utils/posthogErrorCapture";
+import { slugify } from "~/utils/slugify";
 import {
   createLicenseEnforcementService,
   LimitExceededError,
 } from "../../license-enforcement";
-import { captureException } from "~/utils/posthogErrorCapture";
-import { slugify } from "~/utils/slugify";
+import {
+  assertEnterprisePlan,
+  ENTERPRISE_FEATURE_ERRORS,
+  isCustomRole,
+} from "../enterprise";
 import {
   checkOrganizationPermission,
   checkTeamPermission,
   hasOrganizationPermission,
 } from "../rbac";
-import { TeamService, TEAM_ROLE_PRIORITY } from "~/server/teams/team.service";
-import { assertUsersInOrganization } from "~/server/organizations/assertUsersInOrganization";
 
 // Reusable schema for team member role validation
 const teamMemberRoleSchema = z
@@ -130,7 +130,9 @@ export const teamRouter = createTRPCRouter({
     .use(checkOrganizationPermission("organization:manage"))
     .query(async ({ input, ctx }) => {
       const service = new TeamService(ctx.prisma);
-      return service.getTeamsWithRoleBindings({ organizationId: input.organizationId });
+      return service.getTeamsWithRoleBindings({
+        organizationId: input.organizationId,
+      });
     }),
 
   getTeamWithMembers: protectedProcedure
@@ -162,7 +164,11 @@ export const teamRouter = createTRPCRouter({
       // Privacy floor: a non-admin probing for someone else's personal
       // workspace by slug gets a NOT_FOUND, not a 200-with-team. We
       // surface the same error a missing slug would for non-distinguishability.
-      if (!callerHasManage && team.isPersonal && team.ownerUserId !== callerId) {
+      if (
+        !callerHasManage &&
+        team.isPersonal &&
+        team.ownerUserId !== callerId
+      ) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Team not found." });
       }
 
@@ -228,7 +234,9 @@ export const teamRouter = createTRPCRouter({
 
       // Validate custom roles belong to this org
       if (input.members.some((m) => isCustomRole(m.role))) {
-        for (const member of input.members.filter((m) => isCustomRole(m.role))) {
+        for (const member of input.members.filter((m) =>
+          isCustomRole(m.role),
+        )) {
           if (!member.customRoleId) {
             throw new TRPCError({
               code: "BAD_REQUEST",
@@ -239,24 +247,31 @@ export const teamRouter = createTRPCRouter({
             where: { id: member.customRoleId },
             select: { organizationId: true, kind: true },
           });
-          if (!customRole || customRole.kind !== "custom") {
-            throw new TRPCError({ code: "NOT_FOUND", message: `Custom role ${member.customRoleId} not found` });
+          if (customRole?.kind !== "custom") {
+            throw new TRPCError({
+              code: "NOT_FOUND",
+              message: `Custom role ${member.customRoleId} not found`,
+            });
           }
           if (customRole.organizationId !== organizationId) {
-            throw new TRPCError({ code: "FORBIDDEN", message: `Custom role ${member.customRoleId} does not belong to team's organization` });
+            throw new TRPCError({
+              code: "FORBIDDEN",
+              message: `Custom role ${member.customRoleId} does not belong to team's organization`,
+            });
           }
         }
       }
 
       return await prisma.$transaction(async (tx) => {
         // ── Rename team ──
-        await tx.team.update({ where: { id: input.teamId }, data: { name: input.name } });
+        await tx.team.update({
+          where: { id: input.teamId },
+          data: { name: input.name },
+        });
 
         if (input.members.length === 0) return { success: true };
 
-        const newMembersMap = new Map(
-          input.members.map((m) => [m.userId, m]),
-        );
+        const newMembersMap = new Map(input.members.map((m) => [m.userId, m]));
 
         // ── RoleBinding ──
         // A user can hold MORE THAN ONE TEAM binding on the same team (the
@@ -269,7 +284,12 @@ export const teamRouter = createTRPCRouter({
         // silently revoke custom-role grants. Removing a user from the team is
         // unambiguous, so that path still drops all of their bindings.
         const currentBindings = await tx.roleBinding.findMany({
-          where: { organizationId, scopeType: RoleBindingScopeType.TEAM, scopeId: input.teamId, userId: { not: null } },
+          where: {
+            organizationId,
+            scopeType: RoleBindingScopeType.TEAM,
+            scopeId: input.teamId,
+            userId: { not: null },
+          },
           select: { id: true, userId: true, role: true, customRoleId: true },
         });
         const currentBindingsByUser = new Map<string, typeof currentBindings>();
@@ -291,7 +311,11 @@ export const teamRouter = createTRPCRouter({
           )[0]!;
 
         const idsToRemove: string[] = [];
-        const toUpdate: { id: string; role: TeamUserRole; customRoleId: string | null }[] = [];
+        const toUpdate: {
+          id: string;
+          role: TeamUserRole;
+          customRoleId: string | null;
+        }[] = [];
         const toCreate: (typeof input.members)[number][] = [];
 
         // Drop every binding belonging to a user no longer on the team.
@@ -312,14 +336,20 @@ export const teamRouter = createTRPCRouter({
             continue;
           }
           const displayed = displayedBinding(existing);
-          if (displayed.role === role && displayed.customRoleId === customRoleId) {
+          if (
+            displayed.role === role &&
+            displayed.customRoleId === customRoleId
+          ) {
             continue; // displayed binding already matches — nothing to do
           }
           // If the target grant already exists on another binding, updating into
           // it would collide with the partial unique index, so drop the
           // displayed binding instead (the grant is already present).
           const targetAlreadyHeld = existing.some(
-            (b) => b.id !== displayed.id && b.role === role && b.customRoleId === customRoleId,
+            (b) =>
+              b.id !== displayed.id &&
+              b.role === role &&
+              b.customRoleId === customRoleId,
           );
           if (targetAlreadyHeld) {
             idsToRemove.push(displayed.id);
@@ -329,10 +359,15 @@ export const teamRouter = createTRPCRouter({
         }
 
         if (idsToRemove.length > 0) {
-          await tx.roleBinding.deleteMany({ where: { id: { in: idsToRemove } } });
+          await tx.roleBinding.deleteMany({
+            where: { id: { in: idsToRemove } },
+          });
         }
         for (const { id, role, customRoleId } of toUpdate) {
-          await tx.roleBinding.update({ where: { id }, data: { role, customRoleId } });
+          await tx.roleBinding.update({
+            where: { id },
+            data: { role, customRoleId },
+          });
         }
         for (const member of toCreate) {
           await tx.roleBinding.create({
@@ -451,8 +486,7 @@ export const teamRouter = createTRPCRouter({
             });
 
             if (
-              !customRole ||
-              customRole.kind !== "custom" ||
+              customRole?.kind !== "custom" ||
               customRole.organizationId !== team.organizationId
             ) {
               throw new TRPCError({
@@ -468,7 +502,9 @@ export const teamRouter = createTRPCRouter({
               organizationId: input.organizationId,
               userId: member.userId,
               role: memberRole,
-              customRoleId: memberIsCustomRole ? (member.customRoleId ?? null) : null,
+              customRoleId: memberIsCustomRole
+                ? (member.customRoleId ?? null)
+                : null,
               scopeType: RoleBindingScopeType.TEAM,
               scopeId: team.id,
             },

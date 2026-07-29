@@ -1,0 +1,36 @@
+id: use-action-based-test-name-tsx
+valid:
+  - |
+    it("checks local first", () => {
+      expect(resolve()).toBe("local");
+    });
+  - |
+    it("refuses a cross-tenant read", () => {
+      expect(read).toThrow();
+    });
+  - |
+    test("keeps the cursor stable across a version bump", () => {
+      expect(cursor).toBe(before);
+    });
+  # "should" inside the sentence is fine — only a leading "should" is the smell.
+  - |
+    it("explains why a caller should retry", () => {
+      expect(message).toContain("retry");
+    });
+invalid:
+  - |
+    it("should check local first", () => {
+      expect(resolve()).toBe("local");
+    });
+  - |
+    test("Should reject an unknown provider", () => {
+      expect(fn).toThrow();
+    });
+  - |
+    it("works", () => {
+      expect(run()).toBe(true);
+    });
+  - |
+    it("renders", () => {
+      expect(el).toBeTruthy();
+    });

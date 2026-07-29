@@ -1,5 +1,5 @@
 import type { Context, MiddlewareHandler } from "hono";
-import { streamSSE, type SSEStreamingApi } from "hono/streaming";
+import { type SSEStreamingApi, streamSSE } from "hono/streaming";
 import type { ZodType, z } from "zod";
 
 import type { EndpointConfig } from "./types.js";

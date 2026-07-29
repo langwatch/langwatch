@@ -50,7 +50,7 @@ type Credentials struct {
 	// reusing a token scoped to different repositories.
 	GithubRepoScope string `json:"githubRepoScopeKey,omitempty"`
 	// EgressAllowlist is the project's per-project Langy egress allow-list
-	// (ADR-043 rung 2), resolved by the control plane's
+	// (ADR-076 rung 2), resolved by the control plane's
 	// LangyCredentialService.getEgressAllowlist and threaded through this
 	// envelope. The *presence* of the list is the mode: nil/empty ⇒ the egress
 	// adapter watches but blocks nothing; non-empty ⇒ the adapter restricts
@@ -139,7 +139,7 @@ type CredentialSignature struct {
 	// comparable with ==. The keys encode presence, never the secret.
 	Capabilities string
 	// EgressAllowlist is a canonical fingerprint (sorted + newline-joined) of
-	// the project's egress allow-list (ADR-043). Folding it in means a policy
+	// the project's egress allow-list (ADR-076). Folding it in means a policy
 	// change (the customer edits the list) recycles the worker on its next turn
 	// — the egress adapter is rebuilt with the new list, so a live worker is
 	// never left running under the old policy. A string (not the []string

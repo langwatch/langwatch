@@ -35,7 +35,9 @@ export const isSsoProviderMatch = (
  * and `extractEmailDomain("a@b@c.com")` returning `"b@c.com"` would be
  * a silent SSO routing bug. Caught by CodeRabbit in PR review.
  */
-export const extractEmailDomain = (email: string | null | undefined): string | null => {
+export const extractEmailDomain = (
+  email: string | null | undefined,
+): string | null => {
   if (!email) return null;
   const at = email.indexOf("@");
   if (at < 0 || at === email.length - 1 || at !== email.lastIndexOf("@")) {

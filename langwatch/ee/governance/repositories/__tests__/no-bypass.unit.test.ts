@@ -94,7 +94,8 @@ describe("no-bypass invariant: governance tables route through repositories", ()
         // discriminator so we don't accept comment-only matches.
         const rest = line.slice(colonIdx + 1);
         const colonIdx2 = rest.indexOf(":");
-        const codeFragment = colonIdx2 === -1 ? rest : rest.slice(colonIdx2 + 1);
+        const codeFragment =
+          colonIdx2 === -1 ? rest : rest.slice(colonIdx2 + 1);
         return isMethodCall(codeFragment);
       });
       if (violations.length > 0) {
@@ -117,9 +118,7 @@ describe("no-bypass invariant: governance tables route through repositories", ()
     // bug where the refactor accidentally removed the persistence layer.
     const ingestionMatches = grepRepo(
       String.raw`prisma\.ingestionTemplate\.`,
-    ).concat(
-      grepRepo(String.raw`client\.ingestionTemplate\.`),
-    );
+    ).concat(grepRepo(String.raw`client\.ingestionTemplate\.`));
     const repoMatches = ingestionMatches.filter((line) =>
       line.includes("ee/governance/repositories/"),
     );

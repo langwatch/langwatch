@@ -7,7 +7,7 @@
  * scope) for a hair under their lifetime; tokens are NEVER logged.
  *
  * Replaces the per-user OAuth/refresh-token machinery (issue #4747). See
- * LANGY_GITHUB_AUTH_PLAN.md §2–3 and specs/langy/langy-github-install.feature.
+ * specs/langy/langy-github-install.feature.
  */
 import { createLogger } from "@langwatch/observability";
 import { createHash, randomBytes } from "crypto";
@@ -93,7 +93,7 @@ export interface MintInstallationTokenArgs {
  * Computes a short, stable key for a token's scope so the cache re-mints when
  * (and only when) the repository set or permission set changes. Also the
  * "repo-scope key" threaded into the worker credential signature so a scope
- * change re-warms the worker (LANGY_GITHUB_AUTH_PLAN.md §3).
+ * change re-warms the worker (specs/langy/langy-github-install.feature).
  */
 export function computeRepoScopeKey({
   repositoryIds,

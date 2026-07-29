@@ -211,7 +211,11 @@ function parseArgs(tokens: string[], from: number): Record<string, unknown> {
       continue;
     }
     const next = tokens[i + 1];
-    if (next !== undefined && !COMMAND_SEPARATORS.has(next) && !isFlagToken(next)) {
+    if (
+      next !== undefined &&
+      !COMMAND_SEPARATORS.has(next) &&
+      !isFlagToken(next)
+    ) {
       put(name, next);
       i++;
     } else {
@@ -231,7 +235,9 @@ function parseArgs(tokens: string[], from: number): Record<string, unknown> {
  * docs integration/python`. Those carry no capability, so the caller leaves the
  * frame as the shell call it was.
  */
-export function parseLangwatchCommand(command: string): LangwatchCommand | null {
+export function parseLangwatchCommand(
+  command: string,
+): LangwatchCommand | null {
   if (typeof command !== "string" || !command.trim()) return null;
 
   const tokens = tokenize(command);

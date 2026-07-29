@@ -6,14 +6,14 @@ import {
 import type { FoldProjectionStore } from "../../../projections/foldProjection.types";
 import { SUITE_RUN_PROJECTION_VERSIONS } from "../schemas/constants";
 import type {
-  SuiteRunStartedEvent,
-  SuiteRunItemStartedEvent,
   SuiteRunItemCompletedEvent,
+  SuiteRunItemStartedEvent,
+  SuiteRunStartedEvent,
 } from "../schemas/events";
 import {
-  SuiteRunStartedEventSchema,
-  SuiteRunItemStartedEventSchema,
   SuiteRunItemCompletedEventSchema,
+  SuiteRunItemStartedEventSchema,
+  SuiteRunStartedEventSchema,
 } from "../schemas/events";
 
 /**
@@ -151,9 +151,7 @@ export class SuiteRunStateFoldProjection
     }
 
     const passRateBps =
-      gradedCount > 0
-        ? Math.round((passedCount / gradedCount) * 10000)
-        : null;
+      gradedCount > 0 ? Math.round((passedCount / gradedCount) * 10000) : null;
 
     const progress = completedCount + failedCount;
     const allDone = state.Total > 0 && progress >= state.Total;

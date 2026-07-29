@@ -1,11 +1,4 @@
-import {
-  Box,
-  Button,
-  type ButtonProps,
-  HStack,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, type ButtonProps, HStack, Text } from "@chakra-ui/react";
 import type { ReactJsonViewProps } from "@microlink/react-json-view";
 import React, { useMemo, useState } from "react";
 import type { SpanInputOutput } from "~/server/tracer/types";

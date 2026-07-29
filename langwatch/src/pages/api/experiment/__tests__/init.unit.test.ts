@@ -51,7 +51,7 @@ vi.mock("@langwatch/observability", () => ({
 
 vi.mock("~/utils/posthogErrorCapture", () => ({
   captureException: vi.fn(),
-  toError: vi.fn((e) => e instanceof Error ? e : new Error(String(e))),
+  toError: vi.fn((e) => (e instanceof Error ? e : new Error(String(e)))),
 }));
 
 import { prisma } from "~/server/db";
@@ -181,10 +181,7 @@ describe("POST /api/experiment/init", () => {
           where: { id: "team-456" },
           select: { organizationId: true },
         });
-        expect(mockEnforceLimit).toHaveBeenCalledWith(
-          "org-789",
-          "experiments",
-        );
+        expect(mockEnforceLimit).toHaveBeenCalledWith("org-789", "experiments");
       });
     });
 

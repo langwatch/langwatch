@@ -1679,6 +1679,7 @@ export const tracesV2Router = createTRPCRouter({
         logs: logs.map((row) => ({
           timestampMs: row.timeUnixMs,
           attributes: (row.attributes ?? {}) as Record<string, unknown>,
+          serviceName: row.resourceAttributes?.["service.name"] ?? null,
         })),
       });
     }),

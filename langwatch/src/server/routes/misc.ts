@@ -27,6 +27,7 @@ import type Stripe from "stripe";
 import { type ZodError, z } from "zod";
 import { fromZodError } from "zod-validation-error";
 import { env } from "~/env.mjs";
+import { getOAuthClient } from "~/mcp/oauthClientRegistry";
 import { findOrCreateExperiment } from "~/pages/api/experiment/init";
 import {
   type TimeseriesInputType,
@@ -56,7 +57,6 @@ import {
 } from "~/server/app-layer/events/track-event.service";
 import { ProjectService } from "~/server/app-layer/projects/project.service";
 import { PrismaProjectRepository } from "~/server/app-layer/projects/repositories/project.prisma.repository";
-import { getOAuthClient } from "~/mcp/oauthClientRegistry";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 import {
@@ -228,11 +228,13 @@ const RAG_SYSTEM_PROMPT =
 // second layer here would double-validate the same token and require a
 // scope that demo tokens may not have.
 secured
-  .access(handlerManagedAuth({
+  .access(
+    handlerManagedAuth({
       reason: "demo endpoint validates X-Auth-Token in-handler",
       permissions: [],
-  credential: "apiKey",
-}))
+      credential: "apiKey",
+    }),
+  )
   .post("/demo/hotel_bot", async (c) => {
     const authToken = c.req.header("x-auth-token");
     if (!authToken) {
@@ -524,8 +526,8 @@ secured
       reason: "user session validated in-handler via getServerAuthSession",
       // OAuth authorize step; no RBAC permission gates it.
       permissions: [],
-  credential: "session",
-}),
+      credential: "session",
+    }),
   )
   .post("/mcp/authorize", async (c) => {
     const session = await getServerAuthSession({ req: c.req.raw as any });
@@ -581,10 +583,7 @@ secured
     // slip past.
     const registeredClient = await getOAuthClient(client_id);
     if (!registeredClient) {
-      return c.json(
-        { error: "Unknown or unregistered client_id" },
-        400,
-      );
+      return c.json({ error: "Unknown or unregistered client_id" }, 400);
     }
     if (!registeredClient.redirectUris.includes(redirect_uri)) {
       return c.json(
@@ -874,53 +873,49 @@ async function enforceInstanceRateLimit(
 
 secured
   .access(publicEndpoint("anonymous product telemetry, no credential"))
-  .post(
-    "/track_usage",
-    bodyLimit({ maxSize: 10 * 1024 }),
-    async (c) => {
-      const ip = getClientIpFromHonoContext(c) ?? "unknown";
+  .post("/track_usage", bodyLimit({ maxSize: 10 * 1024 }), async (c) => {
+    const ip = getClientIpFromHonoContext(c) ?? "unknown";
 
-      const ipLimit = await enforceGlobalAndIpRateLimit(ip);
-      if (!ipLimit.allowed) {
-        c.header("Retry-After", String(ipLimit.retryAfterSeconds));
-        return c.json({ message: "Too many requests" }, 429);
-      }
+    const ipLimit = await enforceGlobalAndIpRateLimit(ip);
+    if (!ipLimit.allowed) {
+      c.header("Retry-After", String(ipLimit.retryAfterSeconds));
+      return c.json({ message: "Too many requests" }, 429);
+    }
 
-      let rawBody: unknown;
+    let rawBody: unknown;
+    try {
+      rawBody = await c.req.json();
+    } catch {
+      return c.json({ message: "Bad request" }, 400);
+    }
+
+    const parsed = trackUsageBodySchema.safeParse(rawBody);
+    if (!parsed.success) {
+      return c.json({ message: "Bad request" }, 400);
+    }
+    const { event, instance_id, ...properties } = parsed.data;
+
+    const instanceLimit = await enforceInstanceRateLimit(instance_id);
+    if (!instanceLimit.allowed) {
+      c.header("Retry-After", String(instanceLimit.retryAfterSeconds));
+      return c.json({ message: "Too many requests" }, 429);
+    }
+
+    const posthog = getPostHogInstance();
+    if (posthog) {
       try {
-        rawBody = await c.req.json();
-      } catch {
-        return c.json({ message: "Bad request" }, 400);
+        posthog.capture({
+          distinctId: instance_id,
+          event,
+          properties,
+        });
+      } catch (error) {
+        captureException(toError(error));
       }
+    }
 
-      const parsed = trackUsageBodySchema.safeParse(rawBody);
-      if (!parsed.success) {
-        return c.json({ message: "Bad request" }, 400);
-      }
-      const { event, instance_id, ...properties } = parsed.data;
-
-      const instanceLimit = await enforceInstanceRateLimit(instance_id);
-      if (!instanceLimit.allowed) {
-        c.header("Retry-After", String(instanceLimit.retryAfterSeconds));
-        return c.json({ message: "Too many requests" }, 429);
-      }
-
-      const posthog = getPostHogInstance();
-      if (posthog) {
-        try {
-          posthog.capture({
-            distinctId: instance_id,
-            event,
-            properties,
-          });
-        } catch (error) {
-          captureException(toError(error));
-        }
-      }
-
-      return c.json({ message: "Event captured" });
-    },
-  );
+    return c.json({ message: "Event captured" });
+  });
 
 // =============================================
 // POST /api/trigger/slack

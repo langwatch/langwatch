@@ -5,8 +5,8 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { AutomationTypePicker } from "../AutomationTypePicker";
 import { useAutomationStore } from "../../state/automationStore";
+import { AutomationTypePicker } from "../AutomationTypePicker";
 
 // Transitive: provider ConfigForms import ~/utils/api at module scope.
 vi.mock("~/utils/api", () => ({
@@ -89,9 +89,10 @@ describe("AutomationTypePicker", () => {
 
       // The active card (Automation, the default source) stays live; the
       // others render aria-disabled.
-      expect(
-        screen.getByRole("button", { name: /Schedule/i }),
-      ).toHaveAttribute("aria-disabled", "true");
+      expect(screen.getByRole("button", { name: /Schedule/i })).toHaveAttribute(
+        "aria-disabled",
+        "true",
+      );
     });
   });
 });

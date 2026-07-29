@@ -2,7 +2,7 @@
  * @vitest-environment node
  */
 
-import { AgentRole, type AgentInput } from "@langwatch/scenario";
+import { type AgentInput, AgentRole } from "@langwatch/scenario";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Span } from "../../../tracer/types";
 import { RemoteSpanJudgeAgent } from "../remote-span-judge-agent";
@@ -62,9 +62,11 @@ describe("RemoteSpanJudgeAgent", () => {
 
   describe("when trace ID is set explicitly", () => {
     it("queries remote spans before delegating to judge", async () => {
-      const querySpans = vi.fn().mockResolvedValue([
-        createTestSpan({ name: "tool-call", span_id: "s1" }),
-      ]);
+      const querySpans = vi
+        .fn()
+        .mockResolvedValue([
+          createTestSpan({ name: "tool-call", span_id: "s1" }),
+        ]);
 
       const agent = new RemoteSpanJudgeAgent({
         criteria: ["Agent must use tools"],

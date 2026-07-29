@@ -66,7 +66,7 @@ export const PushToCopiesDialog = ({
       sourceName={promptName}
       copies={availableCopies}
       isLoading={isLoading}
-      error={error ? { message: error.message } : null}
+      error={error}
       selectedCopyIds={selectedCopyIds}
       onToggleCopy={handleToggleCopy}
       onPush={async () => {
