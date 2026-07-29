@@ -238,6 +238,37 @@ async function readUpstreamRefusal(
 }
 
 /**
+ * Google's verdict on the key itself, when it gave one.
+ *
+ * The only branch that ranks a refusal by what the provider said rather than
+ * by the status it said it with, which is why it reads better apart from the
+ * status handling below.
+ */
+function geminiReasonRefusal({
+  provider,
+  reason,
+}: {
+  provider: string;
+  reason: string | undefined;
+}): RankedFailure | undefined {
+  if (provider !== "gemini" || !reason) return undefined;
+
+  const known = GEMINI_REASON_MESSAGES[reason];
+  if (!known) return undefined;
+
+  return {
+    valid: false,
+    error: known,
+    // Only a reason naming something else is worth outranking the
+    // provider's own verdict that the key itself is wrong.
+    rank:
+      known === INVALID_KEY_MESSAGE
+        ? FAILURE_RANK.definitive
+        : FAILURE_RANK.actionable,
+  };
+}
+
+/**
  * Turns an HTTP failure into a message the customer can act on, preferring
  * the provider's own explanation over our guess about what went wrong.
  *
@@ -257,19 +288,11 @@ async function handleHttpError({
     context.apiKey,
   );
 
-  const knownReason = reason ? GEMINI_REASON_MESSAGES[reason] : undefined;
-  if (context.provider === "gemini" && knownReason) {
-    return {
-      valid: false,
-      error: knownReason,
-      // Only a reason naming something else is worth outranking the
-      // provider's own verdict that the key itself is wrong.
-      rank:
-        knownReason === INVALID_KEY_MESSAGE
-          ? FAILURE_RANK.definitive
-          : FAILURE_RANK.actionable,
-    };
-  }
+  const fromReason = geminiReasonRefusal({
+    provider: context.provider,
+    reason,
+  });
+  if (fromReason) return fromReason;
 
   // Gemini reports a rejected key as 400, every other provider as 401/403.
   const isAuthFailure =
