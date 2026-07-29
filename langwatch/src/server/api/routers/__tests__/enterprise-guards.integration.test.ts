@@ -6,7 +6,11 @@
  *
  * Requires: PostgreSQL database (Prisma)
  */
-import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
+import {
+  OrganizationUserRole,
+  RoleBindingScopeType,
+  TeamUserRole,
+} from "@prisma/client";
 import { nanoid } from "nanoid";
 import {
   afterAll,
@@ -31,9 +35,7 @@ import { ENTERPRISE_FEATURE_ERRORS } from "../../enterprise";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
 
-const isTestcontainersOnly = !!process.env.TEST_CLICKHOUSE_URL;
-
-describe.skipIf(isTestcontainersOnly)("enterprise feature guards", () => {
+describe("enterprise feature guards", () => {
   const testNamespace = `ent-guard-${nanoid(8)}`;
   let organizationId: string;
   let userId: string;
@@ -100,6 +102,35 @@ describe.skipIf(isTestcontainersOnly)("enterprise feature guards", () => {
         userId: user.id,
         teamId: team.id,
         role: TeamUserRole.ADMIN,
+      },
+    });
+
+    // RoleBindings, not just the OrganizationUser/TeamUser rows above.
+    //
+    // `OrganizationUser.role = ADMIN` does NOT confer admin permissions on its
+    // own — `hasOrganizationPermission` gives every member only MEMBER's base
+    // bag as a floor, then resolves the rest through ORGANIZATION-scoped
+    // bindings, and the legacy TeamUser union deliberately cannot grant
+    // `organization:*` (ADR-021). Without these rows the caller is rejected at
+    // the permission gate with UNAUTHORIZED and never reaches the enterprise
+    // guard each test here is about, which is exactly what happened while this
+    // suite was skipped.
+    await prisma.roleBinding.create({
+      data: {
+        organizationId: organization.id,
+        userId: user.id,
+        role: TeamUserRole.ADMIN,
+        scopeType: RoleBindingScopeType.ORGANIZATION,
+        scopeId: organization.id,
+      },
+    });
+    await prisma.roleBinding.create({
+      data: {
+        organizationId: organization.id,
+        userId: user.id,
+        role: TeamUserRole.ADMIN,
+        scopeType: RoleBindingScopeType.TEAM,
+        scopeId: team.id,
       },
     });
 

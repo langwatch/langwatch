@@ -765,7 +765,20 @@ export class ModelProviderService {
     projectId: string,
     ctx: AuthzContext,
   ): Promise<ModelProviderWithScopes> {
-    const existing = await this.repository.findById(id, projectId);
+    // Org-anchored, for the same reason the edit path is (see
+    // `findEditableById`): `findById` matches only rows carrying a PROJECT
+    // scope for this project, so an ORGANIZATION- or TEAM-scoped provider —
+    // which the settings list surfaces here by inheritance — resolved to null
+    // and 404'd. Worse, it made the read gate below unreachable for exactly
+    // the scopes it exists to judge: a row that never loads is never asked
+    // about. The gate, not the lookup, is the security boundary — the anchor
+    // keeps the query inside one tenant and `canReadAnyScope` then decides.
+    // Falls back to the project lookup when the tenant can't be resolved, so
+    // a missing project can't widen the blast radius.
+    const anchor = await this.resolveOrganizationAnchor({ projectId });
+    const existing = anchor
+      ? await this.repository.findByIdForOrganization(id, anchor)
+      : await this.repository.findById(id, projectId);
     if (!existing) {
       throw new ModelProviderNotFoundError();
     }

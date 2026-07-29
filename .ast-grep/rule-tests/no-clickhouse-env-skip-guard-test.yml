@@ -1,0 +1,25 @@
+id: no-clickhouse-env-skip-guard
+valid:
+  # The correct polarity: skip when the services are ABSENT. This is what the
+  # ClickHouse-dependent suites already do, and it must keep passing.
+  - |
+    const hasTestcontainers = !!(
+      process.env.TEST_CLICKHOUSE_URL || process.env.CI_CLICKHOUSE_URL
+    );
+    describe.skipIf(!hasTestcontainers)("needs clickhouse", () => {});
+  # An unrelated, honestly-named guard.
+  - |
+    const hasCredentialsSecret = !!process.env.CREDENTIALS_SECRET;
+    describe.skipIf(!hasCredentialsSecret)("model providers", () => {});
+  # No guard at all — the outcome #6327 wanted.
+  - |
+    describe("plan.getActivePlan integration", () => {});
+invalid:
+  - |
+    const isTestcontainersOnly = !!process.env.TEST_CLICKHOUSE_URL;
+  - |
+    describe.skipIf(isTestcontainersOnly)("suite", () => {});
+  - |
+    describe.skipIf(!!process.env.TEST_CLICKHOUSE_URL)("suite", () => {});
+  - |
+    describe.skipIf(process.env.TEST_CLICKHOUSE_URL)("suite", () => {});
