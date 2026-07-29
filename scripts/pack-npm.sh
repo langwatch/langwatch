@@ -102,9 +102,37 @@ EXCLUDES=(
   --exclude=.DS_Store
   --exclude=.vscode
   --exclude=.idea
+  # EVERY dotenv variant, not just `.env` and `*.local`. This tarball is
+  # PUBLIC, and the working tree carries dotenv files that are gitignored but
+  # very much present: haven writes langwatch/.env.portless (mode 0600, with
+  # the admin password and access tokens in it) and the quickstart picker
+  # writes langwatch/.env.dev-up. Listing the variants individually shipped
+  # .env.portless into a real tarball — deleting langwatch/.npmignore removed
+  # the `.env*.local` rule that used to catch some of them, and because this
+  # script also strips .gitignore/.npmignore from the staged tree, this array
+  # is the ONLY filter left. `.env.example` is tracked documentation and is
+  # re-included after.
+  # The include MUST precede the excludes: rsync takes the first matching
+  # filter rule, so `.env.example` has to be claimed before `.env.*` sees it.
+  --include=.env.example
   --exclude=.env
-  --exclude=.env.local
-  --exclude=.env.*.local
+  --exclude=.env.*
+  # Keys and certificates. `*.pem` was in the deleted langwatch/.npmignore and
+  # was not carried across; a TLS key, JWT signing key or SSH key dropped
+  # anywhere under a shipped directory would otherwise be published.
+  --exclude=*.pem
+  --exclude=*.key
+  --exclude=*.p12
+  --exclude=*.pfx
+  # npm strips a root .npmrc from published packages, but ONLY at the root —
+  # and this script deliberately stages everything one level down, which
+  # disables that protection for every nested one. .npmrc is where
+  # `npm config set --location=project` and most CI setups write registry auth.
+  --exclude=.npmrc
+  # Debug logs routinely carry registry URLs and, on auth failure, token
+  # fragments.
+  --exclude=*-debug.log*
+  --exclude=.vercel
   --exclude=.sentryclirc
   --exclude=server.log
   --exclude=licenses.json
@@ -160,7 +188,24 @@ cp "$ROOT/LICENSE.md" "$STAGE/LICENSE.md"
 echo "→ staged $(du -sh "$STAGE" | cut -f1) at $STAGE"
 echo "→ running: pnpm pack $*"
 cd "$STAGE"
-pnpm pack "$@"
+# Always pack to an explicit destination OUTSIDE the staging dir, because the
+# EXIT trap deletes that dir. Packing from the repo root used to leave the
+# tarball in the repo; staging moved the cwd, so a caller who passes no
+# --pack-destination (both documented local entry points — `pnpm pack:npm` and
+# `pnpm release:dry-run`) would have had it written into $STAGE and swept away
+# on exit, producing nothing and reporting success.
+#
+# A caller-supplied destination still wins; this only supplies the default.
+# Both spellings are handled, since `--pack-destination=DIR` would otherwise
+# slip past a space-separated scan.
+case " $* " in
+  *" --pack-destination "*|*" --pack-destination="*|*=--pack-destination*)
+    pnpm pack "$@"
+    ;;
+  *)
+    pnpm pack --pack-destination "$ROOT" "$@"
+    ;;
+esac
 
 # Assert the tarball still carries what the staging tree put in it.
 #
@@ -174,10 +219,14 @@ pnpm pack "$@"
 # `|| true` on both: under `set -e` + `pipefail` a glob that matches nothing
 # makes ls fail, which would abort the script here — silently, since packing
 # has already succeeded by this point.
-dest="$STAGE"
+# Default matches the default supplied to `pnpm pack` above. Both spellings of
+# the flag are read, so `--pack-destination=DIR` cannot leave dest pointing at
+# the wrong directory and produce a misleading "pack produced no tarball".
+dest="$ROOT"
 prev=""
 for arg in "$@"; do
   [ "$prev" = "--pack-destination" ] && dest="$arg"
+  case "$arg" in --pack-destination=*) dest="${arg#--pack-destination=}" ;; esac
   prev="$arg"
 done
 tarball="$(ls -t "$dest"/*.tgz 2>/dev/null | head -n1 || true)"
@@ -235,3 +284,25 @@ if git -C "$ROOT" rev-parse --git-dir >/dev/null 2>&1; then
   fi
   echo "→ verified: tarball ships every tracked langwatch/src and langwatch/ee file"
 fi
+
+# Refuse to publish anything secret-shaped.
+#
+# The exclude list above is a blocklist, and a blocklist is one new filename
+# away from being wrong — which already happened: `.env.portless` (haven's
+# resolved config, mode 0600, admin password and access tokens inside) shipped
+# into a real tarball because the list named `.env`, `.env.local` and
+# `.env.*.local` individually. This tarball goes to a PUBLIC registry, so the
+# check is fail-closed and runs on the packed artifact rather than on
+# intentions.
+secrets="$(mktemp)"
+tar -tzf "$tarball" \
+  | grep -Ei '(^|/)\.env($|\.)|\.pem$|\.key$|\.p12$|\.pfx$|(^|/)\.npmrc$|(^|/)id_(rsa|ed25519)|-debug\.log|(^|/)auth\.json$' \
+  | grep -v '\.env\.example$' > "$secrets" || true
+if [ -s "$secrets" ]; then
+  echo "✗ the tarball contains secret-shaped files — refusing to publish:" >&2
+  head -20 "$secrets" >&2
+  rm -f "$secrets"
+  exit 1
+fi
+rm -f "$secrets"
+echo "→ verified: tarball carries no dotenv, key, .npmrc or debug-log files"

@@ -46,6 +46,8 @@ export async function ensureLangwatchDeps(
 	// where the app resolves from — only the directory we invoke pnpm in moved.
 	const rootDir = appRoot();
 	const nodeModulesPath = join(langwatchDir, "node_modules");
+	// Where pnpm's virtual store actually lives since ADR-076.
+	const rootNodeModules = join(rootDir, "node_modules");
 	const distPath = join(langwatchDir, "dist");
 	const lockfilePath = join(rootDir, "pnpm-lock.yaml");
 	const workspacePath = join(rootDir, "pnpm-workspace.yaml");
@@ -82,7 +84,7 @@ export async function ensureLangwatchDeps(
 
 	if (
 		installFresh &&
-		prismaClientGenerated(nodeModulesPath) &&
+		prismaClientGenerated(rootNodeModules, nodeModulesPath) &&
 		distAlreadyBuilt
 	) {
 		return;
@@ -221,7 +223,7 @@ export async function ensureLangwatchDeps(
 	// a generated one (it is not a declared dependency, so prune sees it as
 	// extraneous — the Dockerfile regenerates after pruning for the same
 	// reason). One post-prune generate covers every path that needs it.
-	if (!prismaClientGenerated(nodeModulesPath)) {
+	if (!prismaClientGenerated(rootNodeModules, nodeModulesPath)) {
 		await execAndPipe(bus, "prepare:langwatch", pnpm.command, [
 			...pnpm.args,
 			"-C",
@@ -358,15 +360,26 @@ export function assertWorkspaceLinksResolve(nodeModulesPath: string): void {
 }
 
 /**
- * Whether `prisma generate` has produced a client in this tree. Under pnpm
- * the generated files live inside the virtual store
+ * Whether `prisma generate` has produced a client in any of these trees. Under
+ * pnpm the generated files live inside the virtual store
  * (node_modules/.pnpm/@prisma+client@<ver>/node_modules/.prisma/client/), NOT
  * the top-level node_modules/.prisma/ that npm and yarn use. The old
  * top-level-only check could never pass on a pnpm tree, so every single boot
  * re-ran the entire prepare step — install, build, generate — for minutes,
- * believing the client was missing. Exported for tests.
+ * believing the client was missing.
+ *
+ * Takes several roots because ADR-076 moved the store. The install root is now
+ * the workspace root, so the store is at <root>/node_modules/.pnpm and
+ * langwatch/node_modules holds only symlinks — checking langwatch/node_modules
+ * alone reintroduced exactly the bug described above, silently, for every npx
+ * user. Both are checked: the root for current trees, langwatch/ for ones
+ * installed before the merge. Exported for tests.
  */
-export function prismaClientGenerated(nodeModulesPath: string): boolean {
+export function prismaClientGenerated(...nodeModulesPaths: string[]): boolean {
+	return nodeModulesPaths.some(prismaClientGeneratedIn);
+}
+
+function prismaClientGeneratedIn(nodeModulesPath: string): boolean {
 	if (existsSync(join(nodeModulesPath, ".prisma", "client", "index.js"))) {
 		return true;
 	}
