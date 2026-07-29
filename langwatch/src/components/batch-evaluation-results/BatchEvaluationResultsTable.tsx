@@ -118,9 +118,21 @@ export const DEFAULT_VIEW_SECTIONS: ViewSections = {
 
 /** Quick "lenses" that map to common section combinations. */
 const VIEW_PRESETS: { id: string; label: string; sections: ViewSections }[] = [
-  { id: "all", label: "Everything", sections: { outputs: true, evaluations: true } },
-  { id: "data", label: "Data only", sections: { outputs: true, evaluations: false } },
-  { id: "scores", label: "Scores only", sections: { outputs: false, evaluations: true } },
+  {
+    id: "all",
+    label: "Everything",
+    sections: { outputs: true, evaluations: true },
+  },
+  {
+    id: "data",
+    label: "Data only",
+    sections: { outputs: true, evaluations: false },
+  },
+  {
+    id: "scores",
+    label: "Scores only",
+    sections: { outputs: false, evaluations: true },
+  },
 ];
 
 /**

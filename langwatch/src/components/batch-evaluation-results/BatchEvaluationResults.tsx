@@ -20,8 +20,8 @@ import {
 import { type Experiment, ExperimentType, type Project } from "@prisma/client";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useLocalStorage } from "usehooks-ts";
 import { BarChart2, Download, ExternalLink } from "react-feather";
+import { useLocalStorage } from "usehooks-ts";
 
 import { Link } from "~/components/ui/link";
 import { useLiteMemberGuard } from "~/hooks/useLiteMemberGuard";
