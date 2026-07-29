@@ -352,9 +352,7 @@ describe("Feature: Langy prompts for a model when the project has none configure
 
         // It replaces — not supplements — the normal empty state.
         expect(
-          screen.queryByText(
-            "Just type away, or start with one of these.",
-          ),
+          screen.queryByText("Just type away, or start with one of these."),
         ).not.toBeInTheDocument();
       });
     });

@@ -230,5 +230,4 @@ const seedDemoHandler = async (c: CronContext) => {
 secured.access(cronPolicy()).get("/cron/seed_demo", seedDemoHandler);
 secured.access(cronPolicy()).post("/cron/seed_demo", seedDemoHandler);
 
-
 export const app = secured.hono;

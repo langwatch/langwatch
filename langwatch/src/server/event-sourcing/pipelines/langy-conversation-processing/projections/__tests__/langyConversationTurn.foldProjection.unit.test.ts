@@ -1,18 +1,16 @@
-import { describe, expect, it } from "vitest";
-import { createTenantId } from "../../../../domain/tenantId";
-import type { StateProjectionStore } from "../../../../projections/stateProjection.types";
 import {
   LANGY_CONVERSATION_EVENT_TYPES,
   LANGY_CONVERSATION_EVENT_VERSIONS,
   LANGY_CONVERSATION_TURN_STATUS,
   LANGY_TURN_TOOL_CALL_STATUS,
-} from "@langwatch/langy";
-import type { LangyConversationProcessingEvent } from "../../schemas/events";
-import {
   type LangyConversationTurnData,
   makeConversationTurnKey,
   parseConversationTurnKey,
 } from "@langwatch/langy";
+import { describe, expect, it } from "vitest";
+import { createTenantId } from "../../../../domain/tenantId";
+import type { StateProjectionStore } from "../../../../projections/stateProjection.types";
+import type { LangyConversationProcessingEvent } from "../../schemas/events";
 import { LangyConversationTurnFoldProjection } from "../langyConversationTurn.foldProjection";
 
 const noopStore: StateProjectionStore<LangyConversationTurnData> = {

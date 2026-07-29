@@ -50,10 +50,7 @@ export interface StateProjectionOptions {
  * ClickHouse fold: direct store load/apply/store, no event-log recovery read,
  * no Redis cache hook, and no projection-attached reactor or outbox.
  */
-export interface StateProjectionDefinition<
-  State,
-  E extends Event = Event,
-> {
+export interface StateProjectionDefinition<State, E extends Event = Event> {
   name: string;
   version: string;
   eventTypes: readonly string[];
@@ -63,4 +60,3 @@ export interface StateProjectionDefinition<
   key?: (event: E) => string;
   options?: StateProjectionOptions;
 }
-

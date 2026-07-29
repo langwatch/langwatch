@@ -677,8 +677,7 @@ async function openRecentOption(pattern: RegExp): Promise<void> {
   const titleButton = within(row)
     .getAllByRole("button")
     .find(
-      (button) =>
-        button.getAttribute("aria-label") !== "Conversation actions",
+      (button) => button.getAttribute("aria-label") !== "Conversation actions",
     );
   expect(titleButton).toBeDefined();
   await userEvent.click(titleButton!);

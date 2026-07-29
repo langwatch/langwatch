@@ -119,7 +119,8 @@ export const SETUP_SUGGESTIONS: LangySuggestion[] = [
   {
     icon: ScanSearch,
     label: "Onboard your agent",
-    prompt: "Help me onboard my agent and send its first trace to this project.",
+    prompt:
+      "Help me onboard my agent and send its first trace to this project.",
     // The first trace arriving is exactly what makes this ask obsolete.
     until: "traces",
   },
@@ -153,9 +154,7 @@ export const SETUP_SUGGESTIONS: LangySuggestion[] = [
  * Kept dry, never cutesy: Langy is a competent teammate having a good day, not
  * a mascot. A fresh one is picked each time the empty state mounts.
  */
-const GREETINGS = [
-  "Hey, I'm Langy!"
-];
+const GREETINGS = ["Hey, I'm Langy!"];
 
 export function EmptyState({
   onPick,

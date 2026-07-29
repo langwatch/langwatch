@@ -175,7 +175,11 @@ vi.mock("~/utils/api", async () => {
       },
       langyGithub: {
         getInstallStatus: {
-          useQuery: () => ({ data: undefined, isLoading: false, isError: true }),
+          useQuery: () => ({
+            data: undefined,
+            isLoading: false,
+            isError: true,
+          }),
         },
         disconnect: {
           useMutation: () => ({ mutate: () => undefined, isPending: false }),
@@ -257,7 +261,8 @@ const lastPropsFor = (messageId: string) =>
   [...rendered]
     .reverse()
     .find(
-      (props) => (props.message as { id?: string } | undefined)?.id === messageId,
+      (props) =>
+        (props.message as { id?: string } | undefined)?.id === messageId,
     );
 
 describe("given a conversation with an open choices card", () => {
@@ -313,9 +318,7 @@ describe("given a conversation with an open choices card", () => {
 
       streamToken("Looking at your traces");
 
-      await waitFor(() =>
-        expect(lastPropsFor("m-question")).not.toBe(before),
-      );
+      await waitFor(() => expect(lastPropsFor("m-question")).not.toBe(before));
       const after = lastPropsFor("m-question")!;
 
       expect(after.onChoiceSelect).toBe(before.onChoiceSelect);

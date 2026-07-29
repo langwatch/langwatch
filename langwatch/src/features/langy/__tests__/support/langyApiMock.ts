@@ -74,9 +74,11 @@ export const withFallback = (explicit: Record<string, unknown>) =>
  * throwing at render. A suite that asserts on a cache invalidation passes
  * `onListInvalidate` and observes it.
  */
-export const createTrpcUtils = (
-  { onListInvalidate }: { onListInvalidate?: (input?: unknown) => void } = {},
-) => ({
+export const createTrpcUtils = ({
+  onListInvalidate,
+}: {
+  onListInvalidate?: (input?: unknown) => void;
+} = {}) => ({
   langy: {
     list: {
       getData: () => undefined,

@@ -69,4 +69,3 @@ export const LANGY_LIVENESS = {
    */
   HEARTBEAT_GRACE_MS: 30_000,
 } as const;
-

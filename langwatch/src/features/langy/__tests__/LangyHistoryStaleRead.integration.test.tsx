@@ -479,7 +479,10 @@ describe("a failed read of an open conversation's history", () => {
           expect(document.body.textContent).toContain(QUESTION),
         );
 
-        setHistory({ errored: true, errorCode: "langy_conversation_not_found" });
+        setHistory({
+          errored: true,
+          errorCode: "langy_conversation_not_found",
+        });
 
         await waitFor(() =>
           expect(
@@ -499,7 +502,10 @@ describe("a failed read of an open conversation's history", () => {
           expect(document.body.textContent).toContain(QUESTION),
         );
 
-        setHistory({ errored: true, errorCode: "langy_conversation_not_owned" });
+        setHistory({
+          errored: true,
+          errorCode: "langy_conversation_not_owned",
+        });
 
         await waitFor(() =>
           expect(

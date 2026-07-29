@@ -4,9 +4,9 @@ import { describe, expect, it, vi } from "vitest";
 
 import { reapExpiredLangySessionApiKeys } from "~/server/app-layer/langy/langyApiKey";
 import {
+  guardOrganizationId,
   ORG_SCOPED_MODEL_NAMES,
   ORG_TENANCY_EXEMPT,
-  guardOrganizationId,
 } from "../dbOrganizationIdProtection";
 
 /**
@@ -42,7 +42,9 @@ describe("guardOrganizationId — original three models preserved", () => {
           model: "OrganizationUser",
           action: "findUnique",
           args: {
-            where: { userId_organizationId: { userId: "u_1", organizationId: "org_1" } },
+            where: {
+              userId_organizationId: { userId: "u_1", organizationId: "org_1" },
+            },
           },
         }),
       ).resolves.toBe("ok");
@@ -92,7 +94,9 @@ describe("guardOrganizationId — original three models preserved", () => {
           model: "CustomRole",
           action: "upsert",
           args: {
-            where: { organizationId_name: { organizationId: "org_1", name: "auditor" } },
+            where: {
+              organizationId_name: { organizationId: "org_1", name: "auditor" },
+            },
             create: { name: "auditor", permissions: [] },
             update: {},
           },
@@ -108,8 +112,14 @@ describe("guardOrganizationId — original three models preserved", () => {
           model: "CustomRole",
           action: "upsert",
           args: {
-            where: { organizationId_name: { organizationId: "org_1", name: "auditor" } },
-            create: { organizationId: "org_1", name: "auditor", permissions: [] },
+            where: {
+              organizationId_name: { organizationId: "org_1", name: "auditor" },
+            },
+            create: {
+              organizationId: "org_1",
+              name: "auditor",
+              permissions: [],
+            },
             update: {},
           },
         }),
@@ -153,10 +163,7 @@ describe("guardOrganizationId — single-organization invariant", () => {
           action: "findMany",
           args: {
             where: {
-              OR: [
-                { organizationId: "org_1" },
-                { organizationId: "org_2" },
-              ],
+              OR: [{ organizationId: "org_1" }, { organizationId: "org_2" }],
             },
           },
         }),
@@ -269,7 +276,11 @@ describe("guardOrganizationId — audited real query shapes pass", () => {
         runGuard({
           model: "Group",
           action: "findUnique",
-          args: { where: { organizationId_slug: { organizationId: "org_1", slug: "eng" } } },
+          args: {
+            where: {
+              organizationId_slug: { organizationId: "org_1", slug: "eng" },
+            },
+          },
         }),
       ).resolves.toBe("ok");
     });
@@ -313,7 +324,9 @@ describe("guardOrganizationId — unguarded models are ignored", () => {
  */
 describe("organization-tenancy regime partition", () => {
   const orgBearingModels = Prisma.dmmf.datamodel.models
-    .filter((model) => model.fields.some((field) => field.name === "organizationId"))
+    .filter((model) =>
+      model.fields.some((field) => field.name === "organizationId"),
+    )
     .map((model) => model.name);
 
   it("covers every org-bearing model with exactly one regime", () => {
@@ -475,7 +488,10 @@ describe("guardOrganizationId — platform-owned API-key sweeps", () => {
 
   describe("when an updateMany keeps an expiresAt clause but drops its elapsed bound", () => {
     it("THROWS — 'has an expiry' still names live keys; only 'already passed' does not", async () => {
-      const where = { ...(await captureSweepWhere()), expiresAt: { not: null } };
+      const where = {
+        ...(await captureSweepWhere()),
+        expiresAt: { not: null },
+      };
 
       await expect(
         runGuard({

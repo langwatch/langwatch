@@ -20,23 +20,24 @@
  * such calls in the generic activity collapser (so a settled search never shows
  * both a "Analysing traces" line AND a traces card).
  */
+
+import { VStack } from "@chakra-ui/react";
 import {
   asJsonDocument,
+  type CliToolResult,
   namesCreatedResource,
   parseCliToolResult,
   toCliToolResult,
-  type CliToolResult,
 } from "@langwatch/langy";
-import { VStack } from "@chakra-ui/react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { digestOfToolCall } from "../../logic/langyCapabilityDigest";
 import { LangyCardBoundary } from "../LangyCardBoundary";
 import {
+  type CapabilityCardInput,
+  type CapabilityDescriptor,
   isProposalOutput,
   resolveCapability,
   withDecidedCard,
-  type CapabilityCardInput,
-  type CapabilityDescriptor,
 } from "./capabilityRegistry";
 import { deriveFollowUpChips } from "./followUpChips";
 import { LangyDatasetCard } from "./LangyDatasetCard";
@@ -44,8 +45,8 @@ import { LangyDeclarativeCard } from "./LangyDeclarativeCard";
 import { LangyEvalRunCard } from "./LangyEvalRunCard";
 import { LangyFollowUpChips } from "./LangyFollowUpChips";
 import { LangyMetricsCard } from "./LangyMetricsCard";
-import { LangyTimeseriesCard } from "./LangyTimeseriesCard";
 import { LangyScenarioCard } from "./LangyScenarioCard";
+import { LangyTimeseriesCard } from "./LangyTimeseriesCard";
 import { LangyTraceSampleCard } from "./LangyTraceSampleCard";
 import { LangyTracesCard } from "./LangyTracesCard";
 

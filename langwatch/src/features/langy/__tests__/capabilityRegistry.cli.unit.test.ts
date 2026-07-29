@@ -6,7 +6,7 @@ import { CAPABILITY_CATALOG } from "../components/capabilities/capabilityCatalog
 import {
   buildResourceHref,
   buildSurfaceHref,
-    resolveCapability,
+  resolveCapability,
   SURFACE_BY_FEATURE,
   withDecidedCard,
 } from "../components/capabilities/capabilityRegistry";

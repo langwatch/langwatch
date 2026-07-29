@@ -116,7 +116,9 @@ describe("resolveLangyPrompt", () => {
       expect(LANGY_TURN_OVERRIDE_FALLBACK).toContain(
         "you are Langy, the in-product LangWatch assistant.",
       );
-      expect(LANGY_TURN_OVERRIDE_FALLBACK).toContain("never hand the work back");
+      expect(LANGY_TURN_OVERRIDE_FALLBACK).toContain(
+        "never hand the work back",
+      );
     });
 
     // The cards ARE the record of what happened. Prose that repeats them is a

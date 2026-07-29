@@ -10,7 +10,6 @@ import { postSlackChatMessage } from "~/server/app-layer/automations/delivery/sl
 import { liveTriggerNotifier } from "~/server/app-layer/automations/delivery/triggerNotifier";
 import { LangyCredentialService } from "~/server/app-layer/langy/LangyCredentialService";
 import { LangyFeedbackPromptService } from "~/server/app-layer/langy/langy-feedback-prompt.service";
-import { PromptService } from "~/server/prompt-config/prompt.service";
 import {
   mintLangySessionApiKey,
   revokeLangySessionApiKey,
@@ -43,6 +42,7 @@ import {
 import { LANGY_CHAT_FEATURE_KEY } from "~/server/modelProviders/codexRestrictions";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
 import { getPostHogInstance } from "~/server/posthog";
+import { PromptService } from "~/server/prompt-config/prompt.service";
 import { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
 import { createS3Client } from "~/server/storage";
 import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";

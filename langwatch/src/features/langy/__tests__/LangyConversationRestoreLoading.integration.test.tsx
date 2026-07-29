@@ -213,9 +213,14 @@ vi.mock("~/utils/api", async () => {
         useQuery: (
           input: { projectId: string; conversationId: string },
           opts?: { enabled?: boolean },
-        ) => useHeldHistoryQuery(opts?.enabled !== false && !!input.conversationId),
+        ) =>
+          useHeldHistoryQuery(
+            opts?.enabled !== false && !!input.conversationId,
+          ),
       },
-      stopTurn: { useMutation: () => ({ mutateAsync: () => Promise.resolve() }) },
+      stopTurn: {
+        useMutation: () => ({ mutateAsync: () => Promise.resolve() }),
+      },
       onConversationUpdate: { useSubscription: () => undefined },
     }),
     useUtils: () => trpcUtils,

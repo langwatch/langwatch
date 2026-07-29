@@ -26,7 +26,6 @@ import { LANGY_CONVERSATION_STATUS } from "@langwatch/langy";
 import { createLogger } from "@langwatch/observability";
 import { trace } from "@opentelemetry/api";
 import type { LangyCredentialService } from "~/server/app-layer/langy/LangyCredentialService";
-import type { PromptService } from "~/server/prompt-config/prompt.service";
 import { LangySessionKeyScopeError } from "~/server/app-layer/langy/langyApiKey";
 import {
   extractLangyConversationMemory,
@@ -52,6 +51,7 @@ import type { LangyTurnAccessStore } from "~/server/app-layer/langy/streaming/la
 import type { LangyTurnHandoffStore } from "~/server/app-layer/langy/streaming/langyTurnHandoff";
 import type { Session } from "~/server/auth";
 import { getLangyTurnsCounter } from "~/server/metrics";
+import type { PromptService } from "~/server/prompt-config/prompt.service";
 import {
   LangyAgentUnavailableError,
   LangyConversationNotOwnedError,

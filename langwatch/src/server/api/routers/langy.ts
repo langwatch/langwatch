@@ -1,7 +1,8 @@
 import { on } from "node:events";
 import { ValidationError } from "@langwatch/handled-error";
-import { TRPCError } from "@trpc/server";
+import { LANGY_CONVERSATION_STATUS } from "@langwatch/langy";
 import { createLogger } from "@langwatch/observability";
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
@@ -24,19 +25,13 @@ import {
   createLangyTokenBuffer,
   type LangyStreamEntry,
 } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
-import { decideSyntheticTerminal } from "~/server/app-layer/langy/streaming/langyTurnSettlement";
 import { createLangyTurnAccessStore } from "~/server/app-layer/langy/streaming/langyTurnAccess";
-
+import { decideSyntheticTerminal } from "~/server/app-layer/langy/streaming/langyTurnSettlement";
 import type { Session } from "~/server/auth";
-import { LANGY_CONVERSATION_STATUS } from "@langwatch/langy";
 import { checkLangyMessageRateLimit } from "~/server/middleware/rate-limit-langy";
 import { trackServerEvent } from "~/server/posthog";
 import { connection } from "~/server/redis";
 import { checkProjectPermission, type Permission } from "../rbac";
-import {
-  enforceLangyAccess,
-  refuseDemoProject,
-} from "./langyAccessMiddleware";
 import {
   type LangyConversationDetailDto,
   type LangyConversationListCursorDto,
@@ -49,6 +44,7 @@ import {
   langyMessageRoleSchema,
   langyMessageSchema,
 } from "./langy.schemas";
+import { enforceLangyAccess, refuseDemoProject } from "./langyAccessMiddleware";
 
 const logger = createLogger("langwatch:langy:router");
 
@@ -611,7 +607,8 @@ export const langyRouter = createTRPCRouter({
       // practice this branch is unreachable. It stays because the return type
       // permits null and a silent `undefined` detail would be worse than a
       // redundant throw.
-      if (!detail) throw new LangyConversationNotFoundError(input.conversationId);
+      if (!detail)
+        throw new LangyConversationNotFoundError(input.conversationId);
       return toDetailDto(detail);
     }),
 
@@ -661,7 +658,8 @@ export const langyRouter = createTRPCRouter({
    * `LangyConversationNotOwnedError` for someone else's conversation.
    */
   continueConversation: langyTurnProcedure
-    .input(z.object({
+    .input(
+      z.object({
         conversationId: z.string().min(1),
         ...langyTurnInputShape,
       }),
@@ -983,7 +981,7 @@ export const langyRouter = createTRPCRouter({
             // minutes, so a rejection would sit unhandled until then — and Node's
             // default --unhandled-rejections=throw would take the process down
             // first. A failed watcher just means no synthesized terminal.
-            .catch(() => {});
+            .catch(() => undefined);
 
           try {
             for await (const { entry } of buffer.follow({

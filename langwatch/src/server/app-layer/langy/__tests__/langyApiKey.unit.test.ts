@@ -401,7 +401,11 @@ describe("revokeLangySessionApiKey", () => {
         });
 
         await expect(
-          revokeLangySessionApiKey({ prisma: p, apiKeyId: "k1", projectId: "p1" }),
+          revokeLangySessionApiKey({
+            prisma: p,
+            apiKeyId: "k1",
+            projectId: "p1",
+          }),
         ).resolves.toBe("revoked");
 
         expect(p.apiKey.update).toHaveBeenCalledWith({
@@ -425,7 +429,11 @@ describe("revokeLangySessionApiKey", () => {
         });
 
         await expect(
-          revokeLangySessionApiKey({ prisma: p, apiKeyId: "k2", projectId: "p1" }),
+          revokeLangySessionApiKey({
+            prisma: p,
+            apiKeyId: "k2",
+            projectId: "p1",
+          }),
         ).resolves.toBe("refused");
 
         expect(p.apiKey.update).not.toHaveBeenCalled();

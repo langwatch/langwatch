@@ -16,17 +16,18 @@
  * On instance death the worker reconnects and re-pushes from the stream's last
  * id; redelivered frames are dropped by the dedup set. Never expose publicly.
  */
+
+import { createLogger } from "@langwatch/observability";
 import { createServiceApp, internalSecret } from "~/server/api/security";
 import { getApp } from "~/server/app-layer/app";
-import { connection } from "~/server/redis";
 import { createLangyFrameDedup } from "~/server/app-layer/langy/streaming/langyFrameDedup";
 import { resolveNavigateFallbackUrl } from "~/server/app-layer/langy/streaming/langyNavigateFallback";
 import { createLangyResourceLinkStore } from "~/server/app-layer/langy/streaming/langyResourceLinks";
 import { createLangyTokenBuffer } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
 import { createLangyTurnHandoffStore } from "~/server/app-layer/langy/streaming/langyTurnHandoff";
 import { LangyTurnRelay } from "~/server/app-layer/langy/streaming/langyTurnRelay";
-import { createLogger } from "@langwatch/observability";
 import { getLangyRelayFramesCounter } from "~/server/metrics";
+import { connection } from "~/server/redis";
 import { verifyLangyInternalSecret } from "./langy-internal";
 
 const logger = createLogger("langwatch:langy:relay");
