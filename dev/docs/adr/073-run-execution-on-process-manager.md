@@ -175,14 +175,19 @@ is deleted. This is the invasive half: it moves the execution path for a feature
 that costs money per run, and it is worth landing only once step 1 has proven
 the deadline arithmetic in production.
 
-### What is deleted
+### What is deleted, and when
 
+**Step 1** stops the two boot sweeps being the mechanism:
 `scenario-orphan-reconciler.ts`, `orphaned-run-reconciliation.ts` and
-`orphaned-run-reconciliation.clickhouse.ts` with their boot wiring; the
-read-time `STALLED` derivation in `stall-detection.ts`; the pending queue and
-drain path in `ScenarioExecutionPool`; and the dead `SCENARIO_QUEUE` constants
-left over from BullMQ, which no longer has a producer or a consumer anywhere
-in the codebase.
+`orphaned-run-reconciliation.clickhouse.ts` keep their boot wiring, but only as
+a one-time drain for runs already stuck when this deploys — the process manager
+arms deadlines from live events and cannot see that population. They are
+deleted one release later, when no run predating it can still be open.
+
+**Step 2** deletes the rest: the read-time `STALLED` derivation in
+`stall-detection.ts`; the pending queue and drain path in
+`ScenarioExecutionPool`; and the dead `SCENARIO_QUEUE` constants left over from
+BullMQ, which no longer has a producer or a consumer anywhere in the codebase.
 
 `STALLED` survives as a *stored* status written by `failRun`, so a stalled run
 is a fact in ClickHouse rather than a function of when someone looked at it.

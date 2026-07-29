@@ -226,18 +226,22 @@ const FAKE_NOW = 99999;
 
 describe("batch denominator", () => {
   describe("given a run queued as part of a batch", () => {
-    it("records the size the batch set out to queue", () => {
-      const state = foldEvents([createRunQueuedEvent({ batchTotal: 6 })]);
+    describe("when the queued event is folded", () => {
+      it("records the size the batch set out to queue", () => {
+        const state = foldEvents([createRunQueuedEvent({ batchTotal: 6 })]);
 
-      expect(state.BatchTotal).toBe(6);
+        expect(state.BatchTotal).toBe(6);
+      });
     });
   });
 
   describe("given a run queued before the denominator was carried", () => {
-    it("records an unknown size rather than guessing one", () => {
-      const state = foldEvents([createRunQueuedEvent()]);
+    describe("when the queued event is folded", () => {
+      it("records an unknown size rather than guessing one", () => {
+        const state = foldEvents([createRunQueuedEvent()]);
 
-      expect(state.BatchTotal).toBe(0);
+        expect(state.BatchTotal).toBe(0);
+      });
     });
   });
 
