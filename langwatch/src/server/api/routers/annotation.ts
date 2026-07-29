@@ -257,8 +257,19 @@ export const annotationRouter = createTRPCRouter({
           },
           projectId: input.projectId,
         },
+        // Only what the UI renders. `include: { user: true }` returned every
+        // User column — email, emailVerified, lastLoginAt, deactivatedAt — and
+        // there is no output schema on this procedure, so all of it reached
+        // the browser for every annotation on screen. Mirrors the sibling
+        // getByTraceId above, which already selects narrowly.
         include: {
-          user: true,
+          user: {
+            select: {
+              id: true,
+              name: true,
+              image: true,
+            },
+          },
         },
         orderBy: {
           createdAt: "asc",
