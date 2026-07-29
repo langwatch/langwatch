@@ -12,14 +12,16 @@ import { SecretsIndicator } from "../SecretsIndicator";
 let mockSecrets: Array<{ id: string; name: string }> = [];
 let mockIsLoading = false;
 
+// Reads the options argument rather than discarding it, so the popover's
+// `enabled: open` gating is observable to the assertions below.
+const { mockSecretsListQuery } = vi.hoisted(() => ({
+  mockSecretsListQuery: vi.fn(),
+}));
 vi.mock("~/utils/api", () => ({
   api: {
     secrets: {
       list: {
-        useQuery: vi.fn(() => ({
-          data: mockSecrets,
-          isLoading: mockIsLoading,
-        })),
+        useQuery: mockSecretsListQuery,
       },
     },
   },
@@ -49,6 +51,11 @@ describe("<SecretsIndicator />", () => {
     mockSecrets = [];
     mockIsLoading = false;
     mockOnInsertSecret.mockClear();
+    mockSecretsListQuery.mockReset();
+    mockSecretsListQuery.mockImplementation(() => ({
+      data: mockSecrets,
+      isLoading: mockIsLoading,
+    }));
   });
 
   it("renders the trigger button with key icon", () => {
@@ -57,7 +64,32 @@ describe("<SecretsIndicator />", () => {
     expect(screen.getByText("Secrets")).toBeInTheDocument();
   });
 
+  describe("when the popover has not been opened", () => {
+    it("does not enable the secrets query", () => {
+      renderIndicator();
+
+      expect(mockSecretsListQuery).toHaveBeenCalledWith(
+        expect.objectContaining({ projectId: "test-project-id" }),
+        expect.objectContaining({ enabled: false }),
+      );
+    });
+  });
+
   describe("when clicked", () => {
+    it("enables the secrets query", async () => {
+      const user = userEvent.setup();
+      renderIndicator();
+
+      await user.click(screen.getByTestId("secrets-indicator"));
+
+      await waitFor(() => {
+        expect(mockSecretsListQuery).toHaveBeenLastCalledWith(
+          expect.objectContaining({ projectId: "test-project-id" }),
+          expect.objectContaining({ enabled: true }),
+        );
+      });
+    });
+
     it("shows usage hint at the bottom of the popover", async () => {
       const user = userEvent.setup();
       renderIndicator();
