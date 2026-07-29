@@ -1,12 +1,12 @@
-# ADR-058: Langy user-initiated turn controls — stop for real, continue, resume-on-refresh
+# ADR-078: Langy user-initiated turn controls — stop for real, continue, resume-on-refresh
 
 **Date:** 2026-07-21
 
 **Status:** Accepted
 
-**Builds on:** ADR-044 (event-driven turns: Redis token buffer + liveness),
+**Builds on:** the event-driven-turns design (Redis token buffer + liveness),
 ADR-046 (event-sourced conversations: the `langy_conversation` aggregate, the
-`agent_responded` terminal, the one-terminal-per-turn idempotency slot), ADR-048
+`agent_responded` terminal, the one-terminal-per-turn idempotency slot), ADR-077
 (dual-stream + "the buffered tail is the resume state"), ADR-049 (Postgres
 operational projections). Adds three USER-initiated controls; changes none of
 those transports.
@@ -28,7 +28,7 @@ control of one in-flight turn:
 2. **Continue a stopped chat.** With no real stop there is no real resume. Even the
    conversation lifecycle has no notion of "the user stopped here."
 
-3. **Carry on after a refresh.** ADR-048 made the durable token buffer the resume
+3. **Carry on after a refresh.** ADR-077 made the durable token buffer the resume
    state and the server already settles a turn whose terminal frame was missed
    (`langyTurnSettlement.ts`), but the browser never *rejoins* a running turn on a
    cold mount — `reconnectToStream()` returns null and the "Catching up…" state is
@@ -184,3 +184,15 @@ and the panel renders the final/stopped answer instead of reattaching to nothing
 3. **Continue depth.** V1 continues by re-driving against durable history. Reusing
    the ADR-048 handoff/`revive` machinery to resume the *same* opencode session
    (preserving in-memory context past a hard cancel) is a later enhancement.
+
+## References
+
+- [`specs/langy/langy-stop-and-resume.feature`](../../../specs/langy/langy-stop-and-resume.feature)
+  — the behavioural contract for stop / continue / resume.
+- `langwatch/prisma/migrations/20260722060000_langy_turn_status_text/migration.sql`
+  — drops the turn-status enum in favour of TEXT, driven by the `stopped` status
+  this ADR introduces. **Its comment cites this ADR as "ADR-058".** That number
+  predates the renumber that moved this document from 058 to 078; live ADR-058 is
+  now `058-full-stack-trace-correlation-browser-rum.md`, an unrelated subject.
+  Merged migrations are immutable in this repo even for comments, so the stale
+  pointer stays where it is and is corrected from here instead.

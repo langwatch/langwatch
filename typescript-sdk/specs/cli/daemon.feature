@@ -57,6 +57,23 @@ Feature: CLI daemon mode
       When I run "trace search --format json"
       Then the daemon serves the command
 
+    @unit
+    Scenario: A command reads the caller's standard input
+      Given a daemon is running
+      And no TTY is attached to any of my streams
+      But I am piping data into the CLI
+      When I run "dataset records add my-dataset --stdin"
+      Then the command runs in-process
+      And every record I piped in is added, exactly as with no daemon running
+
+    @unit
+    Scenario: A command asks me a question at a prompt
+      Given a daemon is running
+      And no TTY is attached to any of my streams
+      When I run a command that confirms before it destroys something
+      Then the command runs in-process
+      And it does not hang waiting for an answer nobody can give it
+
     Scenario Outline: Commands that must never be served by the daemon
       Given a daemon is running
       When I run "<command>"

@@ -15,9 +15,9 @@ render on the event-sourced frontend)
 > `blockId` — and the scanner/salvage/preview code now sits under
 > `packages/langy/src/inline-channel`. Read "block" below as "a card Langy wrote".
 
-**Builds on:** ADR-059 (card selection is deterministic — §5 sketched the
+**Builds on:** ADR-079 (card selection is deterministic — §5 sketched the
 model's typed-data channel this ADR now specifies), ADR-059 (event-sourced
-Langy frontend — the durable event stream these cards must live in), ADR-058
+Langy frontend — the durable event stream these cards must live in), ADR-078
 (turn lifecycle — which this ADR deliberately does not extend).
 
 **Specs:** `specs/langy/langy-derived-cards.feature`,
@@ -25,7 +25,7 @@ Langy frontend — the durable event stream these cards must live in), ADR-058
 
 ## Context
 
-ADR-059 (card determinism) settled who decides presentation: a pure function
+ADR-079 (card determinism) settled who decides presentation: a pure function
 at the command boundary, never the model. It also named what the model was
 left without — any legitimate channel to contribute *data* to a card — and
 sketched one (`langwatch present`) that was never built, with the amendment
@@ -49,7 +49,7 @@ Two needs have since become pressing:
 The transport question has a live reference point. Claude's own surfaces
 (artifacts, streamed tool inputs) do not use API-level structured outputs for
 this; they parse **generated JSON on the fly**, tolerantly, as it streams.
-ADR-059 already catalogued why API structured outputs are the wrong tool for
+ADR-079 already catalogued why API structured outputs are the wrong tool for
 a presentation channel (enum-casing escapes, refusal/max_tokens holes); this
 ADR adopts the streaming-JSON transport — with the one scar this codebase
 carries kept firmly in view: the panel once parsed prose sentinels to drive
@@ -77,7 +77,7 @@ stream — extracts the block, salvages its JSON, validates it against the
 block kind's schema, and emits it as a **typed part** in the durable event
 stream, exactly as tool results already travel. The browser never parses
 fences out of text; time travel replays the same stamped part; the event log
-is the record. This is ADR-059 §1's "one decision point", applied to a second
+is the record. This is ADR-079 §1's "one decision point", applied to a second
 entry path.
 
 Structurally, only assistant-generated stream parts are scanned for fences.
@@ -107,13 +107,13 @@ assert records that were never searched for. Now that measured and derived
 cards share one kind list, that exclusion is enforced by construction:
 every kind is classified `resource` or `presentation` at declaration, and the
 allowlist is typed as presentation-only, so widening it is a type error rather
-than an omission (see `cards/derived-safe.ts`). This answers ADR-059's open
+than an omission (see `cards/derived-safe.ts`). This answers ADR-079's open
 question conservatively.
 
 ### 4. Provenance chrome is always on, and computation still belongs to the platform
 
 Every model-emitted card renders in visibly distinct "derived" chrome. A
-derived number must never pass as a measured one (ADR-059 §6) — the chrome is
+derived number must never pass as a measured one (ADR-079 §6) — the chrome is
 the enforcement, styled once in the card frame, not per-card. This is also
 the v1 injection posture: with only structural fence-scanning (§1) as
 transport defense, the chrome guarantees a spoofed or model-confused block
@@ -148,7 +148,7 @@ it. The model never authors a URL, an action, or a component. v1 vocabulary:
 `{ question, options: [{ id, label, description?, ref? }], multiSelect?,
 allowOther? }` renders as a selectable card. Decisions:
 
-- **The question ends the turn.** No new phase in the ADR-058 machine, no
+- **The question ends the turn.** No new phase in the ADR-078 machine, no
   parked worker. The agent asks as the tail of its reply; the turn settles;
   the selection arrives as the next user message. Stop, resume, refresh and
   replay all work unchanged because nothing about the turn lifecycle changed.
@@ -188,14 +188,14 @@ A block that cannot be salvaged, or fails validation, renders as a collapsed
 one-line disclosure ("Langy tried to draw a chart here — view raw") that
 expands to the raw fenced text. Never a guessed card, never silent removal
 of content the model produced — a failure may never be quieter than a
-success. Salvage and validation failures are counted, like ADR-059's probe
+success. Salvage and validation failures are counted, like ADR-079's probe
 misses: that counter is the drift alarm for prompt regressions in block
 emission.
 
 ## Rationale / Trade-offs
 
 **Why in-stream rather than `langwatch present`.** The CLI command remains
-the most attributable transport (a visible tool call), and §5 of ADR-059 is
+the most attributable transport (a visible tool call), and §5 of ADR-079 is
 not repealed — but a card that cannot sit mid-sentence, costs a shell
 round-trip, and cannot stream its build-up serves the reply-flow use badly.
 The relay stamp preserves what `present` would have bought — schema
@@ -249,11 +249,11 @@ validator is what keeps it from adding a second truth.
 
 ## References
 
-- ADR-059 (card determinism) — §5 typed channel, §7 bounded hint, amendment
+- ADR-079 (card determinism) — §5 typed channel, §7 bounded hint, amendment
   on `present` not existing.
 - ADR-059 (event-sourced frontend) — the durable stream and shared-fold
   architecture these parts ride.
-- ADR-058 — the turn lifecycle deliberately left unchanged by §6.
+- ADR-078 — the turn lifecycle deliberately left unchanged by §6.
 - ADR-050 — prompt registry and the eval obligation for prompt-resting rules.
 - Anthropic — structured outputs and the documented limits of the guarantee:
   https://platform.claude.com/docs/en/build-with-claude/structured-outputs

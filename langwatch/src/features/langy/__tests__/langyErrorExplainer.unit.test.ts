@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   explainLangyError,
+  isStaleLangyHistoryRead,
   KNOWN_LANGY_ERROR_KINDS,
   type LangyDomainError,
   readLangyStreamError,
@@ -54,6 +55,10 @@ describe("KNOWN_LANGY_ERROR_KINDS", () => {
       "langy_egress_misconfigured",
       "langy_insufficient_scope",
       "langy_turn_in_progress",
+      // Sending faster than the per-user limit allows: without an entry here it
+      // fell into the generic default, which tells a throttled user Langy is
+      // broken and offers a retry into the same limit.
+      "langy_rate_limited",
       // Codex (sign-in-with-OpenAI): dead OAuth session / ChatGPT plan limit,
       // promoted off the agent-errored reason chain by exact reason code.
       "langy_codex_session_expired",
@@ -404,8 +409,42 @@ describe("explainLangyError", () => {
       expect(presentation.title).toBe("Langy is still replying");
       expect(presentation.action).toBeUndefined();
       // A wait, not a turn failure: a dismissable notice attached above the
-      // composer that keeps the user's draft — not a red history card (ADR-058).
+      // composer that keeps the user's draft — not a red history card (ADR-078).
       expect(presentation.render).toBe("composer-notice");
+    });
+  });
+
+  describe("given the sender tripped the per-user message limit", () => {
+    describe("when the refusal is explained", () => {
+      it("asks for patience without a retry, and never claims Langy is broken", () => {
+        const generic = explainLangyError(domain({ code: "some_new_kind" }));
+        const presentation = explainLangyError(
+          domain({
+            code: "langy_rate_limited",
+            httpStatus: 429,
+            // The server puts its sentence here because `serialize()` drops the
+            // HandledError message; before this kind had copy, that sentence
+            // was the ONLY correct thing on an otherwise wrong card.
+            meta: { message: "Too many messages. Please slow down." },
+          }),
+        );
+
+        // The copy has to name THROTTLING, not just differ from the generic
+        // card: "Something went wrong" is exactly the wrong story for a
+        // message that was refused because it arrived too fast.
+        expect(presentation.title).toBe("You're sending messages too quickly");
+        expect(presentation.description).toContain("in a few seconds");
+        // ...and it has to say the draft survived, because it does — the notice
+        // rides above the composer with the message still in the box.
+        expect(presentation.description).toContain("still in the box");
+        expect(presentation.title).not.toBe(generic.title);
+        // A retry is the one action that makes throttling worse — it spends
+        // another request against the limit that just refused this one.
+        expect(presentation.action).toBeUndefined();
+        // A wait, not a turn failure: it rides above the composer and keeps the
+        // user's draft, rather than a red card in the transcript.
+        expect(presentation.render).toBe("composer-notice");
+      });
     });
   });
 
@@ -418,6 +457,104 @@ describe("explainLangyError", () => {
       expect(presentation.title).toBe("Something went wrong");
       expect(presentation.traceId).toBe("abc123");
       expect(presentation.action?.kind).toBe("retry");
+      expect(presentation.description).toContain("share the id below");
+    });
+
+    it("never prints `unknown` as if it were a domain code", () => {
+      // The card renders `code` ungated, so setting it here put the literal
+      // word "unknown" under the message — a mono line that names nothing,
+      // offered to the reader as the thing to quote to support.
+      const presentation = explainLangyError(domain({ code: "unknown" }));
+
+      expect(presentation.code).toBeUndefined();
+    });
+
+    describe("when the failure carries no trace id", () => {
+      it("stops at 'Try again' instead of promising details it has none of", () => {
+        // An untyped browser failure (`Error("Failed to fetch")`) resolves to
+        // `unknown` with no trace id, so there is nothing below the message at
+        // all — and the card was still telling the reader to share it.
+        const presentation = explainLangyError(domain({ code: "unknown" }));
+
+        expect(presentation.description).not.toContain("below");
+        expect(presentation.description).toContain("Try again.");
+      });
+    });
+  });
+});
+
+describe("isStaleLangyHistoryRead", () => {
+  /**
+   * The panel demotes a failed history read to a one-line footnote whenever
+   * there is content on screen, so a 3s poll blip mid-turn cannot wipe an
+   * answer that is still streaming. That rule asked only whether anything was
+   * visible, never which failure had arrived.
+   */
+  const readFailedWith = (code: string) =>
+    explainLangyError(domain({ code, httpStatus: 404 }));
+
+  describe("given the transcript is still on screen", () => {
+    describe("when the failure is one the next poll might clear", () => {
+      it("demotes it to the quiet line", () => {
+        expect(
+          isStaleLangyHistoryRead({
+            presentation: readFailedWith("clickhouse_unavailable"),
+            hasContentOnScreen: true,
+          }),
+        ).toBe(true);
+      });
+    });
+
+    describe("when the conversation is gone", () => {
+      it("refuses to demote it", () => {
+        // Deleted from another tab: every poll from here on answers the same
+        // thing, and the engine still holds the messages. Demoted, the reader
+        // goes on reading a conversation that no longer exists, with no retry
+        // and no next step, forever.
+        expect(
+          isStaleLangyHistoryRead({
+            presentation: readFailedWith("langy_conversation_not_found"),
+            hasContentOnScreen: true,
+          }),
+        ).toBe(false);
+      });
+    });
+
+    describe("when the conversation is someone else's", () => {
+      it("refuses to demote it", () => {
+        expect(
+          isStaleLangyHistoryRead({
+            presentation: readFailedWith("langy_conversation_not_owned"),
+            hasContentOnScreen: true,
+          }),
+        ).toBe(false);
+      });
+    });
+  });
+
+  describe("given nothing is on screen to protect", () => {
+    describe("when even a transient failure arrives", () => {
+      it("lets it own the column", () => {
+        expect(
+          isStaleLangyHistoryRead({
+            presentation: readFailedWith("clickhouse_unavailable"),
+            hasContentOnScreen: false,
+          }),
+        ).toBe(false);
+      });
+    });
+  });
+
+  describe("given the read succeeded", () => {
+    describe("when there is no failure to explain at all", () => {
+      it("has nothing to say", () => {
+        expect(
+          isStaleLangyHistoryRead({
+            presentation: null,
+            hasContentOnScreen: true,
+          }),
+        ).toBe(false);
+      });
     });
   });
 });

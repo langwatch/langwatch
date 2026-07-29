@@ -82,7 +82,7 @@ type Config struct {
 	// deadline can never eat the drain budget out from under the kill.
 	ShutdownDrainBudgetMS int64 `env:"LANGY_SHUTDOWN_DRAIN_BUDGET_MS" validate:"gte=0"`
 
-	// Egress enforcement (ADR-043). These configure the per-worker egress
+	// Egress enforcement (ADR-076). These configure the per-worker egress
 	// forward proxy the manager spawns for each worker (see adapters/egress).
 	//
 	// EgressFqdnFloor is the operator-owned always-allowed set (github /
@@ -188,7 +188,7 @@ func defaultConfig() Config {
 		OpenCodeBinaryPath:        "opencode",
 		ShutdownHandoffDeadlineMS: defaultShutdownHandoffDeadlineMS,
 		ShutdownDrainBudgetMS:     defaultShutdownDrainBudgetMS,
-		// ADR-043 rung 1a + SNI cross-check are the always-safe rungs; both
+		// ADR-076 rung 1a + SNI cross-check are the always-safe rungs; both
 		// default ON. Unset env leaves these defaults (Hydrate skips empty env),
 		// so an install that configures nothing still requires TLS and cross-
 		// checks SNI. EgressEnforceFloor defaults OFF (zero value) — the floor

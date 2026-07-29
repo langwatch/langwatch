@@ -12,14 +12,13 @@ Spec: `specs/langy/langy-context-awareness.feature` (page-side gesture) and
 
 | Piece | Where |
 |---|---|
-| Target registry + picks + reveal | `stores/langyContextTargetStore.ts` |
+| Target registry, picks, spotlight (+ the orphaned reveal — see below) | `stores/langyContextTargetStore.ts` |
 | Opt-in hook / wrapper | `hooks/useLangyContextTarget.ts`, `components/LangyContextTarget.tsx` |
 | Pointer proximity + the one "Absorb context" button | `components/LangyContextTargetLayer.tsx` |
 | The visual (ring, shimmer, reduced-motion) | `langyContextTarget.css` |
 | Chip identity (one resource = one chip id) | `logic/langyContextChips.ts` |
 | Chip composition per page | `hooks/useLangyPageContext.ts` (+ drawer / selection / filter sub-hooks) |
-| `#trace` kind intents | `logic/langyContextKindIntent.ts` |
-| First-time hint | `components/LangyContextDiscoveryHint.tsx`, `logic/langyContextDiscovery.ts` |
+| The `#` palette (and its `/` twin) | `components/LangyComposerPalette.tsx` |
 | The wire + prompt rendering | `server/app-layer/langy/langyTurnContext.schema.ts` |
 
 ## The affordance: a proximity field, not a page-wide glow
@@ -74,31 +73,42 @@ The pointer route and the keyboard route teach each other:
 
 - `#` lists the chips in reach AND an "On this page" group — everything
   registered as a target that isn't already a chip. Picking one absorbs it.
-- `#trace` (or `#datasets`, `#evals`…) when the query names a KIND rather than
-  a resource appends an intent row:
-  - targets of that kind are on this page → **"Show traces on this page"**:
-    the matching targets light up for a moment (`requestReveal`, the `near`
-    ring, ~2.6s, capped at 30) so the user sees what can be taken;
-  - none here → **"Browse traces"**: navigates to the surface
-    (`SURFACE_PATH_FOR_KIND`), and a pending reveal lights the rows up as they
-    mount there (15s TTL so a page visited later doesn't glow out of nowhere).
-- The context palette carries one quiet footer line pointing at the page
-  gesture.
+- **Highlighting a row lights the thing it names.** The palette writes
+  `spotlightId` on the target store while a row is highlighted and clears it on
+  the way out, so the list says *which* card it means rather than asking the
+  user to match a label against nine of them.
+- **`#` is CONTEXT, and only context.** It carries no navigation and no
+  commands. It once appended "browse"/"reveal" intent rows for a query naming a
+  KIND (`#trace`, `#datasets`) rather than a resource; they made the one
+  palette that answers "what can I attach?" answer with things that attach
+  nothing, and on a page with no targets they were the entire list. The fix for
+  a page with nothing to pick is for the page to offer its things, not for this
+  list to change subject.
 
-The reveal is the brief's "breathe once", repurposed: it fires only when the
-user asks for it, which is the only pulse that can never be annoying.
+### The reveal is orphaned
+
+`stores/langyContextTargetStore.ts` still carries the reveal machinery —
+`requestReveal`, `pendingReveal`, `revealedIds`, the 30-target cap, the 15s
+pending TTL — and `useLangyContextTarget` / `LangyContextTargetLayer` still
+render off `revealedIds`. **Nothing in product code triggers it.** Its only
+caller was the `#trace` kind-intent chain described above, and that is gone;
+today only the store's own unit tests reach it.
+
+It was left in place deliberately: `requestReveal` is woven through
+`register`'s live path, and unpicking it risks breaking target registration for
+no visible gain. So it is a pending decision — give the reveal a new trigger,
+or take it out with the care the entanglement needs — not an oversight, and not
+something to build on until that decision is made.
 
 ## Discovery
 
-One dismissible hint above the composer, only when the panel is open on a page
-that actually has targets, only until the user dismisses it or absorbs their
-first thing (doing the thing is the best dismissal). Retired forever in
-localStorage (`langwatch:langy:context-discovery:v1`). No toasts, no tours.
+Discovery is the affordance itself: move the pointer and the things Langy can
+take light up, and `#` lists them by name under "On this page". There is no
+first-run hint, no toast and no tour.
 
-Deviation from the brief: the hint lives inside the panel, not anchored to a
-page element — with a proximity field nothing glows until the pointer moves,
-so a page-anchored callout would point at nothing, and a page overlay is
-exactly the ambient cost the design forbids.
+Deviation from the brief, which asked for a page-anchored callout: with a
+proximity field nothing glows until the pointer moves, so a callout would point
+at nothing, and a page overlay is exactly the ambient cost the design forbids.
 
 ## The wire
 
@@ -113,11 +123,11 @@ resolve it (ADR-047). Nothing in this feature changes the Go side.
 ## The annoyance budget, as invariants
 
 - Panel closed → literally nothing: no styles, no listeners, no registry.
-- Lit at once: what is near the pointer, what is added, and (briefly, on
-  request) a capped reveal. Never the whole page.
+- Lit at once: what is near the pointer, what is added, and the single row the
+  palette is highlighting. Never the whole page.
 - The shimmer is 11s, low-alpha, per-target phase-offset ("light on water",
   not a barcode); `added` is still.
-- One hint, once per browser, self-retiring.
+- Nothing pulses unprompted — no first-run hint, no toast, no tour.
 - The affordance button exists once per page, only under the pointer.
 
 ## Wired surfaces

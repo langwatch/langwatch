@@ -21,15 +21,12 @@ import type {
   LangyMessageProjectionRecord,
 } from "@langwatch/langy";
 import { createLogger } from "@langwatch/observability";
-import {
-  generateKillSwitchKey,
-  type KillSwitchComponentType,
-} from "./utils/killSwitch";
 import type { PrismaClient } from "@prisma/client";
 import type { Cluster, Redis } from "ioredis";
 import { createOrUpdateQueueItems } from "~/server/api/routers/annotation";
 import { createManyDatasetRecords } from "~/server/api/routers/datasetRecord.utils";
 import { getProtectionsForProject } from "~/server/api/utils";
+import { reapExpiredLangySessionApiKeys } from "~/server/app-layer/langy/langyApiKey";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import { DatasetRepository } from "~/server/datasets/dataset.repository";
 import {
@@ -133,6 +130,7 @@ import type { ExperimentRunStateRepository } from "./pipelines/experiment-run-pr
 import type { ComputeExperimentRunMetricsCommandData } from "./pipelines/experiment-run-processing/schemas/commands";
 import { createLangyConversationProcessingPipeline } from "./pipelines/langy-conversation-processing/pipeline";
 import type { LangyAnalyticsEventProjectionRecord } from "./pipelines/langy-conversation-processing/projections/langyAnalyticsEvent.mapProjection";
+import { createLangyMaintenancePipeline } from "./pipelines/langy-maintenance/pipeline";
 import { resolveLogCommandShardCount as resolveCanonicalLogCommandShardCount } from "./pipelines/log-processing/canonicalLog";
 import { createLogProcessingPipeline } from "./pipelines/log-processing/pipeline";
 import { CanonicalLogAppendStore } from "./pipelines/log-processing/projections/stores";
@@ -199,6 +197,10 @@ import { RedisCachedFoldStore } from "./projections/redisCachedFoldStore";
 import { RepositoryFoldStore } from "./projections/repositoryFoldStore";
 import type { StateProjectionStore } from "./projections/stateProjection.types";
 import { BlobSweeper } from "./queues/groupQueue/blobSweeper";
+import {
+  generateKillSwitchKey,
+  type KillSwitchComponentType,
+} from "./utils/killSwitch";
 
 const logger = createLogger("langwatch:event-sourcing:pipeline-registry");
 
@@ -415,6 +417,20 @@ export class PipelineRegistry {
       createBlobMaintenancePipeline({
         cleanup: {
           sweep: () => blobSweeper.sweep(),
+          deleteDispatchedBefore: (params) =>
+            this.deps.repositories.processStore.deleteDispatchedBefore(params),
+        },
+      }),
+    );
+
+    // Langy credential maintenance, on the same footing. The reaper existed and
+    // was routed for cron, but the chart ships no CronJobs — so until now the
+    // backstop for keys orphaned by a SIGKILLed manager had no caller at all.
+    this.deps.eventSourcing.register(
+      createLangyMaintenancePipeline({
+        sessionKeyReap: {
+          reap: () =>
+            reapExpiredLangySessionApiKeys({ prisma: this.deps.prisma }),
           deleteDispatchedBefore: (params) =>
             this.deps.repositories.processStore.deleteDispatchedBefore(params),
         },

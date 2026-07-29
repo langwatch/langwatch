@@ -1,5 +1,5 @@
 /**
- * The Langy turn phase state machine (ADR-058) — the whole thing, in one file.
+ * The Langy turn phase state machine (ADR-078) — the whole thing, in one file.
  *
  * It is the SINGLE source for the composer's send/stop affordance and every
  * "is a turn in flight" read, replacing the old scatter of isBusy /

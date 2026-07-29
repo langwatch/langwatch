@@ -42,6 +42,7 @@ import {
 import { LANGY_CHAT_FEATURE_KEY } from "~/server/modelProviders/codexRestrictions";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
 import { getPostHogInstance } from "~/server/posthog";
+import { PromptService } from "~/server/prompt-config/prompt.service";
 import { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
 import { createS3Client } from "~/server/storage";
 import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
@@ -1034,7 +1035,7 @@ export function initializeDefaultApp(options?: {
     langyGithubAppTokens,
   );
 
-  // Langy turn-start orchestration (LANGY_REWORK_PLAN.md S2 C): the pipeline the
+  // Langy turn-start orchestration (ADR-046): the pipeline the
   // Hono route used to inline, now an app-layer service with injected ports. The
   // worker port + turn stores are null when their infra is absent (no agent env /
   // no Redis); the service raises LangyAgentUnavailableError in that case, exactly
@@ -1042,6 +1043,10 @@ export function initializeDefaultApp(options?: {
   const langyTurns = LangyTurnService.create({
     conversations: langyConversations,
     credentials: LangyCredentialService.create(prisma),
+    // ADR-050 versioned prompts. Only consulted when LANGY_PROMPT_PROJECT_ID
+    // names the project holding the rows; unset (the default) skips the
+    // registry entirely and the in-repo text is used verbatim.
+    prompts: new PromptService(prisma),
     // Langy resolves through its own feature key (falling back to the
     // original prompt.create_default gate inside the resolver), so a codex
     // default set for Langy never leaks into new-prompt creation. The
@@ -1051,7 +1056,7 @@ export function initializeDefaultApp(options?: {
       getVercelAIModel({ projectId, featureKey: LANGY_CHAT_FEATURE_KEY }),
     worker: langyAgentUrl && langyInternalSecret ? langyWorker : null,
     // The durable buffer backs a user Stop: reconstruct the partial answer and
-    // end the live stream (ADR-058). Null without Redis, like the stores below.
+    // end the live stream (ADR-078). Null without Redis, like the stores below.
     tokenBuffer: redis ? langyTokenBuffer : null,
     reservePermit: reserveLangyGithubPrPermit,
     releasePermit: releaseLangyGithubPrPermit,

@@ -127,7 +127,7 @@ export interface LangyWorkerPort {
 
   /**
    * Ask the manager to abandon an in-flight turn (`POST /worker/cancel`) so the
-   * model stops generating — the token-burn half of a user Stop (ADR-058).
+   * model stops generating — the token-burn half of a user Stop (ADR-078).
    * FIRE-AND-FORGET and FAILS OPEN: the durable stopped terminal the control
    * plane already recorded is what makes the stop truthful, so a cancel that
    * never reaches a wedged worker costs wasted tokens, never a wrong turn state.

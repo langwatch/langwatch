@@ -47,6 +47,7 @@ describe("Target Trace Isolation", () => {
     }
   });
 
+  /** @scenario "Parallel target execution within single dataset item" */
   it("creates unique trace_id per target within the SAME row (with real tracer)", async () => {
     // Set up a real tracer provider so we get actual trace IDs
     const { provider } = setupTestTracer();
@@ -125,6 +126,7 @@ describe("Target Trace Isolation", () => {
     expect(traceIds[0]).not.toBe(traceIds[1]);
   });
 
+  /** @scenario "Trace ID extraction from span" */
   it("creates unique trace_id across ALL targets in multi-row evaluation (with real tracer)", async () => {
     // Set up a real tracer provider
     const { provider } = setupTestTracer();

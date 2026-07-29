@@ -589,7 +589,7 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 		}
 	}()
 
-	// Egress seam (ADR-043 / ADR-047): the enforcing guard stands up THIS
+	// Egress seam (ADR-076 / ADR-047): the enforcing guard stands up THIS
 	// worker's outbound forward proxy here and returns its loopback port (which
 	// buildWorkerEnv points HTTPS_PROXY at); it can fail the spawn closed. The
 	// observe-only / pass-through guards run no proxy (ProxyPort 0).

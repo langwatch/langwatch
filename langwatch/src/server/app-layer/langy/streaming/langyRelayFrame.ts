@@ -1,5 +1,5 @@
 /**
- * The wire shapes the Langy relay ingests (LANGY_WORKER_REDESIGN_PLAN §0/§0a).
+ * The wire shapes the Langy relay ingests (see `langyTurnRelay.ts`).
  *
  * The worker streams one ndjson line per frame. Each line is a
  * `LangyFrameEnvelope`: the authenticated identity + nonce + an opaque `payload`
@@ -14,13 +14,13 @@
 // zod/v4, not the default v3 entrypoint: `cliToolResultSchema` below is authored
 // against zod/v4, and a v4 schema embedded in a v3 `z.object()` blows up at parse
 // time (`keyValidator._parse is not a function`) rather than at construction.
-import * as z from "zod/v4";
-import { cliToolResultSchema } from "@langwatch/langy";
 
 import {
-  handledErrorFromHerr,
   type HerrEnvelope,
+  handledErrorFromHerr,
 } from "@langwatch/handled-error";
+import { cliToolResultSchema } from "@langwatch/langy";
+import * as z from "zod/v4";
 
 /**
  * The signed envelope — mirrors frameauth's construction. `payload` is the exact
@@ -104,9 +104,7 @@ const TOOL_CALL_ID_MAX_LENGTH = 256;
 export function normalizeToolCallId(id: string): string {
   const separator = id.indexOf(TOOL_CALL_ID_SIGNATURE_SEPARATOR);
   if (separator <= 0) return id;
-  const suffix = id.slice(
-    separator + TOOL_CALL_ID_SIGNATURE_SEPARATOR.length,
-  );
+  const suffix = id.slice(separator + TOOL_CALL_ID_SIGNATURE_SEPARATOR.length);
   if (suffix.length < TOOL_CALL_ID_SIGNATURE_MIN_LENGTH) return id;
   if (!TOOL_CALL_ID_SIGNATURE_SHAPE.test(suffix)) return id;
   return id.slice(0, separator);

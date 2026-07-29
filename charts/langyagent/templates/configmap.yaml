@@ -34,7 +34,7 @@ data:
   LANGY_MAX_WORKERS: {{ .Values.manager.maxWorkers | quote }}
   LANGY_WORKER_IDLE_MS: {{ .Values.manager.workerIdleMs | quote }}
   LANGY_READINESS_TIMEOUT_MS: {{ .Values.manager.readinessTimeoutMs | quote }}
-  # Egress enforcement (ADR-043). The FQDN floor is the operator-owned
+  # Egress enforcement (ADR-076). The FQDN floor is the operator-owned
   # always-allowed set; the toggles gate the enforcement rungs. Per-project
   # customer allow-lists do NOT live here — they ride the per-request
   # credentials envelope (Project.langyEgressAllowlist).

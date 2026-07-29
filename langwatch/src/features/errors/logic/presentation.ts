@@ -816,6 +816,14 @@ const presentations = {
     title: "That request couldn't be understood",
     describe: () => "Rephrase and try again.",
   },
+  langy_rate_limited: {
+    // Raised when someone sends faster than their own Langy allowance. The
+    // message never reached Langy, so the copy says so and gives the one
+    // action that works: wait.
+    title: "Too many messages just now",
+    describe: () =>
+      "That one wasn't sent. Wait a few seconds, then send it again.",
+  },
   langy_turn_in_progress: {
     title: "Langy is still replying",
     describe: () =>

@@ -1,5 +1,3 @@
-import type { LensConfig } from "../stores/viewStore";
-
 // Density is intentionally NOT serialised into the URL — it's a personal
 // preference, not a shareable view setting. Lives in `densityStore.ts`.
 //
@@ -67,7 +65,6 @@ export function parseFragment(fragment: string): FragmentState | null {
 }
 
 interface ComputeOverridesInput {
-  activeLens: LensConfig;
   query: string;
   timeRange: { from: number; to: number; presetId?: string };
   defaultPresetId: string;

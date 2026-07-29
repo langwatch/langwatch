@@ -1,15 +1,17 @@
-# ADR-043: Langy egress enforcement — monitor first, enforce last
+# ADR-076: Langy egress enforcement — monitor first, enforce last
 
 **Date:** 2026-07-10
 
-**Status:** Draft
+**Status:** Accepted
 
-> **This is the PR4-of-4 design in the Langy egress-hardening series.** It is
-> deliberately docs-only and **blocked on PR3**: it builds the enforcement rungs
-> on top of the egress instrumentation seam (PR1) and the monitor-only telemetry
-> (PR3). Nothing here should be implemented until PR3's seam is merged and has
-> observed real traffic — the whole thesis is "let monitoring prove what's
-> legitimate before anything blocks."
+> **Implemented.** This was PR4-of-4 in the Langy egress-hardening series and
+> was written docs-only, blocked on PR3's seam. That seam landed and the rungs
+> were built: `services/langyagent/adapters/egress/` (adapter, policy, throttle,
+> SNI cross-check), wired by `cmd/manager.go` and consumed per-worker by
+> `app/workerpool/pool.go`, with the per-project allow-list at
+> `api/routers/langyEgress.ts`. The staging thesis still holds in the DEFAULT:
+> stock posture is monitor-only, and nothing blocks until an operator sets an
+> allow-list or flips `EgressEnforceFloor`.
 
 ## Context
 
@@ -164,6 +166,34 @@ operators who need it, and the ADR recommends them without hard-requiring either
   this adapter. So if a customer needs bypass-proof enforcement without Cilium,
   Fix B + this adapter is the combination, at the cost of the broader capability.
 
+## The SNI cross-check (rung 3's second reading)
+
+The CONNECT authority is what the client *claims*; the TLS SNI is what it is
+actually negotiating. Reading both and re-deciding on the SNI is what closes the
+gap where `CONNECT allowed.example:443` is followed by a handshake for
+`attacker.example` on a shared CDN IP. We parse the ClientHello **without
+terminating TLS** — the tunnel stays opaque — and the decision table is:
+
+| What the peek yields | Decision |
+| --- | --- |
+| An SNI that differs from the authority, and would **not** pass the same allow set | **Deny** (`denied_sni_mismatch`), before the destination is dialled |
+| An SNI that differs but **is** itself allowed | Allow, and flag — a differing SNI is anomalous whether or not the target is listed |
+| No readable SNI, **while a policy is enforcing** | **Deny** (`denied_sni_unreadable`) |
+| No readable SNI, monitor-only | Allow — the stock posture blocks nothing |
+| An IP-literal authority | Exempt — RFC 6066 forbids sending server_name for one |
+| A stream that is cleanly not TLS | Exempt — require-TLS is the rung that governs cleartext |
+
+Two properties are load-bearing and easy to lose in a refactor. **A handshake we
+cannot follow is "unreadable", never "absent"**: a ClientHello may legally span
+several TLS records, so the peek reassembles across them (bounded at 64 KiB), and
+anything claiming handshake content type that we cannot parse — including an
+implausible `legacy_record_version` — must fail closed rather than fall through.
+Keying that branch on "did we see a handshake byte" instead of "could we read an
+SNI" left it defeatable by sending nothing at all. And **the enforcing check is
+what separates deny from watch**: dropping it would turn every monitor-only
+install into one that hard-denies unreadable handshakes, breaking the "unset =
+watch" guarantee this ADR rests on.
+
 ## Where the allow-list config lives
 
 **A per-project setting, resolved by the control plane and threaded into the
@@ -227,6 +257,18 @@ the same shape, with one deliberate divergence:
   ADR-033 Fix B, neither of which every operator wants; and (c) we surface both
   as documented upgrades. Pretending L3/L4 policy can FQDN-block, or that the
   loopback proxy is unbypassable, would be the worse outcome.
+- **Trade-off accepted: the cross-check reads SNI only.** It catches the SNI
+  variant of domain fronting, where the handshake names a host the authority did
+  not. It does **not** catch the classic variant, where the SNI is the allowed
+  host and the deception is a `Host:` header inside the encrypted stream — the
+  form meek and domain-fronted messaging apps actually used. Seeing that would
+  mean terminating TLS and inspecting customer traffic, which we decline to do.
+  The tunnel stays opaque; the authority and the SNI are the two honest readings
+  available to us, and we use both. A second consequence worth stating plainly:
+  once an allow-list is set, a client whose ClientHello we cannot parse is now
+  denied where it previously passed. Reassembling across records makes a
+  successful read *more* likely than before, but operators enabling enforcement
+  should watch `denied_sni_unreadable` after rollout.
 - **Trade-off accepted: throttle is heuristic.** Byte/connection-rate signatures
   are not proof of exfiltration; they can false-positive on a legitimate large
   clone. That is exactly why throttle *slows and flags* rather than hard-denies,

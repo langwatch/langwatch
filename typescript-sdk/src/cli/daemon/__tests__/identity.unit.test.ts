@@ -8,7 +8,9 @@ import {
   daemonSocketDir,
   ensureSocketDir,
   inspectSocketTrust,
+  isDaemonSocketPathUsable,
   isSocketPathUsable,
+  MAX_STAGING_OVERHEAD_BYTES,
   resolveIdentity,
   secureSocketFile,
   UntrustedSocketDirError,
@@ -127,6 +129,23 @@ describe("daemonSocketDir", () => {
         path.join(os.homedir(), ".langwatch", "run", path.basename(dir)),
       );
       expect(path.basename(dir)).toMatch(/^langwatch-\d+$/);
+    });
+
+    it("never returns a directory a daemon could not actually bind in", () => {
+      delete process.env.XDG_RUNTIME_DIR;
+      delete process.env.LANGWATCH_DAEMON_DIR;
+
+      // The band this sweep exists for is the one where the SHARED path fits
+      // and the pid-scoped name a daemon really binds does not. Budgeting only
+      // the shared path left those directories approved, so the client kept
+      // judging the daemon viable, spawning one every second miss, and every
+      // one of them died at bind().
+      for (let length = 30; length <= 90; length++) {
+        process.env.HOME = "/" + "h".repeat(length);
+        const socketPath = path.join(daemonSocketDir(), `${"0".repeat(16)}.sock`);
+
+        expect(isDaemonSocketPathUsable(socketPath)).toBe(true);
+      }
     });
 
     it("still uses the temp dir when HOME is too long for a unix socket", () => {
@@ -340,6 +359,33 @@ describe("isSocketPathUsable", () => {
       expect(isSocketPathUsable("/tmp/" + "x".repeat(120) + ".sock")).toBe(
         false,
       );
+    });
+  });
+});
+
+describe("isDaemonSocketPathUsable", () => {
+  /**
+   * The band between "the shared path fits" and "a daemon can run on it". A
+   * daemon binds a pid-scoped name beside the shared one, and it is longer.
+   * Approving this band is what left the client spawning a daemon every second
+   * miss, each dying at bind(), forever — with an error naming the shared path,
+   * which anybody could measure and find to be within the limit.
+   */
+  describe("given a shared path that fits but leaves no room for the staging name", () => {
+    // 100 bytes exactly: the widest path `isSocketPathUsable` still allows.
+    const atTheLimit = "/tmp/" + "x".repeat(90) + ".sock";
+
+    it("is rejected even though the shared path itself is usable", () => {
+      expect(Buffer.byteLength(atTheLimit, "utf8")).toBe(100);
+      expect(isSocketPathUsable(atTheLimit)).toBe(true);
+      expect(isDaemonSocketPathUsable(atTheLimit)).toBe(false);
+    });
+
+    it("becomes usable once the staging allowance fits", () => {
+      const shorter =
+        "/tmp/" + "x".repeat(90 - MAX_STAGING_OVERHEAD_BYTES) + ".sock";
+
+      expect(isDaemonSocketPathUsable(shorter)).toBe(true);
     });
   });
 });

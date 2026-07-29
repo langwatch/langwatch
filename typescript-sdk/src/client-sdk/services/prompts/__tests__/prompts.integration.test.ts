@@ -160,6 +160,7 @@ describe("Prompts Integration", () => {
     });
 
     describe("when no local prompt file is present", () => {
+      /** @scenario "Default policy fetches from API when no local file exists" */
       it("returns server prompt", async () => {
         const prompt = await langwatch.prompts.get("123");
         expect(prompt?.id).toBe("123");

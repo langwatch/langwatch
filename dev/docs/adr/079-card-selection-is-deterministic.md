@@ -1,9 +1,11 @@
-# ADR-059: Card selection is deterministic — the model supplies data, never presentation
+# ADR-079: Card selection is deterministic — the model supplies data, never presentation
 
 **Date:** 2026-07-21
 
-**Status:** Accepted (amended 2026-07-22 — see "Amendment: one decision point,
-enforced" for what shipped and what turned out to be wrong)
+**Status:** Accepted
+
+**Amended:** 2026-07-22 — see "Amendment: one decision point, enforced" below for
+what shipped and what turned out to be wrong.
 
 **Builds on:** the `@langwatch/langy/cards` contract (one card per result
 *shape*, shared by the CLI and the Langy panel so the two can never disagree
@@ -341,7 +343,7 @@ payload through the envelope and into a rendered card**
 
 ## References
 
-- Related: ADR-058 (Langy user-initiated turn controls) for the turn lifecycle
+- Related: ADR-078 (Langy user-initiated turn controls) for the turn lifecycle
   these cards render within.
 - Vercel AI SDK — generative UI as tool-result → component:
   https://ai-sdk.dev/docs/ai-sdk-ui/generative-user-interfaces ·

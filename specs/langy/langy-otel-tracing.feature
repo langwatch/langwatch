@@ -33,6 +33,7 @@ Feature: Langy agent activity is traced into the user's project
   # Worker-side export wiring (no secrets in the worker)
   # ============================================================================
 
+  @unimplemented
   Scenario: The worker exports OTLP to the manager over loopback
     Given the manager spawns an opencode subprocess for a conversation
     Then the subprocess environment points OTEL_EXPORTER_OTLP_ENDPOINT at a loopback manager address
@@ -40,6 +41,7 @@ Feature: Langy agent activity is traced into the user's project
     And the generated opencode config enables native OpenTelemetry export
     And the subprocess environment carries no OTLP authorization header
 
+  @unimplemented
   Scenario: The worker environment carries no LangWatch OTLP secret
     Given the manager spawns an opencode subprocess for a conversation
     Then no OTLP exporter header in the worker environment contains the session key
@@ -49,6 +51,7 @@ Feature: Langy agent activity is traced into the user's project
   # Manager-side re-parenting and forwarding
   # ============================================================================
 
+  @unit
   Scenario: Worker spans are re-parented under the turn's trace
     Given a turn is in flight for conversation "conv-123" with a known trace context
     When the worker exports a span batch to the manager's loopback OTLP endpoint
@@ -56,6 +59,7 @@ Feature: Langy agent activity is traced into the user's project
     And every root span in the batch is parented on the turn's span
     And spans keep their internal parent/child relationships
 
+  @unit
   Scenario: Forwarded traces land in the customer's project
     When the manager forwards a worker span batch
     Then it POSTs OTLP protobuf to "<LANGWATCH_ENDPOINT>/api/otel/v1/traces"
@@ -63,16 +67,19 @@ Feature: Langy agent activity is traced into the user's project
     And the resource attributes include "langwatch.thread.id=<conversationId>"
     And the trace's origin resolves to Langy without a "langy" label repeating it
 
+  @unit
   Scenario: A span batch with no turn in flight still reaches the project
     Given no turn trace context has been recorded for the conversation yet
     When the worker exports a span batch
     Then the batch is forwarded without re-parenting
     And the resource attributes still group it under the conversation's thread id
 
+  @unit
   Scenario: An unknown routing token is rejected
     When a span batch is posted to the loopback endpoint with an unknown token
     Then the manager rejects it and forwards nothing
 
+  @unit
   Scenario: A dead worker's routing token stops working
     Given a worker is killed or exits
     When a span batch is posted with that worker's token
@@ -81,6 +88,7 @@ Feature: Langy agent activity is traced into the user's project
   # A failed turn should not need the chat panel to explain itself: the turn's
   # trace in the user's project tells the same story, including the provider's
   # own words when a model call was rejected.
+  @unimplemented
   Scenario: A failed turn's trace shows what went wrong
     Given a turn ends in a terminal error
     When the user opens the turn's trace in their project
@@ -92,6 +100,7 @@ Feature: Langy agent activity is traced into the user's project
   # it must not read as billable API spend. Whether a turn was bundled is
   # decided from the account the turn actually ran on, never from what the
   # traced activity claims about itself, so it cannot be forged.
+  @unit
   Scenario: Codex-plan usage appears as bundled cost
     Given a turn runs on the user's ChatGPT plan through Codex
     When the turn's model calls appear in the user's project
@@ -123,12 +132,14 @@ Feature: Langy agent activity is traced into the user's project
   # and a turn run inside the prod Langy project itself never mirrors.
   # ============================================================================
 
+  @unit
   Scenario: Worker telemetry remains complete for the customer
     Given the manager is running a worker for a customer conversation
     When the worker reports its activity
     Then the customer's trace contains the worker's complete activity
     And the worker's prompts, completions and tool output remain visible there
 
+  @unit
   Scenario: The mirror receives the turn at the customer's tier
     Given a customer organization at the default content tier
     When the worker reports its activity
@@ -136,46 +147,54 @@ Feature: Langy agent activity is traced into the user's project
     And the mirrored turn keeps the shape the customer sees
     And the mirrored turn names the customer it came from
 
+  @unit
   Scenario: A restricted customer's mirror carries structure and never content
     Given a customer organization restricted to the structural tier
     When LangWatch records its mirror copy of the turn
     Then operators can see the model, token usage and failure outcome
     And LangWatch cannot see the customer's prompts, completions or tool output
 
+  @unit
   Scenario: A skipped customer produces no mirror at all
     Given a customer organization at the skip tier
     When the worker reports its activity
     Then the customer's trace is complete
     And nothing about the turn reaches the prod Langy project
 
+  @unimplemented
   Scenario: A turn in the prod Langy project never mirrors into itself
     Given a conversation whose own project is the prod Langy project
     When the worker reports its activity
     Then exactly one copy of the turn exists
     And no mirror export is attempted
 
+  @unimplemented
   Scenario: The model-call content follows the same tier on every leg
     Given a customer organization restricted to the structural tier
     When the gateway records the turn's model calls
     Then the customer's trace carries the calls with their content
     And the mirror copy of those calls carries no content
 
+  @unimplemented
   Scenario: Newly introduced worker metadata cannot expose customer content
     Given the worker reports an unrecognised metadata value
     When LangWatch records operational worker telemetry
     Then the unrecognised value is absent from LangWatch's operational view
 
+  @unimplemented
   Scenario: Worker diagnostics do not expose raw error text
     Given a worker reports an exception and a provider error description
     When LangWatch records operational worker telemetry
     Then operators can see that the worker failed
     And raw exception and provider error text is absent
 
+  @unimplemented
   Scenario: Worker identity is not presented as customer identity
     When LangWatch records operational worker telemetry
     Then it identifies the LangWatch worker and conversation
     And customer-controlled worker resource metadata is absent
 
+  @unit
   Scenario: Customer telemetry is unaffected when operational recording is unavailable
     Given LangWatch cannot record operational worker telemetry
     When the worker reports its activity
@@ -191,21 +210,25 @@ Feature: Langy agent activity is traced into the user's project
   # removed on the way to the customer's project no matter how it is dressed up.
   # ============================================================================
 
+  @unit
   Scenario: A worker cannot claim its telemetry is LangWatch's own
     Given the worker claims its telemetry is LangWatch's own
     When the manager forwards that activity to the customer's project
     Then the provenance claim is absent from the forwarded trace
 
+  @unit
   Scenario: Repeating the provenance claim does not smuggle it through
     Given the worker repeats its provenance claim several times in one batch
     When the manager forwards that activity to the customer's project
     Then no copy of the provenance claim survives in the forwarded trace
 
+  @unit
   Scenario: Moving the provenance claim onto individual spans does not smuggle it through
     Given the worker attaches its provenance claim to individual spans
     When the manager forwards that activity to the customer's project
     Then the provenance claim is absent from every forwarded span
 
+  @unit
   Scenario: Repeating a reserved grouping key does not override the manager's value
     Given the worker repeats a reserved grouping key several times in one batch
     When the manager forwards that activity to the customer's project
@@ -215,17 +238,20 @@ Feature: Langy agent activity is traced into the user's project
   # Manager-mediated LLM calls (phase 2)
   # ============================================================================
 
+  @unimplemented
   Scenario: The worker's LLM traffic goes through the manager
     Given the manager spawns an opencode subprocess for a conversation
     Then the subprocess environment points the LLM base URL at a loopback manager address
     And the subprocess environment does not contain the LLM virtual key
 
+  @unit
   Scenario: The manager injects the virtual key and the turn's trace context
     Given a turn is in flight with a known trace context
     When the worker makes an LLM call through the manager
     Then the request forwarded to the AI gateway authenticates with the virtual key
     And the forwarded request carries a traceparent continuing the turn's trace
 
+  @unit
   Scenario: Streaming LLM responses pass through unbuffered
     When the worker makes a streaming LLM call through the manager
     Then each server-sent event is flushed to the worker as it arrives
@@ -234,46 +260,54 @@ Feature: Langy agent activity is traced into the user's project
   # End-to-end: a Langy chat becomes one continuous, labeled trace
   # ============================================================================
 
+  @unimplemented
   Scenario: A Langy chat produces a trace in the user's project
     When I send a message to Langy in my project
     Then a trace appears in that same project
     And the trace shows Langy as its origin
     And the trace carries no "langy" label repeating the origin
 
+  @unit
   Scenario: A Langy turn is one trace with the model call inside it
     When I send a message to Langy in my project
     Then the turn appears as a single trace in my project
     And the model call the gateway served for the turn appears inside that trace
     And no separate gateway-origin trace duplicates the turn's model call
 
+  @unit
   Scenario: Gateway traffic outside a Langy turn keeps its own trace
     Given I call the AI gateway directly with my own key, outside any Langy turn
     When the call completes
     Then the call appears as its own trace with origin "Gateway"
 
+  @unit
   Scenario: A turn stays one trace even when the manager runs without its own telemetry
     Given the manager runs with its own telemetry export disabled
     When I send a message to Langy in my project
     Then the turn still appears as a single trace with the model call inside it
 
+  @unit
   Scenario: A turn's usage is counted once across the worker and gateway views
     Given a turn whose model call is served through the gateway
     When the turn's trace appears in my project
     Then the trace's token and cost totals count the model call once
     And the agent's activity and the gateway's metered call both remain visible as spans
 
+  @unit
   Scenario: The gateway's model call nests under the agent's own call span
     Given a turn whose model call is served through the gateway
     When the turn's trace appears in my project
     Then the gateway's model-call span sits under the agent span that made the call
     And not beside the agent's whole call tree
 
+  @unit
   Scenario: Every span of a turn names the model the same way
     Given a turn running on a provider-prefixed model
     When the turn's trace appears in my project
     Then the agent's span and the gateway's span report the same provider-prefixed model id
     And the trace's model filter lists the model once
 
+  @unimplemented
   Scenario: Turns of one conversation are grouped together
     Given a Langy conversation with id "conv-123"
     When I send two messages in that conversation
@@ -284,11 +318,13 @@ Feature: Langy agent activity is traced into the user's project
   # Covered by src/server/tracer/__tests__/metadataLabels.integration.test.ts
   # ============================================================================
 
+  @integration
   Scenario: tag.tags in resource attributes becomes trace labels
     Given an OTLP trace whose resource attributes include "tag.tags=checkout-flow"
     When the trace is ingested at /api/otel/v1/traces
     Then the stored trace's labels contain "checkout-flow"
 
+  @integration
   Scenario: langwatch.thread.id in resource attributes becomes thread_id
     Given an OTLP trace whose resource attributes include "langwatch.thread.id=conv-123"
     When the trace is ingested

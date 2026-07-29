@@ -835,7 +835,8 @@ export const observeEsProcessOutboxDispatchLag = ({
 }: {
   processName: string;
   lagMs: number;
-}) => esProcessOutboxDispatchLag.labels(processName).observe(Math.max(0, lagMs));
+}) =>
+  esProcessOutboxDispatchLag.labels(processName).observe(Math.max(0, lagMs));
 
 // Commits whose intents were dropped as already-dispatched (ADR-054).
 // Legitimate on event redelivery — but a sustained per-process rate is
@@ -916,7 +917,9 @@ const ingestionPullDuration = new Histogram({
   // adapter kind lives behind the run port — no cheap low-cardinality label.
   // A pull is a network poll plus row inserts, capped by the worker's
   // 5-minute soft deadline, so buckets run 100ms to 5min.
-  buckets: [100, 250, 500, 1000, 2500, 5000, 15000, 30000, 60000, 120000, 300000],
+  buckets: [
+    100, 250, 500, 1000, 2500, 5000, 15000, 30000, 60000, 120000, 300000,
+  ],
 });
 
 export const observeIngestionPullDuration = ({
@@ -1135,7 +1138,7 @@ export const getLangyRateLimitCounter = (outcome: "rejected" | "fail_open") =>
 // Model-emitted ```langy-card blocks at the relay stamp (ADR-060 §8). The
 // failure outcomes are the drift alarm for prompt regressions in block
 // emission — a rising unsalvageable/invalid rate means the agent's emission
-// quality slipped, exactly like ADR-059's probe-miss counter for cards.
+// quality slipped, exactly like ADR-079's probe-miss counter for cards.
 register.removeSingleMetric("langwatch_langy_blocks_total");
 const langyBlocksTotal = new Counter({
   name: "langwatch_langy_blocks_total",
@@ -1273,9 +1276,7 @@ const codingAgentSessionListReadDuration = new Histogram({
   // "now", and a top bucket at 5s would put exactly that degradation into
   // `+Inf`, where a p99 cannot be resolved — the histogram would go blind at
   // the moment it was supposed to speak.
-  buckets: [
-    1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10_000, 30_000,
-  ],
+  buckets: [1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10_000, 30_000],
 });
 
 /**
@@ -1317,9 +1318,7 @@ export const observeCodingAgentSessionListReadDuration = ({
   outcome: CodingAgentSessionListReadOutcome;
   durationMs: number;
 }) =>
-  codingAgentSessionListReadDuration
-    .labels(table, outcome)
-    .observe(durationMs);
+  codingAgentSessionListReadDuration.labels(table, outcome).observe(durationMs);
 
 // ============================================================================
 // withMetrics utility

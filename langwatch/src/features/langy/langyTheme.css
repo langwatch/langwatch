@@ -137,16 +137,6 @@
   display: block;
 }
 
-/* The home banner borrows the grid for its INK view (LangyBannerSignalGrid).
-   The banner lives outside `.langy-root`, so the `--chakra-colors-langy-grid`
-   token never resolves there — the modifier supplies the line colour itself —
-   and it shows regardless of the app theme's `.dark` gate: the banner's tone
-   is INVERTED, so its ink ground appears in app-LIGHT mode. */
-.langy-signal-grid--banner {
-  --chakra-colors-langy-grid: rgba(255, 255, 255, 0.035);
-  display: block;
-}
-
 /* ── Composer "thinking" sheen ────────────────────────────────────────────
    While a turn is in flight the composer grows a 1px gradient ring with a soft
    highlight travelling along it.

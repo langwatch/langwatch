@@ -4,77 +4,126 @@ import (
 	"errors"
 	"io"
 	"net"
+	"net/netip"
 	"strings"
 	"time"
 )
 
 // The egress adapter reads the FQDN from the CONNECT authority as the primary,
-// enforceable destination (ADR-043 "Where FQDN enforcement lives"). It ALSO
+// enforceable destination (ADR-076 "Where FQDN enforcement lives"). It ALSO
 // peeks the TLS ClientHello SNI as a cross-check: a cooperative-but-hostile
 // client that sends `CONNECT allowed.com:443` and then negotiates TLS with SNI
 // `attacker.com` (domain-fronting a shared CDN) would otherwise slip past an
 // authority-only check. We parse the SNI without terminating TLS — the tunnel
 // stays opaque — and refuse a definite mismatch.
 
-// maxClientHelloRecord bounds how much we buffer while looking for the SNI. A
-// TLS record payload is at most 16384 bytes; the ClientHello fits comfortably.
+// maxClientHelloRecord bounds a single TLS record payload. A TLS record payload
+// is at most 16384 bytes; one ClientHello record fits comfortably.
 const maxClientHelloRecord = 18 << 10
 
-// peekClientHelloSNI reads the first TLS record from conn, returns the SNI host
-// found in it (lowercased, "" if none/not-a-ClientHello), and a net.Conn that
-// re-serves the consumed bytes so the caller can forward them upstream
-// unchanged. On any parse ambiguity it returns sni="" — the caller only ever
-// BLOCKS on a definite mismatch, never on an unparseable hello, so opaque and
-// non-TLS tunnels are unaffected.
-func peekClientHelloSNI(conn net.Conn, deadline time.Duration) (string, net.Conn, error) {
+// maxClientHelloBytes bounds the REASSEMBLED handshake across records, so a
+// peer that dribbles endless handshake fragments cannot make us buffer forever.
+const maxClientHelloBytes = 64 << 10
+
+// peekClientHelloSNI reads TLS records from conn until the first handshake
+// message is complete, returns the SNI host found in it (lowercased, "" if
+// none), whether the stream was a TLS handshake at all, and a net.Conn that
+// re-serves every consumed byte so the caller forwards the handshake upstream
+// unchanged.
+//
+// It reassembles ACROSS records on purpose. A handshake message may legally be
+// fragmented over several TLS records, and reading only the first one let a
+// hostile client split its ClientHello so the SNI landed in record 2 — the peek
+// then found nothing, the caller had no "definite mismatch" to act on, and the
+// domain-fronting check this exists to perform was skipped. Reassembly closes
+// that, and `sawHandshake` lets the caller fail closed when it still cannot
+// read an SNI out of something that plainly IS a TLS handshake.
+func peekClientHelloSNI(conn net.Conn, deadline time.Duration) (sni string, sawHandshake bool, replayed net.Conn, err error) {
 	if deadline > 0 {
 		_ = conn.SetReadDeadline(time.Now().Add(deadline))
-		defer conn.SetReadDeadline(time.Time{})
+		defer func() { _ = conn.SetReadDeadline(time.Time{}) }()
 	}
-	record, err := readFirstTLSRecord(conn)
+	raw, handshake, sawHandshake, err := readClientHelloRecords(conn)
 	// Whatever we managed to read must be replayed, even on error, so the
 	// upstream sees a byte-identical handshake.
-	replayed := &prefixConn{Conn: conn, prefix: record}
-	if err != nil {
-		return "", replayed, err
+	replayed = &prefixConn{Conn: conn, prefix: raw}
+	if err != nil || !sawHandshake {
+		return "", sawHandshake, replayed, err
 	}
-	return parseClientHelloSNI(record), replayed, nil
+	return parseHandshakeSNI(handshake), true, replayed, nil
 }
 
-// readFirstTLSRecord reads one TLS record (5-byte header + payload). If the
-// leading byte is not a handshake content type (22) the stream isn't TLS; we
-// return what we read so it can be replayed, with no error. On a short read the
-// bytes actually consumed are returned so they can still be replayed upstream.
-func readFirstTLSRecord(r io.Reader) ([]byte, error) {
-	header := make([]byte, 5)
-	n, err := io.ReadFull(r, header)
-	if err != nil {
-		return header[:n], err
+// readClientHelloRecords reads TLS handshake records until the first handshake
+// message is complete (or a bound/error stops it). It returns the raw bytes
+// consumed — every one of them, so they can be replayed upstream — the
+// reassembled handshake stream with record framing stripped, and whether the
+// stream is a TLS handshake at all.
+func readClientHelloRecords(r io.Reader) (raw []byte, handshake []byte, sawHandshake bool, err error) {
+	for {
+		header := make([]byte, 5)
+		n, herr := io.ReadFull(r, header)
+		raw = append(raw, header[:n]...)
+		if herr != nil {
+			return raw, handshake, sawHandshake, herr
+		}
+		// A content type that is not 22 is the clean "not TLS" exit: an opaque
+		// tunnel that never claimed to be a handshake. No error, no
+		// sawHandshake — require-TLS is the rung that governs it, and holding
+		// it for the whole peek timeout would be a latency cost for nothing.
+		if header[0] != 22 {
+			return raw, handshake, sawHandshake, nil
+		}
+		// Past here the stream HAS claimed to be a handshake, so every exit
+		// below must leave the caller able to tell it could not read an SNI.
+		//
+		// The version is checked, but an implausible one is an ERROR rather
+		// than a pass. Returning nil here — as this did — was a fail-OPEN: the
+		// caller's guard is `sni == "" && sniUnreadable(sawHandshake, err)`,
+		// and (false, nil) satisfies neither term, so the tunnel spliced
+		// uninspected. Flipping one byte of legacy_record_version (0x0301 ->
+		// 0x0305) was enough, because RFC 8446 §5.1 deprecates that field and
+		// says it MUST be ignored — so the destination still parsed the very
+		// ClientHello we had just declined to look at, and domain fronting was
+		// back. Anything claiming content type 22 that we cannot follow is
+		// unreadable, not absent.
+		sawHandshake = true
+		if header[1] != 3 || header[2] > 4 {
+			return raw, handshake, sawHandshake, errors.New("implausible tls record version")
+		}
+		length := int(header[3])<<8 | int(header[4])
+		if length <= 0 || length > maxClientHelloRecord {
+			return raw, handshake, sawHandshake, errors.New("tls record length out of range")
+		}
+		payload := make([]byte, length)
+		pn, perr := io.ReadFull(r, payload)
+		raw = append(raw, payload[:pn]...)
+		handshake = append(handshake, payload[:pn]...)
+		if perr != nil {
+			return raw, handshake, sawHandshake, perr
+		}
+		if handshakeMessageComplete(handshake) {
+			return raw, handshake, sawHandshake, nil
+		}
+		if len(handshake) >= maxClientHelloBytes {
+			return raw, handshake, sawHandshake, errors.New("client hello exceeds reassembly bound")
+		}
 	}
-	// header[0] == 22 (handshake). Anything else: not a TLS ClientHello.
-	if header[0] != 22 {
-		return header, nil
-	}
-	length := int(header[3])<<8 | int(header[4])
-	if length <= 0 || length > maxClientHelloRecord {
-		return header, errors.New("tls record length out of range")
-	}
-	payload := make([]byte, length)
-	pn, err := io.ReadFull(r, payload)
-	if err != nil {
-		return append(header, payload[:pn]...), err
-	}
-	return append(header, payload...), nil
 }
 
-// parseClientHelloSNI extracts the server_name from a full TLS record
-// (header+payload). Returns "" on any malformed or absent field — never panics
-// on a truncated buffer.
-func parseClientHelloSNI(record []byte) string {
-	if len(record) < 5 || record[0] != 22 {
-		return ""
+// handshakeMessageComplete reports whether b holds a whole handshake message:
+// type(1) + uint24 length + body.
+func handshakeMessageComplete(b []byte) bool {
+	if len(b) < 4 {
+		return false
 	}
-	b := record[5:] // handshake payload
+	msgLen := int(b[1])<<16 | int(b[2])<<8 | int(b[3])
+	return len(b) >= 4+msgLen
+}
+
+// parseHandshakeSNI extracts the server_name from a reassembled handshake
+// stream (record framing already stripped). Returns "" on any malformed or
+// absent field — never panics on a truncated buffer.
+func parseHandshakeSNI(b []byte) string {
 	// Handshake: type(1)=ClientHello(1), length(3), body.
 	if len(b) < 4 || b[0] != 1 {
 		return ""
@@ -185,4 +234,28 @@ func (c *prefixConn) Read(p []byte) (int, error) {
 		return n, nil
 	}
 	return c.Conn.Read(p)
+}
+
+// sniUnreadable reports whether the peek failed to produce a positive answer
+// about the stream's SNI.
+//
+// True in two cases: the stream IS a TLS handshake but no server_name came out
+// of it, or the peek errored before it could tell (a stall past the deadline, a
+// truncated header, a record length out of range). Both mean "we were supposed
+// to check and could not".
+//
+// False for a stream that is cleanly not TLS — a complete record header with a
+// non-handshake content type and no error. That is an opaque tunnel, and
+// require-TLS is the rung that governs it.
+func sniUnreadable(sawHandshake bool, err error) bool {
+	return sawHandshake || err != nil
+}
+
+// isIPLiteral reports whether the CONNECT authority is a bare address rather
+// than a name. RFC 6066 forbids sending server_name for an IP literal, so a
+// conforming client legitimately produces no SNI and must not be failed closed
+// for it.
+func isIPLiteral(host string) bool {
+	_, err := netip.ParseAddr(strings.TrimSuffix(strings.TrimSpace(host), "."))
+	return err == nil
 }
