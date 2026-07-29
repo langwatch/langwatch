@@ -248,3 +248,36 @@ describe("when delete is called and the file does not exist", () => {
     await expect(driver.delete(uri)).resolves.toBeUndefined();
   });
 });
+
+// ---------------------------------------------------------------------------
+// containment
+// ---------------------------------------------------------------------------
+
+describe("given a URI whose encoded segment decodes into path separators", () => {
+  // `new URL()` leaves `%2F` encoded, so this URI looks like a single path
+  // segment right up until `decodeURIComponent` turns it back into `../../`.
+  // A caller that percent-encoded its segments is therefore NOT protected by
+  // having done so — this is the backstop that catches it.
+  const escaping = `file://${tmpDir}/proj/${encodeURIComponent("../../../../etc/evil")}/obj`;
+
+  it("refuses to read, write or delete outside the path it names", async () => {
+    await expect(
+      driver.put(escaping, Buffer.from("owned"), "text/plain"),
+    ).rejects.toThrow(/single component/i);
+    await expect(driver.get(escaping)).rejects.toThrow(/single component/i);
+    await expect(driver.delete(escaping)).rejects.toThrow(/single component/i);
+    await expect(driver.exists(escaping)).rejects.toThrow(/single component/i);
+  });
+
+  it("leaves nothing behind at the escaped location", async () => {
+    const escaped = path.resolve(
+      decodeURIComponent(new URL(escaping).pathname),
+    );
+
+    await driver.put(escaping, Buffer.from("owned"), "text/plain").catch(() => {
+      // expected — the assertion is that the refusal wrote nothing
+    });
+
+    await expect(fs.access(escaped)).rejects.toThrow();
+  });
+});

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type { Readable } from "node:stream";
 import {
   DeleteObjectCommand,
@@ -186,11 +187,47 @@ const SPOOL_KEY_PREFIX = "trace-blobs/spool";
 export const SPOOL_REF_V2 = "spool:v2";
 
 /**
- * Builds the transient spool object path. The ONLY place the shape is encoded.
+ * Raised when the project's storage destination cannot host the spool. Distinct
+ * from a storage failure so the fail-open warn can say "this deployment has no
+ * spool" rather than implying an outage the operator should go chase.
+ */
+export class SpoolDestinationUnsupportedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "SpoolDestinationUnsupportedError";
+  }
+}
+
+/**
+ * Ids that are safe to use verbatim as one path segment: the normal case, since
+ * OTLP ids normalise to hex. Excludes `.` and `..` explicitly — both match the
+ * character class but are directory references, not names.
+ */
+const SAFE_PATH_SEGMENT = /^[A-Za-z0-9_-]+$/;
+
+/**
+ * Reduces one id to a single path component.
  *
- * Segments are percent-encoded: OTLP ids arrive as opaque strings and the
- * base64 alphabet includes `/`, which would otherwise inject extra path
- * segments (and, for a leading-`/` id, escape the spool prefix entirely).
+ * Percent-encoding is NOT sufficient on its own. It survives URI construction,
+ * but `LocalFilesystemDriver.parseFileUri` round-trips through
+ * `decodeURIComponent`, which turns `..%2F..%2F` straight back into `../../`
+ * before `mkdir`/`writeFile` see it — so an id of `../../…` escaped the object
+ * root entirely. `idSchema` accepts arbitrary strings, so anyone able to ingest
+ * a span could pick that path.
+ *
+ * Anything outside the safe class is replaced by a hash of the id rather than
+ * escaped: a hash cannot contain a separator or a `..` no matter what decodes
+ * it downstream, and it stays deterministic, so the read and delete paths
+ * re-derive the identical location. Ordinary hex ids are untouched and remain
+ * legible in a bucket listing.
+ */
+function safePathSegment(id: string): string {
+  if (SAFE_PATH_SEGMENT.test(id) && id !== "." && id !== "..") return id;
+  return createHash("sha256").update(id, "utf8").digest("hex");
+}
+
+/**
+ * Builds the transient spool object path. The ONLY place the shape is encoded.
  */
 function buildSpoolObjectPath({
   projectId,
@@ -203,9 +240,9 @@ function buildSpoolObjectPath({
 }): string {
   return [
     SPOOL_KEY_PREFIX,
-    encodeURIComponent(projectId),
-    encodeURIComponent(traceId),
-    encodeURIComponent(spanId),
+    safePathSegment(projectId),
+    safePathSegment(traceId),
+    safePathSegment(spanId),
   ].join("/");
 }
 
@@ -220,9 +257,9 @@ function buildSpoolObjectPath({
  * falls through to the v2 path, where the location is derived and the reference
  * ignored.
  *
- * TODO(#800): drop the v1 branch one release after this ships — by then no
- * in-flight command can still carry a v1 ref (the spool's own lifecycle
- * expiry is 3 days).
+ * TODO(langwatch/langwatch-saas#837): drop the v1 branch one release after this
+ * ships. By then no in-flight command can still carry a v1 ref — the spool's
+ * own lifecycle expiry is 3 days, so nothing can resolve one after that.
  */
 function isLegacySpoolRef(spoolRef: string): boolean {
   return spoolRef.startsWith(`${SPOOL_KEY_PREFIX}/`);
@@ -337,6 +374,27 @@ export class BlobStore {
       );
     }
     const destination = await this.spoolStorage.resolveDestination(projectId);
+
+    // The spool is the one stored-objects consumer that depends on something
+    // OUTSIDE the object store to stay bounded: it deletes eagerly after the
+    // event_log INSERT, and leans on a lifecycle rule to reap whatever a crash
+    // between those two steps leaves behind. A filesystem has no such rule, so
+    // on this destination an orphan is permanent and the volume is what fills.
+    //
+    // Refusing here is not a regression. Before this consumer moved onto the
+    // shared layer it built an S3 client, and on a local install that resolved
+    // to the hardcoded "langwatch" bucket, which does not exist — so the PUT
+    // failed and `maybeSpool` fell open to an inline payload every time. This
+    // makes that same outcome explicit and loud instead of incidental.
+    if (destination.kind === "file") {
+      throw new SpoolDestinationUnsupportedError(
+        "The trace spool has no local-filesystem path: orphaned spool objects are reaped by a " +
+          "bucket/container lifecycle rule, which a filesystem cannot express, so a crash between " +
+          "the write and its delete would leave the object forever. Ingestion continues with the " +
+          "full payload inline. Configure S3 or Azure Blob storage to get oversize protection.",
+      );
+    }
+
     return {
       uri: mintUriForDestination({
         destination,
