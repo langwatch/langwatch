@@ -1,6 +1,7 @@
+import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
-import { checkApiKey } from "../../utils/apiKey";
+import { resolveCredentials } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
 import { formatRelativeTime } from "../../utils/formatting";
@@ -15,9 +16,9 @@ export const listSimulationRunsCommand = async (options: {
   status?: string;
   name?: string;
 }): Promise<CommandResult | void> => {
-  checkApiKey();
+  await resolveCredentials();
 
-  const apiKey = process.env.LANGWATCH_API_KEY ?? "";
+  const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
   const endpoint = resolveControlPlaneUrl();
 
   const spinner = createSpinner("Fetching simulation runs...").start();

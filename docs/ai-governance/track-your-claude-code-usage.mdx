@@ -262,6 +262,10 @@ You can read every prompt the agent issued, including the long system prompt and
 - **Path 1**: the gateway enforces it. Requests fail with `budget_exceeded` once you cross.
 - **Path 2**: alerts at 80% and 100%. Claude Code calls keep flowing; Anthropic does not let the receiver gate them.
 
+### Ask your own agent where your tokens went
+
+The same CLI that captured your sessions can read them back, authenticated by your device login, with no API key to configure (an explicit `LANGWATCH_API_KEY` still wins when you set one). Paste one prompt into Claude Code and it answers which sessions were the most expensive, what ran above 150k context, which subagents consumed the most, and more. See [Explore your usage with your own agent](/ai-governance/explore-your-usage-with-your-own-agent).
+
 ### Have the agent improve itself off its own traces
 
 Point Claude Code (or any agent) at LangWatch's [skills directory](https://langwatch.ai/docs/skills/directory) so it can reach into its own past traces, find where it wasted tokens or made the wrong call, and update its own behaviour. The [LangWatch MCP](https://langwatch.ai/docs/integration/mcp) does the same thing through the MCP protocol.

@@ -105,6 +105,17 @@ describe("setupAgentPrompt()", () => {
 });
 
 describe("SetupWithAgentButton", () => {
+  describe("when the button renders on any surface", () => {
+    /** @scenario the traces empty state keeps Setup via Agent on every project */
+    it("reads Setup via Agent with no per-surface override", () => {
+      renderButton("traces");
+      expect(
+        screen.getByRole("button", { name: /setup via agent/i }),
+      ).toBeDefined();
+      expect(screen.queryByText(/connect your agent/i)).toBeNull();
+    });
+  });
+
   describe("when the reader can ask Langy", () => {
     /** @scenario Langy is offered first where the reader can ask */
     it("offers all three routes and hands the surface prompt to Langy", async () => {
@@ -194,7 +205,7 @@ describe("SetupWithAgentButton", () => {
     });
   });
 
-  describe("the docs route", () => {
+  describe("when the docs entry is followed", () => {
     it("links the surface's documentation overview", async () => {
       const user = userEvent.setup();
       renderButton("prompts");

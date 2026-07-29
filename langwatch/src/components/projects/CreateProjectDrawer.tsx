@@ -10,12 +10,24 @@ import { toaster } from "../ui/toaster";
 import { ProjectForm, type ProjectFormData } from "./ProjectForm";
 import { NEW_TEAM_VALUE } from "./projectFormValidation";
 
+/** Every list a freshly created project has to show up in right away. */
+function invalidateProjectListQueries(
+  utils: ReturnType<typeof api.useContext>,
+): void {
+  void utils.organization.getAll.invalidate();
+  void utils.limits.getUsage.invalidate();
+  void utils.team.getTeamsWithMembers.invalidate();
+  void utils.team.getTeamWithMembers.invalidate();
+  void utils.team.getTeamsWithRoleBindings.invalidate();
+}
+
 export function CreateProjectDrawer({
   open = true,
   onClose,
   navigateOnCreate = false,
   defaultTeamId,
   organizationId: organizationIdProp,
+  onCreated,
 }: {
   open?: boolean;
   onClose?: () => void;
@@ -25,6 +37,10 @@ export function CreateProjectDrawer({
    * When the user clicks "New Project" under Org B while viewing Org A, this ensures
    * the project is created in Org B instead of the current context. */
   organizationId?: string;
+  /** Fires on successful creation (before the drawer closes) so embedding
+   * surfaces without an ambient project (the CLI authorize page) can adopt
+   * the new project, e.g. select it in a picker once lists refresh. */
+  onCreated?: (result: { projectSlug: string }) => void;
 }): React.ReactElement {
   const { organization: currentOrganization } = useOrganizationTeamProject();
 
@@ -68,12 +84,7 @@ export function CreateProjectDrawer({
         },
         {
           onSuccess: (result) => {
-            // Invalidate queries so project appears immediately in lists
-            void queryClient.organization.getAll.invalidate();
-            void queryClient.limits.getUsage.invalidate();
-            void queryClient.team.getTeamsWithMembers.invalidate();
-            void queryClient.team.getTeamWithMembers.invalidate();
-            void queryClient.team.getTeamsWithRoleBindings.invalidate();
+            invalidateProjectListQueries(queryClient);
 
             trackEvent("project_created", {
               project_slug: result.projectSlug,
@@ -87,6 +98,8 @@ export function CreateProjectDrawer({
               type: "success",
               meta: { closable: true },
             });
+
+            onCreated?.({ projectSlug: result.projectSlug });
 
             if (navigateOnCreate) {
               // Use hard redirect to ensure fresh data after project creation

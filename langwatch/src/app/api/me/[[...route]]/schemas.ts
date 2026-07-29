@@ -69,3 +69,15 @@ export const meUsageResponseSchema = z.object({
   dailyBuckets: z.array(bucketSchema),
   breakdownByModel: z.array(breakdownSchema),
 });
+
+/**
+ * Wire schema for GET /api/me/project: the identity of the project the
+ * calling API key belongs to. Consumed by the CLI's identity notice to
+ * name the project behind LANGWATCH_API_KEY.
+ */
+export const meProjectResponseSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  slug: z.string(),
+  isPersonal: z.boolean(),
+});

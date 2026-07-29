@@ -30,9 +30,11 @@ import {
   CircleAlert,
   Clock3,
   Info,
+  Plus,
   TriangleAlert,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { CreateProjectDrawer } from "~/components/projects/CreateProjectDrawer";
 import { ScopeChipPicker } from "~/components/settings/ScopeChipPicker";
 import { OnboardingContainer } from "~/features/onboarding/components/containers/OnboardingContainer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -194,20 +196,33 @@ export default function CliAuthPage() {
   }, [session, organizations, userCode, router]);
 
   // Projects offered in the project-login picker (project_api_key mode).
-  // resolveCliAuthProjects hides personal workspace projects. Project login
-  // must target a real, shared project, never a personal one (a coding agent
-  // that picked one silently routed evaluations there), and the hidden
-  // internal_governance tenancy project. It also picks the default: the last
-  // project the user worked in when it's offered, else the sole project.
+  // resolveCliAuthProjects offers the shared projects grouped by team plus
+  // the caller's own personal project as an explicit "Personal" entry
+  // (silent auto-selection of personal was the historical hazard; explicit
+  // choice is honoured server-side, and it is preselected only when the org
+  // has no shared projects at all). The hidden internal_governance tenancy
+  // project is never offered. The default is the last project the user
+  // worked in when offered, else the sole shared project, else personal.
   const lastProjectSlug = currentProject?.slug ?? null;
+  const currentUserId = session?.user?.id ?? null;
   const {
     projects: projectsForOrg,
     teams: teamsForOrg,
+    personalProject,
     defaultProjectId,
   } = useMemo(() => {
     const org = organizations?.find((o) => o.id === selectedOrgId);
-    return resolveCliAuthProjects({ teams: org?.teams, lastProjectSlug });
-  }, [organizations, selectedOrgId, lastProjectSlug]);
+    return resolveCliAuthProjects({
+      teams: org?.teams,
+      lastProjectSlug,
+      currentUserId,
+    });
+  }, [organizations, selectedOrgId, lastProjectSlug, currentUserId]);
+
+  const offeredProjects = useMemo(
+    () => [...projectsForOrg, ...(personalProject ? [personalProject] : [])],
+    [projectsForOrg, personalProject],
+  );
 
   // Reset when org changes so the picker is fresh per-org, then apply the
   // computed default selection.
@@ -219,6 +234,22 @@ export default function CliAuthPage() {
       setSelectedProjectId(defaultProjectId);
     }
   }, [defaultProjectId, selectedProjectId]);
+
+  // "Create project" from the no-shared-projects state. The drawer needs no
+  // ambient project; on creation the org list refreshes and the effect below
+  // promotes the new project (matched by slug) to the current selection.
+  const [createProjectOpen, setCreateProjectOpen] = useState(false);
+  const [pendingCreatedSlug, setPendingCreatedSlug] = useState<string | null>(
+    null,
+  );
+  useEffect(() => {
+    if (!pendingCreatedSlug) return;
+    const created = projectsForOrg.find((p) => p.slug === pendingCreatedSlug);
+    if (created) {
+      setSelectedProjectId(created.id);
+      setPendingCreatedSlug(null);
+    }
+  }, [pendingCreatedSlug, projectsForOrg]);
 
   // Redirect to sign-in if unauthenticated, preserving the user_code in
   // the callback URL so the user lands back here after SSO.
@@ -337,7 +368,7 @@ export default function CliAuthPage() {
         organizations?.find((o) => o.id === selectedOrgId)?.name ??
         "your organization";
       const projectName = requiresProject
-        ? projectsForOrg.find((p) => p.id === selectedProjectId)?.name
+        ? offeredProjects.find((p) => p.id === selectedProjectId)?.name
         : undefined;
       setAction({
         kind: "success",
@@ -513,48 +544,65 @@ export default function CliAuthPage() {
 
                 {requiresProject && (
                   <Box>
-                    <Text
-                      textStyle="sm"
-                      fontWeight="semibold"
-                      color="fg"
-                      mb={2}
-                    >
-                      Project
-                    </Text>
-                    {projectsForOrg.length === 0 ? (
+                    <HStack mb={2} justify="space-between" align="center">
+                      <Text textStyle="sm" fontWeight="semibold" color="fg">
+                        Project
+                      </Text>
+                      <Button
+                        size="xs"
+                        variant="ghost"
+                        color="fg.muted"
+                        onClick={() => setCreateProjectOpen(true)}
+                      >
+                        <Icon as={Plus} boxSize={3.5} />
+                        Create project
+                      </Button>
+                    </HStack>
+                    {offeredProjects.length === 0 ? (
                       <StatusCard
                         palette="orange"
                         icon={CircleAlert}
-                        title="No shared projects yet"
+                        title="No projects yet"
                       >
-                        Create a team project in this organization first
-                        (personal projects can&apos;t back an SDK key), then
-                        re-run <code>langwatch login</code> in your terminal.
+                        Create a project in this organization first, then pick
+                        it here; the key flows back to your terminal
+                        automatically.
                       </StatusCard>
                     ) : (
-                      <ScopeChipPicker
-                        variant="single-select"
-                        label=""
-                        placeholder="Select a project"
-                        allowedScopeTypes={["PROJECT"]}
-                        organizationId={selectedOrgId ?? undefined}
-                        availableProjects={projectsForOrg}
-                        availableTeams={teamsForOrg}
-                        value={
-                          selectedProjectId
-                            ? [
-                                {
-                                  scopeType: "PROJECT",
-                                  scopeId: selectedProjectId,
-                                },
-                              ]
-                            : []
-                        }
-                        onChange={(next) =>
-                          setSelectedProjectId(next[0]?.scopeId ?? null)
-                        }
-                        showSummary={false}
-                      />
+                      <>
+                        <ScopeChipPicker
+                          variant="single-select"
+                          label=""
+                          placeholder="None selected"
+                          allowedScopeTypes={["PROJECT"]}
+                          organizationId={selectedOrgId ?? undefined}
+                          availableProjects={offeredProjects}
+                          availableTeams={teamsForOrg}
+                          value={
+                            selectedProjectId
+                              ? [
+                                  {
+                                    scopeType: "PROJECT",
+                                    scopeId: selectedProjectId,
+                                  },
+                                ]
+                              : []
+                          }
+                          onChange={(next) =>
+                            setSelectedProjectId(next[0]?.scopeId ?? null)
+                          }
+                          showSummary={false}
+                        />
+                        {projectsForOrg.length === 0 &&
+                          personalProject &&
+                          selectedProjectId === personalProject.id && (
+                            <Text textStyle="xs" color="fg.muted" mt={1.5}>
+                              No shared projects in this organization yet, so
+                              your personal project is preselected. Only you can
+                              read what lands there.
+                            </Text>
+                          )}
+                      </>
                     )}
                   </Box>
                 )}
@@ -638,6 +686,17 @@ export default function CliAuthPage() {
             </>
           )}
         </VStack>
+        {createProjectOpen && (
+          <CreateProjectDrawer
+            open
+            onClose={() => setCreateProjectOpen(false)}
+            organizationId={selectedOrgId ?? undefined}
+            onCreated={(created) => {
+              setPendingCreatedSlug(created.projectSlug);
+              setCreateProjectOpen(false);
+            }}
+          />
+        )}
       </OnboardingContainer>
     </>
   );

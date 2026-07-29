@@ -45,6 +45,12 @@ const run = (
   cwd: string = workDir,
 ): Promise<RunResult> =>
   new Promise((resolve) => {
+    // The identity notice is shown once per credential per 30 minutes
+    // (utils/identityNotice.ts), so a pair of runs would legitimately differ:
+    // the first prints it, the second is suppressed. These tests compare runs
+    // byte-for-byte, so every run starts from a fresh notice state and the
+    // notice itself becomes part of the fidelity check.
+    fs.rmSync(path.join(socketDir, "notice-state.json"), { force: true });
     const child = spawn(process.execPath, [CLI_PATH, ...args], {
       cwd,
       // stdio: "pipe" is what makes this a non-TTY invocation — i.e. exactly the
@@ -212,7 +218,7 @@ describe("the CLI served by a daemon", () => {
 
     describe("when a command exits non-zero", () => {
       it("reproduces the exit code and stderr of the in-process run", async () => {
-        // No API key: checkApiKey() prints and calls process.exit(1) — the exact
+        // No API key: resolveCredentials() prints and calls process.exit(1) — the exact
         // mid-flight-exit path that a warm process has to reproduce.
         const noKey = { LANGWATCH_API_KEY: "" };
 

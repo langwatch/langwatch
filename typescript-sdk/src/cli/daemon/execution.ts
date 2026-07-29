@@ -11,6 +11,7 @@ import { StringDecoder } from "node:string_decoder";
 
 import chalk from "chalk";
 
+import { runWithCredentialHolder } from "@/internal/credentialContext";
 import { AGENT_MODE_ENV_VARS } from "../utils/output";
 import { currentOutputScope, withOutputScope } from "../utils/errorOutput";
 
@@ -35,7 +36,7 @@ const PARTIAL_SGR_AT_END = /\u001B(?:\[[0-9;]*)?$/;
  * command actions are full of `try { … } catch (e) { console.error(e); process.exit(1) }`,
  * and a `catch` catches everything. That is fine, and is exactly why
  * `ExecutionContext` finalises on the FIRST exit and drops every write after
- * it: in a real process, `process.exit(1)` inside `checkApiKey()` terminates
+ * it: in a real process, `process.exit(1)` inside `resolveCredentials()` terminates
  * immediately and the enclosing catch block never gets to print anything. We
  * reproduce that by discarding whatever the unwinding stack emits.
  */
@@ -163,7 +164,13 @@ export function withExecutionContext<T>(
   context: ExecutionContext,
   fn: () => T,
 ): T {
-  return storage.run(context, () => withOutputScope(fn));
+  // A fresh credential holder per request: the resolver fills it later and the
+  // request's own services read it, so a resolved device-session key never
+  // reaches the shared env where a concurrent request could pick it up
+  // (internal/credentialContext.ts).
+  return storage.run(context, () =>
+    withOutputScope(() => runWithCredentialHolder(fn)),
+  );
 }
 
 let installed = false;

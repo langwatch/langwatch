@@ -1,10 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("../../../utils/apiKey", () => ({
-  checkApiKey: vi.fn(),
+  resolveCredentials: vi.fn(async () => ({
+    apiKey: "test-key",
+    source: "env",
+    endpoint: "https://app.langwatch.ai",
+  })),
 }));
 
-import { checkApiKey } from "../../../utils/apiKey";
+import { resolveCredentials } from "../../../utils/apiKey";
 import { navigateOpenCommand } from "../open";
 
 const noop = () => {
@@ -18,14 +22,15 @@ describe("navigateOpenCommand()", () => {
   });
 
   describe("given a resource id", () => {
-    it("checks the api key before doing anything else", async () => {
+    it("resolves credentials before doing anything else", async () => {
       const log = vi.spyOn(console, "log").mockImplementation(noop);
       await navigateOpenCommand("run_1");
 
-      expect(checkApiKey).toHaveBeenCalledTimes(1);
-      // Ordering, not just presence: the key check must run BEFORE any output,
-      // so a regression that prints first would fail here.
-      const checkOrder = vi.mocked(checkApiKey).mock.invocationCallOrder[0]!;
+      expect(resolveCredentials).toHaveBeenCalledTimes(1);
+      // Ordering, not just presence: the credential check must run BEFORE any
+      // output, so a regression that prints first would fail here.
+      const checkOrder = vi.mocked(resolveCredentials).mock
+        .invocationCallOrder[0]!;
       const logOrder = log.mock.invocationCallOrder[0]!;
       expect(checkOrder).toBeLessThan(logOrder);
     });

@@ -1,7 +1,8 @@
+import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
 import { SuitesApiService } from "@/client-sdk/services/suites";
-import { checkApiKey } from "../../utils/apiKey";
+import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import { resolveOutputFormat } from "../../utils/errorOutput";
 import { buildAuthHeaders } from "@/internal/api/auth";
@@ -11,7 +12,7 @@ export const runSuiteCommand = async (
   id: string,
   options: { wait?: boolean; format?: string },
 ): Promise<void> => {
-  checkApiKey();
+  await resolveCredentials();
 
   const service = new SuitesApiService();
   const spinner = createSpinner(`Scheduling suite run "${id}"...`).start();
@@ -73,7 +74,7 @@ export const runSuiteCommand = async (
     console.log();
     const pollSpinner = createSpinner("Waiting for suite run to complete...").start();
 
-    const apiKey = process.env.LANGWATCH_API_KEY ?? "";
+    const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
     const endpoint = resolveControlPlaneUrl();
 
     let completed = false;

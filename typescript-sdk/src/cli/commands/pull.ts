@@ -10,7 +10,7 @@ import {
 import type { PromptsConfig, PromptsLock, SyncResult } from "../types";
 import { FileManager } from "../utils/fileManager";
 import { ensureProjectInitialized } from "../utils/init";
-import { checkApiKey } from "../utils/apiKey";
+import { resolveCredentials } from "../utils/apiKey";
 import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 
 /**
@@ -198,7 +198,7 @@ export const pullCommand = async (options?: { tag?: string }): Promise<void> => 
   const startTime = Date.now();
 
   try {
-    checkApiKey();
+    await resolveCredentials();
 
     const promptsApiService = new PromptsApiService();
 

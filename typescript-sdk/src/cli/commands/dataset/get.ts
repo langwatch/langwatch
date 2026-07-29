@@ -1,6 +1,6 @@
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
-import { checkApiKey } from "../../utils/apiKey";
+import { resolveCredentials } from "../../utils/apiKey";
 import type { CommandResult } from "../../utils/output";
 import { formatTable, formatRelativeTime } from "../../utils/formatting";
 import { createDatasetService } from "./service-factory";
@@ -54,7 +54,7 @@ const buildDatasetPreviewRows = (
  * Gets dataset details by slug or ID, showing metadata and a preview of records.
  */
 export const getCommand = async (slugOrId: string): Promise<CommandResult | void> => {
-  checkApiKey();
+  await resolveCredentials();
 
   const service = createDatasetService();
   const spinner = createSpinner(`Fetching dataset "${slugOrId}"...`).start();

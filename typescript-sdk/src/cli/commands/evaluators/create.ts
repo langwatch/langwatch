@@ -1,7 +1,7 @@
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
 import { EvaluatorsApiService } from "@/client-sdk/services/evaluators";
-import { checkApiKey } from "../../utils/apiKey";
+import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import {
   commandValidationError,
@@ -45,7 +45,7 @@ export const createEvaluatorCommand = async (
     process.exit(1);
   }
 
-  checkApiKey();
+  await resolveCredentials();
 
   const service = new EvaluatorsApiService();
   const spinner = createSpinner(`Creating evaluator "${name}"...`).start();
