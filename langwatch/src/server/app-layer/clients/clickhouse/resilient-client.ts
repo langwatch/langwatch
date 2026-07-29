@@ -198,7 +198,18 @@ function logFailure({
   try {
     const meta = safeQueryMeta(params);
 
-    queryLogger.error(
+    // `queryLogger` is the ClickHouse QUERY LOG, not application error
+    // reporting — the same channel `logSuccess` writes to at warn/debug. A
+    // failed query is a query-log record here; whether it mattered is decided
+    // by the caller, which receives the rethrow and logs with tenant, table
+    // and trace context.
+    //
+    // At error this was 26,535 lines/day and the middle of a triple-log: the
+    // driver reported the same failure, this reported it, and the repository
+    // reported it again — three ERROR lines per failure, all on one trace_id.
+    // Now exactly one of the three is an error, and it is the one with the
+    // most context.
+    queryLogger.warn(
       {
         source: "clickhouse",
         operation,

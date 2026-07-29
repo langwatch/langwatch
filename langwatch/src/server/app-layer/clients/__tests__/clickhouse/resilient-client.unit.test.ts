@@ -218,13 +218,17 @@ describe("createResilientClickHouseClient()", () => {
         "Syntax error in query",
       );
 
-      expect(mockQueryLogger.error).toHaveBeenCalledWith(
+      // The query log records the failure at warn; the caller that receives
+      // the rethrow owns the error-level report. Asserting the absence of
+      // error is what stops this regressing back into a triple-log.
+      expect(mockQueryLogger.warn).toHaveBeenCalledWith(
         expect.objectContaining({
           source: "clickhouse",
           operation: "query",
         }),
         expect.any(String),
       );
+      expect(mockQueryLogger.error).not.toHaveBeenCalled();
     });
 
     it("passes the raw error object for Pino serializer", async () => {
@@ -241,7 +245,7 @@ describe("createResilientClickHouseClient()", () => {
         "Syntax error in query",
       );
 
-      const loggedObj = mockQueryLogger.error.mock.calls[0]![0] as Record<
+      const loggedObj = mockQueryLogger.warn.mock.calls[0]![0] as Record<
         string,
         unknown
       >;
