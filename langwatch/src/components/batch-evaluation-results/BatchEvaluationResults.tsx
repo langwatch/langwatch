@@ -32,9 +32,9 @@ import {
   BatchEvaluationResultsTable,
   ColumnVisibilityButton,
   DEFAULT_HIDDEN_COLUMNS,
-  DEFAULT_VIEW_SECTIONS,
-  ViewLensButton,
-  type ViewSections,
+  FieldsButton,
+  type ResultField,
+  RowHeightButton,
 } from "./BatchEvaluationResultsTable";
 import { type BatchRunSummary, BatchRunsSidebar } from "./BatchRunsSidebar";
 import { ComparisonCharts } from "./ComparisonCharts";
@@ -42,12 +42,20 @@ import { downloadCsv } from "./csvExport";
 import { getRunDisplayName } from "./getRunDisplayName";
 import { isRunFinished } from "./isRunFinished";
 import { TableSkeleton } from "./TableSkeleton";
+import { DEFAULT_ROW_HEIGHT, type RowHeight } from "./tableUtils";
 import {
   type BatchEvaluationData,
   transformBatchEvaluationData,
 } from "./types";
 import { useComparisonMode } from "./useComparisonMode";
 import { RUN_COLORS, useMultiRunData } from "./useMultiRunData";
+
+/** Every target field shown by default. */
+const DEFAULT_RESULT_FIELDS: Record<ResultField, boolean> = {
+  outputs: true,
+  scores: true,
+  costAndLatency: true,
+};
 
 type BatchEvaluationResultsProps = {
   project?: Project;
@@ -83,11 +91,24 @@ export function BatchEvaluationResults({
     () => new Set(DEFAULT_HIDDEN_COLUMNS),
   );
 
-  // View lens state - which result sections to render (persisted across sessions)
-  const [viewSections, setViewSections] = useLocalStorage<ViewSections>(
-    "batch-results-view-sections",
-    DEFAULT_VIEW_SECTIONS,
+  // Fields state - which target details to render. Deliberately NOT
+  // persisted: a section hidden on a previous visit should never silently
+  // explain "no results" on a different run.
+  const [fields, setFields] = useState<Record<ResultField, boolean>>(
+    DEFAULT_RESULT_FIELDS,
   );
+
+  // Row height - how much of each cell's content shows before it needs
+  // expanding. Nothing is hidden here, only resized, so unlike field
+  // visibility this is safe to persist across sessions.
+  const [rowHeight, setRowHeight] = useLocalStorage<RowHeight>(
+    "batch-results-row-height",
+    DEFAULT_ROW_HEIGHT,
+  );
+
+  const toggleField = useCallback((field: ResultField) => {
+    setFields((prev) => ({ ...prev, [field]: !prev[field] }));
+  }, []);
 
   // Toggle column visibility
   const toggleColumn = useCallback((columnName: string) => {
@@ -509,10 +530,10 @@ export function BatchEvaluationResults({
             </Button>
           )}
           {transformedData && transformedData.targetColumns.length > 0 && (
-            <ViewLensButton
-              sections={viewSections}
-              onChange={setViewSections}
-            />
+            <>
+              <RowHeightButton value={rowHeight} onChange={setRowHeight} />
+              <FieldsButton fields={fields} onToggle={toggleField} />
+            </>
           )}
           {transformedData && transformedData.datasetColumns.length > 0 && (
             <ColumnVisibilityButton
@@ -592,8 +613,10 @@ export function BatchEvaluationResults({
                   onToggleColumn={toggleColumn}
                   comparisonData={comparisonData}
                   targetColors={targetColors}
-                  showOutputs={viewSections.outputs}
-                  showEvaluations={viewSections.evaluations}
+                  showOutputs={fields.outputs}
+                  showEvaluations={fields.scores}
+                  showCostAndLatency={fields.costAndLatency}
+                  rowHeight={rowHeight}
                 />
               </Card.Body>
             </Card.Root>

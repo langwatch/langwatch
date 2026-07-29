@@ -432,8 +432,8 @@ describe("BatchEvaluationResultsTable", () => {
     });
   });
 
-  describe("when changing visible result sections", () => {
-    /** @scenario Hide evaluation scores to focus on outputs */
+  describe("when changing visible result fields", () => {
+    /** @scenario Hide scores to focus on outputs */
     it("hides evaluator chips but keeps outputs when showEvaluations is false", () => {
       const data = createTestData();
 
@@ -451,7 +451,7 @@ describe("BatchEvaluationResultsTable", () => {
       expect(screen.queryByText("Exact Match")).not.toBeInTheDocument();
     });
 
-    /** @scenario Hide outputs to focus on evaluation scores */
+    /** @scenario Hide outputs to focus on scores */
     it("hides outputs but keeps evaluator chips when showOutputs is false", () => {
       const data = createTestData();
 
@@ -468,8 +468,26 @@ describe("BatchEvaluationResultsTable", () => {
       expect(screen.queryByText(/response/)).not.toBeInTheDocument();
     });
 
-    /** @scenario Hide the target column when no target sections are shown */
-    it("removes the target column when both sections are off", () => {
+    /** @scenario Hide cost and latency to reduce clutter */
+    it("hides cost and latency but keeps output when showCostAndLatency is false", () => {
+      const data = createTestData();
+
+      render(
+        <BatchEvaluationResultsTable
+          data={data}
+          showCostAndLatency={false}
+          disableVirtualization
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(screen.getByText(/response/)).toBeInTheDocument();
+      expect(screen.queryByTestId("cost-target-1")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("latency-target-1")).not.toBeInTheDocument();
+    });
+
+    /** @scenario Hide the target column when no fields are shown */
+    it("removes the target column when all fields are off", () => {
       const data = createTestData();
 
       render(
@@ -477,6 +495,7 @@ describe("BatchEvaluationResultsTable", () => {
           data={data}
           showOutputs={false}
           showEvaluations={false}
+          showCostAndLatency={false}
           disableVirtualization
         />,
         { wrapper: Wrapper },
@@ -504,7 +523,7 @@ describe("BatchEvaluationResultsTable", () => {
         },
       ];
 
-      /** @scenario Hide evaluation scores to focus on outputs */
+      /** @scenario Hide scores to focus on outputs */
       it("hides evaluator chips but keeps outputs when showEvaluations is false", () => {
         render(
           <BatchEvaluationResultsTable
@@ -520,7 +539,7 @@ describe("BatchEvaluationResultsTable", () => {
         expect(screen.queryAllByText("Exact Match")).toHaveLength(0);
       });
 
-      /** @scenario Hide outputs to focus on evaluation scores */
+      /** @scenario Hide outputs to focus on scores */
       it("hides outputs but keeps evaluator chips when showOutputs is false", () => {
         render(
           <BatchEvaluationResultsTable
@@ -536,14 +555,15 @@ describe("BatchEvaluationResultsTable", () => {
         expect(screen.queryAllByText(/response/)).toHaveLength(0);
       });
 
-      /** @scenario Hide the target column when no target sections are shown */
-      it("removes the target column when both sections are off", () => {
+      /** @scenario Hide the target column when no fields are shown */
+      it("removes the target column when all fields are off", () => {
         render(
           <BatchEvaluationResultsTable
             data={null}
             comparisonData={createComparisonRuns()}
             showOutputs={false}
             showEvaluations={false}
+            showCostAndLatency={false}
             disableVirtualization
           />,
           { wrapper: Wrapper },
@@ -552,6 +572,29 @@ describe("BatchEvaluationResultsTable", () => {
         expect(screen.queryByText("GPT-4o")).not.toBeInTheDocument();
         expect(screen.getAllByText("What is 2+2?").length).toBeGreaterThan(0);
       });
+    });
+  });
+
+  describe("when changing row height", () => {
+    /** @scenario Increase row height to see more of a long output before expanding */
+    it("threads the selected tier down to each cell", () => {
+      const data = createTestData();
+
+      render(
+        <BatchEvaluationResultsTable
+          data={data}
+          rowHeight="l"
+          disableVirtualization
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(
+        screen.getByText("What is 2+2?").closest("[data-row-height]"),
+      ).toHaveAttribute("data-row-height", "l");
+      expect(
+        screen.getByText(/response/).closest("[data-row-height]"),
+      ).toHaveAttribute("data-row-height", "l");
     });
   });
 });

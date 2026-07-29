@@ -9,20 +9,22 @@ import { Box, Button, HStack, Portal, Text, VStack } from "@chakra-ui/react";
 import { useCallback, useRef, useState } from "react";
 import { LuCheck, LuCircleAlert, LuCopy, LuListTree } from "react-icons/lu";
 import { EvaluatorResultChip } from "~/components/shared/EvaluatorResultChip";
-import { formatLatency } from "~/components/shared/formatters";
+import { formatCost, formatLatency } from "~/components/shared/formatters";
 import { Tooltip } from "~/components/ui/tooltip";
 import { describeCellFailure } from "~/experiments-v3/utils/cellFailure";
 import { TraceIdPeek } from "~/features/traces-v2/components/TraceIdPeek";
 import { useDrawer } from "~/hooks/useDrawer";
 import { formatTargetOutput } from "~/utils/formatTargetOutput";
 import { isTextLikelyOverflowing } from "~/utils/textOverflowHeuristic";
+import {
+  COLLAPSED_CELL_HEIGHT_PX,
+  DEFAULT_ROW_HEIGHT,
+  type RowHeight,
+} from "./tableUtils";
 import type { BatchEvaluatorResult, BatchTargetOutput } from "./types";
 
 // Max characters to display for performance
 const MAX_DISPLAY_CHARS = 10000;
-
-// Max height for collapsed output
-const OUTPUT_MAX_HEIGHT = 120;
 
 type BatchTargetCellProps = {
   /** Target output data for this row */
@@ -43,6 +45,10 @@ type BatchTargetCellProps = {
   showOutput?: boolean;
   /** Whether to render the evaluator score chips (default true) */
   showEvaluations?: boolean;
+  /** Whether to render the cost/latency readout (default true) */
+  showCostAndLatency?: boolean;
+  /** How much of the collapsed output to show before it needs expanding */
+  rowHeight?: RowHeight;
 };
 
 export function BatchTargetCell({
@@ -51,7 +57,10 @@ export function BatchTargetCell({
   suppressedEvaluatorIds,
   showOutput = true,
   showEvaluations = true,
+  showCostAndLatency = true,
+  rowHeight = DEFAULT_ROW_HEIGHT,
 }: BatchTargetCellProps) {
+  const outputMaxHeight = COLLAPSED_CELL_HEIGHT_PX[rowHeight];
   const { openDrawer } = useDrawer();
 
   // State for expanded output view
@@ -232,7 +241,8 @@ export function BatchTargetCell({
       return (
         <Box position="relative">
           <Box
-            maxHeight={`${OUTPUT_MAX_HEIGHT}px`}
+            maxHeight={`${outputMaxHeight}px`}
+            data-row-height={rowHeight}
             overflow="hidden"
             cursor={isLikelyOverflowing ? "pointer" : undefined}
             onClick={isLikelyOverflowing ? handleExpandOutput : undefined}
@@ -329,8 +339,26 @@ export function BatchTargetCell({
       borderRadius="md"
       px={0.5}
     >
+      {/* Cost display */}
+      {showCostAndLatency && targetOutput.cost !== null && (
+        <Tooltip
+          content={`Cost: ${formatCost(targetOutput.cost)}`}
+          positioning={{ placement: "top" }}
+          openDelay={100}
+        >
+          <Text
+            fontSize="11px"
+            color="fg.muted"
+            whiteSpace="nowrap"
+            px={1}
+            data-testid={`cost-${targetOutput.targetId}`}
+          >
+            {formatCost(targetOutput.cost)}
+          </Text>
+        </Tooltip>
+      )}
       {/* Latency display */}
-      {targetOutput.duration !== null && (
+      {showCostAndLatency && targetOutput.duration !== null && (
         <Tooltip
           content={`Latency: ${formatLatency(targetOutput.duration)}`}
           positioning={{ placement: "top" }}
@@ -348,7 +376,7 @@ export function BatchTargetCell({
         </Tooltip>
       )}
       {/* Trace link button */}
-      {targetOutput.traceId && (
+      {showOutput && targetOutput.traceId && (
         <Tooltip
           content="View trace"
           positioning={{ placement: "top" }}
@@ -365,9 +393,11 @@ export function BatchTargetCell({
           </Button>
         </Tooltip>
       )}
-      {targetOutput.traceId && <TraceIdPeek traceId={targetOutput.traceId} />}
+      {showOutput && targetOutput.traceId && (
+        <TraceIdPeek traceId={targetOutput.traceId} />
+      )}
       {/* Copy button */}
-      {rawOutput && (
+      {showOutput && rawOutput && (
         <Tooltip
           content={hasCopied ? "Copied!" : "Copy to clipboard"}
           positioning={{ placement: "top" }}
@@ -400,7 +430,7 @@ export function BatchTargetCell({
         gap={2}
         css={{ "&:hover .cell-action-btn": { opacity: 1 } }}
       >
-        {showOutput && renderActionButtons(false)}
+        {(showOutput || showCostAndLatency) && renderActionButtons(false)}
         {showOutput && renderOutput(false)}
         {showEvaluations && renderEvaluatorChips()}
       </VStack>
@@ -437,7 +467,7 @@ export function BatchTargetCell({
             }}
           >
             <VStack align="stretch" gap={2} height="100%" position="relative">
-              {showOutput && renderActionButtons(true)}
+              {(showOutput || showCostAndLatency) && renderActionButtons(true)}
               {showOutput && renderOutput(true)}
               {showEvaluations && renderEvaluatorChips()}
             </VStack>

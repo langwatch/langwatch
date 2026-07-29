@@ -7,8 +7,8 @@
  *
  * The actual table implementations are in separate files for better maintainability.
  */
-import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
-import { Columns3, Eye } from "lucide-react";
+import { Button, HStack, Text, VStack } from "@chakra-ui/react";
+import { Columns3, Rows3, SlidersHorizontal } from "lucide-react";
 import { Checkbox } from "~/components/ui/checkbox";
 import {
   PopoverArrow,
@@ -17,8 +17,14 @@ import {
   PopoverRoot,
   PopoverTrigger,
 } from "~/components/ui/popover";
+import { Radio, RadioGroup } from "~/components/ui/radio";
 import { ComparisonTable } from "./ComparisonTable";
 import { SingleRunTable } from "./SingleRunTable";
+import {
+  DEFAULT_ROW_HEIGHT,
+  ROW_HEIGHT_OPTIONS,
+  type RowHeight,
+} from "./tableUtils";
 import type {
   BatchDatasetColumn,
   BatchEvaluationData,
@@ -42,6 +48,10 @@ type BatchEvaluationResultsTableProps = {
   showOutputs?: boolean;
   /** Whether to render evaluator score chips (default true) */
   showEvaluations?: boolean;
+  /** Whether to render the cost/latency readout (default true) */
+  showCostAndLatency?: boolean;
+  /** How much of each cell's collapsed content to show (default "m") */
+  rowHeight?: RowHeight;
   /** Disable virtualization (for tests) */
   disableVirtualization?: boolean;
 };
@@ -99,125 +109,110 @@ export const ColumnVisibilityButton = ({
 };
 
 /**
- * Which result sections the table renders. Lets users dial the detail level
- * up or down — e.g. read outputs without the evaluator-score noise, or scan
- * scores without the outputs. Dataset columns stay controlled by
- * {@link ColumnVisibilityButton}.
+ * A target detail the results table can show or hide, independently of the
+ * others. Dataset columns stay controlled by {@link ColumnVisibilityButton}.
  */
-export type ViewSections = {
-  /** Show the target/model output values */
-  outputs: boolean;
-  /** Show the evaluator score chips */
-  evaluations: boolean;
+export type ResultField = "outputs" | "scores" | "costAndLatency";
+
+const FIELD_LABELS: Record<ResultField, string> = {
+  outputs: "Outputs",
+  scores: "Scores",
+  costAndLatency: "Latency and cost",
 };
 
-export const DEFAULT_VIEW_SECTIONS: ViewSections = {
-  outputs: true,
-  evaluations: true,
-};
-
-/** Quick "lenses" that map to common section combinations. */
-const VIEW_PRESETS: { id: string; label: string; sections: ViewSections }[] = [
-  {
-    id: "all",
-    label: "Everything",
-    sections: { outputs: true, evaluations: true },
-  },
-  {
-    id: "data",
-    label: "Data only",
-    sections: { outputs: true, evaluations: false },
-  },
-  {
-    id: "scores",
-    label: "Scores only",
-    sections: { outputs: false, evaluations: true },
-  },
-];
-
-/**
- * View lens control — quick presets plus per-section toggles for tuning how
- * much detail the results table shows. Exported for use in the page header.
- */
-export type ViewLensButtonProps = {
-  sections: ViewSections;
-  onChange: (sections: ViewSections) => void;
-};
-
-const SectionToggle = ({
-  label,
+const FieldToggle = ({
+  field,
   checked,
   onToggle,
 }: {
-  label: string;
+  field: ResultField;
   checked: boolean;
-  onToggle: () => void;
+  onToggle: (field: ResultField) => void;
 }) => (
   <HStack paddingY={1}>
-    <Checkbox checked={checked} onCheckedChange={onToggle}>
-      <Text fontSize="sm">{label}</Text>
+    <Checkbox checked={checked} onCheckedChange={() => onToggle(field)}>
+      <Text fontSize="sm">{FIELD_LABELS[field]}</Text>
     </Checkbox>
   </HStack>
 );
 
-export const ViewLensButton = ({ sections, onChange }: ViewLensButtonProps) => {
-  const activePreset = VIEW_PRESETS.find(
-    (preset) =>
-      preset.sections.outputs === sections.outputs &&
-      preset.sections.evaluations === sections.evaluations,
-  );
-
-  return (
-    <PopoverRoot>
-      <PopoverTrigger asChild>
-        <Button size="sm" variant="outline" aria-label="Change results view">
-          <Eye size={16} />
-          {activePreset?.label ?? "View"}
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent width="220px">
-        <PopoverArrow />
-        <PopoverBody>
-          <VStack align="stretch" gap={2}>
-            <Text fontSize="xs" color="fg.muted" fontWeight="medium">
-              Quick views
-            </Text>
-            <HStack gap={1} flexWrap="wrap">
-              {VIEW_PRESETS.map((preset) => (
-                <Button
-                  key={preset.id}
-                  size="xs"
-                  variant={activePreset?.id === preset.id ? "solid" : "outline"}
-                  onClick={() => onChange(preset.sections)}
-                >
-                  {preset.label}
-                </Button>
-              ))}
-            </HStack>
-            <Box borderTopWidth="1px" borderColor="border" marginY={1} />
-            <Text fontSize="xs" color="fg.muted" fontWeight="medium">
-              Sections
-            </Text>
-            <SectionToggle
-              label="Outputs"
-              checked={sections.outputs}
-              onToggle={() =>
-                onChange({ ...sections, outputs: !sections.outputs })
-              }
-            />
-            <SectionToggle
-              label="Evaluations"
-              checked={sections.evaluations}
-              onToggle={() =>
-                onChange({ ...sections, evaluations: !sections.evaluations })
-              }
-            />
-          </VStack>
-        </PopoverBody>
-      </PopoverContent>
-    </PopoverRoot>
-  );
+/**
+ * Fields control — independent checkboxes for which target details render.
+ * The trigger label is always "Fields": it never mutates to reflect the
+ * current selection, so there's no state it can't name (unlike a preset
+ * button whose label degrades to a generic fallback once the selection
+ * doesn't match any preset). Exported for use in the page header.
+ */
+export type FieldsButtonProps = {
+  fields: Record<ResultField, boolean>;
+  onToggle: (field: ResultField) => void;
 };
+
+export const FieldsButton = ({ fields, onToggle }: FieldsButtonProps) => (
+  <PopoverRoot>
+    <PopoverTrigger asChild>
+      <Button size="sm" variant="outline" aria-label="Choose result fields">
+        <SlidersHorizontal size={16} />
+        Fields
+      </Button>
+    </PopoverTrigger>
+    <PopoverContent width="200px">
+      <PopoverArrow />
+      <PopoverBody>
+        {(Object.keys(FIELD_LABELS) as ResultField[]).map((field) => (
+          <FieldToggle
+            key={field}
+            field={field}
+            checked={fields[field]}
+            onToggle={onToggle}
+          />
+        ))}
+      </PopoverBody>
+    </PopoverContent>
+  </PopoverRoot>
+);
+
+/**
+ * Row height control — how much of each cell's content shows before it
+ * needs expanding. Unlike field visibility, nothing is hidden here, only
+ * resized, so it's safe (and useful) to persist across sessions — see the
+ * `useLocalStorage` call in {@link BatchEvaluationResults}.
+ */
+export type RowHeightButtonProps = {
+  value: RowHeight;
+  onChange: (value: RowHeight) => void;
+};
+
+export const RowHeightButton = ({ value, onChange }: RowHeightButtonProps) => (
+  <PopoverRoot>
+    <PopoverTrigger asChild>
+      <Button size="sm" variant="outline" aria-label="Change row height">
+        <Rows3 size={16} />
+        Row height
+      </Button>
+    </PopoverTrigger>
+    <PopoverContent width="160px">
+      <PopoverArrow />
+      <PopoverBody>
+        <RadioGroup
+          value={value}
+          onValueChange={(d: { value: string | null }) => {
+            if (d.value) onChange(d.value as RowHeight);
+          }}
+          size="sm"
+        >
+          <VStack align="stretch" gap={1.5}>
+            {ROW_HEIGHT_OPTIONS.map((option) => (
+              <Radio key={option.value} value={option.value}>
+                <Text fontSize="sm">{option.label}</Text>
+              </Radio>
+            ))}
+          </VStack>
+        </RadioGroup>
+      </PopoverBody>
+    </PopoverContent>
+  </PopoverRoot>
+);
 
 /**
  * Main table component that chooses between single run and comparison modes
@@ -230,6 +225,8 @@ export function BatchEvaluationResultsTable({
   targetColors = {},
   showOutputs = true,
   showEvaluations = true,
+  showCostAndLatency = true,
+  rowHeight = DEFAULT_ROW_HEIGHT,
   disableVirtualization = false,
 }: BatchEvaluationResultsTableProps) {
   // Determine if we're in comparison mode
@@ -243,6 +240,8 @@ export function BatchEvaluationResultsTable({
         hiddenColumns={hiddenColumns}
         showOutputs={showOutputs}
         showEvaluations={showEvaluations}
+        showCostAndLatency={showCostAndLatency}
+        rowHeight={rowHeight}
         disableVirtualization={disableVirtualization}
       />
     );
@@ -256,6 +255,8 @@ export function BatchEvaluationResultsTable({
       targetColors={targetColors}
       showOutputs={showOutputs}
       showEvaluations={showEvaluations}
+      showCostAndLatency={showCostAndLatency}
+      rowHeight={rowHeight}
       disableVirtualization={disableVirtualization}
     />
   );

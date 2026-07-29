@@ -20,8 +20,10 @@ import { ExpandableDatasetCell } from "./ExpandableDatasetCell";
 import { TableSkeleton } from "./TableSkeleton";
 import {
   calculateMinTableWidth,
+  DEFAULT_ROW_HEIGHT,
+  ESTIMATED_ROW_HEIGHT_PX,
   getTableStyles,
-  ROW_HEIGHT,
+  type RowHeight,
 } from "./tableUtils";
 import type {
   BatchDatasetColumn,
@@ -41,6 +43,10 @@ type ComparisonTableProps = {
   showOutputs?: boolean;
   /** Whether to render evaluator score chips (default true) */
   showEvaluations?: boolean;
+  /** Whether to render the cost/latency readout (default true) */
+  showCostAndLatency?: boolean;
+  /** How much of each cell's collapsed content to show (default "m") */
+  rowHeight?: RowHeight;
   /** Disable virtualization (for tests) */
   disableVirtualization?: boolean;
 };
@@ -61,15 +67,26 @@ type ComparisonRow = {
 // Column helper for comparison rows
 const comparisonColumnHelper = createColumnHelper<ComparisonRow>();
 
+type BuildComparisonColumnsOptions = {
+  comparisonData: ComparisonRunData[];
+  hiddenColumns: Set<string>;
+  showOutputs: boolean;
+  showEvaluations: boolean;
+  showCostAndLatency: boolean;
+  rowHeight: RowHeight;
+};
+
 /**
  * Build columns for comparison mode
  */
-const buildComparisonColumns = (
-  comparisonData: ComparisonRunData[],
-  hiddenColumns: Set<string>,
-  showOutputs: boolean,
-  showEvaluations: boolean,
-) => {
+const buildComparisonColumns = ({
+  comparisonData,
+  hiddenColumns,
+  showOutputs,
+  showEvaluations,
+  showCostAndLatency,
+  rowHeight,
+}: BuildComparisonColumnsOptions) => {
   const columns = [];
 
   // Get a merged view of all columns from all runs
@@ -136,7 +153,11 @@ const buildComparisonColumns = (
                 runId: run.runId,
                 color: run.color,
                 value: (
-                  <ExpandableDatasetCell value={value} columnName={colName} />
+                  <ExpandableDatasetCell
+                    value={value}
+                    columnName={colName}
+                    rowHeight={rowHeight}
+                  />
                 ),
               };
             });
@@ -160,8 +181,9 @@ const buildComparisonColumns = (
   }
 
   // Target columns with diff values.
-  // Skip them entirely when neither outputs nor evaluations are shown.
-  const showTargetColumns = showOutputs || showEvaluations;
+  // Skip them entirely when no target field is shown.
+  const showTargetColumns =
+    showOutputs || showEvaluations || showCostAndLatency;
   for (const [targetId, targetCol] of showTargetColumns
     ? allTargetColumns
     : new Map<string, BatchTargetColumn>()) {
@@ -191,6 +213,8 @@ const buildComparisonColumns = (
                     targetOutput={targetOutput}
                     showOutput={showOutputs}
                     showEvaluations={showEvaluations}
+                    showCostAndLatency={showCostAndLatency}
+                    rowHeight={rowHeight}
                   />
                 ) : (
                   <Text fontSize="13px" color="fg.subtle">
@@ -261,17 +285,28 @@ export function ComparisonTable({
   hiddenColumns = new Set(),
   showOutputs = true,
   showEvaluations = true,
+  showCostAndLatency = true,
+  rowHeight = DEFAULT_ROW_HEIGHT,
   disableVirtualization = false,
 }: ComparisonTableProps) {
   // Build columns for comparison mode
   const columns = useMemo(() => {
-    return buildComparisonColumns(
+    return buildComparisonColumns({
       comparisonData,
       hiddenColumns,
       showOutputs,
       showEvaluations,
-    );
-  }, [comparisonData, hiddenColumns, showOutputs, showEvaluations]);
+      showCostAndLatency,
+      rowHeight,
+    });
+  }, [
+    comparisonData,
+    hiddenColumns,
+    showOutputs,
+    showEvaluations,
+    showCostAndLatency,
+    rowHeight,
+  ]);
 
   // Build comparison rows
   const comparisonRows = useMemo(() => {
@@ -306,7 +341,11 @@ export function ComparisonTable({
     () => scrollContainer,
     [scrollContainer],
   );
-  const estimateSize = useCallback(() => ROW_HEIGHT, []);
+  const estimatedRowHeight = ESTIMATED_ROW_HEIGHT_PX[rowHeight];
+  const estimateSize = useCallback(
+    () => estimatedRowHeight,
+    [estimatedRowHeight],
+  );
 
   // Set up row virtualization with dynamic measurement
   const rowVirtualizer = useVirtualizer({
@@ -318,7 +357,8 @@ export function ComparisonTable({
     // Enable dynamic measurement - measures actual row heights as they render
     measureElement:
       typeof window !== "undefined"
-        ? (element) => element?.getBoundingClientRect().height ?? ROW_HEIGHT
+        ? (element) =>
+            element?.getBoundingClientRect().height ?? estimatedRowHeight
         : undefined,
   });
 
@@ -343,7 +383,7 @@ export function ComparisonTable({
       (c) => !hiddenColumns.has(c.name),
     ).length ?? 0;
   const targetColCount =
-    showOutputs || showEvaluations
+    showOutputs || showEvaluations || showCostAndLatency
       ? (firstRunWithData?.data?.targetColumns.length ?? 0)
       : 0;
   const minTableWidth = calculateMinTableWidth(datasetColCount, targetColCount);

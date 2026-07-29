@@ -28,9 +28,11 @@ import { ExpandableDatasetCell } from "./ExpandableDatasetCell";
 import { TableSkeleton } from "./TableSkeleton";
 import {
   calculateMinTableWidth,
+  DEFAULT_ROW_HEIGHT,
+  ESTIMATED_ROW_HEIGHT_PX,
   getTableStyles,
   inferColumnType,
-  ROW_HEIGHT,
+  type RowHeight,
 } from "./tableUtils";
 import type {
   BatchComparisonColumn,
@@ -53,6 +55,10 @@ type SingleRunTableProps = {
   showOutputs?: boolean;
   /** Whether to render evaluator score chips (default true) */
   showEvaluations?: boolean;
+  /** Whether to render the cost/latency readout (default true) */
+  showCostAndLatency?: boolean;
+  /** How much of each cell's collapsed content to show (default "m") */
+  rowHeight?: RowHeight;
   /** Disable virtualization (for tests) */
   disableVirtualization?: boolean;
 };
@@ -60,20 +66,36 @@ type SingleRunTableProps = {
 // Column helper for type-safe column definitions
 const columnHelper = createColumnHelper<BatchResultRow>();
 
+type BuildColumnsOptions = {
+  datasetColumns: BatchDatasetColumn[];
+  targetColumns: BatchTargetColumn[];
+  comparisonColumns: BatchComparisonColumn[];
+  aggregatesMap: Map<string, BatchTargetAggregate>;
+  rows: BatchResultRow[];
+  hiddenColumns: Set<string>;
+  showOutputs: boolean;
+  showEvaluations: boolean;
+  showCostAndLatency: boolean;
+  rowHeight: RowHeight;
+  targetColors?: Record<string, string>;
+};
+
 /**
  * Build columns for single run mode
  */
-const buildColumns = (
-  datasetColumns: BatchDatasetColumn[],
-  targetColumns: BatchTargetColumn[],
-  comparisonColumns: BatchComparisonColumn[],
-  aggregatesMap: Map<string, BatchTargetAggregate>,
-  rows: BatchResultRow[],
-  hiddenColumns: Set<string>,
-  showOutputs: boolean,
-  showEvaluations: boolean,
-  targetColors?: Record<string, string>,
-) => {
+const buildColumns = ({
+  datasetColumns,
+  targetColumns,
+  comparisonColumns,
+  aggregatesMap,
+  rows,
+  hiddenColumns,
+  showOutputs,
+  showEvaluations,
+  showCostAndLatency,
+  rowHeight,
+  targetColors,
+}: BuildColumnsOptions) => {
   // Evaluator ids whose per-row chip is redundant with the dedicated Winner
   // column below — the generic `EvaluatorResultChip` renders the comparison
   // verdict as `<target_XYZ> 1.00`, which reads as noise to users (dogfood
@@ -151,7 +173,13 @@ const buildColumns = (
           }
 
           // Use expandable cell for text content
-          return <ExpandableDatasetCell value={value} columnName={col.name} />;
+          return (
+            <ExpandableDatasetCell
+              value={value}
+              columnName={col.name}
+              rowHeight={rowHeight}
+            />
+          );
         },
       }),
     );
@@ -166,11 +194,12 @@ const buildColumns = (
   );
 
   // Target columns with headers that include summary.
-  // Skip a column entirely when neither outputs nor evaluations are shown —
-  // unless it hosts a comparison verdict (Winner cell), which is independent
-  // of the output/evaluation section toggles and would otherwise vanish
-  // along with them, silently dropping the comparison result.
-  const showTargetColumns = showOutputs || showEvaluations;
+  // Skip a column entirely when no target field is shown — unless it hosts
+  // a comparison verdict (Winner cell), which is independent of the field
+  // toggles and would otherwise vanish along with them, silently dropping
+  // the comparison result.
+  const showTargetColumns =
+    showOutputs || showEvaluations || showCostAndLatency;
   for (const targetCol of targetColumns) {
     const comparisonMeta = comparisonByTargetId.get(targetCol.id);
     if (!showTargetColumns && !comparisonMeta) continue;
@@ -217,6 +246,8 @@ const buildColumns = (
               suppressedEvaluatorIds={comparisonEvaluatorIds}
               showOutput={showOutputs}
               showEvaluations={showEvaluations}
+              showCostAndLatency={showCostAndLatency}
+              rowHeight={rowHeight}
             />
           );
         },
@@ -277,6 +308,8 @@ export function SingleRunTable({
   targetColors = {},
   showOutputs = true,
   showEvaluations = true,
+  showCostAndLatency = true,
+  rowHeight = DEFAULT_ROW_HEIGHT,
   disableVirtualization = false,
 }: SingleRunTableProps) {
   // Check if target colors should be shown (non-empty means X-axis is "target")
@@ -291,23 +324,27 @@ export function SingleRunTable({
   // Build columns from data
   const columns = useMemo(() => {
     if (!data) return [];
-    return buildColumns(
-      data.datasetColumns,
-      data.targetColumns,
-      data.comparisonColumns ?? [],
+    return buildColumns({
+      datasetColumns: data.datasetColumns,
+      targetColumns: data.targetColumns,
+      comparisonColumns: data.comparisonColumns ?? [],
       aggregatesMap,
-      data.rows,
+      rows: data.rows,
       hiddenColumns,
       showOutputs,
       showEvaluations,
-      showTargetColors ? targetColors : undefined,
-    );
+      showCostAndLatency,
+      rowHeight,
+      targetColors: showTargetColors ? targetColors : undefined,
+    });
   }, [
     data,
     aggregatesMap,
     hiddenColumns,
     showOutputs,
     showEvaluations,
+    showCostAndLatency,
+    rowHeight,
     showTargetColors,
     targetColors,
   ]);
@@ -341,7 +378,11 @@ export function SingleRunTable({
     () => scrollContainer,
     [scrollContainer],
   );
-  const estimateSize = useCallback(() => ROW_HEIGHT, []);
+  const estimatedRowHeight = ESTIMATED_ROW_HEIGHT_PX[rowHeight];
+  const estimateSize = useCallback(
+    () => estimatedRowHeight,
+    [estimatedRowHeight],
+  );
 
   // Set up row virtualization with dynamic measurement
   const rowVirtualizer = useVirtualizer({
@@ -353,7 +394,8 @@ export function SingleRunTable({
     // Enable dynamic measurement - measures actual row heights as they render
     measureElement:
       typeof window !== "undefined"
-        ? (element) => element?.getBoundingClientRect().height ?? ROW_HEIGHT
+        ? (element) =>
+            element?.getBoundingClientRect().height ?? estimatedRowHeight
         : undefined,
   });
 
@@ -381,7 +423,8 @@ export function SingleRunTable({
   const comparisonTargetIds = new Set(
     (data.comparisonColumns ?? []).map((p) => p.evaluatorId),
   );
-  const showTargetColumns = showOutputs || showEvaluations;
+  const showTargetColumns =
+    showOutputs || showEvaluations || showCostAndLatency;
   const targetColCount = showTargetColumns
     ? data.targetColumns.length
     : data.targetColumns.filter((t) => comparisonTargetIds.has(t.id)).length;
