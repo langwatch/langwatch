@@ -11,7 +11,7 @@ vi.mock("../../../src/server/app-layer/app", () => ({
 }));
 
 import type { PrismaClient } from "@prisma/client";
-import type Stripe from "stripe";
+import Stripe from "stripe";
 import type { OrganizationRepository } from "../../../src/server/app-layer/organizations/repositories/organization.repository";
 import type { SubscriptionRepository } from "../../../src/server/app-layer/subscription/subscription.repository";
 import type { SubscriptionService } from "../../../src/server/app-layer/subscription/subscription.service";
@@ -709,19 +709,21 @@ describe("EESubscriptionService", () => {
       });
     });
 
-    describe("when the payment provider fails to return invoices", () => {
-      it("fails with a named handled error instead of an unknown one", async () => {
+    describe("when the provider rate-limits the invoice list", () => {
+      it("fails with a retryable provider-unavailable error", async () => {
         organizationRepository.getStripeCustomerId.mockResolvedValue("cus_123");
         stripe.invoices.list.mockRejectedValue(
-          new Error("No such customer: 'cus_123'"),
+          new Stripe.errors.StripeRateLimitError({ message: "slow down" }),
         );
 
         await expect(
           service.listInvoices({ organizationId: "org_with_stripe" }),
-        ).rejects.toMatchObject({ code: "billing_invoices_unavailable" });
+        ).rejects.toMatchObject({ code: "billing_provider_unavailable" });
       });
+    });
 
-      it("keeps the provider error as a reason", async () => {
+    describe("when the invoice list fails for a reason we cannot name", () => {
+      it("lets the original error through rather than dressing it as handled", async () => {
         const providerError = new Error("No such customer: 'cus_123'");
         organizationRepository.getStripeCustomerId.mockResolvedValue("cus_123");
         stripe.invoices.list.mockRejectedValue(providerError);
@@ -730,9 +732,8 @@ describe("EESubscriptionService", () => {
           .listInvoices({ organizationId: "org_with_stripe" })
           .catch((caught: unknown) => caught);
 
-        expect((error as { reasons: readonly Error[] }).reasons).toEqual([
-          providerError,
-        ]);
+        expect(error).toBe(providerError);
+        expect(error).not.toHaveProperty("isHandled");
       });
     });
 

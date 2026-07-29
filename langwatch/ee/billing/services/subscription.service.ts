@@ -14,10 +14,8 @@ import type {
   SubscriptionService,
 } from "../../../src/server/app-layer/subscription/subscription.service";
 import { traced } from "../../../src/server/app-layer/tracing";
-import { toError } from "../../../src/utils/posthogErrorCapture";
 import {
   InvalidPlanError,
-  InvoicesUnavailableError,
   OrganizationNotFoundError,
   SeatBillingUnavailableError,
   SubscriptionCreationFailedError,
@@ -27,6 +25,7 @@ import {
   PlanTypes,
   SubscriptionStatus,
 } from "../planTypes";
+import { translateStripeError } from "../stripe/translateStripeError";
 import {
   isStripePriceName,
   stripePricesFile,
@@ -403,8 +402,6 @@ export class EESubscriptionService implements SubscriptionService {
       return [];
     }
 
-    // Without this the raw provider error escapes unwrapped and the client
-    // renders "An unknown error occurred" in place of the invoice list.
     let invoices: Stripe.ApiList<Stripe.Invoice>;
     try {
       invoices = await this.stripe.invoices.list({
@@ -412,7 +409,9 @@ export class EESubscriptionService implements SubscriptionService {
         limit: RECENT_INVOICES_LIMIT,
       });
     } catch (error) {
-      throw new InvoicesUnavailableError({ reasons: [toError(error)] });
+      // Rate limit / unreachable provider become a handled "try again";
+      // anything else stays unhandled and degrades to unknown at the boundary.
+      throw translateStripeError(error);
     }
 
     return invoices.data
