@@ -40,6 +40,11 @@ on:
       - "langwatch/scripts/start.sh"
       - "langwatch/scripts/check-ports.sh"
       - ".github/workflows/npx-server-smoke.yml"
+      # The script that assembles the tarball. It decides what every npm user
+      # receives, so a change to it is precisely what this job exists to
+      # validate — but it was missing from this list, so two packaging bugs
+      # went out on a push that started no smoke run at all and looked green.
+      - "scripts/pack-npm.sh"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
