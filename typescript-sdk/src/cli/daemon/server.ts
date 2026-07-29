@@ -222,11 +222,8 @@ export function unlinkIfSameFile(
   if (expected === null) return false;
 
   const current = identifyFile(filePath);
-  if (
-    current === null ||
-    current.dev !== expected.dev ||
-    current.ino !== expected.ino
-  ) {
+  if (current === null) return false;
+  if (current.dev !== expected.dev || current.ino !== expected.ino) {
     return false;
   }
 
