@@ -12,14 +12,16 @@ import { SecretsIndicator } from "../SecretsIndicator";
 let mockSecrets: Array<{ id: string; name: string }> = [];
 let mockIsLoading = false;
 
+// Records each call's options argument instead of discarding it, so the
+// popover's `enabled: open` gating is observable to the assertions below.
+const { mockSecretsListQuery } = vi.hoisted(() => ({
+  mockSecretsListQuery: vi.fn(),
+}));
 vi.mock("~/utils/api", () => ({
   api: {
     secrets: {
       list: {
-        useQuery: vi.fn(() => ({
-          data: mockSecrets,
-          isLoading: mockIsLoading,
-        })),
+        useQuery: mockSecretsListQuery,
       },
     },
   },
@@ -44,13 +46,47 @@ function renderIndicator({
   );
 }
 
-describe("<SecretsIndicator />", () => {
-  beforeEach(() => {
-    mockSecrets = [];
-    mockIsLoading = false;
-    mockOnInsertSecret.mockClear();
+beforeEach(() => {
+  mockSecrets = [];
+  mockIsLoading = false;
+  mockOnInsertSecret.mockClear();
+  mockSecretsListQuery.mockReset();
+  mockSecretsListQuery.mockImplementation(() => ({
+    data: mockSecrets,
+    isLoading: mockIsLoading,
+  }));
+});
+
+describe("<SecretsIndicator /> secrets query", () => {
+  describe("when the popover has not been opened", () => {
+    it("does not enable the query", () => {
+      renderIndicator();
+
+      expect(mockSecretsListQuery).toHaveBeenCalledWith(
+        expect.objectContaining({ projectId: "test-project-id" }),
+        expect.objectContaining({ enabled: false }),
+      );
+    });
   });
 
+  describe("when the popover is opened", () => {
+    it("enables the query", async () => {
+      const user = userEvent.setup();
+      renderIndicator();
+
+      await user.click(screen.getByTestId("secrets-indicator"));
+
+      await waitFor(() => {
+        expect(mockSecretsListQuery).toHaveBeenLastCalledWith(
+          expect.objectContaining({ projectId: "test-project-id" }),
+          expect.objectContaining({ enabled: true }),
+        );
+      });
+    });
+  });
+});
+
+describe("<SecretsIndicator />", () => {
   it("renders the trigger button with key icon", () => {
     renderIndicator();
     expect(screen.getByTestId("secrets-indicator")).toBeInTheDocument();
