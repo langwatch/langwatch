@@ -25,12 +25,20 @@ export function ExpiredIngestKeyNoticeView({
       borderTopLeftRadius="xl"
     >
       <Alert.Indicator />
-      <Alert.Content>
+      {/* Keep the copy clear of the close button, which is absolutely
+          positioned and would otherwise sit on the text once it wraps. */}
+      <Alert.Content paddingRight={8}>
         <HStack width="full" wrap="wrap" gap={1}>
           <Text>
             Your coding agent tried to send traces with a session that is no
             longer valid, so nothing was recorded. Run{" "}
-            <Code>langwatch login --device</Code> to reconnect it.
+            {/* The mono face runs the two hyphens of `--device` together into
+                what reads as one long dash, and this is a command people
+                retype by hand. */}
+            <Code css={{ fontVariantLigatures: "none", letterSpacing: "0.04em" }}>
+              langwatch login --device
+            </Code>{" "}
+            to reconnect it.
           </Text>
         </HStack>
       </Alert.Content>
