@@ -1292,7 +1292,9 @@ async function loadScopeResolution(
               {
                 userId,
                 user: {
-                  orgMemberships: { some: { organizationId: args.organizationId } },
+                  orgMemberships: {
+                    some: { organizationId: args.organizationId },
+                  },
                 },
               },
               ...(groupIds.length > 0 ? [{ groupId: { in: groupIds } }] : []),

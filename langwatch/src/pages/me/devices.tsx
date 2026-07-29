@@ -13,9 +13,9 @@ import { useState } from "react";
 import { InstallCliCard } from "~/components/me/InstallCliCard";
 import MyLayout from "~/components/me/MyLayout";
 import { usePersonalContext } from "~/components/me/usePersonalContext";
-import { showErrorToast } from "~/features/errors";
 import { toaster } from "~/components/ui/toaster";
 import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
+import { showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
 import Head from "~/utils/compat/next-head";
 

@@ -52,7 +52,10 @@ describe("parseAvatarDataUrl", () => {
       try {
         parseAvatarDataUrl("not a data url");
       } catch (err) {
-        expect((err as AvatarValidationError).code).toBe("invalid_data_url");
+        expect((err as AvatarValidationError).code).toBe("avatar_image_unreadable");
+        expect((err as AvatarValidationError).meta).toMatchObject({
+          reason: "invalid_data_url",
+        });
       }
     });
   });
@@ -65,7 +68,7 @@ describe("parseAvatarDataUrl", () => {
         throw new Error("expected parseAvatarDataUrl to throw");
       } catch (err) {
         expect(err).toBeInstanceOf(AvatarValidationError);
-        expect((err as AvatarValidationError).code).toBe("invalid_type");
+        expect((err as AvatarValidationError).code).toBe("avatar_image_type_unsupported");
       }
     });
   });
@@ -76,7 +79,10 @@ describe("parseAvatarDataUrl", () => {
         parseAvatarDataUrl("data:image/png;base64,");
         throw new Error("expected parseAvatarDataUrl to throw");
       } catch (err) {
-        expect((err as AvatarValidationError).code).toBe("empty");
+        expect((err as AvatarValidationError).code).toBe("avatar_image_unreadable");
+        expect((err as AvatarValidationError).meta).toMatchObject({
+          reason: "empty",
+        });
       }
     });
   });
@@ -88,7 +94,7 @@ describe("parseAvatarDataUrl", () => {
         parseAvatarDataUrl(`data:image/png;base64,${tooBig}`);
         throw new Error("expected parseAvatarDataUrl to throw");
       } catch (err) {
-        expect((err as AvatarValidationError).code).toBe("file_too_large");
+        expect((err as AvatarValidationError).code).toBe("avatar_image_too_large");
       }
     });
   });
@@ -115,7 +121,10 @@ describe("parseAvatarDataUrl", () => {
         throw new Error("expected parseAvatarDataUrl to throw");
       } catch (err) {
         expect(err).toBeInstanceOf(AvatarValidationError);
-        expect((err as AvatarValidationError).code).toBe("content_mismatch");
+        expect((err as AvatarValidationError).code).toBe("avatar_image_unreadable");
+        expect((err as AvatarValidationError).meta).toMatchObject({
+          reason: "content_mismatch",
+        });
       }
     });
 
@@ -126,7 +135,10 @@ describe("parseAvatarDataUrl", () => {
         parseAvatarDataUrl(pngDeclaredAsJpeg);
         throw new Error("expected parseAvatarDataUrl to throw");
       } catch (err) {
-        expect((err as AvatarValidationError).code).toBe("content_mismatch");
+        expect((err as AvatarValidationError).code).toBe("avatar_image_unreadable");
+        expect((err as AvatarValidationError).meta).toMatchObject({
+          reason: "content_mismatch",
+        });
       }
     });
   });

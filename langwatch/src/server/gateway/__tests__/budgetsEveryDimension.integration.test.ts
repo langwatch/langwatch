@@ -319,7 +319,12 @@ describe("budgets on every dimension (real PG + real CH)", () => {
           limitUsd: "25.00",
           actorUserId: USER_ID,
         }),
-      ).rejects.toThrow(/group_budget_requires_clickhouse/);
+      ).rejects.toMatchObject({
+        // A limit of the deployment, not the admin's mistake — and the copy no
+        // longer names the storage engine that cannot do it.
+        code: "gateway_group_budget_unsupported",
+        fault: "platform",
+      });
 
       const rows = await prisma.gatewayBudget.findMany({
         where: { organizationId: ORG_ID, name: `No ledger ${suffix}` },

@@ -87,7 +87,6 @@ export function resolveErrorCopy({
   };
 }
 
-
 /**
  * The whole explanation as one string, for slots that can only take text —
  * a `title=` tooltip, a state field typed `string`, an aria-label.

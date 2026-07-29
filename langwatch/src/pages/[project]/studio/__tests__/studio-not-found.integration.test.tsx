@@ -42,9 +42,12 @@ vi.mock("../../../../optimization_studio/hooks/useLoadWorkflow", () => ({
   useLoadWorkflow: () => ({ workflow: workflowRef.current }),
 }));
 
-vi.mock("../../../../optimization_studio/components/OptimizationStudio", () => ({
-  default: () => <div data-testid="studio-canvas" />,
-}));
+vi.mock(
+  "../../../../optimization_studio/components/OptimizationStudio",
+  () => ({
+    default: () => <div data-testid="studio-canvas" />,
+  }),
+);
 
 vi.mock("../../../../optimization_studio/hooks/useWorkflowStore", () => ({
   useWorkflowStore: () => ({

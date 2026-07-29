@@ -7,11 +7,11 @@ import { requireProjectPermission } from "~/server/auth/permissions";
 import { prisma } from "~/server/db";
 import { rateLimit } from "~/server/rateLimit";
 import {
+  STORED_OBJECT_RESPONSE_BASE_HEADERS as FILES_RESPONSE_BASE_HEADERS,
   jsonResponse,
   rateLimitedResponse,
   safeMediaType,
   sanitizeFilenameSegment,
-  STORED_OBJECT_RESPONSE_BASE_HEADERS as FILES_RESPONSE_BASE_HEADERS,
 } from "~/server/stored-objects/media-response";
 import {
   resolveStoredObjectOwner,
@@ -40,7 +40,6 @@ const secured = createServiceApp<{ Variables: DualAuthVariables }>({
  */
 const FILES_RATE_LIMIT_WINDOW_SECONDS = 60;
 const FILES_RATE_LIMIT_MAX = 120;
-
 
 /**
  * Stored objects are shared by several features, and which permission guards

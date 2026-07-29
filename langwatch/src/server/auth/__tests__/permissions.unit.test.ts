@@ -8,8 +8,8 @@ vi.mock("~/server/api/rbac", () => ({
     resolveProjectPermissionMock(...args),
 }));
 
-import { requireProjectPermission } from "../permissions";
 import { LiteMemberRestrictedError } from "~/server/app-layer/permissions/errors";
+import { requireProjectPermission } from "../permissions";
 
 const prisma = {} as any;
 

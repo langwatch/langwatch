@@ -1,6 +1,7 @@
 import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { LiteMemberRestrictedError } from "~/server/app-layer/permissions/errors";
 import {
   checkOrganizationPermission,
   checkProjectPermission,
@@ -9,14 +10,13 @@ import {
   hasOrganizationPermission,
   hasProjectPermission,
   hasTeamPermission,
-  resolveProjectPermission,
-  resolveTeamPermission,
   type Permission,
   type PermissionResult,
+  resolveProjectPermission,
+  resolveTeamPermission,
   skipPermissionCheck,
   skipPermissionCheckProjectCreation,
 } from "../rbac";
-import { LiteMemberRestrictedError } from "~/server/app-layer/permissions/errors";
 
 // Mock Prisma client
 const mockPrisma = {
@@ -788,7 +788,6 @@ describe("RBAC Integration Tests", () => {
         expect(mockCtx.permissionChecked).toBe(true);
       });
     });
-
   });
 
   // ==========================================================================
@@ -983,33 +982,70 @@ describe("RBAC Integration Tests", () => {
 
     describe("when verifying permission decisions are unchanged (regression)", () => {
       it.each([
-        { teamRole: TeamUserRole.ADMIN, permission: "analytics:view", expected: true },
-        { teamRole: TeamUserRole.ADMIN, permission: "datasets:manage", expected: true },
-        { teamRole: TeamUserRole.ADMIN, permission: "team:manage", expected: true },
-        { teamRole: TeamUserRole.MEMBER, permission: "analytics:view", expected: true },
-        { teamRole: TeamUserRole.MEMBER, permission: "datasets:manage", expected: true },
-        { teamRole: TeamUserRole.MEMBER, permission: "team:manage", expected: false },
-        { teamRole: TeamUserRole.VIEWER, permission: "analytics:view", expected: true },
-        { teamRole: TeamUserRole.VIEWER, permission: "datasets:manage", expected: false },
-        { teamRole: TeamUserRole.VIEWER, permission: "team:manage", expected: false },
-      ])(
-        "returns permitted=$expected for $teamRole with $permission",
-        async ({ teamRole, permission, expected }) => {
-          setupProjectMocks({
-            orgRole: OrganizationUserRole.MEMBER,
-            teamRole,
-          });
-
-          const result = await resolveProjectPermission(
-            { prisma: mockPrisma, session: mockSession },
-            "project-1",
-            permission as Permission,
-          );
-
-          expect(result.permitted).toBe(expected);
-          expect(result.organizationRole).toBe(OrganizationUserRole.MEMBER);
+        {
+          teamRole: TeamUserRole.ADMIN,
+          permission: "analytics:view",
+          expected: true,
         },
-      );
+        {
+          teamRole: TeamUserRole.ADMIN,
+          permission: "datasets:manage",
+          expected: true,
+        },
+        {
+          teamRole: TeamUserRole.ADMIN,
+          permission: "team:manage",
+          expected: true,
+        },
+        {
+          teamRole: TeamUserRole.MEMBER,
+          permission: "analytics:view",
+          expected: true,
+        },
+        {
+          teamRole: TeamUserRole.MEMBER,
+          permission: "datasets:manage",
+          expected: true,
+        },
+        {
+          teamRole: TeamUserRole.MEMBER,
+          permission: "team:manage",
+          expected: false,
+        },
+        {
+          teamRole: TeamUserRole.VIEWER,
+          permission: "analytics:view",
+          expected: true,
+        },
+        {
+          teamRole: TeamUserRole.VIEWER,
+          permission: "datasets:manage",
+          expected: false,
+        },
+        {
+          teamRole: TeamUserRole.VIEWER,
+          permission: "team:manage",
+          expected: false,
+        },
+      ])("returns permitted=$expected for $teamRole with $permission", async ({
+        teamRole,
+        permission,
+        expected,
+      }) => {
+        setupProjectMocks({
+          orgRole: OrganizationUserRole.MEMBER,
+          teamRole,
+        });
+
+        const result = await resolveProjectPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "project-1",
+          permission as Permission,
+        );
+
+        expect(result.permitted).toBe(expected);
+        expect(result.organizationRole).toBe(OrganizationUserRole.MEMBER);
+      });
     });
 
     describe("when verifying org role is carried for each org role type", () => {
@@ -1276,7 +1312,10 @@ describe("RBAC Integration Tests", () => {
           session: mockSession,
           permissionChecked: false,
           publiclyShared: false,
-          organizationRole: undefined as OrganizationUserRole | null | undefined,
+          organizationRole: undefined as
+            | OrganizationUserRole
+            | null
+            | undefined,
         };
 
         mockPrisma.project.findUnique.mockResolvedValue({
@@ -1315,7 +1354,10 @@ describe("RBAC Integration Tests", () => {
           session: mockSession,
           permissionChecked: false,
           publiclyShared: false,
-          organizationRole: undefined as OrganizationUserRole | null | undefined,
+          organizationRole: undefined as
+            | OrganizationUserRole
+            | null
+            | undefined,
         };
 
         mockPrisma.team.findUnique.mockResolvedValue({
@@ -1409,7 +1451,6 @@ describe("RBAC Integration Tests", () => {
         ).rejects.toThrow(TRPCError);
       });
     });
-
   });
 
   // ==========================================================================
@@ -1477,21 +1518,18 @@ describe("RBAC Integration Tests", () => {
         "project:update",
         "project:delete",
         "triggers:manage",
-      ] as Permission[])(
-        "denies %s",
-        async (permission) => {
-          setupProjectWithExternalUser();
+      ] as Permission[])("denies %s", async (permission) => {
+        setupProjectWithExternalUser();
 
-          const result = await resolveProjectPermission(
-            { prisma: mockPrisma, session: mockSession },
-            "project-1",
-            permission,
-          );
+        const result = await resolveProjectPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "project-1",
+          permission,
+        );
 
-          expect(result.permitted).toBe(false);
-          expect(result.organizationRole).toBe(OrganizationUserRole.EXTERNAL);
-        },
-      );
+        expect(result.permitted).toBe(false);
+        expect(result.organizationRole).toBe(OrganizationUserRole.EXTERNAL);
+      });
     });
 
     describe("when EXTERNAL user requests an allowed permission via project", () => {
@@ -1509,21 +1547,18 @@ describe("RBAC Integration Tests", () => {
         "scenarios:view",
         "secrets:view",
         "team:view",
-      ] as Permission[])(
-        "grants %s",
-        async (permission) => {
-          setupProjectWithExternalUser();
+      ] as Permission[])("grants %s", async (permission) => {
+        setupProjectWithExternalUser();
 
-          const result = await resolveProjectPermission(
-            { prisma: mockPrisma, session: mockSession },
-            "project-1",
-            permission,
-          );
+        const result = await resolveProjectPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "project-1",
+          permission,
+        );
 
-          expect(result.permitted).toBe(true);
-          expect(result.organizationRole).toBe(OrganizationUserRole.EXTERNAL);
-        },
-      );
+        expect(result.permitted).toBe(true);
+        expect(result.organizationRole).toBe(OrganizationUserRole.EXTERNAL);
+      });
     });
 
     describe("when EXTERNAL user requests a mutate permission via team", () => {
@@ -1536,21 +1571,18 @@ describe("RBAC Integration Tests", () => {
         "scenarios:manage",
         "secrets:manage",
         "team:manage",
-      ] as Permission[])(
-        "denies %s",
-        async (permission) => {
-          setupTeamWithExternalUser();
+      ] as Permission[])("denies %s", async (permission) => {
+        setupTeamWithExternalUser();
 
-          const result = await resolveTeamPermission(
-            { prisma: mockPrisma, session: mockSession },
-            "team-1",
-            permission,
-          );
+        const result = await resolveTeamPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "team-1",
+          permission,
+        );
 
-          expect(result.permitted).toBe(false);
-          expect(result.organizationRole).toBe(OrganizationUserRole.EXTERNAL);
-        },
-      );
+        expect(result.permitted).toBe(false);
+        expect(result.organizationRole).toBe(OrganizationUserRole.EXTERNAL);
+      });
     });
 
     describe("when EXTERNAL user requests an allowed permission via team", () => {
@@ -1568,21 +1600,18 @@ describe("RBAC Integration Tests", () => {
         "scenarios:view",
         "secrets:view",
         "team:view",
-      ] as Permission[])(
-        "grants %s",
-        async (permission) => {
-          setupTeamWithExternalUser();
+      ] as Permission[])("grants %s", async (permission) => {
+        setupTeamWithExternalUser();
 
-          const result = await resolveTeamPermission(
-            { prisma: mockPrisma, session: mockSession },
-            "team-1",
-            permission,
-          );
+        const result = await resolveTeamPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "team-1",
+          permission,
+        );
 
-          expect(result.permitted).toBe(true);
-          expect(result.organizationRole).toBe(OrganizationUserRole.EXTERNAL);
-        },
-      );
+        expect(result.permitted).toBe(true);
+        expect(result.organizationRole).toBe(OrganizationUserRole.EXTERNAL);
+      });
     });
 
     describe("when EXTERNAL user has a custom role granting additional permissions", () => {
@@ -1632,32 +1661,29 @@ describe("RBAC Integration Tests", () => {
         "datasets:view",
         "prompts:view",
         "secrets:view",
-      ] as Permission[])(
-        "grants %s",
-        async (permission) => {
-          mockPrisma.project.findUnique.mockResolvedValue({
-            team: {
-              id: "team-1",
-              organizationId: "org-1",
-              organization: {
-                members: [{ role: OrganizationUserRole.MEMBER }],
-              },
+      ] as Permission[])("grants %s", async (permission) => {
+        mockPrisma.project.findUnique.mockResolvedValue({
+          team: {
+            id: "team-1",
+            organizationId: "org-1",
+            organization: {
+              members: [{ role: OrganizationUserRole.MEMBER }],
             },
-          });
-          mockPrisma.groupMembership.findMany.mockResolvedValue([]);
-          mockPrisma.roleBinding.findMany.mockResolvedValue([
-            { role: TeamUserRole.VIEWER, customRoleId: null },
-          ]);
+          },
+        });
+        mockPrisma.groupMembership.findMany.mockResolvedValue([]);
+        mockPrisma.roleBinding.findMany.mockResolvedValue([
+          { role: TeamUserRole.VIEWER, customRoleId: null },
+        ]);
 
-          const result = await resolveProjectPermission(
-            { prisma: mockPrisma, session: mockSession },
-            "project-1",
-            permission,
-          );
+        const result = await resolveProjectPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "project-1",
+          permission,
+        );
 
-          expect(result.permitted).toBe(true);
-        },
-      );
+        expect(result.permitted).toBe(true);
+      });
     });
 
     describe("when non-EXTERNAL user (ADMIN org role) accesses resources", () => {
@@ -1693,11 +1719,16 @@ describe("RBAC Integration Tests", () => {
           session: mockSession,
           permissionChecked: false,
           publiclyShared: false,
-          organizationRole: undefined as OrganizationUserRole | null | undefined,
+          organizationRole: undefined as
+            | OrganizationUserRole
+            | null
+            | undefined,
         };
 
         const mockNext = vi.fn().mockResolvedValue("success");
-        const middleware = checkProjectPermission("datasets:manage" as Permission);
+        const middleware = checkProjectPermission(
+          "datasets:manage" as Permission,
+        );
 
         try {
           await middleware({
@@ -1710,9 +1741,13 @@ describe("RBAC Integration Tests", () => {
           expect(error).toBeInstanceOf(TRPCError);
           const trpcError = error as TRPCError;
           expect(trpcError.code).toBe("UNAUTHORIZED");
-          expect(trpcError.message).toBe("This feature is not available for your account");
+          expect(trpcError.message).toBe(
+            "This feature is not available for your account",
+          );
           expect(trpcError.cause).toBeInstanceOf(LiteMemberRestrictedError);
-          expect((trpcError.cause as LiteMemberRestrictedError).meta.resource).toBe("datasets");
+          expect(
+            (trpcError.cause as LiteMemberRestrictedError).meta.resource,
+          ).toBe("datasets");
         }
       });
     });
@@ -1726,7 +1761,10 @@ describe("RBAC Integration Tests", () => {
           session: mockSession,
           permissionChecked: false,
           publiclyShared: false,
-          organizationRole: undefined as OrganizationUserRole | null | undefined,
+          organizationRole: undefined as
+            | OrganizationUserRole
+            | null
+            | undefined,
         };
 
         const mockNext = vi.fn().mockResolvedValue("success");
@@ -1743,9 +1781,13 @@ describe("RBAC Integration Tests", () => {
           expect(error).toBeInstanceOf(TRPCError);
           const trpcError = error as TRPCError;
           expect(trpcError.code).toBe("UNAUTHORIZED");
-          expect(trpcError.message).toBe("This feature is not available for your account");
+          expect(trpcError.message).toBe(
+            "This feature is not available for your account",
+          );
           expect(trpcError.cause).toBeInstanceOf(LiteMemberRestrictedError);
-          expect((trpcError.cause as LiteMemberRestrictedError).meta.resource).toBe("datasets");
+          expect(
+            (trpcError.cause as LiteMemberRestrictedError).meta.resource,
+          ).toBe("datasets");
         }
       });
     });
@@ -1768,11 +1810,16 @@ describe("RBAC Integration Tests", () => {
           session: mockSession,
           permissionChecked: false,
           publiclyShared: false,
-          organizationRole: undefined as OrganizationUserRole | null | undefined,
+          organizationRole: undefined as
+            | OrganizationUserRole
+            | null
+            | undefined,
         };
 
         const mockNext = vi.fn().mockResolvedValue("success");
-        const middleware = checkProjectPermission("datasets:view" as Permission);
+        const middleware = checkProjectPermission(
+          "datasets:view" as Permission,
+        );
 
         try {
           await middleware({
@@ -1785,7 +1832,9 @@ describe("RBAC Integration Tests", () => {
           expect(error).toBeInstanceOf(TRPCError);
           const trpcError = error as TRPCError;
           expect(trpcError.code).toBe("UNAUTHORIZED");
-          expect(trpcError.message).toBe("You do not have permission to access this project resource");
+          expect(trpcError.message).toBe(
+            "You do not have permission to access this project resource",
+          );
           // The point of this case is that an ordinary denial is NOT the lite-member
           // one, so the upgrade modal the client opens off that code stays shut. It
           // used to be asserted as "no cause at all", which was only true while this

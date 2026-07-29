@@ -2,12 +2,12 @@ import { Button, Text } from "@chakra-ui/react";
 import { useEffect } from "react";
 import { create } from "zustand";
 import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
+import { showErrorToast } from "~/features/errors";
 import { syncLangyAfterCodingDefaultsWrite } from "~/features/langy/logic/codingDefaultSync";
 import {
   isCodexModel,
   LANGY_CHAT_FEATURE_KEY,
 } from "~/server/modelProviders/codexRestrictions";
-import { showErrorToast } from "~/features/errors";
 import type { ScopeAssignment } from "~/server/scopes/scope.types";
 import { api } from "~/utils/api";
 import {

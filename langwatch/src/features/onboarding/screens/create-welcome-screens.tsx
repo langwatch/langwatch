@@ -192,7 +192,8 @@ export const useCreateWelcomeScreens = ({
         id: "intent",
         required: true,
         heading: "What do you want to do?",
-        subHeading: "Pick your starting point. You can explore the rest anytime",
+        subHeading:
+          "Pick your starting point. You can explore the rest anytime",
         component: IntentSelectionScreen,
       },
       [OnboardingScreenIndex.BASIC_INFO]: {

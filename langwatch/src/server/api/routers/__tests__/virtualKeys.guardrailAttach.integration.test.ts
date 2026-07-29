@@ -255,7 +255,9 @@ describe("virtualKeys.update — guardrail attach", () => {
             ],
           },
         }),
-      ).rejects.toThrow(/guardrail_project_mismatch/);
+      ).rejects.toMatchObject({
+        cause: { code: "gateway_guardrail_project_mismatch" },
+      });
 
       const vk = await prisma.virtualKey.findUniqueOrThrow({
         where: { id: VK_ID },
@@ -300,7 +302,9 @@ describe("virtualKeys.update — guardrail attach", () => {
             id: movingVkId,
             scopes: [{ scopeType: "PROJECT", scopeId: OTHER_PROJECT_ID }],
           }),
-        ).rejects.toThrow(/guardrail_project_mismatch/);
+        ).rejects.toMatchObject({
+        cause: { code: "gateway_guardrail_project_mismatch" },
+      });
       } finally {
         await prisma.virtualKeyScope.deleteMany({
           where: { virtualKeyId: movingVkId },

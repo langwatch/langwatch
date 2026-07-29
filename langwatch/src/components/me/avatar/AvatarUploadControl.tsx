@@ -6,8 +6,8 @@ import { Dialog } from "~/components/ui/dialog";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
 import { showErrorToast } from "~/features/errors";
-import { useSession } from "~/utils/auth-client";
 import { api } from "~/utils/api";
+import { useSession } from "~/utils/auth-client";
 import { processAvatarImage } from "./processAvatarImage";
 
 const FORMAT_HINT = "PNG, JPG, WEBP or GIF, up to 8 MB. Cropped to a square.";
@@ -213,8 +213,7 @@ export function AvatarUploadControl({
       showErrorToast({ error, fallbackTitle: "Couldn't remove photo" }),
   });
 
-  const isBusy =
-    isProcessing || setAvatar.isPending || removeAvatar.isPending;
+  const isBusy = isProcessing || setAvatar.isPending || removeAvatar.isPending;
 
   const onFilePicked = async (file: File | undefined) => {
     // Allow re-selecting the same file later by clearing the input value.
@@ -244,11 +243,7 @@ export function AvatarUploadControl({
           onOpen={() => setIsOpen(true)}
         />
         <Tooltip content={FORMAT_HINT} positioning={{ placement: "right" }}>
-          <Box
-            display="inline-flex"
-            color="fg.muted"
-            aria-label={FORMAT_HINT}
-          >
+          <Box display="inline-flex" color="fg.muted" aria-label={FORMAT_HINT}>
             <Info size={16} />
           </Box>
         </Tooltip>
@@ -279,7 +274,8 @@ export function AvatarUploadControl({
         onChange={() => fileInputRef.current?.click()}
         onRemove={() => removeAvatar.mutate({})}
         onSave={() => {
-          if (preview) setAvatar.mutate({ organizationId, imageDataUrl: preview });
+          if (preview)
+            setAvatar.mutate({ organizationId, imageDataUrl: preview });
         }}
         onCancel={() => setPreview(null)}
       />

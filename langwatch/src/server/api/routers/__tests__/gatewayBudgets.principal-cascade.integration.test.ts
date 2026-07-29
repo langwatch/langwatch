@@ -150,8 +150,12 @@ describe("GatewayBudgetService — PRINCIPAL cascade", () => {
           actorUserId: ACTOR_ID,
         }),
       ).rejects.toMatchObject({
-        code: "BAD_REQUEST",
-        message: expect.stringMatching(/not a member of this organization/i),
+        // Raised by the service, so it arrives as the handled error itself —
+        // there is no tRPC boundary in between to wrap it. Asserted on `code`
+        // and the scope KIND in `meta`; the sentence is copy and the ids it
+        // used to carry belonged to another tenant's records.
+        code: "gateway_scope_org_mismatch",
+        meta: { scopeKind: "user" },
       });
 
       const persisted = await prisma.gatewayBudget.findFirst({

@@ -7,24 +7,17 @@
  *   - `scopeType` + `scopeId` identifies the logical target (ADR-021): the
  *     single inline source of truth, with no typed FK columns mirroring it.
  */
+
+import { createLogger } from "@langwatch/observability";
 import type {
   GatewayBudget,
   GatewayBudgetWindow,
   PrismaClient,
 } from "@prisma/client";
 import { Prisma } from "@prisma/client";
-import {
-  GatewayBudgetNotFoundError,
-  GatewayGroupBudgetUnsupportedError,
-  GatewayScopeOrgMismatchError,
-  VirtualKeyNotFoundError,
-} from "./errors";
-
-import { createLogger } from "@langwatch/observability";
-
 import { GatewayAuditAdapter } from "./auditLog.repository";
 import { serializeRowForAudit } from "./auditSerializer";
-import { GatewayBudgetClickHouseRepository } from "./budget.clickhouse.repository";
+import type { GatewayBudgetClickHouseRepository } from "./budget.clickhouse.repository";
 import {
   budgetAppliesToProvider,
   resolveApplicableBudgets,
@@ -35,6 +28,12 @@ import {
 } from "./budgetScopeReach";
 import { nextResetAt, shouldResetBudget } from "./budgetWindow";
 import { ChangeEventRepository } from "./changeEvent.repository";
+import {
+  GatewayBudgetNotFoundError,
+  GatewayGroupBudgetUnsupportedError,
+  GatewayScopeOrgMismatchError,
+  VirtualKeyNotFoundError,
+} from "./errors";
 
 const logger = createLogger("langwatch:gateway:budget-service");
 
@@ -239,7 +238,10 @@ export class GatewayBudgetService {
       },
       orderBy: [{ scopeType: "asc" }, { createdAt: "desc" }],
     });
-    return await this.applyClickHouseSpend(budgets, project.team.organizationId);
+    return await this.applyClickHouseSpend(
+      budgets,
+      project.team.organizationId,
+    );
   }
 
   /**
@@ -371,7 +373,10 @@ export class GatewayBudgetService {
       where: { id, organizationId },
     });
     if (!budget) return null;
-    const [decorated] = await this.applyClickHouseSpend([budget], organizationId);
+    const [decorated] = await this.applyClickHouseSpend(
+      [budget],
+      organizationId,
+    );
     return decorated ?? budget;
   }
 
@@ -558,7 +563,11 @@ export class GatewayBudgetService {
       case "GROUP": {
         const group = await this.prisma.group.findUnique({
           where: { id: budget.scopeId },
-          select: { name: true, slug: true, _count: { select: { members: true } } },
+          select: {
+            name: true,
+            slug: true,
+            _count: { select: { members: true } },
+          },
         });
         return {
           kind: "GROUP",
@@ -948,13 +957,7 @@ function scopeIdForScope(scope: BudgetScope): string {
 
 function scopeKindToEnum(
   kind: BudgetScope["kind"],
-):
-  | "ORGANIZATION"
-  | "TEAM"
-  | "PROJECT"
-  | "VIRTUAL_KEY"
-  | "PRINCIPAL"
-  | "GROUP" {
+): "ORGANIZATION" | "TEAM" | "PROJECT" | "VIRTUAL_KEY" | "PRINCIPAL" | "GROUP" {
   return kind;
 }
 

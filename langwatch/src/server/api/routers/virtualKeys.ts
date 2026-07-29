@@ -14,6 +14,11 @@
  * derivation; the legacy `providerCredentialIds`/`providerChain`
  * fields are no longer surfaced.
  */
+
+import type { PrismaClient } from "@prisma/client";
+import { z } from "zod";
+import type { Session } from "~/server/auth";
+import { resolveApplicableBudgetsForDraftKey } from "~/server/gateway/applicableBudgets.service";
 import {
   GatewayGuardrailProjectMismatchError,
   GatewayScopeOrgMismatchError,
@@ -21,33 +26,25 @@ import {
   GuardrailAttachForbiddenError,
   VirtualKeyNotFoundError,
 } from "~/server/gateway/errors";
-import { z } from "zod";
-
-import type { PrismaClient } from "@prisma/client";
-
-import type { Session } from "~/server/auth";
-
-import { resolveApplicableBudgetsForDraftKey } from "~/server/gateway/applicableBudgets.service";
 import { GatewayUsageService } from "~/server/gateway/usage.service";
-import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
-import { startOfCurrentMonthUTC } from "~/server/gateway/virtualKeySpend.clickhouse.repository";
-import {
-  parseVirtualKeyConfig,
-  virtualKeyConfigSchema,
-  type GuardrailAttachment,
-} from "~/server/gateway/virtualKey.config";
-import { toVirtualKeyCamelDto } from "~/server/gateway/virtualKey.dto";
-import { scopeAssignmentSchema } from "~/server/scopes/scope.types";
-
-import { authorizeInResolver, hasProjectPermission } from "../rbac";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
-import { chRepoOrUndefined, spendRepoOrUndefined } from "./gatewayUsage";
 import {
   assertCanManageAllScopes,
   assertCanOperateOnAnyScope,
   isVisibleToMembership,
   loadMembershipSet,
 } from "~/server/gateway/virtualKey.authz";
+import {
+  type GuardrailAttachment,
+  parseVirtualKeyConfig,
+  virtualKeyConfigSchema,
+} from "~/server/gateway/virtualKey.config";
+import { toVirtualKeyCamelDto } from "~/server/gateway/virtualKey.dto";
+import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
+import { startOfCurrentMonthUTC } from "~/server/gateway/virtualKeySpend.clickhouse.repository";
+import { scopeAssignmentSchema } from "~/server/scopes/scope.types";
+import { authorizeInResolver, hasProjectPermission } from "../rbac";
+import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { chRepoOrUndefined, spendRepoOrUndefined } from "./gatewayUsage";
 
 const scopeInputSchema = scopeAssignmentSchema;
 
@@ -380,7 +377,10 @@ export const virtualKeysRouter = createTRPCRouter({
         if (
           !isVisibleToMembership(
             membership,
-            vk.scopes as { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }[],
+            vk.scopes as {
+              scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+              scopeId: string;
+            }[],
           )
         ) {
           throw new VirtualKeyNotFoundError();
@@ -390,7 +390,10 @@ export const virtualKeysRouter = createTRPCRouter({
           {
             organizationId: input.organizationId,
             virtualKeyId: vk.id,
-            scopes: vk.scopes as { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }[],
+            scopes: vk.scopes as {
+              scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+              scopeId: string;
+            }[],
             traceProjectId: vk.traceProjectId,
             principalUserId: vk.principalUserId,
           },
