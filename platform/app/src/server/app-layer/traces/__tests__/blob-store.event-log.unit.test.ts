@@ -14,7 +14,6 @@
  * No "should" in it() names (project convention).
  */
 
-import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { generate, Ksuid } from "@langwatch/ksuid";
 import { describe, expect, it, vi } from "vitest";
 import {

@@ -22,7 +22,6 @@ import {
   RecordSpanCommand,
   type RecordSpanCommandDependencies,
 } from "../recordSpanCommand";
-import { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 
 // ---------------------------------------------------------------------------
 // Helpers
