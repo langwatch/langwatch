@@ -367,12 +367,14 @@ describe("mintTurnToken", () => {
         row({ installationId: "inst-dead", createdAt: new Date("2020-01-01") }),
         row({ installationId: "inst-live", createdAt: new Date("2020-01-02") }),
       ]);
-      const mint = vi.fn(async ({ installationId }: { installationId: string }) => {
-        if (installationId === "inst-dead") {
-          throw new GithubInstallationNotFoundError(installationId);
-        }
-        return { token: "ghs_live", expiresAt: "" };
-      });
+      const mint = vi.fn(
+        async ({ installationId }: { installationId: string }) => {
+          if (installationId === "inst-dead") {
+            throw new GithubInstallationNotFoundError(installationId);
+          }
+          return { token: "ghs_live", expiresAt: "" };
+        },
+      );
       const svc = new LangyGithubInstallationsService(
         repo,
         makeAppTokens({ mintInstallationToken: mint }),
@@ -437,12 +439,14 @@ describe("mintTurnToken", () => {
           repositories: [{ id: "77", fullName: "acme/service-x" }],
         }),
       ]);
-      const mint = vi.fn(async ({ installationId }: { installationId: string }) => {
-        if (installationId === "inst-dead") {
-          throw new GithubInstallationNotFoundError(installationId);
-        }
-        return { token: "ghs_live", expiresAt: "" };
-      });
+      const mint = vi.fn(
+        async ({ installationId }: { installationId: string }) => {
+          if (installationId === "inst-dead") {
+            throw new GithubInstallationNotFoundError(installationId);
+          }
+          return { token: "ghs_live", expiresAt: "" };
+        },
+      );
       const svc = new LangyGithubInstallationsService(
         repo,
         makeAppTokens({ mintInstallationToken: mint }),
@@ -458,7 +462,7 @@ describe("mintTurnToken", () => {
     });
   });
 
-  describe("when an explicit repo requires a live listing (an \"all\"-selection installation, nothing cached) and that installation is dead", () => {
+  describe('when an explicit repo requires a live listing (an "all"-selection installation, nothing cached) and that installation is dead', () => {
     it("removes the dead row and mints via the live installation", async () => {
       const repo = makeRepo([
         row({

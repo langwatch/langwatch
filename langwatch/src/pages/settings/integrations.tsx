@@ -55,11 +55,10 @@ function IntegrationsContent({ organizationId }: { organizationId: string }) {
     });
 
     const { githubError: _drop, ...rest } = router.query;
-    void router.replace(
-      { pathname: router.pathname, query: rest },
-      undefined,
-      { shallow: true, scroll: false },
-    );
+    void router.replace({ pathname: router.pathname, query: rest }, undefined, {
+      shallow: true,
+      scroll: false,
+    });
     // Intentionally keyed only on the error value, not the whole router object.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router.query.githubError]);

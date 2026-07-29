@@ -334,7 +334,9 @@ export class LangyGithubInstallationsService {
     // whole turn; any other mint failure stops here, same as before — a
     // transient error must not make us skip past a live installation.
     for (const inst of usable) {
-      const outcome = await this.mintScoped({ installationId: inst.installationId });
+      const outcome = await this.mintScoped({
+        installationId: inst.installationId,
+      });
       if (outcome.token) return outcome.token;
       if (!outcome.wasDeadInstallation) return null;
     }
@@ -347,7 +349,10 @@ export class LangyGithubInstallationsService {
   }: {
     installationId: string;
     repositoryIds?: string[];
-  }): Promise<{ token: LangyGithubTurnToken | null; wasDeadInstallation: boolean }> {
+  }): Promise<{
+    token: LangyGithubTurnToken | null;
+    wasDeadInstallation: boolean;
+  }> {
     try {
       const minted = await this.appTokens.mintInstallationToken({
         installationId,
