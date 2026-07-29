@@ -128,17 +128,18 @@ For a complete installation guide, visit the [documentation](https://docs.langwa
 
 ### Pod security
 
-Every LangWatch pod and every bundled datastore (PostgreSQL, Redis, ClickHouse,
-Keeper) runs read-only-root, non-root at both pod and container level, with
+Every LangWatch pod (including the cron pods) and every bundled datastore
+(PostgreSQL, Redis, ClickHouse, Keeper) runs read-only-root, non-root at both pod and container level, with
 dropped capabilities, `RuntimeDefault` seccomp, no mounted SA token, and
 resource requests/limits on every container.
 
 A default install does **not** clear Pod Security Admission `restricted` on its
-own: two bundled components can't comply. On clusters that enforce it, add
+own: three bundled components can't comply. On clusters that enforce it, add
 `examples/overlays/strict-admission.yaml`, which turns off the upstream
-Prometheus subchart and the Langy assistant (whose manager must run as root to
-give each worker its own UID — never force it non-root), plus the
-custom-metrics gateway HPA. Full details in
+Prometheus subchart, the Langy assistant (whose manager must run as root to
+give each worker its own UID — never force it non-root), and the ClickHouse
+preflight Job (it runs kubectl, so it needs a token and a writable root), plus
+the custom-metrics gateway HPA. Full details in
 [Security → Pod Security](https://docs.langwatch.ai/self-hosting/security#pod-security).
 
 ### Regenerate this table

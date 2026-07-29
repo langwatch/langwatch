@@ -46,7 +46,8 @@ Feature: The Helm chart installs on a cluster that enforces strict admission con
   Scenario: Every LangWatch workload and bundled datastore ships hardened
     Given the chart is rendered with its default values
     When I inspect each workload LangWatch authors, including the bundled
-      PostgreSQL, Redis, ClickHouse and Keeper
+      PostgreSQL, Redis, ClickHouse and Keeper, but excluding the components
+      recorded below as unable to comply
     Then every container runs with a read-only root filesystem
     And every container drops all Linux capabilities
     And every container disallows privilege escalation
@@ -84,8 +85,8 @@ Feature: The Helm chart installs on a cluster that enforces strict admission con
 
   @e2e @unimplemented
   Scenario: Scratch volumes cannot exhaust the node they run on
-    Given a datastore writes logs to a scratch volume
-    When that workload enters an error loop and writes without bound
+    Given a workload writes to a scratch volume rather than its data volume
+    When it enters an error loop and writes without bound
     Then the workload is capped by its own volume quota
     And unrelated workloads on the same node keep their disk
     # An unbounded scratch volume is backed by node ephemeral storage, so the

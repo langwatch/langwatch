@@ -192,9 +192,11 @@ own quota instead of filling the node.
 
 ## Pod Security
 
-ClickHouse, Keeper, and the backup/restore Jobs run non-root (uid 101) with a
-read-only root filesystem, `RuntimeDefault` seccomp, dropped capabilities, no
-privilege escalation, and no mounted ServiceAccount token. The paths written at
+ClickHouse, Keeper, and the backup/restore Jobs run non-root (uid 101; Keeper's
+init container runs 65534) with a read-only root filesystem, `RuntimeDefault`
+seccomp, dropped capabilities, no privilege escalation, and no mounted
+ServiceAccount token. A `MustRunAs` constraint has to allow both uids, or it
+denies the Keeper pod on its init container. The paths written at
 runtime outside the data volume — server logs, `/tmp`, and the rendered
 `config.d`/`users.d` — are `emptyDir` volumes; everything else ClickHouse
 writes (`preprocessed_configs`, `status`, `uuid`, `format_schemas`,
