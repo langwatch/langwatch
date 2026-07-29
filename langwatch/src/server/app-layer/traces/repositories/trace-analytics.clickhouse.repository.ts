@@ -327,7 +327,9 @@ export class TraceAnalyticsClickHouseRepository
    * what lets a trace's versions share that key, but rows written before the
    * freeze — and a trace whose anchor a post-miss rebuild re-stamped — still
    * carry more than one OccurredAt, so superseded versions persist until TTL.
-   * The inner dedup subquery reads only sort-key columns — no heavy Attributes
+   * The inner dedup subquery reads only three narrow scalar columns —
+   * `TenantId`, `TraceId` and `max(UpdatedAt)`, the last of which is the RMT
+   * version column rather than part of the sort key — and no heavy Attributes
    * map. It is NOT a keyed seek: `TraceId` is third in the sort key and the
    * inner scope carries no `OccurredAt` predicate (deliberately — see below), so
    * it is a tenant-wide scan over the trace's versions. What keeps it cheap is
