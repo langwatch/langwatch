@@ -123,7 +123,7 @@ function loggedPayloads(logger: FakeLogger): string {
 }
 
 function loggedHeaders(
-  call: [unknown, ...unknown[]] | undefined,
+  call: readonly unknown[] | undefined,
 ): Record<string, string> {
   const fields = call?.[0] as { headers?: Record<string, string> } | undefined;
   return fields?.headers ?? {};

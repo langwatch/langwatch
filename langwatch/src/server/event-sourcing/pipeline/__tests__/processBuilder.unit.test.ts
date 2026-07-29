@@ -9,6 +9,8 @@ import type {
 } from "../processManagerDefinition";
 import type { AutomationEvent } from "../../pipelines/automations/schemas/events";
 import { TRIGGER_MATCH_RECORDED_EVENT_TYPE } from "../../pipelines/automations/schemas/constants";
+import { SIMULATION_RUN_EVENT_TYPES } from "../../pipelines/simulation-processing/schemas/constants";
+import type { SimulationProcessingEvent } from "../../pipelines/simulation-processing/schemas/events";
 
 const payloadSchema = z.object({ traceId: z.string() });
 
@@ -147,13 +149,19 @@ describe("given a process that ignores events", () => {
       // null, and null is authoritative — so an ignored event would cancel the
       // armed wake with nothing failing and no test catching it. The builder
       // makes that combination unbuildable instead of documenting it.
+      //
+      // Built over the simulation events because the guard needs `.on()` and
+      // `.ignores()` on DIFFERENT types — declaring one type twice trips the
+      // duplicate-handler check first, and would assert the wrong refusal.
       expect(() =>
-        buildProcessManager<AutomationEvent>({
+        buildProcessManager<SimulationProcessingEvent>({
           name: "ignoresAndWakes",
           applier: (pm) =>
             pm
               .state({ seen: 0 })
-              .ignores("lw.automation.trigger.match_recorded")
+              .intent("noop", payloadSchema, async () => {})
+              .on(SIMULATION_RUN_EVENT_TYPES.STARTED, (state) => ({ state }))
+              .ignores(SIMULATION_RUN_EVENT_TYPES.FINISHED)
               .onWake((state) => ({ state })),
         }),
       ).toThrow(/cannot use both \.ignores\(\) and \.onWake\(\)/);
@@ -161,13 +169,15 @@ describe("given a process that ignores events", () => {
 
     it("refuses it in the other order too", () => {
       expect(() =>
-        buildProcessManager<AutomationEvent>({
+        buildProcessManager<SimulationProcessingEvent>({
           name: "wakesAndIgnores",
           applier: (pm) =>
             pm
               .state({ seen: 0 })
+              .intent("noop", payloadSchema, async () => {})
+              .on(SIMULATION_RUN_EVENT_TYPES.STARTED, (state) => ({ state }))
               .onWake((state) => ({ state }))
-              .ignores("lw.automation.trigger.match_recorded"),
+              .ignores(SIMULATION_RUN_EVENT_TYPES.FINISHED),
         }),
       ).toThrow(/cannot use \.ignores\(\) after \.onWake\(\)/);
     });

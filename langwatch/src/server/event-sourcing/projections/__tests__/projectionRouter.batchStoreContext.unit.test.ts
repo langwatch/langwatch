@@ -11,7 +11,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 import type { Event } from "../../domain/types";
-import type { QueueManager } from "../../queues/queueManager";
+import type { QueueManager } from "../../services/queues/queueManager";
 import {
   createMockAppendStore,
   createMockMapProjectionDefinition,

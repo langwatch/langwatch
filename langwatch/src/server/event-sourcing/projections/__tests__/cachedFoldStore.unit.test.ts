@@ -318,7 +318,7 @@ describe("CachedFoldStore", () => {
         const { store } = createStore(redis);
         redis.values.set(CACHE_KEY, {
           value: JSON.stringify({ count: 9, UpdatedAt: 300 }),
-          ttlSeconds: 300,
+          expiresAt: Date.now() + 300_000,
         });
 
         const cached = await store.getWithApplied("agg-1", CONTEXT);

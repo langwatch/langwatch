@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, type Mock, vi } from "vitest";
 
 import type { IntentContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 
@@ -25,7 +25,14 @@ const INTENT: OriginGateResolveIntent = {
 
 type ResolveOrigin = OriginGateDispatchDeps["resolveOrigin"];
 
-function makeDeps(overrides: Partial<OriginGateDispatchDeps> = {}) {
+/**
+ * Typed so `resolveOrigin` stays a `Mock` through the spread — a
+ * `Partial<OriginGateDispatchDeps>` override widens it back to the bare
+ * function type and `.mock.calls` stops type-checking.
+ */
+function makeDeps(
+  overrides: { resolveOrigin?: Mock<ResolveOrigin> } = {},
+): OriginGateDispatchDeps & { resolveOrigin: Mock<ResolveOrigin> } {
   return {
     resolveOrigin: vi.fn<ResolveOrigin>(async () => undefined),
     ...overrides,
