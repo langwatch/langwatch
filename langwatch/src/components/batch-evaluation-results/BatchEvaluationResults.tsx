@@ -21,7 +21,6 @@ import { type Experiment, ExperimentType, type Project } from "@prisma/client";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { BarChart2, Download, ExternalLink } from "react-feather";
-import { useLocalStorage } from "usehooks-ts";
 
 import { Link } from "~/components/ui/link";
 import { useLiteMemberGuard } from "~/hooks/useLiteMemberGuard";
@@ -33,7 +32,6 @@ import {
   ColumnVisibilityButton,
   DEFAULT_HIDDEN_COLUMNS,
   FieldsButton,
-  type ResultField,
   RowHeightButton,
 } from "./BatchEvaluationResultsTable";
 import { type BatchRunSummary, BatchRunsSidebar } from "./BatchRunsSidebar";
@@ -42,20 +40,13 @@ import { downloadCsv } from "./csvExport";
 import { getRunDisplayName } from "./getRunDisplayName";
 import { isRunFinished } from "./isRunFinished";
 import { TableSkeleton } from "./TableSkeleton";
-import { DEFAULT_ROW_HEIGHT, type RowHeight } from "./tableUtils";
 import {
   type BatchEvaluationData,
   transformBatchEvaluationData,
 } from "./types";
 import { useComparisonMode } from "./useComparisonMode";
 import { RUN_COLORS, useMultiRunData } from "./useMultiRunData";
-
-/** Every target field shown by default. */
-const DEFAULT_RESULT_FIELDS: Record<ResultField, boolean> = {
-  outputs: true,
-  scores: true,
-  costAndLatency: true,
-};
+import { useResultDisplayPreferences } from "./useResultDisplayPreferences";
 
 type BatchEvaluationResultsProps = {
   project?: Project;
@@ -91,24 +82,11 @@ export function BatchEvaluationResults({
     () => new Set(DEFAULT_HIDDEN_COLUMNS),
   );
 
-  // Fields state - which target details to render. Deliberately NOT
-  // persisted: a section hidden on a previous visit should never silently
-  // explain "no results" on a different run.
-  const [fields, setFields] = useState<Record<ResultField, boolean>>(
-    DEFAULT_RESULT_FIELDS,
-  );
-
-  // Row height - how much of each cell's content shows before it needs
-  // expanding. Nothing is hidden here, only resized, so unlike field
-  // visibility this is safe to persist across sessions.
-  const [rowHeight, setRowHeight] = useLocalStorage<RowHeight>(
-    "batch-results-row-height",
-    DEFAULT_ROW_HEIGHT,
-  );
-
-  const toggleField = useCallback((field: ResultField) => {
-    setFields((prev) => ({ ...prev, [field]: !prev[field] }));
-  }, []);
+  // Which target fields render, and how much of each cell's content shows —
+  // see useResultDisplayPreferences for why fields reset per session while
+  // row height persists.
+  const { fields, toggleField, rowHeight, setRowHeight } =
+    useResultDisplayPreferences();
 
   // Toggle column visibility
   const toggleColumn = useCallback((columnName: string) => {

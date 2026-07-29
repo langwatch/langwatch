@@ -14,7 +14,6 @@ export {
   DEFAULT_HIDDEN_COLUMNS,
   FieldsButton,
   type FieldsButtonProps,
-  type ResultField,
   RowHeightButton,
   type RowHeightButtonProps,
 } from "./BatchEvaluationResultsTable";
@@ -62,3 +61,9 @@ export {
   isImageUrlHeuristic,
   transformBatchEvaluationData,
 } from "./types";
+// Result display preferences (fields visibility + row height)
+export {
+  DEFAULT_RESULT_FIELDS,
+  type ResultField,
+  useResultDisplayPreferences,
+} from "./useResultDisplayPreferences";

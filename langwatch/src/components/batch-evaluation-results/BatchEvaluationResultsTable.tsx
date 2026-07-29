@@ -30,6 +30,7 @@ import type {
   BatchEvaluationData,
   ComparisonRunData,
 } from "./types";
+import type { ResultField } from "./useResultDisplayPreferences";
 
 type BatchEvaluationResultsTableProps = {
   /** Transformed batch evaluation data (single run mode) */
@@ -108,12 +109,6 @@ export const ColumnVisibilityButton = ({
   );
 };
 
-/**
- * A target detail the results table can show or hide, independently of the
- * others. Dataset columns stay controlled by {@link ColumnVisibilityButton}.
- */
-export type ResultField = "outputs" | "scores" | "costAndLatency";
-
 const FIELD_LABELS: Record<ResultField, string> = {
   outputs: "Outputs",
   scores: "Scores",
@@ -175,8 +170,8 @@ export const FieldsButton = ({ fields, onToggle }: FieldsButtonProps) => (
 /**
  * Row height control — how much of each cell's content shows before it
  * needs expanding. Unlike field visibility, nothing is hidden here, only
- * resized, so it's safe (and useful) to persist across sessions — see the
- * `useLocalStorage` call in {@link BatchEvaluationResults}.
+ * resized, so it's safe (and useful) to persist across sessions — see
+ * {@link useResultDisplayPreferences}.
  */
 export type RowHeightButtonProps = {
   value: RowHeight;
