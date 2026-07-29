@@ -102,12 +102,6 @@ Feature: Work that happens after an event
     When the page is opened again
     Then it shows the same thing it would have shown had the update arrived
 
-  # ============================================================================
-  # There is no third kind
-  # ============================================================================
-
-  @unit @unimplemented
-  Scenario: Post-event work is a subscriber or a process manager
-    Given the ways the platform can do work after an event
-    Then each is either a subscriber or a process manager
-    And no other kind can be registered
+  # The constraint that there is no third kind of post-event work is an
+  # architectural one, and it lives in ADR-075. It said nothing a customer
+  # could observe, so asserting it here only restated the ADR in Gherkin.

@@ -12,8 +12,9 @@ export const SCENARIO_EXECUTION_INTENT_TYPES = {
 /**
  * How long a run may go quiet before it is declared dead.
  *
- * 2× the child-process timeout, which is the same bound the read-time
- * `STALLED` derivation and both deleted boot sweeps used. A child that hits
+ * 2× the child-process timeout, the same bound the legacy stall derivation and
+ * both boot sweeps used — the sweeps still run, but only as a cutover drain for
+ * runs stuck before this process existed. A child that hits
  * its own 15-minute cap still has a full cap's worth of margin to report the
  * failure itself, so this deadline only fires when nothing is left to report
  * it — which is exactly the case it exists for.

@@ -59,44 +59,52 @@ async function firstBatch(row: Record<string, string>) {
 
 describe("batch history expected count", () => {
   describe("given every run in the batch reached the queue", () => {
-    it("reports the same expected and actual count", async () => {
-      const batch = await firstBatch(
-        batchRow({ TotalCount: "6", ExpectedCount: "6" }),
-      );
+    describe("when batch history is read", () => {
+      it("reports the same expected and actual count", async () => {
+        const batch = await firstBatch(
+          batchRow({ TotalCount: "6", ExpectedCount: "6" }),
+        );
 
-      expect(batch.totalCount).toBe(6);
-      expect(batch.expectedCount).toBe(6);
+        expect(batch.totalCount).toBe(6);
+        expect(batch.expectedCount).toBe(6);
+      });
     });
   });
 
   describe("given part of the fan-out never reached the queue", () => {
-    it("reports more expected than were run", async () => {
-      const batch = await firstBatch(
-        batchRow({ TotalCount: "5", ExpectedCount: "6" }),
-      );
+    describe("when batch history is read", () => {
+      it("reports more expected than were run", async () => {
+        const batch = await firstBatch(
+          batchRow({ TotalCount: "5", ExpectedCount: "6" }),
+        );
 
-      expect(batch.totalCount).toBe(5);
-      expect(batch.expectedCount).toBe(6);
+        expect(batch.totalCount).toBe(5);
+        expect(batch.expectedCount).toBe(6);
+      });
     });
   });
 
   describe("given a batch queued before the denominator was recorded", () => {
-    it("falls back to counting the runs rather than reporting zero", async () => {
-      const batch = await firstBatch(
-        batchRow({ TotalCount: "4", ExpectedCount: "0" }),
-      );
+    describe("when batch history is read", () => {
+      it("falls back to counting the runs rather than reporting zero", async () => {
+        const batch = await firstBatch(
+          batchRow({ TotalCount: "4", ExpectedCount: "0" }),
+        );
 
-      expect(batch.expectedCount).toBe(4);
+        expect(batch.expectedCount).toBe(4);
+      });
     });
   });
 
   describe("given more runs exist than the batch expected", () => {
-    it("never reports fewer expected than actually ran", async () => {
-      const batch = await firstBatch(
-        batchRow({ TotalCount: "7", ExpectedCount: "6" }),
-      );
+    describe("when batch history is read", () => {
+      it("never reports fewer expected than actually ran", async () => {
+        const batch = await firstBatch(
+          batchRow({ TotalCount: "7", ExpectedCount: "6" }),
+        );
 
-      expect(batch.expectedCount).toBe(7);
+        expect(batch.expectedCount).toBe(7);
+      });
     });
   });
 });

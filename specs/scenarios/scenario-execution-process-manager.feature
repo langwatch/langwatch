@@ -109,4 +109,4 @@ Feature: A scenario run always reaches a terminal state
     Given no report has said which scenario or batch the run belongs to
     When its deadline fires
     Then nothing is recorded against it
-    And it is not re-examined on every later sweep
+    And it never reappears as a result

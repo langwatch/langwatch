@@ -2,12 +2,16 @@
 
 **Date:** 2026-06-23
 
-**Status:** Superseded by [ADR-073](073-run-execution-on-process-manager.md)
+**Status:** Superseded
+
+**Superseded by:** [ADR-073](073-run-execution-on-process-manager.md)
 
 > **Superseded 2026-07-28.** Both boot-time sweeps this ADR introduced —
 > `scenario-orphan-reconciler.ts` (QUEUED) and
-> `orphaned-run-reconciliation.ts` / `.clickhouse.ts` (IN_PROGRESS) — are
-> deleted. The `scenarioExecution` process manager (ADR-073, step 1) holds the
+> `orphaned-run-reconciliation.ts` / `.clickhouse.ts` (IN_PROGRESS) — stop
+> being the mechanism. They still run once per boot as a cutover drain for runs
+> already stuck when ADR-073 deploys, and are deleted one release later. The
+> `scenarioExecution` process manager (ADR-073, step 1) holds the
 > same guarantee continuously instead of at worker boot, so recovery is bounded
 > by a deadline rather than by deploy cadence.
 >
