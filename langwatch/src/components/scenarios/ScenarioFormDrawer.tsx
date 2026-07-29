@@ -56,6 +56,16 @@ export type ScenarioFormDrawerProps = {
 } & Partial<ScenarioInitialData>;
 
 /**
+ * Model overrides chosen in the run dialog. Omitted on a plain save so the
+ * scenario's existing models are left untouched (undefined = no-op in the
+ * Prisma update).
+ */
+type ModelOverrides = {
+  simulatorModel: string | null;
+  judgeModel: string | null;
+};
+
+/**
  * URL-based wrapper for ScenarioFormDrawer.
  * Reads scenarioId from drawer URL params and passes it as a prop.
  * Use this when rendering via the drawer registry / URL navigation.
@@ -220,6 +230,95 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
     [openDrawer],
   );
 
+  // Edit mode: the scenario already exists, so the save is a plain update.
+  // Mutation errors are caught here so a save failure never surfaces as
+  // "Failed to run scenario" in the save-and-run path — updateMutation's own
+  // onError toast is what the user sees.
+  const updateExisting = useCallback(
+    async ({
+      projectId,
+      scenarioId,
+      data,
+      models,
+    }: {
+      projectId: string;
+      scenarioId: string;
+      data: ScenarioFormData;
+      models?: ModelOverrides;
+    }): Promise<Scenario | null> => {
+      try {
+        return await updateMutation.mutateAsync({
+          projectId,
+          id: scenarioId,
+          ...data,
+          ...(models ?? {}),
+        });
+      } catch {
+        // Error toast already surfaced by updateMutation.onError; return null
+        // so the save-and-run caller doesn't re-report it as a run failure.
+        return null;
+      }
+    },
+    [updateMutation],
+  );
+
+  const createScenario = useCallback(
+    async ({
+      projectId,
+      data,
+      skipTransition,
+      models,
+    }: {
+      projectId: string;
+      data: ScenarioFormData;
+      skipTransition: boolean;
+      models?: ModelOverrides;
+    }): Promise<Scenario | null> => {
+      try {
+        const result = await createMutation.mutateAsync({
+          projectId,
+          ...data,
+          ...(models ?? {}),
+        });
+        // Transition to edit mode to prevent double-create on subsequent saves.
+        // Skip when the drawer is about to close (save-without-running).
+        if (!skipTransition) {
+          transitionToEditMode(result.id);
+        }
+        return result;
+      } catch {
+        // Error already handled by global mutation cache if license error
+        return null;
+      }
+    },
+    [createMutation, transitionToEditMode],
+  );
+
+  // Create mode: no scenarioId in the URL yet, so the create has to clear the
+  // plan limit before it runs.
+  const createNew = useCallback(
+    (args: {
+      projectId: string;
+      data: ScenarioFormData;
+      skipTransition: boolean;
+      models?: ModelOverrides;
+    }): Promise<Scenario | null> =>
+      new Promise((resolve) => {
+        // checkCompoundLimits takes a synchronous callback, so the create runs
+        // in a fire-and-forget scope that resolves the outer promise on both
+        // paths rather than returning one the caller would drop.
+        checkCompoundLimits([scenarioEnforcement], () => {
+          void createScenario(args).then(resolve);
+        });
+
+        // If limit exceeded, modal is shown and callback won't run - resolve null
+        if (!scenarioEnforcement.isAllowed) {
+          resolve(null);
+        }
+      }),
+    [createScenario, scenarioEnforcement],
+  );
+
   const handleSave = useCallback(
     async ({
       data,
@@ -228,66 +327,21 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
     }: {
       data: ScenarioFormData;
       skipTransition?: boolean;
-      /** Model overrides chosen in the run dialog. Omitted on a plain save
-       *  so existing scenario models are left untouched (undefined = no-op
-       *  in the Prisma update). */
-      models?: { simulatorModel: string | null; judgeModel: string | null };
+      models?: ModelOverrides;
     }): Promise<Scenario | null> => {
-      if (!project?.id) return null;
+      const projectId = project?.id;
+      if (!projectId) return null;
 
-      // Edit mode: scenarioId is in URL and scenario data is loaded.
-      // Catch mutation errors here so save failures never surface as "Failed to run scenario"
-      // in the save-and-run path — the mutation's own onError toast handles user feedback.
-      if (scenario) {
-        try {
-          return await updateMutation.mutateAsync({
-            projectId: project.id,
-            id: scenario.id,
-            ...data,
-            ...(models ?? {}),
-          });
-        } catch {
-          // Error toast already surfaced by updateMutation.onError; return null
-          // so the save-and-run caller doesn't re-report it as a run failure.
-          return null;
-        }
-      }
-
-      // Create mode: no scenarioId in URL yet
-      return new Promise((resolve) => {
-        checkCompoundLimits([scenarioEnforcement], async () => {
-          try {
-            const result = await createMutation.mutateAsync({
-              projectId: project.id,
-              ...data,
-              ...(models ?? {}),
-            });
-            // Transition to edit mode to prevent double-create on subsequent saves.
-            // Skip when the drawer is about to close (save-without-running).
-            if (!skipTransition) {
-              transitionToEditMode(result.id);
-            }
-            resolve(result);
-          } catch {
-            // Error already handled by global mutation cache if license error
-            resolve(null);
-          }
-        });
-
-        // If limit exceeded, modal is shown and callback won't run - resolve null
-        if (!scenarioEnforcement.isAllowed) {
-          resolve(null);
-        }
-      });
+      return scenario
+        ? await updateExisting({
+            projectId,
+            scenarioId: scenario.id,
+            data,
+            models,
+          })
+        : await createNew({ projectId, data, skipTransition, models });
     },
-    [
-      project?.id,
-      scenario,
-      createMutation,
-      updateMutation,
-      scenarioEnforcement,
-      transitionToEditMode,
-    ],
+    [project?.id, scenario, updateExisting, createNew],
   );
   const handleSaveAndRun = useCallback(
     async (target: TargetValue) => {

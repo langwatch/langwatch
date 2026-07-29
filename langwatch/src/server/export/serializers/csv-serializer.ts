@@ -9,13 +9,13 @@
 
 import Parse from "papaparse";
 import type {
-  Trace,
-  Span,
+  ErrorCapture,
+  Evaluation,
   LLMSpan,
   RAGSpan,
-  Evaluation,
+  Span,
   SpanInputOutput,
-  ErrorCapture,
+  Trace,
 } from "~/server/tracer/types";
 import { RESERVED_METADATA_KEYS } from "./constants";
 
@@ -122,7 +122,12 @@ function buildSummaryRow({
     trace.metadata.subtopic_id ?? "",
   ];
 
-  row.push(...buildEvaluationColumns({ evaluations: trace.evaluations, evaluatorNames }));
+  row.push(
+    ...buildEvaluationColumns({
+      evaluations: trace.evaluations,
+      evaluatorNames,
+    }),
+  );
 
   return row;
 }
@@ -203,10 +208,7 @@ function buildFullHeaders({
 }: {
   evaluatorNames: string[];
 }): string[] {
-  const headers: string[] = [
-    ...FULL_TRACE_COLUMNS,
-    ...FULL_SPAN_COLUMNS,
-  ];
+  const headers: string[] = [...FULL_TRACE_COLUMNS, ...FULL_SPAN_COLUMNS];
   for (const name of evaluatorNames) {
     headers.push(`${name}_score`);
     headers.push(`${name}_passed`);
@@ -275,9 +277,11 @@ function buildFullRow({
 
   // Include trace-level evaluations (no span_id) and span-specific evaluations
   const spanEvaluations = (trace.evaluations ?? []).filter(
-    (e) => !e.span_id || e.span_id === span.span_id
+    (e) => !e.span_id || e.span_id === span.span_id,
   );
-  row.push(...buildEvaluationColumns({ evaluations: spanEvaluations, evaluatorNames }));
+  row.push(
+    ...buildEvaluationColumns({ evaluations: spanEvaluations, evaluatorNames }),
+  );
 
   return row;
 }
@@ -321,9 +325,7 @@ function nullableNumber(value: number | null | undefined): string {
  * Serialize a span input or output to a string for CSV export.
  * Structured types (chat_messages, json, list) are stringified as JSON.
  */
-function serializeSpanIO(
-  io: SpanInputOutput | null | undefined,
-): string {
+function serializeSpanIO(io: SpanInputOutput | null | undefined): string {
   if (!io) return "";
   if (io.type === "chat_messages") {
     return JSON.stringify(io.value);
@@ -348,7 +350,11 @@ function serializeError(error: ErrorCapture | null | undefined): string {
 function extractCustomMetadata(trace: Trace): Record<string, unknown> {
   const custom: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(trace.metadata)) {
-    if (!RESERVED_METADATA_KEYS.has(key) && value !== null && value !== undefined) {
+    if (
+      !RESERVED_METADATA_KEYS.has(key) &&
+      value !== null &&
+      value !== undefined
+    ) {
       custom[key] = value;
     }
   }

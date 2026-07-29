@@ -2,7 +2,6 @@ import { Alert, Box, HStack, Spacer, VStack } from "@chakra-ui/react";
 import { nanoid } from "nanoid";
 import { useEffect, useMemo } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
-import { LoadingScreen } from "~/components/LoadingScreen";
 import { AutosaveStatus } from "~/experiments-v3/components/AutosaveStatus";
 import { EditableHeading } from "~/experiments-v3/components/EditableHeading";
 import { EvaluationsV3Table } from "~/experiments-v3/components/EvaluationsV3Table";

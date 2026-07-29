@@ -55,7 +55,8 @@ export async function isComponentDisabled({
   }
 
   const flagKey: FeatureFlagKey =
-    customKey ?? generateKillSwitchKey(aggregateType, componentType, componentName);
+    customKey ??
+    generateKillSwitchKey(aggregateType, componentType, componentName);
 
   try {
     // `projectId` — not just `distinctId` — is what makes this switch targetable

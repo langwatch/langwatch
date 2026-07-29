@@ -1,7 +1,7 @@
-import type { LangyTurnAdmissionRepository } from "../repositories/langy-turn-admission.repository";
 import { LANGY_CONVERSATION_EVENT_TYPES } from "@langwatch/langy";
 import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
 import type { EventSubscriberDefinition } from "~/server/event-sourcing/subscribers/eventSubscriber.types";
+import type { LangyTurnAdmissionRepository } from "../repositories/langy-turn-admission.repository";
 
 const TERMINAL_EVENTS = [
   LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONDED,

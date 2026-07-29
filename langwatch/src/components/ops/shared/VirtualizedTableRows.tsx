@@ -71,7 +71,8 @@ export function VirtualizedTableRows({
 
   const virtualItems = virtualizer.getVirtualItems();
   const totalSize = virtualizer.getTotalSize();
-  const paddingTop = virtualItems.length > 0 ? (virtualItems[0]?.start ?? 0) : 0;
+  const paddingTop =
+    virtualItems.length > 0 ? (virtualItems[0]?.start ?? 0) : 0;
   const paddingBottom =
     virtualItems.length > 0
       ? totalSize - (virtualItems[virtualItems.length - 1]?.end ?? 0)

@@ -4,8 +4,8 @@ import {
   Button,
   chakra,
   EmptyState,
-  HStack,
   Heading,
+  HStack,
   Spacer,
   Spinner,
   Stat,
@@ -28,11 +28,11 @@ import {
 
 import AiGatewayLayout from "~/components/gateway/AiGatewayLayout";
 import { formatBudgetUsd } from "~/components/gateway/formatBudgetUsd";
-import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { GatewayErrorPanel } from "~/components/gateway/GatewayErrorPanel";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Link } from "~/components/ui/link";
 import { Tooltip as UITooltip } from "~/components/ui/tooltip";
+import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRollingWindow } from "~/hooks/useRollingWindow";
 import { api } from "~/utils/api";
@@ -123,7 +123,13 @@ function GatewayUsagePage() {
     rows.push(["Section", "Key", "Prefix / Model", "Spend (USD)", "Requests"]);
     rows.push(["daily", "day", "", "", ""]);
     for (const d of data.byDay) {
-      rows.push(["daily", d.day, "", Number(d.totalUsd).toFixed(6), d.requests]);
+      rows.push([
+        "daily",
+        d.day,
+        "",
+        Number(d.totalUsd).toFixed(6),
+        d.requests,
+      ]);
     }
     rows.push([]);
     rows.push(["virtual_key", "id", "prefix", "spend", "requests"]);
@@ -273,41 +279,41 @@ function GatewayUsagePage() {
               {data.byDay.length >= 2 && <SpendSparkline byDay={data.byDay} />}
 
               {!virtualKeyId && (
-              <VStack align="stretch" gap={2}>
-                <Heading size="sm">Top virtual keys</Heading>
-                <Table.Root size="sm">
-                  <Table.Header>
-                    <Table.Row>
-                      <Table.ColumnHeader>Key</Table.ColumnHeader>
-                      <Table.ColumnHeader>Prefix</Table.ColumnHeader>
-                      <Table.ColumnHeader>Spend</Table.ColumnHeader>
-                      <Table.ColumnHeader>Requests</Table.ColumnHeader>
-                    </Table.Row>
-                  </Table.Header>
-                  <Table.Body>
-                    {data.byVirtualKey.map((row) => (
-                      <Table.Row key={row.virtualKeyId}>
-                        <Table.Cell>
-                          <Link
-                            href={`/settings/gateway/virtual-keys/${row.virtualKeyId}`}
-                          >
-                            {row.name}
-                          </Link>
-                        </Table.Cell>
-                        <Table.Cell>
-                          <Text fontFamily="mono" fontSize="xs">
-                            {row.displayPrefix}…
-                          </Text>
-                        </Table.Cell>
-                        <Table.Cell>
-                          {formatBudgetUsd(row.totalUsd)}
-                        </Table.Cell>
-                        <Table.Cell>{row.requests}</Table.Cell>
+                <VStack align="stretch" gap={2}>
+                  <Heading size="sm">Top virtual keys</Heading>
+                  <Table.Root size="sm">
+                    <Table.Header>
+                      <Table.Row>
+                        <Table.ColumnHeader>Key</Table.ColumnHeader>
+                        <Table.ColumnHeader>Prefix</Table.ColumnHeader>
+                        <Table.ColumnHeader>Spend</Table.ColumnHeader>
+                        <Table.ColumnHeader>Requests</Table.ColumnHeader>
                       </Table.Row>
-                    ))}
-                  </Table.Body>
-                </Table.Root>
-              </VStack>
+                    </Table.Header>
+                    <Table.Body>
+                      {data.byVirtualKey.map((row) => (
+                        <Table.Row key={row.virtualKeyId}>
+                          <Table.Cell>
+                            <Link
+                              href={`/settings/gateway/virtual-keys/${row.virtualKeyId}`}
+                            >
+                              {row.name}
+                            </Link>
+                          </Table.Cell>
+                          <Table.Cell>
+                            <Text fontFamily="mono" fontSize="xs">
+                              {row.displayPrefix}…
+                            </Text>
+                          </Table.Cell>
+                          <Table.Cell>
+                            {formatBudgetUsd(row.totalUsd)}
+                          </Table.Cell>
+                          <Table.Cell>{row.requests}</Table.Cell>
+                        </Table.Row>
+                      ))}
+                    </Table.Body>
+                  </Table.Root>
+                </VStack>
               )}
 
               <VStack align="stretch" gap={2}>
@@ -328,9 +334,7 @@ function GatewayUsagePage() {
                             {row.model}
                           </Text>
                         </Table.Cell>
-                        <Table.Cell>
-                          {formatBudgetUsd(row.totalUsd)}
-                        </Table.Cell>
+                        <Table.Cell>{formatBudgetUsd(row.totalUsd)}</Table.Cell>
                         <Table.Cell>{row.requests}</Table.Cell>
                       </Table.Row>
                     ))}
@@ -376,14 +380,21 @@ function SpendSparkline({
         height="220px"
       >
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={points} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+          <AreaChart
+            data={points}
+            margin={{ top: 8, right: 8, bottom: 0, left: 0 }}
+          >
             <defs>
               <linearGradient id="spendFill" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="#f97316" stopOpacity={0.35} />
                 <stop offset="100%" stopColor="#f97316" stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+            <CartesianGrid
+              strokeDasharray="3 3"
+              stroke="#e2e8f0"
+              vertical={false}
+            />
             <XAxis
               dataKey="day"
               tick={{ fontSize: 11, fill: "#64748b" }}

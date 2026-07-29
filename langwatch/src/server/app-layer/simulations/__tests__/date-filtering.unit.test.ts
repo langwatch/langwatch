@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { ClickHouseClient } from "@clickhouse/client";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SimulationClickHouseRepository } from "../repositories/simulation.clickhouse.repository";
 
 function makeRunRow(overrides: Record<string, unknown> = {}) {
@@ -37,10 +37,7 @@ function createMockClickHouse() {
   return { query: queryFn, command: vi.fn() } as unknown as ClickHouseClient;
 }
 
-function setQueryResults(
-  clickhouse: ClickHouseClient,
-  results: unknown[][],
-) {
+function setQueryResults(clickhouse: ClickHouseClient, results: unknown[][]) {
   const queryFn = clickhouse.query as ReturnType<typeof vi.fn>;
   for (const result of results) {
     const jsonFn = vi.fn().mockResolvedValue(result);
@@ -69,7 +66,10 @@ describe("SimulationClickHouseRepository date filtering", () => {
         });
 
         const call = (clickhouse.query as ReturnType<typeof vi.fn>).mock
-          .calls[0]![0] as { query: string; query_params: Record<string, string> };
+          .calls[0]![0] as {
+          query: string;
+          query_params: Record<string, string>;
+        };
 
         expect(call.query_params.startDateMs).toBe("1700000000000");
         expect(call.query_params.endDateMs).toBe("1700100000000");

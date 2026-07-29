@@ -3,9 +3,9 @@ import type { Prisma } from "@prisma/client";
 import { z } from "zod";
 
 import {
-  topicClusteringRunHistoryEntrySchema,
   type TopicClusteringRunHistoryData,
   type TopicClusteringRunHistoryEntry,
+  topicClusteringRunHistoryEntrySchema,
 } from "~/server/event-sourcing/pipelines/topic-clustering-processing/projections/topicClusteringRunHistory.foldProjection";
 import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
 import type {
@@ -58,7 +58,9 @@ function fromRow(row: Row): StoredProjection<TopicClusteringRunHistoryData> {
 }
 
 /** Postgres row I/O for the topic clustering run-history projection. */
-export class PrismaTopicClusteringRunHistoryProjectionRepository implements StateProjectionStore<TopicClusteringRunHistoryData> {
+export class PrismaTopicClusteringRunHistoryProjectionRepository
+  implements StateProjectionStore<TopicClusteringRunHistoryData>
+{
   constructor(private readonly prisma: RunHistoryPrismaClient) {}
 
   async load(

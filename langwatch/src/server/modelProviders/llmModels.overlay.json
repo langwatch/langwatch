@@ -1,258 +1,252 @@
 {
-  "_comment": "Hand-curated model entries for direct-API providers that the upstream model-catalog source does not carry (Voyage AI's direct API today, others later). Merged into llmModels at module load \u2014 see loadModelCatalog.ts. The base llmModels.json is regenerated periodically and overwriting hand-added entries would silently drop these providers; the overlay file is never touched by the regen task. Add entries here when integrating a provider whose models aren't reachable via the upstream catalog. Audio entries here are the ones litellm's price registry cannot serve correctly: models it lacks (ElevenLabs flash/turbo), models it prices without audio units (gpt-4o-mini-tts, the gpt-4o transcribe pair), and models where its rate lags a provider price change (eleven_multilingual_v2 still carries the pre-cut rate upstream). Entries litellm carries correctly (tts-1, tts-1-hd, whisper-1, scribe_v1) were retired from the overlay and flow in via the weekly sync.",
-  "models": {
-    "voyage/voyage-3.5": {
-      "id": "voyage/voyage-3.5",
-      "name": "Voyage AI: Voyage 3.5",
-      "provider": "voyage",
-      "pricing": {
-        "inputCostPerToken": 6e-08,
-        "outputCostPerToken": 0
-      },
-      "contextLength": 32000,
-      "maxCompletionTokens": null,
-      "supportedParameters": [],
-      "defaultParameters": null,
-      "modality": "text->embeddings",
-      "mode": "embedding",
-      "description": "Voyage AI's flagship general-purpose embedding model with strong retrieval quality across domains.",
-      "supportsImageInput": false,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
-    "voyage/voyage-3.5-lite": {
-      "id": "voyage/voyage-3.5-lite",
-      "name": "Voyage AI: Voyage 3.5 Lite",
-      "provider": "voyage",
-      "pricing": {
-        "inputCostPerToken": 2e-08,
-        "outputCostPerToken": 0
-      },
-      "contextLength": 32000,
-      "maxCompletionTokens": null,
-      "supportedParameters": [],
-      "defaultParameters": null,
-      "modality": "text->embeddings",
-      "mode": "embedding",
-      "description": "Voyage AI's smaller, faster embedding model. Lower cost per token at a modest quality tradeoff, useful for high-volume topic-clustering workloads.",
-      "supportsImageInput": false,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
-    "openai_codex/gpt-5.6-terra": {
-      "id": "openai_codex/gpt-5.6-terra",
-      "name": "Codex: GPT-5.6 Terra",
-      "provider": "openai_codex",
-      "pricing": {
-        "inputCostPerToken": 0,
-        "outputCostPerToken": 0
-      },
-      "contextLength": 400000,
-      "maxCompletionTokens": 128000,
-      "supportedParameters": [
-        "reasoning_effort"
-      ],
-      "defaultParameters": null,
-      "modality": "text->text",
-      "mode": "chat",
-      "description": "OpenAI's flagship coding model, billed to your ChatGPT plan. Zero token cost: usage counts against your subscription limits instead.",
-      "supportsImageInput": true,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
-    "openai_codex/gpt-5.6-sol": {
-      "id": "openai_codex/gpt-5.6-sol",
-      "name": "Codex: GPT-5.6 Sol",
-      "provider": "openai_codex",
-      "pricing": {
-        "inputCostPerToken": 0,
-        "outputCostPerToken": 0
-      },
-      "contextLength": 400000,
-      "maxCompletionTokens": 128000,
-      "supportedParameters": [
-        "reasoning_effort"
-      ],
-      "defaultParameters": null,
-      "modality": "text->text",
-      "mode": "chat",
-      "description": "Balanced coding model on your ChatGPT plan. Zero token cost: usage counts against your subscription limits instead.",
-      "supportsImageInput": true,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
-    "openai_codex/gpt-5.6-luna": {
-      "id": "openai_codex/gpt-5.6-luna",
-      "name": "Codex: GPT-5.6 Luna",
-      "provider": "openai_codex",
-      "pricing": {
-        "inputCostPerToken": 0,
-        "outputCostPerToken": 0
-      },
-      "contextLength": 400000,
-      "maxCompletionTokens": 128000,
-      "supportedParameters": [
-        "reasoning_effort"
-      ],
-      "defaultParameters": null,
-      "modality": "text->text",
-      "mode": "chat",
-      "description": "Fast, lighter coding model on your ChatGPT plan. Zero token cost: usage counts against your subscription limits instead.",
-      "supportsImageInput": true,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
-    "openai/gpt-4o-mini-tts": {
-      "id": "openai/gpt-4o-mini-tts",
-      "name": "OpenAI: GPT-4o mini TTS",
-      "provider": "openai",
-      "pricing": {
-        "inputCostPerToken": 0,
-        "outputCostPerToken": 0,
-        "inputCostPerCharacter": 1.667e-05
-      },
-      "contextLength": 0,
-      "maxCompletionTokens": null,
-      "supportedParameters": [],
-      "defaultParameters": null,
-      "modality": "text->audio",
-      "mode": "audio",
-      "description": "OpenAI speech synthesis on the GPT-4o mini engine. Priced per input character, derived from OpenAI's published $0.015-per-minute estimate at a standard speech rate.",
-      "supportsImageInput": false,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": true
-    },
-    "openai/gpt-4o-transcribe": {
-      "id": "openai/gpt-4o-transcribe",
-      "name": "OpenAI: GPT-4o Transcribe",
-      "provider": "openai",
-      "pricing": {
-        "inputCostPerToken": 0,
-        "outputCostPerToken": 0,
-        "inputCostPerSecond": 0.0001
-      },
-      "contextLength": 0,
-      "maxCompletionTokens": null,
-      "supportedParameters": [],
-      "defaultParameters": null,
-      "modality": "audio->text",
-      "mode": "audio",
-      "description": "OpenAI speech-to-text on the GPT-4o engine. Priced per second of audio ($0.006 per minute). An explicit entry so it stops prefix-matching gpt-4o's text-token rates.",
-      "supportsImageInput": false,
-      "supportsAudioInput": true,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
-    "openai/gpt-4o-mini-transcribe": {
-      "id": "openai/gpt-4o-mini-transcribe",
-      "name": "OpenAI: GPT-4o mini Transcribe",
-      "provider": "openai",
-      "pricing": {
-        "inputCostPerToken": 0,
-        "outputCostPerToken": 0,
-        "inputCostPerSecond": 5e-05
-      },
-      "contextLength": 0,
-      "maxCompletionTokens": null,
-      "supportedParameters": [],
-      "defaultParameters": null,
-      "modality": "audio->text",
-      "mode": "audio",
-      "description": "OpenAI speech-to-text on the GPT-4o mini engine. Priced per second of audio ($0.003 per minute). An explicit entry so it stops prefix-matching gpt-4o-mini's text-token rates.",
-      "supportsImageInput": false,
-      "supportsAudioInput": true,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
-    "elevenlabs/eleven_multilingual_v2": {
-      "id": "elevenlabs/eleven_multilingual_v2",
-      "name": "ElevenLabs: Multilingual v2",
-      "provider": "elevenlabs",
-      "pricing": {
-        "inputCostPerToken": 0,
-        "outputCostPerToken": 0,
-        "inputCostPerCharacter": 0.0001
-      },
-      "contextLength": 0,
-      "maxCompletionTokens": null,
-      "supportedParameters": [],
-      "defaultParameters": null,
-      "modality": "text->audio",
-      "mode": "audio",
-      "description": "ElevenLabs' quality-tier speech synthesis. Priced per input character ($0.10 per 1k characters).",
-      "supportsImageInput": false,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": true
-    },
-    "elevenlabs/eleven_flash_v2": {
-      "id": "elevenlabs/eleven_flash_v2",
-      "name": "ElevenLabs: Flash v2",
-      "provider": "elevenlabs",
-      "pricing": {
-        "inputCostPerToken": 0,
-        "outputCostPerToken": 0,
-        "inputCostPerCharacter": 5e-05
-      },
-      "contextLength": 0,
-      "maxCompletionTokens": null,
-      "supportedParameters": [],
-      "defaultParameters": null,
-      "modality": "text->audio",
-      "mode": "audio",
-      "description": "ElevenLabs' low-latency speech synthesis. Priced per input character ($0.05 per 1k characters).",
-      "supportsImageInput": false,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": true
-    },
-    "elevenlabs/eleven_flash_v2_5": {
-      "id": "elevenlabs/eleven_flash_v2_5",
-      "name": "ElevenLabs: Flash v2.5",
-      "provider": "elevenlabs",
-      "pricing": {
-        "inputCostPerToken": 0,
-        "outputCostPerToken": 0,
-        "inputCostPerCharacter": 5e-05
-      },
-      "contextLength": 0,
-      "maxCompletionTokens": null,
-      "supportedParameters": [],
-      "defaultParameters": null,
-      "modality": "text->audio",
-      "mode": "audio",
-      "description": "ElevenLabs' low-latency multilingual speech synthesis. Priced per input character ($0.05 per 1k characters).",
-      "supportsImageInput": false,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": true
-    },
-    "elevenlabs/eleven_turbo_v2_5": {
-      "id": "elevenlabs/eleven_turbo_v2_5",
-      "name": "ElevenLabs: Turbo v2.5",
-      "provider": "elevenlabs",
-      "pricing": {
-        "inputCostPerToken": 0,
-        "outputCostPerToken": 0,
-        "inputCostPerCharacter": 5e-05
-      },
-      "contextLength": 0,
-      "maxCompletionTokens": null,
-      "supportedParameters": [],
-      "defaultParameters": null,
-      "modality": "text->audio",
-      "mode": "audio",
-      "description": "ElevenLabs' balanced quality/latency speech synthesis. Priced per input character ($0.05 per 1k characters).",
-      "supportsImageInput": false,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": true
-    }
-  }
+	"_comment": "Hand-curated model entries for direct-API providers that the upstream model-catalog source does not carry (Voyage AI's direct API today, others later). Merged into llmModels at module load \u2014 see loadModelCatalog.ts. The base llmModels.json is regenerated periodically and overwriting hand-added entries would silently drop these providers; the overlay file is never touched by the regen task. Add entries here when integrating a provider whose models aren't reachable via the upstream catalog. Audio entries here are the ones litellm's price registry cannot serve correctly: models it lacks (ElevenLabs flash/turbo), models it prices without audio units (gpt-4o-mini-tts, the gpt-4o transcribe pair), and models where its rate lags a provider price change (eleven_multilingual_v2 still carries the pre-cut rate upstream). Entries litellm carries correctly (tts-1, tts-1-hd, whisper-1, scribe_v1) were retired from the overlay and flow in via the weekly sync.",
+	"models": {
+		"voyage/voyage-3.5": {
+			"id": "voyage/voyage-3.5",
+			"name": "Voyage AI: Voyage 3.5",
+			"provider": "voyage",
+			"pricing": {
+				"inputCostPerToken": 6e-8,
+				"outputCostPerToken": 0
+			},
+			"contextLength": 32000,
+			"maxCompletionTokens": null,
+			"supportedParameters": [],
+			"defaultParameters": null,
+			"modality": "text->embeddings",
+			"mode": "embedding",
+			"description": "Voyage AI's flagship general-purpose embedding model with strong retrieval quality across domains.",
+			"supportsImageInput": false,
+			"supportsAudioInput": false,
+			"supportsImageOutput": false,
+			"supportsAudioOutput": false
+		},
+		"voyage/voyage-3.5-lite": {
+			"id": "voyage/voyage-3.5-lite",
+			"name": "Voyage AI: Voyage 3.5 Lite",
+			"provider": "voyage",
+			"pricing": {
+				"inputCostPerToken": 2e-8,
+				"outputCostPerToken": 0
+			},
+			"contextLength": 32000,
+			"maxCompletionTokens": null,
+			"supportedParameters": [],
+			"defaultParameters": null,
+			"modality": "text->embeddings",
+			"mode": "embedding",
+			"description": "Voyage AI's smaller, faster embedding model. Lower cost per token at a modest quality tradeoff, useful for high-volume topic-clustering workloads.",
+			"supportsImageInput": false,
+			"supportsAudioInput": false,
+			"supportsImageOutput": false,
+			"supportsAudioOutput": false
+		},
+		"openai_codex/gpt-5.6-terra": {
+			"id": "openai_codex/gpt-5.6-terra",
+			"name": "Codex: GPT-5.6 Terra",
+			"provider": "openai_codex",
+			"pricing": {
+				"inputCostPerToken": 0,
+				"outputCostPerToken": 0
+			},
+			"contextLength": 400000,
+			"maxCompletionTokens": 128000,
+			"supportedParameters": ["reasoning_effort"],
+			"defaultParameters": null,
+			"modality": "text->text",
+			"mode": "chat",
+			"description": "OpenAI's flagship coding model, billed to your ChatGPT plan. Zero token cost: usage counts against your subscription limits instead.",
+			"supportsImageInput": true,
+			"supportsAudioInput": false,
+			"supportsImageOutput": false,
+			"supportsAudioOutput": false
+		},
+		"openai_codex/gpt-5.6-sol": {
+			"id": "openai_codex/gpt-5.6-sol",
+			"name": "Codex: GPT-5.6 Sol",
+			"provider": "openai_codex",
+			"pricing": {
+				"inputCostPerToken": 0,
+				"outputCostPerToken": 0
+			},
+			"contextLength": 400000,
+			"maxCompletionTokens": 128000,
+			"supportedParameters": ["reasoning_effort"],
+			"defaultParameters": null,
+			"modality": "text->text",
+			"mode": "chat",
+			"description": "Balanced coding model on your ChatGPT plan. Zero token cost: usage counts against your subscription limits instead.",
+			"supportsImageInput": true,
+			"supportsAudioInput": false,
+			"supportsImageOutput": false,
+			"supportsAudioOutput": false
+		},
+		"openai_codex/gpt-5.6-luna": {
+			"id": "openai_codex/gpt-5.6-luna",
+			"name": "Codex: GPT-5.6 Luna",
+			"provider": "openai_codex",
+			"pricing": {
+				"inputCostPerToken": 0,
+				"outputCostPerToken": 0
+			},
+			"contextLength": 400000,
+			"maxCompletionTokens": 128000,
+			"supportedParameters": ["reasoning_effort"],
+			"defaultParameters": null,
+			"modality": "text->text",
+			"mode": "chat",
+			"description": "Fast, lighter coding model on your ChatGPT plan. Zero token cost: usage counts against your subscription limits instead.",
+			"supportsImageInput": true,
+			"supportsAudioInput": false,
+			"supportsImageOutput": false,
+			"supportsAudioOutput": false
+		},
+		"openai/gpt-4o-mini-tts": {
+			"id": "openai/gpt-4o-mini-tts",
+			"name": "OpenAI: GPT-4o mini TTS",
+			"provider": "openai",
+			"pricing": {
+				"inputCostPerToken": 0,
+				"outputCostPerToken": 0,
+				"inputCostPerCharacter": 1.667e-5
+			},
+			"contextLength": 0,
+			"maxCompletionTokens": null,
+			"supportedParameters": [],
+			"defaultParameters": null,
+			"modality": "text->audio",
+			"mode": "audio",
+			"description": "OpenAI speech synthesis on the GPT-4o mini engine. Priced per input character, derived from OpenAI's published $0.015-per-minute estimate at a standard speech rate.",
+			"supportsImageInput": false,
+			"supportsAudioInput": false,
+			"supportsImageOutput": false,
+			"supportsAudioOutput": true
+		},
+		"openai/gpt-4o-transcribe": {
+			"id": "openai/gpt-4o-transcribe",
+			"name": "OpenAI: GPT-4o Transcribe",
+			"provider": "openai",
+			"pricing": {
+				"inputCostPerToken": 0,
+				"outputCostPerToken": 0,
+				"inputCostPerSecond": 0.0001
+			},
+			"contextLength": 0,
+			"maxCompletionTokens": null,
+			"supportedParameters": [],
+			"defaultParameters": null,
+			"modality": "audio->text",
+			"mode": "audio",
+			"description": "OpenAI speech-to-text on the GPT-4o engine. Priced per second of audio ($0.006 per minute). An explicit entry so it stops prefix-matching gpt-4o's text-token rates.",
+			"supportsImageInput": false,
+			"supportsAudioInput": true,
+			"supportsImageOutput": false,
+			"supportsAudioOutput": false
+		},
+		"openai/gpt-4o-mini-transcribe": {
+			"id": "openai/gpt-4o-mini-transcribe",
+			"name": "OpenAI: GPT-4o mini Transcribe",
+			"provider": "openai",
+			"pricing": {
+				"inputCostPerToken": 0,
+				"outputCostPerToken": 0,
+				"inputCostPerSecond": 5e-5
+			},
+			"contextLength": 0,
+			"maxCompletionTokens": null,
+			"supportedParameters": [],
+			"defaultParameters": null,
+			"modality": "audio->text",
+			"mode": "audio",
+			"description": "OpenAI speech-to-text on the GPT-4o mini engine. Priced per second of audio ($0.003 per minute). An explicit entry so it stops prefix-matching gpt-4o-mini's text-token rates.",
+			"supportsImageInput": false,
+			"supportsAudioInput": true,
+			"supportsImageOutput": false,
+			"supportsAudioOutput": false
+		},
+		"elevenlabs/eleven_multilingual_v2": {
+			"id": "elevenlabs/eleven_multilingual_v2",
+			"name": "ElevenLabs: Multilingual v2",
+			"provider": "elevenlabs",
+			"pricing": {
+				"inputCostPerToken": 0,
+				"outputCostPerToken": 0,
+				"inputCostPerCharacter": 0.0001
+			},
+			"contextLength": 0,
+			"maxCompletionTokens": null,
+			"supportedParameters": [],
+			"defaultParameters": null,
+			"modality": "text->audio",
+			"mode": "audio",
+			"description": "ElevenLabs' quality-tier speech synthesis. Priced per input character ($0.10 per 1k characters).",
+			"supportsImageInput": false,
+			"supportsAudioInput": false,
+			"supportsImageOutput": false,
+			"supportsAudioOutput": true
+		},
+		"elevenlabs/eleven_flash_v2": {
+			"id": "elevenlabs/eleven_flash_v2",
+			"name": "ElevenLabs: Flash v2",
+			"provider": "elevenlabs",
+			"pricing": {
+				"inputCostPerToken": 0,
+				"outputCostPerToken": 0,
+				"inputCostPerCharacter": 5e-5
+			},
+			"contextLength": 0,
+			"maxCompletionTokens": null,
+			"supportedParameters": [],
+			"defaultParameters": null,
+			"modality": "text->audio",
+			"mode": "audio",
+			"description": "ElevenLabs' low-latency speech synthesis. Priced per input character ($0.05 per 1k characters).",
+			"supportsImageInput": false,
+			"supportsAudioInput": false,
+			"supportsImageOutput": false,
+			"supportsAudioOutput": true
+		},
+		"elevenlabs/eleven_flash_v2_5": {
+			"id": "elevenlabs/eleven_flash_v2_5",
+			"name": "ElevenLabs: Flash v2.5",
+			"provider": "elevenlabs",
+			"pricing": {
+				"inputCostPerToken": 0,
+				"outputCostPerToken": 0,
+				"inputCostPerCharacter": 5e-5
+			},
+			"contextLength": 0,
+			"maxCompletionTokens": null,
+			"supportedParameters": [],
+			"defaultParameters": null,
+			"modality": "text->audio",
+			"mode": "audio",
+			"description": "ElevenLabs' low-latency multilingual speech synthesis. Priced per input character ($0.05 per 1k characters).",
+			"supportsImageInput": false,
+			"supportsAudioInput": false,
+			"supportsImageOutput": false,
+			"supportsAudioOutput": true
+		},
+		"elevenlabs/eleven_turbo_v2_5": {
+			"id": "elevenlabs/eleven_turbo_v2_5",
+			"name": "ElevenLabs: Turbo v2.5",
+			"provider": "elevenlabs",
+			"pricing": {
+				"inputCostPerToken": 0,
+				"outputCostPerToken": 0,
+				"inputCostPerCharacter": 5e-5
+			},
+			"contextLength": 0,
+			"maxCompletionTokens": null,
+			"supportedParameters": [],
+			"defaultParameters": null,
+			"modality": "text->audio",
+			"mode": "audio",
+			"description": "ElevenLabs' balanced quality/latency speech synthesis. Priced per input character ($0.05 per 1k characters).",
+			"supportsImageInput": false,
+			"supportsAudioInput": false,
+			"supportsImageOutput": false,
+			"supportsAudioOutput": true
+		}
+	}
 }

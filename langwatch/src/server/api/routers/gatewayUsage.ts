@@ -19,7 +19,9 @@ import { createTRPCRouter, protectedProcedure } from "../trpc";
 async function resolveClient(projectId: string) {
   const client = await getClickHouseClientForProject(projectId);
   if (!client) {
-    throw new Error(`ClickHouse enabled but no client for project ${projectId}`);
+    throw new Error(
+      `ClickHouse enabled but no client for project ${projectId}`,
+    );
   }
   return client;
 }
@@ -72,13 +74,9 @@ export const gatewayUsageRouter = createTRPCRouter({
         chRepo: chRepoOrUndefined(),
         spendRepo: spendRepoOrUndefined(),
       });
-      return service.summaryForVirtualKey(
-        input.projectId,
-        input.virtualKeyId,
-        {
-          fromDate: new Date(input.fromDate),
-          toDate: new Date(input.toDate),
-        },
-      );
+      return service.summaryForVirtualKey(input.projectId, input.virtualKeyId, {
+        fromDate: new Date(input.fromDate),
+        toDate: new Date(input.toDate),
+      });
     }),
 });

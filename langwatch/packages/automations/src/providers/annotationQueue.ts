@@ -1,5 +1,5 @@
-import { TriggerAction } from "../enums";
 import { z } from "zod";
+import { TriggerAction } from "../enums";
 import type { SharedDef } from "./types";
 
 export const annotationQueueActionParamsSchema = z.object({

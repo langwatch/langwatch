@@ -140,9 +140,7 @@ describe("GET /api/github-langy/install", () => {
 
   describe("when organizationId is missing", () => {
     it("rejects with 400", async () => {
-      const res = await request(
-        "http://localhost/api/github-langy/install",
-      );
+      const res = await request("http://localhost/api/github-langy/install");
       expect(res.status).toBe(400);
     });
   });
@@ -376,7 +374,9 @@ describe("GET /api/github-langy/setup", () => {
 
 describe("POST /api/github-langy/webhook", () => {
   function sign(body: string): string {
-    return "sha256=" + createHmac("sha256", "whsecret").update(body).digest("hex");
+    return (
+      "sha256=" + createHmac("sha256", "whsecret").update(body).digest("hex")
+    );
   }
 
   describe("when the signature matches", () => {

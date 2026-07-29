@@ -14,10 +14,10 @@ import {
   startOfDay,
   subDays,
 } from "date-fns";
-import { useRouter } from "~/utils/compat/next-router";
 import { useCallback, useMemo } from "react";
-import { Calendar, ChevronDown } from "react-feather";
+import { ChevronDown } from "react-feather";
 import { LuCalendar } from "react-icons/lu";
+import { useRouter } from "~/utils/compat/next-router";
 import { Popover } from "./ui/popover";
 
 /** Date range used for time-based filtering across the app. */

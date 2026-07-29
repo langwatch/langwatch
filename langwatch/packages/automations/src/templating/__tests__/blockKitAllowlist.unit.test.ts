@@ -93,7 +93,10 @@ describe("filterBlockKit", () => {
 
     it("keeps a valid plain_text header verbatim", () => {
       const [block] = filterBlockKit([
-        { type: "header", text: { type: "plain_text", text: "Hi", emoji: true } },
+        {
+          type: "header",
+          text: { type: "plain_text", text: "Hi", emoji: true },
+        },
       ]);
       expect(block).toEqual({
         type: "header",
@@ -301,7 +304,9 @@ describe("filterBlockKit", () => {
           elements: [
             {
               type: "rich_text_section",
-              elements: [{ type: "text", text: "Input", style: { bold: true } }],
+              elements: [
+                { type: "text", text: "Input", style: { bold: true } },
+              ],
             },
             {
               type: "rich_text_quote",
@@ -624,7 +629,11 @@ describe("filterBlockKit", () => {
       it("drops a chart with an unknown chart type or no usable data", () => {
         const blocks = filterBlockKit(
           [
-            { type: "data_visualization", title: "x", chart: { type: "radar" } },
+            {
+              type: "data_visualization",
+              title: "x",
+              chart: { type: "radar" },
+            },
             {
               type: "data_visualization",
               title: "y",

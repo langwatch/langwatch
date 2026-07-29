@@ -35,7 +35,13 @@ function CriteriaList({
       </Text>
       {items.map((criterion) => (
         <HStack key={criterion} gap={1.5} align="flex-start">
-          <Icon as={icon} boxSize={3} color={color} marginTop="2px" flexShrink={0} />
+          <Icon
+            as={icon}
+            boxSize={3}
+            color={color}
+            marginTop="2px"
+            flexShrink={0}
+          />
           <Text textStyle="xs" color="fg">
             {criterion}
           </Text>

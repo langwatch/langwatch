@@ -1,5 +1,4 @@
 import { Text, VStack } from "@chakra-ui/react";
-import type { ReactNode } from "react";
 import { isValidElement } from "react";
 
 interface FormErrorDisplayProps {

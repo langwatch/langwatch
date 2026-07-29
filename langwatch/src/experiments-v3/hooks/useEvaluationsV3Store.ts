@@ -2,19 +2,14 @@ import isDeepEqual from "fast-deep-equal";
 import debounce from "lodash-es/debounce";
 import { temporal } from "zundo";
 import { create, type StateCreator } from "zustand";
-import type { CellPosition } from "~/components/datasets/editor/DatasetTableContext";
-import type { DatasetColumnType } from "~/server/datasets/types";
 import {
   createInitialResults,
   createInitialState,
   type DatasetColumn,
-  type DatasetReference,
-  type EvaluationsV3Actions,
   type EvaluationsV3State,
   type EvaluationsV3Store,
   type EvaluatorConfig,
   type FieldMapping,
-  type OverlayType,
   isComparisonEvaluator,
   type TargetConfig,
 } from "../types";
@@ -263,7 +258,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
   addColumn: (datasetId, column) => {
     set((state) => {
       const dataset = state.datasets.find((d) => d.id === datasetId);
-      if (!dataset || dataset.type !== "inline" || !dataset.inline) {
+      if (dataset?.type !== "inline" || !dataset.inline) {
         return state;
       }
 
@@ -294,7 +289,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
   removeColumn: (datasetId, columnId) => {
     set((state) => {
       const dataset = state.datasets.find((d) => d.id === datasetId);
-      if (!dataset || dataset.type !== "inline" || !dataset.inline) {
+      if (dataset?.type !== "inline" || !dataset.inline) {
         return state;
       }
 
@@ -323,7 +318,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
   renameColumn: (datasetId, columnId, newName) => {
     set((state) => {
       const dataset = state.datasets.find((d) => d.id === datasetId);
-      if (!dataset || dataset.type !== "inline" || !dataset.inline) {
+      if (dataset?.type !== "inline" || !dataset.inline) {
         return state;
       }
 
@@ -350,7 +345,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
   updateColumnType: (datasetId, columnId, type) => {
     set((state) => {
       const dataset = state.datasets.find((d) => d.id === datasetId);
-      if (!dataset || dataset.type !== "inline" || !dataset.inline) {
+      if (dataset?.type !== "inline" || !dataset.inline) {
         return state;
       }
 
@@ -424,7 +419,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
   updateSavedRecordValue: (datasetId, rowIndex, columnId, value) => {
     set((state) => {
       const dataset = state.datasets.find((d) => d.id === datasetId);
-      if (!dataset || dataset.type !== "saved" || !dataset.datasetId) {
+      if (dataset?.type !== "saved" || !dataset.datasetId) {
         return state;
       }
 
@@ -521,8 +516,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
     const state = get();
     const dataset = state.datasets.find((d) => d.id === datasetId);
     if (
-      !dataset ||
-      dataset.type !== "saved" ||
+      dataset?.type !== "saved" ||
       !dataset.savedRecords ||
       !dataset.datasetId
     ) {
@@ -742,7 +736,12 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
         targets: state.targets.map((t) =>
           t.id === targetId
             ? // Drop the legacy shape as we write the canonical one.
-              { ...t, pairwise: undefined, comparison, mappings: newDatasetMappings }
+              {
+                ...t,
+                pairwise: undefined,
+                comparison,
+                mappings: newDatasetMappings,
+              }
             : t,
         ),
       };
@@ -1010,11 +1009,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
         const currentDataset = currentState.datasets.find(
           (d) => d.id === datasetId,
         );
-        if (
-          !currentDataset ||
-          currentDataset.type !== "inline" ||
-          !currentDataset.inline
-        ) {
+        if (currentDataset?.type !== "inline" || !currentDataset.inline) {
           return currentState;
         }
 
@@ -1065,11 +1060,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
         const currentDataset = currentState.datasets.find(
           (d) => d.id === datasetId,
         );
-        if (
-          !currentDataset ||
-          currentDataset.type !== "saved" ||
-          !currentDataset.savedRecords
-        ) {
+        if (currentDataset?.type !== "saved" || !currentDataset.savedRecords) {
           return currentState;
         }
 
@@ -1301,8 +1292,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
         // folded into the canonical `comparison` shape — everything
         // downstream, including what gets saved back, sees only `comparison`.
         evaluators: normalizeEvaluators(
-          (state.evaluators as typeof current.evaluators) ??
-            current.evaluators,
+          (state.evaluators as typeof current.evaluators) ?? current.evaluators,
         ),
         // Support loading old state format (agents) and new format (targets)
         targets: normalizeTargets(

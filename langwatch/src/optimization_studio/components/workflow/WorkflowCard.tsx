@@ -1,12 +1,4 @@
-import {
-  Button,
-  Heading,
-  HStack,
-  Separator,
-  Spacer,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";

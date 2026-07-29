@@ -37,4 +37,3 @@ export function stableStringify(value: unknown): string {
 export function sha256(value: string): string {
   return createHash("sha256").update(value).digest("hex");
 }
-

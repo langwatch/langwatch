@@ -19,7 +19,9 @@ describe("buildSharedTraceCacheKey", () => {
     it("builds the same key", () => {
       expect(
         buildSharedTraceCacheKey({ token: "tok", protections: anonymous }),
-      ).toBe(buildSharedTraceCacheKey({ token: "tok", protections: anonymous }));
+      ).toBe(
+        buildSharedTraceCacheKey({ token: "tok", protections: anonymous }),
+      );
     });
 
     it("ignores key order in the protections object", () => {
@@ -32,7 +34,9 @@ describe("buildSharedTraceCacheKey", () => {
 
       expect(
         buildSharedTraceCacheKey({ token: "tok", protections: reordered }),
-      ).toBe(buildSharedTraceCacheKey({ token: "tok", protections: anonymous }));
+      ).toBe(
+        buildSharedTraceCacheKey({ token: "tok", protections: anonymous }),
+      );
     });
   });
 

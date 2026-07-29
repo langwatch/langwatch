@@ -16,11 +16,7 @@ import { studioBackendPostEvent } from "~/app/api/workflows/post_event/post-even
 import type { HttpConfig, TargetConfig } from "~/experiments-v3/types";
 import { addEnvs } from "~/optimization_studio/server/addEnvs";
 import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
-import type {
-  Field,
-  HttpComponentConfig,
-  ServerWorkflow,
-} from "~/optimization_studio/types/dsl";
+import type { HttpComponentConfig } from "~/optimization_studio/types/dsl";
 import type { StudioServerEvent } from "~/optimization_studio/types/events";
 import { getTestProject } from "~/utils/testUtils";
 import type { ExecutionCell } from "../types";

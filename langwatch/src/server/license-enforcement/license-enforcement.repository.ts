@@ -6,11 +6,7 @@ import {
   RoleBindingScopeType,
 } from "@prisma/client";
 import { getCurrentMonthStart } from "../utils/dateUtils";
-import {
-  isFullMember,
-  isLiteMember,
-  isViewOnlyCustomRole,
-} from "./member-classification";
+import { isFullMember, isLiteMember } from "./member-classification";
 
 /**
  * Type for team assignment in organization invites.

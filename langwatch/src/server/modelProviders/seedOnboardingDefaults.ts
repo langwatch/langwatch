@@ -41,9 +41,7 @@ interface ProviderSeedPlan {
  * EMBEDDINGS), which means the role inherits from a higher scope or
  * resolves to ModelNotConfiguredError when nothing covers it.
  */
-export function buildSeedPlanForProvider(
-  provider: string,
-): ProviderSeedPlan {
+export function buildSeedPlanForProvider(provider: string): ProviderSeedPlan {
   // openai/anthropic/gemini get the `{provider}/latest` and
   // `{provider}/latest-mini` aliases so the seed never pins a customer
   // to a specific model version. The resolver expands them at read

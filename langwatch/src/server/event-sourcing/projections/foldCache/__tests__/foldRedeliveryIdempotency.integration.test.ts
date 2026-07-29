@@ -45,8 +45,8 @@ import type { Event } from "../../../domain/types";
 import { GroupQueueProcessor } from "../../../queues/groupQueue/groupQueue";
 import type { EventSourcedQueueDefinition } from "../../../queues/queue.types";
 import { createMockFoldProjectionDefinition } from "../../../services/__tests__/testHelpers";
-import { FoldProjectionExecutor } from "../../foldProjectionExecutor";
 import type { FoldProjectionStore } from "../../foldProjection.types";
+import { FoldProjectionExecutor } from "../../foldProjectionExecutor";
 import type { ProjectionStoreContext } from "../../projectionStoreContext";
 import { RedisCachedFoldStore } from "../../redisCachedFoldStore";
 
@@ -195,9 +195,13 @@ describe.skipIf(!hasTestcontainers)("fold redelivery idempotency", () => {
     durableFactory?: DurableStoreFactory;
   }) {
     const durable = durableFactory();
-    const cached = new RedisCachedFoldStore<CounterState>(durable.store, redis, {
-      keyPrefix,
-    });
+    const cached = new RedisCachedFoldStore<CounterState>(
+      durable.store,
+      redis,
+      {
+        keyPrefix,
+      },
+    );
 
     const fold = createMockFoldProjectionDefinition("counter", {
       store: cached,
@@ -291,10 +295,13 @@ describe.skipIf(!hasTestcontainers)("fold redelivery idempotency", () => {
         });
 
         // Delivered at least twice: the failure, then the retry.
-        await vi.waitFor(() => expect(applied.length).toBeGreaterThanOrEqual(2), {
-          timeout: 15_000,
-          interval: 50,
-        });
+        await vi.waitFor(
+          () => expect(applied.length).toBeGreaterThanOrEqual(2),
+          {
+            timeout: 15_000,
+            interval: 50,
+          },
+        );
 
         expect(durable.committed()?.count).toBe(1);
       }, 30_000);
@@ -320,16 +327,19 @@ describe.skipIf(!hasTestcontainers)("fold redelivery idempotency", () => {
           });
         }
 
-        await vi.waitFor(() => expect(applied.length).toBeGreaterThanOrEqual(2), {
-          timeout: 15_000,
-          interval: 50,
-        });
+        await vi.waitFor(
+          () => expect(applied.length).toBeGreaterThanOrEqual(2),
+          {
+            timeout: 15_000,
+            interval: 50,
+          },
+        );
 
         // Five distinct events, however many times they were delivered.
-        await vi.waitFor(
-          () => expect(durable.committed()?.count).toBe(5),
-          { timeout: 15_000, interval: 100 },
-        );
+        await vi.waitFor(() => expect(durable.committed()?.count).toBe(5), {
+          timeout: 15_000,
+          interval: 100,
+        });
       }, 30_000);
     });
   });
@@ -424,10 +434,13 @@ describe.skipIf(!hasTestcontainers)("fold redelivery idempotency", () => {
           });
         }
 
-        await vi.waitFor(() => expect(applied.length).toBeGreaterThanOrEqual(1), {
-          timeout: 15_000,
-          interval: 50,
-        });
+        await vi.waitFor(
+          () => expect(applied.length).toBeGreaterThanOrEqual(1),
+          {
+            timeout: 15_000,
+            interval: 50,
+          },
+        );
 
         // Arrive mid-chain, so a retry batch mixes redelivered and fresh events.
         for (let index = 0; index < 2; index++) {
@@ -460,7 +473,10 @@ describe.skipIf(!hasTestcontainers)("fold redelivery idempotency", () => {
           keyPrefix: "it_tenant_a",
           failFirstBatch: true,
         });
-        const b = createFoldQueue({ keyPrefix: "it_tenant_a", tenantId: other });
+        const b = createFoldQueue({
+          keyPrefix: "it_tenant_a",
+          tenantId: other,
+        });
         await a.queue.waitUntilReady();
         await b.queue.waitUntilReady();
 
@@ -502,7 +518,11 @@ describe.skipIf(!hasTestcontainers)("fold redelivery idempotency", () => {
         await second.queue.waitUntilReady();
 
         const now = Date.now();
-        await queue.send({ eventId: "a1", groupId: AGGREGATE, occurredAt: now });
+        await queue.send({
+          eventId: "a1",
+          groupId: AGGREGATE,
+          occurredAt: now,
+        });
         await second.queue.send({
           eventId: "b1",
           groupId: "trace-2",
@@ -538,10 +558,13 @@ describe.skipIf(!hasTestcontainers)("fold redelivery idempotency", () => {
           groupId: AGGREGATE,
           occurredAt: base,
         });
-        await vi.waitFor(() => expect(applied.length).toBeGreaterThanOrEqual(2), {
-          timeout: 15_000,
-          interval: 50,
-        });
+        await vi.waitFor(
+          () => expect(applied.length).toBeGreaterThanOrEqual(2),
+          {
+            timeout: 15_000,
+            interval: 50,
+          },
+        );
 
         await queue.send({
           eventId: "late-arrival",
@@ -579,10 +602,13 @@ describe.skipIf(!hasTestcontainers)("fold redelivery idempotency", () => {
           occurredAt: Date.now(),
         });
 
-        await vi.waitFor(() => expect(applied.length).toBeGreaterThanOrEqual(1), {
-          timeout: 15_000,
-          interval: 50,
-        });
+        await vi.waitFor(
+          () => expect(applied.length).toBeGreaterThanOrEqual(1),
+          {
+            timeout: 15_000,
+            interval: 50,
+          },
+        );
 
         // Keep the entry evicted for the whole retry window. Deleting once
         // races the retry: if the redelivery lands first it dedups normally and
@@ -625,10 +651,13 @@ describe.skipIf(!hasTestcontainers)("fold redelivery idempotency", () => {
           occurredAt: Date.now(),
         });
 
-        await vi.waitFor(() => expect(applied.length).toBeGreaterThanOrEqual(1), {
-          timeout: 15_000,
-          interval: 50,
-        });
+        await vi.waitFor(
+          () => expect(applied.length).toBeGreaterThanOrEqual(1),
+          {
+            timeout: 15_000,
+            interval: 50,
+          },
+        );
 
         // Keep the entry evicted for the whole retry window, exactly as the
         // watermark-less scenario does, so the retry is forced through the
@@ -657,7 +686,6 @@ describe.skipIf(!hasTestcontainers)("fold redelivery idempotency", () => {
       }, 40_000);
     });
   });
-
 
   // ==========================================================================
   // Applied-set lifecycle.
@@ -716,10 +744,13 @@ describe.skipIf(!hasTestcontainers)("fold redelivery idempotency", () => {
           });
         }
 
-        await vi.waitFor(() => expect(applied.length).toBeGreaterThanOrEqual(2), {
-          timeout: 20_000,
-          interval: 50,
-        });
+        await vi.waitFor(
+          () => expect(applied.length).toBeGreaterThanOrEqual(2),
+          {
+            timeout: 20_000,
+            interval: 50,
+          },
+        );
 
         const ids = await readAppliedIds();
         expect(ids).toEqual(
@@ -880,10 +911,13 @@ describe.skipIf(!hasTestcontainers)("fold redelivery idempotency", () => {
             occurredAt: base + index,
           });
         }
-        await vi.waitFor(() => expect(applied.length).toBeGreaterThanOrEqual(1), {
-          timeout: 20_000,
-          interval: 50,
-        });
+        await vi.waitFor(
+          () => expect(applied.length).toBeGreaterThanOrEqual(1),
+          {
+            timeout: 20_000,
+            interval: 50,
+          },
+        );
         for (let index = 3; index < 5; index++) {
           await queue.send({
             eventId: `r-${index}`,
@@ -949,5 +983,4 @@ describe.skipIf(!hasTestcontainers)("fold redelivery idempotency", () => {
       }, 60_000);
     });
   });
-
 });

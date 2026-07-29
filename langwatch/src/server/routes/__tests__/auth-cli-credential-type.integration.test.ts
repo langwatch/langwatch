@@ -56,7 +56,11 @@ describe("CLI credential_type discriminator — no-paste convergence", () => {
     await startTestContainers();
 
     await prisma.organization.create({
-      data: { id: ORG_ID, name: `CredType Org ${suffix}`, slug: `credtype-${suffix}` },
+      data: {
+        id: ORG_ID,
+        name: `CredType Org ${suffix}`,
+        slug: `credtype-${suffix}`,
+      },
     });
     await prisma.team.create({
       data: {
@@ -93,7 +97,9 @@ describe("CLI credential_type discriminator — no-paste convergence", () => {
   });
 
   afterAll(async () => {
-    await prisma.project.deleteMany({ where: { id: PROJECT_ID } }).catch(() => {});
+    await prisma.project
+      .deleteMany({ where: { id: PROJECT_ID } })
+      .catch(() => {});
     await prisma.teamUser
       .deleteMany({ where: { userId: USER_ID, teamId: TEAM_ID } })
       .catch(() => {});

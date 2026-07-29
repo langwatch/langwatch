@@ -222,12 +222,15 @@ export function decodeScenarioError(
   }
   if (!parsed || typeof parsed !== "object") return null;
   const candidate = parsed as Record<string, unknown>;
-  if (typeof candidate.code !== "string" || typeof candidate.message !== "string") {
+  if (
+    typeof candidate.code !== "string" ||
+    typeof candidate.message !== "string"
+  ) {
     return null;
   }
-  const knownCode = (Object.values(ScenarioInfraErrorCode) as string[]).includes(
-    candidate.code,
-  );
+  const knownCode = (
+    Object.values(ScenarioInfraErrorCode) as string[]
+  ).includes(candidate.code);
   if (!knownCode) return null;
   return {
     code: candidate.code as ScenarioInfraErrorCode,

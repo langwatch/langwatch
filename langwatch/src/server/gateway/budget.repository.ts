@@ -10,15 +10,11 @@
  * callers that need per-member buckets (GROUP) or the provider filter read
  * the resolver directly.
  */
-import type {
-  GatewayBudget,
-  Prisma,
-  PrismaClient,
-} from "@prisma/client";
+import type { GatewayBudget, Prisma, PrismaClient } from "@prisma/client";
 
 import {
-  resolveApplicableBudgets,
   type ResolvedBudget,
+  resolveApplicableBudgets,
 } from "./budgetResolution.service";
 
 export type ApplicableScopes = {

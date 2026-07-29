@@ -8,12 +8,12 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { Plus } from "lucide-react";
-import { useRouter } from "~/utils/compat/next-router";
 import { FilterSidebar } from "~/components/filters/FilterSidebar";
 import { useFilterToggle } from "~/components/filters/FilterToggle";
 import GraphsLayout from "~/components/GraphsLayout";
 import { toaster } from "~/components/ui/toaster";
 import { api } from "~/utils/api";
+import { useRouter } from "~/utils/compat/next-router";
 import {
   calculateGridPositions,
   type GridLayout,

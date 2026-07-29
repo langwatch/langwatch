@@ -12,6 +12,9 @@
  * MCP transport's shape, kept so a conversation recorded under it still replays.
  */
 import { Button, Text, VStack } from "@chakra-ui/react";
+// `asJsonDocument` is the shared CLI contract's, not the panel's — the CLI and the
+// panel agree on what a result document IS in exactly one place.
+import { asJsonDocument } from "@langwatch/langy";
 import { Search } from "lucide-react";
 import { useRouter } from "~/utils/compat/next-router";
 import {
@@ -20,14 +23,11 @@ import {
 } from "../../logic/traceExplorerLink";
 import {
   buildSurfaceHref,
+  type CapabilityCardInput,
   extractPrimaryId,
   extractToolText,
   summaryLines,
-  type CapabilityCardInput,
 } from "./capabilityRegistry";
-// `asJsonDocument` is the shared CLI contract's, not the panel's — the CLI and the
-// panel agree on what a result document IS in exactly one place.
-import { asJsonDocument } from "@langwatch/langy";
 import { collectionOf, textValue, totalOf } from "./cliResultDocument";
 import { CapabilityRow, LangyCapabilityCard } from "./LangyCapabilityCard";
 

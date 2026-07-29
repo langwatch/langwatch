@@ -2,7 +2,7 @@ import type {
   CanonicalMetricDataPoint,
   MetricRollupRow,
 } from "../schemas/metricDataPoint";
-import { resetOrGap, type BucketEntry } from "./row";
+import { type BucketEntry, resetOrGap } from "./row";
 import { bigint, previousPoint, startsNewSequence } from "./sequence";
 
 /**

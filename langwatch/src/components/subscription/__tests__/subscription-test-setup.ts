@@ -36,7 +36,9 @@ export function setMockOrganization(value: typeof mockOrganization) {
 // ---------------------------------------------------------------------------
 // Plan factory
 // ---------------------------------------------------------------------------
-export const createMockPlan = (overrides: Partial<PlanInfo> = {}): PlanInfo => ({
+export const createMockPlan = (
+  overrides: Partial<PlanInfo> = {},
+): PlanInfo => ({
   planSource: "free",
   type: "FREE",
   name: "Developer",
@@ -129,7 +131,9 @@ export const mockAddTeamMemberOrEvents = vi.fn(() => ({
 
 export const mockManageSubscription = vi.fn(() => ({
   mutate: vi.fn(),
-  mutateAsync: vi.fn().mockResolvedValue({ url: "https://billing.stripe.com/session/test" }),
+  mutateAsync: vi
+    .fn()
+    .mockResolvedValue({ url: "https://billing.stripe.com/session/test" }),
   isLoading: false,
   isPending: false,
 }));
@@ -142,7 +146,12 @@ export const mockUpgradeWithInvites = vi.fn(() => ({
 }));
 
 export const mockGetPendingInvites = vi.fn(() => ({
-  data: [] as Array<{ id?: string; email?: string; role: string; status: string }>,
+  data: [] as Array<{
+    id?: string;
+    email?: string;
+    role: string;
+    status: string;
+  }>,
   isLoading: false,
 }));
 
@@ -210,4 +219,3 @@ export function resetMocks() {
     isLoading: false,
   });
 }
-

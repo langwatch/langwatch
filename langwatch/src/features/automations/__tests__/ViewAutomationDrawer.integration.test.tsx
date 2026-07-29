@@ -12,8 +12,8 @@ const MINUTE_MS = 60 * 1000;
 
 let mockTriggerRow: Record<string, unknown> | null = null;
 let mockRecentFires: Array<Record<string, unknown>> = [];
-let mockGraphRow: Record<string, unknown> | null = null;
-let mockDatasets: Array<Record<string, unknown>> = [];
+const mockGraphRow: Record<string, unknown> | null = null;
+const mockDatasets: Array<Record<string, unknown>> = [];
 let mockWebhookDeliveries: Array<Record<string, unknown>> = [];
 
 const { mockOpenDrawer, mockCloseDrawer } = vi.hoisted(() => ({
@@ -245,13 +245,9 @@ describe("ViewAutomationDrawer", () => {
       it("renders the response body and headers as literal text, not markup", async () => {
         renderDrawer();
 
-        await userEvent.click(
-          screen.getByRole("button", { name: /HTTP 500/ }),
-        );
+        await userEvent.click(screen.getByRole("button", { name: /HTTP 500/ }));
 
-        expect(
-          screen.getByText("<script>alert('xss')</script>"),
-        ).toBeDefined();
+        expect(screen.getByText("<script>alert('xss')</script>")).toBeDefined();
         expect(document.querySelector("script")).toBeNull();
         expect(
           screen.getByText("X-Debug: <img src=x onerror=alert(1)>"),

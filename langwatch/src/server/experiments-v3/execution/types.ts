@@ -4,7 +4,6 @@ import {
   type DatasetReference,
   type EvaluatorConfig,
   evaluatorConfigSchema,
-  type FieldMapping,
   type TargetConfig,
   targetConfigSchema,
 } from "~/experiments-v3/types";

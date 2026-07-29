@@ -31,11 +31,11 @@ import {
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { Event } from "~/server/event-sourcing";
 import { createTenantId } from "~/server/event-sourcing";
+import { TraceSummaryFoldProjection } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.foldProjection";
 import {
   SPAN_RECEIVED_EVENT_TYPE,
   SPAN_RECEIVED_EVENT_VERSION_LATEST,
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
-import { TraceSummaryFoldProjection } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.foldProjection";
 import type { SpanReceivedEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
 import type { FoldProjectionStore } from "../../foldProjection.types";
 import { RedisCachedFoldStore } from "../../redisCachedFoldStore";
@@ -178,11 +178,9 @@ describe("given a trace whose span carries a 1 MB output value", () => {
         },
       };
       const { redis, entries } = createRedisDouble();
-      const store = new RedisCachedFoldStore<TraceSummaryData>(
-        durable,
-        redis,
-        { keyPrefix: KEY_PREFIX },
-      );
+      const store = new RedisCachedFoldStore<TraceSummaryData>(durable, redis, {
+        keyPrefix: KEY_PREFIX,
+      });
       const projection = new TraceSummaryFoldProjection({ store: durable });
 
       let state = projection.init();
@@ -206,12 +204,14 @@ describe("given a trace whose span carries a 1 MB output value", () => {
       // "…" (3 bytes) at the codepoint boundary, so allow that much slack and
       // nothing more — a raw 1 MB value would miss this by 16x.
       expect(cached.computedOutput).not.toBeNull();
-      expect(Buffer.byteLength(cached.computedOutput!, "utf8")).toBeLessThanOrEqual(
-        IO_PREVIEW_BYTES + 8,
-      );
+      expect(
+        Buffer.byteLength(cached.computedOutput!, "utf8"),
+      ).toBeLessThanOrEqual(IO_PREVIEW_BYTES + 8);
       expect(cached.computedOutput).toContain("oooo");
       // No string anywhere in the entry — attributes included — busts the budget.
-      expect(longestStringBytes(cached)).toBeLessThanOrEqual(IO_PREVIEW_BYTES + 8);
+      expect(longestStringBytes(cached)).toBeLessThanOrEqual(
+        IO_PREVIEW_BYTES + 8,
+      );
       expect(Buffer.byteLength(raw!, "utf8")).toBeLessThan(1024 * 1024);
 
       // Then: no events[] payload. The span-count-scaling collections are

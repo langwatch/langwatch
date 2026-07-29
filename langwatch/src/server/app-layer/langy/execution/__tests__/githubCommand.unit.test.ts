@@ -15,7 +15,7 @@
  * The local-git cases below are therefore the important half of this file.
  */
 import { describe, expect, it } from "vitest";
-import { githubStepOf, needsGithubAuth } from "../githubCommand";
+import { needsGithubAuth } from "../githubCommand";
 
 describe("needsGithubAuth", () => {
   describe("given the GitHub CLI", () => {
@@ -88,7 +88,9 @@ describe("needsGithubAuth", () => {
     // The skill's own steps chain commands, so a recogniser that only reads the
     // first word would sail straight past the push.
     it("finds it after &&", () => {
-      expect(needsGithubAuth("git add -A && git push -u origin HEAD")).toBe(true);
+      expect(needsGithubAuth("git add -A && git push -u origin HEAD")).toBe(
+        true,
+      );
     });
 
     it("finds it after a semicolon, a pipe, and a newline", () => {

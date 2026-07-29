@@ -41,7 +41,6 @@ import type { RouterOutputs } from "../../utils/api";
 import { api } from "../../utils/api";
 
 type TeamData = RouterOutputs["team"]["getTeamsWithRoleBindings"][number];
-type DirectMember = TeamData["directMembers"][number];
 type ProjectAccessEntry = TeamData["projectAccess"][string][number];
 
 // ── Role options ──────────────────────────────────────────────────────────────

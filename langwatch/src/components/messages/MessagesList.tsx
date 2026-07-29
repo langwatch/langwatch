@@ -12,10 +12,10 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type { Project } from "@prisma/client";
-import { useRouter } from "~/utils/compat/next-router";
 import React, { createRef, useEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronUp, Maximize2 } from "react-feather";
 import { LuLayers, LuRefreshCw } from "react-icons/lu";
+import { useRouter } from "~/utils/compat/next-router";
 import { formatMilliseconds } from "~/utils/formatMilliseconds";
 import { Menu } from "../../components/ui/menu";
 import { Radio, RadioGroup } from "../../components/ui/radio";

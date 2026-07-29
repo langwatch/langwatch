@@ -1,7 +1,14 @@
 import { buildStorageConnectSrc } from "./buildStorageConnectSrc";
 
 type SecurityHeaderEnvironment = Partial<
-  Record<"AWS_REGION" | "AZURE_BLOB_ENDPOINT" | "S3_BUCKET_NAME" | "S3_ENDPOINT" | "S3_REGION", string>
+  Record<
+    | "AWS_REGION"
+    | "AZURE_BLOB_ENDPOINT"
+    | "S3_BUCKET_NAME"
+    | "S3_ENDPOINT"
+    | "S3_REGION",
+    string
+  >
 >;
 
 export function buildSecurityHeaders({
@@ -24,7 +31,7 @@ export function buildSecurityHeaders({
     ...(!dev ? ["upgrade-insecure-requests"] : []),
     "worker-src 'self' blob:",
     `connect-src 'self' ${buildStorageConnectSrc(environment).join(
-      " "
+      " ",
     )} https://*.posthog.com https://*.pendo.io wss://*.pendo.io wss://client.relay.crisp.chat https://client.crisp.chat https://*.googletagmanager.com https://analytics.google.com https://stats.g.doubleclick.net https://*.google-analytics.com https://www.google.com https://*.reo.dev`,
     "frame-src 'self' https://*.posthog.com https://*.pendo.io https://www.youtube.com https://get.langwatch.ai https://*.googletagmanager.com https://www.google.com https://*.reo.dev",
   ].join("; ");
@@ -32,7 +39,8 @@ export function buildSecurityHeaders({
   return {
     "Referrer-Policy": "no-referrer",
     "X-Content-Type-Options": "nosniff",
-    "Permissions-Policy": "geolocation=(), microphone=(), camera=(), payment=(), usb=()",
+    "Permissions-Policy":
+      "geolocation=(), microphone=(), camera=(), payment=(), usb=()",
     ...(!dev ? { "Content-Security-Policy": cspHeader } : {}),
     ...(!dev
       ? {

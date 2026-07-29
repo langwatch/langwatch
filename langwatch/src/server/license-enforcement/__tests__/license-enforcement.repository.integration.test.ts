@@ -1,21 +1,14 @@
 import {
-  OrganizationUserRole,
+  type Evaluator,
   type Organization,
+  OrganizationUserRole,
   type Project,
   type Team,
   type User,
   type Workflow,
-  type Evaluator,
 } from "@prisma/client";
 import { nanoid } from "nanoid";
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  describe,
-  expect,
-  it,
-} from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "~/server/db";
 import { LicenseEnforcementRepository } from "../license-enforcement.repository";
 
@@ -102,11 +95,9 @@ describe("LicenseEnforcementRepository Integration", () => {
 
     // Delete evaluators
     for (const id of createdEvaluatorIds) {
-      await prisma.evaluator
-        .delete({ where: { id } })
-        .catch(() => {
-          /* ignore if already deleted */
-        });
+      await prisma.evaluator.delete({ where: { id } }).catch(() => {
+        /* ignore if already deleted */
+      });
     }
 
     // Delete workflows (need to handle versions first)
@@ -202,7 +193,10 @@ describe("LicenseEnforcementRepository Integration", () => {
         role,
       },
     });
-    createdOrgUserIds.push({ organizationId: organization.id, userId: user.id });
+    createdOrgUserIds.push({
+      organizationId: organization.id,
+      userId: user.id,
+    });
 
     return user;
   }
@@ -343,8 +337,9 @@ describe("LicenseEnforcementRepository Integration", () => {
 
     it("returns zero when no Lite Member users exist", async () => {
       // Count before creating any more users
-      const externalCountBefore =
-        await repository.getMembersLiteCount(organization.id);
+      const externalCountBefore = await repository.getMembersLiteCount(
+        organization.id,
+      );
 
       // Given: only ADMIN and MEMBER users (no additional Lite Member)
       await createOrgUser(OrganizationUserRole.ADMIN);

@@ -10,7 +10,7 @@
  */
 
 import { act, cleanup } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";

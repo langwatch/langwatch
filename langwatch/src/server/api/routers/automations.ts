@@ -1079,7 +1079,7 @@ export const automationRouter = createTRPCRouter({
       // Force createdByUserId to the session user — never trust the client
       // (builder5015-002). The schema strips it from the wire; we stamp
       // unconditionally on the annotation-queue branch below.
-      let actionParams: Record<string, unknown> =
+      const actionParams: Record<string, unknown> =
         input.action === TriggerAction.ADD_TO_ANNOTATION_QUEUE
           ? {
               ...(storedActionParams as Record<string, unknown>),

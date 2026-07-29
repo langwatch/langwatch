@@ -1,4 +1,7 @@
+// biome-ignore-all lint/suspicious/noEmptyBlockStatements: the empty blocks in this file are deliberate no-ops.
+
 import { performance } from "node:perf_hooks";
+import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import {
   context as otelContext,
@@ -11,6 +14,8 @@ import fastq from "fastq";
 import { Cluster, Redis as IORedis } from "ioredis";
 import { getLangWatchTracer } from "langwatch";
 import type { SemConvAttributes } from "langwatch/observability";
+import { isDispatchError } from "~/server/event-sourcing/queues/dispatchError";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import {
   createContextFromJobData,
   getJobContextMetadata,
@@ -27,9 +32,6 @@ import {
   type ProjectStorageDestination,
   redactStorageUrisInText,
 } from "../../../stored-objects/project-storage-destination";
-import { isDispatchError } from "~/server/event-sourcing/queues/dispatchError";
-import { generate } from "@langwatch/ksuid";
-import { KSUID_RESOURCES } from "~/utils/constants";
 import type {
   DeduplicationConfig,
   EventSourcedQueueDefinition,
@@ -59,9 +61,9 @@ import {
 } from "./jobEnvelope";
 import { legacyStagedJobAttempt } from "./legacyStagedJobAttempt";
 import {
+  gqForeignSiblingsRestagedTotal,
   gqGroupAttemptReadFailuresTotal,
   gqGroupsBlockedTotal,
-  gqForeignSiblingsRestagedTotal,
   gqGroupsPoisonParkedTotal,
   gqJobDelayMilliseconds,
   gqJobDurationMilliseconds,
@@ -112,7 +114,6 @@ export const GROUP_ATTEMPT_TTL_SECONDS = Math.ceil(
 function nonEmptyString(value: unknown): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
-
 
 /**
  * Configuration for the group queue.
@@ -294,7 +295,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
    * Consecutive-failure count that quarantines (blocks) a group. Read once at
    * construction; 0 disables the breaker. See {@link readGroupQuarantineThreshold}.
    */
-  private readonly quarantineFailStreakThreshold = readGroupQuarantineThreshold();
+  private readonly quarantineFailStreakThreshold =
+    readGroupQuarantineThreshold();
 
   private shutdownRequested = false;
   /** Tracks in-flight jobs for active count metrics. */
@@ -1282,7 +1284,9 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                   // its very next failure instead of getting that fresh run.
                   // Best-effort: we are already on the failure path, so a blip
                   // clearing it must not derail parking the group.
-                  await this.scripts.clearGroupFailures(groupId).catch(() => {});
+                  await this.scripts
+                    .clearGroupFailures(groupId)
+                    .catch(() => {});
                   // Carried into handleExhaustedRetries as the group's stored
                   // error so /ops shows WHY it was blocked (a run of failures),
                   // not just the last job's error.
@@ -2119,7 +2123,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     // `p.id` is the event id this job was sent for. The fallback stands in for
     // one, so it is a KSUID like every other id the platform mints — and being
     // k-sortable it keeps the Redis key ordering the real ids already have.
-    const baseId = nonEmptyString(p.id) ?? generate(KSUID_RESOURCES.EVENT).toString();
+    const baseId =
+      nonEmptyString(p.id) ?? generate(KSUID_RESOURCES.EVENT).toString();
     const jobType = nonEmptyString(p.__jobType);
     const jobName = nonEmptyString(p.__jobName);
     if (jobType && jobName) {

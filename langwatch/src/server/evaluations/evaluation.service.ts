@@ -83,7 +83,9 @@ export class EvaluationService {
   private readonly tracer = getLangWatchTracer("langwatch.evaluations.service");
   private readonly resolveInputsMarker: ResolveEvaluationInputsMarker;
 
-  constructor(resolveInputsMarkerFn: ResolveEvaluationInputsMarker = defaultResolveInputsMarker) {
+  constructor(
+    resolveInputsMarkerFn: ResolveEvaluationInputsMarker = defaultResolveInputsMarker,
+  ) {
     this.resolveInputsMarker = resolveInputsMarkerFn;
   }
 

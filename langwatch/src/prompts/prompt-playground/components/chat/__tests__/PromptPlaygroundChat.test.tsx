@@ -5,7 +5,6 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
-import { createRef } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   clearStoreInstances,
@@ -231,9 +230,13 @@ describe("PromptPlaygroundChat ref methods", () => {
         </ChakraProvider>,
       );
 
-      const AssistantMessageProp = captured.chatProps?.[
-        "AssistantMessage"
-      ] as unknown as React.ComponentType<Record<string, unknown>>;
+      // Re-widen: the `= null` above narrows the property to `null`, and the
+      // render that repopulates it is opaque to control-flow analysis.
+      const chatProps = captured.chatProps as Record<string, any> | null;
+      const AssistantMessageProp =
+        chatProps?.AssistantMessage as unknown as React.ComponentType<
+          Record<string, unknown>
+        >;
       expect(AssistantMessageProp).toBeDefined();
 
       render(

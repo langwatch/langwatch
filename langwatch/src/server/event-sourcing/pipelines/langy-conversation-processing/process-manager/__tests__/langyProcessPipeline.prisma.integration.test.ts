@@ -1,21 +1,20 @@
 import { nanoid } from "nanoid";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { prisma } from "~/server/db";
 import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
+import { buildProcessManager } from "~/server/event-sourcing/pipeline/processBuilder";
+import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
 import {
   OutboxDispatcherService,
   PrismaProcessStore,
   type ProcessRef,
 } from "~/server/event-sourcing/process-manager";
-import type { EventSubscriberContext } from "~/server/event-sourcing/subscribers/eventSubscriber.types";
-
-import { buildProcessManager } from "~/server/event-sourcing/pipeline/processBuilder";
 import {
   buildIntentHandlers,
   ProcessRuntime,
 } from "~/server/event-sourcing/process-manager/processRuntime";
-import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
+import type { EventSubscriberContext } from "~/server/event-sourcing/subscribers/eventSubscriber.types";
 
 import { langyConversationProcess } from "../langyConversationProcess";
 import {
@@ -113,10 +112,13 @@ describe("Langy process manager and outbox with Postgres", () => {
     // The real production path: ProcessRuntime generates the
     // `pm:langyConversation` subscriber from the pipeline declaration.
     const runtime = new ProcessRuntime({ store, consumersEnabled: false });
-    const { subscribers } = runtime.registerPipeline<LangyConversationProcessingEvent>({
-      pipelineName: "langy-conversation-processing",
-      processManagers: new Map([[LANGY_CONVERSATION_PROCESS_NAME, definition]]),
-    });
+    const { subscribers } =
+      runtime.registerPipeline<LangyConversationProcessingEvent>({
+        pipelineName: "langy-conversation-processing",
+        processManagers: new Map([
+          [LANGY_CONVERSATION_PROCESS_NAME, definition],
+        ]),
+      });
     const subscriber = subscribers[0];
     if (!subscriber) throw new Error("runtime generated no subscriber");
     const events = lifecycle();

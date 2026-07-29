@@ -1,21 +1,15 @@
-import type { AlertType } from "@prisma/client";
-import { computeDefaultFrom } from "~/server/mailer/emailSender";
 import {
-  buildTriggerNoReplyAddress,
-  TEST_FIRE_TRIGGER_ID_SENTINEL,
-} from "~/server/mailer/triggerNoReply";
+  defaultsForSourceKind,
+  type TemplateSourceKind,
+} from "@langwatch/automations/templating/defaults";
 import { EXAMPLE_MATCHES } from "@langwatch/automations/templating/exampleContext";
 import { renderTriggerEmail } from "@langwatch/automations/templating/renderEmail";
-import { renderWebhookBody } from "@langwatch/automations/templating/renderWebhookBody";
 import {
   renderTriggerSlack,
   type SlackPayload,
   type SlackTemplateType,
 } from "@langwatch/automations/templating/renderSlack";
-import {
-  defaultsForSourceKind,
-  type TemplateSourceKind,
-} from "@langwatch/automations/templating/defaults";
+import { renderWebhookBody } from "@langwatch/automations/templating/renderWebhookBody";
 import {
   buildExampleGraphAlertTemplateContext,
   buildExampleReportTemplateContext,
@@ -26,6 +20,12 @@ import {
   type TemplateContext,
 } from "@langwatch/automations/templating/templateContext";
 import { validateLiquid } from "@langwatch/automations/templating/validate";
+import type { AlertType } from "@prisma/client";
+import { computeDefaultFrom } from "~/server/mailer/emailSender";
+import {
+  buildTriggerNoReplyAddress,
+  TEST_FIRE_TRIGGER_ID_SENTINEL,
+} from "~/server/mailer/triggerNoReply";
 import { TemplateValidationError, TestFireUnavailableError } from "./errors";
 
 export type TemplateChannel = "email" | "slack" | "webhook";

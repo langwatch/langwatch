@@ -67,7 +67,12 @@ export function FacetSection({
   // Always-open panel (standalone / test path).
   if (!accordion) {
     return (
-      <Box padding={3} borderRadius="md" border="1px solid" borderColor="border">
+      <Box
+        padding={3}
+        borderRadius="md"
+        border="1px solid"
+        borderColor="border"
+      >
         <HStack mb={3} gap={2}>
           {titleRow}
           <Spacer />

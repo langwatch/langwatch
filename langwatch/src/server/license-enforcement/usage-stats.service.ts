@@ -1,7 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
 import { UNLIMITED_MESSAGES } from "../../../ee/billing/planLimits";
 import type { PlanInfo } from "../../../ee/licensing/planInfo";
-import { env } from "../../env.mjs";
 import { formatNumber, formatPercent } from "../../utils/formatNumber";
 import { getApp } from "../app-layer/app";
 import type { PlanProvider } from "../app-layer/subscription/plan-provider";

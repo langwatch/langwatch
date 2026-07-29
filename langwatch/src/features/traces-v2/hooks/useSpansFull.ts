@@ -22,6 +22,7 @@ export function useSpansFull(enabled: boolean) {
     keepPreviousData: true,
   });
 
-  if (shared) return asSharedQueryResult(shared.spansFull) as unknown as typeof query;
+  if (shared)
+    return asSharedQueryResult(shared.spansFull) as unknown as typeof query;
   return query;
 }

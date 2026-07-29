@@ -1,0 +1,25 @@
+id: no-tautological-assertion-ts
+message: >
+  This assertion cannot fail. Comparing an expression to itself, or a literal
+  to the same literal, tests the assertion library rather than the code —
+  it stays green through any rewrite of the thing it appears to cover. Assert
+  the value the code produced against one derived independently of it.
+  If the point really is determinism — that two calls agree — say so: compute
+  the two results into named variables first, so the intent survives the next
+  reader. See CLAUDE.md on regression tests that only check a generated string.
+severity: warning
+language: TypeScript
+rule:
+  any:
+    # expect(X).toBe(X) — the same text on both sides.
+    - pattern: expect($X).toBe($X)
+    - pattern: expect($X).toEqual($X)
+    - pattern: expect($X).toStrictEqual($X)
+    # Constants asserted at themselves.
+    - pattern: expect(true).toBe(true)
+    - pattern: expect(false).toBe(false)
+files:
+  - "langwatch/**/*.test.ts"
+  - "langwatch/**/*.spec.ts"
+  - "typescript-sdk/**/*.test.ts"
+  - "packages/**/*.test.ts"

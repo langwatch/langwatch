@@ -25,9 +25,7 @@ import type {
   OrganizationRepository,
   OrganizationWithAdmins,
   OrganizationWithMembersAndTheirTeams,
-  UpdateMemberRoleInput,
   UpdateOrganizationInput,
-  UpdateTeamMemberRoleInput,
 } from "./repositories/organization.repository";
 
 /**

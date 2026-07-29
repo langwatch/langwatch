@@ -374,7 +374,9 @@ describe("Prompt Editor Local Changes", () => {
         () => {
           const callWithMessages = mockOnLocalConfigChange.mock.calls.find(
             (call: unknown[]) =>
-              call[0] != null && typeof call[0] === "object" && "messages" in call[0],
+              call[0] != null &&
+              typeof call[0] === "object" &&
+              "messages" in call[0],
           );
           expect(callWithMessages).toBeDefined();
         },

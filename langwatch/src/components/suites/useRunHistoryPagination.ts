@@ -5,10 +5,10 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
-import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
-import { STALL_THRESHOLD_MS } from "~/server/scenarios/stall-detection";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
+import { STALL_THRESHOLD_MS } from "~/server/scenarios/stall-detection";
 import { api } from "~/utils/api";
 import { useSuiteRunFreshness } from "./useSuiteRunFreshness";
 
@@ -81,15 +81,17 @@ export function useRunHistoryPagination({
   // actually stalled. Re-check using the run's timestamp (= UpdatedAt).
   const allRuns = useMemo(() => {
     const now = Date.now();
-    return pages.flatMap((p) => p.runs).map((run) => {
-      if (
-        run.status === ScenarioRunStatus.IN_PROGRESS &&
-        now - run.timestamp >= STALL_THRESHOLD_MS
-      ) {
-        return { ...run, status: ScenarioRunStatus.STALLED };
-      }
-      return run;
-    });
+    return pages
+      .flatMap((p) => p.runs)
+      .map((run) => {
+        if (
+          run.status === ScenarioRunStatus.IN_PROGRESS &&
+          now - run.timestamp >= STALL_THRESHOLD_MS
+        ) {
+          return { ...run, status: ScenarioRunStatus.STALLED };
+        }
+        return run;
+      });
   }, [pages]);
 
   // Cheap freshness probe replaces the old 30s heavy re-fetch. Matches the

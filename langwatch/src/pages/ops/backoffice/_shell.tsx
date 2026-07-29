@@ -1,5 +1,5 @@
 import { Center, Spinner, Text, VStack } from "@chakra-ui/react";
-import { useEffect, type PropsWithChildren } from "react";
+import { type PropsWithChildren, useEffect } from "react";
 import SettingsLayout from "~/components/SettingsLayout";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
@@ -24,8 +24,7 @@ export default function BackofficeShell({ children }: PropsWithChildren) {
   );
 
   const hasAccess = adminStatus.data?.isAdmin === true;
-  const isDenied =
-    (adminStatus.isSuccess && !hasAccess) || adminStatus.isError;
+  const isDenied = (adminStatus.isSuccess && !hasAccess) || adminStatus.isError;
 
   useEffect(() => {
     if (isDenied) {

@@ -13,8 +13,8 @@
  */
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Component } from "../../types/dsl";
 import type { NodeWithOptionalPosition } from "~/types";
+import type { Component } from "../../types/dsl";
 
 // Mock useWorkflowStore
 const mockSetNode = vi.fn();
@@ -127,11 +127,9 @@ describe("useEvaluatorPickerFlow()", () => {
         vi.runAllTimers();
       });
 
-      expect(mockOpenDrawer).toHaveBeenCalledWith(
-        "evaluatorList",
-        undefined,
-        { resetStack: true },
-      );
+      expect(mockOpenDrawer).toHaveBeenCalledWith("evaluatorList", undefined, {
+        resetStack: true,
+      });
     });
 
     it("stores the pending node id in the ref", () => {
@@ -166,9 +164,7 @@ describe("useEvaluatorPickerFlow()", () => {
             { identifier: "input", type: "str" },
             { identifier: "context", type: "str", optional: true },
           ],
-          outputFields: [
-            { identifier: "score", type: "float" },
-          ],
+          outputFields: [{ identifier: "score", type: "float" }],
         });
       });
 
@@ -182,9 +178,7 @@ describe("useEvaluatorPickerFlow()", () => {
               { identifier: "input", type: "str" },
               { identifier: "context", type: "str", optional: true },
             ],
-            outputs: [
-              { identifier: "score", type: "float" },
-            ],
+            outputs: [{ identifier: "score", type: "float" }],
           }),
         }),
       );
@@ -484,9 +478,7 @@ describe("useEvaluatorPickerFlow()", () => {
               { identifier: "output", type: "str" },
               { identifier: "expected_output", type: "str" },
             ],
-            outputs: [
-              { identifier: "passed", type: "bool" },
-            ],
+            outputs: [{ identifier: "passed", type: "bool" }],
           }),
         }),
       );
@@ -536,9 +528,7 @@ describe("useEvaluatorPickerFlow()", () => {
               { identifier: "output", type: "str" },
               { identifier: "contexts", type: "list", optional: true },
             ],
-            outputs: [
-              { identifier: "score", type: "float" },
-            ],
+            outputs: [{ identifier: "score", type: "float" }],
           }),
         }),
       );

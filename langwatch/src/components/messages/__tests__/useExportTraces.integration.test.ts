@@ -41,7 +41,7 @@ describe("useExportTraces()", () => {
   describe("when initialized", () => {
     it("starts with dialog closed", () => {
       const { result } = renderHook(() =>
-        useExportTraces({ projectId: "proj-1" })
+        useExportTraces({ projectId: "proj-1" }),
       );
 
       expect(result.current.isDialogOpen).toBe(false);
@@ -49,7 +49,7 @@ describe("useExportTraces()", () => {
 
     it("starts with isExporting false", () => {
       const { result } = renderHook(() =>
-        useExportTraces({ projectId: "proj-1" })
+        useExportTraces({ projectId: "proj-1" }),
       );
 
       expect(result.current.isExporting).toBe(false);
@@ -57,7 +57,7 @@ describe("useExportTraces()", () => {
 
     it("starts with zero progress", () => {
       const { result } = renderHook(() =>
-        useExportTraces({ projectId: "proj-1" })
+        useExportTraces({ projectId: "proj-1" }),
       );
 
       expect(result.current.progress).toEqual({ exported: 0, total: 0 });
@@ -67,7 +67,7 @@ describe("useExportTraces()", () => {
   describe("when openExportDialog is called", () => {
     it("opens the dialog", () => {
       const { result } = renderHook(() =>
-        useExportTraces({ projectId: "proj-1" })
+        useExportTraces({ projectId: "proj-1" }),
       );
 
       act(() => {
@@ -81,7 +81,7 @@ describe("useExportTraces()", () => {
   describe("when closeExportDialog is called", () => {
     it("closes the dialog", () => {
       const { result } = renderHook(() =>
-        useExportTraces({ projectId: "proj-1" })
+        useExportTraces({ projectId: "proj-1" }),
       );
 
       act(() => {
@@ -105,11 +105,11 @@ describe("useExportTraces()", () => {
           ok: true,
           headers: new Headers(),
           blob: vi.fn().mockResolvedValue(new Blob()),
-        })
+        }),
       );
 
       const { result } = renderHook(() =>
-        useExportTraces({ projectId: "proj-1" })
+        useExportTraces({ projectId: "proj-1" }),
       );
 
       act(() => {
@@ -131,11 +131,11 @@ describe("useExportTraces()", () => {
           ok: true,
           headers: new Headers(),
           blob: vi.fn().mockResolvedValue(new Blob()),
-        })
+        }),
       );
 
       const { result } = renderHook(() =>
-        useExportTraces({ projectId: "proj-1" })
+        useExportTraces({ projectId: "proj-1" }),
       );
 
       act(() => {
@@ -154,11 +154,11 @@ describe("useExportTraces()", () => {
           ok: true,
           headers: new Headers(),
           blob: vi.fn().mockResolvedValue(new Blob()),
-        })
+        }),
       );
 
       const { result } = renderHook(() =>
-        useExportTraces({ projectId: "proj-1" })
+        useExportTraces({ projectId: "proj-1" }),
       );
 
       act(() => {
@@ -180,11 +180,11 @@ describe("useExportTraces()", () => {
           ok: true,
           headers: new Headers(),
           blob: vi.fn().mockResolvedValue(new Blob()),
-        })
+        }),
       );
 
       const { result } = renderHook(() =>
-        useExportTraces({ projectId: "proj-1" })
+        useExportTraces({ projectId: "proj-1" }),
       );
 
       act(() => {
@@ -214,11 +214,11 @@ describe("useExportTraces()", () => {
           }
           // Return a promise that never resolves so the export stays in-flight
           return new Promise(() => {});
-        })
+        }),
       );
 
       const { result } = renderHook(() =>
-        useExportTraces({ projectId: "proj-1" })
+        useExportTraces({ projectId: "proj-1" }),
       );
 
       act(() => {
@@ -254,11 +254,11 @@ describe("useExportTraces()", () => {
           }
           // Second export: never resolves
           return new Promise(() => {});
-        })
+        }),
       );
 
       const { result } = renderHook(() =>
-        useExportTraces({ projectId: "proj-1" })
+        useExportTraces({ projectId: "proj-1" }),
       );
 
       // Start first export
@@ -296,7 +296,7 @@ describe("useExportTraces()", () => {
   describe("when projectId is undefined", () => {
     it("does not start export and shows error toast", () => {
       const { result } = renderHook(() =>
-        useExportTraces({ projectId: undefined })
+        useExportTraces({ projectId: undefined }),
       );
 
       act(() => {
@@ -305,16 +305,14 @@ describe("useExportTraces()", () => {
 
       expect(result.current.isExporting).toBe(false);
       expect(mockToasterCreate).toHaveBeenCalledWith(
-        expect.objectContaining({ type: "error" })
+        expect.objectContaining({ type: "error" }),
       );
     });
   });
 
   describe("when server returns an empty response body", () => {
     it("shows a warning toast instead of downloading a blank file", async () => {
-      const createObjectURLSpy = vi
-        .fn()
-        .mockReturnValue("blob:fake-url");
+      const createObjectURLSpy = vi.fn().mockReturnValue("blob:fake-url");
       vi.stubGlobal("URL", {
         ...globalThis.URL,
         createObjectURL: createObjectURLSpy,
@@ -334,7 +332,11 @@ describe("useExportTraces()", () => {
       );
 
       const { result } = renderHook(() =>
-        useExportTraces({ projectId: "proj-1", startDate: 1000, endDate: 2000 }),
+        useExportTraces({
+          projectId: "proj-1",
+          startDate: 1000,
+          endDate: 2000,
+        }),
       );
 
       await act(async () => {

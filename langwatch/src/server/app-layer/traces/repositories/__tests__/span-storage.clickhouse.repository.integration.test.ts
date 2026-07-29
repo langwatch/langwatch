@@ -497,7 +497,7 @@ describe("SpanStorageClickHouseRepository single-trace reads (integration)", () 
       expect(spans.map((s) => s.spanId)).toEqual([spanIdFor(0)]);
     });
 
-it("returns no spans for a trace without any, via the bounded-then-unbounded fallback", async () => {
+    it("returns no spans for a trace without any, via the bounded-then-unbounded fallback", async () => {
       const storedSpansQueries: { query: string; params: unknown }[] = [];
       const recordingClient = new Proxy(ch, {
         get(target, prop, receiver) {
@@ -847,7 +847,13 @@ describe("SpanStorageClickHouseRepository cursor-paged span summaries (integrati
       const pages = await walkSpanSummaries(longTraceId, 2);
 
       const all = pages.flatMap((p) => p.rows.map((r) => r.spanId));
-      expect(all).toEqual(["early-0", "early-1", "early-2", "late-0", "late-1"]);
+      expect(all).toEqual([
+        "early-0",
+        "early-1",
+        "early-2",
+        "late-0",
+        "late-1",
+      ]);
     });
   });
 });
@@ -872,9 +878,7 @@ describe("SpanStorageClickHouseRepository langwatch signals read (integration)",
         occurredAtMs: base,
       });
 
-      expect(rows).toEqual([
-        { spanId: "sig-prompt", signals: ["prompt"] },
-      ]);
+      expect(rows).toEqual([{ spanId: "sig-prompt", signals: ["prompt"] }]);
     });
   });
 });

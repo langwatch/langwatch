@@ -13,18 +13,17 @@ import {
 import { useEffect, useMemo, useState } from "react";
 
 import { Drawer } from "~/components/ui/drawer";
+import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import { toaster } from "~/components/ui/toaster";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-
-import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
-import { humanizeGatewayError } from "./gatewayErrorCopy";
 import {
-  parseTagsCsv,
-  TAGS_CSV_MAX_LENGTH,
-  tagsBeyondLimitsNotice,
-  VK_TAGS_FIELD_DESCRIPTION,
-} from "./virtualKeyTagsField";
+  buildScopeHierarchy,
+  type OrgModelProvider,
+  resolveEligible,
+  type VirtualKeyScopeEntry,
+} from "./eligibleModelProviders";
+import { humanizeGatewayError } from "./gatewayErrorCopy";
 import {
   budgetInvalidReason,
   EMPTY_BUDGET,
@@ -35,10 +34,10 @@ import {
 import { VirtualKeyOwnershipReadOnly } from "./VirtualKeyOwnershipSection";
 import {
   ALL_PROVIDERS,
+  type ProviderAccessValue,
   providerAccessInvalidReason,
   providerAccessToConfig,
   VirtualKeyProviderAccessSection,
-  type ProviderAccessValue,
 } from "./VirtualKeyProviderAccessSection";
 import {
   routingValueFromKey,
@@ -46,11 +45,11 @@ import {
   type VirtualKeyRoutingValue,
 } from "./VirtualKeyRoutingSection";
 import {
-  buildScopeHierarchy,
-  resolveEligible,
-  type OrgModelProvider,
-  type VirtualKeyScopeEntry,
-} from "./eligibleModelProviders";
+  parseTagsCsv,
+  TAGS_CSV_MAX_LENGTH,
+  tagsBeyondLimitsNotice,
+  VK_TAGS_FIELD_DESCRIPTION,
+} from "./virtualKeyTagsField";
 
 type VirtualKeyDetail = {
   id: string;
@@ -89,11 +88,7 @@ type VirtualKeyEditDrawerProps = {
   onSaved: () => void;
 };
 
-const MANAGED_WINDOWS: ReadonlySet<string> = new Set([
-  "DAY",
-  "WEEK",
-  "MONTH",
-]);
+const MANAGED_WINDOWS: ReadonlySet<string> = new Set(["DAY", "WEEK", "MONTH"]);
 
 export function VirtualKeyEditDrawer({
   organizationId,
@@ -195,8 +190,7 @@ export function VirtualKeyEditDrawer({
     // replace what was typed with what was stored.
     if (!vk || budgetLoaded || isBudgetDirty || !applicableQuery.data) return;
     const own = applicableQuery.data.find(
-      (b) =>
-        b.managedByVirtualKeyId === vk.id && MANAGED_WINDOWS.has(b.window),
+      (b) => b.managedByVirtualKeyId === vk.id && MANAGED_WINDOWS.has(b.window),
     );
     if (own) {
       const limit = Number.parseFloat(own.limitUsd);
@@ -497,7 +491,12 @@ export function VirtualKeyEditDrawer({
                     docHref="/ai-gateway/rate-limits"
                   />
                 </Field.Label>
-                <Input value={tpm} placeholder="deferred" inputMode="numeric" disabled />
+                <Input
+                  value={tpm}
+                  placeholder="deferred"
+                  inputMode="numeric"
+                  disabled
+                />
                 <Field.HelperText>Tokens / minute</Field.HelperText>
               </Field.Root>
               <Field.Root flex={1}>

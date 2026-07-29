@@ -1,6 +1,14 @@
 import { TriggerAction } from "@prisma/client";
 import type { Redis } from "ioredis";
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 
 import {
   getTestRedisConnection,
@@ -15,14 +23,14 @@ import { createTenantId } from "../../../domain/tenantId";
 import { EventSourcing } from "../../../eventSourcing";
 import { mapCommands } from "../../../mapCommands";
 import { InMemoryProcessStore } from "../../../process-manager/stores/inMemoryProcessStore";
-import type { AutomationEvent } from "../schemas/events";
+import {
+  type AutomationsPipelineDeps,
+  createAutomationsPipeline,
+} from "../pipeline";
 import type { SettlementState } from "../process-manager/triggerSettlement.process";
 import type { TriggerSettlementDispatchDeps } from "../process-manager/triggerSettlementIntentHandlers";
-import {
-  createAutomationsPipeline,
-  type AutomationsPipelineDeps,
-} from "../pipeline";
 import { TRIGGER_MATCH_COALESCE_MAX_BATCH } from "../schemas/constants";
+import type { AutomationEvent } from "../schemas/events";
 
 const tenantId = createTenantId("project-1");
 

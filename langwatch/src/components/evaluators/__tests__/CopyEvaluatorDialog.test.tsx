@@ -6,7 +6,15 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import { CopyEvaluatorDialog } from "../CopyEvaluatorDialog";
 
 const SOURCE_PROJECT_ID = "test-project-id";
@@ -35,8 +43,11 @@ const MOCK_ORGANIZATIONS = [
   },
 ];
 
-let copyMutateArgs: { evaluatorId: string; projectId: string; sourceProjectId: string } | null =
-  null;
+let copyMutateArgs: {
+  evaluatorId: string;
+  projectId: string;
+  sourceProjectId: string;
+} | null = null;
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
@@ -112,10 +123,9 @@ describe("CopyEvaluatorDialog", () => {
   it("calls copy mutation and onClose when project selected and Replicate clicked", async () => {
     const user = userEvent.setup();
     const onClose = vi.fn();
-    render(
-      <CopyEvaluatorDialog {...defaultProps} onClose={onClose} />,
-      { wrapper: Wrapper },
-    );
+    render(<CopyEvaluatorDialog {...defaultProps} onClose={onClose} />, {
+      wrapper: Wrapper,
+    });
 
     const trigger = screen.getByRole("combobox");
     await user.click(trigger);
@@ -144,10 +154,9 @@ describe("CopyEvaluatorDialog", () => {
   it("calls onSuccess after successful replicate", async () => {
     const user = userEvent.setup();
     const onSuccess = vi.fn();
-    render(
-      <CopyEvaluatorDialog {...defaultProps} onSuccess={onSuccess} />,
-      { wrapper: Wrapper },
-    );
+    render(<CopyEvaluatorDialog {...defaultProps} onSuccess={onSuccess} />, {
+      wrapper: Wrapper,
+    });
 
     await user.click(screen.getByRole("combobox"));
     const options = await screen.findAllByRole("option", {
@@ -157,7 +166,9 @@ describe("CopyEvaluatorDialog", () => {
     await user.click(options[0]!);
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: /replicate/i })).not.toBeDisabled();
+      expect(
+        screen.getByRole("button", { name: /replicate/i }),
+      ).not.toBeDisabled();
     });
     await user.click(screen.getByRole("button", { name: /replicate/i }));
 
@@ -169,10 +180,9 @@ describe("CopyEvaluatorDialog", () => {
   it("Cancel button calls onClose", async () => {
     const user = userEvent.setup();
     const onClose = vi.fn();
-    render(
-      <CopyEvaluatorDialog {...defaultProps} onClose={onClose} />,
-      { wrapper: Wrapper },
-    );
+    render(<CopyEvaluatorDialog {...defaultProps} onClose={onClose} />, {
+      wrapper: Wrapper,
+    });
     await user.click(screen.getByRole("button", { name: /cancel/i }));
     expect(onClose).toHaveBeenCalled();
   });

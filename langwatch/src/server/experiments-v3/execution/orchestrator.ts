@@ -266,7 +266,7 @@ export const generateCells = (
   // visible to the user as a silent no-op with "No verdict yet" everywhere.
   const expandComparisonDeps = (id: string): string[] => {
     const t = state.targets.find((tg: TargetConfig) => tg.id === id);
-    if (!t || t.type !== "evaluator") return [id];
+    if (t?.type !== "evaluator") return [id];
     const deps = (toComparisonConfig(t)?.variants ?? []).filter(
       (v): v is string => !!v,
     );

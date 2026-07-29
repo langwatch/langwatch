@@ -33,8 +33,5 @@ export interface TeamRepository {
     organizationId: string;
     data: UpdateTeamInput;
   }): Promise<Team | null>;
-  archive(params: {
-    id: string;
-    organizationId: string;
-  }): Promise<Team | null>;
+  archive(params: { id: string; organizationId: string }): Promise<Team | null>;
 }

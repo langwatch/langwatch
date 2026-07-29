@@ -146,9 +146,7 @@ export async function fetchSSE<T>({
         }
       })
       .catch((error) => {
-        handleError(
-          toError(error),
-        );
+        handleError(toError(error));
       });
   });
 }

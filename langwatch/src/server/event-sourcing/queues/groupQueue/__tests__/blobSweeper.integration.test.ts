@@ -64,7 +64,11 @@ describe("BlobSweeper", () => {
         await redis.set(blobKey(), "body", "EX", BLOB_BACKSTOP_TTL_SECONDS);
         // No lease member: the holder's deadline already lapsed. But its mirrored
         // token survives, because only a clean release ever removes one.
-        await redis.sadd(holderKey(), LEGACY_HOLDER_LEASE_GUARD, "died-mid-flight");
+        await redis.sadd(
+          holderKey(),
+          LEGACY_HOLDER_LEASE_GUARD,
+          "died-mid-flight",
+        );
 
         const tally = await sweepOnce();
 
@@ -123,7 +127,11 @@ describe("BlobSweeper", () => {
           BLOB_RECLAIM_TTL_THRESHOLD_SECONDS - 1,
         );
         await redis.sadd(holderKey(), LEGACY_HOLDER_LEASE_GUARD);
-        await redis.zadd(leaseKey(), (await redisNowMs()) - 1, "expired-holder");
+        await redis.zadd(
+          leaseKey(),
+          (await redisNowMs()) - 1,
+          "expired-holder",
+        );
 
         const tally = await sweepOnce();
 

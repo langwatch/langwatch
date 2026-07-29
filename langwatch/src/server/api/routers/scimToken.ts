@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { checkOrganizationPermission } from "../rbac";
-import { assertEnterprisePlan, ENTERPRISE_FEATURE_ERRORS } from "../enterprise";
 import { ScimTokenService } from "~/server/scim/scim-token.service";
+import { assertEnterprisePlan, ENTERPRISE_FEATURE_ERRORS } from "../enterprise";
+import { checkOrganizationPermission } from "../rbac";
 
 const enterpriseScimProcedure = protectedProcedure
   .input(z.object({ organizationId: z.string() }))
@@ -16,20 +16,19 @@ const enterpriseScimProcedure = protectedProcedure
   });
 
 export const scimTokenRouter = createTRPCRouter({
-  list: enterpriseScimProcedure
-    .query(async ({ ctx, input }) => {
-      const tokens = await ctx.prisma.scimToken.findMany({
-        where: { organizationId: input.organizationId },
-        select: {
-          id: true,
-          description: true,
-          createdAt: true,
-          lastUsedAt: true,
-        },
-        orderBy: { createdAt: "desc" },
-      });
-      return tokens;
-    }),
+  list: enterpriseScimProcedure.query(async ({ ctx, input }) => {
+    const tokens = await ctx.prisma.scimToken.findMany({
+      where: { organizationId: input.organizationId },
+      select: {
+        id: true,
+        description: true,
+        createdAt: true,
+        lastUsedAt: true,
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    return tokens;
+  }),
 
   generate: enterpriseScimProcedure
     .input(
@@ -60,5 +59,4 @@ export const scimTokenRouter = createTRPCRouter({
       });
       return { success: true };
     }),
-
 });

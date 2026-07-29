@@ -36,9 +36,7 @@ function mockPrisma(
   } as unknown as PrismaClient;
 }
 
-function mockSpendRepo(
-  traces: TraceStub[],
-): GatewayVirtualKeySpendRepository {
+function mockSpendRepo(traces: TraceStub[]): GatewayVirtualKeySpendRepository {
   const rows: GatewayTraceRow[] = traces.map((t, i) => ({
     traceId: `trace_${i}`,
     virtualKeyId: t.virtualKeyId,

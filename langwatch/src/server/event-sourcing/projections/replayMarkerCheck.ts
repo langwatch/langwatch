@@ -1,6 +1,10 @@
 import type { Event } from "../domain/types";
+import {
+  CUTOFF_KEY_PREFIX,
+  doneMarkerKey,
+  isAtOrBeforeCutoffMarker,
+} from "../replay/replayConstants";
 import { RecoverableError } from "../services/errorHandling";
-import { CUTOFF_KEY_PREFIX, doneMarkerKey, isAtOrBeforeCutoffMarker } from "../replay/replayConstants";
 
 /**
  * Thrown when a fold projection event must be deferred because projection-replay
@@ -60,7 +64,10 @@ interface ReplayMarkerRedis {
 export class RedisReplayMarkerChecker implements ReplayMarkerChecker {
   constructor(private readonly redis: ReplayMarkerRedis) {}
 
-  async check(projectionName: string, event: Event): Promise<ReplayMarkerDecision> {
+  async check(
+    projectionName: string,
+    event: Event,
+  ): Promise<ReplayMarkerDecision> {
     const aggregateKey = `${String(event.tenantId)}:${event.aggregateType}:${String(event.aggregateId)}`;
 
     // Read the active cutoff marker (in-flight replay) and the short-TTL
@@ -115,7 +122,10 @@ export class RedisReplayMarkerChecker implements ReplayMarkerChecker {
  * coordination is needed. Always allows events through.
  */
 export class NoopReplayMarkerChecker implements ReplayMarkerChecker {
-  async check(_projectionName: string, _event: Event): Promise<ReplayMarkerDecision> {
+  async check(
+    _projectionName: string,
+    _event: Event,
+  ): Promise<ReplayMarkerDecision> {
     return "process";
   }
 }

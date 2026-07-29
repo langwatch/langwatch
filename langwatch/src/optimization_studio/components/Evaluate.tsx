@@ -64,7 +64,11 @@ export function Evaluate() {
           size="sm"
           onClick={() => {
             trackEvent("evaluate_click", { project_id: project?.id });
-            form.reset({ version: "", commitMessage: "", evaluateOn: undefined });
+            form.reset({
+              version: "",
+              commitMessage: "",
+              evaluateOn: undefined,
+            });
             onToggle();
           }}
           disabled={isRunning}
@@ -150,7 +154,10 @@ export function EvaluateModalContent({
   });
 
   const evaluateOn = useWatch({ control: form.control, name: "evaluateOn" });
-  const commitMessage = useWatch({ control: form.control, name: "commitMessage" });
+  const commitMessage = useWatch({
+    control: form.control,
+    name: "commitMessage",
+  });
 
   useEffect(() => {
     if (!evaluateOn) {
@@ -310,7 +317,9 @@ export function EvaluateModalContent({
           workflow_version_id: versionId,
           evaluate_on: evaluateOn.value,
           dataset_entry:
-            evaluateOn.value === "specific" ? evaluateOn.datasetEntry : undefined,
+            evaluateOn.value === "specific"
+              ? evaluateOn.datasetEntry
+              : undefined,
         });
         setHasStarted(true);
       });
@@ -353,71 +362,74 @@ export function EvaluateModalContent({
 
   return (
     <FormProvider {...form}>
-    <Dialog.Content bg="bg"
-      as="form"
-      // eslint-disable-next-line @typescript-eslint/no-misused-promises
-      onSubmit={form.handleSubmit(onSubmit)}
-      borderTop="5px solid"
-      borderTopColor="green.400"
-    >
-      <Dialog.Header>
-        <Dialog.Title fontWeight={600}>Evaluate Workflow</Dialog.Title>
-        <Dialog.CloseTrigger />
-      </Dialog.Header>
-      <Dialog.Body>
-        <VStack align="start" width="full" gap={4}>
-          <VStack align="start" width="full">
-            <VersionToBeUsed />
+      <Dialog.Content
+        bg="bg"
+        as="form"
+        // eslint-disable-next-line @typescript-eslint/no-misused-promises
+        onSubmit={form.handleSubmit(onSubmit)}
+        borderTop="5px solid"
+        borderTopColor="green.400"
+      >
+        <Dialog.Header>
+          <Dialog.Title fontWeight={600}>Evaluate Workflow</Dialog.Title>
+          <Dialog.CloseTrigger />
+        </Dialog.Header>
+        <Dialog.Body>
+          <VStack align="start" width="full" gap={4}>
+            <VStack align="start" width="full">
+              <VersionToBeUsed />
+            </VStack>
+            <VStack align="start" width="full" gap={2}>
+              <SmallLabel>Evaluate on</SmallLabel>
+              <Controller
+                control={form.control}
+                name="evaluateOn"
+                rules={{ required: "Evaluate on is required" }}
+                render={({ field }) => (
+                  <DatasetSplitSelect
+                    field={field}
+                    options={splitOptions}
+                    total={total}
+                  />
+                )}
+              />
+            </VStack>
           </VStack>
-          <VStack align="start" width="full" gap={2}>
-            <SmallLabel>Evaluate on</SmallLabel>
-            <Controller
-              control={form.control}
-              name="evaluateOn"
-              rules={{ required: "Evaluate on is required" }}
-              render={({ field }) => (
-                <DatasetSplitSelect
-                  field={field}
-                  options={splitOptions}
-                  total={total}
-                />
-              )}
-            />
+        </Dialog.Body>
+        <Dialog.Footer borderTop="1px solid" borderColor="border" marginTop={4}>
+          <VStack align="start" width="full" gap={3}>
+            {hasProvidersWithoutCustomKeys && (
+              <AddModelProviderKey
+                runWhat="run evaluations"
+                nodeProvidersWithoutCustomKeys={nodeProvidersWithoutCustomKeys}
+              />
+            )}
+            <HStack width="full">
+              <Text fontWeight={500}>
+                {isDatasetLoading
+                  ? "Loading dataset..."
+                  : `${estimatedTotal ?? 0} entries`}
+              </Text>
+              <Spacer />
+              <Tooltip content={isDisabled}>
+                <Button
+                  variant="outline"
+                  type="submit"
+                  disabled={!!isDisabled}
+                  loading={
+                    isDatasetLoading ||
+                    commitVersion.isLoading ||
+                    evaluationState?.status === "waiting"
+                  }
+                >
+                  <CheckSquare size={16} />
+                  {canSave ? "Save & Run Evaluation" : "Run Evaluation"}
+                </Button>
+              </Tooltip>
+            </HStack>
           </VStack>
-        </VStack>
-      </Dialog.Body>
-      <Dialog.Footer borderTop="1px solid" borderColor="border" marginTop={4}>
-        <VStack align="start" width="full" gap={3}>
-          {hasProvidersWithoutCustomKeys && (
-            <AddModelProviderKey
-              runWhat="run evaluations"
-              nodeProvidersWithoutCustomKeys={nodeProvidersWithoutCustomKeys}
-            />
-          )}
-          <HStack width="full">
-            <Text fontWeight={500}>
-              {isDatasetLoading ? "Loading dataset..." : `${estimatedTotal ?? 0} entries`}
-            </Text>
-            <Spacer />
-            <Tooltip content={isDisabled}>
-              <Button
-                variant="outline"
-                type="submit"
-                disabled={!!isDisabled}
-                loading={
-                  isDatasetLoading ||
-                  commitVersion.isLoading ||
-                  evaluationState?.status === "waiting"
-                }
-              >
-                <CheckSquare size={16} />
-                {canSave ? "Save & Run Evaluation" : "Run Evaluation"}
-              </Button>
-            </Tooltip>
-          </HStack>
-        </VStack>
-      </Dialog.Footer>
-    </Dialog.Content>
+        </Dialog.Footer>
+      </Dialog.Content>
     </FormProvider>
   );
 }

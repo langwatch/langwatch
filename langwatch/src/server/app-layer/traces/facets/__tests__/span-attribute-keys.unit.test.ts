@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { FACET_REGISTRY } from "../../facet-registry";
 import { KEY_DISCOVERY_SETTINGS } from "../helpers";
 import {
-  SPAN_ATTRIBUTE_KEYS_FACET,
   buildSpanAttributeKeysFacetQuery,
+  SPAN_ATTRIBUTE_KEYS_FACET,
 } from "../span-attribute-keys";
 
 const baseCtx = {
@@ -22,9 +22,7 @@ describe("SPAN_ATTRIBUTE_KEYS_FACET registration", () => {
   });
 
   it("registers exactly once into FACET_REGISTRY", () => {
-    const matches = FACET_REGISTRY.filter(
-      (d) => d.key === "spanAttributeKeys",
-    );
+    const matches = FACET_REGISTRY.filter((d) => d.key === "spanAttributeKeys");
     expect(matches).toHaveLength(1);
     expect(matches[0]).toBe(SPAN_ATTRIBUTE_KEYS_FACET);
   });
@@ -144,9 +142,7 @@ describe("buildSpanAttributeKeysFacetQuery", () => {
       // SpanAttributes; without this filter they would surface as browsable
       // facet entries exposing raw ref JSON as values. Concern 1 / #4215.
       const query = buildSpanAttributeKeysFacetQuery(baseCtx);
-      expect(query.sql).toContain(
-        "NOT startsWith(key, 'langwatch.reserved.')",
-      );
+      expect(query.sql).toContain("NOT startsWith(key, 'langwatch.reserved.')");
     });
 
     it("SQL would exclude langwatch.reserved.eventref.langwatch.output from discovered keys", () => {
@@ -157,7 +153,9 @@ describe("buildSpanAttributeKeysFacetQuery", () => {
       const outerWhereIdx = query.sql.lastIndexOf("WHERE key");
       expect(outerWhereIdx).toBeGreaterThan(-1);
       const outerWhere = query.sql.slice(outerWhereIdx);
-      expect(outerWhere).toContain("NOT startsWith(key, 'langwatch.reserved.')");
+      expect(outerWhere).toContain(
+        "NOT startsWith(key, 'langwatch.reserved.')",
+      );
     });
   });
 

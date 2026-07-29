@@ -16,17 +16,17 @@
  * readable text) through the ordinary send path — the turn machinery is
  * untouched by construction.
  */
-import { Box, Button, HStack, Text, VStack, chakra } from "@chakra-ui/react";
+import { Box, Button, chakra, HStack, Text, VStack } from "@chakra-ui/react";
 import type {
-  LangyDerivedChoicesCard,
   LangyChoiceSelection,
   LangyChoicesLockState,
+  LangyDerivedChoicesCard,
 } from "@langwatch/langy";
 import { Check, CircleSlash } from "lucide-react";
 import { useState } from "react";
 
 import { LangyDerivedCardFrame } from "./LangyDerivedCardFrame";
-import { useChoicesRefRows, type ChoicesRefRow } from "./useChoicesRefRows";
+import { type ChoicesRefRow, useChoicesRefRows } from "./useChoicesRefRows";
 
 export function LangyChoicesCard({
   card,
@@ -47,9 +47,7 @@ export function LangyChoicesCard({
   /** Fixture seam (gallery/tests): pre-resolved rows instead of fetching. */
   refRowsOverride?: ReadonlyMap<string, ChoicesRefRow>;
 }) {
-  const hydratedRows = useChoicesRefRows(
-    refRowsOverride ? [] : card.options,
-  );
+  const hydratedRows = useChoicesRefRows(refRowsOverride ? [] : card.options);
   const refRows = refRowsOverride ?? hydratedRows;
   const [picked, setPicked] = useState<Set<string>>(() => new Set());
   const [otherOpen, setOtherOpen] = useState(false);
@@ -119,8 +117,8 @@ export function LangyChoicesCard({
               : option.label;
           const secondary = dead
             ? "No longer exists"
-            : (refRow.state === "live" ? refRow.secondary : undefined) ??
-              option.description;
+            : ((refRow.state === "live" ? refRow.secondary : undefined) ??
+              option.description);
 
           return (
             <chakra.button

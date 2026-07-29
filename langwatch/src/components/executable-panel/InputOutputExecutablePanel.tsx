@@ -4,7 +4,6 @@ import { motion } from "motion/react";
 import React, {
   type ForwardedRef,
   forwardRef,
-  type PropsWithChildren,
   useCallback,
   useEffect,
   useLayoutEffect,

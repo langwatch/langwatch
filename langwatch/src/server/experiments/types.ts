@@ -11,14 +11,10 @@ const anyJSONDumpedClassSchema = z
   .object({ __class__: z.string().optional() })
   .and(z.record(z.string(), z.any()));
 
-type AnyJSONDumpedClass = z.infer<typeof anyJSONDumpedClassSchema>;
-
 const dSPyTraceSchema = z.object({
   input: anyJSONDumpedClassSchema,
   pred: anyJSONDumpedClassSchema,
 });
-
-type DSPyTrace = z.infer<typeof dSPyTraceSchema>;
 
 export const dSPyExampleSchema = z.object({
   hash: z.string(),

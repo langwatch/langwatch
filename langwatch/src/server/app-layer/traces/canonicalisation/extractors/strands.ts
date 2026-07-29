@@ -18,11 +18,7 @@
 
 import type { NormalizedEvent } from "../../../../event-sourcing/pipelines/trace-processing/schemas/spans";
 import { ATTR_KEYS } from "./_constants";
-import {
-  extractOutputMessages,
-  inferSpanTypeIfAbsent,
-  recordValueType,
-} from "./_extraction";
+import { extractOutputMessages, recordValueType } from "./_extraction";
 import { safeJsonParse } from "./_guards";
 import {
   extractSystemInstructionFromMessages,

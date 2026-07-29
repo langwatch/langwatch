@@ -73,7 +73,13 @@ export function createNotFoundRenderer() {
     colors: CanvasColors;
     smoothMouse: { x: number; y: number };
   }) {
-    const { gridBaseColor, particleBaseColor, aberrationRed, aberrationBlue, alphaScale } = colors;
+    const {
+      gridBaseColor,
+      particleBaseColor,
+      aberrationRed,
+      aberrationBlue,
+      alphaScale,
+    } = colors;
     const [particleR, particleG, particleB] = particleBaseColor;
 
     ctx.clearRect(0, 0, w, h);
@@ -175,19 +181,22 @@ export function createNotFoundRenderer() {
     const getNearBoost = (y1: number, y2: number) => {
       const nearestDepth = Math.max(
         0,
-        Math.min(
-          1,
-          (Math.max(y1, y2) - horizonY) / Math.max(1, h - horizonY),
-        ),
+        Math.min(1, (Math.max(y1, y2) - horizonY) / Math.max(1, h - horizonY)),
       );
       return 1.25 + Math.pow(nearestDepth, 1.02) * 4.1;
     };
 
     // Background cache — only rebuilt when viewport/colors/params change
     const bgKey = [
-      w, h,
-      ...gridBaseColor, ...particleBaseColor, ...aberrationRed, ...aberrationBlue,
-      alphaScale, p.fovScale, p.pitch,
+      w,
+      h,
+      ...gridBaseColor,
+      ...particleBaseColor,
+      ...aberrationRed,
+      ...aberrationBlue,
+      alphaScale,
+      p.fovScale,
+      p.pitch,
     ].join("|");
 
     if (bgCache?.key !== bgKey) {
@@ -259,9 +268,17 @@ export function createNotFoundRenderer() {
         backgroundCtx.fill();
       }
 
-      const horizonLineGlow = backgroundCtx.createLinearGradient(0, horizonY - 4, 0, horizonY + 6);
+      const horizonLineGlow = backgroundCtx.createLinearGradient(
+        0,
+        horizonY - 4,
+        0,
+        horizonY + 6,
+      );
       horizonLineGlow.addColorStop(0, "rgba(0, 0, 0, 0)");
-      horizonLineGlow.addColorStop(0.5, `rgba(${particleR}, ${particleG}, ${particleB}, ${0.06 * alphaScale})`);
+      horizonLineGlow.addColorStop(
+        0.5,
+        `rgba(${particleR}, ${particleG}, ${particleB}, ${0.06 * alphaScale})`,
+      );
       horizonLineGlow.addColorStop(1, "rgba(0, 0, 0, 0)");
       backgroundCtx.fillStyle = horizonLineGlow;
       backgroundCtx.fillRect(0, horizonY - 4, w, 10);
@@ -303,14 +320,8 @@ export function createNotFoundRenderer() {
     ) => {
       const depthFade = getDepthFade(y1, y2);
       const nearBoost = getNearBoost(y1, y2);
-      const startAlpha = Math.min(
-        1,
-        alpha * getAtmosphereFade(y1) * nearBoost,
-      );
-      const endAlpha = Math.min(
-        1,
-        alpha * getAtmosphereFade(y2) * nearBoost,
-      );
+      const startAlpha = Math.min(1, alpha * getAtmosphereFade(y1) * nearBoost);
+      const endAlpha = Math.min(1, alpha * getAtmosphereFade(y2) * nearBoost);
       const lineAlpha = Math.max(startAlpha, endAlpha) * depthFade;
 
       if (lineAlpha < 0.02) return;
@@ -383,11 +394,19 @@ export function createNotFoundRenderer() {
       ctx.lineWidth = 1.05 + Math.min(0.55, nearGlow * 0.12);
 
       const redGradient = ctx.createLinearGradient(
-        line.x1 - splitX, line.y1 - splitY,
-        line.x2 - splitX, line.y2 - splitY,
+        line.x1 - splitX,
+        line.y1 - splitY,
+        line.x2 - splitX,
+        line.y2 - splitY,
       );
-      redGradient.addColorStop(0, `rgba(${abRedR}, ${abRedG}, ${abRedB}, ${line.startAlpha * 0.42})`);
-      redGradient.addColorStop(1, `rgba(${abRedR}, ${abRedG}, ${abRedB}, ${line.endAlpha * 0.42})`);
+      redGradient.addColorStop(
+        0,
+        `rgba(${abRedR}, ${abRedG}, ${abRedB}, ${line.startAlpha * 0.42})`,
+      );
+      redGradient.addColorStop(
+        1,
+        `rgba(${abRedR}, ${abRedG}, ${abRedB}, ${line.endAlpha * 0.42})`,
+      );
 
       ctx.strokeStyle = redGradient;
       ctx.beginPath();
@@ -396,11 +415,19 @@ export function createNotFoundRenderer() {
       ctx.stroke();
 
       const blueGradient = ctx.createLinearGradient(
-        line.x1 + splitX, line.y1 + splitY,
-        line.x2 + splitX, line.y2 + splitY,
+        line.x1 + splitX,
+        line.y1 + splitY,
+        line.x2 + splitX,
+        line.y2 + splitY,
       );
-      blueGradient.addColorStop(0, `rgba(${abBlueR}, ${abBlueG}, ${abBlueB}, ${line.startAlpha * 0.42})`);
-      blueGradient.addColorStop(1, `rgba(${abBlueR}, ${abBlueG}, ${abBlueB}, ${line.endAlpha * 0.42})`);
+      blueGradient.addColorStop(
+        0,
+        `rgba(${abBlueR}, ${abBlueG}, ${abBlueB}, ${line.startAlpha * 0.42})`,
+      );
+      blueGradient.addColorStop(
+        1,
+        `rgba(${abBlueR}, ${abBlueG}, ${abBlueB}, ${line.endAlpha * 0.42})`,
+      );
 
       ctx.strokeStyle = blueGradient;
       ctx.beginPath();
@@ -408,8 +435,16 @@ export function createNotFoundRenderer() {
       ctx.lineTo(line.x2 + splitX, line.y2 + splitY);
       ctx.stroke();
 
-      const mainGradient = ctx.createLinearGradient(line.x1, line.y1, line.x2, line.y2);
-      mainGradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${line.startAlpha})`);
+      const mainGradient = ctx.createLinearGradient(
+        line.x1,
+        line.y1,
+        line.x2,
+        line.y2,
+      );
+      mainGradient.addColorStop(
+        0,
+        `rgba(${r}, ${g}, ${b}, ${line.startAlpha})`,
+      );
       mainGradient.addColorStop(1, `rgba(${r}, ${g}, ${b}, ${line.endAlpha})`);
 
       ctx.strokeStyle = mainGradient;

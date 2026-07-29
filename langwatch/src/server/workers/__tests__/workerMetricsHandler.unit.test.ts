@@ -15,8 +15,8 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  WORKER_LIVENESS_PATH,
   createWorkerMetricsHandler,
+  WORKER_LIVENESS_PATH,
 } from "../startWorkers";
 
 // Derive the fakes' types from the handler itself, so this test cannot drift

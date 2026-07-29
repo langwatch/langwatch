@@ -13,8 +13,8 @@
  * Run against the isolated smoketest Postgres only.
  */
 
-import { hash } from "bcrypt";
 import { PrismaClient } from "@prisma/client";
+import { hash } from "bcrypt";
 import { assertLocalhostDatabaseUrl } from "./_smoketest-guard";
 
 let exitCode = 0;
@@ -39,8 +39,12 @@ async function main() {
   const password = "compat-pass-1234";
 
   // Cleanup
-  await prisma.session.deleteMany({ where: { userId: { in: [userId, adminId] } } });
-  await prisma.account.deleteMany({ where: { userId: { in: [userId, adminId] } } });
+  await prisma.session.deleteMany({
+    where: { userId: { in: [userId, adminId] } },
+  });
+  await prisma.account.deleteMany({
+    where: { userId: { in: [userId, adminId] } },
+  });
   await prisma.user.deleteMany({ where: { id: { in: [userId, adminId] } } });
 
   console.log("═".repeat(60));
@@ -90,8 +94,7 @@ async function main() {
     return setCookie.split(";")[0] ?? "";
   };
 
-  const makeReq = (cookie: string) =>
-    ({ headers: { cookie } }) as any;
+  const makeReq = (cookie: string) => ({ headers: { cookie } }) as any;
 
   // ─────────────────────────────────────────────────────────────────
   // [1] getServerAuthSession with no cookie → null
@@ -117,7 +120,8 @@ async function main() {
   check("impersonator is undefined", session1?.user.impersonator === undefined);
   check(
     "expires is ISO string",
-    typeof session1?.expires === "string" && !isNaN(Date.parse(session1!.expires)),
+    typeof session1?.expires === "string" &&
+      !isNaN(Date.parse(session1!.expires)),
   );
 
   // ─────────────────────────────────────────────────────────────────
@@ -126,7 +130,9 @@ async function main() {
 
   console.log("\n[3] Invalid/tampered cookie → null");
   const tampered = await getServerAuthSession({
-    req: makeReq("better-auth.session_token=garbage-not-a-real-token.signature"),
+    req: makeReq(
+      "better-auth.session_token=garbage-not-a-real-token.signature",
+    ),
   });
   check("tampered cookie returns null", tampered === null);
 
@@ -166,10 +172,7 @@ async function main() {
       impersonated?.user.id === userId,
       impersonated?.user.id,
     );
-    check(
-      "user.email is the target's",
-      impersonated?.user.email === email,
-    );
+    check("user.email is the target's", impersonated?.user.email === email);
     check(
       "impersonator.id is the real admin",
       impersonated?.user.impersonator?.id === adminId,
@@ -205,10 +208,7 @@ async function main() {
     const afterExpire = await getServerAuthSession({
       req: makeReq(adminCookie),
     });
-    check(
-      "falls back to admin id",
-      afterExpire?.user.id === adminId,
-    );
+    check("falls back to admin id", afterExpire?.user.id === adminId);
     check(
       "impersonator is undefined",
       afterExpire?.user.impersonator === undefined,
@@ -273,8 +273,12 @@ async function main() {
   // ─────────────────────────────────────────────────────────────────
 
   console.log("\n[cleanup] Removing test data...");
-  await prisma.session.deleteMany({ where: { userId: { in: [userId, adminId] } } });
-  await prisma.account.deleteMany({ where: { userId: { in: [userId, adminId] } } });
+  await prisma.session.deleteMany({
+    where: { userId: { in: [userId, adminId] } },
+  });
+  await prisma.account.deleteMany({
+    where: { userId: { in: [userId, adminId] } },
+  });
   await prisma.user.deleteMany({ where: { id: { in: [userId, adminId] } } });
 
   await prisma.$disconnect();

@@ -32,7 +32,7 @@ import { useRouter } from "~/utils/compat/next-router";
  * Note: Prompt-based agents are no longer supported - use the Prompts page instead.
  */
 function Page() {
-  const { project, hasPermission } = useOrganizationTeamProject();
+  const { project } = useOrganizationTeamProject();
   const { openDrawer } = useDrawer();
   const utils = api.useContext();
   const router = useRouter();

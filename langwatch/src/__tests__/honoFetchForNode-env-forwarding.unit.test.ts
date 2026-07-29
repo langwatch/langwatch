@@ -21,7 +21,9 @@ import { honoFetchForNode } from "~/start";
 describe("honoFetchForNode()", () => {
   describe("when called the way getRequestListener actually calls it", () => {
     it("forwards the second (env) argument to honoApp.fetch", async () => {
-      const fetch = vi.fn().mockResolvedValue(new Response("ok", { status: 200 }));
+      const fetch = vi
+        .fn()
+        .mockResolvedValue(new Response("ok", { status: 200 }));
       const honoApp = { fetch } as unknown as Hono;
       const env = { incoming: { socket: {} }, outgoing: {} };
 
@@ -33,7 +35,9 @@ describe("honoFetchForNode()", () => {
 
   describe("when called with only a request (existing single-arg call sites)", () => {
     it("still works, forwarding no extra arguments", async () => {
-      const fetch = vi.fn().mockResolvedValue(new Response("ok", { status: 200 }));
+      const fetch = vi
+        .fn()
+        .mockResolvedValue(new Response("ok", { status: 200 }));
       const honoApp = { fetch } as unknown as Hono;
 
       const response = await honoFetchForNode(honoApp)(

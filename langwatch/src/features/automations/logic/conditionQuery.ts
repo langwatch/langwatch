@@ -13,16 +13,15 @@
  * The two are inverse for everything the builder can produce, so a query
  * round-trips builder → string → builder unchanged.
  */
-import type {
-  LiqeQuery,
-  ParserAst,
-  TagToken,
-} from "liqe";
+import type { LiqeQuery, ParserAst, TagToken } from "liqe";
 import {
   SEARCH_FIELDS,
   type SearchFieldMeta,
 } from "~/server/app-layer/traces/query-language/metadata";
-import { parse, stripAtSigils } from "~/server/app-layer/traces/query-language/parse";
+import {
+  parse,
+  stripAtSigils,
+} from "~/server/app-layer/traces/query-language/parse";
 
 /** Comparators the builder exposes. Categorical / text / existence fields get
  *  `is` / `is_not`; range fields get the numeric comparators plus `between`. */
@@ -210,7 +209,12 @@ function tagToCondition(
     typeof expr.value === "string" ? expr.value : String(expr.value);
 
   const comparison = tag.operator.operator;
-  if (comparison === ":>" || comparison === ":>=" || comparison === ":<" || comparison === ":<=") {
+  if (
+    comparison === ":>" ||
+    comparison === ":>=" ||
+    comparison === ":<" ||
+    comparison === ":<="
+  ) {
     // A comparator is a range concept; negating it (`-cost:>1`) has no builder
     // representation.
     if (negated) return null;

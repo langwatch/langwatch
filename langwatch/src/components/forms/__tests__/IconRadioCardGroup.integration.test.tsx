@@ -46,13 +46,9 @@ describe("<IconRadioCardGroup/>", () => {
     });
 
     it("renders all items as unchecked radios", () => {
-      render(
-        <IconRadioCardGroup
-          items={items}
-          onChange={() => {}}
-        />,
-        { wrapper: Wrapper },
-      );
+      render(<IconRadioCardGroup items={items} onChange={() => {}} />, {
+        wrapper: Wrapper,
+      });
 
       const radios = screen.getAllByRole("radio");
       expect(radios).toHaveLength(3);
@@ -62,13 +58,9 @@ describe("<IconRadioCardGroup/>", () => {
     });
 
     it("makes only the first item tabbable", () => {
-      render(
-        <IconRadioCardGroup
-          items={items}
-          onChange={() => {}}
-        />,
-        { wrapper: Wrapper },
-      );
+      render(<IconRadioCardGroup items={items} onChange={() => {}} />, {
+        wrapper: Wrapper,
+      });
 
       const radios = screen.getAllByRole("radio");
       expect(radios[0]).toHaveAttribute("tabindex", "0");
@@ -80,11 +72,7 @@ describe("<IconRadioCardGroup/>", () => {
   describe("when an item is selected", () => {
     it("marks the selected item as checked", () => {
       render(
-        <IconRadioCardGroup
-          items={items}
-          value="beta"
-          onChange={() => {}}
-        />,
+        <IconRadioCardGroup items={items} value="beta" onChange={() => {}} />,
         { wrapper: Wrapper },
       );
 
@@ -96,11 +84,7 @@ describe("<IconRadioCardGroup/>", () => {
 
     it("makes the selected item tabbable", () => {
       render(
-        <IconRadioCardGroup
-          items={items}
-          value="beta"
-          onChange={() => {}}
-        />,
+        <IconRadioCardGroup items={items} value="beta" onChange={() => {}} />,
         { wrapper: Wrapper },
       );
 
@@ -117,11 +101,7 @@ describe("<IconRadioCardGroup/>", () => {
       const onChange = vi.fn();
 
       render(
-        <IconRadioCardGroup
-          items={items}
-          value="alpha"
-          onChange={onChange}
-        />,
+        <IconRadioCardGroup items={items} value="alpha" onChange={onChange} />,
         { wrapper: Wrapper },
       );
 
@@ -170,13 +150,9 @@ describe("<IconRadioCardGroup/>", () => {
         { title: "Two", value: "two" as const },
       ];
 
-      render(
-        <IconRadioCardGroup
-          items={noIconItems}
-          onChange={() => {}}
-        />,
-        { wrapper: Wrapper },
-      );
+      render(<IconRadioCardGroup items={noIconItems} onChange={() => {}} />, {
+        wrapper: Wrapper,
+      });
 
       expect(screen.getByText("One")).toBeInTheDocument();
       expect(screen.getByText("Two")).toBeInTheDocument();

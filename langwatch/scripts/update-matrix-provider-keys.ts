@@ -49,7 +49,8 @@ const UPDATES: {
   {
     provider: "vertex_ai",
     env: {
-      GOOGLE_APPLICATION_CREDENTIALS_JSON: process.env.GOOGLE_APPLICATION_CREDENTIALS
+      GOOGLE_APPLICATION_CREDENTIALS_JSON: process.env
+        .GOOGLE_APPLICATION_CREDENTIALS
         ? readFileSync(process.env.GOOGLE_APPLICATION_CREDENTIALS, "utf-8")
         : undefined,
       VERTEXAI_PROJECT: process.env.GOOGLE_CLOUD_PROJECT,
@@ -68,7 +69,7 @@ async function main() {
 
   for (const { provider, env } of UPDATES) {
     const filtered = Object.fromEntries(
-      Object.entries(env).filter(([, v]) => v !== undefined && v !== "")
+      Object.entries(env).filter(([, v]) => v !== undefined && v !== ""),
     );
     if (Object.keys(filtered).length === 0) {
       console.log(`⊘ ${provider}: no env set — skipping`);

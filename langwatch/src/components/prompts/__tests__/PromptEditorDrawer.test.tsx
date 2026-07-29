@@ -5,7 +5,6 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { ReactNode } from "react";
 import { useForm, useFormContext } from "react-hook-form";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getMaxTokenLimit } from "~/components/llmPromptConfigs/utils/tokenUtils";
@@ -594,7 +593,9 @@ describe("PromptEditorDrawer", () => {
         const methods = capturedFormMethods[capturedFormMethods.length - 1]!;
         expect(methods.getValues("version.configData.llm.maxTokens")).toBe(
           getMaxTokenLimit(
-            mockModelMetadata["openai/gpt-4o"] as unknown as ModelMetadataForFrontend,
+            mockModelMetadata[
+              "openai/gpt-4o"
+            ] as unknown as ModelMetadataForFrontend,
           ),
         );
       });
@@ -696,9 +697,7 @@ describe("PromptEditorDrawer", () => {
         });
         // ...but the user's manually-edited token limit survives.
         const methods = capturedFormMethods[capturedFormMethods.length - 1]!;
-        expect(methods.getValues("version.configData.llm.maxTokens")).toBe(
-          777,
-        );
+        expect(methods.getValues("version.configData.llm.maxTokens")).toBe(777);
       });
     });
   });

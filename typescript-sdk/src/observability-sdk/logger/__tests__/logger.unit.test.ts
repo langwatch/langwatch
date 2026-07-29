@@ -46,7 +46,7 @@ describe("LangWatch Logger", () => {
   });
 
   describe("setLangWatchLoggerProvider", () => {
-    it("should set the logger provider for LangWatch logging", () => {
+    it("sets the logger provider for LangWatch logging", () => {
       const customLoggerInstance = {
         emit: vi.fn(),
       };
@@ -71,7 +71,7 @@ describe("LangWatch Logger", () => {
   });
 
   describe("getLangWatchLogger", () => {
-    it("should create a logger with the given name", () => {
+    it("creates a logger with the given name", () => {
       const logger = getLangWatchLogger("test-logger");
 
       expect(logger).toBeDefined();
@@ -80,7 +80,7 @@ describe("LangWatch Logger", () => {
       expect(typeof logger.emit).toBe("function");
     });
 
-    it("should create a logger with name and version", () => {
+    it("creates a logger with name and version", () => {
       const logger = getLangWatchLogger("test-logger", "1.0.0");
 
       expect(logger).toBeDefined();
@@ -88,14 +88,14 @@ describe("LangWatch Logger", () => {
       expect(typeof logger.emit).toBe("function");
     });
 
-    it("should return a LangWatchLogger instance", () => {
+    it("returns a LangWatchLogger instance", () => {
       const logger = getLangWatchLogger("test-logger");
 
       expect(logger).toBeInstanceOf(Object);
       expect(typeof logger.emit).toBe("function");
     });
 
-    it("should use NoOp logger when no provider is set", () => {
+    it("uses NoOp logger when no provider is set", () => {
       // Reset to use NoOp logger
       new NoopLoggerProvider();
 
@@ -107,7 +107,7 @@ describe("LangWatch Logger", () => {
   });
 
   describe("getLangWatchLoggerFromProvider", () => {
-    it("should create a logger from a specific provider", () => {
+    it("creates a logger from a specific provider", () => {
       const customProvider = {
         getLogger: vi.fn().mockReturnValue(mockLogger),
       };
@@ -121,7 +121,7 @@ describe("LangWatch Logger", () => {
       expect(customProvider.getLogger).toHaveBeenCalledWith("custom-logger", undefined);
     });
 
-    it("should create a logger with name and version from provider", () => {
+    it("creates a logger with name and version from provider", () => {
       const customProvider = {
         getLogger: vi.fn().mockReturnValue(mockLogger),
       };
@@ -138,7 +138,7 @@ describe("LangWatch Logger", () => {
   });
 
   describe("LangWatchLogger emit functionality", () => {
-    it("should emit log records with LangWatch attributes", () => {
+    it("emits log records with LangWatch attributes", () => {
       const logger = getLangWatchLogger("test-logger");
 
       const logRecord: LangWatchLogRecord = {
@@ -158,7 +158,7 @@ describe("LangWatch Logger", () => {
       expect(() => logger.emit(logRecord)).not.toThrow();
     });
 
-    it("should emit log records without attributes", () => {
+    it("emits log records without attributes", () => {
       const logger = getLangWatchLogger("test-logger");
 
       const logRecord: LangWatchLogRecord = {
@@ -170,7 +170,7 @@ describe("LangWatch Logger", () => {
       expect(() => logger.emit(logRecord)).not.toThrow();
     });
 
-    it("should emit log records with complex attributes", () => {
+    it("emits log records with complex attributes", () => {
       const logger = getLangWatchLogger("test-logger");
 
       const logRecord: LangWatchLogRecord = {
@@ -191,7 +191,7 @@ describe("LangWatch Logger", () => {
   });
 
   describe("Data capture functionality", () => {
-    it("should preserve log record body when output capture is enabled", () => {
+    it("preserves log record body when output capture is enabled", () => {
       // Initialize config with output capture enabled
       initializeObservabilitySdkConfig({
         logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
@@ -218,7 +218,7 @@ describe("LangWatch Logger", () => {
       );
     });
 
-    it("should remove log record body when output capture is disabled", () => {
+    it("removes log record body when output capture is disabled", () => {
       // Initialize config with output capture disabled
       initializeObservabilitySdkConfig({
         logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
@@ -245,7 +245,7 @@ describe("LangWatch Logger", () => {
       );
     });
 
-    it("should preserve log record body when output capture is set to 'output'", () => {
+    it("preserves log record body when output capture is set to 'output'", () => {
       // Initialize config with output capture enabled
       initializeObservabilitySdkConfig({
         logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
@@ -272,7 +272,7 @@ describe("LangWatch Logger", () => {
       );
     });
 
-    it("should remove log record body when output capture is set to 'none'", () => {
+    it("removes log record body when output capture is set to 'none'", () => {
       // Initialize config with output capture disabled
       initializeObservabilitySdkConfig({
         logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
@@ -299,7 +299,7 @@ describe("LangWatch Logger", () => {
       );
     });
 
-    it("should preserve log record body when no data capture config is set", () => {
+    it("preserves log record body when no data capture config is set", () => {
       // Initialize config without data capture (defaults to "all")
       initializeObservabilitySdkConfig({
         logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
@@ -325,7 +325,7 @@ describe("LangWatch Logger", () => {
       );
     });
 
-    it("should preserve other log record properties when output capture is disabled", () => {
+    it("preserves other log record properties when output capture is disabled", () => {
       // Initialize config with output capture disabled
       initializeObservabilitySdkConfig({
         logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
@@ -356,7 +356,7 @@ describe("LangWatch Logger", () => {
       );
     });
 
-    it("should handle log records without body when output capture is disabled", () => {
+    it("handles log records without body when output capture is disabled", () => {
       // Initialize config with output capture disabled
       initializeObservabilitySdkConfig({
         logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
@@ -382,7 +382,7 @@ describe("LangWatch Logger", () => {
       );
     });
 
-    it("should handle log records with null body when output capture is disabled", () => {
+    it("handles log records with null body when output capture is disabled", () => {
       // Initialize config with output capture disabled
       initializeObservabilitySdkConfig({
         logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
@@ -408,7 +408,7 @@ describe("LangWatch Logger", () => {
       );
     });
 
-    it("should handle log records with empty string body when output capture is disabled", () => {
+    it("handles log records with empty string body when output capture is disabled", () => {
       // Initialize config with output capture disabled
       initializeObservabilitySdkConfig({
         logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
@@ -436,7 +436,7 @@ describe("LangWatch Logger", () => {
   });
 
   describe("Logger naming and versioning", () => {
-    it("should handle different logger names", () => {
+    it("handles different logger names", () => {
       const loggers = [
         getLangWatchLogger("app-logger"),
         getLangWatchLogger("database-logger"),
@@ -450,7 +450,7 @@ describe("LangWatch Logger", () => {
       });
     });
 
-    it("should handle different versions", () => {
+    it("handles different versions", () => {
       const loggers = [
         getLangWatchLogger("test-logger", "1.0.0"),
         getLangWatchLogger("test-logger", "2.0.0"),
@@ -466,14 +466,14 @@ describe("LangWatch Logger", () => {
   });
 
   describe("Integration with OpenTelemetry logs API", () => {
-    it("should use the current logger provider by default", () => {
+    it("uses the current logger provider by default", () => {
       getLangWatchLogger("test-logger");
 
       // Should not throw when getting logger
       expect(() => getLangWatchLogger("test-logger")).not.toThrow();
     });
 
-    it("should use the provided logger provider when specified", () => {
+    it("uses the provided logger provider when specified", () => {
       const customProvider = {
         getLogger: vi.fn().mockReturnValue(mockLogger),
       };
@@ -485,14 +485,14 @@ describe("LangWatch Logger", () => {
   });
 
   describe("Error handling", () => {
-    it("should handle undefined version gracefully", () => {
+    it("handles undefined version gracefully", () => {
       const logger = getLangWatchLogger("test-logger", undefined);
 
       expect(logger).toBeDefined();
       expect(typeof logger.emit).toBe("function");
     });
 
-    it("should handle empty string version", () => {
+    it("handles empty string version", () => {
       const logger = getLangWatchLogger("test-logger", "");
 
       expect(logger).toBeDefined();
@@ -501,7 +501,7 @@ describe("LangWatch Logger", () => {
   });
 
   describe("Type safety", () => {
-    it("should maintain LangWatchLogger type", () => {
+    it("maintains LangWatchLogger type", () => {
       const logger = getLangWatchLogger("test-logger");
 
       // TypeScript should recognize this as LangWatchLogger

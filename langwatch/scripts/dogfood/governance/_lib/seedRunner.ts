@@ -19,7 +19,7 @@
  */
 
 import type { Organization, PrismaClient } from "@prisma/client";
-import { DemoOrgScope } from "./scopeGuard";
+import type { DemoOrgScope } from "./scopeGuard";
 
 export type SeedActionOutcome =
   | { status: "succeeded"; summary: string }
@@ -62,7 +62,10 @@ export async function runSeedActions(args: {
   const now = args.now ?? (() => new Date());
   const startedAt = now().toISOString();
 
-  const organization = await args.scope.loadOrg(args.prisma, args.organizationId);
+  const organization = await args.scope.loadOrg(
+    args.prisma,
+    args.organizationId,
+  );
 
   const actionReports: SeedRunReport["actions"] = [];
   for (const action of args.actions) {

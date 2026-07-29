@@ -14,7 +14,7 @@ import {
 
 function buildError(
   cause: Record<string, unknown> | undefined,
-  code: string = "BAD_REQUEST",
+  code = "BAD_REQUEST",
 ): TRPCClientError<any> {
   const err = new TRPCClientError<any>("Model not configured");
   // The TRPC client populates `error.data` from the server's

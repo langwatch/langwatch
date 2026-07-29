@@ -96,7 +96,7 @@ export class ProcessWakeWorker {
     // Do not overlap scans: due rows only leave the scan set when a commit
     // moves nextWakeAt, so a slow scan re-finding the same wakes is wasted
     // work the revision fence would reject anyway.
-    if (this.inFlight) return;
+    if (this.inFlight !== null) return;
     const scan = this.runScan();
     this.inFlight = scan;
     void scan.finally(() => {

@@ -102,7 +102,11 @@ describe("FoldProjectionExecutor out-of-order re-fold", () => {
     describe("when the projection declares no re-fold policy", () => {
       /** @scenario "An out-of-order batch re-folds from the event log by default" */
       it("loads the aggregate's full history and replays it from init state", async () => {
-        const history = [eventAt(1_000), eventAt(2_000), eventAt(CHECKPOINT_MS)];
+        const history = [
+          eventAt(1_000),
+          eventAt(2_000),
+          eventAt(CHECKPOINT_MS),
+        ];
         const { fold, store, eventLoader } = makeFold({
           storedState: { count: 99, LastEventOccurredAt: CHECKPOINT_MS },
           loadedEvents: history,
@@ -148,11 +152,7 @@ describe("FoldProjectionExecutor out-of-order re-fold", () => {
         }) as FoldProjectionDefinition<OrderState, Event>;
         fold.eventLoader = vi.fn().mockResolvedValue(history);
 
-        const result = await executor.execute(
-          fold,
-          eventAt(1_000),
-          context,
-        );
+        const result = await executor.execute(fold, eventAt(1_000), context);
 
         expect(result.sequence).toEqual([1_000, 2_000, 3_000]);
         expect(fold.eventLoader).toHaveBeenCalledOnce();

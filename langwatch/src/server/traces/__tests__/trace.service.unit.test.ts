@@ -107,7 +107,6 @@ describe("TraceService", () => {
         {},
       );
     });
-
   });
 
   describe("getById()", () => {

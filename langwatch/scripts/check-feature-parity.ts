@@ -27,13 +27,13 @@
  */
 
 import {
-  readFileSync,
-  readdirSync,
-  statSync,
   existsSync,
+  readdirSync,
+  readFileSync,
   realpathSync,
+  statSync,
 } from "node:fs";
-import { resolve, relative, join, dirname } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -740,9 +740,14 @@ function parseFeature(absPath: string): Scenario[] {
       continue;
     }
 
-    if (!trimmed.startsWith("Given") && !trimmed.startsWith("When") &&
-        !trimmed.startsWith("Then") && !trimmed.startsWith("And") &&
-        !trimmed.startsWith("But") && !trimmed.startsWith("|")) {
+    if (
+      !trimmed.startsWith("Given") &&
+      !trimmed.startsWith("When") &&
+      !trimmed.startsWith("Then") &&
+      !trimmed.startsWith("And") &&
+      !trimmed.startsWith("But") &&
+      !trimmed.startsWith("|")
+    ) {
       pendingTags = [];
     }
   }
@@ -750,7 +755,10 @@ function parseFeature(absPath: string): Scenario[] {
   return scenarios;
 }
 
-function walkFiles(root: string, predicate: (name: string) => boolean): string[] {
+function walkFiles(
+  root: string,
+  predicate: (name: string) => boolean,
+): string[] {
   const out: string[] = [];
   let entries: string[];
   try {
@@ -784,20 +792,20 @@ function walkFiles(root: string, predicate: (name: string) => boolean): string[]
  * is either there or the check refuses to run.
  */
 export function discoverFeatureFiles(
-  roots: readonly string[] = SPECS_ROOTS
+  roots: readonly string[] = SPECS_ROOTS,
 ): string[] {
   const files = roots.flatMap((root) => {
     if (!existsSync(root)) {
       throw new Error(
         `Configured specs root does not exist: ${root}. ` +
           `Fix SPECS_ROOTS in scripts/check-feature-parity.ts, or restore the tree — ` +
-          `a missing root would silently report every scenario under it as bound.`
+          `a missing root would silently report every scenario under it as bound.`,
       );
     }
     if (!statSync(root).isDirectory()) {
       throw new Error(
         `Configured specs root is not a directory: ${root}. ` +
-          `Fix SPECS_ROOTS in scripts/check-feature-parity.ts.`
+          `Fix SPECS_ROOTS in scripts/check-feature-parity.ts.`,
       );
     }
     return walkFiles(root, (n) => FEATURE_FILE_RE.test(n));
@@ -843,7 +851,9 @@ function collectAllBindings(testRoots: string[]): CollectedBinding[] {
   const bindings: CollectedBinding[] = [];
   const files: string[] = [];
   for (const r of testRoots) {
-    files.push(...walkFiles(resolve(REPO_ROOT, r), (n) => TEST_FILE_RE.test(n)));
+    files.push(
+      ...walkFiles(resolve(REPO_ROOT, r), (n) => TEST_FILE_RE.test(n)),
+    );
   }
 
   for (const file of files) {
@@ -942,7 +952,7 @@ const GO_SUBTEST_SCAN_BUDGET = 4096;
 function skipGoSpaceAndComments(
   src: string,
   start: number,
-  limit: number
+  limit: number,
 ): number {
   let i = start;
   while (i < limit) {
@@ -1081,7 +1091,7 @@ export function collectGoBindings(testRoots: string[]): CollectedBinding[] {
   const files: string[] = [];
   for (const r of testRoots) {
     files.push(
-      ...walkFiles(resolve(REPO_ROOT, r), (n) => GO_TEST_FILE_RE.test(n))
+      ...walkFiles(resolve(REPO_ROOT, r), (n) => GO_TEST_FILE_RE.test(n)),
     );
   }
 
@@ -1165,7 +1175,7 @@ function collectPythonBindings(testRoots: string[]): CollectedBinding[] {
   const files: string[] = [];
   for (const r of testRoots) {
     files.push(
-      ...walkFiles(resolve(REPO_ROOT, r), (n) => PYTHON_TEST_FILE_RE.test(n))
+      ...walkFiles(resolve(REPO_ROOT, r), (n) => PYTHON_TEST_FILE_RE.test(n)),
     );
   }
 
@@ -1196,8 +1206,9 @@ function collectPythonBindings(testRoots: string[]): CollectedBinding[] {
       if (!title) continue;
       // Use the same proximity check as the block form. Walk from the
       // start of the next line.
-      const lineStartOffset =
-        lines.slice(0, i + 1).reduce((acc, l) => acc + l.length + 1, 0);
+      const lineStartOffset = lines
+        .slice(0, i + 1)
+        .reduce((acc, l) => acc + l.length + 1, 0);
       if (!isFollowedByPythonTestFunc(src, lineStartOffset)) continue;
       bindings.push({
         title,
@@ -1213,7 +1224,9 @@ function collectBatsBindings(testRoots: string[]): CollectedBinding[] {
   const bindings: CollectedBinding[] = [];
   const files: string[] = [];
   for (const r of testRoots) {
-    files.push(...walkFiles(resolve(REPO_ROOT, r), (n) => BATS_FILE_RE.test(n)));
+    files.push(
+      ...walkFiles(resolve(REPO_ROOT, r), (n) => BATS_FILE_RE.test(n)),
+    );
   }
 
   for (const file of files) {
@@ -1255,7 +1268,7 @@ function buildReport(
   const scenarios = allScenarios.filter(
     (s) =>
       s.tags.some((t) => BOUND_TAGS.has(t)) &&
-      !s.tags.includes(UNIMPLEMENTED_TAG)
+      !s.tags.includes(UNIMPLEMENTED_TAG),
   );
 
   const unbound: Scenario[] = [];
@@ -1271,7 +1284,7 @@ function buildReport(
     unbound,
     totalScenarios: allScenarios.length,
     unimplementedScenarios: allScenarios.filter((s) =>
-      s.tags.includes(UNIMPLEMENTED_TAG)
+      s.tags.includes(UNIMPLEMENTED_TAG),
     ).length,
   };
 }
@@ -1282,7 +1295,7 @@ function buildReport(
  * (`LEGACY_INERT`) or fatal.
  */
 export function isInert(
-  r: Pick<Report, "scenarios" | "totalScenarios">
+  r: Pick<Report, "scenarios" | "totalScenarios">,
 ): boolean {
   return r.totalScenarios > 0 && r.scenarios.length === 0;
 }
@@ -1335,7 +1348,7 @@ function printEnforcedReport(r: Report): void {
     console.log(`    ✗ [${tags}] ${s.title}`);
     console.log(`      ${r.feature}:${s.line}`);
     console.log(
-      `      Add: /** @scenario ${s.title} */ above an it(...) test, or # @scenario "${s.title}" above an @test in a .bats file`
+      `      Add: /** @scenario ${s.title} */ above an it(...) test, or # @scenario "${s.title}" above an @test in a .bats file`,
     );
   }
 }
@@ -1347,13 +1360,15 @@ function printLegacySummary(reports: LegacyReport[]): void {
   const totalScenarios = reports.reduce((s, r) => s + r.total, 0);
   console.log(`\nLegacy (tolerated — not failing CI):`);
   console.log(
-    `  ${reports.length} file(s), ${totalBound}/${totalScenarios} bound, ${totalUnbound} unbound`
+    `  ${reports.length} file(s), ${totalBound}/${totalScenarios} bound, ${totalUnbound} unbound`,
   );
   for (const r of reports) {
-    console.log(`  · ${r.feature}  ${r.bound}/${r.total} bound, ${r.unbound} unbound`);
+    console.log(
+      `  · ${r.feature}  ${r.bound}/${r.total} bound, ${r.unbound} unbound`,
+    );
   }
   console.log(
-    `\n  Shrink this list by binding scenarios, flagging @unimplemented, or removing stale scenarios. See dev/docs/TESTING_PHILOSOPHY.md.`
+    `\n  Shrink this list by binding scenarios, flagging @unimplemented, or removing stale scenarios. See dev/docs/TESTING_PHILOSOPHY.md.`,
   );
 }
 
@@ -1376,10 +1391,10 @@ function printInertSummary(reports: InertReport[]): void {
   console.log(`\nInert (no enforced scenarios — tolerated via LEGACY_INERT):`);
   console.log(
     `  ${reports.length} file(s) hold ${invisible} scenario(s) this check cannot see` +
-      (parked > 0 ? ` (${parked} of them parked as @unimplemented).` : ".")
+      (parked > 0 ? ` (${parked} of them parked as @unimplemented).` : "."),
   );
   console.log(
-    `  Tag them @unit/@integration to measure them, or @unimplemented to declare the gap. See dev/docs/TESTING_PHILOSOPHY.md.`
+    `  Tag them @unit/@integration to measure them, or @unimplemented to declare the gap. See dev/docs/TESTING_PHILOSOPHY.md.`,
   );
 }
 
@@ -1390,7 +1405,7 @@ function printNewInert(reports: InertReport[]): void {
     console.log(`  ✗ ${r.feature}`);
     console.log(`      ${describeInert(r)}`);
     console.log(
-      `      Tag the scenarios @unit / @integration / @e2e / @regression and bind them, or add this file to LEGACY_INERT with a reason.`
+      `      Tag the scenarios @unit / @integration / @e2e / @regression and bind them, or add this file to LEGACY_INERT with a reason.`,
     );
   }
 }
@@ -1398,7 +1413,7 @@ function printNewInert(reports: InertReport[]): void {
 function printUnknownAnnotations(unknown: UnknownAnnotation[]): void {
   if (unknown.length === 0) return;
   console.log(
-    `\nAnnotations referencing unknown scenarios (typo? renamed scenario? stale binding?):`
+    `\nAnnotations referencing unknown scenarios (typo? renamed scenario? stale binding?):`,
   );
   for (const a of unknown) {
     console.log(`  ✗ @scenario ${a.title}`);
@@ -1427,11 +1442,11 @@ function validateExemptionList({
       const abs = resolve(REPO_ROOT, entry);
       if (!existsSync(abs)) {
         errors.push(
-          `${name} entry does not resolve to an existing .feature file: ${entry}`
+          `${name} entry does not resolve to an existing .feature file: ${entry}`,
         );
       } else {
         errors.push(
-          `${name} entry is not discovered under the configured spec roots: ${entry}`
+          `${name} entry is not discovered under the configured spec roots: ${entry}`,
         );
       }
     }
@@ -1504,7 +1519,7 @@ function main(): void {
   // leave the list so it can never silently regress.
   const inertFeatures = new Set(inert.map((r) => r.feature));
   const staleInert = LEGACY_INERT.filter(
-    (f) => allFeatures.includes(f) && !inertFeatures.has(f)
+    (f) => allFeatures.includes(f) && !inertFeatures.has(f),
   );
 
   if (asJson) {
@@ -1521,14 +1536,14 @@ function main(): void {
           staleInert,
         },
         null,
-        2
-      )
+        2,
+      ),
     );
   } else {
     console.log("Feature-file parity check");
     console.log("=========================");
     console.log(
-      `Enforced: ${enforced.length} file(s) · Legacy: ${legacy.length} file(s) · Inert: ${inert.length} file(s)`
+      `Enforced: ${enforced.length} file(s) · Legacy: ${legacy.length} file(s) · Inert: ${inert.length} file(s)`,
     );
 
     for (const r of enforced) printEnforcedReport(r);
@@ -1560,19 +1575,19 @@ function main(): void {
         parts.push(
           `${staleLegacy.length} fully-bound file(s) still in LEGACY_UNBOUND — remove them from the list: ${staleLegacy
             .map((r) => r.feature)
-            .join(", ")}`
+            .join(", ")}`,
         );
       }
       if (newInert.length > 0) {
         parts.push(
-          `${newInert.length} file(s) enforce no scenario at all (nothing in them is tagged @unit/@integration/@e2e/@regression)`
+          `${newInert.length} file(s) enforce no scenario at all (nothing in them is tagged @unit/@integration/@e2e/@regression)`,
         );
       }
       if (staleInert.length > 0) {
         parts.push(
           `${staleInert.length} file(s) in LEGACY_INERT now enforce scenarios — remove them from the list: ${staleInert.join(
-            ", "
-          )}`
+            ", ",
+          )}`,
         );
       }
       if (listErrors.length > 0) {
@@ -1582,31 +1597,28 @@ function main(): void {
       for (const err of listErrors) console.error(`Exemption list: ${err}`);
       console.error(
         `FAIL: ${parts.join(
-          ", "
-        )}. See spec-binding convention in dev/docs/TESTING_PHILOSOPHY.md.`
+          ", ",
+        )}. See spec-binding convention in dev/docs/TESTING_PHILOSOPHY.md.`,
       );
     }
     process.exit(1);
   }
 
   if (!asJson) {
-    const enforcedTotal = enforced.reduce(
-      (s, r) => s + r.scenarios.length,
-      0
-    );
+    const enforcedTotal = enforced.reduce((s, r) => s + r.scenarios.length, 0);
     const legacyUnbound = legacy.reduce((s, r) => s + r.unbound, 0);
     console.log(
-      `\nOK: ${enforcedTotal} enforced scenario(s) bound across ${enforced.length} file(s).`
+      `\nOK: ${enforcedTotal} enforced scenario(s) bound across ${enforced.length} file(s).`,
     );
     if (legacy.length > 0) {
       console.log(
-        `    ${legacyUnbound} unbound scenario(s) tolerated in ${legacy.length} legacy file(s).`
+        `    ${legacyUnbound} unbound scenario(s) tolerated in ${legacy.length} legacy file(s).`,
       );
     }
     if (exemptInert.length > 0) {
       const invisible = exemptInert.reduce((s, r) => s + r.totalScenarios, 0);
       console.log(
-        `    ${exemptInert.length} file(s) exempted via LEGACY_INERT enforce nothing at all — ${invisible} scenario(s) are invisible to this check.`
+        `    ${exemptInert.length} file(s) exempted via LEGACY_INERT enforce nothing at all — ${invisible} scenario(s) are invisible to this check.`,
       );
     }
   }

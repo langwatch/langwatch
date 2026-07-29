@@ -77,7 +77,7 @@ const STRATEGY_OPTIONS: Array<{ value: Strategy; label: string }> = [
 ];
 
 function RoutingPoliciesPage() {
-  const { organization, project } = useOrganizationTeamProject({
+  const { organization } = useOrganizationTeamProject({
     redirectToOnboarding: false,
   });
   const orgId = organization?.id ?? "";
@@ -1167,8 +1167,7 @@ function RoutingPolicyDrawer({
   ) => ScopeTriadEntry[];
 }) {
   const submitDisabled =
-    !composer ||
-    !composer.name.trim() ||
+    !composer?.name.trim() ||
     composer.scopes.length === 0 ||
     composer.modelProviderIds.length === 0 ||
     isPending;

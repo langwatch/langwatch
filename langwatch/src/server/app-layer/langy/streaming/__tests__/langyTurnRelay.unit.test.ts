@@ -5,19 +5,21 @@
  * drive it with REAL signed envelopes (langyFrameAuth.signFrame) so the auth
  * path is exercised end to end, and lock which frames become durable events.
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 // A navigate instruction resolves its address by comparing a resource's
 // remembered platformUrl against BASE_HOST (the server-side notion of "this
 // instance") — fixed here so those tests have a stable origin to assert
 // against, same pattern as platform-url.unit.test.ts.
-vi.mock("~/env.mjs", () => ({ env: { BASE_HOST: "https://app.langwatch.ai" } }));
+vi.mock("~/env.mjs", () => ({
+  env: { BASE_HOST: "https://app.langwatch.ai" },
+}));
 
 import { mintRunToken, signFrame } from "../langyFrameAuth";
 import {
-  LangyTurnRelay,
   type LangyRelayBuffer,
   type LangyRelayConversations,
+  LangyTurnRelay,
 } from "../langyTurnRelay";
 
 const RUN_TOKEN = mintRunToken();
@@ -56,7 +58,13 @@ function surfaceResourceFrames({
 } = {}) {
   command ??= `langwatch trace get ${resourceId}`;
   return [
-    frame({ type: "tool", id, name: "bash", phase: "start", input: { command } }),
+    frame({
+      type: "tool",
+      id,
+      name: "bash",
+      phase: "start",
+      input: { command },
+    }),
     frame({
       type: "tool",
       id,
@@ -70,7 +78,10 @@ function surfaceResourceFrames({
 
 const navigateFrames = (
   resourceId: string,
-  { id = "call-navigate", output = "ok" }: { id?: string; output?: string } = {},
+  {
+    id = "call-navigate",
+    output = "ok",
+  }: { id?: string; output?: string } = {},
 ) => [
   frame({
     type: "tool",
@@ -614,8 +625,9 @@ describe("LangyTurnRelay", () => {
       // stdout is never trusted for remembering) or a surfacing payload with
       // no per-item platform link. The address is still platform-computed —
       // the fallback resolves the id with the PROJECT's own access.
-      const resolveResourceUrl = vi.fn(async () =>
-        "https://app.langwatch.ai/acme/simulations?drawer.open=scenarioRunDetail&drawer.scenarioRunId=run_cold",
+      const resolveResourceUrl = vi.fn(
+        async () =>
+          "https://app.langwatch.ai/acme/simulations?drawer.open=scenarioRunDetail&drawer.scenarioRunId=run_cold",
       );
       const { relay, buffer } = makeRelay({ resolveResourceUrl });
 
@@ -718,7 +730,13 @@ describe("LangyTurnRelay", () => {
       const { relay, buffer } = makeRelay();
       const command = "langwatch trace get run_1";
       await relay.handle(
-        frame({ type: "tool", id: "call-surface", name: "bash", phase: "start", input: { command } }),
+        frame({
+          type: "tool",
+          id: "call-surface",
+          name: "bash",
+          phase: "start",
+          input: { command },
+        }),
       );
       await relay.handle(
         frame({
@@ -807,7 +825,8 @@ describe("LangyTurnRelay", () => {
       const { relay, buffer } = makeRelay();
       for (const f of surfaceResourceFrames({
         resourceId: "run_1",
-        platformUrl: "https://not-this-instance.example.com/acme/simulations/set_1/batch_1?openRun=run_1",
+        platformUrl:
+          "https://not-this-instance.example.com/acme/simulations/set_1/batch_1?openRun=run_1",
       })) {
         await relay.handle(f);
       }
@@ -1073,7 +1092,9 @@ describe("LangyTurnRelay", () => {
         const first = await relay.handle(frame({ type: "delta", text: "one" }));
         expect(first).toEqual({ status: "rejected", reason: "no-run-token" });
 
-        const second = await relay.handle(frame({ type: "delta", text: "two" }));
+        const second = await relay.handle(
+          frame({ type: "delta", text: "two" }),
+        );
         expect(second).toEqual({ status: "applied" });
         expect(buffer.appendChunk).toHaveBeenCalledTimes(1);
         // Re-queried because the first null was NOT cached (the bug this fixes).

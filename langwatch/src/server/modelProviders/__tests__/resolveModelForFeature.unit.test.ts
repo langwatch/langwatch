@@ -13,12 +13,9 @@
  *     legacy-column fallback, feature override over role default,
  *     missing-key cascade up)
  */
-import { describe, it, expect } from "vitest";
 
-import type {
-  ModelDefaultScopeType,
-  PrismaClient,
-} from "@prisma/client";
+import type { ModelDefaultScopeType, PrismaClient } from "@prisma/client";
+import { describe, expect, it } from "vitest";
 
 import { resolveModelForFeature } from "../resolveModelForFeature";
 

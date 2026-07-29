@@ -3,10 +3,10 @@ import { z } from "zod";
 import { getSpanNameOrModel } from "../../utils/trace";
 import { datasetSpanSchema } from "../datasets/types";
 import {
-  reservedTraceMetadataSchema,
   type Trace as BaseTrace,
   type DatasetSpan,
   type Evaluation,
+  reservedTraceMetadataSchema,
   type Span,
 } from "./types";
 import { getRAGChunks, getRAGInfo } from "./utils";
@@ -47,7 +47,7 @@ export const SPAN_SUBFIELDS: SpanSubfield[] = [
  * @returns Array of span field children with nested subfields
  */
 export function buildSpanFieldChildren(
-  spanNames: Array<{ key: string; label: string }>
+  spanNames: Array<{ key: string; label: string }>,
 ): Array<{
   name: string;
   label: string;
@@ -55,7 +55,12 @@ export function buildSpanFieldChildren(
   children: SpanSubfield[];
 }> {
   return [
-    { name: "*", label: "* (any span)", type: "dict" as const, children: SPAN_SUBFIELDS },
+    {
+      name: "*",
+      label: "* (any span)",
+      type: "dict" as const,
+      children: SPAN_SUBFIELDS,
+    },
     ...spanNames.map((span) => ({
       name: span.key,
       label: span.label,
@@ -85,7 +90,7 @@ export const RESERVED_METADATA_KEYS = [
  * @returns Array of metadata field children
  */
 export function buildMetadataFieldChildren(
-  metadataKeys: Array<{ key: string; label: string }>
+  metadataKeys: Array<{ key: string; label: string }>,
 ): Array<{
   name: string;
   label: string;
@@ -130,12 +135,7 @@ function filterThreadTraces(
         const traceMapping =
           TRACE_MAPPINGS[field as keyof typeof TRACE_MAPPINGS];
         if (traceMapping) {
-          filteredTrace[field] = traceMapping.mapping(
-            threadTrace,
-            "",
-            "",
-            {},
-          );
+          filteredTrace[field] = traceMapping.mapping(threadTrace, "", "", {});
         } else {
           filteredTrace[field] =
             threadTrace[field as keyof TraceWithAnnotations];
@@ -286,7 +286,9 @@ export const TRACE_MAPPINGS = {
       if (key === "*") {
         return trace.metadata;
       }
-      return key ? (trace.metadata?.[key] as any) : JSON.stringify(trace.metadata);
+      return key
+        ? (trace.metadata?.[key] as any)
+        : JSON.stringify(trace.metadata);
     },
   },
   evaluations: {
@@ -705,20 +707,17 @@ export type MappingState = z.infer<typeof mappingStateSchema>;
 //
 // Using z.preprocess (vs z.unknown().transform().pipe()) so hono-openapi can
 // infer the output type from the inner mappingStateSchema for the OpenAPI spec.
-export const monitorMappingsSchema = z.preprocess(
-  (value) => {
-    if (value === null || value === undefined) return value;
-    if (
-      typeof value === "object" &&
-      !Array.isArray(value) &&
-      "mapping" in (value as object)
-    ) {
-      return value;
-    }
-    return { mapping: {}, expansions: [] };
-  },
-  mappingStateSchema.nullable().optional(),
-);
+export const monitorMappingsSchema = z.preprocess((value) => {
+  if (value === null || value === undefined) return value;
+  if (
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    "mapping" in (value as object)
+  ) {
+    return value;
+  }
+  return { mapping: {}, expansions: [] };
+}, mappingStateSchema.nullable().optional());
 
 // Runtime equivalent of monitorMappingsSchema for callers that don't validate
 // through Zod (e.g. internal tRPC routes that consume already-typed input).
@@ -1021,7 +1020,7 @@ export const THREAD_MAPPING_LABELS: Record<string, string | undefined> = {
  */
 export function getTraceAvailableSources(
   spanNames: Array<{ key: string; label: string }>,
-  metadataKeys: Array<{ key: string; label: string }>
+  metadataKeys: Array<{ key: string; label: string }>,
 ): TraceAvailableSource[] {
   // Filter out "threads" from trace-level sources - it's confusing at trace level
   // (threads is for getting all traces in a thread, which is a thread-level concept)
@@ -1033,9 +1032,7 @@ export function getTraceAvailableSources(
       type: "str" as const,
     })),
     ...Object.entries(TRACE_MAPPINGS)
-      .filter(
-        ([key]) => key !== "threads" && key !== "threads_until_current",
-      )
+      .filter(([key]) => key !== "threads" && key !== "threads_until_current")
       .map(([key, config]) => {
         const hasKeys = "keys" in config && typeof config.keys === "function";
 

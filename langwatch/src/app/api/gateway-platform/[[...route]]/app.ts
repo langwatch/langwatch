@@ -15,17 +15,16 @@
  */
 
 import { createLogger } from "@langwatch/observability";
-import type { Prisma } from "@prisma/client";
 import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi/zod";
 import { z } from "zod";
 import { apiKeyPermission, createProjectApp } from "~/server/api/security";
+import { validator as zValidator } from "~/server/api/validation";
 import { prisma } from "~/server/db";
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
 import { GatewayCacheRuleService } from "~/server/gateway/cacheRule.service";
 import { virtualKeyConfigSchema } from "~/server/gateway/virtualKey.config";
 import { toVirtualKeySnakeDto } from "~/server/gateway/virtualKey.dto";
-import { validator as zValidator } from "~/server/api/validation";
 // GatewayProviderCredentialService removed in iter 110; /providers REST
 // routes return 410 Gone until A3 lands the ModelProvider-backed
 // replacement surface (current proposal: fold into /model-providers).
@@ -626,7 +625,11 @@ secured.access(apiKeyPermission("gatewayBudgets:create")).post(
   zValidator("json", createBudgetSchema),
   async (c) => {
     const project = c.get("project");
-    const body = { data: c.req.valid("json" as never) as import("zod").infer<typeof createBudgetSchema> };
+    const body = {
+      data: c.req.valid("json" as never) as import("zod").infer<
+        typeof createBudgetSchema
+      >,
+    };
     const organizationId = await orgIdForProject(project.id);
     const service = GatewayBudgetService.create(prisma);
     const row = await service.create({

@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSSESubscription } from "~/hooks/useSSESubscription";
-import { api } from "~/utils/api";
 import {
-  langyConversationUpdateSignalSchema,
   type LangyConversationUpdateSignal,
+  langyConversationUpdateSignalSchema,
 } from "~/server/api/routers/langy.schemas";
+import { api } from "~/utils/api";
 
 interface UseLangyConversationUpdateListenerOptions {
   projectId: string;

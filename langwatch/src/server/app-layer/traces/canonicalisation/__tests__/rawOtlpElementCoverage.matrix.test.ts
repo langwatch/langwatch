@@ -1,10 +1,9 @@
 import { describe, expect, it } from "vitest";
-
-import { CanonicalizeSpanAttributesService } from "../canonicalizeSpanAttributesService";
 import type {
   NormalizedAttributes,
   NormalizedEvent,
 } from "../../../../event-sourcing/pipelines/trace-processing/schemas/spans";
+import { CanonicalizeSpanAttributesService } from "../canonicalizeSpanAttributesService";
 import type { ExtractorContext } from "../extractors/_types";
 
 import codexBSpan from "./fixtures/codex-B.session_task_turn.json";
@@ -111,9 +110,12 @@ const TOOLS: {
     name: "codex-B (codex_cli_rs session_task.turn span)",
     attrs: () => canonicalizeSpan(codexBSpan),
     absentReason: {
-      "cache write": "OpenAI usage exposes only cached (read) tokens, no creation count",
-      "input content": "codex OTLP carries token counts only, no message bodies",
-      "output content": "codex OTLP carries token counts only, no message bodies",
+      "cache write":
+        "OpenAI usage exposes only cached (read) tokens, no creation count",
+      "input content":
+        "codex OTLP carries token counts only, no message bodies",
+      "output content":
+        "codex OTLP carries token counts only, no message bodies",
     },
     expected: {
       model: "present",
@@ -150,7 +152,8 @@ const TOOLS: {
     name: "opencode-B (Vercel AI SDK ai.streamText.doStream span, cache-creation turn)",
     attrs: () => canonicalizeSpan(opencodeBSpan),
     absentReason: {
-      "cache read": "this captured turn created cache (cacheReadTokens=0); read shows on the next turn",
+      "cache read":
+        "this captured turn created cache (cacheReadTokens=0); read shows on the next turn",
     },
     expected: {
       model: "present",

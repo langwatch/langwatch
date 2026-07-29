@@ -51,7 +51,7 @@ export async function runCodeEvaluator({
     const evaluator = await prisma.evaluator.findFirst({
       where: { id: evaluatorId, projectId, archivedAt: null },
     });
-    if (!evaluator || evaluator.type !== "code") {
+    if (evaluator?.type !== "code") {
       throw new Error(`Code evaluator not found: ${evaluatorId}`);
     }
     const config = codeEvaluatorConfigSchema.parse(evaluator.config);

@@ -1,4 +1,4 @@
-import { Heading, HStack, Text } from "@chakra-ui/react";
+import { Heading } from "@chakra-ui/react";
 import type React from "react";
 import { useDrawer } from "../../hooks/useDrawer";
 import { useLicenseEnforcement } from "../../hooks/useLicenseEnforcement";

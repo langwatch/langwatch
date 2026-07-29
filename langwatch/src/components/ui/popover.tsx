@@ -1,7 +1,10 @@
 import { Popover as ChakraPopover, Portal } from "@chakra-ui/react";
 import * as React from "react";
+import {
+  OverlayDepthContext,
+  useOverlayZIndex,
+} from "~/hooks/useOverlayZIndex";
 import { CloseButton } from "./close-button";
-import { OverlayDepthContext, useOverlayZIndex } from "~/hooks/useOverlayZIndex";
 
 interface PopoverContentProps extends ChakraPopover.ContentProps {
   portalled?: boolean;
@@ -48,7 +51,10 @@ export const PopoverArrow = React.forwardRef<
     <ChakraPopover.Arrow
       {...props}
       ref={ref}
-      css={{ "--arrow-size": "12px", "--arrow-background": "var(--popover-bg)" }}
+      css={{
+        "--arrow-size": "12px",
+        "--arrow-background": "var(--popover-bg)",
+      }}
     >
       <ChakraPopover.ArrowTip />
     </ChakraPopover.Arrow>

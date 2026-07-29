@@ -18,7 +18,6 @@ vi.mock("~/optimization_studio/hooks/useWorkflowStore", () => ({
 
 import { EvaluationsV3Table } from "../components/EvaluationsV3Table";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
-import type { DatasetColumn } from "../types";
 
 // Mock next/router
 vi.mock("~/utils/compat/next-router", () => ({

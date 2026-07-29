@@ -37,7 +37,6 @@ describe("EventSourcingService - Error Handling Flows", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-
       });
 
       const events = [
@@ -67,7 +66,6 @@ describe("EventSourcingService - Error Handling Flows", () => {
         eventStore,
         mapProjections: [mapDef],
         foldProjections: [foldDef],
-
       });
 
       const events = [
@@ -319,7 +317,6 @@ describe("EventSourcingService - Error Handling Flows", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-
       });
 
       const events = [
@@ -339,7 +336,6 @@ describe("EventSourcingService - Error Handling Flows", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-
       });
 
       const events = [
@@ -360,9 +356,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-        foldProjections: [
-          createMockFoldProjectionDefinition("projection"),
-        ],
+        foldProjections: [createMockFoldProjectionDefinition("projection")],
       });
 
       await expect(

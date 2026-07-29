@@ -65,7 +65,6 @@ import { useReducedMotion } from "~/hooks/useReducedMotion";
 import type { LangyResourceContext } from "~/server/app-layer/langy/langyTurnContext.schema";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
-import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { useLangyConversationCommands } from "../data/useLangyConversationCommands";
 import { useLangyConversationList } from "../data/useLangyConversationList";
 import { useLangyMessages } from "../data/useLangyMessages";
@@ -180,7 +179,6 @@ const PANEL_INSET = FLOATING_PANEL_INSET;
 // line's blur-crossfade when its text changes. `css` still routes through
 // emotion (so the shimmer keyframes inject), while motion drives opacity /
 // blur / y.
-const MotionText = motion.create(Box);
 // The "still replying" notice slides up out of the composer (height + fade)
 // rather than snapping in — see the composer-notice branch below.
 const MotionNotice = motion.create(Box);

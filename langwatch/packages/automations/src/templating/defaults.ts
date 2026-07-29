@@ -289,7 +289,6 @@ export const TRACE_TRIGGER_DEFAULTS: TriggerTemplateDefaults = {
   webhookBody: DEFAULT_WEBHOOK_BODY_TEMPLATE,
 };
 
-
 /**
  * ADR-044: default templates for a SCHEDULED REPORT. Reads as "here is your
  * {source} for {period}" — `report.sourceLabel`, `report.scheduleLabel`,

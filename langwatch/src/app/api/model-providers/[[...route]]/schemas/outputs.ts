@@ -19,10 +19,7 @@ export const apiResponseModelProviderSchema = z.object({
   models: z.array(z.string()).nullable().optional(),
   embeddingsModels: z.array(z.string()).nullable().optional(),
   customModels: z.array(customModelEntrySchema).nullable().optional(),
-  customEmbeddingsModels: z
-    .array(customModelEntrySchema)
-    .nullable()
-    .optional(),
+  customEmbeddingsModels: z.array(customModelEntrySchema).nullable().optional(),
   disabledByDefault: z.boolean().optional(),
   extraHeaders: z.array(extraHeaderSchema).nullable().optional(),
 });

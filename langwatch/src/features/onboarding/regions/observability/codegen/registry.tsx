@@ -694,7 +694,10 @@ export function getRegistryEntry(
 
 export function deriveFrameworksByPlatform(
   category?: IntegrationCategory,
-): Record<PlatformKey, { key: FrameworkKey; label: string; icon?: IconData }[]> {
+): Record<
+  PlatformKey,
+  { key: FrameworkKey; label: string; icon?: IconData }[]
+> {
   const out: Record<
     PlatformKey,
     { key: FrameworkKey; label: string; icon?: IconData }[]

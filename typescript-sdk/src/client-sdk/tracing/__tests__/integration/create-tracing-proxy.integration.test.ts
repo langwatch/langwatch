@@ -60,7 +60,7 @@ describe("createTracingProxy Integration Tests", () => {
   });
 
   describe("basic functionality", () => {
-    it("should create a proxy that traces public methods", async () => {
+    it("creates a proxy that traces public methods", async () => {
       class TestClass {
         publicMethod() {
           return 'public result';
@@ -95,7 +95,7 @@ describe("createTracingProxy Integration Tests", () => {
       expect(span.attributes["code.namespace"]).toBe("TestClass");
     });
 
-    it("should not trace private methods", async () => {
+    it("does not trace private methods", async () => {
       class TestClass {
         publicMethod() {
           return 'public result';
@@ -123,7 +123,7 @@ describe("createTracingProxy Integration Tests", () => {
       expect(exportedSpans[0]?.name).toBe("TestClass.publicMethod");
     });
 
-    it("should not trace built-in methods", async () => {
+    it("does not trace built-in methods", async () => {
       class TestClass {
         publicMethod() {
           return 'public result';
@@ -145,7 +145,7 @@ describe("createTracingProxy Integration Tests", () => {
       expect(exportedSpans).toHaveLength(0);
     });
 
-    it("should handle non-function properties", async () => {
+    it("handles non-function properties", async () => {
       class TestClass {
         public property = 'test value';
 
@@ -168,7 +168,7 @@ describe("createTracingProxy Integration Tests", () => {
   });
 
   describe("decorator functionality", () => {
-    it("should use decorator methods when available", async () => {
+    it("uses decorator methods when available", async () => {
       class TestClass {
         publicMethod() {
           return 'original result';
@@ -205,7 +205,7 @@ describe("createTracingProxy Integration Tests", () => {
       expect(span.attributes["code.namespace"]).toBe("TestClass");
     });
 
-    it("should fall back to original method when decorator method is not available", async () => {
+    it("falls back to original method when decorator method is not available", async () => {
       class TestClass {
         publicMethod() {
           return 'original result';
@@ -237,7 +237,7 @@ describe("createTracingProxy Integration Tests", () => {
       expect(span.status.code).toBe(SpanStatusCode.OK);
     });
 
-    it("should handle decorator methods that are not functions", async () => {
+    it("handles decorator methods that are not functions", async () => {
       class TestClass {
         publicMethod() {
           return 'original result';
@@ -272,7 +272,7 @@ describe("createTracingProxy Integration Tests", () => {
   });
 
   describe("method arguments and return values", () => {
-    it("should pass arguments correctly to traced methods", async () => {
+    it("passes arguments correctly to traced methods", async () => {
       class TestClass {
         publicMethod(arg1: string, arg2: number) {
           return `${arg1}-${arg2}`;
@@ -299,7 +299,7 @@ describe("createTracingProxy Integration Tests", () => {
       expect(span.status.code).toBe(SpanStatusCode.OK);
     });
 
-    it("should handle async methods", async () => {
+    it("handles async methods", async () => {
       class TestClass {
         async publicMethod() {
           return 'async result';
@@ -326,7 +326,7 @@ describe("createTracingProxy Integration Tests", () => {
       expect(span.status.code).toBe(SpanStatusCode.OK);
     });
 
-    it("should handle methods that throw errors", async () => {
+    it("handles methods that throw errors", async () => {
       class TestClass {
         publicMethod() {
           throw new Error('test error');
@@ -352,7 +352,7 @@ describe("createTracingProxy Integration Tests", () => {
       expect(span.status.message).toBe("test error");
     });
 
-    it("should handle async methods that throw errors", async () => {
+    it("handles async methods that throw errors", async () => {
       class TestClass {
         async publicMethod() {
           throw new Error('async error');
@@ -380,7 +380,7 @@ describe("createTracingProxy Integration Tests", () => {
   });
 
   describe("decorator span access", () => {
-    it("should call decorator method with correct context", async () => {
+    it("calls decorator method with correct context", async () => {
       class TestClass {
         publicMethod() {
           return 'original result';
@@ -420,7 +420,7 @@ describe("createTracingProxy Integration Tests", () => {
   });
 
   describe("span lifecycle", () => {
-    it("should handle multiple method calls", async () => {
+    it("handles multiple method calls", async () => {
       class TestClass {
         method1() {
           return 'result1';
@@ -452,7 +452,7 @@ describe("createTracingProxy Integration Tests", () => {
   });
 
   describe("method filtering", () => {
-    it("should not trace getters", async () => {
+    it("does not trace getters", async () => {
       class TestClass {
         // eslint-disable-next-line @typescript-eslint/class-literal-property-style
         get getterProperty() {
@@ -480,7 +480,7 @@ describe("createTracingProxy Integration Tests", () => {
       expect(exportedSpans[0]?.name).toBe("TestClass.publicMethod");
     });
 
-    it("should not trace setters", async () => {
+    it("does not trace setters", async () => {
       class TestClass {
         private _value = '';
 
@@ -516,7 +516,7 @@ describe("createTracingProxy Integration Tests", () => {
   });
 
   describe("edge cases", () => {
-    it("should handle target with no methods", async () => {
+    it("handles target with no methods", async () => {
       class EmptyClass {}
 
       const target = new EmptyClass();
@@ -531,7 +531,7 @@ describe("createTracingProxy Integration Tests", () => {
       expect(exportedSpans).toHaveLength(0);
     });
 
-    it("should handle target with only private methods", async () => {
+    it("handles target with only private methods", async () => {
       class PrivateOnlyClass {
         private _privateMethod() {
           return 'private';
@@ -550,7 +550,7 @@ describe("createTracingProxy Integration Tests", () => {
       expect(exportedSpans).toHaveLength(0);
     });
 
-    it("should handle target with only built-in methods", async () => {
+    it("handles target with only built-in methods", async () => {
       class BuiltInOnlyClass {
         toString() {
           return 'built-in';
@@ -569,7 +569,7 @@ describe("createTracingProxy Integration Tests", () => {
       expect(exportedSpans).toHaveLength(0);
     });
 
-    it("should handle symbol properties", async () => {
+    it("handles symbol properties", async () => {
       const symbol = Symbol('test');
 
       class SymbolClass {
@@ -599,7 +599,7 @@ describe("createTracingProxy Integration Tests", () => {
       expect(exportedSpans[0]?.name).toBe("SymbolClass.publicMethod");
     });
 
-    it("should handle methods with special characters in names", async () => {
+    it("handles methods with special characters in names", async () => {
       class TestClass {
         'method-with-dash'() {
           return 'dash result';
@@ -633,7 +633,7 @@ describe("createTracingProxy Integration Tests", () => {
       expect(camelSpan).toBeDefined();
     });
 
-    it("should handle methods that return undefined", async () => {
+    it("handles methods that return undefined", async () => {
       class TestClass {
         publicMethod() {
           // Returns undefined
@@ -653,7 +653,7 @@ describe("createTracingProxy Integration Tests", () => {
       expect(exportedSpans[0]?.name).toBe("TestClass.publicMethod");
     });
 
-    it("should handle methods that return null", async () => {
+    it("handles methods that return null", async () => {
       class TestClass {
         publicMethod() {
           return null;
@@ -673,7 +673,7 @@ describe("createTracingProxy Integration Tests", () => {
       expect(exportedSpans[0]?.name).toBe("TestClass.publicMethod");
     });
 
-    it("should handle methods with complex return values", async () => {
+    it("handles methods with complex return values", async () => {
       class TestClass {
         publicMethod() {
           return { complex: 'object', nested: { value: 42 } };
@@ -693,7 +693,7 @@ describe("createTracingProxy Integration Tests", () => {
       expect(exportedSpans[0]?.name).toBe("TestClass.publicMethod");
     });
 
-    it("should handle methods with this context", async () => {
+    it("handles methods with this context", async () => {
       class TestClass {
         private value = 'test';
 
@@ -715,7 +715,7 @@ describe("createTracingProxy Integration Tests", () => {
       expect(exportedSpans[0]?.name).toBe("TestClass.publicMethod");
     });
 
-    it("should handle methods that modify target state", async () => {
+    it("handles methods that modify target state", async () => {
       class TestClass {
         private counter = 0;
 
@@ -749,7 +749,7 @@ describe("createTracingProxy Integration Tests", () => {
       expect(counterSpans).toHaveLength(1);
     });
 
-    it("should handle methods with default parameters", async () => {
+    it("handles methods with default parameters", async () => {
       class TestClass {
         publicMethod(param1 = 'default', param2 = 42) {
           return `${param1}-${param2}`;
@@ -773,7 +773,7 @@ describe("createTracingProxy Integration Tests", () => {
       });
     });
 
-    it("should handle methods with rest parameters", async () => {
+    it("handles methods with rest parameters", async () => {
       class TestClass {
         publicMethod(...args: any[]) {
           return args.join('-');
@@ -797,7 +797,7 @@ describe("createTracingProxy Integration Tests", () => {
       });
     });
 
-    it("should handle methods with destructuring parameters", async () => {
+    it("handles methods with destructuring parameters", async () => {
       class TestClass {
         publicMethod({ name, age }: { name: string; age: number }) {
           return `${name}-${age}`;
@@ -820,7 +820,7 @@ describe("createTracingProxy Integration Tests", () => {
   });
 
   describe("performance and concurrency", () => {
-    it("should handle concurrent method calls efficiently", async () => {
+    it("handles concurrent method calls efficiently", async () => {
       class TestClass {
         async publicMethod(index: number) {
           // Simulate some async work

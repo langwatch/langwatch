@@ -27,14 +27,7 @@
 import crypto from "node:crypto";
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
-import {
-  afterAll,
-  beforeAll,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import * as clickhouseClientModule from "~/server/clickhouse/clickhouseClient";
 import {
   startTestContainers,
@@ -48,9 +41,9 @@ import { StoredObjectsService } from "../stored-objects.service";
 import { mintAzureBlobUri } from "../uri";
 import {
   ensureAzuriteContainer,
+  type StartedAzurite,
   startAzurite,
   stopAzurite,
-  type StartedAzurite,
 } from "./azurite-test-support";
 
 // env mock — the driver and service receive explicit config in this test;
@@ -135,8 +128,12 @@ beforeAll(async () => {
 
   const containers = await startTestContainers();
   ch = containers.clickHouseClient;
-  vi.mocked(clickhouseClientModule.getClickHouseClientForProject).mockResolvedValue(ch);
-  vi.mocked(clickhouseClientModule.getSharedClickHouseClient).mockReturnValue(ch);
+  vi.mocked(
+    clickhouseClientModule.getClickHouseClientForProject,
+  ).mockResolvedValue(ch);
+  vi.mocked(clickhouseClientModule.getSharedClickHouseClient).mockReturnValue(
+    ch,
+  );
 }, 120_000);
 
 afterAll(async () => {
@@ -281,7 +278,10 @@ describe("StoredObjectsService against a real Azurite emulator", () => {
 
       expect(await waitForRow(ch, PROJECT, stored.id)).toBe(true);
 
-      const result = await service.getById({ projectId: PROJECT, id: stored.id });
+      const result = await service.getById({
+        projectId: PROJECT,
+        id: stored.id,
+      });
       expect(result).not.toBeNull();
       if (!result || !("stream" in result)) {
         throw new Error("expected a stream result");
@@ -290,7 +290,9 @@ describe("StoredObjectsService against a real Azurite emulator", () => {
 
       const chunks: Buffer[] = [];
       for await (const chunk of result.stream) chunks.push(chunk as Buffer);
-      expect(Buffer.concat(chunks).toString("utf8")).toBe("azure media payload");
+      expect(Buffer.concat(chunks).toString("utf8")).toBe(
+        "azure media payload",
+      );
     });
   });
 });

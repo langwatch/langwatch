@@ -1,6 +1,5 @@
-import { ExperimentType, Prisma, type PrismaClient } from "@prisma/client";
+import { ExperimentType, type Prisma, type PrismaClient } from "@prisma/client";
 import { DEMO_PLATFORM_IDS } from "./demo-platform-ids";
-
 
 const DATASET_ROWS = [
   {

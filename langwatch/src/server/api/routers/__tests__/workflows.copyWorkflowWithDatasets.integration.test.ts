@@ -1,9 +1,9 @@
-import { describe, expect, it, beforeAll, afterAll } from "vitest";
 import { nanoid } from "nanoid";
-import { getTestUser } from "~/utils/testUtils";
-import { prisma } from "~/server/db";
-import { copyWorkflowWithDatasets } from "../workflows";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Session } from "~/server/auth";
+import { prisma } from "~/server/db";
+import { getTestUser } from "~/utils/testUtils";
+import { copyWorkflowWithDatasets } from "../workflows";
 
 describe("copyWorkflowWithDatasets", () => {
   const sourceProjectId = "test-project-id";
@@ -83,12 +83,17 @@ describe("copyWorkflowWithDatasets", () => {
         })
         .catch(() => {});
       await prisma.workflowVersion
-        .updateMany({ where: { workflowId: id, projectId }, data: { parentId: null } })
+        .updateMany({
+          where: { workflowId: id, projectId },
+          data: { parentId: null },
+        })
         .catch(() => {});
       await prisma.workflowVersion
         .deleteMany({ where: { workflowId: id, projectId } })
         .catch(() => {});
-      await prisma.workflow.delete({ where: { id, projectId } }).catch(() => {});
+      await prisma.workflow
+        .delete({ where: { id, projectId } })
+        .catch(() => {});
     }
   });
 
@@ -146,7 +151,10 @@ describe("copyWorkflowWithDatasets", () => {
           isComponent: true,
         },
       });
-      cleanupWorkflows.push({ id: componentWorkflowId, projectId: sourceProjectId });
+      cleanupWorkflows.push({
+        id: componentWorkflowId,
+        projectId: sourceProjectId,
+      });
 
       await prisma.workflowVersion.create({
         data: {

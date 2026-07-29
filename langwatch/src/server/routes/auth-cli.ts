@@ -50,11 +50,11 @@ import {
   ENTERPRISE_FEATURE_ERRORS,
 } from "~/server/api/enterprise";
 import type { Permission } from "~/server/api/rbac";
-import { hasOrganizationPermission, hasProjectPermission } from "~/server/api/rbac";
 import {
-  createServiceApp,
-  handlerManagedAuth,
-} from "~/server/api/security";
+  hasOrganizationPermission,
+  hasProjectPermission,
+} from "~/server/api/rbac";
+import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { getServerAuthSession } from "~/server/auth";
 import {
   getClickHouseClientForProject,
@@ -96,11 +96,7 @@ const REFRESH_TOKEN_PREFIX = "lwcli:refresh:"; // Redis key prefix for refresh-t
 const ACCESS_TOKEN_PREFIX = "lwcli:access:"; // Redis key prefix for access-token records
 const POLL_RATE_PREFIX = "lwcli:poll:"; // Redis key prefix for poll-rate-limit window
 
-type DeviceCodeStatus =
-  | "pending"
-  | "approved"
-  | "denied"
-  | "expired";
+type DeviceCodeStatus = "pending" | "approved" | "denied" | "expired";
 
 /**
  * What the CLI is asking the browser to mint on approval.
@@ -310,8 +306,7 @@ function controlPlaneBaseUrl(): string {
  * staging, and prod without per-env config.
  */
 function verificationUri(): string {
-  const base =
-    env.NEXTAUTH_URL ?? env.BASE_HOST ?? "http://localhost:5560";
+  const base = env.NEXTAUTH_URL ?? env.BASE_HOST ?? "http://localhost:5560";
   return `${base.replace(/\/$/, "")}/cli/auth`;
 }
 
@@ -444,7 +439,10 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
     // Either the device_code never existed or it expired and Redis evicted it.
     // RFC 8628 recommends `expired_token` here.
     return c.json(
-      { error: "expired_token", error_description: "Device code expired or unknown" },
+      {
+        error: "expired_token",
+        error_description: "Device code expired or unknown",
+      },
       408,
     );
   }
@@ -542,7 +540,8 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
         return c.json(
           {
             error: "authorization_pending",
-            error_description: "Approval received but project key not ready yet",
+            error_description:
+              "Approval received but project key not ready yet",
           },
           428,
         );
@@ -629,7 +628,11 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
     const indexKey = userTokensIndexKey(user.id);
     await redis
       .pipeline()
-      .sadd(indexKey, accessTokenKey(accessToken), refreshTokenKey(refreshToken))
+      .sadd(
+        indexKey,
+        accessTokenKey(accessToken),
+        refreshTokenKey(refreshToken),
+      )
       .pexpire(indexKey, REFRESH_TOKEN_TTL_SECONDS * 1000)
       .exec();
 
@@ -811,7 +814,11 @@ secured.access(CLI_POLICY).post("/refresh", async (c: Context) => {
   const indexKey = userTokensIndexKey(record.user_id);
   await redis
     .pipeline()
-    .sadd(indexKey, accessTokenKey(newAccessToken), refreshTokenKey(newRefreshToken))
+    .sadd(
+      indexKey,
+      accessTokenKey(newAccessToken),
+      refreshTokenKey(newRefreshToken),
+    )
     .pexpire(indexKey, REFRESH_TOKEN_TTL_SECONDS * 1000)
     .exec();
 
@@ -870,8 +877,7 @@ function requestIncreaseUrl(opts: {
   limitUsd: string;
   spentUsd: string;
 }): string {
-  const base =
-    env.NEXTAUTH_URL ?? env.BASE_HOST ?? "http://localhost:5560";
+  const base = env.NEXTAUTH_URL ?? env.BASE_HOST ?? "http://localhost:5560";
   const params = new URLSearchParams({
     scope: opts.scope,
     scope_id: opts.scopeId,
@@ -1055,162 +1061,184 @@ async function ensureGovernancePermissionOr403(
   );
 }
 
-secured.access(CLI_POLICY).get("/governance/ingest/sources", async (c: Context) => {
-  const tokenRecord = await validateAccessToken(c.req.header("Authorization"));
-  if (!tokenRecord) {
-    return c.json(
-      {
-        error: "unauthorized",
-        error_description:
-          "Bearer access token is missing, malformed, or expired",
-      },
-      401,
+secured
+  .access(CLI_POLICY)
+  .get("/governance/ingest/sources", async (c: Context) => {
+    const tokenRecord = await validateAccessToken(
+      c.req.header("Authorization"),
     );
-  }
-  const gate = await ensureEnterpriseOr402(
-    c,
-    tokenRecord.organization_id,
-    ENTERPRISE_FEATURE_ERRORS.INGESTION_SOURCES,
-  );
-  if (gate) return gate;
-  const denied = await ensureGovernancePermissionOr403(
-    c,
-    tokenRecord,
-    "ingestionSources:view",
-  );
-  if (denied) return denied;
-  const includeArchived = c.req.query("include_archived") === "1";
-  const service = new IngestionSourceService(prisma);
-  const sources = await service.list(tokenRecord.organization_id);
-  const filtered = includeArchived
-    ? sources
-    : sources.filter((s: { archivedAt: Date | null }) => s.archivedAt === null);
-  return c.json({
-    sources: filtered.map((s: any) => ({
-      id: s.id,
-      name: s.name,
-      sourceType: s.sourceType,
-      description: s.description,
-      status: s.status,
-      lastEventAt: s.lastEventAt?.toISOString() ?? null,
-      createdAt: s.createdAt.toISOString(),
-      archivedAt: s.archivedAt?.toISOString() ?? null,
-    })),
+    if (!tokenRecord) {
+      return c.json(
+        {
+          error: "unauthorized",
+          error_description:
+            "Bearer access token is missing, malformed, or expired",
+        },
+        401,
+      );
+    }
+    const gate = await ensureEnterpriseOr402(
+      c,
+      tokenRecord.organization_id,
+      ENTERPRISE_FEATURE_ERRORS.INGESTION_SOURCES,
+    );
+    if (gate) return gate;
+    const denied = await ensureGovernancePermissionOr403(
+      c,
+      tokenRecord,
+      "ingestionSources:view",
+    );
+    if (denied) return denied;
+    const includeArchived = c.req.query("include_archived") === "1";
+    const service = new IngestionSourceService(prisma);
+    const sources = await service.list(tokenRecord.organization_id);
+    const filtered = includeArchived
+      ? sources
+      : sources.filter(
+          (s: { archivedAt: Date | null }) => s.archivedAt === null,
+        );
+    return c.json({
+      sources: filtered.map((s: any) => ({
+        id: s.id,
+        name: s.name,
+        sourceType: s.sourceType,
+        description: s.description,
+        status: s.status,
+        lastEventAt: s.lastEventAt?.toISOString() ?? null,
+        createdAt: s.createdAt.toISOString(),
+        archivedAt: s.archivedAt?.toISOString() ?? null,
+      })),
+    });
   });
-});
 
-secured.access(CLI_POLICY).get("/governance/ingest/sources/:id/events", async (c: Context) => {
-  const tokenRecord = await validateAccessToken(c.req.header("Authorization"));
-  if (!tokenRecord) {
-    return c.json(
-      {
-        error: "unauthorized",
-        error_description:
-          "Bearer access token is missing, malformed, or expired",
-      },
-      401,
+secured
+  .access(CLI_POLICY)
+  .get("/governance/ingest/sources/:id/events", async (c: Context) => {
+    const tokenRecord = await validateAccessToken(
+      c.req.header("Authorization"),
     );
-  }
-  const gate = await ensureEnterpriseOr402(
-    c,
-    tokenRecord.organization_id,
-    ENTERPRISE_FEATURE_ERRORS.ACTIVITY_MONITOR,
-  );
-  if (gate) return gate;
-  const denied = await ensureGovernancePermissionOr403(
-    c,
-    tokenRecord,
-    "activityMonitor:view",
-  );
-  if (denied) return denied;
-  const sourceId = c.req.param("id");
-  if (!sourceId) {
-    return c.json(
-      { error: "invalid_request", error_description: "source id is required" },
-      400,
+    if (!tokenRecord) {
+      return c.json(
+        {
+          error: "unauthorized",
+          error_description:
+            "Bearer access token is missing, malformed, or expired",
+        },
+        401,
+      );
+    }
+    const gate = await ensureEnterpriseOr402(
+      c,
+      tokenRecord.organization_id,
+      ENTERPRISE_FEATURE_ERRORS.ACTIVITY_MONITOR,
     );
-  }
-  const limitRaw = c.req.query("limit");
-  const beforeIso = c.req.query("before_iso") ?? undefined;
-  const limit = limitRaw ? Math.min(Math.max(1, parseInt(limitRaw, 10)), 200) : 50;
+    if (gate) return gate;
+    const denied = await ensureGovernancePermissionOr403(
+      c,
+      tokenRecord,
+      "activityMonitor:view",
+    );
+    if (denied) return denied;
+    const sourceId = c.req.param("id");
+    if (!sourceId) {
+      return c.json(
+        {
+          error: "invalid_request",
+          error_description: "source id is required",
+        },
+        400,
+      );
+    }
+    const limitRaw = c.req.query("limit");
+    const beforeIso = c.req.query("before_iso") ?? undefined;
+    const limit = limitRaw
+      ? Math.min(Math.max(1, parseInt(limitRaw, 10)), 200)
+      : 50;
 
-  // Defensive ownership check before hitting CH — prevents the
-  // "querying any source-id with a valid bearer" footgun even
-  // though ActivityMonitorService also filters by OrganizationId.
-  const sourceService = new IngestionSourceService(prisma);
-  const source = await sourceService.findById(
-    sourceId,
-    tokenRecord.organization_id,
-  );
-  if (!source) {
-    return c.json(
-      { error: "not_found", error_description: "IngestionSource not found" },
-      404,
+    // Defensive ownership check before hitting CH — prevents the
+    // "querying any source-id with a valid bearer" footgun even
+    // though ActivityMonitorService also filters by OrganizationId.
+    const sourceService = new IngestionSourceService(prisma);
+    const source = await sourceService.findById(
+      sourceId,
+      tokenRecord.organization_id,
     );
-  }
+    if (!source) {
+      return c.json(
+        { error: "not_found", error_description: "IngestionSource not found" },
+        404,
+      );
+    }
 
-  const monitor = new ActivityMonitorService(prisma);
-  const events = await monitor.eventsForSource({
-    organizationId: tokenRecord.organization_id,
-    sourceId,
-    limit,
-    beforeIso,
+    const monitor = new ActivityMonitorService(prisma);
+    const events = await monitor.eventsForSource({
+      organizationId: tokenRecord.organization_id,
+      sourceId,
+      limit,
+      beforeIso,
+    });
+    return c.json({ events });
   });
-  return c.json({ events });
-});
 
-secured.access(CLI_POLICY).get("/governance/ingest/sources/:id/health", async (c: Context) => {
-  const tokenRecord = await validateAccessToken(c.req.header("Authorization"));
-  if (!tokenRecord) {
-    return c.json(
-      {
-        error: "unauthorized",
-        error_description:
-          "Bearer access token is missing, malformed, or expired",
-      },
-      401,
+secured
+  .access(CLI_POLICY)
+  .get("/governance/ingest/sources/:id/health", async (c: Context) => {
+    const tokenRecord = await validateAccessToken(
+      c.req.header("Authorization"),
     );
-  }
-  const gate = await ensureEnterpriseOr402(
-    c,
-    tokenRecord.organization_id,
-    ENTERPRISE_FEATURE_ERRORS.INGESTION_SOURCES,
-  );
-  if (gate) return gate;
-  const denied = await ensureGovernancePermissionOr403(
-    c,
-    tokenRecord,
-    "activityMonitor:view",
-  );
-  if (denied) return denied;
-  const sourceId = c.req.param("id");
-  if (!sourceId) {
-    return c.json(
-      { error: "invalid_request", error_description: "source id is required" },
-      400,
+    if (!tokenRecord) {
+      return c.json(
+        {
+          error: "unauthorized",
+          error_description:
+            "Bearer access token is missing, malformed, or expired",
+        },
+        401,
+      );
+    }
+    const gate = await ensureEnterpriseOr402(
+      c,
+      tokenRecord.organization_id,
+      ENTERPRISE_FEATURE_ERRORS.INGESTION_SOURCES,
     );
-  }
-  const sourceService = new IngestionSourceService(prisma);
-  const source = await sourceService.findById(
-    sourceId,
-    tokenRecord.organization_id,
-  );
-  if (!source) {
-    return c.json(
-      { error: "not_found", error_description: "IngestionSource not found" },
-      404,
+    if (gate) return gate;
+    const denied = await ensureGovernancePermissionOr403(
+      c,
+      tokenRecord,
+      "activityMonitor:view",
     );
-  }
-  const monitor = new ActivityMonitorService(prisma);
-  const health = await monitor.sourceHealthMetrics({
-    organizationId: tokenRecord.organization_id,
-    sourceId,
+    if (denied) return denied;
+    const sourceId = c.req.param("id");
+    if (!sourceId) {
+      return c.json(
+        {
+          error: "invalid_request",
+          error_description: "source id is required",
+        },
+        400,
+      );
+    }
+    const sourceService = new IngestionSourceService(prisma);
+    const source = await sourceService.findById(
+      sourceId,
+      tokenRecord.organization_id,
+    );
+    if (!source) {
+      return c.json(
+        { error: "not_found", error_description: "IngestionSource not found" },
+        404,
+      );
+    }
+    const monitor = new ActivityMonitorService(prisma);
+    const health = await monitor.sourceHealthMetrics({
+      organizationId: tokenRecord.organization_id,
+      sourceId,
+    });
+    return c.json({
+      source: { id: source.id, name: source.name, status: source.status },
+      health,
+    });
   });
-  return c.json({
-    source: { id: source.id, name: source.name, status: source.status },
-    health,
-  });
-});
 
 secured.access(CLI_POLICY).get("/governance/status", async (c: Context) => {
   const tokenRecord = await validateAccessToken(c.req.header("Authorization"));
@@ -1248,9 +1276,9 @@ secured.access(CLI_POLICY).get("/governance/status", async (c: Context) => {
 // { data: [...] } shape.
 // ---------------------------------------------------------------------------
 
-secured.access(CLI_POLICY).get(
-  "/governance/ingestion-templates",
-  async (c: Context) => {
+secured
+  .access(CLI_POLICY)
+  .get("/governance/ingestion-templates", async (c: Context) => {
     const tokenRecord = await validateAccessToken(
       c.req.header("Authorization"),
     );
@@ -1283,8 +1311,7 @@ secured.access(CLI_POLICY).get(
         enabled: t.enabled,
       })),
     });
-  },
-);
+  });
 
 // ---------------------------------------------------------------------------
 // POST /api/auth/cli/governance/ingestion-key
@@ -1301,9 +1328,9 @@ const mintIngestionKeySchema = z.object({
   source_type: z.string().min(1),
 });
 
-secured.access(CLI_POLICY).post(
-  "/governance/ingestion-key",
-  async (c: Context) => {
+secured
+  .access(CLI_POLICY)
+  .post("/governance/ingestion-key", async (c: Context) => {
     const tokenRecord = await validateAccessToken(
       c.req.header("Authorization"),
     );
@@ -1361,8 +1388,7 @@ secured.access(CLI_POLICY).post(
         412,
       );
     }
-  },
-);
+  });
 
 // ---------------------------------------------------------------------------
 // GET /api/auth/cli/governance/ingestion-keys
@@ -1380,9 +1406,9 @@ secured.access(CLI_POLICY).post(
 // (`ik-lw-{lookupId}_…`) so the CLI can match the cached token against a
 // live server entry without possessing the full secret.
 // ---------------------------------------------------------------------------
-secured.access(CLI_POLICY).get(
-  "/governance/ingestion-keys",
-  async (c: Context) => {
+secured
+  .access(CLI_POLICY)
+  .get("/governance/ingestion-keys", async (c: Context) => {
     const tokenRecord = await validateAccessToken(
       c.req.header("Authorization"),
     );
@@ -1411,8 +1437,7 @@ secured.access(CLI_POLICY).get(
       },
       200,
     );
-  },
-);
+  });
 
 // ---------------------------------------------------------------------------
 // GET /api/auth/cli/lookup?user_code=XXXX-YYYY
@@ -1516,7 +1541,10 @@ secured.access(CLI_POLICY).post("/approve", async (c: Context) => {
   // Verify caller is a member of the org they're issuing a key for.
   const membership = await prisma.organizationUser.findUnique({
     where: {
-      userId_organizationId: { userId: session.user.id, organizationId: organization_id },
+      userId_organizationId: {
+        userId: session.user.id,
+        organizationId: organization_id,
+      },
     },
   });
   if (!membership) {
@@ -1561,7 +1589,8 @@ secured.access(CLI_POLICY).post("/approve", async (c: Context) => {
       return c.json(
         {
           error: "invalid_request",
-          error_description: "project_id is required when credential_type is project_api_key",
+          error_description:
+            "project_id is required when credential_type is project_api_key",
         },
         400,
       );
@@ -1585,7 +1614,13 @@ secured.access(CLI_POLICY).post("/approve", async (c: Context) => {
           organizationId: organization_id,
         },
       },
-      select: { id: true, slug: true, name: true, apiKey: true, isPersonal: true },
+      select: {
+        id: true,
+        slug: true,
+        name: true,
+        apiKey: true,
+        isPersonal: true,
+      },
     });
     if (!project) {
       return c.json(
@@ -1753,7 +1788,10 @@ secured.access(CLI_POLICY).post("/approve", async (c: Context) => {
       });
       if (!workspace?.projects[0]) {
         return c.json(
-          { error: "server_error", error_description: "Personal workspace missing" },
+          {
+            error: "server_error",
+            error_description: "Personal workspace missing",
+          },
           500,
         );
       }
@@ -1774,13 +1812,11 @@ secured.access(CLI_POLICY).post("/approve", async (c: Context) => {
       // users can issue personal VKs (storyboard Screen 4 prerequisite).
       // Other errors stay generic to avoid leaking internals.
       const message =
-        err instanceof Error && /provider credential is required/i.test(err.message)
+        err instanceof Error &&
+        /provider credential is required/i.test(err.message)
           ? "Your admin needs to configure a model provider first. Ask them to add one at Settings → Model Providers."
           : "Failed to issue key";
-      return c.json(
-        { error: "server_error", error_description: message },
-        500,
-      );
+      return c.json({ error: "server_error", error_description: message }, 500);
     }
   }
 

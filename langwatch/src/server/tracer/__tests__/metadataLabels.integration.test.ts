@@ -14,10 +14,7 @@ import type {
 } from "@opentelemetry/otlp-transformer";
 import { describe, expect, it } from "vitest";
 import type { DeepPartial } from "../../../utils/types";
-import {
-  openTelemetryTraceRequestToTracesForCollection,
-  type TraceForCollection,
-} from "../otel.traces";
+import { openTelemetryTraceRequestToTracesForCollection } from "../otel.traces";
 
 /**
  * Helper to create a minimal OTEL trace request with the given span attributes.

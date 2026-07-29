@@ -33,7 +33,7 @@ describe("usageLimitEmail", () => {
   });
 
   describe("sendUsageLimitEmail", () => {
-    it("should send email with correct subject line", async () => {
+    it("sends email with correct subject line", async () => {
       await sendUsageLimitEmail(baseProps);
 
       expect(sendEmail).toHaveBeenCalledTimes(1);
@@ -45,7 +45,7 @@ describe("usageLimitEmail", () => {
       );
     });
 
-    it("should include organization name in email HTML", async () => {
+    it("includes organization name in email HTML", async () => {
       await sendUsageLimitEmail(baseProps);
 
       expect(sendEmail).toHaveBeenCalled();
@@ -56,7 +56,7 @@ describe("usageLimitEmail", () => {
       expect(html).toContain("Test Organization");
     });
 
-    it("should include usage percentage in email HTML", async () => {
+    it("includes usage percentage in email HTML", async () => {
       await sendUsageLimitEmail(baseProps);
 
       expect(sendEmail).toHaveBeenCalled();
@@ -70,7 +70,7 @@ describe("usageLimitEmail", () => {
       expect(html).toContain("75.5");
     });
 
-    it("should display all projects in the table", async () => {
+    it("displays all projects in the table", async () => {
       await sendUsageLimitEmail(baseProps);
 
       expect(sendEmail).toHaveBeenCalled();
@@ -86,7 +86,7 @@ describe("usageLimitEmail", () => {
       expect(html).toContain("2,000");
     });
 
-    it("should display total message count", async () => {
+    it("displays total message count", async () => {
       await sendUsageLimitEmail(baseProps);
 
       expect(sendEmail).toHaveBeenCalled();
@@ -98,7 +98,7 @@ describe("usageLimitEmail", () => {
       expect(html).toContain("Total (3)");
     });
 
-    it("should show upgrade message when threshold < 100", async () => {
+    it("shows upgrade message when threshold < 100", async () => {
       await sendUsageLimitEmail({
         ...baseProps,
         crossedThreshold: 90,
@@ -116,7 +116,7 @@ describe("usageLimitEmail", () => {
       );
     });
 
-    it("should show immediate upgrade message when threshold >= 100", async () => {
+    it("shows immediate upgrade message when threshold >= 100", async () => {
       await sendUsageLimitEmail({
         ...baseProps,
         crossedThreshold: 100,
@@ -134,7 +134,7 @@ describe("usageLimitEmail", () => {
       );
     });
 
-    it("should use correct progress bar color for different usage levels", async () => {
+    it("uses correct progress bar color for different usage levels", async () => {
       // Test red color for >= 100%
       await sendUsageLimitEmail({
         ...baseProps,
@@ -182,7 +182,7 @@ describe("usageLimitEmail", () => {
       expect(html).toContain("background-color:#10b981"); // green
     });
 
-    it("should include action URL in button and project links", async () => {
+    it("includes action URL in button and project links", async () => {
       await sendUsageLimitEmail(baseProps);
 
       expect(sendEmail).toHaveBeenCalled();
@@ -193,7 +193,7 @@ describe("usageLimitEmail", () => {
       expect(html).toContain('href="https://app.langwatch.ai/settings/usage"');
     });
 
-    it("should format large numbers with commas", async () => {
+    it("formats large numbers with commas", async () => {
       await sendUsageLimitEmail({
         ...baseProps,
         currentMonthMessagesCount: 1234567,
@@ -212,7 +212,7 @@ describe("usageLimitEmail", () => {
       expect(html).toContain("2,000,000");
     });
 
-    it("should cap progress bar width at 100%", async () => {
+    it("caps progress bar width at 100%", async () => {
       await sendUsageLimitEmail({
         ...baseProps,
         usagePercentage: 150, // Over 100%
@@ -229,7 +229,7 @@ describe("usageLimitEmail", () => {
       expect(html).toContain("width:100%");
     });
 
-    it("should include logo URL in email", async () => {
+    it("includes logo URL in email", async () => {
       await sendUsageLimitEmail(baseProps);
 
       expect(sendEmail).toHaveBeenCalled();
@@ -240,7 +240,7 @@ describe("usageLimitEmail", () => {
       expect(html).toContain("https://example.com/logo.png");
     });
 
-    it("should include help center link", async () => {
+    it("includes help center link", async () => {
       await sendUsageLimitEmail(baseProps);
 
       expect(sendEmail).toHaveBeenCalled();

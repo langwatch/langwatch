@@ -13,16 +13,16 @@
  * @see specs/scenarios/scenario-input-mapping.feature (UI section, @integration)
  */
 
-import type React from "react";
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { FieldMapping } from "~/components/variables/VariableMappingInput";
 import {
   ScenarioInputMappingSection,
   type ScenarioInputMappingSectionProps,
 } from "../ScenarioInputMappingSection";
-import type { FieldMapping } from "~/components/variables/VariableMappingInput";
 
 // -- Mock transitive deps that pull in complex modules --
 
@@ -52,10 +52,9 @@ function renderSection(
     onMappingChange: vi.fn(),
   };
 
-  return render(
-    <ScenarioInputMappingSection {...defaults} {...overrides} />,
-    { wrapper: Wrapper },
-  );
+  return render(<ScenarioInputMappingSection {...defaults} {...overrides} />, {
+    wrapper: Wrapper,
+  });
 }
 
 describe("ScenarioInputMappingSection", () => {
@@ -71,18 +70,14 @@ describe("ScenarioInputMappingSection", () => {
       it("shows the 'Scenario Mappings' section header", () => {
         renderSection();
 
-        expect(
-          screen.getByText("Scenario Mappings"),
-        ).toBeInTheDocument();
+        expect(screen.getByText("Scenario Mappings")).toBeInTheDocument();
       });
 
       /** @scenario Scenario Mappings section shows a row for each scenario field */
       it("shows a row for each scenario field", () => {
         renderSection();
 
-        expect(
-          screen.getByTestId("variable-name-input"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("variable-name-input")).toBeInTheDocument();
         expect(
           screen.getByTestId("variable-name-messages"),
         ).toBeInTheDocument();
@@ -172,7 +167,9 @@ describe("ScenarioInputMappingSection", () => {
         // The messages row should show "context" as its mapping
         // We verify by checking the mapping input values contain the agent input names
         const scenarioMessageInput = screen.getByTestId("mapping-input-input");
-        const conversationHistoryInput = screen.getByTestId("mapping-input-messages");
+        const conversationHistoryInput = screen.getByTestId(
+          "mapping-input-messages",
+        );
 
         // The inputs should exist and be rendered
         expect(scenarioMessageInput).toBeInTheDocument();
@@ -210,8 +207,7 @@ describe("ScenarioInputMappingSection", () => {
         // the inverted scenario-field-row UI — the keyspace has no place for it.
         const valueCalls = onMappingChange.mock.calls.filter(
           ([, mapping]) =>
-            mapping !== undefined &&
-            (mapping as FieldMapping).type === "value",
+            mapping !== undefined && (mapping as FieldMapping).type === "value",
         );
         expect(valueCalls).toHaveLength(0);
       });
@@ -250,9 +246,7 @@ describe("ScenarioInputMappingSection", () => {
           inputs: [{ identifier: "query", type: "str" }],
         });
 
-        expect(
-          screen.getByTestId("variable-name-input"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("variable-name-input")).toBeInTheDocument();
         expect(
           screen.getByTestId("variable-name-messages"),
         ).toBeInTheDocument();

@@ -1,0 +1,27 @@
+id: no-test-without-assertion-tsx
+valid:
+  - |
+    it("returns the trimmed handle", () => {
+      expect(normalise(" a ")).toBe("a");
+    });
+  - |
+    test("rejects an unknown provider", async () => {
+      await expect(resolve("nope")).rejects.toThrow();
+    });
+  - |
+    it("refuses a cross-tenant read", () => {
+      assertRefused(() => repo.findById(otherTenantId));
+    });
+  - |
+    it("does not throw on an empty span list", () => {
+      expect(() => summarise([])).not.toThrow();
+    });
+invalid:
+  - |
+    it("builds the query", () => {
+      buildQuery({ tenantId: "t" });
+    });
+  - |
+    test("seeds the catalog", async () => {
+      await seedCatalog(db);
+    });

@@ -38,10 +38,7 @@ import type {
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import type { DatasetColumnType } from "~/server/datasets/types";
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators";
-import type {
-  EvaluatorField,
-  EvaluatorWithFields,
-} from "~/server/evaluators/evaluator.service";
+import type { EvaluatorWithFields } from "~/server/evaluators/evaluator.service";
 import { api } from "~/utils/api";
 import { DRAWER_WIDTH } from "../constants";
 import { resolveTargetNameFromCache } from "../hooks/resolveTargetName";
@@ -61,7 +58,6 @@ import type {
   EvaluationResults,
   EvaluatorConfig,
   FieldMapping,
-  SavedRecord,
   TableMeta,
   TableRowData,
   TargetConfig,
@@ -75,10 +71,7 @@ import { convertInlineToRowRecords } from "../utils/datasetConversion";
 import { isRowEmpty } from "../utils/emptyRowDetection";
 import { createEvaluatorEditorCallbacks } from "../utils/evaluatorEditorCallbacks";
 import { isCellInExecution } from "../utils/executionScope";
-import {
-  convertFromUIMapping,
-  convertToUIMapping,
-} from "../utils/fieldMappingConverters";
+import { convertFromUIMapping } from "../utils/fieldMappingConverters";
 import {
   buildInputsFromBodyTemplate,
   convertHttpComponentConfig,

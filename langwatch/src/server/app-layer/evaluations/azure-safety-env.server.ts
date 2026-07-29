@@ -13,7 +13,7 @@ export async function getAzureSafetyEnvFromProject(
   const modelProviders = await getProjectModelProviders(projectId);
   const provider = modelProviders[AZURE_SAFETY_PROVIDER_KEY];
 
-  if (!provider || !provider.enabled) {
+  if (!provider?.enabled) {
     return null;
   }
 

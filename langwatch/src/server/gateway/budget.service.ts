@@ -644,7 +644,7 @@ export class GatewayBudgetService {
         },
         select: { purpose: true },
       });
-      if (!vk || vk.purpose !== "USER") {
+      if (vk?.purpose !== "USER") {
         throw new VirtualKeyNotFoundError();
       }
     }

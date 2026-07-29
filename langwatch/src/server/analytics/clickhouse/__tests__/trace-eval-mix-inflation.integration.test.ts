@@ -20,19 +20,19 @@
  * @see https://github.com/langwatch/langwatch/issues/3088
  */
 
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { ClickHouseClient } from "@clickhouse/client";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { wrapWithDefaultSettings } from "~/server/clickhouse/safeClickhouseClient";
 import {
-  getTestClickHouseClient,
   cleanupTestData,
+  getTestClickHouseClient,
 } from "../../../event-sourcing/__tests__/integration/testContainers";
-import { buildTimeseriesQuery } from "../aggregation-builder";
-import { resetParamCounter } from "../filter-translator";
 import type { FlattenAnalyticsMetricsEnum } from "../../registry";
 import type { AggregationTypes } from "../../types";
-import { seedSpans } from "./test-utils/clickhouse-fixtures";
-import { wrapWithDefaultSettings } from "~/server/clickhouse/safeClickhouseClient";
+import { buildTimeseriesQuery } from "../aggregation-builder";
+import { resetParamCounter } from "../filter-translator";
 import { deleteEvaluationRunsByTenant } from "./test-utils/clickhouse-cleanup";
+import { seedSpans } from "./test-utils/clickhouse-fixtures";
 
 const TENANT_ID = "test-trace-eval-mix-3088";
 
@@ -58,57 +58,54 @@ const baseInput = {
 describe("trace-eval-mix-inflation (#3088)", () => {
   let ch: ClickHouseClient;
 
-  beforeAll(
-    async () => {
-      const rawClient = getTestClickHouseClient();
-      if (!rawClient) throw new Error("ClickHouse client not available");
-      ch = wrapWithDefaultSettings(rawClient);
+  beforeAll(async () => {
+    const rawClient = getTestClickHouseClient();
+    if (!rawClient) throw new Error("ClickHouse client not available");
+    ch = wrapWithDefaultSettings(rawClient);
 
-      // Seed 2 traces with knownCost=10 each. One span per trace is enough —
-      // the bug is about evaluation_runs fan-out, not span fan-out.
-      await seedSpans(ch, {
-        tenantId: TENANT_ID,
-        count: TRACE_COUNT,
-        attributeKeys: 2,
-        traceCount: TRACE_COUNT,
-        knownCost: KNOWN_COST,
-      });
+    // Seed 2 traces with knownCost=10 each. One span per trace is enough —
+    // the bug is about evaluation_runs fan-out, not span fan-out.
+    await seedSpans(ch, {
+      tenantId: TENANT_ID,
+      count: TRACE_COUNT,
+      attributeKeys: 2,
+      traceCount: TRACE_COUNT,
+      knownCost: KNOWN_COST,
+    });
 
-      // Insert 3 evaluation_runs rows per trace (6 total). Half pass (Passed=1)
-      // so the average pass rate across traces is a meaningful 0.5.
-      const traceIds = [TRACE_ID_0, TRACE_ID_1];
-      const evalRows: Array<Record<string, unknown>> = [];
-      for (const traceId of traceIds) {
-        for (let i = 0; i < EVALS_PER_TRACE; i++) {
-          // Alternate passed values so ~half of evals per trace pass.
-          const passed = i % 2 === 0 ? 1 : 0;
-          evalRows.push({
-            ProjectionId: `proj-3088-${traceId}-${i}`,
-            TenantId: TENANT_ID,
-            EvaluationId: `eval-3088-${traceId}-${i}`,
-            Version: "1",
-            EvaluatorId: EVALUATOR_ID,
-            EvaluatorType: "custom",
-            TraceId: traceId,
-            Status: "processed",
-            Score: passed === 1 ? 0.9 : 0.1,
-            Passed: passed,
-            Label: passed === 1 ? "good" : "bad",
-            LastProcessedEventId: `evt-3088-${traceId}-${i}`,
-            UpdatedAt: new Date().toISOString(),
-          });
-        }
+    // Insert 3 evaluation_runs rows per trace (6 total). Half pass (Passed=1)
+    // so the average pass rate across traces is a meaningful 0.5.
+    const traceIds = [TRACE_ID_0, TRACE_ID_1];
+    const evalRows: Array<Record<string, unknown>> = [];
+    for (const traceId of traceIds) {
+      for (let i = 0; i < EVALS_PER_TRACE; i++) {
+        // Alternate passed values so ~half of evals per trace pass.
+        const passed = i % 2 === 0 ? 1 : 0;
+        evalRows.push({
+          ProjectionId: `proj-3088-${traceId}-${i}`,
+          TenantId: TENANT_ID,
+          EvaluationId: `eval-3088-${traceId}-${i}`,
+          Version: "1",
+          EvaluatorId: EVALUATOR_ID,
+          EvaluatorType: "custom",
+          TraceId: traceId,
+          Status: "processed",
+          Score: passed === 1 ? 0.9 : 0.1,
+          Passed: passed,
+          Label: passed === 1 ? "good" : "bad",
+          LastProcessedEventId: `evt-3088-${traceId}-${i}`,
+          UpdatedAt: new Date().toISOString(),
+        });
       }
+    }
 
-      await ch.insert({
-        table: "evaluation_runs",
-        values: evalRows,
-        format: "JSONEachRow",
-        clickhouse_settings: { async_insert: 0, wait_for_async_insert: 0 },
-      });
-    },
-    60_000,
-  );
+    await ch.insert({
+      table: "evaluation_runs",
+      values: evalRows,
+      format: "JSONEachRow",
+      clickhouse_settings: { async_insert: 0, wait_for_async_insert: 0 },
+    });
+  }, 60_000);
 
   afterAll(async () => {
     await cleanupTestData(TENANT_ID);
@@ -120,7 +117,7 @@ describe("trace-eval-mix-inflation (#3088)", () => {
     rows: Array<Record<string, unknown>>,
     alias: string,
   ): number {
-    const currentRows = rows.filter((r) => r["period"] === "current");
+    const currentRows = rows.filter((r) => r.period === "current");
     expect(currentRows.length).toBeGreaterThan(0);
     // Sum across all current buckets (some paths return one row, others
     // return one row per date bucket).
@@ -136,7 +133,7 @@ describe("trace-eval-mix-inflation (#3088)", () => {
     rows: Array<Record<string, unknown>>,
     alias: string,
   ): number {
-    const currentRows = rows.filter((r) => r["period"] === "current");
+    const currentRows = rows.filter((r) => r.period === "current");
     const values = currentRows
       .map((r) => Number(r[alias]))
       .filter((n) => Number.isFinite(n));
@@ -179,10 +176,7 @@ describe("trace-eval-mix-inflation (#3088)", () => {
       const rows = await runQuery(sql, params);
 
       // Cost: 2 traces × 10 = 20. Pre-fix would have returned 60 (2 × 10 × 3 evals).
-      const totalCost = extractMetric(
-        rows,
-        "0__performance_total_cost__sum",
-      );
+      const totalCost = extractMetric(rows, "0__performance_total_cost__sum");
       expect(totalCost).toBeCloseTo(EXPECTED_TOTAL_COST);
       expect(totalCost).not.toBeCloseTo(EXPECTED_TOTAL_COST * EVALS_PER_TRACE);
 
@@ -219,13 +213,11 @@ describe("trace-eval-mix-inflation (#3088)", () => {
       });
 
       const rows = await runQuery(sql, params);
-      const currentRows = rows.filter((r) => r["period"] === "current");
+      const currentRows = rows.filter((r) => r.period === "current");
 
       // seedSpans populates Models: ["gpt-5-mini"] for every trace, so we
       // expect the cost for that single group to equal EXPECTED_TOTAL_COST.
-      const gpt5Rows = currentRows.filter(
-        (r) => r["group_key"] === "gpt-5-mini",
-      );
+      const gpt5Rows = currentRows.filter((r) => r.group_key === "gpt-5-mini");
       expect(gpt5Rows.length).toBeGreaterThan(0);
 
       const totalCost = gpt5Rows
@@ -271,10 +263,7 @@ describe("trace-eval-mix-inflation (#3088)", () => {
 
       const rows = await runQuery(sql, params);
 
-      const totalCost = extractMetric(
-        rows,
-        "0__performance_total_cost__sum",
-      );
+      const totalCost = extractMetric(rows, "0__performance_total_cost__sum");
       expect(totalCost).toBeCloseTo(EXPECTED_TOTAL_COST);
       expect(totalCost).not.toBeCloseTo(EXPECTED_TOTAL_COST * EVALS_PER_TRACE);
 

@@ -13,11 +13,10 @@ import {
 } from "~/experiments-v3/types";
 import { resetApp } from "~/server/app-layer/app";
 import { initializeDefaultApp } from "~/server/app-layer/presets";
-import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import { getTestProject } from "~/utils/testUtils";
 import { abortManager } from "../abortManager";
 import { type OrchestratorInput, runOrchestrator } from "../orchestrator";
-import type { EvaluationV3Event, ExecutionScope } from "../types";
+import type { EvaluationV3Event } from "../types";
 
 /**
  * Integration tests for the orchestrator against langwatch_nlp.

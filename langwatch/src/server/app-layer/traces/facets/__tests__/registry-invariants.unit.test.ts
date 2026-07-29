@@ -143,7 +143,7 @@ describe("FACET_REGISTRY shape", () => {
       const def = FACET_REGISTRY.find((d) => d.key === "eventAttributeKeys");
       // Must double-arrayJoin: outer for events, inner for map keys per event.
       // Without both, distinct keys would collapse onto the first event only.
-      if (!def || def.kind !== "dynamic_keys") {
+      if (def?.kind !== "dynamic_keys") {
         throw new Error("expected eventAttributeKeys to be dynamic_keys");
       }
       const { sql } = def.queryBuilder(baseCtx);
@@ -223,7 +223,7 @@ describe("Map-keys discovery facets", () => {
     MAP_KEY_FACETS.map((f) => [f.key, f.map]),
   )("[%s] keeps the empty-map filter on the keys subcolumn", (key, map) => {
     const def = FACET_REGISTRY.find((d) => d.key === key);
-    if (!def || def.kind !== "dynamic_keys") {
+    if (def?.kind !== "dynamic_keys") {
       throw new Error(`expected ${key} to be a dynamic_keys facet`);
     }
     const { sql } = def.queryBuilder(baseCtx);

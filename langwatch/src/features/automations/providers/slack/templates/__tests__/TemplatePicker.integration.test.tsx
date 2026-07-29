@@ -152,9 +152,7 @@ describe("SlackBlockKitTemplatePicker", () => {
     it("hides the other-cadence disclosure because alerts have no digest layouts", () => {
       renderPicker({ kind: "graphAlert" });
 
-      expect(
-        screen.queryByText(/more layouts for/i),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText(/more layouts for/i)).not.toBeInTheDocument();
     });
   });
 });

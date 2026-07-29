@@ -5,14 +5,20 @@
  * Pure function tests — no mocking needed.
  */
 
-import { describe, expect, it } from "vitest";
 import Parse from "papaparse";
-import type { Trace, Evaluation, Span, LLMSpan, RAGSpan } from "~/server/tracer/types";
-import {
-  serializeTracesToSummaryCsv,
-  serializeTracesToFullCsv,
-} from "../serializers/csv-serializer";
+import { describe, expect, it } from "vitest";
+import type {
+  Evaluation,
+  LLMSpan,
+  RAGSpan,
+  Span,
+  Trace,
+} from "~/server/tracer/types";
 import { stripCsvHeader } from "../export.service";
+import {
+  serializeTracesToFullCsv,
+  serializeTracesToSummaryCsv,
+} from "../serializers/csv-serializer";
 
 // ---------------------------------------------------------------------------
 // Test data builders
@@ -72,9 +78,7 @@ function buildLLMSpan(overrides?: Partial<LLMSpan>): LLMSpan {
     vendor: "openai",
     input: {
       type: "chat_messages",
-      value: [
-        { role: "user", content: "Hello" },
-      ],
+      value: [{ role: "user", content: "Hello" }],
     },
     output: { type: "text", value: "Hi there" },
     timestamps: {
@@ -152,18 +156,18 @@ describe("serializeTracesToSummaryCsv()", () => {
       expect(result.data).toHaveLength(1);
 
       const row = result.data[0] as Record<string, string>;
-      expect(row["trace_id"]).toBe("trace-1");
-      expect(row["timestamp"]).toBe("1700000000000");
-      expect(row["input"]).toBe("Hello world");
-      expect(row["output"]).toBe("Hi there");
-      expect(row["labels"]).toBe("production");
-      expect(row["first_token_ms"]).toBe("100");
-      expect(row["total_time_ms"]).toBe("500");
-      expect(row["prompt_tokens"]).toBe("10");
-      expect(row["completion_tokens"]).toBe("20");
-      expect(row["total_cost"]).toBe("0.001");
-      expect(row["topic"]).toBe("topic-1");
-      expect(row["subtopic"]).toBe("subtopic-1");
+      expect(row.trace_id).toBe("trace-1");
+      expect(row.timestamp).toBe("1700000000000");
+      expect(row.input).toBe("Hello world");
+      expect(row.output).toBe("Hi there");
+      expect(row.labels).toBe("production");
+      expect(row.first_token_ms).toBe("100");
+      expect(row.total_time_ms).toBe("500");
+      expect(row.prompt_tokens).toBe("10");
+      expect(row.completion_tokens).toBe("20");
+      expect(row.total_cost).toBe("0.001");
+      expect(row.topic).toBe("topic-1");
+      expect(row.subtopic).toBe("subtopic-1");
     });
   });
 
@@ -171,8 +175,19 @@ describe("serializeTracesToSummaryCsv()", () => {
     it("includes per-evaluator score, passed, label, and details columns", () => {
       const trace = buildTrace({
         evaluations: [
-          buildEvaluation({ name: "Faithfulness", score: 0.95, passed: true, details: "All good" }),
-          buildEvaluation({ name: "Relevance", score: 0.8, passed: false, label: "low", details: "Needs work" }),
+          buildEvaluation({
+            name: "Faithfulness",
+            score: 0.95,
+            passed: true,
+            details: "All good",
+          }),
+          buildEvaluation({
+            name: "Relevance",
+            score: 0.8,
+            passed: false,
+            label: "low",
+            details: "Needs work",
+          }),
         ],
       });
 
@@ -183,13 +198,13 @@ describe("serializeTracesToSummaryCsv()", () => {
 
       const result = parseCsv(csv);
       const row = result.data[0] as Record<string, string>;
-      expect(row["Faithfulness_score"]).toBe("0.95");
-      expect(row["Faithfulness_passed"]).toBe("true");
-      expect(row["Faithfulness_details"]).toBe("All good");
-      expect(row["Relevance_score"]).toBe("0.8");
-      expect(row["Relevance_passed"]).toBe("false");
-      expect(row["Relevance_label"]).toBe("low");
-      expect(row["Relevance_details"]).toBe("Needs work");
+      expect(row.Faithfulness_score).toBe("0.95");
+      expect(row.Faithfulness_passed).toBe("true");
+      expect(row.Faithfulness_details).toBe("All good");
+      expect(row.Relevance_score).toBe("0.8");
+      expect(row.Relevance_passed).toBe("false");
+      expect(row.Relevance_label).toBe("low");
+      expect(row.Relevance_details).toBe("Needs work");
     });
   });
 
@@ -203,10 +218,10 @@ describe("serializeTracesToSummaryCsv()", () => {
 
       const result = parseCsv(csv);
       const row = result.data[0] as Record<string, string>;
-      expect(row["Toxicity_score"]).toBe("");
-      expect(row["Toxicity_passed"]).toBe("");
-      expect(row["Toxicity_label"]).toBe("");
-      expect(row["Toxicity_details"]).toBe("");
+      expect(row.Toxicity_score).toBe("");
+      expect(row.Toxicity_passed).toBe("");
+      expect(row.Toxicity_label).toBe("");
+      expect(row.Toxicity_details).toBe("");
     });
   });
 
@@ -222,7 +237,7 @@ describe("serializeTracesToSummaryCsv()", () => {
 
       const result = parseCsv(csv);
       const row = result.data[0] as Record<string, string>;
-      expect(row["input"]).toBe('He said "hello, world"\nand left');
+      expect(row.input).toBe('He said "hello, world"\nand left');
     });
   });
 
@@ -238,11 +253,11 @@ describe("serializeTracesToSummaryCsv()", () => {
 
       const result = parseCsv(csv);
       const row = result.data[0] as Record<string, string>;
-      expect(row["first_token_ms"]).toBe("");
-      expect(row["total_time_ms"]).toBe("");
-      expect(row["prompt_tokens"]).toBe("");
-      expect(row["completion_tokens"]).toBe("");
-      expect(row["total_cost"]).toBe("");
+      expect(row.first_token_ms).toBe("");
+      expect(row.total_time_ms).toBe("");
+      expect(row.prompt_tokens).toBe("");
+      expect(row.completion_tokens).toBe("");
+      expect(row.total_cost).toBe("");
     });
   });
 
@@ -281,8 +296,8 @@ describe("serializeTracesToSummaryCsv()", () => {
       const result = parseCsv(csv);
       const row = result.data[0] as Record<string, string>;
       // metadata should be serialized as JSON containing the custom keys
-      expect(row["metadata"]).toContain("custom_field");
-      expect(row["metadata"]).toContain("custom_value");
+      expect(row.metadata).toContain("custom_field");
+      expect(row.metadata).toContain("custom_value");
     });
   });
 });
@@ -295,11 +310,7 @@ describe("serializeTracesToFullCsv()", () => {
   describe("when trace has LLM and RAG spans", () => {
     it("creates one row per span with trace fields repeated", () => {
       const trace = buildTrace({
-        spans: [
-          buildBaseSpan(),
-          buildLLMSpan(),
-          buildRAGSpan(),
-        ],
+        spans: [buildBaseSpan(), buildLLMSpan(), buildRAGSpan()],
       });
 
       const csv = serializeTracesToFullCsv({
@@ -313,10 +324,10 @@ describe("serializeTracesToFullCsv()", () => {
 
       // Each row should have trace-level fields repeated
       for (const row of result.data as Record<string, string>[]) {
-        expect(row["trace_id"]).toBe("trace-1");
-        expect(row["trace_timestamp"]).toBe("1700000000000");
-        expect(row["trace_input"]).toBe("Hello world");
-        expect(row["trace_output"]).toBe("Hi there");
+        expect(row.trace_id).toBe("trace-1");
+        expect(row.trace_timestamp).toBe("1700000000000");
+        expect(row.trace_input).toBe("Hello world");
+        expect(row.trace_output).toBe("Hi there");
       }
     });
   });
@@ -336,10 +347,10 @@ describe("serializeTracesToFullCsv()", () => {
 
       const result = parseCsv(csv);
       const row = result.data[0] as Record<string, string>;
-      expect(row["span_model"]).toBe("gpt-4o");
-      expect(row["span_vendor"]).toBe("openai");
-      expect(row["span_type"]).toBe("llm");
-      expect(row["span_name"]).toBe("ChatCompletion");
+      expect(row.span_model).toBe("gpt-4o");
+      expect(row.span_vendor).toBe("openai");
+      expect(row.span_type).toBe("llm");
+      expect(row.span_name).toBe("ChatCompletion");
     });
   });
 
@@ -360,7 +371,7 @@ describe("serializeTracesToFullCsv()", () => {
 
       const result = parseCsv(csv);
       const row = result.data[0] as Record<string, string>;
-      const parsed = JSON.parse(row["span_input"]!);
+      const parsed = JSON.parse(row.span_input!);
       expect(parsed).toEqual([{ role: "user", content: "Hello" }]);
     });
   });
@@ -377,7 +388,7 @@ describe("serializeTracesToFullCsv()", () => {
 
       const result = parseCsv(csv);
       const row = result.data[0] as Record<string, string>;
-      const contexts = JSON.parse(row["span_contexts"]!);
+      const contexts = JSON.parse(row.span_contexts!);
       expect(contexts).toHaveLength(2);
       expect(contexts[0]).toEqual({
         document_id: "doc-1",
@@ -410,11 +421,11 @@ describe("serializeTracesToFullCsv()", () => {
 
       const result = parseCsv(csv);
       const row = result.data[0] as Record<string, string>;
-      expect(row["span_duration_ms"]).toBe("1200");
-      expect(row["span_first_token_ms"]).toBe("100");
-      expect(row["span_prompt_tokens"]).toBe("500");
-      expect(row["span_completion_tokens"]).toBe("150");
-      expect(row["span_cost"]).toBe("0.003");
+      expect(row.span_duration_ms).toBe("1200");
+      expect(row.span_first_token_ms).toBe("100");
+      expect(row.span_prompt_tokens).toBe("500");
+      expect(row.span_completion_tokens).toBe("150");
+      expect(row.span_cost).toBe("0.003");
     });
   });
 
@@ -433,8 +444,8 @@ describe("serializeTracesToFullCsv()", () => {
 
       const result = parseCsv(csv);
       const row = result.data[0] as Record<string, string>;
-      expect(row["span_input"]).toBe("");
-      expect(row["span_output"]).toBe("");
+      expect(row.span_input).toBe("");
+      expect(row.span_output).toBe("");
     });
   });
 
@@ -443,7 +454,12 @@ describe("serializeTracesToFullCsv()", () => {
       const trace = buildTrace({
         spans: [buildLLMSpan()],
         evaluations: [
-          buildEvaluation({ name: "Toxicity", score: 0.95, passed: true, details: "No toxic content detected" }),
+          buildEvaluation({
+            name: "Toxicity",
+            score: 0.95,
+            passed: true,
+            details: "No toxic content detected",
+          }),
         ],
       });
 
@@ -454,9 +470,9 @@ describe("serializeTracesToFullCsv()", () => {
 
       const result = parseCsv(csv);
       const row = result.data[0] as Record<string, string>;
-      expect(row["Toxicity_score"]).toBe("0.95");
-      expect(row["Toxicity_passed"]).toBe("true");
-      expect(row["Toxicity_details"]).toBe("No toxic content detected");
+      expect(row.Toxicity_score).toBe("0.95");
+      expect(row.Toxicity_passed).toBe("true");
+      expect(row.Toxicity_details).toBe("No toxic content detected");
     });
   });
 
@@ -474,7 +490,7 @@ describe("serializeTracesToFullCsv()", () => {
 
       const result = parseCsv(csv);
       const row = result.data[0] as Record<string, string>;
-      const params = JSON.parse(row["span_params"]!);
+      const params = JSON.parse(row.span_params!);
       expect(params).toEqual({ temperature: 0.7, max_tokens: 100 });
     });
   });
@@ -482,7 +498,11 @@ describe("serializeTracesToFullCsv()", () => {
   describe("when span has an error", () => {
     it("includes span_error with the error message", () => {
       const span = buildBaseSpan({
-        error: { has_error: true, message: "Something broke", stacktrace: ["line1"] },
+        error: {
+          has_error: true,
+          message: "Something broke",
+          stacktrace: ["line1"],
+        },
       });
       const trace = buildTrace({ spans: [span] });
 
@@ -493,7 +513,7 @@ describe("serializeTracesToFullCsv()", () => {
 
       const result = parseCsv(csv);
       const row = result.data[0] as Record<string, string>;
-      expect(row["span_error"]).toContain("Something broke");
+      expect(row.span_error).toContain("Something broke");
     });
   });
 
@@ -512,8 +532,8 @@ describe("serializeTracesToFullCsv()", () => {
 
       const result = parseCsv(csv);
       const row = result.data[0] as Record<string, string>;
-      expect(row["span_id"]).toBe("child-span");
-      expect(row["parent_span_id"]).toBe("parent-span");
+      expect(row.span_id).toBe("child-span");
+      expect(row.parent_span_id).toBe("parent-span");
     });
   });
 
@@ -531,7 +551,7 @@ describe("serializeTracesToFullCsv()", () => {
 
       const result = parseCsv(csv);
       const row = result.data[0] as Record<string, string>;
-      expect(row["trace_error"]).toContain("Trace error");
+      expect(row.trace_error).toContain("Trace error");
     });
   });
 });

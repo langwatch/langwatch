@@ -10,7 +10,7 @@
  *   no longer get FORBIDDEN noise on every page load.
  */
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 // Pre-stub the admin lookup so the test isn't coupled to ADMIN_EMAILS env.
 vi.mock("../../../../ee/admin/isAdmin", () => ({
@@ -19,7 +19,7 @@ vi.mock("../../../../ee/admin/isAdmin", () => ({
 }));
 
 // We import after the mock so the module sees our stubbed isAdmin.
-import { resolveOpsScope, checkOpsPermission } from "../rbac";
+import { checkOpsPermission, resolveOpsScope } from "../rbac";
 
 describe("resolveOpsScope (lw#3584)", () => {
   describe("when the caller is a non-admin user", () => {

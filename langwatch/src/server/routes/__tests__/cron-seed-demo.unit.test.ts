@@ -1,4 +1,12 @@
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import type { SeedRunReport } from "../../../../scripts/dogfood/governance/_lib/seedRunner";
 
 vi.mock("../../../../scripts/dogfood/governance/seed-demo", () => ({
@@ -43,7 +51,9 @@ describe("/api/cron/seed_demo", () => {
     const seedMod = await import(
       "../../../../scripts/dogfood/governance/seed-demo"
     );
-    runSeedDemoMock = seedMod.runSeedDemo as unknown as ReturnType<typeof vi.fn>;
+    runSeedDemoMock = seedMod.runSeedDemo as unknown as ReturnType<
+      typeof vi.fn
+    >;
   }, 30_000);
 
   beforeEach(() => {

@@ -4,15 +4,20 @@ import { navigateDedupKey, reserveNavigate } from "../langyNavigateDedup";
 describe("navigateDedupKey", () => {
   describe("given a turn id and a resolved destination", () => {
     it("combines them into one key", () => {
-      expect(navigateDedupKey({ turnId: "turn-1", href: "/demo/simulations/set_1/batch_1?openRun=run_1" })).toBe(
-        "turn-1:/demo/simulations/set_1/batch_1?openRun=run_1",
-      );
+      expect(
+        navigateDedupKey({
+          turnId: "turn-1",
+          href: "/demo/simulations/set_1/batch_1?openRun=run_1",
+        }),
+      ).toBe("turn-1:/demo/simulations/set_1/batch_1?openRun=run_1");
     });
   });
 
   describe("given no active turn id yet", () => {
     it("still produces a stable key", () => {
-      expect(navigateDedupKey({ turnId: null, href: "/demo/x" })).toBe(":/demo/x");
+      expect(navigateDedupKey({ turnId: null, href: "/demo/x" })).toBe(
+        ":/demo/x",
+      );
     });
   });
 });

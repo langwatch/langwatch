@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-
-import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
 import type { LangyAnalyticsEventRepository } from "~/server/app-layer/langy/repositories/langy-analytics-event.repository";
+import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
 
 import type { LangyAnalyticsEventProjectionRecord } from "../langyAnalyticsEvent.mapProjection";
 import { LangyAnalyticsEventAppendStore } from "../langyAnalyticsEvent.store";
@@ -53,7 +52,11 @@ describe("LangyAnalyticsEventAppendStore", () => {
   it("uses one tenant-scoped batch insert during replay", async () => {
     const repository = makeRepository();
     const store = new LangyAnalyticsEventAppendStore(repository);
-    const second = { ...record, eventId: "event_2", aggregateId: "conversation_2" };
+    const second = {
+      ...record,
+      eventId: "event_2",
+      aggregateId: "conversation_2",
+    };
 
     await store.bulkAppend([record, second], {
       tenantId: createTenantId("project_1"),

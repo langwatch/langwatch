@@ -1,13 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
-import type { FoldProjectionStore } from "../foldProjection.types";
-import { MAX_APPLIED_EVENT_IDS } from "../foldCache/foldCacheEntry";
-import { ProjectionRouter } from "../projectionRouter";
 import {
   createMockFoldProjectionDefinition,
   createMockFoldProjectionStore,
   createMockQueueManager,
   TEST_CONSTANTS,
 } from "../../services/__tests__/testHelpers";
+import { MAX_APPLIED_EVENT_IDS } from "../foldCache/foldCacheEntry";
+import type { FoldProjectionStore } from "../foldProjection.types";
+import { ProjectionRouter } from "../projectionRouter";
 
 /**
  * A store carrying a durable applied-event-id watermark: it answers reads with
@@ -51,9 +51,7 @@ describe("ProjectionRouter registration guard", () => {
           options: { coalesceMaxBatch: MAX_APPLIED_EVENT_IDS + 1 },
         });
 
-        expect(() =>
-          createRouter().registerFoldProjection(fold),
-        ).toThrow(
+        expect(() => createRouter().registerFoldProjection(fold)).toThrow(
           new RegExp(
             `durable-over-cap.*${MAX_APPLIED_EVENT_IDS + 1}.*${MAX_APPLIED_EVENT_IDS}`,
           ),
@@ -68,9 +66,7 @@ describe("ProjectionRouter registration guard", () => {
           options: { coalesceMaxBatch: MAX_APPLIED_EVENT_IDS - 1 },
         });
 
-        expect(() =>
-          createRouter().registerFoldProjection(fold),
-        ).not.toThrow();
+        expect(() => createRouter().registerFoldProjection(fold)).not.toThrow();
       });
     });
   });
@@ -83,9 +79,7 @@ describe("ProjectionRouter registration guard", () => {
           options: { coalesceMaxBatch: MAX_APPLIED_EVENT_IDS },
         });
 
-        expect(() =>
-          createRouter().registerFoldProjection(fold),
-        ).not.toThrow();
+        expect(() => createRouter().registerFoldProjection(fold)).not.toThrow();
       });
     });
   });

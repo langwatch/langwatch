@@ -885,7 +885,11 @@ describe("guardProjectId — ShareLink", () => {
           model: "ShareLink",
           action: "updateMany",
           args: {
-            where: { id: "share_1", projectId: "project_1", viewCount: { lt: 1 } },
+            where: {
+              id: "share_1",
+              projectId: "project_1",
+              viewCount: { lt: 1 },
+            },
             data: { viewCount: { increment: 1 } },
           },
         }),

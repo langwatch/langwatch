@@ -23,14 +23,11 @@ import {
 } from "../constants/onboarding-data";
 import { useOnboardingFormContext } from "../contexts/form-context";
 import {
-  type CompanySize,
   type DesireType,
   type OnboardingFlowConfig,
-  type OnboardingFormData,
   type OnboardingScreen,
   OnboardingScreenIndex,
   type RoleType,
-  type SolutionType,
   type UsageStyle,
 } from "../types/types";
 

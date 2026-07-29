@@ -21,11 +21,7 @@ export const fallbackTriggerSchema = z.enum([
 ]);
 export type FallbackTrigger = z.infer<typeof fallbackTriggerSchema>;
 
-export const guardrailDirectionSchema = z.enum([
-  "pre",
-  "post",
-  "stream_chunk",
-]);
+export const guardrailDirectionSchema = z.enum(["pre", "post", "stream_chunk"]);
 export type GuardrailDirection = z.infer<typeof guardrailDirectionSchema>;
 
 // VK opt-in / opt-out wiring to project guardrails. Each entry binds a
@@ -97,7 +93,9 @@ export const virtualKeyConfigSchema = z.object({
     .default({ mode: "respect", ttlS: 3600 }),
   fallback: z
     .object({
-      on: z.array(fallbackTriggerSchema).default(["5xx", "timeout", "rate_limit_exceeded"]),
+      on: z
+        .array(fallbackTriggerSchema)
+        .default(["5xx", "timeout", "rate_limit_exceeded"]),
       timeoutMs: z.number().int().positive().default(30000),
       maxAttempts: z.number().int().positive().default(3),
     })

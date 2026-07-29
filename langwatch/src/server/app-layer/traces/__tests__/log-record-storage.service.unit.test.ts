@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import type { CanonicalLogRecordRepository } from "~/server/app-layer/logs/repositories/canonical-log-record.repository";
 import { LogRecordStorageService } from "../log-record-storage.service";
-import { mergeStoredLogRows } from "../repositories/log-record-storage.repository";
 import type {
   LogRecordStorageRepository,
   StoredLogRecordRow,
 } from "../repositories/log-record-storage.repository";
+import { mergeStoredLogRows } from "../repositories/log-record-storage.repository";
 
 const row: StoredLogRecordRow = {
   traceId: "trace-1",
@@ -138,7 +138,10 @@ describe("mergeStoredLogRows", () => {
         scopeName: "com.anthropic.claude_code.events",
         scopeVersion: null,
       };
-      const canonical: StoredLogRecordRow = { ...legacy, body: "canonical-body" };
+      const canonical: StoredLogRecordRow = {
+        ...legacy,
+        body: "canonical-body",
+      };
 
       const merged = mergeStoredLogRows([legacy, canonical]);
 

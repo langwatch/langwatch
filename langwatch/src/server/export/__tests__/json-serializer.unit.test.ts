@@ -6,10 +6,15 @@
  */
 
 import { describe, expect, it } from "vitest";
-import type { Trace, Evaluation, LLMSpan, RAGSpan } from "~/server/tracer/types";
+import type {
+  Evaluation,
+  LLMSpan,
+  RAGSpan,
+  Trace,
+} from "~/server/tracer/types";
 import {
-  serializeTraceToSummaryJson,
   serializeTraceToFullJson,
+  serializeTraceToSummaryJson,
 } from "../serializers/json-serializer";
 
 // ---------------------------------------------------------------------------

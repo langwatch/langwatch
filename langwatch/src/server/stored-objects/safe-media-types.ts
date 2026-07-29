@@ -16,19 +16,13 @@
  * Media-type prefixes that are served verbatim on the read path.
  * All subtypes of these families (e.g. `audio/mp3`, `image/png`) pass.
  */
-export const SAFE_MEDIA_TYPE_PREFIXES = [
-  "audio/",
-  "image/",
-  "video/",
-] as const;
+export const SAFE_MEDIA_TYPE_PREFIXES = ["audio/", "image/", "video/"] as const;
 
 /**
  * Exact media types served verbatim on the read path in addition to the
  * prefix families above.
  */
-export const SAFE_MEDIA_TYPES_EXACT = new Set([
-  "application/pdf",
-]);
+export const SAFE_MEDIA_TYPES_EXACT = new Set(["application/pdf"]);
 
 /**
  * Returns `true` when the read path (`/api/files/:id`) will serve the given
@@ -40,6 +34,7 @@ export const SAFE_MEDIA_TYPES_EXACT = new Set([
  */
 export function isReadbackSafe(mediaType: string): boolean {
   if (SAFE_MEDIA_TYPES_EXACT.has(mediaType)) return true;
-  if (SAFE_MEDIA_TYPE_PREFIXES.some((p) => mediaType.startsWith(p))) return true;
+  if (SAFE_MEDIA_TYPE_PREFIXES.some((p) => mediaType.startsWith(p)))
+    return true;
   return false;
 }

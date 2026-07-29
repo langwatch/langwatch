@@ -157,7 +157,7 @@ export const workflowRouter = createTRPCRouter({
         },
       });
 
-      if (!workflow || !workflow.latestVersion?.dsl) {
+      if (!workflow?.latestVersion?.dsl) {
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "Workflow not found",
@@ -571,7 +571,7 @@ export const workflowRouter = createTRPCRouter({
         where: { id: input.versionId, projectId: input.projectId },
       });
 
-      if (!version || !version.dsl) {
+      if (!version?.dsl) {
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "Workflow version not found",
@@ -744,7 +744,7 @@ export const workflowRouter = createTRPCRouter({
 
       const sourceWorkflow = workflow.copiedFrom;
 
-      if (!sourceWorkflow || !sourceWorkflow.latestVersion?.dsl) {
+      if (!sourceWorkflow?.latestVersion?.dsl) {
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "Source workflow or its latest version not found",

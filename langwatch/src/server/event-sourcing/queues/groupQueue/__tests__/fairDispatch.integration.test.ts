@@ -1,11 +1,19 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { Redis } from "ioredis";
 import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+} from "vitest";
+import {
+  getTestRedisConnection,
   startTestContainers,
   stopTestContainers,
-  getTestRedisConnection,
 } from "../../../__tests__/integration/testContainers";
-import { GroupStagingScripts, CLAIMANT_WINDOW_MS } from "../scripts";
+import { CLAIMANT_WINDOW_MS, GroupStagingScripts } from "../scripts";
 
 // Behavioral suite for specs/event-sourcing/work-conserving-fair-dispatch.feature.
 //
@@ -70,7 +78,10 @@ let inflight: Slot[] = [];
 
 async function fillToFleet(size: number) {
   while (inflight.length < size) {
-    const r = await scripts.dispatch({ nowMs: Date.now(), activeTtlSec: ACTIVE_TTL_SEC });
+    const r = await scripts.dispatch({
+      nowMs: Date.now(),
+      activeTtlSec: ACTIVE_TTL_SEC,
+    });
     if (!r) break;
     inflight.push({ groupId: r.groupId, stagedJobId: r.stagedJobId });
   }
@@ -116,7 +127,13 @@ let prevBudgetEnv: string | undefined;
 async function flushSuiteKeys() {
   let cursor = "0";
   do {
-    const [next, keys] = await redis.scan(cursor, "MATCH", `${QUEUE_NAME}*`, "COUNT", 500);
+    const [next, keys] = await redis.scan(
+      cursor,
+      "MATCH",
+      `${QUEUE_NAME}*`,
+      "COUNT",
+      500,
+    );
     cursor = next;
     if (keys.length > 0) await redis.del(...keys);
   } while (cursor !== "0");
@@ -330,8 +347,14 @@ describe("work-conserving fair dispatch", () => {
           shouldReplace: true,
         });
 
-        const first = await scripts.dispatch({ nowMs: Date.now(), activeTtlSec: ACTIVE_TTL_SEC });
-        const second = await scripts.dispatch({ nowMs: Date.now(), activeTtlSec: ACTIVE_TTL_SEC });
+        const first = await scripts.dispatch({
+          nowMs: Date.now(),
+          activeTtlSec: ACTIVE_TTL_SEC,
+        });
+        const second = await scripts.dispatch({
+          nowMs: Date.now(),
+          activeTtlSec: ACTIVE_TTL_SEC,
+        });
 
         expect(first?.groupId).toBe(gid("solo", "early"));
         expect(second?.groupId).toBe(gid("solo", "late"));
@@ -382,7 +405,9 @@ describe("work-conserving fair dispatch", () => {
 
   // Off by default; fails to the protective (low) side when clamp state is gone.
   describe("Rule: an operator can still hard-clamp a pathological tenant", () => {
-    it.todo("holds a tenant to an explicit ceiling regardless of free capacity");
+    it.todo(
+      "holds a tenant to an explicit ceiling regardless of free capacity",
+    );
     it.todo("leaves other tenants unaffected by one tenant's ceiling");
   });
 
@@ -390,8 +415,12 @@ describe("work-conserving fair dispatch", () => {
   // gate falls back to the static operator cap until the next reconcile rebuilds
   // the water level from in-flight + parked truth.
   describe("Rule: a stale dynamic cap fails safe and is rebuilt from truth", () => {
-    it.todo("falls back to the static operator cap when the dynamic-cap value has lapsed");
-    it.todo("rebuilds the water level from authoritative counts on the next reconcile");
+    it.todo(
+      "falls back to the static operator cap when the dynamic-cap value has lapsed",
+    );
+    it.todo(
+      "rebuilds the water level from authoritative counts on the next reconcile",
+    );
   });
 
   // Mixed-fleet rollout: an old pod (feature off, static-cap path) and a new pod
@@ -425,18 +454,30 @@ describe("work-conserving fair dispatch", () => {
         // new pod drains a few each pass
         process.env.LANGWATCH_DISPATCH_GLOBAL_BUDGET = String(FLEET);
         for (let i = 0; i < 3; i++) {
-          const r = await scripts.dispatch({ nowMs: Date.now(), activeTtlSec: ACTIVE_TTL_SEC });
+          const r = await scripts.dispatch({
+            nowMs: Date.now(),
+            activeTtlSec: ACTIVE_TTL_SEC,
+          });
           if (!r) break;
           dispatched++;
-          await scripts.complete({ groupId: r.groupId, stagedJobId: r.stagedJobId });
+          await scripts.complete({
+            groupId: r.groupId,
+            stagedJobId: r.stagedJobId,
+          });
         }
       }
       // new dispatcher keeps draining until legacy-ready is empty
       for (;;) {
-        const r = await scripts.dispatch({ nowMs: Date.now(), activeTtlSec: ACTIVE_TTL_SEC });
+        const r = await scripts.dispatch({
+          nowMs: Date.now(),
+          activeTtlSec: ACTIVE_TTL_SEC,
+        });
         if (!r) break;
         dispatched++;
-        await scripts.complete({ groupId: r.groupId, stagedJobId: r.stagedJobId });
+        await scripts.complete({
+          groupId: r.groupId,
+          stagedJobId: r.stagedJobId,
+        });
       }
       // every group an old pod added mid-rollout was dispatched - none stranded
       expect(dispatched).toBe(staged);

@@ -1,4 +1,3 @@
-import { useState } from "react";
 import {
   Badge,
   Box,
@@ -13,24 +12,25 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { Currency as PrismaCurrency } from "@prisma/client";
-import { ArrowLeft, Check, CircleDollarSign, DollarSign, Euro, Info } from "lucide-react";
-import { api } from "~/utils/api";
+import { ArrowLeft, Check, DollarSign, Euro, Info } from "lucide-react";
+import { useState } from "react";
 import { Link } from "~/components/ui/link";
+import { api } from "~/utils/api";
+import { CONTACT_SALES_URL } from "../../../ee/licensing/constants";
+import {
+  type BillingInterval,
+  type Currency,
+  currencySymbol,
+  ENTERPRISE_PLAN_FEATURES,
+  FREE_PLAN_FEATURES,
+  formatPrice,
+  getGrowthPlanFeatures,
+  getGrowthSeatPriceCents,
+} from "../subscription/billing-plans";
 import {
   type ComparisonPlanId,
   resolveCurrentComparisonPlan,
 } from "./planCurrentResolver";
-import { CONTACT_SALES_URL } from "../../../ee/licensing/constants";
-import {
-  type Currency,
-  type BillingInterval,
-  getGrowthSeatPriceCents,
-  formatPrice,
-  currencySymbol,
-  FREE_PLAN_FEATURES,
-  getGrowthPlanFeatures,
-  ENTERPRISE_PLAN_FEATURES,
-} from "../subscription/billing-plans";
 
 type PlanColumn = {
   id: ComparisonPlanId;
@@ -112,7 +112,13 @@ function PlanCardActions({
     if (currentPlan === "growth") {
       return (
         <VStack width="full" gap={2}>
-          <Button asChild width="full" color="bg.emphasized" backgroundColor="orange.600" variant="solid">
+          <Button
+            asChild
+            width="full"
+            color="bg.emphasized"
+            backgroundColor="orange.600"
+            variant="solid"
+          >
             <Link href="/settings/members">Add Members</Link>
           </Button>
         </VStack>
@@ -221,11 +227,13 @@ export function PlansComparisonPage({
   const showTieredNotice = pricingModel === "TIERED" && !activePlan?.free;
 
   const detectedCurrency = api.currency.detectCurrency.useQuery({});
-  const [selectedCurrency, setSelectedCurrency] = useState<Currency | null>(null);
-  const currency = selectedCurrency ?? detectedCurrency.data?.currency ?? PrismaCurrency.EUR;
-  const [billingPeriod, setBillingPeriod] = useState<BillingInterval>(
-    "monthly",
+  const [selectedCurrency, setSelectedCurrency] = useState<Currency | null>(
+    null,
   );
+  const currency =
+    selectedCurrency ?? detectedCurrency.data?.currency ?? PrismaCurrency.EUR;
+  const [billingPeriod, setBillingPeriod] =
+    useState<BillingInterval>("monthly");
 
   if (detectedCurrency.isLoading) {
     return <Spinner />;
@@ -308,9 +316,19 @@ export function PlansComparisonPage({
               bgColor: "orange.400",
               color: "bg.muted",
             }}
-            onClick={() => setSelectedCurrency(currency === PrismaCurrency.EUR ? PrismaCurrency.USD : PrismaCurrency.EUR)}
+            onClick={() =>
+              setSelectedCurrency(
+                currency === PrismaCurrency.EUR
+                  ? PrismaCurrency.USD
+                  : PrismaCurrency.EUR,
+              )
+            }
           >
-            {currency === PrismaCurrency.EUR ? <Euro size={14} /> : <DollarSign size={14} />}
+            {currency === PrismaCurrency.EUR ? (
+              <Euro size={14} />
+            ) : (
+              <DollarSign size={14} />
+            )}
             {currency}
           </Button>
         </Box>

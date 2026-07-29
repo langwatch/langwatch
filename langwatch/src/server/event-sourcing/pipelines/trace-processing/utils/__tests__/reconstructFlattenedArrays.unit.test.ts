@@ -87,10 +87,10 @@ describe("reconstructFlattenedArrays", () => {
   describe("when mixed array and non-array keys coexist", () => {
     it("reconstructs arrays and preserves non-array keys", () => {
       const result = reconstructFlattenedArrays({
-        "model": "gpt-4",
+        model: "gpt-4",
         "items.0.name": "first",
         "items.1.name": "second",
-        "count": 42,
+        count: 42,
       });
 
       expect(result.model).toBe("gpt-4");

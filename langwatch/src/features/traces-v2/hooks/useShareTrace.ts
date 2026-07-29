@@ -1,6 +1,5 @@
 import type { ShareLink } from "@prisma/client";
 import { useCallback } from "react";
-import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
 

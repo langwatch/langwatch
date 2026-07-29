@@ -1,5 +1,8 @@
 import { createLogger } from "@langwatch/observability";
-import { SpanKind as ApiSpanKind, type Span as OtelSpan } from "@opentelemetry/api";
+import {
+  SpanKind as ApiSpanKind,
+  type Span as OtelSpan,
+} from "@opentelemetry/api";
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
 import { getLangWatchTracer } from "langwatch";
 import type {
@@ -83,7 +86,9 @@ export interface TraceRequestCollectionDeps {
    * FAIL-OPEN: errors from this hook are caught by the composition root wrapper
    * and log at warn level, returning the original commandData unchanged.
    */
-  processCommandData?: (data: RecordSpanCommandData) => Promise<RecordSpanCommandData>;
+  processCommandData?: (
+    data: RecordSpanCommandData,
+  ) => Promise<RecordSpanCommandData>;
 }
 
 /**

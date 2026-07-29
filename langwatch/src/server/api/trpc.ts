@@ -573,7 +573,7 @@ const auditLogMutations = t.middleware(
       return next();
     }
 
-    let result = await next();
+    const result = await next();
 
     const target = result.ok ? deriveAuditTarget(path, result.data) : {};
 

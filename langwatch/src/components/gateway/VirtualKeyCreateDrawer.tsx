@@ -12,26 +12,19 @@ import {
 import { useEffect, useMemo, useState } from "react";
 
 import { Drawer } from "~/components/ui/drawer";
-import { Tooltip } from "~/components/ui/tooltip";
+import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import { toaster } from "~/components/ui/toaster";
+import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
 import { api } from "~/utils/api";
-
 import {
   buildScopeHierarchy,
   firstEligibleDefaultModel,
-  resolveEligible,
   type OrgModelProvider,
+  resolveEligible,
 } from "./eligibleModelProviders";
-import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import { humanizeGatewayError } from "./gatewayErrorCopy";
-import {
-  parseTagsCsv,
-  TAGS_CSV_MAX_LENGTH,
-  tagsBeyondLimitsNotice,
-  VK_TAGS_FIELD_DESCRIPTION,
-} from "./virtualKeyTagsField";
 import {
   budgetInvalidReason,
   EMPTY_BUDGET,
@@ -42,21 +35,28 @@ import {
   ownershipIncompleteReason,
   ownershipToScopes,
   ownershipTraceProjectId,
-  VirtualKeyOwnershipSection,
   type VirtualKeyOwnership,
+  VirtualKeyOwnershipSection,
 } from "./VirtualKeyOwnershipSection";
 import {
   ALL_PROVIDERS,
+  type ProviderAccessValue,
   providerAccessInvalidReason,
   providerAccessToConfig,
   VirtualKeyProviderAccessSection,
-  type ProviderAccessValue,
 } from "./VirtualKeyProviderAccessSection";
 import {
   ROUTING_NONE,
   VirtualKeyRoutingSection,
   type VirtualKeyRoutingValue,
 } from "./VirtualKeyRoutingSection";
+import {
+  parseTagsCsv,
+  TAGS_CSV_MAX_LENGTH,
+  tagsBeyondLimitsNotice,
+  VK_TAGS_FIELD_DESCRIPTION,
+} from "./virtualKeyTagsField";
+
 type VirtualKeyCreateDrawerProps = {
   organizationId: string;
   open: boolean;
@@ -94,8 +94,7 @@ export function VirtualKeyCreateDrawer({
   const canCreateShared = hasPermission("virtualKeys:manage");
 
   const availableTeams = useMemo(
-    () =>
-      organization?.teams?.map((t) => ({ id: t.id, name: t.name })) ?? [],
+    () => organization?.teams?.map((t) => ({ id: t.id, name: t.name })) ?? [],
     [organization?.teams],
   );
   const availableProjects = useMemo(
@@ -174,8 +173,7 @@ export function VirtualKeyCreateDrawer({
 
   const scopes = useMemo(
     () =>
-      ownershipToScopes(ownership, { organizationId, personalProjectId }) ??
-      [],
+      ownershipToScopes(ownership, { organizationId, personalProjectId }) ?? [],
     [ownership, organizationId, personalProjectId],
   );
   const eligible = useMemo(

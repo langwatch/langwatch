@@ -9,6 +9,8 @@
  */
 process.env.TZ = "Asia/Kolkata";
 
+import type { ClickHouseClient } from "@clickhouse/client";
+import { register } from "prom-client";
 /**
  * The RMT version stamp. The IN-tuple dedup read depends on the repo-wide
  * invariant that no two versions of one row tie on UpdatedAt
@@ -19,8 +21,6 @@ process.env.TZ = "Asia/Kolkata";
  * real ClickHouse; this suite pins the stamp seam itself.
  */
 import { describe, expect, it, vi } from "vitest";
-import type { ClickHouseClient } from "@clickhouse/client";
-import { register } from "prom-client";
 import { parseClickHouseDateTimeMs } from "~/server/clickhouse/dateTime";
 import type { CodingAgentSessionRow } from "~/server/event-sourcing/pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
 import { CodingAgentSessionClickHouseRepository } from "../coding-agent-session.clickhouse.repository";
@@ -232,7 +232,9 @@ describe("CodingAgentSessionClickHouseRepository DateTime64 decode", () => {
  * of it: that helper lives on an unmerged branch, and its grammar does not
  * cover the summed key this repository emits.
  */
-function orderingClient(rows: Array<Record<string, unknown>>): ClickHouseClient {
+function orderingClient(
+  rows: Array<Record<string, unknown>>,
+): ClickHouseClient {
   return {
     query: async (params: { query: string }) => ({
       json: async () => applyOrderBy(rows, params.query).slice(0, 1),
@@ -530,8 +532,9 @@ function listClient(rows: Array<Record<string, unknown>>): {
         .filter((row) => inScope(row, outer, args.query_params))
         .filter(
           (row) =>
-            latest.get(`${String(row.TenantId)}\u0000${String(row.SessionId)}`) ===
-            millis(row.UpdatedAt),
+            latest.get(
+              `${String(row.TenantId)}\u0000${String(row.SessionId)}`,
+            ) === millis(row.UpdatedAt),
         )
         .sort((left, right) => millis(right.StartedAt) - millis(left.StartedAt))
         .slice(0, Number(args.query_params.limit));
@@ -575,13 +578,15 @@ const listRecent = (
   client: ClickHouseClient,
   userId?: string,
 ): Promise<CodingAgentSessionRow[]> =>
-  new CodingAgentSessionClickHouseRepository(async () => client).findManyRecent({
-    tenantId: "tenant-1",
-    fromMs: WINDOW_FROM,
-    toMs: WINDOW_TO,
-    limit: 50,
-    ...(userId !== undefined ? { userId } : {}),
-  });
+  new CodingAgentSessionClickHouseRepository(async () => client).findManyRecent(
+    {
+      tenantId: "tenant-1",
+      fromMs: WINDOW_FROM,
+      toMs: WINDOW_TO,
+      limit: 50,
+      ...(userId !== undefined ? { userId } : {}),
+    },
+  );
 
 describe("CodingAgentSessionClickHouseRepository list-read dedup scope", () => {
   describe("given a windowed list read", () => {

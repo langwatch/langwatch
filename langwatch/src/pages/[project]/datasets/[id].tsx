@@ -1,4 +1,4 @@
-import { Alert, Box, Button, HStack, Spinner, Text } from "@chakra-ui/react";
+import { Alert, Box, Button, Spinner, Text } from "@chakra-ui/react";
 import { FlaskConical } from "lucide-react";
 import { useState } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";

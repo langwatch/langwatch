@@ -1,4 +1,13 @@
 import {
+  createLogger,
+  getStatusCodeFromError,
+  logHttpRequest,
+} from "@langwatch/observability";
+import {
+  runWithContext,
+  updateCurrentContext,
+} from "@langwatch/observability/context";
+import {
   context as otContext,
   propagation,
   SpanKind,
@@ -6,15 +15,6 @@ import {
   trace,
 } from "@opentelemetry/api";
 import type { Context, Next } from "hono";
-import {
-  createLogger,
-  logHttpRequest,
-  getStatusCodeFromError,
-} from "@langwatch/observability";
-import {
-  runWithContext,
-  updateCurrentContext,
-} from "@langwatch/observability/context";
 
 import { RESOLVED_ERROR, type ResolvedError } from "./errors.js";
 import { getSSECompletion } from "./sse.js";
@@ -170,7 +170,9 @@ export function loggerMiddleware(options?: { name?: string }) {
           const requestError = resolved ? resolved.error : error || c.error;
           const statusCode =
             resolved?.status ??
-            (requestError ? getStatusCodeFromError(requestError) : c.res.status);
+            (requestError
+              ? getStatusCodeFromError(requestError)
+              : c.res.status);
 
           // This is the only error record written per failed request. The
           // error handler deliberately does not log its own copy.
@@ -181,7 +183,9 @@ export function loggerMiddleware(options?: { name?: string }) {
             duration,
             userAgent: c.req.header("user-agent") ?? null,
             error: requestError,
-            ...(resolved?.traceId ? { extra: { traceId: resolved.traceId } } : {}),
+            ...(resolved?.traceId
+              ? { extra: { traceId: resolved.traceId } }
+              : {}),
           });
         };
 

@@ -23,11 +23,9 @@
  * hydrator, a call with nothing to fetch by, or a missing project all resolve
  * to `idle`, and the card falls back to its stored-output path.
  */
+
+import { CLI_SUBRESOURCE_VERBS, type CliResultDigest } from "@langwatch/langy";
 import { useQuery } from "@tanstack/react-query";
-import {
-  CLI_SUBRESOURCE_VERBS,
-  type CliResultDigest,
-} from "@langwatch/langy";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import {
@@ -147,8 +145,7 @@ export function useCapabilityData({
   if (!enabled) return IDLE;
 
   const hydration = result.data;
-  const totalCount =
-    digest?.counts?.total ?? hydration?.total ?? null;
+  const totalCount = digest?.counts?.total ?? hydration?.total ?? null;
 
   if (result.isError) {
     return {

@@ -2,7 +2,7 @@ import { Box, Image, Spinner, VStack } from "@chakra-ui/react";
 import { Bug, TextCursorInput } from "lucide-react";
 import type { ReactNode } from "react";
 import { useState } from "react";
-import { Edit, Italic, Search } from "react-feather";
+import { Edit } from "react-feather";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useTraceDetailsDrawer } from "~/hooks/useTraceDetailsDrawer";
 import { useAnnotationCommentStore } from "../../hooks/useAnnotationCommentStore";

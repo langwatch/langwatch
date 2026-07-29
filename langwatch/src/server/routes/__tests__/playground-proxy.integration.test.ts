@@ -24,9 +24,9 @@
  *
  * Run cost: ~3-5s per invocation + ~3s subprocess startup.
  */
-import { spawn, type ChildProcess } from "node:child_process";
-import { setTimeout as sleep } from "node:timers/promises";
+import { type ChildProcess, spawn } from "node:child_process";
 import path from "node:path";
+import { setTimeout as sleep } from "node:timers/promises";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -165,9 +165,7 @@ describe("playground proxy /go/proxy/v1/chat/completions", () => {
       const url = `http://127.0.0.1:${NLPGO_PORT}/go/proxy/v1/chat/completions`;
       const body = {
         model: "openai/gpt-5-mini",
-        messages: [
-          { role: "user" as const, content: "Say 'hi' in one word." },
-        ],
+        messages: [{ role: "user" as const, content: "Say 'hi' in one word." }],
         temperature: 0,
         max_tokens: 8,
         stream: true,

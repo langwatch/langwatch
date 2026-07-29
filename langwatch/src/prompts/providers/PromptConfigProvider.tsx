@@ -96,7 +96,10 @@ export function PromptConfigProvider({
           } catch (error) {
             onError?.(error as Error);
             // Don't close the dialog if a global handler will show a modal
-            if (!extractLimitExceededInfo(error) && !extractLiteMemberRestrictionInfo(error)) {
+            if (
+              !extractLimitExceededInfo(error) &&
+              !extractLiteMemberRestrictionInfo(error)
+            ) {
               setSaveVersionDialogProps(null);
             }
           }
@@ -131,7 +134,10 @@ export function PromptConfigProvider({
           } catch (error) {
             onError?.(error as Error);
             // Don't close the dialog if a global handler will show a modal
-            if (!extractLimitExceededInfo(error) && !extractLiteMemberRestrictionInfo(error)) {
+            if (
+              !extractLimitExceededInfo(error) &&
+              !extractLiteMemberRestrictionInfo(error)
+            ) {
               setCreatePromptDialogProps(null);
             }
           }
@@ -169,7 +175,10 @@ export function PromptConfigProvider({
               } catch (error) {
                 onError?.(error as Error);
                 // Don't close the dialog if a global handler will show a modal
-                if (!extractLimitExceededInfo(error) && !extractLiteMemberRestrictionInfo(error)) {
+                if (
+                  !extractLimitExceededInfo(error) &&
+                  !extractLiteMemberRestrictionInfo(error)
+                ) {
                   setChangeHandleDialogProps(null);
                 }
               }

@@ -216,10 +216,7 @@ function PeekPopoverContent({
           />
         )}
         {trace.models.length > 0 && (
-          <PopoverMetric
-            label="Model"
-            value={(trace.models[0]!)}
-          />
+          <PopoverMetric label="Model" value={trace.models[0]!} />
         )}
         <PopoverMetric label="Spans" value={String(trace.spanCount)} />
       </HStack>

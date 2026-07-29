@@ -50,9 +50,7 @@ export class AlreadyOrganizationMemberError extends HandledError {
 }
 
 export class InviteNotFoundError extends Error {
-  constructor(
-    message = "Invitation not found or is not waiting for approval"
-  ) {
+  constructor(message = "Invitation not found or is not waiting for approval") {
     super(message);
     this.name = "InviteNotFoundError";
   }
@@ -61,7 +59,7 @@ export class InviteNotFoundError extends Error {
 export class InviteNotReadyError extends Error {
   constructor(inviteId: string, status: string) {
     super(
-      `Cannot apply invite ${inviteId}: status is ${status}, expected PENDING`
+      `Cannot apply invite ${inviteId}: status is ${status}, expected PENDING`,
     );
     this.name = "InviteNotReadyError";
   }

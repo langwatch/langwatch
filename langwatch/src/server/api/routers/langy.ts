@@ -1,8 +1,9 @@
+// biome-ignore-all lint/suspicious/noEmptyBlockStatements: the empty blocks in this file are deliberate no-ops.
+
 import { on } from "node:events";
 import { ValidationError } from "@langwatch/handled-error";
 import { LANGY_CONVERSATION_STATUS } from "@langwatch/langy";
 import { createLogger } from "@langwatch/observability";
-import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
@@ -37,12 +38,9 @@ import {
   type LangyConversationListCursorDto,
   type LangyConversationListItemDto,
   type LangyMessageDto,
-  langyConversationDetailSchema,
   langyConversationListCursorSchema,
-  langyConversationListItemSchema,
   langyConversationStatusSchema,
   langyMessageRoleSchema,
-  langyMessageSchema,
 } from "./langy.schemas";
 import { enforceLangyAccess, refuseDemoProject } from "./langyAccessMiddleware";
 

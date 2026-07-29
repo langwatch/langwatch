@@ -417,7 +417,7 @@ export class FoldProjectionExecutor {
       eventOccurredAt < prevLastOccurred &&
       canRefold(projection, context)
     ) {
-      // biome-ignore lint/style/noNonNullAssertion: canRefold returns false without an eventLoader.
+      // CanRefold returns false without an eventLoader.
       const allEvents = await projection.eventLoader!({
         tenantId: context.tenantId,
         aggregateId: context.aggregateId,
@@ -498,7 +498,7 @@ export class FoldProjectionExecutor {
     // Anchor the read to the batch's earliest event (any event in the batch is
     // for the same aggregate, so it anchors the same partition window; the
     // unwindowed retry covers a batch that somehow spans wider than widthMs).
-    // biome-ignore lint/style/noNonNullAssertion: the empty/single-event batches returned above, so ordered has at least two events.
+    // The empty/single-event batches returned above, so ordered has at least two events.
     const loadContext = withReadHints({
       context,
       event: ordered[0]!,
@@ -562,8 +562,7 @@ export class FoldProjectionExecutor {
       (loadedState as Record<string, unknown>)[
         projection.LastEventOccurredAtKey
       ] ?? 0;
-    const earliestOccurredAt = (fresh[0] as Record<string, unknown>)
-      .occurredAt;
+    const earliestOccurredAt = (fresh[0] as Record<string, unknown>).occurredAt;
 
     // Out-of-order vs the persisted checkpoint: the batch starts earlier than
     // what we've already folded. Re-fold from scratch when we can load the full
@@ -579,7 +578,7 @@ export class FoldProjectionExecutor {
 
     let state = loadedState;
     if (isOutOfOrder && canRefold(projection, context)) {
-      // biome-ignore lint/style/noNonNullAssertion: canRefold returns false without an eventLoader.
+      // CanRefold returns false without an eventLoader.
       const allEvents = await projection.eventLoader!({
         tenantId: context.tenantId,
         aggregateId: context.aggregateId,
@@ -825,7 +824,7 @@ export class FoldProjectionExecutor {
           `streamRefoldUpToDelivered exceeded ${MAX_PAGES} pages for aggregate ${context.aggregateId} — possible non-advancing cursor`,
         );
       }
-      // biome-ignore lint/style/noNonNullAssertion: caller guards eventLoaderUpToPaged is set.
+      // Caller guards eventLoaderUpToPaged is set.
       const page = await projection.eventLoaderUpToPaged!({
         tenantId: context.tenantId,
         aggregateId: context.aggregateId,

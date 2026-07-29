@@ -33,8 +33,19 @@ export function LeftPanel({
       bg="bg.surface"
     >
       <VStack align="stretch" gap={0}>
-        <Box paddingX={3} paddingY={2} borderBottom="1px solid" borderBottomColor="border">
-          <Text textStyle="xs" fontWeight="semibold" color="fg.muted" textTransform="uppercase" letterSpacing="wider">
+        <Box
+          paddingX={3}
+          paddingY={2}
+          borderBottom="1px solid"
+          borderBottomColor="border"
+        >
+          <Text
+            textStyle="xs"
+            fontWeight="semibold"
+            color="fg.muted"
+            textTransform="uppercase"
+            letterSpacing="wider"
+          >
             Fold Projections
           </Text>
         </Box>
@@ -59,17 +70,11 @@ export function LeftPanel({
                 borderBottom="1px solid"
                 borderBottomColor="border"
                 onClick={() =>
-                  onSelectProjection(
-                    isSelected ? null : proj.projectionName,
-                  )
+                  onSelectProjection(isSelected ? null : proj.projectionName)
                 }
               >
                 <HStack gap={2}>
-                  <Circle
-                    size={8}
-                    fill="currentColor"
-                    color="green.500"
-                  />
+                  <Circle size={8} fill="currentColor" color="green.500" />
                   <VStack align="start" gap={0}>
                     <Text textStyle="xs" fontWeight="medium">
                       {proj.projectionName}
@@ -91,7 +96,13 @@ export function LeftPanel({
           borderBottomColor="border"
           marginTop={2}
         >
-          <Text textStyle="xs" fontWeight="semibold" color="fg.muted" textTransform="uppercase" letterSpacing="wider">
+          <Text
+            textStyle="xs"
+            fontWeight="semibold"
+            color="fg.muted"
+            textTransform="uppercase"
+            letterSpacing="wider"
+          >
             Event Subscribers
           </Text>
         </Box>
@@ -111,11 +122,7 @@ export function LeftPanel({
               borderBottomColor="border"
             >
               <HStack gap={2}>
-                <Circle
-                  size={8}
-                  fill="currentColor"
-                  color="cyan.500"
-                />
+                <Circle size={8} fill="currentColor" color="cyan.500" />
                 <VStack align="start" gap={0} minW={0}>
                   <Text textStyle="xs" fontWeight="medium">
                     {subscriber.subscriberName}

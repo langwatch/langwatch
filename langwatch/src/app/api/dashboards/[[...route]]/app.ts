@@ -1,8 +1,8 @@
 import { describeRoute } from "hono-openapi";
-import { validator as zValidator } from "~/server/api/validation";
 import { z } from "zod";
-import { patchZodOpenapi } from "../../../../utils/extend-zod-openapi";
 import { createProjectApp, requires } from "~/server/api/security";
+import { validator as zValidator } from "~/server/api/validation";
+import { patchZodOpenapi } from "../../../../utils/extend-zod-openapi";
 import { resourceLimitMiddleware } from "../../middleware";
 import {
   type DashboardServiceMiddlewareVariables,
@@ -58,26 +58,26 @@ secured.access(requires("analytics:view")).get(
     description: "List all dashboards for the project with graph counts",
   }),
   async (c) => {
-      const project = c.get("project");
-      const service = c.get("dashboardService");
+    const project = c.get("project");
+    const service = c.get("dashboardService");
 
-      const dashboards = await service.getAll(project.id);
+    const dashboards = await service.getAll(project.id);
 
-      return c.json({
-        data: dashboards.map((d) => ({
-          id: d.id,
-          name: d.name,
-          order: d.order,
-          graphCount: d._count.graphs,
-          createdAt: d.createdAt,
-          updatedAt: d.updatedAt,
-          platformUrl: platformUrl({
-            projectSlug: project.slug,
-            path: `/analytics/reports?dashboard=${d.id}`,
-          }),
-        })),
-      });
-    },
+    return c.json({
+      data: dashboards.map((d) => ({
+        id: d.id,
+        name: d.name,
+        order: d.order,
+        graphCount: d._count.graphs,
+        createdAt: d.createdAt,
+        updatedAt: d.updatedAt,
+        platformUrl: platformUrl({
+          projectSlug: project.slug,
+          path: `/analytics/reports?dashboard=${d.id}`,
+        }),
+      })),
+    });
+  },
 );
 
 // ── Create Dashboard ──────────────────────────────────────────
@@ -93,27 +93,27 @@ secured.access(requires("analytics:create")).post(
   resourceLimitMiddleware("dashboards"),
   zValidator("json", createDashboardSchema),
   async (c) => {
-      const project = c.get("project");
-      const { name } = c.req.valid("json");
-      const service = c.get("dashboardService");
+    const project = c.get("project");
+    const { name } = c.req.valid("json");
+    const service = c.get("dashboardService");
 
-      const dashboard = await service.create(project.id, name);
+    const dashboard = await service.create(project.id, name);
 
-      return c.json(
-        {
-          id: dashboard.id,
-          name: dashboard.name,
-          order: dashboard.order,
-          createdAt: dashboard.createdAt,
-          updatedAt: dashboard.updatedAt,
-          platformUrl: platformUrl({
-            projectSlug: project.slug,
-            path: `/analytics/reports?dashboard=${dashboard.id}`,
-          }),
-        },
-        201,
-      );
-    },
+    return c.json(
+      {
+        id: dashboard.id,
+        name: dashboard.name,
+        order: dashboard.order,
+        createdAt: dashboard.createdAt,
+        updatedAt: dashboard.updatedAt,
+        platformUrl: platformUrl({
+          projectSlug: project.slug,
+          path: `/analytics/reports?dashboard=${dashboard.id}`,
+        }),
+      },
+      201,
+    );
+  },
 );
 
 // ── Reorder Dashboards ────────────────────────────────────────
@@ -127,17 +127,17 @@ secured.access(requires("analytics:update")).put(
   }),
   zValidator("json", reorderDashboardsSchema),
   async (c) => {
-      const project = c.get("project");
-      const { dashboardIds } = c.req.valid("json");
-      const service = c.get("dashboardService");
+    const project = c.get("project");
+    const { dashboardIds } = c.req.valid("json");
+    const service = c.get("dashboardService");
 
-      try {
-        const result = await service.reorder(project.id, dashboardIds);
-        return c.json(result);
-      } catch (error) {
-        mapDashboardReorderError(error);
-      }
-    },
+    try {
+      const result = await service.reorder(project.id, dashboardIds);
+      return c.json(result);
+    } catch (error) {
+      mapDashboardReorderError(error);
+    }
+  },
 );
 
 // ── Get Single Dashboard ──────────────────────────────────────
@@ -148,28 +148,28 @@ secured.access(requires("analytics:view")).get(
     description: "Get a dashboard by its id, including its graphs",
   }),
   async (c) => {
-      const { id } = c.req.param();
-      const project = c.get("project");
-      const service = c.get("dashboardService");
+    const { id } = c.req.param();
+    const project = c.get("project");
+    const service = c.get("dashboardService");
 
-      try {
-        const dashboard = await service.getById(project.id, id);
-        return c.json({
-          id: dashboard.id,
-          name: dashboard.name,
-          order: dashboard.order,
-          graphs: dashboard.graphs,
-          createdAt: dashboard.createdAt,
-          updatedAt: dashboard.updatedAt,
-          platformUrl: platformUrl({
-            projectSlug: project.slug,
-            path: `/analytics/reports?dashboard=${dashboard.id}`,
-          }),
-        });
-      } catch (error) {
-        return mapDashboardNotFoundError(error);
-      }
-    },
+    try {
+      const dashboard = await service.getById(project.id, id);
+      return c.json({
+        id: dashboard.id,
+        name: dashboard.name,
+        order: dashboard.order,
+        graphs: dashboard.graphs,
+        createdAt: dashboard.createdAt,
+        updatedAt: dashboard.updatedAt,
+        platformUrl: platformUrl({
+          projectSlug: project.slug,
+          path: `/analytics/reports?dashboard=${dashboard.id}`,
+        }),
+      });
+    } catch (error) {
+      return mapDashboardNotFoundError(error);
+    }
+  },
 );
 
 // ── Rename Dashboard ──────────────────────────────────────────
@@ -181,28 +181,28 @@ secured.access(requires("analytics:update")).patch(
   }),
   zValidator("json", renameDashboardSchema),
   async (c) => {
-      const { id } = c.req.param();
-      const project = c.get("project");
-      const { name } = c.req.valid("json");
-      const service = c.get("dashboardService");
+    const { id } = c.req.param();
+    const project = c.get("project");
+    const { name } = c.req.valid("json");
+    const service = c.get("dashboardService");
 
-      try {
-        const dashboard = await service.rename(project.id, id, name);
-        return c.json({
-          id: dashboard.id,
-          name: dashboard.name,
-          order: dashboard.order,
-          createdAt: dashboard.createdAt,
-          updatedAt: dashboard.updatedAt,
-          platformUrl: platformUrl({
-            projectSlug: project.slug,
-            path: `/analytics/reports?dashboard=${dashboard.id}`,
-          }),
-        });
-      } catch (error) {
-        return mapDashboardNotFoundError(error);
-      }
-    },
+    try {
+      const dashboard = await service.rename(project.id, id, name);
+      return c.json({
+        id: dashboard.id,
+        name: dashboard.name,
+        order: dashboard.order,
+        createdAt: dashboard.createdAt,
+        updatedAt: dashboard.updatedAt,
+        platformUrl: platformUrl({
+          projectSlug: project.slug,
+          path: `/analytics/reports?dashboard=${dashboard.id}`,
+        }),
+      });
+    } catch (error) {
+      return mapDashboardNotFoundError(error);
+    }
+  },
 );
 
 // ── Delete Dashboard ──────────────────────────────────────────
@@ -214,20 +214,20 @@ secured.access(requires("analytics:manage")).delete(
     description: "Delete a dashboard and its graphs (hard delete, cascade)",
   }),
   async (c) => {
-      const { id } = c.req.param();
-      const project = c.get("project");
-      const service = c.get("dashboardService");
+    const { id } = c.req.param();
+    const project = c.get("project");
+    const service = c.get("dashboardService");
 
-      try {
-        const dashboard = await service.delete(project.id, id);
-        return c.json({
-          id: dashboard.id,
-          name: dashboard.name,
-        });
-      } catch (error) {
-        return mapDashboardNotFoundError(error);
-      }
-    },
+    try {
+      const dashboard = await service.delete(project.id, id);
+      return c.json({
+        id: dashboard.id,
+        name: dashboard.name,
+      });
+    } catch (error) {
+      return mapDashboardNotFoundError(error);
+    }
+  },
 );
 
 export const app = secured.hono;

@@ -170,5 +170,4 @@ export class FeatureFlagServicePostHog implements FeatureFlagServiceInterface {
   isAvailable(): boolean {
     return this.posthog !== null;
   }
-
 }

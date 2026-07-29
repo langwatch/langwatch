@@ -20,10 +20,7 @@ import { afterAll, describe, expect, it } from "vitest";
 
 import { prisma } from "~/server/db";
 
-import {
-  AiToolEntryService,
-  STARTER_PACK_TILES,
-} from "../aiToolEntry.service";
+import { AiToolEntryService, STARTER_PACK_TILES } from "../aiToolEntry.service";
 import { seedPlatformIngestionTemplates } from "../platformIngestionTemplates.seeds";
 
 const ns = `dfltcat-${nanoid(8)}`;
@@ -93,9 +90,9 @@ describe("AiToolEntryService.ensureDefaultCatalog", () => {
 
     const second = await service.ensureDefaultCatalog({ organizationId });
     expect(second).toEqual({ hasSeeded: false, created: 0 });
-    expect(
-      await prisma.aiToolEntry.count({ where: { organizationId } }),
-    ).toBe(8);
+    expect(await prisma.aiToolEntry.count({ where: { organizationId } })).toBe(
+      8,
+    );
   });
 
   /** @scenario An organization whose admin archived or disabled every entry is not re-seeded */

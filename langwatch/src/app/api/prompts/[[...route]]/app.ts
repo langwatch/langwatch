@@ -1,5 +1,5 @@
-import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { createProjectApp } from "~/server/api/security";
+import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import type { OrganizationMiddlewareVariables } from "../../middleware/organization";
 import type { PromptServiceMiddlewareVariables } from "../../middleware/prompt-service";
 import { registerPromptRoutes } from "./app.v1";

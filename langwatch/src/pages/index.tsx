@@ -1,10 +1,10 @@
-import { useRouter } from "~/utils/compat/next-router";
 import { useEffect } from "react";
 import { useLocalStorage } from "usehooks-ts";
+import { api } from "~/utils/api";
+import { useRouter } from "~/utils/compat/next-router";
+import { resolveHomeDestination } from "~/utils/resolveHomeDestination";
 import { LoadingScreen } from "../components/LoadingScreen";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
-import { api } from "~/utils/api";
-import { resolveHomeDestination } from "~/utils/resolveHomeDestination";
 
 /**
  * `/` redirect — picks the right home for the user's persona via the
@@ -57,8 +57,7 @@ export default function Index() {
           // Personal workspaces are never a project-home target (ADR-038
           // v6) — without this, the last-visited substitution could land
           // on a personal-… slug.
-          lastProjectSlug:
-            project && !project.isPersonal ? project.slug : null,
+          lastProjectSlug: project && !project.isPersonal ? project.slug : null,
         }),
       );
       return;
@@ -84,11 +83,7 @@ export default function Index() {
     // less-broken default (admin funnel works; personal-only user hits
     // an extra page they can navigate away from, vs admin funnel
     // hitting an unrecoverable dead-end on /me).
-    if (
-      !isLoading &&
-      !organization &&
-      (organizations?.length ?? 0) === 0
-    ) {
+    if (!isLoading && !organization && (organizations?.length ?? 0) === 0) {
       void router.replace("/onboarding/welcome");
     }
   }, [

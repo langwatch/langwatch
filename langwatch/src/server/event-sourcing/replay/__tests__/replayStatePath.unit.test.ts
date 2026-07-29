@@ -1,16 +1,15 @@
-import { describe, it, expect, vi } from "vitest";
 import type { ClickHouseClient } from "@clickhouse/client";
-
-import { replayStateProjection } from "../replayStatePath";
-import { replayOptimized } from "../replayOptimizedPath";
-import type { RegisteredStateProjection, ReplayContext } from "../types";
+import { describe, expect, it, vi } from "vitest";
+import type { ProjectionStoreContext } from "../../projections/projectionStoreContext";
 import type {
   StateProjectionDefinition,
   StateProjectionStore,
   StoredProjection,
 } from "../../projections/stateProjection.types";
-import type { ProjectionStoreContext } from "../../projections/projectionStoreContext";
 import { nullLog } from "../replayLog";
+import { replayOptimized } from "../replayOptimizedPath";
+import { replayStateProjection } from "../replayStatePath";
+import type { RegisteredStateProjection, ReplayContext } from "../types";
 
 interface CounterState {
   count: number;
