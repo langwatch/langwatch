@@ -1010,3 +1010,63 @@ def test_pairwise_compare_evaluator_is_independent():
         pairwise_compare.PairwiseCompareEvaluator,
         select_best_compare.SelectBestCompareEvaluator,
     )
+
+
+def test_disagreement_details_do_not_blame_order_when_sampling_is_not_pinned():
+    """gpt-5-family models are forced to temperature=1.0, so the two
+    reconcile calls differ in TWO ways: candidate order AND sampling. The
+    conclusion (this row establishes no winner) still holds, but attributing
+    the flip to candidate order specifically is a cause the run did not
+    establish — the judge was never asked the same question twice."""
+    evaluator = SelectBestCompareEvaluator(
+        settings=SelectBestCompareSettings(
+            model="openai/gpt-5-mini", randomize_order=False
+        )
+    )
+    entry = _make_entry(num_candidates=3, row_index=0)
+
+    responses = [
+        _mock_completion_response("variant_0 is more concise", "A"),
+        _mock_completion_response("variant_2 covers more ground", "A"),
+    ]
+    with patch(
+        "langevals_langevals.select_best_compare.completion",
+        side_effect=responses,
+    ), patch(
+        "langevals_langevals.select_best_compare.completion_cost",
+        return_value=0.0001,
+    ):
+        result = evaluator.evaluate(entry)
+
+    assert result.details is not None
+    # The finding — no winner here — must survive.
+    assert "does not establish a winner" in result.details
+    # But the cause must not be asserted, because it was not isolated.
+    assert "changed with candidate order" not in result.details
+
+
+def test_disagreement_details_may_blame_order_when_the_judge_is_deterministic():
+    """At temperature 0 the reversed call differs ONLY in candidate order,
+    so attributing the flip to order is a claim the run actually supports."""
+    evaluator = SelectBestCompareEvaluator(
+        settings=SelectBestCompareSettings(
+            model="openai/gpt-4.1", temperature=0.0, randomize_order=False
+        )
+    )
+    entry = _make_entry(num_candidates=3, row_index=0)
+
+    responses = [
+        _mock_completion_response("variant_0 is more concise", "A"),
+        _mock_completion_response("variant_2 covers more ground", "A"),
+    ]
+    with patch(
+        "langevals_langevals.select_best_compare.completion",
+        side_effect=responses,
+    ), patch(
+        "langevals_langevals.select_best_compare.completion_cost",
+        return_value=0.0001,
+    ):
+        result = evaluator.evaluate(entry)
+
+    assert result.details is not None
+    assert "changed with candidate order" in result.details

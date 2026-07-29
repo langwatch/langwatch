@@ -312,6 +312,20 @@ class SelectBestCompareEvaluator(
             ),
         )
 
+    def _effective_temperature(self) -> float:
+        """
+        gpt-5-family models require temperature=1.0 and reject any other
+        value; every other model/provider gets the user's configured value
+        (default 0.0). `drop_params=True` at the call site tells litellm to
+        silently strip the param for any other model that doesn't support it,
+        rather than raising. Mirrors llm_answer_match.py's
+        `model_to_dspy_lm`.
+
+        Shared with `_reconcile`, which needs to know whether the judge was
+        actually pinned before it attributes a flipped verdict to anything.
+        """
+        return 1.0 if "gpt-5" in self.settings.model else self.settings.temperature
+
     def _reconcile(
         self,
         entry: SelectBestCompareEntry,
@@ -356,11 +370,32 @@ class SelectBestCompareEvaluator(
         # Disagreement: the verdict flipped when candidate order flipped.
         # Don't guess which direction was right — say so, and let the caller
         # decide what an unresolvable row means for them.
+        # What changed between the two calls decides what we may blame.
+        #
+        # At temperature 0 the reversed call differs ONLY in candidate order,
+        # so "the verdict changed with candidate order" is a claim the run
+        # supports. Above 0 — which gpt-5-family models force, and they are
+        # the usual judge here — the two calls differ in candidate order AND
+        # in sampling, so the same sentence names a cause that was never
+        # isolated. The finding is identical either way: this row does not
+        # establish a winner. Only the explanation has to be earned.
+        pinned = self._effective_temperature() == 0.0
+        cause = (
+            "The verdict changed with candidate order, so this row does not "
+            "establish a winner."
+            if pinned
+            else (
+                "The verdict did not survive being asked again with the "
+                "candidate order reversed, so this row does not establish a "
+                "winner. This judge does not run at a fixed temperature, so "
+                "the disagreement is not necessarily caused by the order."
+            )
+        )
+        label = "Order-sensitive verdict" if pinned else "Unreproducible verdict"
         details = (
-            f"Order-sensitive verdict: original order picked {winner1} "
+            f"{label}: original order picked {winner1} "
             f"({verdict1['reasoning']}); reversed order picked {winner2} "
-            f"({verdict2['reasoning']}). The verdict changed with candidate "
-            f"order, so this row does not establish a winner."
+            f"({verdict2['reasoning']}). {cause}"
         )
 
         # `allow_tie=False` means the caller does not accept "tie" as an
@@ -455,14 +490,7 @@ class SelectBestCompareEvaluator(
         slot_labels = list(slot_to_candidate.keys())
         winner_enum = slot_labels + (["tie"] if self.settings.allow_tie else [])
 
-        # gpt-5-family models require temperature=1.0 and reject any other
-        # value; every other model/provider gets the user's configured value
-        # (default 0.0). `drop_params=True` tells litellm to silently strip
-        # the param for any other model that doesn't support it, rather than
-        # raising. Mirrors llm_answer_match.py's `model_to_dspy_lm`.
-        effective_temperature = (
-            1.0 if "gpt-5" in self.settings.model else self.settings.temperature
-        )
+        effective_temperature = self._effective_temperature()
 
         response = completion(
             model=self.settings.model,
