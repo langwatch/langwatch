@@ -1900,6 +1900,90 @@ model BillingMeterCheckpoint {
 }
 
 // ============================================================================
+// Storage billing (ADR-039): boundary-event fold
+//
+// Billable bytes (aged > 35d, still under retention) are maintained as a
+// per-org gauge folded from signed boundary events — never recomputed by
+// scanning an org's full ClickHouse backlog (the query shape behind two
+// production OOM incidents). See dev/docs/adr/039-*.md.
+// ============================================================================
+
+// Signed boundary events — the fold's source of truth and the billing audit
+// trail. One row per (project, category, week-partition, day-slice,
+// retention-group, edge). Immutable once written.
+model StorageBoundaryEvent {
+  id             String   @id @default(cuid())
+  organizationId String
+  projectId      String
+  category       String // retention category of the source tables ("traces" | "scenarios" | "experiments")
+  partitionKey   String // toYearWeek of the source partition, e.g. "202625"
+  sliceDate      DateTime // the day-slice this delta covers
+  retentionDays  Int // _retention_days of the rows in this delta
+  edge           String // ENTRY | EXIT | DELETION | SEED | REVERSAL
+  deltaBytes     BigInt // signed; BigInt — INT32 overflows at ~2.8 TiB-month
+  // Replay identity = (project, category, partition, slice, retentionDays,
+  // edgeClass [+ causeId for corrections]). ENTRY and SEED share one
+  // edge-class (kills the seed/live cutover double-count); EXIT is its own
+  // (an exit mirrors its entry's values and must never dedup into it);
+  // DELETION/REVERSAL embed their cause id. See boundaryEventIdentity.ts.
+  dedupKey       String   @unique
+  occurredAt     DateTime // the boundary instant this delta takes effect
+  createdAt      DateTime @default(now())
+
+  @@index([organizationId, occurredAt])
+}
+
+// Materialized fold result — one row per org. O(1) for sampling the CURRENT
+// hour only; missed past hours are reconstructed by folding events with
+// occurredAt <= H (never stamped from this row).
+model StorageBillableGauge {
+  organizationId String   @id
+  billableBytes  BigInt
+  // occurredAt of the most-recently-APPLIED event — NOT a monotonic
+  // high-water mark: seeding and catch-up append historical events in
+  // arbitrary order, so this can move backwards. Do not build "resample if
+  // newer" logic on it; hour sampling cursors on StorageSweepCursor instead.
+  lastEventAt    DateTime
+  updatedAt      DateTime @updatedAt
+}
+
+// Durable per-sealed-UTC-hour sample + reporter cursor (reportedAt). The
+// contract every invoice line traces back to; consumed by the phase-4
+// reporter with a deterministic per-hour Stripe identifier.
+model StorageUsageHourly {
+  organizationId String
+  sealedHour     DateTime
+  megabytes      Int // ceil(gaugeBytes / MiB), clamped at 0
+  reportedAt     DateTime?
+  createdAt      DateTime  @default(now())
+
+  @@id([organizationId, sealedHour])
+  @@index([reportedAt])
+}
+
+// Reporter failure tracking for the storage meter — sibling of
+// BillingMeterCheckpoint, deliberately LEAN: per-hour reporting needs no
+// running accumulator columns (the predecessor's were dead code).
+model StorageBillingCheckpoint {
+  id                  String   @id @default(cuid())
+  organizationId      String
+  billingMonth        String // "2026-02"
+  consecutiveFailures Int      @default(0)
+  updatedAt           DateTime @updatedAt
+
+  @@unique([organizationId, billingMonth])
+}
+
+// Durable home for the once-per-effective-sweep-per-hour guarantee. Queue
+// dedup only squashes re-enqueues while a job is staged; this cursor is the
+// guarantee and survives redeploys, which a process-local guard cannot.
+model StorageSweepCursor {
+  id                  String   @id // singleton row
+  lastSweptSealedHour DateTime
+  updatedAt           DateTime @updatedAt
+}
+
+// ============================================================================
 // AI Gateway
 //
 // Wire-shape aligned with specs/ai-gateway/_shared/contract.md (v0.1).

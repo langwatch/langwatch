@@ -115,6 +115,12 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   // `userId_organizationId` unique key (every service-layer query). Issue
   // #4747; spec specs/langy/langy-github-prs.feature.
   UserGitHubCredential: {},
+  // Storage-billing boundary events + gauge (ADR-039): the money path's audit
+  // trail and fold result. Every access path is per-org by design (event
+  // append, fold, per-org audit, catch-up replay all carry organizationId),
+  // so these are guarded from day one rather than deferred.
+  StorageBoundaryEvent: {},
+  StorageBillableGauge: {},
 };
 
 /**
@@ -154,6 +160,15 @@ export const ORG_TENANCY_EXEMPT: readonly string[] = [
   // organizationId; the evaluator's sweep is the constraint.
   "AnomalyRule",
   "AnomalyAlert",
+  // Storage-billing reporter (ADR-039, phase 4) drains `reportedAt IS NULL`
+  // across every org as a background sweep, so a mandatory-organizationId
+  // guard cannot apply. Per-org access carries the composite
+  // (organizationId, sealedHour) key, which the guard already accepts.
+  "StorageUsageHourly",
+  // Storage-meter checkpoint; sibling of BillingMeterCheckpoint below and
+  // deferred for the same reason. Access is via the
+  // (organizationId, billingMonth) composite key.
+  "StorageBillingCheckpoint",
   // Org-scoped but not yet audited for every query shape. Listed explicitly so
   // the partition test stays green while the per-model call-site audit that
   // precedes enforcement (ADR-021) is completed.
