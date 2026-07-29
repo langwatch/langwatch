@@ -280,8 +280,9 @@ export class LangyGithubInstallationsService {
    * installation can predate the webhook being configured at all), leaving a
    * `LangyGithubInstallation` row for an installation GitHub has already
    * forgotten. Rather than let that dead row block every real installation
-   * behind it forever, a confirmed 404 from GitHub on mint removes the row and
-   * moves on to the next candidate.
+   * behind it forever, a confirmed 404 from GitHub — whether it surfaces
+   * while minting or while resolving an explicit repo id — removes the row
+   * and moves on to the next candidate.
    *
    * TODO(JIT narrowing): the plan's delivery option 2 replaces spawn-env
    * with a clone-time credential-helper callback that mints per-clone; the
@@ -301,12 +302,20 @@ export class LangyGithubInstallationsService {
     if (usable.length === 0) return null;
 
     // Explicit repo: pick the installation that can reach it and scope to it.
-    // A candidate that turns out to be a dead installation (self-healed away
-    // by mintScoped) is skipped in favor of the next one that can reach the
-    // same repo, rather than failing the turn outright.
+    // A candidate that turns out to be a dead installation — whether that
+    // surfaces while resolving the repo id (an uncached "all" selection has to
+    // list live) or while minting — is self-healed away in favor of the next
+    // one that can reach the same repo, rather than failing the turn outright.
     if (repositoryFullName) {
       for (const inst of usable) {
-        const repoId = await this.resolveRepositoryId(inst, repositoryFullName);
+        let repoId: string | null;
+        try {
+          repoId = await this.resolveRepositoryId(inst, repositoryFullName);
+        } catch (error) {
+          if (!(error instanceof GithubInstallationNotFoundError)) throw error;
+          await this.markInstallationDead(inst.installationId);
+          continue;
+        }
         if (!repoId) continue;
         const outcome = await this.mintScoped({
           installationId: inst.installationId,
@@ -354,11 +363,7 @@ export class LangyGithubInstallationsService {
       };
     } catch (error) {
       if (error instanceof GithubInstallationNotFoundError) {
-        logger.warn(
-          { installationId },
-          "github installation no longer exists, removing stale record",
-        );
-        await this.repo.deleteByInstallationId(installationId);
+        await this.markInstallationDead(installationId);
         return { token: null, wasDeadInstallation: true };
       }
       logger.warn(
@@ -369,8 +374,22 @@ export class LangyGithubInstallationsService {
     }
   }
 
+  // Removes a `LangyGithubInstallation` row GitHub has confirmed (404) it no
+  // longer knows about. Shared by every call site that can hit that error —
+  // minting and, via listInstallationRepositories, resolving a repo id too.
+  private async markInstallationDead(installationId: string): Promise<void> {
+    logger.warn(
+      { installationId },
+      "github installation no longer exists, removing stale record",
+    );
+    await this.repo.deleteByInstallationId(installationId);
+  }
+
   // Resolve a repo full-name to its numeric id for a given installation, from
-  // the cached selection when present, else a live listing.
+  // the cached selection when present, else a live listing. A confirmed-dead
+  // installation (GithubInstallationNotFoundError) is rethrown so the caller
+  // can self-heal it — every other failure degrades to "can't resolve", same
+  // as before.
   private async resolveRepositoryId(
     inst: LangyGithubInstallationRow,
     repositoryFullName: string,
@@ -388,6 +407,7 @@ export class LangyGithubInstallationsService {
       const match = repos.find((r) => r.fullName.toLowerCase() === wanted);
       return match?.id ?? null;
     } catch (error) {
+      if (error instanceof GithubInstallationNotFoundError) throw error;
       logger.warn(
         { error, installationId: inst.installationId, repositoryFullName },
         "failed to resolve repository id for installation",

@@ -60,7 +60,7 @@ function IntegrationsContent({ organizationId }: { organizationId: string }) {
       undefined,
       { shallow: true, scroll: false },
     );
-    // router is a fresh compat object each render; only re-run when the error itself changes.
+    // Intentionally keyed only on the error value, not the whole router object.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router.query.githubError]);
 

@@ -457,4 +457,50 @@ describe("mintTurnToken", () => {
       expect(repo.deleteByInstallationId).toHaveBeenCalledWith("inst-dead");
     });
   });
+
+  describe("when an explicit repo requires a live listing (an \"all\"-selection installation, nothing cached) and that installation is dead", () => {
+    it("removes the dead row and mints via the live installation", async () => {
+      const repo = makeRepo([
+        row({
+          installationId: "inst-dead",
+          createdAt: new Date("2020-01-01"),
+          repositorySelection: "all",
+          repositories: null,
+        }),
+        row({
+          installationId: "inst-live",
+          createdAt: new Date("2020-01-02"),
+          repositorySelection: "selected",
+          repositories: [{ id: "77", fullName: "acme/service-x" }],
+        }),
+      ]);
+      // resolveRepositoryId has no cache to consult for inst-dead ("all"
+      // selection), so it falls through to listInstallationRepositories —
+      // which itself mints a token first, surfacing the same 404.
+      const listInstallationRepositories = vi.fn(
+        async (installationId: string) => {
+          if (installationId === "inst-dead") {
+            throw new GithubInstallationNotFoundError(installationId);
+          }
+          return [{ id: "77", fullName: "acme/service-x" }];
+        },
+      );
+      const mint = vi.fn(async () => ({ token: "ghs_live", expiresAt: "" }));
+      const svc = new LangyGithubInstallationsService(
+        repo,
+        makeAppTokens({
+          listInstallationRepositories,
+          mintInstallationToken: mint,
+        }),
+      );
+
+      const result = await svc.mintTurnToken({
+        organizationId: "org-1",
+        repositoryFullName: "acme/service-x",
+      });
+
+      expect(result?.token).toBe("ghs_live");
+      expect(repo.deleteByInstallationId).toHaveBeenCalledWith("inst-dead");
+    });
+  });
 });
