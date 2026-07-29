@@ -42,23 +42,37 @@ describe("EventStoreClickHouse — re-fold reads prune partitions", () => {
     occurredAt: OCCURRED_AT,
   } as unknown as Event;
 
-  const lastCall = () => queryMock.mock.calls[0]![0] as {
-    query: string;
-    query_params: Record<string, unknown>;
-  };
+  // Genuinely the LAST call, not `calls[0]`: today each test issues exactly one
+  // query so the two coincide, but a helper named `lastCall` that silently
+  // returns the first would start lying the moment a read takes two queries.
+  const lastCall = () =>
+    queryMock.mock.calls.at(-1)![0] as {
+      query: string;
+      query_params: Record<string, unknown>;
+    };
 
   describe("given a time-local aggregate type", () => {
     const aggregateType: AggregateType = "trace";
 
     describe("when getEventsUpTo runs", () => {
       it("filters on EventOccurredAt so ClickHouse can prune partitions", async () => {
-        await store.getEventsUpTo("trace-1", { tenantId }, aggregateType, upToEvent);
+        await store.getEventsUpTo(
+          "trace-1",
+          { tenantId },
+          aggregateType,
+          upToEvent,
+        );
 
         expect(lastCall().query).toContain("EventOccurredAt >=");
       });
 
       it("anchors the window on the triggering event, one window back", async () => {
-        await store.getEventsUpTo("trace-1", { tenantId }, aggregateType, upToEvent);
+        await store.getEventsUpTo(
+          "trace-1",
+          { tenantId },
+          aggregateType,
+          upToEvent,
+        );
 
         expect(lastCall().query_params.occurredAtFromMs).toBe(
           OCCURRED_AT - REHYDRATION_WINDOW_MS,
@@ -66,7 +80,12 @@ describe("EventStoreClickHouse — re-fold reads prune partitions", () => {
       });
 
       it("keeps rows with an unknown occurred time, so the bound can never drop one", async () => {
-        await store.getEventsUpTo("trace-1", { tenantId }, aggregateType, upToEvent);
+        await store.getEventsUpTo(
+          "trace-1",
+          { tenantId },
+          aggregateType,
+          upToEvent,
+        );
 
         expect(lastCall().query).toContain("EventOccurredAt = 0 OR");
       });
@@ -90,6 +109,22 @@ describe("EventStoreClickHouse — re-fold reads prune partitions", () => {
           OCCURRED_AT - REHYDRATION_WINDOW_MS,
         );
       });
+
+      it("keeps rows with an unknown occurred time on the paged path too", async () => {
+        // The paged builder renders its own copy of the filter string rather
+        // than sharing one, so the escape hatch has to be asserted separately —
+        // dropping it from just this copy would otherwise pass every test.
+        await store.getEventsUpToPaged?.({
+          aggregateId: "trace-1",
+          context: { tenantId },
+          aggregateType,
+          upToEvent,
+          after: { timestamp: 500, eventId: "event-0" },
+          limit: 100,
+        });
+
+        expect(lastCall().query).toContain("EventOccurredAt = 0 OR");
+      });
     });
   });
 
@@ -111,17 +146,39 @@ describe("EventStoreClickHouse — re-fold reads prune partitions", () => {
       expect(lastCall().query).not.toContain("EventOccurredAt >=");
       expect(lastCall().query_params.occurredAtFromMs).toBeUndefined();
     });
+
+    it("leaves the paged scan unbounded too", async () => {
+      // The paged path computes the bound with its own call to
+      // `rehydrationLowerBoundMs`, so the unbounded half of the contract has to
+      // be proven here as well as on the unpaged read.
+      await store.getEventsUpToPaged?.({
+        aggregateId: "global-1",
+        context: { tenantId },
+        aggregateType: "global" as AggregateType,
+        upToEvent,
+        after: undefined,
+        limit: 100,
+      });
+
+      expect(lastCall().query).not.toContain("EventOccurredAt >=");
+      expect(lastCall().query_params.occurredAtFromMs).toBeUndefined();
+    });
   });
 
   describe("given an event with no usable occurred time", () => {
     it("issues no lower bound rather than anchoring on zero", async () => {
       // Anchoring on 0 would produce a bound in 1970 and prune nothing, or
       // worse, a negative bound. Better to skip it.
-      await store.getEventsUpTo("trace-1", { tenantId }, "trace" as AggregateType, {
-        id: "event-1",
-        createdAt: 1000,
-        occurredAt: 0,
-      } as unknown as Event);
+      await store.getEventsUpTo(
+        "trace-1",
+        { tenantId },
+        "trace" as AggregateType,
+        {
+          id: "event-1",
+          createdAt: 1000,
+          occurredAt: 0,
+        } as unknown as Event,
+      );
 
       expect(lastCall().query).not.toContain("EventOccurredAt >=");
       expect(lastCall().query_params.occurredAtFromMs).toBeUndefined();

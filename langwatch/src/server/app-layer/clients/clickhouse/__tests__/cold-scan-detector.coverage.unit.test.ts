@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { TIME_PARTITIONED_TABLES } from "../cold-scan-detector";
@@ -47,14 +47,17 @@ describe("cold-scan detector coverage", () => {
       if (!file.endsWith(".sql")) continue;
 
       const raw = readFileSync(resolve(migrationDir, file), "utf-8");
-      // Drop comment lines: a commented-out CREATE in a Down section is not a
-      // live table, and counting it would demand coverage for something that
-      // does not exist.
-      const body = raw
+      // Split on the Down marker BEFORE stripping comments. The marker is
+      // itself a comment line (`-- +goose Down`) in every migration, so
+      // stripping first would delete it and leave `split` matching nothing —
+      // the "Up section" would silently be the whole file, Down included.
+      const upSection = raw.split(/^\s*--\s*\+goose Down/m)[0] ?? raw;
+      // Then drop comment lines: a commented-out CREATE is not a live table,
+      // and counting it would demand coverage for something that does not exist.
+      const up = upSection
         .split("\n")
         .filter((line) => !line.trim().startsWith("--"))
         .join("\n");
-      const up = body.split("+goose Down")[0] ?? body;
 
       const createRe = /CREATE TABLE[^(]*?[.`]?(\w+)[\s`]*?\(/gi;
       let match: RegExpExecArray | null;
@@ -74,6 +77,11 @@ describe("cold-scan detector coverage", () => {
     /** @scenario Every partitioned table is known to the cold-scan detector */
     it("is listed in TIME_PARTITIONED_TABLES so its unpruned reads get flagged", () => {
       const partitioned = partitionedTablesFromMigrations();
+      // Guard against a vacuous pass: if the migration directory ever moved,
+      // or the CREATE regex stopped matching, `partitioned` would be empty and
+      // "nothing is uncovered" would be trivially true — the exact silent
+      // failure this whole file exists to prevent.
+      expect(partitioned.size).toBeGreaterThan(0);
       const known = new Set(Object.keys(TIME_PARTITIONED_TABLES));
 
       const uncovered = [...partitioned.keys()]
@@ -99,7 +107,9 @@ describe("cold-scan detector coverage", () => {
           new RegExp(`\\b${column}\\b`, "i").test(expression),
         );
         if (!anyMatches) {
-          wrong.push(`${table}: declares [${columns.join(", ")}], partitioned by ${expression}`);
+          wrong.push(
+            `${table}: declares [${columns.join(", ")}], partitioned by ${expression}`,
+          );
         }
       }
 
@@ -108,12 +118,11 @@ describe("cold-scan detector coverage", () => {
   });
 
   describe("given a table is listed in the detector", () => {
-    /**
-     * @scenario The map carries no table that is not partitioned
-     *
+    /*
      * A stale entry makes the detector demand a time predicate on a table that
      * cannot prune by one — noise that trains people to ignore the warning.
      */
+    /** @scenario The map carries no table that is not partitioned */
     it("is a table that really is partitioned", () => {
       const partitioned = partitionedTablesFromMigrations();
 
