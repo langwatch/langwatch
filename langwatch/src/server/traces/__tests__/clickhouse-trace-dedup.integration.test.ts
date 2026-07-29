@@ -376,7 +376,11 @@ describe("ClickHouse trace dedup (integration)", () => {
           }),
         );
 
-        // Insert two versions of the same span (different StartTime = version key)
+        // Two versions of the same span. `UpdatedAt` is what separates them —
+        // the writer stamps it fresh on every insert, and it is the only
+        // column on stored_spans that orders writes (ADR-078). StartTime
+        // differs here too, but only because this fixture predates that and
+        // the other assertions below read the durations off it.
         await insertSpan(
           ch,
           makeSpanRow({
@@ -387,6 +391,7 @@ describe("ClickHouse trace dedup (integration)", () => {
             EndTime: new Date(now - 19900),
             DurationMs: 100,
             SpanAttributes: { "llm.model": "old-model" },
+            UpdatedAt: new Date(now - 10000),
           }),
         );
         await insertSpan(
@@ -399,6 +404,7 @@ describe("ClickHouse trace dedup (integration)", () => {
             EndTime: new Date(now - 9700),
             DurationMs: 300,
             SpanAttributes: heavyAttrs,
+            UpdatedAt: new Date(now),
           }),
         );
       });
@@ -607,6 +613,7 @@ describe("ClickHouse trace dedup (integration)", () => {
             StartTime: new Date(now - 30000),
             EndTime: new Date(now - 29800),
             DurationMs: 200,
+            UpdatedAt: new Date(now - 20000),
           }),
         );
         // Span X1: latest version
@@ -619,6 +626,7 @@ describe("ClickHouse trace dedup (integration)", () => {
             StartTime: new Date(now - 20000),
             EndTime: new Date(now - 19800),
             DurationMs: 200,
+            UpdatedAt: new Date(now),
           }),
         );
 
@@ -632,6 +640,7 @@ describe("ClickHouse trace dedup (integration)", () => {
             StartTime: new Date(now - 30000),
             EndTime: new Date(now - 29700),
             DurationMs: 300,
+            UpdatedAt: new Date(now - 20000),
           }),
         );
         // Span X2: latest version
@@ -644,6 +653,7 @@ describe("ClickHouse trace dedup (integration)", () => {
             StartTime: new Date(now - 20000),
             EndTime: new Date(now - 19700),
             DurationMs: 300,
+            UpdatedAt: new Date(now),
           }),
         );
 
@@ -696,6 +706,87 @@ describe("ClickHouse trace dedup (integration)", () => {
         // Trace Y: 1 span, no dedup needed
         expect(tY!.spans).toHaveLength(1);
         expect(tY!.spans[0]!.name).toBe("span-y1-only");
+      });
+    });
+
+    /**
+     * The ordinary re-report: an emitter sends the same span again — a retried
+     * export, a re-projection, a late correction. StartTime is the span's own
+     * business time and comes back UNCHANGED; only the write time moves.
+     *
+     * This is the case the old `max(StartTime)` dedup could not handle. Both
+     * versions tie on StartTime, so both satisfy the IN-tuple, and with no
+     * `LIMIT 1 BY SpanId` behind it the read emitted the span once per
+     * unmerged version. See ADR-078.
+     */
+    describe("when a span is re-reported with the same start time", () => {
+      const traceId = `trace-rereport-${nanoid()}`;
+      const spanId = `span-rereport-${nanoid()}`;
+      const spanStart = new Date(now - 15000);
+
+      beforeAll(async () => {
+        await insertTraceSummary(
+          ch,
+          makeTraceSummaryRow({
+            TraceId: traceId,
+            OccurredAt: new Date(now - 15000),
+            CreatedAt: new Date(now - 15000),
+            UpdatedAt: new Date(now),
+            SpanCount: 1,
+            TotalDurationMs: 120,
+          }),
+        );
+
+        // First report.
+        await insertSpan(
+          ch,
+          makeSpanRow({
+            TraceId: traceId,
+            SpanId: spanId,
+            SpanName: "rereport-first",
+            StartTime: spanStart,
+            EndTime: new Date(now - 14880),
+            DurationMs: 120,
+            SpanAttributes: { "llm.model": "stale-model" },
+            UpdatedAt: new Date(now - 5000),
+          }),
+        );
+        // Re-report: identical StartTime, corrected content, later write.
+        await insertSpan(
+          ch,
+          makeSpanRow({
+            TraceId: traceId,
+            SpanId: spanId,
+            SpanName: "rereport-latest",
+            StartTime: spanStart,
+            EndTime: new Date(now - 14880),
+            DurationMs: 120,
+            SpanAttributes: { "llm.model": "corrected-model" },
+            UpdatedAt: new Date(now),
+          }),
+        );
+      });
+
+      it("returns the span once", async () => {
+        const traces = await service.getTracesWithSpans(
+          tenantId,
+          [traceId],
+          openProtections,
+        );
+
+        expect(traces).toHaveLength(1);
+        expect(traces![0]!.spans).toHaveLength(1);
+      });
+
+      it("returns the report that arrived last", async () => {
+        const traces = await service.getTracesWithSpans(
+          tenantId,
+          [traceId],
+          openProtections,
+        );
+
+        const span = traces![0]!.spans[0]!;
+        expect(span.name).toBe("rereport-latest");
       });
     });
   });
