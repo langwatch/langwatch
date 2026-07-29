@@ -23,7 +23,13 @@ OVERLAYS="${CHART_DIR}/examples/overlays"
 # shellcheck source=../../lib/test-helpers.sh
 source "$(cd "$(dirname "$0")/../../lib" && pwd)/test-helpers.sh"
 
-trap cleanup_cluster EXIT
+# Temp files registered here are removed on exit, however the script leaves.
+TMP_FILES=()
+cleanup_all() {
+  rm -f "${TMP_FILES[@]:-}"
+  cleanup_cluster
+}
+trap cleanup_all EXIT
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -551,11 +557,14 @@ test_pod_security() {
   # so the baseline has to come from `-f` too: `--set` outranks every `-f`
   # regardless of order, so a --set baseline could never be overridden and the
   # test would fail against a perfectly good overlay.
+  # Registered for cleanup rather than removed inline: fail() exits, so a
+  # trailing rm never runs on the failure path and each red CI run would leak
+  # a temp file. (A `trap ... RETURN` here would be worse — it is global, so it
+  # fires on every later function return, where this local is gone and `set -u`
+  # makes that fatal.)
   local metrics_base
   metrics_base=$(mktemp)
-  # fail() exits, so a trailing rm never runs on the failure path; RETURN fires
-  # either way and keeps failing CI runs from leaking a temp file each time.
-  trap 'rm -f "$metrics_base"' RETURN
+  TMP_FILES+=("$metrics_base")
   cat > "$metrics_base" <<'YAML'
 app:
   telemetry:
