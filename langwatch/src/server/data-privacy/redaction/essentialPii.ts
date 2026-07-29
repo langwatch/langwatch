@@ -256,19 +256,60 @@ export interface PiiRedactionResult {
 }
 
 /**
+ * Whether a detected span is vetoed by a do-not-redact exception: one of the
+ * compiled exception regexes matches its ENTIRE matched text. Full-match only,
+ * so an exception for a known-safe prefix can never carve a hole out of a
+ * longer identifier it happens to start. Callers pre-anchor the patterns via
+ * `compilePiiExceptPatterns`.
+ */
+export function matchesPiiException(
+  matchedText: string,
+  exceptPatterns: readonly RegExp[],
+): boolean {
+  return exceptPatterns.some((pattern) => pattern.test(matchedText));
+}
+
+/**
+ * Compile policy exception patterns for the redaction passes, anchoring each
+ * one so it must cover a detected span's whole matched text. Invalid patterns
+ * are skipped defensively: the service layer rejects them at save time, so a
+ * compile failure here means legacy or hand-edited config, and redaction must
+ * keep running rather than crash ingestion.
+ */
+export function compilePiiExceptPatterns(
+  patterns: readonly string[],
+): RegExp[] {
+  const compiled: RegExp[] = [];
+  for (const pattern of patterns) {
+    try {
+      compiled.push(new RegExp(`^(?:${pattern})$`));
+    } catch {
+      // Skip: validated at write time; never let a bad pattern break ingestion.
+    }
+  }
+  return compiled;
+}
+
+/**
  * Redact essential PII from one string and report how many spans were replaced.
  *
  * `entities` narrows the recognizers that run: pass a subset (the custom PII
  * level) to redact only those identifiers, or omit it (the essential level) to
  * run every native recognizer. Entity names are the canonical identifiers from
  * `ESSENTIAL_PII_ENTITIES` (e.g. `EMAIL_ADDRESS`, `BR_CPF`).
+ *
+ * `exceptPatterns` are the policy's do-not-redact exceptions (pre-anchored via
+ * `compilePiiExceptPatterns`): a detected span whose entire matched text
+ * matches one of them is left as it was.
  */
 export function redactEssentialPiiInText({
   text,
   entities,
+  exceptPatterns,
 }: {
   text: string;
   entities?: readonly string[];
+  exceptPatterns?: readonly RegExp[];
 }): PiiRedactionResult {
   if (
     typeof text !== "string" ||
@@ -277,6 +318,11 @@ export function redactEssentialPiiInText({
   ) {
     return { text, redactedCount: 0 };
   }
+
+  const excepted = (span: Span): boolean =>
+    !!exceptPatterns &&
+    exceptPatterns.length > 0 &&
+    matchesPiiException(text.slice(span.start, span.end), exceptPatterns);
 
   const allowed = entities ? new Set(entities) : null;
   const spans: Span[] = [];
@@ -298,6 +344,7 @@ export function redactEssentialPiiInText({
       ) {
         continue;
       }
+      if (excepted(span)) continue;
       spans.push(span);
     }
   }
@@ -307,11 +354,13 @@ export function redactEssentialPiiInText({
       for (const phone of findPhoneNumbersInText(text, {
         defaultCountry: "US",
       })) {
-        spans.push({
+        const span: Span = {
           start: phone.startsAt,
           end: phone.endsAt,
           entity: "PHONE_NUMBER",
-        });
+        };
+        if (excepted(span)) continue;
+        spans.push(span);
       }
     } catch {
       // Defensive: never let phone parsing break ingestion.

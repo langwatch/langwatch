@@ -31,6 +31,7 @@ const TENANT = createTenantId("project-web-app");
 function mkPolicy({
   piiLevel = "essential" as PiiLevel,
   piiEntities = [] as string[],
+  piiExceptPatterns = [] as string[],
   secretsEnabled = true,
   customPatterns = [] as string[],
 }): ResolvedDataPrivacy {
@@ -40,7 +41,11 @@ function mkPolicy({
   });
   return {
     categories: { input: cat(), output: cat(), system: cat(), tools: cat() },
-    pii: { level: piiLevel, entities: piiEntities },
+    pii: {
+      level: piiLevel,
+      entities: piiEntities,
+      exceptPatterns: piiExceptPatterns,
+    },
     secrets: { enabled: secretsEnabled, customPatterns },
     customAttributes: [],
   };
@@ -444,5 +449,86 @@ describe("OtlpSpanPiiRedactionService scoped-policy native redaction", () => {
       ).rejects.toThrow();
       expect(attr(span, PII_INCOMPLETE)).toBeUndefined();
     });
+  });
+});
+
+describe("OtlpSpanPiiRedactionService PII exception patterns", () => {
+  /** @scenario An exception pattern keeps a business identifier while other PII is still redacted */
+  describe("given an essential policy with an exception for a business number format", () => {
+    it("keeps the excepted number and still redacts the email next to it", async () => {
+      const { service } = makeService(
+        mkPolicy({ piiExceptPatterns: ["00\\d{12}"] }),
+      );
+      const span = spanWith({
+        "gen_ai.prompt": "reservation 00528000043000 for test@example.com",
+      });
+      await service.redactSpan(span, null, "ESSENTIAL", TENANT);
+      expect(attr(span, "gen_ai.prompt")).toBe(
+        "reservation 00528000043000 for [EMAIL_ADDRESS]",
+      );
+    });
+  });
+
+  /** @scenario Exceptions hold at the strict level */
+  describe("given a strict policy with exceptions", () => {
+    it("scopes the analysis batch to strict-only entities and forwards the exceptions", async () => {
+      const { service, batchSpy } = makeService(
+        mkPolicy({ piiLevel: "strict", piiExceptPatterns: ["00\\d{12}"] }),
+      );
+      const span = spanWith({
+        "gen_ai.prompt": "reservation 00528000043000 here",
+      });
+      await service.redactSpan(span, null, "STRICT", TENANT);
+
+      expect(batchSpy).toHaveBeenCalledTimes(1);
+      const options = batchSpy.mock.calls[0]![1];
+      expect(options.entities).toBeDefined();
+      expect(options.entities).not.toContain("CREDIT_CARD");
+      expect(options.entities).toContain("PERSON");
+      expect(options.exceptPatterns).toEqual(["00\\d{12}"]);
+    });
+  });
+
+  describe("given a strict policy without exceptions", () => {
+    it("keeps the full strict entity list for the analysis batch", async () => {
+      const { service, batchSpy } = makeService(
+        mkPolicy({ piiLevel: "strict" }),
+      );
+      const span = spanWith({ "gen_ai.prompt": "hello there" });
+      await service.redactSpan(span, null, "STRICT", TENANT);
+
+      expect(batchSpy).toHaveBeenCalledTimes(1);
+      const options = batchSpy.mock.calls[0]![1];
+      expect(options.entities).toBeUndefined();
+      expect(options.exceptPatterns).toBeUndefined();
+    });
+  });
+});
+
+describe("OtlpSpanPiiRedactionService ingestion key id attribute", () => {
+  /** @scenario The receiver-stamped ingestion key id stays readable */
+  it("keeps the receiver-stamped key id readable", async () => {
+    const { service } = makeService(mkPolicy({}));
+    const span = spanWith({ "langwatch.api_key.id": "key_abc123def456" });
+    await service.redactSpan(span, null, "ESSENTIAL", TENANT);
+    expect(attr(span, "langwatch.api_key.id")).toBe("key_abc123def456");
+  });
+
+  /** @scenario Real key material under the key id attribute name is still redacted */
+  it("scrubs actual key material under that attribute name", async () => {
+    const { service } = makeService(mkPolicy({}));
+    const span = spanWith({
+      "langwatch.api_key.id": "sk-lw-" + "a".repeat(40),
+    });
+    await service.redactSpan(span, null, "ESSENTIAL", TENANT);
+    expect(attr(span, "langwatch.api_key.id")).toContain("[SECRET]");
+    expect(attr(span, "langwatch.api_key.id")).not.toContain("sk-lw-");
+  });
+
+  it("still nukes other api_key-named attributes by name", async () => {
+    const { service } = makeService(mkPolicy({}));
+    const span = spanWith({ "user.api_key": "plain text value" });
+    await service.redactSpan(span, null, "ESSENTIAL", TENANT);
+    expect(attr(span, "user.api_key")).toBe("[SECRET]");
   });
 });

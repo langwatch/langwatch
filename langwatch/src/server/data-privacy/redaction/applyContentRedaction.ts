@@ -6,6 +6,7 @@ import {
 } from "@langwatch/redaction";
 import type { ResolvedDataPrivacy } from "../dataPrivacy.types";
 import {
+  compilePiiExceptPatterns,
   ESSENTIAL_PII_ENTITIES,
   redactEssentialPiiInText,
 } from "./essentialPii";
@@ -53,10 +54,12 @@ export function redactStringNative({
   text,
   policy,
   compiledSecretPatterns,
+  compiledPiiExceptions,
 }: {
   text: string;
   policy: ResolvedDataPrivacy;
   compiledSecretPatterns?: readonly RegExp[];
+  compiledPiiExceptions?: readonly RegExp[];
 }): { text: string; redactedCount: number } {
   let result = text;
   let redactedCount = 0;
@@ -78,6 +81,7 @@ export function redactStringNative({
     const pii = redactEssentialPiiInText({
       text: result,
       entities: piiEntities === "all" ? undefined : piiEntities,
+      exceptPatterns: compiledPiiExceptions,
     });
     result = pii.text;
     redactedCount += pii.redactedCount;
@@ -85,6 +89,19 @@ export function redactStringNative({
 
   return { text: result, redactedCount };
 }
+
+/**
+ * Attribute keys exempt from the sensitive-NAME deny-list. These are platform
+ * attributes whose values are opaque row ids by construction, not key material:
+ * `langwatch.api_key.id` is stamped by the OTLP receiver with the ingestion
+ * key's id, overwriting anything a client sent under that name (see
+ * ingestKeyProvenance.utils.ts). The value still runs through the normal
+ * value-scan passes, so actual key material under this name is scrubbed by
+ * shape regardless.
+ */
+const NAME_DENYLIST_EXEMPT_KEYS: ReadonlySet<string> = new Set([
+  "langwatch.api_key.id",
+]);
 
 /**
  * Redact one attribute (key + value). When secrets redaction is on and the
@@ -98,20 +115,28 @@ export function redactAttributeNative({
   value,
   policy,
   compiledSecretPatterns,
+  compiledPiiExceptions,
 }: {
   key: string;
   value: string;
   policy: ResolvedDataPrivacy;
   compiledSecretPatterns?: readonly RegExp[];
+  compiledPiiExceptions?: readonly RegExp[];
 }): { text: string; redactedCount: number } {
   if (
     policy.secrets.enabled &&
     value.length > 0 &&
-    isSensitiveAttributeKey(key)
+    isSensitiveAttributeKey(key) &&
+    !NAME_DENYLIST_EXEMPT_KEYS.has(key)
   ) {
     return { text: SECRETS_REDACTION_MARKER, redactedCount: 1 };
   }
-  return redactStringNative({ text: value, policy, compiledSecretPatterns });
+  return redactStringNative({
+    text: value,
+    policy,
+    compiledSecretPatterns,
+    compiledPiiExceptions,
+  });
 }
 
 /**
@@ -130,4 +155,14 @@ export function compilePolicySecretPatterns(
   policy: ResolvedDataPrivacy,
 ): RegExp[] {
   return compileSecretPatterns(policy.secrets.customPatterns);
+}
+
+/**
+ * Compile a resolved policy's PII exception patterns once (anchored to full
+ * matches), for reuse across all of a span's strings.
+ */
+export function compilePolicyPiiExceptions(
+  policy: ResolvedDataPrivacy,
+): RegExp[] {
+  return compilePiiExceptPatterns(policy.pii.exceptPatterns);
 }

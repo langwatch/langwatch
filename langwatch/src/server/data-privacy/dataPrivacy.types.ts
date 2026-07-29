@@ -126,6 +126,15 @@ export const dataPrivacyConfigSchema = z
           )
           .max(64)
           .optional(),
+        // Do-not-redact exceptions: regexes for known-safe formats (an internal
+        // reservation number that looks like a card, a shared mailbox address).
+        // A detected span whose entire matched text matches one of these is
+        // left as it was. Unioned down the cascade like secret customPatterns;
+        // each is safe-regex validated at the service layer before write.
+        exceptPatterns: z
+          .array(z.string().trim().min(1).max(512))
+          .max(50)
+          .optional(),
       })
       .strict()
       .superRefine((pii, ctx) => {
@@ -142,6 +151,18 @@ export const dataPrivacyConfigSchema = z
             code: z.ZodIssueCode.custom,
             message: "Entities can only be set when the level is custom",
             path: ["entities"],
+          });
+        }
+        if (
+          pii.level === "disabled" &&
+          pii.exceptPatterns &&
+          pii.exceptPatterns.length > 0
+        ) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message:
+              "Exception patterns need a PII level that redacts something",
+            path: ["exceptPatterns"],
           });
         }
       })
@@ -186,7 +207,7 @@ export interface ResolvedCustomAttributeRule {
 
 export interface ResolvedDataPrivacy {
   categories: Record<ContentCategory, ResolvedCategory>;
-  pii: { level: PiiLevel; entities: string[] };
+  pii: { level: PiiLevel; entities: string[]; exceptPatterns: string[] };
   secrets: { enabled: boolean; customPatterns: string[] };
   customAttributes: ResolvedCustomAttributeRule[];
 }
@@ -212,7 +233,7 @@ export const PLATFORM_DEFAULT_DATA_PRIVACY: ResolvedDataPrivacy = {
     system: { disposition: "capture", audience: { ...EMPTY_AUDIENCE } },
     tools: { disposition: "capture", audience: { ...EMPTY_AUDIENCE } },
   },
-  pii: { level: "essential", entities: [] },
+  pii: { level: "essential", entities: [], exceptPatterns: [] },
   secrets: { enabled: true, customPatterns: [] },
   customAttributes: [],
 };

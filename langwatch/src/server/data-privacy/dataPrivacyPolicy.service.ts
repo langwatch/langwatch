@@ -22,25 +22,25 @@ export class InvalidDataPrivacyConfigError extends Error {
 }
 
 /**
- * Custom secret patterns run against every ingested payload, so a pattern must
- * both compile and pass the safe-regex (ReDoS) analysis before it is stored.
- * Rejecting at write time keeps the redaction hot path free of per-event
- * pattern vetting.
+ * Custom secret patterns and PII exception patterns run against every ingested
+ * payload, so a pattern must both compile and pass the safe-regex (ReDoS)
+ * analysis before it is stored. Rejecting at write time keeps the redaction hot
+ * path free of per-event pattern vetting.
  */
-function assertSafeCustomPatterns(patterns: string[]): void {
+function assertSafePatterns(patterns: string[], label: string): void {
   for (const pattern of patterns) {
     try {
       new RegExp(pattern);
     } catch {
       throw new InvalidDataPrivacyConfigError(
-        `Custom secret pattern ${JSON.stringify(
+        `${label} ${JSON.stringify(
           pattern,
         )} is not a valid regular expression.`,
       );
     }
     if (!isSafeRegex(pattern)) {
       throw new InvalidDataPrivacyConfigError(
-        `Custom secret pattern ${JSON.stringify(
+        `${label} ${JSON.stringify(
           pattern,
         )} could backtrack catastrophically (ReDoS) and was rejected. ` +
           "Simplify the pattern (avoid nested quantifiers).",
@@ -126,7 +126,14 @@ export class DataPrivacyPolicyService {
         `Invalid data-privacy config: ${parsed.error.message}`,
       );
     }
-    assertSafeCustomPatterns(parsed.data.secrets?.customPatterns ?? []);
+    assertSafePatterns(
+      parsed.data.secrets?.customPatterns ?? [],
+      "Custom secret pattern",
+    );
+    assertSafePatterns(
+      parsed.data.pii?.exceptPatterns ?? [],
+      "PII exception pattern",
+    );
     assertSafeAttributePatterns(parsed.data.customAttributes);
 
     const organizationId =

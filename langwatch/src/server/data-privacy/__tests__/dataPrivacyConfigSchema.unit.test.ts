@@ -53,6 +53,26 @@ describe("dataPrivacyConfigSchema", () => {
       });
     });
 
+    describe("when a redacting level carries exception patterns", () => {
+      it("accepts the config", () => {
+        const result = dataPrivacyConfigSchema.safeParse({
+          pii: { level: "essential", exceptPatterns: ["00\\d{12}"] },
+        });
+
+        expect(result.success).toBe(true);
+      });
+    });
+
+    describe("when the disabled level carries exception patterns", () => {
+      it("rejects the config (there is nothing to except from)", () => {
+        const result = dataPrivacyConfigSchema.safeParse({
+          pii: { level: "disabled", exceptPatterns: ["00\\d{12}"] },
+        });
+
+        expect(result.success).toBe(false);
+      });
+    });
+
     describe("when a non-custom level carries no entities", () => {
       it("accepts the config", () => {
         const result = dataPrivacyConfigSchema.safeParse({

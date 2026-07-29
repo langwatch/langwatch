@@ -153,6 +153,7 @@ export function buildRuleConfig({
   audience,
   piiChoice,
   piiEntities,
+  piiExceptPatterns,
   secretsChoice,
   secretsPatterns,
   customAttributes,
@@ -161,6 +162,7 @@ export function buildRuleConfig({
   audience: AudienceFormState;
   piiChoice: PiiChoice;
   piiEntities: string[];
+  piiExceptPatterns: string[];
   secretsChoice: SecretsChoice;
   secretsPatterns: string[];
   customAttributes: CustomAttributeFormRow[];
@@ -182,10 +184,15 @@ export function buildRuleConfig({
   const config: DataPrivacyConfig = {};
   if (Object.keys(categories).length > 0) config.categories = categories;
   if (piiChoice !== "inherit") {
-    config.pii =
-      piiChoice === "custom"
-        ? { level: piiChoice, entities: [...piiEntities].sort() }
-        : { level: piiChoice };
+    const exceptions =
+      piiChoice === "disabled"
+        ? []
+        : piiExceptPatterns.map((p) => p.trim()).filter(Boolean);
+    config.pii = {
+      level: piiChoice,
+      ...(piiChoice === "custom" ? { entities: [...piiEntities].sort() } : {}),
+      ...(exceptions.length > 0 ? { exceptPatterns: exceptions } : {}),
+    };
   }
   if (secretsChoice !== "inherit") {
     const patterns = secretsPatterns.map((p) => p.trim()).filter(Boolean);
@@ -218,6 +225,8 @@ export interface RuleFormState {
   piiChoice: PiiChoice;
   /** Selected entity names, only meaningful when piiChoice === "custom". */
   piiEntities: string[];
+  /** Do-not-redact exception regexes, meaningful at any redacting level. */
+  piiExceptPatterns: string[];
   secretsChoice: SecretsChoice;
   secretsPatterns: string[];
   customAttributes: CustomAttributeFormRow[];
@@ -241,6 +250,7 @@ export function inheritFormState(): RuleFormState {
     audience: { ...EMPTY_AUDIENCE_FORM, admins: true },
     piiChoice: "inherit",
     piiEntities: [],
+    piiExceptPatterns: [],
     secretsChoice: "inherit",
     secretsPatterns: [],
     customAttributes: [],
@@ -307,6 +317,7 @@ export function configToFormState(config: DataPrivacyConfig): RuleFormState {
     audience,
     piiChoice: config.pii?.level ?? "inherit",
     piiEntities: [...(config.pii?.entities ?? [])],
+    piiExceptPatterns: [...(config.pii?.exceptPatterns ?? [])],
     secretsChoice: config.secrets
       ? config.secrets.enabled
         ? "on"
@@ -371,6 +382,12 @@ export function ruleSummary(config: DataPrivacyConfig): string {
       );
     } else {
       parts.push(PII_SUMMARY_LABELS[config.pii.level]);
+    }
+    const exceptions = config.pii.exceptPatterns?.length ?? 0;
+    if (exceptions > 0) {
+      parts.push(
+        exceptions === 1 ? "1 PII exception" : `${exceptions} PII exceptions`,
+      );
     }
   }
   if (config.secrets) {

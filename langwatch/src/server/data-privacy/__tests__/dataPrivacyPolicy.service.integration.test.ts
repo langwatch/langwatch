@@ -270,6 +270,48 @@ describe("DataPrivacyPolicyService integration", () => {
       });
     });
 
+    describe("when a PII exception pattern is unsafe", () => {
+      /** @scenario An unsafe exception pattern is rejected when saving the rule */
+      it("rejects a pattern that can backtrack catastrophically", async () => {
+        await expect(
+          service.setForScope({
+            scope: { scopeType: "PROJECT", scopeId: project.id },
+            personalOnly: false,
+            config: {
+              pii: { level: "essential", exceptPatterns: ["(a+)+$"] },
+            },
+          }),
+        ).rejects.toThrow(InvalidDataPrivacyConfigError);
+      });
+
+      it("rejects a pattern that does not compile", async () => {
+        await expect(
+          service.setForScope({
+            scope: { scopeType: "PROJECT", scopeId: project.id },
+            personalOnly: false,
+            config: {
+              pii: { level: "essential", exceptPatterns: ["[unclosed"] },
+            },
+          }),
+        ).rejects.toThrow(/not a valid regular expression/);
+      });
+
+      it("stores a safe exception pattern and resolves it", async () => {
+        await service.setForScope({
+          scope: { scopeType: "PROJECT", scopeId: project.id },
+          personalOnly: false,
+          config: {
+            pii: { level: "essential", exceptPatterns: ["00\\d{12}"] },
+          },
+        });
+
+        const resolved = await service.getResolvedForProject({
+          projectId: project.id,
+        });
+        expect(resolved.pii.exceptPatterns).toEqual(["00\\d{12}"]);
+      });
+    });
+
     describe("when the scope target does not exist", () => {
       it("rejects the write before storing anything", async () => {
         await expect(

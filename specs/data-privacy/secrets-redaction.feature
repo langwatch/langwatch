@@ -53,3 +53,21 @@ Feature: Redacting secrets from traces
   Scenario: An unsafe custom pattern is rejected when saving the rule
     When an admin tries to save a custom secret pattern that is a catastrophic-backtracking regex
     Then the request is rejected with a validation error
+
+  # The OTLP receiver stamps ingestion-key traces with provenance attributes,
+  # among them "langwatch.api_key.id": the opaque id of the ingestion key row,
+  # never the key material, and overwriting anything the client sent under that
+  # name. The sensitive-attribute-name deny-list would nuke it to a redaction
+  # placeholder just for containing "api_key", hiding the one field that says
+  # which key ingested the trace. The receiver-stamped id is exempt from the
+  # name rule; its value still runs through the secret value rules, so actual
+  # key material under that name is scrubbed anyway.
+  @integration
+  Scenario: The receiver-stamped ingestion key id stays readable
+    When a trace is ingested with a resource attribute "langwatch.api_key.id" carrying an opaque key id
+    Then the stored "langwatch.api_key.id" attribute still contains the key id
+
+  @integration
+  Scenario: Real key material under the key id attribute name is still redacted
+    When a trace is ingested with a resource attribute "langwatch.api_key.id" carrying an "sk-lw-" API key
+    Then the stored "langwatch.api_key.id" attribute is redacted

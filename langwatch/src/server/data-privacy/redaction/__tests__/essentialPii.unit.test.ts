@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { redactEssentialPiiInText } from "../essentialPii";
+import {
+  compilePiiExceptPatterns,
+  redactEssentialPiiInText,
+} from "../essentialPii";
 
 const redact = (text: string) => redactEssentialPiiInText({ text });
 
@@ -212,5 +215,73 @@ describe("redactEssentialPiiInText", () => {
       );
       expect(redactedCount).toBe(2);
     });
+  });
+});
+
+describe("redactEssentialPiiInText with exception patterns", () => {
+  const withExceptions = (text: string, patterns: string[]) =>
+    redactEssentialPiiInText({
+      text,
+      exceptPatterns: compilePiiExceptPatterns(patterns),
+    });
+
+  describe("given an exception for a business number format", () => {
+    it("keeps the excepted number and still redacts other PII in the same text", () => {
+      const { text, redactedCount } = withExceptions(
+        "reservation 00528000043000 booked by test@example.com",
+        ["00\\d{12}"],
+      );
+      expect(text).toBe("reservation 00528000043000 booked by [EMAIL_ADDRESS]");
+      expect(redactedCount).toBe(1);
+    });
+
+    it("still redacts a card number the exception does not cover", () => {
+      const { text } = withExceptions("card 4111111111111111 ok", [
+        "00\\d{12}",
+      ]);
+      expect(text).toBe("card [CREDIT_CARD] ok");
+    });
+  });
+
+  describe("given an exception matching only part of the detected value", () => {
+    it("redacts anyway, since exceptions must cover the whole match", () => {
+      const { text } = withExceptions("reservation 00528000043000 here", [
+        "00\\d{6}",
+      ]);
+      expect(text).toBe("reservation [CREDIT_CARD] here");
+    });
+  });
+
+  describe("given an exception for one specific address", () => {
+    it("keeps that address and redacts the rest", () => {
+      const { text } = withExceptions(
+        "write orders@acme.example or personal@example.com",
+        ["orders@acme\\.example"],
+      );
+      expect(text).toBe("write orders@acme.example or [EMAIL_ADDRESS]");
+    });
+  });
+
+  describe("given an exception covering a phone number", () => {
+    it("keeps the excepted phone", () => {
+      const phone = "+1 415 555 2671";
+      const kept = withExceptions(`call ${phone} now`, ["\\+1 415 555 2671"]);
+      expect(kept.text).toBe(`call ${phone} now`);
+    });
+  });
+});
+
+describe("compilePiiExceptPatterns", () => {
+  it("anchors patterns to full matches", () => {
+    const [compiled] = compilePiiExceptPatterns(["00\\d{12}"]);
+    expect(compiled!.test("00528000043000")).toBe(true);
+    expect(compiled!.test("x00528000043000")).toBe(false);
+    expect(compiled!.test("005280000430001")).toBe(false);
+  });
+
+  it("skips invalid patterns instead of throwing", () => {
+    const compiled = compilePiiExceptPatterns(["([unclosed", "ok\\d+"]);
+    expect(compiled).toHaveLength(1);
+    expect(compiled[0]!.test("ok123")).toBe(true);
   });
 });

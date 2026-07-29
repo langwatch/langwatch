@@ -202,10 +202,31 @@ const codepointToCodeUnitConverter = (
   return (cp) => offsets[Math.max(0, Math.min(cp, offsets.length - 1))]!;
 };
 
+/**
+ * Compile do-not-redact exception patterns for the DLP finding filter, each
+ * anchored so it must cover a finding's whole quoted text. Invalid patterns are
+ * skipped: they are validated at policy save time, so a failure here is legacy
+ * config and redaction must keep running.
+ */
+const compileDlpExceptions = (
+  patterns: readonly string[] | undefined,
+): RegExp[] => {
+  const compiled: RegExp[] = [];
+  for (const pattern of patterns ?? []) {
+    try {
+      compiled.push(new RegExp(`^(?:${pattern})$`));
+    } catch {
+      // Skip: rejected at save time; never let a bad pattern break ingestion.
+    }
+  }
+  return compiled;
+};
+
 export const googleDLPClearPII = async (
   currentObject: Record<string | number, any>,
   lastKey: string | number,
   piiRedactionLevel: PIIRedactionLevel,
+  exceptPatterns?: readonly string[],
 ): Promise<void> => {
   getPiiChecksCounter("google_dlp").inc();
   const [text, remaining] = [
@@ -214,25 +235,43 @@ export const googleDLPClearPII = async (
   ];
 
   const findings = await dlpCheck(text, piiRedactionLevel);
+  const exceptions = compileDlpExceptions(exceptPatterns);
   // DLP reports codepoint offsets against the original text; convert them to
   // code-unit indices once. Each mask below replaces the range with the same
   // number of code units ("✳" is a single BMP code unit), so code-unit indices
   // derived from the original text stay valid on the accumulating copy.
   const toCodeUnit = codepointToCodeUnitConverter(text);
   let redacted = text;
+  let masked = 0;
   for (const finding of findings) {
     const start = finding.location?.codepointRange?.start;
     const end = finding.location?.codepointRange?.end;
     if (start != null && end != null) {
       const startIdx = toCodeUnit(+start);
       const endIdx = toCodeUnit(+end);
+      // A finding whose entire matched text matches a policy exception is a
+      // known-safe format (an internal id that merely looks like PII): keep it.
+      // `includeQuote` is set, but derive the matched text from the range over
+      // the ORIGINAL text as the fallback (the accumulating copy may already
+      // carry masks from earlier findings), so the veto never depends on the
+      // quote being echoed back.
+      const matchedText = finding.quote?.length
+        ? finding.quote
+        : text.substring(startIdx, endIdx);
+      if (
+        exceptions.length > 0 &&
+        exceptions.some((exception) => exception.test(matchedText))
+      ) {
+        continue;
+      }
       redacted =
         redacted.substring(0, startIdx) +
         "✳".repeat(endIdx - startIdx) +
         redacted.substring(endIdx);
+      masked++;
     }
   }
-  if (findings.length > 0) {
+  if (masked > 0) {
     currentObject[lastKey] = redacted.replace(/✳+/g, "[REDACTED]") + remaining;
   }
 };
@@ -349,4 +388,12 @@ export type PIICheckOptions = {
    * only the analysis-service identifiers a team selected.
    */
   entities?: readonly string[];
+  /**
+   * The policy's do-not-redact exception patterns (raw source strings). Only
+   * the Google DLP path can honor them (its findings carry the matched text);
+   * the Presidio path returns pre-anonymized text, which is why a policy with
+   * exceptions scopes the Presidio call to name/location entities instead
+   * (see lambdaAfterNative in span-pii-redaction.service.ts).
+   */
+  exceptPatterns?: readonly string[];
 };

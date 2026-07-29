@@ -45,7 +45,7 @@ function policy({
       system: cat(system),
       tools: cat(tools),
     },
-    pii: { level: "essential", entities: [] },
+    pii: { level: "essential", entities: [], exceptPatterns: [] },
     secrets: { enabled: true, customPatterns: [] },
     customAttributes: dropAttributes.map((pattern) => ({
       pattern,
