@@ -51,6 +51,7 @@ const OPERATION_TO_SPAN_TYPE: Record<string, string> = {
 export class CopilotExtractor implements CanonicalAttributesExtractor {
   readonly id = "copilot";
 
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: a flat, linear sequence of independent `take attribute → if present, lift` guards — the score comes from the count of one-line lifts, not tangled control flow; the branches don't interact.
   apply(ctx: ExtractorContext): void {
     const { attrs } = ctx.bag;
 
