@@ -31,10 +31,18 @@ Feature: The Helm chart installs on a cluster that enforces strict admission con
   # category, and "we harden it by default and hope nobody overrides it" is a
   # bug — see the override scenarios at the end.
 
+  # Tagging. These scenarios are verified by charts/langwatch/tests/e2e-overlays.sh
+  # (test_pod_security), but the parity checker's shell binding roots scan .bats
+  # only, so a chart-e2e scenario cannot bind to a .sh assertion as written.
+  # They carry @e2e @unimplemented so the gap is a tracked one rather than an
+  # untagged file, which the checker skips entirely — an untagged .feature
+  # reports "0/0 all bound" and enforces nothing.
+
   # ===========================================================================
   # The posture every LangWatch workload carries
   # ===========================================================================
 
+  @e2e @unimplemented
   Scenario: Every LangWatch workload and bundled datastore ships hardened
     Given the chart is rendered with its default values
     When I inspect each workload LangWatch authors, including the bundled
@@ -46,6 +54,7 @@ Feature: The Helm chart installs on a cluster that enforces strict admission con
     And every pod declines to mount a ServiceAccount token
     And every container declares CPU and memory requests and limits
 
+  @e2e @unimplemented
   Scenario: Non-root is asserted where a policy engine will actually look for it
     Given the chart is rendered with its default values
     When I inspect a workload's security context
@@ -56,6 +65,7 @@ Feature: The Helm chart installs on a cluster that enforces strict admission con
     # implementations that read the container field deny pods that carry the
     # value only on the pod, which is how the customer's install first failed.
 
+  @e2e @unimplemented
   Scenario: A bundled datastore keeps its own image user
     Given the chart is rendered with its default values
     When I inspect a bundled datastore's security context
@@ -64,6 +74,7 @@ Feature: The Helm chart installs on a cluster that enforces strict admission con
     # An operator writing a MustRunAs constraint needs to allow those uids, so
     # the documentation names them rather than implying a single uid.
 
+  @e2e @unimplemented
   Scenario: Writable paths live on mounted volumes, never the image layer
     Given a bundled datastore is running with a read-only root filesystem
     When it writes the paths it needs at runtime
@@ -71,6 +82,7 @@ Feature: The Helm chart installs on a cluster that enforces strict admission con
     And any remaining runtime path is written to a mounted scratch volume
     And no write is attempted against the image layer
 
+  @e2e @unimplemented
   Scenario: Scratch volumes cannot exhaust the node they run on
     Given a datastore writes logs to a scratch volume
     When that workload enters an error loop and writes without bound
@@ -83,6 +95,7 @@ Feature: The Helm chart installs on a cluster that enforces strict admission con
   # What cannot comply, and what the operator does about it
   # ===========================================================================
 
+  @e2e @unimplemented
   Scenario: A default install is honest that it does not pass on its own
     Given a cluster that enforces the restricted pod security standard
     When an operator installs the chart with default values
@@ -93,6 +106,7 @@ Feature: The Helm chart installs on a cluster that enforces strict admission con
     # extra config" that sends an operator into a denial they were told not to
     # expect.
 
+  @e2e @unimplemented
   Scenario: The strict-admission overlay removes every non-complying component
     Given a cluster that enforces the restricted pod security standard
     When an operator installs the chart with the strict-admission overlay
@@ -100,6 +114,7 @@ Feature: The Helm chart installs on a cluster that enforces strict admission con
     And the assistant is not deployed
     And the bundled metrics stack is not deployed
 
+  @e2e @unimplemented
   Scenario: The assistant is removed rather than de-privileged
     Given the assistant's manager requires root and a narrow capability set so
       it can give each of its workers a distinct user id
@@ -110,6 +125,7 @@ Feature: The Helm chart installs on a cluster that enforces strict admission con
     # makes sibling workers share a uid and read each other's credentials off
     # disk. Removing the workload is the safe answer, weakening it is not.
 
+  @e2e @unimplemented
   Scenario: An exempt component must be one the overlay actually disables
     Given a workload that does not carry the hardened posture
     When the chart's own checks run
@@ -123,6 +139,7 @@ Feature: The Helm chart installs on a cluster that enforces strict admission con
   # Overrides layer onto the posture, they do not replace it
   # ===========================================================================
 
+  @e2e @unimplemented
   Scenario: A partial security-context override keeps the defaults it did not mention
     Given an operator overrides a single security-context field on one component
     When the chart is rendered
@@ -133,6 +150,7 @@ Feature: The Helm chart installs on a cluster that enforces strict admission con
     # non-root, the user id and the seccomp profile, and nothing in the
     # rendered output said so.
 
+  @e2e @unimplemented
   Scenario: Deliberately relaxing one control does not relax the others
     Given an operator turns off the read-only root filesystem for one component
     When the chart is rendered
