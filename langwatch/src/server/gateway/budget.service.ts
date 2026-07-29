@@ -13,7 +13,12 @@ import type {
   PrismaClient,
 } from "@prisma/client";
 import { Prisma } from "@prisma/client";
-import { TRPCError } from "@trpc/server";
+import {
+  GatewayBudgetNotFoundError,
+  GatewayGroupBudgetUnsupportedError,
+  GatewayScopeOrgMismatchError,
+  VirtualKeyNotFoundError,
+} from "./errors";
 
 import { createLogger } from "@langwatch/observability";
 
@@ -584,11 +589,7 @@ export class GatewayBudgetService {
         select: { userId: true },
       });
       if (!membership) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message:
-            "principalUserId is not a member of this organization — PRINCIPAL budgets must scope a user inside the budget's org.",
-        });
+        throw new GatewayScopeOrgMismatchError("user");
       }
     }
 
@@ -604,11 +605,7 @@ export class GatewayBudgetService {
         select: { id: true },
       });
       if (!team) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message:
-            "teamId does not belong to this organization — TEAM budgets must scope a team inside the budget's org.",
-        });
+        throw new GatewayScopeOrgMismatchError("team");
       }
     }
     if (input.scope.kind === "PROJECT") {
@@ -620,11 +617,7 @@ export class GatewayBudgetService {
         select: { id: true },
       });
       if (!proj) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message:
-            "projectId does not belong to this organization — PROJECT budgets must scope a project inside the budget's org.",
-        });
+        throw new GatewayScopeOrgMismatchError("project");
       }
     }
     // Cross-org + product-managed guard for VIRTUAL_KEY budgets. The scope id
@@ -643,10 +636,7 @@ export class GatewayBudgetService {
         select: { purpose: true },
       });
       if (!vk || vk.purpose !== "USER") {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Virtual key not found.",
-        });
+        throw new VirtualKeyNotFoundError();
       }
     }
 
@@ -661,11 +651,7 @@ export class GatewayBudgetService {
       // the presence of the ClickHouse repo this service was built with.
       // Spec: specs/ai-gateway/gateway-budget-targeting.feature.
       if (!this.chRepo) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message:
-            "group_budget_requires_clickhouse: group budgets track spend per member, which needs the ClickHouse spend ledger; this deployment reads budget spend from Postgres only, which cannot keep members apart.",
-        });
+        throw new GatewayGroupBudgetUnsupportedError();
       }
       // Cross-org guard, mirroring the TEAM / PROJECT / PRINCIPAL guards:
       // the scope id is request-supplied, so without this a caller could
@@ -678,11 +664,7 @@ export class GatewayBudgetService {
         select: { id: true },
       });
       if (!group) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message:
-            "groupId does not belong to this organization; GROUP budgets must scope a group inside the budget's org.",
-        });
+        throw new GatewayScopeOrgMismatchError("group");
       }
     }
 
@@ -699,11 +681,7 @@ export class GatewayBudgetService {
         select: { id: true },
       });
       if (!provider) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message:
-            "provider_not_in_organization: the provider filter must name a model provider configured in this organization.",
-        });
+        throw new GatewayScopeOrgMismatchError("model provider");
       }
     }
 
@@ -757,7 +735,7 @@ export class GatewayBudgetService {
 
   async update(input: UpdateBudgetInput): Promise<GatewayBudget> {
     const existing = await this.get(input.id, input.organizationId);
-    if (!existing) throw new TRPCError({ code: "NOT_FOUND" });
+    if (!existing) throw new GatewayBudgetNotFoundError();
     const before = serializeRowForAudit(existing);
 
     return this.prisma.$transaction(async (tx) => {
@@ -804,7 +782,7 @@ export class GatewayBudgetService {
 
   async archive(input: ArchiveBudgetInput): Promise<GatewayBudget> {
     const existing = await this.get(input.id, input.organizationId);
-    if (!existing) throw new TRPCError({ code: "NOT_FOUND" });
+    if (!existing) throw new GatewayBudgetNotFoundError();
     const before = serializeRowForAudit(existing);
 
     return this.prisma.$transaction(async (tx) => {

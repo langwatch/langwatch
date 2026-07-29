@@ -58,6 +58,11 @@ export const APP_ERROR_CODES = [
   "export_failed",
   "filter_field_unknown",
   "filter_parse_error",
+  "gateway_budget_not_found",
+  "gateway_group_budget_unsupported",
+  "gateway_guardrail_project_mismatch",
+  "gateway_scope_org_mismatch",
+  "gateway_spend_unavailable",
   "guardrail_attach_forbidden",
   "ingestion_source_cap_reached",
   "ingestion_source_not_found",
@@ -170,6 +175,7 @@ export const APP_ERROR_CODES = [
   // `ValidationError` (and `ValidationError.fromZodError`, which the tRPC
   // boundary uses to promote input ZodErrors onto the handled channel).
   "validation_error",
+  "virtual_key_not_found",
   "workflow_execution_failed",
   "workflow_not_found",
 ] as const;

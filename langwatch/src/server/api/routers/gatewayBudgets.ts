@@ -6,7 +6,8 @@
  * flows pass a scope kind + target id; the server normalises onto
  * `scopeType` and the matching typed FK column.
  */
-import { TRPCError } from "@trpc/server";
+import { OrganizationNotFoundError } from "../../../../ee/licensing/errors";
+import { GatewayBudgetNotFoundError } from "~/server/gateway/errors";
 import { z } from "zod";
 
 import {
@@ -58,10 +59,7 @@ async function requireOrgAccess(
     where: { id: organizationId },
   });
   if (!org) {
-    throw new TRPCError({
-      code: "NOT_FOUND",
-      message: "organization not found",
-    });
+    throw new OrganizationNotFoundError();
   }
 }
 
@@ -129,7 +127,7 @@ export const gatewayBudgetsRouter = createTRPCRouter({
       const service = GatewayBudgetService.create(ctx.prisma, chRepoOrUndefined());
       const detail = await service.getDetail(input.id, input.organizationId);
       if (!detail) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "budget not found" });
+        throw new GatewayBudgetNotFoundError();
       }
       const providerLabels = await resolveProviderLabels({
         prisma: ctx.prisma,

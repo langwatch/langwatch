@@ -165,3 +165,34 @@ Feature: Knowable failures reach the customer as themselves
     Given a sign-up form
     When the name is left empty
     Then the name field explains that it is required
+
+  # ---------------------------------------------------------------------------
+  # The gateway's own failures
+  #
+  # The virtual-key and budget surfaces landed after this migration was written,
+  # so they had no channel and invented one: a pseudo-code on the front of a
+  # prose message ("scope_org_mismatch: team tm_… is not in organization org_…",
+  # "missing_perm:gatewayGuardrails:attach"). That shipped internal record ids
+  # to whoever asked, named our storage engines in customer copy, and still left
+  # the client with no code to key copy off.
+  # ---------------------------------------------------------------------------
+
+  @unit
+  Scenario: A cross-organization scope is refused without naming the record
+    Given a request naming a team outside the caller's organization
+    When the scope is validated
+    Then the refusal carries the gateway scope mismatch code
+    And it names the kind of scope but not its id
+
+  @unit
+  Scenario: A virtual key the caller cannot see is indistinguishable from a missing one
+    Given a virtual key that exists but is not visible to the caller
+    When it is requested
+    Then the answer is the same not-found code a genuinely missing key gives
+
+  @unit
+  Scenario: A limit of the deployment is not blamed on the customer
+    Given a deployment that cannot track spend per member
+    When a per-member budget is requested
+    Then the refusal is attributed to the platform
+    And the copy does not name the storage engine

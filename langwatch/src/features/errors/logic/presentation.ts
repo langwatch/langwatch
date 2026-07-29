@@ -1115,6 +1115,46 @@ const presentations = {
     title: "You don't have permission to attach guardrails",
     describe: () => "Ask an admin on your team for access to this project.",
   },
+  virtual_key_not_found: {
+    title: "Virtual key not found",
+    describe: () =>
+      "It may have been deleted, or it isn't shared with you. Reload to see the keys you can open.",
+  },
+  gateway_budget_not_found: {
+    title: "Budget not found",
+    describe: () => "It may have been deleted. Reload to see the current list.",
+  },
+  gateway_scope_org_mismatch: {
+    // Names the KIND of scope, never the id — the id belongs to a record in
+    // another organization, which is exactly what this guard refuses to
+    // confirm the existence of.
+    title: "That scope isn't in this organization",
+    describe: (error) => {
+      const kind = str(error, "scopeKind", "");
+      return kind
+        ? `Pick a ${kind} that belongs to this organization.`
+        : "Pick a scope that belongs to this organization.";
+    },
+  },
+  gateway_guardrail_project_mismatch: {
+    title: "That guardrail is in a different project",
+    describe: () =>
+      "A key can only use guardrails from its own project. Pick one from this project instead.",
+  },
+  gateway_spend_unavailable: {
+    // fault: platform. Says what is missing, not which engine is missing it.
+    title: "Spend isn't available for this key",
+    describe: () =>
+      "This deployment doesn't record spend per key, so there's no figure to show.",
+  },
+  gateway_group_budget_unsupported: {
+    // Refusing beats creating a cap that quietly means something else, so the
+    // copy says what the budget would NOT have done — that is the whole reason
+    // the request was turned down.
+    title: "Per-member budgets aren't available here",
+    describe: () =>
+      "This deployment can only cap a group's combined spend, not each member's. Set the budget on a team or project instead.",
+  },
   ssrf_blocked: {
     title: "That address isn't allowed",
     describe: () => "Use a public URL that isn't on an internal network.",

@@ -1786,7 +1786,15 @@ describe("RBAC Integration Tests", () => {
           const trpcError = error as TRPCError;
           expect(trpcError.code).toBe("UNAUTHORIZED");
           expect(trpcError.message).toBe("You do not have permission to access this project resource");
-          expect(trpcError.cause).toBeUndefined();
+          // The point of this case is that an ordinary denial is NOT the lite-member
+          // one, so the upgrade modal the client opens off that code stays shut. It
+          // used to be asserted as "no cause at all", which was only true while this
+          // refusal had no name; it now carries `project_permission_denied` so the
+          // client has copy to render instead of the generic unknown state.
+          expect(trpcError.cause).not.toBeInstanceOf(LiteMemberRestrictedError);
+          expect(trpcError.cause).toMatchObject({
+            code: "project_permission_denied",
+          });
         }
       });
     });

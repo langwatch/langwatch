@@ -675,10 +675,11 @@ export const checkProjectPermission =
       // "unknown" state for a refusal we can name — and one the customer can
       // act on by asking an admin for the permission named in `meta`.
       //
-      // The tRPC code stays UNAUTHORIZED rather than moving to FORBIDDEN even
-      // though the handled error is a 403: the client's interceptors branch on
-      // it, and re-tagging every project denial is a behaviour change that has
-      // nothing to do with giving this error its words back.
+      // The wire code that results is FORBIDDEN, not the UNAUTHORIZED spelled
+      // below: `handledErrorMiddleware` re-derives it from the handled cause's
+      // `httpStatus` (403). That is the right answer — the caller IS
+      // authenticated, they just lack the permission — and it now matches what
+      // the REST surface has always returned for the same refusal.
       throw new TRPCError({
         code: "UNAUTHORIZED",
         message: "You do not have permission to access this project resource",
