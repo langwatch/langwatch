@@ -368,7 +368,7 @@ function SpendSparkline({
         <Heading size="sm">Spend over time</Heading>
         <Spacer />
         <Text fontSize="xs" color="fg.muted">
-          ledger-backed, day-bucketed UTC
+          day-bucketed UTC
         </Text>
       </HStack>
       <Box
