@@ -314,10 +314,14 @@ export class EnvelopeBlobLifecycle {
    * Best-effort: a failure warns and relies on the existing backstop, and never
    * blocks the drop.
    *
-   * Uses {@link BlobLeases.extendTtl} — plain `EXPIRE` calls, not `renew` — because
-   * `renew`/`take` only extend the *logical* lease deadline (the Lua script's
-   * hardcoded `BLOB_LEASE_SET_TTL_SECONDS`/`BLOB_BACKSTOP_TTL_SECONDS` still cap
-   * the *physical* Redis TTL regardless of the ttlSeconds passed to them).
+   * Uses {@link BlobLeases.holdForDlq}, which records the dead-letter as a real
+   * holder for the window. `renew`/`take` cannot serve: they only extend the
+   * *logical* lease deadline, since the Lua script's hardcoded
+   * `BLOB_LEASE_SET_TTL_SECONDS`/`BLOB_BACKSTOP_TTL_SECONDS` still cap the
+   * *physical* Redis TTL regardless of the ttlSeconds passed to them. A bare TTL
+   * bump cannot serve either: both the release-time grace helper and the
+   * maintenance sweep reclaim an *unleased* blob back to the 1-hour grace window
+   * — and the job's own `releaseLease()` runs immediately after this call.
    */
   async preserveForDlq({
     value,
@@ -341,7 +345,7 @@ export class EnvelopeBlobLifecycle {
           );
           return;
         }
-        await this.blobLeases.extendTtl({
+        await this.blobLeases.holdForDlq({
           projectId: lease.ref.projectId,
           hash: lease.ref.hash,
           tier: lease.ref.tier,

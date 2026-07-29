@@ -74,10 +74,34 @@ if count == 0 then redis.call("DEL", KEYS[1]) end
 return count
 `;
 
+/**
+ * The dead-letter's holder token. One shared constant, not a per-entry id — see
+ * {@link BlobLeases.holdForDlq}.
+ */
+const DLQ_LEASE_HOLDER_ID = "gq:dlq";
+
+/**
+ * {@link TAKE_LUA}'s shape, with the caller's window used for the physical
+ * `EXPIRE`s as well as the deadline. That single difference is the point: TAKE
+ * hardcodes the routine constants there, which is exactly what would let the
+ * dead-letter outlive its own blob.
+ */
+const HOLD_FOR_DLQ_LUA = `${REDIS_NOW_MS_LUA}
+local ttlSeconds = tonumber(ARGV[2])
+redis.call("ZREMRANGEBYSCORE", KEYS[1], "-inf", nowMs)
+redis.call("ZADD", KEYS[1], nowMs + (ttlSeconds * 1000), ARGV[1])
+redis.call("EXPIRE", KEYS[1], ttlSeconds)
+redis.call("SADD", KEYS[2], "${LEGACY_HOLDER_LEASE_GUARD}", ARGV[1])
+redis.call("EXPIRE", KEYS[2], ttlSeconds)
+if #KEYS == 3 then redis.call("EXPIRE", KEYS[3], ttlSeconds) end
+return 1
+`;
+
 const takeScript = new CachedLuaScript(TAKE_LUA);
 const releaseScript = new CachedLuaScript(RELEASE_LUA);
 const transferScript = new CachedLuaScript(TRANSFER_LUA);
 const countLiveScript = new CachedLuaScript(COUNT_LIVE_LUA);
+const holdForDlqScript = new CachedLuaScript(HOLD_FOR_DLQ_LUA);
 
 /**
  * Per-holder, renewable leases for content-addressed blobs. Each sorted-set
@@ -281,25 +305,41 @@ export class BlobLeases {
   }
 
   /**
-   * Directly extends the Redis TTL on the lease-set keys and the blob's own
-   * redis-tier key to at least `ttlSeconds` — independent of the fixed
-   * `BLOB_LEASE_SET_TTL_SECONDS` / `BLOB_BACKSTOP_TTL_SECONDS` constants
-   * `take`/`renew` bake into `TAKE_LUA`. Plain `EXPIRE` calls, not a Lua script:
-   * passing a larger `ttlSeconds` to `take`/`renew` only extends the *logical*
-   * lease deadline recorded as the sorted-set member's score — the *physical*
-   * Redis TTL on the lease-set key and the blob key stays capped at the
-   * hardcoded constant, so the blob would still be reclaimed on schedule. This
-   * method touches only the real TTLs, and never the Lua scripts, so it cannot
-   * perturb `take`/`renew`/`release`/`transfer`'s atomicity.
+   * Records the dead-letter itself as a holder of the blob, for the length of
+   * the quarantine window (#719/#720).
    *
-   * Used by the DLQ dead-letter path (#719/#720): a body-present drop is
-   * quarantined for a window that can exceed the routine lease/backstop TTL,
-   * so without this the referenced blob could be reclaimed before an operator
-   * drains the dead-letter. s3-tier objects have no per-object Redis TTL (left
-   * to the bucket lifecycle, ADR-029), so only the lease bookkeeping is
-   * extended for that tier — the caller's tier param mirrors `renew`'s.
+   * A quarantined value is a real future reader of that blob, so it takes a real
+   * lease rather than a bare TTL bump. Two independent mechanisms reclaim an
+   * *unleased* blob back to {@link BLOB_RELEASE_GRACE_TTL_SECONDS}, and a bumped
+   * TTL survives neither:
+   *
+   * - release time — `gqGraceExpireIfUnleased` runs on the job's own
+   *   `release()`, which lands immediately AFTER this call in the drop path; and
+   * - the maintenance sweep — `blobSweepLua`'s `repaired` branch, which
+   *   independently shortens any blob whose TTL exceeds the grace window.
+   *
+   * Both gate on the LEASE SET being non-empty (`ZCARD`), and the sweep does not
+   * consult the legacy holder set at all — so a lease member is the only thing
+   * that holds a blob past the grace window. Without it the dead-letter entry
+   * (7 days) outlives the blob it references (1 hour) and a drain recovers an
+   * envelope pointing at nothing, which is the exact failure #720 exists to
+   * prevent.
+   *
+   * `ttlSeconds` sets the deadline AND the physical expiries, which is why this
+   * cannot route through `take`/`renew`: `TAKE_LUA` takes the caller's ttl for
+   * the sorted-set member's score but bakes `BLOB_LEASE_SET_TTL_SECONDS` /
+   * `BLOB_BACKSTOP_TTL_SECONDS` into its `EXPIRE`s, so the blob would still be
+   * reclaimed on the routine schedule no matter what window was asked for.
+   *
+   * One constant holder token, not a per-entry id: the window is per-blob, so
+   * re-quarantining the same blob must move one deadline rather than accumulate
+   * members that outlive their entries. Everything then expires together at the
+   * window — bounded, and no orphan beyond it. s3-tier objects have no
+   * per-object Redis TTL (left to the bucket lifecycle, ADR-029), so only the
+   * lease bookkeeping is extended for that tier — the `tier` param mirrors
+   * `renew`'s.
    */
-  async extendTtl({
+  async holdForDlq({
     projectId,
     hash,
     tier,
@@ -310,17 +350,12 @@ export class BlobLeases {
     tier: "redis" | "s3";
     ttlSeconds: number;
   }): Promise<void> {
-    await this.redis.expire(this.leaseKey({ projectId, hash }), ttlSeconds);
-    await this.redis.expire(
-      this.legacyHolderKey({ projectId, hash }),
-      ttlSeconds,
+    await holdForDlqScript.run(
+      this.redis,
+      ...this.blobKeyArgs({ projectId, hash, tier }),
+      DLQ_LEASE_HOLDER_ID,
+      String(ttlSeconds),
     );
-    if (tier === "redis") {
-      await this.redis.expire(
-        redisBlobKey({ queueName: this.queueName, projectId, hash }),
-        ttlSeconds,
-      );
-    }
   }
 
   async countLive({

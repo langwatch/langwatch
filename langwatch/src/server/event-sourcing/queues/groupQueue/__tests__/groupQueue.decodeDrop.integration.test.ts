@@ -291,7 +291,16 @@ describe.skipIf(!hasTestcontainers)(
           );
 
           expect(processed).not.toHaveBeenCalled();
-          expect(await redis.keys(`${name}:gq:blobleases:*`)).toHaveLength(0);
+          // The JOB's lease is retired — but the dead-letter takes one of its own
+          // for the quarantine window (#720). Asserting the set is EMPTY here
+          // would assert the bug: both the release-time grace helper and the
+          // maintenance sweep reclaim an *unleased* blob back to the 1h grace
+          // window, so a body preserved for 7 days would lose its bytes in one.
+          // One member, and it is the dead-letter's — which is what proves the
+          // job's own holder was removed.
+          const leaseKeys = await redis.keys(`${name}:gq:blobleases:*`);
+          expect(leaseKeys).toHaveLength(1);
+          expect(await redis.zrange(leaseKeys[0]!, 0, -1)).toEqual(["gq:dlq"]);
           expect(objectStore.deleted).toEqual([]);
           expect(objectStore.store.size).toBe(1);
         });
@@ -718,9 +727,13 @@ describe.skipIf(!hasTestcontainers)(
           // an operator saw nothing while an event that could not recover via
           // replay was thrown away.
           expect(entry!.labels.reason).toBe("transient_exhausted");
-          // The terminal retires its lease but leaves shared object bytes to
-          // the durable-store lifecycle.
-          expect(await redis.keys(`${name}:gq:blobleases:*`)).toHaveLength(0);
+          // The terminal retires ITS lease but leaves shared object bytes to the
+          // durable-store lifecycle — and, because the value is dead-lettered,
+          // the quarantine holds a lease of its own so the blob outlives the
+          // 1h release-grace window (#720). One member, and it is that one.
+          const leaseKeys = await redis.keys(`${name}:gq:blobleases:*`);
+          expect(leaseKeys).toHaveLength(1);
+          expect(await redis.zrange(leaseKeys[0]!, 0, -1)).toEqual(["gq:dlq"]);
           expect(flaky.deleted).toEqual([]);
         });
       });
