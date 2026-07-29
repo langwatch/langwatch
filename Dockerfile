@@ -99,14 +99,23 @@ COPY --from=builder /app/langwatch ./langwatch
 # handled-error is imported for side effects by the server and worker entry
 # points, so omitting it fails the boot outright.
 COPY --from=builder /app/mcp-server ./mcp-server
-# Whole directories, including each package's own node_modules. langy and
+# The whole packages/ tree, not a cherry-picked list.
+#
+# Two reasons. First, each package's own node_modules comes with it: langy and
 # handled-error declare zod / @opentelemetry/api as PEERS, and pnpm satisfies
 # those by linking them into the member's own node_modules, pointing at the
 # shared store above. That replaces the hand-built symlinks this stage used to
 # create at /app/node_modules — which would now collide with the real store,
 # and are unnecessary because pnpm already did the job correctly.
-COPY --from=builder /app/packages/langy ./packages/langy
-COPY --from=builder /app/packages/handled-error ./packages/handled-error
+#
+# Second, cherry-picking is the failure mode. Adding a root workspace package
+# as an app dependency and forgetting to add a COPY line here leaves a
+# dangling symlink and a boot-time "Cannot find module" — which is exactly how
+# @langwatch/handled-error broke the workers entry point once already. Copying
+# the tree cannot be forgotten. It costs about 1.3MB (packages/server, the npx
+# CLI, is the only member the app does not import) against an image measured
+# in hundreds.
+COPY --from=builder /app/packages ./packages
 COPY --from=builder /app/langevals/ts-integration/evaluators.generated.ts ./langevals/ts-integration/evaluators.generated.ts
 COPY --from=builder /app/feature-map.json ./feature-map.json
 
