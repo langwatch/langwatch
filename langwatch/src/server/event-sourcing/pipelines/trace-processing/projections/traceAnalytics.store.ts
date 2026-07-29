@@ -136,7 +136,7 @@ export class TraceAnalyticsStore
    * aggregate is rewritten, and for the population as a whole once retention has
    * aged the pre-00056 rows out.
    *
-   * The storage-anchor split (ADR-071 step 3, migration 00060) is the ONE stamp
+   * The storage-anchor split (ADR-071 step 3, migration 00061) is the ONE stamp
    * change that does NOT take that route, and deliberately. Its predecessor is
    * admitted and decoded, because on a pre-split row `OccurredAt` is
    * `min(span start)` — at once a valid anchor (it is what the row is already

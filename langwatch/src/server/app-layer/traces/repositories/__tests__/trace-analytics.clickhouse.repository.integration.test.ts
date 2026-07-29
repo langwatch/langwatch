@@ -73,7 +73,7 @@ function traceRow(over: Partial<TraceAnalyticsRow> = {}): TraceAnalyticsRow {
     rootMetadataFromFallback: false,
     traceNameUserOverridden: true,
     lastEventOccurredAt: baseMs + 50,
-    // Span timing baseline (migration 00060), deliberately EARLIER than the
+    // Span timing baseline (migration 00061), deliberately EARLIER than the
     // anchor in OccurredAt: a late earlier-starting span moved the baseline
     // while the anchor stayed frozen. The two must not swap in the round-trip.
     earliestSpanStartMs: baseMs - 250,
@@ -97,7 +97,7 @@ afterAll(async () => {
   await stopTestContainers();
 });
 
-describe("trace_analytics round-trip (migrations 00039 + 00056 + 00060)", () => {
+describe("trace_analytics round-trip (migrations 00039 + 00056 + 00061)", () => {
   describe("given a fully populated slim row", () => {
     it("reads back every read-back column so the fold recovers its state", async () => {
       const row = traceRow({ traceId: `${tag}-rt` });
@@ -132,7 +132,7 @@ describe("trace_analytics round-trip (migrations 00039 + 00056 + 00060)", () => 
       expect(read!.row.traceNameFromFallback).toBe(false);
       expect(read!.row.rootMetadataFromFallback).toBe(false);
       expect(read!.row.lastEventOccurredAt).toBe(baseMs + 50);
-      // Span timing baseline (00060) — its own column, exact as a UInt64, and
+      // Span timing baseline (00061) — its own column, exact as a UInt64, and
       // NOT confused with the anchor the partition column carries.
       expect(read!.row.earliestSpanStartMs).toBe(baseMs - 250);
       // Partition/timestamp column is populated (DateTime64 exactness is
@@ -215,7 +215,7 @@ describe("trace_analytics round-trip (migrations 00039 + 00056 + 00060)", () => 
       expect(read!.row.rootSpanStartTimeMs).toBe(0);
       expect(read!.row.traceNameFromFallback).toBe(false);
       expect(read!.row.lastEventOccurredAt).toBe(0);
-      // Same for the 00060 column: the DEFAULT is what a row written before it
+      // Same for the 00061 column: the DEFAULT is what a row written before it
       // means, and reading it must not throw the way an Array without a DEFAULT
       // did in the 2026-07-28 incident (migration 00057).
       expect(read!.row.earliestSpanStartMs).toBe(0);

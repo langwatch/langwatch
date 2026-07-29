@@ -106,7 +106,7 @@ import {
  * contribution that carries a usable business time and never moved after
  * (`storageAnchorMs`). It is no longer the running minimum of span starts; that
  * value is the fold's timing baseline and now has its own column
- * (`EarliestSpanStartMs`, migration 00060). Sharing one column between the two
+ * (`EarliestSpanStartMs`, migration 00061). Sharing one column between the two
  * jobs is what wrote a log-only trace into partition 196952 with an
  * already-expired TTL deadline.
  *
@@ -156,7 +156,7 @@ const traceAnalyticsEvents = [
  *  cannot be told apart from real zeroes and it is treated as a store miss
  *  (see `TraceAnalyticsStore.getWithApplied`).
  *
- *  2026-07-29 — the storage anchor split (ADR-071 step 3, migration 00060).
+ *  2026-07-29 — the storage anchor split (ADR-071 step 3, migration 00061).
  *  BOTH halves of what this stamp records changed at once: the DERIVATION
  *  (`OccurredAt` is now the frozen first-observed business time rather than the
  *  running min of span starts) and the ROW SHAPE (`EarliestSpanStartMs` carries
@@ -276,7 +276,7 @@ export interface TraceAnalyticsRow {
   occurredAtMs: number;
   /**
    * The span timing baseline → the `EarliestSpanStartMs` column (migration
-   * 00060): the earliest start time across the trace's non-synthetic spans, or
+   * 00061): the earliest start time across the trace's non-synthetic spans, or
    * 0 while no span has been folded. `TotalDurationMs` is measured from it.
    *
    * It has its own column because `OccurredAt` no longer carries it, and
@@ -1162,7 +1162,7 @@ export class TraceAnalyticsFoldProjection
    * fallback-named trace, and reset the MAX_PROCESSED_SPANS cap so already-
    * committed cost/tokens were counted twice.
    *
-   * The storage-anchor split (migration 00060) pointedly did NOT join that list
+   * The storage-anchor split (migration 00061) pointedly did NOT join that list
    * — its predecessor stamp is decoded rather than refused, because refusing it
    * would rebuild the whole population and a rebuild re-derives the anchor. See
    * {@link TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT}.
