@@ -25,7 +25,11 @@ overrides:
   # Security: hono request smuggling / path confusion
   "hono@<4.12.25": ">=4.12.25"
   # Security: fast-uri path traversal + host confusion
-  "fast-uri@<3.1.2": "3.1.2"
+  "fast-uri@<3.1.4": "3.1.4"
+  # Security: postcss source-map parsing DoS
+  "postcss@<8.5.18": ">=8.5.18"
+  # Security: js-yaml prototype pollution via merge keys
+  "js-yaml@>=4.0.0 <4.3.0": "4.3.0"
   liquidjs: ">=10.26.0"
   # Security: uuid missing buffer bounds check in v3/v5/v6 (GHSA-w5hq-g745-h8pq)
   "uuid@<11.1.1": ">=11.1.1 <12"
