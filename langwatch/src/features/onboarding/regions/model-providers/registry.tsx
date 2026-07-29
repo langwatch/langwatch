@@ -75,6 +75,43 @@ export const modelProviderRegistry: ModelProviderRegistry = [
     },
   },
   {
+    key: "google_agent_platform",
+    backendModelProviderKey: "google_agent_platform",
+    label: "Google Agent Platform",
+    defaultModel: "gemini-2.5-flash",
+    // The path names the project and location, so there is no static base
+    // URL to probe — it is assembled per credential. See
+    // buildProbeCandidates' `google_agent_platform` branch.
+    defaultBaseUrl: "https://aiplatform.googleapis.com",
+    apiRoot: "https://aiplatform.googleapis.com",
+    icon: singleIcon(
+      "/images/external-icons/gcloud.svg",
+      "Google Agent Platform",
+    ),
+    externalDocsUrl:
+      "https://docs.cloud.google.com/gemini-enterprise-agent-platform",
+    fieldMetadata: {
+      GOOGLE_AGENT_PLATFORM_API_KEY: {
+        label: "Agent Platform API Key",
+        // Says where the key comes from, because this is the distinction that
+        // sent a customer round in circles: an Agent Platform key and an AI
+        // Studio key look alike and are not interchangeable.
+        description:
+          "A Google Cloud API key for Gemini Enterprise Agent Platform, created under APIs & Services > Credentials. An AI Studio key belongs on the Google Gemini provider instead.",
+      },
+      GOOGLE_AGENT_PLATFORM_PROJECT: {
+        label: "Google Cloud Project ID",
+        description:
+          "The project the key belongs to. Its number appears in the error Google returns if the key is used against the wrong service.",
+      },
+      GOOGLE_AGENT_PLATFORM_LOCATION: {
+        label: "Location",
+        description:
+          "Where to serve the model from — 'global', or a region such as us-central1.",
+      },
+    },
+  },
+  {
     key: "open_ai_azure",
     backendModelProviderKey: "azure",
     label: "Azure OpenAI",

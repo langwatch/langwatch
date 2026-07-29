@@ -9,6 +9,7 @@ export type ModelProviderKey =
   | "custom"
   | "deepseek"
   | "gemini"
+  | "google_agent_platform"
   | "grok_xai"
   | "groq"
   | "open_ai_azure"

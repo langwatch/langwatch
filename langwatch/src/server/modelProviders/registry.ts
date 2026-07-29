@@ -350,6 +350,27 @@ export const modelProviders = {
     }),
     enabledSince: new Date("2023-01-01"),
   },
+  // Gemini models served by Gemini Enterprise Agent Platform rather than by
+  // AI Studio. Its own provider, not a mode of `gemini`, for the same reason
+  // `vertex_ai` is: different host, different auth header, and a path that
+  // names the project and location. A key minted for it is refused by
+  // generativelanguage.googleapis.com, which is what made this look like an
+  // invalid key rather than the wrong service. See
+  // specs/model-providers/google-agent-platform.feature.
+  google_agent_platform: {
+    name: "Google Agent Platform",
+    type: "llm",
+    apiKey: "GOOGLE_AGENT_PLATFORM_API_KEY",
+    endpointKey: undefined,
+    keysSchema: z.object({
+      GOOGLE_AGENT_PLATFORM_API_KEY: z.string().min(1),
+      GOOGLE_AGENT_PLATFORM_PROJECT: z.string().min(1),
+      // Both `global` and a region such as `us-central1` resolve; the path
+      // requires one either way, so it is asked for rather than guessed.
+      GOOGLE_AGENT_PLATFORM_LOCATION: z.string().min(1),
+    }),
+    enabledSince: new Date("2026-07-29"),
+  },
   elevenlabs: {
     name: "ElevenLabs",
     // Ships audio only (TTS + STT through the gateway's /v1/audio routes).
