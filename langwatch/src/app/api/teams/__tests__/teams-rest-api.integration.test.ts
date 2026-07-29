@@ -12,6 +12,79 @@ import { prisma } from "~/server/db";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { app } from "../[[...route]]/app";
 
+/**
+ * A personal workspace as provisioning leaves it: one team, owned by one user,
+ * with that user as its only member. The colleague is in the organization on
+ * purpose and off the team on purpose, so a refusal to add them is a refusal
+ * about the team rather than about the account.
+ */
+async function createPersonalWorkspaceFixture({
+  ns,
+  organizationId,
+  ownerUserId,
+}: {
+  ns: string;
+  organizationId: string;
+  ownerUserId: string;
+}) {
+  const colleague = await prisma.user.create({
+    data: {
+      name: "Colleague",
+      email: `colleague-${ns}@example.com`,
+    },
+  });
+  await prisma.organizationUser.create({
+    data: {
+      userId: colleague.id,
+      organizationId,
+      role: OrganizationUserRole.MEMBER,
+    },
+  });
+
+  const personalTeam = await prisma.team.create({
+    data: {
+      name: "Owner's Workspace",
+      slug: `--personal-${ns}`,
+      organizationId,
+      isPersonal: true,
+      ownerUserId,
+    },
+  });
+
+  await prisma.roleBinding.create({
+    data: {
+      id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+      organizationId,
+      userId: ownerUserId,
+      role: TeamUserRole.ADMIN,
+      scopeType: RoleBindingScopeType.TEAM,
+      scopeId: personalTeam.id,
+    },
+  });
+
+  return { personalTeamId: personalTeam.id, colleagueUserId: colleague.id };
+}
+
+/**
+ * The organization membership holds a required relation to the user, so it
+ * goes first. The suite-wide teardown sweeps the organization rows, but it
+ * runs after this one.
+ */
+async function deletePersonalWorkspaceColleague({
+  organizationId,
+  colleagueUserId,
+}: {
+  organizationId: string;
+  colleagueUserId: string | undefined;
+}) {
+  if (!colleagueUserId) return;
+
+  await prisma.organizationUser.deleteMany({
+    where: { organizationId, userId: colleagueUserId },
+  });
+  await prisma.user.deleteMany({ where: { id: colleagueUserId } });
+}
+
 describe("Feature: Teams REST API", () => {
   const ns = `teams-api-${nanoid(8)}`;
 
@@ -363,57 +436,20 @@ describe("Feature: Teams REST API", () => {
     let colleagueUserId: string | undefined;
 
     beforeAll(async () => {
-      const colleague = await prisma.user.create({
-        data: {
-          name: "Colleague",
-          email: `colleague-${ns}@example.com`,
-        },
+      const fixture = await createPersonalWorkspaceFixture({
+        ns,
+        organizationId: testOrganization.id,
+        ownerUserId: userId,
       });
-      colleagueUserId = colleague.id;
-      await prisma.organizationUser.create({
-        data: {
-          userId: colleague.id,
-          organizationId: testOrganization.id,
-          role: OrganizationUserRole.MEMBER,
-        },
-      });
-
-      const personalTeam = await prisma.team.create({
-        data: {
-          name: "Owner's Workspace",
-          slug: `--personal-${ns}`,
-          organizationId: testOrganization.id,
-          isPersonal: true,
-          ownerUserId: userId,
-        },
-      });
-      personalTeamId = personalTeam.id;
-
-      await prisma.roleBinding.create({
-        data: {
-          id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-          organizationId: testOrganization.id,
-          userId,
-          role: TeamUserRole.ADMIN,
-          scopeType: RoleBindingScopeType.TEAM,
-          scopeId: personalTeam.id,
-        },
-      });
+      personalTeamId = fixture.personalTeamId;
+      colleagueUserId = fixture.colleagueUserId;
     });
 
     afterAll(async () => {
-      // The organization membership holds a required relation to the user, so
-      // it goes first. The suite-wide teardown below sweeps the organization
-      // rows, but it runs after this one.
-      if (colleagueUserId) {
-        await prisma.organizationUser.deleteMany({
-          where: {
-            organizationId: testOrganization.id,
-            userId: colleagueUserId,
-          },
-        });
-        await prisma.user.deleteMany({ where: { id: colleagueUserId } });
-      }
+      await deletePersonalWorkspaceColleague({
+        organizationId: testOrganization.id,
+        colleagueUserId,
+      });
     });
 
     /** @scenario Refuses to archive a personal team */

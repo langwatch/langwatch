@@ -25,6 +25,10 @@
  * PersonalWorkspaceService, because a guard that rejects while the damage
  * lands anyway would pass a test that only looked at the error.
  *
+ * One fixture serves every case, so its state and the body of each `when`
+ * live at module scope and the suite below reads as the list of write paths
+ * the invariant has to survive.
+ *
  * Requires: PostgreSQL database (Prisma)
  */
 
@@ -63,6 +67,137 @@ vi.mock("../../../auditLog", () => ({
 const ns = `pw-invariants-${nanoid(8)}`;
 const ownerEmail = `${ns}-owner@example.com`;
 const colleagueEmail = `${ns}-colleague@example.com`;
+
+let organizationId: string;
+let ownerUserId: string;
+let colleagueUserId: string;
+let sharedTeamId: string;
+let sharedProjectId: string;
+let personalTeamId: string;
+let personalProjectId: string;
+let personalTeamName: string;
+
+let repository: LicenseEnforcementRepository;
+let workspaceService: PersonalWorkspaceService;
+
+const callerAsOwner = () =>
+  appRouter.createCaller(
+    createInnerTRPCContext({
+      session: {
+        user: { id: ownerUserId, name: "Workspace Owner", email: ownerEmail },
+        expires: "1",
+      } as any,
+    }),
+  );
+
+/**
+ * The workspace as the service would hand it back on the next login. Both
+ * the "still there" assertions and the bricking this suite rules out read
+ * through here, so they exercise the same lookup the app does.
+ */
+const ensureWorkspace = () =>
+  workspaceService.ensure({
+    userId: ownerUserId,
+    organizationId,
+    displayName: "Workspace Owner",
+    displayEmail: ownerEmail,
+  });
+
+const personalTeamScope = () => ({
+  scopeType: RoleBindingScopeType.TEAM,
+  scopeId: personalTeamId,
+});
+
+const ownerBindingsOnPersonalTeam = () =>
+  prisma.roleBinding.findMany({
+    where: {
+      organizationId,
+      scopeType: RoleBindingScopeType.TEAM,
+      scopeId: personalTeamId,
+    },
+    select: { userId: true, role: true },
+  });
+
+async function createFixture(): Promise<void> {
+  const owner = await prisma.user.create({
+    data: { name: "Workspace Owner", email: ownerEmail },
+  });
+  ownerUserId = owner.id;
+
+  const colleague = await prisma.user.create({
+    data: { name: "Colleague", email: colleagueEmail },
+  });
+  colleagueUserId = colleague.id;
+
+  const organization = await prisma.organization.create({
+    data: { name: `ACME ${ns}`, slug: `--test-org-${ns}` },
+  });
+  organizationId = organization.id;
+
+  for (const userId of [ownerUserId, colleagueUserId]) {
+    await prisma.organizationUser.create({
+      data: { userId, organizationId, role: OrganizationUserRole.ADMIN },
+    });
+  }
+
+  const sharedTeam = await prisma.team.create({
+    data: {
+      name: `ACME ${ns}`,
+      slug: `--test-team-${ns}-shared`,
+      organizationId,
+    },
+  });
+  sharedTeamId = sharedTeam.id;
+
+  const sharedProject = await prisma.project.create({
+    data: {
+      name: "ACME App",
+      slug: `--test-proj-${ns}-shared`,
+      apiKey: `sk-lw-test-${nanoid()}`,
+      teamId: sharedTeamId,
+      language: "en",
+      framework: "test",
+    },
+  });
+  sharedProjectId = sharedProject.id;
+
+  // The owner administers both the organization and the shared team, which
+  // is what makes these mutations reach their guards at all: every one of
+  // them is behind a permission this user holds.
+  await prisma.roleBinding.create({
+    data: {
+      userId: ownerUserId,
+      organizationId,
+      role: TeamUserRole.ADMIN,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: organizationId,
+    },
+  });
+  await prisma.roleBinding.create({
+    data: {
+      userId: ownerUserId,
+      organizationId,
+      role: TeamUserRole.ADMIN,
+      scopeType: RoleBindingScopeType.TEAM,
+      scopeId: sharedTeamId,
+    },
+  });
+  await prisma.teamUser.create({
+    data: {
+      userId: ownerUserId,
+      teamId: sharedTeamId,
+      role: TeamUserRole.ADMIN,
+    },
+  });
+
+  workspaceService = new PersonalWorkspaceService(prisma);
+  const workspace = await ensureWorkspace();
+  personalTeamId = workspace.team.id;
+  personalTeamName = workspace.team.name;
+  personalProjectId = workspace.project.id;
+
+  repository = new LicenseEnforcementRepository(prisma);
+}
 
 /**
  * Delete the rows the fixture created, and nothing else.
@@ -117,122 +252,487 @@ async function deleteFixture({
   }
 }
 
-describe("given a personal workspace beside a shared team in one organization", () => {
-  let organizationId: string;
-  let ownerUserId: string;
-  let colleagueUserId: string;
-  let sharedTeamId: string;
-  let sharedProjectId: string;
-  let personalTeamId: string;
-  let personalProjectId: string;
-  let personalTeamName: string;
-
-  let repository: LicenseEnforcementRepository;
-  let workspaceService: PersonalWorkspaceService;
-
-  const callerAsOwner = () =>
-    appRouter.createCaller(
-      createInnerTRPCContext({
-        session: {
-          user: { id: ownerUserId, name: "Workspace Owner", email: ownerEmail },
-          expires: "1",
-        } as any,
+function movingThePersonalProjectIntoTheSharedTeam() {
+  /** @scenario Moving a personal project into a shared team is refused */
+  it("refuses the move", async () => {
+    await expect(
+      callerAsOwner().project.update({
+        projectId: personalProjectId,
+        teamId: sharedTeamId,
       }),
+    ).rejects.toMatchObject({
+      code: "FORBIDDEN",
+      message: expect.stringContaining(
+        "Personal workspace projects cannot be moved",
+      ),
+    });
+  });
+
+  /** @scenario Moving a personal project into a shared team is refused */
+  it("leaves the project in the personal team", async () => {
+    await expect(
+      callerAsOwner().project.update({
+        projectId: personalProjectId,
+        teamId: sharedTeamId,
+      }),
+    ).rejects.toThrow();
+
+    const project = await prisma.project.findUnique({
+      where: { id: personalProjectId },
+      select: { teamId: true, isPersonal: true },
+    });
+    expect(project).toMatchObject({
+      teamId: personalTeamId,
+      isPersonal: true,
+    });
+  });
+
+  /** @scenario Moving a personal project into a shared team is refused */
+  it("does not hand the organization a project the plan stops counting", async () => {
+    const before = await repository.getProjectCount(organizationId);
+
+    await expect(
+      callerAsOwner().project.update({
+        projectId: personalProjectId,
+        teamId: sharedTeamId,
+      }),
+    ).rejects.toThrow();
+
+    await expect(repository.getProjectCount(organizationId)).resolves.toBe(
+      before,
     );
+  });
 
-  /**
-   * The workspace as the service would hand it back on the next login. Both
-   * the "still there" assertions and the bricking this suite rules out read
-   * through here, so they exercise the same lookup the app does.
-   */
-  const ensureWorkspace = () =>
-    workspaceService.ensure({
-      userId: ownerUserId,
-      organizationId,
-      displayName: "Workspace Owner",
-      displayEmail: ownerEmail,
+  /** @scenario Moving a personal project into a shared team is refused */
+  it("leaves the owner's workspace where the next login finds it", async () => {
+    await expect(
+      callerAsOwner().project.update({
+        projectId: personalProjectId,
+        teamId: sharedTeamId,
+      }),
+    ).rejects.toThrow();
+
+    await expect(ensureWorkspace()).resolves.toMatchObject({
+      created: false,
+      team: { id: personalTeamId },
+      project: { id: personalProjectId },
     });
+  });
+}
 
-  beforeAll(async () => {
-    const owner = await prisma.user.create({
-      data: { name: "Workspace Owner", email: ownerEmail },
+function movingASharedProjectIntoThePersonalTeam() {
+  /** @scenario Moving a real project into a personal workspace is refused */
+  it("refuses the move", async () => {
+    await expect(
+      callerAsOwner().project.update({
+        projectId: sharedProjectId,
+        teamId: personalTeamId,
+      }),
+    ).rejects.toMatchObject({
+      code: "FORBIDDEN",
+      message: expect.stringContaining(
+        "cannot be moved into a personal workspace",
+      ),
     });
-    ownerUserId = owner.id;
+  });
 
-    const colleague = await prisma.user.create({
-      data: { name: "Colleague", email: colleagueEmail },
+  /** @scenario Moving a real project into a personal workspace is refused */
+  it("leaves the project in the shared team, still counted", async () => {
+    const before = await repository.getProjectCount(organizationId);
+
+    await expect(
+      callerAsOwner().project.update({
+        projectId: sharedProjectId,
+        teamId: personalTeamId,
+      }),
+    ).rejects.toThrow();
+
+    const project = await prisma.project.findUnique({
+      where: { id: sharedProjectId },
+      select: { teamId: true },
     });
-    colleagueUserId = colleague.id;
+    expect(project?.teamId).toBe(sharedTeamId);
+    await expect(repository.getProjectCount(organizationId)).resolves.toBe(
+      before,
+    );
+  });
+}
 
-    const organization = await prisma.organization.create({
-      data: { name: `ACME ${ns}`, slug: `--test-org-${ns}` },
+function addingAColleagueToThePersonalTeam() {
+  const membersWithColleague = () => [
+    { userId: ownerUserId, role: TeamUserRole.ADMIN },
+    { userId: colleagueUserId, role: TeamUserRole.MEMBER },
+  ];
+
+  /** @scenario Adding a member to a personal team is refused */
+  it("refuses the membership change", async () => {
+    await expect(
+      callerAsOwner().team.update({
+        teamId: personalTeamId,
+        name: personalTeamName,
+        members: membersWithColleague(),
+      }),
+    ).rejects.toMatchObject({
+      code: "FORBIDDEN",
+      message: expect.stringContaining("exactly one member"),
     });
-    organizationId = organization.id;
+  });
 
-    for (const userId of [ownerUserId, colleagueUserId]) {
-      await prisma.organizationUser.create({
-        data: { userId, organizationId, role: OrganizationUserRole.ADMIN },
-      });
-    }
+  /** @scenario Adding a member to a personal team is refused */
+  it("leaves the personal team holding its owner alone", async () => {
+    await expect(
+      callerAsOwner().team.update({
+        teamId: personalTeamId,
+        name: personalTeamName,
+        members: membersWithColleague(),
+      }),
+    ).rejects.toThrow();
 
-    const sharedTeam = await prisma.team.create({
-      data: {
-        name: `ACME ${ns}`,
-        slug: `--test-team-${ns}-shared`,
+    await expect(ownerBindingsOnPersonalTeam()).resolves.toEqual([
+      { userId: ownerUserId, role: TeamUserRole.ADMIN },
+    ]);
+  });
+
+  /** @scenario Adding a member to a personal team is refused */
+  it("does not leave a shared team the plan stops counting", async () => {
+    const before = await repository.getTeamCount(organizationId);
+
+    await expect(
+      callerAsOwner().team.update({
+        teamId: personalTeamId,
+        name: personalTeamName,
+        members: membersWithColleague(),
+      }),
+    ).rejects.toThrow();
+
+    await expect(repository.getTeamCount(organizationId)).resolves.toBe(before);
+  });
+}
+
+function renamingThePersonalTeam() {
+  /** @scenario Renaming a personal team is still allowed */
+  it("still lets the owner rename their own workspace", async () => {
+    const renamed = `${personalTeamName} (renamed)`;
+
+    await expect(
+      callerAsOwner().team.update({
+        teamId: personalTeamId,
+        name: renamed,
+        members: [{ userId: ownerUserId, role: TeamUserRole.ADMIN }],
+      }),
+    ).resolves.toMatchObject({ success: true });
+
+    const team = await prisma.team.findUnique({
+      where: { id: personalTeamId },
+      select: { name: true },
+    });
+    expect(team?.name).toBe(renamed);
+
+    await callerAsOwner().team.update({
+      teamId: personalTeamId,
+      name: personalTeamName,
+      members: [],
+    });
+    await expect(ensureWorkspace()).resolves.toMatchObject({
+      created: false,
+      team: { id: personalTeamId },
+    });
+  });
+}
+
+function grantingAccessToThePersonalTeamAnotherWay() {
+  /** @scenario Giving someone else access to a personal workspace is refused */
+  it("refuses roleBinding.create for a second user", async () => {
+    await expect(
+      callerAsOwner().roleBinding.create({
         organizationId,
+        userId: colleagueUserId,
+        role: TeamUserRole.MEMBER,
+        ...personalTeamScope(),
+      }),
+    ).rejects.toMatchObject({
+      code: "FORBIDDEN",
+      message: expect.stringContaining("exactly one member"),
+    });
+
+    await expect(ownerBindingsOnPersonalTeam()).resolves.toEqual([
+      { userId: ownerUserId, role: TeamUserRole.ADMIN },
+    ]);
+  });
+
+  /** @scenario Giving a group access to a personal workspace is refused */
+  it("refuses group.addBinding, which would make it multi-member by proxy", async () => {
+    const group = await prisma.group.create({
+      data: {
+        id: generate(KSUID_RESOURCES.GROUP).toString(),
+        organizationId,
+        name: `Everyone ${ns}`,
+        slug: `--everyone-${ns}`,
       },
     });
-    sharedTeamId = sharedTeam.id;
 
-    const sharedProject = await prisma.project.create({
-      data: {
-        name: "ACME App",
-        slug: `--test-proj-${ns}-shared`,
-        apiKey: `sk-lw-test-${nanoid()}`,
-        teamId: sharedTeamId,
+    await expect(
+      callerAsOwner().group.addBinding({
+        organizationId,
+        groupId: group.id,
+        role: TeamUserRole.ADMIN,
+        ...personalTeamScope(),
+      }),
+    ).rejects.toMatchObject({
+      code: "FORBIDDEN",
+      message: expect.stringContaining("exactly one member"),
+    });
+
+    await expect(ownerBindingsOnPersonalTeam()).resolves.toEqual([
+      { userId: ownerUserId, role: TeamUserRole.ADMIN },
+    ]);
+  });
+
+  /** @scenario Giving someone else access to a personal workspace is refused */
+  it("refuses a binding that names the personal project instead of the team", async () => {
+    await expect(
+      callerAsOwner().roleBinding.create({
+        organizationId,
+        userId: colleagueUserId,
+        role: TeamUserRole.MEMBER,
+        scopeType: RoleBindingScopeType.PROJECT,
+        scopeId: personalProjectId,
+      }),
+    ).rejects.toMatchObject({
+      code: "FORBIDDEN",
+      message: expect.stringContaining("exactly one member"),
+    });
+
+    const projectBindings = await prisma.roleBinding.findMany({
+      where: {
+        organizationId,
+        scopeType: RoleBindingScopeType.PROJECT,
+        scopeId: personalProjectId,
+      },
+      select: { id: true },
+    });
+    expect(projectBindings).toEqual([]);
+  });
+}
+
+function takingTheOwnersAccessToTheirWorkspaceAway() {
+  /** @scenario Taking the owner's access to their own workspace away is refused */
+  it("refuses roleBinding.delete on the owner's own binding", async () => {
+    const binding = await prisma.roleBinding.findFirstOrThrow({
+      where: {
+        organizationId,
+        scopeType: RoleBindingScopeType.TEAM,
+        scopeId: personalTeamId,
+        userId: ownerUserId,
+      },
+      select: { id: true },
+    });
+
+    await expect(
+      callerAsOwner().roleBinding.delete({
+        organizationId,
+        bindingId: binding.id,
+      }),
+    ).rejects.toMatchObject({
+      code: "FORBIDDEN",
+      message: expect.stringContaining("exactly one member"),
+    });
+
+    await expect(ownerBindingsOnPersonalTeam()).resolves.toEqual([
+      { userId: ownerUserId, role: TeamUserRole.ADMIN },
+    ]);
+  });
+
+  /** @scenario Changing the owner's role on their own workspace is refused */
+  it("refuses organization.updateTeamMemberRole demoting the owner", async () => {
+    await expect(
+      callerAsOwner().organization.updateTeamMemberRole({
+        teamId: personalTeamId,
+        userId: ownerUserId,
+        role: TeamUserRole.VIEWER,
+      }),
+    ).rejects.toMatchObject({
+      code: "FORBIDDEN",
+      message: expect.stringContaining("exactly one member"),
+    });
+
+    await expect(ownerBindingsOnPersonalTeam()).resolves.toEqual([
+      { userId: ownerUserId, role: TeamUserRole.ADMIN },
+    ]);
+  });
+
+  /** @scenario Taking the owner's access to their own workspace away is refused */
+  it("leaves the workspace resolvable after every refusal", async () => {
+    await expect(ensureWorkspace()).resolves.toMatchObject({
+      created: false,
+      team: { id: personalTeamId },
+      project: { id: personalProjectId },
+    });
+  });
+}
+
+function creatingASecondProjectInThePersonalTeam() {
+  // Plan limits are wired generously on purpose. Without them the creation
+  // would fail for want of an app rather than for the reason under test,
+  // and the assertion that no project appeared would pass even with the
+  // guard removed.
+  beforeEach(async () => {
+    await resetApp();
+    globalForApp.__langwatch_app = createTestApp({
+      planProvider: PlanProviderService.create({
+        getActivePlan: vi.fn().mockResolvedValue({
+          ...FREE_PLAN,
+          overrideAddingLimitations: false,
+          maxProjects: 100,
+        }),
+      }),
+      usageLimits: {
+        notifyResourceLimitReached: vi.fn().mockResolvedValue(undefined),
+        checkAndSendWarning: vi.fn().mockResolvedValue(undefined),
+      } as any,
+    });
+  });
+
+  afterEach(async () => {
+    await resetApp();
+  });
+
+  /** @scenario Creating a project in a personal workspace is refused */
+  it("refuses the creation", async () => {
+    await expect(
+      callerAsOwner().project.create({
+        organizationId,
+        teamId: personalTeamId,
+        name: "Second Personal Project",
         language: "en",
         framework: "test",
-      },
+      }),
+    ).rejects.toMatchObject({
+      code: "FORBIDDEN",
+      message: expect.stringContaining(
+        "cannot be created in a personal workspace",
+      ),
     });
-    sharedProjectId = sharedProject.id;
-
-    // The owner administers both the organization and the shared team, which
-    // is what makes these mutations reach their guards at all: every one of
-    // them is behind a permission this user holds.
-    await prisma.roleBinding.create({
-      data: {
-        userId: ownerUserId,
-        organizationId,
-        role: TeamUserRole.ADMIN,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: organizationId,
-      },
-    });
-    await prisma.roleBinding.create({
-      data: {
-        userId: ownerUserId,
-        organizationId,
-        role: TeamUserRole.ADMIN,
-        scopeType: RoleBindingScopeType.TEAM,
-        scopeId: sharedTeamId,
-      },
-    });
-    await prisma.teamUser.create({
-      data: {
-        userId: ownerUserId,
-        teamId: sharedTeamId,
-        role: TeamUserRole.ADMIN,
-      },
-    });
-
-    workspaceService = new PersonalWorkspaceService(prisma);
-    const workspace = await ensureWorkspace();
-    personalTeamId = workspace.team.id;
-    personalTeamName = workspace.team.name;
-    personalProjectId = workspace.project.id;
-
-    repository = new LicenseEnforcementRepository(prisma);
   });
+
+  /** @scenario Creating a project in a personal workspace is refused */
+  it("leaves the workspace holding exactly its one project", async () => {
+    await expect(
+      callerAsOwner().project.create({
+        organizationId,
+        teamId: personalTeamId,
+        name: "Second Personal Project",
+        language: "en",
+        framework: "test",
+      }),
+    ).rejects.toThrow();
+
+    const projects = await prisma.project.findMany({
+      where: { teamId: personalTeamId, archivedAt: null },
+      select: { id: true },
+    });
+    expect(projects).toEqual([{ id: personalProjectId }]);
+  });
+}
+
+function archivingThePersonalProject() {
+  /** @scenario Archiving a personal project is refused */
+  it("refuses the archival", async () => {
+    await expect(
+      callerAsOwner().project.archiveById({
+        projectId: sharedProjectId,
+        projectToArchiveId: personalProjectId,
+      }),
+    ).rejects.toMatchObject({
+      code: "FORBIDDEN",
+      message: expect.stringContaining("cannot be archived"),
+    });
+  });
+
+  /** @scenario Archiving a personal project is refused */
+  it("leaves the workspace where the next login finds it", async () => {
+    await expect(
+      callerAsOwner().project.archiveById({
+        projectId: sharedProjectId,
+        projectToArchiveId: personalProjectId,
+      }),
+    ).rejects.toThrow();
+
+    const project = await prisma.project.findUnique({
+      where: { id: personalProjectId },
+      select: { archivedAt: true },
+    });
+    expect(project?.archivedAt).toBeNull();
+
+    await expect(ensureWorkspace()).resolves.toMatchObject({
+      created: false,
+      project: { id: personalProjectId },
+    });
+  });
+}
+
+function archivingThePersonalTeam() {
+  /** @scenario Archiving a personal team is refused */
+  it("refuses the archival", async () => {
+    await expect(
+      callerAsOwner().team.archiveById({ teamId: personalTeamId }),
+    ).rejects.toMatchObject({
+      code: "FORBIDDEN",
+      message: expect.stringContaining("cannot be archived"),
+    });
+  });
+
+  /** @scenario Archiving a personal team is refused */
+  it("leaves the team unarchived", async () => {
+    await expect(
+      callerAsOwner().team.archiveById({ teamId: personalTeamId }),
+    ).rejects.toThrow();
+
+    const team = await prisma.team.findUnique({
+      where: { id: personalTeamId },
+      select: { archivedAt: true },
+    });
+    expect(team?.archivedAt).toBeNull();
+  });
+
+  /** @scenario Archiving a personal team is refused */
+  it("leaves provisioning able to find the workspace it would have orphaned", async () => {
+    await expect(
+      callerAsOwner().team.archiveById({ teamId: personalTeamId }),
+    ).rejects.toThrow();
+
+    await expect(ensureWorkspace()).resolves.toMatchObject({
+      created: false,
+      team: { id: personalTeamId },
+      project: { id: personalProjectId },
+    });
+  });
+}
+
+function archivingASharedTeam() {
+  it("archives it, because only personal teams are held back", async () => {
+    const disposable = await prisma.team.create({
+      data: {
+        name: `Disposable ${ns}`,
+        slug: `--test-team-${ns}-disposable`,
+        organizationId,
+      },
+    });
+
+    await expect(
+      callerAsOwner().team.archiveById({ teamId: disposable.id }),
+    ).resolves.toMatchObject({ success: true });
+
+    const team = await prisma.team.findUnique({
+      where: { id: disposable.id },
+      select: { archivedAt: true },
+    });
+    expect(team?.archivedAt).toBeInstanceOf(Date);
+  });
+}
+
+describe("given a personal workspace beside a shared team in one organization", () => {
+  beforeAll(createFixture);
 
   afterAll(async () => {
     await deleteFixture({
@@ -241,509 +741,47 @@ describe("given a personal workspace beside a shared team in one organization", 
     });
   });
 
-  describe("when the owner moves the personal project into the shared team", () => {
-    /** @scenario Moving a personal project into a shared team is refused */
-    it("refuses the move", async () => {
-      await expect(
-        callerAsOwner().project.update({
-          projectId: personalProjectId,
-          teamId: sharedTeamId,
-        }),
-      ).rejects.toMatchObject({
-        code: "FORBIDDEN",
-        message: expect.stringContaining(
-          "Personal workspace projects cannot be moved",
-        ),
-      });
-    });
-
-    /** @scenario Moving a personal project into a shared team is refused */
-    it("leaves the project in the personal team", async () => {
-      await expect(
-        callerAsOwner().project.update({
-          projectId: personalProjectId,
-          teamId: sharedTeamId,
-        }),
-      ).rejects.toThrow();
-
-      const project = await prisma.project.findUnique({
-        where: { id: personalProjectId },
-        select: { teamId: true, isPersonal: true },
-      });
-      expect(project).toMatchObject({
-        teamId: personalTeamId,
-        isPersonal: true,
-      });
-    });
-
-    /** @scenario Moving a personal project into a shared team is refused */
-    it("does not hand the organization a project the plan stops counting", async () => {
-      const before = await repository.getProjectCount(organizationId);
-
-      await expect(
-        callerAsOwner().project.update({
-          projectId: personalProjectId,
-          teamId: sharedTeamId,
-        }),
-      ).rejects.toThrow();
-
-      await expect(repository.getProjectCount(organizationId)).resolves.toBe(
-        before,
-      );
-    });
-
-    /** @scenario Moving a personal project into a shared team is refused */
-    it("leaves the owner's workspace where the next login finds it", async () => {
-      await expect(
-        callerAsOwner().project.update({
-          projectId: personalProjectId,
-          teamId: sharedTeamId,
-        }),
-      ).rejects.toThrow();
-
-      await expect(ensureWorkspace()).resolves.toMatchObject({
-        created: false,
-        team: { id: personalTeamId },
-        project: { id: personalProjectId },
-      });
-    });
-  });
-
-  describe("when the owner moves a shared project into the personal team", () => {
-    /** @scenario Moving a real project into a personal workspace is refused */
-    it("refuses the move", async () => {
-      await expect(
-        callerAsOwner().project.update({
-          projectId: sharedProjectId,
-          teamId: personalTeamId,
-        }),
-      ).rejects.toMatchObject({
-        code: "FORBIDDEN",
-        message: expect.stringContaining(
-          "cannot be moved into a personal workspace",
-        ),
-      });
-    });
-
-    /** @scenario Moving a real project into a personal workspace is refused */
-    it("leaves the project in the shared team, still counted", async () => {
-      const before = await repository.getProjectCount(organizationId);
-
-      await expect(
-        callerAsOwner().project.update({
-          projectId: sharedProjectId,
-          teamId: personalTeamId,
-        }),
-      ).rejects.toThrow();
-
-      const project = await prisma.project.findUnique({
-        where: { id: sharedProjectId },
-        select: { teamId: true },
-      });
-      expect(project?.teamId).toBe(sharedTeamId);
-      await expect(repository.getProjectCount(organizationId)).resolves.toBe(
-        before,
-      );
-    });
-  });
-
-  describe("when the owner adds a colleague to the personal team", () => {
-    const membersWithColleague = () => [
-      { userId: ownerUserId, role: TeamUserRole.ADMIN },
-      { userId: colleagueUserId, role: TeamUserRole.MEMBER },
-    ];
-
-    /** @scenario Adding a member to a personal team is refused */
-    it("refuses the membership change", async () => {
-      await expect(
-        callerAsOwner().team.update({
-          teamId: personalTeamId,
-          name: personalTeamName,
-          members: membersWithColleague(),
-        }),
-      ).rejects.toMatchObject({
-        code: "FORBIDDEN",
-        message: expect.stringContaining("exactly one member"),
-      });
-    });
-
-    /** @scenario Adding a member to a personal team is refused */
-    it("leaves the personal team holding its owner alone", async () => {
-      await expect(
-        callerAsOwner().team.update({
-          teamId: personalTeamId,
-          name: personalTeamName,
-          members: membersWithColleague(),
-        }),
-      ).rejects.toThrow();
-
-      const bindings = await prisma.roleBinding.findMany({
-        where: {
-          organizationId,
-          scopeType: RoleBindingScopeType.TEAM,
-          scopeId: personalTeamId,
-        },
-        select: { userId: true, role: true },
-      });
-      expect(bindings).toEqual([
-        { userId: ownerUserId, role: TeamUserRole.ADMIN },
-      ]);
-    });
-
-    /** @scenario Adding a member to a personal team is refused */
-    it("does not leave a shared team the plan stops counting", async () => {
-      const before = await repository.getTeamCount(organizationId);
-
-      await expect(
-        callerAsOwner().team.update({
-          teamId: personalTeamId,
-          name: personalTeamName,
-          members: membersWithColleague(),
-        }),
-      ).rejects.toThrow();
-
-      await expect(repository.getTeamCount(organizationId)).resolves.toBe(
-        before,
-      );
-    });
-
-    /** @scenario Renaming a personal team is still allowed */
-    it("still lets the owner rename their own workspace", async () => {
-      const renamed = `${personalTeamName} (renamed)`;
-
-      await expect(
-        callerAsOwner().team.update({
-          teamId: personalTeamId,
-          name: renamed,
-          members: [{ userId: ownerUserId, role: TeamUserRole.ADMIN }],
-        }),
-      ).resolves.toMatchObject({ success: true });
-
-      const team = await prisma.team.findUnique({
-        where: { id: personalTeamId },
-        select: { name: true },
-      });
-      expect(team?.name).toBe(renamed);
-
-      await callerAsOwner().team.update({
-        teamId: personalTeamId,
-        name: personalTeamName,
-        members: [],
-      });
-      await expect(ensureWorkspace()).resolves.toMatchObject({
-        created: false,
-        team: { id: personalTeamId },
-      });
-    });
-  });
+  describe(
+    "when the owner moves the personal project into the shared team",
+    movingThePersonalProjectIntoTheSharedTeam,
+  );
+  describe(
+    "when the owner moves a shared project into the personal team",
+    movingASharedProjectIntoThePersonalTeam,
+  );
+  describe(
+    "when the owner adds a colleague to the personal team",
+    addingAColleagueToThePersonalTeam,
+  );
+  describe("when the owner renames the personal team", renamingThePersonalTeam);
 
   // Role bindings are the general form of "who reaches this team". The team
   // editor is one caller of many, so the invariant has to hold on the generic
   // paths too, or an organization manager can grant access to a personal team
   // without the editor's guard ever running.
-  describe("when a manager grants access to the personal team another way", () => {
-    const personalTeamScope = () => ({
-      scopeType: RoleBindingScopeType.TEAM,
-      scopeId: personalTeamId,
-    });
+  describe(
+    "when a manager grants access to the personal team another way",
+    grantingAccessToThePersonalTeamAnotherWay,
+  );
+  describe(
+    "when a manager takes the owner's own access away",
+    takingTheOwnersAccessToTheirWorkspaceAway,
+  );
 
-    const ownerBindingsOnPersonalTeam = () =>
-      prisma.roleBinding.findMany({
-        where: {
-          organizationId,
-          scopeType: RoleBindingScopeType.TEAM,
-          scopeId: personalTeamId,
-        },
-        select: { userId: true, role: true },
-      });
-
-    /** @scenario Giving someone else access to a personal workspace is refused */
-    it("refuses roleBinding.create for a second user", async () => {
-      await expect(
-        callerAsOwner().roleBinding.create({
-          organizationId,
-          userId: colleagueUserId,
-          role: TeamUserRole.MEMBER,
-          ...personalTeamScope(),
-        }),
-      ).rejects.toMatchObject({
-        code: "FORBIDDEN",
-        message: expect.stringContaining("exactly one member"),
-      });
-
-      await expect(ownerBindingsOnPersonalTeam()).resolves.toEqual([
-        { userId: ownerUserId, role: TeamUserRole.ADMIN },
-      ]);
-    });
-
-    /** @scenario Giving a group access to a personal workspace is refused */
-    it("refuses group.addBinding, which would make it multi-member by proxy", async () => {
-      const group = await prisma.group.create({
-        data: {
-          id: generate(KSUID_RESOURCES.GROUP).toString(),
-          organizationId,
-          name: `Everyone ${ns}`,
-          slug: `--everyone-${ns}`,
-        },
-      });
-
-      await expect(
-        callerAsOwner().group.addBinding({
-          organizationId,
-          groupId: group.id,
-          role: TeamUserRole.ADMIN,
-          ...personalTeamScope(),
-        }),
-      ).rejects.toMatchObject({
-        code: "FORBIDDEN",
-        message: expect.stringContaining("exactly one member"),
-      });
-
-      await expect(ownerBindingsOnPersonalTeam()).resolves.toEqual([
-        { userId: ownerUserId, role: TeamUserRole.ADMIN },
-      ]);
-    });
-
-    /** @scenario Taking the owner's access to their own workspace away is refused */
-    it("refuses roleBinding.delete on the owner's own binding", async () => {
-      const binding = await prisma.roleBinding.findFirstOrThrow({
-        where: {
-          organizationId,
-          scopeType: RoleBindingScopeType.TEAM,
-          scopeId: personalTeamId,
-          userId: ownerUserId,
-        },
-        select: { id: true },
-      });
-
-      await expect(
-        callerAsOwner().roleBinding.delete({
-          organizationId,
-          bindingId: binding.id,
-        }),
-      ).rejects.toMatchObject({
-        code: "FORBIDDEN",
-        message: expect.stringContaining("exactly one member"),
-      });
-
-      await expect(ownerBindingsOnPersonalTeam()).resolves.toEqual([
-        { userId: ownerUserId, role: TeamUserRole.ADMIN },
-      ]);
-    });
-
-    /** @scenario Changing the owner's role on their own workspace is refused */
-    it("refuses organization.updateTeamMemberRole demoting the owner", async () => {
-      await expect(
-        callerAsOwner().organization.updateTeamMemberRole({
-          teamId: personalTeamId,
-          userId: ownerUserId,
-          role: TeamUserRole.VIEWER,
-        }),
-      ).rejects.toMatchObject({
-        code: "FORBIDDEN",
-        message: expect.stringContaining("exactly one member"),
-      });
-
-      await expect(ownerBindingsOnPersonalTeam()).resolves.toEqual([
-        { userId: ownerUserId, role: TeamUserRole.ADMIN },
-      ]);
-    });
-
-    /** @scenario Giving someone else access to a personal workspace is refused */
-    it("refuses a binding that names the personal project instead of the team", async () => {
-      await expect(
-        callerAsOwner().roleBinding.create({
-          organizationId,
-          userId: colleagueUserId,
-          role: TeamUserRole.MEMBER,
-          scopeType: RoleBindingScopeType.PROJECT,
-          scopeId: personalProjectId,
-        }),
-      ).rejects.toMatchObject({
-        code: "FORBIDDEN",
-        message: expect.stringContaining("exactly one member"),
-      });
-
-      const projectBindings = await prisma.roleBinding.findMany({
-        where: {
-          organizationId,
-          scopeType: RoleBindingScopeType.PROJECT,
-          scopeId: personalProjectId,
-        },
-        select: { id: true },
-      });
-      expect(projectBindings).toEqual([]);
-    });
-
-    /** @scenario Taking the owner's access to their own workspace away is refused */
-    it("leaves the workspace resolvable after every refusal", async () => {
-      await expect(ensureWorkspace()).resolves.toMatchObject({
-        created: false,
-        team: { id: personalTeamId },
-        project: { id: personalProjectId },
-      });
-    });
-  });
-
-  describe("when the owner creates a second project in their personal team", () => {
-    // Plan limits are wired generously on purpose. Without them the creation
-    // would fail for want of an app rather than for the reason under test,
-    // and the assertion that no project appeared would pass even with the
-    // guard removed.
-    beforeEach(async () => {
-      await resetApp();
-      globalForApp.__langwatch_app = createTestApp({
-        planProvider: PlanProviderService.create({
-          getActivePlan: vi.fn().mockResolvedValue({
-            ...FREE_PLAN,
-            overrideAddingLimitations: false,
-            maxProjects: 100,
-          }),
-        }),
-        usageLimits: {
-          notifyResourceLimitReached: vi.fn().mockResolvedValue(undefined),
-          checkAndSendWarning: vi.fn().mockResolvedValue(undefined),
-        } as any,
-      });
-    });
-
-    afterEach(async () => {
-      await resetApp();
-    });
-
-    /** @scenario Creating a project in a personal workspace is refused */
-    it("refuses the creation", async () => {
-      await expect(
-        callerAsOwner().project.create({
-          organizationId,
-          teamId: personalTeamId,
-          name: "Second Personal Project",
-          language: "en",
-          framework: "test",
-        }),
-      ).rejects.toMatchObject({
-        code: "FORBIDDEN",
-        message: expect.stringContaining(
-          "cannot be created in a personal workspace",
-        ),
-      });
-    });
-
-    /** @scenario Creating a project in a personal workspace is refused */
-    it("leaves the workspace holding exactly its one project", async () => {
-      await expect(
-        callerAsOwner().project.create({
-          organizationId,
-          teamId: personalTeamId,
-          name: "Second Personal Project",
-          language: "en",
-          framework: "test",
-        }),
-      ).rejects.toThrow();
-
-      const projects = await prisma.project.findMany({
-        where: { teamId: personalTeamId, archivedAt: null },
-        select: { id: true },
-      });
-      expect(projects).toEqual([{ id: personalProjectId }]);
-    });
-  });
-
-  describe("when the owner archives the personal project", () => {
-    /** @scenario Archiving a personal project is refused */
-    it("refuses the archival", async () => {
-      await expect(
-        callerAsOwner().project.archiveById({
-          projectId: sharedProjectId,
-          projectToArchiveId: personalProjectId,
-        }),
-      ).rejects.toMatchObject({
-        code: "FORBIDDEN",
-        message: expect.stringContaining("cannot be archived"),
-      });
-    });
-
-    /** @scenario Archiving a personal project is refused */
-    it("leaves the workspace where the next login finds it", async () => {
-      await expect(
-        callerAsOwner().project.archiveById({
-          projectId: sharedProjectId,
-          projectToArchiveId: personalProjectId,
-        }),
-      ).rejects.toThrow();
-
-      const project = await prisma.project.findUnique({
-        where: { id: personalProjectId },
-        select: { archivedAt: true },
-      });
-      expect(project?.archivedAt).toBeNull();
-
-      await expect(ensureWorkspace()).resolves.toMatchObject({
-        created: false,
-        project: { id: personalProjectId },
-      });
-    });
-  });
-
-  describe("when the owner archives the personal team", () => {
-    /** @scenario Archiving a personal team is refused */
-    it("refuses the archival", async () => {
-      await expect(
-        callerAsOwner().team.archiveById({ teamId: personalTeamId }),
-      ).rejects.toMatchObject({
-        code: "FORBIDDEN",
-        message: expect.stringContaining("cannot be archived"),
-      });
-    });
-
-    /** @scenario Archiving a personal team is refused */
-    it("leaves the team unarchived", async () => {
-      await expect(
-        callerAsOwner().team.archiveById({ teamId: personalTeamId }),
-      ).rejects.toThrow();
-
-      const team = await prisma.team.findUnique({
-        where: { id: personalTeamId },
-        select: { archivedAt: true },
-      });
-      expect(team?.archivedAt).toBeNull();
-    });
-
-    /** @scenario Archiving a personal team is refused */
-    it("leaves provisioning able to find the workspace it would have orphaned", async () => {
-      await expect(
-        callerAsOwner().team.archiveById({ teamId: personalTeamId }),
-      ).rejects.toThrow();
-
-      await expect(ensureWorkspace()).resolves.toMatchObject({
-        created: false,
-        team: { id: personalTeamId },
-        project: { id: personalProjectId },
-      });
-    });
-  });
+  describe(
+    "when the owner creates a second project in their personal team",
+    creatingASecondProjectInThePersonalTeam,
+  );
+  describe(
+    "when the owner archives the personal project",
+    archivingThePersonalProject,
+  );
+  describe(
+    "when the owner archives the personal team",
+    archivingThePersonalTeam,
+  );
 
   // Runs last: it archives a team, which moves the team count the assertions
   // above pin.
-  describe("when the owner archives a shared team", () => {
-    it("archives it, because only personal teams are held back", async () => {
-      const disposable = await prisma.team.create({
-        data: {
-          name: `Disposable ${ns}`,
-          slug: `--test-team-${ns}-disposable`,
-          organizationId,
-        },
-      });
-
-      await expect(
-        callerAsOwner().team.archiveById({ teamId: disposable.id }),
-      ).resolves.toMatchObject({ success: true });
-
-      const team = await prisma.team.findUnique({
-        where: { id: disposable.id },
-        select: { archivedAt: true },
-      });
-      expect(team?.archivedAt).toBeInstanceOf(Date);
-    });
-  });
+  describe("when the owner archives a shared team", archivingASharedTeam);
 });
