@@ -119,6 +119,7 @@ func TestRouter_Responses_ZstdEncodedBody(t *testing.T) {
 	assert.JSONEq(t, string(payload), string(dispatchedBody(t, &got)))
 }
 
+/** @scenario "a compressed body is decoded on every dispatch lane" */
 func TestRouter_EncodedBodies_DecodedOnEveryLane(t *testing.T) {
 	payload := chatBody()
 
@@ -192,6 +193,7 @@ func TestRouter_IdentityContentEncodingLeavesBodyAlone(t *testing.T) {
 	assert.JSONEq(t, string(payload), string(dispatchedBody(t, &got)))
 }
 
+/** @scenario "a content coding the gateway cannot decode is a bad request" */
 func TestRouter_UnsupportedContentEncodingIsRejected(t *testing.T) {
 	var got domain.Request
 	router := encodingRouter(t, &got)
@@ -230,6 +232,7 @@ func TestRouter_MalformedEncodedBodyIsBadRequest(t *testing.T) {
 
 // A few KiB on the wire can expand past the body ceiling, so the decoded
 // stream carries the same limit and answers 413 rather than buffering it all.
+/** @scenario "a compression bomb is capped at the same ceiling as a raw body" */
 func TestRouter_CompressionBombIsPayloadTooLarge(t *testing.T) {
 	auth := &mockAuth{
 		resolveFn: func(_ context.Context, _ string) (*domain.Bundle, error) {
@@ -273,6 +276,7 @@ func TestRouter_CompressionBombIsPayloadTooLarge(t *testing.T) {
 // The passthrough lane forwards the client's headers upstream. Once the
 // gateway has decoded the body, a surviving Content-Encoding would describe
 // bytes the provider never receives.
+/** @scenario "the passthrough lane does not forward a stale Content-Encoding" */
 func TestRouter_GeminiPassthrough_DecodesBodyAndDropsEncodingHeader(t *testing.T) {
 	auth := &mockAuth{
 		resolveFn: func(_ context.Context, _ string) (*domain.Bundle, error) {
