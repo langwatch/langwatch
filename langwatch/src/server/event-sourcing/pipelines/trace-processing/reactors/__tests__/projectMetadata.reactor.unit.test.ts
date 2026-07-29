@@ -174,6 +174,7 @@ describe("createProjectMetadataReactor()", () => {
       });
     });
 
+    /** @scenario First trace tracks the PostHog integration milestone against the org admin */
     it("tracks first_trace_integrated against the org admin", async () => {
       const reactor = createProjectMetadataReactor(deps);
       const event = createEvent(tenantId);
@@ -198,6 +199,7 @@ describe("createProjectMetadataReactor()", () => {
       });
     });
 
+    /** @scenario PostHog integration milestone reports unknown when SDK attributes are absent */
     it("falls back to unknown sdk properties when attributes are absent", async () => {
       const reactor = createProjectMetadataReactor(deps);
       const event = createEvent(tenantId);
@@ -214,6 +216,7 @@ describe("createProjectMetadataReactor()", () => {
       );
     });
 
+    /** @scenario PostHog integration milestone is skipped when the project has no org admin */
     it("does not track first_trace_integrated when no admin user is found", async () => {
       mockProjects.resolveOrgAdmin.mockResolvedValue({
         userId: null,
@@ -329,6 +332,7 @@ describe("createProjectMetadataReactor()", () => {
       expect(mockProjects.updateMetadata).not.toHaveBeenCalled();
     });
 
+    /** @scenario PostHog integration milestone fires only on the firstMessage transition */
     it("does not track first_trace_integrated again", async () => {
       const reactor = createProjectMetadataReactor(deps);
       const event = createEvent(tenantId);
@@ -420,6 +424,7 @@ describe("createProjectMetadataReactor()", () => {
       await expect(reactor.handle(event, context)).resolves.toBeUndefined();
     });
 
+    /** @scenario PostHog integration milestone is not tracked when the metadata write fails */
     it("does not track first_trace_integrated for a failed write", async () => {
       // The next trace retries the write and fires the event then.
       const reactor = createProjectMetadataReactor(deps);

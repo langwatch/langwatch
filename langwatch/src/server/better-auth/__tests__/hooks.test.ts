@@ -98,6 +98,7 @@ describe("afterUserCreate", () => {
   });
 
   describe("for every new user", () => {
+    /** @scenario BetterAuth signup tracks the PostHog signed_up milestone */
     it("tracks the signed_up analytics event with the user id", async () => {
       const prisma = makePrismaMock();
 
@@ -113,6 +114,7 @@ describe("afterUserCreate", () => {
       });
     });
 
+    /** @scenario PostHog signed_up still fires when the SSO auto-add path runs */
     it("tracks signed_up even when the SSO auto-add path runs", async () => {
       const prisma = makePrismaMock({
         organization: {
@@ -135,6 +137,7 @@ describe("afterUserCreate", () => {
       });
     });
 
+    /** @scenario PostHog signed_up still fires when the email has no parsable domain */
     it("tracks signed_up even when the user has no parsable email domain", async () => {
       const prisma = makePrismaMock();
 

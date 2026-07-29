@@ -68,6 +68,7 @@ describe("userRouter.register()", () => {
   };
 
   describe("when registration succeeds", () => {
+    /** @scenario Email-mode registration tracks the PostHog signed_up milestone exactly once */
     it("tracks the signed_up analytics event with the new user id", async () => {
       const result = await createCaller().register({
         name: "Alice",
@@ -85,6 +86,7 @@ describe("userRouter.register()", () => {
   });
 
   describe("when the user already exists", () => {
+    /** @scenario A rejected registration tracks no PostHog signed_up milestone */
     it("does not track signed_up", async () => {
       userFindUniqueMock.mockResolvedValue({ id: "user-1" });
 
