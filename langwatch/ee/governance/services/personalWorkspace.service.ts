@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { generate } from "@langwatch/ksuid";
 /**
  * PersonalWorkspaceService — owns the lifecycle of a user's "Personal
  * Workspace" inside an organization.

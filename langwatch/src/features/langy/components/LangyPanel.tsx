@@ -65,7 +65,6 @@ import { useReducedMotion } from "~/hooks/useReducedMotion";
 import type { LangyResourceContext } from "~/server/app-layer/langy/langyTurnContext.schema";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
-import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { useLangyConversationCommands } from "../data/useLangyConversationCommands";
 import { useLangyConversationList } from "../data/useLangyConversationList";
 import { useLangyMessages } from "../data/useLangyMessages";

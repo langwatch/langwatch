@@ -1,6 +1,6 @@
 import type { Currency } from "@prisma/client";
 import { InvalidSeatCountError } from "../errors";
-import { type PlanTypes as PlanType, PlanTypes } from "../planTypes";
+import { PlanTypes } from "../planTypes";
 import { prices } from "../stripe/stripePriceCatalog";
 import type { StripePriceName } from "../stripe/stripePrices.types";
 

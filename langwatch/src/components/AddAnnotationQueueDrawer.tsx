@@ -23,7 +23,6 @@ import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { slugify } from "~/utils/slugify";
-import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { Drawer } from "../components/ui/drawer";
 import { Popover } from "../components/ui/popover";
 import { toaster } from "../components/ui/toaster";

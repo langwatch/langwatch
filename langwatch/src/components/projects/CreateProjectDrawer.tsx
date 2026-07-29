@@ -5,7 +5,6 @@ import { useLicenseEnforcement } from "../../hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import { trackEvent } from "../../utils/tracking";
-import { isHandledByGlobalHandler } from "../../utils/trpcError";
 import { Drawer } from "../ui/drawer";
 import { toaster } from "../ui/toaster";
 import { ProjectForm, type ProjectFormData } from "./ProjectForm";
