@@ -194,8 +194,15 @@ describe("the repo is a single pnpm workspace", () => {
 			// A member whose directory is absent installs without complaint and
 			// fails much later, inside a migration.
 			for (const manifest of memberManifests) {
+				// Compare against a directory prefix that definitely ends in "/",
+				// so a `files` entry of `langwatch` cannot be read as shipping
+				// `langwatch-something/package.json`. (This previously wrote
+				// `f.replace(/\/$/, "/")`, which replaces a trailing slash with a
+				// trailing slash and therefore did nothing at all.)
 				const covered = shipped.some(
-					(f) => manifest === f || manifest.startsWith(f.replace(/\/$/, "/")),
+					(f) =>
+						manifest === f ||
+						manifest.startsWith(f.endsWith("/") ? f : `${f}/`),
 				);
 				expect(covered, `no files[] entry ships ${manifest}`).toBe(true);
 			}
