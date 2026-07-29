@@ -3,5 +3,5 @@
 Feature: Prompt Fetch Policy
   As a developer using the Python SDK
   I want to retrieve prompts using with the same behavior as the
-  typescript feature: ../typescript-sdk/specs/prompts/fetch-policy.feature
+  typescript feature: ../typescript/specs/prompts/fetch-policy.feature
 

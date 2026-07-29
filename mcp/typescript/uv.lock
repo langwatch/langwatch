@@ -967,7 +967,7 @@ wheels = [
 [[package]]
 name = "langwatch"
 version = "0.26.0"
-source = { editable = "../python-sdk" }
+source = { editable = "../../sdks/python" }
 dependencies = [
     { name = "attrs" },
     { name = "coolname" },
@@ -1210,7 +1210,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "ipykernel", specifier = ">=6.30.1" },
-    { name = "langwatch", editable = "../python-sdk" },
+    { name = "langwatch", editable = "../../sdks/python" },
     { name = "litellm", specifier = ">=1.84.0" },
     { name = "mcp", extras = ["cli"], specifier = ">=1.13.1" },
     { name = "pandas", specifier = ">=2.3.2" },
