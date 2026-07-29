@@ -7,6 +7,7 @@ import type {
   AppDependencies,
   DataRetentionDependencies,
   OpsDependencies,
+  StorageBillingDependencies,
 } from "./dependencies";
 
 const logger = createLogger("langwatch:app");
@@ -42,6 +43,7 @@ export class App {
   readonly ops?: OpsDependencies;
   readonly retentionPolicyCache: AppDependencies["retentionPolicyCache"];
   readonly dataRetention: DataRetentionDependencies;
+  readonly storageBilling?: StorageBillingDependencies;
   readonly share: AppDependencies["share"];
 
   /** Keeps EventSourcing infrastructure safe from the greedy garbage men */
@@ -83,6 +85,7 @@ export class App {
     this.ops = deps.ops;
     this.retentionPolicyCache = deps.retentionPolicyCache;
     this.dataRetention = deps.dataRetention;
+    this.storageBilling = deps.storageBilling;
     this.share = deps.share;
     this._eventSourcing = deps._eventSourcing;
     this._gracefulCloseables = deps._gracefulCloseables ?? [];

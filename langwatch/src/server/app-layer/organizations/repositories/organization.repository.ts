@@ -254,12 +254,19 @@ export interface OrganizationRepository {
   getOrganizationForBilling(
     organizationId: string,
   ): Promise<OrganizationForBilling | null>;
+  /**
+   * Every SaaS-billable organization id — the population the ADR-039
+   * storage sweep iterates. STRICTER than getOrganizationForBilling: it
+   * additionally requires a non-null stripeCustomerId and at least one
+   * active growth subscription (getOrganizationForBilling returns
+   * SEAT_EVENT orgs regardless and lets callers inspect the fields), so
+   * every org this enumerates is reportable, never the other way around.
+   */
+  listBillableOrganizationIds(): Promise<string[]>;
 
   // --- New methods for router delegation ---
 
-  createAndAssign(
-    input: CreateAndAssignInput,
-  ): Promise<CreateAndAssignResult>;
+  createAndAssign(input: CreateAndAssignInput): Promise<CreateAndAssignResult>;
 
   getAllForUser(params: {
     userId: string;
@@ -298,6 +305,10 @@ export interface OrganizationRepository {
 export class NullOrganizationRepository implements OrganizationRepository {
   async getOrganizationIdByTeamId(_teamId: string): Promise<string | null> {
     return null;
+  }
+
+  async listBillableOrganizationIds(): Promise<string[]> {
+    return [];
   }
 
   async getUserOrgRole(_params: {

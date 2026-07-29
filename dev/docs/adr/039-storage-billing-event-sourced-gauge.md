@@ -183,7 +183,7 @@ model StorageBoundaryEvent {
   organizationId String
   projectId      String
   category       String   // retention category of the source table
-  partitionKey   String   // toYearWeek, e.g. "202625"
+  partitionKey   String   // week-partition label: ISO date of its Sunday start, e.g. "2026-06-21"
   sliceDate      DateTime // the day-slice this delta covers
   retentionDays  Int      // _retention_days of the rows in this delta
   edge           String   // ENTRY | EXIT | DELETION | SEED

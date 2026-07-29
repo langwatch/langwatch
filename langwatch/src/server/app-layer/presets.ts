@@ -13,15 +13,24 @@ import {
 } from "~/server/clickhouse/clickhouseClient";
 import { closeClickHouseClient } from "~/server/clickhouse/client";
 import { prisma as globalPrisma } from "~/server/db";
+import { featureFlagService } from "~/server/featureFlag";
 import { getFeatureFlagStore } from "~/server/featureFlag/featureFlagStore.postgres";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import { GatewayBudgetRepository } from "~/server/gateway/budget.repository";
+import { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
 import { getEdgeSpoolFailOpenCounter } from "~/server/metrics";
 import { getPostHogInstance } from "~/server/posthog";
 import { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
 import { createS3Client } from "~/server/storage";
 import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
+import { sendRenderedSlackMessage } from "~/server/triggers/sendSlackWebhook";
+import { postSlackChatMessage } from "~/server/triggers/slackWebApi";
 import { liveTriggerNotifier } from "~/server/triggers/triggerNotifier";
+import {
+  captureException,
+  toError,
+  withScope,
+} from "~/utils/posthogErrorCapture";
 import { getSaaSPlanProvider } from "../../../ee/billing";
 import { NotificationService } from "../../../ee/billing/notifications/notification.service";
 import { NotificationRepository } from "../../../ee/billing/notifications/repositories/notification.repository";
@@ -46,21 +55,6 @@ import { DataRetentionPolicyRepository } from "../data-retention/policy/dataRete
 import { DataRetentionPolicyService } from "../data-retention/policy/dataRetentionPolicy.service";
 import { RetentionPolicyCache } from "../data-retention/retentionPolicyCache";
 import { RetroactiveUpdateService } from "../data-retention/retroactive/retroactiveUpdate.service";
-import {
-  NullScheduledJobRepository,
-  PrismaScheduledJobRepository,
-} from "./scheduler/scheduled-job.repository";
-import { schedulerRegistry } from "./scheduler/scheduler.registry";
-import { SchedulerService } from "./scheduler/scheduler.service";
-import { getAnalyticsService } from "./analytics";
-import { loadReportCharts } from "./reports/report-chart.service";
-import { dispatchScheduledReport } from "./reports/report-dispatch";
-import { toReportTraceRow } from "./reports/trace-report-row";
-import { translateFilterToClickHouse } from "./traces/filter-to-clickhouse";
-import { REPORT_SCHEDULER_TARGET_TYPE } from "./triggers/report.builder";
-import { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
-import { sendRenderedSlackMessage } from "~/server/triggers/sendSlackWebhook";
-import { postSlackChatMessage } from "~/server/triggers/slackWebApi";
 import { EventSourcing } from "../event-sourcing";
 import { dispatchOutboxEnqueues } from "../event-sourcing/outbox/dispatchOutboxEnqueues";
 import { outboxHeartbeatRegistry } from "../event-sourcing/outbox/heartbeat/heartbeat.registry";
@@ -93,8 +87,18 @@ import { EventUsageService } from "../traces/event-usage.service";
 import { TraceService } from "../traces/trace.service";
 import { TraceUsageService } from "../traces/trace-usage.service";
 import { runEvaluationWorkflow } from "../workflows/runWorkflow";
+import { getAnalyticsService } from "./analytics";
 import { App, getApp, globalForApp, initializeApp } from "./app";
 import { PrismaBillingCheckpointService } from "./billing/billingCheckpoint.service";
+import { BoundaryExitService } from "./billing/storage/boundaryExit.service";
+import { BoundaryMeasurementService } from "./billing/storage/boundaryMeasurement.service";
+import { GaugeSamplingService } from "./billing/storage/gaugeSampling.service";
+import { PrismaStorageBillableGaugeRepository } from "./billing/storage/repositories/storage-billable-gauge.prisma.repository";
+import { PrismaStorageBoundaryEventRepository } from "./billing/storage/repositories/storage-boundary-event.prisma.repository";
+import { PrismaStorageSweepCursorRepository } from "./billing/storage/repositories/storage-sweep-cursor.prisma.repository";
+import { PrismaStorageUsageHourlyRepository } from "./billing/storage/repositories/storage-usage-hourly.prisma.repository";
+import { StorageCorrectionService } from "./billing/storage/storageCorrection.service";
+import { StorageSweepService } from "./billing/storage/storageSweep.service";
 import { BroadcastService } from "./broadcast/broadcast.service";
 import { createClickHouseClientFromConfig } from "./clients/clickhouse.factory";
 import { NullLangevalsClient } from "./clients/langevals/langevals.client";
@@ -130,7 +134,6 @@ import { PrismaMonitorRepository } from "./monitors/repositories/monitor.prisma.
 import { EventExplorerService } from "./ops/event-explorer.service";
 import { getOpsMetricsCollector } from "./ops/metrics-collector";
 import { QueueService } from "./ops/queue.service";
-import { SchedulerOpsService } from "./ops/scheduler-ops.service";
 import { ReplayService } from "./ops/replay.service";
 import { EventExplorerClickHouseRepository } from "./ops/repositories/event-explorer.clickhouse.repository";
 import { NullEventExplorerRepository } from "./ops/repositories/event-explorer.repository";
@@ -138,6 +141,7 @@ import { QueueRedisRepository } from "./ops/repositories/queue.redis.repository"
 import { NullQueueRepository } from "./ops/repositories/queue.repository";
 import { ReplayRedisRepository } from "./ops/repositories/replay.redis.repository";
 import { NullReplayRepository } from "./ops/repositories/replay.repository";
+import { SchedulerOpsService } from "./ops/scheduler-ops.service";
 import { OrganizationService } from "./organizations/organization.service";
 import { PrismaOrganizationRepository } from "./organizations/repositories/organization.prisma.repository";
 import { NullOrganizationRepository } from "./organizations/repositories/organization.repository";
@@ -147,6 +151,15 @@ import { RedisPresenceRepository } from "./presence/repositories/presence.redis.
 import { ProjectService } from "./projects/project.service";
 import { PrismaProjectRepository } from "./projects/repositories/project.prisma.repository";
 import { NullProjectRepository } from "./projects/repositories/project.repository";
+import { loadReportCharts } from "./reports/report-chart.service";
+import { dispatchScheduledReport } from "./reports/report-dispatch";
+import { toReportTraceRow } from "./reports/trace-report-row";
+import {
+  NullScheduledJobRepository,
+  PrismaScheduledJobRepository,
+} from "./scheduler/scheduled-job.repository";
+import { schedulerRegistry } from "./scheduler/scheduler.registry";
+import { SchedulerService } from "./scheduler/scheduler.service";
 import { PrismaShareRepository } from "./share/repositories/share.prisma.repository";
 import { ShareService } from "./share/share.service";
 import { SimulationRunService } from "./simulations/simulation-run.service";
@@ -158,6 +171,7 @@ import { NullTopicRepository } from "./topics/null-topic.repository";
 import { PrismaTopicRepository } from "./topics/topic.prisma.repository";
 import { TopicService } from "./topics/topic.service";
 import { maybeSpool } from "./traces/edge-spool";
+import { translateFilterToClickHouse } from "./traces/filter-to-clickhouse";
 import { LogRecordStorageService } from "./traces/log-record-storage.service";
 import { LogRequestCollectionService } from "./traces/log-request-collection.service";
 import { MetricRecordStorageService } from "./traces/metric-record-storage.service";
@@ -191,6 +205,7 @@ import {
   defaultGraphTriggerHeartbeatDeps,
   registerGraphTriggerHeartbeat,
 } from "./triggers/graph-trigger-heartbeat";
+import { REPORT_SCHEDULER_TARGET_TYPE } from "./triggers/report.builder";
 import {
   PrismaEmailSuppressionNameLookupRepository,
   PrismaEmailSuppressionRepository,
@@ -634,19 +649,18 @@ export function initializeDefaultApp(options?: {
   // EventSourcing`), so its `.withOutbox` reactors can enqueue settle
   // payloads. Web processes don't build this (no settle traffic; no consumer
   // to drain).
-  const outbox =
-    roleRunsWorkers(config.processRole)
-      ? buildOutboxRuntime({
-          prisma,
-          redis: redis ?? null,
-          triggers,
-          emailSuppressions,
-          projects,
-          evaluations: { runs: evaluations.runs },
-          traces: { spans: spanStorage },
-          traceSummaryRepository: repositories.traceSummaryFold,
-        })
-      : undefined;
+  const outbox = roleRunsWorkers(config.processRole)
+    ? buildOutboxRuntime({
+        prisma,
+        redis: redis ?? null,
+        triggers,
+        emailSuppressions,
+        projects,
+        evaluations: { runs: evaluations.runs },
+        traces: { spans: spanStorage },
+        traceSummaryRepository: repositories.traceSummaryFold,
+      })
+    : undefined;
 
   // EventSourcing must be constructed AFTER `outbox` and be given it here: the
   // reactor adapter (`.withOutbox` → enqueueSettle) and the global queue's
@@ -655,6 +669,88 @@ export function initializeDefaultApp(options?: {
   // leaves every outbox reactor on the silent drop path — the trigger dispatch
   // regression fixed here (also found by /review-pr reg5014-001 +
   // dispatch5015-001). See presets.outboxWiring.integration.test.ts.
+  // ADR-039 phase 2: the storage boundary-measurement engine. Built from
+  // repos + services that all exist before EventSourcing, so the sweep can be
+  // handed to the reactor directly (no forward reference needed). Flag-gated
+  // per org (release_storage_boundary_metering, default OFF = fully dark) and
+  // scoped to SaaS-billable orgs inside the sweep itself.
+  const storageBoundaryEvents = new PrismaStorageBoundaryEventRepository(
+    prisma,
+  );
+  const storageCorrections = new StorageCorrectionService({
+    events: storageBoundaryEvents,
+  });
+  const storageSweep = new StorageSweepService({
+    cursor: new PrismaStorageSweepCursorRepository(prisma),
+    listBillableOrganizationIds: () =>
+      organizations.listBillableOrganizationIds(),
+    // Memoized per process (5 min): the sweep checks every billable org each
+    // sealed hour, and an uncached PRODUCT-scope check would hit PostHog
+    // ~200x/hour while the engine is dark.
+    isMeteringEnabled: (() => {
+      const memo = new Map<string, { value: boolean; expiresAt: number }>();
+      return async (organizationId: string) => {
+        const cached = memo.get(organizationId);
+        if (cached && cached.expiresAt > Date.now()) return cached.value;
+        const value = await featureFlagService.isEnabled(
+          "release_storage_boundary_metering",
+          { distinctId: organizationId, defaultValue: false },
+        );
+        memo.set(organizationId, { value, expiresAt: Date.now() + 300_000 });
+        return value;
+      };
+    })(),
+    measurement: new BoundaryMeasurementService({
+      resolveClickHouseClient: clickhouseEnabled
+        ? resolveClickHouseClient
+        : null,
+      events: storageBoundaryEvents,
+      listProjectIds: async ({ organizationId }) => {
+        // Archived projects included: archived data still occupies storage.
+        const orgProjects = await prisma.project.findMany({
+          where: { team: { organizationId } },
+          select: { id: true },
+        });
+        return orgProjects.map((project) => project.id);
+      },
+      // One cheap `system.mutations` lookup per project per daily sweep —
+      // skips measurement while a retention relabel is mid-flight so the
+      // reverse-then-emit re-book can't be measured back in as a phantom.
+      hasInFlightRetentionMutation: async ({ projectId }) => {
+        const inFlight = await retroactiveUpdateService.getMutationProgress({
+          projectId,
+        });
+        return inFlight.length > 0;
+      },
+    }),
+    exits: new BoundaryExitService({ events: storageBoundaryEvents }),
+    sampling: new GaugeSamplingService({
+      events: storageBoundaryEvents,
+      gauge: new PrismaStorageBillableGaugeRepository(prisma),
+      usageHourly: new PrismaStorageUsageHourlyRepository(prisma),
+      onDriftAlarm: ({ organizationId, sealedHour, gaugeBytes }) => {
+        void withScope(async (scope) => {
+          scope.setTag?.("handler", "storageGaugeDrift");
+          scope.setExtra?.("organizationId", organizationId);
+          scope.setExtra?.("sealedHour", sealedHour.toISOString());
+          scope.setExtra?.("gaugeBytes", gaugeBytes.toString());
+          captureException(
+            new Error(
+              "storage gauge folded below the negative-drift tolerance",
+            ),
+          );
+        });
+      },
+    }),
+    onOrgFailure: ({ organizationId, error }) => {
+      void withScope(async (scope) => {
+        scope.setTag?.("handler", "storageSweepOrg");
+        scope.setExtra?.("organizationId", organizationId);
+        captureException(toError(error));
+      });
+    },
+  });
+
   const es = new EventSourcing({
     clickhouse: clickhouseEnabled ? resolveClickHouseClient : void 0,
     redis,
@@ -663,6 +759,9 @@ export function initializeDefaultApp(options?: {
     processRole: config.processRole,
     retentionPolicyResolver: retentionPolicyCache,
     outbox,
+    getStorageSweep: config.isSaas
+      ? () => () => storageSweep.sweep()
+      : undefined,
   });
 
   // Heartbeat scheduler (ADR-034 Phase 4): for roles where roleRunsWorkers()
@@ -718,16 +817,15 @@ export function initializeDefaultApp(options?: {
   // poll, never affecting correctness. Kept dormant this phase — no consumers
   // register yet (the report handler lands in a later phase), so the loop runs
   // and log-and-skips any orphan targetType.
-  const scheduler =
-    roleRunsWorkers(config.processRole)
-      ? new SchedulerService({
-          repo: new PrismaScheduledJobRepository(prisma),
-          registry: schedulerRegistry,
-          processRole: config.processRole,
-          logger: createLogger("langwatch:app-layer:scheduler"),
-          redis,
-        })
-      : undefined;
+  const scheduler = roleRunsWorkers(config.processRole)
+    ? new SchedulerService({
+        repo: new PrismaScheduledJobRepository(prisma),
+        registry: schedulerRegistry,
+        processRole: config.processRole,
+        logger: createLogger("langwatch:app-layer:scheduler"),
+        redis,
+      })
+    : undefined;
   scheduler?.start();
 
   // ADR-044 Phase 3c: register the report handler so a due report ScheduledJob
@@ -1040,7 +1138,9 @@ export function initializeDefaultApp(options?: {
 
   const ops = {
     queues: new QueueService(queueRepo),
-    scheduler: new SchedulerOpsService(new PrismaScheduledJobRepository(prisma)),
+    scheduler: new SchedulerOpsService(
+      new PrismaScheduledJobRepository(prisma),
+    ),
     eventExplorer: new EventExplorerService(eventExplorerRepo),
     replay: new ReplayService(replayRepo),
     metricsCollector: redis
@@ -1074,6 +1174,7 @@ export function initializeDefaultApp(options?: {
     usageLimits,
     retentionPolicyCache,
     dataRetention,
+    storageBilling: { corrections: storageCorrections },
     share,
     commands,
     ops,

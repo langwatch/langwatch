@@ -36,6 +36,7 @@ import type {
 import { BILLING_REPORTING_PIPELINE_NAME } from "./pipelines/billing-reporting/pipeline";
 import { createBillingMeterDispatchReactor } from "./projections/global/billingMeterDispatch.reactor";
 import { orgBillableEventsMeterProjection } from "./projections/global/orgBillableEventsMeter.mapProjection";
+import { createStorageSweepReactor } from "./projections/global/storageSweep.reactor";
 import { ProjectionRegistry } from "./projections/projectionRegistry";
 import { RedisReplayMarkerChecker } from "./projections/replayMarkerCheck";
 import type {
@@ -70,6 +71,14 @@ export interface EventSourcingOptions {
    *  on the existing queue instead of standing up its own. */
   outbox?: OutboxRuntime;
   retentionPolicyResolver?: RetentionPolicyResolver;
+  /**
+   * ADR-039 phase 2: lazy accessor for the platform-wide storage sweep (the
+   * app-layer engine measuring boundary crossings and sampling gauges). Lazy
+   * because the app-layer service is built after EventSourcing. When
+   * provided (SaaS), a storageSweep reactor is registered on the
+   * orgBillableEventsMeter projection alongside the billing one.
+   */
+  getStorageSweep?: () => () => Promise<void>;
 }
 
 /**
@@ -151,6 +160,12 @@ export class EventSourcing {
           },
         }),
       );
+      if (options.getStorageSweep) {
+        this.projectionRegistry.registerMapReactor(
+          "orgBillableEventsMeter",
+          createStorageSweepReactor({ getSweep: options.getStorageSweep }),
+        );
+      }
     }
   }
 

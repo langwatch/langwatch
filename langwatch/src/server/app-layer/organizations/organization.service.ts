@@ -168,6 +168,10 @@ export class OrganizationService {
     return this.repo.getOrganizationForBilling(organizationId);
   }
 
+  async listBillableOrganizationIds(): Promise<string[]> {
+    return this.repo.listBillableOrganizationIds();
+  }
+
   /**
    * Creates an organization with a default team and assigns the given user as admin.
    * The repository handles the transaction atomically (unit-of-work pattern).

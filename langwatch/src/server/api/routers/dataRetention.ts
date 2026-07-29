@@ -1,5 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
+import { nanoid } from "nanoid";
 import { z } from "zod";
 import { getApp } from "~/server/app-layer/app";
 import type { Session } from "~/server/auth";
@@ -13,6 +14,7 @@ import {
 } from "~/server/data-retention/policy/dataRetentionPolicy.authz";
 import { getRetentionPolicySnapshot } from "~/server/data-retention/policy/dataRetentionPolicy.read";
 import { ScopeTargetNotFoundError } from "~/server/data-retention/policy/dataRetentionPolicy.service";
+import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
 
 /**
  * Plan-gate the retention mutations via the project's owning organization.
@@ -197,11 +199,59 @@ export const dataRetentionRouter = createTRPCRouter({
           message: `No effective retention is resolvable for category ${category}.`,
         });
       }
-      const result = await getApp().dataRetention.retroactive.triggerUpdate({
-        projectId: input.projectId,
-        category,
-        newRetentionDays,
-      });
+      // ADR-039 reverse-then-emit: re-book the recorded billing groups under
+      // the new retention BEFORE submitting the row-relabeling mutation, so
+      // exits follow the new entitlement from this instant. Guarded by the
+      // same in-flight check triggerUpdate enforces, so the emit cannot run
+      // for a change that would be rejected. If the mutation later wedges
+      // partway, the reconciliation tier owns flagging the org (phase 3).
+      const inFlight =
+        await getApp().dataRetention.retroactive.getMutationProgress({
+          projectId: input.projectId,
+        });
+      if (inFlight.length > 0) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message:
+            "A retroactive retention update is already running for this project.",
+        });
+      }
+      const storageBilling = getApp().storageBilling;
+      const organizationId = storageBilling
+        ? await resolveOrganizationId(input.projectId)
+        : null;
+      const causeId = `retchange_${nanoid()}`;
+      const rebooked =
+        storageBilling && organizationId
+          ? await storageBilling.corrections.emitRetentionChange({
+              organizationId,
+              projectId: input.projectId,
+              category,
+              newRetentionDays,
+              causeId,
+              at: new Date(),
+            })
+          : null;
+      let result;
+      try {
+        result = await getApp().dataRetention.retroactive.triggerUpdate({
+          projectId: input.projectId,
+          category,
+          newRetentionDays,
+        });
+      } catch (error) {
+        // The mutation was never submitted: the rows keep their old
+        // retention, so the re-booked billing groups must be restored —
+        // otherwise exits would follow an entitlement that never applied.
+        if (storageBilling && rebooked && rebooked.emitted.length > 0) {
+          await storageBilling.corrections.rollbackRetentionChange({
+            emitted: rebooked.emitted,
+            causeId,
+            at: new Date(),
+          });
+        }
+        throw error;
+      }
       return { ...result, appliedRetentionDays: newRetentionDays };
     }),
 
