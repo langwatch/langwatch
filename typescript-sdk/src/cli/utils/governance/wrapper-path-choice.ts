@@ -156,6 +156,11 @@ export interface ResolveWrapperPathResult {
   mode: WrapperMode;
   /** True when this run made a fresh interactive choice (and persisted it). */
   prompted: boolean;
+  /**
+   * True when the user cancelled the path prompt. `mode` is then a
+   * placeholder the caller must not act on; it should stop the run.
+   */
+  aborted?: boolean;
 }
 
 /**
@@ -284,8 +289,12 @@ export async function resolveWrapperPath(
   // 4 / 5. Both paths allowed.
   const canPrompt = isTTY && !isForcedAutoLogin(env);
   if (!canPrompt) {
-    // Non-TTY / CI / forced-auto-login - default to the gateway, no prompt.
-    return { mode: "gateway", prompted: false };
+    // Non-TTY / CI / forced-auto-login: nobody is there to answer, and the
+    // gateway bills model usage to the organization. Take the same option
+    // the prompt pre-selects, which costs nothing beyond telemetry. A CI
+    // job that wants the gateway asks for it with --tool-mode=gateway,
+    // LANGWATCH_TOOL_MODE=gateway, or a pinned tool_mode.
+    return { mode: "ingestion", prompted: false };
   }
 
   const res = await promptImpl({
@@ -312,9 +321,10 @@ export async function resolveWrapperPath(
 
   const chosen = tokenToMode(res?.path as string | undefined);
   if (!chosen) {
-    // User aborted the prompt (Ctrl-C / empty). Default to the gateway
-    // for this run without persisting, so the next run asks again.
-    return { mode: "gateway", prompted: false };
+    // User aborted the prompt (Ctrl-C / empty). Cancelling the question
+    // cancels the run: picking a path for them would either start the tool
+    // they just interrupted or bill their organization for it.
+    return { mode: "ingestion", prompted: false, aborted: true };
   }
 
   // Remember the choice so subsequent runs don't prompt.

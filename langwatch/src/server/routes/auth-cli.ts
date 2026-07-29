@@ -84,10 +84,19 @@ const CLI_POLICY = handlerManagedAuth(
 const DEVICE_CODE_TTL_SECONDS = 600; // 10 min
 /** Minimum poll interval the CLI should respect. */
 const MIN_POLL_INTERVAL_SECONDS = 5;
-/** Access token lifetime. Short — refresh is the rotation path. */
+/** Access token lifetime. Short; refresh is the rotation path. */
 const ACCESS_TOKEN_TTL_SECONDS = 60 * 60; // 1h
-/** Refresh token lifetime. Long-lived but rotated on every refresh. */
-const REFRESH_TOKEN_TTL_SECONDS = 60 * 60 * 24 * 30; // 30d
+/**
+ * Refresh token lifetime. Rotated on every refresh, so this is how long a
+ * session survives with the CLI sitting idle, not how long the session
+ * lasts: each `langwatch <tool>` run that refreshes restarts the window.
+ * Someone who points a coding agent at LangWatch and comes back a couple
+ * of months later should still be connected, so the idle window is a
+ * quarter rather than a month. Organizations that want a hard ceiling set
+ * `Organization.maxSessionDurationDays`, which /refresh enforces against
+ * the original session start.
+ */
+const REFRESH_TOKEN_TTL_SECONDS = 60 * 60 * 24 * 90; // 90d
 /** Min seconds between successive /exchange polls per device_code. */
 const POLL_RATE_LIMIT_SECONDS = 4;
 
