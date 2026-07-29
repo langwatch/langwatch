@@ -316,16 +316,21 @@ export interface TraceAnalyticsRow {
   attributes: Record<string, string>;
 
   /**
-   * The persistable-signal verdict → the `HasSignal` column (migration 00064).
+   * The persistable-signal verdict. NOT a table column — the row already
+   * carries every operand (`SpanCount`, `EarliestSpanStartMs`, the reserved
+   * log-record-count attribute), so readers derive the verdict in SQL via
+   * {@link TRACE_ANALYTICS_HAS_SIGNAL_SQL}; this field rides the in-memory
+   * row so the write path and tests can speak it directly, and the repository
+   * re-derives it on read-back.
    *
    * The store used to enforce this by NOT WRITING the row, which kept phantom
    * traces out of analytics but made a missing row ambiguous — "new aggregate"
    * and "declined to persist" were indistinguishable, so the executor answered
    * every store miss with an unwindowed fallback scan plus a re-fold from
    * `event_log` (measured: 150,573 fallback scans in 30 days, zero of which
-   * found anything). Now the row is always written and the verdict rides here:
-   * analytics readers filter `AND HasSignal` and see the same population as
-   * before; the fold read-back ignores it, so absence is authoritative.
+   * found anything). Now the row is always written and analytics readers
+   * filter the derived verdict, seeing the same population as before; the
+   * fold read-back ignores it, so absence is authoritative.
    *
    * Monotonic non-decreasing: `spanCount` only grows and `occurredAt` latches,
    * so once a trace has signal every later version has it too. Readers may
@@ -576,13 +581,14 @@ export function anchorStorageTime({
  * langwatch.reserved.log_record_count and this mirrors its acceptance).
  *
  * A state carrying ONLY dimension signal (topic / annotation / name) answers
- * false. Until migration 00064 that answer meant the row was NOT WRITTEN;
- * now it is written with `HasSignal = false` so analytics readers can exclude
- * it while the fold read-back still finds it. `storageAnchorMs` is
- * deliberately NOT a door: a row on this table is a TRACE to every analytics
- * read, so admitting a state whose sole signal is an annotation or a
- * classification would change what the product means by "a trace" — the flag
- * carries that refusal now, instead of the row's absence.
+ * false. That answer used to mean the row was NOT WRITTEN; now it is always
+ * written and analytics readers exclude it via
+ * {@link TRACE_ANALYTICS_HAS_SIGNAL_SQL} while the fold read-back still finds
+ * it. `storageAnchorMs` is deliberately NOT a door: a row on this table is a
+ * TRACE to every analytics read, so admitting a state whose sole signal is an
+ * annotation or a classification would change what the product means by "a
+ * trace" — the derived filter carries that refusal now, instead of the row's
+ * absence.
  */
 export function hasPersistableSignal(state: TraceAnalyticsData): boolean {
   if (state.spanCount > 0) return true;
@@ -590,6 +596,33 @@ export function hasPersistableSignal(state: TraceAnalyticsData): boolean {
   const raw = state.attributes?.["langwatch.reserved.log_record_count"];
   return typeof raw === "string" && Number(raw) > 0;
 }
+
+/**
+ * {@link hasPersistableSignal}, as a SQL predicate over the columns the row
+ * already carries — which is what lets the always-write change ship with NO
+ * schema migration. The doors map 1:1 onto the in-memory predicate:
+ * `SpanCount` is `state.spanCount`, `EarliestSpanStartMs` is
+ * `state.occurredAt` (that column carries it since the 00061 anchor split),
+ * and the reserved log-record-count attribute survives
+ * `trimAttributesForAnalytics` by its `langwatch.reserved.` prefix — the
+ * ADR-066 read-back already depends on that, so the dependency is not new.
+ *
+ * The fourth door has no in-memory twin: rows stamped BEFORE the pre-split
+ * version predate the 00056 read-back columns, so their `SpanCount` /
+ * `EarliestSpanStartMs` decode as default 0 even though every one of them
+ * passed the write-gate (nothing else was ever written back then). Version
+ * stamps are ISO dates, so a lexicographic compare orders them correctly;
+ * without this door those real traces would vanish from analytics.
+ *
+ * Every reader that treats a row on this table as "a trace" must apply this —
+ * today that is one place, `dedupedSlim` in slim-timeseries-query.ts. The
+ * fold read-back must NOT.
+ */
+export const TRACE_ANALYTICS_HAS_SIGNAL_SQL =
+  `(SpanCount > 0` +
+  ` OR EarliestSpanStartMs > 0` +
+  ` OR Attributes['langwatch.reserved.log_record_count'] NOT IN ('', '0')` +
+  ` OR Version < '${TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT}')`;
 
 export function projectAnalyticsStateToRow({
   state,
@@ -1227,10 +1260,10 @@ export class TraceAnalyticsFoldProjection
    * trace's row landed in partition `196952` already past its TTL and was
    * reaped (closed by the storage anchor, 00061), and the dimension-only
    * trace folded a state the store's persistability gate refused to write
-   * (closed by migration 00064 — the row is always written now, the gate's
-   * verdict rides on it as `HasSignal`).
+   * (closed by the always-write change — the row is always written now, and
+   * analytics readers exclude it via TRACE_ANALYTICS_HAS_SIGNAL_SQL).
    *
-   * `trustAbsentMiss: true` — the other half of what 00064 buys. With every
+   * `trustAbsentMiss: true` — the other half of always-write. With every
    * committed state guaranteed a row, an absent read proves the aggregate is
    * new, so the executor folds from `init()` without the unwindowed fallback
    * scan or the store-miss re-fold. The re-folds this retires were measured at

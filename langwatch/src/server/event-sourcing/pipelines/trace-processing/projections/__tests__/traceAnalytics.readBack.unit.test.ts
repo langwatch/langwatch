@@ -503,9 +503,9 @@ describe("TraceAnalyticsStore dimension-only signal", () => {
       /**
        * @scenario a signal with nothing else to store is not lost to a cold cache
        *
-       * Until migration 00064 this protection came from `refoldOnStoreMiss`
+       * Until the always-write change this protection came from `refoldOnStoreMiss`
        * rebuilding the topic out of `event_log` — the row was simply not
-       * written. Now the row IS written (`HasSignal = false` keeps it out of
+       * written. Now the row IS written (readers derive hasSignal=false to keep it out of
        * analytics) and the later span resumes from the read-back directly:
        * same guarantee, no event_log replay, which is what lets the fold
        * declare `trustAbsentMiss`.

@@ -10,7 +10,10 @@ import {
   asStringMap,
 } from "~/server/clickhouse/recordDecode";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
-import type { TraceAnalyticsRow } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceAnalytics.foldProjection";
+import {
+  TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT,
+  type TraceAnalyticsRow,
+} from "~/server/event-sourcing/pipelines/trace-processing/projections/traceAnalytics.foldProjection";
 import { SecurityError } from "~/server/event-sourcing/services/errorHandling";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import { queryWindowed } from "../../clients/clickhouse/windowed-read";
@@ -86,11 +89,6 @@ interface ClickHouseTraceAnalyticsWriteRecord {
   // ── Durable dedup watermark (ADR-066, migration 00056) ─────────────────
   AppliedEventIds: string[];
 
-  /** The persistable-signal verdict (migration 00064) — see TraceAnalyticsRow. */
-  HasSignal: boolean;
-  /** Per-write random identity, the LWW tiebreak's deterministic last key. */
-  WriterNonce: string;
-
   _retention_days: number;
 }
 
@@ -153,24 +151,12 @@ function toClickHouseRecord(
 
     AppliedEventIds: [...appliedEventIds],
 
-    HasSignal: row.hasSignal,
-    // A fresh nonce PER WRITE, not per row object: two writers racing the same
-    // committed version produce rows the progress ranking cannot always split,
-    // and this key makes `queryLatestVersion`'s LIMIT 1 deterministic across
-    // reads (migration 00064). Which one wins is arbitrary — no key can know
-    // which fold got further — but it is the SAME arbitrary winner every time,
-    // which is what the applied-event-id dedup needs.
-    WriterNonce: newWriterNonce(),
-
+    // NOTE: `row.hasSignal` is deliberately NOT serialised — there is no
+    // HasSignal column. Readers derive the verdict from the columns above via
+    // TRACE_ANALYTICS_HAS_SIGNAL_SQL, and `fromRecord` re-derives it on the
+    // way back, so the flag round-trips without a schema change.
     _retention_days: retentionDays,
   };
-}
-
-/** 16 hex chars of randomness — collision-free in practice for a tiebreak key. */
-function newWriterNonce(): string {
-  return Array.from({ length: 16 }, () =>
-    Math.floor(Math.random() * 16).toString(16),
-  ).join("");
 }
 
 export class TraceAnalyticsClickHouseRepository
@@ -402,14 +388,19 @@ export class TraceAnalyticsClickHouseRepository
    * The four progress keys are BEST-EFFORT, not total: two concurrent versions
    * can be equal on every one — same latest event, same span count, same
    * saturated watermark length, and (precisely because the anchor is now
-   * frozen) the same OccurredAt. `WriterNonce DESC` (migration 00064) closes
-   * what that used to leave open: a bare `LIMIT 1` picked ARBITRARILY, so two
-   * reads could crown different winners and the fold would resume from one
-   * version while the applied-id watermark it trusted came from the other. The
-   * nonce cannot know which fold got further — no persisted key can — but it
-   * makes the pick DETERMINISTIC: the same winner every read, which is what
-   * the dedup machinery actually needs. Rows written before the nonce existed
-   * carry '' and rank below any nonce-carrying version.
+   * frozen) the same OccurredAt. `toString(AppliedEventIds) DESC` closes what
+   * that used to leave open: a bare `LIMIT 1` picked ARBITRARILY, so two reads
+   * could crown different winners and the fold would resume from one version
+   * while the applied-id watermark it trusted came from the other. The
+   * watermark CONTENTS discriminate where its length cannot — two writers
+   * racing the same committed version folded different batches, so their
+   * merged id sets differ even at equal size — and any versions still equal on
+   * all five keys carry the same watermark and the same progress, making the
+   * pick between them immaterial. No key can know which fold got further; what
+   * the dedup machinery needs is the SAME winner every read, and a total order
+   * over existing columns provides it without a schema change. Cost: the
+   * serialisation runs only over the handful of candidate rows that survived
+   * the IN-tuple.
    */
   private async queryLatestVersion({
     tenantId,
@@ -446,7 +437,7 @@ export class TraceAnalyticsClickHouseRepository
           SpanCount DESC,
           length(AppliedEventIds) DESC,
           OccurredAt ASC,
-          WriterNonce DESC
+          toString(AppliedEventIds) DESC
         LIMIT 1
       `,
       query_params: {
@@ -523,12 +514,19 @@ function fromRecord(record: Record<string, unknown>): TraceAnalyticsRow {
 
     attributes: asStringMap(record.Attributes),
 
-    // Absent on a pre-00064 record → true: every row an old build wrote had,
-    // by construction, passed the persistable-signal gate.
+    // Derived, not read — there is no HasSignal column. Mirrors
+    // TRACE_ANALYTICS_HAS_SIGNAL_SQL door for door, including the version
+    // door: a pre-00056 row decodes SpanCount/EarliestSpanStartMs as default
+    // 0, but everything written back then had passed the write-gate.
     hasSignal:
-      record.HasSignal === null || record.HasSignal === undefined
-        ? true
-        : Boolean(record.HasSignal),
+      asNumber(record.SpanCount) > 0 ||
+      asNumber(record.EarliestSpanStartMs) > 0 ||
+      !["", "0"].includes(
+        asStringMap(record.Attributes)[
+          "langwatch.reserved.log_record_count"
+        ] ?? "",
+      ) ||
+      String(record.Version ?? "") < TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT,
 
     spanCount: asNumber(record.SpanCount),
     annotationIds: asStringArray(record.AnnotationIds),

@@ -367,7 +367,7 @@ export class FoldProjectionExecutor {
     if (loaded === null) this.assertUndecodableIsRecoverable(projection, miss);
 
     // A trusted absent miss folds from init() WITHOUT replaying event_log:
-    // the store always writes a row (HasSignal, migration 00064), so no row
+    // the store always writes a row (see trustAbsentMiss's docstring), so no row
     // means nothing was ever committed and there is no history worth reading
     // — the measured steady state was 93% of these re-folds returning exactly
     // the delivered batch. `undecodable` deliberately does not take this

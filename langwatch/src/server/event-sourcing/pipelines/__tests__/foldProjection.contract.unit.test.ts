@@ -17,7 +17,7 @@ import { TraceAnalyticsStore } from "../trace-processing/projections/traceAnalyt
 import { TraceSummaryFoldProjection } from "../trace-processing/projections/traceSummary.foldProjection";
 
 /**
- * Structural contracts behind `trustAbsentMiss` (migration 00064) and the
+ * Structural contracts behind `trustAbsentMiss` (the always-write change) and the
  * applied-event-id watermark (ADR-066). Each assertion here is a claim some
  * OTHER file's correctness silently depends on; these tests exist so breaking
  * the pairing fails a build instead of double-counting production data.

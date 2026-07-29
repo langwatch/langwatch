@@ -215,10 +215,11 @@ export interface FoldProjectionOptions {
    * both parts must actually hold:**
    *
    * 1. **A committed state always has a row.** The store never declines a
-   *    write (no persistability gate — carry the verdict on the row, e.g.
-   *    `HasSignal`, instead of in its absence) and never writes a row its own
-   *    read cannot address. Only then does "no row" prove "nothing was ever
-   *    committed".
+   *    write (no persistability gate — carry the verdict on the row, via a
+   *    flag column or a filter derived from columns the row already has, e.g.
+   *    `TRACE_ANALYTICS_HAS_SIGNAL_SQL`, instead of in the row's absence) and
+   *    never writes a row its own read cannot address. Only then does "no
+   *    row" prove "nothing was ever committed".
    * 2. **The declared `readWindow` covers every live row.** The distance
    *    between an incoming event's business time and the row's partition
    *    anchor is bounded well inside `widthMs` — for the analytics folds this

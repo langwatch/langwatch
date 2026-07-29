@@ -34,7 +34,7 @@ const WIDTH_MS = 60_000;
 const OCCURRED_AT = 1_700_000_000_000;
 
 /**
- * `trustAbsentMiss` is the executor half of the migration-00064 contract: the
+ * `trustAbsentMiss` is the executor half of the always-write contract: the
  * store always writes a row, so an ABSENT read proves the aggregate is new and
  * neither the unwindowed fallback read nor the `event_log` re-fold can find
  * anything — measured pre-change at ~290/min fallback scans with 0 recoveries

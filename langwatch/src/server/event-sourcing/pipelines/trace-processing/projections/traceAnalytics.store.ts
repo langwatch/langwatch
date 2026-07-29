@@ -94,9 +94,10 @@ export class TraceAnalyticsStore
     appliedEventIds: string[];
   } | null {
     // ALWAYS writes — including dimension-only states, which used to be gated
-    // out here. The gate's verdict now rides on the row as `HasSignal`
-    // (stamped inside `projectAnalyticsStateToRow`, column added in migration
-    // 00064): analytics readers filter on it, so the product still never
+    // out here. The gate's verdict now rides on the in-memory row as
+    // `hasSignal` (stamped inside `projectAnalyticsStateToRow`) and readers
+    // derive it in SQL from columns the row already carries
+    // (TRACE_ANALYTICS_HAS_SIGNAL_SQL), so the product still never
     // counts a phantom trace, while the fold read-back always finds its row —
     // which is what lets the executor trust an absent read
     // (`trustAbsentMiss`) instead of paying an unwindowed fallback scan plus
