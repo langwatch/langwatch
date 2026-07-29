@@ -713,7 +713,10 @@ describe("EESubscriptionService", () => {
       it("fails with a retryable provider-unavailable error", async () => {
         organizationRepository.getStripeCustomerId.mockResolvedValue("cus_123");
         stripe.invoices.list.mockRejectedValue(
-          new Stripe.errors.StripeRateLimitError({ message: "slow down" }),
+          new Stripe.errors.StripeRateLimitError({
+            message: "slow down",
+            type: "rate_limit_error",
+          }),
         );
 
         await expect(

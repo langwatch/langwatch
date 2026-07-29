@@ -25,12 +25,12 @@ import {
   PlanTypes,
   SubscriptionStatus,
 } from "../planTypes";
-import { translateStripeError } from "../stripe/translateStripeError";
 import {
   isStripePriceName,
   stripePricesFile,
 } from "../stripe/stripePriceCatalog";
 import type { StripePriceName } from "../stripe/stripePrices.types";
+import { translateStripeError } from "../stripe/translateStripeError";
 import {
   type BillingInterval,
   isGrowthSeatEventPlan,

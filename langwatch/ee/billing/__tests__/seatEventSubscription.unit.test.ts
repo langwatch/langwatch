@@ -756,7 +756,10 @@ describe("seatEventSubscription", () => {
       beforeEach(() => {
         db.subscription.findMany.mockResolvedValue([]);
         stripe.customers.retrieve.mockRejectedValue(
-          new Stripe.errors.StripeRateLimitError({ message: "slow down" }),
+          new Stripe.errors.StripeRateLimitError({
+            message: "slow down",
+            type: "rate_limit_error",
+          }),
         );
         stripe.checkout.sessions.create.mockResolvedValue({
           url: "https://checkout.stripe.com/session",

@@ -1,11 +1,11 @@
 import { createLogger } from "@langwatch/observability";
 import { Currency } from "@prisma/client";
 import type Stripe from "stripe";
-import { translateStripeError } from "../stripe/translateStripeError";
 import {
   BillingCustomerDeletedError,
   UnsupportedBillingCurrencyError,
 } from "../errors";
+import { translateStripeError } from "../stripe/translateStripeError";
 
 const logger = createLogger("langwatch:billing:stripeCustomerCurrency");
 
