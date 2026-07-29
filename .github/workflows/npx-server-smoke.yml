@@ -129,6 +129,20 @@ jobs:
       - name: Build @langwatch/server CLI
         run: pnpm --filter @langwatch/server-cli build
 
+      # Runs here because this job's path filter is already the exact set of
+      # files these assert about (the root manifest, the workspace definition,
+      # the lockfile, packages/server/**, the packing script) — and because
+      # nothing else in CI runs the CLI's tests at all, which would leave them
+      # reading as coverage while never executing. Placed before the boot so a
+      # workspace regression fails in seconds rather than 25 minutes.
+      # Scoped to this file rather than the CLI's whole suite: that suite has
+      # two failures that predate this branch (cli-doctor, identical on main),
+      # and surfacing those here would be a different change.
+      - name: Check the workspace invariants (ADR-076)
+        run: >
+          pnpm --filter @langwatch/server-cli exec
+          vitest run test/workspace-invariants.test.ts
+
       # Same prebuild as npx-server-publish.yml: every published artifact
       # ships langwatch/dist + mcp-server/dist (the publish sanity check
       # asserts both), so the artifact THIS job boots must carry them too —
