@@ -88,6 +88,19 @@ export class SuiteRunService {
       idempotencyKey,
     } = params;
 
+    // An explicit batch id and an idempotency key cannot both be honoured. The
+    // key derives the batch FROM the active set precisely so a batch and its
+    // denominator cannot disagree; a caller-pinned id would name a batch the
+    // server never derived, and reusing that id against a changed set is the
+    // mixed-denominator defect the derivation exists to close. Callers pin an
+    // id only on the non-idempotent path.
+    if (params.batchRunId && idempotencyKey) {
+      throw new Error(
+        "SuiteRunService.startRun: batchRunId and idempotencyKey are mutually exclusive — " +
+          "an idempotent submit derives its batch from the active set",
+      );
+    }
+
     const batchRunId =
       params.batchRunId ??
       (idempotencyKey
