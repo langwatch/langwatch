@@ -233,8 +233,7 @@ export async function cleanupTestRows(
   entries: readonly CleanupEntry[],
 ): Promise<void> {
   const problems: string[] = [];
-  const runnable: Array<{ model: string; where: Record<string, unknown> }> =
-    [];
+  const runnable: Array<{ model: string; where: Record<string, unknown> }> = [];
 
   entries.forEach(([model, where], index) => {
     const label = `${String(model)}[${index}]`;

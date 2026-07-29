@@ -4,8 +4,9 @@
  *
  * Spec: specs/setup/test-teardown-safety.feature
  */
-import { describe, expect, it, vi } from "vitest";
+
 import type { PrismaClient } from "@prisma/client";
+import { describe, expect, it, vi } from "vitest";
 import { cleanupTestRows } from "../cleanupTestRows";
 
 function recordingPrisma() {
@@ -178,7 +179,9 @@ describe("cleanupTestRows refusal rules", () => {
 
       await expect(
         cleanupTestRows(prisma, [["organization", { id: "org_a" }]]),
-      ).rejects.toThrow(/organization is not a Prisma delegate with deleteMany/);
+      ).rejects.toThrow(
+        /organization is not a Prisma delegate with deleteMany/,
+      );
     });
   });
 });

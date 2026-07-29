@@ -36,6 +36,7 @@ import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import { PlanProviderService } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
+import { cleanupTestRows, requireAssigned } from "~/test-utils/cleanupTestRows";
 
 const ns = `src-err-${nanoid(8)}`;
 const enterprisePlan: PlanInfo = { ...FREE_PLAN, type: "ENTERPRISE" };
@@ -90,29 +91,35 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await prisma.ingestionSource
-    .deleteMany({ where: { organizationId } })
-    .catch(() => {});
-  await prisma.roleBinding
-    .deleteMany({ where: { organizationId } })
-    .catch(() => {});
-  await prisma.teamUser
-    .deleteMany({
-      where: { team: { slug: { startsWith: `--src-err-team-` } } },
+  // The governance slice provisions its own internal project, so the team
+  // cannot be deleted until that project goes first. ProjectSecret's tenancy
+  // guard demands literal project ids, so they are collected first, anchored
+  // so a broken setup cannot widen the findMany into every project in the
+  // database.
+  const projectIds = (
+    await prisma.project.findMany({
+      where: {
+        team: {
+          organizationId: requireAssigned({
+            value: organizationId,
+            name: "organizationId",
+          }),
+        },
+      },
+      select: { id: true },
     })
-    .catch(() => {});
-  await prisma.organizationUser
-    .deleteMany({ where: { organizationId } })
-    .catch(() => {});
-  await prisma.team
-    .deleteMany({ where: { slug: { startsWith: `--src-err-team-` } } })
-    .catch(() => {});
-  await prisma.organization
-    .deleteMany({ where: { slug: `--src-err-${ns}` } })
-    .catch(() => {});
-  await prisma.user
-    .deleteMany({ where: { email: `src-err-admin-${ns}@example.com` } })
-    .catch(() => {});
+  ).map((project) => project.id);
+  await cleanupTestRows(prisma, [
+    ["ingestionSource", { organizationId }],
+    ["roleBinding", { organizationId }],
+    ["teamUser", { team: { organizationId } }],
+    ["organizationUser", { organizationId }],
+    ["projectSecret", { projectId: { in: projectIds } }],
+    ["project", { team: { organizationId } }],
+    ["team", { organizationId }],
+    ["organization", { slug: `--src-err-${ns}` }],
+    ["user", { email: `src-err-admin-${ns}@example.com` }],
+  ]);
 });
 
 function callerFor(userId: string) {

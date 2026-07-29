@@ -9,7 +9,7 @@
  *
  * Spec: specs/setup/test-teardown-safety.feature
  */
-import { readFileSync, readdirSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { scanTestSourceForUnsafeDeleteMany } from "../teardownScan";

@@ -33,6 +33,10 @@ import {
 } from "vitest";
 import { FREE_PLAN } from "../../../../ee/licensing/constants";
 import type { PlanInfo } from "../../../../ee/licensing/planInfo";
+import {
+  cleanupTestRows,
+  requireAssigned,
+} from "../../../test-utils/cleanupTestRows";
 import { appRouter } from "../../api/root";
 import { createInnerTRPCContext } from "../../api/trpc";
 import { globalForApp, resetApp } from "../../app-layer/app";
@@ -42,10 +46,6 @@ import {
   PlanProviderService,
 } from "../../app-layer/subscription/plan-provider";
 import { prisma } from "../../db";
-import {
-  cleanupTestRows,
-  requireAssigned,
-} from "../../../test-utils/cleanupTestRows";
 import { LicenseEnforcementRepository } from "../license-enforcement.repository";
 import { LicenseEnforcementService } from "../license-enforcement.service";
 import {
