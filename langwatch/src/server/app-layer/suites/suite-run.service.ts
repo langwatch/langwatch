@@ -91,7 +91,16 @@ export class SuiteRunService {
     const batchRunId =
       params.batchRunId ??
       (idempotencyKey
-        ? deriveBatchRunId({ projectId, suiteId, idempotencyKey })
+        ? deriveBatchRunId({
+            projectId,
+            suiteId,
+            idempotencyKey,
+            // The active set is part of the batch's identity: it decides the
+            // denominator every child stamps. See `deriveBatchRunId`.
+            scenarioIds: activeScenarioIds,
+            targetReferenceIds: activeTargets.map((t) => t.referenceId),
+            repeatCount,
+          })
         : generateBatchRunId());
     const setId = getSuiteSetId(suiteId);
     const total = activeScenarioIds.length * activeTargets.length * repeatCount;
@@ -124,7 +133,7 @@ export class SuiteRunService {
             scenarioRunId: idempotencyKey
               ? deriveScenarioRunId({
                   projectId,
-                  idempotencyKey,
+                  batchRunId,
                   scenarioId,
                   targetReferenceId: target.referenceId,
                   repeat,

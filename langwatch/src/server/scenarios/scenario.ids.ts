@@ -57,35 +57,59 @@ function deriveId(resource: string, parts: readonly string[]): string {
   return `${resource}_${suffix}`;
 }
 
-/** The batch a given (project, suite, idempotency key) submit always produces. */
+/**
+ * The batch a given submit always produces.
+ *
+ * Keyed by the active set as well as the idempotency key, because the batch
+ * carries its own denominator: every child stamps `BatchTotal` (ADR-072), so a
+ * batch is only meaningful if every member agrees what the total is.
+ *
+ * Without the set in the key, a retry of the same key against a changed set —
+ * a scenario archived between attempts, say — reuses the batch id while
+ * recomputing the total. Members common to both attempts collapse onto their
+ * first write and keep the OLD total; members new to the second carry the NEW
+ * one. One batch id, two denominators, and progress that never reads as
+ * complete. Changing the set makes it a different batch, which is what it is.
+ */
 export function deriveBatchRunId(params: {
   projectId: string;
   suiteId: string;
   idempotencyKey: string;
+  /** Scenario ids in the submit. Order-insensitive: sorted before hashing. */
+  scenarioIds: readonly string[];
+  /** Target reference ids in the submit. Order-insensitive. */
+  targetReferenceIds: readonly string[];
+  repeatCount: number;
 }): string {
   return deriveId(KSUID_RESOURCES.SCENARIO_BATCH, [
     params.projectId,
     params.suiteId,
     params.idempotencyKey,
+    [...params.scenarioIds].sort().join(","),
+    [...params.targetReferenceIds].sort().join(","),
+    String(params.repeatCount),
   ]);
 }
 
 /**
- * The run id a given item within that submit always produces. Keyed by
- * everything that distinguishes one queued run from its siblings, so a suite
- * whose scenarios or targets changed between retries still queues the runs
- * that are genuinely new.
+ * The run id a given item within that batch always produces.
+ *
+ * Keyed off `batchRunId` rather than the idempotency key directly, so a run id
+ * can never outlive the batch whose total it was queued under. Keying on the
+ * raw idempotency key would let the same run id appear in two batches with
+ * different denominators — the same defect the batch key above closes, moved
+ * one level down.
  */
 export function deriveScenarioRunId(params: {
   projectId: string;
-  idempotencyKey: string;
+  batchRunId: string;
   scenarioId: string;
   targetReferenceId: string;
   repeat: number;
 }): string {
   return deriveId(KSUID_RESOURCES.SCENARIO_RUN, [
     params.projectId,
-    params.idempotencyKey,
+    params.batchRunId,
     params.scenarioId,
     params.targetReferenceId,
     String(params.repeat),

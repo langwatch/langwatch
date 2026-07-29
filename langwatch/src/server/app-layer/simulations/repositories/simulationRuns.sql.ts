@@ -31,19 +31,3 @@ export function simulationRunDedupPredicate(whereFilters: string): string {
     GROUP BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
   )`;
 }
-
-/**
- * Statuses a run holds once it is over. Terminality is read from `FinishedAt`
- * rather than from this list wherever possible — the fold guarantees Status
- * stays terminal once FinishedAt is set — but the list is needed to tell a
- * failure from a success.
- */
-export const SIMULATION_FAILED_STATUSES = [
-  "FAILED",
-  "FAILURE",
-  "ERROR",
-  "STALLED",
-] as const;
-
-/** Statuses that mean the run never left the queue. */
-export const SIMULATION_QUEUED_STATUSES = ["QUEUED", "PENDING"] as const;
