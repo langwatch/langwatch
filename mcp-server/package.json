@@ -46,7 +46,7 @@
     "@eslint/js": "^10.0.1",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/redaction": "workspace:*",
-    "@langwatch/scenario": "^0.4.6",
+    "@langwatch/scenario": "^0.5.5",
     "@langwatch/ssrf": "workspace:*",
     "@opentelemetry/context-async-hooks": "^2.1.0",
     "@opentelemetry/sdk-node": "^0.219.0",
