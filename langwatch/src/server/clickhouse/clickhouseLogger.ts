@@ -35,7 +35,22 @@ export class ClickHouseLogger implements Logger {
     logger.warn({ module, ...args, error: err }, message);
   }
 
+  /**
+   * Deliberately warn, not error.
+   *
+   * The driver logs every failed request here ("Query: HTTP request error.")
+   * including ones it is about to retry successfully, and every one that our
+   * own call sites then catch, wrap with the query/table/tenant context and
+   * log again. That made a single ClickHouse hiccup produce at least two
+   * ERROR lines — together ~53k/day, roughly 90% of the platform's entire
+   * error volume, none of it individually actionable.
+   *
+   * The authoritative severity call belongs to the caller that knows whether
+   * the failure was retried, fell back, or actually broke something. This
+   * stays queryable at warn for the transport-level detail (which retry, which
+   * socket) that the wrapped error drops.
+   */
   error({ module, message, args, err }: ErrorLogParams): void {
-    logger.error({ module, ...args, error: err }, message);
+    logger.warn({ module, ...args, error: err }, message);
   }
 }

@@ -117,7 +117,10 @@ export class ProcessWakeWorker {
       }
     } catch (error) {
       const { errorType, errorMessage } = toSafeFailureDiagnostic(error);
-      this.logger.error(
+      // Warn for the same reason as ProcessOutboxWorker.runDrain: a single
+      // failed poll self-heals on the next tick, and a stuck scan surfaces as
+      // overdue wakes rather than as this line.
+      this.logger.warn(
         { errorType, errorMessage },
         "ProcessWakeWorker scan failed; the next poll will retry",
       );

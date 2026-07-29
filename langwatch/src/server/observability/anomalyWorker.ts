@@ -63,7 +63,10 @@ export function startAnomalyWorker(): AnomalyWorkerHandle | undefined {
         logger.info(result, "anomaly tick");
       }
     } catch (err) {
-      logger.error(
+      // 60s tick, so a single failure self-heals within the minute and warns
+      // rather than errors. A sustained outage warns on every tick, which is
+      // still visible — and noisier than one error line would have been.
+      logger.warn(
         { err: err instanceof Error ? err.message : String(err) },
         "anomaly detector tick failed (will retry on next interval)",
       );

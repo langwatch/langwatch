@@ -80,8 +80,14 @@ export const handleDatasetError = async (
     domain?.status ??
     (error instanceof HttpError ? error.status : (error.status ?? 500));
 
-  // Log the error with context (including status code)
-  logger.error(
+  // Log the error with context (including status code). A 4xx is the caller
+  // asking for something that is not there or sending something we reject —
+  // their bug to fix, not ours — so it warns rather than errors, matching the
+  // fault-axis rule the tRPC, Hono and SSE loggers already follow. Logging
+  // every 404 at error made "dataset not found" a permanent error-rate floor
+  // and buried genuine 5xx from the same route.
+  const level = status >= 500 ? "error" : "warn";
+  logger[level](
     {
       path,
       method,
@@ -90,7 +96,9 @@ export const handleDatasetError = async (
       error: {
         name: error.name,
         message: error.message,
-        stack: error.stack,
+        // A rejected request is not a defect, so the stack is noise; keep it
+        // for the 5xx case where someone has to find the cause.
+        ...(status >= 500 ? { stack: error.stack } : {}),
       },
     },
     `Dataset API Error [${status}]: ${error.message || String(error)}`,

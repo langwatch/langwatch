@@ -100,7 +100,11 @@ export class ProcessOutboxWorker {
         limit: this.batchSize,
       });
     } catch (error) {
-      this.logger.error(
+      // Warn, not error: one failed tick of a polling loop is not an incident
+      // — the next poll retries, as the message says. A persistent failure is
+      // still loud (every poll warns, and the outbox backlog alert fires on
+      // the actual symptom), so nothing is hidden by not erroring here.
+      this.logger.warn(
         { error: error instanceof Error ? error.message : String(error) },
         "ProcessOutboxWorker drain failed; the next poll will retry",
       );
