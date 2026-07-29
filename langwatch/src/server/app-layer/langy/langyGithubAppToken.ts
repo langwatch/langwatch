@@ -202,13 +202,27 @@ export class LangyGithubAppTokenService {
   // any other failure (network blip, GitHub 5xx) fails OPEN, same as every
   // other best-effort check in this file: a flaky liveness probe must not
   // block a cached token that is, as far as we know, still perfectly valid.
+  //
+  // Lock-guarded the same way the mint path guards its own stampede: a cache
+  // hit is the COMMON case (that's the point of caching), so without this,
+  // every concurrent turn for the same installation would fire its own
+  // GitHub liveness probe. A caller that loses the (non-blocking, try-once)
+  // lock race trusts the cache for this call — the prober holding the lock
+  // still throws (and the caller still self-heals the shared installation
+  // list) if the installation is genuinely gone, which is enough for every
+  // later call to see it removed.
   private async assertInstallationStillExists(
     installationId: string,
   ): Promise<void> {
+    const lockKey = `langy:gh:insttoken:${installationId}:liveness:lock`;
+    const lock = await this.tryLockOnce(lockKey);
+    if (!lock) return;
     try {
       await this.getInstallation(installationId);
     } catch (error) {
       if (error instanceof GithubInstallationNotFoundError) throw error;
+    } finally {
+      await this.releaseLock(lockKey, lock);
     }
   }
 
@@ -381,6 +395,22 @@ export class LangyGithubAppTokenService {
       await this.redis.set(key, value, "EX", ttlSec);
     } catch {
       /* best-effort cache */
+    }
+  }
+
+  // A single, non-blocking lock attempt — unlike acquireLock, never retries.
+  // acquireLock's retry-for-up-to-3s exists because the mint path MUST
+  // eventually mint (there's no valid "just skip it" outcome); the liveness
+  // probe has one, so a caller that loses the race should trust the cache
+  // immediately rather than spin waiting for a lock it doesn't need.
+  private async tryLockOnce(key: string): Promise<string | null> {
+    if (!this.redis) return null;
+    const token = randomBytes(16).toString("hex");
+    try {
+      const ok = await this.redis.set(key, token, "NX", "EX", LOCK_TTL_SEC);
+      return ok === "OK" ? token : null;
+    } catch {
+      return null;
     }
   }
 

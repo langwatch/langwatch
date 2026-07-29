@@ -254,6 +254,34 @@ describe("mintInstallationToken", () => {
       expect(result.token).toBe("ghs_cached");
     });
   });
+
+  describe("when many concurrent calls hit a cached token for the same installation", () => {
+    it("probes GitHub liveness only once, not once per caller", async () => {
+      const redis = fakeRedis();
+      const svc = new LangyGithubAppTokenService("app-1", privateKey, redis);
+      const scope = computeRepoScopeKey({});
+      redis.store.set(`langy:gh:insttoken:5:${scope}`, "ghs_cached");
+      const fetchMock = vi.fn<typeof fetch>(async () => {
+        return new Response(
+          JSON.stringify({ id: 5, account: { login: "acme", type: "User" } }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      const results = await Promise.all(
+        Array.from({ length: 5 }, () =>
+          svc.mintInstallationToken({ installationId: "5" }),
+        ),
+      );
+
+      expect(results.every((r) => r.token === "ghs_cached")).toBe(true);
+      const livenessCalls = fetchMock.mock.calls.filter((c) =>
+        String(c[0]).includes("/app/installations/5"),
+      );
+      expect(livenessCalls).toHaveLength(1);
+    });
+  });
 });
 
 describe("configured", () => {
