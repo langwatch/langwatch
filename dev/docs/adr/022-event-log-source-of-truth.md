@@ -227,13 +227,33 @@ rationale that a weekend incident needs catch-up time before orphans are reaped.
 Three days is the intended value and the only one now stated in code.
 
 Provisioning that rule is the **operator's** job and a prerequisite for turning
-the flag on, not a consequence of it. Nothing in the application creates,
-validates, or reports the rule. On S3 it is a lifecycle rule on the
+the flag on, not a consequence of it. On S3 it is a lifecycle rule on the
 `trace-blobs/spool/` prefix; on Azure Blob it is a lifecycle management policy
 with the same prefix filter. Since `release_trace_blob_offload` has never been
 enabled in a shipped deployment, no such rule exists anywhere yet — an operator
 turning the flag on creates it fresh, so there is no deployed rule for the 24h
 correction to contradict.
+
+**On Azure the spool fails closed until the operator says the rule exists.**
+Documenting the prerequisite is not enough on its own: an operator who enables
+the flag without creating the policy gets exactly the unbounded-orphan case the
+local-filesystem refusal above exists to prevent, and trace payloads then
+outlive the retention this ADR promises. `AZURE_BLOB_SPOOL_RETENTION_CONFIRMED`
+(chart: `app.dataplane.providers.azureBlob.spoolRetentionConfirmed`) defaults to
+false, and `mintSpoolUri` refuses an azure destination without it, so ingestion
+degrades to inline payloads rather than accumulating objects nothing reaps.
+
+It is an assertion, not a verification, and deliberately so. An Azure lifecycle
+policy is a management-plane resource
+(`Microsoft.Storage/storageAccounts/managementPolicies`); this deployment holds
+only a data-plane key, so reading the policy back would mean requiring ARM
+credentials, a subscription id and a resource-group name that the feature
+otherwise has no use for — a much larger blast radius than the problem. The
+affirmation lives in the same config that turns the spool on, and the default is
+the safe one. S3 is deliberately not gated the same way: its lifecycle
+requirement predates this change and is the long-standing ADR-022 rule, so
+extending the gate there would silently disable the spool for every existing
+install.
 
 **Superseded above:** "'No S3 equivalent' means no object storage at all";
 "deployments with no object storage should leave `release_trace_blob_offload`

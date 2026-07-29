@@ -69,6 +69,9 @@ function spoolStorageFor(
   return {
     objectStoreFor: () => store,
     resolveDestination: async () => destination,
+    // Existing suites assert the write path, so they run as a deployment that
+    // has provisioned retention. The refusal is covered on its own below.
+    azureRetentionConfirmed: true,
   };
 }
 
@@ -253,6 +256,88 @@ describe("putSpool — given an OTLP id containing a path separator", () => {
 
       await store.deleteSpool({ spoolRef, ...coords });
       expect(objectStore.objects.size).toBe(0);
+    });
+  });
+});
+
+describe("putSpool — given Azure storage whose orphan retention is unconfirmed", () => {
+  describe("when putSpool is called", () => {
+    it("refuses rather than writing an object no lifecycle rule will reap", async () => {
+      const objectStore = fakeObjectStore();
+      const store = new BlobStore({
+        resolveS3Client: forbiddenS3Resolver,
+        spoolStorage: {
+          objectStoreFor: () => objectStore,
+          resolveDestination: async () => AZURE_DESTINATION,
+          // The default for any deployment that has not said otherwise.
+          azureRetentionConfirmed: false,
+        },
+      });
+
+      // Azure can express the lifecycle rule, but the policy is a
+      // management-plane resource and this deployment holds a data-plane key,
+      // so the app cannot read it back to check. Fail closed instead: the
+      // payload rides inline, which is bounded, rather than landing in a
+      // container where nothing reaps it.
+      await expect(
+        store.putSpool({
+          ...spoolCoords,
+          body: Buffer.from("payload", "utf-8"),
+        }),
+      ).rejects.toBeInstanceOf(SpoolDestinationUnsupportedError);
+      expect(objectStore.put).not.toHaveBeenCalled();
+    });
+
+    it("names the policy to create and the setting to flip", async () => {
+      const store = new BlobStore({
+        resolveS3Client: forbiddenS3Resolver,
+        spoolStorage: {
+          objectStoreFor: () => fakeObjectStore(),
+          resolveDestination: async () => AZURE_DESTINATION,
+          azureRetentionConfirmed: false,
+        },
+      });
+
+      // An operator hitting this needs to know what to do, not just that it
+      // refused.
+      await expect(
+        store.putSpool({
+          ...spoolCoords,
+          body: Buffer.from("payload", "utf-8"),
+        }),
+      ).rejects.toThrow(/trace-blobs\/spool\/.*3 days/s);
+      await expect(
+        store.putSpool({
+          ...spoolCoords,
+          body: Buffer.from("payload", "utf-8"),
+        }),
+      ).rejects.toThrow(/AZURE_BLOB_SPOOL_RETENTION_CONFIRMED/);
+    });
+  });
+});
+
+describe("putSpool — given S3 storage with retention unconfirmed", () => {
+  describe("when putSpool is called", () => {
+    it("still writes, because the flag scopes to Azure only", async () => {
+      const objectStore = fakeObjectStore();
+      const store = new BlobStore({
+        resolveS3Client: forbiddenS3Resolver,
+        spoolStorage: {
+          objectStoreFor: () => objectStore,
+          resolveDestination: async () => S3_DESTINATION,
+          azureRetentionConfirmed: false,
+        },
+      });
+
+      // S3 deployments predate this gate and their lifecycle rule is the
+      // long-standing ADR-022 requirement; widening the gate to them would be a
+      // silent regression for every existing install.
+      await store.putSpool({
+        ...spoolCoords,
+        body: Buffer.from("payload", "utf-8"),
+      });
+
+      expect(objectStore.put).toHaveBeenCalledTimes(1);
     });
   });
 });
