@@ -15,6 +15,7 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "../../event-sourcing/__tests__/integration/testContainers";
+import { SpanStorageClickHouseRepository } from "~/server/app-layer/traces/repositories/span-storage.clickhouse.repository";
 import { ClickHouseTraceService } from "../clickhouse-trace.service";
 import type { GetAllTracesForProjectInput } from "../types";
 import { openProtections } from "./open-protections";
@@ -767,6 +768,7 @@ describe("ClickHouse trace dedup (integration)", () => {
         );
       });
 
+      /** @scenario a span reported twice appears once */
       it("returns the span once", async () => {
         const traces = await service.getTracesWithSpans(
           tenantId,
@@ -787,6 +789,93 @@ describe("ClickHouse trace dedup (integration)", () => {
 
         const span = traces![0]!.spans[0]!;
         expect(span.name).toBe("rereport-latest");
+      });
+
+      // The trace-detail page and the trace-scoped span listing are separate
+      // queries over the same table, and they elected versions differently
+      // until ADR-078: one on `max(StartTime)`, one on `max(UpdatedAt)`. Two
+      // readers disagreeing about which report is current is the same defect
+      // as showing the wrong one, so they are asserted against each other
+      // rather than each against a literal.
+      /** @scenario readers agree with each other about which report is current */
+      it("agrees with the trace-scoped span listing about which report is current", async () => {
+        const traces = await service.getTracesWithSpans(
+          tenantId,
+          [traceId],
+          openProtections,
+        );
+        const listed = await new SpanStorageClickHouseRepository(
+          async () => ch,
+        ).getSpansByTraceId({ tenantId, traceId });
+
+        const fromTraceDetail = traces![0]!.spans.map((s) => s.name);
+        expect(listed.map((s) => s.name)).toEqual(fromTraceDetail);
+        expect(fromTraceDetail).toEqual(["rereport-latest"]);
+      });
+    });
+
+    /**
+     * The rarer re-report, and the one that makes `max(StartTime)` actively
+     * wrong rather than merely useless: a correction that moves the span's
+     * start time EARLIER. Electing the greatest start time picks the version
+     * being corrected — it prefers the stale row on purpose. Only the write
+     * time orders reports. See ADR-078.
+     */
+    describe("when a span is re-reported with an earlier start time", () => {
+      const traceId = `trace-restart-${nanoid()}`;
+      const spanId = `span-restart-${nanoid()}`;
+
+      beforeAll(async () => {
+        await insertTraceSummary(
+          ch,
+          makeTraceSummaryRow({
+            TraceId: traceId,
+            OccurredAt: new Date(now - 15000),
+            CreatedAt: new Date(now - 15000),
+            UpdatedAt: new Date(now),
+            SpanCount: 1,
+            TotalDurationMs: 120,
+          }),
+        );
+
+        // First report: the later start time, written first.
+        await insertSpan(
+          ch,
+          makeSpanRow({
+            TraceId: traceId,
+            SpanId: spanId,
+            SpanName: "restart-stale",
+            StartTime: new Date(now - 12000),
+            EndTime: new Date(now - 11880),
+            DurationMs: 120,
+            UpdatedAt: new Date(now - 5000),
+          }),
+        );
+        // Correction: an EARLIER start time, written last.
+        await insertSpan(
+          ch,
+          makeSpanRow({
+            TraceId: traceId,
+            SpanId: spanId,
+            SpanName: "restart-corrected",
+            StartTime: new Date(now - 15000),
+            EndTime: new Date(now - 14880),
+            DurationMs: 120,
+            UpdatedAt: new Date(now),
+          }),
+        );
+      });
+
+      /** @scenario a correction that moves the span's start time is still the current report */
+      it("returns the later report, not the one with the greater start time", async () => {
+        const traces = await service.getTracesWithSpans(
+          tenantId,
+          [traceId],
+          openProtections,
+        );
+
+        expect(traces![0]!.spans).toHaveLength(1);
+        expect(traces![0]!.spans[0]!.name).toBe("restart-corrected");
       });
     });
   });
