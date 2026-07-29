@@ -19,9 +19,9 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 // src/__tests__/ -> ../../ = langwatch/ -> ../../../ = repo root
-const LANGWATCH_DIR = path.join(__dirname, "../..");
-const REPO_ROOT = path.join(LANGWATCH_DIR, "..");
-const DOCKERFILE_PATH = path.join(REPO_ROOT, "Dockerfile");
+const APP_DIR = path.join(__dirname, "../..");
+const REPO_ROOT = path.join(APP_DIR, "../..");
+const DOCKERFILE_PATH = path.join(REPO_ROOT, "infra/docker/Dockerfile");
 const ROOT_PACKAGES_DIR = path.join(REPO_ROOT, "packages");
 
 interface PackageJson {
@@ -30,7 +30,7 @@ interface PackageJson {
 }
 
 const appPkg: PackageJson = JSON.parse(
-  readFileSync(path.join(LANGWATCH_DIR, "package.json"), "utf-8"),
+  readFileSync(path.join(APP_DIR, "package.json"), "utf-8"),
 );
 
 /**

@@ -53,7 +53,7 @@ const REPO_ROOT = resolve(__dirname, "../../..");
  */
 const SPECS_ROOTS = [
   resolve(REPO_ROOT, "specs"),
-  resolve(REPO_ROOT, "typescript-sdk/specs"),
+  resolve(REPO_ROOT, "sdks/typescript/specs"),
 ] as const;
 
 /**
@@ -123,7 +123,7 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
 const DEFAULT_PYTHON_TEST_ROOTS: string[] = [
   "services/langevals",
   "langwatch_server",
-  "python-sdk",
+  "sdks/python",
 ];
 
 /**
