@@ -79,25 +79,34 @@ COPY --from=builder /usr/local/bin/goose /usr/local/bin/goose
 WORKDIR /app
 
 # Copy built artifacts from builder.
+#
+# /app/node_modules FIRST, and it is not optional. Since ADR-076 the install
+# root is /app, not /app/langwatch, so pnpm's virtual store lives at
+# /app/node_modules/.pnpm and every entry in langwatch/node_modules is a
+# symlink into it:
+#
+#   langwatch/node_modules/react -> ../../node_modules/.pnpm/react@…/node_modules/react
+#
+# Copying langwatch/ without it leaves every one of those links dangling. The
+# image builds clean and dies at boot on the first import — there is no build
+# error to catch it, which is exactly why it is spelled out here.
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/langwatch ./langwatch
 # mcp-server must be copied alongside langwatch because pnpm workspace
 # symlinks langwatch/node_modules/@langwatch/mcp-server -> ../../../mcp-server.
 # langy and handled-error are other root workspace packages linked the same
 # way. Both are loaded by migration tasks as well as the running server —
 # handled-error is imported for side effects by the server and worker entry
 # points, so omitting it fails the boot outright.
-COPY --from=builder /app/langwatch ./langwatch
 COPY --from=builder /app/mcp-server ./mcp-server
-COPY --from=builder /app/packages/langy/package.json ./packages/langy/package.json
-COPY --from=builder /app/packages/langy/src ./packages/langy/src
-COPY --from=builder /app/packages/handled-error/package.json ./packages/handled-error/package.json
-COPY --from=builder /app/packages/handled-error/src ./packages/handled-error/src
-# langy and handled-error deliberately declare zod / @opentelemetry/api as
-# peers. Because the workspace packages live outside /app/langwatch, expose the
-# app's production copies at the nearest shared node_modules boundary after dev
-# dependencies have been pruned.
-RUN mkdir -p ./node_modules/@opentelemetry \
-  && ln -s ../langwatch/node_modules/zod ./node_modules/zod \
-  && ln -s ../../langwatch/node_modules/@opentelemetry/api ./node_modules/@opentelemetry/api
+# Whole directories, including each package's own node_modules. langy and
+# handled-error declare zod / @opentelemetry/api as PEERS, and pnpm satisfies
+# those by linking them into the member's own node_modules, pointing at the
+# shared store above. That replaces the hand-built symlinks this stage used to
+# create at /app/node_modules — which would now collide with the real store,
+# and are unnecessary because pnpm already did the job correctly.
+COPY --from=builder /app/packages/langy ./packages/langy
+COPY --from=builder /app/packages/handled-error ./packages/handled-error
 COPY --from=builder /app/langevals/ts-integration/evaluators.generated.ts ./langevals/ts-integration/evaluators.generated.ts
 COPY --from=builder /app/feature-map.json ./feature-map.json
 
