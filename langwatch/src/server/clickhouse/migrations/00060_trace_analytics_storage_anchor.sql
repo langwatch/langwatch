@@ -38,9 +38,17 @@
 -- the old value moved backwards on every late span, which is what orphaned row
 -- versions and dragged the TTL deadline towards the row — but it does mean such
 -- a trace can land in a different week partition than it would have before.
--- Existing rows are NOT re-anchored: the pre-split projection stamp is decoded
--- rather than refolded, precisely so the population is not rewritten (see
--- TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT).
+-- Existing rows are NOT re-anchored by the stamp change: the pre-split
+-- projection stamp is decoded rather than refolded, precisely so the population
+-- is not rewritten (see TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT).
+--
+-- One existing row DOES move, deliberately. The anchor is validated on every
+-- write, not only when it is first frozen, so a row whose committed OccurredAt
+-- is more than a day ahead of fold time — reachable today, because ingest bounds
+-- only the PAST edge — fails the new bound on its next write and is rewritten at
+-- fold time. That is a partition move on an existing row, and it is the point:
+-- such a row was filed in a future partition with a TTL deadline to match, and
+-- would have outlived its tenant's retention. It converges after that one write.
 --
 -- Only log-only traces move unconditionally: out of 1970 and into real time.
 --
@@ -49,10 +57,12 @@
 -- (ADR-066). Without the column the baseline reads back as 0 — "no span yet" —
 -- on a POST-SPLIT trace that has spans, and the next span measures the whole trace's
 -- duration from itself, taking TokensPerSecond (completion tokens over that
--- duration) with it. The projection version was bumped to 2026-07-29 in the same
--- change, so a row written before this migration is reported as a store MISS and
--- refolded once rather than decoded with a defaulted baseline; the rewrite
--- carries the current stamp and every later read hits.
+-- duration) with it. The projection stamp moved to 2026-07-29 in the same
+-- change, and its PREDECESSOR is decoded rather than refused: on a pre-split row
+-- OccurredAt is min(span start), which is both a valid anchor and the baseline
+-- this column was split out to carry, so the row heals in place. No pre-split
+-- row is refolded on account of this migration (see
+-- TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT).
 --
 -- Epoch ms as UInt64, not DateTime64: the fold compares this numerically
 -- (min against each span's start, subtraction for the duration), and a

@@ -147,6 +147,14 @@ export class TraceAnalyticsStore
    * moving. See {@link TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT} for why the
    * pair is unambiguous before the split and ambiguous after it.
    *
+   * That "no refold" holds in the FORWARD direction, which is where the
+   * population is. In the reverse it does not: during a rolling deploy a pod on
+   * the previous build refuses the new stamp — its gate is a bare equality — and
+   * refolds each row a new pod wrote, rewriting it at the old stamp. That is the
+   * ordinary cost of any stamp bump, bounded by the deploy window rather than by
+   * the size of the table, and it is precisely why the decode exists on the
+   * forward path instead.
+   *
    * `context.readWindow` — computed by the executor from the fold's declared
    * `options.readWindow` — prunes the read to a window of partitions around the
    * event being folded; it is passed through verbatim. On an ABSENT windowed

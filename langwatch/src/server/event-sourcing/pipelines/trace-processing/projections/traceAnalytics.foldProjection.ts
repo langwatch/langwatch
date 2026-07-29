@@ -125,9 +125,10 @@ import {
  * typed read-back columns (migration 00056) close the round-trip gap the
  * trimmed row otherwise left, so the delivery path does not re-fold from the
  * event log. Redis fronts the read; a miss is one windowed ClickHouse row.
- * Read-back applies only to rows stamped with the current projection version —
- * a row written before those columns existed is reported as a miss and refolded
- * once, then rewritten at the current version (see `options` below).
+ * Read-back applies to rows stamped with the current projection version and to
+ * the one pre-split stamp the decoder can read unambiguously; anything older is
+ * reported as a miss and refolded once, then rewritten at the current version
+ * (see `options` below and {@link TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT}).
  */
 
 const traceAnalyticsEvents = [
@@ -175,8 +176,10 @@ export const TRACE_ANALYTICS_PROJECTION_VERSION_LATEST = "2026-07-29" as const;
  * `event_log` on its next delivery, and a rebuild RE-DERIVES the anchor from
  * replayed history — so a change whose entire premise is "a storage anchor is
  * written once" would open by re-anchoring every trace it touches. For a trace
- * whose spans arrived out of order the rebuilt anchor is strictly later than the
- * `min(span start)` the column held, so the row changes sort key, orphans its
+ * whose spans arrived out of order the rebuilt anchor differs from the
+ * `min(span start)` the column held — in either direction, since the first event
+ * a replay reaches may be a log or a topic assignment whose time precedes the
+ * first span — so the row changes sort key, orphans its
  * previous version until TTL, and can cross a `toYearWeek` boundary — ADR-071
  * consequences 1-3, reintroduced at population scale by the fix for them.
  *
@@ -440,9 +443,12 @@ export interface TraceAnalyticsData {
  * How far ahead of fold time a producer-supplied business time may still be
  * taken as the storage anchor.
  *
- * The anchor is producer-controlled — a span's `startTimeUnixMs`, a log's
- * `timeUnixMs`, an event envelope's `occurredAt` — and the collector accepts any
- * 13-digit epoch-ms value, bounding only the PAST edge (`SPAN_MAX_PAST_MS`).
+ * The anchor is producer-controlled where it matters: a span's own
+ * `startTimeUnixMs`, which the collector accepts as any 13-digit epoch-ms value,
+ * bounding only the PAST edge (`SPAN_MAX_PAST_MS`). (The other two candidates
+ * are not producer times — a log's envelope carries `record.acceptedAt` and a
+ * span's carries ingest `Date.now()` — so the span start is the one that needs
+ * a bound, and it is the one a span-led trace anchors on.)
  * Unbounded on the future edge, one span claiming to start in 2286 would fix
  * that row's partition and its `TTL toDateTime(OccurredAt) + retention` deadline
  * in 2286: a row that outlives its tenant's retention policy indefinitely, that
@@ -486,7 +492,11 @@ function firstUsableAnchor(candidates: readonly number[], now: number): number {
   for (const candidate of candidates) {
     if (isUsableAnchorMs(candidate, now)) return candidate;
   }
-  return now;
+  // The terminal step is checked too, so the invariant is structural rather
+  // than a convention every caller has to keep. No production caller injects
+  // `now`, but one that injected 0 would otherwise land the row in 196952 —
+  // the single outcome this whole change exists to prevent.
+  return isUsableAnchorMs(now, now) ? now : Date.now();
 }
 
 /**
@@ -535,8 +545,8 @@ export function anchorStorageTime({
 
 /**
  * Project the in-memory slim state into the slim `TraceAnalyticsRow`. Pure: no
- * I/O, and no external state beyond the injectable `now` below — which only the
- * anchor's last-resort fallback reads, and which a caller may pin.
+ * I/O, and no external state beyond the injectable `now` below, which a caller
+ * may pin.
  *
  * Used by the projection's store adapter to derive the persisted record.
  */
@@ -550,9 +560,13 @@ export function projectAnalyticsStateToRow({
   tenantId: string;
   version: string;
   /**
-   * Fold time, injected so the function stays deterministic under test. Read
-   * ONLY by the anchor's last-resort fallback below, which is reached solely by
-   * a state that carries no usable business time at all.
+   * Fold time, injected so the function stays deterministic under test.
+   *
+   * Read by the anchor's VALIDATION as well as its last-resort fallback: every
+   * candidate is bounded against it, so a state whose committed anchor is
+   * implausibly far ahead of `now` is re-anchored on write rather than carried
+   * through. That is the one case where an already-committed row changes
+   * partition, and it is deliberate — see {@link MAX_ANCHOR_FUTURE_SKEW_MS}.
    */
   now?: number;
 }): TraceAnalyticsRow {
@@ -591,7 +605,10 @@ export function projectAnalyticsStateToRow({
     // first write. What the ADR argues for instead (the event log's accept time
     // threaded into the row) is sequencing item 6 and needs the human sign-off
     // recorded there; it is not this change's to take.
-    occurredAtMs: firstUsableAnchor([state.storageAnchorMs, state.createdAt], now),
+    occurredAtMs: firstUsableAnchor(
+      [state.storageAnchorMs, state.createdAt],
+      now,
+    ),
     earliestSpanStartMs: state.occurredAt,
     createdAtMs: state.createdAt,
     updatedAtMs: state.updatedAt,
@@ -730,8 +747,10 @@ export function traceAnalyticsStateFromRow(
     containsErrorStatus: row.hasError,
 
     // The id set behind the row's HasAnnotation boolean; a later add/remove
-    // re-derives the boolean from it. Only rows at the current projection
-    // version reach here, so the set is the real one, never a column default.
+    // re-derives the boolean from it. Only rows at a DECODABLE stamp reach here,
+    // and every decodable stamp postdates migration 00056, so the set is the
+    // real one, never a column default. Adding a stamp to
+    // DECODABLE_PROJECTION_VERSIONS that predates 00056 would break that.
     annotationIds: row.annotationIds,
     attributes,
 
@@ -1173,7 +1192,10 @@ export class TraceAnalyticsFoldProjection
    * Precision about "order-insensitive", because the executor keys on this flag
    * to choose the STREAMING refold (`streamRefoldUpToDelivered`, whose pages
    * arrive in log-append rather than `occurredAt` order): every DERIVED field
-   * here commutes — sums, counters, min/max, LWW-by-occurredAt. `storageAnchorMs`
+   * here commutes IN VALUE — sums, counters, min/max, LWW-by-occurredAt.
+   * (`Models` commutes as a set; `mergeModelsMostRecentFirst` makes its
+   * most-recent-first ORDER arrival-dependent, which no consumer reads.)
+   * `storageAnchorMs`
    * does not: it is first-observed by construction. That is deliberate and it is
    * safe here, because the anchor is a STORAGE address rather than a derived
    * value — a rebuild that reaches a different first event still produces a valid
