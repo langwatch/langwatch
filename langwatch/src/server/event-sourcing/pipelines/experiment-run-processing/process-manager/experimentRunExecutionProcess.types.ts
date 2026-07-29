@@ -46,13 +46,18 @@ export const EXPERIMENT_RUN_EXECUTION_MAX_ATTEMPTS = 3;
 export const EXPERIMENT_RUN_EXECUTION_LEASE_DURATION_MS = 60_000;
 
 /**
- * What a fired deadline records as the cause. The run's stored terminal state
- * cannot yet carry a reason of its own (the `completed` event models only
- * `finishedAt`/`stoppedAt`), so this reaches a user through the cached
- * run-state record and the logs.
+ * What a fired deadline records as the cause.
+ *
+ * A CODE, not a sentence: `runStateManager.failRun` stores this on the cached
+ * run-state record and the run API serves it to the customer, and the platform-wide
+ * handled-error migration (#6010) makes everything on that path a stable code
+ * the frontend maps to copy. A prose message here would render raw.
+ *
+ * The run's stored terminal state still cannot carry a cause of its own (the
+ * `completed` event models only `finishedAt`/`stoppedAt`), so the cached record
+ * and the logs remain how a stall reaches a user.
  */
-export const EXPERIMENT_RUN_STALLED_REASON =
-  "Experiment run stalled — no target or evaluator result was recorded within the allowed window, and the process executing it is no longer alive";
+export const EXPERIMENT_RUN_STALLED_CODE = "lw.experiment_run_stalled";
 
 export interface ExperimentRunExecutionState {
   /** Empty until the first event carrying identities is folded. */
@@ -92,7 +97,7 @@ export const experimentRunExecutionFailRunIntentSchema = z.object({
   /** The instant the deadline fired; recorded as the run's terminal time. */
   stalledAt: z.number(),
   /** Human-readable cause, for the cached run record and the logs. */
-  reason: z.string(),
+  code: z.string(),
 });
 
 export type ExperimentRunExecutionFailRunIntent = z.infer<

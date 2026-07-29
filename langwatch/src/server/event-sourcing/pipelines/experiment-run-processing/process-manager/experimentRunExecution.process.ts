@@ -10,7 +10,7 @@ import type { ExperimentRunProcessingEvent } from "../schemas/events";
 import { parseExperimentRunKey } from "../utils/compositeKey";
 import {
   EXPERIMENT_RUN_PROGRESS_DEADLINE_MS,
-  EXPERIMENT_RUN_STALLED_REASON,
+  EXPERIMENT_RUN_STALLED_CODE,
   experimentRunExecutionEventViewSchema,
   INITIAL_EXPERIMENT_RUN_EXECUTION_STATE,
   type ExperimentRunExecutionState,
@@ -184,7 +184,7 @@ export const experimentRunExecutionWake: WakeHandler<
         runId,
         experimentId,
         stalledAt: ctx.now,
-        reason: EXPERIMENT_RUN_STALLED_REASON,
+        code: EXPERIMENT_RUN_STALLED_CODE,
       }),
     ],
   };

@@ -7,7 +7,7 @@ import {
   type ExperimentRunExecutionDispatchDeps,
 } from "../experimentRunExecutionIntentHandlers";
 import {
-  EXPERIMENT_RUN_STALLED_REASON,
+  EXPERIMENT_RUN_STALLED_CODE,
   type ExperimentRunExecutionFailRunIntent,
 } from "../experimentRunExecutionProcess.types";
 
@@ -27,7 +27,7 @@ const INTENT: ExperimentRunExecutionFailRunIntent = {
   runId: "hypnotic-persimmon-turkey",
   experimentId: "experiment-1",
   stalledAt: STALLED_AT,
-  reason: EXPERIMENT_RUN_STALLED_REASON,
+  code: EXPERIMENT_RUN_STALLED_CODE,
 };
 
 type CompleteRun = ExperimentRunExecutionDispatchDeps["completeRun"];
@@ -77,14 +77,14 @@ describe("experimentRunExecution failRun intent", () => {
       });
     });
 
-    it("gives the reason as a stall", async () => {
+    it("gives the failure code for a stall", async () => {
       const deps = makeDeps();
 
       await createExperimentRunExecutionFailRunHandler(deps)(INTENT, CTX);
 
       expect(deps.markRunFailed).toHaveBeenCalledWith({
         runId: "hypnotic-persimmon-turkey",
-        reason: expect.stringContaining("stalled"),
+        code: EXPERIMENT_RUN_STALLED_CODE,
       });
     });
 

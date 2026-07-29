@@ -1040,8 +1040,8 @@ export class PipelineRegistry {
         // the run spending against a run the platform has already ended.
         experimentRunExecutionEffects: {
           signalStop: ({ runId }) => abortManager.requestAbort(runId),
-          markRunFailed: ({ runId, reason }) =>
-            runStateManager.failRun(runId, reason),
+          markRunFailed: ({ runId, code }) =>
+            runStateManager.failRun(runId, { code }),
         },
       }),
     );

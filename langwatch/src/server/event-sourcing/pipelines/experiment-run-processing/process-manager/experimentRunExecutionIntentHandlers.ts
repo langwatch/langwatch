@@ -32,7 +32,7 @@ export interface ExperimentRunExecutionDispatchDeps {
    */
   signalStop: (params: { runId: string }) => Promise<void>;
   /**
-   * Marks the cached run-state record failed, with the reason. This is the
+   * Marks the cached run-state record failed, with the failure code. This is the
    * only surface that models a *failed* run at all — the stored terminal state
    * has room for "finished" and "stopped" and nothing else — so it is where
    * the polling API learns the run stalled rather than was stopped.
@@ -40,7 +40,7 @@ export interface ExperimentRunExecutionDispatchDeps {
    * Best-effort by construction: the record lives in Redis on a 24-hour TTL
    * and the interactive path never creates one, so it is routinely absent.
    */
-  markRunFailed: (params: { runId: string; reason: string }) => Promise<void>;
+  markRunFailed: (params: { runId: string; code: string }) => Promise<void>;
 }
 
 /**
@@ -93,7 +93,7 @@ export function createExperimentRunExecutionFailRunHandler(
     // guarantee is the event, not the cache. A run whose cached record expired
     // hours ago still reaches a terminal state.
     await deps
-      .markRunFailed({ runId: payload.runId, reason: payload.reason })
+      .markRunFailed({ runId: payload.runId, code: payload.code })
       .catch((err: unknown) => {
         logger.warn(
           { err, runId: payload.runId },
