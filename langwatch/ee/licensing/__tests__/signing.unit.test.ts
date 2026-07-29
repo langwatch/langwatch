@@ -1,5 +1,5 @@
-import crypto from "crypto";
 import { HandledError } from "@langwatch/handled-error";
+import crypto from "crypto";
 import { describe, expect, it } from "vitest";
 import {
   LicenseSigningFailedError,
@@ -172,9 +172,9 @@ describe("signLicense", () => {
     });
 
     it("distinguishes a passphrase-protected key", () => {
-      expect(() => signLicense(createTestLicenseData(), encryptedKey())).toThrow(
-        LicenseSigningKeyEncryptedError,
-      );
+      expect(() =>
+        signLicense(createTestLicenseData(), encryptedKey()),
+      ).toThrow(LicenseSigningKeyEncryptedError);
     });
 
     it("distinguishes a well-formed key OpenSSL refuses to sign with", () => {

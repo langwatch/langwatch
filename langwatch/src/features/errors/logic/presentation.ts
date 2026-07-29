@@ -455,8 +455,7 @@ const presentations = {
   },
   license_signing_key_not_pem: {
     title: "That doesn't look like a private key",
-    describe: () =>
-      "Paste the whole key, including its BEGIN and END lines.",
+    describe: () => "Paste the whole key, including its BEGIN and END lines.",
   },
   license_signing_key_encrypted: {
     title: "That private key is passphrase-protected",

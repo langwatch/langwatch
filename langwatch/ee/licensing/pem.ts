@@ -72,9 +72,12 @@ export function normalizePemKey(raw: string): string {
   const base64 = body.replace(/\s+/g, "");
   const lines = base64.match(PEM_BODY_LINE) ?? [];
 
-  return [`-----BEGIN ${label!}-----`, ...lines, `-----END ${label!}-----`, ""].join(
-    "\n"
-  );
+  return [
+    `-----BEGIN ${label!}-----`,
+    ...lines,
+    `-----END ${label!}-----`,
+    "",
+  ].join("\n");
 }
 
 /**
