@@ -100,12 +100,12 @@ const runGoogleDlpBatch = (
   Promise.all(
     texts.map(async (text) => {
       const wrapper = { value: text };
-      await googleDLPClearPII(
-        wrapper,
-        "value",
+      await googleDLPClearPII({
+        currentObject: wrapper,
+        lastKey: "value",
         piiRedactionLevel,
         exceptPatterns,
-      );
+      });
       return wrapper.value !== text ? wrapper.value : null;
     }),
   );
@@ -464,13 +464,10 @@ export class OtlpSpanPiiRedactionService {
     const lambda = this.lambdaAfterNative(native.policy);
     if (lambda) {
       try {
-        const ran = await this.lambdaRedactSpan(
-          span,
-          resource,
-          "STRICT",
-          lambda.entities,
-          lambda.exceptPatterns,
-        );
+        const ran = await this.lambdaRedactSpan(span, resource, "STRICT", {
+          entities: lambda.entities,
+          exceptPatterns: lambda.exceptPatterns,
+        });
         // Mark the span only when strict could not run because the analysis
         // service is genuinely unavailable (not configured in dev): the native
         // floor redacted the pattern-based identifiers but names/locations slip
@@ -522,13 +519,15 @@ export class OtlpSpanPiiRedactionService {
     span: OtlpSpan,
     resource: OtlpResource | null,
     piiRedactionLevel: PIIRedactionLevel,
-    entities?: readonly string[],
-    exceptPatterns?: readonly string[],
+    lambda?: {
+      entities?: readonly string[];
+      exceptPatterns?: readonly string[];
+    },
   ): Promise<boolean> {
     const options = await this.buildOptions(
       piiRedactionLevel,
-      entities,
-      exceptPatterns,
+      lambda?.entities,
+      lambda?.exceptPatterns,
     );
     // No options means the analysis pass was skipped (disabled, or the service
     // is not configured outside production) — report that it did not run so the
@@ -640,12 +639,10 @@ export class OtlpSpanPiiRedactionService {
     this.applyNativeLogPass(log, native.policy);
     const lambda = this.lambdaAfterNative(native.policy);
     if (lambda) {
-      await this.lambdaRedactLog(
-        log,
-        "STRICT",
-        lambda.entities,
-        lambda.exceptPatterns,
-      );
+      await this.lambdaRedactLog(log, "STRICT", {
+        entities: lambda.entities,
+        exceptPatterns: lambda.exceptPatterns,
+      });
     }
   }
 
@@ -656,13 +653,15 @@ export class OtlpSpanPiiRedactionService {
       resourceAttributes: Record<string, string>;
     },
     piiRedactionLevel: PIIRedactionLevel,
-    entities?: readonly string[],
-    exceptPatterns?: readonly string[],
+    lambda?: {
+      entities?: readonly string[];
+      exceptPatterns?: readonly string[];
+    },
   ): Promise<void> {
     const options = await this.buildOptions(
       piiRedactionLevel,
-      entities,
-      exceptPatterns,
+      lambda?.entities,
+      lambda?.exceptPatterns,
     );
     if (!options) return;
 
@@ -705,12 +704,10 @@ export class OtlpSpanPiiRedactionService {
     }
     const lambda = this.lambdaAfterNative(native.policy);
     if (lambda) {
-      await this.lambdaRedactMetricAttributes(
-        metric,
-        "STRICT",
-        lambda.entities,
-        lambda.exceptPatterns,
-      );
+      await this.lambdaRedactMetricAttributes(metric, "STRICT", {
+        entities: lambda.entities,
+        exceptPatterns: lambda.exceptPatterns,
+      });
     }
   }
 
@@ -720,13 +717,15 @@ export class OtlpSpanPiiRedactionService {
       resourceAttributes: Record<string, string>;
     },
     piiRedactionLevel: PIIRedactionLevel,
-    entities?: readonly string[],
-    exceptPatterns?: readonly string[],
+    lambda?: {
+      entities?: readonly string[];
+      exceptPatterns?: readonly string[];
+    },
   ): Promise<void> {
     const options = await this.buildOptions(
       piiRedactionLevel,
-      entities,
-      exceptPatterns,
+      lambda?.entities,
+      lambda?.exceptPatterns,
     );
     if (!options) return;
 

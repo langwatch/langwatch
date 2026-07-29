@@ -317,6 +317,7 @@ describe("resolveDataPrivacy", () => {
 });
 
 describe("resolveDataPrivacy PII exception patterns", () => {
+  /** @scenario Exception patterns union down the cascade */
   it("unions exceptions across the chain while the level stays first-set-wins", () => {
     const resolved = resolveDataPrivacy({
       rows: [

@@ -60,7 +60,11 @@ describe("googleDLPClearPII", () => {
         ]);
         const wrapper = { value };
 
-        await googleDLPClearPII(wrapper, "value", "STRICT");
+        await googleDLPClearPII({
+          currentObject: wrapper,
+          lastKey: "value",
+          piiRedactionLevel: "STRICT",
+        });
 
         expect(wrapper.value.startsWith("[REDACTED] met [REDACTED]")).toBe(
           true,
@@ -80,7 +84,11 @@ describe("googleDLPClearPII", () => {
         mockFindings([{ start: 2, end: 6 }]);
         const wrapper = { value: "😀😀John" };
 
-        await googleDLPClearPII(wrapper, "value", "STRICT");
+        await googleDLPClearPII({
+          currentObject: wrapper,
+          lastKey: "value",
+          piiRedactionLevel: "STRICT",
+        });
 
         expect(wrapper.value).toBe("😀😀[REDACTED]");
       });
@@ -93,7 +101,11 @@ describe("googleDLPClearPII", () => {
         mockFindings([]);
         const wrapper = { value: "nothing sensitive here" };
 
-        await googleDLPClearPII(wrapper, "value", "STRICT");
+        await googleDLPClearPII({
+          currentObject: wrapper,
+          lastKey: "value",
+          piiRedactionLevel: "STRICT",
+        });
 
         expect(wrapper.value).toBe("nothing sensitive here");
       });

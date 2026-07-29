@@ -222,12 +222,61 @@ const compileDlpExceptions = (
   return compiled;
 };
 
-export const googleDLPClearPII = async (
-  currentObject: Record<string | number, any>,
-  lastKey: string | number,
-  piiRedactionLevel: PIIRedactionLevel,
-  exceptPatterns?: readonly string[],
-): Promise<void> => {
+/**
+ * Mask every DLP finding over `text`, skipping findings vetoed by a policy
+ * exception. DLP reports codepoint offsets against the original text; they are
+ * converted to code-unit indices once. Each mask replaces the range with the
+ * same number of code units ("✳" is a single BMP code unit), so code-unit
+ * indices derived from the original text stay valid on the accumulating copy.
+ */
+const maskDlpFindings = ({
+  text,
+  findings,
+  exceptions,
+}: {
+  text: string;
+  findings: google.privacy.dlp.v2.IFinding[];
+  exceptions: readonly RegExp[];
+}): { redacted: string; masked: number } => {
+  const toCodeUnit = codepointToCodeUnitConverter(text);
+  let redacted = text;
+  let masked = 0;
+  for (const finding of findings) {
+    const start = finding.location?.codepointRange?.start;
+    const end = finding.location?.codepointRange?.end;
+    if (start == null || end == null) continue;
+    const startIdx = toCodeUnit(+start);
+    const endIdx = toCodeUnit(+end);
+    // A finding whose entire matched text matches a policy exception is a
+    // known-safe format (an internal id that merely looks like PII): keep it.
+    // `includeQuote` is set, but derive the matched text from the range over
+    // the ORIGINAL text as the fallback (the accumulating copy may already
+    // carry masks from earlier findings), so the veto never depends on the
+    // quote being echoed back.
+    const matchedText = finding.quote?.length
+      ? finding.quote
+      : text.substring(startIdx, endIdx);
+    if (exceptions.some((exception) => exception.test(matchedText))) continue;
+    redacted =
+      redacted.substring(0, startIdx) +
+      "✳".repeat(endIdx - startIdx) +
+      redacted.substring(endIdx);
+    masked++;
+  }
+  return { redacted, masked };
+};
+
+export const googleDLPClearPII = async ({
+  currentObject,
+  lastKey,
+  piiRedactionLevel,
+  exceptPatterns,
+}: {
+  currentObject: Record<string | number, any>;
+  lastKey: string | number;
+  piiRedactionLevel: PIIRedactionLevel;
+  exceptPatterns?: readonly string[];
+}): Promise<void> => {
   getPiiChecksCounter("google_dlp").inc();
   const [text, remaining] = [
     currentObject[lastKey].slice(0, 250_000),
@@ -235,42 +284,11 @@ export const googleDLPClearPII = async (
   ];
 
   const findings = await dlpCheck(text, piiRedactionLevel);
-  const exceptions = compileDlpExceptions(exceptPatterns);
-  // DLP reports codepoint offsets against the original text; convert them to
-  // code-unit indices once. Each mask below replaces the range with the same
-  // number of code units ("✳" is a single BMP code unit), so code-unit indices
-  // derived from the original text stay valid on the accumulating copy.
-  const toCodeUnit = codepointToCodeUnitConverter(text);
-  let redacted = text;
-  let masked = 0;
-  for (const finding of findings) {
-    const start = finding.location?.codepointRange?.start;
-    const end = finding.location?.codepointRange?.end;
-    if (start != null && end != null) {
-      const startIdx = toCodeUnit(+start);
-      const endIdx = toCodeUnit(+end);
-      // A finding whose entire matched text matches a policy exception is a
-      // known-safe format (an internal id that merely looks like PII): keep it.
-      // `includeQuote` is set, but derive the matched text from the range over
-      // the ORIGINAL text as the fallback (the accumulating copy may already
-      // carry masks from earlier findings), so the veto never depends on the
-      // quote being echoed back.
-      const matchedText = finding.quote?.length
-        ? finding.quote
-        : text.substring(startIdx, endIdx);
-      if (
-        exceptions.length > 0 &&
-        exceptions.some((exception) => exception.test(matchedText))
-      ) {
-        continue;
-      }
-      redacted =
-        redacted.substring(0, startIdx) +
-        "✳".repeat(endIdx - startIdx) +
-        redacted.substring(endIdx);
-      masked++;
-    }
-  }
+  const { redacted, masked } = maskDlpFindings({
+    text,
+    findings,
+    exceptions: compileDlpExceptions(exceptPatterns),
+  });
   if (masked > 0) {
     currentObject[lastKey] = redacted.replace(/✳+/g, "[REDACTED]") + remaining;
   }

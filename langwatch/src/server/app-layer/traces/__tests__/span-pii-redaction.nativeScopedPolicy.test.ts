@@ -453,8 +453,8 @@ describe("OtlpSpanPiiRedactionService scoped-policy native redaction", () => {
 });
 
 describe("OtlpSpanPiiRedactionService PII exception patterns", () => {
-  /** @scenario An exception pattern keeps a business identifier while other PII is still redacted */
   describe("given an essential policy with an exception for a business number format", () => {
+    /** @scenario An exception pattern keeps a business identifier while other PII is still redacted */
     it("keeps the excepted number and still redacts the email next to it", async () => {
       const { service } = makeService(
         mkPolicy({ piiExceptPatterns: ["00\\d{12}"] }),
@@ -469,8 +469,8 @@ describe("OtlpSpanPiiRedactionService PII exception patterns", () => {
     });
   });
 
-  /** @scenario Exceptions hold at the strict level */
   describe("given a strict policy with exceptions", () => {
+    /** @scenario Exceptions hold at the strict level */
     it("scopes the analysis batch to strict-only entities and forwards the exceptions", async () => {
       const { service, batchSpy } = makeService(
         mkPolicy({ piiLevel: "strict", piiExceptPatterns: ["00\\d{12}"] }),
