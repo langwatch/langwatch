@@ -504,74 +504,74 @@ describe("BatchEvaluationResultsTable", () => {
       expect(screen.queryByText("GPT-4o")).not.toBeInTheDocument();
       expect(screen.getByText("What is 2+2?")).toBeInTheDocument();
     });
+  });
 
-    describe("when comparing runs side by side", () => {
-      const createComparisonRuns = (): ComparisonRunData[] => [
-        {
-          runId: "run-a",
-          runName: "Run A",
-          color: "#3182ce",
-          data: createTestData({ runId: "run-a" }),
-          isLoading: false,
-        },
-        {
-          runId: "run-b",
-          runName: "Run B",
-          color: "#dd6b20",
-          data: createTestData({ runId: "run-b" }),
-          isLoading: false,
-        },
-      ];
+  describe("when changing visible result fields in comparison mode", () => {
+    const createComparisonRuns = (): ComparisonRunData[] => [
+      {
+        runId: "run-a",
+        runName: "Run A",
+        color: "#3182ce",
+        data: createTestData({ runId: "run-a" }),
+        isLoading: false,
+      },
+      {
+        runId: "run-b",
+        runName: "Run B",
+        color: "#dd6b20",
+        data: createTestData({ runId: "run-b" }),
+        isLoading: false,
+      },
+    ];
 
-      /** @scenario Hide scores to focus on outputs */
-      it("hides evaluator chips but keeps outputs when showEvaluations is false", () => {
-        render(
-          <BatchEvaluationResultsTable
-            data={null}
-            comparisonData={createComparisonRuns()}
-            showEvaluations={false}
-            disableVirtualization
-          />,
-          { wrapper: Wrapper },
-        );
+    /** @scenario Hide scores to focus on outputs */
+    it("hides evaluator chips but keeps outputs when showEvaluations is false", () => {
+      render(
+        <BatchEvaluationResultsTable
+          data={null}
+          comparisonData={createComparisonRuns()}
+          showEvaluations={false}
+          disableVirtualization
+        />,
+        { wrapper: Wrapper },
+      );
 
-        expect(screen.getAllByText(/response/).length).toBeGreaterThan(0);
-        expect(screen.queryAllByText("Exact Match")).toHaveLength(0);
-      });
+      expect(screen.getAllByText(/response/).length).toBeGreaterThan(0);
+      expect(screen.queryAllByText("Exact Match")).toHaveLength(0);
+    });
 
-      /** @scenario Hide outputs to focus on scores */
-      it("hides outputs but keeps evaluator chips when showOutputs is false", () => {
-        render(
-          <BatchEvaluationResultsTable
-            data={null}
-            comparisonData={createComparisonRuns()}
-            showOutputs={false}
-            disableVirtualization
-          />,
-          { wrapper: Wrapper },
-        );
+    /** @scenario Hide outputs to focus on scores */
+    it("hides outputs but keeps evaluator chips when showOutputs is false", () => {
+      render(
+        <BatchEvaluationResultsTable
+          data={null}
+          comparisonData={createComparisonRuns()}
+          showOutputs={false}
+          disableVirtualization
+        />,
+        { wrapper: Wrapper },
+      );
 
-        expect(screen.getAllByText("Exact Match").length).toBeGreaterThan(0);
-        expect(screen.queryAllByText(/response/)).toHaveLength(0);
-      });
+      expect(screen.getAllByText("Exact Match").length).toBeGreaterThan(0);
+      expect(screen.queryAllByText(/response/)).toHaveLength(0);
+    });
 
-      /** @scenario Hide the target column when no fields are shown */
-      it("removes the target column when all fields are off", () => {
-        render(
-          <BatchEvaluationResultsTable
-            data={null}
-            comparisonData={createComparisonRuns()}
-            showOutputs={false}
-            showEvaluations={false}
-            showCostAndLatency={false}
-            disableVirtualization
-          />,
-          { wrapper: Wrapper },
-        );
+    /** @scenario Hide the target column when no fields are shown */
+    it("removes the target column when all fields are off", () => {
+      render(
+        <BatchEvaluationResultsTable
+          data={null}
+          comparisonData={createComparisonRuns()}
+          showOutputs={false}
+          showEvaluations={false}
+          showCostAndLatency={false}
+          disableVirtualization
+        />,
+        { wrapper: Wrapper },
+      );
 
-        expect(screen.queryByText("GPT-4o")).not.toBeInTheDocument();
-        expect(screen.getAllByText("What is 2+2?").length).toBeGreaterThan(0);
-      });
+      expect(screen.queryByText("GPT-4o")).not.toBeInTheDocument();
+      expect(screen.getAllByText("What is 2+2?").length).toBeGreaterThan(0);
     });
   });
 

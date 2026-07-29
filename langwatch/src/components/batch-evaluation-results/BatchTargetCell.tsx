@@ -6,7 +6,7 @@
  */
 
 import { Box, Button, HStack, Portal, Text, VStack } from "@chakra-ui/react";
-import { useCallback, useRef, useState } from "react";
+import { type ReactNode, useCallback, useRef, useState } from "react";
 import { LuCheck, LuCircleAlert, LuCopy, LuListTree } from "react-icons/lu";
 import { EvaluatorResultChip } from "~/components/shared/EvaluatorResultChip";
 import { formatCost, formatLatency } from "~/components/shared/formatters";
@@ -50,6 +50,33 @@ type BatchTargetCellProps = {
   /** How much of the collapsed output to show before it needs expanding */
   rowHeight?: RowHeight;
 };
+
+/** A single cost/latency readout in the action bar — same tooltip + text shell either way. */
+const MetricBadge = ({
+  testId,
+  tooltipLabel,
+  children,
+}: {
+  testId: string;
+  tooltipLabel: string;
+  children: ReactNode;
+}) => (
+  <Tooltip
+    content={tooltipLabel}
+    positioning={{ placement: "top" }}
+    openDelay={100}
+  >
+    <Text
+      fontSize="11px"
+      color="fg.muted"
+      whiteSpace="nowrap"
+      px={1}
+      data-testid={testId}
+    >
+      {children}
+    </Text>
+  </Tooltip>
+);
 
 export function BatchTargetCell({
   targetOutput,
@@ -341,39 +368,21 @@ export function BatchTargetCell({
     >
       {/* Cost display */}
       {showCostAndLatency && targetOutput.cost !== null && (
-        <Tooltip
-          content={`Cost: ${formatCost(targetOutput.cost)}`}
-          positioning={{ placement: "top" }}
-          openDelay={100}
+        <MetricBadge
+          testId={`cost-${targetOutput.targetId}`}
+          tooltipLabel={`Cost: ${formatCost(targetOutput.cost)}`}
         >
-          <Text
-            fontSize="11px"
-            color="fg.muted"
-            whiteSpace="nowrap"
-            px={1}
-            data-testid={`cost-${targetOutput.targetId}`}
-          >
-            {formatCost(targetOutput.cost)}
-          </Text>
-        </Tooltip>
+          {formatCost(targetOutput.cost)}
+        </MetricBadge>
       )}
       {/* Latency display */}
       {showCostAndLatency && targetOutput.duration !== null && (
-        <Tooltip
-          content={`Latency: ${formatLatency(targetOutput.duration)}`}
-          positioning={{ placement: "top" }}
-          openDelay={100}
+        <MetricBadge
+          testId={`latency-${targetOutput.targetId}`}
+          tooltipLabel={`Latency: ${formatLatency(targetOutput.duration)}`}
         >
-          <Text
-            fontSize="11px"
-            color="fg.muted"
-            whiteSpace="nowrap"
-            px={1}
-            data-testid={`latency-${targetOutput.targetId}`}
-          >
-            {formatLatency(targetOutput.duration)}
-          </Text>
-        </Tooltip>
+          {formatLatency(targetOutput.duration)}
+        </MetricBadge>
       )}
       {/* Trace link button */}
       {showOutput && targetOutput.traceId && (
