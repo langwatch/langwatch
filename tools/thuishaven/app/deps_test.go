@@ -109,3 +109,61 @@ func TestDepsStale(t *testing.T) {
 		}
 	})
 }
+
+// The repo is a single pnpm workspace (ADR-076): the lockfile and node_modules
+// live at the root, and langwatch/ has neither. ensureDeps used to be handed
+// langwatch/, where depsStale found no lockfile and read that as "nothing to
+// install" — so `haven up` in a fresh worktree silently installed nothing and
+// started every service against absent dependencies. Nothing failed loudly;
+// the stack just did not work.
+//
+// @scenario A fresh clone needs one install
+func TestEnsureDepsInstallsAtTheWorkspaceRoot(t *testing.T) {
+	// A checkout shaped like the repo: lockfile at the root, none in langwatch/.
+	repo := func(t *testing.T) (root, lwDir string) {
+		t.Helper()
+		root = t.TempDir()
+		lwDir = filepath.Join(root, "langwatch")
+		if err := os.MkdirAll(lwDir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(root, "pnpm-lock.yaml"), []byte("x"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return root, lwDir
+	}
+
+	t.Run("given a workspace whose lockfile is only at the root", func(t *testing.T) {
+		t.Run("when staleness is judged from langwatch/, it sees nothing to do", func(t *testing.T) {
+			_, lwDir := repo(t)
+			if depsStale(lwDir) {
+				t.Fatal("depsStale(langwatch) = true; the guard below is meaningless if this ever changes")
+			}
+		})
+
+		t.Run("when staleness is judged from the root, the install is required", func(t *testing.T) {
+			root, _ := repo(t)
+			if !depsStale(root) {
+				t.Fatal("depsStale(root) = false, want true — a lockfile with no install stamp must install")
+			}
+		})
+
+		t.Run("when dependencies install, they install at the root", func(t *testing.T) {
+			root, lwDir := repo(t)
+			sup := &fakeSupervisor{}
+			o := &Orchestrator{sup: sup, log: zap.NewNop()}
+			if err := o.ensureDeps(context.Background(), root, true); err != nil {
+				t.Fatalf("ensureDeps: %v", err)
+			}
+			if len(sup.dirs) != 1 {
+				t.Fatalf("dirs = %v, want one install", sup.dirs)
+			}
+			if sup.dirs[0] != root {
+				t.Fatalf("install ran in %q, want the workspace root %q", sup.dirs[0], root)
+			}
+			if sup.dirs[0] == lwDir {
+				t.Fatal("install ran in langwatch/, which is not the workspace root")
+			}
+		})
+	})
+}

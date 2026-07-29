@@ -1014,7 +1014,7 @@ func (o *Orchestrator) PlayLaunch(ctx context.Context, number int, checkout, lwD
 	// than re-deriving fork status inside this detached child. Nothing is lost:
 	// the repo's postinstall is codegen, and the very next step runs it
 	// explicitly through start:prepare:files.
-	if err := o.ensureDeps(ctx, lwDir, false); err != nil {
+	if err := o.ensureDeps(ctx, checkout, false); err != nil {
 		return err
 	}
 	env := append(st.OverlayEnv(), "DOTENV_CONFIG_QUIET=true")
