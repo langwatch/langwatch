@@ -5,6 +5,8 @@ import { normalizePresidioMarkers } from "@langwatch/redaction";
 import {
   compilePiiExceptPatterns,
   matchesPiiException,
+  type ProtectedRange,
+  subtractProtectedRanges,
 } from "~/server/data-privacy/redaction/essentialPii";
 import type { PIIRedactionLevel } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
 import { env } from "../../../env.mjs";
@@ -223,29 +225,45 @@ const maskDlpFindings = ({
   exceptions: readonly RegExp[];
 }): { redacted: string; masked: number } => {
   const toCodeUnit = codepointToCodeUnitConverter(text);
-  let redacted = text;
-  let masked = 0;
-  for (const finding of findings) {
+  const ranged = findings.flatMap((finding) => {
     const start = finding.location?.codepointRange?.start;
     const end = finding.location?.codepointRange?.end;
-    if (start == null || end == null) continue;
-    const startIdx = toCodeUnit(+start);
-    const endIdx = toCodeUnit(+end);
-    // A finding whose entire matched text matches a policy exception is a
-    // known-safe format (an internal id that merely looks like PII): keep it.
-    // `includeQuote` is set, but derive the matched text from the range over
-    // the ORIGINAL text as the fallback (the accumulating copy may already
-    // carry masks from earlier findings), so the veto never depends on the
-    // quote being echoed back.
-    const matchedText = finding.quote?.length
-      ? finding.quote
-      : text.substring(startIdx, endIdx);
-    if (matchesPiiException(matchedText, exceptions)) continue;
-    redacted =
-      redacted.substring(0, startIdx) +
-      "✳".repeat(endIdx - startIdx) +
-      redacted.substring(endIdx);
-    masked++;
+    if (start == null || end == null) return [];
+    return [
+      { finding, startIdx: toCodeUnit(+start), endIdx: toCodeUnit(+end) },
+    ];
+  });
+
+  // First pass: findings whose entire matched text matches a policy exception
+  // are known-safe formats (an internal id that merely looks like PII). Their
+  // ranges become protected so an overlapping finding cannot eat into them.
+  // `includeQuote` is set, but derive the matched text from the range over the
+  // ORIGINAL text as the fallback, so the veto never depends on the quote
+  // being echoed back.
+  const protectedRanges: ProtectedRange[] = ranged.flatMap(
+    ({ finding, startIdx, endIdx }) => {
+      const matchedText = finding.quote?.length
+        ? finding.quote
+        : text.substring(startIdx, endIdx);
+      return matchesPiiException(matchedText, exceptions)
+        ? [{ start: startIdx, end: endIdx }]
+        : [];
+    },
+  );
+
+  let redacted = text;
+  let masked = 0;
+  for (const { startIdx, endIdx } of ranged) {
+    for (const part of subtractProtectedRanges(
+      { start: startIdx, end: endIdx },
+      protectedRanges,
+    )) {
+      redacted =
+        redacted.substring(0, part.start) +
+        "✳".repeat(part.end - part.start) +
+        redacted.substring(part.end);
+      masked++;
+    }
   }
   return { redacted, masked };
 };

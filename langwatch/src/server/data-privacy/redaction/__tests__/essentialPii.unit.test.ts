@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   compilePiiExceptPatterns,
   redactEssentialPiiInText,
+  subtractProtectedRanges,
 } from "../essentialPii";
 
 const redact = (text: string) => redactEssentialPiiInText({ text });
@@ -284,5 +285,48 @@ describe("compilePiiExceptPatterns", () => {
     const compiled = compilePiiExceptPatterns(["([unclosed", "ok\\d+"]);
     expect(compiled).toHaveLength(1);
     expect(compiled[0]!.test("ok123")).toBe(true);
+  });
+});
+
+describe("subtractProtectedRanges", () => {
+  const span = { start: 10, end: 20 };
+
+  it("returns the span untouched when nothing overlaps", () => {
+    expect(subtractProtectedRanges(span, [{ start: 0, end: 5 }])).toEqual([
+      { start: 10, end: 20 },
+    ]);
+  });
+
+  it("returns nothing when a protected range covers the whole span", () => {
+    expect(subtractProtectedRanges(span, [{ start: 8, end: 22 }])).toEqual([]);
+  });
+
+  it("clips a partial overlap on either side", () => {
+    expect(subtractProtectedRanges(span, [{ start: 5, end: 14 }])).toEqual([
+      { start: 14, end: 20 },
+    ]);
+    expect(subtractProtectedRanges(span, [{ start: 16, end: 25 }])).toEqual([
+      { start: 10, end: 16 },
+    ]);
+  });
+
+  it("splits around a protected range in the middle", () => {
+    expect(subtractProtectedRanges(span, [{ start: 13, end: 16 }])).toEqual([
+      { start: 10, end: 13 },
+      { start: 16, end: 20 },
+    ]);
+  });
+
+  it("handles several protected ranges in one span", () => {
+    expect(
+      subtractProtectedRanges({ start: 0, end: 30 }, [
+        { start: 5, end: 10 },
+        { start: 20, end: 25 },
+      ]),
+    ).toEqual([
+      { start: 0, end: 5 },
+      { start: 10, end: 20 },
+      { start: 25, end: 30 },
+    ]);
   });
 });

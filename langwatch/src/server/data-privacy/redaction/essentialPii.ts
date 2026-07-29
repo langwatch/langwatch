@@ -290,6 +290,41 @@ export function compilePiiExceptPatterns(
   return compiled;
 }
 
+/** A [start, end) character range an exception has vetoed from masking. */
+export interface ProtectedRange {
+  start: number;
+  end: number;
+}
+
+/**
+ * Subtract `protectedRanges` from one [start, end) interval, returning the
+ * sub-intervals that remain maskable. Detected spans can overlap an
+ * exception-vetoed span (DLP and the native recognizers both produce
+ * overlapping findings on digit runs); masking must never eat into the vetoed
+ * text, and must still cover whatever falls outside it.
+ */
+export function subtractProtectedRanges(
+  span: { start: number; end: number },
+  protectedRanges: readonly ProtectedRange[],
+): { start: number; end: number }[] {
+  const overlapping = protectedRanges
+    .filter((range) => range.start < span.end && range.end > span.start)
+    .sort((a, b) => a.start - b.start);
+  if (overlapping.length === 0) return [{ start: span.start, end: span.end }];
+
+  const result: { start: number; end: number }[] = [];
+  let cursor = span.start;
+  for (const range of overlapping) {
+    if (range.start > cursor) {
+      result.push({ start: cursor, end: Math.min(range.start, span.end) });
+    }
+    cursor = Math.max(cursor, range.end);
+    if (cursor >= span.end) break;
+  }
+  if (cursor < span.end) result.push({ start: cursor, end: span.end });
+  return result;
+}
+
 /**
  * Redact essential PII from one string and report how many spans were replaced.
  *
@@ -319,10 +354,15 @@ export function redactEssentialPiiInText({
     return { text, redactedCount: 0 };
   }
 
-  const excepted = (span: Span): boolean =>
-    !!exceptPatterns &&
-    exceptPatterns.length > 0 &&
-    matchesPiiException(text.slice(span.start, span.end), exceptPatterns);
+  const protectedRanges: ProtectedRange[] = [];
+  const excepted = (span: Span): boolean => {
+    const veto =
+      !!exceptPatterns &&
+      exceptPatterns.length > 0 &&
+      matchesPiiException(text.slice(span.start, span.end), exceptPatterns);
+    if (veto) protectedRanges.push({ start: span.start, end: span.end });
+    return veto;
+  };
 
   const allowed = entities ? new Set(entities) : null;
   const spans: Span[] = [];
@@ -380,13 +420,24 @@ export function redactEssentialPiiInText({
     }
   }
 
+  // A kept span can still overlap a vetoed one (a phone match inside an
+  // excepted number): mask only the parts outside every protected range, so
+  // an exception always preserves its entire matched text.
+  const maskable = kept.flatMap((span) =>
+    subtractProtectedRanges(span, protectedRanges).map((part) => ({
+      ...part,
+      entity: span.entity,
+    })),
+  );
+  if (maskable.length === 0) return { text, redactedCount: 0 };
+
   let result = "";
   let cursor = 0;
-  for (const span of kept) {
+  for (const span of maskable) {
     result += text.slice(cursor, span.start) + formatPiiMarker(span.entity);
     cursor = span.end;
   }
   result += text.slice(cursor);
 
-  return { text: result, redactedCount: kept.length };
+  return { text: result, redactedCount: maskable.length };
 }
