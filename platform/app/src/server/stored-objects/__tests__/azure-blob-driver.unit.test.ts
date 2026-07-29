@@ -632,7 +632,9 @@ describe("AzureBlobDriver", () => {
    * suite green. These pin the failure path itself.
    */
   describe("given a token-based auth mode where the token exchange fails", () => {
-    const tokenFailure = new Error("AADSTS70021: No matching federated identity record found");
+    const tokenFailure = new Error(
+      "AADSTS70021: No matching federated identity record found",
+    );
 
     beforeEach(() => {
       getAzureBlobTokenMock.mockRejectedValue(tokenFailure);
@@ -641,7 +643,15 @@ describe("AzureBlobDriver", () => {
     /** @scenario "A failed token exchange surfaces as a configuration error, not a storage error" */
     it.each([
       ["get" as const, () => newTokenModeDriver().get(URI)],
-      ["put" as const, () => newTokenModeDriver().put(URI, Buffer.from("x"), "application/octet-stream")],
+      [
+        "put" as const,
+        () =>
+          newTokenModeDriver().put(
+            URI,
+            Buffer.from("x"),
+            "application/octet-stream",
+          ),
+      ],
       ["delete" as const, () => newTokenModeDriver().delete(URI)],
       ["exists" as const, () => newTokenModeDriver().exists(URI)],
       ["head" as const, () => newTokenModeDriver().head(URI)],
@@ -656,10 +666,13 @@ describe("AzureBlobDriver", () => {
       await expect(newTokenModeDriver().get(URI)).rejects.toThrow();
 
       const sentAuthorizations = fetchSpy.mock.calls.map(
-        ([, init]) => (init?.headers as Record<string, string> | undefined)?.Authorization,
+        ([, init]) =>
+          (init?.headers as Record<string, string> | undefined)?.Authorization,
       );
       expect(sentAuthorizations).toHaveLength(0);
-      expect(sentAuthorizations.some((a) => a?.startsWith("SharedKey"))).toBe(false);
+      expect(sentAuthorizations.some((a) => a?.startsWith("SharedKey"))).toBe(
+        false,
+      );
     });
   });
 

@@ -177,7 +177,8 @@ describe("resolveAzureCredentials", () => {
       mockEnv.AZURE_BLOB_CONTAINER = "cont";
       process.env.AZURE_CLIENT_ID = "client-id";
       process.env.AZURE_TENANT_ID = "tenant-id";
-      process.env.AZURE_FEDERATED_TOKEN_FILE = "/var/run/secrets/azure/tokens/azure-identity-token";
+      process.env.AZURE_FEDERATED_TOKEN_FILE =
+        "/var/run/secrets/azure/tokens/azure-identity-token";
 
       const credentials = resolveAzureCredentials({ purpose: "read" });
 
