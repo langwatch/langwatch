@@ -134,6 +134,13 @@ const sharedProject = (id: string, name: string) => ({
   kind: "application",
 });
 
+/** The org under test, whose team shape each scenario varies. */
+const acmeOrg = (teams: Array<Record<string, unknown>>) => ({
+  id: "org-1",
+  name: "Acme Org",
+  teams,
+});
+
 /** A first org whose sole project becomes the AMBIENT one (the hook's
  * fallback picks orgs[0].teams first project), so the org under test can be
  * exercised with a non-matching ambient slug: exactly the shape where the
@@ -197,182 +204,164 @@ const renderPage = () =>
 const approveButton = () =>
   screen.getByRole("button", { name: "Generate API key" }) as HTMLButtonElement;
 
-describe("/cli/auth project picker", () => {
+beforeEach(() => {
+  fetchMock.mockReset();
+  (mockRouter.push as unknown as Mock).mockClear();
+  (mockRouter.replace as unknown as Mock).mockClear();
+  mockRouter.query = { user_code: "WDJB-MJHT" };
+  approveBodies.length = 0;
+  drawerProps.length = 0;
+  window.localStorage.clear();
+  serveCliAuthEndpoints();
+});
+
+afterEach(() => {
+  cleanup();
+  mockRouter.query = {};
+});
+
+describe("/cli/auth project picker, given an organization with no shared projects", () => {
   beforeEach(() => {
-    fetchMock.mockReset();
-    (mockRouter.push as unknown as Mock).mockClear();
-    (mockRouter.replace as unknown as Mock).mockClear();
-    mockRouter.query = { user_code: "WDJB-MJHT" };
-    approveBodies.length = 0;
-    drawerProps.length = 0;
-    window.localStorage.clear();
-    serveCliAuthEndpoints();
+    orgsRef.current = [acmeOrg([personalTeam, sharedTeam([])])];
   });
 
-  afterEach(() => {
-    cleanup();
-    mockRouter.query = {};
-  });
+  /** @scenario a user with no shared projects gets their personal project preselected */
+  it("preselects the personal project, explains it, and enables the approve button", async () => {
+    renderPage();
 
-  describe("given an organization with no shared projects", () => {
-    beforeEach(() => {
-      orgsRef.current = [
-        {
-          id: "org-1",
-          name: "Acme Org",
-          teams: [personalTeam, sharedTeam([])],
-        },
-      ];
-    });
-
-    /** @scenario a user with no shared projects gets their personal project preselected */
-    it("preselects the personal project, explains it, and enables the approve button", async () => {
-      renderPage();
-
-      await waitFor(() =>
-        expect(
-          screen.getAllByText("Personal Workspace").length,
-        ).toBeGreaterThan(0),
-      );
-      expect(
-        screen.getByText(/your personal project is preselected/i),
-      ).toBeDefined();
-      await waitFor(() => expect(approveButton().disabled).toBe(false));
-    });
-
-    /** @scenario the no-shared-projects state offers a create-project action */
-    it("offers Create project, passes the picked org, and adopts the created project", async () => {
-      const user = userEvent.setup();
-      renderPage();
-
-      await waitFor(() =>
-        expect(
-          screen.getByRole("button", { name: /Create project/i }),
-        ).toBeDefined(),
-      );
-      await user.click(screen.getByRole("button", { name: /Create project/i }));
-
-      await waitFor(() =>
-        expect(
-          screen.getByRole("dialog", { name: "Create New Project" }),
-        ).toBeDefined(),
-      );
-      expect(drawerProps[0]?.organizationId).toBe("org-1");
-
-      // The refreshed org list (the real drawer invalidates organization
-      // queries) carries the new project by the time creation is reported.
-      act(() => {
-        orgsRef.current = [
-          {
-            id: "org-1",
-            name: "Acme Org",
-            teams: [
-              personalTeam,
-              sharedTeam([sharedProject("fresh-proj", "Fresh Project")]),
-            ],
-          },
-        ];
-      });
-      await user.click(screen.getByRole("button", { name: "simulate create" }));
-
-      await waitFor(() =>
-        expect(screen.getAllByText("Fresh Project").length).toBeGreaterThan(0),
-      );
-      await waitFor(() => expect(approveButton().disabled).toBe(false));
-      await user.click(approveButton());
-      await waitFor(() => expect(approveBodies.length).toBe(1));
-      expect(approveBodies[0]?.project_id).toBe("fresh-proj");
-    });
-
-    /** @scenario approving with the personal project selected returns the personal project key */
-    it("approves with the preselected personal project id", async () => {
-      const user = userEvent.setup();
-      renderPage();
-
-      await waitFor(() =>
-        expect(
-          screen.getAllByText("Personal Workspace").length,
-        ).toBeGreaterThan(0),
-      );
-      await waitFor(() => expect(approveButton().disabled).toBe(false));
-      await user.click(approveButton());
-
-      await waitFor(() => expect(approveBodies.length).toBe(1));
-      expect(approveBodies[0]?.project_id).toBe("proj-personal");
-      expect(approveBodies[0]?.organization_id).toBe("org-1");
-    });
-  });
-
-  describe("given a switched-to organization whose projects do not match the ambient one", () => {
-    const user = userEvent.setup();
-
-    beforeEach(async () => {
-      orgsRef.current = [
-        homeOrg,
-        {
-          id: "org-1",
-          name: "Acme Org",
-          teams: [
-            personalTeam,
-            sharedTeam([
-              sharedProject("proj-a", "Alpha"),
-              sharedProject("proj-b", "Beta"),
-            ]),
-          ],
-        },
-      ];
-      renderPage();
-      // Two orgs render the org chooser; move onto the org under test. Its
-      // offered projects cannot match the ambient project (Home Org's), so
-      // the picker legitimately starts with nothing selected.
-      await waitFor(() =>
-        expect(screen.getByRole("button", { name: "Acme Org" })).toBeDefined(),
-      );
-      await user.click(screen.getByRole("button", { name: "Acme Org" }));
-    });
-
-    /** @scenario zero selected reads "None selected", never "Multiple" */
-    it("shows None selected (never Multiple) while nothing is picked, and disables approve", async () => {
-      await waitFor(() =>
-        expect(screen.getAllByText("None selected").length).toBeGreaterThan(0),
-      );
-      expect(screen.queryByText("Multiple")).toBeNull();
-      expect(approveButton().disabled).toBe(true);
-    });
-
-    /** @scenario a user with shared projects sees personal as an explicit entry, not an implication */
-    it("lists shared projects under their team and personal under a Personal group", async () => {
-      await waitFor(() =>
-        expect(screen.getAllByText("None selected").length).toBeGreaterThan(0),
-      );
-
-      expect(screen.getAllByText("Alpha").length).toBeGreaterThan(0);
-      expect(screen.getAllByText("Beta").length).toBeGreaterThan(0);
-      expect(screen.getAllByText("Engineering").length).toBeGreaterThan(0);
-      // The personal entry rides its own explicit group label.
-      expect(screen.getAllByText("Personal").length).toBeGreaterThan(0);
+    await waitFor(() =>
       expect(screen.getAllByText("Personal Workspace").length).toBeGreaterThan(
         0,
-      );
+      ),
+    );
+    expect(
+      screen.getByText(/your personal project is preselected/i),
+    ).toBeDefined();
+    await waitFor(() => expect(approveButton().disabled).toBe(false));
+  });
+
+  /** @scenario the no-shared-projects state offers a create-project action */
+  it("offers Create project, passes the picked org, and adopts the created project", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: /Create project/i }),
+      ).toBeDefined(),
+    );
+    await user.click(screen.getByRole("button", { name: /Create project/i }));
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole("dialog", { name: "Create New Project" }),
+      ).toBeDefined(),
+    );
+    expect(drawerProps[0]?.organizationId).toBe("org-1");
+
+    // The refreshed org list (the real drawer invalidates organization
+    // queries) carries the new project by the time creation is reported.
+    act(() => {
+      orgsRef.current = [
+        acmeOrg([
+          personalTeam,
+          sharedTeam([sharedProject("fresh-proj", "Fresh Project")]),
+        ]),
+      ];
     });
+    await user.click(screen.getByRole("button", { name: "simulate create" }));
 
-    it("approves with an explicitly picked personal project", async () => {
-      await waitFor(() =>
-        expect(screen.getAllByText("None selected").length).toBeGreaterThan(0),
-      );
-      // Chakra's Select renders its options in the collection; picking the
-      // personal entry is an explicit act, never implied by the team pick.
-      await user.click(screen.getByRole("combobox"));
-      const personalOption = await screen.findByRole("option", {
-        name: /Personal Workspace/,
-      });
-      await user.click(personalOption);
+    await waitFor(() =>
+      expect(screen.getAllByText("Fresh Project").length).toBeGreaterThan(0),
+    );
+    await waitFor(() => expect(approveButton().disabled).toBe(false));
+    await user.click(approveButton());
+    await waitFor(() => expect(approveBodies.length).toBe(1));
+    expect(approveBodies[0]?.project_id).toBe("fresh-proj");
+  });
 
-      await waitFor(() => expect(approveButton().disabled).toBe(false));
-      await user.click(approveButton());
+  /** @scenario approving with the personal project selected returns the personal project key */
+  it("approves with the preselected personal project id", async () => {
+    const user = userEvent.setup();
+    renderPage();
 
-      await waitFor(() => expect(approveBodies.length).toBe(1));
-      expect(approveBodies[0]?.project_id).toBe("proj-personal");
+    await waitFor(() =>
+      expect(screen.getAllByText("Personal Workspace").length).toBeGreaterThan(
+        0,
+      ),
+    );
+    await waitFor(() => expect(approveButton().disabled).toBe(false));
+    await user.click(approveButton());
+
+    await waitFor(() => expect(approveBodies.length).toBe(1));
+    expect(approveBodies[0]?.project_id).toBe("proj-personal");
+    expect(approveBodies[0]?.organization_id).toBe("org-1");
+  });
+});
+
+describe("/cli/auth project picker, given a switched-to organization whose projects do not match the ambient one", () => {
+  const user = userEvent.setup();
+
+  beforeEach(async () => {
+    orgsRef.current = [
+      homeOrg,
+      acmeOrg([
+        personalTeam,
+        sharedTeam([
+          sharedProject("proj-a", "Alpha"),
+          sharedProject("proj-b", "Beta"),
+        ]),
+      ]),
+    ];
+    renderPage();
+    // Two orgs render the org chooser; move onto the org under test. Its
+    // offered projects cannot match the ambient project (Home Org's), so
+    // the picker legitimately starts with nothing selected.
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Acme Org" })).toBeDefined(),
+    );
+    await user.click(screen.getByRole("button", { name: "Acme Org" }));
+  });
+
+  /** @scenario zero selected reads "None selected", never "Multiple" */
+  it("shows None selected (never Multiple) while nothing is picked, and disables approve", async () => {
+    await waitFor(() =>
+      expect(screen.getAllByText("None selected").length).toBeGreaterThan(0),
+    );
+    expect(screen.queryByText("Multiple")).toBeNull();
+    expect(approveButton().disabled).toBe(true);
+  });
+
+  /** @scenario a user with shared projects sees personal as an explicit entry, not an implication */
+  it("lists shared projects under their team and personal under a Personal group", async () => {
+    await waitFor(() =>
+      expect(screen.getAllByText("None selected").length).toBeGreaterThan(0),
+    );
+
+    expect(screen.getAllByText("Alpha").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Beta").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Engineering").length).toBeGreaterThan(0);
+    // The personal entry rides its own explicit group label.
+    expect(screen.getAllByText("Personal").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Personal Workspace").length).toBeGreaterThan(0);
+  });
+
+  it("approves with an explicitly picked personal project", async () => {
+    await waitFor(() =>
+      expect(screen.getAllByText("None selected").length).toBeGreaterThan(0),
+    );
+    // Chakra's Select renders its options in the collection; picking the
+    // personal entry is an explicit act, never implied by the team pick.
+    await user.click(screen.getByRole("combobox"));
+    const personalOption = await screen.findByRole("option", {
+      name: /Personal Workspace/,
     });
+    await user.click(personalOption);
+
+    await waitFor(() => expect(approveButton().disabled).toBe(false));
+    await user.click(approveButton());
+
+    await waitFor(() => expect(approveBodies.length).toBe(1));
+    expect(approveBodies[0]?.project_id).toBe("proj-personal");
   });
 });

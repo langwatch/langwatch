@@ -60,6 +60,56 @@ interface TeamLike {
 /** The group label the personal entry renders under in the picker. */
 export const PERSONAL_GROUP_NAME = "Personal";
 
+/**
+ * The CALLER's own personal workspace, matched on the PROJECT's ownerUserId:
+ * the exact field the approve endpoint authorizes against, so the picker can
+ * never offer an entry the server would refuse. An admin's payload can carry
+ * other members' personal workspaces too; those never match.
+ */
+function findOwnPersonalProject(
+  teams: TeamLike[],
+  currentUserId: string,
+): CliAuthProjectOption | null {
+  for (const team of teams) {
+    const personal = (team.projects ?? []).find(
+      (p) =>
+        p.isPersonal &&
+        p.ownerUserId === currentUserId &&
+        p.kind !== "internal_governance",
+    );
+    if (personal) {
+      return {
+        id: personal.id,
+        name: personal.name,
+        slug: personal.slug,
+        teamId: team.id,
+        teamName: PERSONAL_GROUP_NAME,
+      };
+    }
+  }
+  return null;
+}
+
+/**
+ * The project the picker starts on: the last project the user worked in when
+ * it is one of the offered ones, then the sole shared project, then, where the
+ * org has no shared projects at all, the personal one, so a fresh solo user is
+ * never dead-ended on an empty picker.
+ */
+function pickDefaultProjectId(args: {
+  projects: CliAuthProjectOption[];
+  lastProjectSlug?: string | null;
+  personalProject: CliAuthProjectOption | null;
+}): string | null {
+  const lastProject = args.lastProjectSlug
+    ? args.projects.find((p) => p.slug === args.lastProjectSlug)
+    : undefined;
+  if (lastProject) return lastProject.id;
+  if (args.projects.length === 1) return args.projects[0]!.id;
+  if (args.projects.length === 0) return args.personalProject?.id ?? null;
+  return null;
+}
+
 export function resolveCliAuthProjects(args: {
   teams: TeamLike[] | null | undefined;
   lastProjectSlug?: string | null;
@@ -89,30 +139,10 @@ export function resolveCliAuthProjects(args: {
       })),
   );
 
-  // Only the CALLER's own personal workspace is offered, matched on the
-  // PROJECT's ownerUserId: the exact field the approve endpoint authorizes
-  // against, so the picker can never offer an entry the server would refuse.
   // Without a caller id, no personal entry is shown (never guess a
   // stranger's workspace).
   const personalProject = args.currentUserId
-    ? (args.teams ?? []).reduce<CliAuthProjectOption | null>((found, team) => {
-        if (found) return found;
-        const personal = (team.projects ?? []).find(
-          (p) =>
-            p.isPersonal &&
-            p.ownerUserId === args.currentUserId &&
-            p.kind !== "internal_governance",
-        );
-        return personal
-          ? {
-              id: personal.id,
-              name: personal.name,
-              slug: personal.slug,
-              teamId: team.id,
-              teamName: PERSONAL_GROUP_NAME,
-            }
-          : null;
-      }, null)
+    ? findOwnPersonalProject(args.teams ?? [], args.currentUserId)
     : null;
 
   // Only teams that actually have an offered project, so the grouped picker
@@ -126,19 +156,11 @@ export function resolveCliAuthProjects(args: {
     teams.push({ id: personalProject.teamId, name: PERSONAL_GROUP_NAME });
   }
 
-  const lastProject = args.lastProjectSlug
-    ? projects.find((p) => p.slug === args.lastProjectSlug)
-    : undefined;
-
-  const defaultProjectId =
-    lastProject?.id ??
-    (projects.length === 1
-      ? projects[0]!.id
-      : // No shared projects at all: the personal project is the only sane
-        // target, so preselect it rather than dead-ending the user.
-        projects.length === 0
-        ? (personalProject?.id ?? null)
-        : null);
+  const defaultProjectId = pickDefaultProjectId({
+    projects,
+    lastProjectSlug: args.lastProjectSlug,
+    personalProject,
+  });
 
   return { projects, teams, personalProject, defaultProjectId };
 }

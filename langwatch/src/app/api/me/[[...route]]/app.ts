@@ -50,6 +50,13 @@ registerMeRoutes(secured);
 export function registerMeRoutes(
   secured: SecuredApp<{ Variables: AuthMiddlewareVariables }>,
 ): void {
+  registerUsageRoute(secured);
+  registerProjectRoute(secured);
+}
+
+function registerUsageRoute(
+  secured: SecuredApp<{ Variables: AuthMiddlewareVariables }>,
+): void {
   secured.access(requires("project:view")).get(
     "/usage",
     describeRoute({
@@ -135,7 +142,11 @@ export function registerMeRoutes(
       return c.json({ summary, dailyBuckets, breakdownByModel });
     },
   );
+}
 
+function registerProjectRoute(
+  secured: SecuredApp<{ Variables: AuthMiddlewareVariables }>,
+): void {
   secured.access(requires("project:view")).get(
     "/project",
     describeRoute({
