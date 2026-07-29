@@ -11,6 +11,7 @@
  */
 
 import type { GatewayBudget } from "@prisma/client";
+import type { ResolvedBudget } from "~/server/gateway/budgetResolution.service";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { GatewayBudgetDebitRecord } from "../../projections/gatewayBudgetDebits.mapProjection";
 import { GatewayBudgetDebitService } from "../gatewayBudgetDebit.service";
@@ -30,8 +31,27 @@ function budget(overrides: Partial<GatewayBudget> = {}): GatewayBudget {
     scopeType: "PROJECT",
     scopeId: "project-1",
     window: "MONTH",
+    providerKey: null,
     ...overrides,
   } as GatewayBudget;
+}
+
+/**
+ * What `resolveForRequest` hands back: the budget plus the bucket its spend
+ * accrues under. Defaults the bucket to the budget's own scope, which is what
+ * resolution does for every scope except GROUP.
+ */
+function resolvedBudget(
+  overrides: Partial<GatewayBudget> = {},
+  bucketScopeId?: string,
+): ResolvedBudget {
+  const b = budget(overrides);
+  return {
+    budget: b,
+    bucketScopeId: bucketScopeId ?? b.scopeId,
+    principalUserId: null,
+    groupId: null,
+  };
 }
 
 const RECORD: GatewayBudgetDebitRecord = {
@@ -43,6 +63,7 @@ const RECORD: GatewayBudgetDebitRecord = {
   tokensInput: 100,
   tokensOutput: 50,
   model: "gpt-5-mini",
+  providerKey: null,
   status: "SUCCESS",
   durationMs: 2000,
   occurredAt: new Date(1_700_000_000_500),
@@ -68,13 +89,13 @@ function buildService({
     kind: "application",
     team: { organizationId: "org-1" },
   },
-  budgets = [budget()],
+  budgets = [resolvedBudget()],
 }: {
   vk?: unknown;
   project?: unknown;
-  budgets?: GatewayBudget[];
+  budgets?: ResolvedBudget[];
 } = {}) {
-  const applicableForRequest = vi.fn().mockResolvedValue(budgets);
+  const resolveForRequest = vi.fn().mockResolvedValue(budgets);
   const service = new GatewayBudgetDebitService({
     prisma: {
       virtualKey: {
@@ -83,9 +104,9 @@ function buildService({
       },
       project: { findUnique: vi.fn().mockResolvedValue(project) },
     } as never,
-    budgetRepository: { applicableForRequest } as never,
+    budgetRepository: { resolveForRequest } as never,
   });
-  return { service, applicableForRequest };
+  return { service, resolveForRequest };
 }
 
 /** Runs a case through both entry points so neither can drift from the other. */
@@ -106,12 +127,12 @@ describe("GatewayBudgetDebitService", () => {
     it("shapes one ledger row per applicable budget", async () => {
       const { service } = buildService({
         budgets: [
-          budget({
+          resolvedBudget({
             id: "budget-org",
             scopeType: "ORGANIZATION",
             scopeId: "org-1",
           }),
-          budget(),
+          resolvedBudget(),
         ],
       });
 
@@ -184,13 +205,13 @@ describe("GatewayBudgetDebitService", () => {
     });
 
     it("never asks which budgets the forged request would have moved", async () => {
-      const { service, applicableForRequest } = buildService({
+      const { service, resolveForRequest } = buildService({
         vk: { ...VK_SCOPED_AT_PROJECT_1, scopes: [] },
       });
 
       await resolveBothWays(service, RECORD);
 
-      expect(applicableForRequest).not.toHaveBeenCalled();
+      expect(resolveForRequest).not.toHaveBeenCalled();
     });
   });
 
@@ -246,10 +267,116 @@ describe("GatewayBudgetDebitService", () => {
     });
   });
 
+  /**
+   * A provider-filtered budget counts only spend dispatched to its own
+   * provider. The filter runs here rather than in resolution because the
+   * dispatched provider varies per request while the resolved set is cached
+   * per key — so this is also the guard on that cache being reused correctly.
+   */
+  describe("given a provider-filtered budget", () => {
+    it("charges it when the request was dispatched to that provider", async () => {
+      const { service } = buildService({
+        budgets: [resolvedBudget({ providerKey: "openai" })],
+      });
+
+      const { single, batched } = await resolveBothWays(service, {
+        ...RECORD,
+        providerKey: "openai",
+      });
+
+      expect(single?.rows).toHaveLength(1);
+      expect(single?.rows[0]?.providerKey).toBe("openai");
+      expect(batched?.rows).toEqual(single?.rows);
+    });
+
+    it("leaves it alone when the request went to a different provider", async () => {
+      const { service } = buildService({
+        budgets: [resolvedBudget({ providerKey: "openai" })],
+      });
+
+      const { single, batched } = await resolveBothWays(service, {
+        ...RECORD,
+        providerKey: "anthropic",
+      });
+
+      expect(single).toBeNull();
+      expect(batched).toBeNull();
+    });
+
+    it("leaves it alone when the gateway did not say which provider it used", async () => {
+      const { service } = buildService({
+        budgets: [resolvedBudget({ providerKey: "openai" })],
+      });
+
+      const { single, batched } = await resolveBothWays(service, {
+        ...RECORD,
+        providerKey: null,
+      });
+
+      expect(single).toBeNull();
+      expect(batched).toBeNull();
+    });
+
+    it("still charges an unfiltered budget for a dispatch of unknown provider", async () => {
+      const { service } = buildService({
+        budgets: [resolvedBudget({ providerKey: null })],
+      });
+
+      const { single } = await resolveBothWays(service, {
+        ...RECORD,
+        providerKey: null,
+      });
+
+      expect(single?.rows).toHaveLength(1);
+    });
+
+    it("one cached resolution serves requests that dispatched to different providers", async () => {
+      const { service, resolveForRequest } = buildService({
+        budgets: [
+          resolvedBudget({ id: "budget-openai", providerKey: "openai" }),
+          resolvedBudget({ id: "budget-any", providerKey: null }),
+        ],
+      });
+
+      const debits = await service.resolveMany([
+        { ...RECORD, gatewayRequestId: "grq_A", providerKey: "openai" },
+        { ...RECORD, gatewayRequestId: "grq_B", providerKey: "anthropic" },
+      ]);
+
+      expect(resolveForRequest).toHaveBeenCalledTimes(1);
+      expect(debits.map((d) => d.budgetIds)).toEqual([
+        ["budget-openai", "budget-any"],
+        ["budget-any"],
+      ]);
+    });
+  });
+
+  /**
+   * Spend accrues under the enforcement bucket, not the budget's target: a
+   * provider-filtered budget and a per-member GROUP allowance each get their
+   * own key so they cannot report each other's spend.
+   */
+  describe("given resolution returns a bucket distinct from the budget's scope", () => {
+    it("writes the bucket to the ledger row, not the budget's own scopeId", async () => {
+      const { service } = buildService({
+        budgets: [
+          resolvedBudget(
+            { id: "budget-group", scopeType: "GROUP", scopeId: "group-1" },
+            "group-1:user-7",
+          ),
+        ],
+      });
+
+      const debit = await service.resolve(RECORD);
+
+      expect(debit?.rows[0]?.scopeId).toBe("group-1:user-7");
+    });
+  });
+
   describe("given Postgres is unavailable", () => {
     it("reports the failure so the map job retries rather than charging nothing", async () => {
-      const { service, applicableForRequest } = buildService();
-      applicableForRequest.mockRejectedValue(new Error("PG down"));
+      const { service, resolveForRequest } = buildService();
+      resolveForRequest.mockRejectedValue(new Error("PG down"));
 
       await expect(service.resolve(RECORD)).rejects.toThrow("PG down");
       await expect(service.resolveMany([RECORD])).rejects.toThrow("PG down");
@@ -258,7 +385,7 @@ describe("GatewayBudgetDebitService", () => {
 
   describe("given a replay hands over a window of requests for one tenant", () => {
     it("queries a key's budgets once however many requests used it", async () => {
-      const { service, applicableForRequest } = buildService();
+      const { service, resolveForRequest } = buildService();
 
       const resolved = await service.resolveMany([
         { ...RECORD, gatewayRequestId: "grq_A" },
@@ -267,7 +394,7 @@ describe("GatewayBudgetDebitService", () => {
       ]);
 
       expect(resolved).toHaveLength(3);
-      expect(applicableForRequest).toHaveBeenCalledTimes(1);
+      expect(resolveForRequest).toHaveBeenCalledTimes(1);
     });
 
     it("collapses a request id delivered twice to the one the ledger probe would have kept", async () => {

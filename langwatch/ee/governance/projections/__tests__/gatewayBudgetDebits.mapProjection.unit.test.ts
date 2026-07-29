@@ -170,6 +170,33 @@ describe("GatewayBudgetDebitsMapProjection", () => {
     });
   });
 
+  /**
+   * Which provider-filtered budgets a request may move is decided downstream
+   * from this field, so a dispatch whose provider the gateway did not report
+   * must read as "unknown" rather than as any particular provider.
+   */
+  describe("given the gateway reported which provider it dispatched to", () => {
+    it("carries the provider onto the debit", () => {
+      const record = mapRecord(
+        gatewaySpan({ "langwatch.model_provider_id": "openai" }),
+      );
+      expect(record?.providerKey).toBe("openai");
+    });
+  });
+
+  describe("given the gateway reported no provider", () => {
+    it("leaves the debit's provider unknown rather than guessing one", () => {
+      expect(mapRecord(gatewaySpan({}))?.providerKey).toBeNull();
+    });
+
+    it("reads an empty provider as unknown too", () => {
+      const record = mapRecord(
+        gatewaySpan({ "langwatch.model_provider_id": "" }),
+      );
+      expect(record?.providerKey).toBeNull();
+    });
+  });
+
   describe("given the ledger's period bucketing depends on business time", () => {
     it("stamps the request's own start time, never the ingest time", () => {
       const record = mapRecord(

@@ -18,6 +18,7 @@
 
 import { GatewayBudgetDebitService } from "@ee/governance/services/gatewayBudgetDebit.service";
 import type { GatewayBudget } from "@prisma/client";
+import type { ResolvedBudget } from "~/server/gateway/budgetResolution.service";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { BudgetDebitRow } from "~/server/gateway/budget.clickhouse.repository";
 import type { GatewayBudgetDebitRecord } from "../gatewayBudgetDebits.mapProjection";
@@ -80,14 +81,21 @@ class FakeLedger {
   }
 }
 
-function budget(overrides: Partial<GatewayBudget> = {}): GatewayBudget {
-  return {
+function budget(overrides: Partial<GatewayBudget> = {}): ResolvedBudget {
+  const b = {
     id: "budget-project",
     scopeType: "PROJECT",
     scopeId: "project-1",
     window: "MONTH",
+    providerKey: null,
     ...overrides,
   } as GatewayBudget;
+  return {
+    budget: b,
+    bucketScopeId: b.scopeId,
+    principalUserId: null,
+    groupId: null,
+  };
 }
 
 const RECORD: GatewayBudgetDebitRecord = {
@@ -99,6 +107,7 @@ const RECORD: GatewayBudgetDebitRecord = {
   tokensInput: 100,
   tokensOutput: 50,
   model: "gpt-5-mini",
+  providerKey: null,
   status: "SUCCESS",
   durationMs: 2000,
   occurredAt: new Date(1_700_000_000_500),
@@ -135,7 +144,7 @@ function buildStore({
 }: {
   vk?: unknown;
   project?: unknown;
-  budgets?: GatewayBudget[];
+  budgets?: ResolvedBudget[];
   ledger?: FakeLedger;
   appendChangeEvent?: ReturnType<typeof vi.fn>;
 } = {}) {
@@ -146,18 +155,18 @@ function buildStore({
     },
     project: { findUnique: vi.fn().mockResolvedValue(project) },
   };
-  const applicableForRequest = vi.fn().mockResolvedValue(budgets);
+  const resolveForRequest = vi.fn().mockResolvedValue(budgets);
   // Composed through the REAL service, so these scenarios still observe the
   // resolve → authorise → insert → notify path end to end after the split.
   const store = new GatewayBudgetDebitsAppendStore({
     debits: new GatewayBudgetDebitService({
       prisma: prisma as never,
-      budgetRepository: { applicableForRequest } as never,
+      budgetRepository: { resolveForRequest } as never,
     }),
     budgetCHRepository: ledger as never,
     changeEvents: { append: appendChangeEvent } as never,
   });
-  return { store, prisma, ledger, appendChangeEvent, applicableForRequest };
+  return { store, prisma, ledger, appendChangeEvent, resolveForRequest };
 }
 
 describe("GatewayBudgetDebitsAppendStore", () => {
@@ -277,8 +286,8 @@ describe("GatewayBudgetDebitsAppendStore", () => {
 
   describe("given the budget lookup fails", () => {
     it("reports the failure rather than silently charging nothing", async () => {
-      const { store, applicableForRequest } = buildStore();
-      applicableForRequest.mockRejectedValue(new Error("PG down"));
+      const { store, resolveForRequest } = buildStore();
+      resolveForRequest.mockRejectedValue(new Error("PG down"));
 
       await expect(store.append(RECORD, STORE_CONTEXT)).rejects.toThrow(
         "PG down",
@@ -337,13 +346,13 @@ describe("GatewayBudgetDebitsAppendStore", () => {
 
   describe("given a key scoped to a principal", () => {
     it("resolves principal-scoped budgets from the key's owner", async () => {
-      const { store, applicableForRequest } = buildStore({
+      const { store, resolveForRequest } = buildStore({
         vk: { ...VK_SCOPED_AT_PROJECT_1, principalUserId: "user-9" },
       });
 
       await store.append(RECORD, STORE_CONTEXT);
 
-      expect(applicableForRequest).toHaveBeenCalledWith({
+      expect(resolveForRequest).toHaveBeenCalledWith({
         organizationId: "org-1",
         teamId: "team-1",
         projectId: "project-1",
@@ -373,13 +382,13 @@ describe("GatewayBudgetDebitsAppendStore", () => {
     });
 
     it("resolves the project, its keys and their budgets once for the whole window, not once per request", async () => {
-      const { store, prisma, applicableForRequest } = buildStore();
+      const { store, prisma, resolveForRequest } = buildStore();
 
       await store.bulkAppend(requests("grq_A", "grq_B", "grq_C"), BULK_CONTEXT);
 
       expect(prisma.project.findUnique).toHaveBeenCalledTimes(1);
       expect(prisma.virtualKey.findMany).toHaveBeenCalledTimes(1);
-      expect(applicableForRequest).toHaveBeenCalledTimes(1);
+      expect(resolveForRequest).toHaveBeenCalledTimes(1);
     });
 
     it("writes the whole window through one ledger call", async () => {
