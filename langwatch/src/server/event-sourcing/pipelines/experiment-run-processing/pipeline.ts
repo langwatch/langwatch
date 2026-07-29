@@ -4,7 +4,6 @@ import type { ProcessManagerApplier } from "../../pipeline/processBuilder";
 import { CachedFoldStore } from "../../projections/cachedFoldStore";
 import type { FoldCacheClient } from "../../projections/foldCache/foldCacheClient";
 import type { AppendStore } from "../../projections/mapProjection.types";
-import type { ExperimentRunStateRepository } from "./repositories/experimentRunState.repository";
 import {
   CompleteExperimentRunCommand,
   RecordEvaluatorResultCommand,
@@ -18,7 +17,6 @@ import {
   handleEvaluatorResult,
   handleStarted,
   handleTargetResult,
-  INITIAL_EXPERIMENT_RUN_EXECUTION_STATE,
 } from "./process-manager/experimentRunExecution.process";
 import {
   createExperimentRunExecutionFailRunHandler,
@@ -30,6 +28,7 @@ import {
   EXPERIMENT_RUN_EXECUTION_MAX_ATTEMPTS,
   EXPERIMENT_RUN_EXECUTION_PROCESS_NAME,
   experimentRunExecutionFailRunIntentSchema,
+  INITIAL_EXPERIMENT_RUN_EXECUTION_STATE,
 } from "./process-manager/experimentRunExecutionProcess.types";
 import {
   type ClickHouseExperimentRunResultRecord,
@@ -40,6 +39,7 @@ import {
   ExperimentRunStateFoldProjection,
 } from "./projections/experimentRunState.foldProjection";
 import { createExperimentRunStateFoldStore } from "./projections/experimentRunState.store";
+import type { ExperimentRunStateRepository } from "./repositories/experimentRunState.repository";
 import { EXPERIMENT_RUN_EVENT_TYPES } from "./schemas/constants";
 import type { ExperimentRunProcessingEvent } from "./schemas/events";
 

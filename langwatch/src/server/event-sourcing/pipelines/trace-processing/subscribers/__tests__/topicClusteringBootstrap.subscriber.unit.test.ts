@@ -12,61 +12,17 @@ vi.mock("@langwatch/observability", () => ({
 }));
 
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import type { TriggerContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
-
-import { SPAN_RECEIVED_EVENT_TYPE } from "../../schemas/constants";
-import type { TraceProcessingEvent } from "../../schemas/events";
 import {
   createTopicClusteringBootstrapSubscriber,
   type TopicClusteringBootstrapSubscriberDeps,
 } from "../topicClusteringBootstrap.subscriber";
-
-const TENANT_ID = "project-123";
-
-function createFoldState(
-  attributes: Record<string, string> = {},
-): TraceSummaryData {
-  return { attributes } as unknown as TraceSummaryData;
-}
-
-function createEvent(
-  tenantId: string,
-  aggregateId = "trace-1",
-): TraceProcessingEvent {
-  return {
-    id: "event-1",
-    aggregateId,
-    aggregateType: "trace",
-    tenantId,
-    createdAt: Date.now(),
-    occurredAt: Date.now(),
-    type: SPAN_RECEIVED_EVENT_TYPE,
-    version: "2025-12-14",
-    data: {
-      span: {},
-      resource: null,
-      instrumentationScope: null,
-      piiRedactionLevel: "STRICT",
-    },
-    metadata: { spanId: "span-1", traceId: aggregateId },
-  } as unknown as TraceProcessingEvent;
-}
-
-function createContext(
-  state: TraceSummaryData,
-): TriggerContext<TraceSummaryData> {
-  return { tenantId: TENANT_ID, aggregateId: "trace-1", state };
-}
-
-function createMockProjectService() {
-  return {
-    getById: vi.fn(),
-    getWithTeam: vi.fn(),
-    updateMetadata: vi.fn(),
-    isFeatureEnabled: vi.fn(),
-    repo: {} as any,
-  };
-}
+import {
+  createContext,
+  createEvent,
+  createFoldState,
+  createMockProjectService,
+  TENANT_ID,
+} from "./support/traceSummaryFixtures";
 
 describe("topicClusteringBootstrap subscriber", () => {
   let deps: TopicClusteringBootstrapSubscriberDeps;

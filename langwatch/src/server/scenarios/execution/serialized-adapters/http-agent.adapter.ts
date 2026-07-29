@@ -5,10 +5,10 @@
  * database access. Designed to run in isolated worker threads.
  */
 
-import type { AgentInput } from "@langwatch/scenario";
-import { AgentAdapter, AgentRole } from "@langwatch/scenario";
 import type { Logger } from "@langwatch/observability";
 import { injectTraceContextHeaders } from "@langwatch/observability/tracing";
+import type { AgentInput } from "@langwatch/scenario";
+import { AgentAdapter, AgentRole } from "@langwatch/scenario";
 import { JSONPath } from "jsonpath-plus";
 import { ssrfSafeFetch } from "~/utils/ssrfProtection";
 import { applyAuthentication } from "../../adapters/auth.strategies";
@@ -65,18 +65,22 @@ function redactUrlForLogs(url: string): string {
  * written verbatim on every call — including the `info` line on SUCCESS — for
  * as long as the deny-list failed to guess that name.
  *
- * Only two classes of name are listed: content negotiation, which by
- * convention never carries credentials, and the W3C trace-context headers this
- * adapter injects itself. Everything else logs its key with a `[REDACTED]`
+ * Only one class of NAME is listed: content negotiation, which by convention
+ * never carries credentials. Everything else logs its key with a `[REDACTED]`
  * value, so an operator can still see WHICH headers were sent without the
  * platform having to predict what a customer will call its secret.
+ *
+ * The W3C trace-context headers are deliberately NOT here. They are loggable
+ * by PROVENANCE, not by name: `propagation.inject()` writes `traceparent` only
+ * when a span is active and `tracestate` only when there is vendor state to
+ * carry, so a target that configured a header literally named `tracestate`
+ * keeps its own value — and that value is user-supplied. Only the ones this
+ * adapter's own injection wrote are logged; see `buildRequestHeaders`.
  */
-const LOGGABLE_HEADERS = new Set([
-  "content-type",
-  "accept",
-  "traceparent",
-  "tracestate",
-]);
+const LOGGABLE_HEADERS = new Set(["content-type", "accept"]);
+
+/** W3C trace-context header names, lowercased. */
+const TRACE_CONTEXT_HEADERS = new Set(["traceparent", "tracestate"]);
 
 /** Maximum body length to include in error messages before truncating. */
 const ERROR_BODY_LIMIT_CHARS = 2048;
@@ -88,14 +92,24 @@ function previewErrorBody(body: string): string {
   return `${body.slice(0, ERROR_BODY_LIMIT_CHARS)}... [truncated]`;
 }
 
-function redactHeaders(
-  headers: Record<string, string>,
-): Record<string, string> {
+/**
+ * @param injectedTraceHeaders - EXACT header keys whose value trace-context
+ *   injection produced. Matched exactly, not case-insensitively: a target may
+ *   configure `TraceState` alongside the injected `tracestate`, and only the
+ *   latter is ours to log.
+ */
+function redactHeaders({
+  headers,
+  injectedTraceHeaders,
+}: {
+  headers: Record<string, string>;
+  injectedTraceHeaders: ReadonlySet<string>;
+}): Record<string, string> {
   const redacted: Record<string, string> = {};
   for (const [key, value] of Object.entries(headers)) {
-    redacted[key] = LOGGABLE_HEADERS.has(key.toLowerCase())
-      ? value
-      : "[REDACTED]";
+    const loggable =
+      LOGGABLE_HEADERS.has(key.toLowerCase()) || injectedTraceHeaders.has(key);
+    redacted[key] = loggable ? value : "[REDACTED]";
   }
   return redacted;
 }
@@ -104,9 +118,9 @@ function redactHeaders(
  * Pick the upstream request id (first match wins). Different upstreams use
  * different header conventions — surface whichever the target chose.
  */
-function pickUpstreamRequestId(
-  headers: { get(name: string): string | null },
-): string | undefined {
+function pickUpstreamRequestId(headers: {
+  get(name: string): string | null;
+}): string | undefined {
   return (
     headers.get("x-request-id") ??
     headers.get("x-amzn-requestid") ??
@@ -145,13 +159,21 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
       scenarioMappings: this.config.scenarioMappings,
     });
     const url = this.buildUrl(templateContext);
-    const headers = this.buildRequestHeaders();
+    const { headers, injectedTraceHeaders } = this.buildRequestHeaders();
     const body = this.buildRequestBody(input, templateContext);
-    const responseData = await this.executeHttpRequest(url, headers, body);
+    const responseData = await this.executeHttpRequest({
+      url,
+      headers,
+      injectedTraceHeaders,
+      body,
+    });
     return this.extractResponseContent(responseData);
   }
 
-  private buildRequestHeaders(): Record<string, string> {
+  private buildRequestHeaders(): {
+    headers: Record<string, string>;
+    injectedTraceHeaders: ReadonlySet<string>;
+  } {
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
     };
@@ -165,25 +187,52 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
 
     Object.assign(headers, applyAuthentication(this.config.auth));
 
+    // Snapshot the user-controlled values first: everything above this line
+    // came from the target's own config, including anything that happens to
+    // be named `traceparent` or `tracestate`.
+    const configuredTraceHeaders = new Map(
+      Object.entries(headers).filter(([key]) =>
+        TRACE_CONTEXT_HEADERS.has(key.toLowerCase()),
+      ),
+    );
+
     const { traceId } = injectTraceContextHeaders({ headers });
     this.capturedTraceId = traceId;
 
-    return headers;
+    // A trace header is ours to log only if injection wrote it — either it
+    // was absent before, or injection overwrote what the target configured.
+    const injectedTraceHeaders = new Set(
+      Object.entries(headers)
+        .filter(
+          ([key, value]) =>
+            TRACE_CONTEXT_HEADERS.has(key.toLowerCase()) &&
+            configuredTraceHeaders.get(key) !== value,
+        )
+        .map(([key]) => key),
+    );
+
+    return { headers, injectedTraceHeaders };
   }
 
   private buildUrl(context: Record<string, unknown>): string {
     return renderUrlTemplate({ template: this.config.url, context });
   }
 
-  private async executeHttpRequest(
-    url: string,
-    headers: Record<string, string>,
-    body: string,
-  ): Promise<unknown> {
+  private async executeHttpRequest({
+    url,
+    headers,
+    injectedTraceHeaders,
+    body,
+  }: {
+    url: string;
+    headers: Record<string, string>;
+    injectedTraceHeaders: ReadonlySet<string>;
+    body: string;
+  }): Promise<unknown> {
     const method = this.config.method.toUpperCase();
     const startedAt = Date.now();
     const loggedUrl = redactUrlForLogs(url);
-    const redactedHeaders = redactHeaders(headers);
+    const redactedHeaders = redactHeaders({ headers, injectedTraceHeaders });
     let response: Awaited<ReturnType<typeof ssrfSafeFetch>>;
     try {
       response = await ssrfSafeFetch(url, {

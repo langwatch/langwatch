@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AutomationDispatchCollaborators } from "../automationDispatch.adapter";
 import { buildAutomationDispatchPorts } from "../automationDispatch.adapter";
 
@@ -75,6 +75,13 @@ const collaborators = () => {
 };
 
 describe("automation dispatch adapter", () => {
+  // The mocks are hoisted, so their call history outlives each test. Clearing
+  // it (not resetting it — `mockResolvedValue` defaults survive `mockClear`)
+  // keeps every assertion about the call THIS test made.
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   describe("when the settlement ports are adapted", () => {
     it("forwards each side effect to its collaborator", async () => {
       const { collaborators: c, spies } = collaborators();
@@ -167,7 +174,7 @@ describe("automation dispatch adapter", () => {
         }),
       );
 
-      const { deps } = evaluateGraphTriggerMock.mock.calls[0]![0];
+      const { deps } = evaluateGraphTriggerMock.mock.calls.at(-1)![0];
       await deps.updateLastRunAt({
         triggerId: "trigger-1",
         projectId: "project-1",

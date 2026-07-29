@@ -52,25 +52,22 @@ import {
   OCSF_ACTIVITY,
   OCSF_SEVERITY,
 } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
-import {
-  spanCostService,
-  spanNormalizationPipelineService,
-} from "@ee/governance/services/spanDerivation.composition";
+import { spanCostService } from "@ee/governance/services/spanDerivation.composition";
 import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
-import {
-  AbstractMapProjection,
-  type MapEventHandlers,
-} from "~/server/event-sourcing/projections/abstractMapProjection";
-import type { AppendStore } from "~/server/event-sourcing/projections/mapProjection.types";
 import { stringAttr } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-summary.utils";
 import {
   type SpanReceivedEvent,
   spanReceivedEventSchema,
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
 import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
+import {
+  AbstractMapProjection,
+  type MapEventHandlers,
+} from "~/server/event-sourcing/projections/abstractMapProjection";
+import type { AppendStore } from "~/server/event-sourcing/projections/mapProjection.types";
 import { GOVERNANCE_ATTR } from "../services/governanceAttributeKeys";
 import {
-  isGovernanceOriginWireSpan,
+  normalizeGovernanceSpanOrNull,
   readGovernanceSpanFacts,
 } from "./governanceSpanFacts";
 
@@ -231,14 +228,8 @@ export class GovernanceOcsfEventsMapProjection
   mapTraceSpanReceived(
     event: SpanReceivedEvent,
   ): GovernanceOcsfEventInput | null {
-    if (!isGovernanceOriginWireSpan(event.data.span)) return null;
-
-    const span = spanNormalizationPipelineService.normalizeSpanReceived(
-      event.tenantId,
-      event.data.span,
-      event.data.resource,
-      event.data.instrumentationScope,
-    );
+    const span = normalizeGovernanceSpanOrNull(event);
+    if (!span) return null;
 
     return deriveGovernanceOcsfEvent({ tenantId: event.tenantId, span });
   }

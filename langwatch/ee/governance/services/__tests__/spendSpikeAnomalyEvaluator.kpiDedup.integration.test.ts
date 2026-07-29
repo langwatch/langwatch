@@ -80,9 +80,11 @@ async function insertGovernanceKpiRow(
 
 describe("SpendSpikeAnomalyEvaluator — unmerged governance_kpis duplicates", () => {
   const namespace = `kpi-dedup-${nanoid(8)}`;
-  let ch: ClickHouseClient;
-  let org: Organization;
-  let govProject: Project;
+  // Optional on purpose: seeding can fail at any of these steps, and teardown
+  // has to be able to tell what exists from what never did.
+  let ch: ClickHouseClient | undefined;
+  let org: Organization | undefined;
+  let govProject: Project | undefined;
   let sourceId: string;
   /** Fixed evaluation moment — windowStart = NOW - 1h, baselineStart = NOW - 7h. */
   const NOW = new Date("2026-04-29T12:00:00Z");
@@ -93,22 +95,27 @@ describe("SpendSpikeAnomalyEvaluator — unmerged governance_kpis duplicates", (
       throw new Error("ClickHouse test container not available");
     }
     ch = maybeCh;
-    await ch.command({ query: "SYSTEM STOP MERGES governance_kpis" });
+    await maybeCh.command({ query: "SYSTEM STOP MERGES governance_kpis" });
 
-    org = await prisma.organization.create({
+    const organization = await prisma.organization.create({
       data: {
         name: `KPI Dedup Org ${namespace}`,
         slug: `kpi-dedup-org-${namespace}`,
       },
     });
+    org = organization;
     await prisma.team.create({
       data: {
         name: `KPI Dedup Team ${namespace}`,
         slug: `kpi-dedup-team-${namespace}`,
-        organizationId: org.id,
+        organizationId: organization.id,
       },
     });
-    govProject = await ensureHiddenGovernanceProject(prisma, org.id);
+    const project = await ensureHiddenGovernanceProject(
+      prisma,
+      organization.id,
+    );
+    govProject = project;
     sourceId = `is-dedup-${nanoid()}`;
 
     const inCurrentWindow = new Date(NOW.getTime() - 30 * 60 * 1000);
@@ -117,7 +124,7 @@ describe("SpendSpikeAnomalyEvaluator — unmerged governance_kpis duplicates", (
     // The two rows are byte-identical under one key — the exact shape 00058
     // makes rebuilds produce.
     for (let attempt = 0; attempt < 2; attempt++) {
-      await insertGovernanceKpiRow(ch, govProject.id, {
+      await insertGovernanceKpiRow(maybeCh, project.id, {
         sourceId,
         hourBucket: inCurrentWindow,
         spendUsd: 6.0,
@@ -127,10 +134,12 @@ describe("SpendSpikeAnomalyEvaluator — unmerged governance_kpis duplicates", (
     }
 
     // Pre-00058 trace grain: EventId = '' and the trace's RUNNING totals
-    // written on successive firings, all stamped with the same version. The
-    // merge keeps the last of the tied rows; only the $4 total is real.
+    // written on successive firings, all stamped with the same version. Only
+    // the $4 total is real — it is the trace's final one, and the read's
+    // tie-break has to elect it deterministically rather than pick whichever
+    // tied row ClickHouse happened to reach first.
     for (const runningTotal of [1.5, 4.0]) {
-      await insertGovernanceKpiRow(ch, govProject.id, {
+      await insertGovernanceKpiRow(maybeCh, project.id, {
         sourceId,
         hourBucket: inCurrentWindow,
         spendUsd: runningTotal,
@@ -142,7 +151,7 @@ describe("SpendSpikeAnomalyEvaluator — unmerged governance_kpis duplicates", (
 
     // Baseline: 6 windows of $1.00, each written exactly once.
     for (let i = 1; i <= 6; i++) {
-      await insertGovernanceKpiRow(ch, govProject.id, {
+      await insertGovernanceKpiRow(maybeCh, project.id, {
         sourceId,
         hourBucket: new Date(NOW.getTime() - (60 + i * 60) * 60 * 1000),
         spendUsd: 1.0,
@@ -153,39 +162,47 @@ describe("SpendSpikeAnomalyEvaluator — unmerged governance_kpis duplicates", (
   });
 
   afterAll(async () => {
-    await ch
-      .command({ query: "SYSTEM START MERGES governance_kpis" })
-      .catch(() => undefined);
-    await prisma.anomalyAlert
-      .deleteMany({ where: { organizationId: org.id } })
-      .catch(() => undefined);
-    await prisma.anomalyRule
-      .deleteMany({ where: { organizationId: org.id } })
-      .catch(() => undefined);
-    await prisma.project
-      .deleteMany({ where: { id: govProject.id } })
-      .catch(() => undefined);
-    await prisma.team
-      .deleteMany({ where: { organizationId: org.id } })
-      .catch(() => undefined);
-    await prisma.organization
-      .deleteMany({ where: { id: org.id } })
-      .catch(() => undefined);
-    await ch
-      .exec({
+    // Merges are a GLOBAL setting: restore them first, before anything that
+    // could fail, and skip only when there is no client because seeding never
+    // got far enough to stop them.
+    if (!ch) return;
+    await ch.command({ query: "SYSTEM START MERGES governance_kpis" });
+
+    // Nothing below swallows. A rejection here is a tenancy-guard or cleanup
+    // bug, and those are exactly the failures worth seeing. What teardown does
+    // instead is check that a thing exists before deleting it, so a seeding
+    // failure surfaces as its own error rather than a TypeError that aborts
+    // the rest of the cleanup.
+    if (org) {
+      await prisma.anomalyAlert.deleteMany({
+        where: { organizationId: org.id },
+      });
+      await prisma.anomalyRule.deleteMany({
+        where: { organizationId: org.id },
+      });
+    }
+    if (govProject) {
+      await prisma.project.deleteMany({ where: { id: govProject.id } });
+    }
+    if (org) {
+      await prisma.team.deleteMany({ where: { organizationId: org.id } });
+      await prisma.organization.deleteMany({ where: { id: org.id } });
+    }
+    if (govProject) {
+      await ch.exec({
         query: `ALTER TABLE governance_kpis DELETE WHERE TenantId = {tenantId:String}`,
         query_params: { tenantId: govProject.id },
-      })
-      .catch(() => undefined);
-    await cleanupTestData(govProject.id);
+      });
+      await cleanupTestData(govProject.id);
+    }
   });
 
   describe("given the fold holds unmerged duplicates of a contribution", () => {
     describe("when the spend spike rule is evaluated", () => {
-      it("reports the spend the merge would elect, not the sum of the duplicates", async () => {
+      it("reports each contribution once, not the sum of the duplicates", async () => {
         const rule = await prisma.anomalyRule.create({
           data: {
-            organizationId: org.id,
+            organizationId: org!.id,
             scope: "source",
             scopeId: sourceId,
             name: `Spend spike dedup ${namespace}`,
@@ -222,7 +239,7 @@ describe("SpendSpikeAnomalyEvaluator — unmerged governance_kpis duplicates", (
       it("reports the baseline average unchanged", async () => {
         const rule = await prisma.anomalyRule.create({
           data: {
-            organizationId: org.id,
+            organizationId: org!.id,
             scope: "source",
             scopeId: sourceId,
             name: `Spend spike dedup baseline ${namespace}`,

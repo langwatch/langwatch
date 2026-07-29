@@ -89,7 +89,12 @@ interface TraceRequestShape {
   resourceSpans?:
     | ({
         resource?: AttributeHolder | null;
-        scopeSpans?: ({ spans?: AttributeHolder[] | null } | null)[] | null;
+        scopeSpans?:
+          | ({
+              scope?: AttributeHolder | null;
+              spans?: AttributeHolder[] | null;
+            } | null)[]
+          | null;
       } | null)[]
     | null;
 }
@@ -98,7 +103,12 @@ interface LogRequestShape {
   resourceLogs?:
     | ({
         resource?: AttributeHolder | null;
-        scopeLogs?: ({ logRecords?: AttributeHolder[] | null } | null)[] | null;
+        scopeLogs?:
+          | ({
+              scope?: AttributeHolder | null;
+              logRecords?: AttributeHolder[] | null;
+            } | null)[]
+          | null;
       } | null)[]
     | null;
 }
@@ -113,12 +123,18 @@ function stripHolder(holder: AttributeHolder | null | undefined): void {
 }
 
 /**
- * Strip the reserved namespace off every span AND every resource of a parsed
- * OTLP trace request, in place.
+ * Strip the reserved namespace off EVERY attribute holder of a parsed OTLP
+ * trace request, in place: resource, instrumentation scope, and span.
  *
- * Resources are included because the reserved keys are hoisted from a trace's
- * whole attribute surface downstream; leaving the resource writable would move
- * the forgery one level up rather than close it.
+ * All three are caller-controlled, so all three are stripped. Resources
+ * because the reserved keys are hoisted from a trace's whole attribute surface
+ * downstream; instrumentation scopes for the same reason and one more — OTLP
+ * gives `InstrumentationScope` its own writable `attributes` list, so a strip
+ * that covered only resources and leaves would leave the namespace assertable
+ * one level in, which moves the forgery rather than closing it. The guarantee
+ * this module states is that NO caller-controlled path can put these keys into
+ * a request; that is only true if the walk is exhaustive over the holders the
+ * schema admits.
  */
 export function stripReservedOriginAttrsFromTraceRequest(
   request: TraceRequestShape,
@@ -127,6 +143,7 @@ export function stripReservedOriginAttrsFromTraceRequest(
     if (!resourceSpans) continue;
     stripHolder(resourceSpans.resource);
     for (const scopeSpans of resourceSpans.scopeSpans ?? []) {
+      stripHolder(scopeSpans?.scope);
       for (const span of scopeSpans?.spans ?? []) {
         stripHolder(span);
       }
@@ -134,7 +151,7 @@ export function stripReservedOriginAttrsFromTraceRequest(
   }
 }
 
-/** Trace-request equivalent for OTLP logs (records + resources). */
+/** Trace-request equivalent for OTLP logs (records + scopes + resources). */
 export function stripReservedOriginAttrsFromLogRequest(
   request: LogRequestShape,
 ): void {
@@ -142,6 +159,7 @@ export function stripReservedOriginAttrsFromLogRequest(
     if (!resourceLogs) continue;
     stripHolder(resourceLogs.resource);
     for (const scopeLogs of resourceLogs.scopeLogs ?? []) {
+      stripHolder(scopeLogs?.scope);
       for (const record of scopeLogs?.logRecords ?? []) {
         stripHolder(record);
       }

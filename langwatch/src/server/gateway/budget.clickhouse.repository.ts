@@ -35,9 +35,7 @@ import {
 const EVENTS_TABLE = "gateway_budget_ledger_events" as const;
 const TOTALS_TABLE = "gateway_budget_scope_totals" as const;
 
-const logger = createLogger(
-  "langwatch:gateway:budget-clickhouse-repository",
-);
+const logger = createLogger("langwatch:gateway:budget-clickhouse-repository");
 
 export type BudgetDebitRow = {
   tenantId: string;
@@ -200,6 +198,21 @@ export class GatewayBudgetClickHouseRepository {
    * ADR-075 `gatewayBudgetDebits` projection gates its `BUDGET_UPDATED`
    * change event on it, so replaying a window cannot flood the gateway's
    * revision feed with notifications for spend it already knows about.
+   *
+   * RESIDUAL RACE — the probe is advisory, not atomic. ClickHouse has no
+   * conditional insert and no unique constraint, and `async_insert` means a
+   * concurrent writer's rows are not even queryable until its buffer flushes,
+   * so two writers for the same `GatewayRequestId` (a rebuild racing live
+   * traffic, or two live retries) can both find the probe empty and both
+   * insert. The ledger still collapses them on merge, but the
+   * `gateway_budget_scope_totals` view aggregates at INSERT time, so
+   * `/budget/check` over-counts that request until the merge fires. Closing it
+   * needs infrastructure this class does not own — either a per-tenant lease
+   * serialising rebuilds against the live debit path, or deriving the rollup
+   * from the ledger (dedup-on-read / a periodic reconcile) instead of trusting
+   * insert-time aggregation. The window is narrow for two live writers and
+   * widest for a rebuild over a busy tenant; run rebuilds outside peak until
+   * one of those lands.
    */
   async insertDebit(rows: BudgetDebitRow[]): Promise<{ inserted: boolean }> {
     if (rows.length === 0) return { inserted: false };
@@ -266,6 +279,11 @@ export class GatewayBudgetClickHouseRepository {
    *
    * Rows for one request id are written together, as `insertDebit` requires,
    * because a gateway request is one write covering every applicable budget.
+   *
+   * Carries the same RESIDUAL RACE documented on {@link insertDebit}, and is
+   * the path most exposed to it: a rebuild probes a whole window at once and
+   * then inserts, so every live debit landing in between is invisible to this
+   * probe and gets written twice into the insert-time rollup.
    */
   async insertDebits(
     rows: BudgetDebitRow[],
@@ -296,7 +314,11 @@ export class GatewayBudgetClickHouseRepository {
     );
     if (toInsert.length === 0) {
       logger.debug(
-        { tenantId, batchSize: rows.length, requests: gatewayRequestIds.length },
+        {
+          tenantId,
+          batchSize: rows.length,
+          requests: gatewayRequestIds.length,
+        },
         "skipping replay batch — every gateway_request_id already in ledger",
       );
       return { insertedGatewayRequestIds: [] };
@@ -618,11 +640,14 @@ function toLedgerEventRow(r: {
     virtualKeyId: r.virtualKeyId,
     amountUsd: r.amountUsd,
     model: r.model,
-    providerSlot: r.providerSlot && r.providerSlot !== "" ? r.providerSlot : null,
+    providerSlot:
+      r.providerSlot && r.providerSlot !== "" ? r.providerSlot : null,
     tokensInput: Number(r.tokensInput),
     tokensOutput: Number(r.tokensOutput),
     durationMs:
-      r.durationMs === null || r.durationMs === undefined || Number(r.durationMs) === 0
+      r.durationMs === null ||
+      r.durationMs === undefined ||
+      Number(r.durationMs) === 0
         ? null
         : Number(r.durationMs),
     status: ledgerStatusFromCH(r.status),

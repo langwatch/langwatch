@@ -4,29 +4,17 @@ Feature: Cross-pipeline command dispatch keyed on identity
   in the system is that and nothing else — no pipeline needs another
   pipeline's handler, only its write surface.
 
-  Until now that coupling was expressed three different ways: a Deferred that
-  a composition root resolved after registration, a hand-rolled `let x = null`
-  thunk, and an untyped `getPipeline(name).commands.x.send(...)` lookup. All
-  three share one defect — the dispatching handler is built outside the
-  pipeline that owns it, at a moment when the target pipeline may not exist —
-  and the first two make pipeline registration order load-bearing with nothing
-  guarding it.
+  The bus makes three promises about that coupling. A pipeline can dispatch
+  into work another pipeline owns without the two being brought up in a
+  particular order, so no arrangement of the system is quietly the wrong one.
+  What it sends is checked against what the receiver accepts, so a mismatched
+  request is a build failure rather than something that surfaces in
+  production. And if a dispatch could never reach an owner at all, the system
+  refuses to start and says which one is missing, instead of accepting the
+  work and failing when it is used.
 
-  The command bus keeps the late lookup and drops everything else. The key is
-  the imported command class itself, so resolution is object identity: no
-  string, no module augmentation, no central registry to keep in sync. The
-  import is also the type, so the payload is checked against the command it is
-  being sent to.
-
-  Resolution happens when a command is sent, not when a port is bound. That is
-  what makes registration order meaningless — and because deferring existence
-  to first dispatch would trade a boot error for a production one, the
-  composition root asserts after registration that every port bound during it
-  resolves.
-
-  # Design: ADR-077 §5 (pipelines own their composition).
-  # Supersedes the Deferred / thunk / getPipeline mechanisms for the
-  # cross-pipeline case.
+  # Design: ADR-077 §5 (pipelines own their composition), which also records
+  # the mechanisms this replaces.
 
   @unit @command-bus
   Scenario: A port bound before its pipeline registers still dispatches

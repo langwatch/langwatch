@@ -146,6 +146,10 @@ export class AnnotationService {
    * Assigns each trace to each annotator, creating the queue item or re-opening
    * an existing one. Cross-tenant references are rejected before anything is
    * written, so a bad annotator in the batch assigns nothing.
+   *
+   * Annotators are deduplicated before the writes fan out: two upserts racing
+   * on the same (trace, annotator) key are what turns a repeated annotator in
+   * the request into a unique-constraint violation instead of a no-op.
    */
   async enqueueTracesForAnnotators({
     traceIds,
@@ -171,6 +175,15 @@ export class AnnotationService {
       },
     );
 
+    const uniqueAnnotators = [
+      ...new Map(
+        parsedAnnotators.map((annotator) => [
+          `${annotator.type}:${annotator.id}`,
+          annotator,
+        ]),
+      ).values(),
+    ];
+
     await this.assertAnnotatorReferences({
       projectId,
       queueIds: parsedAnnotators
@@ -181,24 +194,24 @@ export class AnnotationService {
         .map((annotator) => annotator.id),
     });
 
-    for (const traceId of traceIds) {
-      for (const annotator of parsedAnnotators) {
-        if (annotator.type === "queue") {
-          await this.repository.upsertQueueItemForQueue({
-            projectId,
-            traceId,
-            annotationQueueId: annotator.id,
-            createdByUserId: userId,
-          });
-        } else {
-          await this.repository.upsertQueueItemForUser({
-            projectId,
-            traceId,
-            userId: annotator.id,
-            createdByUserId: userId,
-          });
-        }
-      }
-    }
+    await Promise.all(
+      traceIds.flatMap((traceId) =>
+        uniqueAnnotators.map((annotator) =>
+          annotator.type === "queue"
+            ? this.repository.upsertQueueItemForQueue({
+                projectId,
+                traceId,
+                annotationQueueId: annotator.id,
+                createdByUserId: userId,
+              })
+            : this.repository.upsertQueueItemForUser({
+                projectId,
+                traceId,
+                userId: annotator.id,
+                createdByUserId: userId,
+              }),
+        ),
+      ),
+    );
   }
 }

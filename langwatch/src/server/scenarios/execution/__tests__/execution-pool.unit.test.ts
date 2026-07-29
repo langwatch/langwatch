@@ -68,7 +68,7 @@ describe("ScenarioExecutionPool", () => {
     });
   });
 
-  describe("drain", () => {
+  describe("when the pool is drained", () => {
     it("kills every running child", () => {
       const child1 = makeFakeChild();
       const child2 = makeFakeChild();

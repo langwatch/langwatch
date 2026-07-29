@@ -1,21 +1,23 @@
 /**
  * Governance derived-stream smoke evidence script.
  *
- * Brings up ALL THREE governance write paths end-to-end. They were reactors;
- * ADR-075 Class C made them projections, so a replay now rebuilds them:
+ * Collects LIVE-WRITE evidence for ALL THREE governance write paths
+ * end-to-end: it posts fresh traffic and waits for the projections (ADR-075
+ * Class C, formerly reactors) to land their rows. It never runs a replay —
+ * rebuild coverage lives in the projection integration tests:
  *   - gatewayBudgetDebits.mapProjection → gateway_budget_ledger_events
  *   - governanceKpis.mapProjection      → governance_kpis
  *   - governanceOcsfEvents.mapProjection → governance_ocsf_events
  *
  * Strategy: bypass the live LLM call (which adds Bifrost provider-resolution
- * complexity that's tangential to reactor evidence) and instead POST a
+ * complexity that's tangential to the write-path evidence) and instead POST a
  * synthetic OTLP-shaped trace to /api/otel/v1/traces with the exact span
  * attributes the production gateway's customer-trace-bridge emits
  * (services/aigateway/adapters/gatewaytracer/attrs.go). The OTLP path is
  * the production gateway's path — REST collector doesn't accumulate generic
- * attributes into the fold state, so the reactors only fire on OTLP-fed
- * traces. This script proves the full pipeline (collector → fold →
- * reactors → ClickHouse) end-to-end with the same shape the production
+ * attributes into the fold state, so the projections only derive rows from
+ * OTLP-fed traces. This script proves the full pipeline (collector → fold →
+ * projections → ClickHouse) end-to-end with the same shape the production
  * gateway produces.
  *
  * Flow:
@@ -30,22 +32,25 @@
  *     'cd /app && pnpm tsx scripts/dogfood/governance/smoke-3-governance-streams.ts'
  *
  * Exit code:
- *   0 — all 3 reactors landed at least one row tied to the synthetic trace
- *   1 — any reactor missing evidence after timeout
+ *   0 — all 3 projections landed at least one row tied to the synthetic trace
+ *   1 — any projection missing evidence after timeout
  */
-import { randomBytes } from "crypto";
+
 import { createClient } from "@clickhouse/client";
 import { TeamUserRole } from "@prisma/client";
+import { randomBytes } from "crypto";
 
 import { prisma } from "../../../src/server/db";
+import { defaultVirtualKeyConfig } from "../../../src/server/gateway/virtualKey.config";
 import {
   hashVirtualKeySecret,
   mintVirtualKeySecret,
 } from "../../../src/server/gateway/virtualKey.crypto";
-import { defaultVirtualKeyConfig } from "../../../src/server/gateway/virtualKey.config";
 
 const APP_BASE_URL = process.env.LANGWATCH_BASE_URL ?? "http://localhost:5560";
-const CLICKHOUSE_URL = process.env.CLICKHOUSE_URL ?? "http://default:langwatch@localhost:8123/langwatch";
+const CLICKHOUSE_URL =
+  process.env.CLICKHOUSE_URL ??
+  "http://default:langwatch@localhost:8123/langwatch";
 const POLL_TIMEOUT_MS = 90_000;
 const POLL_INTERVAL_MS = 3_000;
 
@@ -190,7 +195,7 @@ async function postSyntheticOtlpTrace(seeded: SeededState): Promise<string> {
                 startTimeUnixNano,
                 endTimeUnixNano,
                 attributes: [
-                  // Gateway-origin marker — required by reactors
+                  // Gateway-origin marker — required by the projections
                   attrStr("langwatch.origin", "gateway"),
                   attrStr("langwatch.virtual_key_id", seeded.vk.id),
                   attrStr("langwatch.organization_id", seeded.org.id),
@@ -240,17 +245,17 @@ async function postSyntheticOtlpTrace(seeded: SeededState): Promise<string> {
   return traceId;
 }
 
-interface ReactorEvidence {
+interface LiveWriteEvidence {
   table: string;
   rowCount: number;
   sample: unknown;
   landed: boolean;
 }
 
-async function pollClickHouse(projectId: string): Promise<ReactorEvidence[]> {
+async function pollClickHouse(projectId: string): Promise<LiveWriteEvidence[]> {
   // CH `TenantId` column is the trace-processing tenant id, which is the
   // PROJECT id (not the organization id). Earlier smoke runs polled by
-  // org id and consistently returned 0 rows even though reactors had
+  // org id and consistently returned 0 rows even though the projections had
   // written; that was the smoke-script bug, not a pipeline bug.
   const ch = createClient({ url: CLICKHOUSE_URL, database: "langwatch" });
   const deadline = Date.now() + POLL_TIMEOUT_MS;
@@ -269,7 +274,7 @@ async function pollClickHouse(projectId: string): Promise<ReactorEvidence[]> {
     },
   ];
   while (Date.now() < deadline) {
-    const out: ReactorEvidence[] = [];
+    const out: LiveWriteEvidence[] = [];
     let allLanded = true;
     for (const t of tables) {
       const res = await ch.query({ query: t.query, format: "JSON" });
@@ -290,7 +295,7 @@ async function pollClickHouse(projectId: string): Promise<ReactorEvidence[]> {
     process.stdout.write(`.`);
     await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
   }
-  const out: ReactorEvidence[] = [];
+  const out: LiveWriteEvidence[] = [];
   for (const t of tables) {
     const res = await ch.query({ query: t.query, format: "JSON" });
     const data = (await res.json()) as { data: unknown[] };
@@ -305,12 +310,14 @@ async function pollClickHouse(projectId: string): Promise<ReactorEvidence[]> {
   return out;
 }
 
-async function postSyntheticIngestionSourceTrace(seeded: SeededState): Promise<string> {
+async function postSyntheticIngestionSourceTrace(
+  seeded: SeededState,
+): Promise<string> {
   // Build an OTLP/JSON payload for an ingestion-source-shaped trace.
   // governanceKpisSync + governanceOcsfEventsSync gate on
   // langwatch.origin.kind=ingestion_source + langwatch.ingestion_source.id.
   // Without these markers they early-return — so the GATEWAY trace
-  // shape doesn't fire those two reactors. We need a SECOND synthetic
+  // shape doesn't fire those two projections. We need a SECOND synthetic
   // trace shaped like an ingestion-source puller event.
   const traceId = hexId(16);
   const spanId = hexId(8);
@@ -343,7 +350,7 @@ async function postSyntheticIngestionSourceTrace(seeded: SeededState): Promise<s
                 endTimeUnixNano,
                 attributes: [
                   // Governance ingestion-source markers required by the
-                  // governanceKpisSync + governanceOcsfEventsSync reactors
+                  // governanceKpis + governanceOcsfEvents projections
                   attrStr("langwatch.origin.kind", "ingestion_source"),
                   attrStr("langwatch.ingestion_source.id", ingestionSourceId),
                   attrStr(
@@ -394,12 +401,14 @@ async function main() {
   console.log(
     `[smoke] seeded: org=${seeded.org.id} project=${seeded.project.id} vk=${seeded.vk.id}`,
   );
-  console.log(`[smoke] posting synthetic OTLP gateway trace to /api/otel/v1/traces…`);
+  console.log(
+    `[smoke] posting synthetic OTLP gateway trace to /api/otel/v1/traces…`,
+  );
   const traceId = await postSyntheticOtlpTrace(seeded);
   console.log(`[smoke] posting synthetic OTLP ingestion-source trace…`);
   const ingestionTraceId = await postSyntheticIngestionSourceTrace(seeded);
   console.log(
-    `[smoke] polling ClickHouse for reactor evidence (timeout ${POLL_TIMEOUT_MS / 1000}s)…`,
+    `[smoke] polling ClickHouse for live-write evidence (timeout ${POLL_TIMEOUT_MS / 1000}s)…`,
   );
   const evidence = await pollClickHouse(seeded.project.id);
   console.log("\n");
@@ -413,7 +422,7 @@ async function main() {
       gatewayTraceId: traceId,
       ingestionSourceTraceId: ingestionTraceId,
     },
-    reactors: evidence.map((e) => ({
+    projections: evidence.map((e) => ({
       table: e.table,
       landed: e.landed,
       rowCount: e.rowCount,

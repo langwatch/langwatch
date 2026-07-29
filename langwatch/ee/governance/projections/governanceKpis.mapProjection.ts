@@ -73,22 +73,19 @@
  */
 
 import type { GovernanceKpiContribution } from "@ee/governance/services/governanceKpis.clickhouse.repository";
-import {
-  spanCostService,
-  spanNormalizationPipelineService,
-} from "@ee/governance/services/spanDerivation.composition";
-import {
-  AbstractMapProjection,
-  type MapEventHandlers,
-} from "~/server/event-sourcing/projections/abstractMapProjection";
-import type { AppendStore } from "~/server/event-sourcing/projections/mapProjection.types";
+import { spanCostService } from "@ee/governance/services/spanDerivation.composition";
 import {
   type SpanReceivedEvent,
   spanReceivedEventSchema,
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
 import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import {
-  isGovernanceOriginWireSpan,
+  AbstractMapProjection,
+  type MapEventHandlers,
+} from "~/server/event-sourcing/projections/abstractMapProjection";
+import type { AppendStore } from "~/server/event-sourcing/projections/mapProjection.types";
+import {
+  normalizeGovernanceSpanOrNull,
   readGovernanceSpanFacts,
 } from "./governanceSpanFacts";
 
@@ -140,7 +137,8 @@ export function deriveGovernanceKpiContribution({
       ? occurredAtMs
       : facts.eventTimeMs;
 
-  const skipTokenAccumulation = spanCostService.isTokenAccumulationSkipped(span);
+  const skipTokenAccumulation =
+    spanCostService.isTokenAccumulationSkipped(span);
   const tokens = skipTokenAccumulation
     ? { promptTokens: 0, completionTokens: 0, cost: 0 }
     : spanCostService.extractTokenMetrics(span);
@@ -188,14 +186,8 @@ export class GovernanceKpisMapProjection
   mapTraceSpanReceived(
     event: SpanReceivedEvent,
   ): GovernanceKpiContribution | null {
-    if (!isGovernanceOriginWireSpan(event.data.span)) return null;
-
-    const span = spanNormalizationPipelineService.normalizeSpanReceived(
-      event.tenantId,
-      event.data.span,
-      event.data.resource,
-      event.data.instrumentationScope,
-    );
+    const span = normalizeGovernanceSpanOrNull(event);
+    if (!span) return null;
 
     return deriveGovernanceKpiContribution({
       tenantId: event.tenantId,

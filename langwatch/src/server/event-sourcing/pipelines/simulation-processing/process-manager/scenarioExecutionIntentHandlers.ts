@@ -43,6 +43,11 @@ export interface ScenarioExecutionDispatchDeps {
    * `maxAttempts` never sees it. The run's own status is the durable record of
    * whether it has already been dispatched, and it is a property of the work
    * rather than of the attempt.
+   *
+   * Read from the DURABLE tier, never a fold cache: a cached `QUEUED` from
+   * another process is precisely the stale answer that would let a redelivery
+   * dispatch twice. See the residual window on
+   * {@link createScenarioExecutionExecuteRunHandler}.
    */
   readRunStatus: (params: {
     projectId: string;
@@ -83,12 +88,22 @@ const AWAITING_DISPATCH_STATUSES = new Set(["QUEUED", "PENDING"]);
 /**
  * Executes the `executeRun` intent: runs a queued scenario.
  *
- * **This handler is at-most-once by construction, not by configuration.**
- * `maxAttempts` is shared with `failRun`, which must retry, so it cannot also
- * express "never run this twice"; and it would not express it anyway, because
- * a hard-killed worker's lease lapses without incrementing the attempt count.
- * The guard is the run's own stored status: if it has left the queue, this
- * delivery is a redelivery and the run is left to its deadline instead.
+ * **The status read is the guard, and it is check-then-act.** `maxAttempts` is
+ * shared with `failRun`, which must retry, so it cannot also express "never run
+ * this twice"; and it would not express it anyway, because a hard-killed
+ * worker's lease lapses without incrementing the attempt count. The run's own
+ * stored status is the durable record of whether the work has already been
+ * dispatched, and it survives redelivery, lease lapse and restart alike.
+ *
+ * What it does NOT do is close the window. The read and `executeRun` are two
+ * steps with no atomic claim between them, so a worker that was partitioned
+ * rather than dead can still be holding a child while a re-leased delivery
+ * reads a stale `QUEUED` and spawns a second one. That window is the interval
+ * between this read and the child's first status write. Closing it needs the
+ * claim to BE a write — a conditional `QUEUED`/`PENDING` -> `IN_PROGRESS`
+ * transition on the run store, or a fence token compared at spawn time — which
+ * is a store-level capability this handler does not have today. Until then the
+ * guard narrows the double-run window; it does not remove it.
  *
  * Once the run has been handed to the executor the handler never throws.
  * A rejection after that point would re-lease a message whose scenario has

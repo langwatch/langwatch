@@ -13,8 +13,8 @@
  * built from the pipeline's own `Deps` per ADR-077 Rule 1.
  */
 
-import { createLogger } from "@langwatch/observability";
 import type { NurturingService } from "@ee/billing/nurturing/nurturing.service";
+import { createLogger } from "@langwatch/observability";
 import type { ProjectService } from "~/server/app-layer/projects/project.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
@@ -124,49 +124,20 @@ export function createCustomerIoTraceSyncSubscriber(
           summary.attributes["langwatch.sdk.framework"] ?? "unknown";
         const traceOccurredAt = new Date(summary.occurredAt).toISOString();
 
-        if (!firstMessage) {
-          // First trace — fire immediately, fire-and-forget
-          nurtureFireAndForget({
-            promise: deps.nurturing.identifyUser({
-              userId,
-              traits: {
-                has_traces: true,
-                sdk_language: sdkLanguage,
-                sdk_framework: sdkFramework,
-                first_trace_at: traceOccurredAt,
-              },
-            }),
-            logger,
-            projectId,
-            what: "identify user for first trace",
-          });
-          nurtureFireAndForget({
-            promise: deps.nurturing.trackEvent({
-              userId,
-              event: "first_trace_integrated",
-              properties: {
-                sdk_language: sdkLanguage,
-                sdk_framework: sdkFramework,
-                project_id: projectId,
-              },
-            }),
-            logger,
-            projectId,
-            what: "track first_trace_integrated event",
-          });
+        const call = {
+          nurturing: deps.nurturing,
+          projectId,
+          userId,
+          sdkLanguage,
+          sdkFramework,
+          traceOccurredAt,
+        };
+        // `Project.firstMessage` stays false until the projectMetadata process
+        // has recorded one, so false here IS this project's first trace.
+        if (firstMessage) {
+          notifyReturningTrace(call);
         } else {
-          // Subsequent trace — debounced by the dedup window, fire-and-forget
-          nurtureFireAndForget({
-            promise: deps.nurturing.identifyUser({
-              userId,
-              traits: {
-                last_trace_at: traceOccurredAt,
-              },
-            }),
-            logger,
-            projectId,
-            what: "identify user for trace update",
-          });
+          notifyFirstTrace(call);
         }
       } catch (error) {
         // Class B is lossy by contract: never throw back into the queue, so a
@@ -179,4 +150,80 @@ export function createCustomerIoTraceSyncSubscriber(
       }
     },
   };
+}
+
+/** What both nurture branches need. The trace itself never crosses. */
+interface TraceNurtureCall {
+  nurturing: NurturingService;
+  projectId: string;
+  userId: string;
+  sdkLanguage: string;
+  sdkFramework: string;
+  traceOccurredAt: string;
+}
+
+/**
+ * The project's first trace: the integration milestone. Fired immediately —
+ * there is nothing earlier to debounce against — and fire-and-forget, so the
+ * subscriber's lane never waits on Customer.io.
+ */
+function notifyFirstTrace({
+  nurturing,
+  projectId,
+  userId,
+  sdkLanguage,
+  sdkFramework,
+  traceOccurredAt,
+}: TraceNurtureCall): void {
+  nurtureFireAndForget({
+    promise: nurturing.identifyUser({
+      userId,
+      traits: {
+        has_traces: true,
+        sdk_language: sdkLanguage,
+        sdk_framework: sdkFramework,
+        first_trace_at: traceOccurredAt,
+      },
+    }),
+    logger,
+    projectId,
+    what: "identify user for first trace",
+  });
+  nurtureFireAndForget({
+    promise: nurturing.trackEvent({
+      userId,
+      event: "first_trace_integrated",
+      properties: {
+        sdk_language: sdkLanguage,
+        sdk_framework: sdkFramework,
+        project_id: projectId,
+      },
+    }),
+    logger,
+    projectId,
+    what: "track first_trace_integrated event",
+  });
+}
+
+/**
+ * Every trace after the first: one trait, debounced by the subscriber's dedup
+ * window rather than by anything here.
+ */
+function notifyReturningTrace({
+  nurturing,
+  projectId,
+  userId,
+  traceOccurredAt,
+}: TraceNurtureCall): void {
+  nurtureFireAndForget({
+    promise: nurturing.identifyUser({
+      userId,
+      traits: {
+        last_trace_at: traceOccurredAt,
+      },
+    }),
+    logger,
+    projectId,
+    what: "identify user for trace update",
+  });
 }

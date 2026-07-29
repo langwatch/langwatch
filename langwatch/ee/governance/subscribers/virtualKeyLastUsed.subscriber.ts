@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { spanNormalizationPipelineService } from "@ee/governance/services/spanDerivation.composition";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
-import { spanNormalizationPipelineService } from "@ee/governance/services/spanDerivation.composition";
 import { SPAN_RECEIVED_EVENT_TYPE } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
 import type {
   SpanReceivedEvent,
@@ -49,7 +49,9 @@ export interface VirtualKeyLastUsedSubscriberDeps {
  * normalising when the other would not. What they do AFTER normalising
  * differs on purpose — see `deriveGatewayDebitRecord`'s docstring.
  */
-export function spanCarriesVirtualKeyMarker(event: TraceProcessingEvent): boolean {
+export function spanCarriesVirtualKeyMarker(
+  event: TraceProcessingEvent,
+): boolean {
   if (event.type !== SPAN_RECEIVED_EVENT_TYPE) return false;
   return spanCarriesGatewayVirtualKeyId(
     (event as SpanReceivedEvent).data?.span,
@@ -107,38 +109,47 @@ export function createVirtualKeyLastUsedSubscriber(
         });
         if (!vk) return;
 
-        // Cross-tenant guard. `virtualKeyId` comes off a span attribute the
-        // customer writes, and it is not in the reserved namespace the receiver
-        // strips — so any tenant can name any VK id here. The multitenancy
-        // middleware does NOT catch it: VirtualKey's validateWhere accepts a
-        // bare row id as tenancy proof for single-row writes.
-        //
-        // The debit half of this split carries the same check
-        // (gatewayBudgetDebits.store.ts). Splitting the touch out into its own
-        // subscriber removed the only path that resolved project -> org, so
-        // without this the guard is structurally absent rather than merely
-        // late, and a forged span blind-writes another org's row.
-        const project = await deps.prisma.project.findUnique({
-          where: { id: projectId },
-          select: { team: { select: { organizationId: true } } },
-        });
-        if (
-          !project ||
-          project.team.organizationId !== vk.organizationId
-        ) {
-          logger.warn(
-            { projectId, virtualKeyId },
-            "span references a cross-tenant virtual key — refusing to touch lastUsedAt",
-          );
-          return;
-        }
-
+        // Throttle first. The staleness check needs nothing the row above did
+        // not already carry, and it discards the vast majority of gateway
+        // spans — resolving the project's org for a span that is about to
+        // write nothing is a Postgres read per gateway request bought for
+        // nothing.
         const now = new Date();
         const isStale =
           !vk.lastUsedAt ||
           now.getTime() - vk.lastUsedAt.getTime() >
             VIRTUAL_KEY_LAST_USED_THROTTLE_MS;
         if (!isStale) return;
+
+        // Cross-tenant guard, immediately before the write it guards.
+        // `virtualKeyId` comes off a span attribute the customer writes, and it
+        // is not in the reserved namespace the receiver strips — so any tenant
+        // can name any VK id here. The multitenancy middleware does NOT catch
+        // it: VirtualKey's validateWhere accepts a bare row id as tenancy proof
+        // for single-row writes.
+        //
+        // The debit half of this split carries the same check
+        // (gatewayBudgetDebits.store.ts). Splitting the touch out into its own
+        // subscriber removed the only path that resolved project -> org, so
+        // without this the guard is structurally absent rather than merely
+        // late, and a forged span blind-writes another org's row.
+        //
+        // Sitting behind the throttle costs nothing in enforcement — every
+        // write still passes it — but it does mean the warning below is
+        // sampled at the throttle interval rather than logged per forged span,
+        // because a forged span aimed at an actively-used key is discarded as
+        // fresh before the org is ever resolved.
+        const project = await deps.prisma.project.findUnique({
+          where: { id: projectId },
+          select: { team: { select: { organizationId: true } } },
+        });
+        if (!project || project.team.organizationId !== vk.organizationId) {
+          logger.warn(
+            { projectId, virtualKeyId },
+            "span references a cross-tenant virtual key — refusing to touch lastUsedAt",
+          );
+          return;
+        }
 
         // Post-collapse VirtualKey is org-scoped in SCOPED_MODELS; the dbMTP
         // guard accepts a row id as tenancy proof for single-row writes, so the

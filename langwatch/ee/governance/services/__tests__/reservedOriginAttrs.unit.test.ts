@@ -52,9 +52,9 @@ describe("reserved origin attributes", () => {
   describe("given an attribute list carrying forged governance keys", () => {
     describe("when the list is stripped", () => {
       it("drops every langwatch.origin.* and langwatch.ingestion_source.* key", () => {
-        expect(keysOf(stripReservedOriginAttrs(forgedGovernanceAttrs()))).toEqual(
-          ["gen_ai.request.model"],
-        );
+        expect(
+          keysOf(stripReservedOriginAttrs(forgedGovernanceAttrs())),
+        ).toEqual(["gen_ai.request.model"]);
       });
     });
   });
@@ -86,7 +86,10 @@ describe("reserved origin attributes", () => {
           {
             resource: { attributes: forgedGovernanceAttrs() },
             scopeSpans: [
-              { spans: [{ attributes: forgedGovernanceAttrs() }] },
+              {
+                scope: { attributes: forgedGovernanceAttrs() },
+                spans: [{ attributes: forgedGovernanceAttrs() }],
+              },
             ],
           },
         ],
@@ -107,6 +110,19 @@ describe("reserved origin attributes", () => {
         ).toEqual(["gen_ai.request.model"]);
       });
 
+      it("clears the reserved keys off the instrumentation scope", () => {
+        // OTLP gives InstrumentationScope its own writable attribute list, so
+        // it is a caller-controlled path into the reserved namespace exactly
+        // like the resource and the span are.
+        const request = forgedTraceRequest();
+
+        stripReservedOriginAttrsFromTraceRequest(request);
+
+        expect(
+          keysOf(request.resourceSpans[0]!.scopeSpans[0]!.scope.attributes),
+        ).toEqual(["gen_ai.request.model"]);
+      });
+
       it("makes the governance gate reject the span the forgery produced", () => {
         const request = forgedTraceRequest();
         const span = request.resourceSpans[0]!.scopeSpans[0]!.spans[0]!;
@@ -121,13 +137,16 @@ describe("reserved origin attributes", () => {
 
   describe("given OTLP logs and metrics forging governance origin", () => {
     describe("when the request is stripped", () => {
-      it("clears the reserved keys off log records and their resource", () => {
+      it("clears the reserved keys off log records, scopes and their resource", () => {
         const request = {
           resourceLogs: [
             {
               resource: { attributes: forgedGovernanceAttrs() },
               scopeLogs: [
-                { logRecords: [{ attributes: forgedGovernanceAttrs() }] },
+                {
+                  scope: { attributes: forgedGovernanceAttrs() },
+                  logRecords: [{ attributes: forgedGovernanceAttrs() }],
+                },
               ],
             },
           ],
@@ -139,6 +158,9 @@ describe("reserved origin attributes", () => {
           "gen_ai.request.model",
         ]);
         expect(
+          keysOf(request.resourceLogs[0]!.scopeLogs[0]!.scope.attributes),
+        ).toEqual(["gen_ai.request.model"]);
+        expect(
           keysOf(
             request.resourceLogs[0]!.scopeLogs[0]!.logRecords[0]!.attributes,
           ),
@@ -147,14 +169,16 @@ describe("reserved origin attributes", () => {
 
       it("clears the reserved keys off metric resources", () => {
         const request = {
-          resourceMetrics: [{ resource: { attributes: forgedGovernanceAttrs() } }],
+          resourceMetrics: [
+            { resource: { attributes: forgedGovernanceAttrs() } },
+          ],
         };
 
         stripReservedOriginAttrsFromMetricRequest(request);
 
-        expect(keysOf(request.resourceMetrics[0]!.resource.attributes)).toEqual([
-          "gen_ai.request.model",
-        ]);
+        expect(keysOf(request.resourceMetrics[0]!.resource.attributes)).toEqual(
+          ["gen_ai.request.model"],
+        );
       });
     });
   });
@@ -171,7 +195,9 @@ describe("reserved origin attributes", () => {
           stripReservedOriginAttrsFromLogRequest({ resourceLogs: null }),
         ).not.toThrow();
         expect(() =>
-          stripReservedOriginAttrsFromMetricRequest({ resourceMetrics: [null] }),
+          stripReservedOriginAttrsFromMetricRequest({
+            resourceMetrics: [null],
+          }),
         ).not.toThrow();
       });
     });

@@ -90,7 +90,7 @@ export const originGateEventViewSchema = z.object({
    */
   originDecided: z.boolean(),
   /** A root span — the only place the SDK-presence heuristic applies. */
-  rootSpan: z.boolean(),
+  isRootSpan: z.boolean(),
   /** This event's resource named an instrumentation SDK. */
   sdkPresent: z.boolean(),
 });

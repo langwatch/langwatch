@@ -9,11 +9,11 @@ import {
   observeEsFoldCacheStoreDuration,
 } from "~/server/metrics";
 import type { FoldCacheClient } from "./foldCache/foldCacheClient";
-import type { FoldProjectionStore } from "./foldProjection.types";
 import {
   decodeFoldCacheEntry,
   encodeFoldCacheEntry,
 } from "./foldCache/foldCacheEntry";
+import type { FoldProjectionStore } from "./foldProjection.types";
 import type { ProjectionStoreContext } from "./projectionStoreContext";
 
 const logger = createLogger("langwatch:event-sourcing:cached-fold-store");
@@ -218,7 +218,11 @@ export class CachedFoldStore<State> implements FoldProjectionStore<State> {
       incrementEsFoldCacheRedisError(this.keyPrefix, "get");
       incrementEsFoldCacheTotal(this.keyPrefix, "fallback_error");
       logger.warn(
-        { aggregateId, tenantId: String(context.tenantId), error: String(error) },
+        {
+          aggregateId,
+          tenantId: String(context.tenantId),
+          error: String(error),
+        },
         "Fold cache read failed — falling through to the durable store",
       );
       return { hit: false, reason: "read_error" };
@@ -247,7 +251,11 @@ export class CachedFoldStore<State> implements FoldProjectionStore<State> {
       incrementEsFoldCacheRedisError(this.keyPrefix, "get");
       incrementEsFoldCacheTotal(this.keyPrefix, "fallback_error");
       logger.error(
-        { aggregateId, tenantId: String(context.tenantId), error: String(error) },
+        {
+          aggregateId,
+          tenantId: String(context.tenantId),
+          error: String(error),
+        },
         "Fold cache entry was unreadable — falling through to the durable store, dedup unavailable for this read",
       );
       return { hit: false, reason: "unreadable" };
@@ -310,6 +318,12 @@ export class CachedFoldStore<State> implements FoldProjectionStore<State> {
    * already succeeded, so the next read falls through to state that is
    * genuinely there. What is lost is the read-your-writes window and the
    * applied-set, so it is counted rather than swallowed silently.
+   *
+   * Encoding is handled separately from the write. A state that will not
+   * serialise is a payload bug in the caller, not a cache outage, so counting
+   * it as `es_fold_cache_redis_error_total{operation="set"}` would point an
+   * incident at the wrong tier; it is logged on its own and the cache write is
+   * skipped, which leaves `store()` as non-fatal as it was.
    */
   private async writeToCache(
     state: State,
@@ -318,23 +332,35 @@ export class CachedFoldStore<State> implements FoldProjectionStore<State> {
   ): Promise<void> {
     const key = this.cacheKey(aggregateId, context);
 
+    // The applied-event-id set is decided upstream and stamped on the context:
+    // FoldProjectionExecutor.appliedIdsForCommit unions it on a retry and
+    // resets it on a fresh delivery, at all four of its commit sites, before
+    // store() runs. This tier is a dumb read/write cache (ADR-066), so it
+    // persists that set verbatim — it does not re-read the cache to re-merge,
+    // which on the executor path was a guaranteed no-op (an extra cache read
+    // plus a full state decode). The only other caller, replay, writes a
+    // fresh row carrying no set; an absent value is treated as empty, matching
+    // that path's prior result.
+    let payload: string;
     try {
-      // The applied-event-id set is decided upstream and stamped on the context:
-      // FoldProjectionExecutor.appliedIdsForCommit unions it on a retry and
-      // resets it on a fresh delivery, at all four of its commit sites, before
-      // store() runs. This tier is a dumb read/write cache (ADR-066), so it
-      // persists that set verbatim — it does not re-read the cache to re-merge,
-      // which on the executor path was a guaranteed no-op (an extra cache read
-      // plus a full state decode). The only other caller, replay, writes a
-      // fresh row carrying no set; an absent value is treated as empty, matching
-      // that path's prior result.
-      const payload = encodeFoldCacheEntry({
+      payload = encodeFoldCacheEntry({
         state,
         updatedAt: this.updatedAtOf(state),
         appliedEventIds: context.appliedEventIds ?? [],
       });
+    } catch (error) {
+      // Not a cache fault: the durable write already landed, and the state
+      // this projection produced is the thing that will not serialise.
+      logger.error(
+        { aggregateId, error: String(error) },
+        "Fold state could not be encoded for the cache — skipping the cache write",
+      );
+      return;
+    }
 
-      observeEsFoldCacheEntryBytes(this.keyPrefix, Buffer.byteLength(payload));
+    observeEsFoldCacheEntryBytes(this.keyPrefix, Buffer.byteLength(payload));
+
+    try {
       await this.cache.write(key, payload, this.ttlSeconds);
     } catch (error) {
       incrementEsFoldCacheRedisError(this.keyPrefix, "set");

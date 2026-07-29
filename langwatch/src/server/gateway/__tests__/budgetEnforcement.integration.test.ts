@@ -16,19 +16,18 @@
 import { createGatewayBudgetDebitsProjection } from "@ee/governance/projections/governanceProjections.composition";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { replayGooseMigrationUp } from "~/server/clickhouse/__tests__/migrationReplay";
+import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
+import {
+  startTestContainers,
+  stopTestContainers,
+} from "~/server/event-sourcing/__tests__/integration/testContainers";
 import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
 import {
   createSpanReceivedEvent,
   msToUnixNano,
 } from "~/server/event-sourcing/pipelines/trace-processing/projections/__tests__/fixtures/trace-summary-test.fixtures";
-import {
-  startTestContainers,
-  stopTestContainers,
-} from "~/server/event-sourcing/__tests__/integration/testContainers";
 
 import { GatewayBudgetClickHouseRepository } from "../budget.clickhouse.repository";
 import { GatewayBudgetRepository } from "../budget.repository";
@@ -64,6 +63,51 @@ const REQUEST_ATTRIBUTES = {
   "langwatch.model.inputCostPerToken": 0.000005,
   "langwatch.model.outputCostPerToken": 0.00001,
 } as const;
+
+/**
+ * Records one gateway request's spend the way production does: derive the
+ * debit from a gateway span through the real projection and append it.
+ *
+ * One writer, parameterised by project + virtual key, because every suite in
+ * this file must accrue spend through the SAME projection — a second copy of
+ * this body is a second write path, which is precisely what these tests exist
+ * to rule out.
+ */
+async function recordRequestFor({
+  projection,
+  projectId,
+  virtualKeyId,
+}: {
+  projection: ReturnType<typeof createGatewayBudgetDebitsProjection>;
+  projectId: string;
+  virtualKeyId: string;
+}): Promise<void> {
+  // The request's own start time, not ingest time: it is what the rollup
+  // buckets `PeriodStart` from, so a debit stamped anywhere but "now" lands in
+  // a period today's DAY budget never reads.
+  const startedAtMs = Date.now();
+  const event = createSpanReceivedEvent({
+    eventId: `evt-${nanoid()}`,
+    tenantId: projectId,
+    traceId: nanoid(32),
+    spanId: nanoid(16),
+    startTimeUnixNano: msToUnixNano(startedAtMs),
+    endTimeUnixNano: msToUnixNano(startedAtMs + 120),
+    statusCode: 1,
+    attributes: {
+      ...REQUEST_ATTRIBUTES,
+      "langwatch.virtual_key_id": virtualKeyId,
+      "langwatch.gateway_request_id": `grq_${nanoid()}`,
+    },
+  });
+
+  const record = projection.map(event);
+  if (!record) throw new Error("gateway span derived no debit record");
+  await projection.store.append(record, {
+    aggregateId: event.aggregateId,
+    tenantId: createTenantId(projectId),
+  });
+}
 
 describe("given a blocking budget on traffic the gateway is serving", () => {
   let service: GatewayBudgetService;
@@ -172,40 +216,21 @@ describe("given a blocking budget on traffic the gateway is serving", () => {
       changeEvents: new ChangeEventRepository(prisma),
     });
 
-    recordOneRequest = async () => {
-      // The request's own start time, not ingest time: it is what the rollup
-      // buckets `PeriodStart` from, so a debit stamped anywhere but "now"
-      // lands in a period today's DAY budget never reads.
-      const startedAtMs = Date.now();
-      const event = createSpanReceivedEvent({
-        eventId: `evt-${nanoid()}`,
-        tenantId: PROJECT_ID,
-        traceId: nanoid(32),
-        spanId: nanoid(16),
-        startTimeUnixNano: msToUnixNano(startedAtMs),
-        endTimeUnixNano: msToUnixNano(startedAtMs + 120),
-        statusCode: 1,
-        attributes: {
-          ...REQUEST_ATTRIBUTES,
-          "langwatch.virtual_key_id": VK_ID,
-          "langwatch.gateway_request_id": `grq_${nanoid()}`,
-        },
+    recordOneRequest = () =>
+      recordRequestFor({
+        projection,
+        projectId: PROJECT_ID,
+        virtualKeyId: VK_ID,
       });
-
-      const record = projection.map(event);
-      if (!record) throw new Error("gateway span derived no debit record");
-      await projection.store.append(record, {
-        aggregateId: event.aggregateId,
-        tenantId: createTenantId(PROJECT_ID),
-      });
-    };
   }, 120_000);
 
   afterAll(async () => {
     await prisma.gatewayChangeEvent.deleteMany({
       where: { organizationId: ORG_ID },
     });
-    await prisma.gatewayBudget.deleteMany({ where: { organizationId: ORG_ID } });
+    await prisma.gatewayBudget.deleteMany({
+      where: { organizationId: ORG_ID },
+    });
     await prisma.virtualKey.deleteMany({
       where: { id: { in: [VK_ID, PRE_VK_ID] } },
     });
@@ -332,30 +357,12 @@ describe("given a blocking budget on traffic the gateway is serving", () => {
         projectedCostUsd: "0.000001",
       });
 
-    const recordOnePreProjectRequest = async () => {
-      const startedAtMs = Date.now();
-      const event = createSpanReceivedEvent({
-        eventId: `evt-${nanoid()}`,
-        tenantId: PRE_PROJECT_ID,
-        traceId: nanoid(32),
-        spanId: nanoid(16),
-        startTimeUnixNano: msToUnixNano(startedAtMs),
-        endTimeUnixNano: msToUnixNano(startedAtMs + 120),
-        statusCode: 1,
-        attributes: {
-          ...REQUEST_ATTRIBUTES,
-          "langwatch.virtual_key_id": PRE_VK_ID,
-          "langwatch.gateway_request_id": `grq_${nanoid()}`,
-        },
+    const recordOnePreProjectRequest = () =>
+      recordRequestFor({
+        projection,
+        projectId: PRE_PROJECT_ID,
+        virtualKeyId: PRE_VK_ID,
       });
-
-      const record = projection.map(event);
-      if (!record) throw new Error("gateway span derived no debit record");
-      await projection.store.append(record, {
-        aggregateId: event.aggregateId,
-        tenantId: createTenantId(PRE_PROJECT_ID),
-      });
-    };
 
     beforeAll(async () => {
       await prisma.project.create({

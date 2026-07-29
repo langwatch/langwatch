@@ -32,12 +32,17 @@
  * having actually landed (so replaying a window cannot flood the gateway's
  * revision feed).
  */
-import { createGatewayBudgetDebitsProjection } from "@ee/governance/projections/governanceProjections.composition";
+
 import type { GatewayBudgetDebitRecord } from "@ee/governance/projections/gatewayBudgetDebits.mapProjection";
+import { createGatewayBudgetDebitsProjection } from "@ee/governance/projections/governanceProjections.composition";
 import { createVirtualKeyLastUsedSubscriber } from "@ee/governance/subscribers/virtualKeyLastUsed.subscriber";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "~/server/db";
+import {
+  startTestContainers,
+  stopTestContainers,
+} from "~/server/event-sourcing/__tests__/integration/testContainers";
 import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
 import {
   createSpanReceivedEvent,
@@ -51,10 +56,6 @@ import { GatewayBudgetClickHouseRepository } from "../budget.clickhouse.reposito
 import { GatewayBudgetRepository } from "../budget.repository";
 import { GatewayBudgetService } from "../budget.service";
 import { ChangeEventRepository } from "../changeEvent.repository";
-import {
-  startTestContainers,
-  stopTestContainers,
-} from "~/server/event-sourcing/__tests__/integration/testContainers";
 
 const suffix = nanoid(8);
 const ORG_ID = `org-${suffix}`;
@@ -322,7 +323,9 @@ describe("gatewayBudgetDebits projection — real PG + real CH", () => {
     // guard accepts a row id as the tenancy proof for single-row writes.
     await prisma.virtualKey.deleteMany({ where: { id: VK_ID } });
     await prisma.virtualKey.deleteMany({ where: { id: OTHER_VK_ID } });
-    await prisma.user.deleteMany({ where: { id: { in: [USER_ID, OTHER_USER_ID] } } });
+    await prisma.user.deleteMany({
+      where: { id: { in: [USER_ID, OTHER_USER_ID] } },
+    });
     await prisma.project.deleteMany({
       where: { id: { in: [PROJECT_ID, OTHER_PROJECT_ID] } },
     });
@@ -393,6 +396,7 @@ describe("gatewayBudgetDebits projection — real PG + real CH", () => {
       const chRepo = testClickHouseRepository();
       const projection = budgetDebitsProjection(chRepo);
       const before = await projectSpend(chRepo);
+      const changesBefore = await budgetUpdatedCount();
 
       // Three deliveries of one request. Each is a separately-derived record
       // — a replay produces new event ids and new span envelopes, and only
@@ -409,15 +413,12 @@ describe("gatewayBudgetDebits projection — real PG + real CH", () => {
         DEFAULT_COST_USD,
         4,
       );
-    }, 60_000);
-
-    it("does not re-announce spend the gateway already knows about", async () => {
-      // Three deliveries above, and the two that found the ledger already
-      // intact wrote nothing — so exactly one BUDGET_UPDATED joined the one
-      // from the first test. Ungated, a replay of a window would append a
-      // change row per historical request and sweep every VK's cache in the
-      // project.
-      expect(await budgetUpdatedCount()).toBe(2);
+      // Only the delivery that actually wrote announces: the two that found
+      // the ledger already intact wrote nothing, so exactly one
+      // BUDGET_UPDATED joins the count. Ungated, a replay of a window would
+      // append a change row per historical request and sweep every VK's cache
+      // in the project.
+      expect(await budgetUpdatedCount()).toBe(changesBefore + 1);
     }, 60_000);
   });
 

@@ -339,10 +339,30 @@ export class SpendSpikeAnomalyEvaluator {
    *   - `FINAL` is not used: it forces a merge-on-read across the whole scan.
    *   - No heavy columns exist on this table, so the inner scope reading the
    *     value directly costs nothing the IN-tuple form would have saved.
-   *   - Under a version tie `argMax` returns exactly one of the tied values
-   *     rather than all of them. Which one is arbitrary — but that is precisely
-   *     what the background merge itself elects, so this read now agrees with
-   *     the table's own eventual state instead of over-reporting against it.
+   *   - The version column is TIED far more often than it is not, so the
+   *     tie-break is part of the answer rather than an edge case, and it is
+   *     spelled out: `argMax(SpendUsd, (LastEventOccurredAt, SpendUsd))` picks
+   *     the LARGEST tied contribution. `argMax(SpendUsd, LastEventOccurredAt)`
+   *     alone picks an arbitrary one, and arbitrary is not stable — the same
+   *     unchanged rows can answer $10 on one read and $7.50 on the next,
+   *     which is a customer-facing spend figure and an alert threshold moving
+   *     because a query re-ran.
+   *
+   *     Post-00058 the tied rows are byte-identical, so the tie-break cannot
+   *     change the number; it only makes it repeatable. Pre-00058 trace-grain
+   *     rows tie on a constant version while carrying the trace's RUNNING
+   *     totals, so the largest tied row IS the trace's final total — the
+   *     complete figure rather than a partial one caught mid-flight.
+   *
+   *     What this deliberately does NOT claim is agreement with the survivor a
+   *     background merge elects. A ReplacingMergeTree tie is broken by
+   *     insertion order, which no column here records, so no read can
+   *     reproduce it without a schema change (an insertion-sequence column, or
+   *     a version that is strictly monotonic per write). For the legacy
+   *     running-total rows the merge's arbitrary pick can therefore be a
+   *     partial total where this read reports the complete one; that
+   *     disagreement is in the direction of the truth, and it stops mattering
+   *     as the pre-cutover partitions age out of the baseline window.
    *   - `HourBucket` is bounded in the dedup scope, not only outside it. That
    *     is safe here and required for partition pruning: `HourBucket` is part
    *     of the sorting key, so a row's versions cannot straddle the bound and
@@ -364,7 +384,7 @@ export class SpendSpikeAnomalyEvaluator {
         FROM (
           SELECT
             HourBucket,
-            argMax(SpendUsd, LastEventOccurredAt) AS SpendUsd
+            argMax(SpendUsd, (LastEventOccurredAt, SpendUsd)) AS SpendUsd
           FROM governance_kpis
           WHERE TenantId = {tenantId:String}
             AND HourBucket >= fromUnixTimestamp64Milli({baselineStartMs:UInt64})

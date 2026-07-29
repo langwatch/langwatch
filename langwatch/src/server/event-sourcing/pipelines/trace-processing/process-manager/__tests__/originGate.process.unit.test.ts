@@ -2,11 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import { buildProcessManager } from "~/server/event-sourcing/pipeline/processBuilder";
 import type { ProcessHandlerContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
-import { buildProcessDefinition } from "~/server/event-sourcing/process-manager/processRuntime";
 import type {
   ProcessEventEnvelope,
   ProcessRef,
 } from "~/server/event-sourcing/process-manager/processManager.types";
+import { buildProcessDefinition } from "~/server/event-sourcing/process-manager/processRuntime";
 
 import {
   ORIGIN_RESOLVED_EVENT_TYPE,
@@ -20,7 +20,6 @@ import {
   handleTraceActivity,
   originGateWake,
 } from "../originGate.process";
-import { originGatePM } from "../originGateProcessManager";
 import {
   INITIAL_ORIGIN_GATE_STATE,
   ORIGIN_GATE_DEADLINE_MS,
@@ -28,6 +27,7 @@ import {
   type OriginGateEventView,
   type OriginGateState,
 } from "../originGateProcess.types";
+import { originGatePM } from "../originGateProcessManager";
 
 const TRACE_ID = "trace-1";
 const PROJECT_ID = "project-1";
@@ -36,7 +36,12 @@ const NOW = 1_700_000_000_000;
 type Intents = Parameters<typeof originGateWake>[1]["intents"];
 
 function makeCtx(
-  overrides: { at?: number; now?: number; key?: string; projectId?: string } = {},
+  overrides: {
+    at?: number;
+    now?: number;
+    key?: string;
+    projectId?: string;
+  } = {},
 ): ProcessHandlerContext<any> {
   return {
     at: overrides.at ?? NOW,
@@ -56,7 +61,7 @@ function makeCtx(
 /** A trace that has told us nothing about where it came from. */
 const NO_EVIDENCE: OriginGateEventView = {
   originDecided: false,
-  rootSpan: false,
+  isRootSpan: false,
   sdkPresent: false,
 };
 
@@ -211,7 +216,7 @@ describe("originGate process", () => {
     it("closes the gate for a root span carrying an SDK marker", () => {
       const result = handleTraceActivity(
         INITIAL_ORIGIN_GATE_STATE,
-        { originDecided: false, rootSpan: true, sdkPresent: true },
+        { originDecided: false, isRootSpan: true, sdkPresent: true },
         makeCtx(),
       );
 
@@ -225,13 +230,13 @@ describe("originGate process", () => {
       // span at a time would miss it and write a needless fallback.
       const child = handleTraceActivity(
         INITIAL_ORIGIN_GATE_STATE,
-        { originDecided: false, rootSpan: false, sdkPresent: true },
+        { originDecided: false, isRootSpan: false, sdkPresent: true },
         makeCtx(),
       );
 
       const root = handleTraceActivity(
         child.state,
-        { originDecided: false, rootSpan: true, sdkPresent: false },
+        { originDecided: false, isRootSpan: true, sdkPresent: false },
         makeCtx({ at: NOW + 100, now: NOW + 100 }),
       );
 
@@ -245,7 +250,7 @@ describe("originGate process", () => {
       // traces whose platform span has not arrived yet.
       const result = handleTraceActivity(
         INITIAL_ORIGIN_GATE_STATE,
-        { originDecided: false, rootSpan: false, sdkPresent: true },
+        { originDecided: false, isRootSpan: false, sdkPresent: true },
         makeCtx(),
       );
 
@@ -361,7 +366,7 @@ describe("originGate process", () => {
 
       expect(view).toEqual({
         originDecided: false,
-        rootSpan: true,
+        isRootSpan: true,
         sdkPresent: false,
       });
     });
@@ -420,7 +425,7 @@ describe("originGate process", () => {
     it("counts a span with a parent as a child", () => {
       const view = buildProcessEventView(spanEvent({ parentSpanId: "span-0" }));
 
-      expect(view.rootSpan).toBe(false);
+      expect(view.isRootSpan).toBe(false);
     });
 
     it("settles on an origin_resolved event", () => {
@@ -440,7 +445,7 @@ describe("originGate process", () => {
 
       expect(view).toEqual({
         originDecided: false,
-        rootSpan: true,
+        isRootSpan: true,
         sdkPresent: false,
       });
     });

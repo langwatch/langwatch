@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type { GatewayBudgetLedgerStatus } from "@prisma/client";
 import {
   spanCostService,
   spanNormalizationPipelineService,
   spanStatusService,
 } from "@ee/governance/services/spanDerivation.composition";
+import type { GatewayBudgetLedgerStatus } from "@prisma/client";
 import {
   type SpanReceivedEvent,
   spanReceivedEventSchema,
@@ -119,14 +119,23 @@ export interface GatewayBudgetDebitRecord {
 
 const spanEvents = [spanReceivedEventSchema] as const;
 
+/** Scale `gateway_budget_ledger_events.AmountUSD` is declared with. */
+const LEDGER_DECIMAL_SCALE = 10;
+
 /**
  * Serialise a JS number to the fixed-point decimal string ClickHouse expects.
- * Carried over verbatim from `gatewayBudgetSync.reactor.ts` so a converted
- * debit is byte-identical to the one the reactor would have written.
+ * Carried over from `gatewayBudgetSync.reactor.ts` so a converted debit is the
+ * row the reactor would have written.
+ *
+ * ONE shape, rejection path included. A non-finite or negative cost is a
+ * derivation bug rather than a refund, so it debits nothing — but it debits
+ * nothing as `"0.0000000000"`, the fixed-point form every other row carries.
+ * A bare `"0"` gives the ledger two spellings of one amount, which is all it
+ * takes for a re-derived row to compare unequal to the live row it reproduces.
  */
 export function formatLedgerDecimal(n: number): string {
-  if (!Number.isFinite(n) || n < 0) return "0";
-  return n.toFixed(10);
+  if (!Number.isFinite(n) || n < 0) return (0).toFixed(LEDGER_DECIMAL_SCALE);
+  return n.toFixed(LEDGER_DECIMAL_SCALE);
 }
 
 /**

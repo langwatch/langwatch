@@ -55,7 +55,16 @@ export class ReplacingMergeTreeDouble<Row> {
     return this.rows.map(({ row }) => row);
   }
 
-  /** The settled state after dedup-by-key. */
+  /**
+   * The settled state after dedup-by-key.
+   *
+   * **The ORDER of the returned rows is an artifact of this double, not a
+   * property of ClickHouse.** Survivors come back in insertion order because
+   * that is the cheapest thing to model; a real `SELECT ... FINAL` orders
+   * nothing without an explicit `ORDER BY`. Assert on the SET of survivors —
+   * membership, count, which row won a key — never on the sequence they
+   * arrive in, or the test pins a guarantee production does not offer.
+   */
   merged(): Row[] {
     const survivors = new Map<string, { row: Row; sequence: number }>();
     for (const entry of this.rows) {

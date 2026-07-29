@@ -92,11 +92,11 @@ ALTER TABLE ${CLICKHOUSE_DATABASE}.governance_kpis
 -- +goose Down
 -- +goose ENVSUB ON
 --
--- Down migration intentionally not provided — reverting the sorting key
--- would silently collapse every per-span contribution in an hour bucket
--- down to one row per trace, i.e. destroy governance spend data rather
--- than merely un-apply a schema change. To roll back: uncomment below and
--- run manually AFTER coordinating with operators, accepting that loss.
+-- IRREVERSIBLE: data-destructive. Reverting the sorting key would silently
+-- collapse every per-span contribution in an hour bucket down to one row per
+-- trace, i.e. destroy governance spend data rather than merely un-apply a
+-- schema change. To roll back: uncomment below and run manually AFTER
+-- coordinating with operators, accepting that loss.
 --
 -- -- +goose StatementBegin
 -- -- ALTER TABLE ${CLICKHOUSE_DATABASE}.governance_kpis

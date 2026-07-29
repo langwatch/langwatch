@@ -27,8 +27,8 @@ So the table has two candidate versions, and the codebase disagrees about which 
 | the engine's background merge | `max(StartTime)` | yes |
 | `dedupInTuple` (app-layer span-storage repository, 12 call sites) | `max(UpdatedAt)` | yes |
 | `argMax(…, UpdatedAt)` aggregates, `sinceUpdatedAtMs` incremental reader | `UpdatedAt` | yes |
-| `ClickHouseTraceService.getSpansForTraces` | `max(StartTime)` | yes — **this ADR changes it** |
-| `src/server/traces/repositories/span-storage.clickhouse.repository.ts` | `max(StartTime)` | no — dead, one test import |
+| the trace-detail read (`ClickHouseTraceService.getTracesWithSpans` → private `fetchTracesWithSpansJoined`) | `max(StartTime)` | yes — **this ADR changes it** |
+| `src/server/traces/repositories/span-storage.clickhouse.repository.ts` | `max(StartTime)` | no — dead, **deleted here** |
 
 ## Decision
 
@@ -44,7 +44,9 @@ Three reasons, in order of how much they matter:
 
 ### What ships now
 
-**The live reader that elected `max(StartTime)` is corrected to `max(UpdatedAt)`.** `ClickHouseTraceService.getSpansForTraces` is on the trace-detail read path, and the bug it carried was worse than a stale row: because every version of a re-reported span ties on `StartTime`, *every tied row satisfied the IN-tuple*, and there is no `LIMIT 1 BY SpanId` behind it. The read returned the span **once per unmerged version**, so a re-reported span rendered repeatedly in one trace, with stale content in all but one copy. Measured: two unmerged versions in, two rows out. Under `max(UpdatedAt)`, one row out.
+**The live reader that elected `max(StartTime)` is corrected to `max(UpdatedAt)`.** `fetchTracesWithSpansJoined` — the private join behind `ClickHouseTraceService.getTracesWithSpans` — is on the trace-detail read path, and the bug it carried was worse than a stale row: because every version of a re-reported span ties on `StartTime`, *every tied row satisfied the IN-tuple*, and there is no `LIMIT 1 BY SpanId` behind it. The read returned the span **once per unmerged version**, so a re-reported span rendered repeatedly in one trace, with stale content in all but one copy. Measured: two unmerged versions in, two rows out. Under `max(UpdatedAt)`, one row out.
+
+**The dead third copy is deleted.** `src/server/traces/repositories/span-storage.clickhouse.repository.ts` carried its own `max(StartTime)` dedup and had no production caller; its two remaining test importers (`clickhouse-trace-dedup.integration.test.ts`, `clickhouse-trace-rag-contexts.integration.test.ts`) now use the app-layer span-storage repository.
 
 The guidance in `clickhouse-queries.md` that recommended `max(StartTime)` for this table is removed — it is what the two `max(StartTime)` sites were following.
 
@@ -52,7 +54,7 @@ The guidance in `clickhouse-queries.md` that recommended `max(StartTime)` for th
 
 **The engine argument is not changed.** ClickHouse has no `ALTER` for it:
 
-```
+```text
 ALTER TABLE … MODIFY ENGINE = ReplacingMergeTree(UpdatedAt)
   -> Code 62, SYNTAX_ERROR. Expected one of: STATISTICS, COLUMN, ORDER BY,
      SAMPLE BY, TTL, SETTING, QUERY, SQL SECURITY, DEFINER, REFRESH, COMMENT.
@@ -79,4 +81,3 @@ So the pre-rebuild position is: `StartTime` immutability is a **load-bearing ass
 
 1. Rebuild `stored_spans` onto `ReplacingMergeTree(UpdatedAt)` via the CREATE/backfill/EXCHANGE procedure above, in a planned window.
 2. Consider re-anchoring `PARTITION BY` at the same time. `toYearWeek(StartTime)` has the same movable-anchor problem ADR-071 priced for `coding_agent_sessions.StartedAt`: a corrected start time relocates the row to a partition where it can never merge with its predecessor. A rebuild is the only chance to change it, so the two decisions should be taken together rather than paying for two rebuilds.
-3. Delete `src/server/traces/repositories/span-storage.clickhouse.repository.ts`. It is dead (one test import) and carries a third copy of the `max(StartTime)` dedup.

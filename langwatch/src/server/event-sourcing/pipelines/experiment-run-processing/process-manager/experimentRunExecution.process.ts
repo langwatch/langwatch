@@ -11,9 +11,8 @@ import { parseExperimentRunKey } from "../utils/compositeKey";
 import {
   EXPERIMENT_RUN_PROGRESS_DEADLINE_MS,
   EXPERIMENT_RUN_STALLED_CODE,
-  experimentRunExecutionEventViewSchema,
-  INITIAL_EXPERIMENT_RUN_EXECUTION_STATE,
   type ExperimentRunExecutionState,
+  experimentRunExecutionEventViewSchema,
   type experimentRunExecutionFailRunIntentSchema,
 } from "./experimentRunExecutionProcess.types";
 
@@ -189,5 +188,3 @@ export const experimentRunExecutionWake: WakeHandler<
     ],
   };
 };
-
-export { INITIAL_EXPERIMENT_RUN_EXECUTION_STATE };

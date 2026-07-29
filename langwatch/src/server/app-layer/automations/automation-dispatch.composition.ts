@@ -1,7 +1,8 @@
+import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
 
 import { env } from "~/env.mjs";
-import { getAnalyticsService } from "~/server/app-layer/analytics";
+import type { AnnotationService } from "~/server/annotations/annotation.service";
 // LAYERING DEBT — the one import in this file that points upward.
 // `getProtectionsForProject` resolves a project's data-privacy redaction
 // policy; it has nothing to do with tRPC and only lives under `api/` for
@@ -12,7 +13,7 @@ import { getAnalyticsService } from "~/server/app-layer/analytics";
 // ADR-077 step 2. It is held HERE, in the automations composition root, so
 // that no file under `event-sourcing/` reaches into the router layer.
 import { getProtectionsForProject } from "~/server/api/utils";
-import type { AnnotationService } from "~/server/annotations/annotation.service";
+import { getAnalyticsService } from "~/server/app-layer/analytics";
 import { DatasetService } from "~/server/datasets/dataset.service";
 import type { AutomationDispatchCollaborators } from "~/server/event-sourcing/pipelines/automations/automationDispatch.adapter";
 import { TraceSummaryStore } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.store";
@@ -34,6 +35,8 @@ import {
 import { PrismaGraphTriggerSentRepository } from "./repositories/trigger.prisma.repository";
 import type { TriggerService } from "./trigger.service";
 import { WebhookDeliveryService } from "./webhook-delivery.service";
+
+const logger = createLogger("langwatch:automation-dispatch-composition");
 
 /**
  * ADR-077: the composition root for automation dispatch. Everything the
@@ -69,12 +72,18 @@ export function createAutomationDispatchCollaborators({
   spanStorage: SpanStorageService;
   traceSummaryRepository: TraceSummaryRepository;
 }): AutomationDispatchCollaborators {
-  // Fail loud if BASE_HOST is missing: every alert dispatch interpolates it
-  // into deep links; an empty baseHost silently ships broken links.
-  const baseHost = env.BASE_HOST;
+  // BASE_HOST is required by the env schema (`src/env-create.mjs`), which is
+  // where a missing value fails — and it fails there for every role at once.
+  // These collaborators are built on EVERY process role, including ones that
+  // never dispatch an alert, so re-asserting it here would turn the schema's
+  // build-time/validation-skipped escape hatch into a boot failure for roles
+  // that never render a deep link (the test lane first). Warn instead: the
+  // only environments that reach this branch are the ones where nothing
+  // interpolates baseHost anyway.
+  const baseHost = env.BASE_HOST ?? "";
   if (!baseHost) {
-    throw new Error(
-      "BASE_HOST is unset — automation dispatch cannot render deep links (email + Slack alert templates interpolate baseHost). Set env.BASE_HOST before booting the worker.",
+    logger.warn(
+      "BASE_HOST is unset — automation dispatch would render deep links (email + Slack alert templates interpolate baseHost) without a host. Set env.BASE_HOST before dispatching alerts.",
     );
   }
 

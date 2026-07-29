@@ -1,6 +1,6 @@
 # ADR-077: A pipeline is defined in its own file, in layers
 
-- Status: proposed
+- Status: Proposed
 - Date: 2026-07-28
 - Builds on: ADR-052 (automations on the process-manager substrate — which
   introduced the "only the executor dependencies are injected" rule that this
@@ -307,26 +307,30 @@ precisely the change nobody will think to check, because the type says `Redis`.
 > gives the decision to the layer that should own it and makes it greppable at
 > the composition root.
 
-**The decision: infrastructure publishes a resolved capability, not a client.**
+**The decision: infrastructure publishes a resolved tier, not a client.**
 
 ```ts
-// layer 1
-export interface FoldCache {
-  wrap<S>(inner: FoldProjectionStore<S>, keyPrefix: string): FoldProjectionStore<S>;
-}
+// layer 1 — the only place the topology is looked at
+const foldCacheClient: FoldCacheClient = redis
+  ? new RedisFoldCacheClient(redis)   // Redis *and* Cluster: single-key get/set
+  : new InMemoryFoldCacheClient();    // no Redis: the in-process map is the tier
 
-export function createFoldCache(redis: Redis | Cluster | null): FoldCache {
-  // The union is discriminated exactly once, here, at construction.
-  if (!redis || redis instanceof Cluster) return { wrap: (inner) => inner };
-  return { wrap: (inner, keyPrefix) => new RedisCachedFoldStore(inner, redis, { keyPrefix }) };
-}
+// layer 5/6 — composition, no client, no branch
+new CachedFoldStore(inner, foldCacheClient, { keyPrefix: "trace_summaries" });
 ```
 
-`FoldCache` is a layer-4-shaped port produced by layer 1. Every downstream site
-gets a total `wrap` and never sees a redis client at all, so `as Redis` cannot
-be written — there is nothing to cast. The registry's `cached()` and the
-automations ternary collapse into one call each, and the divergence cannot
-recur because there is one branch.
+`FoldCacheClient` exposes `read` and `write` and nothing else, so a downstream
+site cannot reach a multi-key command and `as Redis` cannot be written — there
+is nothing to cast. Which tier backs the cache is decided once, at the
+composition root; every store downstream is composed over the same client, so
+the registry path and the automations path cannot disagree about whether
+`trace_summaries` is cached.
+
+Note that `Pick<Redis, "get" | "set">` would not have closed the hazard —
+`Cluster` structurally satisfies it and also exposes `mget` — and that a
+`createFoldCache(client | null)` factory that branches would only move the
+hidden decision one level down. Narrowing what the store *demands* is what
+closes it.
 
 **A sharpening of the general rule, because the absolute version is wrong.** The
 `Redis | Cluster` union appears at 62 non-test sites, and three of them
@@ -343,12 +347,12 @@ union once and nothing ever sees it again". It is:
 `pipelineRegistry.ts:362` and `automationDispatch.wiring.ts:100` are both
 layer-5/6 files holding the union. Both are violations. `groupQueue.ts` is not.
 
-**This is the one place the restructure is not behaviour-preserving, and that is
-the point.** If any deployment runs Redis in cluster mode, six pipelines
-currently run a cached fold store the class was never written for, and after this
-change they will run uncached — the same thing the automations path already
-does. That is a deliberate correction, and it should be called out in the PR
-rather than discovered from a latency graph.
+**What changes behaviourally.** The registry path is behaviour-preserving: it
+was already cached, and stays cached in every Redis topology. The automations
+path is the one that changes — it read `trace_summaries` uncached under a
+Cluster client and now reads through the same warm tier as everyone else. No
+deployment loses a cache, which is the point: ADR-066 §5 makes this cache the
+event processor's read-your-write consistency layer, not a latency knob.
 
 ### 4. Where each thing lives
 
@@ -814,11 +818,12 @@ and 6 exist in five pipelines under ADR-052. What does not exist is layer 5 as a
 is a much smaller ask than inventing a layering, and it is why this can proceed
 incrementally instead of as one PR.
 
-0. **`FoldCache` and the layer-1 seam, before any pipeline moves.** It deletes
-   `as Redis`, deletes the `instanceof Cluster` ternary, and reconciles the two
-   divergent cache paths. It touches six pipelines' construction but no
-   pipeline's contents, and it is the step that carries the deliberate
-   behaviour change, so it should land alone and be called out.
+0. **`FoldCacheClient` and the layer-1 seam, before any pipeline moves.** It
+   deletes `as Redis`, deletes the `instanceof Cluster` ternary, and reconciles
+   the two divergent cache paths onto one tier. It touches six pipelines'
+   construction but no pipeline's contents, and it is the step that carries the
+   one behaviour change — the automations reader gains the warm tier under
+   Cluster — so it should land alone and be called out.
 1. **`metric-processing` and `log-processing`.** Sixty-two and thirty-nine
    lines, one illegal dep each (`subscribers`), and that dep is precisely the
    cross-pipeline dispatch case — so the smallest possible diff is the one that

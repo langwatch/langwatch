@@ -24,19 +24,31 @@ vi.mock("~/utils/ssrfProtection", () => ({
   ssrfSafeFetch: vi.fn(),
 }));
 
+/**
+ * The default injection writes `traceparent` only — exactly what
+ * `propagation.inject()` does with no vendor state to carry. Tests that need a
+ * `tracestate` on the wire override it per call.
+ */
+const { INJECTED_TRACEPARENT, INJECTED_TRACE_ID } = vi.hoisted(() => ({
+  INJECTED_TRACEPARENT:
+    "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+  INJECTED_TRACE_ID: "4bf92f3577b34da6a3ce929d0e0e4736",
+}));
+
 vi.mock("@langwatch/observability/tracing", () => ({
   injectTraceContextHeaders: vi.fn(
     ({ headers }: { headers: Record<string, string> }) => {
-      headers.traceparent =
-        "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01";
-      return { headers, traceId: "4bf92f3577b34da6a3ce929d0e0e4736" };
+      headers.traceparent = INJECTED_TRACEPARENT;
+      return { headers, traceId: INJECTED_TRACE_ID };
     },
   ),
 }));
 
+import { injectTraceContextHeaders } from "@langwatch/observability/tracing";
 import { ssrfSafeFetch } from "~/utils/ssrfProtection";
 
 const mockSsrfSafeFetch = vi.mocked(ssrfSafeFetch);
+const mockInjectTraceContextHeaders = vi.mocked(injectTraceContextHeaders);
 
 interface FakeLogger {
   info: ReturnType<typeof vi.fn>;
@@ -60,6 +72,10 @@ function makeFakeLogger(): FakeLogger {
 const CUSTOM_AUTH_HEADER = "X-Auth-Token";
 const CUSTOM_AUTH_SECRET = "sk-live-scenario-target-secret";
 const COOKIE_SECRET = "session=super-secret-session-value";
+/** A `tracestate` the TARGET configured — user-supplied, so never loggable. */
+const CONFIGURED_TRACESTATE_SECRET = "vendor=sk-live-tracestate-secret";
+/** A `tracestate` OUR injection wrote — ours to log. */
+const INJECTED_TRACESTATE = "langwatch=1a2b3c4d";
 
 const input: AgentInput = {
   threadId: "thread_redaction",
@@ -235,9 +251,79 @@ describe("SerializedHttpAgentAdapter — header redaction", () => {
 
         expect(loggedHeaders(logger.info.mock.calls[0])).toMatchObject({
           "Content-Type": "application/json",
-          traceparent:
-            "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+          traceparent: INJECTED_TRACEPARENT,
         });
+      });
+    });
+  });
+
+  describe("given the target configures a tracestate header of its own", () => {
+    const config = makeConfig({
+      headers: [{ key: "tracestate", value: CONFIGURED_TRACESTATE_SECRET }],
+    });
+
+    describe("when the call succeeds", () => {
+      it("redacts the tracestate injection left untouched", async () => {
+        mockOk();
+
+        await makeAdapter(config, logger).call(input);
+
+        expect(loggedHeaders(logger.info.mock.calls[0])).toMatchObject({
+          tracestate: "[REDACTED]",
+        });
+      });
+
+      it("never writes the tracestate value into any log entry", async () => {
+        mockOk();
+
+        await makeAdapter(config, logger).call(input);
+
+        expect(loggedPayloads(logger)).not.toContain(
+          CONFIGURED_TRACESTATE_SECRET,
+        );
+      });
+
+      it("still sends the configured tracestate upstream", async () => {
+        mockOk();
+
+        await makeAdapter(config, logger).call(input);
+
+        const sentHeaders = (
+          mockSsrfSafeFetch.mock.calls[0]?.[1] as {
+            headers: Record<string, string>;
+          }
+        ).headers;
+        expect(sentHeaders.tracestate).toBe(CONFIGURED_TRACESTATE_SECRET);
+      });
+    });
+  });
+
+  describe("given injection writes a tracestate the target also configured under a different case", () => {
+    describe("when the call succeeds", () => {
+      it("redacts the target's copy and keeps the injected one readable", async () => {
+        // Provenance, not name: `TraceState` and `tracestate` are the same
+        // header to HTTP, but only the lowercase one came from our own
+        // injection. A case-insensitive match would clear the target's secret
+        // for logging on the strength of the key we happened to write.
+        mockOk();
+        mockInjectTraceContextHeaders.mockImplementationOnce(({ headers }) => {
+          headers.traceparent = INJECTED_TRACEPARENT;
+          headers.tracestate = INJECTED_TRACESTATE;
+          return { headers, traceId: INJECTED_TRACE_ID };
+        });
+        const config = makeConfig({
+          headers: [{ key: "TraceState", value: CONFIGURED_TRACESTATE_SECRET }],
+        });
+
+        await makeAdapter(config, logger).call(input);
+
+        expect(loggedHeaders(logger.info.mock.calls[0])).toMatchObject({
+          TraceState: "[REDACTED]",
+          tracestate: INJECTED_TRACESTATE,
+        });
+        expect(loggedPayloads(logger)).not.toContain(
+          CONFIGURED_TRACESTATE_SECRET,
+        );
       });
     });
   });

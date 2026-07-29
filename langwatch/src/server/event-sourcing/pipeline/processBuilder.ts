@@ -13,12 +13,8 @@ import {
 } from "./processManagerDefinition";
 
 type EventTypeOf<E extends Event> = E["type"] & string;
-type EventData<E extends Event, Type extends string> = Extract<
-  E,
-  { type: Type }
-> extends Event<infer Data>
-  ? Data
-  : never;
+type EventData<E extends Event, Type extends string> =
+  Extract<E, { type: Type }> extends Event<infer Data> ? Data : never;
 
 type OutboxOptions = NonNullable<
   ProcessManagerConfig<any, Record<string, IntentSpec<any>>>["outbox"]
@@ -34,7 +30,9 @@ export interface ProcessManagerStateStage<E extends Event, State> {
     schema: Schema,
     run: IntentSpec<Schema>["run"],
   ): ProcessManagerIntentStage<E, State, Record<Name, IntentSpec<Schema>>>;
-  schedule(options: { everyMs: number }): ProcessManagerScheduledStage<E, State>;
+  schedule(options: {
+    everyMs: number;
+  }): ProcessManagerScheduledStage<E, State>;
 }
 
 export interface ProcessManagerScheduledStage<E extends Event, State>
@@ -132,10 +130,7 @@ class ProcessManagerBuilder<E extends Event> {
   private stateValue: unknown;
   private hasState = false;
   private readonly intents: Record<string, IntentSpec<any>> = {};
-  private readonly handlers: Record<
-    string,
-    EventHandler<any, any, any>
-  > = {};
+  private readonly handlers: Record<string, EventHandler<any, any, any>> = {};
   private wakeHandler: WakeHandler<any, any> | undefined;
   private readonly ignoredEventTypes: string[] = [];
   private outboxOptions: OutboxOptions | undefined;
@@ -164,10 +159,7 @@ class ProcessManagerBuilder<E extends Event> {
     return this;
   }
 
-  on(
-    eventType: string,
-    handle: EventHandler<any, any, any>,
-  ): this {
+  on(eventType: string, handle: EventHandler<any, any, any>): this {
     if (this.handlers[eventType]) {
       throw new ConfigurationError(
         "ProcessManagerBuilder",
@@ -189,9 +181,19 @@ class ProcessManagerBuilder<E extends Event> {
    * wake" are the same value. That is safe only for a process that never arms
    * one. Using this on a process with a deadline silently disarms it on the
    * next ignored event, and nothing fails — so the builder refuses that
-   * combination rather than trusting the caller to notice.
+   * combination rather than trusting the caller to notice. The same applies to
+   * a deadline armed by `.schedule()`, which is refused for the same reason.
    */
   ignores(...eventTypes: string[]): this {
+    if (this.scheduleOptions) {
+      throw new ConfigurationError(
+        "ProcessManagerBuilder",
+        `Process manager "${this.name}" cannot use both .schedule() and .ignores(): ` +
+          `an ignored event clears the wake the schedule armed. Handle those ` +
+          `event types explicitly and return the wake you want to keep.`,
+        { name: this.name, eventTypes },
+      );
+    }
     if (this.wakeHandler) {
       throw new ConfigurationError(
         "ProcessManagerBuilder",
@@ -257,7 +259,24 @@ class ProcessManagerBuilder<E extends Event> {
     return this;
   }
 
+  /**
+   * Arm a recurring wake. The runtime re-arms it from the present on every
+   * wake, so a schedule is a standing deadline rather than a one-shot.
+   *
+   * Refused alongside `.ignores()` for the reason that method documents: an
+   * ignored event resolves `nextWakeAt` to null, and null is authoritative, so
+   * the first ignored event would disarm the schedule with nothing failing.
+   */
   schedule(options: { everyMs: number }): this {
+    if (this.ignoredEventTypes.length > 0) {
+      throw new ConfigurationError(
+        "ProcessManagerBuilder",
+        `Process manager "${this.name}" cannot use both .ignores() and .schedule(): ` +
+          `an ignored event clears the wake the schedule armed. Handle those ` +
+          `event types explicitly and return the wake you want to keep.`,
+        { name: this.name, ignoredEventTypes: this.ignoredEventTypes },
+      );
+    }
     if (!Number.isFinite(options.everyMs) || options.everyMs <= 0) {
       throw new ConfigurationError(
         "ProcessManagerBuilder",

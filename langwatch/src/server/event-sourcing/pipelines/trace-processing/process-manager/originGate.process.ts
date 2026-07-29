@@ -6,13 +6,16 @@ import type {
   WakeHandler,
 } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 
-import { ORIGIN_RESOLVED_EVENT_TYPE, STALE_TRACE_THRESHOLD_MS } from "../schemas/constants";
+import {
+  ORIGIN_RESOLVED_EVENT_TYPE,
+  STALE_TRACE_THRESHOLD_MS,
+} from "../schemas/constants";
 import type { TraceProcessingEvent } from "../schemas/events";
 import {
   ORIGIN_GATE_DEADLINE_MS,
-  originGateEventViewSchema,
   type OriginGateEventView,
   type OriginGateState,
+  originGateEventViewSchema,
   type originGateResolveIntentSchema,
 } from "./originGateProcess.types";
 
@@ -117,7 +120,10 @@ function spanEvidence(data: Record<string, unknown>): boolean {
   if (readOtlpString(span?.attributes, "langwatch.origin")) return true;
   if (readOtlpString(resource?.attributes, "langwatch.origin")) return true;
 
-  if (typeof scope?.name === "string" && ORIGIN_BEARING_SCOPES.has(scope.name)) {
+  if (
+    typeof scope?.name === "string" &&
+    ORIGIN_BEARING_SCOPES.has(scope.name)
+  ) {
     return true;
   }
 
@@ -146,7 +152,7 @@ export function buildProcessEventView(
   event: TraceProcessingEvent,
 ): OriginGateEventView {
   if (event.type === ORIGIN_RESOLVED_EVENT_TYPE) {
-    return { originDecided: true, rootSpan: false, sdkPresent: false };
+    return { originDecided: true, isRootSpan: false, sdkPresent: false };
   }
 
   const data = (event.data ?? {}) as Record<string, unknown>;
@@ -157,7 +163,7 @@ export function buildProcessEventView(
     originDecided: spanEvidence(data),
     // A root span is one with no parent. Matches the fold, which reads a
     // falsy wire `parentSpanId` as "no parent" before normalizing it.
-    rootSpan: span != null && !span.parentSpanId,
+    isRootSpan: span != null && !span.parentSpanId,
     sdkPresent:
       readOtlpString(resource?.attributes, "telemetry.sdk.name") !== null,
   };
@@ -211,7 +217,7 @@ function evolveGate(
   // straggling span must not re-arm a gate that has already closed.
   if (seen.resolved) return closed(seen);
 
-  if (view.originDecided || (view.rootSpan && seen.sdkSeen)) {
+  if (view.originDecided || (view.isRootSpan && seen.sdkSeen)) {
     return closed(seen);
   }
 
@@ -220,7 +226,8 @@ function evolveGate(
   // A trace aggregate with an empty id cannot be resolved, and a fallback
   // addressed at nothing produces an `origin_resolved` with an empty
   // aggregateId that the automations pipeline rejects later. Never arm one.
-  if (!ctx.key) return { state: { ...seen, deadlineAt: null }, nextWakeAt: null };
+  if (!ctx.key)
+    return { state: { ...seen, deadlineAt: null }, nextWakeAt: null };
 
   // Armed once, from the first span that found no origin — a long trace's
   // later spans must not keep pushing the fallback out. This is what the old

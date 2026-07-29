@@ -25,7 +25,15 @@ import { LANGY_CONVERSATION_PROCESS_NAME } from "../../langyConversationProcess.
  * recording doubles standing in for them.
  */
 export interface LangyEffectCalls {
-  /** One per accepted worker dispatch, recorded at the worker boundary. */
+  /**
+   * One per accepted worker dispatch, recorded at the worker boundary.
+   *
+   * Identities only. `resumeFromTurnId` is deliberately not recorded here:
+   * handoff-resume wiring is a property of the intent the handler produces,
+   * and `langyConversationProcess.unit.test.ts` asserts it on the dispatch
+   * payload itself for both branches (a pending handoff and none). Recording
+   * it a second time through the port would test the harness, not the wiring.
+   */
   dispatchedTurns: Array<{
     projectId: string;
     conversationId: string;
@@ -80,7 +88,9 @@ export function buildLangyProcessManager({
     // `command` is generic here, so `===` against one concrete class is not a
     // comparison TypeScript will accept.
     port: (command) => async (data: any) => {
-      if (command.schema.type !== GenerateConversationTitleCommand.schema.type) {
+      if (
+        command.schema.type !== GenerateConversationTitleCommand.schema.type
+      ) {
         return;
       }
       calls.titleRequests.push({

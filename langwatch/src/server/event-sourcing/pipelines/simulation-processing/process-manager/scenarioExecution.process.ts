@@ -13,11 +13,11 @@ import {
   failRunMessageKey,
   SCENARIO_CANCEL_DEADLINE_MS,
   SCENARIO_PROGRESS_DEADLINE_MS,
-  scenarioExecutionEventViewSchema,
-  scenarioExecutionTargetSchema,
   type ScenarioExecutionState,
+  scenarioExecutionEventViewSchema,
   type scenarioExecutionExecuteRunIntentSchema,
   type scenarioExecutionFailRunIntentSchema,
+  scenarioExecutionTargetSchema,
 } from "./scenarioExecutionProcess.types";
 
 /**
@@ -61,6 +61,16 @@ type Ctx = ProcessHandlerContext<ScenarioExecutionIntents>;
  * `batchTotal` is the one non-identity field beyond the target that crosses: it
  * is a bounded integer, and {@link handleQueued} cannot size the dispatch
  * deadline without it. Anything wider stays on the far side of this narrowing.
+ *
+ * The view must be TOTAL — it runs at the enqueue seam, where a throw wedges
+ * the run's process instance — so a target that fails its schema degrades to
+ * `null`, the same value an event carrying no target at all produces. Both end
+ * the same way: nothing is enqueued and the armed deadline finalises the run.
+ * A malformed target is a configuration bug rather than a stall, though, and
+ * the terminal write cannot currently say so: telling the two apart needs a
+ * discriminator on the persisted view schema and on
+ * `ScenarioExecutionState` (`scenarioExecutionProcess.types.ts`), which the
+ * wake would then report as its own outcome.
  */
 export function buildProcessEventView(event: SimulationProcessingEvent) {
   const data = event.data as Record<string, unknown>;
@@ -154,7 +164,11 @@ const refreshDeadline: EventHandler<
   unknown,
   ScenarioExecutionIntents
 > = (state, payload, ctx) =>
-  armed(withIdentities(state, payload, ctx), ctx, SCENARIO_PROGRESS_DEADLINE_MS);
+  armed(
+    withIdentities(state, payload, ctx),
+    ctx,
+    SCENARIO_PROGRESS_DEADLINE_MS,
+  );
 
 /**
  * The run is queued: enqueue its dispatch and arm the window it has to be

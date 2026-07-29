@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { createLogger } from "@langwatch/observability";
 import type {
   GatewayBudgetDebitService,
   ResolvedGatewayBudgetDebit,
 } from "@ee/governance/services/gatewayBudgetDebit.service";
+import { createLogger } from "@langwatch/observability";
 import type {
   AppendStore,
   BulkAppendContext,
@@ -12,15 +12,10 @@ import type {
 import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
 import type { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import type { ChangeEventRepository } from "~/server/gateway/changeEvent.repository";
-import {
-  assertRecordsTenant,
-  assertRecordTenant,
-} from "./assertRecordTenant";
+import { assertRecordsTenant, assertRecordTenant } from "./assertRecordTenant";
 import type { GatewayBudgetDebitRecord } from "./gatewayBudgetDebits.mapProjection";
 
-const logger = createLogger(
-  "langwatch:governance:gateway-budget-debits-store",
-);
+const logger = createLogger("langwatch:governance:gateway-budget-debits-store");
 
 const STORE_NAME = "GatewayBudgetDebitsAppendStore";
 
@@ -112,10 +107,16 @@ export class GatewayBudgetDebitsAppendStore
       );
     if (insertedGatewayRequestIds.length === 0) return;
 
+    // Concurrently, on purpose: this is the path that repairs many lost debits
+    // at once, the notifications are independent of each other, and
+    // `notifyGateway` swallows its own failures — so there is no ordering to
+    // preserve and nothing here can reject.
     const inserted = new Set(insertedGatewayRequestIds);
-    for (const debit of debits) {
-      if (inserted.has(debit.gatewayRequestId)) await this.notifyGateway(debit);
-    }
+    await Promise.all(
+      debits
+        .filter((debit) => inserted.has(debit.gatewayRequestId))
+        .map((debit) => this.notifyGateway(debit)),
+    );
   }
 
   /**
@@ -145,7 +146,9 @@ export class GatewayBudgetDebitsAppendStore
    * logged and swallowed: the ledger row is already committed, and throwing
    * would retry the whole map job — re-probing ClickHouse — to re-send a hint.
    */
-  private async notifyGateway(debit: ResolvedGatewayBudgetDebit): Promise<void> {
+  private async notifyGateway(
+    debit: ResolvedGatewayBudgetDebit,
+  ): Promise<void> {
     try {
       await this.deps.changeEvents.append({
         organizationId: debit.organizationId,

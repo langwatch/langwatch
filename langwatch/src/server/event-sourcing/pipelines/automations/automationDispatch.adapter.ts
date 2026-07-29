@@ -1,5 +1,9 @@
+import type { AnnotationService } from "~/server/annotations/annotation.service";
 import type { AnalyticsService } from "~/server/app-layer/analytics";
 import type { AutomationCustomGraphService } from "~/server/app-layer/automations/custom-graph.service";
+import { sendRenderedSlackMessage } from "~/server/app-layer/automations/delivery/sendSlackWebhook";
+import { sendWebhook } from "~/server/app-layer/automations/delivery/sendWebhook";
+import { postSlackChatMessage } from "~/server/app-layer/automations/delivery/slackWebApi";
 import {
   consumeEmailCapSlot,
   consumeTenantEmailCapSlot,
@@ -8,9 +12,6 @@ import {
   dispatchGraphAlertAction,
   type GraphAlertDispatchDeps,
 } from "~/server/app-layer/automations/dispatch/graphAlertActionDispatch";
-import { sendRenderedSlackMessage } from "~/server/app-layer/automations/delivery/sendSlackWebhook";
-import { sendWebhook } from "~/server/app-layer/automations/delivery/sendWebhook";
-import { postSlackChatMessage } from "~/server/app-layer/automations/delivery/slackWebApi";
 import type { EmailSuppressionService } from "~/server/app-layer/automations/emailSuppression.service";
 import {
   evaluateGraphTrigger,
@@ -31,7 +32,6 @@ import type { ProjectService } from "~/server/app-layer/projects/project.service
 import type { SystemTraceReadService } from "~/server/app-layer/traces/system-trace-read.service";
 import type { TraceReadDerivationService } from "~/server/app-layer/traces/trace-read-derivation.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import type { AnnotationService } from "~/server/annotations/annotation.service";
 import type { DatasetService } from "~/server/datasets/dataset.service";
 import type { FoldProjectionStore } from "~/server/event-sourcing/projections/foldProjection.types";
 import { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
@@ -118,6 +118,22 @@ export function buildAutomationDispatchPorts(
   };
 }
 
+/**
+ * The ADR-031 hourly cap, bound onto the cap consumer.
+ *
+ * Shared by both dispatch paths on purpose: the settlement digest and the
+ * graph-alert notify hop must consume the SAME cap, and two copies of the
+ * binding is how that stops being true the first time one side is edited.
+ */
+function boundEmailCapSlot(cap: number) {
+  return (params: {
+    projectId: string;
+    triggerId: string;
+    now: Date;
+    dedupKey: string;
+  }) => consumeEmailCapSlot({ ...params, cap });
+}
+
 /** What the triggerSettlement process manager's intent handlers call out to. */
 function settlementDispatchPorts({
   baseHost,
@@ -143,14 +159,7 @@ function settlementDispatchPorts({
     emailHourlyCap,
     tenantDailyCap,
     deriveEvents: (params) => traceReadDerivation.deriveEvents(params),
-    consumeEmailCapSlot: ({ projectId, triggerId, now, dedupKey }) =>
-      consumeEmailCapSlot({
-        projectId,
-        triggerId,
-        now,
-        cap: emailHourlyCap,
-        dedupKey,
-      }),
+    consumeEmailCapSlot: boundEmailCapSlot(emailHourlyCap),
     consumeTenantEmailCapSlot: (params) => consumeTenantEmailCapSlot(params),
     filterSuppressedEmails: (params) =>
       emailSuppressions.filterSuppressed(params),
@@ -217,14 +226,7 @@ function graphAlertNotifierPorts({
     recordWebhookDelivery: (input) => webhookDeliveries.record(input),
     filterSuppressedRecipients: (params) =>
       emailSuppressions.filterSuppressed(params),
-    consumeEmailCapSlot: ({ projectId, triggerId, now, dedupKey }) =>
-      consumeEmailCapSlot({
-        projectId,
-        triggerId,
-        now,
-        cap: emailHourlyCap,
-        dedupKey,
-      }),
+    consumeEmailCapSlot: boundEmailCapSlot(emailHourlyCap),
     consumeTenantEmailCapSlot: (params) => consumeTenantEmailCapSlot(params),
     isRecipientSent: (params) => triggers.isSendClaimed(params),
     recordRecipientSent: async (params) => {

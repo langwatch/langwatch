@@ -41,6 +41,16 @@ export function simulationRunDedupPredicate({
   tenantIdParam: string;
   filters?: string;
 }): string {
+  // The fragment is concatenated straight after the tenant predicate, so a
+  // bare condition (or one starting with OR) would either break the SQL or,
+  // worse, widen the inner read past this tenant's rows. Enforced here rather
+  // than left to the doc comment above.
+  if (filters.trim() && !/^\s*AND\b/i.test(filters)) {
+    throw new Error(
+      `simulationRunDedupPredicate: filters must start with "AND", got: ${filters}`,
+    );
+  }
+
   return `AND (TenantId, ScenarioSetId, BatchRunId, ScenarioRunId, UpdatedAt) IN (
     SELECT TenantId, ScenarioSetId, BatchRunId, ScenarioRunId, max(UpdatedAt)
     FROM ${SIMULATION_RUNS_TABLE}
@@ -81,8 +91,6 @@ export const SIMULATION_TERMINAL_STATUSES = [
 ] as const;
 
 /** Renders a status list as a SQL `IN` tuple: `'A','B'`. */
-export function statusList(
-  statuses: readonly string[],
-): string {
+export function statusList(statuses: readonly string[]): string {
   return statuses.map((status) => `'${status}'`).join(",");
 }

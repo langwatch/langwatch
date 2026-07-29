@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 import { ContributeLogFactsCommand } from "../../pipelines/coding-agent-processing/commands/contributeLogFactsCommand";
 import { ContributeMetricFactsCommand } from "../../pipelines/coding-agent-processing/commands/contributeMetricFactsCommand";
@@ -24,7 +24,7 @@ import type { DefinedCommandClass } from "../defineCommand";
  * suppressed line is asserted rather than assumed.
  */
 
-const sent: unknown[] = [];
+let sent: unknown[] = [];
 const dispatcher: EventSourcedQueueProcessor<any> = {
   async send(payload: unknown) {
     sent.push(payload);
@@ -92,6 +92,13 @@ function acceptsOnlyDefinedCommandClasses<
 >(_command: C): void {}
 
 describe("the command bus type surface", () => {
+  // Each test asserts its OWN sends. Vitest runs files sequentially by
+  // default, but that is a default and not a contract — `sequence.shuffle`
+  // exists to catch suites that quietly depend on declaration order.
+  beforeEach(() => {
+    sent = [];
+  });
+
   describe("when the payload is inferred from the imported command class", () => {
     /** @scenario A payload that does not match the command class is a compile error */
     it("rejects an unknown member on the payload", async () => {
@@ -113,7 +120,7 @@ describe("the command bus type surface", () => {
         validPayload,
       );
 
-      expect(sent.at(-1)).toBe(validPayload);
+      expect(sent).toEqual([validPayload]);
     });
 
     it("rejects an unknown member on a batch element", async () => {
@@ -123,7 +130,7 @@ describe("the command bus type surface", () => {
         { ...validPayload, typo: 1 },
       ]);
 
-      expect(sent).toHaveLength(5);
+      expect(sent).toHaveLength(2);
     });
 
     it("rejects an unknown member through a bound port", async () => {
@@ -132,7 +139,7 @@ describe("the command bus type surface", () => {
       // @ts-expect-error — a port carries the same payload type
       await contributeMetricFacts({ ...validPayload, typo: 1 });
 
-      expect(sent).toHaveLength(6);
+      expect(sent).toHaveLength(1);
     });
   });
 

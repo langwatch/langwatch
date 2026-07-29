@@ -23,7 +23,8 @@
  * `/api/collector` path cannot reach the namespace at all: it builds span
  * attributes from a closed key set (`collectorSpan.utils.ts`).
  *
- * Two gates live here on purpose:
+ * Two gates live here on purpose, and {@link normalizeGovernanceSpanOrNull}
+ * is the two of them in the order every consumer needs:
  *
  *  - {@link isGovernanceOriginWireSpan} runs on the RAW OTLP span, before
  *    any normalisation, so a non-governance span (the overwhelming
@@ -41,11 +42,13 @@ import {
   GOVERNANCE_ATTR,
   GOVERNANCE_ORIGIN_KIND_VALUE,
 } from "@ee/governance/services/governanceAttributeKeys";
+import { spanNormalizationPipelineService } from "@ee/governance/services/spanDerivation.composition";
 import { stringAttr } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-summary.utils";
+import type { SpanReceivedEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
 import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 
 /** Fallback `SourceType` label when the receiver stamped no source type. */
-export const GOVERNANCE_SOURCE_TYPE_UNKNOWN = "unknown" as const;
+export const GOVERNANCE_SOURCE_TYPE_UNKNOWN = "unknown";
 
 /**
  * Cheap pre-normalisation gate on the raw OTLP span.
@@ -69,6 +72,34 @@ export function isGovernanceOriginWireSpan(span: unknown): boolean {
     if (value?.stringValue === GOVERNANCE_ORIGIN_KIND_VALUE) return true;
   }
   return false;
+}
+
+/**
+ * Gate on the raw wire span, then normalise — the one sequence both
+ * governance map projections run before they can derive anything.
+ *
+ * It lives here rather than in each projection because the first half decides
+ * whether a span is admitted to an AUDITOR-facing stream. A second copy of
+ * that decision is a second thing to keep correct, and the failure mode of
+ * letting them drift is a forged row in an audit stream, not a style
+ * complaint. The second half is merely expensive, and the two belong together
+ * anyway: normalising without the gate first is the cost this module exists
+ * to avoid.
+ *
+ * Returns null when the span is not governance traffic, which is what a map
+ * projection's `map` returns to say "nothing to store".
+ */
+export function normalizeGovernanceSpanOrNull(
+  event: SpanReceivedEvent,
+): NormalizedSpan | null {
+  if (!isGovernanceOriginWireSpan(event.data.span)) return null;
+
+  return spanNormalizationPipelineService.normalizeSpanReceived(
+    event.tenantId,
+    event.data.span,
+    event.data.resource,
+    event.data.instrumentationScope,
+  );
 }
 
 /**

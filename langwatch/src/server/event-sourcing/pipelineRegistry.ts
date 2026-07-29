@@ -2,7 +2,6 @@ import {
   type EnterprisePipelineSetConfig,
   registerEnterprisePipelineSet,
 } from "@ee/event-sourcing/pipelineSet";
-import { createVirtualKeyLastUsedSubscriber } from "@ee/governance/subscribers/virtualKeyLastUsed.subscriber";
 import {
   createGatewayBudgetDebitsProjection,
   createGovernanceKpisProjection,
@@ -12,16 +11,13 @@ import {
   type GovernanceOcsfEventsProjectionDeps,
 } from "@ee/governance/projections/governanceProjections.composition";
 import { createTraceAlertTriggerMatchHandler } from "@ee/governance/subscribers/traceAlertTriggerMatch.subscriber";
+import { createVirtualKeyLastUsedSubscriber } from "@ee/governance/subscribers/virtualKeyLastUsed.subscriber";
 import type {
   LangyConversationStateData,
   LangyConversationTurnData,
   LangyMessageProjectionRecord,
 } from "@langwatch/langy";
 import { createLogger } from "@langwatch/observability";
-import {
-  generateKillSwitchKey,
-  type KillSwitchComponentType,
-} from "./utils/killSwitch";
 import type { PrismaClient } from "@prisma/client";
 import type { Cluster, Redis } from "ioredis";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
@@ -32,6 +28,8 @@ import {
 } from "~/server/datasets/dataset-normalize.job";
 import { registerDatasetNormalizeEnqueue } from "~/server/datasets/dataset-normalize.queue";
 import { getDatasetStorage } from "~/server/datasets/dataset-storage";
+import { abortManager } from "~/server/experiments-v3/execution/abortManager";
+import { runStateManager } from "~/server/experiments-v3/execution/runStateManager";
 import { featureFlagService } from "~/server/featureFlag";
 import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
 import { queryBillableEventsTotal } from "../../../ee/billing/services/billableEventsQuery";
@@ -75,9 +73,12 @@ import type { RetentionPolicyResolver } from "../data-retention/retentionPolicyR
 import type { AutomationDispatchPorts } from "../event-sourcing/pipelines/automations/automationDispatch.adapter";
 import { createEvaluationAlertTriggerMatchHandler } from "../event-sourcing/pipelines/automations/subscribers/evaluationAlertTriggerMatch.subscriber";
 import { createGraphTriggerActivityHandler } from "../event-sourcing/pipelines/automations/subscribers/graphTriggerActivity.subscriber";
+import type { TopicClusteringRunPort } from "../event-sourcing/pipelines/topic-clustering-processing/process-manager";
+import { createScenarioExecutionDispatcher } from "../scenarios/execution/execution-dispatcher";
+import { executeScenarioRun } from "../scenarios/scenario.processor";
+import { ScenarioService } from "../scenarios/scenario.service";
+import { ScenarioFailureHandler } from "../scenarios/scenario-failure-handler";
 import { type CommandDispatcher, Deferred } from "./deferred";
-import { abortManager } from "~/server/experiments-v3/execution/abortManager";
-import { runStateManager } from "~/server/experiments-v3/execution/runStateManager";
 import { createTenantId } from "./domain/tenantId";
 import type { EventSourcing } from "./eventSourcing";
 import { mapCommands } from "./mapCommands";
@@ -109,16 +110,11 @@ import {
   COMPUTE_METRICS_RETRY_DELAY_MS,
   ComputeRunMetricsCommand,
 } from "./pipelines/simulation-processing/commands/computeRunMetrics.command";
-import { ScenarioFailureHandler } from "../scenarios/scenario-failure-handler";
-import { ScenarioService } from "../scenarios/scenario.service";
 import { createSimulationProcessingPipeline } from "./pipelines/simulation-processing/pipeline";
 import type { SimulationRunStateData } from "./pipelines/simulation-processing/projections/simulationRunState.foldProjection";
-import { createScenarioExecutionDispatcher } from "../scenarios/execution/execution-dispatcher";
-import { executeScenarioRun } from "../scenarios/scenario.processor";
 import type { SimulationRunStateRepository } from "./pipelines/simulation-processing/repositories/simulationRunState.repository";
 import type { ComputeRunMetricsCommandData } from "./pipelines/simulation-processing/schemas/commands";
 import { SIMULATION_PROJECTION_VERSIONS } from "./pipelines/simulation-processing/schemas/constants";
-import type { TopicClusteringRunPort } from "../event-sourcing/pipelines/topic-clustering-processing/process-manager";
 import { createTopicClusteringProcessingPipeline } from "./pipelines/topic-clustering-processing/pipeline";
 import type { TopicClusteringRunHistoryData } from "./pipelines/topic-clustering-processing/projections/topicClusteringRunHistory.foldProjection";
 import type { TopicClusteringRunStatusData } from "./pipelines/topic-clustering-processing/projections/topicClusteringRunStatus.foldProjection";
@@ -156,6 +152,10 @@ import type { AppendStore } from "./projections/mapProjection.types";
 import { RepositoryFoldStore } from "./projections/repositoryFoldStore";
 import type { StateProjectionStore } from "./projections/stateProjection.types";
 import { BlobSweeper } from "./queues/groupQueue/blobSweeper";
+import {
+  generateKillSwitchKey,
+  type KillSwitchComponentType,
+} from "./utils/killSwitch";
 
 const logger = createLogger("langwatch:event-sourcing:pipeline-registry");
 
@@ -405,27 +405,26 @@ export class PipelineRegistry {
     const codingAgentCommands = mapCommands(codingAgentPipeline.commands);
     const metricPipeline = this.registerMetricPipeline();
     const logPipeline = this.registerLogPipeline();
-    const { pipeline: tracePipeline } =
-      this.registerTracePipeline({
-        evalPipeline,
-        traceSummaryStore,
-        automations: {
-          triggerMatchHandler: createTraceAlertTriggerMatchHandler({
-            triggers: this.deps.triggers,
-            recordTriggerMatch: {
-              send: automationCommands.recordTriggerMatch,
-            },
-          }),
-          graphActivityHandler,
-        },
-        codingAgentSubscribers: [
-          createCodingAgentSpanFactsDispatchSubscriber({
-            contributeSpanFacts: codingAgentCommands.contributeSpanFacts,
-            getNormalizedSpanById: (params) =>
-              this.deps.traces.spans.getNormalizedSpanById(params),
-          }),
-        ],
-      });
+    const { pipeline: tracePipeline } = this.registerTracePipeline({
+      evalPipeline,
+      traceSummaryStore,
+      automations: {
+        triggerMatchHandler: createTraceAlertTriggerMatchHandler({
+          triggers: this.deps.triggers,
+          recordTriggerMatch: {
+            send: automationCommands.recordTriggerMatch,
+          },
+        }),
+        graphActivityHandler,
+      },
+      codingAgentSubscribers: [
+        createCodingAgentSpanFactsDispatchSubscriber({
+          contributeSpanFacts: codingAgentCommands.contributeSpanFacts,
+          getNormalizedSpanById: (params) =>
+            this.deps.traces.spans.getNormalizedSpanById(params),
+        }),
+      ],
+    });
     const { pipeline: simulationPipeline, scenarioExecutionHandle } =
       this.registerSimulationPipeline({
         traceSummaryStore,
@@ -580,8 +579,7 @@ export class PipelineRegistry {
   private registerCodingAgentPipeline() {
     return this.deps.eventSourcing.register(
       createCodingAgentProcessingPipeline({
-        codingAgentSessionRepository:
-          this.deps.repositories.codingAgentSession,
+        codingAgentSessionRepository: this.deps.repositories.codingAgentSession,
         codingAgentTraceSessionRepository:
           this.deps.repositories.codingAgentTraceSession,
         sessionMetricSeriesRepository:
@@ -741,8 +739,9 @@ export class PipelineRegistry {
     // now and resolves on first dispatch, so the simulation pipeline
     // registering after this one carries no meaning.
     const simulationMetricsSyncReactor = createSimulationMetricsSyncReactor({
-      computeRunMetrics:
-        this.deps.eventSourcing.commandBus.port(ComputeRunMetricsCommand),
+      computeRunMetrics: this.deps.eventSourcing.commandBus.port(
+        ComputeRunMetricsCommand,
+      ),
     });
 
     // ADR-075 Class C splits this one. The debit rows are derived state and
@@ -890,11 +889,19 @@ export class PipelineRegistry {
   }: {
     traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
   }) {
-    const simulationRunStore = new CachedFoldStore<SimulationRunStateData>(
+    // The durable tier, held separately: the cached wrapper below is what the
+    // pipeline reads for display, but the at-most-once dispatch guard reads
+    // THIS one. A fold-cache hit carries no cross-process freshness promise
+    // (ADR-066: it is a dumb read/write cache), and a stale `QUEUED` served to
+    // `readRunStatus` is exactly the answer that lets a redelivery spawn a
+    // second run.
+    const durableSimulationRunStore =
       new RepositoryFoldStore<SimulationRunStateData>(
         this.deps.repositories.simulationRunState,
         SIMULATION_PROJECTION_VERSIONS.RUN_STATE,
-      ),
+      );
+    const simulationRunStore = new CachedFoldStore<SimulationRunStateData>(
+      durableSimulationRunStore,
       this.deps.foldCacheClient,
       { keyPrefix: "simulation_runs" },
     );
@@ -942,10 +949,11 @@ export class PipelineRegistry {
           // leasing does not touch it — so a worker hard-killed mid-child is
           // re-leased at attempt 1 and `maxAttempts` cannot stop a re-run.
           // Reading the run's own stored status back does, and survives
-          // redelivery, lease lapse and restart alike.
+          // redelivery, lease lapse and restart alike — provided the read is
+          // the durable one. The fold cache is deliberately bypassed here.
           readRunStatus: async ({ projectId, scenarioRunId }) =>
             (
-              await simulationRunStore.get(scenarioRunId, {
+              await durableSimulationRunStore.get(scenarioRunId, {
                 aggregateId: scenarioRunId,
                 tenantId: createTenantId(projectId),
               })
@@ -1023,8 +1031,7 @@ export class PipelineRegistry {
   private registerExperimentRunPipeline() {
     return this.deps.eventSourcing.register(
       createExperimentRunProcessingPipeline({
-        experimentRunStateRepository:
-          this.deps.repositories.experimentRunState,
+        experimentRunStateRepository: this.deps.repositories.experimentRunState,
         experimentRunItemAppendStore:
           this.deps.repositories.experimentRunItemStorage,
         foldCacheClient: this.deps.foldCacheClient,
