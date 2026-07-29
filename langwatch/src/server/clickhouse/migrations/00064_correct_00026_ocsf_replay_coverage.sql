@@ -5,12 +5,15 @@
 -- immutable history (CLAUDE.md), so this correction lands in a NEW migration
 -- rather than editing 00026. Documentation only — no schema change.
 --
--- 00026's header calls governance_ocsf_events a "fold projection" and its Down
--- note claims the table "can be dropped + rebuilt at any time from event_log
--- without data loss". BOTH ARE FALSE, and acting on the rebuild claim
--- PERMANENTLY DESTROYS SOC2 / ISO27001 audit evidence:
+-- 00026 calls governance_ocsf_events a fold of DERIVED data, and asserts the
+-- rebuild claim TWICE. Its header (00026:37-38): "The fold can be dropped +
+-- rebuilt at any time from event_log without data loss (per ADR-018)." Its Down
+-- note (00026:111-114), more weakly: "dropping governance_ocsf_events is
+-- supported (the fold is derived data, rebuildable from event_log)". BOTH ARE
+-- FALSE, and acting on EITHER PERMANENTLY DESTROYS SOC2 / ISO27001 audit
+-- evidence:
 --
---   1. As of this migration the table is REACTOR-populated
+--   1. As of 2026-07 (PR #5853) the table is REACTOR-populated
 --      (governanceOcsfEventsSync, registered via
 --      builder.withReactor("traceSummary", …)), NOT a fold projection. Event
 --      replay rebuilds fold/map projections and NEVER invokes reactors

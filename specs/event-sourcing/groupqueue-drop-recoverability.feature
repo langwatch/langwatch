@@ -267,4 +267,5 @@ Feature: GroupQueue drop recoverability — preserve, name, keep the blob
 #       gaps, same class 5821 deferred; the no-slot sites are WIRED + typecheck-clean).
 # #720: AC-720.1 bound (GQ2 holder, falsifiability-proven). AC-720.1b (@unimplemented, GQ1-forcing harness).
 # #721: AC-721.6 bound (both guard directions). AC-721.1-.5 are documentation ACs (ADR-081 + site corrections
-#       + migration 00064), verified by diff/review, not scenario-mapped.
+#       + the 00026 OCSF replay-coverage correction migration), verified by diff/review,
+#       not scenario-mapped.
