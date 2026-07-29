@@ -17,6 +17,10 @@ import {
   isGrowthSeatPrice,
   resolveGrowthSeatPlanType,
 } from "../utils/growthSeatEvent";
+import {
+  requireCheckoutCurrency,
+  resolveCheckoutCurrency,
+} from "../utils/stripeCustomerCurrency";
 
 type InviteInput = {
   email: string;
@@ -54,6 +58,18 @@ export const createSeatEventSubscriptionFns = ({
     isUpgradeFromTiered?: boolean;
     invites?: InviteInput[];
   }) {
+    // Resolve the currency before touching the database. A checkout we cannot
+    // build in the customer's own currency will be rejected outright, and every
+    // write below this point would have to be cleaned up afterwards.
+    const checkoutCurrency = requireCheckoutCurrency(
+      await resolveCheckoutCurrency({
+        stripe,
+        customerId,
+        organizationId,
+        requestedCurrency: currency,
+      }),
+    );
+
     // Find stale PENDING subs so we can clean up their PAYMENT_PENDING invites too
     const staleSubs = await db.subscription.findMany({
       where: {
@@ -94,7 +110,7 @@ export const createSeatEventSubscriptionFns = ({
     // doesn't leave orphaned pending records in the database.
     const lineItems = createCheckoutLineItems({
       coreMembers: membersToAdd,
-      currency,
+      currency: checkoutCurrency,
       interval: billingInterval,
     });
 
@@ -105,7 +121,7 @@ export const createSeatEventSubscriptionFns = ({
           organizationId,
           status: SubscriptionStatus.PENDING,
           plan: resolveGrowthSeatPlanType({
-            currency,
+            currency: checkoutCurrency,
             interval: billingInterval,
           }),
           maxMembers: membersToAdd,
@@ -145,7 +161,7 @@ export const createSeatEventSubscriptionFns = ({
     });
 
     const selectedOptionsMetadata = {
-      selectedCurrency: currency,
+      selectedCurrency: checkoutCurrency,
       selectedBillingInterval: billingInterval,
     };
 
@@ -166,7 +182,7 @@ export const createSeatEventSubscriptionFns = ({
 
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
-      currency: currency.toLowerCase(),
+      currency: checkoutCurrency.toLowerCase(),
       ...({ adaptive_pricing: { enabled: false } } as Record<string, unknown>),
       customer: customerId,
       customer_update: {
