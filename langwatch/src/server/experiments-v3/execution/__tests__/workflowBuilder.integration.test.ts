@@ -4,7 +4,10 @@ import type {
   LocalPromptConfig,
   TargetConfig,
 } from "~/experiments-v3/types";
-import { LATEST_SPEC_VERSION, type LlmPromptConfigComponent } from "~/optimization_studio/types/dsl";
+import {
+  LATEST_SPEC_VERSION,
+  type LlmPromptConfigComponent,
+} from "~/optimization_studio/types/dsl";
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import type { ExecutionCell, WorkflowBuilderInput } from "../types";

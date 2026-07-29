@@ -33,10 +33,7 @@ export const TRACE_STATUS_CLICKHOUSE_EXPRESSION =
  * Future signals (rate limits, partial responses) plug in here.
  */
 export function deriveTraceStatus(
-  summary: Pick<
-    TraceSummaryData,
-    "containsErrorStatus" | "blockedByGuardrail"
-  >,
+  summary: Pick<TraceSummaryData, "containsErrorStatus" | "blockedByGuardrail">,
 ): DerivedTraceStatus {
   if (summary.containsErrorStatus) return "error";
   if (summary.blockedByGuardrail) return "warning";

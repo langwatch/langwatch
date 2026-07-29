@@ -1,10 +1,10 @@
 import { Button, Spinner, Text } from "@chakra-ui/react";
 import { FlaskConical } from "lucide-react";
-import { useRouter } from "~/utils/compat/next-router";
 import { useMemo, useState } from "react";
 import { Dialog } from "~/components/ui/dialog";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Tooltip } from "~/components/ui/tooltip";
+import type { LocalPromptConfig, TargetConfig } from "~/experiments-v3/types";
 import {
   createInitialState,
   type DatasetReference,
@@ -12,15 +12,15 @@ import {
 import { extractPersistedState } from "~/experiments-v3/types/persistence";
 import { inferAllTargetMappings } from "~/experiments-v3/utils/mappingInference";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import type { Field } from "~/optimization_studio/types/dsl";
 import { areFormValuesEqual } from "~/prompts/utils/areFormValuesEqual";
 import { computeInitialFormValuesForPrompt } from "~/prompts/utils/computeInitialFormValuesForPrompt";
-import { api } from "~/utils/api";
-import { generateHumanReadableId } from "~/utils/humanReadableId";
-import { useDraggableTabsBrowserStore } from "../../prompt-playground-store/DraggableTabsBrowserStore";
-import type { TabData } from "../../prompt-playground-store/DraggableTabsBrowserStore";
-import type { LocalPromptConfig, TargetConfig } from "~/experiments-v3/types";
-import type { Field } from "~/optimization_studio/types/dsl";
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
+import { api } from "~/utils/api";
+import { useRouter } from "~/utils/compat/next-router";
+import { generateHumanReadableId } from "~/utils/humanReadableId";
+import type { TabData } from "../../prompt-playground-store/DraggableTabsBrowserStore";
+import { useDraggableTabsBrowserStore } from "../../prompt-playground-store/DraggableTabsBrowserStore";
 
 /**
  * Converts a playground tab's form values to a LocalPromptConfig.
@@ -198,18 +198,20 @@ export function ExperimentFromPlaygroundButton({
   const utils = api.useContext();
 
   // Get all tabs from all windows
-  const { isComparing, allTabs, activeTab } = useDraggableTabsBrowserStore((state) => {
-    const activeWindow = state.windows.find(
-      (w) => w.id === state.activeWindowId,
-    );
-    return {
-      isComparing: state.windows.length > 1,
-      allTabs: state.windows.flatMap((w) => w.tabs),
-      activeTab: activeWindow?.tabs.find(
-        (t) => t.id === activeWindow?.activeTabId,
-      ),
-    };
-  });
+  const { isComparing, allTabs, activeTab } = useDraggableTabsBrowserStore(
+    (state) => {
+      const activeWindow = state.windows.find(
+        (w) => w.id === state.activeWindowId,
+      );
+      return {
+        isComparing: state.windows.length > 1,
+        allTabs: state.windows.flatMap((w) => w.tabs),
+        activeTab: activeWindow?.tabs.find(
+          (t) => t.id === activeWindow?.activeTabId,
+        ),
+      };
+    },
+  );
 
   const promptCount = allTabs.length;
   const isDisabled = promptCount === 0 || !hasPermission("evaluations:manage");
@@ -286,16 +288,18 @@ export function ExperimentFromPlaygroundButton({
     initialState.name = experimentName;
 
     // Convert all tabs to targets with auto-mapping
-    const targets = (isComparing || !activeTab ? allTabs : [activeTab]).map((tab, index) => {
-      const configId = tab.data.form.currentValues.configId;
-      const savedPrompt = configId ? savedPromptsMap.get(configId) : null;
-      return convertTabToTarget(
-        tab.data,
-        index,
-        initialState.datasets,
-        savedPrompt,
-      );
-    });
+    const targets = (isComparing || !activeTab ? allTabs : [activeTab]).map(
+      (tab, index) => {
+        const configId = tab.data.form.currentValues.configId;
+        const savedPrompt = configId ? savedPromptsMap.get(configId) : null;
+        return convertTabToTarget(
+          tab.data,
+          index,
+          initialState.datasets,
+          savedPrompt,
+        );
+      },
+    );
     initialState.targets = targets;
 
     // Extract persisted state for saving

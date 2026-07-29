@@ -187,7 +187,10 @@ describe("Scenarios API", () => {
           id: scenario.id,
           name: "Login Flow",
           situation: "User attempts to log in with valid credentials",
-          criteria: ["Responds with a welcome message", "Includes user name in greeting"],
+          criteria: [
+            "Responds with a welcome message",
+            "Includes user name in greeting",
+          ],
           labels: ["auth", "happy-path"],
         });
       });
@@ -223,7 +226,10 @@ describe("Scenarios API", () => {
         expect(body).toMatchObject({
           name: "Login Flow Happy Path",
           situation: "User attempts to log in with valid creds",
-          criteria: ["Responds with a welcome message", "Includes user name in greeting"],
+          criteria: [
+            "Responds with a welcome message",
+            "Includes user name in greeting",
+          ],
           labels: ["auth", "happy-path"],
         });
         expect(body).toHaveProperty("id");
@@ -340,9 +346,7 @@ describe("Scenarios API", () => {
       });
 
       it("archives the scenario and returns success", async () => {
-        const res = await helpers.api.delete(
-          `/api/scenarios/${scenario.id}`
-        );
+        const res = await helpers.api.delete(`/api/scenarios/${scenario.id}`);
 
         expect(res.status).toBe(200);
         const body = await res.json();
@@ -363,9 +367,7 @@ describe("Scenarios API", () => {
 
     describe("when the scenario does not exist", () => {
       it("returns 404", async () => {
-        const res = await helpers.api.delete(
-          "/api/scenarios/nonexistent-id"
-        );
+        const res = await helpers.api.delete("/api/scenarios/nonexistent-id");
 
         expect(res.status).toBe(404);
         const body = await res.json();

@@ -26,10 +26,11 @@
  * modelAllowlist unless --clear-allowlist is passed, and refuses to pick
  * among multiple org memberships implicitly (pass --org <id or name>).
  */
+
+import { PersonalVirtualKeyService } from "@ee/governance/services/personalVirtualKey.service";
+import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
 import { prisma } from "~/server/db";
 import { encrypt } from "~/utils/encryption";
-import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
-import { PersonalVirtualKeyService } from "@ee/governance/services/personalVirtualKey.service";
 
 interface Args {
   email: string;
@@ -43,6 +44,7 @@ function parseArgs(argv: string[]): Args {
   let org = "";
   let allowRemoteDb = false;
   let clearAllowlist = false;
+  // biome-ignore lint/style/useForOf: flag parser advances the index (argv[++i]) to consume a value; for...of has no index to advance.
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === "--email") email = argv[++i] ?? "";
     if (argv[i] === "--org") org = argv[++i] ?? "";
@@ -106,7 +108,9 @@ async function ensureProvider({
       where: { id: existing.id },
       data: { enabled: true, customKeys: encrypt(JSON.stringify(keys)) },
     });
-    process.stderr.write(`[seed-audio] refreshed ${provider} provider ${existing.id}\n`);
+    process.stderr.write(
+      `[seed-audio] refreshed ${provider} provider ${existing.id}\n`,
+    );
     return existing.id;
   }
   const created = await prisma.modelProvider.create({
@@ -116,10 +120,14 @@ async function ensureProvider({
       enabled: true,
       organizationId,
       customKeys: encrypt(JSON.stringify(keys)),
-      scopes: { create: [{ scopeType: "ORGANIZATION", scopeId: organizationId }] },
+      scopes: {
+        create: [{ scopeType: "ORGANIZATION", scopeId: organizationId }],
+      },
     },
   });
-  process.stderr.write(`[seed-audio] created ${provider} provider ${created.id}\n`);
+  process.stderr.write(
+    `[seed-audio] created ${provider} provider ${created.id}\n`,
+  );
   return created.id;
 }
 
@@ -160,7 +168,9 @@ async function main() {
         orgs.map((o) => `${o.name} [${o.id}]`).join(", "),
     );
   }
-  process.stderr.write(`[seed-audio] user=${user.id} org=${org.id} (${org.name})\n`);
+  process.stderr.write(
+    `[seed-audio] user=${user.id} org=${org.id} (${org.name})\n`,
+  );
 
   const providerIds: string[] = [];
   const openaiKey = process.env.OPENAI_API_KEY;
@@ -174,7 +184,9 @@ async function main() {
       }),
     );
   } else {
-    process.stderr.write("[seed-audio] OPENAI_API_KEY unset, skipping openai provider\n");
+    process.stderr.write(
+      "[seed-audio] OPENAI_API_KEY unset, skipping openai provider\n",
+    );
   }
   const elevenKey = process.env.ELEVENLABS_API_KEY;
   if (elevenKey) {
@@ -187,7 +199,9 @@ async function main() {
       }),
     );
   } else {
-    process.stderr.write("[seed-audio] ELEVENLABS_API_KEY unset, skipping elevenlabs provider\n");
+    process.stderr.write(
+      "[seed-audio] ELEVENLABS_API_KEY unset, skipping elevenlabs provider\n",
+    );
   }
   if (providerIds.length === 0) {
     throw new Error("no provider keys in env, nothing to route");

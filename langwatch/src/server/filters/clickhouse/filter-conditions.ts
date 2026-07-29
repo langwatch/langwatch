@@ -3,7 +3,6 @@ import type { FilterField } from "../types";
 import type {
   FilterConditionBuilder,
   FilterConditionOptions,
-  FilterConditionResult,
   GenerateFilterConditionsResult,
 } from "./types";
 

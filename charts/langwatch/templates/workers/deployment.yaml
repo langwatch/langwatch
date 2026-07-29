@@ -155,14 +155,31 @@ spec:
             {{- toYaml . | nindent 12 }}
             {{- end }}
 
+          # Probe the worker's HTTP listener (the metrics server port, 2999)
+          # rather than just PID 1 liveness — an answered request proves the
+          # event loop is turning, which `kill -0 1` cannot tell us.
+          #
+          # The probe targets /healthz, NOT /metrics. /metrics is fail-closed in
+          # production: with no METRICS_API_KEY (the default —
+          # app.telemetry.metrics.enabled is false, so the env var is never
+          # emitted) it answers 500 to every caller, which would crash-loop the
+          # workers on a stock install. And an httpGet probe cannot read a
+          # Secret, so a key delivered via secretKeyRef could never be put in a
+          # rendered Authorization header anyway — that install would 401.
+          # /healthz is unauthenticated by design and carries no telemetry, so
+          # no bearer token is copied into this podspec.
+          # See specs/server/worker-liveness-probe.feature.
           startupProbe:
-            exec:
-              command: ["sh", "-c", "kill -0 1"]
+            httpGet:
+              path: /healthz
+              port: 2999
             failureThreshold: 12
             periodSeconds: 10
+            timeoutSeconds: 5
           livenessProbe:
-            exec:
-              command: ["sh", "-c", "kill -0 1"]
+            httpGet:
+              path: /healthz
+              port: 2999
             periodSeconds: 30
             timeoutSeconds: 5
             failureThreshold: 3

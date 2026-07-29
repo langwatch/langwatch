@@ -1,6 +1,6 @@
 import type { LucideIcon } from "lucide-react";
-import type { DrawerType } from "~/components/drawerRegistry";
 import { z } from "zod";
+import type { DrawerType } from "~/components/drawerRegistry";
 
 export type CommandCategory = "navigation" | "actions" | "search" | "projects";
 

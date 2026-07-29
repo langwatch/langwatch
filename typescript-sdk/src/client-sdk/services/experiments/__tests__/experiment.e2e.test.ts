@@ -23,6 +23,8 @@ describe.skipIf(SKIP_INTEGRATION)("Experiment Integration", () => {
   });
 
   describe("init()", () => {
+    /** @scenario "Initialize an evaluation experiment" */
+    /** @scenario "Run ID generation" */
     it("creates experiment and returns evaluation instance", async () => {
       const experimentName = `test-init-${Date.now()}`;
       const evaluation = await langwatch.experiments.init(experimentName);
@@ -55,6 +57,7 @@ describe.skipIf(SKIP_INTEGRATION)("Experiment Integration", () => {
   });
 
   describe("run()", () => {
+    /** @scenario "Run evaluation over dataset with automatic tracing" */
     it("executes callback for each dataset item", async () => {
       const evaluation = await langwatch.experiments.init(`test-run-${Date.now()}`);
       const dataset = [
@@ -73,6 +76,7 @@ describe.skipIf(SKIP_INTEGRATION)("Experiment Integration", () => {
       expect(processed).toEqual([0, 1]);
     });
 
+    /** @scenario "Parallel execution with concurrency control" */
     it("respects concurrency limit", async () => {
       const evaluation = await langwatch.experiments.init(`test-concurrency-${Date.now()}`);
       const dataset = Array.from({ length: 10 }, (_, i) => ({ id: i }));
@@ -227,6 +231,7 @@ describe.skipIf(SKIP_INTEGRATION)("Experiment Integration", () => {
   });
 
   describe("target registration", () => {
+    /** @scenario "Target metadata validation" */
     it("throws on conflicting metadata for same target", async () => {
       const evaluation = await langwatch.experiments.init(`test-conflict-${Date.now()}`);
 
@@ -372,6 +377,7 @@ describe.skipIf(SKIP_INTEGRATION)("Experiment Integration", () => {
       // Duration is now captured in the dataset entry per target (like Evaluations V3)
     });
 
+    /** @scenario "Parallel target execution within single dataset item" */
     it("runs targets in parallel with Promise.all", async () => {
       const evaluation = await langwatch.experiments.init(`test-withTarget-parallel-${Date.now()}`);
       const dataset = [{ question: "Test" }];
@@ -528,6 +534,7 @@ describe.skipIf(SKIP_INTEGRATION)("Experiment Integration", () => {
 // Unit tests that don't require backend
 describe("Evaluation Unit", () => {
   describe("humanReadableId", () => {
+    /** @scenario "Run ID generation" */
     it("generates adjective-adjective-noun pattern", async () => {
       const { generateHumanReadableId } = await import("../humanReadableId.js");
 

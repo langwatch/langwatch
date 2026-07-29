@@ -2,7 +2,7 @@
  * @vitest-environment node
  */
 
-import { AgentRole, type AgentInput } from "@langwatch/scenario";
+import { type AgentInput, AgentRole } from "@langwatch/scenario";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { LiteLLMParams, PromptConfigData } from "../../types";
 import { SerializedPromptConfigAdapter } from "../prompt-config.adapter";
@@ -70,9 +70,7 @@ describe("SerializedPromptConfigAdapter", () => {
     );
 
     // The adapter exposes no fieldMappings property
-    expect(
-      "fieldMappings" in adapter,
-    ).toBe(false);
+    expect("fieldMappings" in adapter).toBe(false);
   });
 
   it("has AGENT role", () => {
@@ -121,7 +119,10 @@ describe("SerializedPromptConfigAdapter", () => {
     await adapter.call(defaultInput);
 
     const callArgs = mockGenerateText.mock.calls[0]![0];
-    const messages = callArgs.messages as Array<{ role: string; content: string }>;
+    const messages = callArgs.messages as Array<{
+      role: string;
+      content: string;
+    }>;
 
     expect(messages[0]).toEqual({
       role: "system",
@@ -195,7 +196,10 @@ describe("SerializedPromptConfigAdapter", () => {
       await adapter.call(defaultInput);
 
       const callArgs = mockGenerateText.mock.calls[0]![0];
-      const messages = callArgs.messages as Array<{ role: string; content: string }>;
+      const messages = callArgs.messages as Array<{
+        role: string;
+        content: string;
+      }>;
 
       expect(messages[0]).toEqual({
         role: "system",
@@ -220,7 +224,10 @@ describe("SerializedPromptConfigAdapter", () => {
       await adapter.call(defaultInput);
 
       const callArgs = mockGenerateText.mock.calls[0]![0];
-      const messages = callArgs.messages as Array<{ role: string; content: string }>;
+      const messages = callArgs.messages as Array<{
+        role: string;
+        content: string;
+      }>;
 
       expect(messages[1]).toEqual({
         role: "user",
@@ -243,7 +250,10 @@ describe("SerializedPromptConfigAdapter", () => {
       await adapter.call(defaultInput);
 
       const callArgs = mockGenerateText.mock.calls[0]![0];
-      const messages = callArgs.messages as Array<{ role: string; content: string }>;
+      const messages = callArgs.messages as Array<{
+        role: string;
+        content: string;
+      }>;
 
       // Only system message - input.messages not appended because template handles it
       expect(messages).toHaveLength(1);
@@ -266,7 +276,10 @@ describe("SerializedPromptConfigAdapter", () => {
       await adapter.call(defaultInput);
 
       const callArgs = mockGenerateText.mock.calls[0]![0];
-      const messages = callArgs.messages as Array<{ role: string; content: string }>;
+      const messages = callArgs.messages as Array<{
+        role: string;
+        content: string;
+      }>;
 
       // System + template message only - input.messages not appended
       expect(messages).toHaveLength(2);
@@ -284,7 +297,10 @@ describe("SerializedPromptConfigAdapter", () => {
       await adapter.call(defaultInput);
 
       const callArgs = mockGenerateText.mock.calls[0]![0];
-      const messages = callArgs.messages as Array<{ role: string; content: string }>;
+      const messages = callArgs.messages as Array<{
+        role: string;
+        content: string;
+      }>;
 
       // System + template message + input message
       expect(messages).toHaveLength(3);
@@ -358,9 +374,7 @@ describe("SerializedPromptConfigAdapter", () => {
 
         const userMessage = promptMessages[1];
         expect(userMessage?.role).toBe("user");
-        expect(userMessage?.content).toBe(
-          "Summary: [Hello][How are you?]",
-        );
+        expect(userMessage?.content).toBe("Summary: [Hello][How are you?]");
         // Verify Liquid tags are fully rendered (no raw template syntax remains)
         expect(userMessage?.content).not.toContain("{%");
         expect(userMessage?.content).not.toContain("%}");

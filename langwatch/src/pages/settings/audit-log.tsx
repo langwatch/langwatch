@@ -2,8 +2,6 @@ import {
   Alert,
   Badge,
   Box,
-  Button,
-  Card,
   Heading,
   HStack,
   Input,
@@ -16,11 +14,12 @@ import {
 } from "@chakra-ui/react";
 import { formatDistanceToNow } from "date-fns";
 import { ArrowLeft, Download, Search } from "lucide-react";
-import { Link } from "~/components/ui/link";
-import { useRouter } from "~/utils/compat/next-router";
 import Parse from "papaparse";
 import { useState } from "react";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
+import { Link } from "~/components/ui/link";
+import type { EnrichedAuditLog } from "~/server/app-layer/organizations/repositories/organization.repository";
+import { useRouter } from "~/utils/compat/next-router";
 import { ProjectSelector } from "../../components/DashboardLayout";
 import { NavigationFooter } from "../../components/NavigationFooter";
 import {
@@ -33,7 +32,6 @@ import { InputGroup } from "../../components/ui/input-group";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
 import { useActivePlan } from "../../hooks/useActivePlan";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import type { EnrichedAuditLog } from "~/server/app-layer/organizations/repositories/organization.repository";
 import { api } from "../../utils/api";
 import { disambiguateLabels } from "../../utils/disambiguateLabels";
 
@@ -97,9 +95,7 @@ function AuditLogPage() {
   // filters are read straight from the URL and sent to the backend so
   // the user lands on a pre-filtered history of that resource.
   const urlTargetKind =
-    typeof router.query.targetKind === "string"
-      ? router.query.targetKind
-      : "";
+    typeof router.query.targetKind === "string" ? router.query.targetKind : "";
   const urlTargetId =
     typeof router.query.targetId === "string" ? router.query.targetId : "";
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
@@ -177,9 +173,8 @@ function AuditLogPage() {
               <Alert.Description>
                 Organisation-wide audit logs — including AI Gateway events
                 (virtual-key / budget / provider / cache-rule mutations)
-                alongside logins, member changes, settings, RBAC, and
-                billing — are available on Enterprise plans. Contact sales
-                to upgrade.
+                alongside logins, member changes, settings, RBAC, and billing —
+                are available on Enterprise plans. Contact sales to upgrade.
               </Alert.Description>
             </Alert.Content>
           </Alert.Root>
@@ -401,11 +396,7 @@ function AuditLogPage() {
         <HStack width="full" marginTop={2}>
           <VStack align="start" gap={1}>
             {backToResource && (
-              <Link
-                href={backToResource.href}
-                color="fg.muted"
-                fontSize="sm"
-              >
+              <Link href={backToResource.href} color="fg.muted" fontSize="sm">
                 <HStack gap={1}>
                   <ArrowLeft size={14} /> {backToResource.label}
                 </HStack>
@@ -572,126 +563,126 @@ function AuditLogPage() {
         ) : (
           <>
             <Box width="full" overflowX="auto">
-            <Table.Root variant="line" width="full">
-              <Table.Header>
-                <Table.Row>
-                  <Table.ColumnHeader>Timestamp</Table.ColumnHeader>
-                  <Table.ColumnHeader>Source</Table.ColumnHeader>
-                  <Table.ColumnHeader>User</Table.ColumnHeader>
-                  <Table.ColumnHeader>Action</Table.ColumnHeader>
-                  <Table.ColumnHeader>Target</Table.ColumnHeader>
-                  <Table.ColumnHeader>Project</Table.ColumnHeader>
-                  <Table.ColumnHeader>IP Address</Table.ColumnHeader>
-                  <Table.ColumnHeader>Error</Table.ColumnHeader>
-                </Table.Row>
-              </Table.Header>
-              <Table.Body>
-                {auditLogs.map((log) => (
-                  <Table.Row key={log.id}>
-                    <Table.Cell>
-                      <VStack align="start" gap={0}>
-                        <Text fontSize="sm">
-                          {new Date(log.createdAt).toLocaleString()}
-                        </Text>
-                        <Text fontSize="xs" color="fg.muted">
-                          {formatDistanceToNow(new Date(log.createdAt), {
-                            addSuffix: true,
-                          })}
-                        </Text>
-                      </VStack>
-                    </Table.Cell>
-                    <Table.Cell>
-                      <Badge
-                        size="sm"
-                        variant="subtle"
-                        colorPalette={
-                          log.source === "gateway" ? "purple" : "gray"
-                        }
-                      >
-                        {log.source === "gateway" ? "Gateway" : "Platform"}
-                      </Badge>
-                    </Table.Cell>
-                    <Table.Cell>
-                      {log.user ? (
-                        <VStack align="start" gap={0}>
-                          <Text fontSize="sm" fontWeight="medium">
-                            {log.user.name ?? "Unknown"}
-                          </Text>
-                          <Text fontSize="xs" color="fg.muted">
-                            {log.user.email}
-                          </Text>
-                        </VStack>
-                      ) : (
-                        <Text fontSize="sm" color="fg.subtle">
-                          User not found
-                        </Text>
-                      )}
-                    </Table.Cell>
-                    <Table.Cell>
-                      <Text fontSize="sm" fontFamily="mono">
-                        {log.action}
-                      </Text>
-                    </Table.Cell>
-                    <Table.Cell>
-                      {log.targetKind && log.targetId ? (
-                        <VStack align="start" gap={0}>
-                          <Text fontSize="xs" color="fg.muted">
-                            {log.targetKind}
-                          </Text>
-                          <Text fontSize="xs" fontFamily="mono">
-                            {log.targetId.slice(0, 16)}…
-                          </Text>
-                        </VStack>
-                      ) : (
-                        <Text fontSize="sm" color="fg.subtle">
-                          —
-                        </Text>
-                      )}
-                    </Table.Cell>
-                    <Table.Cell>
-                      {log.projectId ? (
-                        (() => {
-                          const project = organization.teams
-                            .flatMap((team) => team.projects)
-                            .find((p) => p.id === log.projectId);
-                          return (
-                            <Text fontSize="sm">
-                              {project?.name ?? log.projectId}
-                            </Text>
-                          );
-                        })()
-                      ) : (
-                        <Text fontSize="sm" color="fg.subtle">
-                          —
-                        </Text>
-                      )}
-                    </Table.Cell>
-                    <Table.Cell>
-                      {log.ipAddress ? (
-                        <Text fontSize="sm" fontFamily="mono">
-                          {log.ipAddress}
-                        </Text>
-                      ) : (
-                        <Text fontSize="sm" color="fg.subtle">
-                          —
-                        </Text>
-                      )}
-                    </Table.Cell>
-                    <Table.Cell>
-                      {log.error ? (
-                        <Text fontSize="sm" color="red.600">
-                          {log.error}
-                        </Text>
-                      ) : (
-                        <Text fontSize="sm" color="fg.subtle">
-                          —
-                        </Text>
-                      )}
-                    </Table.Cell>
+              <Table.Root variant="line" width="full">
+                <Table.Header>
+                  <Table.Row>
+                    <Table.ColumnHeader>Timestamp</Table.ColumnHeader>
+                    <Table.ColumnHeader>Source</Table.ColumnHeader>
+                    <Table.ColumnHeader>User</Table.ColumnHeader>
+                    <Table.ColumnHeader>Action</Table.ColumnHeader>
+                    <Table.ColumnHeader>Target</Table.ColumnHeader>
+                    <Table.ColumnHeader>Project</Table.ColumnHeader>
+                    <Table.ColumnHeader>IP Address</Table.ColumnHeader>
+                    <Table.ColumnHeader>Error</Table.ColumnHeader>
                   </Table.Row>
-                ))}
-              </Table.Body>
-            </Table.Root>
+                </Table.Header>
+                <Table.Body>
+                  {auditLogs.map((log) => (
+                    <Table.Row key={log.id}>
+                      <Table.Cell>
+                        <VStack align="start" gap={0}>
+                          <Text fontSize="sm">
+                            {new Date(log.createdAt).toLocaleString()}
+                          </Text>
+                          <Text fontSize="xs" color="fg.muted">
+                            {formatDistanceToNow(new Date(log.createdAt), {
+                              addSuffix: true,
+                            })}
+                          </Text>
+                        </VStack>
+                      </Table.Cell>
+                      <Table.Cell>
+                        <Badge
+                          size="sm"
+                          variant="subtle"
+                          colorPalette={
+                            log.source === "gateway" ? "purple" : "gray"
+                          }
+                        >
+                          {log.source === "gateway" ? "Gateway" : "Platform"}
+                        </Badge>
+                      </Table.Cell>
+                      <Table.Cell>
+                        {log.user ? (
+                          <VStack align="start" gap={0}>
+                            <Text fontSize="sm" fontWeight="medium">
+                              {log.user.name ?? "Unknown"}
+                            </Text>
+                            <Text fontSize="xs" color="fg.muted">
+                              {log.user.email}
+                            </Text>
+                          </VStack>
+                        ) : (
+                          <Text fontSize="sm" color="fg.subtle">
+                            User not found
+                          </Text>
+                        )}
+                      </Table.Cell>
+                      <Table.Cell>
+                        <Text fontSize="sm" fontFamily="mono">
+                          {log.action}
+                        </Text>
+                      </Table.Cell>
+                      <Table.Cell>
+                        {log.targetKind && log.targetId ? (
+                          <VStack align="start" gap={0}>
+                            <Text fontSize="xs" color="fg.muted">
+                              {log.targetKind}
+                            </Text>
+                            <Text fontSize="xs" fontFamily="mono">
+                              {log.targetId.slice(0, 16)}…
+                            </Text>
+                          </VStack>
+                        ) : (
+                          <Text fontSize="sm" color="fg.subtle">
+                            —
+                          </Text>
+                        )}
+                      </Table.Cell>
+                      <Table.Cell>
+                        {log.projectId ? (
+                          (() => {
+                            const project = organization.teams
+                              .flatMap((team) => team.projects)
+                              .find((p) => p.id === log.projectId);
+                            return (
+                              <Text fontSize="sm">
+                                {project?.name ?? log.projectId}
+                              </Text>
+                            );
+                          })()
+                        ) : (
+                          <Text fontSize="sm" color="fg.subtle">
+                            —
+                          </Text>
+                        )}
+                      </Table.Cell>
+                      <Table.Cell>
+                        {log.ipAddress ? (
+                          <Text fontSize="sm" fontFamily="mono">
+                            {log.ipAddress}
+                          </Text>
+                        ) : (
+                          <Text fontSize="sm" color="fg.subtle">
+                            —
+                          </Text>
+                        )}
+                      </Table.Cell>
+                      <Table.Cell>
+                        {log.error ? (
+                          <Text fontSize="sm" color="red.600">
+                            {log.error}
+                          </Text>
+                        ) : (
+                          <Text fontSize="sm" color="fg.subtle">
+                            —
+                          </Text>
+                        )}
+                      </Table.Cell>
+                    </Table.Row>
+                  ))}
+                </Table.Body>
+              </Table.Root>
             </Box>
 
             {/* Pagination */}

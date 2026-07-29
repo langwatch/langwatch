@@ -7,15 +7,13 @@
  *
  * Tests the service in isolation with mocked dependencies.
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import { OrganizationUserRole } from "@prisma/client";
-import {
-  classifyInvitesByMemberType,
-  InviteService,
-} from "../invite.service";
-import type { ILicenseEnforcementRepository } from "../../license-enforcement/license-enforcement.repository";
-import { LimitExceededError } from "../../license-enforcement/errors";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PlanProvider } from "../../app-layer/subscription/plan-provider";
+import { LimitExceededError } from "../../license-enforcement/errors";
+import type { ILicenseEnforcementRepository } from "../../license-enforcement/license-enforcement.repository";
+import { classifyInvitesByMemberType, InviteService } from "../invite.service";
 
 const { mockSendInviteEmail } = vi.hoisted(() => ({
   mockSendInviteEmail: vi.fn(),
@@ -26,8 +24,7 @@ vi.mock("../../mailer/inviteEmail", () => ({
 }));
 
 vi.mock("../../../env.mjs", async (importOriginal) => {
-  const original =
-    await importOriginal<typeof import("../../../env.mjs")>();
+  const original = await importOriginal<typeof import("../../../env.mjs")>();
   return {
     ...original,
     env: {
@@ -146,6 +143,9 @@ describe("InviteService", () => {
       organization: {
         findFirst: vi.fn(),
       },
+      organizationUser: {
+        findFirst: vi.fn(),
+      },
       customRole: {
         findMany: vi.fn(),
       },
@@ -160,11 +160,64 @@ describe("InviteService", () => {
       getActivePlan: vi.fn(),
     };
 
-    service = new InviteService(
-      mockPrisma,
-      mockLicenseRepo,
-      mockPlanProvider
-    );
+    service = new InviteService(mockPrisma, mockLicenseRepo, mockPlanProvider);
+  });
+
+  /**
+   * Inviting an address that is already a member used to succeed, writing a
+   * pending invite row beside the membership it duplicated — so the members
+   * page showed the same person as both an ADMIN and freshly "Invited", and
+   * whatever the admin was actually trying to do never happened.
+   *
+   * Asserted on `code`, not prose: the sentence a customer reads comes from the
+   * presentation registry keyed by that code (ADR-045).
+   */
+  describe("assertNotAlreadyMembers()", () => {
+    describe("when one of the addresses already belongs to a member", () => {
+      /** @scenario "Inviting an existing member is refused with a reason" */
+      it("refuses the batch and names the address", async () => {
+        mockPrisma.organizationUser.findFirst.mockResolvedValue({
+          user: { email: "already@example.com" },
+        });
+
+        await expect(
+          service.assertNotAlreadyMembers({
+            emails: ["new@example.com", "already@example.com"],
+            organizationId: "org-1",
+          }),
+        ).rejects.toMatchObject({
+          code: "already_organization_member",
+          httpStatus: 409,
+          fault: "customer",
+          meta: { email: "already@example.com" },
+        });
+      });
+    });
+
+    describe("when none of the addresses belong to a member", () => {
+      /** @scenario "Inviting a new address still succeeds" */
+      it("lets the invites through", async () => {
+        mockPrisma.organizationUser.findFirst.mockResolvedValue(null);
+
+        await expect(
+          service.assertNotAlreadyMembers({
+            emails: ["new@example.com"],
+            organizationId: "org-1",
+          }),
+        ).resolves.toBeUndefined();
+      });
+    });
+
+    describe("when there is nothing to check", () => {
+      it("does not query at all", async () => {
+        await service.assertNotAlreadyMembers({
+          emails: [],
+          organizationId: "org-1",
+        });
+
+        expect(mockPrisma.organizationUser.findFirst).not.toHaveBeenCalled();
+      });
+    });
   });
 
   describe("checkDuplicateInvite()", () => {
@@ -172,7 +225,7 @@ describe("InviteService", () => {
       it("returns the existing invite", async () => {
         const existingInvite = { id: "inv-1", email: "test@example.com" };
         mockPrisma.organizationInvite.findFirst.mockResolvedValue(
-          existingInvite
+          existingInvite,
         );
 
         const result = await service.checkDuplicateInvite({
@@ -188,7 +241,7 @@ describe("InviteService", () => {
       it("returns the existing invite", async () => {
         const existingInvite = { id: "inv-2", email: "test@example.com" };
         mockPrisma.organizationInvite.findFirst.mockResolvedValue(
-          existingInvite
+          existingInvite,
         );
 
         const result = await service.checkDuplicateInvite({
@@ -305,7 +358,7 @@ describe("InviteService", () => {
             organizationId: "org-1",
             newInvites: [{ role: OrganizationUserRole.MEMBER }],
             user: { id: "user-1" } as any,
-          })
+          }),
         ).resolves.not.toThrow();
       });
     });
@@ -325,7 +378,7 @@ describe("InviteService", () => {
             organizationId: "org-1",
             newInvites: [{ role: OrganizationUserRole.MEMBER }],
             user: { id: "user-1" } as any,
-          })
+          }),
         ).resolves.not.toThrow();
       });
     });
@@ -361,7 +414,7 @@ describe("InviteService", () => {
               email: "user@example.com",
               status: "PENDING",
             }),
-          })
+          }),
         );
       });
 
@@ -462,7 +515,7 @@ describe("InviteService", () => {
               subscriptionId: "sub-1",
               expiration: null,
             }),
-          })
+          }),
         );
       });
 
@@ -516,12 +569,14 @@ describe("InviteService", () => {
       ];
 
       beforeEach(() => {
-        mockPrisma.organizationInvite.findMany.mockResolvedValue(pendingInvites);
+        mockPrisma.organizationInvite.findMany.mockResolvedValue(
+          pendingInvites,
+        );
         mockPrisma.organizationInvite.update.mockImplementation(
           ({ where }: { where: { id: string } }) => {
             const invite = pendingInvites.find((i) => i.id === where.id);
             return Promise.resolve({ ...invite, status: "PENDING" });
-          }
+          },
         );
         mockSendInviteEmail.mockResolvedValue(undefined);
       });
@@ -544,7 +599,8 @@ describe("InviteService", () => {
         });
 
         expect(mockPrisma.organizationInvite.update).toHaveBeenCalledTimes(2);
-        const firstCall = mockPrisma.organizationInvite.update.mock.calls[0]![0];
+        const firstCall =
+          mockPrisma.organizationInvite.update.mock.calls[0]![0];
         expect(firstCall.data.expiration).toBeInstanceOf(Date);
       });
 
@@ -556,10 +612,10 @@ describe("InviteService", () => {
 
         expect(mockSendInviteEmail).toHaveBeenCalledTimes(2);
         expect(mockSendInviteEmail).toHaveBeenCalledWith(
-          expect.objectContaining({ email: "alice@example.com" })
+          expect.objectContaining({ email: "alice@example.com" }),
         );
         expect(mockSendInviteEmail).toHaveBeenCalledWith(
-          expect.objectContaining({ email: "bob@example.com" })
+          expect.objectContaining({ email: "bob@example.com" }),
         );
       });
     });
@@ -670,7 +726,7 @@ describe("InviteService", () => {
 
         // Verify: org-scoped RoleBinding was created (MEMBER gets org binding)
         const orgBinding = roleBindingsCreated.find(
-          (rb) => rb.scopeType === "ORGANIZATION"
+          (rb) => rb.scopeType === "ORGANIZATION",
         );
         expect(orgBinding).toBeDefined();
         expect(orgBinding!.userId).toBe("user-flow-1");
@@ -678,7 +734,7 @@ describe("InviteService", () => {
 
         // Verify: team-scoped RoleBinding was created
         const teamBinding = roleBindingsCreated.find(
-          (rb) => rb.scopeType === "TEAM"
+          (rb) => rb.scopeType === "TEAM",
         );
         expect(teamBinding).toBeDefined();
         expect(teamBinding!.userId).toBe("user-flow-1");
@@ -688,7 +744,7 @@ describe("InviteService", () => {
         expect(mockPrisma.organizationInvite.update).toHaveBeenCalledWith(
           expect.objectContaining({
             data: { status: "ACCEPTED" },
-          })
+          }),
         );
       });
     });
@@ -708,9 +764,9 @@ describe("InviteService", () => {
               teamAssignments: null,
               role: "MEMBER",
             } as any,
-          })
+          }),
         ).rejects.toThrow(
-          "Cannot apply invite inv-guard-1: status is PAYMENT_PENDING, expected PENDING"
+          "Cannot apply invite inv-guard-1: status is PAYMENT_PENDING, expected PENDING",
         );
       });
 
@@ -726,9 +782,9 @@ describe("InviteService", () => {
               teamAssignments: null,
               role: "MEMBER",
             } as any,
-          })
+          }),
         ).rejects.toThrow(
-          "Cannot apply invite inv-guard-2: status is ACCEPTED, expected PENDING"
+          "Cannot apply invite inv-guard-2: status is ACCEPTED, expected PENDING",
         );
       });
     });

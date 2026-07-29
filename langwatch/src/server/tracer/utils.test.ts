@@ -70,7 +70,12 @@ describe("utils test", () => {
         span_id: "s",
         project_id: "p",
         parent_id: null,
-        timestamps: { finished_at: 0, updated_at: 0, started_at: 0, inserted_at: 0 },
+        timestamps: {
+          finished_at: 0,
+          updated_at: 0,
+          started_at: 0,
+          inserted_at: 0,
+        },
         contexts: [],
         type: "rag" as const,
       };

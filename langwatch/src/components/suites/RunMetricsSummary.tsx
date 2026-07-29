@@ -10,15 +10,15 @@
 
 import { HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { LuChevronRight, LuClock, LuZap } from "react-icons/lu";
+import { formatCost, formatLatency } from "~/components/shared/formatters";
 import {
-  LatencyStatsTooltip,
   CostStatsTooltip,
+  LatencyStatsTooltip,
 } from "~/components/shared/MetricStatsTooltip";
 import {
   getPassRateGradientColor,
   PassRateCircle,
 } from "~/components/shared/PassRateIndicator";
-import { formatCost, formatLatency } from "~/components/shared/formatters";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useInteractiveTooltip } from "~/hooks/useInteractiveTooltip";
 import type { RunGroupSummary } from "./run-history-transforms";
@@ -35,7 +35,8 @@ function buildCompletedDetail(summary: RunGroupSummary): string | null {
   const parts: string[] = [];
   if (summary.failedCount > 0) parts.push(`${summary.failedCount} failed`);
   if (summary.stalledCount > 0) parts.push(`${summary.stalledCount} stalled`);
-  if (summary.cancelledCount > 0) parts.push(`${summary.cancelledCount} cancelled`);
+  if (summary.cancelledCount > 0)
+    parts.push(`${summary.cancelledCount} cancelled`);
   return parts.length > 0 ? `(${parts.join(", ")})` : null;
 }
 
@@ -43,13 +44,7 @@ function TooltipContent({ summary }: { summary: RunGroupSummary }) {
   const detail = buildCompletedDetail(summary);
 
   return (
-    <VStack
-      align="stretch"
-      gap={0}
-      fontSize="12px"
-      minWidth="220px"
-      color="fg"
-    >
+    <VStack align="stretch" gap={0} fontSize="12px" minWidth="220px" color="fg">
       <VStack align="stretch" gap={2} padding={2}>
         {/* Pass Rate */}
         <HStack justify="space-between">
@@ -60,7 +55,9 @@ function TooltipContent({ summary }: { summary: RunGroupSummary }) {
               fontWeight="medium"
               color={getPassRateGradientColor(summary.passRate)}
             >
-              {summary.passRate === null ? "-" : `${Math.round(summary.passRate)}%`}
+              {summary.passRate === null
+                ? "-"
+                : `${Math.round(summary.passRate)}%`}
             </Text>
           </HStack>
         </HStack>
@@ -149,7 +146,9 @@ function TooltipContent({ summary }: { summary: RunGroupSummary }) {
         {summary.totalDurationMs !== null && (
           <HStack justify="space-between">
             <Text color="fg.muted">Total Duration</Text>
-            <Text fontWeight="medium">{formatLatency(summary.totalDurationMs)}</Text>
+            <Text fontWeight="medium">
+              {formatLatency(summary.totalDurationMs)}
+            </Text>
           </HStack>
         )}
 
@@ -219,7 +218,9 @@ export function RunMetricsSummary({ summary }: RunMetricsSummaryProps) {
                 color={getPassRateGradientColor(summary.passRate)}
                 fontWeight="medium"
               >
-                {summary.passRate === null ? "-" : `${Math.round(summary.passRate)}%`}
+                {summary.passRate === null
+                  ? "-"
+                  : `${Math.round(summary.passRate)}%`}
               </Text>
             </HStack>
           </>
@@ -233,7 +234,9 @@ export function RunMetricsSummary({ summary }: RunMetricsSummaryProps) {
                 color={getPassRateGradientColor(summary.passRate)}
                 fontWeight="medium"
               >
-                {summary.passRate === null ? "-" : `${Math.round(summary.passRate)}%`}
+                {summary.passRate === null
+                  ? "-"
+                  : `${Math.round(summary.passRate)}%`}
               </Text>
             </HStack>
           </>

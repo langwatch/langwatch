@@ -65,9 +65,10 @@ export class PrismaTopicClusteringStatusRepository
   async findRunHistoryByProjectId(params: {
     projectId: string;
   }): Promise<TopicClusteringRunHistoryEntry[]> {
-    const row = await this.prisma.topicClusteringRunHistoryProjection.findUnique(
-      { where: { projectId: params.projectId } },
-    );
+    const row =
+      await this.prisma.topicClusteringRunHistoryProjection.findUnique({
+        where: { projectId: params.projectId },
+      });
     return row ? parseRunHistoryRuns(row.Runs) : [];
   }
 }

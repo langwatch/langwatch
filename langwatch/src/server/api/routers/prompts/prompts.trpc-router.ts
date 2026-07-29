@@ -1,6 +1,7 @@
 import { PromptScope } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import { afterPromptCreated } from "~/../ee/billing/nurturing/hooks/promptCreation";
 import { nodeDatasetSchema } from "~/optimization_studio/types/dsl";
 import {
   handleSchema,
@@ -11,25 +12,11 @@ import {
   responseFormatSchema,
   runtimeParametersSchema,
 } from "~/prompts/schemas";
-import { afterPromptCreated } from "~/../ee/billing/nurturing/hooks/promptCreation";
 import { enforceLicenseLimit } from "~/server/license-enforcement";
 import { hoistSystemMessage, PromptService } from "~/server/prompt-config";
-import { NotFoundError } from "~/server/prompt-config/errors";
 import { TagValidationError } from "~/server/prompt-config/repositories/llm-config-tag.repository";
 import { checkProjectPermission, hasProjectPermission } from "../../rbac";
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
-
-/**
- * Re-raises a prompt service error as the protocol error tRPC speaks.
- * Anything the service does not model as a domain error travels untouched.
- */
-function rethrowAsTRPCError(error: unknown): never {
-  if (error instanceof NotFoundError) {
-    throw new TRPCError({ code: "NOT_FOUND", message: "Prompt not found" });
-  }
-
-  throw error;
-}
 
 /**
  * Router for handling prompts - the business-facing interface
@@ -313,12 +300,10 @@ export const promptsRouter = createTRPCRouter({
             message: error.message,
           });
         }
-        if (error instanceof NotFoundError) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: error.message,
-          });
-        }
+        // A `NotFoundError` is a `HandledError` carrying `prompt_not_found`.
+        // `handledErrorMiddleware` maps it to NOT_FOUND and the client reads
+        // its copy off the code, so re-wrapping it here only discarded the
+        // code in favour of one-off prose.
         throw error;
       }
     }),
@@ -422,14 +407,15 @@ export const promptsRouter = createTRPCRouter({
       const service = new PromptService(ctx.prisma);
       const authorId = ctx.session?.user?.id;
 
-      const copiedPrompt = await service
-        .copyPrompt({
-          idOrHandle: input.idOrHandle,
-          sourceProjectId: input.sourceProjectId,
-          targetProjectId: input.projectId,
-          authorId,
-        })
-        .catch(rethrowAsTRPCError);
+      // A missing source prompt raises `prompt_not_found`, a HandledError:
+      // `handledErrorMiddleware` gives it the NOT_FOUND tRPC code and the
+      // client reads its copy off that code. Nothing to re-wrap.
+      const copiedPrompt = await service.copyPrompt({
+        idOrHandle: input.idOrHandle,
+        sourceProjectId: input.sourceProjectId,
+        targetProjectId: input.projectId,
+        authorId,
+      });
 
       afterPromptCreated({
         prisma: ctx.prisma,
@@ -459,13 +445,11 @@ export const promptsRouter = createTRPCRouter({
       const service = new PromptService(ctx.prisma);
       const authorId = ctx.session?.user?.id;
 
-      const duplicatedPrompt = await service
-        .duplicatePrompt({
-          idOrHandle: input.idOrHandle,
-          projectId: input.projectId,
-          authorId,
-        })
-        .catch(rethrowAsTRPCError);
+      const duplicatedPrompt = await service.duplicatePrompt({
+        idOrHandle: input.idOrHandle,
+        projectId: input.projectId,
+        authorId,
+      });
 
       afterPromptCreated({
         prisma: ctx.prisma,

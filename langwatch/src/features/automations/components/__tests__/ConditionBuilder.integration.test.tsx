@@ -56,10 +56,9 @@ describe("ConditionBuilder", () => {
   describe("when a value is edited", () => {
     it("emits the updated query string", () => {
       const onChangeSpy = vi.fn();
-      render(
-        <Harness initial="cost:>0.1" onChangeSpy={onChangeSpy} />,
-        { wrapper: Wrapper },
-      );
+      render(<Harness initial="cost:>0.1" onChangeSpy={onChangeSpy} />, {
+        wrapper: Wrapper,
+      });
 
       fireEvent.change(screen.getByDisplayValue("0.1"), {
         target: { value: "0.5" },

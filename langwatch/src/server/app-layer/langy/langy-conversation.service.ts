@@ -1,31 +1,10 @@
-import { generate } from "@langwatch/ksuid";
 import type { HandledError } from "@langwatch/handled-error";
-import { createLogger } from "@langwatch/observability";
-import {
-  LANGY_CONVERSATION_TURN_EVENT_TYPES,
-  cursorHasReachedEvent,
-  langyConversationTurnEventSchema,
-  type LangyConversationTurnWireEvent,
-  type LangyEventCursor,
-} from "@langwatch/langy";
-import {
-  createTenantId,
-  type TenantId,
-} from "~/server/event-sourcing/domain/tenantId";
-import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
-import { REHYDRATION_WINDOW_MS } from "~/server/event-sourcing/stores/rehydrationWindow";
-import {
-  langyAgentErrorFromErrorFrame,
-  serializeLangyTurnError,
-} from "~/server/app-layer/langy/execution/langy-turn-errors";
-import { mintRunToken } from "~/server/app-layer/langy/streaming/langyFrameAuth";
-import type { CommandEnvelope } from "~/server/event-sourcing/commands/commandEnvelope";
+import { generate } from "@langwatch/ksuid";
 import type {
   LangyAgentRespondedEventData,
   LangyAgentResponseFailedEventData,
   LangyAgentTurnAcceptedEventData,
   LangyConversationArchivedEventData,
-  LangyMessageRecordedEventData,
   LangyConversationForkedEventData,
   LangyConversationHandoffConsumedEventData,
   LangyConversationHandoffPendingEventData,
@@ -34,13 +13,35 @@ import type {
   LangyConversationTitleGeneratedEventData,
   LangyMessageImportedEventData,
   LangyMessagePart,
+  LangyMessageRecordedEventData,
   LangyMessageRole,
   LangyPlanUpdatedEventData,
   LangyToolCallFailedEventData,
   LangyToolCallInitiatedEventData,
   LangyToolCallSucceededEventData,
 } from "@langwatch/langy";
-import { LANGY_CONVERSATION_STATUS, langyJsonValueSchema } from "@langwatch/langy";
+import {
+  cursorHasReachedEvent,
+  LANGY_CONVERSATION_STATUS,
+  LANGY_CONVERSATION_TURN_EVENT_TYPES,
+  type LangyConversationTurnWireEvent,
+  type LangyEventCursor,
+  langyConversationTurnEventSchema,
+  langyJsonValueSchema,
+} from "@langwatch/langy";
+import { createLogger } from "@langwatch/observability";
+import {
+  langyAgentErrorFromErrorFrame,
+  serializeLangyTurnError,
+} from "~/server/app-layer/langy/execution/langy-turn-errors";
+import { mintRunToken } from "~/server/app-layer/langy/streaming/langyFrameAuth";
+import type { CommandEnvelope } from "~/server/event-sourcing/commands/commandEnvelope";
+import {
+  createTenantId,
+  type TenantId,
+} from "~/server/event-sourcing/domain/tenantId";
+import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
+import { REHYDRATION_WINDOW_MS } from "~/server/event-sourcing/stores/rehydrationWindow";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import {
   LangyConversationNotFoundError,
@@ -133,7 +134,7 @@ export type ConversationDetail = ConversationListItem & {
    * The turn in flight right now, or null when none is (`CurrentTurnId` on the
    * fold — set at `agent_turn_accepted`, cleared by the turn's terminal).
    *
-   * The durable answer to "which turn would a Stop stop?" (ADR-058). A browser
+   * The durable answer to "which turn would a Stop stop?" (ADR-078). A browser
    * tab only learns a turn id from its own send, so a turn it merely adopted —
    * another tab's, or one rejoined after a refresh — had no id to stop with.
    * The record has always known; nobody read it back.
@@ -172,10 +173,7 @@ export interface LangyConversationCommands {
         LangyConversationStartedEventData,
         "conversationId"
       >;
-      userMessage?: Omit<
-        LangyMessageRecordedEventData,
-        "conversationId"
-      >;
+      userMessage?: Omit<LangyMessageRecordedEventData, "conversationId">;
       consumeHandoffTurnId?: string;
     }
   >;
@@ -509,26 +507,6 @@ export class LangyConversationService {
   }
 
   /**
-   * Count the user's conversations touched since `since` (epoch ms) — the "N
-   * new" pill. Deliberately derived from the already-bounded recent list rather
-   * than a second ClickHouse read path: the pill only needs to distinguish
-   * 0 / small-N, and the list is capped at 100. Kept in the service (not the
-   * transport) so the count derivation lives behind the app layer.
-   */
-  async countSince({
-    projectId,
-    userId,
-    since,
-  }: {
-    projectId: string;
-    userId: string;
-    since: number;
-  }): Promise<number> {
-    const items = await this.getAll({ projectId, userId, limit: 100 });
-    return items.filter((item) => item.lastActivityAt.getTime() > since).length;
-  }
-
-  /**
    * Resolve the conversation id for a chat turn. Does NOT write — the aggregate
    * is created by the first `message_recorded`. Verifies ownership against the fold;
    * a stale/archived/unknown id yields a fresh conversation.
@@ -581,7 +559,7 @@ export class LangyConversationService {
     conversationId?: string;
     title?: string | null;
     /**
-     * The per-conversation runToken (LANGY_WORKER_REDESIGN_PLAN §0a). The caller
+     * The per-conversation runToken (see `streaming/langyFrameAuth.ts`). The caller
      * mints it (or reuses one) and passes it so it can ALSO stash it in the turn
      * handoff — the dispatch reads it from there, not from operational state,
      * which may not have consumed the creation event before the first-turn
@@ -687,7 +665,7 @@ export class LangyConversationService {
   }
 
   /**
-   * The per-conversation `runToken` (LANGY_WORKER_REDESIGN_PLAN §0a), or null
+   * The per-conversation `runToken` (see `streaming/langyFrameAuth.ts`), or null
    * when the conversation has none (lazily created / predates the field). READ
    * ONLY server-side: the worker-provisioning path injects it at spawn and the
    * relay uses it to verify the worker's stream frames. It is deliberately not
@@ -767,10 +745,7 @@ export class LangyConversationService {
       "conversationId"
     >;
     /** Optional user message, committed atomically before acceptance. */
-    userMessage?: Omit<
-      LangyMessageRecordedEventData,
-      "conversationId"
-    >;
+    userMessage?: Omit<LangyMessageRecordedEventData, "conversationId">;
     /** Prior checkpoint-producing turn consumed atomically with this start. */
     consumeHandoffTurnId?: string;
   }): Promise<{ turnId: string }> {
@@ -1105,7 +1080,7 @@ export class LangyConversationService {
     conversationId: string;
     turnId: string;
     parts: LangyMessagePart[];
-    // `stopped` is a user-initiated stop carrying the partial answer (ADR-058);
+    // `stopped` is a user-initiated stop carrying the partial answer (ADR-078);
     // it shares agent_responded's turn-terminal slot with completed/failed, so a
     // stop racing a natural finish collapses to exactly one terminal.
     outcome?: "completed" | "failed" | "stopped";
@@ -1137,7 +1112,7 @@ export class LangyConversationService {
   }): Promise<boolean> {
     const conv = await this.findByIdVisible({ id, projectId, userId });
     // Only the owner may archive — a shared conversation is visible, not deletable.
-    if (!conv || !conv.isOwn) return false;
+    if (!conv?.isOwn) return false;
     await this.commands.archiveConversation({
       tenantId: projectId,
       occurredAt: Date.now(),
@@ -1160,7 +1135,7 @@ export class LangyConversationService {
     isShared?: boolean;
   }): Promise<ConversationDetail | null> {
     const conv = await this.findByIdVisible({ id, projectId, userId });
-    if (!conv || !conv.isOwn) {
+    if (!conv?.isOwn) {
       // A shared conversation is visible but not editable by a non-owner; we do
       // not leak that distinction — both read as "not found" to the caller.
       throw new LangyConversationNotFoundError(id);

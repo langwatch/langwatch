@@ -128,8 +128,7 @@ const checks = [
   },
   {
     name: "Identity: versionId preserved",
-    pass:
-      result?.promptVersionId === "prompt_version__15tZH2WRCGjtqJ5bQoaN",
+    pass: result?.promptVersionId === "prompt_version__15tZH2WRCGjtqJ5bQoaN",
     got: result?.promptVersionId,
   },
 ];

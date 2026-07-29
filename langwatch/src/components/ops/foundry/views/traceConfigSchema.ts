@@ -1,4 +1,4 @@
-import { SPAN_TYPES, INPUT_OUTPUT_TYPES } from "../types";
+import { INPUT_OUTPUT_TYPES, SPAN_TYPES } from "../types";
 
 /** JSON Schema for TraceConfig — used by Monaco for intellisense + validation. */
 export const traceConfigJsonSchema = {
@@ -38,7 +38,16 @@ export const traceConfigJsonSchema = {
   definitions: {
     SpanConfig: {
       type: "object",
-      required: ["id", "name", "type", "durationMs", "offsetMs", "status", "children", "attributes"],
+      required: [
+        "id",
+        "name",
+        "type",
+        "durationMs",
+        "offsetMs",
+        "status",
+        "children",
+        "attributes",
+      ],
       properties: {
         id: { type: "string" },
         name: { type: "string", description: "Span display name" },
@@ -47,8 +56,16 @@ export const traceConfigJsonSchema = {
           enum: [...SPAN_TYPES],
           description: "Span type (llm, agent, tool, rag, etc.)",
         },
-        durationMs: { type: "number", minimum: 0, description: "Span duration in ms" },
-        offsetMs: { type: "number", minimum: 0, description: "Offset from parent start in ms" },
+        durationMs: {
+          type: "number",
+          minimum: 0,
+          description: "Span duration in ms",
+        },
+        offsetMs: {
+          type: "number",
+          minimum: 0,
+          description: "Offset from parent start in ms",
+        },
         status: { type: "string", enum: ["ok", "error", "unset"] },
         children: {
           type: "array",
@@ -60,7 +77,11 @@ export const traceConfigJsonSchema = {
         attributes: {
           type: "object",
           additionalProperties: {
-            oneOf: [{ type: "string" }, { type: "number" }, { type: "boolean" }],
+            oneOf: [
+              { type: "string" },
+              { type: "number" },
+              { type: "boolean" },
+            ],
           },
           description: "Custom span attributes",
         },
@@ -89,7 +110,10 @@ export const traceConfigJsonSchema = {
     LLMConfig: {
       type: "object",
       properties: {
-        requestModel: { type: "string", description: "Model requested (e.g. gpt-4o)" },
+        requestModel: {
+          type: "string",
+          description: "Model requested (e.g. gpt-4o)",
+        },
         responseModel: { type: "string", description: "Model that responded" },
         messages: {
           type: "array",
@@ -97,7 +121,10 @@ export const traceConfigJsonSchema = {
             type: "object",
             required: ["role", "content"],
             properties: {
-              role: { type: "string", enum: ["system", "user", "assistant", "tool"] },
+              role: {
+                type: "string",
+                enum: ["system", "user", "assistant", "tool"],
+              },
               content: { type: "string" },
             },
           },

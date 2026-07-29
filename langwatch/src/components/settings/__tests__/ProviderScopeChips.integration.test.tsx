@@ -11,9 +11,10 @@
  *   - specs/model-providers/role-based-default-models.feature
  *     ("System chip renders for env-var-fed providers")
  */
-import { describe, it, expect, afterEach } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
+
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { cleanup, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { ProviderScopeChips } from "../ProviderScopeChips";
 

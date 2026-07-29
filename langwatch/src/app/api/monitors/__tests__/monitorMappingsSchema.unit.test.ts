@@ -34,7 +34,11 @@ describe("monitorMappingsSchema (write-path coercion)", () => {
     it("preserves the value", () => {
       const valid = {
         mapping: {
-          input: { source: "input" as const, key: undefined, subkey: undefined },
+          input: {
+            source: "input" as const,
+            key: undefined,
+            subkey: undefined,
+          },
         },
         expansions: [],
       };

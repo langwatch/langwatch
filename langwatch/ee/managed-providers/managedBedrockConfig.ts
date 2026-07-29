@@ -126,10 +126,7 @@ export async function getManagedBedrockConfigForProject(
  * Checks if a provider is managed for a given organization.
  * Currently only supports "bedrock" provider.
  */
-export function isManagedProvider(
-  orgId: string,
-  provider: string,
-): boolean {
+export function isManagedProvider(orgId: string, provider: string): boolean {
   if (provider !== "bedrock") return false;
   return managedBedrockConfigs.has(orgId);
 }

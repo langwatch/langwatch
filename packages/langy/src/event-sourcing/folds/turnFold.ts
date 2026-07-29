@@ -113,7 +113,7 @@ export const langyTurnToolCallSchema = z
  *
  * `QuestionParts` is reserved: it is populated once the conversation flow shares
  * a turnId between the user message (`message_recorded`) and the response
- * (`agent_turn_accepted`) — see LANGY_REWORK_PLAN.md, Step S2. Until then the
+ * (`agent_turn_accepted`) — see ADR-046. Until then the
  * answer parts already carry everything renderable (text + tool-output cards +
  * enrichment card + actions).
  */
@@ -347,7 +347,7 @@ export function foldLangyConversationTurn<
     case LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONDED: {
       // Three terminal outcomes on the one answer-carrying event: a user stop
       // keeps the partial answer (AnswerParts) but renders distinctly from a
-      // clean finish, and is never an error (ADR-058). A `failed` outcome here
+      // clean finish, and is never an error (ADR-078). A `failed` outcome here
       // is the ran-but-failed answer; the no-answer stall is
       // agent_response_failed, handled above.
       const outcome = event.data.outcome;

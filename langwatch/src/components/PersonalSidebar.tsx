@@ -16,6 +16,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
+import { findPersonalProject } from "~/utils/personalProject";
 
 import { MENU_WIDTH_COMPACT, MENU_WIDTH_EXPANDED } from "./MainMenu";
 import { GovernSection } from "./sidebar/GovernSection";
@@ -57,19 +58,14 @@ export const PersonalSidebar = React.memo(function PersonalSidebar({
     redirectToOnboarding: false,
     redirectToProjectOnboarding: false,
   });
-  const personalProject = useMemo(() => {
-    const userId = session.data?.user?.id;
-    if (!userId || !organizations) return null;
-    for (const org of organizations) {
-      for (const team of org.teams ?? []) {
-        if (team.isPersonal && team.ownerUserId === userId) {
-          const project = team.projects?.[0];
-          if (project) return { id: project.id, slug: project.slug };
-        }
-      }
-    }
-    return null;
-  }, [organizations, session.data?.user?.id]);
+  const personalProject = useMemo(
+    () =>
+      findPersonalProject({
+        organizations,
+        userId: session.data?.user?.id,
+      }),
+    [organizations, session.data?.user?.id],
+  );
   const personalProjectSlug = personalProject?.slug ?? null;
   const personalProjectId = personalProject?.id ?? null;
   const tracesHref = personalProjectSlug

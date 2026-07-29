@@ -1,8 +1,8 @@
 import { createServer } from "node:http";
 import { createOpenAI } from "@ai-sdk/openai";
+import { context as otelContext, propagation, trace } from "@opentelemetry/api";
 import { generateText, stepCountIs, tool } from "ai";
 import { z } from "zod";
-import { context as otelContext, propagation, trace } from "@opentelemetry/api";
 
 // getLangWatchTracer is loaded lazily after setupObservability initializes
 let tracer:
@@ -127,11 +127,9 @@ const server = createServer(async (req, res) => {
   console.log(`[${timestamp}] ${req.method} ${req.url}`);
 
   // Log trace context headers when present (for OTEL propagation debugging)
-  const traceparent = req.headers["traceparent"];
+  const traceparent = req.headers.traceparent;
   if (traceparent) {
-    console.log(
-      `[${timestamp}] Trace context: traceparent=${traceparent}`,
-    );
+    console.log(`[${timestamp}] Trace context: traceparent=${traceparent}`);
   }
 
   // CORS headers for browser testing

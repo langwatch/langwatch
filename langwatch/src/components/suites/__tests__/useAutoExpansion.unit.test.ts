@@ -55,7 +55,12 @@ describe("useAutoExpansion()", () => {
       const panelKey = freshPanelKey();
       const { result, rerender } = renderHook(
         ({ batchRuns }) =>
-          useAutoExpansion({ panelKey, groupBy: "none", batchRuns, groups: [] }),
+          useAutoExpansion({
+            panelKey,
+            groupBy: "none",
+            batchRuns,
+            groups: [],
+          }),
         { initialProps: { batchRuns: batches("newest", "older") } },
       );
 
@@ -70,7 +75,12 @@ describe("useAutoExpansion()", () => {
       const panelKey = freshPanelKey();
       const { result, rerender } = renderHook(
         ({ batchRuns }) =>
-          useAutoExpansion({ panelKey, groupBy: "none", batchRuns, groups: [] }),
+          useAutoExpansion({
+            panelKey,
+            groupBy: "none",
+            batchRuns,
+            groups: [],
+          }),
         { initialProps: { batchRuns: batches("newest", "older") } },
       );
 
@@ -86,7 +96,12 @@ describe("useAutoExpansion()", () => {
       const panelKey = freshPanelKey();
       const { result, rerender } = renderHook(
         ({ batchRuns }) =>
-          useAutoExpansion({ panelKey, groupBy: "none", batchRuns, groups: [] }),
+          useAutoExpansion({
+            panelKey,
+            groupBy: "none",
+            batchRuns,
+            groups: [],
+          }),
         { initialProps: { batchRuns: batches("newest", "older") } },
       );
 
@@ -103,7 +118,12 @@ describe("useAutoExpansion()", () => {
       const panelKey = freshPanelKey();
       const { result, rerender } = renderHook(
         ({ batchRuns }) =>
-          useAutoExpansion({ panelKey, groupBy: "none", batchRuns, groups: [] }),
+          useAutoExpansion({
+            panelKey,
+            groupBy: "none",
+            batchRuns,
+            groups: [],
+          }),
         { initialProps: { batchRuns: batches("newest", "older") } },
       );
 
@@ -121,7 +141,12 @@ describe("useAutoExpansion()", () => {
       const panelKey = freshPanelKey();
       const { result, rerender } = renderHook(
         ({ batchRuns }) =>
-          useAutoExpansion({ panelKey, groupBy: "none", batchRuns, groups: [] }),
+          useAutoExpansion({
+            panelKey,
+            groupBy: "none",
+            batchRuns,
+            groups: [],
+          }),
         { initialProps: { batchRuns: batches("newest", "older") } },
       );
 

@@ -87,13 +87,10 @@ export function subtractMaps({
  * histogram data model: bucket i covers (base^i, base^(i+1)] where
  * base = 2^(2^-scale). Negative buckets mirror these over |value|.
  */
-function bucketBounds({
-  index,
-  scale,
-}: {
-  index: number;
-  scale: number;
-}): { lower: number; upper: number } {
+function bucketBounds({ index, scale }: { index: number; scale: number }): {
+  lower: number;
+  upper: number;
+} {
   const exponent = 2 ** -scale;
   return {
     lower: 2 ** (index * exponent),

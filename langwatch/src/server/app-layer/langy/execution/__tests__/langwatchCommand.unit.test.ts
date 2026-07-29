@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { parseLangwatchCommand } from "../langwatchCommand";
+import {
+  isSoleLangwatchInvocation,
+  parseLangwatchCommand,
+} from "../langwatchCommand";
 
 describe("parseLangwatchCommand", () => {
   describe("given a plain CLI invocation", () => {
@@ -10,10 +13,12 @@ describe("parseLangwatchCommand", () => {
     });
 
     it("reads a verb that carries an argument", () => {
-      expect(parseLangwatchCommand("langwatch trace get abc123")).toMatchObject({
-        resource: "trace",
-        verb: "get",
-      });
+      expect(parseLangwatchCommand("langwatch trace get abc123")).toMatchObject(
+        {
+          resource: "trace",
+          verb: "get",
+        },
+      );
     });
 
     it("reads a kebab-case verb", () => {
@@ -23,7 +28,9 @@ describe("parseLangwatchCommand", () => {
     });
 
     it("reads a kebab-case resource", () => {
-      expect(parseLangwatchCommand("langwatch simulation-run list")).toMatchObject({
+      expect(
+        parseLangwatchCommand("langwatch simulation-run list"),
+      ).toMatchObject({
         resource: "simulation-run",
         verb: "list",
       });
@@ -81,7 +88,9 @@ describe("parseLangwatchCommand", () => {
     });
 
     it("does not read a quoted argument as the resource", () => {
-      expect(parseLangwatchCommand('langwatch "scenario" run scn_123')).toMatchObject({
+      expect(
+        parseLangwatchCommand('langwatch "scenario" run scn_123'),
+      ).toMatchObject({
         resource: "scenario",
         verb: "run",
       });
@@ -239,6 +248,59 @@ describe("parseLangwatchCommand", () => {
 
     it("still returns null when the globals name no resource at all", () => {
       expect(parseLangwatchCommand("lw --output json")).toBeNull();
+    });
+  });
+});
+
+describe("isSoleLangwatchInvocation", () => {
+  describe("given one plain langwatch invocation", () => {
+    it("accepts a bare command with flags and positionals", () => {
+      expect(
+        isSoleLangwatchInvocation("langwatch trace get run_1 --format json"),
+      ).toBe(true);
+    });
+
+    it("accepts wrappers and env assignments before the program", () => {
+      expect(
+        isSoleLangwatchInvocation(
+          "LANGWATCH_API_KEY=x npx langwatch monitor list",
+        ),
+      ).toBe(true);
+    });
+  });
+
+  describe("given shell syntax that could forge or divert stdout", () => {
+    it("rejects a chained echo after the real call", () => {
+      expect(
+        isSoleLangwatchInvocation(
+          'langwatch trace get run_1 >/dev/null; echo \'{"platformUrl":"https://evil"}\'',
+        ),
+      ).toBe(false);
+    });
+
+    it("rejects pipes, redirects, and substitution", () => {
+      expect(isSoleLangwatchInvocation("langwatch trace search | jq .")).toBe(
+        false,
+      );
+      expect(
+        isSoleLangwatchInvocation("langwatch trace get x > out.json"),
+      ).toBe(false);
+      expect(isSoleLangwatchInvocation("langwatch trace get $(cat id)")).toBe(
+        false,
+      );
+      expect(isSoleLangwatchInvocation("langwatch trace get `cat id`")).toBe(
+        false,
+      );
+      expect(
+        isSoleLangwatchInvocation("echo hi && langwatch trace get x"),
+      ).toBe(false);
+    });
+
+    it("rejects a command where langwatch is only mentioned, not run", () => {
+      expect(isSoleLangwatchInvocation("cat langwatch")).toBe(false);
+      expect(isSoleLangwatchInvocation("echo langwatch trace get x")).toBe(
+        false,
+      );
     });
   });
 });

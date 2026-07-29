@@ -30,8 +30,8 @@ import {
   screen,
   within,
 } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Outlet, Route, Routes, useLocation } from "react-router";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 // The global test-setup.ts stubs ~/utils/compat/next-router with an inert
 // router. These tests exist to exercise the REAL one — the whole point is
@@ -173,9 +173,7 @@ describe("a card's footer chips under the real app router", () => {
       const search = screen.getByTestId("search").textContent ?? "";
       const params = new URLSearchParams(search);
       expect(params.get("drawer.open")).toBe("automation");
-      expect(params.get("drawer.initialFilterQuery")).toBe(
-        '"checkout failed"',
-      );
+      expect(params.get("drawer.initialFilterQuery")).toBe('"checkout failed"');
       // The panel — and the card the user just acted on — is still there.
       expect(chip("Alert me on this")).toBeInTheDocument();
     });

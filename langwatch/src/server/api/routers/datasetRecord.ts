@@ -16,7 +16,6 @@ import {
 } from "../../datasets/errors";
 import { stripNullBytes } from "../../datasets/sanitize";
 import { newDatasetEntriesSchema } from "../../datasets/types";
-import { prisma } from "../../db";
 import { StorageService } from "../../storage";
 import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";

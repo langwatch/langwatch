@@ -30,21 +30,24 @@ export class IngestionTemplateRepository {
       where: {
         archivedAt: null,
         enabled: true,
-        OR: [{ organizationId: null }, { organizationId: params.organizationId }],
+        OR: [
+          { organizationId: null },
+          { organizationId: params.organizationId },
+        ],
       },
       orderBy: [{ platformPublished: "desc" }, { displayName: "asc" }],
     });
   }
 
   /** Admin shape: includes disabled rows but still excludes archived. */
-  findAdminVisibleForOrg(
-    client: Client,
-    params: { organizationId: string },
-  ) {
+  findAdminVisibleForOrg(client: Client, params: { organizationId: string }) {
     return client.ingestionTemplate.findMany({
       where: {
         archivedAt: null,
-        OR: [{ organizationId: null }, { organizationId: params.organizationId }],
+        OR: [
+          { organizationId: null },
+          { organizationId: params.organizationId },
+        ],
       },
       orderBy: [{ platformPublished: "desc" }, { displayName: "asc" }],
     });
@@ -63,7 +66,10 @@ export class IngestionTemplateRepository {
       where: {
         id: params.id,
         archivedAt: null,
-        OR: [{ organizationId: null }, { organizationId: params.organizationId }],
+        OR: [
+          { organizationId: null },
+          { organizationId: params.organizationId },
+        ],
       },
     });
   }
@@ -102,10 +108,7 @@ export class IngestionTemplateRepository {
     });
   }
 
-  create(
-    client: Client,
-    data: Prisma.IngestionTemplateUncheckedCreateInput,
-  ) {
+  create(client: Client, data: Prisma.IngestionTemplateUncheckedCreateInput) {
     return client.ingestionTemplate.create({ data });
   }
 

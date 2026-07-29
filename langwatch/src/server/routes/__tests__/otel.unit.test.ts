@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
 import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root";
+import { describe, expect, it } from "vitest";
 import { classifyTokenType, peekCustomerTraceIds } from "../otel";
 
 const traceRequestType = (root as any).opentelemetry.proto.collector.trace.v1
@@ -88,10 +88,12 @@ describe("peekCustomerTraceIds", () => {
 
   describe("when the body is malformed", () => {
     it("returns an empty array for non-protobuf garbage", () => {
-      const garbage = bufferToArrayBuffer(Buffer.from([0xff, 0x00, 0xde, 0xad]));
-      expect(
-        peekCustomerTraceIds(garbage, "application/x-protobuf"),
-      ).toEqual([]);
+      const garbage = bufferToArrayBuffer(
+        Buffer.from([0xff, 0x00, 0xde, 0xad]),
+      );
+      expect(peekCustomerTraceIds(garbage, "application/x-protobuf")).toEqual(
+        [],
+      );
     });
 
     it("returns an empty array for invalid JSON", () => {
@@ -113,15 +115,10 @@ describe("peekCustomerTraceIds", () => {
       "application/json;charset=utf-8",
       "  Application/JSON  ",
       "APPLICATION/JSON",
-    ])(
-      "still routes through the JSON parser when content-type is %j",
-      (contentType) => {
-        const body = jsonOtlpBody([TRACE_ID_B64_1]);
-        expect(peekCustomerTraceIds(body, contentType)).toEqual([
-          TRACE_ID_HEX_1,
-        ]);
-      },
-    );
+    ])("still routes through the JSON parser when content-type is %j", (contentType) => {
+      const body = jsonOtlpBody([TRACE_ID_B64_1]);
+      expect(peekCustomerTraceIds(body, contentType)).toEqual([TRACE_ID_HEX_1]);
+    });
 
     it("preserves order across distinct trace_ids", () => {
       const body = jsonOtlpBody([TRACE_ID_B64_1, TRACE_ID_B64_2]);
@@ -147,9 +144,9 @@ describe("peekCustomerTraceIds", () => {
   describe("when the body is well-formed protobuf OTLP", () => {
     it("decodes Uint8Array trace_ids to lowercase hex", () => {
       const body = protobufOtlpBody([TRACE_ID_BYTES_1]);
-      expect(
-        peekCustomerTraceIds(body, "application/x-protobuf"),
-      ).toEqual([TRACE_ID_HEX_1]);
+      expect(peekCustomerTraceIds(body, "application/x-protobuf")).toEqual([
+        TRACE_ID_HEX_1,
+      ]);
     });
 
     it("decodes when no content-type is supplied (defaults to protobuf path)", () => {
@@ -159,9 +156,10 @@ describe("peekCustomerTraceIds", () => {
 
     it("returns multiple unique trace_ids in the order they appear", () => {
       const body = protobufOtlpBody([TRACE_ID_BYTES_1, TRACE_ID_BYTES_2]);
-      expect(
-        peekCustomerTraceIds(body, "application/x-protobuf"),
-      ).toEqual([TRACE_ID_HEX_1, TRACE_ID_HEX_2]);
+      expect(peekCustomerTraceIds(body, "application/x-protobuf")).toEqual([
+        TRACE_ID_HEX_1,
+        TRACE_ID_HEX_2,
+      ]);
     });
   });
 
@@ -196,11 +194,7 @@ describe("peekCustomerTraceIds", () => {
         ),
       );
       const body = protobufOtlpBody(ids);
-      const result = peekCustomerTraceIds(
-        body,
-        "application/x-protobuf",
-        5,
-      );
+      const result = peekCustomerTraceIds(body, "application/x-protobuf", 5);
       expect(result).toHaveLength(5);
       // Each id must be 32 hex chars (16 bytes).
       for (const id of result) {

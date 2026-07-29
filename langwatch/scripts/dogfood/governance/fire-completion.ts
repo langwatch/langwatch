@@ -40,6 +40,7 @@ function parseArgs(argv: string[]): Args {
     provider: "openai",
     maxTokens: 200,
   };
+  // biome-ignore lint/style/useForOf: flag parser advances the index (argv[++i]) to consume a value; for...of has no index to advance.
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === "--vk") out.vk = argv[++i];
     else if (argv[i] === "--model") out.model = argv[++i];
@@ -58,9 +59,12 @@ function parseArgs(argv: string[]): Args {
 
 async function fireOpenAi(args: Args) {
   const url = `${args.baseUrl}/v1/chat/completions`;
-  const tokenParam = args.model.startsWith("gpt-5") || args.model.startsWith("o1") || args.model.startsWith("o3")
-    ? "max_completion_tokens"
-    : "max_tokens";
+  const tokenParam =
+    args.model.startsWith("gpt-5") ||
+    args.model.startsWith("o1") ||
+    args.model.startsWith("o3")
+      ? "max_completion_tokens"
+      : "max_tokens";
   const res = await fetch(url, {
     method: "POST",
     headers: {
@@ -136,7 +140,9 @@ async function main() {
     `[fire-completion] base=${args.baseUrl} provider=${args.provider} model=${args.model}\n`,
   );
   const result =
-    args.provider === "anthropic" ? await fireAnthropic(args) : await fireOpenAi(args);
+    args.provider === "anthropic"
+      ? await fireAnthropic(args)
+      : await fireOpenAi(args);
   process.stdout.write(JSON.stringify(result) + "\n");
 }
 

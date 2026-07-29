@@ -12,8 +12,8 @@
  * card's ref hydration) — same harness as LangyDerivedCards.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import type { UIMessage } from "ai";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import type { UIMessage } from "ai";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("~/utils/compat/next-router", () => ({

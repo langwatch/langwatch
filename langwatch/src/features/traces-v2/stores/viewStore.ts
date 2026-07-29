@@ -580,16 +580,54 @@ function clearDraftFor(
 }
 
 /**
- * Push a lens's saved filter into the filter store without surfacing a
- * parse error if the saved text is corrupt (falls back to empty). Imperative
- * one-way write — viewStore never subscribes to filterStore.
+ * Push a lens's saved filter into the filter store. Imperative one-way write —
+ * viewStore never subscribes to filterStore.
+ *
+ * Corrupt saved text does not surface a parse error to the user, but that
+ * fallback belongs to `setFilterFromLens`, which returns an empty AST when
+ * `safeParseAndSerialize` reports a parse error. It does not throw, so there is
+ * nothing here to catch: a `try`/`catch` around this call would only swallow a
+ * real, unexpected failure to install the lens's filter — leaving the user on
+ * the previous lens's filter with no indication anything went wrong.
  */
 function applyFilterTextFromLens(text: string): void {
-  try {
-    useFilterStore.getState().setFilterFromLens(text);
-  } catch {
-    // filterStore unavailable (e.g. SSR boot) — safe to skip.
+  useFilterStore.getState().setFilterFromLens(text);
+}
+
+/**
+ * Drop the trace list's keyset cursors whenever the sort that minted them
+ * changes.
+ *
+ * The list is keyset-paged: a cursor carries the `sortValue` of the last row
+ * of the previous batch, and the server compares it against whatever the
+ * CURRENT sort expression is. So a cursor minted while sorting by Cost
+ * (`sortValue: 0.0042`) carried into a time-ordered query becomes
+ * `toUnixTimestamp64Milli(OccurredAt) < 0.0042` — a batch that matches
+ * nothing. `totalHits` is computed without the cursor and keeps reporting the
+ * full count, and `Pagination` derives its row range from the page number
+ * rather than from the rows that came back, so the empty state never shows:
+ * the user is left staring at a blank table still captioned with the whole
+ * count and a live-looking range ("… traces · showing 101–101" on page 3),
+ * and switching back doesn't recover because the stale cursor is still in the
+ * store. Direction flips the comparison operator, so it invalidates cursors
+ * for the same reason.
+ *
+ * Imperative one-way write — viewStore never subscribes to filterStore.
+ */
+function dropKeysetCursorsIfSortChanged({
+  previous,
+  next,
+}: {
+  previous: SortConfig;
+  next: SortConfig;
+}): void {
+  if (
+    previous.columnId === next.columnId &&
+    previous.direction === next.direction
+  ) {
+    return;
   }
+  useFilterStore.getState().resetPagination();
 }
 
 const initialDismissedBuiltIns = loadDismissedBuiltInIds();
@@ -654,39 +692,67 @@ export const useViewStore = create<ViewState>((set, get) => ({
   // tracking those drafts too. Built-in lenses can't be saved into
   // localStorage (the menu's Save item stays disabled), but the user can
   // duplicate to keep the changes.
-  setSort: (sort) =>
+  //
+  // Pagination invalidation: a new sort is reachable from many actions, and
+  // the cursors it invalidates are dropped on two different axes.
+  //
+  // `setSort` (here) and `setGrouping` (below) install a sort WITHOUT touching
+  // the filter, so they are the only paths that call
+  // `dropKeysetCursorsIfSortChanged` explicitly — the guard lives here rather
+  // than at the UI call sites because a new sort is reachable both by clicking
+  // a header AND by switching grouping, and the grouping path is the one that
+  // shipped without it.
+  //
+  // Every OTHER path that installs a sort — `selectLens`, `createLens` (with
+  // overrides), `revertLens`, `duplicateLens`, `deleteLens` and
+  // `setUserLenses` — is applying a lens, and so also calls
+  // `applyFilterTextFromLens`. That resets `page`/`pageCursors` inside
+  // `setFilterFromLens`, which is why those paths are safe today. That safety
+  // is INCIDENTAL: they are covered on the filter axis, not the sort axis. If
+  // `setFilterFromLens` ever stops resetting pagination, or a lens-applying
+  // path stops pushing the lens's filter text, every one of them starts
+  // carrying stale cursors into a new sort — add the explicit guard there
+  // rather than assuming the side effect still holds.
+  setSort: (sort) => {
+    dropKeysetCursorsIfSortChanged({ previous: get().sort, next: sort });
     set((s) => ({
       sort,
       draftState: setDraft(s.draftState, s.activeLensId, { sort }),
-    })),
+    }));
+  },
 
-  setGrouping: (mode) =>
-    set((s) => {
-      // Each grouping mode renders a different RowKind with its own column
-      // registry — e.g. flat knows `time/trace/service`, group knows
-      // `group/count/duration`. Without reconciling, the old columnOrder
-      // is carried over and the renderer silently drops every id the new
-      // registry doesn't recognise, leaving the user with a table missing
-      // its group-label column (or any meaningful headers at all).
-      //
-      // reconcileColumns drops invalid ids (keeping eval:* for the trace
-      // capability) and falls back to the capability's defaults when nothing
-      // survives — matching what LensConfigDialog does when the user picks a
-      // new grouping in the rich editor.
-      const capability = LENS_CAPABILITIES[mode];
-      const columns = reconcileColumns({ ids: s.columnOrder, capability });
-      const sort = reconcileSort(s.sort, capability);
-      return {
+  setGrouping: (mode) => {
+    // Each grouping mode renders a different RowKind with its own column
+    // registry — e.g. flat knows `time/trace/service`, group knows
+    // `group/count/duration`. Without reconciling, the old columnOrder
+    // is carried over and the renderer silently drops every id the new
+    // registry doesn't recognise, leaving the user with a table missing
+    // its group-label column (or any meaningful headers at all).
+    //
+    // reconcileColumns drops invalid ids (keeping eval:* for the trace
+    // capability) and falls back to the capability's defaults when nothing
+    // survives — matching what LensConfigDialog does when the user picks a
+    // new grouping in the rich editor.
+    const s = get();
+    const capability = LENS_CAPABILITIES[mode];
+    const columns = reconcileColumns({ ids: s.columnOrder, capability });
+    const sort = reconcileSort(s.sort, capability);
+    // reconcileSort can swap the sort column out from under the table without
+    // the user ever touching a header: a grouped RowKind can't order by
+    // `time` (nor `spans`/`ttft`/`size`), so those all land on `count`. That
+    // is a sort change like any other, and the cursors have to go with it.
+    dropKeysetCursorsIfSortChanged({ previous: s.sort, next: sort });
+    set({
+      grouping: mode,
+      columnOrder: columns,
+      sort,
+      draftState: setDraft(s.draftState, s.activeLensId, {
         grouping: mode,
-        columnOrder: columns,
+        columns,
         sort,
-        draftState: setDraft(s.draftState, s.activeLensId, {
-          grouping: mode,
-          columns,
-          sort,
-        }),
-      };
-    }),
+      }),
+    });
+  },
 
   toggleColumn: (columnId) =>
     set((s) => {

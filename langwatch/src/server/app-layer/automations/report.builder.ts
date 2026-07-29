@@ -97,7 +97,9 @@ export const reportScheduleSchema = z
     }
 
     const tightestGapMs = Math.min(
-      ...runs.slice(1).map((run, index) => run.getTime() - runs[index]!.getTime()),
+      ...runs
+        .slice(1)
+        .map((run, index) => run.getTime() - runs[index]!.getTime()),
     );
     if (tightestGapMs < MIN_REPORT_INTERVAL_MS) {
       reject(

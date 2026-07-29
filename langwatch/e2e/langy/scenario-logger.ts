@@ -3,7 +3,11 @@ import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as scenario from "@langwatch/scenario";
 import { expect } from "vitest";
-import { browserQA, type BrowserQACheck, type BrowserQAResult } from "./browser-qa";
+import {
+  type BrowserQACheck,
+  type BrowserQAResult,
+  browserQA,
+} from "./browser-qa";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

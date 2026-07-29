@@ -12,7 +12,7 @@
  *      case-insensitive comparison fix.
  *   5. Direct tRPC call to acceptInvite without auth → UNAUTHORIZED.
  */
-import { chromium, type BrowserContext } from "playwright";
+import { type BrowserContext, chromium } from "playwright";
 import { prisma } from "../../src/server/db";
 
 const BASE_URL = process.env.NEXTAUTH_URL ?? "http://localhost:5571";
@@ -45,10 +45,9 @@ async function signUp(
   await pwFields[0]!.fill(password);
   await pwFields[1]!.fill(password);
   await page.click('button:has-text("Sign up")');
-  await page.waitForURL(
-    (url) => !url.toString().includes("/auth/signup"),
-    { timeout: 15000 },
-  );
+  await page.waitForURL((url) => !url.toString().includes("/auth/signup"), {
+    timeout: 15000,
+  });
   return page;
 }
 
@@ -234,10 +233,7 @@ async function main() {
     const bobMembership = await prisma.organizationUser.findFirst({
       where: { user: { email: bobEmail }, organizationId: orgId },
     });
-    check(
-      "no OrganizationUser row for expired invite",
-      !bobMembership,
-    );
+    check("no OrganizationUser row for expired invite", !bobMembership);
     await ctxB.close();
 
     // ────────────────────────────────────────────────────────────
@@ -308,9 +304,9 @@ async function main() {
       },
     );
     const trpcStatus = trpcRes.status();
-    const trpcJson = (await trpcRes.json().catch(() => null)) as
-      | Array<{ error?: { json?: { data?: { code?: string } } } }>
-      | null;
+    const trpcJson = (await trpcRes.json().catch(() => null)) as Array<{
+      error?: { json?: { data?: { code?: string } } };
+    }> | null;
     const errorCode = trpcJson?.[0]?.error?.json?.data?.code;
     check(
       "unauthenticated POST returns 401",
@@ -339,7 +335,9 @@ async function main() {
       where: { organizationId: orgId },
     });
     await prisma.teamUser.deleteMany({ where: { teamId } });
-    await prisma.organizationUser.deleteMany({ where: { organizationId: orgId } });
+    await prisma.organizationUser.deleteMany({
+      where: { organizationId: orgId },
+    });
     await prisma.project.deleteMany({ where: { teamId } });
     await prisma.team.deleteMany({ where: { id: teamId } });
     await prisma.organization.deleteMany({ where: { id: orgId } });

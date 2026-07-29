@@ -114,9 +114,9 @@ vi.mock("../OrganizationUserRoleField", () => ({
 }));
 
 vi.mock("../GroupBindingInputRow", async () => {
-  const actual = await vi.importActual<typeof import("../GroupBindingInputRow")>(
-    "../GroupBindingInputRow",
-  );
+  const actual = await vi.importActual<
+    typeof import("../GroupBindingInputRow")
+  >("../GroupBindingInputRow");
   return {
     ...actual,
     BindingInputRow: ({
@@ -284,9 +284,7 @@ describe("<MemberDetailDialog/>", () => {
 
       renderDialog();
 
-      fireEvent.click(
-        screen.getByRole("button", { name: /remove binding/i }),
-      );
+      fireEvent.click(screen.getByRole("button", { name: /remove binding/i }));
       fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
 
       await vi.waitFor(() => {
@@ -331,9 +329,16 @@ describe("<MemberDetailDialog/>", () => {
       fireEvent.click(screen.getByTestId("stub-add-binding"));
       fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
 
+      // The headline names the action, not the rejection: since #5984 an
+      // error's message is the code slug for a handled failure, so the raw
+      // string this used to assert on would read `validation_error` to the
+      // customer. `showErrorToast` renders the caller's copy instead.
       await vi.waitFor(() => {
         expect(mockToasterCreate).toHaveBeenCalledWith(
-          expect.objectContaining({ title: "plan limit", type: "error" }),
+          expect.objectContaining({
+            title: "Couldn't update this member",
+            type: "error",
+          }),
         );
       });
       expect(mockApplyMemberBindings).not.toHaveBeenCalled();

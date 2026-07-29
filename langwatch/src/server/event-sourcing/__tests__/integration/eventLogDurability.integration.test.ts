@@ -37,7 +37,11 @@
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import type { AggregateType } from "../../";
+import { createTenantId } from "../../domain/tenantId";
 
+import { EventStoreClickHouse } from "../../stores/eventStoreClickHouse";
+import { EventRepositoryClickHouse } from "../../stores/repositories/eventRepositoryClickHouse";
 import {
   getTestClickHouseClient,
   getTestRedisConnection,
@@ -45,11 +49,6 @@ import {
   stopTestContainers,
 } from "./testContainers";
 import { generateTestTenantId } from "./testHelpers";
-
-import { EventStoreClickHouse } from "../../stores/eventStoreClickHouse";
-import { EventRepositoryClickHouse } from "../../stores/repositories/eventRepositoryClickHouse";
-import type { AggregateType } from "../../";
-import { createTenantId } from "../../domain/tenantId";
 
 const hasTestcontainers = !!(
   process.env.TEST_CLICKHOUSE_URL || process.env.CI_CLICKHOUSE_URL
@@ -249,7 +248,8 @@ describe.skipIf(!hasTestcontainers)(
       await startTestContainers();
       client = getTestClickHouseClient()!;
       const redis = getTestRedisConnection();
-      if (!redis) throw new Error("Redis not available; testcontainers required.");
+      if (!redis)
+        throw new Error("Redis not available; testcontainers required.");
       eventStore = new EventStoreClickHouse(
         new EventRepositoryClickHouse(async () => client),
       );
@@ -325,11 +325,18 @@ describe.skipIf(!hasTestcontainers)(
           );
         }
 
-        await client.insert({ table: "event_log", values: eventRows, format: "JSONEachRow" });
+        await client.insert({
+          table: "event_log",
+          values: eventRows,
+          format: "JSONEachRow",
+        });
         await insertStoredSpansFor({ client, tenantId, traceId, spanIds });
 
         const eventLogBefore = await countEventLogForTenant(client, tenantId);
-        const storedSpansBefore = await countStoredSpansForTenant(client, tenantId);
+        const storedSpansBefore = await countStoredSpansForTenant(
+          client,
+          tenantId,
+        );
         expect(eventLogBefore).toBeGreaterThanOrEqual(3);
         expect(storedSpansBefore).toBeGreaterThanOrEqual(3);
 
@@ -337,7 +344,10 @@ describe.skipIf(!hasTestcontainers)(
         await new Promise((r) => setTimeout(r, 1500));
 
         const eventLogAfter = await countEventLogForTenant(client, tenantId);
-        const storedSpansAfter = await countStoredSpansForTenant(client, tenantId);
+        const storedSpansAfter = await countStoredSpansForTenant(
+          client,
+          tenantId,
+        );
 
         expect(eventLogAfter).toBe(eventLogBefore);
         expect(storedSpansAfter).toBeLessThan(storedSpansBefore);
@@ -452,8 +462,12 @@ describe.skipIf(!hasTestcontainers)(
 
         expect(eventsA.length).toBeGreaterThanOrEqual(1);
         expect(eventsB.length).toBeGreaterThanOrEqual(1);
-        expect(eventsA.some((e: any) => e.type === "SpanReceivedEvent")).toBe(true);
-        expect(eventsB.some((e: any) => e.type === "SpanReceivedEvent")).toBe(true);
+        expect(eventsA.some((e: any) => e.type === "SpanReceivedEvent")).toBe(
+          true,
+        );
+        expect(eventsB.some((e: any) => e.type === "SpanReceivedEvent")).toBe(
+          true,
+        );
       });
     });
 
@@ -509,8 +523,16 @@ describe.skipIf(!hasTestcontainers)(
           ts,
         });
 
-        await client.insert({ table: "event_log", values: [row], format: "JSONEachRow" });
-        await client.insert({ table: "event_log", values: [row], format: "JSONEachRow" });
+        await client.insert({
+          table: "event_log",
+          values: [row],
+          format: "JSONEachRow",
+        });
+        await client.insert({
+          table: "event_log",
+          values: [row],
+          format: "JSONEachRow",
+        });
         await new Promise((r) => setTimeout(r, 500));
 
         const events = await eventStore.getEvents(

@@ -17,7 +17,10 @@ import {
   SPAN_STATUS_FACET,
   TRACE_METADATA_FACET,
 } from "./facets";
-import type { CategoricalRead, RangeRead } from "./filter-to-clickhouse/field-def";
+import type {
+  CategoricalRead,
+  RangeRead,
+} from "./filter-to-clickhouse/field-def";
 import { UNSUPPORTED } from "./filter-to-clickhouse/field-def";
 
 export type FacetTable = "trace_summaries" | "evaluation_runs" | "stored_spans";

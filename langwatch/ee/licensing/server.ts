@@ -1,9 +1,9 @@
 import type { PrismaClient } from "@prisma/client";
-import { LicenseHandler } from "./licenseHandler";
-import type { ITraceUsageService } from "./licenseHandler";
-import { PUBLIC_KEY } from "./constants";
-import { LicenseEnforcementRepository } from "~/server/license-enforcement/license-enforcement.repository";
 import { getApp } from "~/server/app-layer/app";
+import { LicenseEnforcementRepository } from "~/server/license-enforcement/license-enforcement.repository";
+import { PUBLIC_KEY } from "./constants";
+import type { ITraceUsageService } from "./licenseHandler";
+import { LicenseHandler } from "./licenseHandler";
 
 /**
  * Factory function for creating a LicenseHandler instance.

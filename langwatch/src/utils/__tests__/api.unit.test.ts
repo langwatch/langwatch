@@ -1,5 +1,6 @@
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { TRPCClientError } from "@trpc/client";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { useUpgradeModalStore } from "../../stores/upgradeModalStore";
 import {
   extractLimitExceededInfo,
   extractLiteMemberRestrictionInfo,
@@ -9,7 +10,6 @@ import {
   markAsHandledByLicenseHandler,
   markAsHandledByLiteMemberHandler,
 } from "../trpcError";
-import { useUpgradeModalStore } from "../../stores/upgradeModalStore";
 
 describe("Global mutation error handler", () => {
   beforeEach(() => {

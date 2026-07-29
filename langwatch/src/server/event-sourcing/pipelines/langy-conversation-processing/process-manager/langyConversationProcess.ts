@@ -1,28 +1,27 @@
-import type {
-  EventHandler,
-  IntentExecutor,
-} from "~/server/event-sourcing/pipeline/processManagerDefinition";
-import type { ProcessManagerApplier } from "~/server/event-sourcing/pipeline/processBuilder";
 import {
   LANGY_CONVERSATION_EVENT_TYPES,
   LANGY_TITLE_SOURCE,
 } from "@langwatch/langy";
+import type { ProcessManagerApplier } from "~/server/event-sourcing/pipeline/processBuilder";
+import type {
+  EventHandler,
+  IntentExecutor,
+} from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
-
-import {
-  LANGY_OUTBOX_LEASE_DURATION_MS,
-  type LangyEffectPorts,
-} from "./langyEffectPorts";
 import {
   LANGY_PROCESS_INTENT_TYPES,
-  langyGenerateTitleIntentSchema,
-  langyProcessEventViewSchema,
-  langyWorkerDispatchIntentSchema,
   type LangyConversationProcessState,
   type LangyGenerateTitleIntent,
   type LangyProcessEventView,
   type LangyWorkerDispatchIntent,
+  langyGenerateTitleIntentSchema,
+  langyProcessEventViewSchema,
+  langyWorkerDispatchIntentSchema,
 } from "./langyConversationProcess.types";
+import {
+  LANGY_OUTBOX_LEASE_DURATION_MS,
+  type LangyEffectPorts,
+} from "./langyEffectPorts";
 
 /**
  * The content boundary (`toPayload`): narrows a committed Langy pipeline event
@@ -89,7 +88,8 @@ type LangyHandler = EventHandler<
  */
 function shouldGenerateTitle(state: LangyConversationProcessState): boolean {
   return (
-    state.titleSource === LANGY_TITLE_SOURCE.DERIVED && !state.autoTitleRequested
+    state.titleSource === LANGY_TITLE_SOURCE.DERIVED &&
+    !state.autoTitleRequested
   );
 }
 
@@ -253,7 +253,10 @@ export function langyConversationProcess(
         handleAgentResponseFailed,
       )
       .on(LANGY_CONVERSATION_EVENT_TYPES.ARCHIVED, handleArchived)
-      .on(LANGY_CONVERSATION_EVENT_TYPES.METADATA_UPDATED, handleMetadataUpdated)
+      .on(
+        LANGY_CONVERSATION_EVENT_TYPES.METADATA_UPDATED,
+        handleMetadataUpdated,
+      )
       .on(LANGY_CONVERSATION_EVENT_TYPES.TITLE_GENERATED, handleTitleGenerated)
       .on(
         LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_HANDOFF_PENDING,
@@ -278,4 +281,3 @@ export function langyConversationProcess(
       // against the dispatch budget. Previously set in the registry.
       .outbox({ leaseDurationMs: LANGY_OUTBOX_LEASE_DURATION_MS });
 }
-

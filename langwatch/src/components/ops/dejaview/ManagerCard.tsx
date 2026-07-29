@@ -1,4 +1,12 @@
-import { Badge, Box, HStack, Spacer, Text, VStack, Wrap } from "@chakra-ui/react";
+import {
+  Badge,
+  Box,
+  HStack,
+  Spacer,
+  Text,
+  VStack,
+  Wrap,
+} from "@chakra-ui/react";
 
 import { JsonViewer } from "~/components/ops/JsonViewer";
 import { formatTimeAgo } from "~/components/ops/shared/formatters";
@@ -28,7 +36,13 @@ function instanceStatus(instance: AggregateProcessManagerInstance | null): {
   return { label: "Active", palette: "green" };
 }
 
-function Chips({ items, palette }: { items: readonly string[]; palette: string }) {
+function Chips({
+  items,
+  palette,
+}: {
+  items: readonly string[];
+  palette: string;
+}) {
   return (
     <Wrap gap={1}>
       {items.map((item) => (
@@ -40,7 +54,13 @@ function Chips({ items, palette }: { items: readonly string[]; palette: string }
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
   return (
     <Box>
       <Text
@@ -76,7 +96,11 @@ function EmittedCommands({
                 ×{msg.attempts}
               </Text>
             )}
-            <Badge colorPalette={OUTBOX_PALETTE[msg.status]} variant="subtle" size="sm">
+            <Badge
+              colorPalette={OUTBOX_PALETTE[msg.status]}
+              variant="subtle"
+              size="sm"
+            >
               {msg.status}
             </Badge>
           </HStack>
@@ -128,7 +152,9 @@ export function ManagerCard({ manager }: { manager: AggregateProcessManager }) {
             <Field label="State">
               <JsonViewer data={instance.state} maxHeight="220px" />
             </Field>
-            {manager.outbox.length > 0 && <EmittedCommands outbox={manager.outbox} />}
+            {manager.outbox.length > 0 && (
+              <EmittedCommands outbox={manager.outbox} />
+            )}
           </>
         ) : (
           <Text textStyle="xs" color="fg.muted">

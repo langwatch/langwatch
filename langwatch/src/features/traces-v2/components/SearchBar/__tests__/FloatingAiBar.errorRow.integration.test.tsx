@@ -30,9 +30,24 @@ vi.mock("../../ai/useAiTraceAction", () => ({
   }),
 }));
 
+import { explainAnyError } from "~/features/errors";
 import type { AiActionError } from "~/server/app-layer/traces/ai-query";
 import { useFilterStore } from "../../../stores/filterStore";
 import { FloatingAiBar } from "../FloatingAiBar";
+
+/** A handled failure in the shape tRPC delivers it. */
+function handledCause(code: string, meta: Record<string, unknown> = {}) {
+  return {
+    data: {
+      error: { code, httpStatus: 502, fault: "provider", meta, reasons: [] },
+    },
+  };
+}
+
+/** The words the code-keyed registry has for a failure. */
+function registryTitle(cause: unknown): string {
+  return explainAnyError(cause).title;
+}
 
 afterEach(() => {
   cleanup();
@@ -65,14 +80,15 @@ describe("<FloatingAiBar /> error row", () => {
   });
 
   describe("given a provider error in the store", () => {
+    const details = {
+      provider: "azure",
+      model: "azure/gpt-5.4-mini",
+      httpStatus: 404,
+    };
     const providerError: AiActionError = {
-      code: "provider_error",
-      message: "Provider returned 404 for azure/gpt-5.4-mini",
-      details: {
-        provider: "azure",
-        model: "azure/gpt-5.4-mini",
-        httpStatus: 404,
-      },
+      code: "ai_query_provider_error",
+      cause: handledCause("ai_query_provider_error", details),
+      details,
     };
 
     // Set AFTER render: the composer's mount effect syncs its (stubbed,
@@ -87,12 +103,12 @@ describe("<FloatingAiBar /> error row", () => {
       return result;
     }
 
-    it("swaps the tip row for a red alert with the curated message", () => {
+    it("swaps the tip row for a red alert carrying the registry's copy", () => {
       renderWithProviderError();
       const alert = screen.getByRole("alert");
-      expect(alert).toHaveTextContent(
-        "Provider returned 404 for azure/gpt-5.4-mini",
-      );
+      expect(alert).toHaveTextContent(registryTitle(providerError.cause));
+      // The model id is a detail row behind the chevron, not the headline.
+      expect(alert).not.toHaveTextContent("azure/gpt-5.4-mini");
       expect(
         screen.queryByText(/save the result as a lens/i),
       ).not.toBeInTheDocument();
@@ -138,19 +154,17 @@ describe("<FloatingAiBar /> error row", () => {
     });
   });
 
-  describe("given a validation error without details", () => {
-    it("renders the message without the settings link", () => {
+  describe("given a failure that has nothing to do with model configuration", () => {
+    it("renders the registry copy without the settings link", () => {
+      const cause = new Error("socket hang up");
       renderBar();
       act(() => {
-        useFilterStore.getState().setAiError({
-          code: "validation_error",
-          message: "AI's reply didn't match the trace query syntax.",
-          details: {},
-        });
+        useFilterStore.getState().setAiError({ code: "unknown", cause });
       });
-      expect(screen.getByRole("alert")).toHaveTextContent(
-        /didn't match the trace query syntax/,
-      );
+      const alert = screen.getByRole("alert");
+      expect(alert).toHaveTextContent(registryTitle(cause));
+      // Sending the operator to Model Providers for a network blip is advice
+      // that can only waste their time.
       expect(
         screen.queryByRole("link", { name: /review model providers/i }),
       ).not.toBeInTheDocument();

@@ -1,6 +1,6 @@
-import type { DspyStepData, DspyStepSummaryData } from "./types";
 import { DspyStepNotFoundError } from "./errors";
 import type { DspyStepRepository } from "./repositories/dspy-step.repository";
+import type { DspyStepData, DspyStepSummaryData } from "./types";
 
 export class DspyStepService {
   constructor(readonly repository: DspyStepRepository) {}

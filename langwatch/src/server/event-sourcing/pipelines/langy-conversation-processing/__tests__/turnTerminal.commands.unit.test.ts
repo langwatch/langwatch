@@ -72,7 +72,7 @@ describe("turn terminal commands", () => {
   /**
    * A user stop is the third way into that same slot. It is neither a
    * completion nor a failure, but it carries an answer, so it rides
-   * `agent_responded` with `outcome: "stopped"` (ADR-058) — which means it
+   * `agent_responded` with `outcome: "stopped"` (ADR-078) — which means it
    * competes with the natural finish for the ONE terminal a turn is allowed,
    * rather than burying it or being buried by it.
    *

@@ -7,11 +7,11 @@ import {
   SimpleGrid,
   VStack,
 } from "@chakra-ui/react";
+import { ChartCard } from "~/components/analytics/ChartCard";
 import {
   CustomGraph,
   type CustomGraphInput,
 } from "~/components/analytics/CustomGraph";
-import { ChartCard } from "~/components/analytics/ChartCard";
 import { FilterSidebar } from "~/components/filters/FilterSidebar";
 import GraphsLayout from "~/components/GraphsLayout";
 import { FeedbacksTable } from "../../../components/analytics/FeedbacksTable";
@@ -229,7 +229,10 @@ function UsersContent() {
                 <Heading size="sm">User Traces</Heading>
               </Card.Header>
               <Card.Body>
-                <CustomGraph input={messagesCount} emptyState={userEmptyState} />
+                <CustomGraph
+                  input={messagesCount}
+                  emptyState={userEmptyState}
+                />
               </Card.Body>
             </Card.Root>
           </GridItem>

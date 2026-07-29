@@ -71,7 +71,7 @@ describe("<ExportConfigDialog/>", () => {
       render(<ExportConfigDialog {...defaultProps} />, { wrapper: Wrapper });
 
       expect(
-        screen.getByText("One row per span, includes inputs/outputs")
+        screen.getByText("One row per span, includes inputs/outputs"),
       ).toBeInTheDocument();
     });
 
@@ -91,7 +91,7 @@ describe("<ExportConfigDialog/>", () => {
           traceCount={5}
           isSelectedExport={true}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       expect(screen.getByText("5 selected traces")).toBeInTheDocument();
@@ -100,10 +100,9 @@ describe("<ExportConfigDialog/>", () => {
 
   describe("when traceCount is >= 10000", () => {
     it("shows '(limit)' next to the count", () => {
-      render(
-        <ExportConfigDialog {...defaultProps} traceCount={10000} />,
-        { wrapper: Wrapper }
-      );
+      render(<ExportConfigDialog {...defaultProps} traceCount={10000} />, {
+        wrapper: Wrapper,
+      });
 
       expect(screen.getByText("10,000 traces (limit)")).toBeInTheDocument();
     });
@@ -137,10 +136,9 @@ describe("<ExportConfigDialog/>", () => {
     it("calls onExport with summary mode and csv format", async () => {
       const user = userEvent.setup();
       const onExport = vi.fn();
-      render(
-        <ExportConfigDialog {...defaultProps} onExport={onExport} />,
-        { wrapper: Wrapper }
-      );
+      render(<ExportConfigDialog {...defaultProps} onExport={onExport} />, {
+        wrapper: Wrapper,
+      });
 
       await user.click(screen.getByText("Export"));
 
@@ -155,10 +153,9 @@ describe("<ExportConfigDialog/>", () => {
     it("calls onExport with full mode and json format", async () => {
       const user = userEvent.setup();
       const onExport = vi.fn();
-      render(
-        <ExportConfigDialog {...defaultProps} onExport={onExport} />,
-        { wrapper: Wrapper }
-      );
+      render(<ExportConfigDialog {...defaultProps} onExport={onExport} />, {
+        wrapper: Wrapper,
+      });
 
       await user.click(screen.getByLabelText("Full"));
       await user.click(screen.getByLabelText("JSON"));
@@ -175,10 +172,9 @@ describe("<ExportConfigDialog/>", () => {
     it("calls onClose", async () => {
       const user = userEvent.setup();
       const onClose = vi.fn();
-      render(
-        <ExportConfigDialog {...defaultProps} onClose={onClose} />,
-        { wrapper: Wrapper }
-      );
+      render(<ExportConfigDialog {...defaultProps} onClose={onClose} />, {
+        wrapper: Wrapper,
+      });
 
       await user.click(screen.getByText("Cancel"));
 
@@ -188,10 +184,9 @@ describe("<ExportConfigDialog/>", () => {
     it("does not call onExport", async () => {
       const user = userEvent.setup();
       const onExport = vi.fn();
-      render(
-        <ExportConfigDialog {...defaultProps} onExport={onExport} />,
-        { wrapper: Wrapper }
-      );
+      render(<ExportConfigDialog {...defaultProps} onExport={onExport} />, {
+        wrapper: Wrapper,
+      });
 
       await user.click(screen.getByText("Cancel"));
 

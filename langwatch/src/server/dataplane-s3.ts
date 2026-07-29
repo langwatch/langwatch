@@ -144,9 +144,6 @@ export function clearS3ProjectOrgCache(): void {
 /**
  * Returns the parsed private S3 configs map. Exposed for testing.
  */
-export function getPrivateS3Configs(): ReadonlyMap<
-  string,
-  DataplaneS3Config
-> {
+export function getPrivateS3Configs(): ReadonlyMap<string, DataplaneS3Config> {
   return privateS3Configs;
 }

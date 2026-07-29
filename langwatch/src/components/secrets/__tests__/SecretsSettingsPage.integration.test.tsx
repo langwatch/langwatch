@@ -9,8 +9,9 @@
  * - Hides Add Secret button when user lacks manage permission
  * - Shows empty state when no secrets exist
  */
-import { cleanup, render, screen } from "@testing-library/react";
+
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -112,9 +113,7 @@ vi.mock("~/utils/api", () => ({
 }));
 
 // Lazy import to ensure mocks are set up first
-const { default: SecretsPage } = await import(
-  "~/pages/settings/secrets"
-);
+const { default: SecretsPage } = await import("~/pages/settings/secrets");
 
 function renderPage() {
   return render(
@@ -184,9 +183,7 @@ describe("Secrets settings page", () => {
     it("displays the Add Secret button", () => {
       renderPage();
 
-      expect(
-        screen.getByRole("button", { name: /add secret/i }),
-      ).toBeTruthy();
+      expect(screen.getByRole("button", { name: /add secret/i })).toBeTruthy();
     });
   });
 
@@ -199,9 +196,7 @@ describe("Secrets settings page", () => {
     it("hides the Add Secret button", () => {
       renderPage();
 
-      expect(
-        screen.queryByRole("button", { name: /add secret/i }),
-      ).toBeNull();
+      expect(screen.queryByRole("button", { name: /add secret/i })).toBeNull();
     });
   });
 
@@ -215,9 +210,7 @@ describe("Secrets settings page", () => {
 
       expect(screen.getByText("No secrets configured")).toBeTruthy();
       expect(
-        screen.getByText(
-          /Add secrets to use in code blocks/,
-        ),
+        screen.getByText(/Add secrets to use in code blocks/),
       ).toBeTruthy();
     });
   });

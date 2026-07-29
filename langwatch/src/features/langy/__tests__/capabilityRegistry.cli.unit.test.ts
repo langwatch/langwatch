@@ -1,6 +1,7 @@
 import { CLI_SUBRESOURCE_VERBS } from "@langwatch/langy";
 import { describe, expect, it } from "vitest";
 import { FEATURES } from "~/shared/langy/featureMap";
+import { extractPlatformUrl } from "~/utils/platformHref";
 import { CAPABILITY_CATALOG } from "../components/capabilities/capabilityCatalog";
 import {
   buildResourceHref,
@@ -277,6 +278,43 @@ describe("buildResourceHref, given a row-level deep link", () => {
   });
 });
 
+describe("extractPlatformUrl, given a settled tool call's result payload", () => {
+  describe("when the payload carries the platform's own link", () => {
+    it("reads it off the payload", () => {
+      expect(
+        extractPlatformUrl({
+          scenarioRunId: "run_1",
+          platformUrl:
+            "https://app.langwatch.ai/acme/simulations/set_1/batch_1?openRun=run_1",
+        }),
+      ).toBe(
+        "https://app.langwatch.ai/acme/simulations/set_1/batch_1?openRun=run_1",
+      );
+    });
+  });
+
+  describe("when the payload carries no platform link", () => {
+    it("returns null", () => {
+      expect(extractPlatformUrl({ scenarioRunId: "run_1" })).toBeNull();
+    });
+  });
+
+  describe("when the output is not an object", () => {
+    it("returns null instead of throwing", () => {
+      expect(extractPlatformUrl(null)).toBeNull();
+      expect(extractPlatformUrl("Found 0 traces")).toBeNull();
+      expect(extractPlatformUrl(undefined)).toBeNull();
+    });
+  });
+
+  describe("when the platformUrl field is present but blank", () => {
+    it("returns null rather than an empty link", () => {
+      expect(extractPlatformUrl({ platformUrl: "" })).toBeNull();
+      expect(extractPlatformUrl({ platformUrl: "   " })).toBeNull();
+    });
+  });
+});
+
 describe("the card binding, given the catalog and feature map are the sources of structure", () => {
   describe("when a fallback surface is bound to a feature", () => {
     it("binds only to features the map actually declares", () => {
@@ -334,7 +372,7 @@ describe("the card binding, given the catalog and feature map are the sources of
 
 /**
  * The command's name is the PRIOR; the card stamped on the result envelope at
- * the command boundary is the DECISION (ADR-059 §1/§3). `withDecidedCard` is
+ * the command boundary is the DECISION (ADR-079 §1/§3). `withDecidedCard` is
  * where the panel stops arguing with it.
  */
 describe("withDecidedCard, given a result whose card was decided by its shape", () => {

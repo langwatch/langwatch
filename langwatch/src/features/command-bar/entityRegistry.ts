@@ -1,14 +1,14 @@
 import type { LucideIcon } from "lucide-react";
 import {
-  Bot,
+  Bell,
   BookText,
+  Bot,
+  FlaskConical,
   ListTree,
   Percent,
+  Play,
   Table,
   Workflow,
-  Play,
-  Bell,
-  FlaskConical,
 } from "lucide-react";
 import type { SearchResult } from "./types";
 
@@ -109,9 +109,7 @@ export const entityRegistry: EntityConfig[] = [
  * Find entity configuration by prefix.
  * Returns undefined if no matching entity is found.
  */
-export function findEntityByPrefix(
-  query: string
-): EntityConfig | undefined {
+export function findEntityByPrefix(query: string): EntityConfig | undefined {
   return entityRegistry.find((entity) => query.startsWith(entity.prefix));
 }
 

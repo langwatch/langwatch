@@ -5,14 +5,15 @@
  * queried metric lands as a headline figure that springs up from zero, matching
  * the reference's metrics statcard. Reads only — the deep link opens Analytics.
  */
-import { asJsonDocument } from "@langwatch/langy";
+
 import { Text, VStack } from "@chakra-ui/react";
+import { asJsonDocument } from "@langwatch/langy";
 import type { LangyTurnMetric } from "../../hooks/useLangyTurnSignals";
 import { formatMoneyShort } from "../Money";
 import { StreamingStatCard } from "../StreamingStatCard";
 import {
-  extractToolText,
   type CapabilityCardInput,
+  extractToolText,
 } from "./capabilityRegistry";
 import { LangyCapabilityCard } from "./LangyCapabilityCard";
 
@@ -60,7 +61,7 @@ function parseAnalytics(output: unknown): ParsedAnalytics {
   const text = extractToolText(output);
   const header = text.match(/#\s*Analytics:\s*([^\s(]+)\s*(?:\(([^)]+)\))?/i);
   const metric = header ? header[1]! : null;
-  const aggregation = header && header[2] ? header[2]! : null;
+  const aggregation = header?.[2] || null;
   const empty = /No data available/i.test(text);
 
   // Table rows look like `| 2026-07-10 | 94 |` — collect the trailing numeric
@@ -88,11 +89,6 @@ function parseAnalytics(output: unknown): ParsedAnalytics {
  */
 function isUnreadable(parsed: ParsedAnalytics): boolean {
   return !parsed.empty && parsed.metric == null && parsed.points === 0;
-}
-
-/** Shared guard for capability rendering — help/error text is an activity receipt. */
-export function hasRenderableAnalyticsResult(output: unknown): boolean {
-  return !isUnreadable(parseAnalytics(output));
 }
 
 /**

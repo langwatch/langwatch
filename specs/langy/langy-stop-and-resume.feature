@@ -6,7 +6,7 @@ Feature: Langy lets me stop a turn for real, continue where it left off, and rej
 
   # Three user-initiated controls over one in-flight turn, built on the durable
   # event-sourced turn lifecycle (ADR-046) and the durable token buffer / resume
-  # transport (ADR-044/048). Companion specs:
+  # transport (ADR-077). Companion specs:
   #   - specs/langy/langy-turn-recovery.feature  (INFRA-initiated recovery: a worker
   #     dies, a deploy interrupts — Langy re-drives on its own. This spec is the
   #     opposite direction: the USER intervenes on a healthy turn.)
@@ -15,7 +15,7 @@ Feature: Langy lets me stop a turn for real, continue where it left off, and rej
   #   - specs/langy/langy-baseline.feature  ("Stop an in-flight generation" — the v1
   #     stub; this spec deepens it into a backend-confirmed stop.)
   #
-  # ADR: dev/docs/adr/NNN-langy-user-turn-controls.md
+  # ADR: dev/docs/adr/078-langy-user-turn-controls.md
 
   Background:
     Given I am signed in with Langy enabled for a project
@@ -227,7 +227,7 @@ Feature: Langy lets me stop a turn for real, continue where it left off, and rej
   # (3) Refresh and carry on from where it was streaming
   # ===========================================================================
 
-  # The durable half is already built (ADR-048: "the buffered tail is the resume
+  # The durable half is already built (ADR-077: "the buffered tail is the resume
   # state"; the server settles a turn whose terminal frame was missed). What was
   # missing is the browser REJOINING on a cold mount. The in-flight turn id lives
   # on the conversation projection, so a reloaded panel can read it and resubscribe.

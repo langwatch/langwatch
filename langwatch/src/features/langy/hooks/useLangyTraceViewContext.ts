@@ -1,6 +1,6 @@
 import { useMemo } from "react";
-import { useFilterStore } from "../../traces-v2/stores/filterStore";
 import type { TimeRange } from "../../traces-v2/stores/filterStore";
+import { useFilterStore } from "../../traces-v2/stores/filterStore";
 import { useViewStore } from "../../traces-v2/stores/viewStore";
 import type { LangyContextChip } from "../stores/langyStore";
 

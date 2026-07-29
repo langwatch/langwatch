@@ -1,6 +1,6 @@
 /**
  * LangyTurnService — durable turn admission and dispatch orchestration, lifted out of
- * `routes/langy.ts` (ADR-046 / LANGY_REWORK_PLAN.md S2 increment C).
+ * `routes/langy.ts` (ADR-046).
  *
  * The Hono route now keeps only Phase 1 (session auth, demo gate, rate limit,
  * body validation, project-permission gate) and maps DomainErrors to HTTP. This
@@ -33,7 +33,11 @@ import {
   renderLangyConversationMemory,
   renderLangyConversationTranscript,
 } from "~/server/app-layer/langy/langyConversationMemory";
-import { LANGY_TURN_OVERRIDE_FALLBACK } from "~/server/app-layer/langy/langyPromptRegistry";
+import {
+  LANGY_PROMPT_HANDLES,
+  LANGY_TURN_OVERRIDE_FALLBACK,
+  resolveLangyPrompt,
+} from "~/server/app-layer/langy/langyPromptRegistry";
 import type { LangyTurnContext } from "~/server/app-layer/langy/langyTurnContext.schema";
 import { renderLangyTurnContext } from "~/server/app-layer/langy/langyTurnContext.schema";
 import type { LangyWorkerPort } from "~/server/app-layer/langy/langyWorker";
@@ -47,6 +51,7 @@ import type { LangyTurnAccessStore } from "~/server/app-layer/langy/streaming/la
 import type { LangyTurnHandoffStore } from "~/server/app-layer/langy/streaming/langyTurnHandoff";
 import type { Session } from "~/server/auth";
 import { getLangyTurnsCounter } from "~/server/metrics";
+import type { PromptService } from "~/server/prompt-config/prompt.service";
 import {
   LangyAgentUnavailableError,
   LangyConversationNotOwnedError,
@@ -74,6 +79,108 @@ const logger = createLogger("langwatch:langy:turn-service");
  * same bytes. Aliased here to keep the composition below readable.
  */
 const LANGY_OVERRIDE = LANGY_TURN_OVERRIDE_FALLBACK;
+
+/** Which path produced the turn's system-block override. */
+type LangyOverrideSource =
+  /** No holding project configured — the in-repo constant, no registry call. */
+  | "unconfigured"
+  /** Read from the promoted registry row. */
+  | "registry"
+  /** The read FAILED; the last text this process read from the registry. */
+  | "cached"
+  /** A genuine miss (no row / empty row), or a failure with nothing cached. */
+  | "fallback";
+
+export interface ResolvedLangyTurnOverride {
+  text: string;
+  source: LangyOverrideSource;
+}
+
+/**
+ * The last override text a registry read actually returned, held for the life
+ * of the process.
+ *
+ * It exists because the system lane is the provider's CACHE PREFIX and must
+ * stay byte-identical across a conversation's turns (see the composition site
+ * in `startConversationTurn`). Without this, a single Prisma timeout on turn 5
+ * of a conversation whose turns 1-4 used the promoted text would silently swap
+ * the model's system instructions AND pay a full prefix rewrite at the write
+ * premium — a transient blip mutating a live conversation.
+ *
+ * The full matrix, and only a read ERROR reuses this:
+ *
+ *  - `registry` — a promoted row was read: use it, and STORE it as last-good.
+ *  - `fallback` — a genuine miss (row demoted, deleted or blank): use the
+ *    in-repo constant, and CLEAR last-good. The clear is the load-bearing half:
+ *    without it the text an operator deliberately removed stays held for the
+ *    life of the process, and the next transient read failure serves it back
+ *    out of this cache — resurrecting demoted content indefinitely.
+ *  - `error`    — a transient failure: reuse last-good if we hold one, else the
+ *    in-repo constant.
+ *
+ * So the cache only ever holds text the registry is currently serving, and a
+ * demotion is honoured from the turn that observed it onwards — not just on
+ * that one call.
+ */
+let lastRegistryOverrideText: string | null = null;
+
+/**
+ * The system-block override for this turn: the promoted registry row when an
+ * operator has configured the project that holds Langy's prompts, else the
+ * in-repo constant.
+ *
+ * The project id is read from `LANGY_PROMPT_PROJECT_ID` — the SAME variable
+ * `scripts/seed-langy-prompts.ts` seeds into, so "seed it, promote it, set the
+ * id" is one coherent operation rather than two halves that never met.
+ * Unconfigured is the default and costs nothing: no prompt service call, no
+ * database round trip on the turn path.
+ *
+ * When configured it DOES cost round trips (`getPromptByIdOrHandle` resolves
+ * the org before reading the config), which is why the caller starts this
+ * alongside the other conversation-scoped reads instead of awaiting it on its
+ * own — see the overlapped batch in `startConversationTurn`.
+ *
+ * Returns the `source` as well as the text so the caller can record which path
+ * a turn took; a swap must be observable, not warn-log-only.
+ */
+async function resolveLangyTurnOverride(
+  deps: Pick<LangyTurnServiceDeps, "prompts">,
+): Promise<ResolvedLangyTurnOverride> {
+  const projectId = process.env.LANGY_PROMPT_PROJECT_ID?.trim();
+  if (!projectId || !deps.prompts) {
+    return { text: LANGY_OVERRIDE, source: "unconfigured" };
+  }
+
+  const resolved = await resolveLangyPrompt({
+    promptService: deps.prompts,
+    projectId,
+    handle: LANGY_PROMPT_HANDLES.turnOverride,
+    fallback: LANGY_OVERRIDE,
+  });
+  if (resolved.source === "registry") {
+    lastRegistryOverrideText = resolved.text;
+    return { text: resolved.text, source: "registry" };
+  }
+  if (resolved.source === "error") {
+    if (lastRegistryOverrideText !== null) {
+      return { text: lastRegistryOverrideText, source: "cached" };
+    }
+    return { text: resolved.text, source: "fallback" };
+  }
+  // A genuine miss: the row is gone, demoted or blank. Drop the held text so a
+  // later blip cannot serve back what the operator removed.
+  lastRegistryOverrideText = null;
+  return { text: resolved.text, source: "fallback" };
+}
+
+/**
+ * Test seam ONLY: drop the process-held registry text so one test's successful
+ * read cannot leak into the next test's blip. Never called in production — the
+ * cache is meant to outlive every turn the process serves.
+ */
+export function __resetLangyTurnOverrideCacheForTests(): void {
+  lastRegistryOverrideText = null;
+}
 
 /**
  * Turn identity binds the client's idempotency key to WHO sent it and WHAT was
@@ -176,6 +283,12 @@ export interface LangyTurnServiceDeps {
   conversations: LangyConversationService;
   credentials: LangyCredentialService;
   /**
+   * Reads Langy's versioned prompts (ADR-050). Optional: absent (tests, and any
+   * composition that has not wired it) means the in-repo fallback text, which
+   * is also what a configured-but-empty registry yields.
+   */
+  prompts?: Pick<PromptService, "getPromptByIdOrHandle">;
+  /**
    * Resolve the project's configured Langy model; rejects when none is
    * configured. The returned `modelId` is the full provider-prefixed id and
    * is FORWARDED to the worker (ADR-065) — with no per-send override, the
@@ -183,7 +296,7 @@ export interface LangyTurnServiceDeps {
    */
   resolveModel: (args: { projectId: string }) => Promise<{ modelId: string }>;
   /** Direct fast-path dispatch plus durable process-effect recovery. `cancel`
-   * is the best-effort worker abort behind a user Stop (ADR-058). */
+   * is the best-effort worker abort behind a user Stop (ADR-078). */
   worker: Pick<LangyWorkerPort, "probe" | "dispatch" | "cancel"> | null;
   /**
    * The durable token buffer (ADR-044). A user Stop reads its `delta` tail to
@@ -223,7 +336,7 @@ export interface LangyTurnServiceDeps {
 
 /**
  * Reconstruct the partial answer text from the durable buffer's `delta` entries
- * (ADR-058). The buffer batches deltas and flushes its tail on `markEnd`, so this
+ * (ADR-078). The buffer batches deltas and flushes its tail on `markEnd`, so this
  * is the durable truth up to the last flush; a handful of un-flushed words still
  * in the worker's memory are not the control plane's to see, and "the partial is
  * preserved" does not require them. Non-`delta` entries (status, reasoning, tool,
@@ -249,7 +362,7 @@ export class LangyTurnService {
   }
 
   /**
-   * Stop an in-flight turn FOR REAL (ADR-058). The browser's `useChat` stop only
+   * Stop an in-flight turn FOR REAL (ADR-078). The browser's `useChat` stop only
    * aborts its own subscription; this ends the turn on the durable record — the
    * confirmation — and only then, best-effort, asks the worker to abandon the
    * generation. The order matters: the truthful stop must not depend on a live,
@@ -520,6 +633,7 @@ export class LangyTurnService {
         runTokenResult,
         modelsAllowedResult,
         memoryResult,
+        overrideResult,
       ] = await Promise.allSettled([
         conversationService.findByIdVisible({
           id: conversation.id,
@@ -551,12 +665,63 @@ export class LangyTurnService {
               conversationId: conversation.id,
               projectId,
             }),
+        // The system-block override (ADR-050). It depends on nothing computed
+        // after `resolveLangyTurnBaseDependencies`, so it belongs in this
+        // batch: awaiting it on its own at the composition site put two serial
+        // Prisma round trips (`getPromptByIdOrHandle` resolves the org, then
+        // reads the config) in front of time-to-first-token on EVERY turn, for
+        // a value that is the same for every tenant. Unconfigured (the default)
+        // resolves synchronously and costs nothing here either.
+        resolveLangyTurnOverride(this.deps),
       ]);
 
-      const runToken =
-        runTokenResult.status === "fulfilled"
-          ? (runTokenResult.value ?? "")
-          : "";
+      // The runToken IS the frame-signing key, and a turn without one is
+      // refused here. Be precise about what that buys and what it costs.
+      //
+      // WITHOUT the token the turn does NOT hang. The worker's relay client
+      // returns `ErrRelayDisabled` for an empty runToken
+      // (`adapters/controlplane/relay.go`), so no frame is ever signed with an
+      // empty key and none is ever rejected on the verify side; `frameSink`
+      // simply runs with a nil stream. The turn executes to completion and
+      // `finalizeCompletedTurn` posts the durable final to
+      // `/api/internal/langy` unconditionally. The user still gets their
+      // answer — it just lands in one piece at the end, with no live stream to
+      // watch, no progress, and no Stop.
+      //
+      // WHY REFUSE ANYWAY: silently downgrading a turn to no-live-edge is not
+      // the product. The panel is built around a stream the user can watch and
+      // stop, and a conversation that has lost its signing key will stay lost
+      // for every following turn. A card the user can act on beats an
+      // indefinite spinner that resolves minutes later, or a Stop button that
+      // does nothing.
+      //
+      // WHAT IT COSTS, plainly: `langyRecoveryPolicy` classifies
+      // `langy_agent_unavailable` as terminal with no auto-retry. So a
+      // transient Postgres blip on the `getRunToken` read now ends as a dead
+      // "unavailable" card and NO answer, where the degraded path would have
+      // delivered one. We take that trade deliberately — never a half-visible
+      // turn, at the price of a hard fail on a read blip — and it is the
+      // reason to keep this branch loud in the logs.
+      if (runTokenResult.status === "rejected") {
+        logger.error(
+          {
+            error: runTokenResult.reason,
+            projectId,
+            conversationId: conversation.id,
+            turnId,
+          },
+          "could not read the langy runToken; refusing to start an unsignable turn",
+        );
+        throw new LangyAgentUnavailableError("Agent request failed");
+      }
+      const runToken = runTokenResult.value;
+      if (!runToken) {
+        logger.error(
+          { projectId, conversationId: conversation.id, turnId },
+          "langy conversation has no runToken; refusing to start an unsignable turn",
+        );
+        throw new LangyAgentUnavailableError("Agent request failed");
+      }
 
       // The project's Langy allowlist is the ONLY runnable-set gate, and it
       // covers the effective model on BOTH paths — a per-send override and
@@ -652,7 +817,42 @@ export class LangyTurnService {
       // every turn instead of reading it. Everything volatile rides the turn's
       // USER message instead: the history seed below, and the per-turn context
       // inside the composed prompt.
-      const system = [LANGY_OVERRIDE, LANGY_REFERENT_POLICY].join("\n\n");
+      // ADR-050: the override text is a VERSIONED registry row when an operator
+      // has pointed us at the system project that holds it, and the in-repo
+      // constant otherwise. `resolveLangyPrompt` never throws — a miss, an
+      // empty row or a read error all yield usable text — so the registry can
+      // never keep a turn from starting. With no system project configured the
+      // registry is skipped entirely and this is byte-identical to the constant,
+      // which is what makes turning it on a no-op until a row is promoted.
+      //
+      // The one thing it must NOT do is swap the block mid-conversation over a
+      // transient failure, which would rewrite the cache prefix above and
+      // change the model's instructions between turns of one chat. A read error
+      // therefore resolves to the process's last good registry text
+      // (`source: "cached"`); only a genuine miss falls to the constant.
+      //
+      // This seam existed, seeded and documented, with NO caller: `pnpm
+      // seed:langy-prompts` + promoting to `production` changed nothing at
+      // runtime. It is wired here because that is where the system block is
+      // composed (#5881).
+      const override: ResolvedLangyTurnOverride =
+        overrideResult.status === "fulfilled"
+          ? overrideResult.value
+          : { text: LANGY_OVERRIDE, source: "fallback" };
+      if (overrideResult.status === "rejected") {
+        logger.warn(
+          { error: overrideResult.reason, conversationId: conversation.id },
+          "langy system-block override resolution failed — using the in-repo constant",
+        );
+      }
+      // Which path the system block took, on the turn's own span: the swap this
+      // guards against is otherwise invisible except as a warn line in the
+      // registry loader, and "turn 5 of this conversation ran on different
+      // instructions" is exactly the question a trace should answer.
+      trace
+        .getActiveSpan()
+        ?.setAttribute("langy.prompt.override.source", override.source);
+      const system = [override.text, LANGY_REFERENT_POLICY].join("\n\n");
 
       // The history seed rides EVERY dispatch, not just the one after a probe
       // miss, because the worker serving the turn is disposable at any point

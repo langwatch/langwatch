@@ -1,5 +1,5 @@
-import { shortId } from "./types";
 import type { SpanConfig, SpanType, TraceConfig } from "./types";
+import { shortId } from "./types";
 
 export interface PromptRef {
   id: string;
@@ -23,24 +23,52 @@ export interface GeneratorOptions {
   includeEvents?: boolean;
 }
 
-const GENAI_TYPES: SpanType[] = ["llm", "agent", "tool", "rag", "chain", "guardrail"];
-const INFRA_TYPES: SpanType[] = ["server", "client", "span", "task", "component", "module"];
+const INFRA_TYPES: SpanType[] = [
+  "server",
+  "client",
+  "span",
+  "task",
+  "component",
+  "module",
+];
 
 const MODEL_NAMES = [
-  "gpt-4o", "gpt-4o-mini", "gpt-4.1", "gpt-4.1-mini",
-  "claude-sonnet-4-5-20250514", "claude-haiku-4-5-20251001",
-  "gemini-2.5-pro", "gemini-2.5-flash",
+  "gpt-4o",
+  "gpt-4o-mini",
+  "gpt-4.1",
+  "gpt-4.1-mini",
+  "claude-sonnet-4-5-20250514",
+  "claude-haiku-4-5-20251001",
+  "gemini-2.5-pro",
+  "gemini-2.5-flash",
 ];
 
 const TOOL_NAMES = [
-  "search_documents", "get_weather", "execute_sql", "send_email",
-  "create_ticket", "lookup_user", "calculate", "fetch_url",
-  "list_files", "run_code", "translate_text", "summarize",
+  "search_documents",
+  "get_weather",
+  "execute_sql",
+  "send_email",
+  "create_ticket",
+  "lookup_user",
+  "calculate",
+  "fetch_url",
+  "list_files",
+  "run_code",
+  "translate_text",
+  "summarize",
 ];
 
 const AGENT_NAMES = [
-  "orchestrator", "researcher", "planner", "coder", "reviewer",
-  "analyst", "writer", "validator", "router", "extractor",
+  "orchestrator",
+  "researcher",
+  "planner",
+  "coder",
+  "reviewer",
+  "analyst",
+  "writer",
+  "validator",
+  "router",
+  "extractor",
 ];
 
 const SYSTEM_PROMPTS = [
@@ -86,10 +114,21 @@ const RAG_CONTENTS = [
 ];
 
 const INFRA_SPAN_NAMES = [
-  "http.request", "db.query", "cache.lookup", "auth.verify",
-  "rate_limit.check", "metrics.record", "log.flush", "config.load",
-  "health.check", "middleware.cors", "middleware.auth", "serialise",
-  "deserialise", "validate.input", "compress.response",
+  "http.request",
+  "db.query",
+  "cache.lookup",
+  "auth.verify",
+  "rate_limit.check",
+  "metrics.record",
+  "log.flush",
+  "config.load",
+  "health.check",
+  "middleware.cors",
+  "middleware.auth",
+  "serialise",
+  "deserialise",
+  "validate.input",
+  "compress.response",
 ];
 
 function pick<T>(arr: T[]): T {
@@ -162,7 +201,10 @@ function synthesizePromptVariables(
         vars[identifier] = Math.random() < 0.5 ? "true" : "false";
         break;
       case "list[str]":
-        vars[identifier] = JSON.stringify([pick(USER_MESSAGES), pick(USER_MESSAGES)]);
+        vars[identifier] = JSON.stringify([
+          pick(USER_MESSAGES),
+          pick(USER_MESSAGES),
+        ]);
         break;
       default:
         vars[identifier] = `synthetic-${identifier}`;
@@ -171,7 +213,10 @@ function synthesizePromptVariables(
   return vars;
 }
 
-function makeLlmSpan(prompts?: PromptRef[], includeEvents?: boolean): SpanConfig {
+function makeLlmSpan(
+  prompts?: PromptRef[],
+  includeEvents?: boolean,
+): SpanConfig {
   const promptRef =
     prompts && prompts.length > 0 && Math.random() < 0.7 ? pick(prompts) : null;
   const model = promptRef?.model ?? pick(MODEL_NAMES);
@@ -205,7 +250,7 @@ function makeLlmSpan(prompts?: PromptRef[], includeEvents?: boolean): SpanConfig
       metrics: {
         promptTokens,
         completionTokens,
-        cost: (promptTokens * 0.000003 + completionTokens * 0.000015),
+        cost: promptTokens * 0.000003 + completionTokens * 0.000015,
       },
     },
     input: {
@@ -257,7 +302,9 @@ function makeToolSpan(includeEvents?: boolean): SpanConfig {
     output: { type: "json", value: { results: ["item1", "item2"], count: 2 } },
   };
   if (includeEvents && status === "error") {
-    span.events = [makeExceptionEvent(durationMs, `${toolName} invocation failed`)];
+    span.events = [
+      makeExceptionEvent(durationMs, `${toolName} invocation failed`),
+    ];
   }
   return span;
 }
@@ -290,7 +337,12 @@ function makeGuardrailSpan(includeEvents?: boolean): SpanConfig {
   const durationMs = randInt(5, 80);
   const span: SpanConfig = {
     id: shortId(),
-    name: pick(["pii_check", "toxicity_filter", "jailbreak_detector", "content_policy"]),
+    name: pick([
+      "pii_check",
+      "toxicity_filter",
+      "jailbreak_detector",
+      "content_policy",
+    ]),
     type: "guardrail",
     durationMs,
     offsetMs: 0,
@@ -298,10 +350,15 @@ function makeGuardrailSpan(includeEvents?: boolean): SpanConfig {
     children: [],
     attributes: {},
     input: { type: "text", value: "Content to check" },
-    output: { type: "json", value: { passed, score: Math.random().toFixed(3) } },
-    ...(passed ? {} : {
-      exception: { message: "Content policy violation detected" },
-    }),
+    output: {
+      type: "json",
+      value: { passed, score: Math.random().toFixed(3) },
+    },
+    ...(passed
+      ? {}
+      : {
+          exception: { message: "Content policy violation detected" },
+        }),
   };
   if (includeEvents && !passed) {
     span.events = [
@@ -333,14 +390,12 @@ interface StepResult {
   used: number;
 }
 
-function appendLeafStep(
-  isGenai: boolean,
-  args: SubtreeArgs,
-): StepResult {
+function appendLeafStep(isGenai: boolean, args: SubtreeArgs): StepResult {
   const { prompts, includeEvents } = args;
   if (!isGenai) return { span: makeInfraSpan(includeEvents), used: 1 };
   const leafType = Math.random();
-  if (leafType < 0.4) return { span: makeLlmSpan(prompts, includeEvents), used: 1 };
+  if (leafType < 0.4)
+    return { span: makeLlmSpan(prompts, includeEvents), used: 1 };
   if (leafType < 0.6) return { span: makeToolSpan(includeEvents), used: 1 };
   if (leafType < 0.8) return { span: makeRagSpan(), used: 1 };
   return { span: makeGuardrailSpan(includeEvents), used: 1 };
@@ -349,7 +404,10 @@ function appendLeafStep(
 function appendAgentLoopStep(remaining: number, args: SubtreeArgs): StepResult {
   const { depth, maxDepth, genaiRatio, prompts, includeEvents } = args;
   const agentName = pick(AGENT_NAMES);
-  const loopIterations = Math.min(randInt(1, 4), Math.floor((remaining - 1) / 3));
+  const loopIterations = Math.min(
+    randInt(1, 4),
+    Math.floor((remaining - 1) / 3),
+  );
   const agent: SpanConfig = {
     id: shortId(),
     name: agentName,
@@ -364,7 +422,10 @@ function appendAgentLoopStep(remaining: number, args: SubtreeArgs): StepResult {
   };
   let used = 1;
 
-  let childBudget = Math.min(remaining - 1, randInt(3, Math.max(3, Math.floor(remaining * 0.4))));
+  let childBudget = Math.min(
+    remaining - 1,
+    randInt(3, Math.max(3, Math.floor(remaining * 0.4))),
+  );
 
   for (let i = 0; i < loopIterations && childBudget > 0; i++) {
     // LLM call
@@ -396,11 +457,15 @@ function appendAgentLoopStep(remaining: number, args: SubtreeArgs): StepResult {
   }
 
   // Compute agent duration from children
-  agent.durationMs = agent.children.reduce((sum, c) => sum + c.durationMs, 0) + randInt(10, 50);
+  agent.durationMs =
+    agent.children.reduce((sum, c) => sum + c.durationMs, 0) + randInt(10, 50);
   return { span: agent, used };
 }
 
-function appendRagPipelineStep(remaining: number, args: SubtreeArgs): StepResult {
+function appendRagPipelineStep(
+  remaining: number,
+  args: SubtreeArgs,
+): StepResult {
   const { depth, maxDepth, genaiRatio, prompts, includeEvents } = args;
   const chain: SpanConfig = {
     id: shortId(),
@@ -442,7 +507,8 @@ function appendRagPipelineStep(remaining: number, args: SubtreeArgs): StepResult
     used += sub.used;
   }
 
-  chain.durationMs = chain.children.reduce((sum, c) => sum + c.durationMs, 0) + randInt(5, 20);
+  chain.durationMs =
+    chain.children.reduce((sum, c) => sum + c.durationMs, 0) + randInt(5, 20);
   return { span: chain, used };
 }
 
@@ -450,7 +516,12 @@ function appendWorkflowStep(remaining: number, args: SubtreeArgs): StepResult {
   const { depth, maxDepth, genaiRatio, prompts, includeEvents } = args;
   const workflow: SpanConfig = {
     id: shortId(),
-    name: pick(["process_request", "handle_query", "run_pipeline", "execute_workflow"]),
+    name: pick([
+      "process_request",
+      "handle_query",
+      "run_pipeline",
+      "execute_workflow",
+    ]),
     type: "workflow",
     durationMs: 0,
     offsetMs: 0,
@@ -460,7 +531,10 @@ function appendWorkflowStep(remaining: number, args: SubtreeArgs): StepResult {
   };
   let used = 1;
 
-  const childBudget = Math.min(remaining - 1, randInt(2, Math.max(2, Math.floor(remaining * 0.3))));
+  const childBudget = Math.min(
+    remaining - 1,
+    randInt(2, Math.max(2, Math.floor(remaining * 0.3))),
+  );
   const sub = buildSubtree({
     budget: childBudget,
     depth: depth + 1,
@@ -472,7 +546,9 @@ function appendWorkflowStep(remaining: number, args: SubtreeArgs): StepResult {
   workflow.children = sub.spans;
   used += sub.used;
 
-  workflow.durationMs = workflow.children.reduce((sum, c) => sum + c.durationMs, 0) + randInt(5, 30);
+  workflow.durationMs =
+    workflow.children.reduce((sum, c) => sum + c.durationMs, 0) +
+    randInt(5, 30);
   return { span: workflow, used };
 }
 
@@ -480,7 +556,8 @@ function appendSingleLeafStep(isGenai: boolean, args: SubtreeArgs): StepResult {
   const { prompts, includeEvents } = args;
   if (!isGenai) return { span: makeInfraSpan(includeEvents), used: 1 };
   const leafType = Math.random();
-  if (leafType < 0.5) return { span: makeLlmSpan(prompts, includeEvents), used: 1 };
+  if (leafType < 0.5)
+    return { span: makeLlmSpan(prompts, includeEvents), used: 1 };
   if (leafType < 0.75) return { span: makeToolSpan(includeEvents), used: 1 };
   return { span: makeRagSpan(), used: 1 };
 }
@@ -493,7 +570,10 @@ function appendSingleLeafStep(isGenai: boolean, args: SubtreeArgs): StepResult {
  * - Fill children until we approach the target budget
  * - Recurse into children that can hold more children
  */
-function buildSubtree(args: SubtreeArgs): { spans: SpanConfig[]; used: number } {
+function buildSubtree(args: SubtreeArgs): {
+  spans: SpanConfig[];
+  used: number;
+} {
   const { budget, depth, maxDepth, genaiRatio } = args;
   if (budget <= 0 || depth >= maxDepth) return { spans: [], used: 0 };
 
@@ -533,7 +613,7 @@ function buildSubtree(args: SubtreeArgs): { spans: SpanConfig[]; used: number } 
 }
 
 /** Assign sequential offsets so the waterfall view looks realistic */
-function assignOffsets(spans: SpanConfig[], startOffset: number = 0): void {
+function assignOffsets(spans: SpanConfig[], startOffset = 0): void {
   let offset = startOffset;
   for (const span of spans) {
     span.offsetMs = offset;
@@ -548,7 +628,8 @@ function countSpans(spans: SpanConfig[]): number {
 }
 
 export function generateTrace(options: GeneratorOptions): TraceConfig {
-  const { targetSpanCount, maxDepth, genaiRatio, prompts, includeEvents } = options;
+  const { targetSpanCount, maxDepth, genaiRatio, prompts, includeEvents } =
+    options;
 
   // Build the root span tree
   const rootAgent: SpanConfig = {
@@ -574,7 +655,8 @@ export function generateTrace(options: GeneratorOptions): TraceConfig {
   });
 
   rootAgent.children = children;
-  rootAgent.durationMs = children.reduce((sum, c) => sum + c.durationMs, 0) + randInt(20, 100);
+  rootAgent.durationMs =
+    children.reduce((sum, c) => sum + c.durationMs, 0) + randInt(20, 100);
 
   assignOffsets([rootAgent]);
 
@@ -582,14 +664,22 @@ export function generateTrace(options: GeneratorOptions): TraceConfig {
     id: shortId(),
     name: `Generated Trace (${countSpans([rootAgent])} spans)`,
     resourceAttributes: {
-      "service.name": pick(["ai-agent", "chatbot-service", "ml-pipeline", "llm-gateway"]),
+      "service.name": pick([
+        "ai-agent",
+        "chatbot-service",
+        "ml-pipeline",
+        "llm-gateway",
+      ]),
       "service.version": `${randInt(1, 5)}.${randInt(0, 20)}.${randInt(0, 99)}`,
     },
     metadata: {
       userId: `user-${randInt(1000, 9999)}`,
       threadId: `thread-${shortId()}`,
       customerId: `customer-${randInt(100, 999)}`,
-      labels: [pick(["production", "staging", "development"]), pick(["v2", "beta", "canary"])],
+      labels: [
+        pick(["production", "staging", "development"]),
+        pick(["v2", "beta", "canary"]),
+      ],
     },
     spans: [rootAgent],
   };

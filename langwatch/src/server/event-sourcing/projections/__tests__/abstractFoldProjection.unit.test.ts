@@ -1,8 +1,7 @@
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import {
   AbstractFoldProjection,
-  type AnyEventSchema,
   type FoldEventHandlers,
 } from "../abstractFoldProjection";
 import type { FoldProjectionStore } from "../foldProjection.types";
@@ -96,18 +95,18 @@ class CamelFoldProjection
   protected readonly events = camelEvents;
 
   constructor() {
-    super({ createdAtKey: "createdAt", updatedAtKey: "updatedAt", LastEventOccurredAtKey: "LastEventOccurredAt" });
+    super({
+      createdAtKey: "createdAt",
+      updatedAtKey: "updatedAt",
+      LastEventOccurredAtKey: "LastEventOccurredAt",
+    });
   }
-
 
   protected initState() {
     return { name: "" };
   }
 
-  handleTestCamelHappened(
-    _event: CamelEvent,
-    state: CamelState,
-  ): CamelState {
+  handleTestCamelHappened(_event: CamelEvent, state: CamelState): CamelState {
     return { ...state, name: "happened" };
   }
 }
@@ -198,10 +197,7 @@ describe("AbstractFoldProjection", () => {
 
   describe("when eventTypes is accessed", () => {
     it("derives from event schemas", () => {
-      expect(projection.eventTypes).toEqual([
-        "test.incremented",
-        "test.reset",
-      ]);
+      expect(projection.eventTypes).toEqual(["test.incremented", "test.reset"]);
     });
   });
 

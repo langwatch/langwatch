@@ -1,0 +1,68 @@
+id: require-bdd-describe-context-ts
+valid:
+  # Top-level describe names the unit — exempt, it has no describe ancestor.
+  - |
+    describe("computeBTLeaderboard", () => {
+      it("ranks variants by win rate", () => {});
+    });
+  # Nested describe expressing a `when` condition.
+  - |
+    describe("computeBTLeaderboard", () => {
+      describe("when a variant has no comparisons", () => {
+        it("marks it degenerate", () => {});
+      });
+    });
+  # Nested describe expressing a `given` precondition.
+  - |
+    describe("computeBTLeaderboard", () => {
+      describe("given a single annotated row", () => {
+        it("returns one entry", () => {});
+      });
+    });
+  # Capitalised prefixes are the same convention.
+  - |
+    describe("usage.service", () => {
+      describe("When the spend repo is missing", () => {
+        it("refuses to report zero", () => {});
+      });
+    });
+  # Two levels deep, both expressing conditions.
+  - |
+    describe("budget", () => {
+      describe("given a group scope", () => {
+        describe("when the window is empty", () => {
+          it("guards it like an empty scope", () => {});
+        });
+      });
+    });
+invalid:
+  # Nested describe stating a topic rather than a condition.
+  - |
+    describe("csv-serializer", () => {
+      describe("header stripping", () => {
+        it("drops the BOM", () => {});
+      });
+    });
+  # Inner describe names a method, not a condition.
+  - |
+    describe("getAzureBlobToken", () => {
+      describe("invalidateAzureBlobToken", () => {
+        it("clears the cached token", () => {});
+      });
+    });
+  # "should" is not a condition prefix either.
+  - |
+    describe("teardownScan", () => {
+      describe("should reject bare deletes", () => {
+        it("returns a violation", () => {});
+      });
+    });
+  # Deeply nested topic block under a valid `given`.
+  - |
+    describe("stored-objects", () => {
+      describe("given an Azure destination", () => {
+        describe("digest handling", () => {
+          it("asserts the digest independently", () => {});
+        });
+      });
+    });

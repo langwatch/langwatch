@@ -5,11 +5,11 @@ import {
   TABLE_TIME_COLUMNS,
 } from "../facet-registry";
 import { EVALUATOR_DEF, LABEL_DEF, MODEL_DEF } from "./custom-handlers";
-import {
-  type CategoricalRead,
-  type FieldDef,
-  type FieldNeeds,
-  type RangeRead,
+import type {
+  CategoricalRead,
+  FieldDef,
+  FieldNeeds,
+  RangeRead,
 } from "./field-def";
 import { UNSUPPORTED } from "./field-def";
 import {
@@ -33,7 +33,9 @@ function expressionFacet(
   const def = FACET_BY_KEY.get(key);
   if (!def) throw new Error(`facet '${key}' is missing from FACET_REGISTRY`);
   if (!("expression" in def)) {
-    throw new Error(`facet '${key}' has no expression to derive a handler from`);
+    throw new Error(
+      `facet '${key}' has no expression to derive a handler from`,
+    );
   }
   return def;
 }

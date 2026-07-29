@@ -25,7 +25,9 @@ type BatchRunDataResult =
   | { changed: false }
   | { changed: true; runs: ScenarioRun[] };
 
-type FetchBatchRunData = (params: PollForRunParams) => Promise<BatchRunDataResult>;
+type FetchBatchRunData = (
+  params: PollForRunParams,
+) => Promise<BatchRunDataResult>;
 
 export type PollResult =
   | { success: true; scenarioRunId: string }

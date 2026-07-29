@@ -1,11 +1,11 @@
-import type { GroupInfo, QueueSummaryInfo } from "./types";
 import type {
-  QueueRepository,
   BlockedSummary,
   DlqGroupInfo,
   DrainPreview,
   JobEntry,
+  QueueRepository,
 } from "./repositories/queue.repository";
+import type { GroupInfo, QueueSummaryInfo } from "./types";
 
 export class QueueService {
   constructor(readonly repo: QueueRepository) {}
@@ -31,7 +31,12 @@ export class QueueService {
     });
     const queue = queues[0];
     if (!queue) {
-      return { groups: [], total: 0, page: params.page, pageSize: params.pageSize };
+      return {
+        groups: [],
+        total: 0,
+        page: params.page,
+        pageSize: params.pageSize,
+      };
     }
 
     // Groups are loaded in full then sliced — acceptable for typical queue
@@ -111,9 +116,7 @@ export class QueueService {
 
     for (const queueName of queueNames) {
       const groups = await this.repo.listDlqGroups({ queueName });
-      const displayName = queueName
-        .replace(/:gq$/, "")
-        .replace(/^.*:/, "");
+      const displayName = queueName.replace(/:gq$/, "").replace(/^.*:/, "");
       for (const group of groups) {
         allGroups.push({
           queueName,
@@ -169,9 +172,7 @@ export class QueueService {
     return this.repo.retryBlocked(params);
   }
 
-  async listPausedKeys(params: {
-    queueName: string;
-  }): Promise<string[]> {
+  async listPausedKeys(params: { queueName: string }): Promise<string[]> {
     return this.repo.listPausedKeys(params);
   }
 
@@ -189,9 +190,7 @@ export class QueueService {
     return this.repo.unpauseTenant(params);
   }
 
-  async listPausedTenants(params: {
-    queueName: string;
-  }): Promise<string[]> {
+  async listPausedTenants(params: { queueName: string }): Promise<string[]> {
     return this.repo.listPausedTenants(params);
   }
 
@@ -249,9 +248,7 @@ export class QueueService {
     return this.repo.canaryUnblock(params);
   }
 
-  async listDlqGroups(params: {
-    queueName: string;
-  }): Promise<DlqGroupInfo[]> {
+  async listDlqGroups(params: { queueName: string }): Promise<DlqGroupInfo[]> {
     return this.repo.listDlqGroups(params);
   }
 

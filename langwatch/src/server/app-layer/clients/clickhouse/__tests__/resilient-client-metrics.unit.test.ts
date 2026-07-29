@@ -1,13 +1,15 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { ClickHouseClient } from "@clickhouse/client";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock the metrics module to spy on calls
 const mockObserveQueryDuration = vi.fn();
 const mockIncrementQueryCount = vi.fn();
 
 vi.mock("~/server/clickhouse/metrics", () => ({
-  observeClickHouseQueryDuration: (...args: any[]) => mockObserveQueryDuration(...args),
-  incrementClickHouseQueryCount: (...args: any[]) => mockIncrementQueryCount(...args),
+  observeClickHouseQueryDuration: (...args: any[]) =>
+    mockObserveQueryDuration(...args),
+  incrementClickHouseQueryCount: (...args: any[]) =>
+    mockIncrementQueryCount(...args),
 }));
 
 // Must import after mock setup
@@ -55,7 +57,10 @@ describe("createResilientClickHouseClient()", () => {
 
     it("extracts table name from params when available", async () => {
       const wrapper = createResilientClickHouseClient({ client: mockClient });
-      await wrapper.query({ query: "SELECT * FROM traces", table: "traces" } as any);
+      await wrapper.query({
+        query: "SELECT * FROM traces",
+        table: "traces",
+      } as any);
 
       expect(mockObserveQueryDuration).toHaveBeenCalledWith(
         "SELECT",
@@ -118,7 +123,10 @@ describe("createResilientClickHouseClient()", () => {
     });
 
     it("records INSERT error metrics", async () => {
-      const wrapper = createResilientClickHouseClient({ client: mockClient, maxRetries: 0 });
+      const wrapper = createResilientClickHouseClient({
+        client: mockClient,
+        maxRetries: 0,
+      });
       await expect(
         wrapper.insert({ table: "events", values: [] } as any),
       ).rejects.toThrow("Permanent failure");
@@ -136,27 +144,33 @@ describe("createResilientClickHouseClient()", () => {
     const transientCases = [
       {
         label: "TOO_MANY_SIMULTANEOUS_QUERIES (overload, message-only)",
-        message: "Code: 202. DB::Exception: Too many simultaneous queries. Maximum: 100.",
+        message:
+          "Code: 202. DB::Exception: Too many simultaneous queries. Maximum: 100.",
       },
       {
         label: "MEMORY_LIMIT_EXCEEDED (overload, message-only)",
-        message: "Code: 241. DB::Exception: Memory limit (for query) exceeded: would use 3.5 GiB (MEMORY_LIMIT_EXCEEDED)",
+        message:
+          "Code: 241. DB::Exception: Memory limit (for query) exceeded: would use 3.5 GiB (MEMORY_LIMIT_EXCEEDED)",
       },
       {
         label: "QUERY_WAS_CANCELLED (CH replica graceful shutdown)",
-        message: "Code: 394. DB::Exception: Query was cancelled. (QUERY_WAS_CANCELLED)",
+        message:
+          "Code: 394. DB::Exception: Query was cancelled. (QUERY_WAS_CANCELLED)",
       },
       {
         label: "TABLE_IS_READ_ONLY (ZK session lost)",
-        message: "Code: 242. DB::Exception: Table is in readonly mode (replica path: /clickhouse/tables/...)",
+        message:
+          "Code: 242. DB::Exception: Table is in readonly mode (replica path: /clickhouse/tables/...)",
       },
       {
         label: "KEEPER_EXCEPTION Session expired",
-        message: "Code: 999. Coordination::Exception: Session expired. (KEEPER_EXCEPTION)",
+        message:
+          "Code: 999. Coordination::Exception: Session expired. (KEEPER_EXCEPTION)",
       },
       {
         label: "KEEPER_EXCEPTION Connection loss",
-        message: "Code: 999. Coordination::Exception: Coordination error: Connection loss.",
+        message:
+          "Code: 999. Coordination::Exception: Coordination error: Connection loss.",
       },
     ] as const;
 
@@ -181,7 +195,10 @@ describe("createResilientClickHouseClient()", () => {
         await wrapper.insert({ table: "events", values: [] } as any);
 
         expect(insert).toHaveBeenCalledTimes(2);
-        expect(mockIncrementQueryCount).toHaveBeenCalledWith("INSERT", "success");
+        expect(mockIncrementQueryCount).toHaveBeenCalledWith(
+          "INSERT",
+          "success",
+        );
       });
     }
   });

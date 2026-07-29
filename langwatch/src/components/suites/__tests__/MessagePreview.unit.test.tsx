@@ -24,7 +24,9 @@ describe("<MessagePreview/>", () => {
 
   describe("when messages array is empty", () => {
     it("renders skeleton placeholders", () => {
-      const { container } = render(<MessagePreview messages={[]} />, { wrapper: Wrapper });
+      const { container } = render(<MessagePreview messages={[]} />, {
+        wrapper: Wrapper,
+      });
 
       // Should render shimmer skeletons, not "No messages" text
       expect(screen.queryByText("No messages")).not.toBeInTheDocument();
@@ -50,15 +52,16 @@ describe("<MessagePreview/>", () => {
         {
           id: "msg_1",
           role: "assistant",
-          content: [{ type: "text", text: "First part" }, { type: "text", text: "Second part" }],
+          content: [
+            { type: "text", text: "First part" },
+            { type: "text", text: "Second part" },
+          ],
         },
       ] as unknown as Messages;
 
       render(<MessagePreview messages={messages} />, { wrapper: Wrapper });
 
-      expect(
-        screen.getByText("First part Second part"),
-      ).toBeInTheDocument();
+      expect(screen.getByText("First part Second part")).toBeInTheDocument();
     });
   });
 

@@ -8,12 +8,12 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { HelpCircle, Plus } from "react-feather";
 import {
   CADENCE_LABELS,
   CADENCE_WINDOW_MS,
   type NotificationCadence,
 } from "@langwatch/automations/cadences";
+import { HelpCircle, Plus } from "react-feather";
 import { Tooltip } from "~/components/ui/tooltip";
 import {
   OPERATOR_LABELS,
@@ -26,8 +26,7 @@ import { formatTimeAgo } from "~/utils/formatTimeAgo";
 
 type EnhancedTrigger = RouterOutputs["automation"]["getTriggers"][number];
 type TriggerStats = RouterOutputs["automation"]["getTriggerStats"][number];
-type ReportSchedule =
-  RouterOutputs["automation"]["getReportSchedules"][number];
+type ReportSchedule = RouterOutputs["automation"]["getReportSchedules"][number];
 
 /** Column header with a help tooltip explaining the metric. */
 export function MetricHeader({ label, help }: { label: string; help: string }) {
@@ -60,9 +59,7 @@ function DigestScheduleHint({
   const windowMs = CADENCE_WINDOW_MS[cadence as NotificationCadence] ?? 0;
   if (!active || windowMs <= 0) return null;
 
-  const dueAt = lastFiredAt
-    ? new Date(lastFiredAt).getTime() + windowMs
-    : null;
+  const dueAt = lastFiredAt ? new Date(lastFiredAt).getTime() + windowMs : null;
   const now = Date.now();
   const label =
     dueAt && dueAt > now

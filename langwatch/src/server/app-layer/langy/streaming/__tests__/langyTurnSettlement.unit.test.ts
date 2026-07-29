@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
 import { LANGY_CONVERSATION_STATUS } from "@langwatch/langy";
+import { describe, expect, it } from "vitest";
 import { decideSyntheticTerminal } from "../langyTurnSettlement";
 
 describe("decideSyntheticTerminal", () => {

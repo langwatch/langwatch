@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { RoleNotFoundError, RoleReservedNameError } from "../errors";
 import { RoleService } from "../role.service";
-import { RoleReservedNameError, RoleNotFoundError } from "../errors";
 
 function buildMockPrisma() {
   return {
@@ -44,17 +44,25 @@ describe("RoleService", () => {
     describe("when role is system_api_key kind", () => {
       it("throws RoleNotFoundError", async () => {
         prisma.customRole.findUnique.mockResolvedValue({
-          id: "cr_1", name: "apikey:ak_1", kind: "system_api_key", permissions: [],
+          id: "cr_1",
+          name: "apikey:ak_1",
+          kind: "system_api_key",
+          permissions: [],
         });
 
-        await expect(service.getRoleById("cr_1")).rejects.toThrow(RoleNotFoundError);
+        await expect(service.getRoleById("cr_1")).rejects.toThrow(
+          RoleNotFoundError,
+        );
       });
     });
 
     describe("when role is custom kind", () => {
       it("returns the role", async () => {
         prisma.customRole.findUnique.mockResolvedValue({
-          id: "cr_1", name: "Engineer", kind: "custom", permissions: ["traces:view"],
+          id: "cr_1",
+          name: "Engineer",
+          kind: "custom",
+          permissions: ["traces:view"],
         });
 
         const result = await service.getRoleById("cr_1");
@@ -67,7 +75,10 @@ describe("RoleService", () => {
     describe("when target role is system_api_key kind", () => {
       it("throws RoleNotFoundError", async () => {
         prisma.customRole.findUnique.mockResolvedValue({
-          id: "cr_1", name: "apikey:ak_1", kind: "system_api_key", permissions: [],
+          id: "cr_1",
+          name: "apikey:ak_1",
+          kind: "system_api_key",
+          permissions: [],
         });
 
         await expect(
@@ -91,11 +102,16 @@ describe("RoleService", () => {
     describe("when target role is system_api_key kind", () => {
       it("throws RoleNotFoundError", async () => {
         prisma.customRole.findUnique.mockResolvedValue({
-          id: "cr_1", name: "apikey:ak_1", kind: "system_api_key",
-          permissions: [], assignedUsers: [],
+          id: "cr_1",
+          name: "apikey:ak_1",
+          kind: "system_api_key",
+          permissions: [],
+          assignedUsers: [],
         });
 
-        await expect(service.deleteRole("cr_1")).rejects.toThrow(RoleNotFoundError);
+        await expect(service.deleteRole("cr_1")).rejects.toThrow(
+          RoleNotFoundError,
+        );
 
         expect(prisma.customRole.delete).not.toHaveBeenCalled();
       });
@@ -106,8 +122,11 @@ describe("RoleService", () => {
     describe("when target role is system_api_key kind", () => {
       it("throws RoleNotFoundError", async () => {
         prisma.customRole.findUnique.mockResolvedValueOnce({
-          id: "cr_1", name: "apikey:ak_1", kind: "system_api_key",
-          organizationId: "org_1", permissions: [],
+          id: "cr_1",
+          name: "apikey:ak_1",
+          kind: "system_api_key",
+          organizationId: "org_1",
+          permissions: [],
         });
 
         await expect(

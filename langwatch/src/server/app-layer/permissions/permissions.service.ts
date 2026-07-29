@@ -3,7 +3,10 @@ import { OrganizationUserRole } from "@prisma/client";
 import type { Permission } from "~/server/api/rbac";
 import { resolveProjectPermission } from "~/server/api/rbac";
 import type { Session } from "~/server/auth";
-import { LiteMemberRestrictedError } from "./errors";
+import {
+  LiteMemberRestrictedError,
+  ProjectPermissionDeniedError,
+} from "./errors";
 
 /**
  * Service responsible for project-level permission enforcement.
@@ -18,8 +21,10 @@ export class PermissionsService {
    * Asserts that a user holds the given permission on a project.
    *
    * Throws {@link LiteMemberRestrictedError} when the denial is caused by the
-   * user being a Lite Member (EXTERNAL org role). Throws a plain `Error` for
-   * all other denials (not a member, or member without the permission).
+   * user being a Lite Member (EXTERNAL org role), and
+   * {@link ProjectPermissionDeniedError} for every other denial (not a member,
+   * or a member whose role does not carry the permission). Both are handled
+   * errors carrying a code — callers must never tell them apart by message.
    *
    * @param params.userId     - The authenticated user's ID.
    * @param params.projectId  - The project being accessed.
@@ -50,9 +55,11 @@ export class PermissionsService {
 
     if (!permitted) {
       if (organizationRole === OrganizationUserRole.EXTERNAL) {
-        throw new LiteMemberRestrictedError(permission.split(":")[0] ?? "unknown");
+        throw new LiteMemberRestrictedError(
+          permission.split(":")[0] ?? "unknown",
+        );
       }
-      throw new Error("You do not have permission to access this project resource");
+      throw new ProjectPermissionDeniedError(permission);
     }
   }
 }

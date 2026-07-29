@@ -40,9 +40,7 @@ beforeAll(async () => {
       res.end("ok");
     }
   });
-  await new Promise<void>((resolve) =>
-    server.listen(0, "127.0.0.1", resolve),
-  );
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const address = server.address();
   if (typeof address === "string" || address === null) {
     throw new Error("expected an AddressInfo");
@@ -91,7 +89,10 @@ describe("sendHttpDestination with a strict validator", () => {
 
   describe("when the endpoint answers 2xx", () => {
     it("delivers normally through the strict path", async () => {
-      await expect(send("/ok")).resolves.toMatchObject({ status: 200, body: "ok" });
+      await expect(send("/ok")).resolves.toMatchObject({
+        status: 200,
+        body: "ok",
+      });
     });
   });
 });

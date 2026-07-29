@@ -2,11 +2,16 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { FormProvider, useForm, useFormContext } from "react-hook-form";
 import { afterEach, describe, expect, it } from "vitest";
-import { cleanup } from "@testing-library/react";
 import type { PromptConfigFormValues } from "~/prompts/types";
 import { RuntimeParametersField } from "../RuntimeParametersField";
 

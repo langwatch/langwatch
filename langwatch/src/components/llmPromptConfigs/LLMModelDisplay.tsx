@@ -2,9 +2,9 @@ import { Box, HStack, type StackProps, Text, VStack } from "@chakra-ui/react";
 import { AlertTriangle } from "lucide-react";
 
 import { modelProviderIcons } from "~/server/modelProviders/iconsMap";
-import { Tooltip } from "../ui/tooltip";
 import { allModelOptions, useModelSelectionOptions } from "../ModelSelector";
 import { OverflownTextWithTooltip } from "../OverflownText";
+import { Tooltip } from "../ui/tooltip";
 import { MODEL_ICON_SIZE } from "./constants";
 
 export interface LLMModelDisplayProps extends StackProps {
@@ -25,11 +25,8 @@ export function LLMModelDisplay({
   subtitle,
   ...props
 }: LLMModelDisplayProps) {
-  const { modelOption, groupedByProvider, isLoading } = useModelSelectionOptions(
-    allModelOptions,
-    model,
-    "chat",
-  );
+  const { modelOption, groupedByProvider, isLoading } =
+    useModelSelectionOptions(allModelOptions, model, "chat");
 
   // Model is disabled if explicitly marked or if provider is disabled
   const isDisabled = modelOption?.isDisabled ?? false;

@@ -1,10 +1,11 @@
 /**
  * @vitest-environment node
  */
-import { describe, it, expect } from "vitest";
+
 import type { Edge } from "@xyflow/react";
+import { describe, expect, it } from "vitest";
 import type { Field } from "../../types/dsl";
-import { buildInputMappings, applyMappingChange } from "../edgeMappingUtils";
+import { applyMappingChange, buildInputMappings } from "../edgeMappingUtils";
 
 const createEdge = ({
   source,
@@ -182,9 +183,7 @@ describe("edgeMappingUtils", () => {
           targetHandle: "inputs.query",
           type: "default",
         });
-        expect(result.inputs).toEqual([
-          { identifier: "query", type: "str" },
-        ]);
+        expect(result.inputs).toEqual([{ identifier: "query", type: "str" }]);
       });
 
       it("removes a previous edge for the same input", () => {
@@ -196,9 +195,7 @@ describe("edgeMappingUtils", () => {
             targetField: "query",
           }),
         ];
-        const currentInputs: Field[] = [
-          createField({ identifier: "query" }),
-        ];
+        const currentInputs: Field[] = [createField({ identifier: "query" })];
 
         const result = applyMappingChange({
           nodeId: "node_b",
@@ -230,9 +227,7 @@ describe("edgeMappingUtils", () => {
             targetField: "query",
           }),
         ];
-        const currentInputs: Field[] = [
-          createField({ identifier: "query" }),
-        ];
+        const currentInputs: Field[] = [createField({ identifier: "query" })];
 
         const result = applyMappingChange({
           nodeId: "node_b",
@@ -272,9 +267,7 @@ describe("edgeMappingUtils", () => {
         });
 
         expect(result.edges).toHaveLength(0);
-        expect(result.inputs).toEqual([
-          { identifier: "query", type: "str" },
-        ]);
+        expect(result.inputs).toEqual([{ identifier: "query", type: "str" }]);
       });
     });
   });

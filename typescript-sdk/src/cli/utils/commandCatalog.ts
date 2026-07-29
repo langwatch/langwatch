@@ -66,6 +66,10 @@ export const PLUMBING_COMMANDS: ReadonlySet<string> = new Set([
   "config",
   // Browser openers / local shell helpers.
   "open",
+  // Agent-only signal: `navigate open <id>` prints the resource id for the
+  // control-plane relay to intercept and move the user's browser — it fetches
+  // no platform data and returns no result of its own.
+  "navigate",
   "init-shell",
   "request-increase",
   // Local status + documentation fetchers.

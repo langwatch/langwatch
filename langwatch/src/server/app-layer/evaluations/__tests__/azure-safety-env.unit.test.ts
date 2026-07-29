@@ -79,8 +79,7 @@ describe("getAzureSafetyEnvFromProject", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Pollute process.env to prove we don't fall back to it
-    process.env.AZURE_CONTENT_SAFETY_ENDPOINT =
-      "https://shared.example.com/";
+    process.env.AZURE_CONTENT_SAFETY_ENDPOINT = "https://shared.example.com/";
     process.env.AZURE_CONTENT_SAFETY_KEY = "shared-key";
   });
 
@@ -222,7 +221,8 @@ describe("getAzureSafetyEnvFromProject", () => {
       });
 
       it("does not use process.env as a fallback when keys differ", async () => {
-        process.env.AZURE_CONTENT_SAFETY_ENDPOINT = "https://fallback.example.com/";
+        process.env.AZURE_CONTENT_SAFETY_ENDPOINT =
+          "https://fallback.example.com/";
         process.env.AZURE_CONTENT_SAFETY_KEY = "fallback-key";
 
         getProjectModelProvidersMock.mockResolvedValue({

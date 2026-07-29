@@ -7,19 +7,19 @@
  * renders through the resource-result card / staged proposal instead.)
  */
 import { Text, VStack } from "@chakra-ui/react";
+import { asJsonDocument } from "@langwatch/langy";
 import { useCapabilityData } from "../../hooks/useCapabilityData";
 import {
+  type CapabilityCardInput,
   extractPrimaryId,
   extractToolText,
-  type CapabilityCardInput,
 } from "./capabilityRegistry";
+import { collectionOf, totalOf } from "./cliResultDocument";
 import {
   CapabilityRow,
   CapabilityRowSkeletons,
   LangyCapabilityCard,
 } from "./LangyCapabilityCard";
-import { asJsonDocument } from "@langwatch/langy";
-import { collectionOf, totalOf } from "./cliResultDocument";
 
 function parseDataset(output: unknown): {
   count: number | null;

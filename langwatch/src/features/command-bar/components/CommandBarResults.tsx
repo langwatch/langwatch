@@ -214,11 +214,7 @@ export const CommandBarResults = forwardRef<
     if (query === "") {
       return askGroup ? [askGroup, ...emptyQueryGroups] : emptyQueryGroups;
     }
-    return [
-      ...queryGroups,
-      ...(askGroup ? [askGroup] : []),
-      ...fallbackGroups,
-    ];
+    return [...queryGroups, ...(askGroup ? [askGroup] : []), ...fallbackGroups];
   }, [query, emptyQueryGroups, queryGroups, askLangyItem, fallbackGroups]);
 
   // Render groups with running index calculation

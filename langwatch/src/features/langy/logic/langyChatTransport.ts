@@ -1,12 +1,11 @@
-import type { ChatTransport, UIMessage, UIMessageChunk } from "ai";
 import type { Unsubscribable } from "@trpc/server/observable";
-
-import { trpcClient } from "~/utils/api";
-import type { LangyStreamEntry } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
+import type { ChatTransport, UIMessage, UIMessageChunk } from "ai";
 import type {
   LangyResourceContext,
   LangySkillContext,
 } from "~/server/app-layer/langy/langyTurnContext.schema";
+import type { LangyStreamEntry } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
+import { trpcClient } from "~/utils/api";
 
 /**
  * The per-turn request inputs the transport owns. Sourcing them HERE (from the
@@ -48,6 +47,12 @@ export interface LangyChatTransportDeps {
   onIds: (ids: { conversationId: string; turnId: string }) => void;
   /** Push a status/progress/milestone signal (drives StreamingStatusLine via the store). */
   onSignal: (signal: LangyTurnSignalEntry) => void;
+  /**
+   * Forward a live-only navigate instruction, bare passthrough — dedup (the
+   * stream carries no entry id) and routing live in the panel, which alone
+   * holds both the router and the active turn id the dedup key needs.
+   */
+  onNavigate?: (entry: Extract<LangyStreamEntry, { type: "navigate" }>) => void;
   /** Fired when a turn stream terminates — the reconcile trigger. */
   onTurnSettled?: (info: { reason: LangyTurnSettleReason }) => void;
   /**
@@ -141,6 +146,7 @@ export function createLangyChatTransport(
         conversationId,
         turnId,
         onSignal: deps.onSignal,
+        ...(deps.onNavigate ? { onNavigate: deps.onNavigate } : {}),
         onSettled: deps.onTurnSettled,
         ...(deps.onWireEntry ? { onWireEntry: deps.onWireEntry } : {}),
         abortSignal: options.abortSignal,
@@ -165,6 +171,7 @@ function subscribeTurnStream({
   conversationId,
   turnId,
   onSignal,
+  onNavigate,
   onSettled,
   onWireEntry,
   abortSignal,
@@ -173,6 +180,7 @@ function subscribeTurnStream({
   conversationId: string;
   turnId: string;
   onSignal: (signal: LangyTurnSignalEntry) => void;
+  onNavigate?: (entry: Extract<LangyStreamEntry, { type: "navigate" }>) => void;
   onSettled?: (info: { reason: LangyTurnSettleReason }) => void;
   onWireEntry?: (entry: LangyStreamEntry, turnId: string) => void;
   abortSignal?: AbortSignal;
@@ -243,6 +251,11 @@ function subscribeTurnStream({
           case "progress":
           case "milestone":
             onSignal(entry);
+            return;
+          case "navigate":
+            // Not a message part, not a signal the status line renders — a
+            // one-shot action. Bare passthrough; the panel owns dedup + routing.
+            onNavigate?.(entry);
             return;
           case "error":
             controller.enqueue({ type: "error", errorText: entry.error });

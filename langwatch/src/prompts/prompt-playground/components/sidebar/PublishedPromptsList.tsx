@@ -84,44 +84,46 @@ export function PublishedPromptsList() {
                 handle: prompt.handle,
               })}
             >
-            <Sidebar.Item
-              icon={
-                modelProviderIcons[
-                  prompt.model?.split("/")[0] as keyof typeof modelProviderIcons
-                ]
-              }
-              onClick={() => {
-                const defaultValues = computeInitialFormValuesForPrompt({
-                  prompt,
-                  defaultModel: resolvedDefault.data?.model ?? "",
-                  useSystemMessage: true,
-                });
-                addTab({
-                  data: {
-                    chat: {
-                      initialMessagesFromSpanData: [],
+              <Sidebar.Item
+                icon={
+                  modelProviderIcons[
+                    prompt.model?.split(
+                      "/",
+                    )[0] as keyof typeof modelProviderIcons
+                  ]
+                }
+                onClick={() => {
+                  const defaultValues = computeInitialFormValuesForPrompt({
+                    prompt,
+                    defaultModel: resolvedDefault.data?.model ?? "",
+                    useSystemMessage: true,
+                  });
+                  addTab({
+                    data: {
+                      chat: {
+                        initialMessagesFromSpanData: [],
+                      },
+                      form: {
+                        currentValues: defaultValues,
+                      },
+                      meta: {
+                        title: defaultValues.handle ?? null,
+                        versionNumber:
+                          defaultValues.versionMetadata?.versionNumber,
+                      },
+                      variableValues: {},
                     },
-                    form: {
-                      currentValues: defaultValues,
-                    },
-                    meta: {
-                      title: defaultValues.handle ?? null,
-                      versionNumber:
-                        defaultValues.versionMetadata?.versionNumber,
-                    },
-                    variableValues: {},
-                  },
-                });
-              }}
-              paddingY={1}
-              paddingLeft={2}
-            >
-              <PublishedPromptContent
-                promptId={prompt.id}
-                promptHandle={prompt.handle}
-                prompt={prompt}
-              />
-            </Sidebar.Item>
+                  });
+                }}
+                paddingY={1}
+                paddingLeft={2}
+              >
+                <PublishedPromptContent
+                  promptId={prompt.id}
+                  promptHandle={prompt.handle}
+                  prompt={prompt}
+                />
+              </Sidebar.Item>
             </LangyContextTarget>
           ))}
         </Sidebar.List>

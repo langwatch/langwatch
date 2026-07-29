@@ -26,9 +26,7 @@ const payloadSchema = z.object({
 function createMockCommandHandlerClass(
   name: string,
 ): CommandHandlerClass<any, CommandType, Event> {
-  class MockCommandHandler
-    implements CommandHandler<Command<any, any>, Event>
-  {
+  class MockCommandHandler implements CommandHandler<Command<any, any>, Event> {
     static readonly schema = defineCommandSchema(
       `test.command.${name}` as CommandType,
       payloadSchema,
@@ -120,9 +118,7 @@ describe("QueueManager.initializeCommandQueues with getGroupKey", () => {
         "test-pipeline",
       );
 
-      const entry = globalJobRegistry.get(
-        "test-pipeline:command:recordResult",
-      );
+      const entry = globalJobRegistry.get("test-pipeline:command:recordResult");
       expect(entry?.groupKeyFn).toBeDefined();
 
       const payload = {
@@ -174,7 +170,9 @@ describe("QueueManager.initializeCommandQueues with getGroupKey", () => {
       };
 
       const groupKey = entry?.groupKeyFn(payload);
-      expect(groupKey).toBe(`${tenantId}/command/startRun/${aggregateType}:exp1:run1`);
+      expect(groupKey).toBe(
+        `${tenantId}/command/startRun/${aggregateType}:exp1:run1`,
+      );
     });
   });
 
@@ -190,8 +188,7 @@ describe("QueueManager.initializeCommandQueues with getGroupKey", () => {
         globalJobRegistry,
       });
 
-      const optionsGroupKey = (payload: any) =>
-        `custom:${payload.aggregateId}`;
+      const optionsGroupKey = (payload: any) => `custom:${payload.aggregateId}`;
 
       manager.initializeCommandQueues(
         [
@@ -206,9 +203,7 @@ describe("QueueManager.initializeCommandQueues with getGroupKey", () => {
         "test-pipeline",
       );
 
-      const entry = globalJobRegistry.get(
-        "test-pipeline:command:recordResult",
-      );
+      const entry = globalJobRegistry.get("test-pipeline:command:recordResult");
 
       const payload = {
         tenantId: String(tenantId),
@@ -220,7 +215,9 @@ describe("QueueManager.initializeCommandQueues with getGroupKey", () => {
       };
 
       const groupKey = entry?.groupKeyFn(payload);
-      expect(groupKey).toBe(`${tenantId}/command/recordResult/${aggregateType}:custom:exp1:run1`);
+      expect(groupKey).toBe(
+        `${tenantId}/command/recordResult/${aggregateType}:custom:exp1:run1`,
+      );
     });
   });
 });

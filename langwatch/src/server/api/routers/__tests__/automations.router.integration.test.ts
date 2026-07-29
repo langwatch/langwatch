@@ -452,9 +452,9 @@ describe("automationRouter", () => {
       it("routes the update through the SSOT builder shape", async () => {
         mockCustomGraphFindUnique.mockResolvedValueOnce({ id: "graph_1" });
         mockTriggerUpdate.mockResolvedValueOnce({
-            id: "trigger-1",
-            action: TriggerAction.SEND_SLACK_MESSAGE,
-          });
+          id: "trigger-1",
+          action: TriggerAction.SEND_SLACK_MESSAGE,
+        });
 
         await caller.upsert({
           ...baseGraphAlertInput,
@@ -625,9 +625,9 @@ describe("automationRouter", () => {
     describe("on create", () => {
       it("persists a REPORT row and syncs the calendar schedule", async () => {
         mockTriggerCreate.mockResolvedValueOnce({
-            id: "report_trig",
-            action: TriggerAction.SEND_SLACK_MESSAGE,
-          });
+          id: "report_trig",
+          action: TriggerAction.SEND_SLACK_MESSAGE,
+        });
 
         await caller.upsert(baseReportInput as any);
 
@@ -655,10 +655,25 @@ describe("automationRouter", () => {
       // left a live report with no calendar entry that could never fire.
       it.each([
         { name: "a malformed cron", cron: "every monday", timezone: "UTC" },
-        { name: "a seconds-granularity cron", cron: "* * * * * *", timezone: "UTC" },
-        { name: "a cron that sends every minute", cron: "* * * * *", timezone: "UTC" },
-        { name: "an unknown timezone", cron: "0 9 * * 1", timezone: "Mars/Olympus" },
-      ])("rejects $name before anything is written", async ({ cron, timezone }) => {
+        {
+          name: "a seconds-granularity cron",
+          cron: "* * * * * *",
+          timezone: "UTC",
+        },
+        {
+          name: "a cron that sends every minute",
+          cron: "* * * * *",
+          timezone: "UTC",
+        },
+        {
+          name: "an unknown timezone",
+          cron: "0 9 * * 1",
+          timezone: "Mars/Olympus",
+        },
+      ])("rejects $name before anything is written", async ({
+        cron,
+        timezone,
+      }) => {
         await expect(
           caller.upsert({
             ...baseReportInput,
@@ -850,9 +865,7 @@ describe("automationRouter", () => {
                 : [{ triggerId: "trigger_1", _count: { _all: 4 } }],
             ),
         );
-        mockTriggerSentFindMany.mockResolvedValue([
-          { triggerId: "trigger_1" },
-        ]);
+        mockTriggerSentFindMany.mockResolvedValue([{ triggerId: "trigger_1" }]);
       });
 
       it("scopes every fire-history read to the calling project", async () => {

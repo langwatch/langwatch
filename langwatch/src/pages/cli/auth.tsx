@@ -33,15 +33,15 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import Head from "~/utils/compat/next-head";
-import { useRouter } from "~/utils/compat/next-router";
-
-import { useSession } from "~/utils/auth-client";
-import { setAttributionIfAbsent } from "~/utils/attribution";
+import { ScopeChipPicker } from "~/components/settings/ScopeChipPicker";
 import { OnboardingContainer } from "~/features/onboarding/components/containers/OnboardingContainer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { setAttributionIfAbsent } from "~/utils/attribution";
+import { useSession } from "~/utils/auth-client";
+import Head from "~/utils/compat/next-head";
+import { useRouter } from "~/utils/compat/next-router";
 import { resolveCliAuthProjects } from "./cliAuthProjects";
-import { ScopeChipPicker } from "~/components/settings/ScopeChipPicker";
+import { FirstTraceRedirect } from "./FirstTraceRedirect";
 
 /**
  * Credential the CLI is requesting.
@@ -139,9 +139,11 @@ function StatusCard({
 export default function CliAuthPage() {
   const router = useRouter();
   const { data: session, status: sessionStatus } = useSession();
-  const { organizations, project: currentProject } = useOrganizationTeamProject({
-    redirectToOnboarding: false,
-  });
+  const { organizations, project: currentProject } = useOrganizationTeamProject(
+    {
+      redirectToOnboarding: false,
+    },
+  );
 
   // router.query values can legitimately be string | string[] | undefined
   // (Next.js parses repeated query keys as arrays). The CLI always emits a
@@ -224,7 +226,9 @@ export default function CliAuthPage() {
     if (sessionStatus === "loading") return;
     if (!session && userCode) {
       const callbackUrl = `/cli/auth?user_code=${encodeURIComponent(userCode)}`;
-      void router.replace(`/auth/signin?callbackUrl=${encodeURIComponent(callbackUrl)}`);
+      void router.replace(
+        `/auth/signin?callbackUrl=${encodeURIComponent(callbackUrl)}`,
+      );
     }
   }, [session, sessionStatus, userCode, router]);
 
@@ -367,9 +371,14 @@ export default function CliAuthPage() {
 
   const expiryText = useMemo(() => {
     if (lookup.kind !== "ready") return null;
-    const seconds = Math.max(0, Math.round((lookup.expiresAt - Date.now()) / 1000));
+    const seconds = Math.max(
+      0,
+      Math.round((lookup.expiresAt - Date.now()) / 1000),
+    );
     const minutes = Math.floor(seconds / 60);
-    return minutes > 0 ? `Expires in ~${minutes} min` : `Expires in ${seconds}s`;
+    return minutes > 0
+      ? `Expires in ~${minutes} min`
+      : `Expires in ${seconds}s`;
   }, [lookup]);
 
   if (sessionStatus === "loading" || (!session && userCode)) {
@@ -395,240 +404,240 @@ export default function CliAuthPage() {
         showBackButton={false}
         isLogoInside
       >
-            <VStack align="stretch" gap={6}>
-              {!userCode && (
-                <StatusCard
-                  palette="orange"
-                  icon={CircleAlert}
-                  title="No code provided"
+        <VStack align="stretch" gap={6}>
+          {!userCode && (
+            <StatusCard
+              palette="orange"
+              icon={CircleAlert}
+              title="No code provided"
+            >
+              Run <code>langwatch login</code> in your terminal, it will print a
+              link with your code embedded.
+            </StatusCard>
+          )}
+
+          {userCode && lookup.kind === "loading" && (
+            <HStack>
+              <Spinner size="sm" />
+              <Text textStyle="sm" color="fg.muted">
+                Looking up code…
+              </Text>
+            </HStack>
+          )}
+
+          {lookup.kind === "expired" && (
+            <>
+              <StatusCard palette="orange" icon={Clock3} title="Code expired">
+                Restart <code>langwatch login</code> in your terminal to get a
+                new code.
+              </StatusCard>
+            </>
+          )}
+
+          {lookup.kind === "error" && (
+            <>
+              <StatusCard
+                palette="red"
+                icon={TriangleAlert}
+                title="Something went wrong"
+              >
+                {lookup.message}
+              </StatusCard>
+            </>
+          )}
+
+          {lookup.kind === "ready" &&
+            action.kind !== "success" &&
+            action.kind !== "denied" && (
+              <>
+                <Text textStyle="sm" color="fg.muted" lineHeight="tall">
+                  {requiresProject
+                    ? "Pick the project to mint a key for; the key will flow back to your terminal automatically, with no copy-paste."
+                    : "Approving signs in this device for AI-tool wrappers (Claude, Codex, etc.) and governance commands."}
+                </Text>
+                <Box
+                  bg="bg.subtle"
+                  borderWidth="1px"
+                  borderColor="border.muted"
+                  borderRadius="lg"
+                  p={4}
+                  fontFamily="mono"
+                  fontSize="2xl"
+                  fontWeight="bold"
+                  textAlign="center"
+                  letterSpacing="0.2em"
+                  color="fg"
                 >
-                  Run <code>langwatch login</code> in your terminal, it will
-                  print a link with your code embedded.
-                </StatusCard>
-              )}
+                  {lookup.userCode}
+                </Box>
+                <Text textStyle="xs" color="fg.muted" textAlign="center">
+                  Confirm this matches the code shown in your terminal.
+                  {expiryText ? (
+                    <>
+                      <br />
+                      {expiryText}.
+                    </>
+                  ) : null}
+                </Text>
 
-              {userCode && lookup.kind === "loading" && (
-                <HStack>
-                  <Spinner size="sm" />
-                  <Text textStyle="sm" color="fg.muted">
-                    Looking up code…
-                  </Text>
-                </HStack>
-              )}
+                {organizations && organizations.length > 1 && (
+                  <Box>
+                    <Text
+                      textStyle="sm"
+                      fontWeight="semibold"
+                      color="fg"
+                      mb={2}
+                    >
+                      Organization
+                    </Text>
+                    <VStack align="stretch" gap={2}>
+                      {organizations.map((org) => (
+                        <Button
+                          key={org.id}
+                          size="sm"
+                          colorPalette={
+                            selectedOrgId === org.id ? "orange" : "gray"
+                          }
+                          variant={
+                            selectedOrgId === org.id ? "surface" : "outline"
+                          }
+                          onClick={() => setSelectedOrgId(org.id)}
+                          justifyContent="flex-start"
+                        >
+                          {org.name}
+                        </Button>
+                      ))}
+                    </VStack>
+                  </Box>
+                )}
 
-              {lookup.kind === "expired" && (
-                <>
-                  <StatusCard
-                    palette="orange"
-                    icon={Clock3}
-                    title="Code expired"
-                  >
-                    Restart <code>langwatch login</code> in your terminal to
-                    get a new code.
-                  </StatusCard>
-                </>
-              )}
+                {requiresProject && (
+                  <Box>
+                    <Text
+                      textStyle="sm"
+                      fontWeight="semibold"
+                      color="fg"
+                      mb={2}
+                    >
+                      Project
+                    </Text>
+                    {projectsForOrg.length === 0 ? (
+                      <StatusCard
+                        palette="orange"
+                        icon={CircleAlert}
+                        title="No shared projects yet"
+                      >
+                        Create a team project in this organization first
+                        (personal projects can&apos;t back an SDK key), then
+                        re-run <code>langwatch login</code> in your terminal.
+                      </StatusCard>
+                    ) : (
+                      <ScopeChipPicker
+                        variant="single-select"
+                        label=""
+                        placeholder="Select a project"
+                        allowedScopeTypes={["PROJECT"]}
+                        organizationId={selectedOrgId ?? undefined}
+                        availableProjects={projectsForOrg}
+                        availableTeams={teamsForOrg}
+                        value={
+                          selectedProjectId
+                            ? [
+                                {
+                                  scopeType: "PROJECT",
+                                  scopeId: selectedProjectId,
+                                },
+                              ]
+                            : []
+                        }
+                        onChange={(next) =>
+                          setSelectedProjectId(next[0]?.scopeId ?? null)
+                        }
+                        showSummary={false}
+                      />
+                    )}
+                  </Box>
+                )}
 
-              {lookup.kind === "error" && (
-                <>
+                {action.kind === "error" && (
                   <StatusCard
                     palette="red"
                     icon={TriangleAlert}
-                    title="Something went wrong"
+                    title="Approval failed"
                   >
-                    {lookup.message}
+                    {action.message}
                   </StatusCard>
-                </>
-              )}
+                )}
 
-              {lookup.kind === "ready" && action.kind !== "success" && action.kind !== "denied" && (
-                <>
-                  <Text textStyle="sm" color="fg.muted" lineHeight="tall">
-                    {requiresProject
-                      ? "Pick the project to mint a key for; the key will flow back to your terminal automatically, with no copy-paste."
-                      : "Approving signs in this device for AI-tool wrappers (Claude, Codex, etc.) and governance commands."}
-                  </Text>
-                  <Box
-                    bg="bg.subtle"
-                    borderWidth="1px"
-                    borderColor="border.muted"
-                    borderRadius="lg"
-                    p={4}
-                    fontFamily="mono"
-                    fontSize="2xl"
-                    fontWeight="bold"
-                    textAlign="center"
-                    letterSpacing="0.2em"
-                    color="fg"
+                <Stack direction={{ base: "column", sm: "row" }} gap={3}>
+                  <Button
+                    colorPalette="orange"
+                    flex={1}
+                    onClick={handleApprove}
+                    loading={action.kind === "submitting"}
+                    disabled={
+                      !selectedOrgId || (requiresProject && !selectedProjectId)
+                    }
                   >
-                    {lookup.userCode}
-                  </Box>
-                  <Text textStyle="xs" color="fg.muted" textAlign="center">
-                    Confirm this matches the code shown in your terminal.
-                    {expiryText ? (
-                      <>
-                        <br />
-                        {expiryText}.
-                      </>
-                    ) : null}
-                  </Text>
+                    {requiresProject ? "Generate API key" : "Approve"}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    color="fg.muted"
+                    borderColor="border.emphasized"
+                    onClick={handleDeny}
+                    loading={action.kind === "submitting"}
+                  >
+                    Deny
+                  </Button>
+                </Stack>
+              </>
+            )}
 
-                  {organizations && organizations.length > 1 && (
-                    <Box>
-                      <Text
-                        textStyle="sm"
-                        fontWeight="semibold"
-                        color="fg"
-                        mb={2}
-                      >
-                        Organization
-                      </Text>
-                      <VStack align="stretch" gap={2}>
-                        {organizations.map((org) => (
-                          <Button
-                            key={org.id}
-                            size="sm"
-                            colorPalette={
-                              selectedOrgId === org.id ? "orange" : "gray"
-                            }
-                            variant={
-                              selectedOrgId === org.id ? "surface" : "outline"
-                            }
-                            onClick={() => setSelectedOrgId(org.id)}
-                            justifyContent="flex-start"
-                          >
-                            {org.name}
-                          </Button>
-                        ))}
-                      </VStack>
-                    </Box>
-                  )}
-
-                  {requiresProject && (
-                    <Box>
-                      <Text
-                        textStyle="sm"
-                        fontWeight="semibold"
-                        color="fg"
-                        mb={2}
-                      >
-                        Project
-                      </Text>
-                      {projectsForOrg.length === 0 ? (
-                        <StatusCard
-                          palette="orange"
-                          icon={CircleAlert}
-                          title="No shared projects yet"
-                        >
-                          Create a team project in this organization first
-                          (personal projects can&apos;t back an SDK key), then
-                          re-run <code>langwatch login</code> in your terminal.
-                        </StatusCard>
-                      ) : (
-                        <ScopeChipPicker
-                          variant="single-select"
-                          label=""
-                          placeholder="Select a project"
-                          allowedScopeTypes={["PROJECT"]}
-                          organizationId={selectedOrgId ?? undefined}
-                          availableProjects={projectsForOrg}
-                          availableTeams={teamsForOrg}
-                          value={
-                            selectedProjectId
-                              ? [
-                                  {
-                                    scopeType: "PROJECT",
-                                    scopeId: selectedProjectId,
-                                  },
-                                ]
-                              : []
-                          }
-                          onChange={(next) =>
-                            setSelectedProjectId(next[0]?.scopeId ?? null)
-                          }
-                          showSummary={false}
-                        />
-                      )}
-                    </Box>
-                  )}
-
-                  {action.kind === "error" && (
-                    <StatusCard
-                      palette="red"
-                      icon={TriangleAlert}
-                      title="Approval failed"
-                    >
-                      {action.message}
-                    </StatusCard>
-                  )}
-
-                  <Stack direction={{ base: "column", sm: "row" }} gap={3}>
-                    <Button
-                      colorPalette="orange"
-                      flex={1}
-                      onClick={handleApprove}
-                      loading={action.kind === "submitting"}
-                      disabled={
-                        !selectedOrgId ||
-                        (requiresProject && !selectedProjectId)
-                      }
-                    >
-                      {requiresProject ? "Generate API key" : "Approve"}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      color="fg.muted"
-                      borderColor="border.emphasized"
-                      onClick={handleDeny}
-                      loading={action.kind === "submitting"}
-                    >
-                      Deny
-                    </Button>
-                  </Stack>
-                </>
-              )}
-
-              {action.kind === "success" && (
-                <>
-                  {action.credentialType === "project_api_key" ? (
-                    <StatusCard
-                      palette="green"
-                      icon={CheckCircle2}
-                      title="API key generated!"
-                    >
-                      A fresh project API key has been minted for{" "}
-                      <strong>{action.projectName ?? "your project"}</strong> (
-                      {action.organizationName}). The key flowed back to your
-                      terminal automatically, and your <code>.env</code> is
-                      updated. You can close this tab.
-                    </StatusCard>
-                  ) : (
-                    <StatusCard
-                      palette="green"
-                      icon={CheckCircle2}
-                      title="You're signed in!"
-                    >
-                      LangWatch CLI is now authorized for{" "}
-                      <strong>{action.organizationName}</strong> using the{" "}
-                      <code>{action.vkLabel}</code> personal key. You can close
-                      this tab and return to your terminal.
-                    </StatusCard>
-                  )}
-                </>
-              )}
-
-              {action.kind === "denied" && (
+          {action.kind === "success" && (
+            <>
+              {action.credentialType === "project_api_key" ? (
+                <StatusCard
+                  palette="green"
+                  icon={CheckCircle2}
+                  title="API key generated!"
+                >
+                  A fresh project API key has been minted for{" "}
+                  <strong>{action.projectName ?? "your project"}</strong> (
+                  {action.organizationName}). The key flowed back to your
+                  terminal automatically, and your <code>.env</code> is updated.
+                  You can close this tab.
+                </StatusCard>
+              ) : (
                 <>
                   <StatusCard
-                    palette="blue"
-                    icon={Info}
-                    title="Authorization denied"
+                    palette="green"
+                    icon={CheckCircle2}
+                    title="You're signed in!"
                   >
-                    The CLI session has been rejected. You can close this tab.
+                    LangWatch CLI is now authorized for{" "}
+                    <strong>{action.organizationName}</strong> using the{" "}
+                    <code>{action.vkLabel}</code> personal key. You can close
+                    this tab and return to your terminal.
                   </StatusCard>
+                  <FirstTraceRedirect />
                 </>
               )}
-            </VStack>
+            </>
+          )}
+
+          {action.kind === "denied" && (
+            <>
+              <StatusCard
+                palette="blue"
+                icon={Info}
+                title="Authorization denied"
+              >
+                The CLI session has been rejected. You can close this tab.
+              </StatusCard>
+            </>
+          )}
+        </VStack>
       </OnboardingContainer>
     </>
   );
@@ -636,7 +645,11 @@ export default function CliAuthPage() {
 
 function FullPageSpinner() {
   return (
-    <OnboardingContainer title="Authorize the LangWatch CLI" loading isLogoInside>
+    <OnboardingContainer
+      title="Authorize the LangWatch CLI"
+      loading
+      isLogoInside
+    >
       {null}
     </OnboardingContainer>
   );

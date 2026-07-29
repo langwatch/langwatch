@@ -4,15 +4,15 @@
  * @see specs/features/suites/cancel-queued-running-jobs.feature
  */
 import { describe, expect, it, vi } from "vitest";
-import {
-  publishCancellation,
-  subscribeToCancellations,
-  CANCELLATION_CHANNEL,
-} from "../cancellation-channel";
 import type {
+  CancellationMessage,
   CancellationPublisher,
   CancellationSubscriber,
-  CancellationMessage,
+} from "../cancellation-channel";
+import {
+  CANCELLATION_CHANNEL,
+  publishCancellation,
+  subscribeToCancellations,
 } from "../cancellation-channel";
 
 function createMockPublisher(): CancellationPublisher {
@@ -83,7 +83,8 @@ describe("subscribeToCancellations", () => {
 
     await subscribeToCancellations({ subscriber, onCancel });
 
-    const handler = (subscriber.on as ReturnType<typeof vi.fn>).mock.calls[0]![1] as (channel: string, raw: string) => void;
+    const handler = (subscriber.on as ReturnType<typeof vi.fn>).mock
+      .calls[0]![1] as (channel: string, raw: string) => void;
     handler("other:channel", JSON.stringify({ scenarioRunId: "run1" }));
 
     expect(onCancel).not.toHaveBeenCalled();
@@ -95,7 +96,8 @@ describe("subscribeToCancellations", () => {
 
     await subscribeToCancellations({ subscriber, onCancel });
 
-    const handler = (subscriber.on as ReturnType<typeof vi.fn>).mock.calls[0]![1] as (channel: string, raw: string) => void;
+    const handler = (subscriber.on as ReturnType<typeof vi.fn>).mock
+      .calls[0]![1] as (channel: string, raw: string) => void;
     handler(CANCELLATION_CHANNEL, "not-json");
 
     expect(onCancel).not.toHaveBeenCalled();
@@ -105,7 +107,10 @@ describe("subscribeToCancellations", () => {
     const subscriber = createMockSubscriber();
     const onCancel = vi.fn();
 
-    const unsubscribe = await subscribeToCancellations({ subscriber, onCancel });
+    const unsubscribe = await subscribeToCancellations({
+      subscriber,
+      onCancel,
+    });
     await unsubscribe();
 
     expect(subscriber.quit).toHaveBeenCalled();

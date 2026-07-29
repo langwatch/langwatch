@@ -30,7 +30,9 @@ const MIXED_GRAPH = {
 };
 
 function makeDeps(graph: unknown) {
-  const findFirst = vi.fn().mockResolvedValue(graph === null ? null : { graph });
+  const findFirst = vi
+    .fn()
+    .mockResolvedValue(graph === null ? null : { graph });
   const prisma = {
     customGraph: { findFirst },
   } as unknown as Parameters<

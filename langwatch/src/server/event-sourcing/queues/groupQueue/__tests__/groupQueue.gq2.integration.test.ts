@@ -251,7 +251,7 @@ describe.skipIf(!hasTestcontainers)("GroupQueueProcessor — GQ2 offload", () =>
             id: "j1",
             groupId: TENANT_GROUP,
             value: "ok",
-            // biome-ignore lint/suspicious/noExplicitAny: testing a runtime guard
+            // Testing a runtime guard.
             __custom: "this would collide on the content hash",
           } as any),
         ).rejects.toThrow(/__custom.*reserved/);
@@ -274,7 +274,7 @@ describe.skipIf(!hasTestcontainers)("GroupQueueProcessor — GQ2 offload", () =>
             __pipelineName: "trace-processing",
             __jobType: "fold",
             __jobName: "recordSpan",
-            // biome-ignore lint/suspicious/noExplicitAny: routing fields aren't on TestPayload
+            // Routing fields aren't on TestPayload.
           } as any),
         ).resolves.toBeUndefined();
       });
@@ -291,7 +291,7 @@ describe.skipIf(!hasTestcontainers)("GroupQueueProcessor — GQ2 offload", () =>
         await expect(
           queue.sendBatch([
             { id: "ok", groupId: TENANT_GROUP, value: "ok" },
-            // biome-ignore lint/suspicious/noExplicitAny: testing a runtime guard
+            // Testing a runtime guard.
             {
               id: "bad",
               groupId: TENANT_GROUP,

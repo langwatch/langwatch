@@ -482,9 +482,7 @@ describe("Validation edge cases", () => {
       mappings: {},
       localPromptConfig: {
         llm: { model: "gpt-4" },
-        messages: [
-          { role: "user", content: "Classify {{product_name}}" },
-        ],
+        messages: [{ role: "user", content: "Classify {{product_name}}" }],
         inputs: [{ identifier: "product_name", type: "str" }],
         outputs: [{ identifier: "output", type: "str" }],
       },
@@ -535,9 +533,9 @@ describe("Validation edge cases", () => {
     const result = getTargetMissingMappings(target, DEFAULT_TEST_DATA_ID);
 
     // "input" is declared but never referenced -> not flagged at all.
-    expect(
-      result.missingMappings.some((m) => m.fieldId === "input"),
-    ).toBe(false);
+    expect(result.missingMappings.some((m) => m.fieldId === "input")).toBe(
+      false,
+    );
     // "product_name" IS referenced + declared + unmapped -> required.
     expect(
       result.missingMappings.find((m) => m.fieldId === "product_name")

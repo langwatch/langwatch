@@ -148,7 +148,7 @@ export const migrateDatasetToS3 = async (
   const preCheck = await deps.prisma.dataset.findFirst({
     where: { id: dataset.id, projectId },
   });
-  if (!preCheck || preCheck.contentLayout !== "postgres") {
+  if (preCheck?.contentLayout !== "postgres") {
     logger.info(
       { datasetId: dataset.id, projectId },
       "Skipping dataset — already migrated (not on postgres layout)",
@@ -239,7 +239,7 @@ export const migrateDatasetToS3 = async (
       const current = await tx.dataset.findFirst({
         where: { id: dataset.id, projectId },
       });
-      if (!current || current.contentLayout !== "postgres") {
+      if (current?.contentLayout !== "postgres") {
         logger.info(
           { datasetId: dataset.id, projectId },
           "Skipping dataset — already migrated (not on postgres layout)",

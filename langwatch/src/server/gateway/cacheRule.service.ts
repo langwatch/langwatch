@@ -35,9 +35,9 @@
 import type {
   GatewayCacheRule,
   GatewayCacheRuleMode,
+  Prisma,
   PrismaClient,
 } from "@prisma/client";
-import { Prisma } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 
 import { GatewayAuditAdapter } from "./auditLog.repository";
@@ -100,10 +100,7 @@ function actionToEnum(mode: CacheRuleAction["mode"]): GatewayCacheRuleMode {
 }
 
 function validateMatchers(matchers: CacheRuleMatchers): void {
-  if (
-    matchers.vk_tags !== undefined &&
-    !Array.isArray(matchers.vk_tags)
-  ) {
+  if (matchers.vk_tags !== undefined && !Array.isArray(matchers.vk_tags)) {
     throw new TRPCError({
       code: "BAD_REQUEST",
       message: "matchers.vk_tags must be an array of strings",
@@ -306,9 +303,7 @@ export class GatewayCacheRuleService {
    * Disabled rules are filtered out here so the gateway doesn't need to
    * care about the enabled flag at eval time.
    */
-  async bundleFor(
-    organizationId: string,
-  ): Promise<GatewayCacheRule[]> {
+  async bundleFor(organizationId: string): Promise<GatewayCacheRule[]> {
     return this.prisma.gatewayCacheRule.findMany({
       where: {
         organizationId,

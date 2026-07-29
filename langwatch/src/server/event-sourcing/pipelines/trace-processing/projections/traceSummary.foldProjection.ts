@@ -1,3 +1,4 @@
+import { DEFAULT_PARTITION_WINDOW_MS } from "~/server/app-layer/clients/clickhouse/windowed-read";
 import { CanonicalizeSpanAttributesService } from "~/server/app-layer/traces/canonicalisation";
 import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
 import {
@@ -12,7 +13,6 @@ import {
 } from "~/server/event-sourcing/projections/abstractFoldProjection";
 import type { FoldProjectionStore } from "~/server/event-sourcing/projections/foldProjection.types";
 import { SYNTHETIC_SPAN_NAMES } from "~/server/tracer/constants";
-import { DEFAULT_PARTITION_WINDOW_MS } from "~/server/app-layer/clients/clickhouse/windowed-read";
 import {
   METRIC_EXEMPLAR_CORRELATION_COUNT_ATTRIBUTE,
   TRACE_SUMMARY_PROJECTION_VERSION_LATEST,

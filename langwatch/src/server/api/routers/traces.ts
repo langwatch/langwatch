@@ -6,7 +6,6 @@ import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 import { formatSpansDigest } from "~/server/tracer/spanToReadableSpan";
-import type { Trace } from "~/server/tracer/types";
 import { TraceService } from "~/server/traces/trace.service";
 import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
 import { evaluatorsSchema } from "../../evaluations/evaluators.generated";
@@ -23,7 +22,6 @@ import { getAllForProjectInput, tracesFilterInput } from "./traces.schemas";
 export { getAllForProjectInput };
 
 const logger = createLogger("langwatch:traces:sse-subscription");
-
 
 export const tracesRouter = createTRPCRouter({
   getAllForProject: protectedProcedure
@@ -207,9 +205,14 @@ export const tracesRouter = createTRPCRouter({
         buildTraceBlobResolutionDeps(),
       );
 
-      return traceService.getTracesByThreadId(projectId, threadId, protections, {
-        full: true,
-      });
+      return traceService.getTracesByThreadId(
+        projectId,
+        threadId,
+        protections,
+        {
+          full: true,
+        },
+      );
     }),
 
   getTracesWithSpans: protectedProcedure

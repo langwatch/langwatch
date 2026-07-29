@@ -1,6 +1,6 @@
 import { updateCurrentContext } from "@langwatch/observability/context";
 import type { Context, MiddlewareHandler } from "hono";
-import { describeRoute, type DescribeRouteOptions } from "hono-openapi";
+import { type DescribeRouteOptions, describeRoute } from "hono-openapi";
 import { resolver, validator as zValidator } from "hono-openapi/zod";
 import type { ZodType } from "zod";
 

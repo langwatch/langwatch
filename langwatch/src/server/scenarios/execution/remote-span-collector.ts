@@ -9,8 +9,8 @@
  * OTEL SDK pipeline.
  */
 
-import { JudgeSpanCollector } from "@langwatch/scenario";
 import { createLogger } from "@langwatch/observability";
+import { JudgeSpanCollector } from "@langwatch/scenario";
 import type { Attributes } from "@opentelemetry/api";
 import type { ReadableSpan } from "@opentelemetry/sdk-trace-base";
 import { langwatchSpanToReadableSpan } from "../../tracer/spanToReadableSpan";
@@ -77,8 +77,7 @@ export async function collectRemoteSpans({
       "Span collection complete",
     );
   } catch (error) {
-    const reason =
-      error instanceof Error ? error.message : String(error);
+    const reason = error instanceof Error ? error.message : String(error);
     logger.warn({ traceId, error: reason }, "Remote span query failed");
 
     const errorSpan = createSyntheticErrorSpan({

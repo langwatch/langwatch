@@ -10,6 +10,16 @@
 .github
 .env
 **/.env
+# Every dotenv sibling, not just `.env` itself. haven writes `.env.portless`
+# into the worktree and server.mts loads it with override:true at boot, so a
+# copy of it inside the build context would bake a dev stack's overrides —
+# retention default, admin password, access tokens — into the image and let
+# them win over whatever the deployment configured.
+.env.*
+**/.env.*
+# `.env.example` is tracked documentation with no secrets in it.
+!.env.example
+!**/.env.example
 **/.venv
 
 langwatch_nlp/.venv

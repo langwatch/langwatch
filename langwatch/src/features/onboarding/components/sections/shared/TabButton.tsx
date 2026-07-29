@@ -23,13 +23,11 @@ export function TabButton({
       color={active ? { base: "black", _dark: "white" } : "fg.muted"}
       bg={active ? "bg.panel" : "transparent"}
       backdropFilter={active ? "blur(20px) saturate(1.3)" : undefined}
-      boxShadow={
-        active
-          ? "0 2px 8px rgba(0,0,0,0.06)"
-          : undefined
-      }
+      boxShadow={active ? "0 2px 8px rgba(0,0,0,0.06)" : undefined}
       border="1px solid"
-      borderColor={active ? { base: "orange.200", _dark: "orange.800" } : "transparent"}
+      borderColor={
+        active ? { base: "orange.200", _dark: "orange.800" } : "transparent"
+      }
       transition="all 0.17s ease"
       _hover={{
         bg: active ? "bg.panel" : "bg.muted",

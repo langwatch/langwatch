@@ -4,6 +4,7 @@ import { TtlCache } from "~/server/utils/ttlCache";
 import { UNLIMITED_MESSAGES } from "../../../../../ee/billing/planLimits";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import type { PlanInfo } from "../../../../../ee/licensing/planInfo";
+import { USAGE_UNKNOWN } from "../../../traces/usage-count";
 import type { OrganizationService } from "../../organizations/organization.service";
 import type { PlanResolver } from "../../subscription/plan-provider";
 import { UsageService } from "../usage.service";
@@ -132,6 +133,51 @@ describe("UsageService", () => {
         await expect(
           service.checkLimit({ teamId: "team-123" }),
         ).rejects.toThrow("Organization for team not found: team-123");
+      });
+    });
+
+    describe("when the counting store cannot report usage", () => {
+      beforeEach(() => {
+        mockEnv.IS_SAAS = true;
+        vi.mocked(mockOrgService.getOrganizationIdByTeamId).mockResolvedValue(
+          "org-123",
+        );
+        vi.mocked(mockOrgService.getProjectIds).mockResolvedValue(["proj-1"]);
+        mockEventUsageService.getCountByProjects.mockResolvedValue(
+          USAGE_UNKNOWN,
+        );
+        (mockPlanResolver as ReturnType<typeof vi.fn>).mockResolvedValue({
+          ...FREE_PLAN,
+          maxMessagesPerMonth: 50_000,
+        });
+      });
+
+      /** @scenario Usage limits are not enforced against a count we could not take */
+      it("allows traffic rather than enforcing against a fabricated zero", async () => {
+        // The permissive outcome is deliberate: an outage in OUR counting
+        // store must not lock a paying customer out of their own product.
+        //
+        // What this pins is WHERE that decision is made. It used to be made by
+        // the counting service returning 0, which enforcement then read as "no
+        // usage" — the same answer, reached by accident, invisible in the logs,
+        // and equally applied to the usage page and the at-limit emails. Now
+        // the count is `unknown` all the way to here and this method decides.
+        const result = await service.checkLimit({ teamId: "team-123" });
+
+        expect(result).toEqual({ exceeded: false });
+      });
+
+      it("does not cache the unknown as a count", async () => {
+        // A cached unknown-as-zero would outlive the outage by the cache TTL,
+        // leaving enforcement off for minutes after ClickHouse came back.
+        await service.checkLimit({ teamId: "team-123" });
+
+        mockEventUsageService.getCountByProjects.mockResolvedValue([
+          { projectId: "proj-1", count: 90_000 },
+        ]);
+        const result = await service.checkLimit({ teamId: "team-123" });
+
+        expect(result.exceeded).toBe(true);
       });
     });
 

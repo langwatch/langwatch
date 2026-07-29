@@ -90,7 +90,9 @@ export async function deleteStagedObject(args: {
 }): Promise<void> {
   const { s3Client, s3Bucket, key, projectId } = args;
   try {
-    await s3Client.send(new DeleteObjectCommand({ Bucket: s3Bucket, Key: key }));
+    await s3Client.send(
+      new DeleteObjectCommand({ Bucket: s3Bucket, Key: key }),
+    );
     logger.debug(
       { projectId, bucket: s3Bucket, key },
       "deleted staged payload from S3 after use",

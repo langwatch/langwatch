@@ -396,9 +396,20 @@ export class ExperimentRunService {
    * string. See `getRun-null.unit.test.ts` for the regression guard.
    *
    * The route caller at `routes/experiments-v3.ts` therefore collapses
-   * `null` to a `404 Run not found or results not yet available` — that
-   * 404 is intentional polling UX, not infra masking. CH outages still
-   * surface elsewhere (every other read on the experiment-run path throws).
+   * `null` to a `404 run_not_found` — that 404 is intentional polling UX,
+   * not infra masking. CH outages still surface elsewhere (every other read
+   * on the experiment-run path throws).
+   *
+   * Worth being precise about what that costs, since the two cases behind
+   * `null` are not equally benign: a run not folded yet is a 404 that the
+   * next poll resolves, while ClickHouse being down is a 404 that lies until
+   * it recovers. The route no longer widens that — its catch used to turn
+   * EVERY failure into the same 404, so an outage anywhere in the handler
+   * read as "no such run"; only a genuine miss answers 404 now, and anything
+   * unnamed reaches the boundary as a 500 with a trace id. Separating the
+   * two cases inside this method (a distinct "not folded yet" signal) is the
+   * remaining piece, and it needs the poller's retry behaviour thought
+   * through rather than a quick throw.
    *
    * @returns `null` if ClickHouse is unavailable OR if the run row has
    *   not been folded yet — see method-level docstring for the rationale.

@@ -1,15 +1,15 @@
+import type { Logger } from "@langwatch/observability";
 import type fastq from "fastq";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
-import type { Logger } from "@langwatch/observability";
 import {
   gqActiveGroups,
   gqBlockedGroups,
   gqFastqActive,
   gqFastqPending,
+  gqOldestPendingAgeMilliseconds,
   gqParkedGroups,
   gqPendingGroups,
-  gqOldestPendingAgeMilliseconds,
 } from "./metrics";
 import type { DispatchResult, GroupStagingScripts } from "./scripts";
 
@@ -69,9 +69,8 @@ export class GroupQueueMetricsCollector {
       const blockedKey = `${keyPrefix}blocked`;
       const parkedTenantsKey = `${keyPrefix}parked-tenants`;
 
-      const pendingGroupCount = await this.params.redisConnection.zcard(
-        readyKey,
-      );
+      const pendingGroupCount =
+        await this.params.redisConnection.zcard(readyKey);
       const blockedGroupCount =
         await this.params.redisConnection.scard(blockedKey);
 
@@ -136,16 +135,15 @@ export class GroupQueueMetricsCollector {
       // dispatched (one scan cycle). Closing that needs an unpark re-score
       // decision (queue-fairness change), tracked separately.
       const nowMs = Date.now();
-      const oldestEligible =
-        await this.params.redisConnection.zrangebyscore(
-          readyKey,
-          `(${READY_UNBLOCK_SENTINEL_SCORE}`,
-          nowMs,
-          "WITHSCORES",
-          "LIMIT",
-          0,
-          1,
-        );
+      const oldestEligible = await this.params.redisConnection.zrangebyscore(
+        readyKey,
+        `(${READY_UNBLOCK_SENTINEL_SCORE}`,
+        nowMs,
+        "WITHSCORES",
+        "LIMIT",
+        0,
+        1,
+      );
       const age =
         oldestEligible.length >= 2
           ? Math.max(0, nowMs - Number(oldestEligible[1]))

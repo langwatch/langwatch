@@ -285,6 +285,36 @@ func (c *Client) FetchConfig(ctx context.Context, vkID string) (domain.BundleCon
 	return wire.toDomain(), nil
 }
 
+// Health performs the signed control-plane connectivity probe backing the
+// gateway's public /health status endpoint (adapters/statusprobe). It hits
+// the HMAC-protected /api/internal/gateway/health route rather than a
+// public liveness path on purpose: a success proves the whole channel the
+// gateway depends on to serve traffic: DNS, TCP/TLS, the app being up,
+// AND the shared internal secret matching. A wrong secret is the exact
+// misconfig where every pod looks green while every virtual-key resolve
+// is refused, and this is the only probe that catches it.
+func (c *Client) Health(ctx context.Context) error {
+	endpoint, _ := url.JoinPath(c.baseURL, "/api/internal/gateway/health")
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return err
+	}
+	c.setCommonHeaders(req)
+	c.sign(req, nil)
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	// Drain the small body so the pooled connection is reusable.
+	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4096))
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("control plane health returned %d", resp.StatusCode)
+	}
+	return nil
+}
+
 // --- Internal helpers ---
 
 // Claims are the gateway-relevant fields extracted from a control-plane JWT.

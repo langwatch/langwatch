@@ -78,7 +78,13 @@ export const useUpgradeModalStore = create<UpgradeModalState>((set) => ({
   openSeats: ({ organizationId, currentSeats, newSeats, onConfirm }) =>
     set({
       isOpen: true,
-      variant: { mode: "seats", organizationId, currentSeats, newSeats, onConfirm },
+      variant: {
+        mode: "seats",
+        organizationId,
+        currentSeats,
+        newSeats,
+        onConfirm,
+      },
       // Clear legacy fields since seats mode does not use them.
       limitType: null,
       current: null,

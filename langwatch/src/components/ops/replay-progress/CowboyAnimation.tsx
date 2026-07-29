@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
 import { Box } from "@chakra-ui/react";
+import { useEffect, useRef, useState } from "react";
 
 // -- Cowboy Gunfight Frames (adapted from CLI) --
 // Positions: Left figure at col 5, Right figure at col 33
@@ -50,11 +50,7 @@ function buildFrames(): string[][] {
     [
       // 3: Left shoots
       line([L, "O"], [R, "O"]),
-      line(
-        [L - 1, lGun],
-        [L + 3, bullet(11) + "\u25B6"],
-        [R - 1, rStand],
-      ),
+      line([L - 1, lGun], [L + 3, bullet(11) + "\u25B6"], [R - 1, rStand]),
       line([L - 1, lLegs], [15, "pew!"], [R - 1, rLegs]),
     ],
     [
@@ -70,11 +66,7 @@ function buildFrames(): string[][] {
     [
       // 5: Right dodges
       line([L, "O"], [R - 1, "\\O"]),
-      line(
-        [L - 1, lGun],
-        [L + 3, "\u00B7   \u00B7   \u00B7"],
-        [R, "|"],
-      ),
+      line([L - 1, lGun], [L + 3, "\u00B7   \u00B7   \u00B7"], [R, "|"]),
       line([L - 1, lLegs], [R - 1, rLegs]),
     ],
     [
@@ -86,11 +78,7 @@ function buildFrames(): string[][] {
     [
       // 7: Right shoots
       line([L, "O"], [R, "O"]),
-      line(
-        [L - 1, lStand],
-        [L + 2, "\u25C0" + bullet(11)],
-        [R - 2, rGun],
-      ),
+      line([L - 1, lStand], [L + 2, "\u25C0" + bullet(11)], [R - 2, rGun]),
       line([L - 1, lLegs], [20, "!wep"], [R - 1, rLegs]),
     ],
     [
@@ -129,7 +117,15 @@ function buildFrames(): string[][] {
     ],
     [
       // 12: Explosion
-      line([L, "O"], [15, "\\"], [17, "*"], [19, "|"], [21, "*"], [23, "/"], [R, "O"]),
+      line(
+        [L, "O"],
+        [15, "\\"],
+        [17, "*"],
+        [19, "|"],
+        [21, "*"],
+        [23, "/"],
+        [R, "O"],
+      ),
       line(
         [L - 1, lGun],
         [13, bullet(2)],
@@ -160,10 +156,7 @@ function buildFrames(): string[][] {
 
 const FRAMES = buildFrames();
 
-function getFrameForPhase(
-  phase: string | null,
-  tick: number,
-): string[] {
+function getFrameForPhase(phase: string | null, tick: number): string[] {
   if (phase === "replay") {
     const seq = [3, 4, 5, 6, 7, 8, 9, 10, 11];
     const idx = Math.floor(tick / 3) % seq.length;

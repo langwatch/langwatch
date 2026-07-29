@@ -328,7 +328,9 @@ async function bootstrapDatabase(
     const rows = await result.json();
     config.hasLocalPrimaryPolicy = rows.length > 0;
     if (!config.hasLocalPrimaryPolicy) {
-      logger.info("Storage policy 'local_primary' not found — migrations will use 'default' policy");
+      logger.info(
+        "Storage policy 'local_primary' not found — migrations will use 'default' policy",
+      );
     }
   });
 

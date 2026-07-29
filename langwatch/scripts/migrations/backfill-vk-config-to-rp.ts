@@ -108,7 +108,10 @@ async function backfillAliasesAndRules(
   vkId: string,
   vkName: string,
   orgId: string,
-  scopes: Array<{ scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }>,
+  scopes: Array<{
+    scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+    scopeId: string;
+  }>,
   modelAliases: Record<string, string> | undefined,
   policyRules: LegacyConfig["policyRules"],
 ): Promise<string> {
@@ -117,7 +120,9 @@ async function backfillAliasesAndRules(
   const primary = scopes[0]!;
 
   if (DRY_RUN) {
-    console.log(`[dry-run] mint RP ${rpId} (${rpName}) scopes=${scopes.length}`);
+    console.log(
+      `[dry-run] mint RP ${rpId} (${rpName}) scopes=${scopes.length}`,
+    );
     return rpId;
   }
 
@@ -147,11 +152,17 @@ async function backfillAliasesAndRules(
   return rpId;
 }
 
-type GuardrailAttachment = { direction: "pre" | "post" | "streamChunk"; guardrailIds: string[] };
+type GuardrailAttachment = {
+  direction: "pre" | "post" | "streamChunk";
+  guardrailIds: string[];
+};
 
 async function backfillGuardrails(
   vkId: string,
-  vkScopes: Array<{ scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }>,
+  vkScopes: Array<{
+    scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+    scopeId: string;
+  }>,
   legacy: NonNullable<LegacyConfig["guardrails"]>,
 ): Promise<GuardrailAttachment[]> {
   // GatewayGuardrail is project-scoped only. Pick the first PROJECT
@@ -263,7 +274,9 @@ async function main() {
     }
 
     if (DRY_RUN) {
-      console.log(`[dry-run] update vk=${vk.id} routingPolicyId=${routingPolicyId}`);
+      console.log(
+        `[dry-run] update vk=${vk.id} routingPolicyId=${routingPolicyId}`,
+      );
     } else {
       await prisma.virtualKey.update({
         where: { id: vk.id },

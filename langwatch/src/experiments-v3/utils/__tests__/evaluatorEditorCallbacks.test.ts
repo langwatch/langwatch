@@ -7,8 +7,8 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
-import { createEvaluatorEditorCallbacks } from "../evaluatorEditorCallbacks";
 import type { LocalEvaluatorConfig } from "../../types";
+import { createEvaluatorEditorCallbacks } from "../evaluatorEditorCallbacks";
 
 describe("createEvaluatorEditorCallbacks()", () => {
   describe("onLocalConfigChange()", () => {
@@ -102,7 +102,9 @@ describe("createEvaluatorEditorCallbacks()", () => {
 
         callbacks.onLocalConfigChange?.({ name: "Direct wins" });
 
-        expect(onLocalConfigChange).toHaveBeenCalledWith({ name: "Direct wins" });
+        expect(onLocalConfigChange).toHaveBeenCalledWith({
+          name: "Direct wins",
+        });
         expect(updateTarget).not.toHaveBeenCalled();
       });
     });

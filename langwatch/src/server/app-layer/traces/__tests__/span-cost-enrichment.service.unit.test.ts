@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@prisma/client";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { MaybeStoredLLMModelCost } from "~/server/modelProviders/llmModelCost";
 import { getStaticModelCosts } from "~/server/modelProviders/llmModelCost";
 import {

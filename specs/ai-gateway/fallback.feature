@@ -131,3 +131,41 @@ Feature: Provider fallback chain
       When the gateway detects the drop
       Then the gateway does NOT attempt the same request against primary
       And it may attempt fallback (new upstream) if fallback is armed
+
+  Rule: Failing over is a choice the key makes, not a default it inherits
+
+    Fallback sends a request, and its payload, to a different vendor than the
+    one the caller asked for. That is a decision worth stating: a key now
+    carries its routing behaviour explicitly, and a new key does not fail
+    over unless somebody says it should. Keys created before the choice
+    existed are pinned to the old behaviour, so nothing changes underneath a
+    customer who never made the choice.
+
+    @integration
+    Scenario: A key with no fallback attempts one provider and stops
+      Given a key whose routing behaviour is "no fallback"
+      When its configuration reaches the gateway
+      Then the gateway is allowed a single dispatch attempt
+
+    @integration
+    Scenario: A key with no fallback surfaces the provider's failure
+      Given a key whose routing behaviour is "no fallback"
+      And the provider serving the requested model is down
+      When a request arrives
+      Then the caller gets the provider's failure, promptly and in full
+      And no other provider is contacted
+      # Promptly matters: the failure mode this file exists to prevent is a
+      # request that hangs instead of failing.
+
+    @integration
+    Scenario: A key set to fall back still walks every eligible provider
+      Given a key whose routing behaviour is "fall back to every provider"
+      And the first provider in the chain is down
+      When a request arrives
+      Then the next eligible provider serves it
+
+    @integration
+    Scenario: Keys that predate the choice keep falling back
+      Given a key created before routing behaviour was explicit
+      When its configuration is read
+      Then it falls back across every provider it can reach

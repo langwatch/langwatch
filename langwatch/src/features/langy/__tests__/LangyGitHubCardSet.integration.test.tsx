@@ -3,9 +3,8 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { render } from "@testing-library/react";
 import type { UIMessage } from "ai";
 import { describe, expect, it, vi } from "vitest";
-
-import { MessageContent } from "../components/MessageContent";
 import { LANGY_OPEN_PR_TOOL } from "~/shared/langy/githubPrCard";
+import { MessageContent } from "../components/MessageContent";
 
 // MessageContent reads the project for card deep-links; rendering it bare
 // (no tRPC provider) needs the same pinned project the sibling suites use.
@@ -67,7 +66,10 @@ describe("the GitHub card set", () => {
             type: "tool-bash",
             toolCallId: "c1",
             state: "output-available",
-            input: { command: "git clone https://x-access-token@github.com/acme/checkout" },
+            input: {
+              command:
+                "git clone https://x-access-token@github.com/acme/checkout",
+            },
           },
           {
             type: "tool-bash",

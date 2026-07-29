@@ -1,4 +1,4 @@
-import type { z, ZodTypeAny } from "zod";
+import type { ZodTypeAny, z } from "zod";
 
 import type { Event } from "../domain/types";
 import type {
@@ -32,9 +32,7 @@ export type SubscriberSpec<E extends Event = Event> = TriggerSpec &
     handler: (event: E, context: TriggerContext<any>) => Promise<void>;
   };
 
-export type IntentFactories<
-  Intents extends Record<string, IntentSpec<any>>,
-> = {
+export type IntentFactories<Intents extends Record<string, IntentSpec<any>>> = {
   [K in keyof Intents & string]: (
     key: string,
     payload: z.input<Intents[K]["schema"]>,

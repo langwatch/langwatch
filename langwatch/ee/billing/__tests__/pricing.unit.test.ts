@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
-  getGrowthSeatPriceCents,
-  getAnnualDiscountPercent,
   formatPrice,
+  getAnnualDiscountPercent,
+  getGrowthSeatPriceCents,
 } from "../pricing";
 
 describe("pricing", () => {
@@ -44,7 +44,9 @@ describe("pricing", () => {
     });
 
     it("formats large EUR amount with thousands separator", () => {
-      expect(formatPrice({ cents: 128000, currency: "EUR" })).toBe("\u20AC1,280");
+      expect(formatPrice({ cents: 128000, currency: "EUR" })).toBe(
+        "\u20AC1,280",
+      );
     });
 
     it("formats zero correctly", () => {

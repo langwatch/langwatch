@@ -22,7 +22,15 @@ import {
   SimpleSpanProcessor,
 } from "@opentelemetry/sdk-trace-base";
 import { StackContextManager } from "@opentelemetry/sdk-trace-web";
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 
 // `vi.hoisted` so the spy exists before the hoisted `vi.mock` factory and
 // before the module under test is imported below — a plain `const` would be
@@ -64,7 +72,6 @@ describe("captureException trace context", () => {
   describe("given an error captured inside a span", () => {
     /** @scenario An error captured in the browser carries its trace */
     it("records the trace and span it happened in", async () => {
-
       const span = trace
         .getTracer("test")
         .startActiveSpan("handling a call", (started) => {
@@ -81,7 +88,6 @@ describe("captureException trace context", () => {
     });
 
     it("cannot have its trace identity overwritten by caller-supplied extras", async () => {
-
       const span = trace
         .getTracer("test")
         .startActiveSpan("handling a call", (started) => {
@@ -101,7 +107,6 @@ describe("captureException trace context", () => {
   describe("given an error captured outside any span", () => {
     /** @scenario An error captured outside any call records no trace */
     it("is still recorded, and claims no trace", async () => {
-
       captureException(new Error("boom during boot"));
 
       const properties = propertiesOfLastCapture();

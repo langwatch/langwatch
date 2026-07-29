@@ -100,6 +100,7 @@ func (o *Orchestrator) langyChild(st domain.Stack, opts PlanOptions, base []stri
 			Shell: langyContainerShell(langyContainerOpts{
 				Slug:                  st.Slug,
 				Port:                  port,
+				Image:                 st.LangyImage,
 				Secret:                domain.DefaultLangyInternalSecret,
 				DisableUIDSandbox:     st.LangyTier.DisablesUIDSandbox(),
 				ObservabilityOTLPPort: st.ObservabilityOTLPPort,
@@ -240,17 +241,23 @@ func langyContainerShell(o langyContainerOpts) string {
 		shQuote(o.containerName()), strings.Join(quoted, " "))
 }
 
-// langyImageEnsureShell checks the image is present and builds it only when it is
-// not, so a normal `up` pays nothing after the first (minutes-long) build. When
-// forceRebuild is set (HAVEN_LANGY_REBUILD=1) it always rebuilds — the escape
-// hatch for picking up langyagent source changes, since the presence check alone
-// would keep running stale bytes. Runs from the repo root (the build context).
-func langyImageEnsureShell(image string, forceRebuild bool) string {
+// langyImageEnsureShell makes the content-addressed image exist: reuse when a
+// local image already carries the tag, pull a CI-published build for the same
+// inputs when a registry is configured, and build locally only as the last
+// resort. forceRebuild (--rebuild) skips straight to the build — the escape
+// hatch when the hash lies (or you just want fresh bytes). Runs from the repo
+// root (the build context).
+func langyImageEnsureShell(image string, forceRebuild bool, pullRef string) string {
 	build := fmt.Sprintf("docker build -f Dockerfile.langyagent -t %s .", shQuote(image))
 	if forceRebuild {
 		return build
 	}
-	return fmt.Sprintf("docker image inspect %s >/dev/null 2>&1 || %s", shQuote(image), build)
+	ensure := fmt.Sprintf("docker image inspect %s >/dev/null 2>&1", shQuote(image))
+	if pullRef != "" {
+		pull := fmt.Sprintf("{ docker pull %s >/dev/null 2>&1 && docker tag %s %s; }", shQuote(pullRef), shQuote(pullRef), shQuote(image))
+		return fmt.Sprintf("%s || %s || %s", ensure, pull, build)
+	}
+	return fmt.Sprintf("%s || %s", ensure, build)
 }
 
 // shQuote single-quotes a shell argument, escaping embedded single quotes. Every

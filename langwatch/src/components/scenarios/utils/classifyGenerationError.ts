@@ -1,72 +1,58 @@
 /**
- * Classifies a generation error into a tier with tailored copy and a recovery CTA.
+ * Decides which recovery a failed scenario generation offers — and nothing else.
  *
- * Tier-1: known error shapes → specific, actionable copy.
- * Tier-2 (unknown): generic copy + raw backend message verbatim.
+ * It used to decide the words too, by running a regex ladder over the error's
+ * message (`/no default model/i`, `/rate limit/i`, …). That stopped working the
+ * moment #5984 collapsed the wire message of a handled error to its code slug:
+ * the ladder matched nothing, so every named failure the gateway reported
+ * landed in the "unknown" tier and the modal printed the slug back at the
+ * customer. The code was in our hands the whole time.
+ *
+ * So: the handled `code` picks the tier and the CTA, and the copy comes from
+ * the code-keyed registry (`features/errors/logic/presentation.ts`). No copy is
+ * authored here — a sentence written in this file is a sentence the registry
+ * cannot keep consistent with the twenty other places the same code surfaces.
  */
+import {
+  type ErrorExplanation,
+  explainAnyError,
+  explainSerializedError,
+  readHandledError,
+} from "~/features/errors";
+
 import { ScenarioGenerationError } from "../services/scenarioGeneration";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type GenerationErrorClass =
-  | { tier: "config"; cta: "configure"; copy: string }
-  | { tier: "auth"; cta: "configure"; copy: string }
-  | { tier: "rate-limit"; cta: "configure-and-retry"; copy: string }
-  | { tier: "timeout"; cta: "retry"; copy: string }
-  | { tier: "unknown"; cta: "retry-or-skip"; copy: string; rawMessage: string };
+/** How the failure is grouped — what kind of thing went wrong. */
+export type GenerationErrorTier =
+  | "config"
+  | "auth"
+  | "rate-limit"
+  | "timeout"
+  | "unknown";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Message extraction
-// ─────────────────────────────────────────────────────────────────────────────
+/** Which recovery actions the surface offers. */
+export type GenerationErrorCta =
+  | "configure"
+  | "configure-and-retry"
+  | "retry"
+  | "retry-or-skip";
 
-/**
- * Extracts a plain string message from an arbitrary unknown error value.
- *
- * Handles:
- * - Error instances (including TRPCClientError, which extends Error)
- * - Plain strings
- * - Everything else via String()
- */
-/**
- * Formats a typed generation error for display: its kind, the message
- * when it adds information beyond the kind, and every meta entry —
- * e.g. `bad_request (reason: missing_provider)`. This is what the
- * tier-2 raw-message surface shows for handled backend failures, so
- * the user sees the discriminant, not just an opaque status word.
- */
-function describeGenerationError(error: ScenarioGenerationError): string {
-  const head =
-    error.message && error.message !== error.kind
-      ? `${error.kind}: ${error.message}`
-      : error.kind;
-  const meta = Object.entries(error.meta)
-    .map(([k, v]) => `${k}: ${typeof v === "string" ? v : JSON.stringify(v)}`)
-    .join(", ");
-  return meta ? `${head} (${meta})` : head;
-}
-
-function extractMessage(error: unknown): string {
-  if (typeof error === "string") return error;
-
-  if (error instanceof ScenarioGenerationError) {
-    return describeGenerationError(error);
-  }
-
-  if (error instanceof Error) {
-    // TRPCClientError stores the server message in error.message already,
-    // but also exposes data.message on some shapes. Prefer data.message when present.
-    const trpcLike = error as Error & {
-      data?: { message?: string };
-    };
-    if (trpcLike.data?.message) {
-      return trpcLike.data.message;
-    }
-    return error.message;
-  }
-
-  return String(error);
+export interface GenerationErrorClass {
+  tier: GenerationErrorTier;
+  cta: GenerationErrorCta;
+  /** Headline for the failure, from the registry. */
+  title: string;
+  /** Body copy, from the registry. Empty when the headline says it all. */
+  copy: string;
+  /**
+   * The support handle, when the failure carried one — the only technical
+   * detail that belongs in front of a customer (ADR-045).
+   */
+  traceId: string | undefined;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -74,91 +60,87 @@ function extractMessage(error: unknown): string {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Maps a `ScenarioGenerationError.kind` (the stable discriminant the
- * generate endpoint forwards from handled gateway failures) to a
- * classified tier. Returns null for kinds without tailored copy so
- * they fall through to message matching.
+ * The recovery a handled code deserves.
+ *
+ * Anything not listed falls to the unknown tier, whose "try again, or write it
+ * yourself" is the honest offer when we can't say what would fix it.
  */
-function classifyByKind(error: ScenarioGenerationError): GenerationErrorClass | null {
-  switch (error.kind) {
+function recoveryFor(code: string | undefined): {
+  tier: GenerationErrorTier;
+  cta: GenerationErrorCta;
+} {
+  switch (code) {
+    // Nothing will generate until a model provider is set up for this project,
+    // so retrying is advice that cannot work.
     case "missing_provider":
-      return {
-        tier: "config",
-        cta: "configure",
-        copy: "The default model's provider isn't supported for generation. Choose a different default model to continue.",
-      };
+    case "no_provider_configured":
+    case "model_not_allowed":
+    case "llm_model_not_set":
+      return { tier: "config", cta: "configure" };
+
+    // A credential the customer owns was refused. Same destination as `config`,
+    // different reason — kept apart because the tier is what tests and future
+    // surfaces branch on.
+    case "invalid_api_key":
+    case "virtual_key_revoked":
+    case "codex_auth_failed":
+    case "codex_session_expired":
+    case "unauthorized":
+      return { tier: "auth", cta: "configure" };
+
+    // Waiting may be enough, and raising the ceiling lives in settings — so
+    // offer both rather than picking one for them.
+    case "rate_limited":
+    case "budget_exceeded":
+      return { tier: "rate-limit", cta: "configure-and-retry" };
+
+    case "provider_timeout":
+    case "idle_timeout":
+      return { tier: "timeout", cta: "retry" };
+
     default:
-      return null;
+      return { tier: "unknown", cta: "retry-or-skip" };
   }
 }
 
 /**
- * Maps a generation error to a classified tier with tailored copy and a recovery CTA.
+ * The words for a generation failure.
  *
- * Typed errors from the generate endpoint are matched on their `kind`
- * first; everything else falls back to case-insensitive regex matching
- * against the extracted message string.
+ * `ScenarioGenerationError` is the endpoint's handled payload with the envelope
+ * stripped off — `generateScenarioWithAI` parses `code` and `meta` out of
+ * `domainError` and hangs them on a plain `Error` — so `readHandledError` can't
+ * recognise it. Hand the registry the shape it does read rather than
+ * re-deriving the copy here.
  */
-export function classifyGenerationError(error: unknown): GenerationErrorClass {
+function explain(error: unknown): ErrorExplanation {
   if (error instanceof ScenarioGenerationError) {
-    const byKind = classifyByKind(error);
-    if (byKind) return byKind;
+    return explainSerializedError({
+      code: error.kind,
+      kind: error.kind,
+      meta: error.meta,
+      httpStatus: 0,
+      fault: "customer",
+      traceId: undefined,
+      spanId: undefined,
+      reasons: [],
+    });
   }
+  return explainAnyError(error);
+}
 
-  const message = extractMessage(error);
-
-  if (/no default model/i.test(message)) {
-    return {
-      tier: "config",
-      cta: "configure",
-      copy: "Your project has no default model configured. Set one to continue.",
-    };
-  }
-
-  if (/no.*provider|provider.*not.*configured/i.test(message)) {
-    return {
-      tier: "config",
-      cta: "configure",
-      copy: "No model provider is configured. Add one to continue.",
-    };
-  }
-
-  if (/stale|provider.*disabled/i.test(message)) {
-    return {
-      tier: "config",
-      cta: "configure",
-      copy: "The configured default model's provider is disabled. Reconfigure to continue.",
-    };
-  }
-
-  if (/invalid api key|authentication|unauthorized/i.test(message)) {
-    return {
-      tier: "auth",
-      cta: "configure",
-      copy: "There was a problem reaching your model provider. Check your provider configuration and that your API key is correct.",
-    };
-  }
-
-  if (/rate limit|quota/i.test(message)) {
-    return {
-      tier: "rate-limit",
-      cta: "configure-and-retry",
-      copy: "Rate limit reached on your provider. Wait a moment or check your provider's usage settings.",
-    };
-  }
-
-  if (/timeout|timed out/i.test(message)) {
-    return {
-      tier: "timeout",
-      cta: "retry",
-      copy: "The generation request timed out. Try again — the backend may be slow.",
-    };
-  }
+/** Maps a generation failure to its tier, its recovery CTA and its copy. */
+export function classifyGenerationError(error: unknown): GenerationErrorClass {
+  const handled = readHandledError(error);
+  const explanation = explain(error);
+  const { tier, cta } = recoveryFor(
+    error instanceof ScenarioGenerationError ? error.kind : handled?.code,
+  );
 
   return {
-    tier: "unknown",
-    cta: "retry-or-skip",
-    copy: "Something went wrong while generating your scenario.",
-    rawMessage: message,
+    tier,
+    cta,
+    title: explanation.title,
+    copy: explanation.description,
+    traceId: handled?.traceId,
   };
 }

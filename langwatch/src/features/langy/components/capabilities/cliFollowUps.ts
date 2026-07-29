@@ -30,8 +30,12 @@
  *
  * @see specs/langy/langy-followup-suggestions.feature
  */
+
+import {
+  featureForCliToolName,
+  featuresConsuming,
+} from "~/shared/langy/featureMap";
 import { countResults } from "./cliResultDocument";
-import { featureForCliToolName, featuresConsuming } from "~/shared/langy/featureMap";
 
 /** A settled tool call from the turn, as the UI already models it. */
 export interface SettledToolResult {

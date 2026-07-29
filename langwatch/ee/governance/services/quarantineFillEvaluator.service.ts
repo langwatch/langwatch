@@ -43,9 +43,7 @@ import {
 } from "./governanceAttributeKeys";
 import { ensureHiddenGovernanceProject } from "./governanceProject.service";
 
-const logger = createLogger(
-  "langwatch:governance:quarantine-fill-evaluator",
-);
+const logger = createLogger("langwatch:governance:quarantine-fill-evaluator");
 
 /**
  * Default sliding-window length for rate computation. 60 seconds

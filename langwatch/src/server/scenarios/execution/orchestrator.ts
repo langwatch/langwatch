@@ -65,10 +65,15 @@ export class ScenarioExecutionOrchestrator {
       );
       if (!modelParamsResult.success) {
         logger.warn(
-          { reason: modelParamsResult.reason, detail: modelParamsResult.message },
+          {
+            reason: modelParamsResult.reason,
+            detail: modelParamsResult.message,
+          },
           "Model params preparation failed",
         );
-        return this.failure(MODEL_PARAMS_USER_MESSAGES[modelParamsResult.reason]);
+        return this.failure(
+          MODEL_PARAMS_USER_MESSAGES[modelParamsResult.reason],
+        );
       }
 
       const adapterResult = await this.createAdapter(

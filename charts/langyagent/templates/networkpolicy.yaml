@@ -114,7 +114,7 @@ spec:
     # the pod's ONLY route to the public internet, and the most dangerous rule
     # in the policy — it is off by default (allowExternalHttps=false).
     #
-    # ADR-043: FQDN bounding ("only github/npm/…") is enforced at L7 by the
+    # ADR-076: FQDN bounding ("only github/npm/…") is enforced at L7 by the
     # per-worker egress adapter (worker tools egress via HTTPS_PROXY), NOT here —
     # L3/L4 policy cannot express FQDN egress. This rule stays the coarse
     # backstop; for bypass-proof datapath FQDN egress enable

@@ -19,9 +19,9 @@
  */
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { GraphicsQualityProvider } from "../GraphicsQualityProvider";
 import { useGraphicsQuality } from "~/hooks/useGraphicsQuality";
 import { useGraphicsQualityOverrideStore } from "~/stores/graphicsQualityOverrideStore";
+import { GraphicsQualityProvider } from "../GraphicsQualityProvider";
 
 let pendingCallback: FrameRequestCallback | null = null;
 let rafCallCount = 0;

@@ -1,6 +1,6 @@
 import { TOPIC_CLUSTERING_STALE_RUN_MS } from "~/server/event-sourcing/pipelines/topic-clustering-processing/process-manager/topicClustering.process";
-import { TOPIC_CLUSTERING_RUN_OUTCOME } from "~/server/event-sourcing/pipelines/topic-clustering-processing/schemas/constants";
 import type { TopicClusteringRunHistoryEntry } from "~/server/event-sourcing/pipelines/topic-clustering-processing/projections/topicClusteringRunHistory.foldProjection";
+import { TOPIC_CLUSTERING_RUN_OUTCOME } from "~/server/event-sourcing/pipelines/topic-clustering-processing/schemas/constants";
 import type { TopicClusteringStatusRepository } from "./repositories/topic-clustering-status.repository";
 
 export interface TopicClusteringStatus {

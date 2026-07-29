@@ -8,21 +8,14 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { useState } from "react";
-import {
-  LuArrowRight,
-  LuChevronDown,
-  LuChevronRight,
-} from "react-icons/lu";
+import { LuArrowRight, LuChevronDown, LuChevronRight } from "react-icons/lu";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { analyticsMetrics } from "~/server/analytics/registry";
 import { CustomGraph, type CustomGraphInput } from "../analytics/CustomGraph";
 import { usePeriodSelector } from "../PeriodSelector";
 import { Link } from "../ui/link";
 import { HomeCard } from "./HomeCard";
-import {
-  HOME_SECTION_PADDING,
-  HomeSectionHeader,
-} from "./HomeSectionHeader";
+import { HOME_SECTION_PADDING, HomeSectionHeader } from "./HomeSectionHeader";
 
 const QUICK_STARTS = [
   {
@@ -295,7 +288,9 @@ export function TracesOverview({
                 ) : (
                   <LuChevronRight size={12} />
                 )}
-                {chartOpen ? "Hide the trend" : `Show the trend over ${periodPhrase}`}
+                {chartOpen
+                  ? "Hide the trend"
+                  : `Show the trend over ${periodPhrase}`}
               </chakra.button>
             ) : null
           ) : (

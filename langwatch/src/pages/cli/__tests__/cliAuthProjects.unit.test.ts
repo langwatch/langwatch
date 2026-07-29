@@ -7,16 +7,40 @@ describe("resolveCliAuthProjects", () => {
       id: "t-acme",
       name: "ACME",
       projects: [
-        { id: "p-shared", name: "ACME Prod", slug: "acme-prod", isPersonal: false, kind: "application" },
-        { id: "p-personal", name: "My Workspace", slug: "jane-personal", isPersonal: true, kind: "application" },
-        { id: "p-gov", name: "Governance", slug: "internal_governance", isPersonal: false, kind: "internal_governance" },
+        {
+          id: "p-shared",
+          name: "ACME Prod",
+          slug: "acme-prod",
+          isPersonal: false,
+          kind: "application",
+        },
+        {
+          id: "p-personal",
+          name: "My Workspace",
+          slug: "jane-personal",
+          isPersonal: true,
+          kind: "application",
+        },
+        {
+          id: "p-gov",
+          name: "Governance",
+          slug: "internal_governance",
+          isPersonal: false,
+          kind: "internal_governance",
+        },
       ],
     },
     {
       id: "t-personal-only",
       name: "Solo",
       projects: [
-        { id: "p-solo", name: "My Workspace 2", slug: "bob-personal", isPersonal: true, kind: "application" },
+        {
+          id: "p-solo",
+          name: "My Workspace 2",
+          slug: "bob-personal",
+          isPersonal: true,
+          kind: "application",
+        },
       ],
     },
   ];
@@ -25,12 +49,16 @@ describe("resolveCliAuthProjects", () => {
     describe("when the CLI-auth project list is resolved", () => {
       /** @scenario the project picker omits personal and internal-governance projects */
       it("offers only the shared project, carries its team, and drops teams without an offered project", () => {
-        const { projects, teams: offeredTeams } = resolveCliAuthProjects({ teams });
+        const { projects, teams: offeredTeams } = resolveCliAuthProjects({
+          teams,
+        });
 
         expect(projects.map((p) => p.id)).toEqual(["p-shared"]);
         expect(projects[0]!.teamId).toBe("t-acme");
         expect(projects.map((p) => p.slug)).not.toContain("jane-personal");
-        expect(projects.map((p) => p.slug)).not.toContain("internal_governance");
+        expect(projects.map((p) => p.slug)).not.toContain(
+          "internal_governance",
+        );
         // Only teams that actually have an offered project are returned, so the
         // grouped picker never renders an empty or personal-only team header.
         expect(offeredTeams).toEqual([{ id: "t-acme", name: "ACME" }]);
@@ -44,9 +72,27 @@ describe("resolveCliAuthProjects", () => {
         id: "t-acme",
         name: "ACME",
         projects: [
-          { id: "p-a", name: "A", slug: "acme-a", isPersonal: false, kind: "application" },
-          { id: "p-prod", name: "Prod", slug: "acme-prod", isPersonal: false, kind: "application" },
-          { id: "p-c", name: "C", slug: "acme-c", isPersonal: false, kind: "application" },
+          {
+            id: "p-a",
+            name: "A",
+            slug: "acme-a",
+            isPersonal: false,
+            kind: "application",
+          },
+          {
+            id: "p-prod",
+            name: "Prod",
+            slug: "acme-prod",
+            isPersonal: false,
+            kind: "application",
+          },
+          {
+            id: "p-c",
+            name: "C",
+            slug: "acme-c",
+            isPersonal: false,
+            kind: "application",
+          },
         ],
       },
     ];

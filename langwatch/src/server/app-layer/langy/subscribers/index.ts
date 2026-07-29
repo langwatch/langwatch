@@ -1,6 +1,6 @@
 export {
-  createAgentTurnLivenessSubscriber,
   type AgentTurnLivenessSubscriberDeps,
+  createAgentTurnLivenessSubscriber,
   type LangyConversationLivenessReader,
   type LangyConversationLivenessRecord,
   type LangyFailTurnCommandPort,

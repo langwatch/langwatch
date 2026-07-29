@@ -31,7 +31,7 @@
  * bucket. The "fetched staged payload" log proves the body round-tripped
  * through S3 before the delete.
  */
-import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -43,13 +43,7 @@ import {
   ListObjectsV2Command,
   S3Client,
 } from "@aws-sdk/client-s3";
-import {
-  afterAll,
-  beforeAll,
-  describe,
-  expect,
-  it,
-} from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { stagedLangevalsFetch } from "../stagedFetch";
 
@@ -388,12 +382,8 @@ async function deleteStagingObjects(h: Harness): Promise<void> {
   const keys = await listStagingObjects(h);
   for (const Key of keys) {
     try {
-      await h.s3.send(
-        new HeadObjectCommand({ Bucket: h.bucket, Key }),
-      );
-      await h.s3.send(
-        new DeleteObjectCommand({ Bucket: h.bucket, Key }),
-      );
+      await h.s3.send(new HeadObjectCommand({ Bucket: h.bucket, Key }));
+      await h.s3.send(new DeleteObjectCommand({ Bucket: h.bucket, Key }));
     } catch {
       /* best-effort cleanup */
     }

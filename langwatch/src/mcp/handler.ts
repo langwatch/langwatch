@@ -14,9 +14,15 @@
  * - POST /oauth/token  — OAuth token endpoint
  */
 
+// biome-ignore-all lint/suspicious/noEmptyBlockStatements: the empty blocks in this file are deliberate no-ops.
+
 import { createHash, randomUUID } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { getConfig, initConfig, runWithConfig } from "@langwatch/mcp-server/config";
+import {
+  getConfig,
+  initConfig,
+  runWithConfig,
+} from "@langwatch/mcp-server/config";
 import { createMcpServer } from "@langwatch/mcp-server/create-mcp-server";
 import { createLogger } from "@langwatch/observability";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
@@ -259,10 +265,7 @@ export function createMcpHandler(): McpHandler {
 
   function setCorsHeaders(res: ServerResponse): void {
     res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader(
-      "Access-Control-Allow-Methods",
-      "GET, POST, DELETE, OPTIONS",
-    );
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
     res.setHeader(
       "Access-Control-Allow-Headers",
       "Content-Type, Authorization, mcp-session-id, MCP-Protocol-Version",
@@ -430,8 +433,7 @@ export function createMcpHandler(): McpHandler {
    * against DB. Returns the API key if valid, or sends a 401 and returns null.
    */
   function send401(res: ServerResponse, error: string): void {
-    const baseUrl =
-      process.env.BASE_HOST ?? "https://app.langwatch.ai";
+    const baseUrl = process.env.BASE_HOST ?? "https://app.langwatch.ai";
     res.setHeader(
       "WWW-Authenticate",
       `Bearer resource_metadata="${baseUrl}/.well-known/oauth-protected-resource"`,
@@ -547,7 +549,10 @@ export function createMcpHandler(): McpHandler {
         SESSION_REDIS_TTL_SECONDS,
       );
       // Track session ID in a per-key set for counting
-      await redis.sadd(`${REDIS_SESSION_SET_PREFIX}${hashApiKey(apiKey)}`, sessionId);
+      await redis.sadd(
+        `${REDIS_SESSION_SET_PREFIX}${hashApiKey(apiKey)}`,
+        sessionId,
+      );
       await redis.expire(
         `${REDIS_SESSION_SET_PREFIX}${hashApiKey(apiKey)}`,
         SESSION_REDIS_TTL_SECONDS,
@@ -601,7 +606,10 @@ export function createMcpHandler(): McpHandler {
     if (!redis) return;
     try {
       await redis.del(`${REDIS_SESSION_PREFIX}${sessionId}`);
-      await redis.srem(`${REDIS_SESSION_SET_PREFIX}${hashApiKey(apiKey)}`, sessionId);
+      await redis.srem(
+        `${REDIS_SESSION_SET_PREFIX}${hashApiKey(apiKey)}`,
+        sessionId,
+      );
     } catch {
       // Best-effort cleanup
     }
@@ -632,7 +640,10 @@ export function createMcpHandler(): McpHandler {
           liveCount++;
         } else {
           // Stale entry — session expired, clean it from the set
-          await redis.srem(`${REDIS_SESSION_SET_PREFIX}${hashApiKey(apiKey)}`, id);
+          await redis.srem(
+            `${REDIS_SESSION_SET_PREFIX}${hashApiKey(apiKey)}`,
+            id,
+          );
         }
       }
       // SSE sessions are connection-bound (not in Redis) — count local only
@@ -658,8 +669,7 @@ export function createMcpHandler(): McpHandler {
     _req: IncomingMessage,
     res: ServerResponse,
   ): void {
-    const baseUrl =
-      process.env.BASE_HOST ?? "https://app.langwatch.ai";
+    const baseUrl = process.env.BASE_HOST ?? "https://app.langwatch.ai";
 
     sendJson(res, 200, {
       resource: baseUrl,
@@ -674,8 +684,7 @@ export function createMcpHandler(): McpHandler {
     res: ServerResponse,
   ): void {
     // Use configured endpoint to prevent host header injection
-    const baseUrl =
-      process.env.BASE_HOST ?? "https://app.langwatch.ai";
+    const baseUrl = process.env.BASE_HOST ?? "https://app.langwatch.ai";
 
     sendJson(res, 200, {
       issuer: baseUrl,
@@ -751,7 +760,10 @@ export function createMcpHandler(): McpHandler {
         client: { redirectUris: body.redirect_uris, clientName },
       });
     } catch (err) {
-      logger.error({ error: err }, "Failed to persist OAuth client registration");
+      logger.error(
+        { error: err },
+        "Failed to persist OAuth client registration",
+      );
       sendJson(res, 500, { error: "server_error" });
       return;
     }
@@ -793,8 +805,7 @@ export function createMcpHandler(): McpHandler {
     if (params.grant_type !== "authorization_code") {
       sendJson(res, 400, {
         error: "unsupported_grant_type",
-        error_description:
-          "Only authorization_code grant type is supported",
+        error_description: "Only authorization_code grant type is supported",
       });
       return;
     }

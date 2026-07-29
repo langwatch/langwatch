@@ -21,24 +21,23 @@
  */
 import { Box, Button, Grid, Table, Text } from "@chakra-ui/react";
 import type {
-  LangyDerivedCard,
   LangyCardHint,
-  LangyDerivedChoicesCard,
   LangyChoiceSelection,
   LangyChoicesLockState,
+  LangyDerivedCard,
+  LangyDerivedChoicesCard,
   LangyDerivedStatsCard,
   LangyDerivedTableCard,
 } from "@langwatch/langy";
 import { ArrowUpRight, BadgeCheck } from "lucide-react";
 import type { ReactNode } from "react";
-
-import { LangySpaAnchor } from "../LangySpaAnchor";
-import { StreamingStatCard } from "../StreamingStatCard";
-import { TimeseriesPlot } from "../capabilities/LangyTimeseriesCard";
 import {
   buildTraceExplorerHref,
   readTraceSearchQuery,
 } from "../../logic/traceExplorerLink";
+import { TimeseriesPlot } from "../capabilities/LangyTimeseriesCard";
+import { LangySpaAnchor } from "../LangySpaAnchor";
+import { StreamingStatCard } from "../StreamingStatCard";
 import { LangyChoicesCard } from "./LangyChoicesCard";
 import { LangyDerivedCardFrame } from "./LangyDerivedCardFrame";
 
@@ -125,7 +124,9 @@ function DerivedBlockBody({
 const MAX_TABLE_ROWS = 30;
 
 /** One cell, one rule per primitive — flat, no branching in the JSX. */
-function formatCell(cell: string | number | boolean | null | undefined): string {
+function formatCell(
+  cell: string | number | boolean | null | undefined,
+): string {
   if (cell === null || cell === undefined) return "—";
   if (typeof cell === "boolean") return cell ? "yes" : "no";
   if (typeof cell === "number") return cell.toLocaleString();

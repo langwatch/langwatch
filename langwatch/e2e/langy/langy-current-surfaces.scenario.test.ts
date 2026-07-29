@@ -9,6 +9,7 @@
 //   npx vitest run langy-current-surfaces.scenario.test.ts --reporter=verbose
 
 import { setupScenarioTracing } from "@langwatch/scenario";
+
 setupScenarioTracing();
 
 import { openai } from "@ai-sdk/openai";

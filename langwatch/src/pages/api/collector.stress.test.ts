@@ -109,17 +109,14 @@ describe("OTEL traces API stress test", () => {
       };
 
       const startTime = Date.now();
-      const response = await fetch(
-        `${LANGWATCH_ENDPOINT}/api/otel/v1/traces`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Auth-Token": apiKey,
-          },
-          body: JSON.stringify(otelPayload),
+      const response = await fetch(`${LANGWATCH_ENDPOINT}/api/otel/v1/traces`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Auth-Token": apiKey,
         },
-      );
+        body: JSON.stringify(otelPayload),
+      });
       const endTime = Date.now();
 
       expect(response.ok).toBe(true);

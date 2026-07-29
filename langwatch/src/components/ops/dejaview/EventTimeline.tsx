@@ -1,6 +1,6 @@
-import { useEffect, useRef } from "react";
 import { Box, HStack, Text } from "@chakra-ui/react";
-import { hashEventTypeColor, formatTimestamp } from "./fragment";
+import { useEffect, useRef } from "react";
+import { formatTimestamp, hashEventTypeColor } from "./fragment";
 import type { EventResult } from "./types";
 
 export function EventTimeline({
@@ -44,8 +44,19 @@ export function EventTimeline({
       bg="bg.subtle"
       flexShrink={0}
     >
-      <HStack paddingX={3} paddingY={1} gap={2} borderBottom="1px solid" borderBottomColor="border">
-        <Text textStyle="xs" color="fg.muted" fontWeight="medium" flexShrink={0}>
+      <HStack
+        paddingX={3}
+        paddingY={1}
+        gap={2}
+        borderBottom="1px solid"
+        borderBottomColor="border"
+      >
+        <Text
+          textStyle="xs"
+          color="fg.muted"
+          fontWeight="medium"
+          flexShrink={0}
+        >
           Timeline
         </Text>
         <Box flex={1} />

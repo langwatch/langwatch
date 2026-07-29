@@ -106,9 +106,7 @@ describe("VirtualKeyService product-managed guard", () => {
     /** @scenario "Product-managed virtual keys are absent from customer listings" */
     it("constrains the organization listing to customer-owned keys", async () => {
       const findMany = vi.fn().mockResolvedValue([]);
-      const sut = VirtualKeyService.create(
-        mockPrisma(vkRow("USER"), findMany),
-      );
+      const sut = VirtualKeyService.create(mockPrisma(vkRow("USER"), findMany));
 
       await sut.getAll("org_1");
 
@@ -124,9 +122,7 @@ describe("VirtualKeyService product-managed guard", () => {
 
     it("constrains the scope listing to customer-owned keys", async () => {
       const findMany = vi.fn().mockResolvedValue([]);
-      const sut = VirtualKeyService.create(
-        mockPrisma(vkRow("USER"), findMany),
-      );
+      const sut = VirtualKeyService.create(mockPrisma(vkRow("USER"), findMany));
 
       await sut.getAllForScope({ scopeType: "PROJECT", scopeId: "proj_1" });
 

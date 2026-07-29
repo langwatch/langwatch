@@ -8,7 +8,10 @@ import type { LicenseData, SignedLicense } from "./types";
  * @param privateKey - RSA private key in PEM format
  * @returns SignedLicense with data and base64-encoded signature
  */
-export function signLicense(data: LicenseData, privateKey: string): SignedLicense {
+export function signLicense(
+  data: LicenseData,
+  privateKey: string,
+): SignedLicense {
   const dataString = JSON.stringify(data);
   const sign = crypto.createSign("SHA256");
   sign.update(dataString);

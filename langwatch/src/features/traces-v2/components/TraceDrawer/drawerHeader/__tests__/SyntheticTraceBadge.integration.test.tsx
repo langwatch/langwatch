@@ -47,8 +47,9 @@ describe("<SyntheticTraceBadge />", () => {
       // The explanation is mirrored onto the accessible label and the hover
       // tooltip, so asserting the accessible label proves the reader is told
       // the trace was grouped by `session.id`.
-      expect(screen.getByLabelText(/grouped them into one trace by session\.id/i))
-        .toBeInTheDocument();
+      expect(
+        screen.getByLabelText(/grouped them into one trace by session\.id/i),
+      ).toBeInTheDocument();
     });
 
     it("stays general when the ingestion path could not name a grouping key", () => {
@@ -63,14 +64,18 @@ describe("<SyntheticTraceBadge />", () => {
   describe("given an ordinary trace", () => {
     it("renders nothing", () => {
       renderBadge({ "service.name": "my-app" });
-      expect(screen.queryByText("Grouped by LangWatch")).not.toBeInTheDocument();
+      expect(
+        screen.queryByText("Grouped by LangWatch"),
+      ).not.toBeInTheDocument();
     });
   });
 
   describe("given only the per-record span-level synthetic marker", () => {
     it("renders nothing (a real trace must not read as synthetic)", () => {
       renderBadge({ "langwatch.span.synthetic": "true" });
-      expect(screen.queryByText("Grouped by LangWatch")).not.toBeInTheDocument();
+      expect(
+        screen.queryByText("Grouped by LangWatch"),
+      ).not.toBeInTheDocument();
     });
   });
 });

@@ -1,9 +1,9 @@
+import { differenceInDays, isToday, isYesterday } from "date-fns";
 import { useCallback, useMemo } from "react";
 import { useLocalStorage } from "usehooks-ts";
-import { isToday, isYesterday, differenceInDays } from "date-fns";
-import type { RecentItem, RecentItemType } from "./types";
-import { RecentItemSchema } from "./types";
 import { MAX_RECENT_ITEMS } from "./constants";
+import type { RecentItem } from "./types";
+import { RecentItemSchema } from "./types";
 
 const STORAGE_KEY = "langwatch-recent-items";
 
@@ -37,7 +37,7 @@ function getTimeGroup(timestamp: number): TimeGroup {
 export function useRecentItems() {
   const [recentItems, setRecentItems] = useLocalStorage<RecentItem[]>(
     STORAGE_KEY,
-    []
+    [],
   );
 
   /**
@@ -62,7 +62,7 @@ export function useRecentItems() {
         return updated.slice(0, MAX_RECENT_ITEMS);
       });
     },
-    [setRecentItems]
+    [setRecentItems],
   );
 
   /**
@@ -86,7 +86,7 @@ export function useRecentItems() {
 
     // Filter out items older than 30 days
     const validItems = safeItems.filter(
-      (item) => now - item.accessedAt < thirtyDaysMs
+      (item) => now - item.accessedAt < thirtyDaysMs,
     );
 
     const groups: GroupedRecentItems = {

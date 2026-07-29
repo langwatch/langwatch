@@ -8,7 +8,6 @@
 import { snakeCase } from "../../../utils/stringCasing";
 import type { FilterField } from "../../filters/types";
 import { isZeroWhenAbsentSeries, type SeriesInputType } from "../registry";
-import type { AggregationTypes } from "../types";
 import {
   buildJoinClause,
   type CHTable,
@@ -19,10 +18,7 @@ import {
   TRACE_IDENTITY_COLUMNS,
   tableAliases,
 } from "./field-mappings";
-import {
-  type FilterTranslation,
-  translateAllFilters,
-} from "./filter-translator";
+import { translateAllFilters } from "./filter-translator";
 import {
   buildMetricAlias,
   type MetricTranslation,

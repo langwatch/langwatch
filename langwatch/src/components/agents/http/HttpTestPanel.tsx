@@ -497,7 +497,12 @@ export function HttpTestPanel({
           <Alert.Content>
             <Alert.Title>Invalid JSON in body template</Alert.Title>
             <Alert.Description fontFamily="mono" fontSize="sm">
-              {bodyValidation.error}
+              {/* The JSON parser's own message, from a local `JSON.parse` of a
+                  template the author is editing right here — it names the
+                  offending token and position, which is the whole point. It
+                  never crossed the wire, so it is not a handled error's code
+                  slug and carries no server internals. */}
+              {bodyValidation.error /* no-raw-error-toast-ok */}
             </Alert.Description>
           </Alert.Content>
         </Alert.Root>

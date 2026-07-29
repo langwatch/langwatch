@@ -23,8 +23,8 @@ export function useFilteredAgents(
   searchValue: string,
 ): ScenarioAgent[] {
   return useMemo(() => {
-    const scenarioAgents = (agents ?? []).filter(
-      (a): a is ScenarioAgent => SCENARIO_AGENT_TYPES.has(a.type),
+    const scenarioAgents = (agents ?? []).filter((a): a is ScenarioAgent =>
+      SCENARIO_AGENT_TYPES.has(a.type),
     );
     const sorted = [...scenarioAgents].sort(
       (a, b) =>

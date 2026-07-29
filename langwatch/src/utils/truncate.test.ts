@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { safeTruncate } from "./truncate";
 
 describe("safeTruncate", () => {
-  it("should not modify small objects", () => {
+  it("does not modify small objects", () => {
     const input = {
       name: "test",
       value: 123,
@@ -11,12 +11,12 @@ describe("safeTruncate", () => {
     expect(safeTruncate(input)).toEqual(input);
   });
 
-  it("should not modify strings", () => {
+  it("does not modify strings", () => {
     const input = "test";
     expect(safeTruncate(input)).toEqual(input);
   });
 
-  it("should truncate long strings", () => {
+  it("truncates long strings", () => {
     const longString = "a".repeat(40 * 1024); // 40KB string
     const result = safeTruncate({ text: longString }, 16 * 1024); // Truncate to 16kb
 
@@ -24,7 +24,7 @@ describe("safeTruncate", () => {
     expect(result.text.endsWith("...")).toBe(true);
   });
 
-  it("should handle nested objects with long strings", () => {
+  it("handles nested objects with long strings", () => {
     const input = {
       level1: {
         level2: {
@@ -38,7 +38,7 @@ describe("safeTruncate", () => {
     expect(result.level1.level2.text.endsWith("...")).toBe(true);
   });
 
-  it("should handle arrays", () => {
+  it("handles arrays", () => {
     const input = {
       items: ["a".repeat(20 * 1024), "b".repeat(20 * 1024)],
     };
@@ -50,7 +50,7 @@ describe("safeTruncate", () => {
     expect(result.items[1].endsWith("...")).toBe(true);
   });
 
-  it("should progressively reduce string sizes for large objects", () => {
+  it("progressivelies reduce string sizes for large objects", () => {
     const input = {
       text1: "a".repeat(20 * 1024),
       text2: "b".repeat(20 * 1024),
@@ -62,7 +62,7 @@ describe("safeTruncate", () => {
     expect(totalSize).toBeLessThanOrEqual(32 * 1024);
   });
 
-  it("should drop keys and add truncation marker when necessary", () => {
+  it("drops keys and add truncation marker when necessary", () => {
     const input: Record<string, string> = {};
     for (let i = 0; i < 100; i++) {
       input[`key${i}`] = "a".repeat(1024);
@@ -77,18 +77,18 @@ describe("safeTruncate", () => {
     );
   });
 
-  it("should handle null and undefined", () => {
+  it("handles null and undefined", () => {
     expect(safeTruncate(null)).toBe(null);
     expect(safeTruncate(undefined)).toBe(undefined);
   });
 
-  it("should handle primitive types", () => {
+  it("handles primitive types", () => {
     expect(safeTruncate(123)).toBe(123);
     expect(safeTruncate(true)).toBe(true);
     expect(safeTruncate("short string")).toBe("short string");
   });
 
-  it("should handle circular references errors by just returning the original object and reporting the error", () => {
+  it("handles circular references errors by just returning the original object and reporting the error", () => {
     const circular: any = { foo: "bar" };
     circular.self = circular;
 

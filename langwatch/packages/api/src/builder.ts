@@ -3,8 +3,8 @@ import { Hono } from "hono";
 import { createErrorHandler } from "./errors.js";
 import { loggerMiddleware, tracerMiddleware } from "./middleware.js";
 import { mountResolvedRoutes } from "./route-mounting.js";
-import { isDateVersion } from "./types.js";
 import type { BaseApp, EndpointRegistration, ServiceConfig } from "./types.js";
+import { isDateVersion } from "./types.js";
 import { VersionBuilder } from "./version-builder.js";
 import { resolveVersions, type VersionDefinition } from "./versioning.js";
 
@@ -117,8 +117,7 @@ class ServiceBuilder<TProject, TProviders extends Record<string, unknown>> {
       app.use("*", middleware);
     }
 
-    const onError =
-      this._config.onError ?? createErrorHandler();
+    const onError = this._config.onError ?? createErrorHandler();
     mountResolvedRoutes({
       app,
       onError,
@@ -155,7 +154,7 @@ class ServiceBuilder<TProject, TProviders extends Record<string, unknown>> {
 /** Creates a new typed service builder. */
 export function createService<TProject = unknown>(
   config: ServiceConfig,
-  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
+  // biome-ignore lint/complexity/noBannedTypes: the route map starts empty and is widened by each .route() call; Record<string, never> would reject them.
 ): ServiceBuilder<TProject, {}> {
   return new ServiceBuilder(config);
 }

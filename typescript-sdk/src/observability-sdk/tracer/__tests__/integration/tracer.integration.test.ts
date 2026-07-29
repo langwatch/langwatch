@@ -77,7 +77,7 @@ describe("Tracer Integration Tests", () => {
   });
 
   describe("span creation and data flow", () => {
-    it("should create spans with proper LangWatch attributes through real OpenTelemetry", async () => {
+    it("creates spans with proper LangWatch attributes through real OpenTelemetry", async () => {
       const tracer = getLangWatchTracer("integration-test-tracer");
 
       // Create span with LangWatch enhancements
@@ -143,7 +143,7 @@ describe("Tracer Integration Tests", () => {
       }
     });
 
-    it("should handle nested spans with proper parent-child relationships", async () => {
+    it("handles nested spans with proper parent-child relationships", async () => {
       const tracer = getLangWatchTracer("nested-spans-test");
 
       await tracer.withActiveSpan("parent-workflow", async (parent) => {
@@ -201,7 +201,7 @@ describe("Tracer Integration Tests", () => {
       expect(child2Span.attributes[semconv.ATTR_LANGWATCH_SPAN_TYPE]).toBe("tool");
     });
 
-    it("should handle errors and exceptions properly", async () => {
+    it("handles errors and exceptions properly", async () => {
       const tracer = getLangWatchTracer("error-handling-test");
 
       await expect(
@@ -245,7 +245,7 @@ describe("Tracer Integration Tests", () => {
   });
 
   describe("startSpan method integration", () => {
-    it("should create enhanced spans via startSpan with proper data flow", () => {
+    it("creates enhanced spans via startSpan with proper data flow", () => {
       const tracer = getLangWatchTracer("start-span-test");
 
       const span = tracer.startSpan("manual-span");
@@ -272,7 +272,7 @@ describe("Tracer Integration Tests", () => {
   });
 
   describe("tracer-specific functionality", () => {
-    it("should handle tracer provider integration correctly", async () => {
+    it("handles tracer provider integration correctly", async () => {
       const tracer = getLangWatchTracer("provider-integration-test");
 
       await tracer.withActiveSpan("provider-test", async (span) => {
@@ -300,7 +300,7 @@ describe("Tracer Integration Tests", () => {
   });
 
   describe("global tracer provider integration", () => {
-    it("should use the globally configured tracer provider", () => {
+    it("uses the globally configured tracer provider", () => {
       // Get tracer using global provider
       const tracer1 = getLangWatchTracer("global-test-1");
       const tracer2 = getLangWatchTracer("global-test-2");
@@ -321,7 +321,7 @@ describe("Tracer Integration Tests", () => {
   });
 
   describe("performance and concurrency", () => {
-    it("should handle concurrent span creation efficiently", async () => {
+    it("handles concurrent span creation efficiently", async () => {
       const tracer = getLangWatchTracer("concurrent-test");
 
       const concurrentOperations = Array.from({ length: 10 }, (_, i) =>
@@ -359,7 +359,7 @@ describe("Tracer Integration Tests", () => {
       });
     });
 
-    it("should handle rapid span creation/deletion cycles", async () => {
+    it("handles rapid span creation/deletion cycles", async () => {
       const tracer = getLangWatchTracer("rapid-cycle-test");
       const cycles = 50;
 
@@ -392,7 +392,7 @@ describe("Tracer Integration Tests", () => {
       expect(allCompleted).toBe(true);
     });
 
-    it("should handle large data volumes efficiently", async () => {
+    it("handles large data volumes efficiently", async () => {
       const tracer = getLangWatchTracer("large-data-test");
 
       // Create moderately large input data
@@ -430,7 +430,7 @@ describe("Tracer Integration Tests", () => {
   });
 
   describe("attribute and metadata validation", () => {
-    it("should validate and sanitize attribute values", async () => {
+    it("validates and sanitize attribute values", async () => {
       const tracer = getLangWatchTracer("attribute-validation-test");
 
       await tracer.withActiveSpan("validation-span", async (span) => {
@@ -461,7 +461,7 @@ describe("Tracer Integration Tests", () => {
       expect("undefined.attr" in span.attributes).toBe(false);
     });
 
-    it("should handle complex attribute type coercion", async () => {
+    it("handles complex attribute type coercion", async () => {
       const tracer = getLangWatchTracer("attribute-coercion-test");
 
       await tracer.withActiveSpan("coercion-span", async (span) => {
@@ -506,7 +506,7 @@ describe("Tracer Integration Tests", () => {
   });
 
   describe("error boundary and recovery", () => {
-    it("should handle span operation failures gracefully", async () => {
+    it("handles span operation failures gracefully", async () => {
       const tracer = getLangWatchTracer("span-failure-test");
 
       // Test span that encounters issues during configuration
@@ -550,7 +550,7 @@ describe("Tracer Integration Tests", () => {
       expect(inputData.value).toBe("Valid input data");
     });
 
-    it("should handle context corruption gracefully", async () => {
+    it("handles context corruption gracefully", async () => {
       const tracer = getLangWatchTracer("context-corruption-test");
 
       // Create a normal span first
@@ -604,7 +604,7 @@ describe("Tracer Integration Tests", () => {
       expect(traceIds.size).toBe(1); // All spans should be in the same trace
     });
 
-    it("should handle provider shutdown during span operations", async () => {
+    it("handles provider shutdown during span operations", async () => {
       const tracer = getLangWatchTracer("shutdown-test");
 
       // Start a span operation

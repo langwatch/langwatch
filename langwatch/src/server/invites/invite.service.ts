@@ -13,6 +13,7 @@ import { KSUID_RESOURCES } from "~/utils/constants";
 import { LimitExceededError } from "../license-enforcement/errors";
 import { RoleService } from "../role/role.service";
 import {
+  AlreadyOrganizationMemberError,
   DuplicateInviteError,
   InviteNotFoundError,
   InviteNotReadyError,
@@ -69,7 +70,7 @@ export function classifyInvitesByMemberType(
     role: OrganizationUserRole;
     teams?: Array<{ customRoleId?: string }>;
   }>,
-  customRoleMap: Map<string, string[]>
+  customRoleMap: Map<string, string[]>,
 ): { fullMembers: number; liteMembers: number } {
   let fullMembers = 0;
   let liteMembers = 0;
@@ -167,7 +168,7 @@ export class InviteService {
    */
   static create(
     prisma: PrismaClient | Prisma.TransactionClient,
-    options?: { planProvider?: PlanProvider }
+    options?: { planProvider?: PlanProvider },
   ): InviteService {
     const licenseRepo = new LicenseEnforcementRepository(prisma);
     const provider: PlanProvider = options?.planProvider ?? {
@@ -197,6 +198,41 @@ export class InviteService {
         OR: [{ expiration: { gt: new Date() } }, { expiration: null }],
       },
     });
+  }
+
+  /**
+   * Refuses any address that already belongs to a member of this organization.
+   *
+   * Runs before the invites are written, and refuses the whole batch rather
+   * than quietly dropping the offending row: an admin who typed five addresses
+   * and got four invites with no comment on the fifth has been told nothing.
+   *
+   * Membership is by user, and an invite is by email, so the two are joined
+   * through `User.email`. An address with no account cannot be a member yet, so
+   * it is simply absent from the lookup.
+   */
+  async assertNotAlreadyMembers({
+    emails,
+    organizationId,
+  }: {
+    emails: string[];
+    organizationId: string;
+  }): Promise<void> {
+    if (emails.length === 0) return;
+
+    const existing = await this.prisma.organizationUser.findFirst({
+      where: {
+        organizationId,
+        user: { email: { in: emails, mode: "insensitive" } },
+      },
+      select: { user: { select: { email: true } } },
+    });
+
+    if (existing) {
+      // The stored address, not the typed one: it is the one shown in the
+      // members table the admin is being sent back to.
+      throw new AlreadyOrganizationMemberError(existing.user.email ?? "");
+    }
   }
 
   /**
@@ -241,33 +277,28 @@ export class InviteService {
       user,
     });
 
-    const currentFullMembers = await this.licenseRepo.getMemberCount(
-      organizationId
-    );
-    const currentMembersLite = await this.licenseRepo.getMembersLiteCount(
-      organizationId
-    );
+    const currentFullMembers =
+      await this.licenseRepo.getMemberCount(organizationId);
+    const currentMembersLite =
+      await this.licenseRepo.getMembersLiteCount(organizationId);
 
     const customRoles = await this.prisma.customRole.findMany({
       where: { organizationId },
       select: { id: true, permissions: true },
     });
     const customRoleMap = new Map(
-      customRoles.map((r) => [r.id, (r.permissions as string[] | null) ?? []])
+      customRoles.map((r) => [r.id, (r.permissions as string[] | null) ?? []]),
     );
 
     const { fullMembers: newFullMembers, liteMembers: newLiteMembers } =
       classifyInvitesByMemberType(newInvites, customRoleMap);
 
     if (!subscriptionLimits.overrideAddingLimitations) {
-      if (
-        currentFullMembers + newFullMembers >
-        subscriptionLimits.maxMembers
-      ) {
+      if (currentFullMembers + newFullMembers > subscriptionLimits.maxMembers) {
         throw new LimitExceededError(
           "members",
           currentFullMembers,
-          subscriptionLimits.maxMembers
+          subscriptionLimits.maxMembers,
         );
       }
       if (
@@ -277,7 +308,7 @@ export class InviteService {
         throw new LimitExceededError(
           "membersLite",
           currentMembersLite,
-          subscriptionLimits.maxMembersLite
+          subscriptionLimits.maxMembersLite,
         );
       }
     }
@@ -290,7 +321,7 @@ export class InviteService {
    * @returns The created invite and its organization (for email sending later)
    */
   async createAdminInviteRecord(
-    input: CreateAdminInviteInput
+    input: CreateAdminInviteInput,
   ): Promise<{ invite: OrganizationInvite; organization: Organization }> {
     const inviteCode = nanoid();
 
@@ -325,7 +356,11 @@ export class InviteService {
    * Attempts to send an invite email, catching failures gracefully.
    * Returns whether the email was not sent (due to missing provider or error).
    */
-  async trySendInviteEmail({ email, organization, inviteCode }: {
+  async trySendInviteEmail({
+    email,
+    organization,
+    inviteCode,
+  }: {
     email: string;
     organization: Organization;
     inviteCode: string;
@@ -348,7 +383,7 @@ export class InviteService {
    * Tracks the requestedBy user ID.
    */
   async createMemberInviteRequest(
-    input: CreateMemberInviteRequestInput
+    input: CreateMemberInviteRequestInput,
   ): Promise<{ invite: OrganizationInvite }> {
     const existingInvite = await this.checkDuplicateInvite({
       email: input.email,
@@ -388,7 +423,7 @@ export class InviteService {
    * - Attempts to send invitation email (failure does not revert approval)
    */
   async approveInvite(
-    input: ApproveInviteInput
+    input: ApproveInviteInput,
   ): Promise<{ invite: OrganizationInvite; emailNotSent: boolean }> {
     const invite = await this.prisma.organizationInvite.findFirst({
       where: {
@@ -429,7 +464,7 @@ export class InviteService {
    * No expiration, no email — waits for Stripe checkout success.
    */
   async createPaymentPendingInvite(
-    input: CreatePaymentPendingInviteInput
+    input: CreatePaymentPendingInviteInput,
   ): Promise<OrganizationInvite> {
     const inviteCode = nanoid();
 
@@ -457,7 +492,9 @@ export class InviteService {
    * project in the org so the client can land directly in the app rather than
    * hitting the onboarding flow.
    */
-  async findLandingProjectSlug(invite: OrganizationInvite): Promise<string | null> {
+  async findLandingProjectSlug(
+    invite: OrganizationInvite,
+  ): Promise<string | null> {
     // Collect all invited team IDs from either format
     const invitedTeamIds = (() => {
       if (invite.teamAssignments && Array.isArray(invite.teamAssignments)) {
@@ -479,7 +516,8 @@ export class InviteService {
           })
         : null) ??
       // Org-wide fallback only for roles with broad access (ADMIN/MEMBER)
-      (invite.role === OrganizationUserRole.ADMIN || invite.role === OrganizationUserRole.MEMBER
+      (invite.role === OrganizationUserRole.ADMIN ||
+      invite.role === OrganizationUserRole.MEMBER
         ? await this.prisma.project.findFirst({
             where: {
               team: { organizationId: invite.organizationId, archivedAt: null },

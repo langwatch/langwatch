@@ -301,4 +301,3 @@ describe("formHasContent", () => {
     expect(formHasContent(mockForm as never)).toBe(false);
   });
 });
-

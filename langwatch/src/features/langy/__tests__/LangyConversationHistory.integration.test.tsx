@@ -201,6 +201,13 @@ vi.mock("@paper-design/shaders-react", () => ({
 // "Unable to retrieve application context" with no tRPC provider).
 vi.mock("~/utils/api", async () => {
   const React = await import("react");
+  // Peripheral menus in the panel header (Foundry/ops permission, etc.) each
+  // pull their own tRPC queries these tests do not care about; the shared
+  // harness answers every one of them inert. Only the langy surface and the
+  // model picker below are explicit.
+  const { createTrpcUtils, withFallback } = await import(
+    "./support/langyApiMock"
+  );
 
   // A minimal, `enabled`-honouring stand-in for a tRPC query: one async
   // resolution per arm / refetch / invalidate, loading → success | error, no
@@ -407,68 +414,15 @@ vi.mock("~/utils/api", async () => {
   };
 
   // The React Query utils tree, shared by useUtils() and useContext(). Only
-  // list.invalidate does real work (drives the recents refresh after a delete);
-  // the rest exist so useLangyFreshness's SSE handler can reference them without
-  // throwing at render — that handler never runs here (no SSE data).
-  const trpcUtils = {
-    langy: {
-      list: {
-        getData: () => undefined,
-        setData: () => undefined,
-        getInfiniteData: () => undefined,
-        setInfiniteData: () => undefined,
-        cancel: () => Promise.resolve(),
-        invalidate: (input?: unknown) => {
-          spies.listInvalidate(input);
-          bumpList();
-          return Promise.resolve();
-        },
-      },
-      messages: {
-        invalidate: () => Promise.resolve(),
-      },
-      detail: {
-        setData: () => undefined,
-      },
+  // list.invalidate does real work here — it drives the recents refresh after a
+  // delete, which is this suite's own business; the rest of the tree comes from
+  // the shared harness.
+  const trpcUtils = createTrpcUtils({
+    onListInvalidate: (input) => {
+      spies.listInvalidate(input);
+      bumpList();
     },
-    langyGithub: {
-      getInstallStatus: { invalidate: () => Promise.resolve() },
-    },
-  };
-
-  // Peripheral menus in the panel header (Foundry/ops permission, etc.) each
-  // pull their own tRPC queries that these tests don't care about. Rather than
-  // enumerate every one, a recursive proxy answers any UNMOCKED router with a
-  // settled-idle query / no-op mutation / no-op subscription. The langy surface
-  // and the model-picker below stay explicit; everything else is inert.
-  const idleQuery = () => ({
-    data: undefined,
-    isLoading: false,
-    isInitialLoading: false,
-    isFetching: false,
-    isPreviousData: false,
-    isFetched: true,
-    isError: false,
-    error: null,
-    refetch: () => Promise.resolve(),
   });
-  const noopMutation = () => ({
-    mutate: () => undefined,
-    mutateAsync: () => Promise.resolve(),
-    isPending: false,
-  });
-  const routerProxy: unknown = new Proxy(
-    {},
-    {
-      get: (_t, prop) => {
-        if (prop === "useQuery" || prop === "useInfiniteQuery")
-          return idleQuery;
-        if (prop === "useMutation") return noopMutation;
-        if (prop === "useSubscription") return () => undefined;
-        return routerProxy;
-      },
-    },
-  );
 
   const explicitApi: Record<string, unknown> = {
     langy: {
@@ -610,12 +564,7 @@ vi.mock("~/utils/api", async () => {
     },
   };
 
-  const apiHandler: ProxyHandler<Record<string, unknown>> = {
-    get: (target, prop) =>
-      prop in target ? target[prop as string] : (routerProxy as never),
-  };
-
-  return { api: new Proxy(explicitApi, apiHandler) };
+  return { api: withFallback(explicitApi) };
 });
 
 import { toaster } from "~/components/ui/toaster";
@@ -728,8 +677,7 @@ async function openRecentOption(pattern: RegExp): Promise<void> {
   const titleButton = within(row)
     .getAllByRole("button")
     .find(
-      (button) =>
-        button.getAttribute("aria-label") !== "Conversation actions",
+      (button) => button.getAttribute("aria-label") !== "Conversation actions",
     );
   expect(titleButton).toBeDefined();
   await userEvent.click(titleButton!);

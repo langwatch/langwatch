@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
-import { createRunHistoryStore } from "../useRunHistoryStore";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { RunHistoryState } from "../useRunHistoryStore";
+import { createRunHistoryStore } from "../useRunHistoryStore";
 
 /**
  * Unit tests for the run history store.

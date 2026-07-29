@@ -80,6 +80,7 @@ describe("createCommandEvents()", () => {
 
   describe("given the feature flag is unset", () => {
     describe("when a command emits its whole life cycle", () => {
+      /** @scenario "No events are emitted when the feature flag is unset" */
       it("constructs no exporter and emits nothing", async () => {
         const events = createCommandEvents({
           resource: "trace",
@@ -103,6 +104,7 @@ describe("createCommandEvents()", () => {
 
   describe("given the flag is set but no collector is configured", () => {
     describe("when a command emits its life cycle", () => {
+      /** @scenario "No events are emitted when the flag is on but no collector is configured" */
       it("constructs no exporter and emits nothing", async () => {
         const events = createCommandEvents({
           resource: "trace",
@@ -122,6 +124,7 @@ describe("createCommandEvents()", () => {
 
   describe("given the channel is switched on", () => {
     describe("when a command reports a full life cycle", () => {
+      /** @scenario "A trace search reports start, count, progress and completion" */
       it("emits started, count, progress and completed in order", async () => {
         const events = createCommandEvents({
           resource: "trace",
@@ -143,6 +146,7 @@ describe("createCommandEvents()", () => {
         ]);
       });
 
+      /** @scenario "A trace search reports start, count, progress and completion" */
       it("carries the resource and verb on every record", async () => {
         const events = createCommandEvents({
           resource: "trace",
@@ -160,6 +164,7 @@ describe("createCommandEvents()", () => {
         }
       });
 
+      /** @scenario "A trace search reports start, count, progress and completion" */
       it("carries the matched count and a human message on the count record", async () => {
         const events = createCommandEvents({
           resource: "trace",
@@ -178,6 +183,7 @@ describe("createCommandEvents()", () => {
         });
       });
 
+      /** @scenario "A trace search reports start, count, progress and completion" */
       it("carries the elapsed duration on the completed record", async () => {
         const events = createCommandEvents({
           resource: "trace",
@@ -194,6 +200,7 @@ describe("createCommandEvents()", () => {
         expect(completed[ATTR.durationMs] as number).toBeGreaterThanOrEqual(0);
       });
 
+      /** @scenario "The channel switches on when the flag and a collector are both present" */
       it("sends the records to the configured OTLP logs endpoint", async () => {
         const events = createCommandEvents({
           resource: "trace",
@@ -232,6 +239,7 @@ describe("createCommandEvents()", () => {
       // exercises the real production path rather than an injected stand-in.
       // Correlation is the whole point of the channel: without it the panel cannot
       // tell which turn an event belongs to.
+      /** @scenario "The turn the CLI was run for is carried on the events" */
       it("carries the conversation and turn on the resource", async () => {
         const previous = process.env.OTEL_RESOURCE_ATTRIBUTES;
         process.env.OTEL_RESOURCE_ATTRIBUTES =
@@ -263,6 +271,7 @@ describe("createCommandEvents()", () => {
 
   describe("given the collector is broken", () => {
     describe("when the exporter throws on every export", () => {
+      /** @scenario "A collector that rejects the export does not fail the command" */
       it("does not fail the command", async () => {
         loggerEmit.mockImplementation(() => {
           throw new Error("collector refused the connection");
@@ -282,6 +291,7 @@ describe("createCommandEvents()", () => {
     });
 
     describe("when the collector never answers", () => {
+      /** @scenario "A collector that never answers does not hang the command" */
       it("bounds the flush instead of hanging the command", async () => {
         forceFlush.mockImplementation(() => new Promise<void>(() => undefined));
 
@@ -303,6 +313,7 @@ describe("createCommandEvents()", () => {
 
   describe("given a command fails", () => {
     describe("when the failure message quotes the API key", () => {
+      /** @scenario "A failure whose message quotes the API key is redacted" */
       it("redacts the key out of the error event", async () => {
         const apiKey = "sk-lw-super-secret-key-value";
         const events = createCommandEvents({
@@ -324,6 +335,7 @@ describe("createCommandEvents()", () => {
     });
 
     describe("when the failure is a plain message", () => {
+      /** @scenario "A failed command reports an error event" */
       it("carries the reason on the error event", async () => {
         const events = createCommandEvents({
           resource: "trace",

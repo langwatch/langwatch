@@ -128,9 +128,7 @@ describe("traceSummary full-flow integration", () => {
         expect(state.totalCost).not.toBeNull();
         expect(state.totalCost).toBeGreaterThan(0);
         expect(state.models).toContain("gpt-5-mini");
-        expect(state.computedInput).toBe(
-          "What is the weather in Tokyo?",
-        );
+        expect(state.computedInput).toBe("What is the weather in Tokyo?");
         expect(state.computedOutput).toBe(
           "The weather in Tokyo is sunny, 22C.",
         );
@@ -230,9 +228,7 @@ describe("traceSummary full-flow integration", () => {
         state = applySpanToSummary({ state, span: toolCallSpan });
 
         // Root langwatch.input/output wins I/O
-        expect(state.computedInput).toBe(
-          "Tell me about quantum computing",
-        );
+        expect(state.computedInput).toBe("Tell me about quantum computing");
         expect(state.computedOutput).toBe(
           "Quantum computing uses qubits that can exist in superposition.",
         );
@@ -298,8 +294,7 @@ describe("traceSummary full-flow integration", () => {
             "gen_ai.output.messages": [
               {
                 role: "assistant",
-                content:
-                  "Here is a summary of the latest news headlines.",
+                content: "Here is a summary of the latest news headlines.",
               },
             ],
           },
@@ -444,9 +439,7 @@ describe("traceSummary full-flow integration", () => {
         state = applySpanToSummary({ state, span: chatSpan });
         state = applySpanToSummary({ state, span: executeToolSpan });
 
-        expect(state.models).toContain(
-          "gpt-5-mini",
-        );
+        expect(state.models).toContain("gpt-5-mini");
         expect(state.totalPromptTokenCount).toBe(300);
         expect(state.totalCompletionTokenCount).toBe(150);
         expect(state.computedInput).toBe(

@@ -67,7 +67,7 @@ func TestSignatureOf_BindsWorkerToProjectAndActor(t *testing.T) {
 	}
 }
 
-// A per-project egress allow-list change (ADR-043) must recycle the worker so a
+// A per-project egress allow-list change (ADR-076) must recycle the worker so a
 // live worker never runs a stale egress policy; a semantically-equal list must
 // NOT, or a benign re-save would needlessly kill the conversation's worker.
 func TestSignatureOf_EgressAllowlistChangeRecyclesWorker(t *testing.T) {

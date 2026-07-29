@@ -17,13 +17,18 @@ export function getTenantRateTracker(): TenantRateTracker | null {
   return _tenantRateTracker;
 }
 
-export { TenantRateTracker, tenantIdFromGroupId } from "./tenantRateTracker";
 export {
   AnomalyDetector,
-  SURFACE_TIER_MULTIPLIER,
   HARD_TIER_MULTIPLIER,
-  SURFACE_TIER_SUSTAIN_MINUTES,
   HARD_TIER_SUSTAIN_MINUTES,
+  SURFACE_TIER_MULTIPLIER,
+  SURFACE_TIER_SUSTAIN_MINUTES,
 } from "./anomalyDetector";
-export { AnomalyStateStore, type Anomaly, type AnomalyKind, type AnomalyTier } from "./anomalyState";
+export {
+  type Anomaly,
+  type AnomalyKind,
+  AnomalyStateStore,
+  type AnomalyTier,
+} from "./anomalyState";
 export { startAnomalyWorker } from "./anomalyWorker";
+export { TenantRateTracker, tenantIdFromGroupId } from "./tenantRateTracker";

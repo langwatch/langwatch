@@ -24,16 +24,16 @@
  * @see specs/scenarios/simulation-runner.feature (Worker-Based Execution scenarios)
  */
 
-import { trace, type TracerProvider } from "@opentelemetry/api";
 import * as ScenarioRunner from "@langwatch/scenario";
-import type { ChildProcessJobData } from "./types";
-import { createModelFromParams } from "./model.factory";
-import { createAdapter } from "./serialized-adapter.registry";
-import { RemoteSpanJudgeAgent } from "./remote-span-judge-agent";
-import { createTraceApiSpanQuery } from "./trace-api-span-query";
-import { SerializedHttpAgentAdapter } from "./serialized-adapters/http-agent.adapter";
+import { type TracerProvider, trace } from "@opentelemetry/api";
 import { bridgeTraceIdFromAdapterToJudge } from "./bridge-trace-id";
 import { createChildProcessLogger } from "./child-logger";
+import { createModelFromParams } from "./model.factory";
+import { RemoteSpanJudgeAgent } from "./remote-span-judge-agent";
+import { createAdapter } from "./serialized-adapter.registry";
+import { SerializedHttpAgentAdapter } from "./serialized-adapters/http-agent.adapter";
+import { createTraceApiSpanQuery } from "./trace-api-span-query";
+import type { ChildProcessJobData } from "./types";
 
 const logger = createChildProcessLogger("langwatch:scenarios:child");
 
@@ -145,7 +145,10 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
           });
           return remoteSpanJudge;
         })()
-      : ScenarioRunner.judgeAgent({ criteria: scenario.criteria, model: judgeModel });
+      : ScenarioRunner.judgeAgent({
+          criteria: scenario.criteria,
+          model: judgeModel,
+        });
 
   // Results are reported via LangWatch SDK automatically
   const verbose = process.env.SCENARIO_VERBOSE === "true";
@@ -199,9 +202,10 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
 
   // Output JSON result to stdout for parent process to parse
   // Only stdout contains the JSON result; all other output goes to stderr
-  const outputResult: { success: boolean; reasoning?: string; error?: string } = {
-    success: result.success,
-  };
+  const outputResult: { success: boolean; reasoning?: string; error?: string } =
+    {
+      success: result.success,
+    };
   if (result.reasoning) {
     outputResult.reasoning = result.reasoning;
   }
@@ -219,7 +223,8 @@ async function flushOtelTraces(): Promise<void> {
     // The provider might be a ProxyTracerProvider wrapping the real one.
     // We need the concrete provider to access forceFlush/shutdown methods.
     const delegating = provider as DelegatingTracerProvider;
-    const concreteProvider = (delegating.getDelegate?.() ?? provider) as FlushableTracerProvider;
+    const concreteProvider = (delegating.getDelegate?.() ??
+      provider) as FlushableTracerProvider;
 
     // Try forceFlush first (preferred), then shutdown
     if (concreteProvider.forceFlush) {
@@ -259,7 +264,9 @@ function formatErrorWithCauses(error: unknown): string {
     if (current instanceof Error) {
       const code = (current as { code?: unknown }).code;
       parts.push(
-        typeof code === "string" ? `${current.message} (${code})` : current.message,
+        typeof code === "string"
+          ? `${current.message} (${code})`
+          : current.message,
       );
       current = (current as { cause?: unknown }).cause;
     } else {
@@ -276,6 +283,8 @@ main().catch(async (error) => {
   // Still flush traces on error so we capture what happened
   await flushOtelTraces();
   // Output JSON error result to stdout for parent process to parse
-  process.stdout.write(JSON.stringify({ success: false, error: errorMessage }) + "\n");
+  process.stdout.write(
+    JSON.stringify({ success: false, error: errorMessage }) + "\n",
+  );
   process.exit(1);
 });

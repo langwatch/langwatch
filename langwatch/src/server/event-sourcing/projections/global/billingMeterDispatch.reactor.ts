@@ -34,8 +34,7 @@ export function createBillingMeterDispatchReactor(deps: {
     name: "billingMeterDispatch",
     options: {
       runIn: ["worker"],
-      makeJobId: (payload) =>
-        `billing_dispatch_${payload.event.tenantId}`,
+      makeJobId: (payload) => `billing_dispatch_${payload.event.tenantId}`,
       ttl: 300_000,
     },
 

@@ -10,16 +10,16 @@
  */
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import type { SimulationSuite } from "@prisma/client";
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { MAX_REPEAT_COUNT } from "~/server/suites/constants";
 import {
   parseSuiteTargets,
-  suiteTargetSchema,
   type SuiteTarget,
+  suiteTargetSchema,
 } from "~/server/suites/types";
-import type { SimulationSuite } from "@prisma/client";
 
 export const suiteFormSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -319,15 +319,21 @@ export function useSuiteForm({
 
   const removeArchivedScenario = (id: string) => {
     const current = form.getValues("selectedScenarioIds");
-    form.setValue("selectedScenarioIds", current.filter((s) => s !== id));
+    form.setValue(
+      "selectedScenarioIds",
+      current.filter((s) => s !== id),
+    );
   };
 
-  const removeArchivedTarget = (target: Pick<SuiteTarget, "type" | "referenceId">) => {
+  const removeArchivedTarget = (
+    target: Pick<SuiteTarget, "type" | "referenceId">,
+  ) => {
     const current = form.getValues("selectedTargets");
     form.setValue(
       "selectedTargets",
       current.filter(
-        (t) => !(t.type === target.type && t.referenceId === target.referenceId),
+        (t) =>
+          !(t.type === target.type && t.referenceId === target.referenceId),
       ),
     );
   };

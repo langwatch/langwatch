@@ -1,8 +1,8 @@
-import { shortId } from "./types";
 import type { Preset, SpanConfig, SpanEvent } from "./types";
+import { shortId } from "./types";
 
 function span(
-  overrides: Partial<SpanConfig> & { name: string; type: SpanConfig["type"] }
+  overrides: Partial<SpanConfig> & { name: string; type: SpanConfig["type"] },
 ): SpanConfig {
   return {
     id: shortId(),
@@ -183,7 +183,7 @@ export const builtInPresets: Preset[] = [
                   {
                     role: "assistant",
                     content:
-                      'I need to use two tools: weather_lookup and currency_convert.',
+                      "I need to use two tools: weather_lookup and currency_convert.",
                   },
                 ],
                 metrics: { promptTokens: 45, completionTokens: 30 },
@@ -572,8 +572,7 @@ export const builtInPresets: Preset[] = [
               },
               output: {
                 type: "text",
-                value:
-                  "Help Alice with their billing discrepancy issue.",
+                value: "Help Alice with their billing discrepancy issue.",
               },
             }),
             span({
@@ -586,8 +585,7 @@ export const builtInPresets: Preset[] = [
                 messages: [
                   {
                     role: "system",
-                    content:
-                      "Help Alice with their billing discrepancy issue.",
+                    content: "Help Alice with their billing discrepancy issue.",
                   },
                   {
                     role: "user",
@@ -699,8 +697,7 @@ export const builtInPresets: Preset[] = [
             messages: [
               {
                 role: "user",
-                content:
-                  "Write a short poem about distributed systems.",
+                content: "Write a short poem about distributed systems.",
               },
               {
                 role: "assistant",
@@ -756,8 +753,14 @@ export const builtInPresets: Preset[] = [
             "ai.operationId": "ai.generateText",
             "ai.settings.maxRetries": 2,
           },
-          input: { type: "text", value: "Search for the latest news on AI regulation" },
-          output: { type: "text", value: "According to recent reports, the EU AI Act..." },
+          input: {
+            type: "text",
+            value: "Search for the latest news on AI regulation",
+          },
+          output: {
+            type: "text",
+            value: "According to recent reports, the EU AI Act...",
+          },
           children: [
             span({
               name: "ai.generateText.doGenerate",
@@ -766,9 +769,19 @@ export const builtInPresets: Preset[] = [
               llm: {
                 requestModel: "gpt-4o",
                 messages: [
-                  { role: "system", content: "You are a helpful research assistant." },
-                  { role: "user", content: "Search for the latest news on AI regulation" },
-                  { role: "assistant", content: "I'll search for that information using the web_search tool." },
+                  {
+                    role: "system",
+                    content: "You are a helpful research assistant.",
+                  },
+                  {
+                    role: "user",
+                    content: "Search for the latest news on AI regulation",
+                  },
+                  {
+                    role: "assistant",
+                    content:
+                      "I'll search for that information using the web_search tool.",
+                  },
                 ],
                 temperature: 0.7,
                 metrics: { promptTokens: 85, completionTokens: 40 },
@@ -785,8 +798,18 @@ export const builtInPresets: Preset[] = [
               type: "tool",
               durationMs: 400,
               offsetMs: 950,
-              input: { type: "json", value: { query: "AI regulation 2025 latest news" } },
-              output: { type: "json", value: { results: [{ title: "EU AI Act Update", snippet: "New provisions..." }] } },
+              input: {
+                type: "json",
+                value: { query: "AI regulation 2025 latest news" },
+              },
+              output: {
+                type: "json",
+                value: {
+                  results: [
+                    { title: "EU AI Act Update", snippet: "New provisions..." },
+                  ],
+                },
+              },
               attributes: {
                 "ai.toolCall.name": "web_search",
                 "ai.toolCall.id": "call_abc123",
@@ -800,7 +823,11 @@ export const builtInPresets: Preset[] = [
               llm: {
                 requestModel: "gpt-4o",
                 messages: [
-                  { role: "assistant", content: "According to recent reports, the EU AI Act has entered its enforcement phase..." },
+                  {
+                    role: "assistant",
+                    content:
+                      "According to recent reports, the EU AI Act has entered its enforcement phase...",
+                  },
                 ],
                 metrics: { promptTokens: 200, completionTokens: 120 },
               },
@@ -818,7 +845,8 @@ export const builtInPresets: Preset[] = [
   {
     id: "mastra-agent",
     name: "Mastra Agent",
-    description: "A Mastra framework agent trace with workflow steps and tool execution",
+    description:
+      "A Mastra framework agent trace with workflow steps and tool execution",
     builtIn: true,
     config: {
       id: "mastra-agent",
@@ -834,8 +862,15 @@ export const builtInPresets: Preset[] = [
             "mastra.agent.name": "research-assistant",
             "mastra.agent.model": "gpt-4o",
           },
-          input: { type: "text", value: "Summarize the top 3 trending repos on GitHub today" },
-          output: { type: "text", value: "Here are today's top trending repos: 1. langwatch/langwatch..." },
+          input: {
+            type: "text",
+            value: "Summarize the top 3 trending repos on GitHub today",
+          },
+          output: {
+            type: "text",
+            value:
+              "Here are today's top trending repos: 1. langwatch/langwatch...",
+          },
           children: [
             span({
               name: "mastra.agent.generate",
@@ -844,9 +879,21 @@ export const builtInPresets: Preset[] = [
               llm: {
                 requestModel: "gpt-4o",
                 messages: [
-                  { role: "system", content: "You are a research assistant with access to GitHub tools." },
-                  { role: "user", content: "Summarize the top 3 trending repos on GitHub today" },
-                  { role: "assistant", content: "I'll use the github_trending tool to find today's trending repositories." },
+                  {
+                    role: "system",
+                    content:
+                      "You are a research assistant with access to GitHub tools.",
+                  },
+                  {
+                    role: "user",
+                    content:
+                      "Summarize the top 3 trending repos on GitHub today",
+                  },
+                  {
+                    role: "assistant",
+                    content:
+                      "I'll use the github_trending tool to find today's trending repositories.",
+                  },
                 ],
                 metrics: { promptTokens: 60, completionTokens: 35 },
               },
@@ -857,13 +904,24 @@ export const builtInPresets: Preset[] = [
               type: "tool",
               durationMs: 1200,
               offsetMs: 850,
-              input: { type: "json", value: { language: "all", since: "daily", limit: 3 } },
+              input: {
+                type: "json",
+                value: { language: "all", since: "daily", limit: 3 },
+              },
               output: {
                 type: "json",
                 value: [
-                  { name: "langwatch/langwatch", stars: 5200, description: "LLM Ops platform" },
+                  {
+                    name: "langwatch/langwatch",
+                    stars: 5200,
+                    description: "LLM Ops platform",
+                  },
                   { name: "vercel/ai", stars: 12000, description: "AI SDK" },
-                  { name: "anthropics/claude-code", stars: 18000, description: "CLI for Claude" },
+                  {
+                    name: "anthropics/claude-code",
+                    stars: 18000,
+                    description: "CLI for Claude",
+                  },
                 ],
               },
               attributes: { "mastra.tool.name": "github_trending" },
@@ -876,9 +934,17 @@ export const builtInPresets: Preset[] = [
               llm: {
                 requestModel: "gpt-4o",
                 messages: [
-                  { role: "assistant", content: "Here are today's top trending repos:\n1. langwatch/langwatch (5.2k stars)..." },
+                  {
+                    role: "assistant",
+                    content:
+                      "Here are today's top trending repos:\n1. langwatch/langwatch (5.2k stars)...",
+                  },
                 ],
-                metrics: { promptTokens: 250, completionTokens: 150, cost: 0.02 },
+                metrics: {
+                  promptTokens: 250,
+                  completionTokens: 150,
+                  cost: 0.02,
+                },
               },
               attributes: { "mastra.step": "synthesize" },
             }),
@@ -890,7 +956,8 @@ export const builtInPresets: Preset[] = [
   {
     id: "langchain-rag",
     name: "LangChain RAG",
-    description: "LangChain-style RAG chain with retriever and LLM using langchain callback spans",
+    description:
+      "LangChain-style RAG chain with retriever and LLM using langchain callback spans",
     builtIn: true,
     config: {
       id: "langchain-rag",
@@ -916,12 +983,29 @@ export const builtInPresets: Preset[] = [
               },
               rag: {
                 contexts: [
-                  { document_id: "pg-essay-1", chunk_id: "chunk-12", content: "The best way to get startup ideas is not to try to think of startup ideas..." },
-                  { document_id: "pg-essay-1", chunk_id: "chunk-13", content: "Live in the future, then build what's missing." },
-                  { document_id: "pg-essay-2", chunk_id: "chunk-5", content: "Do things that don't scale. The most common unscalable thing founders have to do..." },
+                  {
+                    document_id: "pg-essay-1",
+                    chunk_id: "chunk-12",
+                    content:
+                      "The best way to get startup ideas is not to try to think of startup ideas...",
+                  },
+                  {
+                    document_id: "pg-essay-1",
+                    chunk_id: "chunk-13",
+                    content: "Live in the future, then build what's missing.",
+                  },
+                  {
+                    document_id: "pg-essay-2",
+                    chunk_id: "chunk-5",
+                    content:
+                      "Do things that don't scale. The most common unscalable thing founders have to do...",
+                  },
                 ],
               },
-              input: { type: "text", value: "What does Paul Graham say about startup ideas?" },
+              input: {
+                type: "text",
+                value: "What does Paul Graham say about startup ideas?",
+              },
               output: { type: "json", value: { documents: 3 } },
             }),
             span({
@@ -934,11 +1018,15 @@ export const builtInPresets: Preset[] = [
               },
               input: {
                 type: "json",
-                value: { context: "{retrieved_docs}", question: "{user_question}" },
+                value: {
+                  context: "{retrieved_docs}",
+                  question: "{user_question}",
+                },
               },
               output: {
                 type: "text",
-                value: "Based on the following context, answer the question.\n\nContext: The best way to get startup ideas...\n\nQuestion: What does Paul Graham say about startup ideas?",
+                value:
+                  "Based on the following context, answer the question.\n\nContext: The best way to get startup ideas...\n\nQuestion: What does Paul Graham say about startup ideas?",
               },
             }),
             span({
@@ -949,12 +1037,27 @@ export const builtInPresets: Preset[] = [
               llm: {
                 requestModel: "gpt-4o",
                 messages: [
-                  { role: "system", content: "Based on the following context, answer the question.\n\nContext: The best way to get startup ideas..." },
-                  { role: "user", content: "What does Paul Graham say about startup ideas?" },
-                  { role: "assistant", content: "Paul Graham advises against deliberately brainstorming startup ideas. Instead, he recommends living in the future and building what's missing. He also emphasizes doing things that don't scale in the early stages." },
+                  {
+                    role: "system",
+                    content:
+                      "Based on the following context, answer the question.\n\nContext: The best way to get startup ideas...",
+                  },
+                  {
+                    role: "user",
+                    content: "What does Paul Graham say about startup ideas?",
+                  },
+                  {
+                    role: "assistant",
+                    content:
+                      "Paul Graham advises against deliberately brainstorming startup ideas. Instead, he recommends living in the future and building what's missing. He also emphasizes doing things that don't scale in the early stages.",
+                  },
                 ],
                 temperature: 0,
-                metrics: { promptTokens: 180, completionTokens: 60, cost: 0.009 },
+                metrics: {
+                  promptTokens: 180,
+                  completionTokens: 60,
+                  cost: 0.009,
+                },
               },
               attributes: {
                 "langwatch.langchain.run.type": "llm",
@@ -968,7 +1071,8 @@ export const builtInPresets: Preset[] = [
   {
     id: "agno-agent",
     name: "Agno Agent",
-    description: "An Agno (formerly Phidata) agent with knowledge base and tool use",
+    description:
+      "An Agno (formerly Phidata) agent with knowledge base and tool use",
     builtIn: true,
     config: {
       id: "agno-agent",
@@ -984,8 +1088,16 @@ export const builtInPresets: Preset[] = [
             "agno.agent.name": "finance-analyst",
             "agno.agent.model": "gpt-4o",
           },
-          input: { type: "text", value: "What's the current P/E ratio of AAPL and how does it compare to the sector average?" },
-          output: { type: "text", value: "Apple's current P/E ratio is 32.5, compared to the Technology sector average of 28.1..." },
+          input: {
+            type: "text",
+            value:
+              "What's the current P/E ratio of AAPL and how does it compare to the sector average?",
+          },
+          output: {
+            type: "text",
+            value:
+              "Apple's current P/E ratio is 32.5, compared to the Technology sector average of 28.1...",
+          },
           children: [
             span({
               name: "agno.knowledge.search",
@@ -993,19 +1105,44 @@ export const builtInPresets: Preset[] = [
               durationMs: 400,
               rag: {
                 contexts: [
-                  { document_id: "market-data-2025", chunk_id: "aapl-fundamentals", content: "AAPL: P/E 32.5, Forward P/E 29.8, PEG 1.85" },
-                  { document_id: "sector-analysis", chunk_id: "tech-sector-avg", content: "Technology sector avg P/E: 28.1, median: 25.3" },
+                  {
+                    document_id: "market-data-2025",
+                    chunk_id: "aapl-fundamentals",
+                    content: "AAPL: P/E 32.5, Forward P/E 29.8, PEG 1.85",
+                  },
+                  {
+                    document_id: "sector-analysis",
+                    chunk_id: "tech-sector-avg",
+                    content: "Technology sector avg P/E: 28.1, median: 25.3",
+                  },
                 ],
               },
-              input: { type: "text", value: "AAPL P/E ratio sector comparison" },
+              input: {
+                type: "text",
+                value: "AAPL P/E ratio sector comparison",
+              },
             }),
             span({
               name: "agno.tool.run get_stock_data",
               type: "tool",
               durationMs: 800,
               offsetMs: 450,
-              input: { type: "json", value: { symbol: "AAPL", metrics: ["pe_ratio", "forward_pe", "peg_ratio"] } },
-              output: { type: "json", value: { pe_ratio: 32.5, forward_pe: 29.8, peg_ratio: 1.85, price: 198.50 } },
+              input: {
+                type: "json",
+                value: {
+                  symbol: "AAPL",
+                  metrics: ["pe_ratio", "forward_pe", "peg_ratio"],
+                },
+              },
+              output: {
+                type: "json",
+                value: {
+                  pe_ratio: 32.5,
+                  forward_pe: 29.8,
+                  peg_ratio: 1.85,
+                  price: 198.5,
+                },
+              },
               attributes: { "agno.tool.name": "get_stock_data" },
             }),
             span({
@@ -1016,11 +1153,23 @@ export const builtInPresets: Preset[] = [
               llm: {
                 requestModel: "gpt-4o",
                 messages: [
-                  { role: "user", content: "What's the current P/E ratio of AAPL and how does it compare to the sector average?" },
-                  { role: "assistant", content: "Apple's current P/E ratio is 32.5, compared to the Technology sector average of 28.1. This means Apple trades at a 15.7% premium to the sector." },
+                  {
+                    role: "user",
+                    content:
+                      "What's the current P/E ratio of AAPL and how does it compare to the sector average?",
+                  },
+                  {
+                    role: "assistant",
+                    content:
+                      "Apple's current P/E ratio is 32.5, compared to the Technology sector average of 28.1. This means Apple trades at a 15.7% premium to the sector.",
+                  },
                 ],
                 temperature: 0.3,
-                metrics: { promptTokens: 280, completionTokens: 90, cost: 0.014 },
+                metrics: {
+                  promptTokens: 280,
+                  completionTokens: 90,
+                  cost: 0.014,
+                },
               },
             }),
           ],
@@ -1031,7 +1180,8 @@ export const builtInPresets: Preset[] = [
   {
     id: "crewai-crew",
     name: "CrewAI Crew",
-    description: "A CrewAI multi-agent crew with researcher and writer agents collaborating",
+    description:
+      "A CrewAI multi-agent crew with researcher and writer agents collaborating",
     builtIn: true,
     config: {
       id: "crewai-crew",
@@ -1054,7 +1204,8 @@ export const builtInPresets: Preset[] = [
               durationMs: 4500,
               attributes: {
                 "crewai.agent.role": "Senior Researcher",
-                "crewai.task.description": "Research the latest trends in AI agents",
+                "crewai.task.description":
+                  "Research the latest trends in AI agents",
               },
               children: [
                 span({
@@ -1064,8 +1215,16 @@ export const builtInPresets: Preset[] = [
                   llm: {
                     requestModel: "gpt-4o",
                     messages: [
-                      { role: "system", content: "You are a Senior Researcher. Research the latest trends in AI agents." },
-                      { role: "assistant", content: "I need to search for recent developments. Let me use the search tool." },
+                      {
+                        role: "system",
+                        content:
+                          "You are a Senior Researcher. Research the latest trends in AI agents.",
+                      },
+                      {
+                        role: "assistant",
+                        content:
+                          "I need to search for recent developments. Let me use the search tool.",
+                      },
                     ],
                     metrics: { promptTokens: 100, completionTokens: 30 },
                   },
@@ -1075,8 +1234,18 @@ export const builtInPresets: Preset[] = [
                   type: "tool",
                   durationMs: 1500,
                   offsetMs: 700,
-                  input: { type: "json", value: { query: "AI agents trends 2025" } },
-                  output: { type: "json", value: { results: 15, summary: "Multi-agent systems, tool use, and autonomous coding are top trends." } },
+                  input: {
+                    type: "json",
+                    value: { query: "AI agents trends 2025" },
+                  },
+                  output: {
+                    type: "json",
+                    value: {
+                      results: 15,
+                      summary:
+                        "Multi-agent systems, tool use, and autonomous coding are top trends.",
+                    },
+                  },
                 }),
                 span({
                   name: "researcher.llm.synthesize",
@@ -1086,9 +1255,17 @@ export const builtInPresets: Preset[] = [
                   llm: {
                     requestModel: "gpt-4o",
                     messages: [
-                      { role: "assistant", content: "Key findings: 1) Multi-agent collaboration is replacing single-agent architectures. 2) Tool use is becoming standardized via MCP. 3) Autonomous coding agents are gaining enterprise adoption." },
+                      {
+                        role: "assistant",
+                        content:
+                          "Key findings: 1) Multi-agent collaboration is replacing single-agent architectures. 2) Tool use is becoming standardized via MCP. 3) Autonomous coding agents are gaining enterprise adoption.",
+                      },
                     ],
-                    metrics: { promptTokens: 350, completionTokens: 200, cost: 0.025 },
+                    metrics: {
+                      promptTokens: 350,
+                      completionTokens: 200,
+                      cost: 0.025,
+                    },
                   },
                 }),
               ],
@@ -1100,7 +1277,8 @@ export const builtInPresets: Preset[] = [
               offsetMs: 4800,
               attributes: {
                 "crewai.agent.role": "Content Writer",
-                "crewai.task.description": "Write a blog post based on the research",
+                "crewai.task.description":
+                  "Write a blog post based on the research",
               },
               children: [
                 span({
@@ -1110,11 +1288,23 @@ export const builtInPresets: Preset[] = [
                   llm: {
                     requestModel: "gpt-4o",
                     messages: [
-                      { role: "system", content: "You are a Content Writer. Write a compelling blog post based on the research provided." },
-                      { role: "assistant", content: "# The Rise of AI Agents in 2025\n\nThe landscape of AI agents is evolving rapidly..." },
+                      {
+                        role: "system",
+                        content:
+                          "You are a Content Writer. Write a compelling blog post based on the research provided.",
+                      },
+                      {
+                        role: "assistant",
+                        content:
+                          "# The Rise of AI Agents in 2025\n\nThe landscape of AI agents is evolving rapidly...",
+                      },
                     ],
                     temperature: 0.7,
-                    metrics: { promptTokens: 400, completionTokens: 500, cost: 0.04 },
+                    metrics: {
+                      promptTokens: 400,
+                      completionTokens: 500,
+                      cost: 0.04,
+                    },
                   },
                 }),
               ],
@@ -1127,7 +1317,8 @@ export const builtInPresets: Preset[] = [
   {
     id: "openai-agents-sdk",
     name: "OpenAI Agents SDK",
-    description: "OpenAI Agents SDK trace with handoffs between specialized agents",
+    description:
+      "OpenAI Agents SDK trace with handoffs between specialized agents",
     builtIn: true,
     config: {
       id: "openai-agents-sdk",
@@ -1156,9 +1347,20 @@ export const builtInPresets: Preset[] = [
                   llm: {
                     requestModel: "gpt-4o-mini",
                     messages: [
-                      { role: "system", content: "You are a triage agent. Route the user to the appropriate specialist." },
-                      { role: "user", content: "I need help with a refund for my order" },
-                      { role: "assistant", content: "I'll transfer you to our billing specialist who can help with refunds." },
+                      {
+                        role: "system",
+                        content:
+                          "You are a triage agent. Route the user to the appropriate specialist.",
+                      },
+                      {
+                        role: "user",
+                        content: "I need help with a refund for my order",
+                      },
+                      {
+                        role: "assistant",
+                        content:
+                          "I'll transfer you to our billing specialist who can help with refunds.",
+                      },
                     ],
                     metrics: { promptTokens: 45, completionTokens: 25 },
                   },
@@ -1177,8 +1379,18 @@ export const builtInPresets: Preset[] = [
                   name: "tool.lookup_order",
                   type: "tool",
                   durationMs: 500,
-                  input: { type: "json", value: { customer_id: "cust_123", order_type: "recent" } },
-                  output: { type: "json", value: { order_id: "ord_456", amount: 79.99, status: "delivered" } },
+                  input: {
+                    type: "json",
+                    value: { customer_id: "cust_123", order_type: "recent" },
+                  },
+                  output: {
+                    type: "json",
+                    value: {
+                      order_id: "ord_456",
+                      amount: 79.99,
+                      status: "delivered",
+                    },
+                  },
                 }),
                 span({
                   name: "responses.create",
@@ -1188,7 +1400,11 @@ export const builtInPresets: Preset[] = [
                   llm: {
                     requestModel: "gpt-4o",
                     messages: [
-                      { role: "assistant", content: "I found your order #ord_456 for $79.99. I can process a refund. Would you like to proceed?" },
+                      {
+                        role: "assistant",
+                        content:
+                          "I found your order #ord_456 for $79.99. I can process a refund. Would you like to proceed?",
+                      },
                     ],
                     metrics: { promptTokens: 150, completionTokens: 40 },
                   },
@@ -1198,8 +1414,22 @@ export const builtInPresets: Preset[] = [
                   type: "tool",
                   durationMs: 800,
                   offsetMs: 1400,
-                  input: { type: "json", value: { order_id: "ord_456", amount: 79.99, reason: "customer_request" } },
-                  output: { type: "json", value: { refund_id: "ref_789", status: "processed", eta_days: 3 } },
+                  input: {
+                    type: "json",
+                    value: {
+                      order_id: "ord_456",
+                      amount: 79.99,
+                      reason: "customer_request",
+                    },
+                  },
+                  output: {
+                    type: "json",
+                    value: {
+                      refund_id: "ref_789",
+                      status: "processed",
+                      eta_days: 3,
+                    },
+                  },
                 }),
                 span({
                   name: "responses.create",
@@ -1209,7 +1439,11 @@ export const builtInPresets: Preset[] = [
                   llm: {
                     requestModel: "gpt-4o",
                     messages: [
-                      { role: "assistant", content: "Your refund of $79.99 has been processed. You should see it in your account within 3 business days." },
+                      {
+                        role: "assistant",
+                        content:
+                          "Your refund of $79.99 has been processed. You should see it in your account within 3 business days.",
+                      },
                     ],
                     metrics: { promptTokens: 200, completionTokens: 35 },
                   },
@@ -1245,8 +1479,16 @@ export const builtInPresets: Preset[] = [
               llm: {
                 requestModel: "gpt-4o-mini",
                 messages: [
-                  { role: "user", content: "Write a search query to find: How many storeys are in the castle David Gregory inherited?" },
-                  { role: "assistant", content: "David Gregory inherited castle number of storeys floors" },
+                  {
+                    role: "user",
+                    content:
+                      "Write a search query to find: How many storeys are in the castle David Gregory inherited?",
+                  },
+                  {
+                    role: "assistant",
+                    content:
+                      "David Gregory inherited castle number of storeys floors",
+                  },
                 ],
                 metrics: { promptTokens: 30, completionTokens: 12 },
               },
@@ -1259,7 +1501,12 @@ export const builtInPresets: Preset[] = [
               offsetMs: 650,
               rag: {
                 contexts: [
-                  { document_id: "wiki-kinnettles", chunk_id: "p1", content: "Kinnettles is a five-storey castle. David Gregory inherited it from his father." },
+                  {
+                    document_id: "wiki-kinnettles",
+                    chunk_id: "p1",
+                    content:
+                      "Kinnettles is a five-storey castle. David Gregory inherited it from his father.",
+                  },
                 ],
               },
               attributes: { "dspy.retriever": "ColBERTv2", "dspy.hop": 0 },
@@ -1272,7 +1519,10 @@ export const builtInPresets: Preset[] = [
               llm: {
                 requestModel: "gpt-4o-mini",
                 messages: [
-                  { role: "assistant", content: "Kinnettles castle architecture storeys history" },
+                  {
+                    role: "assistant",
+                    content: "Kinnettles castle architecture storeys history",
+                  },
                 ],
                 metrics: { promptTokens: 60, completionTokens: 10 },
               },
@@ -1285,7 +1535,12 @@ export const builtInPresets: Preset[] = [
               offsetMs: 1550,
               rag: {
                 contexts: [
-                  { document_id: "wiki-kinnettles-arch", chunk_id: "p2", content: "The castle was built in the 15th century and has five storeys with a garret." },
+                  {
+                    document_id: "wiki-kinnettles-arch",
+                    chunk_id: "p2",
+                    content:
+                      "The castle was built in the 15th century and has five storeys with a garret.",
+                  },
                 ],
               },
               attributes: { "dspy.retriever": "ColBERTv2", "dspy.hop": 1 },
@@ -1298,7 +1553,11 @@ export const builtInPresets: Preset[] = [
               llm: {
                 requestModel: "gpt-4o-mini",
                 messages: [
-                  { role: "assistant", content: "The castle that David Gregory inherited, Kinnettles, has five storeys." },
+                  {
+                    role: "assistant",
+                    content:
+                      "The castle that David Gregory inherited, Kinnettles, has five storeys.",
+                  },
                 ],
                 metrics: { promptTokens: 120, completionTokens: 20 },
               },
@@ -1315,7 +1574,8 @@ export const builtInPresets: Preset[] = [
   {
     id: "user-feedback-events",
     name: "User Feedback (Thumbs Up/Down)",
-    description: "A chatbot trace with thumbs up, thumbs down, and custom feedback events",
+    description:
+      "A chatbot trace with thumbs up, thumbs down, and custom feedback events",
     builtIn: true,
     config: {
       id: "user-feedback-events",
@@ -1336,7 +1596,11 @@ export const builtInPresets: Preset[] = [
                 requestModel: "gpt-4o",
                 messages: [
                   { role: "user", content: "How do I reset my password?" },
-                  { role: "assistant", content: "To reset your password, go to Settings > Security > Change Password. You'll need to verify your email first." },
+                  {
+                    role: "assistant",
+                    content:
+                      "To reset your password, go to Settings > Security > Change Password. You'll need to verify your email first.",
+                  },
                 ],
                 metrics: { promptTokens: 25, completionTokens: 35 },
               },
@@ -1347,7 +1611,9 @@ export const builtInPresets: Preset[] = [
                   attributes: {
                     "langwatch.event.type": "thumbs_up_down",
                     "langwatch.event.metrics": JSON.stringify({ vote: 1 }),
-                    "langwatch.event.details": JSON.stringify({ comment: "Very helpful, thanks!" }),
+                    "langwatch.event.details": JSON.stringify({
+                      comment: "Very helpful, thanks!",
+                    }),
                   },
                 },
               ],
@@ -1360,8 +1626,15 @@ export const builtInPresets: Preset[] = [
               llm: {
                 requestModel: "gpt-4o",
                 messages: [
-                  { role: "user", content: "What about two-factor authentication?" },
-                  { role: "assistant", content: "I'm sorry, but I don't have specific information about your 2FA setup. Please contact our support team for assistance." },
+                  {
+                    role: "user",
+                    content: "What about two-factor authentication?",
+                  },
+                  {
+                    role: "assistant",
+                    content:
+                      "I'm sorry, but I don't have specific information about your 2FA setup. Please contact our support team for assistance.",
+                  },
                 ],
                 metrics: { promptTokens: 60, completionTokens: 40 },
               },
@@ -1372,7 +1645,10 @@ export const builtInPresets: Preset[] = [
                   attributes: {
                     "langwatch.event.type": "thumbs_up_down",
                     "langwatch.event.metrics": JSON.stringify({ vote: -1 }),
-                    "langwatch.event.details": JSON.stringify({ reason: "unhelpful", comment: "Should know about 2FA" }),
+                    "langwatch.event.details": JSON.stringify({
+                      reason: "unhelpful",
+                      comment: "Should know about 2FA",
+                    }),
                   },
                 },
               ],
@@ -1385,8 +1661,16 @@ export const builtInPresets: Preset[] = [
               llm: {
                 requestModel: "gpt-4o",
                 messages: [
-                  { role: "user", content: "Can you at least tell me where to find the 2FA settings?" },
-                  { role: "assistant", content: "Yes! Go to Settings > Security > Two-Factor Authentication. You can enable SMS or authenticator app verification there." },
+                  {
+                    role: "user",
+                    content:
+                      "Can you at least tell me where to find the 2FA settings?",
+                  },
+                  {
+                    role: "assistant",
+                    content:
+                      "Yes! Go to Settings > Security > Two-Factor Authentication. You can enable SMS or authenticator app verification there.",
+                  },
                 ],
                 metrics: { promptTokens: 95, completionTokens: 35 },
               },
@@ -1405,7 +1689,9 @@ export const builtInPresets: Preset[] = [
                   attributes: {
                     "langwatch.event.type": "user_score",
                     "langwatch.event.metrics": JSON.stringify({ score: 4.5 }),
-                    "langwatch.event.details": JSON.stringify({ max_score: "5" }),
+                    "langwatch.event.details": JSON.stringify({
+                      max_score: "5",
+                    }),
                   },
                 },
               ],
@@ -1418,7 +1704,8 @@ export const builtInPresets: Preset[] = [
   {
     id: "multiple-evaluations",
     name: "Multiple Evaluations",
-    description: "A trace with sentiment analysis, toxicity, faithfulness, and other evaluation results",
+    description:
+      "A trace with sentiment analysis, toxicity, faithfulness, and other evaluation results",
     builtIn: true,
     config: {
       id: "multiple-evaluations",
@@ -1437,8 +1724,18 @@ export const builtInPresets: Preset[] = [
               durationMs: 400,
               rag: {
                 contexts: [
-                  { document_id: "policy-doc", chunk_id: "returns-1", content: "Items can be returned within 30 days of purchase with a valid receipt. Refunds are processed within 5-7 business days." },
-                  { document_id: "policy-doc", chunk_id: "returns-2", content: "Electronics have a 15-day return window. Opened software cannot be returned." },
+                  {
+                    document_id: "policy-doc",
+                    chunk_id: "returns-1",
+                    content:
+                      "Items can be returned within 30 days of purchase with a valid receipt. Refunds are processed within 5-7 business days.",
+                  },
+                  {
+                    document_id: "policy-doc",
+                    chunk_id: "returns-2",
+                    content:
+                      "Electronics have a 15-day return window. Opened software cannot be returned.",
+                  },
                 ],
               },
               input: { type: "text", value: "What is the return policy?" },
@@ -1451,20 +1748,57 @@ export const builtInPresets: Preset[] = [
               llm: {
                 requestModel: "gpt-4o",
                 messages: [
-                  { role: "system", content: "Answer based on the provided context about return policies." },
+                  {
+                    role: "system",
+                    content:
+                      "Answer based on the provided context about return policies.",
+                  },
                   { role: "user", content: "What is the return policy?" },
-                  { role: "assistant", content: "Our return policy allows returns within 30 days with a receipt. Electronics have a shorter 15-day window, and opened software cannot be returned. Refunds take 5-7 business days to process." },
+                  {
+                    role: "assistant",
+                    content:
+                      "Our return policy allows returns within 30 days with a receipt. Electronics have a shorter 15-day window, and opened software cannot be returned. Refunds take 5-7 business days to process.",
+                  },
                 ],
                 temperature: 0.2,
-                metrics: { promptTokens: 150, completionTokens: 55, cost: 0.008 },
+                metrics: {
+                  promptTokens: 150,
+                  completionTokens: 55,
+                  cost: 0.008,
+                },
               },
               events: evaluationEvents([
-                { name: "sentiment_analysis", score: 0.72, label: "neutral", passed: true },
+                {
+                  name: "sentiment_analysis",
+                  score: 0.72,
+                  label: "neutral",
+                  passed: true,
+                },
                 { name: "toxicity", score: 0.03, label: "safe", passed: true },
-                { name: "faithfulness", score: 0.95, label: "faithful", passed: true },
-                { name: "answer_relevancy", score: 0.88, label: "relevant", passed: true },
-                { name: "ragas_context_precision", score: 0.91, label: "precise", passed: true },
-                { name: "tone_consistency", score: 0.85, label: "professional", passed: true },
+                {
+                  name: "faithfulness",
+                  score: 0.95,
+                  label: "faithful",
+                  passed: true,
+                },
+                {
+                  name: "answer_relevancy",
+                  score: 0.88,
+                  label: "relevant",
+                  passed: true,
+                },
+                {
+                  name: "ragas_context_precision",
+                  score: 0.91,
+                  label: "precise",
+                  passed: true,
+                },
+                {
+                  name: "tone_consistency",
+                  score: 0.85,
+                  label: "professional",
+                  passed: true,
+                },
               ]),
             }),
             span({
@@ -1472,10 +1806,21 @@ export const builtInPresets: Preset[] = [
               type: "guardrail",
               durationMs: 150,
               offsetMs: 1400,
-              input: { type: "text", value: "Our return policy allows returns within 30 days..." },
-              output: { type: "json", value: { passed: true, piiDetected: false } },
+              input: {
+                type: "text",
+                value: "Our return policy allows returns within 30 days...",
+              },
+              output: {
+                type: "json",
+                value: { passed: true, piiDetected: false },
+              },
               events: evaluationEvents([
-                { name: "pii_detection", score: 1.0, label: "clean", passed: true },
+                {
+                  name: "pii_detection",
+                  score: 1.0,
+                  label: "clean",
+                  passed: true,
+                },
               ]),
             }),
           ],
@@ -1486,7 +1831,8 @@ export const builtInPresets: Preset[] = [
   {
     id: "prompt-heavy",
     name: "Multiple Prompts",
-    description: "A trace using several managed prompts with variables and versioning",
+    description:
+      "A trace using several managed prompts with variables and versioning",
     builtIn: true,
     config: {
       id: "prompt-heavy",
@@ -1507,10 +1853,20 @@ export const builtInPresets: Preset[] = [
                 promptId: "intent-classifier",
                 version: 3,
                 versionId: "ver-ic-prod-3",
-                variables: { user_message: "I want to cancel my subscription and get a refund" },
+                variables: {
+                  user_message:
+                    "I want to cancel my subscription and get a refund",
+                },
               },
-              input: { type: "json", value: { template: "Classify the intent of: {{user_message}}" } },
-              output: { type: "text", value: "Classify the intent of: I want to cancel my subscription and get a refund" },
+              input: {
+                type: "json",
+                value: { template: "Classify the intent of: {{user_message}}" },
+              },
+              output: {
+                type: "text",
+                value:
+                  "Classify the intent of: I want to cancel my subscription and get a refund",
+              },
             }),
             span({
               name: "intent-llm",
@@ -1520,8 +1876,16 @@ export const builtInPresets: Preset[] = [
               llm: {
                 requestModel: "gpt-4o-mini",
                 messages: [
-                  { role: "system", content: "Classify the intent of: I want to cancel my subscription and get a refund" },
-                  { role: "assistant", content: '{"intent": "cancellation_refund", "confidence": 0.97}' },
+                  {
+                    role: "system",
+                    content:
+                      "Classify the intent of: I want to cancel my subscription and get a refund",
+                  },
+                  {
+                    role: "assistant",
+                    content:
+                      '{"intent": "cancellation_refund", "confidence": 0.97}',
+                  },
                 ],
                 metrics: { promptTokens: 25, completionTokens: 15 },
               },
@@ -1544,11 +1908,15 @@ export const builtInPresets: Preset[] = [
               },
               input: {
                 type: "json",
-                value: { template: "Handle cancellation for {{customer_name}} on {{subscription_type}} plan. {{months_remaining}} months remaining. Offer: {{retention_offer}}" },
+                value: {
+                  template:
+                    "Handle cancellation for {{customer_name}} on {{subscription_type}} plan. {{months_remaining}} months remaining. Offer: {{retention_offer}}",
+                },
               },
               output: {
                 type: "text",
-                value: "Handle cancellation for Sarah Chen on Pro Annual plan. 4 months remaining. Offer: 20% discount for 3 months",
+                value:
+                  "Handle cancellation for Sarah Chen on Pro Annual plan. 4 months remaining. Offer: 20% discount for 3 months",
               },
             }),
             span({
@@ -1559,12 +1927,28 @@ export const builtInPresets: Preset[] = [
               llm: {
                 requestModel: "gpt-4o",
                 messages: [
-                  { role: "system", content: "Handle cancellation for Sarah Chen on Pro Annual plan. 4 months remaining. Offer: 20% discount for 3 months" },
-                  { role: "user", content: "I want to cancel my subscription and get a refund" },
-                  { role: "assistant", content: "I understand you'd like to cancel, Sarah. Before we proceed, I'd like to offer you 20% off for the next 3 months on your Pro Annual plan. You still have 4 months of value remaining. Would you like to consider this offer?" },
+                  {
+                    role: "system",
+                    content:
+                      "Handle cancellation for Sarah Chen on Pro Annual plan. 4 months remaining. Offer: 20% discount for 3 months",
+                  },
+                  {
+                    role: "user",
+                    content:
+                      "I want to cancel my subscription and get a refund",
+                  },
+                  {
+                    role: "assistant",
+                    content:
+                      "I understand you'd like to cancel, Sarah. Before we proceed, I'd like to offer you 20% off for the next 3 months on your Pro Annual plan. You still have 4 months of value remaining. Would you like to consider this offer?",
+                  },
                 ],
                 temperature: 0.5,
-                metrics: { promptTokens: 120, completionTokens: 65, cost: 0.007 },
+                metrics: {
+                  promptTokens: 120,
+                  completionTokens: 65,
+                  cost: 0.007,
+                },
               },
             }),
             span({
@@ -1580,8 +1964,18 @@ export const builtInPresets: Preset[] = [
                   escalation_threshold: "0.3",
                 },
               },
-              input: { type: "json", value: { template: "Generate empathetic follow-up given sentiment: {{customer_sentiment}}" } },
-              output: { type: "text", value: "Generate empathetic follow-up given sentiment: frustrated" },
+              input: {
+                type: "json",
+                value: {
+                  template:
+                    "Generate empathetic follow-up given sentiment: {{customer_sentiment}}",
+                },
+              },
+              output: {
+                type: "text",
+                value:
+                  "Generate empathetic follow-up given sentiment: frustrated",
+              },
             }),
             span({
               name: "render-summary-prompt",
@@ -1593,12 +1987,23 @@ export const builtInPresets: Preset[] = [
                 version: 1,
                 versionId: "ver-cs-latest",
                 variables: {
-                  conversation: "[user: cancel subscription] [agent: retention offer]",
+                  conversation:
+                    "[user: cancel subscription] [agent: retention offer]",
                   format: "bullet_points",
                 },
               },
-              input: { type: "json", value: { template: "Summarize conversation in {{format}} format:\n{{conversation}}" } },
-              output: { type: "text", value: "Summarize conversation in bullet_points format:\n[user: cancel subscription] [agent: retention offer]" },
+              input: {
+                type: "json",
+                value: {
+                  template:
+                    "Summarize conversation in {{format}} format:\n{{conversation}}",
+                },
+              },
+              output: {
+                type: "text",
+                value:
+                  "Summarize conversation in bullet_points format:\n[user: cancel subscription] [agent: retention offer]",
+              },
             }),
             span({
               name: "summary-llm",
@@ -1608,7 +2013,11 @@ export const builtInPresets: Preset[] = [
               llm: {
                 requestModel: "gpt-4o-mini",
                 messages: [
-                  { role: "assistant", content: "- Customer Sarah Chen requested cancellation of Pro Annual plan\n- 4 months remaining on subscription\n- Retention offer presented: 20% discount for 3 months\n- Awaiting customer response" },
+                  {
+                    role: "assistant",
+                    content:
+                      "- Customer Sarah Chen requested cancellation of Pro Annual plan\n- 4 months remaining on subscription\n- Retention offer presented: 20% discount for 3 months\n- Awaiting customer response",
+                  },
                 ],
                 metrics: { promptTokens: 80, completionTokens: 50 },
               },
@@ -1621,7 +2030,8 @@ export const builtInPresets: Preset[] = [
   {
     id: "data-format-showcase",
     name: "Data Format Showcase",
-    description: "Demonstrates all input/output formats: text, JSON, chat_messages, raw, and list",
+    description:
+      "Demonstrates all input/output formats: text, JSON, chat_messages, raw, and list",
     builtIn: true,
     config: {
       id: "data-format-showcase",
@@ -1658,7 +2068,11 @@ export const builtInPresets: Preset[] = [
                 type: "json",
                 value: {
                   action: "search",
-                  filters: { category: "electronics", priceRange: { min: 100, max: 500 }, inStock: true },
+                  filters: {
+                    category: "electronics",
+                    priceRange: { min: 100, max: 500 },
+                    inStock: true,
+                  },
                   sort: { field: "relevance", order: "desc" },
                   limit: 10,
                 },
@@ -1667,8 +2081,18 @@ export const builtInPresets: Preset[] = [
                 type: "json",
                 value: {
                   results: [
-                    { id: "prod-1", name: "Wireless Headphones", price: 149.99, rating: 4.5 },
-                    { id: "prod-2", name: "USB-C Hub", price: 79.99, rating: 4.8 },
+                    {
+                      id: "prod-1",
+                      name: "Wireless Headphones",
+                      price: 149.99,
+                      rating: 4.5,
+                    },
+                    {
+                      id: "prod-2",
+                      name: "USB-C Hub",
+                      price: 79.99,
+                      rating: 4.8,
+                    },
                   ],
                   totalCount: 42,
                   page: 1,
@@ -1683,11 +2107,26 @@ export const builtInPresets: Preset[] = [
               llm: {
                 requestModel: "gpt-4o",
                 messages: [
-                  { role: "system", content: "You are a coding assistant. Respond with code examples." },
-                  { role: "user", content: "Show me a TypeScript interface for a User" },
-                  { role: "assistant", content: "```typescript\ninterface User {\n  id: string;\n  name: string;\n  email: string;\n  createdAt: Date;\n}\n```" },
+                  {
+                    role: "system",
+                    content:
+                      "You are a coding assistant. Respond with code examples.",
+                  },
+                  {
+                    role: "user",
+                    content: "Show me a TypeScript interface for a User",
+                  },
+                  {
+                    role: "assistant",
+                    content:
+                      "```typescript\ninterface User {\n  id: string;\n  name: string;\n  email: string;\n  createdAt: Date;\n}\n```",
+                  },
                   { role: "user", content: "Add an optional avatar field" },
-                  { role: "assistant", content: "```typescript\ninterface User {\n  id: string;\n  name: string;\n  email: string;\n  avatar?: string;\n  createdAt: Date;\n}\n```" },
+                  {
+                    role: "assistant",
+                    content:
+                      "```typescript\ninterface User {\n  id: string;\n  name: string;\n  email: string;\n  avatar?: string;\n  createdAt: Date;\n}\n```",
+                  },
                 ],
                 temperature: 0.3,
                 metrics: { promptTokens: 80, completionTokens: 60 },
@@ -1695,16 +2134,31 @@ export const builtInPresets: Preset[] = [
               input: {
                 type: "chat_messages",
                 value: [
-                  { role: "system", content: "You are a coding assistant. Respond with code examples." },
-                  { role: "user", content: "Show me a TypeScript interface for a User" },
-                  { role: "assistant", content: "```typescript\ninterface User {\n  id: string;\n  name: string;\n  email: string;\n  createdAt: Date;\n}\n```" },
+                  {
+                    role: "system",
+                    content:
+                      "You are a coding assistant. Respond with code examples.",
+                  },
+                  {
+                    role: "user",
+                    content: "Show me a TypeScript interface for a User",
+                  },
+                  {
+                    role: "assistant",
+                    content:
+                      "```typescript\ninterface User {\n  id: string;\n  name: string;\n  email: string;\n  createdAt: Date;\n}\n```",
+                  },
                   { role: "user", content: "Add an optional avatar field" },
                 ],
               },
               output: {
                 type: "chat_messages",
                 value: [
-                  { role: "assistant", content: "```typescript\ninterface User {\n  id: string;\n  name: string;\n  email: string;\n  avatar?: string;\n  createdAt: Date;\n}\n```" },
+                  {
+                    role: "assistant",
+                    content:
+                      "```typescript\ninterface User {\n  id: string;\n  name: string;\n  email: string;\n  avatar?: string;\n  createdAt: Date;\n}\n```",
+                  },
                 ],
               },
             }),
@@ -1717,9 +2171,20 @@ export const builtInPresets: Preset[] = [
                 requestModel: "gpt-4o",
                 messages: [
                   { role: "user", content: "What's the weather in London?" },
-                  { role: "assistant", content: "Let me check the weather for you." },
-                  { role: "tool", content: '{"temperature": 15, "condition": "partly cloudy", "humidity": 72}' },
-                  { role: "assistant", content: "It's 15°C and partly cloudy in London with 72% humidity." },
+                  {
+                    role: "assistant",
+                    content: "Let me check the weather for you.",
+                  },
+                  {
+                    role: "tool",
+                    content:
+                      '{"temperature": 15, "condition": "partly cloudy", "humidity": 72}',
+                  },
+                  {
+                    role: "assistant",
+                    content:
+                      "It's 15°C and partly cloudy in London with 72% humidity.",
+                  },
                 ],
                 metrics: { promptTokens: 40, completionTokens: 30 },
               },
@@ -1731,7 +2196,8 @@ export const builtInPresets: Preset[] = [
               },
               output: {
                 type: "text",
-                value: "It's 15°C and partly cloudy in London with 72% humidity.",
+                value:
+                  "It's 15°C and partly cloudy in London with 72% humidity.",
               },
             }),
             span({
@@ -1741,7 +2207,12 @@ export const builtInPresets: Preset[] = [
               offsetMs: 2400,
               input: {
                 type: "json",
-                value: { format: "png", width: 512, height: 512, prompt: "a sunset" },
+                value: {
+                  format: "png",
+                  width: 512,
+                  height: 512,
+                  prompt: "a sunset",
+                },
               },
               output: {
                 type: "raw",
@@ -1757,9 +2228,33 @@ export const builtInPresets: Preset[] = [
               output: {
                 type: "list",
                 value: [
-                  { type: "json", value: { id: "u1", name: "Alice", status: "active", lastSeen: "2025-04-24T10:30:00Z" } },
-                  { type: "json", value: { id: "u2", name: "Bob", status: "active", lastSeen: "2025-04-24T09:15:00Z" } },
-                  { type: "json", value: { id: "u3", name: "Charlie", status: "active", lastSeen: "2025-04-24T11:00:00Z" } },
+                  {
+                    type: "json",
+                    value: {
+                      id: "u1",
+                      name: "Alice",
+                      status: "active",
+                      lastSeen: "2025-04-24T10:30:00Z",
+                    },
+                  },
+                  {
+                    type: "json",
+                    value: {
+                      id: "u2",
+                      name: "Bob",
+                      status: "active",
+                      lastSeen: "2025-04-24T09:15:00Z",
+                    },
+                  },
+                  {
+                    type: "json",
+                    value: {
+                      id: "u3",
+                      name: "Charlie",
+                      status: "active",
+                      lastSeen: "2025-04-24T11:00:00Z",
+                    },
+                  },
                 ],
               },
             }),
@@ -1771,26 +2266,58 @@ export const builtInPresets: Preset[] = [
               llm: {
                 requestModel: "gpt-4o",
                 messages: [
-                  { role: "system", content: "You have access to functions: get_weather, search_products, create_ticket" },
-                  { role: "user", content: "Create a support ticket for order #12345 with priority high" },
-                  { role: "assistant", content: '{"function_call": {"name": "create_ticket", "arguments": "{\"order_id\": \"12345\", \"priority\": \"high\", \"description\": \"Customer support request for order #12345\"}"}}' },
-                  { role: "tool", content: '{"ticket_id": "TKT-789", "status": "created", "assigned_to": "support-team-1"}' },
-                  { role: "assistant", content: "I've created support ticket TKT-789 for order #12345 with high priority. It's been assigned to our support team." },
+                  {
+                    role: "system",
+                    content:
+                      "You have access to functions: get_weather, search_products, create_ticket",
+                  },
+                  {
+                    role: "user",
+                    content:
+                      "Create a support ticket for order #12345 with priority high",
+                  },
+                  {
+                    role: "assistant",
+                    content:
+                      '{"function_call": {"name": "create_ticket", "arguments": "{\"order_id\": \"12345\", \"priority\": \"high\", \"description\": \"Customer support request for order #12345\"}"}}',
+                  },
+                  {
+                    role: "tool",
+                    content:
+                      '{"ticket_id": "TKT-789", "status": "created", "assigned_to": "support-team-1"}',
+                  },
+                  {
+                    role: "assistant",
+                    content:
+                      "I've created support ticket TKT-789 for order #12345 with high priority. It's been assigned to our support team.",
+                  },
                 ],
                 metrics: { promptTokens: 120, completionTokens: 80 },
               },
               input: {
                 type: "chat_messages",
                 value: [
-                  { role: "system", content: "You have access to functions: get_weather, search_products, create_ticket" },
-                  { role: "user", content: "Create a support ticket for order #12345 with priority high" },
+                  {
+                    role: "system",
+                    content:
+                      "You have access to functions: get_weather, search_products, create_ticket",
+                  },
+                  {
+                    role: "user",
+                    content:
+                      "Create a support ticket for order #12345 with priority high",
+                  },
                 ],
               },
               output: {
                 type: "json",
                 value: {
-                  message: "I've created support ticket TKT-789 for order #12345 with high priority.",
-                  function_call: { name: "create_ticket", result: { ticket_id: "TKT-789", status: "created" } },
+                  message:
+                    "I've created support ticket TKT-789 for order #12345 with high priority.",
+                  function_call: {
+                    name: "create_ticket",
+                    result: { ticket_id: "TKT-789", status: "created" },
+                  },
                 },
               },
             }),
@@ -1808,15 +2335,31 @@ export const builtInPresets: Preset[] = [
                 value: {
                   pipeline: {
                     stages: [
-                      { $match: { status: "active", "metadata.region": "us-east-1" } },
-                      { $group: { _id: "$category", total: { $sum: "$amount" }, count: { $sum: 1 }, avgAmount: { $avg: "$amount" } } },
+                      {
+                        $match: {
+                          status: "active",
+                          "metadata.region": "us-east-1",
+                        },
+                      },
+                      {
+                        $group: {
+                          _id: "$category",
+                          total: { $sum: "$amount" },
+                          count: { $sum: 1 },
+                          avgAmount: { $avg: "$amount" },
+                        },
+                      },
                       { $sort: { total: -1 } },
                       { $limit: 10 },
                     ],
                     options: { allowDiskUse: true, maxTimeMS: 30000 },
                   },
                   results: {
-                    executionStats: { nReturned: 10, executionTimeMillis: 142, totalDocsExamined: 50000 },
+                    executionStats: {
+                      nReturned: 10,
+                      executionTimeMillis: 142,
+                      totalDocsExamined: 50000,
+                    },
                   },
                 },
               },
@@ -1881,14 +2424,22 @@ export const builtInPresets: Preset[] = [
               llm: {
                 requestModel: "gpt-4o",
                 messages: [
-                  { role: "user", content: "What are the benefits of event-driven architecture?" },
+                  {
+                    role: "user",
+                    content:
+                      "What are the benefits of event-driven architecture?",
+                  },
                   {
                     role: "assistant",
                     content:
                       "Event-driven architecture offers loose coupling, scalability, and real-time processing capabilities.",
                   },
                 ],
-                metrics: { promptTokens: 20, completionTokens: 25, cost: 0.002 },
+                metrics: {
+                  promptTokens: 20,
+                  completionTokens: 25,
+                  cost: 0.002,
+                },
               },
               events: [
                 {
@@ -1940,7 +2491,7 @@ export const builtInPresets: Preset[] = [
 ];
 
 function evaluationEvents(
-  evals: Array<{ name: string; score: number; label: string; passed: boolean }>
+  evals: Array<{ name: string; score: number; label: string; passed: boolean }>,
 ): SpanEvent[] {
   return evals.map((ev, i) => ({
     name: "langwatch.evaluation.custom",

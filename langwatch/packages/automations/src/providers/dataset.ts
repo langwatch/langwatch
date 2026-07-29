@@ -1,5 +1,5 @@
-import { TriggerAction } from "../enums";
 import { z } from "zod";
+import { TriggerAction } from "../enums";
 import type { SharedDef } from "./types";
 
 /** One dataset column's source in the trace. Mirrors the `TraceMapping`

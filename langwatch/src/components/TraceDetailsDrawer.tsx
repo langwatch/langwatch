@@ -32,7 +32,8 @@ export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
         commentState.resetComment();
       }}
     >
-      <Drawer.Content bg="bg"
+      <Drawer.Content
+        bg="bg"
         paddingX={0}
         maxWidth={traceView === "full" ? undefined : "70%"}
       >

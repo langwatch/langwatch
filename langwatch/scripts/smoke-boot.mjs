@@ -18,8 +18,9 @@
 //
 // Note this is an init-time net: a bug that only throws when a function is
 // *called* (not at module load) still needs an interaction/e2e test.
-import { chromium } from "playwright";
+
 import { readdirSync } from "node:fs";
+import { chromium } from "playwright";
 
 const baseUrl = process.env.SMOKE_URL ?? "http://localhost:4173/";
 // Where `vite build` writes the client chunks, relative to the cwd the script
