@@ -11,7 +11,7 @@ vi.mock("../../../src/server/app-layer/app", () => ({
 }));
 
 import type { PrismaClient } from "@prisma/client";
-import type Stripe from "stripe";
+import Stripe from "stripe";
 import type { OrganizationRepository } from "../../../src/server/app-layer/organizations/repositories/organization.repository";
 import type { SubscriptionRepository } from "../../../src/server/app-layer/subscription/subscription.repository";
 import type { SubscriptionService } from "../../../src/server/app-layer/subscription/subscription.service";
@@ -706,6 +706,34 @@ describe("EESubscriptionService", () => {
         });
 
         expect(result).toEqual([]);
+      });
+    });
+
+    describe("when the provider rate-limits the invoice list", () => {
+      it("fails with a retryable provider-unavailable error", async () => {
+        organizationRepository.getStripeCustomerId.mockResolvedValue("cus_123");
+        stripe.invoices.list.mockRejectedValue(
+          new Stripe.errors.StripeRateLimitError({ message: "slow down" }),
+        );
+
+        await expect(
+          service.listInvoices({ organizationId: "org_with_stripe" }),
+        ).rejects.toMatchObject({ code: "billing_provider_unavailable" });
+      });
+    });
+
+    describe("when the invoice list fails for a reason we cannot name", () => {
+      it("lets the original error through rather than dressing it as handled", async () => {
+        const providerError = new Error("No such customer");
+        organizationRepository.getStripeCustomerId.mockResolvedValue("cus_123");
+        stripe.invoices.list.mockRejectedValue(providerError);
+
+        const error = await service
+          .listInvoices({ organizationId: "org_with_stripe" })
+          .catch((caught: unknown) => caught);
+
+        expect(error).toBe(providerError);
+        expect(error).not.toHaveProperty("isHandled");
       });
     });
 
