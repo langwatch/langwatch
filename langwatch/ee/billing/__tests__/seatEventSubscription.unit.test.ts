@@ -775,6 +775,26 @@ describe("seatEventSubscription", () => {
         ).rejects.toMatchObject({ code: "billing_currency_unavailable" });
       });
 
+      it("keeps the original failure as a reason on the handled error", async () => {
+        const lookupError = new Error("rate limit exceeded");
+        stripe.customers.retrieve.mockRejectedValue(lookupError);
+
+        const error = await service
+          .createSeatEventCheckout({
+            organizationId: "org_1",
+            customerId: "cus_1",
+            baseUrl: "https://app.test",
+            currency: "USD" as any,
+            billingInterval: "monthly",
+            membersToAdd: 2,
+          })
+          .catch((caught: unknown) => caught);
+
+        expect((error as { reasons: readonly Error[] }).reasons).toEqual([
+          lookupError,
+        ]);
+      });
+
       it("creates no checkout session and no pending records", async () => {
         await service
           .createSeatEventCheckout({

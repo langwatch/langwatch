@@ -1,6 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import { Currency } from "@prisma/client";
 import type Stripe from "stripe";
+import { toError } from "../../../src/utils/posthogErrorCapture";
 
 const logger = createLogger("langwatch:billing:stripeCustomerCurrency");
 
@@ -22,7 +23,7 @@ const logger = createLogger("langwatch:billing:stripeCustomerCurrency");
 export type CheckoutCurrencyResolution =
   | { status: "resolved"; currency: Currency }
   | { status: "unsupported"; stripeCurrency: string }
-  | { status: "unavailable"; reason: string };
+  | { status: "unavailable"; cause: Error };
 
 /**
  * Establish the currency a checkout session must be created in.
@@ -46,12 +47,10 @@ export const resolveCheckoutCurrency = async ({
   try {
     customer = await stripe.customers.retrieve(customerId);
   } catch (error) {
-    const reason = (error as Error).message;
-    logger.warn(
-      { organizationId, error: reason },
-      "[billing] Could not read the customer's billing currency",
-    );
-    return { status: "unavailable", reason };
+    // Hand the original error back so the caller can attach it as a `reason`
+    // on the handled error — that is what carries the provider's own message
+    // to the logs, rather than a message copied into a fresh Error here.
+    return { status: "unavailable", cause: toError(error) };
   }
 
   // No currency yet means nothing is fixed, so the requested one is still free

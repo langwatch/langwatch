@@ -72,7 +72,7 @@ export const createSeatEventSubscriptionFns = ({
     }
     if (resolution.status === "unavailable") {
       throw new BillingCurrencyUnavailableError({
-        reasons: [new Error(resolution.reason)],
+        reasons: [resolution.cause],
       });
     }
 
