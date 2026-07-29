@@ -27,11 +27,11 @@
  *     vary far more than variants do. "Cheaper" means that interval sits
  *     entirely below zero.
  *
- *     `TRADEOFF_NOISE_FLOOR` survives only as the fallback for runs that
- *     produced no interval. It was the whole test once, and it was a guess
- *     dressed as a rule: a flat 5% relative gap called a 6% difference over
- *     two rows "cheaper" while missing a dead-certain 4% one over two
- *     hundred. Sample size is exactly what it could not see.
+ *     A pair with no interval — too few rows answered by both — is a tie
+ *     rather than a comparison of averages. The flat 5% threshold that used
+ *     to stand in here is gone: it was a guess dressed as a rule, calling a
+ *     6% difference over two rows "cheaper" while missing a dead-certain 4%
+ *     one over two hundred. Sample size is exactly what it could not see.
  *
  * A dimension is only compared at all when every ranked variant recorded
  * enough of it, so a statement never silently rests on one variant's missing
@@ -50,14 +50,6 @@ import {
 } from "./computeVariantMetrics";
 import { areDistinguishable } from "./scoreSeparation";
 
-/**
- * Relative gap below which cost or speed counts as a tie.
- *
- * Lower than the 10% the cost recommendation requires, because that one is
- * advice ("switch to this") while this is a statement of fact ("it is
- * cheaper"), and the bar for a fact is lower than for a nudge.
- */
-export const TRADEOFF_NOISE_FLOOR = 0.05;
 
 export type TradeoffDimension = "quality" | "cost" | "speed";
 
@@ -87,22 +79,6 @@ export type ParetoDominance = {
 /** -1 when `b` is better, +1 when `a` is better, 0 when the run cannot tell. */
 type Comparison = -1 | 0 | 1;
 
-/**
- * Lower-is-better metrics (cost, duration) compared against the noise floor.
- * The larger value is the denominator, so the same pair reads the same way
- * whichever order it arrives in.
- */
-const compareLowerIsBetter = (a: number, b: number): Comparison => {
-  // Identical values are a tie on their own terms, not because they happen
-  // to fall inside the floor. Leaving it to the floor means the function
-  // stops being correct the moment the floor is narrowed to zero, which is
-  // a fragile thing for a guard to depend on.
-  if (a === b) return 0;
-  const larger = Math.max(Math.abs(a), Math.abs(b));
-  if (larger === 0) return 0;
-  if (Math.abs(a - b) / larger < TRADEOFF_NOISE_FLOOR) return 0;
-  return a < b ? 1 : -1;
-};
 
 const compareQuality = ({
   a,
@@ -176,20 +152,18 @@ export const computeParetoDominance = ({
       return 0;
     }
 
-    // The map is present but this pair is not in it, which means the paired
-    // test RAN AND DECLINED — the two shared too few rows to compare. Falling
-    // through to the averages here would judge anyway, by a cruder test, in
-    // exactly the case where the averages are least trustworthy, and would
-    // re-assert the claim the paired test had just refused to make.
-    if (differences) return 0;
-
-    // No map at all: a caller from before the paired intervals existed. The
-    // relative floor is the best available answer rather than a preference.
-    const read = dimension === "cost" ? costOf : speedOf;
-    const aValue = read(a.variantId);
-    const bValue = read(b.variantId);
-    if (aValue === null || bValue === null) return 0;
-    return compareLowerIsBetter(aValue, bValue);
+    // No interval for this pair means the paired test RAN AND DECLINED — the
+    // two shared too few rows to compare — so the run cannot tell them apart
+    // on this dimension.
+    //
+    // There used to be a fallback here that compared the two overall averages
+    // against a flat 5% threshold. It judged anyway, by a cruder test, in
+    // exactly the case where the averages are least trustworthy, and it was
+    // also dead: `VariantMetrics` declares the difference maps non-optional
+    // and `computeVariantMetrics` is the only thing that builds one, so no
+    // production caller could ever reach it. Ten tests in this module's suite
+    // were passing against it.
+    return 0;
   };
 
   const edges: DominanceEdge[] = [];

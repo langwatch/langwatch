@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  computeParetoDominance,
-  TRADEOFF_NOISE_FLOOR,
-} from "../computeParetoDominance";
+import { computeParetoDominance } from "../computeParetoDominance";
 
 /**
  * Dominance is the one claim on the trade-off chart a reader acts on
@@ -62,23 +59,77 @@ const board = (entries: any[]) =>
     comparability: { identifiable: true, groups: [], dominates: [] },
   }) as any;
 
+/**
+ * Paired difference interval standing in for what the bootstrap would produce
+ * from well-behaved rows: a clear gap yields an interval on one side of zero,
+ * a negligible one yields an interval spanning it.
+ *
+ * The helper used to omit these entirely, which quietly pointed every test in
+ * this file at the mean-comparison fallback — a branch production cannot
+ * reach, since `computeVariantMetrics` is the only builder of VariantMetrics
+ * and always populates the maps. Ten tests were passing against dead code.
+ */
+const SYNTHETIC_GAP = 0.1;
+
+const differenceInterval = (
+  mine: number | null | undefined,
+  theirs: number | null | undefined,
+): [number, number] | null => {
+  if (
+    mine === null ||
+    mine === undefined ||
+    theirs === null ||
+    theirs === undefined
+  ) {
+    return null;
+  }
+  const diff = mine - theirs;
+  const larger = Math.max(Math.abs(mine), Math.abs(theirs));
+  if (larger === 0 || Math.abs(diff) / larger < SYNTHETIC_GAP) {
+    // Too close to call: an interval straddling zero.
+    const halfWidth = Math.abs(diff) + larger * SYNTHETIC_GAP;
+    return [diff - halfWidth, diff + halfWidth];
+  }
+  // A real gap: a tight interval that stays on the sign of the difference.
+  const halfWidth = Math.abs(diff) * 0.2;
+  return [diff - halfWidth, diff + halfWidth];
+};
+
 const metrics = (
   byId: Record<string, { cost?: number | null; duration?: number | null; rows?: number }>,
-) =>
-  Object.fromEntries(
-    Object.entries(byId).map(([variantId, m]) => [
-      variantId,
-      {
+) => {
+  const ids = Object.keys(byId);
+  return Object.fromEntries(
+    ids.map((variantId) => {
+      const m = byId[variantId]!;
+      const costDifferenceCI: Record<string, [number, number]> = {};
+      const durationDifferenceCI: Record<string, [number, number]> = {};
+      for (const other of ids) {
+        if (other === variantId) continue;
+        const cost = differenceInterval(m.cost, byId[other]!.cost);
+        if (cost) costDifferenceCI[other] = cost;
+        const duration = differenceInterval(m.duration, byId[other]!.duration);
+        if (duration) durationDifferenceCI[other] = duration;
+      }
+      return [
         variantId,
-        costStats:
-          m.cost === null || m.cost === undefined ? null : stats(m.cost, m.rows ?? 20),
-        durationStats:
-          m.duration === null || m.duration === undefined
-            ? null
-            : stats(m.duration, m.rows ?? 20),
-      },
-    ]),
+        {
+          variantId,
+          costStats:
+            m.cost === null || m.cost === undefined ? null : stats(m.cost, m.rows ?? 20),
+          durationStats:
+            m.duration === null || m.duration === undefined
+              ? null
+              : stats(m.duration, m.rows ?? 20),
+          costMeanCI: null,
+          durationMeanCI: null,
+          costDifferenceCI,
+          durationDifferenceCI,
+        },
+      ];
+    }),
   ) as any;
+};
 
 describe("computeParetoDominance", () => {
   describe("given a variant beaten on quality, cost and speed", () => {
@@ -163,18 +214,11 @@ describe("computeParetoDominance", () => {
     });
   });
 
-  describe("given a cost difference below the noise floor", () => {
-    // The gap is a fixed 2%, NOT derived from TRADEOFF_NOISE_FLOOR. Deriving
-    // it moves the fixture with the constant, so zeroing the floor made both
-    // costs identical and the test passed against a build with no floor at
-    // all — it asserted nothing. The precondition is asserted instead, so
-    // dropping the floor below 2% fails here loudly rather than silently
-    // turning this back into a no-op.
+  describe("given a cost difference the paired interval cannot resolve", () => {
+    // 2% apart, which the helper renders as an interval straddling zero —
+    // the shape a real bootstrap produces when the gap is lost in the
+    // row-to-row spread.
     const TWO_PERCENT_APART = 1.02;
-
-    it("keeps a floor wide enough for this fixture to test", () => {
-      expect(TRADEOFF_NOISE_FLOOR).toBeGreaterThan(TWO_PERCENT_APART - 1);
-    });
 
     it("does not treat it as cheaper", () => {
       // No duration on purpose: an equal duration on both sides is itself
