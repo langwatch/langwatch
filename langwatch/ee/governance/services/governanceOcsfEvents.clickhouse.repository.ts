@@ -18,6 +18,7 @@ import { createLogger } from "@langwatch/observability";
  * Migration: 00023_create_governance_ocsf_events.sql
  */
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import { assertSingleTenantBatch } from "./singleTenantBatch";
 
 const TABLE_NAME = "governance_ocsf_events" as const;
 
@@ -179,12 +180,10 @@ export class GovernanceOcsfEventsClickHouseRepository {
     if (rows.length === 0) return;
     for (const row of rows) assertInsertable(row, "insertEvents");
 
-    const tenantId = rows[0]!.tenantId;
-    if (rows.some((row) => row.tenantId !== tenantId)) {
-      throw new Error(
-        "GovernanceOcsfEventsClickHouseRepository.insertEvents: every row must share one tenantId",
-      );
-    }
+    const tenantId = assertSingleTenantBatch(
+      rows,
+      "GovernanceOcsfEventsClickHouseRepository.insertEvents",
+    );
 
     try {
       const client = await this.resolveClient(tenantId);

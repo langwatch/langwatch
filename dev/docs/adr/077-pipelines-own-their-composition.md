@@ -803,6 +803,7 @@ only thing tests import from this module. They belong in `introspection.ts`.
 > `createCodingAgentSpanFactsDispatchSubscriber` in the registry, closing over
 > `codingAgentCommands.contributeSpanFacts` eagerly. Both comments are narrowed
 > to trace and go at step 7.
+
 ## Migration order
 
 Ten-plus pipelines, one at a time, each independently shippable. Ordered by what

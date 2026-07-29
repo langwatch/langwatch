@@ -16,6 +16,7 @@ import { createLogger } from "@langwatch/observability";
  * Migration: 00021_create_governance_kpis.sql
  */
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import { assertSingleTenantBatch } from "./singleTenantBatch";
 
 const TABLE_NAME = "governance_kpis" as const;
 
@@ -115,12 +116,10 @@ export class GovernanceKpisClickHouseRepository {
     if (rows.length === 0) return;
     for (const row of rows) assertInsertable(row, "insertContributions");
 
-    const tenantId = rows[0]!.tenantId;
-    if (rows.some((row) => row.tenantId !== tenantId)) {
-      throw new Error(
-        "GovernanceKpisClickHouseRepository.insertContributions: every row must share one tenantId",
-      );
-    }
+    const tenantId = assertSingleTenantBatch(
+      rows,
+      "GovernanceKpisClickHouseRepository.insertContributions",
+    );
 
     try {
       const client = await this.resolveClient(tenantId);

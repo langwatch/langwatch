@@ -51,13 +51,48 @@ describe("simulationRunDedupPredicate", () => {
           "utf-8",
         );
 
-        const callSites = source.match(/simulationRunDedupPredicate\(\{/g) ?? [];
-        const tenantBindings =
-          source.match(/tenantIdParam: "tenantId"/g) ?? [];
+        const callSites = dedupPredicateArguments(source);
 
         expect(callSites.length).toBeGreaterThan(0);
-        expect(tenantBindings).toHaveLength(callSites.length);
+        // Per call site, not in aggregate: counting `tenantIdParam` across the
+        // whole file cannot tell which call site each one belongs to, so one
+        // unscoped call plus a stray mention elsewhere would still balance.
+        for (const [index, argument] of callSites.entries()) {
+          expect(
+            argument,
+            `simulationRunDedupPredicate call site #${index + 1} is not tenant-scoped`,
+          ).toContain('tenantIdParam: "tenantId"');
+        }
       });
     });
   });
 });
+
+/**
+ * The argument object literal of every `simulationRunDedupPredicate(...)` call
+ * in `source`, each as its own string.
+ *
+ * A brace counter rather than a regex: one call site spans several lines, and
+ * the `filters` values embed both template placeholders (`${...}`) and
+ * ClickHouse parameter tokens (`{x:String}`) — all balanced, so the count still
+ * lands on the literal's own closing brace.
+ */
+function dedupPredicateArguments(source: string): string[] {
+  const CALL = "simulationRunDedupPredicate({";
+  const args: string[] = [];
+  let from = source.indexOf(CALL);
+
+  while (from !== -1) {
+    const open = from + CALL.length - 1;
+    let depth = 0;
+    let cursor = open;
+    for (; cursor < source.length; cursor++) {
+      if (source[cursor] === "{") depth++;
+      else if (source[cursor] === "}" && --depth === 0) break;
+    }
+    args.push(source.slice(open, cursor + 1));
+    from = source.indexOf(CALL, cursor);
+  }
+
+  return args;
+}

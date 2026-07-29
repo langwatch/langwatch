@@ -13,8 +13,8 @@
  * built from the pipeline's own `Deps` per ADR-077 Rule 1.
  */
 
-import { createLogger } from "@langwatch/observability";
 import type { NurturingService } from "@ee/billing/nurturing/nurturing.service";
+import { createLogger } from "@langwatch/observability";
 import type { ProjectService } from "~/server/app-layer/projects/project.service";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import type {
@@ -118,48 +118,11 @@ export function createCustomerIoSimulationSyncSubscriber(
         const existingCount = priorNurtureCount(rawCount);
         const isFirstSimulation = existingCount === 0;
 
+        const call = { nurturing: deps.nurturing, projectId, userId, now };
         if (isFirstSimulation) {
-          // Fire-and-forget: do not block the subscriber's lane
-          nurtureFireAndForget({
-            promise: deps.nurturing.identifyUser({
-              userId,
-              traits: {
-                has_simulations: true,
-                simulation_count: 1,
-                first_simulation_at: now,
-              },
-            }),
-            logger,
-            projectId,
-            what: "identify user for first simulation",
-          });
-          nurtureFireAndForget({
-            promise: deps.nurturing.trackEvent({
-              userId,
-              event: "first_simulation_ran",
-              properties: {
-                project_id: projectId,
-              },
-            }),
-            logger,
-            projectId,
-            what: "track first_simulation_ran event",
-          });
+          notifyFirstSimulation(call);
         } else {
-          const newCount = existingCount + 1;
-          // Fire-and-forget: do not block the subscriber's lane
-          nurtureFireAndForget({
-            promise: deps.nurturing.identifyUser({
-              userId,
-              traits: {
-                simulation_count: newCount,
-                last_simulation_at: now,
-              },
-            }),
-            logger,
-            projectId,
-            what: "identify user for simulation update",
-          });
+          notifyReturningSimulation({ ...call, newCount: existingCount + 1 });
         }
       } catch (error) {
         // Class B is lossy by contract: never throw back into the queue.
@@ -171,4 +134,76 @@ export function createCustomerIoSimulationSyncSubscriber(
       }
     },
   };
+}
+
+/** What both nurture branches need. The simulation run itself never crosses. */
+interface SimulationNurtureCall {
+  nurturing: NurturingService;
+  projectId: string;
+  userId: string;
+  /** The run's own finish time, ISO-formatted. */
+  now: string;
+}
+
+/**
+ * The org's first simulation: the activation milestone. Fired immediately —
+ * there is nothing earlier to debounce against — and fire-and-forget, so the
+ * subscriber's lane never waits on Customer.io.
+ */
+function notifyFirstSimulation({
+  nurturing,
+  projectId,
+  userId,
+  now,
+}: SimulationNurtureCall): void {
+  nurtureFireAndForget({
+    promise: nurturing.identifyUser({
+      userId,
+      traits: {
+        has_simulations: true,
+        simulation_count: 1,
+        first_simulation_at: now,
+      },
+    }),
+    logger,
+    projectId,
+    what: "identify user for first simulation",
+  });
+  nurtureFireAndForget({
+    promise: nurturing.trackEvent({
+      userId,
+      event: "first_simulation_ran",
+      properties: {
+        project_id: projectId,
+      },
+    }),
+    logger,
+    projectId,
+    what: "track first_simulation_ran event",
+  });
+}
+
+/**
+ * Every simulation after the first: two traits, debounced by the subscriber's
+ * dedup window rather than by anything here.
+ */
+function notifyReturningSimulation({
+  nurturing,
+  projectId,
+  userId,
+  now,
+  newCount,
+}: SimulationNurtureCall & { newCount: number }): void {
+  nurtureFireAndForget({
+    promise: nurturing.identifyUser({
+      userId,
+      traits: {
+        simulation_count: newCount,
+        last_simulation_at: now,
+      },
+    }),
+    logger,
+    projectId,
+    what: "identify user for simulation update",
+  });
 }

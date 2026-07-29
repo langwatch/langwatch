@@ -1,13 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { NurturingService } from "@ee/billing/nurturing/nurturing.service";
-import type { ProjectService } from "~/server/app-layer/projects/project.service";
 import type { EventSubscriberContext } from "~/server/event-sourcing/subscribers/eventSubscriber.types";
+import {
+  createMockNurturing,
+  createMockProjectService,
+} from "../../../shared/__tests__/support/nurtureFixtures";
+import { CIO_SYNC_DEBOUNCE_TTL_MS } from "../../../shared/nurtureSync";
 import type { SimulationProcessingEvent } from "../../schemas/events";
 import {
   type CustomerIoSimulationSyncSubscriberDeps,
   createCustomerIoSimulationSyncSubscriber,
 } from "../customerIoSimulationSync.subscriber";
-import { CIO_SYNC_DEBOUNCE_TTL_MS } from "../../../shared/nurtureSync";
 
 // Suppress logger output
 vi.mock("@langwatch/observability", () => ({
@@ -48,28 +50,6 @@ function createEvent(
 
 function createContext(tenantId = "project-1"): EventSubscriberContext {
   return { tenantId, aggregateId: "run-1" };
-}
-
-function createMockNurturing(): NurturingService {
-  return {
-    identifyUser: vi.fn().mockResolvedValue(undefined),
-    trackEvent: vi.fn().mockResolvedValue(undefined),
-    groupUser: vi.fn().mockResolvedValue(undefined),
-    batch: vi.fn().mockResolvedValue(undefined),
-  } as unknown as NurturingService;
-}
-
-function createMockProjectService(
-  overrides: Partial<{ resolveOrgAdmin: ReturnType<typeof vi.fn> }> = {},
-): ProjectService {
-  return {
-    resolveOrgAdmin: vi.fn().mockResolvedValue({
-      userId: "user-1",
-      organizationId: "org-1",
-      firstMessage: false,
-    }),
-    ...overrides,
-  } as unknown as ProjectService;
 }
 
 function createDeps(

@@ -96,7 +96,11 @@ export const experimentRunExecutionFailRunIntentSchema = z.object({
   experimentId: z.string(),
   /** The instant the deadline fired; recorded as the run's terminal time. */
   stalledAt: z.number(),
-  /** Human-readable cause, for the cached run record and the logs. */
+  /**
+   * The stable failure CODE, never prose. It reaches the customer through the
+   * cached run record, where the frontend maps the code to copy; a sentence
+   * here would render raw. See {@link EXPERIMENT_RUN_STALLED_CODE}.
+   */
   code: z.string(),
 });
 

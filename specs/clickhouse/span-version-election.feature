@@ -19,14 +19,14 @@ Feature: A re-reported span reads back as the report that arrived last
   Scenario: a span reported twice appears once
     Given a span has been reported
     And the same span is reported again with corrected content
-    And no background maintenance has collapsed the two reports yet
+    And the second report has only just arrived
     When a reader loads the trace
     Then the span appears exactly once
     And it shows the corrected content
 
   @integration
   Scenario: readers agree with each other about which report is current
-    Given a span holds several uncollapsed reports
+    Given a span has been reported more than once
     When the trace is loaded through any surface that shows spans
     Then every surface shows the same report of that span
 
@@ -50,9 +50,9 @@ Feature: A re-reported span reads back as the report that arrived last
   # ---------------------------------------------------------------------------
 
   @deferred
-  Scenario: background maintenance keeps the report that arrived last
+  Scenario: the report a reader shows does not change as the store settles
     Given a span has been reported
     And the same span is reported again with an earlier start time
-    When background maintenance collapses the two reports into one
-    Then the surviving report is the one that arrived last
-    And a reader returns the same report before and after that maintenance ran
+    When enough time passes for the store to settle down to one report
+    Then a reader still shows the report that arrived last
+    And it shows the same report it showed before the store settled

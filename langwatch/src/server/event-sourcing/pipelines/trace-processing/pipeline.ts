@@ -91,7 +91,7 @@ export interface TraceProcessingPipelineDeps {
    * a replay rebuilds it. Absent when ClickHouse is disabled.
    */
   gatewayBudgetDebitsProjection?: MapProjectionDefinition<
-    any,
+    unknown,
     TraceProcessingEvent
   >;
   /** The best-effort `VirtualKey.lastUsedAt` touch the debit write split from. */
@@ -110,9 +110,12 @@ export interface TraceProcessingPipelineDeps {
    * spanCommandGroupKey.ts.
    */
   spanCommandShardCount?: number;
-  governanceKpisProjection?: MapProjectionDefinition<any, TraceProcessingEvent>;
+  governanceKpisProjection?: MapProjectionDefinition<
+    unknown,
+    TraceProcessingEvent
+  >;
   governanceOcsfEventsProjection?: MapProjectionDefinition<
-    any,
+    unknown,
     TraceProcessingEvent
   >;
   /** Cross-pipeline dispatchers (e.g. coding-agent span-facts, ADR-056). */
@@ -203,7 +206,6 @@ export function createTraceProcessingPipeline(
       "spanStorageBroadcast",
       deps.spanStorageBroadcastReactor,
     );
-
 
   if (deps.gatewayBudgetDebitsProjection) {
     builder = builder.withMapProjection(

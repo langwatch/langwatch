@@ -99,7 +99,10 @@ satisfies the IN-tuple, and the read returns the span once per unmerged version
 (measured: two versions in, two rows out). On the rarer re-report that does move
 `StartTime`, electing the greatest one prefers the *stale* row. `UpdatedAt` is
 stamped fresh on every insert, so it is the only column on this table that
-orders writes.
+records *when a report was written* — which makes it the correct version
+column, not a total order. Two writers can still land on the same millisecond
+and tie; see "UpdatedAt is Monotonically Increasing" below for the
+deterministic tie-break a reader that must pick exactly one row still needs.
 
 This is a defect in the DDL, not in the readers. ClickHouse cannot `ALTER` an
 engine argument, so fixing it needs a full rebuild of the largest table in the

@@ -95,6 +95,17 @@ one — the same tuple `makeJobId` already builds, promoted from a Redis dedup k
 to the aggregate id. Experiment cells come from `(runId, rowIndex, targetId)`,
 which is already how `experiment_run_items` is keyed.
 
+The subject tuple alone is not the whole id. It collapses two deliveries of one
+evaluation, which is the point — but it would also collapse a *deliberate*
+re-evaluation of the same trace by the same monitor onto the completed aggregate
+that already exists, so a re-run would silently return the old verdict. The
+derived id therefore carries a discriminator for the occasion:
+`(projectId, monitorId, subject, occasion)`, where `occasion` is the monitor's
+configuration version for an automatic firing and an explicit re-run token for a
+manual one. Retries of one occasion share it; a new evaluation of the same
+subject does not. Without it, "derive the id" reads as "one evaluation per trace
+forever", which is not the rule we want.
+
 This is a precondition, not a consequence. Dispatching at least once with minted
 ids converts a lost evaluation into a duplicated one, which is worse: the first
 is invisible, the second is billed.

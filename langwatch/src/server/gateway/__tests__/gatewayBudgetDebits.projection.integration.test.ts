@@ -75,8 +75,10 @@ const OTHER_VK_ID = `vk_other_${suffix}`;
 /**
  * The projection prices a request off the span's own provider-reported tokens
  * and the per-token rates on it, so a test states a cost by stating those.
- * 1000 x $1e-5 plus 500 x $5e-6 = $0.0125, the figure the reactor's tests
- * asserted when they handed the fold a `totalCost` directly.
+ * `pricingFor` splits the target cost evenly across the two rates, so $0.0125
+ * is stated as $6.25e-6 per input token and $1.25e-5 per output token — the
+ * same figure the reactor's tests asserted when they handed the fold a
+ * `totalCost` directly.
  */
 const DEFAULT_COST_USD = 0.0125;
 const INPUT_TOKENS = 1000;
@@ -492,6 +494,7 @@ describe("gatewayBudgetDebits projection — real PG + real CH", () => {
       );
     }, 30_000);
 
+    /** @scenario "Spend recorded during a failure still counts against the budget" */
     it("leaves the debit re-derivable, so the retry can still record it", async () => {
       const chRepo = testClickHouseRepository();
       const projection = budgetDebitsProjection(chRepo);

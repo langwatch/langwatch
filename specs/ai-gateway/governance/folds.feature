@@ -13,30 +13,24 @@ Feature: Governance derived streams atop the unified observability store
   excluded.
 
   # ---------------------------------------------------------------------------
-  # CORRECTION (2026-07-28) — these are not fold projections yet.
+  # HISTORY — why "rebuildable" is a claim this file once could not make.
   #
-  # This file previously called both streams "folds" and asserted they were
-  # "rebuildable at any time from the append-only event_log". Neither is true
-  # today. There is no fold projection for either: they are written by
-  # `governanceKpisSync.reactor.ts` and `governanceOcsfEventsSync.reactor.ts`
-  # into repositories, and the projection router never dispatches a reactor on
-  # the replay path — the replay service rebuilds fold projections and never
-  # invokes a reactor at all. So a lost or failed write cannot be recovered by
-  # rebuilding, and drift is permanent.
+  # Both streams used to be written by `governanceKpisSync.reactor.ts` and
+  # `governanceOcsfEventsSync.reactor.ts`. The projection router never
+  # dispatches a reactor on the replay path, so a lost or failed write could not
+  # be recovered by rebuilding and drift was permanent — worst of all for
+  # governance_ocsf_events, an audit stream that event-log-durability.feature
+  # tells auditors derives from the event log.
   #
-  # That matters most for governance_ocsf_events, which is an audit stream.
-  # event-log-durability.feature tells auditors that read projections derive
-  # from the event log; for these two streams that is the target state, not the
-  # current one.
+  # ADR-075 Class C has since converted both to map projections over the spans
+  # the streams are derived from, and retired the two reactors. Rebuilding is
+  # now the recovery mechanism rather than the target state, which is why the
+  # rebuild scenarios below are enforced rather than @unimplemented.
   #
-  # ADR-075 converts both to real projections (Class C, first in the migration
-  # order). Scenarios describing rebuild are tagged @unimplemented until it
-  # lands — they are the contract that conversion has to satisfy, and they are
-  # deliberately NOT presented as current behaviour.
-  #
-  # Scenarios describing today's write path say "reactor" advisedly; they are
-  # descriptive and become inaccurate the moment ADR-075 Class C ships, at
-  # which point they are rewritten rather than deleted.
+  # Both tables are ReplacingMergeTree, so a rebuild re-deriving a row it
+  # already holds collapses onto it instead of adding a second one — that is
+  # what makes replay safe to run over an intact window, and it is asserted
+  # rather than assumed.
   # ---------------------------------------------------------------------------
 
   Companion: receiver-shapes.feature,
@@ -52,7 +46,7 @@ Feature: Governance derived streams atop the unified observability store
     Scenario: a span lands with origin metadata
       Given a Cowork OTel push has just landed in recorded_spans
       And the span's attributes include `langwatch.origin.kind = "ingestion_source"`
-      When the trace-processing pipeline emits the post-fold reactor event
+      When the trace-processing pipeline records the span
       Then governance_kpis updates the (org_id, source_id, hour_bucket) row
       And the row's spendUsd increments by the span's gen_ai.usage.cost_usd
       And the row's tokensInput / tokensOutput increment by the span's token attributes
@@ -60,13 +54,13 @@ Feature: Governance derived streams atop the unified observability store
 
     Scenario: a log_record lands with origin metadata
       Given a Workato webhook has just landed as a log_record
-      When the post-fold reactor fires
+      When the pipeline records it
       Then governance_kpis updates the (org, source, hour_bucket) row
       And the row reflects the log_record's cost / token attributes (if present)
 
     Scenario: anomaly detection reads the derived stream (not raw spans/logs)
       Given a spend_spike rule with windowSec=86400 and ratioVsBaseline=2.0
-      When the reactor evaluates after each event
+      When the rule is evaluated after each event
       Then the evaluation queries governance_kpis for the rolling window + baseline
       And it does NOT scan recorded_spans / log_records partitions directly
       And the query is cheap (small denormalised table)
@@ -82,7 +76,7 @@ Feature: Governance derived streams atop the unified observability store
 
     Scenario: a governance event derives an OCSF row
       Given a span/log_record lands with origin metadata
-      When the post-fold reactor fires
+      When the pipeline records it
       Then governance_ocsf_events emits a row with:
         | actor    | derived from langwatch.user.id / user.email / enduser.id          |
         | action   | derived from span.name or log_record body                          |
@@ -100,12 +94,12 @@ Feature: Governance derived streams atop the unified observability store
 
   Rule: derived streams are derived data, not source of truth
 
-    # Not reachable today: nothing rebuilds a reactor-written stream. Tagged
-    # @unimplemented rather than deleted because this is exactly the contract
-    # ADR-075's Class C conversion has to satisfy, and an auditor reading
-    # event-log-durability.feature has already been told it holds.
+    # Reachable since ADR-075 Class C: both streams are map projections over
+    # the events they derive from, so a rebuild re-runs the same derivation the
+    # live write path runs. This is the contract event-log-durability.feature
+    # has always told auditors holds, and it now does.
 
-    @integration @unimplemented
+    @integration
     Scenario: A drifted KPI stream is corrected by rebuilding from event_log
       Given the governance_kpis stream has drifted (e.g. CH replica catch-up failure)
       When operators trigger a rebuild from event_log
@@ -113,14 +107,14 @@ Feature: Governance derived streams atop the unified observability store
       And produces state identical to the live write path
       And no governance data is lost — the source of truth is event_log + recorded_spans/log_records
 
-    @integration @unimplemented
+    @integration
     Scenario: An audit entry lost to a failure is recovered by rebuilding
       Given governed activity whose OCSF entry was never written
       When the audit stream is rebuilt from event_log
       Then the missing entry is present
       And the auditor cannot tell it was ever absent
 
-    @integration @unimplemented
+    @integration
     Scenario: Rebuilding does not duplicate what is already recorded
       Given an audit stream that is already complete
       When it is rebuilt from the same events

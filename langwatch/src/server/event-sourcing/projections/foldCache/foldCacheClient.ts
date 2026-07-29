@@ -70,15 +70,23 @@ export class RedisFoldCacheClient implements FoldCacheClient {
  * hit means dev and every integration run never once take the store's
  * ClickHouse read-back path, so a bug there is invisible until production —
  * and the `Map` grows for the process lifetime. Expiry is enforced lazily on
- * read (there is no sweep timer; a client used by tests must not hold one),
- * which is the same shape Redis has from a caller's point of view: a key past
- * its TTL is simply not there.
+ * read, plus an amortised sweep on write — there is no timer, because a client
+ * used by tests must not hold one. Read-time expiry alone would not be enough:
+ * an entry written and never read again is never reached, so the `Map` would
+ * still grow without bound. The sweep runs at most once a second, so it costs
+ * one pass over live entries rather than a pass per write. From a caller's
+ * point of view this is the same shape Redis has: a key past its TTL is simply
+ * not there.
  *
  * Being a real implementation rather than a no-op double, it is also what tests
  * exercise the store's hit, miss and TTL paths with.
  */
+/** Shortest interval between two write-time sweeps. */
+const SWEEP_INTERVAL_MS = 1_000;
+
 export class InMemoryFoldCacheClient implements FoldCacheClient {
   readonly entries = new Map<string, { value: string; expiresAt: number }>();
+  private nextSweepAt = 0;
 
   async read(key: string): Promise<string | null> {
     const entry = this.entries.get(key);
@@ -91,9 +99,16 @@ export class InMemoryFoldCacheClient implements FoldCacheClient {
   }
 
   async write(key: string, value: string, ttlSeconds: number): Promise<void> {
+    const now = Date.now();
+    if (now >= this.nextSweepAt) {
+      this.nextSweepAt = now + SWEEP_INTERVAL_MS;
+      for (const [existingKey, entry] of this.entries) {
+        if (entry.expiresAt <= now) this.entries.delete(existingKey);
+      }
+    }
     this.entries.set(key, {
       value,
-      expiresAt: Date.now() + ttlSeconds * 1000,
+      expiresAt: now + ttlSeconds * 1000,
     });
   }
 }

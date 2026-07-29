@@ -166,6 +166,37 @@ export function createScenarioExecutionExecuteRunHandler(
 }
 
 /**
+ * Reads the scenario's display fields for a run that is about to be written as
+ * failed.
+ *
+ * Best-effort on purpose, and shared by BOTH terminal paths: a run that died to
+ * a post-dispatch fault and a run reaped by its deadline are the same thing to
+ * whoever is looking at the list, so they must not read differently. Failing to
+ * read cosmetics never stops the terminal event being written.
+ */
+async function readScenarioDisplayFields({
+  deps,
+  projectId,
+  scenarioId,
+  scenarioRunId,
+}: {
+  deps: ScenarioExecutionDispatchDeps;
+  projectId: string;
+  scenarioId: string;
+  scenarioRunId: string;
+}): Promise<{ name: string; situation: string } | null> {
+  return await deps
+    .lookupScenario({ projectId, scenarioId })
+    .catch((err: unknown) => {
+      logger.warn(
+        { err, scenarioRunId },
+        "Could not read scenario display fields for a failed run",
+      );
+      return null;
+    });
+}
+
+/**
  * Records a post-dispatch fault as the run's terminal state. Best-effort on
  * purpose: if this write fails too, the process's armed deadline still
  * finalises the run, and throwing here would re-run the scenario.
@@ -180,6 +211,12 @@ async function recordExecutionFault({
   err: unknown;
 }): Promise<void> {
   try {
+    const scenario = await readScenarioDisplayFields({
+      deps,
+      projectId: payload.projectId,
+      scenarioId: payload.scenarioId,
+      scenarioRunId: payload.scenarioRunId,
+    });
     await deps.emitFailure({
       projectId: payload.projectId,
       scenarioId: payload.scenarioId,
@@ -187,6 +224,8 @@ async function recordExecutionFault({
       batchRunId: payload.batchRunId,
       scenarioRunId: payload.scenarioRunId,
       error: err instanceof Error ? err.message : String(err),
+      name: scenario?.name,
+      description: scenario?.situation,
       outcome: "error",
     });
   } catch (writeErr) {
@@ -211,20 +250,12 @@ export function createScenarioExecutionFailRunHandler(
   deps: ScenarioExecutionDispatchDeps,
 ): IntentExecutor<ScenarioExecutionFailRunIntent> {
   return async (payload) => {
-    // Best-effort: display fields are cosmetic, and failing to read them must
-    // not stop the terminal event being written.
-    const scenario = await deps
-      .lookupScenario({
-        projectId: payload.projectId,
-        scenarioId: payload.scenarioId,
-      })
-      .catch((err: unknown) => {
-        logger.warn(
-          { err, scenarioRunId: payload.scenarioRunId },
-          "Could not read scenario display fields for a reaped run",
-        );
-        return null;
-      });
+    const scenario = await readScenarioDisplayFields({
+      deps,
+      projectId: payload.projectId,
+      scenarioId: payload.scenarioId,
+      scenarioRunId: payload.scenarioRunId,
+    });
 
     logger.info(
       {
