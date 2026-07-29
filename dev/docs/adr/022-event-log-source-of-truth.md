@@ -192,19 +192,51 @@ and span ids. This is the same discipline `BlobRef` follows in ADR-030 §5.
 
 For one release the worker still accepts a v1 raw key, so commands queued across
 the deploy resolve; a v1 key whose tenant segment does not match the command's
-authenticated tenant is refused rather than dereferenced.
+authenticated tenant is refused rather than dereferenced. **Removal is tracked in
+langwatch/langwatch-saas#837**, and the `TODO` markers in `blob-store.service.ts`
+name that issue. It is safe to remove one release after this ships: a v1
+reference can only live inside a command queued before the deploy, and the object
+it names is reaped by the lifecycle rule within 3 days.
 
-**The orphan-cleanup window is 3 days, not 24h.** This ADR says 24h in two
-places (the flow sketch and the rules list); the implementation has said 3 days
-since it was written, with the rationale that a weekend incident needs catch-up
-time before orphans are reaped. Three days is the intended value and the only
-one now stated in code. Since `release_trace_blob_offload` has never been
-enabled in a shipped deployment, no lifecycle rule exists yet for this prefix
-anywhere — an operator turning the flag on creates it fresh, so there is no
-deployed rule for the correction to contradict.
+**Each derived path segment is a single component.** Percent-encoding is not
+enough on its own: `LocalFilesystemDriver` round-trips the URI through
+`decodeURIComponent`, which turns `..%2F..%2F` back into `../../` before
+`mkdir`/`writeFile` see it. Since `idSchema` accepts arbitrary strings, a span id
+of `../../…` would otherwise have escaped the object root. Ids outside
+`[A-Za-z0-9_-]` are replaced by a hash of the id — deterministic, so the read and
+delete paths re-derive the same location, and incapable of carrying a separator
+whatever decodes it downstream. `LocalFilesystemDriver` additionally refuses any
+`file:` URI whose decoded path is not already canonical, so a future caller that
+gets this wrong fails loudly rather than writing outside the root.
+
+**The spool has no local-filesystem destination.** It is the one stored-objects
+consumer whose boundedness depends on something outside the object store: it
+deletes eagerly after the `event_log` INSERT and leans on a lifecycle rule to
+reap what a crash between those two steps leaves behind. A filesystem cannot
+express such a rule, so an orphan there is permanent and the volume is what
+fills. `mintSpoolUri` therefore refuses a `file` destination and ingestion
+continues with the payload inline. This is not a regression: before the spool
+moved onto the shared storage layer it built an S3 client, which on a local
+install resolved to the hardcoded `langwatch` bucket, so the write failed and the
+same fail-open path ran every time. It is now explicit instead of incidental.
+
+**The orphan-cleanup window is 3 days, not 24h — and enabling the flag does not
+create it.** This ADR says 24h in two places (the flow sketch and the rules
+list); the implementation has said 3 days since it was written, with the
+rationale that a weekend incident needs catch-up time before orphans are reaped.
+Three days is the intended value and the only one now stated in code.
+
+Provisioning that rule is the **operator's** job and a prerequisite for turning
+the flag on, not a consequence of it. Nothing in the application creates,
+validates, or reports the rule. On S3 it is a lifecycle rule on the
+`trace-blobs/spool/` prefix; on Azure Blob it is a lifecycle management policy
+with the same prefix filter. Since `release_trace_blob_offload` has never been
+enabled in a shipped deployment, no such rule exists anywhere yet — an operator
+turning the flag on creates it fresh, so there is no deployed rule for the 24h
+correction to contradict.
 
 **Superseded above:** "'No S3 equivalent' means no object storage at all";
 "deployments with no object storage should leave `release_trace_blob_offload`
-off"; and both "24h lifecycle policy" statements. Azure Blob and the local
-filesystem are now first-class spool destinations. The fail-open-on-write and
+off"; and both "24h lifecycle policy" statements. Azure Blob is now a
+first-class spool destination alongside S3. The fail-open-on-write and
 read-must-not-degrade rules are unchanged.

@@ -22,6 +22,7 @@ import {
   MAX_SPOOL_BYTES,
   type S3ClientResolver,
   SPOOL_REF_V2,
+  SpoolDestinationUnsupportedError,
   type SpoolStorage,
 } from "./blob-store.service";
 
@@ -144,12 +145,9 @@ describe("putSpool — given each supported storage destination", () => {
         expectedUri:
           "azure-blob://acct/cont/trace-blobs/spool/orgA/trace-1/span-1",
       },
-      {
-        name: "local filesystem",
-        destination: FILE_DESTINATION,
-        expectedUri:
-          "file:///var/lib/langwatch/objects/trace-blobs/spool/orgA/trace-1/span-1",
-      },
+      // No local-filesystem row on purpose: the spool refuses that
+      // destination, since a filesystem cannot express the lifecycle rule the
+      // orphan bound depends on. Covered by its own case below.
     ])("writes to the $name destination the deployment resolved", async ({
       destination,
       expectedUri,
@@ -208,16 +206,13 @@ describe("putSpool — given a span payload body", () => {
 
 describe("putSpool — given an OTLP id containing a path separator", () => {
   describe("when putSpool is called", () => {
-    it("keeps the object under the spool prefix", async () => {
+    it("reduces the id to one path component so nothing can escape the prefix", async () => {
       const objectStore = fakeObjectStore();
       const store = new BlobStore({
         resolveS3Client: forbiddenS3Resolver,
         spoolStorage: spoolStorageFor(objectStore, S3_DESTINATION),
       });
 
-      // Base64-encoded OTLP ids can contain "/", which unescaped would
-      // inject extra path segments — or, leading, escape the prefix that
-      // the lifecycle rule matches on.
       await store.putSpool({
         projectId: "orgA",
         traceId: "../../etc",
@@ -225,9 +220,62 @@ describe("putSpool — given an OTLP id containing a path separator", () => {
         body: Buffer.from("payload", "utf-8"),
       });
 
-      expect(objectStore.putUris[0]).toBe(
-        "s3://test-bucket/trace-blobs/spool/orgA/..%2F..%2Fetc/a%2Fb",
-      );
+      // Percent-encoding alone was not enough: the local driver decodes the
+      // URI before touching the filesystem, which turned `..%2F..%2F` back
+      // into `../../`. Unsafe ids become a hash, which cannot carry a
+      // separator no matter what decodes it downstream.
+      const [uri] = objectStore.putUris;
+      const key = uri!.replace("s3://test-bucket/", "");
+      const segments = key.split("/");
+      expect(segments.slice(0, 3)).toEqual(["trace-blobs", "spool", "orgA"]);
+      expect(segments).toHaveLength(5);
+      for (const segment of segments) {
+        expect(segment).not.toBe("..");
+        expect(segment).not.toContain("%2F");
+      }
+      // Decoding the whole key must not introduce separators either — this is
+      // the exact step that defeated the previous encoding.
+      expect(decodeURIComponent(key).split("/")).toHaveLength(5);
+    });
+
+    it("derives the same location on read and delete", async () => {
+      const objectStore = fakeObjectStore();
+      const store = new BlobStore({
+        resolveS3Client: forbiddenS3Resolver,
+        spoolStorage: spoolStorageFor(objectStore, S3_DESTINATION),
+      });
+      const coords = { projectId: "orgA", traceId: "../../etc", spanId: "a/b" };
+      const body = Buffer.from("payload", "utf-8");
+
+      // Hashing must be deterministic, or a spooled span becomes unreadable.
+      const spoolRef = await store.putSpool({ ...coords, body });
+      expect(await store.getSpool({ spoolRef, ...coords })).toEqual(body);
+
+      await store.deleteSpool({ spoolRef, ...coords });
+      expect(objectStore.objects.size).toBe(0);
+    });
+  });
+});
+
+describe("putSpool — given the project's storage is the local filesystem", () => {
+  describe("when putSpool is called", () => {
+    it("refuses rather than writing an object nothing will ever reap", async () => {
+      const objectStore = fakeObjectStore();
+      const store = new BlobStore({
+        resolveS3Client: forbiddenS3Resolver,
+        spoolStorage: spoolStorageFor(objectStore, FILE_DESTINATION),
+      });
+
+      // A filesystem cannot express a lifecycle rule, so a crash between the
+      // write and its delete would strand the object forever. `maybeSpool` is
+      // fail-open, so ingestion continues with the payload inline.
+      await expect(
+        store.putSpool({
+          ...spoolCoords,
+          body: Buffer.from("payload", "utf-8"),
+        }),
+      ).rejects.toBeInstanceOf(SpoolDestinationUnsupportedError);
+      expect(objectStore.put).not.toHaveBeenCalled();
     });
   });
 });
