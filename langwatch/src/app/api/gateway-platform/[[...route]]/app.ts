@@ -20,7 +20,11 @@
  */
 
 import { createLogger } from "@langwatch/observability";
-import type { Project } from "@prisma/client";
+import type {
+  GatewayBudget,
+  GatewayCacheRule,
+  Project,
+} from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
@@ -29,9 +33,11 @@ import { resolver } from "hono-openapi/zod";
 import { z } from "zod";
 import type { AuthMiddlewareVariables } from "~/app/api/middleware/auth";
 import { apiKeyPermission, createProjectApp } from "~/server/api/security";
-import { validator as zValidator } from "~/server/api/validation";
 import { prisma } from "~/server/db";
-import { GatewayBudgetService } from "~/server/gateway/budget.service";
+import {
+  type BudgetScope,
+  GatewayBudgetService,
+} from "~/server/gateway/budget.service";
 import { GatewayCacheRuleService } from "~/server/gateway/cacheRule.service";
 import {
   chRepoOrUndefined,
@@ -266,6 +272,14 @@ const updateCacheRuleSchema = z.object({
   action: cacheRuleActionSchema.optional(),
 });
 
+const updateBudgetSchema = z.object({
+  name: z.string().min(1).max(128).optional(),
+  description: z.string().nullable().optional(),
+  limit_usd: z.number().positive().or(z.string()).optional(),
+  on_breach: z.enum(["BLOCK", "WARN"]).optional(),
+  timezone: z.string().nullable().optional(),
+});
+
 const budgetScopeTypeSchema = z.enum([
   "ORGANIZATION",
   "TEAM",
@@ -347,6 +361,29 @@ function membershipForApiCaller(project: Project): MembershipSet {
     teamIds: new Set([project.teamId]),
     projectIds: new Set([project.id]),
   };
+}
+
+/**
+ * Load a key for a by-id route, applying the same visibility rule as the
+ * list: a key the caller can't see is indistinguishable from one that
+ * doesn't exist. Shared by reads AND mutations so an unauthorized-but-
+ * invisible key can never answer 403 where the GET answers 404 (an
+ * existence oracle).
+ */
+async function requireVisibleVk(
+  service: VirtualKeyService,
+  id: string,
+  organizationId: string,
+  project: Project,
+) {
+  const vk = await service.getById(id, organizationId);
+  if (!vk || !isVisibleToMembership(membershipForApiCaller(project), vk.scopes)) {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "virtual_key_not_found: virtual key not found",
+    });
+  }
+  return vk;
 }
 
 const TRPC_HTTP_STATUS: Record<string, ContentfulStatusCode> = {
@@ -791,13 +828,7 @@ secured.access(apiKeyPermission("virtualKeys:update")).patch(
     const { actor, actorUserId } = actorForRequest(c);
     const service = VirtualKeyService.create(prisma);
     try {
-      const existing = await service.getById(id, organizationId);
-      if (!existing) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "virtual_key_not_found: virtual key not found",
-        });
-      }
+      const existing = await requireVisibleVk(service, id, organizationId, project);
       // Mutating an existing key needs virtualKeys:update on one of the
       // scopes it already lives in; re-scoping additionally needs manage
       // on every NEW scope — the same two gates as the tRPC update.
@@ -900,13 +931,7 @@ secured.access(apiKeyPermission("virtualKeys:rotate")).post(
     const { actor, actorUserId } = actorForRequest(c);
     const service = VirtualKeyService.create(prisma);
     try {
-      const existing = await service.getById(id, organizationId);
-      if (!existing) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "virtual_key_not_found: virtual key not found",
-        });
-      }
+      const existing = await requireVisibleVk(service, id, organizationId, project);
       await assertActorCanOperateOnAnyScope(
         { prisma, actor },
         existing.scopes,
@@ -950,13 +975,7 @@ secured.access(apiKeyPermission("virtualKeys:delete")).post(
     const { actor, actorUserId } = actorForRequest(c);
     const service = VirtualKeyService.create(prisma);
     try {
-      const existing = await service.getById(id, organizationId);
-      if (!existing) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "virtual_key_not_found: virtual key not found",
-        });
-      }
+      const existing = await requireVisibleVk(service, id, organizationId, project);
       await assertActorCanOperateOnAnyScope(
         { prisma, actor },
         existing.scopes,
@@ -1156,12 +1175,10 @@ secured.access(apiKeyPermission("gatewayBudgets:create")).post(
       },
     },
   }),
-  zValidator("json", createBudgetSchema),
   async (c) => {
     const project = c.get("project");
-    const body = {
-      data: c.req.valid("json" as never) as z.infer<typeof createBudgetSchema>,
-    };
+    const body = createBudgetSchema.safeParse(await c.req.json());
+    if (!body.success) return validationErrorResponse(c, body.error);
     const organizationId = await orgIdForProject(project.id);
     const { actorUserId } = actorForRequest(c);
     const service = GatewayBudgetService.create(prisma, chRepoOrUndefined());
@@ -1211,7 +1228,8 @@ secured.access(apiKeyPermission("gatewayBudgets:update")).patch(
   async (c) => {
     const project = c.get("project");
     const id = c.req.param("id");
-    const raw = (await c.req.json()) as Record<string, unknown>;
+    const body = updateBudgetSchema.safeParse(await c.req.json());
+    if (!body.success) return validationErrorResponse(c, body.error);
     const organizationId = await orgIdForProject(project.id);
     const { actorUserId } = actorForRequest(c);
     const service = GatewayBudgetService.create(prisma, chRepoOrUndefined());
@@ -1219,23 +1237,11 @@ secured.access(apiKeyPermission("gatewayBudgets:update")).patch(
       const row = await service.update({
         id,
         organizationId,
-        name: typeof raw.name === "string" ? raw.name : undefined,
-        description:
-          raw.description === undefined
-            ? undefined
-            : (raw.description as string | null),
-        limitUsd:
-          raw.limit_usd !== undefined
-            ? (raw.limit_usd as number | string)
-            : undefined,
-        onBreach:
-          raw.on_breach === "BLOCK" || raw.on_breach === "WARN"
-            ? raw.on_breach
-            : undefined,
-        timezone:
-          raw.timezone === undefined
-            ? undefined
-            : (raw.timezone as string | null),
+        name: body.data.name,
+        description: body.data.description,
+        limitUsd: body.data.limit_usd,
+        onBreach: body.data.on_breach,
+        timezone: body.data.timezone,
         actorUserId,
       });
       const memberCounts = await groupMemberCounts([row]);
@@ -1464,17 +1470,21 @@ secured.access(apiKeyPermission("gatewayCacheRules:create")).post(
     const organizationId = await orgIdForProject(project.id);
     const { actorUserId } = actorForRequest(c);
     const service = GatewayCacheRuleService.create(prisma);
-    const row = await service.create({
-      organizationId,
-      name: body.data.name,
-      description: body.data.description ?? null,
-      priority: body.data.priority,
-      enabled: body.data.enabled,
-      matchers: body.data.matchers,
-      action: body.data.action,
-      actorUserId,
-    });
-    return c.json({ cache_rule: toCacheRuleDto(row) }, 201);
+    try {
+      const row = await service.create({
+        organizationId,
+        name: body.data.name,
+        description: body.data.description ?? null,
+        priority: body.data.priority,
+        enabled: body.data.enabled,
+        matchers: body.data.matchers,
+        action: body.data.action,
+        actorUserId,
+      });
+      return c.json({ cache_rule: toCacheRuleDto(row) }, 201);
+    } catch (error) {
+      return trpcErrorResponse(c, error);
+    }
   },
 );
 
@@ -1505,18 +1515,22 @@ secured.access(apiKeyPermission("gatewayCacheRules:update")).patch(
     const organizationId = await orgIdForProject(project.id);
     const { actorUserId } = actorForRequest(c);
     const service = GatewayCacheRuleService.create(prisma);
-    const row = await service.update({
-      id,
-      organizationId,
-      name: body.data.name,
-      description: body.data.description,
-      priority: body.data.priority,
-      enabled: body.data.enabled,
-      matchers: body.data.matchers,
-      action: body.data.action,
-      actorUserId,
-    });
-    return c.json({ cache_rule: toCacheRuleDto(row) });
+    try {
+      const row = await service.update({
+        id,
+        organizationId,
+        name: body.data.name,
+        description: body.data.description,
+        priority: body.data.priority,
+        enabled: body.data.enabled,
+        matchers: body.data.matchers,
+        action: body.data.action,
+        actorUserId,
+      });
+      return c.json({ cache_rule: toCacheRuleDto(row) });
+    } catch (error) {
+      return trpcErrorResponse(c, error);
+    }
   },
 );
 
@@ -1545,16 +1559,20 @@ secured.access(apiKeyPermission("gatewayCacheRules:delete")).delete(
     const organizationId = await orgIdForProject(project.id);
     const { actorUserId } = actorForRequest(c);
     const service = GatewayCacheRuleService.create(prisma);
-    const row = await service.archive({
-      id,
-      organizationId,
-      actorUserId,
-    });
-    return c.json({ cache_rule: toCacheRuleDto(row) });
+    try {
+      const row = await service.archive({
+        id,
+        organizationId,
+        actorUserId,
+      });
+      return c.json({ cache_rule: toCacheRuleDto(row) });
+    } catch (error) {
+      return trpcErrorResponse(c, error);
+    }
   },
 );
 
-function toCacheRuleDto(r: import("@prisma/client").GatewayCacheRule) {
+function toCacheRuleDto(r: GatewayCacheRule) {
   return {
     id: r.id,
     organization_id: r.organizationId,
@@ -1596,10 +1614,7 @@ async function groupMemberCounts(
   return new Map(groups.map((g) => [g.id, g._count.members]));
 }
 
-function toBudgetDto(
-  b: import("@prisma/client").GatewayBudget,
-  memberCount?: number,
-) {
+function toBudgetDto(b: GatewayBudget, memberCount?: number) {
   return {
     id: b.id,
     organization_id: b.organizationId,
@@ -1624,7 +1639,7 @@ function toBudgetDto(
 
 function scopeFromWire(
   scope: z.infer<typeof createBudgetSchema>["scope"],
-): import("~/server/gateway/budget.service").BudgetScope {
+): BudgetScope {
   switch (scope.kind) {
     case "ORGANIZATION":
       return { kind: "ORGANIZATION", organizationId: scope.organization_id };

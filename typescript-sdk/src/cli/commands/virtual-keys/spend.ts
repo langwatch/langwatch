@@ -39,7 +39,7 @@ export const virtualKeySpendCommand = async (
       table: () => {
         console.log();
         console.log(`${chalk.bold("Virtual key:")} ${summary.virtual_key_id}`);
-        console.log(`${chalk.bold("Window:")}      ${new Date(summary.window.from).toISOString()} → ${new Date(summary.window.to).toISOString()}`);
+        console.log(`${chalk.bold("Window:")}      ${new Date(summary.window.from).toLocaleString()} → ${new Date(summary.window.to).toLocaleString()}`);
         console.log(`${chalk.bold("Spent:")}       $${Number.parseFloat(summary.spent_usd).toFixed(4)}`);
         console.log(`${chalk.bold("Requests:")}    ${summary.requests}`);
         console.log();

@@ -1645,7 +1645,11 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .description("Create a new virtual key (secret is shown once)")
       .requiredOption("--name <name>", "Human-readable name for the key")
       .option("--description <desc>", "Optional description")
-      .option("--scope <typeAndId...>", "Scope row in TYPE:id form (repeatable). Types: ORG | TEAM | PROJECT. Defaults to the calling project when omitted. Example: --scope ORG:acme --scope TEAM:platform")
+      .option(
+        "--scope <typeAndId>",
+        "Scope row in TYPE:id form (repeat the flag for several). Types: ORG | TEAM | PROJECT. Defaults to the calling project when omitted. Example: --scope ORG:acme --scope TEAM:platform",
+        (value: string, previous: string[] = []) => [...previous, value],
+      )
       .option("--trace-project <id>", "Explicit trace destination project for org- or team-scoped keys (needs virtualKeys:manage there)")
       .option("--routing-policy <id>", "RoutingPolicy id to pin (pairs with --routing-mode policy)")
       .option("--routing-mode <mode>", "none (default: no silent failover) | fallback_all | policy")
@@ -1693,7 +1697,11 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("--name <name>", "New display name")
       .option("--description <desc>", "New description")
       .option("--clear-description", "Clear the description")
-      .option("--scope <typeAndId...>", "Replace the scope set (repeatable; supplies the full set). Same TYPE:id form as create.")
+      .option(
+        "--scope <typeAndId>",
+        "Replace the scope set (repeat the flag for several; supplies the full set). Same TYPE:id form as create.",
+        (value: string, previous: string[] = []) => [...previous, value],
+      )
       .option("--trace-project <id>", "Re-point the key's trace destination project (needs virtualKeys:manage there)")
       .option("--clear-trace-project", "Clear the explicit trace destination (falls back to project scope or governance project)")
       .option("--routing-policy <id>", "Switch to a different RoutingPolicy (pass id)")

@@ -14,8 +14,6 @@ import { GatewayUsageService } from "~/server/gateway/usage.service";
 import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
-export { chRepoOrUndefined, spendRepoOrUndefined };
-
 export const gatewayUsageRouter = createTRPCRouter({
   summary: protectedProcedure
     .input(

@@ -83,7 +83,9 @@ export const listGatewayBudgetsCommand = async (
           // the whole group, so utilization compares against limit x members.
           const isGroup = b.scope_type === "GROUP";
           const effectiveLimit = isGroup ? limit * (b.member_count ?? 0) : limit;
-          const pct = effectiveLimit > 0 ? (spent / effectiveLimit) * 100 : spent > 0 ? 100 : 0;
+          // A zero effective limit admits no spend at all: maximally
+          // breached, not 0% utilized (matches `langwatch status`).
+          const pct = effectiveLimit > 0 ? (spent / effectiveLimit) * 100 : 100;
           const pctLabel = `${pct.toFixed(0)}%`;
           const coloredPct = pct >= 100 ? chalk.red(pctLabel) : pct >= 80 ? chalk.yellow(pctLabel) : chalk.green(pctLabel);
           const spentLabel = spend_available

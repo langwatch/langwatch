@@ -10,7 +10,7 @@ The AI Gateway is governed by LangWatch's existing RBAC system, the same resourc
 
 ## Resources
 
-Every gateway UI, tRPC call, and REST endpoint checks one of these six resource keys:
+Every gateway UI, tRPC call, and REST endpoint checks one of these seven resource keys:
 
 | Resource | What it gates |
 |---|---|
@@ -18,6 +18,7 @@ Every gateway UI, tRPC call, and REST endpoint checks one of these six resource 
 | `gatewayBudgets` | Budget list, detail, drawer, create, update, archive, spend view. |
 | `modelProviders` | ModelProvider list, create, update, basic credentials, AND the **Advanced (Gateway)** tab (RPM, TPM, RPD, fallback priority, providerConfig). Same resource the platform already uses; no gateway-specific provider resource exists. |
 | `gatewayGuardrails` | Attaching, detaching guardrails to a VK (the evaluator itself is still `evaluations` scope). |
+| `gatewayCacheRules` | Cache-control rule list, detail, create, update, archive. |
 | `gatewayLogs` | Audit log list, filter, export. |
 | `gatewayUsage` | `/gateway/usage` stat tiles + time-windowed spend aggregation. |
 

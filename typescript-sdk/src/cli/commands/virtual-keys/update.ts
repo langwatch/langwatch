@@ -8,7 +8,12 @@ import {
 } from "@/client-sdk/services/virtual-keys/virtual-keys-api.service";
 import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
-import { formatScope, parseScopeArg } from "./_shared";
+import {
+  buildBudgetFlags,
+  formatScope,
+  parseRoutingModeArg,
+  parseScopeArg,
+} from "./_shared";
 import type { CommandResult } from "../../utils/output";
 
 export interface UpdateVirtualKeyOptions {
@@ -29,44 +34,6 @@ export interface UpdateVirtualKeyOptions {
   configFile?: string;
 }
 
-const ROUTING_MODES: VirtualKeyRoutingMode[] = ["NONE", "FALLBACK_ALL", "POLICY"];
-const BUDGET_WINDOWS = ["DAY", "WEEK", "MONTH"] as const;
-
-/**
- * Undefined leaves the key's cap alone; a value upserts it; null (from
- * --clear-budget) archives it — mirroring the wire contract exactly.
- */
-function buildBudget(
-  options: UpdateVirtualKeyOptions,
-): VirtualKeyBudgetInput | null | undefined {
-  if (options.clearBudget) {
-    if (options.budgetLimit || options.budgetWindow || options.budgetBreach) {
-      throw new Error("--clear-budget cannot be combined with the other --budget-* flags");
-    }
-    return null;
-  }
-  const anyBudgetFlag =
-    options.budgetLimit !== undefined ||
-    options.budgetWindow !== undefined ||
-    options.budgetBreach !== undefined;
-  if (!anyBudgetFlag) return undefined;
-  if (!options.budgetLimit || !options.budgetWindow) {
-    throw new Error(
-      "--budget-limit and --budget-window travel together (e.g. --budget-limit 25 --budget-window month)",
-    );
-  }
-  const window = options.budgetWindow.toUpperCase();
-  if (!(BUDGET_WINDOWS as readonly string[]).includes(window)) {
-    throw new Error("--budget-window must be one of day | week | month");
-  }
-  return {
-    limit_usd: options.budgetLimit,
-    window: window as (typeof BUDGET_WINDOWS)[number],
-    on_breach: options.budgetBreach
-      ? (options.budgetBreach.toUpperCase() as "BLOCK" | "WARN")
-      : undefined,
-  };
-}
 
 function parseConfig(options: UpdateVirtualKeyOptions): Record<string, unknown> | undefined {
   if (options.configJson) {
@@ -107,13 +74,9 @@ export const updateVirtualKeyCommand = async (
   let routingMode: VirtualKeyRoutingMode | undefined;
   try {
     config = parseConfig(options);
-    budget = buildBudget(options);
+    budget = buildBudgetFlags(options);
     if (options.routingMode !== undefined) {
-      const mode = options.routingMode.toUpperCase();
-      if (!(ROUTING_MODES as readonly string[]).includes(mode)) {
-        throw new Error("--routing-mode must be one of none | fallback_all | policy");
-      }
-      routingMode = mode as VirtualKeyRoutingMode;
+      routingMode = parseRoutingModeArg(options.routingMode);
     }
   } catch (err) {
     console.error(chalk.red(`Error: ${err instanceof Error ? err.message : String(err)}`));
@@ -136,7 +99,7 @@ export const updateVirtualKeyCommand = async (
   if (noFieldsProvided) {
     console.error(
       chalk.red(
-        "Error: nothing to update. Provide at least one of --name, --description, --clear-description, --scope, --routing-policy, --clear-routing-policy, --routing-mode, --budget-limit/--budget-window, --clear-budget, --config-json, --config-file.",
+        "Error: nothing to update. Provide at least one of --name, --description, --clear-description, --scope, --trace-project, --clear-trace-project, --routing-policy, --clear-routing-policy, --routing-mode, --budget-limit/--budget-window, --clear-budget, --config-json, --config-file.",
       ),
     );
     process.exit(1);

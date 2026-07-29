@@ -135,7 +135,7 @@ PATCH /virtual-keys/:id
 
 Body (all fields optional):
 
-```json
+```jsonc
 {
   "name": "new-name",
   "scopes": [{ "scope_type": "TEAM", "scope_id": "team_..." }],
@@ -155,7 +155,7 @@ POST /virtual-keys/:id/rotate
 
 Response `200`:
 
-```json
+```jsonc
 {
   "virtual_key": { /* ... */ },
   "secret": "vk-lw-NEW..."
@@ -224,7 +224,7 @@ POST /budgets
 
 Body:
 
-```json
+```jsonc
 {
   "scope": {
     "kind": "PROJECT",         // or ORGANIZATION, TEAM, VIRTUAL_KEY, PRINCIPAL, GROUP

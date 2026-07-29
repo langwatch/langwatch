@@ -7,7 +7,13 @@ import {
 } from "@/client-sdk/services/virtual-keys/virtual-keys-api.service";
 import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
-import { formatScope, parseScopeArg, virtualKeyDetailUrl } from "./_shared";
+import {
+  buildBudgetFlags,
+  formatScope,
+  parseRoutingModeArg,
+  parseScopeArg,
+  virtualKeyDetailUrl,
+} from "./_shared";
 import type { CommandResult } from "../../utils/output";
 
 export interface CreateVirtualKeyOptions {
@@ -24,39 +30,6 @@ export interface CreateVirtualKeyOptions {
   providersAllowed?: string;
 }
 
-const ROUTING_MODES: VirtualKeyRoutingMode[] = ["NONE", "FALLBACK_ALL", "POLICY"];
-const BUDGET_WINDOWS = ["DAY", "WEEK", "MONTH"] as const;
-
-/**
- * Assemble the key's own cap from the three budget flags. The pair
- * limit+window travels together: one without the other is a half-said cap
- * the server would refuse anyway, so refuse it here with a usable message.
- */
-function buildBudget(
-  options: CreateVirtualKeyOptions,
-): VirtualKeyBudgetInput | undefined {
-  const anyBudgetFlag =
-    options.budgetLimit !== undefined ||
-    options.budgetWindow !== undefined ||
-    options.budgetBreach !== undefined;
-  if (!anyBudgetFlag) return undefined;
-  if (!options.budgetLimit || !options.budgetWindow) {
-    throw new Error(
-      "--budget-limit and --budget-window travel together (e.g. --budget-limit 25 --budget-window month)",
-    );
-  }
-  const window = options.budgetWindow.toUpperCase();
-  if (!(BUDGET_WINDOWS as readonly string[]).includes(window)) {
-    throw new Error("--budget-window must be one of day | week | month");
-  }
-  return {
-    limit_usd: options.budgetLimit,
-    window: window as (typeof BUDGET_WINDOWS)[number],
-    on_breach: options.budgetBreach
-      ? (options.budgetBreach.toUpperCase() as "BLOCK" | "WARN")
-      : undefined,
-  };
-}
 
 /**
  * Returns the created key rather than printing it: the output port renders it
@@ -85,13 +58,9 @@ export const createVirtualKeyCommand = async (
     // Omitted scopes are the common reseller path: the server scopes the
     // key to the calling project.
     scopes = options.scope?.length ? options.scope.map(parseScopeArg) : undefined;
-    budget = buildBudget(options);
+    budget = buildBudgetFlags(options) ?? undefined;
     if (options.routingMode !== undefined) {
-      const mode = options.routingMode.toUpperCase();
-      if (!(ROUTING_MODES as readonly string[]).includes(mode)) {
-        throw new Error("--routing-mode must be one of none | fallback_all | policy");
-      }
-      routingMode = mode as VirtualKeyRoutingMode;
+      routingMode = parseRoutingModeArg(options.routingMode);
     }
   } catch (error) {
     console.error(chalk.red(`Error: ${(error as Error).message}`));

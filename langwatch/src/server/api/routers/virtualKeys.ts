@@ -14,8 +14,11 @@
  * derivation; the legacy `providerCredentialIds`/`providerChain`
  * fields are no longer surfaced.
  */
+import type { PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+
+import type { Session } from "~/server/auth";
 
 import { resolveApplicableBudgetsForDraftKey } from "~/server/gateway/applicableBudgets.service";
 import {
@@ -38,15 +41,48 @@ import { scopeAssignmentSchema } from "~/server/scopes/scope.types";
 import { authorizeInResolver } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import {
-  assertCanManageAllScopes,
-  assertCanOperateOnAnyScope,
+  assertActorCanManageAllScopes,
+  assertActorCanOperateOnAnyScope,
   assertGuardrailAttachmentsAllowed,
   assertScopesBelongToOrg,
   assertTraceProjectBelongsToOrg,
   isVisibleToMembership,
   loadMembershipSet,
   resolveVkProjectId,
+  type VirtualKeyActor,
 } from "~/server/gateway/virtualKey.authz";
+
+/** The session expressed in the shared actor vocabulary. */
+function sessionActor(session: Session): VirtualKeyActor {
+  return { kind: "session", session };
+}
+
+/**
+ * Load a key for a by-id procedure with the same visibility rule as
+ * `get`: a key outside the caller's membership set is indistinguishable
+ * from one that doesn't exist. Mutations share this so an invisible key
+ * can never answer FORBIDDEN where the read answers NOT_FOUND.
+ */
+async function requireVisibleVk(
+  ctx: { prisma: PrismaClient; session: Session },
+  organizationId: string,
+  id: string,
+) {
+  const service = VirtualKeyService.create(ctx.prisma);
+  const vk = await service.getById(id, organizationId);
+  if (!vk) {
+    throw new TRPCError({ code: "NOT_FOUND" });
+  }
+  const membership = await loadMembershipSet(
+    ctx.prisma,
+    organizationId,
+    ctx.session.user.id,
+  );
+  if (!isVisibleToMembership(membership, vk.scopes)) {
+    throw new TRPCError({ code: "NOT_FOUND" });
+  }
+  return vk;
+}
 
 const scopeInputSchema = scopeAssignmentSchema;
 
@@ -226,8 +262,8 @@ export const virtualKeysRouter = createTRPCRouter({
       // destination, the exact boundary `create` will hold them to when
       // they submit; previewing a target's budgets must not be cheaper
       // than creating a key against it.
-      await assertCanManageAllScopes(
-        { prisma: ctx.prisma, session: ctx.session },
+      await assertActorCanManageAllScopes(
+        { prisma: ctx.prisma, actor: sessionActor(ctx.session) },
         input.scopes,
       );
       await assertScopesBelongToOrg(
@@ -241,8 +277,8 @@ export const virtualKeysRouter = createTRPCRouter({
         input.traceProjectId,
       );
       if (input.traceProjectId) {
-        await assertCanManageAllScopes(
-          { prisma: ctx.prisma, session: ctx.session },
+        await assertActorCanManageAllScopes(
+          { prisma: ctx.prisma, actor: sessionActor(ctx.session) },
           [{ scopeType: "PROJECT", scopeId: input.traceProjectId }],
         );
       }
@@ -298,8 +334,8 @@ export const virtualKeysRouter = createTRPCRouter({
     // coarse org-wide check.
     .use(authorizeInResolver)
     .mutation(async ({ ctx, input }) => {
-      await assertCanManageAllScopes(
-        { prisma: ctx.prisma, session: ctx.session },
+      await assertActorCanManageAllScopes(
+        { prisma: ctx.prisma, actor: sessionActor(ctx.session) },
         input.scopes,
       );
       await assertScopesBelongToOrg(
@@ -317,8 +353,8 @@ export const virtualKeysRouter = createTRPCRouter({
       // PROJECT scope enforced; tenancy alone would let a team manager
       // point a key at a sibling team's project and consume its budget.
       if (input.traceProjectId) {
-        await assertCanManageAllScopes(
-          { prisma: ctx.prisma, session: ctx.session },
+        await assertActorCanManageAllScopes(
+          { prisma: ctx.prisma, actor: sessionActor(ctx.session) },
           [{ scopeType: "PROJECT", scopeId: input.traceProjectId }],
         );
       }
@@ -330,7 +366,7 @@ export const virtualKeysRouter = createTRPCRouter({
         input.traceProjectId ?? null,
       );
       await assertGuardrailAttachmentsAllowed(
-        { prisma: ctx.prisma, actor: { kind: "session", session: ctx.session } },
+        { prisma: ctx.prisma, actor: sessionActor(ctx.session) },
         vkProjectId,
         input.config?.guardrailAttachments,
       );
@@ -369,22 +405,23 @@ export const virtualKeysRouter = createTRPCRouter({
     .use(authorizeInResolver)
     .mutation(async ({ ctx, input }) => {
       const service = VirtualKeyService.create(ctx.prisma);
-      const existing = await service.getById(input.id, input.organizationId);
-      if (!existing) {
-        throw new TRPCError({ code: "NOT_FOUND" });
-      }
+      const existing = await requireVisibleVk(
+        ctx,
+        input.organizationId,
+        input.id,
+      );
       // Mutating an existing key needs virtualKeys:update on one of the
       // scopes it already lives in.
-      await assertCanOperateOnAnyScope(
-        { prisma: ctx.prisma, session: ctx.session },
+      await assertActorCanOperateOnAnyScope(
+        { prisma: ctx.prisma, actor: sessionActor(ctx.session) },
         existing.scopes,
         "virtualKeys:update",
       );
       // Re-scoping additionally needs manage on every NEW scope, so a key
       // can't be moved into a scope the caller doesn't control.
       if (input.scopes) {
-        await assertCanManageAllScopes(
-          { prisma: ctx.prisma, session: ctx.session },
+        await assertActorCanManageAllScopes(
+          { prisma: ctx.prisma, actor: sessionActor(ctx.session) },
           input.scopes,
         );
         await assertScopesBelongToOrg(
@@ -402,8 +439,8 @@ export const virtualKeysRouter = createTRPCRouter({
         // Re-pointing the destination is the same decision as choosing
         // it at create: it needs manage on the target project.
         if (input.traceProjectId) {
-          await assertCanManageAllScopes(
-            { prisma: ctx.prisma, session: ctx.session },
+          await assertActorCanManageAllScopes(
+            { prisma: ctx.prisma, actor: sessionActor(ctx.session) },
             [{ scopeType: "PROJECT", scopeId: input.traceProjectId }],
           );
         }
@@ -430,7 +467,7 @@ export const virtualKeysRouter = createTRPCRouter({
           ? parseVirtualKeyConfig(existing.config).guardrailAttachments
           : undefined);
       await assertGuardrailAttachmentsAllowed(
-        { prisma: ctx.prisma, actor: { kind: "session", session: ctx.session } },
+        { prisma: ctx.prisma, actor: sessionActor(ctx.session) },
         vkProjectId,
         attachmentsToCheck,
       );
@@ -455,12 +492,13 @@ export const virtualKeysRouter = createTRPCRouter({
     .use(authorizeInResolver)
     .mutation(async ({ ctx, input }) => {
       const service = VirtualKeyService.create(ctx.prisma);
-      const existing = await service.getById(input.id, input.organizationId);
-      if (!existing) {
-        throw new TRPCError({ code: "NOT_FOUND" });
-      }
-      await assertCanOperateOnAnyScope(
-        { prisma: ctx.prisma, session: ctx.session },
+      const existing = await requireVisibleVk(
+        ctx,
+        input.organizationId,
+        input.id,
+      );
+      await assertActorCanOperateOnAnyScope(
+        { prisma: ctx.prisma, actor: sessionActor(ctx.session) },
         existing.scopes,
         "virtualKeys:rotate",
       );
@@ -477,12 +515,13 @@ export const virtualKeysRouter = createTRPCRouter({
     .use(authorizeInResolver)
     .mutation(async ({ ctx, input }) => {
       const service = VirtualKeyService.create(ctx.prisma);
-      const existing = await service.getById(input.id, input.organizationId);
-      if (!existing) {
-        throw new TRPCError({ code: "NOT_FOUND" });
-      }
-      await assertCanOperateOnAnyScope(
-        { prisma: ctx.prisma, session: ctx.session },
+      const existing = await requireVisibleVk(
+        ctx,
+        input.organizationId,
+        input.id,
+      );
+      await assertActorCanOperateOnAnyScope(
+        { prisma: ctx.prisma, actor: sessionActor(ctx.session) },
         existing.scopes,
         "virtualKeys:delete",
       );

@@ -82,7 +82,7 @@ function isProductManaged(vk: Pick<VirtualKey, "purpose">): boolean {
  * not a spending decision, and belongs on the budgets page.
  */
 export const virtualKeyBudgetInputSchema = z.object({
-  // A whole decimal number of dollars, strictly positive. String rather
+  // A decimal number of dollars, strictly positive. String rather
   // than number to survive JSON round-trips without float drift; the
   // regex rejects partial parses ("10abs"), signs, and bare dots.
   limitUsd: z

@@ -57,10 +57,9 @@ def build_example_input(example_file: str) -> str:
     if "rag" in example_file:
         return "what is LangWatch?"
     if "function_call" in example_file:
-        # This example FORCES the get_weather tool via tool_choice. Asking
-        # it something unrelated makes the forced call incoherent, which
-        # OpenAI's safety layer now rejects outright as invalid_prompt.
-        # Ask the weather bot a weather question.
+        # The function-call example offers a get_weather tool with
+        # tool_choice="auto"; a weather question is what makes the model
+        # actually pick it.
         return "what is the weather in Amsterdam?"
     return "what makes a good daily routine?"
 
@@ -102,6 +101,9 @@ def get_example_files():
 def test_example_input_is_local():
     assert build_example_input("span_evaluation.py") == "who is the oldest person?"
     assert build_example_input("langchain_rag_bot.py") == "what is LangWatch?"
+    assert build_example_input("openai_bot_function_call.py") == (
+        "what is the weather in Amsterdam?"
+    )
     assert build_example_input("distributed_tracing.py") == (
         "what makes a good daily routine?"
     )

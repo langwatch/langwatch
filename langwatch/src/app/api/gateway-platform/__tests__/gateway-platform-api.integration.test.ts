@@ -418,12 +418,8 @@ describe("gateway platform REST API (real PG + real CH)", () => {
     // Every filter names module-level constants (or `in` lists built from
     // them), so a failed setup can never widen a delete (see the
     // undefined-collapse footgun: prisma drops undefined keys entirely).
-    await ch().command({
-      query: `DELETE FROM trace_summaries WHERE TenantId IN ('${PROJECT_ID}', '${GOV_PROJECT_ID}')`,
-    });
-    await ch().command({
-      query: `DELETE FROM gateway_budget_ledger_events WHERE TenantId IN ('${PROJECT_ID}', '${GOV_PROJECT_ID}')`,
-    });
+    // Postgres first: `ch()` throws when the test client is missing —
+    // exactly the broken-setup case — and must not abort the PG cleanup.
     await prisma.auditLog.deleteMany({
       where: { organizationId: { in: ALL_ORG_IDS } },
     });
@@ -467,6 +463,12 @@ describe("gateway platform REST API (real PG + real CH)", () => {
     await prisma.organization.deleteMany({
       where: { id: { in: ALL_ORG_IDS } },
     });
+    await ch().command({
+      query: `DELETE FROM trace_summaries WHERE TenantId IN ('${PROJECT_ID}', '${GOV_PROJECT_ID}')`,
+    });
+    await ch().command({
+      query: `DELETE FROM gateway_budget_ledger_events WHERE TenantId IN ('${PROJECT_ID}', '${GOV_PROJECT_ID}')`,
+    });
   });
 
   // ── Auth ──────────────────────────────────────────────────────────────
@@ -484,6 +486,8 @@ describe("gateway platform REST API (real PG + real CH)", () => {
         headers: legacyAuth(),
       });
       expect(res.status).toBe(410);
+      // A 410 without a forwarding address is a dead end for SDK authors.
+      expect((await res.json()).message).toContain("model-providers");
     });
 
     /** @scenario A viewer-scoped API key can list but not create virtual keys */
@@ -622,7 +626,10 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       );
       expect(status).toBe(201);
       expect(body.virtual_key.trace_project_id).toBe(NOGOV_PROJECT_ID);
+    });
 
+    /** @scenario An explicit trace destination gives an org-scoped key a home for its spend */
+    it("refuses a sibling team's project as the trace destination", async () => {
       // Choosing a destination routes spend into that project, so it
       // demands manage there: a legacy key cannot point at a sibling
       // team's project.
@@ -1004,7 +1011,7 @@ describe("gateway platform REST API (real PG + real CH)", () => {
     });
 
     /** @scenario A GROUP budget cannot target another org's group */
-    it("refuses a GROUP budget for a foreign group", async () => {
+    it("refuses a foreign tenant naming this org's group", async () => {
       const res = await post(
         "/api/gateway/v1/budgets",
         {

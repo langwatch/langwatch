@@ -2129,7 +2129,7 @@ PATCH /virtual-keys/:id
 
 Body (all fields optional):
 
-```json
+```jsonc
 {
   "name": "new-name",
   "scopes": [{ "scope_type": "TEAM", "scope_id": "team_..." }],
@@ -2149,7 +2149,7 @@ POST /virtual-keys/:id/rotate
 
 Response `200`:
 
-```json
+```jsonc
 {
   "virtual_key": { /* ... */ },
   "secret": "vk-lw-NEW..."
@@ -2218,7 +2218,7 @@ POST /budgets
 
 Body:
 
-```json
+```jsonc
 {
   "scope": {
     "kind": "PROJECT",         // or ORGANIZATION, TEAM, VIRTUAL_KEY, PRINCIPAL, GROUP
@@ -5790,7 +5790,7 @@ Because the response is standard OpenAI-compatible, your error handler only need
 
 Every write through your backend credential is audited with action, target, and before/after metadata. Scoped API keys attribute the write to the key's owning user; legacy project keys carry no user, so their writes record the machine principal `svc_<your_project_id>`. Filter the audit log on target `virtual_key` to get a per-customer provisioning history, under **/settings/audit-log** in the LangWatch UI.
 
-If you need SIEM export: the Postgres `AuditLog` table is queryable for gateway-shape rows (filter on `targetKind IN ('virtual_key', 'budget', 'model_provider', 'routing_policy', 'cache_rule')`). Set up a daily `pg_dump`-then-ship pipeline into your SIEM's ingestion path. There is no public REST audit-export endpoint in v1, see [Audit log → Querying programmatically](/ai-gateway/audit#querying-programmatically) for the supported paths (UI CSV download, direct SQL).
+If you need SIEM export: query ONLY the gateway-shape `AuditLog` rows with a read-only role scoped to that table, and ship the filtered result set, never a whole-database dump (which would carry unrelated, sensitive application data). For example, a daily job running `COPY (SELECT * FROM "AuditLog" WHERE "targetKind" IN ('virtual_key', 'budget', 'model_provider', 'routing_policy', 'cache_rule') AND "createdAt" >= now() - interval '1 day') TO STDOUT WITH CSV` into your SIEM's ingestion path. There is no public REST audit-export endpoint in v1, see [Audit log → Querying programmatically](/ai-gateway/audit#querying-programmatically) for the supported paths (UI CSV download, direct SQL).
 
 ## Gotchas
 
@@ -9538,7 +9538,7 @@ The AI Gateway is governed by LangWatch's existing RBAC system, the same resourc
 
 ## Resources
 
-Every gateway UI, tRPC call, and REST endpoint checks one of these six resource keys:
+Every gateway UI, tRPC call, and REST endpoint checks one of these seven resource keys:
 
 | Resource | What it gates |
 |---|---|
@@ -9546,6 +9546,7 @@ Every gateway UI, tRPC call, and REST endpoint checks one of these six resource 
 | `gatewayBudgets` | Budget list, detail, drawer, create, update, archive, spend view. |
 | `modelProviders` | ModelProvider list, create, update, basic credentials, AND the **Advanced (Gateway)** tab (RPM, TPM, RPD, fallback priority, providerConfig). Same resource the platform already uses; no gateway-specific provider resource exists. |
 | `gatewayGuardrails` | Attaching, detaching guardrails to a VK (the evaluator itself is still `evaluations` scope). |
+| `gatewayCacheRules` | Cache-control rule list, detail, create, update, archive. |
 | `gatewayLogs` | Audit log list, filter, export. |
 | `gatewayUsage` | `/gateway/usage` stat tiles + time-windowed spend aggregation. |
 

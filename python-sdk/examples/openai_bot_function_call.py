@@ -59,10 +59,17 @@ async def main(message: cl.Message):
         ],
         # gpt-5-mini refuses a FORCED function tool_choice outright
         # (400 invalid_prompt, pointing at the reasoning-model prompting
-        # guide). "auto" still calls the tool for a weather question and
-        # keeps the example's function-call round-trip intact.
+        # guide), so the example relies on "auto" picking the tool for a
+        # weather question.
         tool_choice="auto",
     )
+
+    # "auto" does not guarantee a tool call: bail out with the model's
+    # text answer instead of crashing on tool_calls[0].
+    if not completion.choices[0].message.tool_calls:
+        await msg.stream_token(completion.choices[0].message.content or "")
+        await msg.update()
+        return
 
     tool_message = completion.choices[0].message.tool_calls[0]  # type: ignore
     weather_call = json.loads(tool_message.function.arguments)  # type: ignore
