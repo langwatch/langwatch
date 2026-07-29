@@ -91,6 +91,7 @@ export const APP_ERROR_CODES = [
   "langy_model_not_allowed",
   "langy_model_not_configured",
   "langy_not_enabled",
+  "langy_rate_limited",
   "langy_turn_in_progress",
   "langy_turn_not_stoppable",
   "langy_turn_timeout",

@@ -55,7 +55,7 @@ vi.mock("../../rbac", async (importOriginal) => {
 });
 
 import { LangyRateLimitedError } from "~/server/app-layer/langy/errors";
-import { createInnerTRPCContext, errorFormatterForTesting } from "../../trpc";
+import { createInnerTRPCContext, errorFormatter } from "../../trpc";
 import { langyRouter } from "../langy";
 
 const caller = () =>
@@ -72,7 +72,10 @@ const caller = () =>
     }),
   );
 
-const message = { role: "user" as const, parts: [{ type: "text", text: "hi" }] };
+const message = {
+  role: "user" as const,
+  parts: [{ type: "text", text: "hi" }],
+};
 
 /**
  * Put a caught error through the SAME formatter production uses, so what these
@@ -81,7 +84,7 @@ const message = { role: "user" as const, parts: [{ type: "text", text: "hi" }] }
  */
 function onTheWire(error: unknown) {
   const trpcError = error as TRPCError;
-  return errorFormatterForTesting({
+  return errorFormatter({
     shape: {
       message: trpcError.message,
       code: -32600,
