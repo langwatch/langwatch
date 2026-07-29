@@ -92,7 +92,7 @@ const secured = createOrgApp({ basePath: "/api/gateway/v1" });
 secured.hono.onError(handleGatewaySpendApiError);
 
 secured
-  .access(requires("billing:view"))
+  .access(requires("gatewaySpend:view"))
   .get(
     "/spend-events",
     requireBillingPlan,
@@ -110,7 +110,7 @@ secured
         organization.id,
         query.project_id,
       );
-      const page = await spendEvents.readSpendEventsPage({
+      const page = await spendEvents.walkSpendEvents({
         tenantIds,
         fromMs: query.from,
         toMs: query.to,
@@ -129,7 +129,7 @@ secured
   );
 
 secured
-  .access(requires("billing:view"))
+  .access(requires("gatewaySpend:view"))
   .get(
     "/end-users/:id/spend",
     requireBillingPlan,

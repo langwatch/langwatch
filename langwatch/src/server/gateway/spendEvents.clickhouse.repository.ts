@@ -298,7 +298,7 @@ export class GatewaySpendEventsRepository {
    * One query serves every tenant of the org (rows never leave the org:
    * the tenant list IS the org's project list, resolved by the caller).
    */
-  async readSpendEventsPage({
+  async walkSpendEvents({
     tenantIds,
     fromMs,
     toMs,
