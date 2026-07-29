@@ -370,35 +370,36 @@ export function traceSummaryRow(tenantId: string, t: TraceFixture) {
   };
 }
 
-export function storedSpanRow(tenantId: string, s: SpanFixture) {
-  const attrs: Record<string, string> = {};
-  if (s.model) {
-    attrs["gen_ai.request.model"] = s.model;
-    attrs["gen_ai.response.model"] = s.model;
-    attrs["langwatch.span.type"] = "llm";
-  } else {
-    attrs["langwatch.span.type"] = "agent";
+const USAGE_ATTRIBUTE_BY_FIELD = {
+  inputTokens: "gen_ai.usage.input_tokens",
+  outputTokens: "gen_ai.usage.output_tokens",
+  cacheReadTokens: "gen_ai.usage.cache_read.input_tokens",
+  cacheWriteTokens: "gen_ai.usage.cache_creation.input_tokens",
+  reasoningTokens: "gen_ai.usage.reasoning_tokens",
+} as const;
+
+function spanAttributes(s: SpanFixture): Record<string, string> {
+  const attrs: Record<string, string> = s.model
+    ? {
+        "gen_ai.request.model": s.model,
+        "gen_ai.response.model": s.model,
+        "langwatch.span.type": "llm",
+      }
+    : { "langwatch.span.type": "agent" };
+
+  for (const [field, attribute] of Object.entries(USAGE_ATTRIBUTE_BY_FIELD)) {
+    const value = s[field as keyof typeof USAGE_ATTRIBUTE_BY_FIELD];
+    if (value !== undefined) attrs[attribute] = String(value);
   }
-  if (s.inputTokens !== undefined) {
-    attrs["gen_ai.usage.input_tokens"] = String(s.inputTokens);
-  }
-  if (s.outputTokens !== undefined) {
-    attrs["gen_ai.usage.output_tokens"] = String(s.outputTokens);
-  }
-  if (s.cacheReadTokens !== undefined) {
-    attrs["gen_ai.usage.cache_read.input_tokens"] = String(s.cacheReadTokens);
-  }
-  if (s.cacheWriteTokens !== undefined) {
-    attrs["gen_ai.usage.cache_creation.input_tokens"] = String(
-      s.cacheWriteTokens,
-    );
-  }
-  if (s.reasoningTokens !== undefined) {
-    attrs["gen_ai.usage.reasoning_tokens"] = String(s.reasoningTokens);
-  }
+
   if (s.skipTokenAccumulation) {
     attrs["langwatch.reserved.skip_token_accumulation"] = "true";
   }
+  return attrs;
+}
+
+export function storedSpanRow(tenantId: string, s: SpanFixture) {
+  const attrs = spanAttributes(s);
   return {
     ProjectionId: `proj-${s.spanId}`,
     TenantId: tenantId,
