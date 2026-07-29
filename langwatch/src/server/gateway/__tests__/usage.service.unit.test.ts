@@ -22,15 +22,8 @@ function mockPrisma(
   return {
     virtualKey: {
       findMany: async () => virtualKeys,
-      findFirst: async ({ where }: { where: { id: string } }) =>
-        virtualKeys.some((v) => v.id === where.id) ? { id: where.id } : null,
     },
     project: {
-      findUnique: async () => ({
-        id: "proj_01",
-        teamId: "team_01",
-        team: { organizationId: "org_01" },
-      }),
       findMany: async () => [{ id: "proj_01" }],
     },
   } as unknown as PrismaClient;
@@ -117,9 +110,16 @@ const window = {
 };
 
 describe("GatewayUsageService.summary", () => {
-  describe("when the project has no gateway traffic", () => {
+  describe("when the org has no gateway traffic", () => {
     it("returns an empty summary", async () => {
-      const result = await service([], []).summary("proj_01", window);
+      const result = await service(
+        [{ id: "vk_01", name: "prod", displayPrefix: "lw_abc" }],
+        [],
+      ).summary({
+        organizationId: "org_01",
+        virtualKeyIds: ["vk_01"],
+        window,
+      });
       expect(result).toEqual({
         totalUsd: "0.000000",
         totalRequests: 0,
@@ -157,7 +157,11 @@ describe("GatewayUsageService.summary", () => {
             occurredAt: new Date("2026-04-15T10:00:00Z"),
           },
         ],
-      ).summary("proj_01", window);
+      ).summary({
+        organizationId: "org_01",
+        virtualKeyIds: ["vk_01", "vk_02"],
+        window,
+      });
 
       expect(result.totalUsd).toBe("3.500000");
       expect(result.totalRequests).toBe(3);
@@ -174,11 +178,9 @@ describe("GatewayUsageService.summary", () => {
       ]);
     });
 
-    it("names a key that spent here even when it is scoped above the project", async () => {
-      // The key list no longer gates the query: an org- or team-scoped key
-      // spends in this project and must be visible on its Usage tab. Only
-      // its display name comes from Postgres, and a name we cannot resolve
-      // falls back to the id rather than dropping the row.
+    it("falls back to the key id when its display name cannot be resolved", async () => {
+      // Only the display name comes from Postgres; a name we cannot
+      // resolve falls back to the id rather than dropping the row.
       const result = await service(
         [],
         [
@@ -188,7 +190,11 @@ describe("GatewayUsageService.summary", () => {
             occurredAt: new Date("2026-04-15T10:00:00Z"),
           },
         ],
-      ).summary("proj_01", window);
+      ).summary({
+        organizationId: "org_01",
+        virtualKeyIds: ["vk_org_wide"],
+        window,
+      });
       expect(result.byVirtualKey[0]).toMatchObject({
         virtualKeyId: "vk_org_wide",
         name: "vk_org_wide",
@@ -214,7 +220,11 @@ describe("GatewayUsageService.summary", () => {
             occurredAt: new Date("2026-04-15T11:00:00Z"),
           },
         ],
-      ).summary("proj_01", window);
+      ).summary({
+        organizationId: "org_01",
+        virtualKeyIds: ["vk_01"],
+        window,
+      });
       expect(result.totalRequests).toBe(2);
       expect(result.blockedRequests).toBe(1);
     });
@@ -225,7 +235,11 @@ describe("GatewayUsageService.summary", () => {
       const result = await service(
         [{ id: "vk_01", name: "prod", displayPrefix: "lw_abc" }],
         [],
-      ).summary("proj_01", window);
+      ).summary({
+        organizationId: "org_01",
+        virtualKeyIds: ["vk_01"],
+        window,
+      });
       expect(result.avgUsdPerRequest).toBe("0.000000");
     });
 
@@ -244,7 +258,11 @@ describe("GatewayUsageService.summary", () => {
             occurredAt: new Date("2026-04-15T10:00:00Z"),
           },
         ],
-      ).summary("proj_01", window);
+      ).summary({
+        organizationId: "org_01",
+        virtualKeyIds: ["vk_01"],
+        window,
+      });
       expect(result.avgUsdPerRequest).toBe("1.790123");
     });
   });

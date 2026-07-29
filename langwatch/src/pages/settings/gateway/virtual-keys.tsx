@@ -5,6 +5,7 @@ import {
   Card,
   EmptyState,
   HStack,
+  IconButton,
   Spacer,
   Spinner,
   Table,
@@ -17,6 +18,7 @@ import {
   Eye,
   Gauge,
   KeyRound,
+  LineChart,
   MoreVertical,
   Pencil,
   Plus,
@@ -411,33 +413,49 @@ function VirtualKeysPage() {
                               onClick={(e) => e.stopPropagation()}
                               cursor="default"
                             >
-                              <Link
-                                href={`/settings/gateway/usage?vk=${vk.id}&days=mtd`}
-                                data-testid={`vk-spend-${vk.id}`}
-                                aria-label={`Usage for ${vk.name}, this month`}
-                              >
-                                <Text
-                                  fontSize="sm"
-                                  fontVariantNumeric="tabular-nums"
-                                  color={
-                                    spendByKeyId.get(vk.id) &&
-                                    Number.parseFloat(
-                                      spendByKeyId.get(vk.id)!,
-                                    ) > 0
-                                      ? "fg"
-                                      : "fg.muted"
-                                  }
-                                  _hover={{ textDecoration: "underline" }}
+                              <HStack gap={1} justify="space-between">
+                                <Link
+                                  href={`/settings/gateway/usage?vk=${vk.id}&days=mtd`}
+                                  data-testid={`vk-spend-${vk.id}`}
+                                  aria-label={`Usage for ${vk.name}, this month`}
                                 >
-                                  {spendQuery.isLoading
-                                    ? "…"
-                                    : spendQuery.isError
-                                      ? "n/a"
-                                      : formatBudgetUsd(
-                                          spendByKeyId.get(vk.id) ?? "0",
-                                        )}
-                                </Text>
-                              </Link>
+                                  <Text
+                                    fontSize="sm"
+                                    fontVariantNumeric="tabular-nums"
+                                    color={
+                                      spendByKeyId.get(vk.id) &&
+                                      Number.parseFloat(
+                                        spendByKeyId.get(vk.id)!,
+                                      ) > 0
+                                        ? "fg"
+                                        : "fg.muted"
+                                    }
+                                    _hover={{ textDecoration: "underline" }}
+                                  >
+                                    {spendQuery.isLoading
+                                      ? "…"
+                                      : spendQuery.isError
+                                        ? "n/a"
+                                        : formatBudgetUsd(
+                                            spendByKeyId.get(vk.id) ?? "0",
+                                          )}
+                                  </Text>
+                                </Link>
+                                <IconButton
+                                  asChild
+                                  size="xs"
+                                  variant="ghost"
+                                  color="fg.muted"
+                                  aria-label={`Open usage for ${vk.name}`}
+                                  data-testid={`vk-spend-chart-${vk.id}`}
+                                >
+                                  <Link
+                                    href={`/settings/gateway/usage?vk=${vk.id}&days=mtd`}
+                                  >
+                                    <LineChart size={14} />
+                                  </Link>
+                                </IconButton>
+                              </HStack>
                             </Table.Cell>
                             <Table.Cell>
                               {vk.lastUsedAt ? (

@@ -48,8 +48,17 @@ const ROUTE_PATTERNS = [
   // their own filter state. Without these, the wildcard `/settings/*`
   // wins → resolves to `/settings/[[...path]]` → push leaves `path`
   // unresolved → URL bounces to `/settings/` (caught on /settings/audit-log
-  // Filter-by-Action input during γ post-dogfood UI bug-bash).
+  // Filter-by-Action input during γ post-dogfood UI bug-bash, then again on
+  // /settings/gateway/usage date presets and its key-filter chip).
   "/settings/audit-log",
+  "/settings/gateway",
+  "/settings/gateway/virtual-keys",
+  "/settings/gateway/virtual-keys/:id",
+  "/settings/gateway/budgets",
+  "/settings/gateway/budgets/:id",
+  "/settings/gateway/usage",
+  "/settings/gateway/cache-rules",
+  "/settings/gateway/guardrails",
   "/settings/*",
   // Personal-scope governance routes — must precede the "/:project/*" patterns
   // so the auto-detection in components/useWorkspaceCurrent doesn't classify

@@ -14,6 +14,13 @@
  *
  * The virtual-keys table's spend column reads the same repository, because
  * a number you can click has to match the page it lands on.
+ *
+ * Every read spans the organization's projects, not just one: traces land
+ * in the tenant of a key's trace destination (its explicit trace project,
+ * else its single PROJECT scope, else the org's governance project), which
+ * is rarely the project the viewer happens to have selected. Reading one
+ * project is how the Usage page rendered "No usage in this window" while
+ * the keys table showed spend for the same keys.
  */
 import { Prisma, type PrismaClient } from "@prisma/client";
 
@@ -106,14 +113,11 @@ export class GatewayUsageService {
     const out = new Map<string, { spentUsd: string; requests: number }>();
     if (!this.spendRepo || args.virtualKeyIds.length === 0) return out;
 
-    const projects = await this.prisma.project.findMany({
-      where: { team: { organizationId: args.organizationId } },
-      select: { id: true },
-    });
-    if (projects.length === 0) return out;
+    const tenantIds = await this.orgProjectIds(args.organizationId);
+    if (tenantIds.length === 0) return out;
 
     const rows = await this.spendRepo.spendByVirtualKey({
-      tenantIds: projects.map((p) => p.id),
+      tenantIds,
       virtualKeyIds: args.virtualKeyIds,
       window: { fromDate: args.window.fromDate, toDate: args.window.toDate },
     });
@@ -126,18 +130,31 @@ export class GatewayUsageService {
     return out;
   }
 
-  async summary(projectId: string, window: UsageWindow): Promise<UsageSummary> {
-    if (!this.spendRepo) return emptySummary();
+  /**
+   * The Usage page's org-wide rollup.
+   *
+   * `virtualKeyIds` is the caller's visible-key set, computed by the
+   * router with the same membership rule the keys table applies, so the
+   * page totals exactly the keys the table lists. The aggregation itself
+   * happens in ClickHouse: the buckets are keys x models x days, so a
+   * busy org's window never streams per-trace rows into this process.
+   */
+  async summary(args: {
+    organizationId: string;
+    virtualKeyIds: string[];
+    window: UsageWindow;
+  }): Promise<UsageSummary> {
+    if (!this.spendRepo || args.virtualKeyIds.length === 0) {
+      return emptySummary();
+    }
 
-    // No VirtualKey predicate: the traces themselves say which key spent
-    // in this project. Filtering by "keys with a PROJECT scope row here"
-    // is what hid org- and team-scoped keys, whose traffic lands in this
-    // project's ledger all the same. The aggregation itself happens in
-    // ClickHouse: the buckets are keys x models x days, so a busy
-    // project's window never streams per-trace rows into this process.
+    const tenantIds = await this.orgProjectIds(args.organizationId);
+    if (tenantIds.length === 0) return emptySummary();
+
     const buckets = await this.spendRepo.usageBuckets({
-      tenantIds: [projectId],
-      window,
+      tenantIds,
+      window: args.window,
+      virtualKeyIds: args.virtualKeyIds,
     });
     if (buckets.length === 0) return emptySummary();
 
@@ -191,35 +208,34 @@ export class GatewayUsageService {
     };
   }
 
-  async summaryForVirtualKey(
-    projectId: string,
-    virtualKeyId: string,
-    window: UsageWindow,
-  ): Promise<VirtualKeyUsageSummary> {
+  /**
+   * One key's usage, read across the organization's projects so the total
+   * matches the spend column that deep-links here. Key visibility is the
+   * router's job (the same membership rule as `virtualKeys.get`); by the
+   * time this runs the caller is allowed to see the key.
+   */
+  async summaryForVirtualKey(args: {
+    organizationId: string;
+    virtualKeyId: string;
+    window: UsageWindow;
+  }): Promise<VirtualKeyUsageSummary> {
     if (!this.spendRepo) return emptyVkSummary();
 
-    // Tenancy: only a key the project can actually see. A key is visible
-    // to a project when it is scoped there, or when it is scoped wider
-    // (team / org) over that project: the same reach that decides where
-    // its traces land.
-    const visible = await this.isVirtualKeyVisibleToProject(
-      projectId,
-      virtualKeyId,
-    );
-    if (!visible) return emptyVkSummary();
+    const tenantIds = await this.orgProjectIds(args.organizationId);
+    if (tenantIds.length === 0) return emptyVkSummary();
 
     // Slices aggregate in ClickHouse; only the 20-row recent list pulls
     // raw traces, and that pull carries its own LIMIT.
     const [buckets, recentTraces] = await Promise.all([
       this.spendRepo.usageBuckets({
-        tenantIds: [projectId],
-        window,
-        virtualKeyIds: [virtualKeyId],
+        tenantIds,
+        window: args.window,
+        virtualKeyIds: [args.virtualKeyId],
       }),
       this.spendRepo.gatewayTraces({
-        tenantIds: [projectId],
-        window,
-        virtualKeyIds: [virtualKeyId],
+        tenantIds,
+        window: args.window,
+        virtualKeyIds: [args.virtualKeyId],
         limit: RECENT_DEBITS_LIMIT,
       }),
     ]);
@@ -286,39 +302,13 @@ export class GatewayUsageService {
     );
   }
 
-  private async isVirtualKeyVisibleToProject(
-    projectId: string,
-    virtualKeyId: string,
-  ): Promise<boolean> {
-    const project = await this.prisma.project.findUnique({
-      where: { id: projectId },
-      select: {
-        id: true,
-        teamId: true,
-        team: { select: { organizationId: true } },
-      },
-    });
-    if (!project?.team) return false;
-    const vk = await this.prisma.virtualKey.findFirst({
-      where: {
-        id: virtualKeyId,
-        organizationId: project.team.organizationId,
-        scopes: {
-          some: {
-            OR: [
-              { scopeType: "PROJECT", scopeId: project.id },
-              { scopeType: "TEAM", scopeId: project.teamId },
-              {
-                scopeType: "ORGANIZATION",
-                scopeId: project.team.organizationId,
-              },
-            ],
-          },
-        },
-      },
+  /** Every project of the org: the tenant set gateway traces can land in. */
+  private async orgProjectIds(organizationId: string): Promise<string[]> {
+    const projects = await this.prisma.project.findMany({
+      where: { team: { organizationId } },
       select: { id: true },
     });
-    return vk !== null;
+    return projects.map((p) => p.id);
   }
 }
 

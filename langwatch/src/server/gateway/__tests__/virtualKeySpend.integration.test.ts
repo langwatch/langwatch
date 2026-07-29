@@ -36,9 +36,13 @@ const suffix = nanoid(8);
 const ORG_ID = `org-spend-${suffix}`;
 const TEAM_ID = `team-spend-${suffix}`;
 const PROJECT_ID = `proj-spend-${suffix}`;
+// A second project in the same org, standing in for the governance
+// project org- and team-scoped keys resolve as their trace destination.
+const GOV_PROJECT_ID = `proj-spend-gov-${suffix}`;
 const USER_ID = `usr-spend-${suffix}`;
 const VK_UNBUDGETED_ID = `vk_spend_nobudget_${suffix}`;
 const VK_BUDGETED_ID = `vk_spend_budgeted_${suffix}`;
+const VK_ORG_SCOPED_ID = `vk_spend_orgscoped_${suffix}`;
 const BUDGET_ORG_ID = `bdg-spend-org-${suffix}`;
 const BUDGET_PROJECT_ID = `bdg-spend-proj-${suffix}`;
 
@@ -50,13 +54,14 @@ async function insertGatewayTrace(args: {
   totalCost: number;
   models?: string[];
   updatedAt?: Date;
+  tenantId?: string;
 }): Promise<void> {
   await args.ch.insert({
     table: "trace_summaries",
     values: [
       {
         ProjectionId: `projn-${nanoid()}`,
-        TenantId: PROJECT_ID,
+        TenantId: args.tenantId ?? PROJECT_ID,
         TraceId: args.traceId,
         Version: "v1",
         Attributes: { "langwatch.virtual_key_id": args.virtualKeyId },
@@ -133,6 +138,17 @@ describe("virtual key spend (real PG + real CH)", () => {
         apiKey: `spend-key-${suffix}`,
       },
     });
+    await prisma.project.create({
+      data: {
+        id: GOV_PROJECT_ID,
+        name: `Spend Gov Project ${suffix}`,
+        slug: `spend-gov-${suffix}`,
+        teamId: TEAM_ID,
+        language: "en",
+        framework: "openai",
+        apiKey: `spend-gov-key-${suffix}`,
+      },
+    });
     await prisma.user.create({
       data: { id: USER_ID, email: `${suffix}@spend.local`, name: "Spender" },
     });
@@ -153,6 +169,22 @@ describe("virtual key spend (real PG + real CH)", () => {
         },
       });
     }
+
+    // Org-scoped key whose traces land in its trace-destination project,
+    // NOT in the project a viewer would have selected. This is the shape
+    // of every org- and team-scoped key in production.
+    await prisma.virtualKey.create({
+      data: {
+        id: VK_ORG_SCOPED_ID,
+        organizationId: ORG_ID,
+        name: "org-scoped-key",
+        hashedSecret: `hash-${VK_ORG_SCOPED_ID}`,
+        displayPrefix: "vk-lw-org",
+        createdById: USER_ID,
+        traceProjectId: GOV_PROJECT_ID,
+        scopes: { create: [{ scopeType: "ORGANIZATION", scopeId: ORG_ID }] },
+      },
+    });
 
     // Two budgets cover the budgeted key. The old ledger-backed read wrote
     // and summed one row per budget, so this key would have reported twice
@@ -202,6 +234,14 @@ describe("virtual key spend (real PG + real CH)", () => {
       totalCost: 0.25,
       models: ["claude-sonnet-4"],
     });
+    await insertGatewayTrace({
+      ch,
+      traceId: `trace-orgscoped-${suffix}`,
+      virtualKeyId: VK_ORG_SCOPED_ID,
+      occurredAt: new Date(now.getTime() - 120_000),
+      totalCost: 0.123456,
+      tenantId: GOV_PROJECT_ID,
+    });
   }, 120_000);
 
   afterAll(async () => {
@@ -209,18 +249,25 @@ describe("virtual key spend (real PG + real CH)", () => {
     // shared container should not accrue a suite's worth of rows per run.
     const ch = getTestClickHouseClient();
     if (ch) {
-      await ch.command({
-        query: "DELETE FROM trace_summaries WHERE TenantId = {tenantId:String}",
-        query_params: { tenantId: PROJECT_ID },
-      });
+      for (const tenantId of [PROJECT_ID, GOV_PROJECT_ID]) {
+        await ch.command({
+          query:
+            "DELETE FROM trace_summaries WHERE TenantId = {tenantId:String}",
+          query_params: { tenantId },
+        });
+      }
     }
     await prisma.gatewayBudget.deleteMany({
       where: { organizationId: ORG_ID },
     });
     await prisma.virtualKey.deleteMany({
-      where: { id: { in: [VK_UNBUDGETED_ID, VK_BUDGETED_ID] } },
+      where: {
+        id: { in: [VK_UNBUDGETED_ID, VK_BUDGETED_ID, VK_ORG_SCOPED_ID] },
+      },
     });
-    await prisma.project.deleteMany({ where: { id: PROJECT_ID } });
+    await prisma.project.deleteMany({
+      where: { id: { in: [PROJECT_ID, GOV_PROJECT_ID] } },
+    });
     await prisma.team.deleteMany({ where: { id: TEAM_ID } });
     await prisma.user.deleteMany({ where: { id: USER_ID } });
     await prisma.organization.deleteMany({ where: { id: ORG_ID } });
@@ -255,9 +302,13 @@ describe("virtual key spend (real PG + real CH)", () => {
   it("includes a request made moments ago in a rolling window", async () => {
     const now = new Date();
     const thirtyDays = 30 * 24 * 60 * 60 * 1000;
-    const summary = await usageService().summary(PROJECT_ID, {
-      fromDate: new Date(now.getTime() - thirtyDays),
-      toDate: now,
+    const summary = await usageService().summary({
+      organizationId: ORG_ID,
+      virtualKeyIds: [VK_UNBUDGETED_ID, VK_BUDGETED_ID],
+      window: {
+        fromDate: new Date(now.getTime() - thirtyDays),
+        toDate: now,
+      },
     });
     expect(summary.totalRequests).toBe(2);
     expect(Number(summary.totalUsd)).toBeCloseTo(0.65, 4);
@@ -284,15 +335,23 @@ describe("virtual key spend (real PG + real CH)", () => {
     });
 
     const service = usageService();
-    const onStart = await service.summary(PROJECT_ID, {
-      fromDate: anchor,
-      toDate: new Date(anchor.getTime() + 1000),
+    const onStart = await service.summary({
+      organizationId: ORG_ID,
+      virtualKeyIds: [VK_UNBUDGETED_ID],
+      window: {
+        fromDate: anchor,
+        toDate: new Date(anchor.getTime() + 1000),
+      },
     });
     expect(onStart.totalRequests).toBe(1);
 
-    const onEnd = await service.summary(PROJECT_ID, {
-      fromDate: new Date(anchor.getTime() - 1000),
-      toDate: anchor,
+    const onEnd = await service.summary({
+      organizationId: ORG_ID,
+      virtualKeyIds: [VK_UNBUDGETED_ID],
+      window: {
+        fromDate: new Date(anchor.getTime() - 1000),
+        toDate: anchor,
+      },
     });
     expect(onEnd.totalRequests).toBe(0);
   });
@@ -321,9 +380,13 @@ describe("virtual key spend (real PG + real CH)", () => {
       updatedAt: new Date(anchor.getTime() + 5_000),
     });
 
-    const summary = await usageService().summary(PROJECT_ID, {
-      fromDate: anchor,
-      toDate: new Date(anchor.getTime() + 60_000),
+    const summary = await usageService().summary({
+      organizationId: ORG_ID,
+      virtualKeyIds: [VK_UNBUDGETED_ID],
+      window: {
+        fromDate: anchor,
+        toDate: new Date(anchor.getTime() + 60_000),
+      },
     });
     expect(summary.totalRequests).toBe(1);
     expect(Number(summary.totalUsd)).toBeCloseTo(0.9, 4);
@@ -333,14 +396,70 @@ describe("virtual key spend (real PG + real CH)", () => {
   it("breaks one key's spend down by day and model", async () => {
     const now = new Date();
     const thirtyDays = 30 * 24 * 60 * 60 * 1000;
-    const summary = await usageService().summaryForVirtualKey(
-      PROJECT_ID,
-      VK_BUDGETED_ID,
-      { fromDate: new Date(now.getTime() - thirtyDays), toDate: now },
-    );
+    const summary = await usageService().summaryForVirtualKey({
+      organizationId: ORG_ID,
+      virtualKeyId: VK_BUDGETED_ID,
+      window: { fromDate: new Date(now.getTime() - thirtyDays), toDate: now },
+    });
     expect(Number(summary.totalUsd)).toBeCloseTo(0.25, 4);
     expect(summary.byModel.map((m) => m.model)).toEqual(["claude-sonnet-4"]);
     expect(summary.byDay).toHaveLength(1);
     expect(summary.recentDebits).toHaveLength(1);
+  });
+
+  /** @scenario "Spend that lands in the key's trace project is visible from anywhere in the organization" */
+  it("reports an org-scoped key's spend even though its traces live in another project's tenant", async () => {
+    // The trace for VK_ORG_SCOPED_ID sits under GOV_PROJECT_ID, the shape
+    // production always has for org- and team-scoped keys. Reading the
+    // viewer's selected project instead of the org is the bug that made
+    // the Usage page render "No usage in this window" for every key while
+    // the keys table showed spend.
+    const now = new Date();
+    const thirtyDays = 30 * 24 * 60 * 60 * 1000;
+    const window = {
+      fromDate: new Date(now.getTime() - thirtyDays),
+      toDate: now,
+    };
+    const service = usageService();
+
+    const perKey = await service.summaryForVirtualKey({
+      organizationId: ORG_ID,
+      virtualKeyId: VK_ORG_SCOPED_ID,
+      window,
+    });
+    expect(perKey.totalRequests).toBe(1);
+    expect(Number(perKey.totalUsd)).toBeCloseTo(0.123456, 6);
+    expect(perKey.recentDebits).toHaveLength(1);
+
+    // The number the page shows is the number the column shows.
+    const column = await service.spendByVirtualKey({
+      organizationId: ORG_ID,
+      virtualKeyIds: [VK_ORG_SCOPED_ID],
+      window,
+    });
+    expect(Number(column.get(VK_ORG_SCOPED_ID)?.spentUsd)).toBeCloseTo(
+      Number(perKey.totalUsd),
+      6,
+    );
+    expect(column.get(VK_ORG_SCOPED_ID)?.requests).toBe(perKey.totalRequests);
+  });
+
+  /** @scenario "Spend that lands in the key's trace project is visible from anywhere in the organization" */
+  it("includes the org-scoped key in the unfiltered org summary", async () => {
+    const now = new Date();
+    const thirtyDays = 30 * 24 * 60 * 60 * 1000;
+    const summary = await usageService().summary({
+      organizationId: ORG_ID,
+      virtualKeyIds: [VK_UNBUDGETED_ID, VK_BUDGETED_ID, VK_ORG_SCOPED_ID],
+      window: {
+        fromDate: new Date(now.getTime() - thirtyDays),
+        toDate: now,
+      },
+    });
+    expect(summary.totalRequests).toBe(3);
+    expect(Number(summary.totalUsd)).toBeCloseTo(0.773456, 4);
+    expect(summary.byVirtualKey.map((v) => v.virtualKeyId).sort()).toEqual(
+      [VK_BUDGETED_ID, VK_ORG_SCOPED_ID, VK_UNBUDGETED_ID].sort(),
+    );
   });
 });
