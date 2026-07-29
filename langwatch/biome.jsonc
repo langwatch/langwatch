@@ -188,9 +188,23 @@
 			// full of best-effort `catch {}` around actions allowed to fail, and
 			// fire-and-forget awaits. Same category as the test-file exemption
 			// below; they ship to nobody.
+			//
+			// The complexity trio is off here for a different reason than the
+			// promise rules above. A browser walkthrough is one long linear
+			// script — navigate, click, assert, repeat — and its cognitive
+			// complexity is a count of the steps in the flow, not of anything
+			// tangled. Splitting `parseSetCookie` or a 4-argument `signUp(ctx,
+			// email, password, name)` into smaller pieces to satisfy a limit
+			// makes the flow harder to follow, not easier, so the rules would
+			// only ever be silenced file by file.
 			"includes": ["e2e/**", "scripts/dogfood/**", "scripts/_dogfood_*"],
 			"linter": {
 				"rules": {
+					"complexity": {
+						"noExcessiveCognitiveComplexity": "off",
+						"noExcessiveLinesPerFunction": "off",
+						"useMaxParams": "off"
+					},
 					"nursery": {
 						"noFloatingPromises": "off",
 						"noMisusedPromises": "off"

@@ -378,6 +378,20 @@ jobs:
     needs: changes
     if: needs.changes.outputs.relevant == 'true'
     runs-on: ubuntu-latest
+    # Scoped to this job rather than the workflow, so nothing else gains write
+    # access. `reporter: github-pr-review` posts inline review comments, which
+    # needs `pull-requests: write`; without it reviewdog gets a 403 from the
+    # Review API and silently degrades to logging commands. The gate itself
+    # still bites either way — the exit code does not depend on posting — but
+    # the findings stop landing on the diff, which is the whole point of
+    # annotating rather than just failing.
+    #
+    # A pull_request from a fork gets a read-only token no matter what is
+    # declared here, so reviewdog falls back to logging for those. That is
+    # GitHub's rule, not something this block can opt out of.
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
@@ -405,6 +419,12 @@ jobs:
         working-directory: langwatch
         run: pnpm lint
 
+      - name: Set up reviewdog
+        if: github.event_name == 'pull_request'
+        uses: reviewdog/action-setup@d8a7baabd7f3e8544ee4dbde3ee41d0011c3a93f # v1.5.0
+        with:
+          reviewdog_version: v0.21.0
+
       # The house rules that still carry a baseline are `warn` in biome.jsonc,
       # so the step above lets them through. This step makes them BLOCKING on
       # the lines the PR actually adds.
@@ -416,19 +436,63 @@ jobs:
       # violation already in it (measured at 902 on this branch alone). A gate
       # that fires on work you did not do is a gate people switch off.
       #
-      # fail_on_error: true is what makes this a gate at all. The action
-      # defaults it to false, which is how the pre-existing Biome step reported
-      # success for months while Biome was refusing to start.
+      # reviewdog comes from its own first-party setup action, pinned to the
+      # same v0.21.0 the previous wrapper resolved. Biome comes from this
+      # repo's lockfile rather than a second copy bundled by a wrapper action.
+      #
+      # That split replaces mongolyy/reviewdog-action-biome, for four measured
+      # reasons:
+      #
+      #  1. VERSION DRIFT. That action bundles its own Biome (renovate moved it
+      #     to ^2.5.5) while this repo pins 2.5.1 in package.json. Rule
+      #     behaviour is version-sensitive, so CI would enforce rules the
+      #     developer's `pnpm lint` never runs. `pnpm exec` uses the lockfile's
+      #     Biome, so the gate and the local command are the same program.
+      #  2. It shells out to `biome check --write`, which MUTATES files during
+      #     what is supposed to be a check.
+      #  3. It reconstructs diagnostics by scraping Biome's human-readable
+      #     console output through a stack of errorformat regexes. Biome 2.x
+      #     emits `--reporter=rdjson` — reviewdog's own schema — so the parsing
+      #     step disappears along with its failure mode.
+      #  4. It passes `--max-diagnostics=30`, silently capping what is reported.
+      #
+      # Biome's own CI recipe is `biome ci`, which annotates via GitHub
+      # directly. That is not enough on its own here: `biome ci` has no notion
+      # of a diff, and the `warn`-tier rules have a baseline in the thousands.
+      # reviewdog is what narrows them to the lines this PR actually adds.
+      #
+      # rdjson carries no severity (verified — Biome omits it even for errors),
+      # so `-level=warning` supplies it and `-fail-level=warning` fails on any
+      # diagnostic landing on an added line. Errors are already caught
+      # full-tree by the blocking step above.
       - name: Biome house rules — blocking on added lines
         if: github.event_name == 'pull_request'
-        uses: mongolyy/reviewdog-action-biome@c49bee54c1f87e4be32446ae3deca3a186b88a3a # v2
-        with:
-          reporter: github-pr-review
-          filter_mode: added
-          fail_level: warning
-          fail_on_error: true
-          level: warning
-          workdir: langwatch
+        env:
+          REVIEWDOG_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          # Biome exits non-zero whenever it reports anything; the gate is
+          # reviewdog's decision, not this line's, so don't abort here.
+          pnpm --dir langwatch exec biome check --reporter=rdjson \
+            ./src ./ee ./scripts ./e2e ./prisma ./vite ./packages \
+            > biome.raw.json || true
+
+          # Biome ran with langwatch/ as its cwd, so its paths are relative to
+          # that; reviewdog matches against a repo-root diff. Rewriting the
+          # paths here rather than running reviewdog from langwatch/ keeps the
+          # mapping explicit — a path that silently fails to match the diff
+          # would filter every finding away and read as a clean gate.
+          jq '.diagnostics |= map(.location.path = "langwatch/" + .location.path)' \
+            biome.raw.json > biome.rdjson
+          echo "diagnostics: $(jq '.diagnostics | length' biome.rdjson)"
+
+          reviewdog -f=rdjson -name=Biome \
+            -reporter=github-pr-review \
+            -filter-mode=added \
+            -level=warning \
+            -fail-level=warning \
+            < biome.rdjson
           biome_flags: "./src ./ee ./scripts ./e2e ./prisma ./vite ./packages"
 
       - name: Notify Slack on failure
