@@ -1,5 +1,21 @@
+import type { SerializedHandledError } from "@langwatch/handled-error";
 import { useCallback, useState } from "react";
+import { describeError, explainSerializedError } from "../features/errors";
 import { api } from "../utils/api";
+
+/**
+ * The refusal, in the words the registry chose for its code.
+ *
+ * A refused credential arrives as a serialized handled error on the result
+ * rather than as a thrown one, so it is read with `explainSerializedError`
+ * instead of `describeError`. Both end at the same registry; only the
+ * transport differs.
+ */
+const describeRefusal = (domainError: SerializedHandledError): string => {
+  const { title, description } = explainSerializedError(domainError);
+
+  return description ? `${title}. ${description}` : title;
+};
 
 /**
  * Hook for validating model provider API keys.
@@ -28,6 +44,10 @@ export function useModelProviderApiKeyValidation(
   const [isValidating, setIsValidating] = useState(false);
   const [validationError, setValidationError] = useState<string | undefined>();
   const utils = api.useContext();
+  // A mutation, so the key travels in a request body rather than encoded into
+  // a URL. See the procedure for why that matters.
+  const { mutateAsync: validateApiKey } =
+    api.modelProvider.validateApiKey.useMutation();
 
   const validate = useCallback(async (): Promise<boolean> => {
     // The probe reads nothing from storage — it sends the typed keys
@@ -42,7 +62,7 @@ export function useModelProviderApiKeyValidation(
     setValidationError(undefined);
 
     try {
-      const result = await utils.modelProvider.validateApiKey.fetch({
+      const result = await validateApiKey({
         projectId,
         organizationId,
         provider,
@@ -51,29 +71,25 @@ export function useModelProviderApiKeyValidation(
       });
 
       if (!result.valid) {
-        setValidationError(result.error);
+        setValidationError(describeRefusal(result.domainError));
         return false;
       }
 
       return true;
     } catch (error) {
+      // Not `error.message`: a handled error's message is replaced with its
+      // stable code on the wire, so reading it renders a slug like
+      // `provider_unreachable` straight into the drawer. `describeError`
+      // resolves the code against the presentation registry instead. The
+      // drawer's slot is a plain string, which is exactly what it is for.
       setValidationError(
-        error instanceof Error
-          ? error.message
-          : "An unexpected error occurred during validation",
+        describeError({ error, fallbackTitle: "Couldn't check this API key" }),
       );
       return false;
     } finally {
       setIsValidating(false);
     }
-  }, [
-    projectId,
-    organizationId,
-    provider,
-    customKeys,
-    scopes,
-    utils.modelProvider.validateApiKey,
-  ]);
+  }, [projectId, organizationId, provider, customKeys, scopes, validateApiKey]);
 
   /**
    * Validates stored or env var API key against a custom URL or default URL.
@@ -99,16 +115,17 @@ export function useModelProviderApiKeyValidation(
         );
 
         if (!result.valid) {
-          setValidationError(result.error);
+          setValidationError(describeRefusal(result.domainError));
           return false;
         }
 
         return true;
       } catch (error) {
         setValidationError(
-          error instanceof Error
-            ? error.message
-            : "An unexpected error occurred during validation",
+          describeError({
+            error,
+            fallbackTitle: "Couldn't check this API key",
+          }),
         );
         return false;
       } finally {

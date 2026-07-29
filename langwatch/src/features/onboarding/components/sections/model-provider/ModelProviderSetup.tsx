@@ -15,6 +15,7 @@ import type { ScopeAssignment } from "~/server/scopes/scope.types";
 import { CodexSignIn } from "../../../../../components/settings/CodexSignIn";
 import { CustomModelInputSection } from "../../../../../components/settings/ModelProviderCustomModelInput";
 import { Switch } from "../../../../../components/ui/switch";
+import { useCredentialProbeGate } from "../../../../../hooks/useCredentialProbeGate";
 import { useModelProviderApiKeyValidation } from "../../../../../hooks/useModelProviderApiKeyValidation";
 import { useModelProviderFields } from "../../../../../hooks/useModelProviderFields";
 import { useModelProviderForm } from "../../../../../hooks/useModelProviderForm";
@@ -226,6 +227,15 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
     state.scopes,
   );
 
+  // The same gate the settings drawer uses. Without it this surface — which
+  // includes the "Langy needs a model to get started" step, where there is no
+  // skip — turns a refusal into a dead end.
+  const { probeRequired, recordRefusal, clearRefusal, saveLabel } =
+    useCredentialProbeGate({
+      customKeys: state.customKeys,
+      resetKey: modelProviderKey,
+    });
+
   useEffect(() => {
     setOpenAiValidationError(void 0);
     setFieldErrors({});
@@ -342,19 +352,29 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
         );
     };
 
-    // ALWAYS validate API key on save
-    if (userEnteredNewApiKey) {
-      // User entered new API key - validate it (against custom or default URL)
-      const isValid = await validateApiKey();
-      if (!isValid) return;
-    } else if (customBaseUrl) {
-      // Stored/env key + custom URL - validate against custom URL
-      const isValid = await validateWithCustomUrl(customBaseUrl);
-      if (!isValid) return;
-    } else {
-      // Stored/env key + default URL - validate against default URL
-      const isValid = await validateWithCustomUrl();
-      if (!isValid) return;
+    // Probe only what the customer actually changed. Checking the stored
+    // credentials on every save makes unrelated edits — picking a model,
+    // renaming — depend on third-party uptime, and blocks them behind a key
+    // that has drifted out-of-band (rotated in the provider's console, hit a
+    // temporary 401). The settings drawer already worked this way.
+    //
+    // The gate on top of that: once the provider has refused these exact
+    // credentials, the next save goes through unprobed. This is the step the
+    // customer cannot skip past — the Langy gate has no "Skip for now" — so a
+    // probe that is wrong about a working key stranded them here entirely.
+    const credentialsChanged = userEnteredNewApiKey || hasNonApiKeyChanges;
+
+    if (credentialsChanged && probeRequired) {
+      const isValid = userEnteredNewApiKey
+        ? await validateApiKey()
+        : // A stored or env key against a base URL they just changed.
+          await validateWithCustomUrl(customBaseUrl);
+
+      if (!isValid) {
+        recordRefusal();
+        return;
+      }
+      clearRefusal();
     }
 
     submitForm();
@@ -369,6 +389,9 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
     isUsingEnvVars,
     validateApiKey,
     validateWithCustomUrl,
+    probeRequired,
+    recordRefusal,
+    clearRefusal,
   ]);
 
   if (!meta || !backendModelProviderKey) return null;
@@ -538,7 +561,7 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
               loading={state.isSaving || isValidatingApiKey}
               size="sm"
             >
-              Save
+              {saveLabel}
             </Button>
           </HStack>
         </>

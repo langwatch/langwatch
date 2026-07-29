@@ -2,6 +2,7 @@ import { Box, Field, Input, VStack } from "@chakra-ui/react";
 import type React from "react";
 import { useEffect } from "react";
 import { ManagedModelProviderAlert } from "../../../ee/managed-providers/ManagedModelProviderAlert";
+import { modelProviderRegistry } from "../../features/onboarding/regions/model-providers/registry";
 import type {
   UseModelProviderFormActions,
   UseModelProviderFormState,
@@ -11,6 +12,19 @@ import type { MaybeStoredModelProvider } from "../../server/modelProviders/regis
 import { api } from "../../utils/api";
 import { isApiKeyField } from "../../utils/modelProviderHelpers";
 import { SmallLabel } from "../SmallLabel";
+
+/**
+ * Where this provider's credential comes from, in a sentence.
+ *
+ * Every provider already carries one; the drawer just never showed it, so
+ * customers saw a bare env-var name and had to guess which key was wanted.
+ * Keyed by the backend provider, since a few entries name themselves
+ * differently there (open_ai_azure -> azure).
+ */
+const fieldMetadataFor = (backendProviderKey: string) =>
+  modelProviderRegistry.find(
+    (entry) => entry.backendModelProviderKey === backendProviderKey,
+  )?.fieldMetadata;
 
 /**
  * Renders credential input fields (API keys, endpoints, etc.) based on the provider's schema.
@@ -55,6 +69,8 @@ export const CredentialsSection = ({
     );
   const isManaged = managedProviderData?.managed ?? false;
 
+  const fieldMetadata = fieldMetadataFor(provider.provider);
+
   const requiredKeys = useRequiredCredentialKeys({
     providerKey: provider.provider,
     displayKeys: state.displayKeys,
@@ -84,6 +100,7 @@ export const CredentialsSection = ({
           // Requiredness is derived from the provider's own schema against
           // the values entered so far, so a field that a base URL makes
           // optional loses its marker the moment that URL is typed.
+          const description = fieldMetadata?.[key]?.description;
           const isOptional = !requiredKeys.has(key);
           const isPassword = isApiKeyField(key);
           const isInvalid = Boolean(fieldErrors[key]);
@@ -122,6 +139,9 @@ export const CredentialsSection = ({
                   width="full"
                 />
               </Box>
+              {description && (
+                <Field.HelperText>{description}</Field.HelperText>
+              )}
               {fieldErrors[key] && (
                 <Field.ErrorText>{fieldErrors[key]}</Field.ErrorText>
               )}
