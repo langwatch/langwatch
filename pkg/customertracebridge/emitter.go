@@ -317,6 +317,17 @@ func (e *Emitter) EndSpan(ctx context.Context, params domain.AITraceParams) {
 	if sessionID := clientSessionID(ctx, params); sessionID != "" {
 		attrs = append(attrs, attribute.String(AttrGenAIConversationID, sessionID))
 	}
+	// External end-user attribution: the header-resolved id (middleware) wins,
+	// else the OpenAI `user` body param. The trace fold copies this into
+	// per-request spend events and attributed-user budget buckets key on it.
+	if endUser := endUserID(ctx, params); endUser != "" {
+		attrs = append(attrs, attribute.String(AttrEndUserID, endUser))
+	}
+	// The caller's metadata echo, validated at the edge; round-tripped
+	// verbatim into billing spend events as their join key.
+	if md := RequestMetadataJSON(ctx); md != "" {
+		attrs = append(attrs, attribute.String(AttrRequestMetadata, md))
+	}
 
 	// When the request failed upstream, stamp the provider's HTTP status +
 	// error class so the trace renders as an error instead of silently dropping
@@ -468,6 +479,26 @@ func parseTraceparent(tp string) (traceID []byte, spanID []byte) {
 // the id survives even if a future middleware change stops forwarding the
 // header. Empty when the tool sends no per-conversation id on the gateway wire
 // (gemini-cli, which only emits its conversation id via direct OTLP / Path B).
+// endUserID resolves the external end-user id for attribution: the
+// middleware-lifted header value wins (already sanitized), else the OpenAI
+// `user` body param on the request shapes that carry one. Both paths land in
+// SanitizeEndUserID so the stamped value is source-independent.
+func endUserID(ctx context.Context, params domain.AITraceParams) string {
+	if id := EndUserID(ctx); id != "" {
+		return id
+	}
+	switch params.RequestType {
+	case domain.RequestTypeChat, domain.RequestTypeEmbeddings,
+		domain.RequestTypeResponses, domain.RequestTypeSpeech:
+		// OpenAI-wire shapes carry a top-level `user` string for abuse
+		// attribution; it is forwarded upstream unchanged and mirrored here.
+		if user := gjson.GetBytes(params.RequestBody, "user").String(); user != "" {
+			return SanitizeEndUserID(user)
+		}
+	}
+	return ""
+}
+
 func clientSessionID(ctx context.Context, params domain.AITraceParams) string {
 	if id := ClientSessionID(ctx); id != "" {
 		return id

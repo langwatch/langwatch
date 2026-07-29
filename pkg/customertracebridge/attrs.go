@@ -31,4 +31,18 @@ const (
 	// exact key into metadata.labels (otel.traces.ts), which the Trace
 	// Explorer filters as "Label".
 	AttrLabels = "langwatch.labels"
+
+	// AttrEndUserID is the caller's external end-user id (their customer's
+	// user, not a LangWatch principal), resolved from the
+	// x-langwatch-end-user-id header, its x-litellm-end-user-id migration
+	// alias, or the OpenAI `user` body param, in that order. The trace fold
+	// copies it into per-request spend events and the attributed-user
+	// budget buckets key on it.
+	AttrEndUserID = "langwatch.end_user_id"
+
+	// AttrRequestMetadata is the caller's x-langwatch-metadata echo: a raw
+	// JSON object (4KB cap, validated at the edge) round-tripped verbatim
+	// into billing spend events so the caller's billing system can join
+	// events back to its own entities without a lookup.
+	AttrRequestMetadata = "langwatch.reserved.request_metadata"
 )
