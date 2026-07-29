@@ -322,7 +322,9 @@ describe("validateProviderApiKey", () => {
     });
 
     it("returns error for 400 (invalid key) from Gemini", async () => {
-      mockFetch.mockResolvedValueOnce({
+      // Persistent: a bare 400 carries no reason, so it does not end the walk
+      // and every remaining shape is asked the same question.
+      mockFetch.mockResolvedValue({
         ok: false,
         status: 400,
       });
@@ -361,8 +363,14 @@ describe("validateProviderApiKey", () => {
       },
     });
 
+    // Persistent, not one-shot: a refusal that is not `API_KEY_INVALID` does
+    // not stop the walk, so Gemini goes on to probe every remaining shape —
+    // and a key the provider refuses is refused on all of them. Queuing a
+    // single response left the later shapes resolving `undefined`, which the
+    // probe loop used to swallow as "unreachable" and outrank with the real
+    // refusal, so these tests passed without ever exercising the walk.
     const respondWith = (status: number, body: unknown) => {
-      mockFetch.mockResolvedValueOnce({
+      mockFetch.mockResolvedValue({
         ok: false,
         status,
         text: async () => JSON.stringify(body),

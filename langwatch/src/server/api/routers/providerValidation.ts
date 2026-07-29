@@ -347,10 +347,6 @@ const PROBE_BUDGET_MS = 10_000;
 type ProbeRequest = { url: string; headers: Record<string, string> };
 
 /**
- * Builds the models request for an auth strategy. Every provider is probed
- * the same way; only where the credential rides differs.
- */
-/**
  * Every way a provider's credential can legitimately prove itself.
  *
  * A credential is not tied to one URL. Google alone issues keys from AI
@@ -511,28 +507,36 @@ async function runProbeChain({
       break;
     }
 
+    // Only the request itself is guarded. Reading the refusal happens below,
+    // outside the `catch`, because the two failures mean opposite things: a
+    // throw here is the request not landing, while a throw from
+    // `handleHttpError` is a bug in our own parsing of a response we did get.
+    // Catching both told the customer to check their network connection for a
+    // host that had answered perfectly well, and hid the defect completely.
+    let response: Response;
     try {
-      const response = await fetch(candidate.url, {
+      response = await fetch(candidate.url, {
         method: "GET",
         headers: candidate.headers,
         signal: deadline,
       });
-
-      if (response.ok) {
-        return { valid: true };
-      }
-
-      const failure = await handleHttpError({ response, context });
-      failures.push(failure);
-
-      // The provider has positively identified the key as wrong. Asking the
-      // remaining shapes cannot change that answer, and each one is another
-      // outbound request on this request thread.
-      if (failure.rank === FAILURE_RANK.definitive) {
-        break;
-      }
     } catch {
       failures.push(unreachable());
+      continue;
+    }
+
+    if (response.ok) {
+      return { valid: true };
+    }
+
+    const failure = await handleHttpError({ response, context });
+    failures.push(failure);
+
+    // The provider has positively identified the key as wrong. Asking the
+    // remaining shapes cannot change that answer, and each one is another
+    // outbound request on this request thread.
+    if (failure.rank === FAILURE_RANK.definitive) {
+      break;
     }
   }
 
