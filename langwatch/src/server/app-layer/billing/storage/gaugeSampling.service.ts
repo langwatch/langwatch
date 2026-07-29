@@ -1,4 +1,4 @@
-import { createLogger } from "~/utils/logger/server";
+import { createLogger } from "@langwatch/observability";
 import { foldBoundaryEvents } from "./gaugeFold";
 import type { StorageBillableGaugeRepository } from "./repositories/storage-billable-gauge.repository";
 import type { StorageBoundaryEventRepository } from "./repositories/storage-boundary-event.repository";
