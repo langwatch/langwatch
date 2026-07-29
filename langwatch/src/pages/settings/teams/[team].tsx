@@ -195,6 +195,47 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembersAndUsers }) {
   const apiContext = api.useContext();
   const router = useRouter();
 
+  /** The status code of a tRPC failure, when it carries one. */
+  function trpcErrorCode(error: unknown): string | undefined {
+    return error instanceof TRPCClientError
+      ? (error.data?.code as string | undefined)
+      : undefined;
+  }
+
+  /**
+   * Saving is autosaved and debounced, so a failure nobody surfaces is a change
+   * that silently did not happen.
+   */
+  function reportTeamSaveFailure(error: unknown): void {
+    if (isHandledByGlobalHandler(error)) return;
+
+    const code = trpcErrorCode(error);
+
+    // The server rejects some edits on their merits rather than on the caller's
+    // permissions, and says what to do instead. A FORBIDDEN here is only ever
+    // raised by the personal-workspace guards, and its message is a sentence
+    // written for the customer; RBAC failures arrive as UNAUTHORIZED.
+    if (code === "FORBIDDEN") {
+      toaster.create({
+        title: (error as TRPCClientError<never>).message, // no-raw-error-toast-ok
+        type: "error",
+        duration: 8000,
+        meta: { closable: true },
+      });
+      return;
+    }
+
+    if (code === "UNAUTHORIZED") {
+      toaster.create({
+        title:
+          "You need to be an administrator of the organization to update this team",
+        type: "error",
+        duration: 5000,
+        meta: { closable: true },
+      });
+    }
+  }
+
   const onSubmit: SubmitHandler<TeamFormData> = useDebouncedCallback(
     (data: TeamFormData) => {
       if (isEqual(data, defaultValues)) return;
@@ -223,46 +264,7 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembersAndUsers }) {
             });
             void apiContext.organization.getAll.refetch();
           },
-          onError: (error) => {
-            if (isHandledByGlobalHandler(error)) return;
-            // The server rejects some edits on their merits rather than on the
-            // caller's permissions, and says what to do instead. Saving is
-            // autosaved and debounced, so anything not surfaced here is a
-            // change that silently did not happen.
-            if (
-              error instanceof TRPCClientError &&
-              error.data?.code === "FORBIDDEN"
-            ) {
-              toaster.create({
-                // FORBIDDEN on this mutation is only ever raised by our own
-                // personal-workspace guards, and its message is a sentence
-                // written for the customer that says what to do instead. RBAC
-                // failures arrive as UNAUTHORIZED and are handled below, so
-                // nothing unauthored reaches this line.
-                title: error.message, // no-raw-error-toast-ok
-                type: "error",
-                duration: 8000,
-                meta: {
-                  closable: true,
-                },
-              });
-              return;
-            }
-            if (
-              error instanceof TRPCClientError &&
-              error.data?.code === "UNAUTHORIZED"
-            ) {
-              toaster.create({
-                title:
-                  "You need to be an administrator of the organization to update this team",
-                type: "error",
-                duration: 5000,
-                meta: {
-                  closable: true,
-                },
-              });
-            }
-          },
+          onError: reportTeamSaveFailure,
         },
       );
     },

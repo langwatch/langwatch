@@ -64,6 +64,59 @@ const ns = `pw-invariants-${nanoid(8)}`;
 const ownerEmail = `${ns}-owner@example.com`;
 const colleagueEmail = `${ns}-colleague@example.com`;
 
+/**
+ * Delete the rows the fixture created, and nothing else.
+ *
+ * A `beforeAll` that threw partway leaves these ids unset, and Prisma drops an
+ * `undefined` from a where clause rather than matching nothing:
+ * `deleteMany({ where: { organizationId: undefined } })` is `deleteMany({})`,
+ * which empties the table. This database is shared with every other suite and
+ * worktree, so a broken setup must not escalate into a destructive teardown.
+ * A real cleanup failure is left to surface rather than swallowed.
+ */
+async function deleteTeamOwnedRows(organizationId: string): Promise<void> {
+  const teams = await prisma.team.findMany({
+    where: { organizationId },
+    select: { id: true },
+  });
+  const teamIds = teams.map((team) => team.id);
+  if (teamIds.length === 0) return;
+
+  const projects = await prisma.project.findMany({
+    where: { teamId: { in: teamIds } },
+    select: { id: true },
+  });
+  const projectIds = projects.map((project) => project.id);
+  if (projectIds.length > 0) {
+    await prisma.projectSecret.deleteMany({
+      where: { projectId: { in: projectIds } },
+    });
+  }
+  await prisma.project.deleteMany({ where: { teamId: { in: teamIds } } });
+  await prisma.teamUser.deleteMany({ where: { teamId: { in: teamIds } } });
+}
+
+async function deleteFixture({
+  organizationId,
+  userIds,
+}: {
+  organizationId?: string;
+  userIds: (string | undefined)[];
+}): Promise<void> {
+  if (organizationId) {
+    await deleteTeamOwnedRows(organizationId);
+    await prisma.roleBinding.deleteMany({ where: { organizationId } });
+    await prisma.organizationUser.deleteMany({ where: { organizationId } });
+    await prisma.team.deleteMany({ where: { organizationId } });
+    await prisma.organization.deleteMany({ where: { id: organizationId } });
+  }
+
+  const created = userIds.filter((id): id is string => !!id);
+  if (created.length > 0) {
+    await prisma.user.deleteMany({ where: { id: { in: created } } });
+  }
+}
+
 describe("given a personal workspace beside a shared team in one organization", () => {
   let organizationId: string;
   let ownerUserId: string;
@@ -182,47 +235,10 @@ describe("given a personal workspace beside a shared team in one organization", 
   });
 
   afterAll(async () => {
-    // A `beforeAll` that threw partway leaves these ids unset, and Prisma
-    // drops an `undefined` from a where clause rather than matching nothing:
-    // `deleteMany({ where: { organizationId: undefined } })` is
-    // `deleteMany({})`, which empties the table. This database is shared with
-    // every other suite and worktree, so a broken setup must not escalate
-    // into a destructive teardown. Delete only what was created, and let a
-    // real cleanup failure surface rather than swallowing it.
-    if (organizationId) {
-      const teams = await prisma.team.findMany({
-        where: { organizationId },
-        select: { id: true },
-      });
-      const teamIds = teams.map((team) => team.id);
-
-      if (teamIds.length > 0) {
-        const projects = await prisma.project.findMany({
-          where: { teamId: { in: teamIds } },
-          select: { id: true },
-        });
-        const projectIds = projects.map((project) => project.id);
-        if (projectIds.length > 0) {
-          await prisma.projectSecret.deleteMany({
-            where: { projectId: { in: projectIds } },
-          });
-        }
-        await prisma.project.deleteMany({ where: { teamId: { in: teamIds } } });
-        await prisma.teamUser.deleteMany({
-          where: { teamId: { in: teamIds } },
-        });
-      }
-
-      await prisma.roleBinding.deleteMany({ where: { organizationId } });
-      await prisma.organizationUser.deleteMany({ where: { organizationId } });
-      await prisma.team.deleteMany({ where: { organizationId } });
-      await prisma.organization.deleteMany({ where: { id: organizationId } });
-    }
-
-    const userIds = [ownerUserId, colleagueUserId].filter(Boolean);
-    if (userIds.length > 0) {
-      await prisma.user.deleteMany({ where: { id: { in: userIds } } });
-    }
+    await deleteFixture({
+      organizationId,
+      userIds: [ownerUserId, colleagueUserId],
+    });
   });
 
   describe("when the owner moves the personal project into the shared team", () => {

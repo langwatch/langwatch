@@ -259,6 +259,25 @@
 			}
 		},
 		{
+			// A `describe` body is a suite declaration, not a function whose
+			// length says anything about how hard it is to follow: the rule
+			// counts every nested `describe` and `it` inside it, so any
+			// integration suite covering more than a couple of cases trips it
+			// no matter how it is written, and the only way to satisfy it
+			// would be to split coverage across files by line count rather
+			// than by subject. `e2e/**` is already exempt for the same reason.
+			// Cognitive complexity stays on, because that does measure
+			// something real in a test body.
+			"includes": ["**/__tests__/**"],
+			"linter": {
+				"rules": {
+					"complexity": {
+						"noExcessiveLinesPerFunction": "off"
+					}
+				}
+			}
+		},
+		{
 			"includes": [
 				"**/*.test.ts",
 				"**/*.test.tsx",

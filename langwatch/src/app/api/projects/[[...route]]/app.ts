@@ -200,6 +200,20 @@ secured.access(requires("project:view")).get(
   },
 );
 
+/** The service's update failures, as the status codes they mean. */
+function asProjectUpdateHttpError(error: unknown): unknown {
+  if (error instanceof ProjectNotFoundError) {
+    return new NotFoundError("Project not found");
+  }
+  if (error instanceof DestinationTeamNotFoundError) {
+    return new BadRequestError(error.message);
+  }
+  if (error instanceof PersonalWorkspaceBoundaryError) {
+    return new ForbiddenError(error.message);
+  }
+  return error;
+}
+
 secured.access(requires("project:update")).patch(
   "/:id",
   projectServiceMiddleware,
@@ -227,16 +241,7 @@ secured.access(requires("project:update")).patch(
         },
       });
     } catch (error) {
-      if (error instanceof ProjectNotFoundError) {
-        throw new NotFoundError("Project not found");
-      }
-      if (error instanceof DestinationTeamNotFoundError) {
-        throw new BadRequestError(error.message);
-      }
-      if (error instanceof PersonalWorkspaceBoundaryError) {
-        throw new ForbiddenError(error.message);
-      }
-      throw error;
+      throw asProjectUpdateHttpError(error);
     }
 
     return c.json(projectResponse(project));

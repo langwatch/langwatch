@@ -36,6 +36,52 @@ import {
 } from "../rbac";
 import { getUserProtectionsForProject } from "../utils";
 
+/**
+ * The owner is ADMIN of their own personal team, so `project:create` passes
+ * there. A personal workspace holds only the project provisioned with it.
+ */
+async function assertTeamCanHoldANewProject(
+  prisma: PrismaClient,
+  { teamId, organizationId }: { teamId?: string; organizationId: string },
+): Promise<void> {
+  if (!teamId) return;
+
+  const destinationTeam = await prisma.team.findFirst({
+    where: { id: teamId, organizationId },
+    select: { isPersonal: true },
+  });
+  const violation = personalWorkspaceCreateViolation(
+    destinationTeam?.isPersonal ?? false,
+  );
+  if (violation) {
+    throw new TRPCError({ code: "FORBIDDEN", message: violation });
+  }
+}
+
+/**
+ * The boundary itself is defined once in the projects app layer, which this
+ * router does not go through. See the helper there for why it holds.
+ */
+function assertMoveStaysOutOfPersonalWorkspaces({
+  isMovingTeams,
+  isProjectPersonal,
+  isDestinationTeamPersonal,
+}: {
+  isMovingTeams: boolean;
+  isProjectPersonal: boolean;
+  isDestinationTeamPersonal: boolean;
+}): void {
+  if (!isMovingTeams) return;
+
+  const violation = personalWorkspaceMoveViolation({
+    isProjectPersonal,
+    isDestinationTeamPersonal,
+  });
+  if (violation) {
+    throw new TRPCError({ code: "FORBIDDEN", message: violation });
+  }
+}
+
 export const projectRouter = createTRPCRouter({
   create: protectedProcedure
     .input(
@@ -73,20 +119,10 @@ export const projectRouter = createTRPCRouter({
       const userId = ctx.session.user.id;
       const prisma = ctx.prisma;
 
-      // The owner is ADMIN of their own personal team, so `project:create`
-      // passes there. See the helper for why a second project does not belong.
-      if (input.teamId) {
-        const destinationTeam = await prisma.team.findFirst({
-          where: { id: input.teamId, organizationId: input.organizationId },
-          select: { isPersonal: true },
-        });
-        const createViolation = personalWorkspaceCreateViolation(
-          destinationTeam?.isPersonal ?? false,
-        );
-        if (createViolation) {
-          throw new TRPCError({ code: "FORBIDDEN", message: createViolation });
-        }
-      }
+      await assertTeamCanHoldANewProject(prisma, {
+        teamId: input.teamId,
+        organizationId: input.organizationId,
+      });
 
       const enforcement = createLicenseEnforcementService(prisma);
       try {
@@ -353,17 +389,11 @@ export const projectRouter = createTRPCRouter({
           });
         }
 
-        // The boundary itself is defined once in the projects app layer, which
-        // this router does not go through. See the helper for why it holds.
-        if (input.teamId !== project.teamId) {
-          const violation = personalWorkspaceMoveViolation({
-            isProjectPersonal: project.isPersonal,
-            isDestinationTeamPersonal: destinationTeam.isPersonal,
-          });
-          if (violation) {
-            throw new TRPCError({ code: "FORBIDDEN", message: violation });
-          }
-        }
+        assertMoveStaysOutOfPersonalWorkspaces({
+          isMovingTeams: input.teamId !== project.teamId,
+          isProjectPersonal: project.isPersonal,
+          isDestinationTeamPersonal: destinationTeam.isPersonal,
+        });
       }
 
       const updatedProject = await prisma.project.update({

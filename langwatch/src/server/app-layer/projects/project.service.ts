@@ -155,6 +155,34 @@ export class ProjectService {
     return this.repo.getById(id);
   }
 
+  /**
+   * The destination has to be a live team of this organization, and not a
+   * personal workspace: that holds only the project provisioned with it.
+   */
+  private async assertTeamCanHoldANewProject({
+    teamId,
+    organizationId,
+  }: {
+    teamId: string;
+    organizationId: string;
+  }): Promise<void> {
+    const destinationTeam = await this.repo.findActiveTeamInOrganization({
+      teamId,
+      organizationId,
+    });
+    if (!destinationTeam) {
+      throw new TeamNotInOrganizationError(
+        "Team does not belong to this organization",
+      );
+    }
+    const violation = personalWorkspaceCreateViolation(
+      destinationTeam.isPersonal,
+    );
+    if (violation) {
+      throw new PersonalWorkspaceBoundaryError(violation);
+    }
+  }
+
   async create(params: CreateProjectParams): Promise<Project> {
     if (!params.teamId && !params.newTeamName) {
       throw new Error("Either teamId or newTeamName must be provided");
@@ -163,21 +191,10 @@ export class ProjectService {
     let teamId: string;
 
     if (params.teamId) {
-      const destinationTeam = await this.repo.findActiveTeamInOrganization({
+      await this.assertTeamCanHoldANewProject({
         teamId: params.teamId,
         organizationId: params.organizationId,
       });
-      if (!destinationTeam) {
-        throw new TeamNotInOrganizationError(
-          "Team does not belong to this organization",
-        );
-      }
-      const createViolation = personalWorkspaceCreateViolation(
-        destinationTeam.isPersonal,
-      );
-      if (createViolation) {
-        throw new PersonalWorkspaceBoundaryError(createViolation);
-      }
       teamId = params.teamId;
     } else {
       const teamName = params.newTeamName!;
