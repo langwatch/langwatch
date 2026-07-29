@@ -24,14 +24,14 @@ import {
   type S3ClientResolver,
   type SpoolStorage,
 } from "~/server/app-layer/traces/blob-store.service";
-import { AzureBlobDriver } from "~/server/stored-objects/azure-blob-driver";
-import type { ProjectStorageDestination } from "~/server/stored-objects/project-storage-destination";
 import {
   ensureAzuriteContainer,
-  startAzurite,
   type StartedAzurite,
+  startAzurite,
   stopAzurite,
 } from "~/server/stored-objects/__tests__/azurite-test-support";
+import { AzureBlobDriver } from "~/server/stored-objects/azure-blob-driver";
+import type { ProjectStorageDestination } from "~/server/stored-objects/project-storage-destination";
 
 const CONTAINER = "trace-spool";
 const PROJECT_ID = "proj-spool-azure";

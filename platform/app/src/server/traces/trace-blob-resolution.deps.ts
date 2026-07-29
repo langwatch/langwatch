@@ -1,5 +1,6 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { createLogger } from "@langwatch/observability";
+import type { SpoolStorage } from "~/server/app-layer/traces/blob-store.service";
 import { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import {
@@ -8,9 +9,8 @@ import {
   isClickHouseEnabled,
 } from "~/server/clickhouse/clickhouseClient";
 import { createS3Client } from "~/server/storage";
-import type { SpoolStorage } from "~/server/app-layer/traces/blob-store.service";
-import { createStorageRegistry } from "~/server/stored-objects/stored-objects-factory";
 import { resolveProjectStorageDestination } from "~/server/stored-objects/project-storage-destination";
+import { createStorageRegistry } from "~/server/stored-objects/stored-objects-factory";
 import type { BlobResolutionDeps } from "./trace.service";
 
 /**

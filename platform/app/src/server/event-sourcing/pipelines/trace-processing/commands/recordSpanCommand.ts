@@ -415,11 +415,14 @@ export class RecordSpanCommand
           spanId: command.data.span.spanId,
         })
         .catch((err: unknown) => {
-        this.logger.warn(
-          { spoolRef, error: err instanceof Error ? err.message : String(err) },
-          "Best-effort spool deletion failed — lifecycle policy will clean up",
-        );
-      });
+          this.logger.warn(
+            {
+              spoolRef,
+              error: err instanceof Error ? err.message : String(err),
+            },
+            "Best-effort spool deletion failed — lifecycle policy will clean up",
+          );
+        });
     }
   }
 
