@@ -397,3 +397,85 @@ describe("computeParetoDominance — when the paired test declined", () => {
     });
   });
 });
+
+describe("computeParetoDominance — the duration side of the paired test", () => {
+  const board3 = (entries: any[]) =>
+    ({
+      entries,
+      winMatrix: {},
+      comparisonCount: 60,
+      minMatchups: 60,
+      hasDegenerate: false,
+      didConverge: true,
+      comparability: { identifiable: true, groups: [], dominates: [] },
+      scoreDifferenceCI: { a: { b: [40, 160] }, b: { a: [-160, -40] } },
+      bootstrapNonConvergence: null,
+    }) as any;
+
+  const withDurations = ({
+    durationDiff,
+  }: {
+    durationDiff: [number, number];
+  }) =>
+    ({
+      a: {
+        variantId: "a",
+        costStats: { avg: 0.00171, count: 60 },
+        durationStats: { avg: 17576, count: 60 },
+        costMeanCI: null,
+        durationMeanCI: null,
+        costDifferenceCI: { b: [-0.0009, -0.0002] as [number, number] },
+        durationDifferenceCI: { b: durationDiff },
+      },
+      b: {
+        variantId: "b",
+        costStats: { avg: 0.00226, count: 60 },
+        durationStats: { avg: 22654, count: 60 },
+        costMeanCI: null,
+        durationMeanCI: null,
+        costDifferenceCI: { a: [0.0002, 0.0009] as [number, number] },
+        durationDifferenceCI: {
+          a: [-durationDiff[1], -durationDiff[0]] as [number, number],
+        },
+      },
+    }) as any;
+
+  describe("given a mean speed gap swamped by row-to-row variation", () => {
+    it("does not claim the faster average as a speed win", () => {
+      // Taken from the live run: 'a' averages 8.2s faster than 'b' over 60
+      // paired rows, but the per-row difference has a standard deviation of
+      // 52s, so the interval runs from -21.4s to +5.0s and includes zero.
+      // The averages alone would have called this a 22% speed advantage.
+      const leaderboard = board3([
+        entry({ variantId: "a", score: 153, scoreCI: [72, 235] }),
+        entry({ variantId: "b", score: 45, scoreCI: [-30, 120] }),
+      ]);
+
+      const dominance = computeParetoDominance({
+        leaderboard,
+        variantMetrics: withDurations({ durationDiff: [-21379, 5020] }),
+      });
+      const edge = dominance.edges.find((e) => e.loserId === "b")!;
+
+      expect(edge.strictlyBetterOn).toEqual(["quality", "cost"]);
+      expect(edge.strictlyBetterOn).not.toContain("speed");
+    });
+  });
+
+  describe("given a speed gap the run can actually see", () => {
+    it("counts it, so the guard above is not simply refusing everything", () => {
+      const leaderboard = board3([
+        entry({ variantId: "a", score: 153, scoreCI: [72, 235] }),
+        entry({ variantId: "b", score: 45, scoreCI: [-30, 120] }),
+      ]);
+
+      const dominance = computeParetoDominance({
+        leaderboard,
+        variantMetrics: withDurations({ durationDiff: [-9000, -3000] }),
+      });
+      const edge = dominance.edges.find((e) => e.loserId === "b")!;
+
+      expect(edge.strictlyBetterOn).toEqual(["quality", "cost", "speed"]);
+    });
+  });
+});
