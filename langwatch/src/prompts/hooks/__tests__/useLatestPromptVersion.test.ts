@@ -58,7 +58,7 @@ describe("useLatestPromptVersion", () => {
         useLatestPromptVersion({
           configId: "config-123",
           currentVersion: 3,
-          liveRefetch: false,
+          isLiveRefetchEnabled: false,
         }),
       );
 

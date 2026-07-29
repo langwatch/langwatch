@@ -30,8 +30,14 @@ type UseLatestPromptVersionOptions = {
    * save-driven instead: `useHandleSavePrompt` invalidates this key, so
    * same-app version bumps still move the badge, but another session's new
    * version isn't reflected until the next save or reload.
+   *
+   * The callers left live are bounded by open *editors*, not by tab count:
+   * one prompt editor drawer, and one editor per browser window in Compare
+   * mode (a window renders only its active tab's content — the tab panels are
+   * `lazyMount unmountOnExit`). So focus costs one refetch per prompt being
+   * edited, and the two hooks inside a window share one query key.
    */
-  liveRefetch?: boolean;
+  isLiveRefetchEnabled?: boolean;
 };
 
 /**
@@ -45,7 +51,7 @@ type UseLatestPromptVersionOptions = {
 export const useLatestPromptVersion = ({
   configId,
   currentVersion,
-  liveRefetch = true,
+  isLiveRefetchEnabled = true,
 }: UseLatestPromptVersionOptions): UseLatestPromptVersionResult => {
   const { project } = useOrganizationTeamProject();
 
@@ -66,12 +72,13 @@ export const useLatestPromptVersion = ({
       // Live by default so "the prompt was updated in another tab/session"
       // stays observable without a reload — that is the whole point of the
       // drift check for the single-instance callers (save button, editor
-      // drawer). The N-mounted callers opt out with `liveRefetch: false`,
-      // matching the codebase convention for dashboard queries (see
-      // useFilterParams). True cross-session liveness for those would need a
-      // lightweight version-number endpoint (noted in #5585).
-      staleTime: liveRefetch ? 0 : 30_000,
-      refetchOnWindowFocus: liveRefetch,
+      // drawer). The N-mounted callers opt out with
+      // `isLiveRefetchEnabled: false`, matching the codebase convention for
+      // dashboard queries (see useFilterParams). True cross-session liveness
+      // for those would need a lightweight version-number endpoint (noted in
+      // #5585).
+      staleTime: isLiveRefetchEnabled ? 0 : 30_000,
+      refetchOnWindowFocus: isLiveRefetchEnabled,
     },
   );
 

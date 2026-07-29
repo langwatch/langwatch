@@ -12,8 +12,8 @@ import { SecretsIndicator } from "../SecretsIndicator";
 let mockSecrets: Array<{ id: string; name: string }> = [];
 let mockIsLoading = false;
 
-// Reads the options argument rather than discarding it, so the popover's
-// `enabled: open` gating is observable to the assertions below.
+// Records each call's options argument instead of discarding it, so the
+// popover's `enabled: open` gating is observable to the assertions below.
 const { mockSecretsListQuery } = vi.hoisted(() => ({
   mockSecretsListQuery: vi.fn(),
 }));
