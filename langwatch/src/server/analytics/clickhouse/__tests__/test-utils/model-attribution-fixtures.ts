@@ -38,6 +38,8 @@ export interface SpanFixture {
   cacheWriteTokens?: number;
   reasoningTokens?: number;
   skipTokenAccumulation?: boolean;
+  /** Shift this span's StartTime relative to T0 (e.g. outside the scan envelope). */
+  startTimeOffsetMs?: number;
 }
 
 export interface TraceFixture {
@@ -205,12 +207,91 @@ export const TRACE_LEGACY_BUNDLED_SPANS: SpanFixture[] = [
   },
 ];
 
+/** Mirrors the fold's MAX_PROCESSED_SPANS cap (traceSummary.foldProjection). */
+export const FOLD_SPAN_CAP = 512;
+
+export const MODEL_CAP_A = "cap-model-a";
+export const MODEL_CAP_B = "cap-model-b";
+
+/**
+ * Trace F: past the fold's processing cap. The fold froze the totals after
+ * the first FOLD_SPAN_CAP spans (512 x 0.001 on model A), while stored_spans
+ * also holds span 513 (1.0 on model B). Span-level attribution would report
+ * 1.512 across two buckets against a 0.512 ungrouped total, so the query must
+ * fall back to whole-trace attribution under the primary model.
+ */
+export const TRACE_OVER_CAP: TraceFixture = {
+  traceId: "trace-over-cap",
+  models: [MODEL_CAP_A],
+  totalCost: 0.512,
+  promptTokens: null,
+  completionTokens: null,
+};
+
+export const TRACE_OVER_CAP_SPANS: SpanFixture[] = [
+  ...Array.from({ length: FOLD_SPAN_CAP }, (_, i) => ({
+    traceId: "trace-over-cap",
+    spanId: `f-${i}`,
+    parentSpanId: null,
+    model: MODEL_CAP_A,
+    cost: 0.001,
+  })),
+  {
+    traceId: "trace-over-cap",
+    spanId: `f-${FOLD_SPAN_CAP}`,
+    parentSpanId: null,
+    model: MODEL_CAP_B,
+    cost: 1.0,
+  },
+];
+
+export const MODEL_ENV_A = "env-model-a";
+export const MODEL_ENV_B = "env-model-b";
+
+/** StartTime offset that puts a span outside the query's 2-day scan cushion. */
+export const OUTSIDE_ENVELOPE_MS = 30 * 24 * 60 * 60 * 1000;
+
+/**
+ * Trace G: one contributing span outside the span scan envelope. The fold saw
+ * both spans (TotalCost 0.09375, SpanCount 2) but the scan only sees the
+ * in-window span, so span-level attribution would ship a PARTIAL partition
+ * (model A's 0.03125 only). The incomplete-scan detection must put the whole
+ * trace under its primary model instead.
+ */
+export const TRACE_OUTSIDE_ENVELOPE: TraceFixture = {
+  traceId: "trace-outside-envelope",
+  models: [MODEL_ENV_B, MODEL_ENV_A],
+  totalCost: 0.09375,
+  promptTokens: null,
+  completionTokens: null,
+};
+
+export const TRACE_OUTSIDE_ENVELOPE_SPANS: SpanFixture[] = [
+  {
+    traceId: "trace-outside-envelope",
+    spanId: "g-in",
+    parentSpanId: null,
+    model: MODEL_ENV_A,
+    cost: 0.03125,
+  },
+  {
+    traceId: "trace-outside-envelope",
+    spanId: "g-out",
+    parentSpanId: null,
+    model: MODEL_ENV_B,
+    cost: 0.0625,
+    startTimeOffsetMs: -OUTSIDE_ENVELOPE_MS,
+  },
+];
+
 export const ALL_TRACES = [
   TRACE_MULTI,
   TRACE_SINGLE,
   TRACE_MODELLESS,
   TRACE_SKIP,
   TRACE_LEGACY_BUNDLED,
+  TRACE_OVER_CAP,
+  TRACE_OUTSIDE_ENVELOPE,
 ];
 export const ALL_SPANS = [
   ...TRACE_MULTI_SPANS,
@@ -218,10 +299,13 @@ export const ALL_SPANS = [
   ...TRACE_MODELLESS_SPANS,
   ...TRACE_SKIP_SPANS,
   ...TRACE_LEGACY_BUNDLED_SPANS,
+  ...TRACE_OVER_CAP_SPANS,
+  ...TRACE_OUTSIDE_ENVELOPE_SPANS,
 ];
 
 /** Ungrouped truths the grouped buckets must partition to. */
-export const EXPECTED_TOTAL_COST = 0.875 + 0.0625 + 0.03125 + 0.25; // 1.21875
+export const EXPECTED_TOTAL_COST =
+  0.875 + 0.0625 + 0.03125 + 0.25 + 0.512 + 0.09375; // 1.8245
 export const EXPECTED_NON_BILLED_COST = 0.125 + 0.25; // A's span split + E's legacy marker
 export const EXPECTED_PROMPT_TOKENS = 7000 + 800 + 100; // 7900
 export const EXPECTED_COMPLETION_TOKENS = 700 + 80 + 10; // 790
@@ -324,8 +408,8 @@ export function storedSpanRow(tenantId: string, s: SpanFixture) {
     ParentTraceId: null,
     ParentIsRemote: null,
     Sampled: 1,
-    StartTime: new Date(T0),
-    EndTime: new Date(T0 + 200),
+    StartTime: new Date(T0 + (s.startTimeOffsetMs ?? 0)),
+    EndTime: new Date(T0 + (s.startTimeOffsetMs ?? 0) + 200),
     DurationMs: 200,
     SpanName: s.spanId,
     SpanKind: 1,

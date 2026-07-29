@@ -33,6 +33,7 @@ export const TRACE_ANALYTICS_COLUMNS = [
   "TotalPromptTokenCount",
   "TotalCompletionTokenCount",
   "TokensPerSecond",
+  "SpanCount",
   "TraceName",
   "ContainsErrorStatus",
   "ErrorMessage",

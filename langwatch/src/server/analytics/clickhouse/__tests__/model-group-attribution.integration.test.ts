@@ -38,6 +38,10 @@ import {
   EXPECTED_PROMPT_TOKENS,
   EXPECTED_TOTAL_COST,
   EXPECTED_TOTAL_TOKENS,
+  MODEL_CAP_A,
+  MODEL_CAP_B,
+  MODEL_ENV_A,
+  MODEL_ENV_B,
   MODEL_HAIKU,
   MODEL_OPUS,
   MODEL_OPUS_1M,
@@ -312,6 +316,35 @@ describe("model group attribution (integration)", () => {
       // traces all have model-less root spans with zero contribution and must
       // NOT mint an unknown bucket.
       expect(buckets.unknown).toBe(1);
+    });
+
+    it("keeps traces past the fold cap on whole-trace attribution", async () => {
+      // The fold froze this trace's totals at MAX_PROCESSED_SPANS while
+      // stored_spans holds one more span on another model. Span-level sums
+      // would EXCEED the frozen ungrouped total, so the whole trace must sit
+      // under its primary model instead.
+      const rows = await runQuery(
+        ch,
+        sumSeries("performance.total_cost"),
+        "metadata.model",
+      );
+      const buckets = bucketsOf(rows, "0__performance_total_cost__sum");
+      expect(buckets[MODEL_CAP_A]).toBeCloseTo(0.512, 9);
+      expect(buckets[MODEL_CAP_B]).toBeUndefined();
+    });
+
+    it("falls back to the primary model when spans fall outside the scan envelope", async () => {
+      // One contributing span sits outside the StartTime scan cushion. A
+      // partial span scan must NOT ship a partial partition (model A's share
+      // only); the whole trace falls back to its primary model.
+      const rows = await runQuery(
+        ch,
+        sumSeries("performance.total_cost"),
+        "metadata.model",
+      );
+      const buckets = bucketsOf(rows, "0__performance_total_cost__sum");
+      expect(buckets[MODEL_ENV_B]).toBeCloseTo(0.09375, 9);
+      expect(buckets[MODEL_ENV_A]).toBeUndefined();
     });
   });
 

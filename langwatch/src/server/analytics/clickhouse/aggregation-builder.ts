@@ -5,6 +5,7 @@
  * into complete ClickHouse SQL queries.
  */
 
+import { MAX_PROCESSED_SPANS } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.foldProjection";
 import { snakeCase } from "../../../utils/stringCasing";
 import type { FilterField } from "../../filters/types";
 import { isZeroWhenAbsentSeries, type SeriesInputType } from "../registry";
@@ -335,37 +336,47 @@ function buildSpanModelPartitionJoin(spanTimeFilter: string): string {
   const smd = SPAN_MODEL_ALIAS;
   const contribution = (expr: string) =>
     `max(if(${SPAN_NOT_SKIPPED}, ${expr}, 0))`;
+  // TraceSpanCount = spans of the trace visible to THIS scan, computed as a
+  // window over the per-bucket groups BEFORE the zero-suppression filter (a
+  // suppressed model-less bucket still holds real spans, e.g. the root).
+  // spanModelPartitionMissExpr compares it against ts.SpanCount to detect an
+  // incomplete scan (spans outside the StartTime envelope) and fall back to
+  // whole-trace attribution instead of shipping a partial partition.
   return `LEFT JOIN (
-        SELECT
-          TenantId,
-          TraceId,
-          SpanModelKey,
-          sum(SpanCost) AS SpanModelCost,
-          sum(SpanNonBilledCost) AS SpanModelNonBilledCost,
-          sum(SpanPromptTokens) AS SpanModelPromptTokens,
-          sum(SpanCompletionTokens) AS SpanModelCompletionTokens,
-          sum(SpanCacheReadTokens) AS SpanModelCacheReadTokens,
-          sum(SpanCacheWriteTokens) AS SpanModelCacheWriteTokens,
-          sum(SpanReasoningTokens) AS SpanModelReasoningTokens
+        SELECT *
         FROM (
           SELECT
             TenantId,
             TraceId,
-            SpanId,
-            ${SPAN_MODEL_KEY_EXPR} AS SpanModelKey,
-            ${contribution("coalesce(Cost, 0)")} AS SpanCost,
-            ${contribution("coalesce(NonBilledCost, 0)")} AS SpanNonBilledCost,
-            ${contribution(spanTokenReadExpr("gen_ai.usage.input_tokens"))} AS SpanPromptTokens,
-            ${contribution(spanTokenReadExpr("gen_ai.usage.output_tokens"))} AS SpanCompletionTokens,
-            ${contribution(spanFirstPositiveExpr(["gen_ai.usage.cache_read.input_tokens", "gen_ai.usage.cached_tokens"]))} AS SpanCacheReadTokens,
-            ${contribution(spanFirstPositiveExpr(["gen_ai.usage.cache_creation.input_tokens"]))} AS SpanCacheWriteTokens,
-            ${contribution(spanFirstPositiveExpr(["gen_ai.usage.reasoning_tokens"]))} AS SpanReasoningTokens
-          FROM stored_spans
-          WHERE TenantId = {tenantId:String} ${spanTimeFilter}
-          GROUP BY TenantId, TraceId, SpanId, SpanModelKey
+            SpanModelKey,
+            sum(SpanCost) AS SpanModelCost,
+            sum(SpanNonBilledCost) AS SpanModelNonBilledCost,
+            sum(SpanPromptTokens) AS SpanModelPromptTokens,
+            sum(SpanCompletionTokens) AS SpanModelCompletionTokens,
+            sum(SpanCacheReadTokens) AS SpanModelCacheReadTokens,
+            sum(SpanCacheWriteTokens) AS SpanModelCacheWriteTokens,
+            sum(SpanReasoningTokens) AS SpanModelReasoningTokens,
+            sum(count()) OVER (PARTITION BY TenantId, TraceId) AS TraceSpanCount
+          FROM (
+            SELECT
+              TenantId,
+              TraceId,
+              SpanId,
+              ${SPAN_MODEL_KEY_EXPR} AS SpanModelKey,
+              ${contribution("coalesce(Cost, 0)")} AS SpanCost,
+              ${contribution("coalesce(NonBilledCost, 0)")} AS SpanNonBilledCost,
+              ${contribution(spanTokenReadExpr("gen_ai.usage.input_tokens"))} AS SpanPromptTokens,
+              ${contribution(spanTokenReadExpr("gen_ai.usage.output_tokens"))} AS SpanCompletionTokens,
+              ${contribution(spanFirstPositiveExpr(["gen_ai.usage.cache_read.input_tokens", "gen_ai.usage.cached_tokens"]))} AS SpanCacheReadTokens,
+              ${contribution(spanFirstPositiveExpr(["gen_ai.usage.cache_creation.input_tokens"]))} AS SpanCacheWriteTokens,
+              ${contribution(spanFirstPositiveExpr(["gen_ai.usage.reasoning_tokens"]))} AS SpanReasoningTokens
+            FROM stored_spans
+            WHERE TenantId = {tenantId:String} ${spanTimeFilter}
+            GROUP BY TenantId, TraceId, SpanId, SpanModelKey
+          )
+          GROUP BY TenantId, TraceId, SpanModelKey
         )
-        GROUP BY TenantId, TraceId, SpanModelKey
-        HAVING SpanModelKey != 'unknown'
+        WHERE SpanModelKey != 'unknown'
           OR SpanModelCost > 0
           OR SpanModelNonBilledCost > 0
           OR SpanModelPromptTokens > 0
@@ -374,6 +385,28 @@ function buildSpanModelPartitionJoin(spanTimeFilter: string): string {
           OR SpanModelCacheWriteTokens > 0
           OR SpanModelReasoningTokens > 0
       ) ${smd} ON ${ts}.TenantId = ${smd}.TenantId AND ${ts}.TraceId = ${smd}.TraceId`;
+}
+
+/**
+ * Condition under which a model-grouped trace falls back to WHOLE-TRACE
+ * attribution under its primary model (`Models[1]`, or `'unknown'`), keeping
+ * every trace an exact single-bucket partition instead of a wrong multi-bucket
+ * one. True when:
+ *
+ *   - the span-model join found nothing (log-only traces, spans not stored);
+ *   - the trace is past the fold's MAX_PROCESSED_SPANS cap: the fold FREEZES
+ *     cost/token totals at the cap while stored_spans keeps every span, so
+ *     span-level sums would EXCEED the frozen ungrouped totals;
+ *   - the scan saw fewer spans than the fold counted (ts.SpanCount): spans
+ *     outside the StartTime envelope (long-lived traces, clock skew) would
+ *     otherwise produce a PARTIAL partition that silently drops their share.
+ *     The fold does not count synthetic spans while stored_spans keeps them,
+ *     so the scan count can only ever be >= the fold count on a complete scan.
+ */
+function spanModelPartitionMissExpr(): string {
+  const ts = tableAliases.trace_summaries;
+  const smd = SPAN_MODEL_ALIAS;
+  return `(${smd}.SpanModelKey IS NULL OR ${smd}.SpanModelKey = '' OR ${ts}.SpanCount > ${MAX_PROCESSED_SPANS} OR ${smd}.TraceSpanCount < ${ts}.SpanCount)`;
 }
 
 /**
@@ -433,7 +466,7 @@ const groupByExpressions: Partial<
   // genuinely has no model, so they keep a single, exactly-partitioned
   // bucket instead of vanishing.
   "metadata.model": () => ({
-    column: `if(${SPAN_MODEL_ALIAS}.SpanModelKey IS NULL OR ${SPAN_MODEL_ALIAS}.SpanModelKey = '', if(empty(${tableAliases.trace_summaries}.Models), 'unknown', ${tableAliases.trace_summaries}.Models[1]), ${SPAN_MODEL_ALIAS}.SpanModelKey)`,
+    column: `if(${spanModelPartitionMissExpr()}, if(empty(${tableAliases.trace_summaries}.Models), 'unknown', ${tableAliases.trace_summaries}.Models[1]), ${SPAN_MODEL_ALIAS}.SpanModelKey)`,
     requiredJoins: [],
     handlesUnknown: true,
     spanModelPartitioned: true,
@@ -1461,7 +1494,7 @@ function buildArrayJoinTimeseriesQuery({
   // traces exactly one bucket, so whole-trace attribution stays a partition.
   // Non-additive trace-level columns (duration, TTFT, tokens/second) keep
   // whole-trace attribution in every bucket the trace touched.
-  const smdMiss = `(${SPAN_MODEL_ALIAS}.SpanModelKey IS NULL OR ${SPAN_MODEL_ALIAS}.SpanModelKey = '')`;
+  const smdMiss = spanModelPartitionMissExpr();
   const partitionedOrTrace = (bucketExpr: string, traceExpr: string) =>
     spanModelPartitioned
       ? `if(${smdMiss}, ${traceExpr}, ${bucketExpr})`
