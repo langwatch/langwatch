@@ -96,3 +96,25 @@ paths = [
   '''docs/ai-gateway/cookbooks/metering-and-rebilling\.mdx''',
   '''docs/llms-full\.txt''',
 ]
+
+# `azure-secret-hygiene.unit.test.ts` proves the opposite of a leak: that
+# `redactAuthorizationMaterial` strips bearer tokens out of Azure error text
+# before it reaches a log. To prove that, the fixture has to be shaped exactly
+# like the thing a real leak would be — so gitleaks flags it, correctly, on
+# shape alone.
+#
+# Naming the value, as this file requires. `LEAKED_TOKEN` is three base64
+# segments that decode to:
+#   header    {"alg":"RS256","typ":"JWT"}
+#   payload   {"aud":"https://storage"}
+#   signature the literal ASCII word `signature`
+# No key signed it, it names no tenant, no account and no subject, and it
+# authenticates against nothing. Decode it and there is nothing to revoke.
+#
+# Scoped to this one file and to the two rules its shape trips, so every other
+# rule still applies here: a real Azure account key or SAS token landing in this
+# file is still caught.
+[[allowlists]]
+description = "Synthetic JWT-shaped fixture proving bearer-token redaction; signs nothing, grants nothing"
+targetRules = ["jwt", "generic-api-key"]
+paths = ['''platform/app/src/server/stored-objects/__tests__/azure-secret-hygiene\.unit\.test\.ts''']
