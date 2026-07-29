@@ -250,13 +250,10 @@ export class QueueManager<EventType extends Event = Event> {
           ? namespaceDedup(options.deduplication as DeduplicationConfig<any>)
           : namespacedEntryDedup;
 
-        await globalQueue.sendBatch(
-          payloads.map(withMachinery),
-          {
-            delay: options?.delay ?? entry.delay,
-            deduplication: effectiveDedup,
-          },
-        );
+        await globalQueue.sendBatch(payloads.map(withMachinery), {
+          delay: options?.delay ?? entry.delay,
+          deduplication: effectiveDedup,
+        });
       },
       // Global queue lifecycle is owned by EventSourcing — facade close is a no-op
       close: async () => undefined,

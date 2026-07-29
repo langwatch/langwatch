@@ -122,7 +122,10 @@ describe("jobEnvelope recovery key (#718)", () => {
       /** @scenario two events with different recovery keys but identical bodies still dedup to one blob */
       it("collapses them to the same content-addressed blob", async () => {
         const { tieredBlobs } = makeTiered();
-        const body = { event: { id: "shared", body: "y".repeat(48 * 1024) }, foldState: {} };
+        const body = {
+          event: { id: "shared", body: "y".repeat(48 * 1024) },
+          foldState: {},
+        };
         const a = await encodeJobEnvelope({
           jobData: { ...body, __recoveryKey: "evt-1" },
           tieredBlobs,
@@ -137,7 +140,9 @@ describe("jobEnvelope recovery key (#718)", () => {
         });
 
         // The recovery key does NOT perturb the content hash — dedup intact.
-        expect(readEnvelopeDescriptor(a).blobId).toBe(readEnvelopeDescriptor(b).blobId);
+        expect(readEnvelopeDescriptor(a).blobId).toBe(
+          readEnvelopeDescriptor(b).blobId,
+        );
         // …and each keeps its own key.
         expect(readJobRecoveryKey(a)).toBe("evt-1");
         expect(readJobRecoveryKey(b)).toBe("evt-2");
@@ -207,7 +212,11 @@ async function roundTripGq2(jobData: Record<string, unknown>) {
 
 async function roundTripGq1(jobData: Record<string, unknown>) {
   const blobs = new InMemoryJobBlobStore();
-  const encoded = await encodeJobEnvelope({ jobData, blobs, writesEnabled: true });
+  const encoded = await encodeJobEnvelope({
+    jobData,
+    blobs,
+    writesEnabled: true,
+  });
   const decoded = await decodeJobEnvelope({ value: encoded, blobs });
   return { encoded, decoded };
 }

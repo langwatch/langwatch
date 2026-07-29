@@ -294,7 +294,8 @@ function routingHeader(
   if (typeof jobData.__jobName === "string") header.n = jobData.__jobName;
   // #718: lift the recovery key into the header alongside the routing trio, for
   // BOTH tiers — a value whose blob is gone can still name its event.
-  if (typeof jobData.__recoveryKey === "string") header.k = jobData.__recoveryKey;
+  if (typeof jobData.__recoveryKey === "string")
+    header.k = jobData.__recoveryKey;
   return header;
 }
 

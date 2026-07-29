@@ -771,7 +771,9 @@ describe.skipIf(!hasTestcontainers)(
           const preserved = await dlqValue(name, groupId, "victim");
           expect(preserved).not.toBeNull();
           // AC-719.3: labelled with the failure class.
-          expect(await dlqReason(name, groupId, "victim")).toBe("body_unreadable");
+          expect(await dlqReason(name, groupId, "victim")).toBe(
+            "body_unreadable",
+          );
           // AC-718.2: the quarantined reactor job is addressable by its event id.
           expect(readJobRecoveryKey(preserved!)).toBe("evt-1");
           // The drop is counted: recordDrop now fires only after the DLQ write
@@ -911,7 +913,9 @@ describe.skipIf(!hasTestcontainers)(
             { timeout: 10000, interval: 100 },
           );
           expect(processed.mock.calls[0]![0].id).toBe("victim");
-          expect(processed.mock.calls[0]![0]).not.toHaveProperty("__recoveryKey");
+          expect(processed.mock.calls[0]![0]).not.toHaveProperty(
+            "__recoveryKey",
+          );
         });
       });
     });
@@ -954,7 +958,9 @@ describe.skipIf(!hasTestcontainers)(
           // BEFORE the DLQ write, so the holder's remaining TTL tracks the entry's
           // within write latency (5s slack) — it does not expire before it.
           const holderPttl = await redis.pttl(holderKeys[0]!);
-          const dlqDataPttl = await redis.pttl(`${name}:gq:dlq:${groupId}:data`);
+          const dlqDataPttl = await redis.pttl(
+            `${name}:gq:dlq:${groupId}:data`,
+          );
           expect(dlqDataPttl).toBeGreaterThan(0);
           expect(holderPttl).toBeGreaterThan(dlqDataPttl - 5_000);
           // Falsifiability retained: the legacy holder-mirror key's default TTL is
@@ -996,7 +1002,9 @@ describe.skipIf(!hasTestcontainers)(
             groupId,
             value: OFFLOADABLE_S3_VALUE(),
           });
-          const s2Uri = [...objectStore.store.keys()].find((u) => !jUris.has(u));
+          const s2Uri = [...objectStore.store.keys()].find(
+            (u) => !jUris.has(u),
+          );
           expect(s2Uri).toBeDefined();
 
           // Corrupt ONLY the sibling's blob: body present, unreadable to this
@@ -1022,9 +1030,9 @@ describe.skipIf(!hasTestcontainers)(
           // non-dropped complete()).
           await vi.waitFor(
             async () => {
-              expect(
-                await redis.hlen(`${name}:gq:dlq:${groupId}:data`),
-              ).toBe(1);
+              expect(await redis.hlen(`${name}:gq:dlq:${groupId}:data`)).toBe(
+                1,
+              );
               expect(await completedStat(name)).not.toBeNull();
             },
             { timeout: 15000, interval: 100 },

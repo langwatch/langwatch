@@ -17,7 +17,8 @@ const MODULE_DIR = path.join(
 );
 
 /** The false premise, in any of its phrasings. */
-const CLAIM = /recover(s|able|ed)?\b[^\n]{0,24}\bvia\b[^\n]{0,24}(event\s+)?replay/i;
+const CLAIM =
+  /recover(s|able|ed)?\b[^\n]{0,24}\bvia\b[^\n]{0,24}(event\s+)?replay/i;
 /**
  * Tokens that genuinely SCOPE or DENY the claim on the SAME line. Deliberately
  * NOT `reactor` (a claim stated affirmatively *about* a reactor is the single most
@@ -49,9 +50,9 @@ describe("replay-recovery premise guard (#721 / ADR-046)", () => {
           (f.endsWith(".ts") || f.endsWith(".md")) && !f.includes(".test."),
       );
       const violations = files.flatMap((f) =>
-        replayClaimViolations(readFileSync(path.join(MODULE_DIR, f), "utf8")).map(
-          (line) => `${f}: ${line}`,
-        ),
+        replayClaimViolations(
+          readFileSync(path.join(MODULE_DIR, f), "utf8"),
+        ).map((line) => `${f}: ${line}`),
       );
       expect(violations).toEqual([]);
     });
