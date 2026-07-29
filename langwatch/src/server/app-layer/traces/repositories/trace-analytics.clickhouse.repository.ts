@@ -23,6 +23,43 @@ const logger = createLogger(
 );
 
 /**
+ * A stored column this row's bytes cannot be decoded from — as opposed to any
+ * other reason a read failed.
+ *
+ * The shape this exists for: an `ADD COLUMN` of a variable-size type without a
+ * DEFAULT leaves the column unmaterialised in parts written before the ALTER,
+ * so a read decodes a size header that was never written and asks for an absurd
+ * allocation (migrations 00014, 00057, 00062). It has surfaced twice in
+ * production on this table's `AnnotationIds`.
+ *
+ * BOTH conditions are required, and the pairing is the point:
+ *
+ *   - code 173 alone is a genuine out-of-memory on a large-but-valid read,
+ *     which retrying CAN fix. Refolding it would throw away a row that was
+ *     fine and rebuild it for nothing.
+ *   - "while reading column" alone appears on unrelated read failures.
+ *
+ * Together they mean a specific column's stream is undecodable, which no number
+ * of retries repairs. Keep this narrow: every predicate added here converts a
+ * retryable failure into a refold, and refolds are the expensive direction —
+ * ADR-066 and 00061 both trace production outages to mass refolds.
+ *
+ * Matched on the message because that is how ClickHouse failures are classified
+ * throughout this codebase (see `isTransientError` in
+ * app-layer/clients/clickhouse/resilient-client.ts); the driver does not expose
+ * a typed code on the thrown error.
+ */
+function isUnreadableColumnError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const message = error.message;
+
+  return (
+    /\bCode:\s*173\b/.test(message) &&
+    message.includes("while reading column")
+  );
+}
+
+/**
  * ClickHouse write shape for the slim `trace_analytics` table (ADR-034 Phase 2,
  * migration 00039).
  *
@@ -309,6 +346,30 @@ export class TraceAnalyticsClickHouseRepository
           }),
       });
     } catch (error) {
+      // An unreadable column is terminal for this ROW but not for the fold: the
+      // refold-from-event_log path behind a miss rebuilds the state and writes a
+      // new version, whose higher UpdatedAt wins the dedup IN-tuple so the
+      // damaged row stops being selected. Rethrowing instead denies the fold its
+      // own repair path — the job dies before the write, GroupQueue redelivers,
+      // the read hits the same bytes, and the group wedges on a row that one
+      // successful write would have superseded.
+      //
+      // Deliberately narrow (see {@link isUnreadableColumnError}): a broad
+      // "read failed -> refold" would turn a ClickHouse blip into a fleet-wide
+      // refold storm, which is the pattern 00061 blames for the 2026-07-23
+      // TOO_MANY_PARTS outage.
+      //
+      // Logged at warn, not error: this is a handled, self-healing path. The
+      // `error` outcome on clickhouse_windowed_read_total is already counted by
+      // queryWindowed, so the occurrence stays visible in metrics either way.
+      if (isUnreadableColumnError(error)) {
+        logger.warn(
+          { tenantId, traceId, error },
+          "Unreadable column in trace analytics row — refolding from event log",
+        );
+        return null;
+      }
+
       // Logged with its identifiers, like every other read in this file.
       // `queryWindowed` counts the error and rethrows but knows nothing about
       // the row, so without this the deploy window ADR-066 documents — workers

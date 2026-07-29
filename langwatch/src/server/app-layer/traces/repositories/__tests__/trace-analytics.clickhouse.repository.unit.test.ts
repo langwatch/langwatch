@@ -109,6 +109,110 @@ describe("TraceAnalyticsClickHouseRepository DateTime64 decode", () => {
 });
 
 /**
+ * An unmaterialised variable-size column (see migrations 00014 / 00057 / 00062)
+ * makes ClickHouse decode a size header that was never written and request an
+ * absurd allocation. Retrying cannot repair it, so the read has to be reported
+ * as a MISS — the refold-from-event_log path then writes a fresh version whose
+ * higher UpdatedAt wins the dedup, superseding the damaged row.
+ *
+ * Rethrowing instead is a per-trace livelock: the job dies before the write,
+ * GroupQueue redelivers, the read hits the same bytes. That is what wedged
+ * trace_processing groups on 2026-07-28.
+ */
+describe("given a read fails because a column cannot be decoded", () => {
+  const failingRepository = (message: string) =>
+    new TraceAnalyticsClickHouseRepository(
+      async () =>
+        ({
+          query: async () => {
+            throw new Error(message);
+          },
+        }) as never,
+    );
+
+  const UNREADABLE_COLUMN =
+    "Code: 173. DB::Exception: Amount of memory requested to allocate is more " +
+    "than allowed: (while reading column AnnotationIds): (while reading from " +
+    "part 202629_0_387304_1998/ in table langwatch.trace_analytics ...). " +
+    "(CANNOT_ALLOCATE_MEMORY)";
+
+  describe("when the column's stream is undecodable", () => {
+    it("reports a miss so the fold refolds and supersedes the damaged row", async () => {
+      const read = await failingRepository(
+        UNREADABLE_COLUMN,
+      ).findByTraceIdWithApplied({
+        tenantId: TENANT_ID,
+        traceId: TRACE_ID,
+      });
+
+      expect(read).toBeNull();
+    });
+  });
+
+  /**
+   * The narrowness IS the safety property. A broad "read failed -> refold"
+   * turns a ClickHouse blip into a fleet-wide refold storm — the pattern 00061
+   * blames for the 2026-07-23 TOO_MANY_PARTS outage — so each of these asserts
+   * a failure that must still reach the caller.
+   */
+  describe("when the failure is anything else", () => {
+    it("rethrows a plain out-of-memory, which a retry can still resolve", async () => {
+      // Code 173 WITHOUT "while reading column": a large-but-valid read that
+      // genuinely exceeded the limit. Refolding would discard a healthy row.
+      await expect(
+        failingRepository(
+          "Code: 173. DB::Exception: Amount of memory requested to allocate " +
+            "is more than allowed. (CANNOT_ALLOCATE_MEMORY)",
+        ).findByTraceIdWithApplied({
+          tenantId: TENANT_ID,
+          traceId: TRACE_ID,
+        }),
+      ).rejects.toThrow(/173/);
+    });
+
+    it("rethrows a read failure that merely mentions a column", async () => {
+      // "while reading column" WITHOUT code 173 — a different fault that says
+      // nothing about the column being undecodable.
+      await expect(
+        failingRepository(
+          "Code: 241. DB::Exception: Memory limit exceeded (while reading " +
+            "column AnnotationIds). (MEMORY_LIMIT_EXCEEDED)",
+        ).findByTraceIdWithApplied({
+          tenantId: TENANT_ID,
+          traceId: TRACE_ID,
+        }),
+      ).rejects.toThrow(/241/);
+    });
+
+    it("rethrows the schema-drift error from a mid-deploy worker", async () => {
+      // ADR-066's deploy window: workers rolling ahead of the migration. Every
+      // read fails, and every one of them must stay loud.
+      await expect(
+        failingRepository(
+          "Code: 47. DB::Exception: Unknown expression identifier " +
+            "'AnnotationIds'. (UNKNOWN_IDENTIFIER)",
+        ).findByTraceIdWithApplied({
+          tenantId: TENANT_ID,
+          traceId: TRACE_ID,
+        }),
+      ).rejects.toThrow(/47/);
+    });
+
+    it("rethrows a transport failure", async () => {
+      await expect(
+        failingRepository(
+          "Code: 210. DB::NetException: I/O error: Broken pipe, while writing " +
+            "to socket. (NETWORK_ERROR)",
+        ).findByTraceIdWithApplied({
+          tenantId: TENANT_ID,
+          traceId: TRACE_ID,
+        }),
+      ).rejects.toThrow(/210/);
+    });
+  });
+});
+
+/**
  * Two physical versions of one trace can tie on UpdatedAt: the fold stamps
  * `max(Date.now(), prev + 1)`, monotonic only within one state chain, so two
  * writers resuming from the same committed version land on the same ms. Both
