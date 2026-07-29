@@ -37,7 +37,7 @@ Feature: Suite run progress is derived from its simulation runs
     Given a batch showing a failed scenario
     When that scenario's run is later recorded as succeeded
     Then the batch reflects the success on the next read
-    And no projection has to be rebuilt
+    And no operator action is needed to make it appear
 
   Scenario: Archived runs are left out of the batch
     Given a batch containing an archived scenario run

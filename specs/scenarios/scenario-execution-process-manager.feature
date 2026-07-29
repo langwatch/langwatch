@@ -45,7 +45,7 @@ Feature: A scenario run always reaches a terminal state
   Scenario: A backlog does not kill a healthy run
     Given progress reports are being delivered later than they occurred
     When a report arrives describing a moment already past
-    Then the run's remaining quiet time is measured from now
+    Then the run keeps its full allowance of quiet time from that report
     And a healthy run is not declared dead because of the delay
 
   # ============================================================================
