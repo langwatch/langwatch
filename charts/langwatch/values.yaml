@@ -437,6 +437,20 @@ app:
     # being emitted, but STORED_OBJECTS_BACKEND does not, so new writes go to
     # S3 and historical azure-blob:// URIs still resolve. Leave false unless
     # Azure objects exist.
+    #
+    # SCOPE — this covers URI-addressed STORED OBJECTS only (externalized byte
+    # content, trace payloads, staged uploads): each one carries an
+    # `azure-blob://` URI whose scheme picks the driver, so a read re-derives
+    # its own provider regardless of the write toggle.
+    #
+    # It does NOT cover DATASET chunks. Those are addressed by
+    # {projectId, datasetId, index} with no provider recorded on the row, so
+    # dataset reads follow the CURRENT toggle and cannot reach chunks written
+    # to Azure. Switching a deployment that already has datasets makes them
+    # unreachable (not deleted — reachable again if the toggle is reverted).
+    # A migration that carries datasets needs per-dataset storage provenance,
+    # tracked in #6323. Do not use this flag on an install with datasets until
+    # that lands.
     ## @param app.dataplane.legacyAzureRead [default: false] Keep Azure settings for reads after moving writes back to S3.
     legacyAzureRead: false
 
