@@ -37,6 +37,7 @@ export const APP_ERROR_CODES = [
   "avatar_rate_limited",
   "billing_currency_unavailable",
   "billing_currency_unsupported",
+  "billing_customer_deleted",
   "billing_customer_email_required",
   "billing_plan_price_missing",
   "broadcaster_not_active",

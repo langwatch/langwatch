@@ -18,11 +18,14 @@ const logger = createLogger("langwatch:billing:stripeCustomerCurrency");
  * - `resolved`  — use this currency. Either the customer's fixed one, or the
  *                 requested one when the customer genuinely has none yet.
  * - `unsupported` — the customer is fixed to a currency we sell no prices in.
+ * - `deleted`   — the billing customer no longer exists. Terminal: no
+ *                 subscription can be attached to it in any currency.
  * - `unavailable` — we could not ask. Not evidence that they are unfixed.
  */
 export type CheckoutCurrencyResolution =
   | { status: "resolved"; currency: Currency }
   | { status: "unsupported"; stripeCurrency: string }
+  | { status: "deleted" }
   | { status: "unavailable"; cause: Error };
 
 /**
@@ -53,9 +56,20 @@ export const resolveCheckoutCurrency = async ({
     return { status: "unavailable", cause: toError(error) };
   }
 
+  // A deleted customer is not an unfixed one. Stripe keeps returning the
+  // record but refuses to attach anything to it, so no currency makes this
+  // checkout work — recovering the stored id belongs in its own audited flow.
+  if (customer.deleted) {
+    logger.warn(
+      { organizationId },
+      "[billing] Stored billing customer no longer exists",
+    );
+    return { status: "deleted" };
+  }
+
   // No currency yet means nothing is fixed, so the requested one is still free
   // to use — this is the path every first-time subscriber takes.
-  if (customer.deleted || !customer.currency) {
+  if (!customer.currency) {
     return { status: "resolved", currency: requestedCurrency };
   }
 

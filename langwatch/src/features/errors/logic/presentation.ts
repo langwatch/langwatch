@@ -567,6 +567,13 @@ const presentations = {
     title: "This plan isn't available in your billing currency",
     describe: () => "Contact support and we'll get you onto the right plan.",
   },
+  billing_customer_deleted: {
+    // fault: platform. Our stored billing profile points at a record the
+    // provider has deleted. Nothing the customer can do, and retrying is not
+    // it — recovery is an operator action.
+    title: "This account's billing profile isn't active",
+    describe: () => "We've been notified. Contact support to get set back up.",
+  },
   billing_currency_unavailable: {
     // fault: provider. We couldn't confirm the billing currency, so we stopped
     // before creating anything. Saying nothing was charged comes first.

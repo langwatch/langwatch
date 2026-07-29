@@ -7,6 +7,7 @@ import { nanoid } from "nanoid";
 import type Stripe from "stripe";
 import {
   BillingCurrencyUnavailableError,
+  BillingCustomerDeletedError,
   NoActiveSubscriptionError,
   SubscriptionItemNotFoundError,
   UnsupportedBillingCurrencyError,
@@ -69,6 +70,9 @@ export const createSeatEventSubscriptionFns = ({
 
     if (resolution.status === "unsupported") {
       throw new UnsupportedBillingCurrencyError();
+    }
+    if (resolution.status === "deleted") {
+      throw new BillingCustomerDeletedError();
     }
     if (resolution.status === "unavailable") {
       throw new BillingCurrencyUnavailableError({

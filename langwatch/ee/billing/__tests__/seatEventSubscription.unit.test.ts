@@ -858,12 +858,56 @@ describe("seatEventSubscription", () => {
       });
     });
 
-    describe("when the Stripe customer is deleted", () => {
-      it("uses the requested currency, since nothing is fixed yet", async () => {
+    describe("when the Stripe customer has been deleted", () => {
+      beforeEach(() => {
         db.subscription.findMany.mockResolvedValue([]);
         stripe.customers.retrieve.mockResolvedValue({
           id: "cus_1",
           deleted: true,
+        });
+        stripe.checkout.sessions.create.mockResolvedValue({
+          url: "https://checkout.stripe.com/session",
+        });
+      });
+
+      it("fails with a deleted-billing-customer error", async () => {
+        await expect(
+          service.createSeatEventCheckout({
+            organizationId: "org_1",
+            customerId: "cus_1",
+            baseUrl: "https://app.test",
+            currency: "USD" as any,
+            billingInterval: "monthly",
+            membersToAdd: 2,
+          }),
+        ).rejects.toMatchObject({ code: "billing_customer_deleted" });
+      });
+
+      it("creates no checkout session and no pending records", async () => {
+        await service
+          .createSeatEventCheckout({
+            organizationId: "org_1",
+            customerId: "cus_1",
+            baseUrl: "https://app.test",
+            currency: "USD" as any,
+            billingInterval: "monthly",
+            membersToAdd: 2,
+          })
+          .catch(() => undefined);
+
+        expect(stripe.checkout.sessions.create).not.toHaveBeenCalled();
+        expect(db.$transaction).not.toHaveBeenCalled();
+        expect(db.subscription.updateMany).not.toHaveBeenCalled();
+        expect(db.organizationInvite.deleteMany).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the Stripe customer has no currency yet", () => {
+      it("uses the requested currency, since nothing is fixed", async () => {
+        db.subscription.findMany.mockResolvedValue([]);
+        stripe.customers.retrieve.mockResolvedValue({
+          id: "cus_1",
+          currency: null,
         });
         stripe.checkout.sessions.create.mockResolvedValue({
           url: "https://checkout.stripe.com/session",

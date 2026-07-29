@@ -273,6 +273,28 @@ export class UnsupportedBillingCurrencyError extends HandledError {
 }
 
 /**
+ * The billing profile this organization points at no longer exists.
+ *
+ * Deletion is terminal on the provider's side: the record still reads back,
+ * but nothing can be attached to it, so no currency or plan makes the checkout
+ * succeed. Retrying cannot help and neither can the customer — putting the
+ * organization back on a usable billing profile is an explicit, audited
+ * operation, not something to paper over by quietly making a new one here.
+ */
+export class BillingCustomerDeletedError extends HandledError {
+  declare readonly code: "billing_customer_deleted";
+
+  constructor() {
+    super(
+      "billing_customer_deleted",
+      "This account's billing profile is no longer active",
+      { httpStatus: 409, fault: "platform" },
+    );
+    this.name = "BillingCustomerDeletedError";
+  }
+}
+
+/**
  * We could not establish which currency the account is billed in.
  *
  * A failed lookup is not evidence that the account is unfixed, so guessing
