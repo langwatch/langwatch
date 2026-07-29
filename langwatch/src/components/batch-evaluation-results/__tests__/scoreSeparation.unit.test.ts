@@ -80,12 +80,47 @@ describe("areDistinguishable", () => {
   });
 
   describe("given a non-finite difference bound", () => {
-    it("does not read it as a separation", () => {
+    it("does not read NaN as a separation", () => {
+      // Note this one passes with or without the finiteness guard: every
+      // comparison against NaN is false, so the sign test below returns
+      // false on its own. Kept for the behaviour, but the Infinity case
+      // underneath is what actually exercises the guard.
       expect(
         areDistinguishable({
           a: entry("a", 60, [10, 110]),
           b: entry("b", 20, [-30, 70]),
           differenceCI: { a: { b: [NaN, NaN] }, b: { a: [NaN, NaN] } },
+        }),
+      ).toBe(false);
+    });
+
+    it("does not read an infinite bound as a separation", () => {
+      // This is the case the guard exists for. Without it the sign test sees
+      // a lower bound of 50 sitting above zero and reports the pair as
+      // separated — when an infinite bound means the fit blew up rather than
+      // that a real gap was measured. A blown-up replicate is the absence of
+      // an answer, not a confident one.
+      expect(
+        areDistinguishable({
+          a: entry("a", 200, [150, 250]),
+          b: entry("b", 10, [-40, 40]),
+          differenceCI: {
+            a: { b: [50, Infinity] },
+            b: { a: [-Infinity, -50] },
+          },
+        }),
+      ).toBe(false);
+    });
+
+    it("does not read a negative infinite bound as a separation either", () => {
+      expect(
+        areDistinguishable({
+          a: entry("a", 10, [-40, 40]),
+          b: entry("b", 200, [150, 250]),
+          differenceCI: {
+            a: { b: [-Infinity, -50] },
+            b: { a: [50, Infinity] },
+          },
         }),
       ).toBe(false);
     });
