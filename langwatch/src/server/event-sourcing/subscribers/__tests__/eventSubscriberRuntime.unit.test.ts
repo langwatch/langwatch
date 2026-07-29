@@ -64,6 +64,13 @@ function createMemoryGlobalQueue(registry: Map<string, JobRegistryEntry>) {
       __pipelineName: pipelineName,
       __jobType: jobType,
       __jobName: jobName,
+      // #718 stamps a fourth machinery key. The real global queue strips it
+      // before the handler — `INTERNAL_FIELDS` in groupQueue.ts, and
+      // `stripInternal` in queueManager.ts's facade — so a double that carried
+      // it through would hand subscribers a field production never delivers,
+      // and this file's "receives the full queued event" assertion would fail
+      // on a leak that does not exist.
+      __recoveryKey: _recoveryKey,
       ...clean
     } = payload;
     const entry = registry.get(`${pipelineName}:${jobType}:${jobName}`);
