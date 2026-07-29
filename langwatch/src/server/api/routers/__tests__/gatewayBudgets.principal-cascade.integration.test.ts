@@ -101,7 +101,9 @@ describe("GatewayBudgetService — PRINCIPAL cascade", () => {
   });
 
   afterAll(async () => {
-    await prisma.gatewayBudget.deleteMany({ where: { organizationId: ORG_ID } });
+    await prisma.gatewayBudget.deleteMany({
+      where: { organizationId: ORG_ID },
+    });
     await prisma.virtualKey.deleteMany({
       where: { organizationId: ORG_ID, id: VK_ID },
     });
@@ -111,7 +113,9 @@ describe("GatewayBudgetService — PRINCIPAL cascade", () => {
     await prisma.user.deleteMany({
       where: { id: { in: [ALICE_ID, OUTSIDER_ID, ACTOR_ID] } },
     });
-    await prisma.project.deleteMany({ where: { teamId: TEAM_ID, id: PROJECT_ID } });
+    await prisma.project.deleteMany({
+      where: { teamId: TEAM_ID, id: PROJECT_ID },
+    });
     await prisma.team.deleteMany({
       where: { organizationId: ORG_ID, id: TEAM_ID },
     });

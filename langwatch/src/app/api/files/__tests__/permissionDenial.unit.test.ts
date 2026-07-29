@@ -29,9 +29,9 @@ describe("isPermissionDenial", () => {
   describe("given a refusal from the permission layer", () => {
     /** @scenario "A denial is recognised without matching on its wording" */
     it("recognises a project permission denial by its code", () => {
-      expect(isPermissionDenial(new ProjectPermissionDeniedError("traces:view"))).toBe(
-        true,
-      );
+      expect(
+        isPermissionDenial(new ProjectPermissionDeniedError("traces:view")),
+      ).toBe(true);
     });
 
     it("recognises a lite-member restriction", () => {
@@ -73,7 +73,9 @@ describe("isPermissionDenial", () => {
     });
 
     it("treats an unrelated handled error as an outage", () => {
-      expect(isPermissionDenial({ code: "clickhouse_unavailable" })).toBe(false);
+      expect(isPermissionDenial({ code: "clickhouse_unavailable" })).toBe(
+        false,
+      );
     });
   });
 });
