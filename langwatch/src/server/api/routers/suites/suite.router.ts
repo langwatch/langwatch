@@ -135,8 +135,6 @@ export const suiteRouter = createTRPCRouter({
       projectSchema.extend({
         id: z.string(),
         idempotencyKey: z.string(),
-        /** Optional client-generated batch run ID for immediate placeholder feedback */
-        batchRunId: z.string().optional(),
       }),
     )
     .use(checkProjectPermission("scenarios:manage"))
@@ -171,7 +169,6 @@ export const suiteRouter = createTRPCRouter({
         projectId: input.projectId,
         organizationId,
         idempotencyKey: input.idempotencyKey,
-        batchRunId: input.batchRunId,
       });
 
       return {

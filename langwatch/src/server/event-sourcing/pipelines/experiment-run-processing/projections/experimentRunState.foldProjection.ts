@@ -108,10 +108,15 @@ export class ExperimentRunStateFoldProjection
   /**
    * Order-insensitive fold, by two different arguments.
    *
-   * The per-item handlers are commutative outright: a counter
+   * The arithmetic handlers are commutative outright: a counter
    * (`CompletedCount++`), a running sum (`TotalDurationMs`/`TotalScoreSum`
-   * +=), a `Math.max` (`Total`), or a keyed map that last-write-wins per key
-   * (`Targets` merged by id).
+   * +=), a `Math.max` (`Total`).
+   *
+   * `Targets` is a keyed map merged last-write-wins, which is commutative only
+   * because each target id is written once — one `targetResult` per row. Two
+   * writes to one key WOULD be order-dependent, and with
+   * `refoldOnOutOfOrder: false` nothing would re-derive the loser. It is safe
+   * on the shape the stream actually has, not by the merge's own algebra.
    *
    * The lifecycle timestamps are NOT commutative — `StartedAt` is
    * first-write-wins and `FinishedAt`/`StoppedAt` overwrite whatever was
