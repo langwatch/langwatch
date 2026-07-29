@@ -34,6 +34,17 @@ const LOCK_TTL_SEC = 15;
 const LOCK_RETRY_MS = 100;
 const LOCK_MAX_WAIT_MS = 3_000;
 
+// How long a confirmed-alive result is trusted before the next cache hit
+// probes GitHub again. Deliberately much shorter than the token cache TTL —
+// this bounds how stale a missed-webhook deletion can go undetected, without
+// turning every cache hit (i.e. every normal turn) into a live GitHub call.
+const LIVENESS_RECHECK_TTL_SEC = 5 * 60;
+// A transient probe failure (network blip, 5xx, rate limit) backs off for a
+// shorter window before trying again — long enough that a GitHub outage
+// doesn't cost every subsequent turn its own probe (and the 10s githubFetch
+// timeout on top), short enough to notice GitHub recovering reasonably fast.
+const LIVENESS_FAILURE_BACKOFF_SEC = 60;
+
 /**
  * The least-privilege permission set Langy asks for at mint time. Cannot exceed
  * the installation's own grant (GitHub clamps it). Kept minimal so a leaked
@@ -198,29 +209,43 @@ export class LangyGithubAppTokenService {
   }
 
   // Confirms an installation still exists before trusting a cached token for
-  // it. Only a confirmed 404 (GithubInstallationNotFoundError) propagates —
-  // any other failure (network blip, GitHub 5xx) fails OPEN, same as every
-  // other best-effort check in this file: a flaky liveness probe must not
-  // block a cached token that is, as far as we know, still perfectly valid.
+  // it — but only actually probes GitHub once per LIVENESS_RECHECK_TTL_SEC.
+  // Without that marker, every cache hit (i.e. every normal turn) would cost
+  // a live GitHub call: the lock below only coalesces callers that overlap
+  // in time, and is released the moment the probe returns, so sequential
+  // turns each re-acquire it and each pay for their own GET. That would turn
+  // the 50-minute token cache into ~one GitHub App API request per turn, and
+  // during a GitHub outage or rate-limit response every turn would sit on
+  // `githubFetch`'s 10s timeout before falling back to the cached token —
+  // reintroducing exactly the GitHub-availability dependency the token cache
+  // exists to remove.
   //
-  // Lock-guarded the same way the mint path guards its own stampede: a cache
-  // hit is the COMMON case (that's the point of caching), so without this,
-  // every concurrent turn for the same installation would fire its own
-  // GitHub liveness probe. A caller that loses the (non-blocking, try-once)
-  // lock race trusts the cache for this call — the prober holding the lock
-  // still throws (and the caller still self-heals the shared installation
-  // list) if the installation is genuinely gone, which is enough for every
-  // later call to see it removed.
+  // Only a confirmed 404 (GithubInstallationNotFoundError) propagates and
+  // skips the marker entirely — the installation is about to be deleted, so
+  // there is nothing to mark alive. Any other failure (network blip, GitHub
+  // 5xx, rate limit) fails OPEN and sets a much shorter backoff marker, so an
+  // outage costs at most one stalled probe per LIVENESS_FAILURE_BACKOFF_SEC
+  // rather than one per turn.
   private async assertInstallationStillExists(
     installationId: string,
   ): Promise<void> {
-    const lockKey = `langy:gh:insttoken:${installationId}:liveness:lock`;
+    const markerKey = `langy:gh:insttoken:${installationId}:liveness`;
+    if (await this.redisGet(markerKey)) return;
+
+    // Lock-guarded the same way the mint path guards its own stampede: a
+    // caller that loses the (non-blocking, try-once) lock race trusts the
+    // cache for this call — the prober holding the lock still throws (and
+    // still self-heals the shared installation list) on a confirmed 404,
+    // which is enough for every later call to see it removed.
+    const lockKey = `${markerKey}:lock`;
     const lock = await this.tryLockOnce(lockKey);
     if (!lock) return;
     try {
       await this.getInstallation(installationId);
+      await this.redisSetEx(markerKey, LIVENESS_RECHECK_TTL_SEC, "alive");
     } catch (error) {
       if (error instanceof GithubInstallationNotFoundError) throw error;
+      await this.redisSetEx(markerKey, LIVENESS_FAILURE_BACKOFF_SEC, "backoff");
     } finally {
       await this.releaseLock(lockKey, lock);
     }

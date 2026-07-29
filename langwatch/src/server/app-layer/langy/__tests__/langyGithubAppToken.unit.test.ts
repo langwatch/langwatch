@@ -282,6 +282,81 @@ describe("mintInstallationToken", () => {
       expect(livenessCalls).toHaveLength(1);
     });
   });
+
+  describe("when the same installation is checked across multiple sequential turns", () => {
+    it("probes GitHub once, then trusts the liveness marker for later cached calls", async () => {
+      const redis = fakeRedis();
+      const svc = new LangyGithubAppTokenService("app-1", privateKey, redis);
+      const scope = computeRepoScopeKey({});
+      redis.store.set(`langy:gh:insttoken:5:${scope}`, "ghs_cached");
+      const fetchMock = vi.fn<typeof fetch>(async () => {
+        return new Response(
+          JSON.stringify({ id: 5, account: { login: "acme", type: "User" } }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      // Three separate turns, one after another — no overlap, so the
+      // stampede lock alone would not prevent a probe on every single one.
+      await svc.mintInstallationToken({ installationId: "5" });
+      await svc.mintInstallationToken({ installationId: "5" });
+      await svc.mintInstallationToken({ installationId: "5" });
+
+      const livenessCalls = fetchMock.mock.calls.filter((c) =>
+        String(c[0]).includes("/app/installations/5"),
+      );
+      expect(livenessCalls).toHaveLength(1);
+    });
+  });
+
+  describe("when the liveness marker has expired", () => {
+    it("probes GitHub again on the next cached call", async () => {
+      const redis = fakeRedis();
+      const svc = new LangyGithubAppTokenService("app-1", privateKey, redis);
+      const scope = computeRepoScopeKey({});
+      redis.store.set(`langy:gh:insttoken:5:${scope}`, "ghs_cached");
+      const fetchMock = vi.fn<typeof fetch>(async () => {
+        return new Response(
+          JSON.stringify({ id: 5, account: { login: "acme", type: "User" } }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      await svc.mintInstallationToken({ installationId: "5" });
+      redis.store.delete("langy:gh:insttoken:5:liveness"); // simulate TTL expiry
+      await svc.mintInstallationToken({ installationId: "5" });
+
+      const livenessCalls = fetchMock.mock.calls.filter((c) =>
+        String(c[0]).includes("/app/installations/5"),
+      );
+      expect(livenessCalls).toHaveLength(2);
+    });
+  });
+
+  describe("when a liveness probe fails transiently", () => {
+    it("backs off instead of probing again on the very next cached call", async () => {
+      const redis = fakeRedis();
+      const svc = new LangyGithubAppTokenService("app-1", privateKey, redis);
+      const scope = computeRepoScopeKey({});
+      redis.store.set(`langy:gh:insttoken:5:${scope}`, "ghs_cached");
+      const fetchMock = vi.fn<typeof fetch>(
+        async () => new Response("boom", { status: 500 }),
+      );
+      vi.stubGlobal("fetch", fetchMock);
+
+      const first = await svc.mintInstallationToken({ installationId: "5" });
+      const second = await svc.mintInstallationToken({ installationId: "5" });
+
+      expect(first.token).toBe("ghs_cached");
+      expect(second.token).toBe("ghs_cached");
+      const livenessCalls = fetchMock.mock.calls.filter((c) =>
+        String(c[0]).includes("/app/installations/5"),
+      );
+      expect(livenessCalls).toHaveLength(1);
+    });
+  });
 });
 
 describe("configured", () => {
