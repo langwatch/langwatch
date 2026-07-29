@@ -92,12 +92,9 @@ function deps(triggerRows: TriggerSummary[] = [trigger()]) {
     triggers: {
       getActiveTraceTriggersForProject: vi.fn().mockResolvedValue(triggerRows),
     },
-    traceSummaryStore: {
-      get: vi
-        .fn()
-        .mockResolvedValue({ traceId: "trace-1" } as TraceSummaryData),
-      store: vi.fn(),
-    },
+    readTraceSummary: vi
+      .fn()
+      .mockResolvedValue({ traceId: "trace-1" } as TraceSummaryData),
     recordTriggerMatch: { send: vi.fn().mockResolvedValue(undefined) },
   };
 }
@@ -106,7 +103,6 @@ function subscriberFor(dependencies: ReturnType<typeof deps>) {
   return createEvaluationAlertTriggerMatchSubscriber({
     ...dependencies,
     triggers: dependencies.triggers as never,
-    traceSummaryStore: dependencies.traceSummaryStore as never,
   });
 }
 
@@ -151,9 +147,11 @@ describe("evaluation alert trigger match subscriber", () => {
         context(),
       );
 
-      expect(dependencies.traceSummaryStore.get).toHaveBeenCalledWith(
-        "trace-from-the-event",
-        expect.objectContaining({ aggregateId: "trace-from-the-event" }),
+      expect(dependencies.readTraceSummary).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenantId: "project-1",
+          traceId: "trace-from-the-event",
+        }),
       );
       expect(dependencies.recordTriggerMatch.send).toHaveBeenCalledWith(
         expect.objectContaining({ traceId: "trace-from-the-event" }),
@@ -252,17 +250,20 @@ describe("evaluation alert trigger match subscriber", () => {
         subscriberFor(dependencies).handle(inputEvent, context()),
       ).resolves.toBeUndefined();
 
-      expect(dependencies.traceSummaryStore.get).not.toHaveBeenCalled();
+      expect(dependencies.readTraceSummary).not.toHaveBeenCalled();
       expect(dependencies.recordTriggerMatch.send).not.toHaveBeenCalled();
     });
   });
 
-  describe("given the trace fold is unavailable", () => {
-    it("drops the match before loading automations", async () => {
+  describe("given the trace fold has not caught up", () => {
+    /** @scenario Something the platform cannot read yet is not read as an answer */
+    it("throws so the queue asks again, instead of dropping the alerts", async () => {
       const dependencies = deps();
-      dependencies.traceSummaryStore.get.mockResolvedValue(null as never);
+      dependencies.readTraceSummary.mockResolvedValue(null as never);
 
-      await subscriberFor(dependencies).handle(completedEvent(), context());
+      await expect(
+        subscriberFor(dependencies).handle(completedEvent(), context()),
+      ).rejects.toThrow(/Trace summary not found/);
 
       expect(
         dependencies.triggers.getActiveTraceTriggersForProject,

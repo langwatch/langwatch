@@ -199,6 +199,11 @@ export class ComputeRunMetricsCommand
     // Nothing measurable came back: no trace reported a cost and no span carried
     // a scenario role. Writing that would overwrite whatever the run already
     // shows with a row of blanks, so it is left alone and logged instead.
+    //
+    // Recording no event is also the signal the `runMetrics` process reads: the
+    // absence of a `metrics_recorded` event is what leaves its re-measure
+    // standing, so a run measured before its cost enrichment landed is asked
+    // for again rather than left unpriced.
     if (costTotal <= 0 && !hasRoleMetrics) {
       logger.warn(
         { tenantId, scenarioRunId, traceCount: traceIds.length },

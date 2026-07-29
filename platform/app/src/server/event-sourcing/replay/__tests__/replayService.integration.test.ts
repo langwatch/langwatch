@@ -366,6 +366,7 @@ describe("ReplayService tenant-specific ClickHouse", () => {
       };
     }
 
+    /** @scenario "Replaying a map projection rebuilds its records from history" */
     it("drains, marks cutoffs, bulk-appends mapped records, and cleans markers", async () => {
       const redis = getTestRedisConnection()!;
       const projectionName = `mapReplayHappy_${Date.now()}`;
@@ -484,6 +485,7 @@ describe("ReplayService tenant-specific ClickHouse", () => {
       expect(bulkAppendCalledWhileJobActive).toBe(false);
     });
 
+    /** @scenario "Replaying fold and map projections together" */
     it("runs both fold and map projections in the same replay, isolating pause-set entries", async () => {
       const redis = getTestRedisConnection()!;
       const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
@@ -778,6 +780,7 @@ describe("ReplayService tenant-specific ClickHouse", () => {
       expect(await redis.sismember(pausedSetKey, mapPauseKey)).toBe(0);
     });
 
+    /** @scenario "Resuming an interrupted replay skips completed aggregates" */
     it("skips aggregates already in the completed set on resume", async () => {
       const redis = getTestRedisConnection()!;
       const projectionName = `mapReplayResume_${Date.now()}`;
@@ -1066,6 +1069,7 @@ describe("ReplayService tenant-specific ClickHouse", () => {
     }
 
     describe("when a replay spans multiple batches", () => {
+      /** @scenario "Only the batch being replayed pauses live processing" */
       it("pauses only while a batch is replayed and resumes between batches", async () => {
         const redis = getTestRedisConnection()!;
         const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
@@ -1129,6 +1133,7 @@ describe("ReplayService tenant-specific ClickHouse", () => {
     });
 
     describe("when a batch fails", () => {
+      /** @scenario "A batch failure resumes live processing" */
       it("unpauses the projections instead of leaving live processing frozen", async () => {
         const redis = getTestRedisConnection()!;
         const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;

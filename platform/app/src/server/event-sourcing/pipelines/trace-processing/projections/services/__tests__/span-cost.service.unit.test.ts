@@ -52,6 +52,7 @@ describe("SpanCostService.extractTokenTiming", () => {
       expect(timing.timeToFirstToken).toBe(500);
     });
 
+    /** @scenario "Stream events win over langwatch.timestamps" */
     it("prefers stream events over the langwatch.timestamps attribute", () => {
       const span = makeSpan({
         events: [
@@ -81,6 +82,7 @@ describe("SpanCostService.extractTokenTiming", () => {
   });
 
   describe("when the span carries only the langwatch.timestamps attribute", () => {
+    /** @scenario "Span with first_token_at populates the trace summary TTFT" */
     it("derives TTFT from first_token_at relative to the span start", () => {
       const span = makeSpan({
         spanAttributes: {
@@ -109,6 +111,7 @@ describe("SpanCostService.extractTokenTiming", () => {
       expect(timing.timeToFirstToken).toBe(650);
     });
 
+    /** @scenario "first_token_at before the span start is ignored" */
     it("ignores a first_token_at earlier than the span start", () => {
       const span = makeSpan({
         spanAttributes: {

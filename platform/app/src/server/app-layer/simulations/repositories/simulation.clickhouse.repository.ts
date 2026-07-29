@@ -136,6 +136,29 @@ export function startedAtBoundsForPage(
 }
 
 /**
+ * Maps each batch on the page to the number of runs it set out to queue
+ * (`BatchTotal`, ADR-072), so a caller holding only the runs that landed can
+ * still tell a five-run batch from a six-run batch that lost one.
+ *
+ * A batch queued before the denominator existed reports 0, and is left out
+ * entirely rather than published as a zero total — the absence is what tells
+ * the reader to count the runs instead. Callers must apply that fallback; see
+ * `computeGroupSummary` in run-history-transforms.ts for the read side.
+ */
+export function expectedCountsForPage(
+  rows: { BatchRunId: string; ExpectedCount: string }[],
+): Record<string, number> {
+  const expectedCounts: Record<string, number> = {};
+  for (const row of rows) {
+    const expected = Number(row.ExpectedCount);
+    if (Number.isFinite(expected) && expected > 0) {
+      expectedCounts[row.BatchRunId] = expected;
+    }
+  }
+  return expectedCounts;
+}
+
+/**
  * Renders the StartedAt predicate the step-2 read has always emitted, from a
  * {@link queryWindowed} fragment (or the empty clause for an unbounded `null`
  * fragment). Deliberately hand-written as `toUInt64({...:String})` rather than
@@ -763,6 +786,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     endDate?: number;
   }): Promise<{
     runs: ScenarioRunData[];
+    expectedCounts: Record<string, number>;
     nextCursor?: string;
     hasMore: boolean;
   }> {
@@ -783,12 +807,14 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     const batchRows = await this.queryRows<{
       BatchRunId: string;
       MaxCreatedAt: string;
+      ExpectedCount: string;
       MinStartedAt: string;
       MaxStartedAt: string;
     }>(
       `SELECT
         BatchRunId,
         toString(toUnixTimestamp64Milli(max(CreatedAt))) AS MaxCreatedAt,
+        toString(max(BatchTotal))                        AS ExpectedCount,
         toString(toUnixTimestamp64Milli(min(StartedAt))) AS MinStartedAt,
         toString(toUnixTimestamp64Milli(max(StartedAt))) AS MaxStartedAt
        FROM ${TABLE_NAME}
@@ -816,7 +842,12 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     const pageRows = hasMore ? batchRows.slice(0, validatedLimit) : batchRows;
 
     if (pageRows.length === 0) {
-      return { runs: [], nextCursor: undefined, hasMore: false };
+      return {
+        runs: [],
+        expectedCounts: {},
+        nextCursor: undefined,
+        hasMore: false,
+      };
     }
 
     const lastRow = pageRows[pageRows.length - 1];
@@ -834,7 +865,12 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       startedAtBounds: startedAtBoundsForPage(pageRows),
     });
 
-    return { runs, nextCursor, hasMore };
+    return {
+      runs,
+      expectedCounts: expectedCountsForPage(pageRows),
+      nextCursor,
+      hasMore,
+    };
   }
 
   async getRunDataForAllSuites({
@@ -858,6 +894,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
         lastUpdatedAt: number;
         runs: ScenarioRunData[];
         scenarioSetIds: Record<string, string>;
+        expectedCounts: Record<string, number>;
         nextCursor?: string;
         hasMore: boolean;
       }
@@ -893,6 +930,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       BatchRunId: string;
       MaxCreatedAt: string;
       NormalizedSetId: string;
+      ExpectedCount: string;
       MinStartedAt: string;
       MaxStartedAt: string;
     }>(
@@ -900,6 +938,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
         BatchRunId,
         toString(toUnixTimestamp64Milli(max(CreatedAt))) AS MaxCreatedAt,
         any(IF(ScenarioSetId = '', 'default', ScenarioSetId)) AS NormalizedSetId, -- Must match DEFAULT_SET_ID from internal-set-id.ts
+        toString(max(BatchTotal))                        AS ExpectedCount,
         toString(toUnixTimestamp64Milli(min(StartedAt))) AS MinStartedAt,
         toString(toUnixTimestamp64Milli(max(StartedAt))) AS MaxStartedAt
        FROM ${TABLE_NAME}
@@ -934,6 +973,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
         lastUpdatedAt: watermark ?? 0,
         runs: [],
         scenarioSetIds: {},
+        expectedCounts: {},
         nextCursor: undefined,
         hasMore: false,
       };
@@ -968,6 +1008,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       lastUpdatedAt,
       runs,
       scenarioSetIds,
+      expectedCounts: expectedCountsForPage(pageRows),
       nextCursor,
       hasMore,
     };

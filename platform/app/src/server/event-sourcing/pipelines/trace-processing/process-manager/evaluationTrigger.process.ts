@@ -1,3 +1,4 @@
+import type { ProcessManagerApplier } from "~/server/event-sourcing/pipeline/processBuilder";
 import type {
   EventHandler,
   IntentSpec,
@@ -15,14 +16,22 @@ import {
 } from "../schemas/constants";
 import type { TraceProcessingEvent } from "../schemas/events";
 import {
+  createEvaluationTriggerRequestHandler,
+  type EvaluationTriggerDispatchDeps,
+} from "./evaluationTriggerIntentHandlers";
+import {
   CAUSALITY_DEPTH_ATTRIBUTE,
   EVALUATION_TRIGGER_ENQUEUE_WINDOW_MS,
+  EVALUATION_TRIGGER_INTENT_TYPES,
+  EVALUATION_TRIGGER_LEASE_DURATION_MS,
+  EVALUATION_TRIGGER_MAX_ATTEMPTS,
   EVALUATION_TRIGGER_MAX_TRACE_AGE_MS,
   EVALUATION_TRIGGER_QUIET_PERIOD_MS,
   type EvaluationTriggerEventView,
   type EvaluationTriggerState,
   evaluationTriggerEventViewSchema,
-  type evaluationTriggerRequestIntentSchema,
+  evaluationTriggerRequestIntentSchema,
+  INITIAL_EVALUATION_TRIGGER_STATE,
   requestEvaluationsMessageKey,
 } from "./evaluationTriggerProcess.types";
 import { readOtlpNumber, spanOf } from "./otlpEventView";
@@ -336,3 +345,38 @@ export const evaluationTriggerWake: WakeHandler<
     ],
   };
 };
+
+/**
+ * The `evaluationTrigger` process-manager topology, exported standalone so the
+ * pipeline mounts one expression of it and tests can build the exact definition
+ * the runtime runs. `trace-processing/pipeline.ts` mounts it as
+ * `.withProcessManager(EVALUATION_TRIGGER_PROCESS_NAME,
+ * evaluationTriggerPM(deps.evaluationTriggerDispatch))`.
+ *
+ * The project's on-message monitors run once the trace has gone quiet for a
+ * full period. The quiet period is re-armed by every message, so a conversation
+ * that resumes pushes its own evaluation out; every fallible guard lives in the
+ * intent handler, where a failure retries the ask instead of dropping it
+ * (ADR-075 Class D).
+ */
+export function evaluationTriggerPM(
+  dispatch: EvaluationTriggerDispatchDeps,
+): ProcessManagerApplier<TraceProcessingEvent> {
+  return (pm) =>
+    pm
+      .state(INITIAL_EVALUATION_TRIGGER_STATE)
+      .intent(
+        EVALUATION_TRIGGER_INTENT_TYPES.REQUEST_EVALUATIONS,
+        evaluationTriggerRequestIntentSchema,
+        createEvaluationTriggerRequestHandler(dispatch),
+      )
+      .on(SPAN_RECEIVED_EVENT_TYPE, handleTraceActivity)
+      .on(ORIGIN_RESOLVED_EVENT_TYPE, handleTraceActivity)
+      .onWake(evaluationTriggerWake)
+      .toPayload(buildProcessEventView)
+      .enqueue(EVALUATION_TRIGGER_ENQUEUE)
+      .outbox({
+        maxAttempts: EVALUATION_TRIGGER_MAX_ATTEMPTS,
+        leaseDurationMs: EVALUATION_TRIGGER_LEASE_DURATION_MS,
+      });
+}

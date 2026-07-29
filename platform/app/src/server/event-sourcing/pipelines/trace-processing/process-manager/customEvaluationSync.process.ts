@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-
+import type { ProcessManagerApplier } from "~/server/event-sourcing/pipeline/processBuilder";
 import type {
   EventHandler,
   IntentSpec,
@@ -7,8 +7,12 @@ import type {
   ProcessHandlerContext,
   ProcessManagerEnqueueOptions,
 } from "~/server/event-sourcing/pipeline/processManagerDefinition";
+import { customEvaluationSyncDroppedCounter } from "~/server/metrics";
 
-import { STALE_TRACE_THRESHOLD_MS } from "../schemas/constants";
+import {
+  SPAN_RECEIVED_EVENT_TYPE,
+  STALE_TRACE_THRESHOLD_MS,
+} from "../schemas/constants";
 import {
   makeSpanReferencedEvent,
   parseSpanReferencedEvent,
@@ -16,12 +20,21 @@ import {
   type TraceProcessingEvent,
 } from "../schemas/events";
 import {
+  type CustomEvaluationSyncDispatchDeps,
+  createCustomEvaluationReportHandler,
+} from "./customEvaluationSyncIntentHandlers";
+import {
   CUSTOM_EVALUATION_PAYLOAD_ATTRIBUTE,
   CUSTOM_EVALUATION_SPAN_EVENT_NAME,
+  CUSTOM_EVALUATION_SYNC_INTENT_TYPES,
+  CUSTOM_EVALUATION_SYNC_LEASE_DURATION_MS,
+  CUSTOM_EVALUATION_SYNC_MAX_ATTEMPTS,
   type CustomEvaluationSyncEventView,
   type CustomEvaluationSyncState,
-  type customEvaluationReportIntentSchema,
+  customEvaluationReportIntentSchema,
   customEvaluationSyncEventViewSchema,
+  customEvaluationSyncRetryDelayMs,
+  INITIAL_CUSTOM_EVALUATION_SYNC_STATE,
   reportEvaluationsMessageKey,
 } from "./customEvaluationSyncProcess.types";
 import { readOtlpString, spanOf } from "./otlpEventView";
@@ -71,6 +84,43 @@ import { readOtlpString, spanOf } from "./otlpEventView";
  * replay" row. Under that reading the stale guard is a defect rather than a
  * safeguard. It is kept because the dispatch shape is kept; if the
  * reclassification is ever taken up, this guard is the first thing to go.
+ *
+ * **Assessed 2026-07-29; Class D stands, and the note above overstates the
+ * case.** Three things have to be true before the projection row applies, and
+ * none of them is today:
+ *
+ *  1. *A projection derives a ROW; this derives an EVENT.* The relay's output
+ *     is `reportEvaluation`, a command that appends `lw.evaluation.reported` to
+ *     `event_log` for a different aggregate. ADR-075's Class C conversions
+ *     (`governanceKpisSync`, `governanceOcsfEventsSync`, `gatewayBudgetSync`)
+ *     all write derived ClickHouse rows idempotent on a natural key, which is
+ *     what makes "rebuilt by replay" mean rewriting the same row. A rebuild
+ *     that appends to the event store instead re-enters every downstream of
+ *     that aggregate.
+ *  2. *"No billing to protect against replay" is not accurate.*
+ *     `lw.evaluation.reported` IS metered — `orgBillableEventsMeter` subscribes
+ *     to it and writes `billable_events`. It happens to be replay-safe, but
+ *     because the row's `DeduplicationKey` is the command's idempotency key
+ *     (`${tenantId}:${evaluationId}:reported`, derived from the deterministic
+ *     evaluation id), NOT because there is no money on the path. The same is
+ *     true of `evaluationAnalyticsRollup`, an additive sink kept honest by
+ *     `dedupeByIdempotencyKey` — which is fail-open on event-log read lag.
+ *     Any conversion has to re-argue both, not assume neither exists.
+ *  3. *The outbox's retry is load-bearing, not incidental.* The intent handler
+ *     deliberately THROWS when the claim-check read comes back empty, so the
+ *     lease backs off and re-asks until the sibling span write lands
+ *     (ADR-069). `MapProjectionOptions` has no lease, no per-message backoff
+ *     and no `filter` — so the conversion would also lose
+ *     `CUSTOM_EVALUATION_SYNC_ENQUEUE` and mint a projection job for every
+ *     `span_received` in the product. ADR-075's own consequences name that
+ *     missing seam as the thing that must land BEFORE any further Class C
+ *     conversion.
+ *
+ * So the guard is not "a defect kept for shape". What was a real defect is that
+ * it discarded a customer's verdict silently; that is fixed below. Deleting it
+ * outright, and moving the process to a projection, remains an ADR decision
+ * (it re-classifies a call site ADR-075 enumerates, and edits the mount), not a
+ * cleanup.
  */
 
 const logger = createLogger(
@@ -184,9 +234,15 @@ export function buildProcessEventView(
  * re-emit events with historical `occurredAt`; the test is the gap between
  * when the event happened and when it is being handled.
  *
- * See the classification note in this file's docblock — this guard is what
- * makes the process non-reproducing under replay, which is correct for
- * dispatched work and wrong for derived state.
+ * `ctx.at` is the span's BUSINESS time, so this catches more than a flood: a
+ * live SDK that batch-exports after a long job, a client whose clock runs
+ * behind, and a trace-processing group parked past the threshold all answer
+ * true while holding a verdict the customer genuinely computed. That is why
+ * the caller counts and logs the branch — see the classification note in this
+ * file's docblock, and `langwatch_custom_evaluation_sync_dropped_total`.
+ *
+ * This guard is also what makes the process non-reproducing under replay,
+ * which is correct for dispatched work and wrong for derived state.
  */
 function isStale(ctx: Ctx): boolean {
   return ctx.now - ctx.at > STALE_TRACE_THRESHOLD_MS;
@@ -212,7 +268,30 @@ export const handleSpanReceived: EventHandler<
   };
 
   if (!view.hasCustomEvaluations) return idle;
-  if (isStale(ctx)) return idle;
+
+  // The span carried a verdict and this declines it, so the drop is reported
+  // the same way the unreferenceable one below is. Nothing downstream will
+  // ever show this evaluation and nothing upstream will ask again — the
+  // customer simply sees an evaluation that never ran — and the guard fires on
+  // more than the resync flood it was written for: an SDK that batch-exports
+  // after a long job, a client whose clock runs behind, and a trace-processing
+  // group parked past the threshold all reach it with a live verdict in hand.
+  // Which of those is happening is only answerable from the age, so the age is
+  // in the line. See the classification note in this file's docblock: this
+  // makes the cost of the guard auditable, it does not change it.
+  if (isStale(ctx)) {
+    customEvaluationSyncDroppedCounter.inc({ reason: "stale" });
+    logger.warn(
+      {
+        tenantId: ctx.projectId,
+        traceId: ctx.key,
+        spanId: view.spanId,
+        ageMs: ctx.now - ctx.at,
+      },
+      "Dropping custom evaluations — the span is older than the stale-trace threshold",
+    );
+    return idle;
+  }
 
   // An evaluation addressed at nothing cannot be attributed to a trace, and a
   // report with no project cannot be addressed at a tenant at all.
@@ -223,6 +302,7 @@ export const handleSpanReceived: EventHandler<
   // as a shape only a future producer could send; logged at error because if
   // it ever does happen, a customer's evaluation was dropped.
   if (view.spanId === null || view.spanStartedAt === null) {
+    customEvaluationSyncDroppedCounter.inc({ reason: "unreferenceable" });
     logger.error(
       { tenantId: ctx.projectId, traceId: ctx.key },
       "Dropping custom evaluations — the span cannot be referenced for read-back",
@@ -247,3 +327,36 @@ export const handleSpanReceived: EventHandler<
     ],
   };
 };
+
+/**
+ * The `customEvaluationSync` process-manager topology, exported standalone so
+ * the pipeline mounts one expression of it and tests can build the exact
+ * definition the runtime runs. `trace-processing/pipeline.ts` mounts it as
+ * `.withProcessManager(CUSTOM_EVALUATION_SYNC_PROCESS_NAME,
+ * customEvaluationSyncPM(deps.customEvaluationSyncDispatch))`.
+ *
+ * Evaluations an SDK ran itself arrive stapled to a span. The intent carries
+ * the span's identity alone and reads the verdicts back out of the span store
+ * (ADR-069's claim-check), so the retries are sized for losing the race against
+ * the sibling span write rather than for a failing command.
+ */
+export function customEvaluationSyncPM(
+  dispatch: CustomEvaluationSyncDispatchDeps,
+): ProcessManagerApplier<TraceProcessingEvent> {
+  return (pm) =>
+    pm
+      .state(INITIAL_CUSTOM_EVALUATION_SYNC_STATE)
+      .intent(
+        CUSTOM_EVALUATION_SYNC_INTENT_TYPES.REPORT_EVALUATIONS,
+        customEvaluationReportIntentSchema,
+        createCustomEvaluationReportHandler(dispatch),
+      )
+      .on(SPAN_RECEIVED_EVENT_TYPE, handleSpanReceived)
+      .toPayload(buildProcessEventView)
+      .enqueue(CUSTOM_EVALUATION_SYNC_ENQUEUE)
+      .outbox({
+        maxAttempts: CUSTOM_EVALUATION_SYNC_MAX_ATTEMPTS,
+        leaseDurationMs: CUSTOM_EVALUATION_SYNC_LEASE_DURATION_MS,
+        retryDelayMs: customEvaluationSyncRetryDelayMs,
+      });
+}

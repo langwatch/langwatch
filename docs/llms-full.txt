@@ -326,7 +326,7 @@ LangWatch accepts OTLP/HTTP at two distinct URLs. They share **everything that m
 | **Auth** | LangWatch project API key, PAT, `X-Auth-Token` or `Authorization: Bearer <project-token>` | IngestionSource bearer secret (`lw_is_<...>`), minted once via the secret-reveal modal |
 | **Tenancy** | Project-scoped (data lives in the project's CH partition) | Org-scoped, routed through a hidden internal Governance Project per org (lazy-ensured on first IngestionSource mint; never user-visible) |
 | **Storage** | `recorded_spans` + `log_records`, the LangWatch trace pipeline | **Same `recorded_spans` + `log_records`**, distinguished by `langwatch.origin.kind = "ingestion_source"` attribute stamped at the receiver edge |
-| **Downstream consumers** | Trace viewer, evaluations, simulations, prompts, online evals, PII redaction, cost enrichment | Same trace viewer + log-detail pane (drill-down works regardless of origin) **plus** governance dashboard at `/governance`, anomaly detection reactor, OCSF/SIEM forwarding |
+| **Downstream consumers** | Trace viewer, evaluations, simulations, prompts, online evals, PII redaction, cost enrichment | Same trace viewer + log-detail pane (drill-down works regardless of origin) **plus** governance dashboard at `/governance`, anomaly detection, OCSF/SIEM forwarding |
 | **Plan accounting** | Counts against the project's trace allowance | Counts against the org's governance audit-event allowance |
 | **Source identity** | Whoever holds the project key (typically your own apps) | An IngestionSource the admin authored explicitly with per-platform config |
 | **Other shapes** | OTLP only | OTLP **plus** webhook envelope (`/api/ingest/webhook/:id` for Workato + s3_custom callback mode) and pull-mode workers for compliance feeds (OpenAI, Anthropic, Microsoft Copilot Studio) |
@@ -4162,7 +4162,7 @@ Windows: `minute`, `hour`, `day`, `week`, `month`, `total`.
 
 Hierarchical: a single request is checked against every budget that applies. **Any** hard-block breach blocks; warnings compose.
 
-Spend is debited after the response completes, using the token counts the provider reported, via the trace-fold reactor, replays of the same `gateway_request_id` collapse so gateway retries never double-bill.
+Spend is debited after the response completes, using the token counts the provider reported, via the budget-debit projection, the ledger records at most one debit per `gateway_request_id` so gateway retries never double-bill.
 
 See [Budgets](/ai-gateway/budgets).
 
@@ -5018,7 +5018,7 @@ Save the JSON below as `langwatch-gateway.json`, then in Grafana: **Dashboards �
     {
       "type": "timeseries",
       "title": "Budget blocks by scope",
-      "description": "The gateway does not debit budgets: cost rides the OTel span and the control plane's trace-fold reactor writes the ledger. This counter is the only gateway-side signal that a hard cap actually rejected traffic.",
+      "description": "The gateway does not debit budgets: cost rides the OTel span and the control plane's budget-debit projection writes the ledger. This counter is the only gateway-side signal that a hard cap actually rejected traffic.",
       "datasource": "$datasource",
       "gridPos": { "x": 0, "y": 31, "w": 12, "h": 7 },
       "targets": [{
@@ -5967,12 +5967,17 @@ go tool pprof http://localhost:6060/debug/pprof/allocs
 
 **Symptom:** Budget scopes never approach their limit even though traffic is flowing, or `gateway_budget_blocks_total{scope}` stays flat on a scope you expect to be capped.
 
-The gateway does not send debits. Cost is captured as attributes on the OTel span the gateway emits; the control plane's trace-fold reactor (`gatewayBudgetSync.reactor.ts`) reads finalised spans and writes the ClickHouse ledger rows. Budget enforcement on the gateway is a purely local precheck against the budget snapshot baked into the cached bundle, so spend only moves when the whole chain runs:
+The gateway does not send debits. Cost is captured as attributes on the OTel span the gateway emits; the control plane's `gatewayBudgetDebits` projection reads finalised spans and writes the ClickHouse ledger rows. Budget enforcement on the gateway is a purely local precheck against the budget snapshot baked into the cached bundle, so spend only moves when the whole chain runs:
 
 ```
 gateway request -> OTel span (cost attrs) -> collector -> langwatch-workers
-  -> trace-fold reactor -> ClickHouse ledger -> bundle snapshot -> gateway precheck
+  -> budget-debit projection -> ClickHouse ledger -> bundle snapshot
+  -> gateway precheck
 ```
+
+Because the ledger is a projection over the append-only event log, a debit
+that never landed is re-derived by replaying that window — the ledger is
+repairable rather than a one-shot write.
 
 **Diagnose, in order:**
 
@@ -5980,7 +5985,7 @@ gateway request -> OTel span (cost attrs) -> collector -> langwatch-workers
 |---|---|---|
 | Spans leaving the gateway | `sum(rate(gateway_http_requests_total[5m]))` against your collector's received-spans counter | OTLP export is broken; see [Observability](/ai-gateway/observability) |
 | Workers running | `kubectl -n langwatch get deploy langwatch-workers` | `workers.enabled: false` means the ledger is never written and hard caps never fire |
-| Ledger advancing | Query `gateway_budget_ledger_events` in ClickHouse for the scope | Reactor is stalled or the span carried no cost attrs |
+| Ledger advancing | Query `gateway_budget_ledger_events` in ClickHouse for the scope | The projection is stalled or the span carried no cost attrs |
 | Gateway seeing the new totals | Watch `gateway_internal_rtt_seconds{endpoint="changes"}` and `gateway_control_plane_requests_total{endpoint="changes"}` | The bundle is not refreshing, so the gateway is prechecking against stale spend |
 
 **Operator signal:** `gateway_budget_blocks_total{scope}` is the counter that tells you enforcement actually fired. A scope configured with `on_breach: block` whose ledger is past the limit but whose block counter is flat means the gateway has not received a refreshed bundle yet.
@@ -6214,8 +6219,8 @@ groups:
             See /ai-gateway/streaming#usage-extraction-critical-for-streaming-budgets.
 
       # The gateway does not debit budgets. Cost rides the OTel span and the
-      # control plane's trace-fold reactor writes the ClickHouse ledger, so
-      # there is no gateway-side queue to alert on. The signal that
+      # control plane's budget-debit projection writes the ClickHouse ledger,
+      # so there is no gateway-side queue to alert on. The signal that
       # enforcement is actually firing is the block counter below.
       - alert: BudgetBlockSpike
         expr: |
@@ -6252,7 +6257,8 @@ groups:
       # Note: the registry carries no per-request cost metric, by design.
       # Cost anomalies are easier to derive from the ledger table in the
       # control-plane warehouse than from Prometheus, since cost attribution
-      # happens control-plane side when the trace-fold reactor folds the span.
+      # happens control-plane side when the budget-debit projection derives
+      # the ledger row from the span.
       # See /gateway/usage UI for the visual equivalent.
 
       # ─── Blocked-by-policy noise ────────────────────────────────────────
@@ -11034,7 +11040,7 @@ See [Config → Secret rotation](/ai-gateway/self-hosting/config#secret-rotation
 Two control-plane components must be running for the gateway to function fully:
 
 - **`langwatch-app`** on `gateway.controlPlane.baseUrl` (default `http://langwatch-app:5560`). The gateway hits `/api/internal/gateway/resolve-key`, `/config`, `/changes`, and `/guardrail-check` synchronously. If unreachable, the gateway extends its cached entries via stale-while-error (see `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP`, `HARD_GRACE`) but new VKs cannot resolve and rate limits cannot tighten.
-- **`langwatch-workers`** running the trace-processing pipeline. **Budget enforcement depends on this.** The gateway emits OTLP spans with cost attrs but does NOT debit budgets directly, the workers' trace-fold reactor (`gatewayBudgetSync.reactor.ts`) reads finalised spans, computes cost, and inserts ledger rows into ClickHouse. The `gateway_budget_scope_totals_mv` materialized view aggregates spend, and the bundle the gateway long-polls for is built from that view. **If `workers.enabled: false`, gateway traces still flow but spend never accumulates against budgets, so hard-cap scopes will not block at the configured limit.** Self-hosters running the umbrella chart get workers by default; standalone `charts/gateway` installs MUST point at a control plane that has the worker pipeline running.
+- **`langwatch-workers`** running the trace-processing pipeline. **Budget enforcement depends on this.** The gateway emits OTLP spans with cost attrs but does NOT debit budgets directly, the workers' `gatewayBudgetDebits` projection reads finalised spans, computes cost, and inserts ledger rows into ClickHouse. The `gateway_budget_scope_totals_mv` materialized view aggregates spend, and the bundle the gateway long-polls for is built from that view. **If `workers.enabled: false`, gateway traces still flow but spend never accumulates against budgets, so hard-cap scopes will not block at the configured limit.** Self-hosters running the umbrella chart get workers by default; standalone `charts/gateway` installs MUST point at a control plane that has the worker pipeline running.
 
 ## Networking
 
@@ -12587,33 +12593,33 @@ See [Self-Hosting → Config](/ai-gateway/self-hosting/config) for tuning the ca
 
 ---
 title: Anomaly rules
-description: Define detection rules that fire AnomalyAlerts when activity-event traffic crosses a threshold, what the reactor evaluates today, what is preview-only, and how to write a working rule.
+description: Define detection rules that fire AnomalyAlerts when activity-event traffic crosses a threshold, what LangWatch evaluates today, what is preview-only, and how to write a working rule.
 sidebarTitle: Anomaly rules
 ---
 
-<Info>**Pairs with:** [AI Gateway → Budgets](/ai-gateway/budgets). Budgets enforce hard spend limits; anomaly rules detect patterns *before* a budget breach (spend-spike, geo-mismatch, off-hours).</Info>
+<Info>**Pairs with:** [AI Gateway → Budgets](/ai-gateway/budgets). Budgets enforce hard spend limits; anomaly rules detect patterns *before* a budget breach, starting with spend spikes.</Info>
 
 <Note>**Available on Enterprise plans.** Non-enterprise organizations see an upgrade card on `/settings/governance/anomaly-rules` instead of the composer. See [Open-core licensing](/ai-governance/overview#open-core-licensing) for the full Apache 2.0, Enterprise split.</Note>
 
-Anomaly rules are the "Detect" layer of the [governance control plane](/ai-governance/control-plane#tier-3--audit-log-ingest). The composer at `/settings/governance/anomaly-rules` accepts a rule definition and persists it; the [event-sourcing reactor](/ai-gateway/governance/activity-monitor-event-sourcing) evaluates each rule against incoming events and produces an `AnomalyAlert` row when a violation is detected.
+Anomaly rules are the "Detect" layer of the [governance control plane](/ai-governance/control-plane#tier-3--audit-log-ingest). The composer at `/settings/governance/anomaly-rules` accepts a rule definition and persists it; LangWatch then evaluates each rule against the [governance activity it has recorded](/ai-gateway/governance/activity-monitor-event-sourcing) and produces an `AnomalyAlert` row when a violation is detected.
 
-This page documents what the reactor actually evaluates today vs what's preview-only, so you don't author rules that look "active" in the list but never fire.
+<Note>**Detection runs on a recurring sweep, not on every request.** Rules are re-evaluated every few minutes, so expect an alert to appear within minutes of the traffic that triggered it rather than the instant it lands.</Note>
+
+This page documents what LangWatch actually evaluates today vs what's preview-only, so you don't author rules that look "active" in the list but never fire.
 
 ## Rule-type coverage
 
-The composer's rule-type dropdown surfaces every shape the schema can hold; the reactor only evaluates one of them today.
+These are the rule types a rule can be saved with; only one of them is evaluated today. Any other value is rejected when you save.
 
-| Rule type | Reactor coverage | What it detects | Threshold config keys |
+| Rule type | Detection coverage | What it detects | Threshold config keys |
 |-----------|------------------|------------------|------------------------|
-| **`spend_spike`** | ✅ Live | Cost-USD growth in a rolling window vs a baseline window | `windowSec`, `baselineOffsetSec`, `ratioVsBaseline`, `minBaselineUsd` |
-| `rate_limit` | ⏳ Preview | Volume of actions per actor per window | (config schema TBD) |
-| `tool_mismatch` | ⏳ Preview | Tool invocation outside the policy_rules.tools.allow set | (config schema TBD) |
-| `after_hours` | ⏳ Preview | Activity outside org-configured business-hours window | (config schema TBD) |
-| `unusual_model` | ⏳ Preview | Model used for actor that's not on their typical short-list | (config schema TBD) |
-| `pii_leak` | ⏳ Preview | Outbound payload matches a PII regex set | (config schema TBD) |
-| `custom` | ⏳ Preview | User-defined CEL, SQL predicate | (config schema TBD) |
+| **`spend_spike`** | ✅ Live | Spend in a rolling window rising sharply above the spend that came before it | `windowSec`, `ratioVsBaseline`, `minBaselineUsd` |
+| `rate_limit` | ⏳ Preview | Volume of activity per actor per window | (config schema TBD) |
+| `after_hours` | ⏳ Preview | Activity outside your business-hours window | (config schema TBD) |
+| `model_drift` | ⏳ Preview | A shift in which models your org is using | (config schema TBD) |
+| `error_rate` | ⏳ Preview | A rise in failed requests | (config schema TBD) |
 
-**⏳ Preview** rules can be created and the row will show `active` in the list, but the reactor logs `debug` and skips them, no AnomalyAlert is produced. Until the reactor slice for each ships, treat them as "save the rule for the future, don't expect alerts."
+**⏳ Preview** rules can be created and the row will show `active` in the list, but they are skipped at evaluation time and no AnomalyAlert is produced. Until detection for each ships, treat them as "save the rule for the future, don't expect alerts."
 
 If you need detection beyond `spend_spike` today, the recommended shape is one of:
 
@@ -12624,7 +12630,7 @@ If you need detection beyond `spend_spike` today, the recommended shape is one o
 
 Open `/settings/governance/anomaly-rules` → click **New anomaly rule**.
 
-Fields the reactor reads:
+Fields that shape detection:
 
 | Field | Typical value | What it does |
 |-------|---------------|---------------|
@@ -12633,7 +12639,7 @@ Fields the reactor reads:
 | **Rule type** | `spend_spike` | Pick exactly this, see coverage table above. |
 | **Scope** | `organization`, `source_type`, `source` | Filters which IngestionSources the rule applies to (see Scope coverage below). |
 | **Scope ID** | (cuid) | Required when scope is `source_type` or `source`. The IngestionSource ID can be copied from `/settings/governance/ingestion-sources/<id>` or the URL of the per-source detail page. |
-| **Threshold config** | (JSON object, see below) | The reactor's per-rule-type tuning knobs. |
+| **Threshold config** | (JSON object, see below) | Per-rule-type tuning knobs. |
 | **Destination config** | `{}` (today) | Reserved for future Slack, PagerDuty, SIEM dispatch, see Dispatch coverage below. |
 
 ### Threshold config: `spend_spike`
@@ -12641,40 +12647,42 @@ Fields the reactor reads:
 ```json
 {
   "windowSec": 86400,
-  "baselineOffsetSec": 604800,
   "ratioVsBaseline": 2.0,
   "minBaselineUsd": 1.0
 }
 ```
 
-| Key | Default | Meaning |
-|-----|---------|---------|
-| `windowSec` | `86400` (24 h) | The "current" window the reactor sums spend across, ending at the latest event timestamp. |
-| `baselineOffsetSec` | `604800` (7 d) | How far back from the current window the reactor pulls the baseline window from. With the defaults, the baseline is the same-shape 24-hour window from 7 days ago. |
-| `ratioVsBaseline` | `2.0` | Multiplier, the reactor fires when current spend ≥ baseline × ratio. `2.0` means "double the spend of last week's same-window." |
-| `minBaselineUsd` | `1.0` | Floor, the reactor skips evaluation when the baseline window is below this value. Prevents trivial alerts on cold sources where last week's spend was ~$0.01 and a 2× rise is meaningless. |
+All three keys are required, and they are the only ones the rule reads. `windowSec` is the single time knob: the baseline follows from it.
+
+| Key | Starter value | Meaning |
+|-----|---------------|---------|
+| `windowSec` | `86400` (24 h) | The "current" window spend is summed across, ending at the moment the detection sweep runs. |
+| `ratioVsBaseline` | `2.0` | Multiplier, the rule fires when current spend ≥ baseline × ratio. `2.0` means "double the recent norm." |
+| `minBaselineUsd` | `1.0` | Floor, evaluation is skipped when the baseline is below this value. Prevents trivial alerts on cold sources where the recent norm was ~$0.01 and a 2× rise is meaningless. |
+
+**The baseline is the recent past, not a fixed point in history.** It is the average spend across the six windows immediately before the current one, so with `windowSec: 86400` today's spend is measured against the average of the previous six days. Nothing to configure: widen or narrow `windowSec` and the baseline moves with it, and it keeps tracking your traffic as it grows rather than drifting out of date.
 
 Sensible starting values for most orgs:
 
-| Goal | `windowSec` | `baselineOffsetSec` | `ratioVsBaseline` | `minBaselineUsd` |
-|------|---------------|------------------------|----------------------|---------------------|
-| Day-over-week catch (default) | 86400 | 604800 | 2.0 | 1.0 |
-| Hour-over-day catch (tighter) | 3600 | 86400 | 3.0 | 0.10 |
-| Week-over-week catch (looser) | 604800 | 2592000 | 1.5 | 5.0 |
+| Goal | `windowSec` | `ratioVsBaseline` | `minBaselineUsd` |
+|------|---------------|----------------------|---------------------|
+| Today vs the previous six days (default) | 86400 | 2.0 | 1.0 |
+| This hour vs the previous six hours (tighter, fastest to react) | 3600 | 3.0 | 0.10 |
+| This week vs the previous six weeks (looser, least noisy) | 604800 | 1.5 | 5.0 |
 
 ## Scope coverage
 
-| Scope | Reactor coverage | Notes |
+| Scope | Detection coverage | Notes |
 |-------|------------------|-------|
 | `organization` | ✅ Evaluated | Fires on any IngestionSource in the org. Best default. |
 | `source_type` | ✅ Evaluated | Fires on every source whose `sourceType` matches (e.g. all `otel_generic` sources). |
 | `source` | ✅ Evaluated | Fires on a single named IngestionSource. |
-| `team` | ⏳ Preview | Persisted but not filtered by the reactor today. Don't rely on it. |
+| `team` | ⏳ Preview | Persisted but not applied as a filter today. Don't rely on it. |
 | `project` | ⏳ Preview | Same. |
 
 ## Dispatch coverage (C3 in flight)
 
-The composer's **Destination config** field accepts a JSON object describing where to push the alert. Today the reactor's dispatch path is **log-only**: alerts surface on the `/governance` dashboard's "Recent anomalies" section but no Slack message, PagerDuty page, SIEM event is generated.
+The composer's **Destination config** field accepts a JSON object describing where to push the alert. Today the dispatch path is **log-only**: alerts surface on the `/governance` dashboard's "Recent anomalies" section but no Slack message, PagerDuty page, SIEM event is generated.
 
 C3 (in flight on the [governance platform](https://github.com/langwatch/langwatch/pull/3524) branch) wires `triggerActionDispatch` so the destinationConfig values below start working:
 
@@ -12693,7 +12701,7 @@ Until C3 lands, leave destinationConfig empty (`{}`) and rely on the dashboard t
 
 Two angles, same data:
 
-**Web**: open `/governance` and look for the rule's name in the "Recent anomalies" section. Each fire creates one row keyed by `(ruleId, triggerWindowStart)` so the reactor doesn't double-alert on a single window.
+**Web**: open `/governance` and look for the rule's name in the "Recent anomalies" section. Each fire creates one row keyed by `(ruleId, triggerWindowStart)` so a single window doesn't produce duplicate alerts.
 
 **CLI**: `langwatch governance status` shows `hasAnomalyRules: true` once at least one rule exists. The `recentAnomalies` query is wired into the same `api.activityMonitor.recentAnomalies` tRPC procedure the dashboard reads.
 
@@ -12701,13 +12709,13 @@ For a dogfood loop you can drive yourself:
 
 1. Create a `spend_spike` rule scoped to your test IngestionSource with `minBaselineUsd: 0.001` (tiny floor) and `ratioVsBaseline: 1.5`.
 2. Send one OTel event with `gen_ai.usage.cost_usd: 0.05` (baseline seed), see [otel-generic, Test it now](/ai-gateway/governance/ingestion-sources/otel-generic#test-it-now--copy-paste-curl).
-3. Wait long enough for the baseline window to roll past the seed (default `windowSec: 86400` means 24h, so use the tighter values from the table above for fast iteration).
+3. Wait long enough for the seed to fall out of the current window and into the baseline behind it (a `windowSec` of 86400 means 24h, so use the tighter values from the table above for fast iteration).
 4. Send a second event with `gen_ai.usage.cost_usd: 2.00` (the spike).
-5. Reload `/governance`, the alert should appear in "Recent anomalies" with `state: open` and a populated `detail.ratio`.
+5. Give the next detection sweep a few minutes, then reload `/governance`, the alert should appear in "Recent anomalies" with `state: open` and a populated `detail.ratio`.
 
 ## What's persisted vs what's evaluated
 
-A rule that's persisted but unevaluated is intentional, admins can pre-stage rules so when the reactor slice ships, no rework. But it's a real failure mode if you don't know which is which. The two coverage tables above are the source of truth: **only `spend_spike` + (`organization` | `source_type` | `source`) actually fires today**. Everything else is preview state.
+A rule that's persisted but unevaluated is intentional, admins can pre-stage rules so when detection for that rule type ships, no rework. But it's a real failure mode if you don't know which is which. The two coverage tables above are the source of truth: **only `spend_spike` + (`organization` | `source_type` | `source`) actually fires today**. Everything else is preview state.
 
 ---
 
@@ -13382,7 +13390,7 @@ description: How LangWatch AI Gateway governance underwrites SOC 2 Type II, ISO 
 sidebarTitle: Compliance architecture
 ---
 
-<Info>**Pairs with:** [AI Gateway → Audit](/ai-gateway/audit). The gateway emits the spans; governance reactors fold them into OCSF-mapped events for SIEM export.</Info>
+<Info>**Pairs with:** [AI Gateway → Audit](/ai-gateway/audit). The gateway emits the spans; governance projections derive OCSF-mapped events from them for SIEM export, and can re-derive them from the event log at any time.</Info>
 
 <Note>**Available on Enterprise plans.** The OCSF/SIEM export, multi-class retention, and tamper-evidence (post-GA follow-up) covered on this page require an Enterprise license. The Apache 2.0 floor still gives you a single trace store with `thirty_days` retention and append-only event_log; the compliance underwriting documented below is the Enterprise extension. See [Open-core licensing](/ai-governance/overview#open-core-licensing) for the full Apache 2.0, Enterprise split.</Note>
 
@@ -13416,16 +13424,17 @@ This page maps each compliance framework you might need to which mechanisms in L
                 ┌─────────────────┼─────────────────┐
                 ▼                 ▼                 ▼
      ┌─────────────────┐ ┌─────────────────┐ ┌────────────────────┐
-     │ governance_kpis │ │governance_ocsf  │ │  Trace viewer      │
-     │     (fold)      │ │  _events (fold) │ │  Log detail pane   │
-     └─────────────────┘ └─────────────────┘ │  Existing UI       │
-              │                  │           └────────────────────┘
+     │ governance_kpis │ │ governance_ocsf │ │  Trace viewer      │
+     │  (projection)   │ │    _events      │ │  Log detail pane   │
+     │                 │ │  (projection)   │ │  Existing UI       │
+     └─────────────────┘ └─────────────────┘ └────────────────────┘
+              │                  │
               ▼                  ▼
-     ┌─────────────────┐ ┌──────────────────────┐
-     │ Anomaly reactor │ │ OCSF read API        │
-     │ /governance KPI │ │ (SIEM cron-pull,     │
-     │     strip       │ │  Splunk/Datadog/etc.)│
-     └─────────────────┘ └──────────────────────┘
+     ┌───────────────────┐ ┌──────────────────────┐
+     │ Anomaly detection │ │ OCSF read API        │
+     │ /governance KPI   │ │ (SIEM cron-pull,     │
+     │      strip        │ │  Splunk/Datadog/etc.)│
+     └───────────────────┘ └──────────────────────┘
 ```
 
 **Governance is origin metadata, not a parallel pipeline.** Two URL surfaces (project-keyed vs IngestionSource-bearer-keyed) share one hardened parser, one trace pipeline, one set of `recorded_spans` + `log_records` tables, one set of compliance controls. The architecture decision is captured in [ADR-018](https://github.com/langwatch/langwatch/blob/main/dev/docs/adr/018-governance-unified-observability-substrate.md).
@@ -13552,7 +13561,7 @@ description: Where the LangWatch CLI, AI Gateway, web app, and Activity Monitor 
 sidebarTitle: Control plane
 ---
 
-<Info>**Pairs with:** [AI Gateway → Overview](/ai-gateway/overview). The gateway is the data plane (request path); this page is the control plane (configuration + fold reactors) that sits next to it in the same compose stack and Helm chart.</Info>
+<Info>**Pairs with:** [AI Gateway → Overview](/ai-gateway/overview). The gateway is the data plane (request path); this page is the control plane (configuration + the projections derived from those spans) that sits next to it in the same compose stack and Helm chart.</Info>
 
 LangWatch is positioned as a **control plane** above every AI tool an
 enterprise uses, not just the ones whose API key path you own. The
@@ -14605,14 +14614,14 @@ The deep reference for budget shape, fallback semantics, and the WARN response t
 
 ## Step 8: Write your first anomaly rule
 
-Budgets enforce *at* the limit. [Anomaly rules](/ai-governance/anomaly-rules) detect *before* it, the patterns that precede a breach (spend spike, geo-mismatch, off-hours usage). The reactor evaluates `spend_spike` rules live today; other rule types are preview-only (the [coverage table](/ai-governance/anomaly-rules#rule-type-coverage) is honest about which is which).
+Budgets enforce *at* the limit. [Anomaly rules](/ai-governance/anomaly-rules) detect *before* it, the patterns that precede a breach. `spend_spike` rules are evaluated today; other rule types are preview-only (the [coverage table](/ai-governance/anomaly-rules#rule-type-coverage) is honest about which is which).
 
 Write a starter `spend_spike` rule:
 
 1. Navigate to **Settings → AI Governance → Anomaly Rules** (`/settings/governance/anomaly-rules`).
 2. Click **+ New anomaly rule**.
 3. Fill in:
-   - **Name**: `Daily spend doubles vs last week`
+   - **Name**: `Daily spend doubles vs the recent norm`
    - **Severity**: `warning`
    - **Rule type**: `spend_spike`
    - **Scope**: `organization`
@@ -14620,14 +14629,13 @@ Write a starter `spend_spike` rule:
      ```json
      {
        "windowSec": 86400,
-       "baselineOffsetSec": 604800,
        "ratioVsBaseline": 2.0,
        "minBaselineUsd": 1.0
      }
      ```
 4. Click **Create rule**.
 
-The reactor will start evaluating from the next ingest event. When today's 24h spend exceeds 2× last week's same-day baseline (and the baseline was at least \$1, to avoid noise on quiet days), the reactor writes an `AnomalyAlert` row visible in `/governance` and surfaces it in the [`activityMonitor.recentAnomalies`](/ai-governance/anomaly-rules) procedure.
+The rule joins the next detection sweep, which runs every few minutes. When today's 24h spend exceeds 2× the average of the previous six days (and that average was at least \$1, to avoid noise on quiet days), LangWatch writes an `AnomalyAlert` row visible in `/governance` and surfaces it in the [`activityMonitor.recentAnomalies`](/ai-governance/anomaly-rules) procedure.
 
 ## Where to next
 
@@ -53644,7 +53652,7 @@ Three things to know before flipping it on:
 
 1. **One Secret holds everything** (or use `autogen.enabled=true` and let the chart materialise it). Both `langwatch-app` and the AI gateway pod mount `LW_GATEWAY_INTERNAL_SECRET` + `LW_GATEWAY_JWT_SECRET` from the same `secrets.existingSecret` Secret (default `langwatch-app-secrets`) that also holds the app keys (`credentialsEncryptionKey`, `cronApiKey`, `nextAuthSecret`, `virtualKeyPepper`). The [Production Deployment](#production-deployment) section above shows the single `kubectl create secret generic` command. With `autogen.enabled=false` and any required key missing, the preflight Job aborts the install with a clear list of what is missing; under `autogen.enabled=true` the chart materialises the Secret on first install via lookup-or-rand.
 2. **Public ingress needs DNS + TLS.** The gateway is what your LLM clients hit, so it usually wants its own hostname (e.g. `gateway.your-corp.com`), separate cert, separate ingress rule. See [AI Gateway → Self-hosting → DNS & TLS](/ai-gateway/self-hosting/dns-and-tls).
-3. **Worker pods must be running.** Budget enforcement reads from a ClickHouse rollup that the trace-processing reactor folds into. If you deploy with `workers.enabled=false`, budgets stop accumulating spend and breach enforcement silently degrades. The default `workers.enabled=true` is correct for production.
+3. **Worker pods must be running.** Budget enforcement reads from a ClickHouse rollup that the trace-processing pipeline's budget-debit projection writes into. If you deploy with `workers.enabled=false`, budgets stop accumulating spend and breach enforcement silently degrades. The default `workers.enabled=true` is correct for production.
 
 ## Upgrade
 
@@ -55055,7 +55063,7 @@ Press `e` or click the toggle to open a detailed JSON viewer in the right panel 
 
 ## Projection State
 
-The left panel lists all available **projections** and **reactors** for the aggregate type. Select a projection to compute its state at the current event position.
+The left panel lists the **fold projections** and **event subscribers** registered for the aggregate type. Select a fold projection to compute its state at the current event position.
 
 This is the core of the time-travel capability: you can step through events and watch how a projection's state evolves with each event.
 

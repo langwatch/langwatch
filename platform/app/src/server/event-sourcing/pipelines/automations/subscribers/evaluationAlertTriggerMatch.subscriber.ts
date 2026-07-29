@@ -1,23 +1,16 @@
-import { createLogger } from "@langwatch/observability";
 import {
   NOTIFY_TRIGGER_ACTIONS,
   triggerReadsEvaluations,
 } from "~/server/app-layer/automations/dispatch/triggerActionDispatch";
 import type { TriggerService } from "~/server/app-layer/automations/trigger.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
 import type { TriggerMatchRecordedEventData } from "~/server/event-sourcing/pipelines/automations/schemas/events";
 import {
   EVALUATION_COMPLETED_EVENT_TYPE,
   EVALUATION_REPORTED_EVENT_TYPE,
 } from "~/server/event-sourcing/pipelines/evaluation-processing/schemas/constants";
 import type { EvaluationProcessingEvent } from "~/server/event-sourcing/pipelines/evaluation-processing/schemas/events";
-import type { FoldProjectionStore } from "~/server/event-sourcing/projections/foldProjection.types";
 import type { EventSubscriberDefinition } from "~/server/event-sourcing/subscribers/eventSubscriber.types";
-
-const logger = createLogger(
-  "langwatch:triggers:evaluation-alert-trigger-match-subscriber",
-);
 
 /** Debounce window before an evaluation outcome is matched against automations. */
 const EVALUATION_ALERT_TRIGGER_MATCH_DELAY_MS = 10_000;
@@ -48,7 +41,18 @@ export interface RecordTriggerMatchPort {
 
 interface EvaluationAlertTriggerMatchDeps {
   triggers: TriggerService;
-  traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
+  /**
+   * The committed trace summary, read by identity — the same narrow port the
+   * trace-alert subscriber and the evaluation trigger's dispatch take
+   * (ADR-082 layer 4). Handing the whole `FoldProjectionStore` over would give
+   * this reader write access it never uses and let three call sites disagree
+   * about which tier they read.
+   */
+  readTraceSummary: (params: {
+    tenantId: string;
+    traceId: string;
+    occurredAtMs?: number;
+  }) => Promise<TraceSummaryData | null>;
   recordTriggerMatch: RecordTriggerMatchPort;
 }
 
@@ -95,6 +99,21 @@ function readAlertableOutcome(
  * unalertable event minting a job at all; as the first thing `handle` does it
  * keeps the subscriber correct for jobs a build without the filter already
  * staged, which a rolling deploy leaves in the queue.
+ *
+ * **A trace whose summary cannot be read throws**, matching the two siblings
+ * that ask the same question — `traceAlertTriggerMatch.subscriber` and
+ * `evaluationTriggerIntentHandlers`. A miss is "we could not find out", not
+ * "this evaluation matches nothing", and this subscriber has the WIDEST race of
+ * the three: the summary is written by the trace pipeline, so the fold it reads
+ * is not even on the stream it consumes and no amount of debounce orders the
+ * two. Returning would drop that evaluation's alerts silently and permanently —
+ * "the next event asks again" does not hold, because an evaluation's terminal
+ * outcome arrives once and the dedup key covers it. Throwing hands the job back
+ * to the group queue, which retries with backoff and parks the group per
+ * (subscriber, tenant, evaluation) once the budget is spent, so a trace that
+ * never folds is visible and self-limiting. The declines above — a non-terminal
+ * status, no trace id, an event past the age cutoff — are answers, and answers
+ * do not retry.
  */
 export function createEvaluationAlertTriggerMatchSubscriber(
   deps: EvaluationAlertTriggerMatchDeps,
@@ -128,16 +147,19 @@ export function createEvaluationAlertTriggerMatchSubscriber(
       if (!outcome) return;
       const { traceId } = outcome;
 
-      const traceSummary = await deps.traceSummaryStore.get(traceId, {
-        tenantId: createTenantId(context.tenantId),
-        aggregateId: traceId,
+      const traceSummary = await deps.readTraceSummary({
+        tenantId: context.tenantId,
+        traceId,
+        occurredAtMs: event.occurredAt,
       });
+      // Not "this evaluation matches nothing" — "we could not find out".
+      // Throwing hands the job back to the queue, which asks again on the next
+      // attempt; returning would drop this evaluation's alerts with nothing
+      // recorded. See the docblock above.
       if (!traceSummary) {
-        logger.debug(
-          { tenantId: context.tenantId, traceId },
-          "Trace summary not found for evaluation automation match",
+        throw new Error(
+          `Trace summary not found for evaluation-alert trigger match (trace ${traceId})`,
         );
-        return;
       }
       const triggers = await deps.triggers.getActiveTraceTriggersForProject(
         context.tenantId,

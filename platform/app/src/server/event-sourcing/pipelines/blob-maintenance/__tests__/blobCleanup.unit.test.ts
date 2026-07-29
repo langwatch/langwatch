@@ -43,6 +43,7 @@ const wakeContext = (at: number) => ({
 describe("blobCleanup process", () => {
   describe("given the schedule fires", () => {
     describe("when the wake handler runs", () => {
+      /** @scenario "The runner is driven by the schedule, not by a request" */
       it("emits one sweep intent keyed by the tick", () => {
         const evolution = blobCleanupWake(
           { lastSweepAt: null },

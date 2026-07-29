@@ -19,29 +19,63 @@ process managers.
 
 ## Subscribers
 
-`withSubscriber` supports raw event delivery or sequencing behind a fold/map
-projection:
+`withEventSubscriber` is the only subscriber form. It takes an
+`EventSubscriberDefinition`: a name, the event types it wants, a `handle`
+function, and delivery `options`. There is no fold-bound variant — the context a
+handler receives is `{ tenantId, aggregateId }` and nothing else.
 
 ```ts
-.withSubscriber("triggerMatch", {
-  fold: "traceSummary",
-  events: [SPAN_RECEIVED_EVENT_TYPE, ORIGIN_RESOLVED_EVENT_TYPE],
-  when: event => isRelevant(event),
-  delay: 30_000,
-  ttl: 30_000,
-  dedupId: event => String(event.aggregateId),
-  handler: async (event, ctx) => {
-    // ctx.state is the committed traceSummary fold.
+.withEventSubscriber("triggerMatch", {
+  name: "triggerMatch",
+  eventTypes: [SPAN_RECEIVED_EVENT_TYPE, ORIGIN_RESOLVED_EVENT_TYPE],
+  options: {
+    delay: 30_000,
+    deduplication: {
+      makeId: event => `subscriber:triggerMatch:${event.tenantId}:${String(event.aggregateId)}`,
+      ttlMs: 30_000,
+    },
+    enqueue: {
+      filter: event => event.occurredAt >= Date.now() - STALE_TRACE_THRESHOLD_MS,
+    },
+  },
+  async handle(event, context) {
+    // context is { tenantId, aggregateId }. No projection state.
   },
 })
 ```
 
-- `fold` or `map` sequences after that projection and supplies committed
-  `ctx.state`.
-- `events` filters event types. Without `fold`/`map`, it is a raw subscriber.
-- `when` is a pure pre-enqueue filter.
-- `delay`, `ttl`, `dedup`, and `dedupId` configure GroupQueue delivery.
-- Fold state is inferred from the named projection through the builder chain.
+The name passed to `.withEventSubscriber` must equal `definition.name`; the
+builder throws on a mismatch.
+
+- `eventTypes` filters event types. Empty means every type on the pipeline.
+- `delay` defers delivery; `deduplication` (`"aggregate"`, or
+  `{ makeId, ttlMs }`) collapses a burst; `groupKeyFn` overrides the queue's
+  group key.
+- `enqueue.filter` runs at fan-out, before a job is staged, so a declined event
+  costs nothing. `enqueue.stage` swaps the staged payload for a claim-check
+  reference (ADR-069).
+- `disabled` is the compile-time off switch; `killSwitch` is the per-tenant
+  runtime one.
+
+**`enqueue` hooks must be total, and a throw there is unrecoverable.** They run
+in the routing worker, which has no retry: a throw is reported loudly and the
+job for that `(subscriber, event)` pair is lost permanently. Restrict them to a
+set lookup, a `typeof` check or a field comparison. Anything data-dependent or
+fallible belongs in `handle`, whose own lane the queue does retry.
+
+### A subscriber that needs committed projection state
+
+Take a narrow read port for it — one function, the smallest signature that
+answers the question — and inject it as a dep. Do not widen the event, and do
+not reach for the fold from inside the handler.
+
+The read races the fold. A subscriber fires on delivery, not after a projection
+commits, so the row may not be there yet even though it will be. **Treat a miss
+as "we could not find out", never as "there is nothing".** Throw, and let the
+queue ask again with backoff; returning drops the work silently and permanently,
+because the dedup key usually covers the whole burst and no second job will
+arrive to heal it. `ee/governance/subscribers/traceAlertTriggerMatch.subscriber.ts`
+is the worked example.
 
 Subscribers may read query projections and call services, but they must stay
 lightweight at source-pipeline volume. Do not put per-trace Postgres process
@@ -138,9 +172,16 @@ Re-read trace/message content at the execution boundary from its canonical
 store. This makes the persisted schemas a reviewable proof that customer
 content is not copied into Postgres.
 
-## Existing reactors
+## What no longer exists
 
-`withReactor` still exists for current plain post-projection reactors. Do not
-mechanically migrate unrelated reactors while changing a domain. New code
-should choose deliberately between `withSubscriber` and `withProcessManager`;
-the removed `withOutbox` primitive is not an option.
+The reactor is retired (ADR-075). `ReactorDefinition`, `ReactorContext`,
+`ReactorOptions` and `withReactor` are gone, as are the earlier fold-bound
+`withSubscriber` and the `withOutbox` primitive before it. The builder's whole
+surface is `withName`, `withAggregateType`, `withProjection`,
+`withFoldProjection`, `withMapProjection`, `withFeatureFlagService`,
+`withEventSubscriber`, `withProcessManager`, `withCommand` and
+`withCommandInstance`.
+
+Post-event work is an event subscriber or a process manager, and nothing else.
+Derived state that someone later reads as fact is neither — it is a projection,
+so replay rebuilds it.

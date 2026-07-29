@@ -427,6 +427,7 @@ describe("GroupStagingScripts", () => {
     });
 
     describe("extend/replace flags", () => {
+      /** @scenario "Custom deduplication with extended TTL" */
       it("updates score when extend is true", async () => {
         await scripts.stage(
           makeJob({
@@ -597,7 +598,7 @@ describe("GroupStagingScripts", () => {
     });
 
     // A dedup squash drops one payload on the floor. When that payload carried
-    // an offloaded blob (ADR-026) the blob would leak until its 7-day TTL (the
+    // an offloaded blob (ADR-090) the blob would leak until its 7-day TTL (the
     // 2026-06-11 Redis capacity incident). stage()/stageBatch() report the
     // displaced value so GroupQueue can reclaim its blob; these lock the
     // reporting contract at the script layer (which is itself blob-agnostic).
@@ -617,6 +618,7 @@ describe("GroupStagingScripts", () => {
       });
 
       describe("when a dedup squash displaces a staged payload", () => {
+        /** @scenario "Offloaded blobs displaced by a dedup squash are reclaimed" */
         it("reports the displaced OLD value on replace", async () => {
           const oldValue = JSON.stringify({ v: 1 });
           await scripts.stage(
@@ -2687,7 +2689,7 @@ describe("GroupStagingScripts", () => {
       });
     });
 
-    // ADR-026: staged values are GQ1 envelopes whose routing fields live in a
+    // ADR-090: staged values are GQ1 envelopes whose routing fields live in a
     // tiny header so the Lua pause-check never decodes the (gzipped) body.
     describe("when head-of-line job is envelope-encoded", () => {
       beforeEach(() => {

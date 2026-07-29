@@ -42,6 +42,8 @@ describe("ReplacingMergeTree + TTL retention compatibility", () => {
     await client.close();
   });
 
+  /** @scenario "TTL expression evaluates correctly for active retention" */
+  /** @scenario "ReplacingMergeTree dedup runs before TTL" */
   it("deletes expired rows, preserves indefinite and not-expired rows after merge", async () => {
     const twoDaysAgo = new Date(Date.now() - 2 * 86400000);
     const now = new Date();
@@ -151,6 +153,7 @@ describe("ReplacingMergeTree + TTL retention compatibility", () => {
     }
   });
 
+  /** @scenario "Row-level TTL precision in shared partitions" */
   it("handles mixed-tenant partitions correctly", async () => {
     const threeDaysAgo = new Date(Date.now() - 3 * 86400000);
 

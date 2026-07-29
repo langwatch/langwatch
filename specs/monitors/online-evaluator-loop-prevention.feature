@@ -138,26 +138,26 @@ Feature: Online-evaluator infinite-loop prevention
   # nlpgo-side guarantees (Go tests live in services/nlpgo/...)
   # ============================================================================
 
-  @go @nlpgo @propagation
+  @integration @go @nlpgo @propagation
   Scenario: nlpgo handler extracts traceparent header and continues parent trace
     Given a POST to /go/studio/execute_sync with header "traceparent: 00-<traceId>-<spanId>-01"
     When nlpgo creates its root studio span
     Then the studio span shares trace_id with the parent
     And the studio span's parent_span_id equals the header's span_id
 
-  @go @nlpgo @depth-increment
+  @integration @go @nlpgo @depth-increment
   Scenario: nlpgo handler increments causality_depth on its root span
     Given a POST to /go/studio/execute_sync with header "X-LangWatch-Causality-Depth: 0"
     When nlpgo creates its root studio span
     Then the root span attribute "langwatch.reserved.causality_depth" equals "1"
 
-  @go @nlpgo @span-processor
+  @integration @go @nlpgo @span-processor
   Scenario: Every span emitted during an nlpgo evaluator run carries causality_depth via SpanProcessor
     Given a POST to /go/studio/execute_sync with header "X-LangWatch-Causality-Depth: 0"
     When nlpgo runs the evaluator workflow producing multiple child and grandchild spans
     Then every emitted span (root, child, grandchild) carries attribute "langwatch.reserved.causality_depth" = "1"
 
-  @go @nlpgo @outbound
+  @integration @go @nlpgo @outbound
   Scenario: Outbound HTTP from nlpgo evaluator block carries traceparent + baggage + depth header
     Given an nlpgo evaluator block makes an outbound HTTP call
     Then the outbound request carries header "traceparent"

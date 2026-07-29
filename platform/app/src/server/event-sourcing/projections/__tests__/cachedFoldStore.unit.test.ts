@@ -157,6 +157,7 @@ function createStore<
 describe("CachedFoldStore", () => {
   describe("given a cached entry", () => {
     describe("when the fold reads state", () => {
+      /** @scenario "A cached entry is served without reading the durable store" */
       it("returns the cached state without reading the durable store", async () => {
         const redis = createCache();
         const { store, inner } = createStore(redis);
@@ -173,6 +174,7 @@ describe("CachedFoldStore", () => {
   describe("given no cached entry", () => {
     describe("when the fold reads state", () => {
       /** @scenario a cold cache recovers state from the store, not the event log */
+      /** @scenario "A miss reads the durable store" */
       it("reads the durable store, which confirmation proves authoritative", async () => {
         const redis = createCache();
         const { store, inner } = createStore(redis);
@@ -209,6 +211,7 @@ describe("CachedFoldStore", () => {
 
   describe("given Redis is unreachable", () => {
     describe("when the fold reads state", () => {
+      /** @scenario "A corrupt cached entry is treated as a miss" */
       it("falls through to the durable store rather than failing the fold", async () => {
         const redis = createCache();
         redis.read.mockRejectedValueOnce(new Error("connection lost"));
@@ -278,6 +281,44 @@ describe("CachedFoldStore", () => {
 
         expect(inner.calls.get).toEqual(["agg-1"]);
         expect(result).toEqual({ count: 1, UpdatedAt: 100 });
+      });
+
+      /**
+       * The rotation is what the version key COSTS, and it is deliberate: the
+       * previous version's entry is still live — a reader on that version is
+       * served from it — and the new version passes it over anyway. So a miss
+       * after a version change carries none of the settling the TTL contract
+       * infers from an ordinary miss: the write behind it may be seconds old,
+       * and the durable read that answers instead may be a lagging replica.
+       * Pinned here because it is the one deploy-time correctness cost of
+       * keying by version, and it is paid on purpose.
+       *
+       * @scenario state cached under an older shape is passed over even while it is still warm
+       */
+      it("passes over the previous version's live entry rather than waiting for it to expire", async () => {
+        const redis = createCache();
+        const previous = new CachedFoldStore<TestState>(
+          versioned(createInnerStore().store, "2026-07-01"),
+          redis.client,
+          { keyPrefix: "test_table" },
+        );
+        await previous.store({ count: 5, UpdatedAt: 200 }, CONTEXT);
+
+        // The durable tier answers with older state, which is what a replica
+        // that has not caught up with that write looks like.
+        const inner = createInnerStore({ count: 1, UpdatedAt: 100 });
+        const current = new CachedFoldStore<TestState>(
+          versioned(inner.store, "2026-07-28"),
+          redis.client,
+          { keyPrefix: "test_table" },
+        );
+
+        const afterChange = await current.get("agg-1", CONTEXT);
+        const stillWarm = await previous.get("agg-1", CONTEXT);
+
+        expect(afterChange).toEqual({ count: 1, UpdatedAt: 100 });
+        expect(stillWarm).toEqual({ count: 5, UpdatedAt: 200 });
+        expect(inner.calls.get).toEqual(["agg-1"]);
       });
     });
 
@@ -415,6 +456,7 @@ describe("CachedFoldStore", () => {
   });
 
   describe("given a retry whose applied-set is gone", () => {
+    /** @scenario "A corrupt cached entry is treated as a miss" */
     it("counts it, because the batch is about to be re-applied on top of itself", async () => {
       // The dangerous case is invisible in the existing signals: a miss on a
       // retry and a miss on a fresh delivery are the same observation, and the

@@ -170,8 +170,10 @@ func TestControlPlaneBucketSeparatorsAreStable(t *testing.T) {
 }
 
 // The debit attribution seam: the gateway stamps the dispatched provider on
-// the customer span; the control plane's accumulation allowlist and the
-// trace-fold reactor read the same key. If either side renames it,
+// the customer span, and the control plane reads that same key back on two
+// paths — the gateway-budget map projection derives each debit's provider from
+// the span directly, and the accumulation allowlist keeps the key visible on
+// the trace fold for everything else. If either side renames it,
 // provider-filtered budgets stop accruing, and the failure is silent: every request
 // still succeeds. This test makes the drift loud.
 func TestSpanAttributeContractForProviderAttribution(t *testing.T) {
@@ -185,9 +187,17 @@ func TestSpanAttributeContractForProviderAttribution(t *testing.T) {
 		t.Error("the accumulation allowlist dropped langwatch.model_provider_id, so the fold will never see the provider")
 	}
 
-	reactor := readControlPlaneSource(t, "ee", "governance", "reactors", "gatewayBudgetSync.reactor.ts")
-	if !strings.Contains(reactor, `attributes["`+customertracebridge.AttrModelProviderID+`"]`) {
-		t.Error("gatewayBudgetSync.reactor.ts no longer reads langwatch.model_provider_id off the fold state")
+	projection := readControlPlaneSource(t,
+		"ee", "governance", "projections", "gatewayBudgetDebits.mapProjection.ts")
+	if !strings.Contains(projection, `"`+customertracebridge.AttrModelProviderID+`"`) {
+		t.Error("gatewayBudgetDebits.mapProjection.ts no longer declares langwatch.model_provider_id")
+	}
+	// Declaring the constant is not enough — the projection has to read it off
+	// the span it is deriving the debit from. Pinning the use as well as the
+	// name is what keeps a rename from passing this test while provider-filtered
+	// budgets quietly stop accruing.
+	if !strings.Contains(projection, "spanAttributes[GATEWAY_MODEL_PROVIDER_ID_ATTR]") {
+		t.Error("gatewayBudgetDebits.mapProjection.ts no longer reads langwatch.model_provider_id off the span")
 	}
 }
 

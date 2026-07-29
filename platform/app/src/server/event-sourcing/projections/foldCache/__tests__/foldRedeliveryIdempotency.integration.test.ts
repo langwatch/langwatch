@@ -281,6 +281,7 @@ describe.skipIf(!hasTestcontainers)("fold redelivery idempotency", () => {
   describe("given a fold job that fails after its state was stored", () => {
     describe("when the queue redelivers it", () => {
       /** @scenario "The same event delivered twice counts once" */
+      /** @scenario "A redelivered event is not applied twice" */
       it("counts the event once, not twice", async () => {
         const { queue, durable, applied } = createFoldQueue({
           keyPrefix: "it_redeliver_single",
@@ -340,6 +341,7 @@ describe.skipIf(!hasTestcontainers)("fold redelivery idempotency", () => {
 
   describe("given a batch failure that re-stages drained siblings", () => {
     describe("when a sibling leads the next attempt", () => {
+      /** @scenario "A sibling leading a retry is still recognised as a retry" */
       it("still reports a retry rather than a fresh delivery", async () => {
         // A re-staged sibling carries no attempt of its own. If that read as a
         // fresh delivery it would both restart the 25-attempt budget and, for a
@@ -407,6 +409,7 @@ describe.skipIf(!hasTestcontainers)("fold redelivery idempotency", () => {
 
   describe("given a retry chain where each attempt fails after storing", () => {
     describe("when new events arrive between attempts", () => {
+      /** @scenario "A retry chain remembers everything it has applied" */
       it("counts every distinct event once across the whole chain", async () => {
         // This is the case the applied-set accumulates FOR. Retry 1 skips the
         // redelivered batch and applies whatever arrived alongside it; if the
@@ -563,6 +566,7 @@ describe.skipIf(!hasTestcontainers)("fold redelivery idempotency", () => {
 
   describe("given the cache entry is lost before a redelivery", () => {
     describe("when the durable store keeps no applied-event watermark", () => {
+      /** @scenario "Losing the cached entry loses the protection" */
       it("double-counts — the known limit of a cache-held applied-set", async () => {
         // Not a bug report, a boundary scoped to a durable store WITHOUT an
         // applied-event watermark (the default `createDurableStore` here). For
@@ -676,6 +680,7 @@ describe.skipIf(!hasTestcontainers)("fold redelivery idempotency", () => {
 
   describe("applied-set lifecycle", () => {
     describe("given consecutive batches that all succeed", () => {
+      /** @scenario "A fresh delivery forgets what an acked batch applied" */
       it("keeps the set at one batch instead of growing without bound", async () => {
         const { queue, readAppliedIds, durable } = createFoldQueue({
           keyPrefix: "it_lifecycle_happy",

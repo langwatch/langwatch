@@ -13,6 +13,8 @@ import type {
 import type { EventSubscriberDefinition } from "../../subscribers/eventSubscriber.types";
 import { ReportUsageForMonthCommand } from "../billing-reporting/commands/reportUsageForMonth.command";
 import { createBillingMeterPokeSubscriber } from "../billing-reporting/subscribers/billingMeterPoke.subscriber";
+import { ContributeSpanFactsCommand } from "../coding-agent-processing/commands/contributeSpanFactsCommand";
+import { createCodingAgentSpanFactsDispatchSubscriber } from "../coding-agent-processing/subscribers/codingAgentSpanFactsDispatch.subscriber";
 import {
   AddAnnotationCommand,
   BulkSyncAnnotationsCommand,
@@ -22,51 +24,15 @@ import { AssignTopicCommand } from "./commands/assignTopicCommand";
 import { ChangeTraceNameCommand } from "./commands/changeTraceNameCommand";
 import { RecordLogContributionCommand } from "./commands/recordLogContributionCommand";
 import { RecordMetricCorrelationCommand } from "./commands/recordMetricCorrelationCommand";
-import {
-  RECORD_SPAN_DEDUPLICATION,
-  RecordSpanCommand,
-} from "./commands/recordSpanCommand";
+import { RecordSpanCommand } from "./commands/recordSpanCommand";
+import { recordSpanOptions } from "./commands/recordSpanOptions";
 import { ResolveOriginCommand } from "./commands/resolveOriginCommand";
-import {
-  clampSpanShardCount,
-  spanCommandGroupKey,
-} from "./commands/spanCommandGroupKey";
-import {
-  buildProcessEventView as buildCustomEvaluationSyncEventView,
-  CUSTOM_EVALUATION_SYNC_ENQUEUE,
-  handleSpanReceived as handleCustomEvaluationSpanReceived,
-} from "./process-manager/customEvaluationSync.process";
-import {
-  type CustomEvaluationSyncDispatchDeps,
-  createCustomEvaluationReportHandler,
-} from "./process-manager/customEvaluationSyncIntentHandlers";
-import {
-  CUSTOM_EVALUATION_SYNC_INTENT_TYPES,
-  CUSTOM_EVALUATION_SYNC_LEASE_DURATION_MS,
-  CUSTOM_EVALUATION_SYNC_MAX_ATTEMPTS,
-  CUSTOM_EVALUATION_SYNC_PROCESS_NAME,
-  customEvaluationReportIntentSchema,
-  customEvaluationSyncRetryDelayMs,
-  INITIAL_CUSTOM_EVALUATION_SYNC_STATE,
-} from "./process-manager/customEvaluationSyncProcess.types";
-import {
-  buildProcessEventView as buildEvaluationTriggerEventView,
-  EVALUATION_TRIGGER_ENQUEUE,
-  evaluationTriggerWake,
-  handleTraceActivity as handleEvaluationTriggerActivity,
-} from "./process-manager/evaluationTrigger.process";
-import {
-  createEvaluationTriggerRequestHandler,
-  type EvaluationTriggerDispatchDeps,
-} from "./process-manager/evaluationTriggerIntentHandlers";
-import {
-  EVALUATION_TRIGGER_INTENT_TYPES,
-  EVALUATION_TRIGGER_LEASE_DURATION_MS,
-  EVALUATION_TRIGGER_MAX_ATTEMPTS,
-  EVALUATION_TRIGGER_PROCESS_NAME,
-  evaluationTriggerRequestIntentSchema,
-  INITIAL_EVALUATION_TRIGGER_STATE,
-} from "./process-manager/evaluationTriggerProcess.types";
+import { customEvaluationSyncPM } from "./process-manager/customEvaluationSync.process";
+import type { CustomEvaluationSyncDispatchDeps } from "./process-manager/customEvaluationSyncIntentHandlers";
+import { CUSTOM_EVALUATION_SYNC_PROCESS_NAME } from "./process-manager/customEvaluationSyncProcess.types";
+import { evaluationTriggerPM } from "./process-manager/evaluationTrigger.process";
+import type { EvaluationTriggerDispatchDeps } from "./process-manager/evaluationTriggerIntentHandlers";
+import { EVALUATION_TRIGGER_PROCESS_NAME } from "./process-manager/evaluationTriggerProcess.types";
 import { originGatePM } from "./process-manager/originGate.process";
 import { ORIGIN_GATE_PROCESS_NAME } from "./process-manager/originGateProcess.types";
 import { SpanStorageMapProjection } from "./projections/spanStorage.mapProjection";
@@ -79,7 +45,6 @@ import {
   type TraceAnalyticsRollupRow,
 } from "./projections/traceAnalyticsRollup.mapProjection";
 import { TraceSummaryFoldProjection } from "./projections/traceSummary.foldProjection";
-import type { RecordSpanCommandData } from "./schemas/commands";
 import {
   ORIGIN_RESOLVED_EVENT_TYPE,
   SPAN_RECEIVED_EVENT_TYPE,
@@ -90,14 +55,24 @@ import { createProjectMetadataSubscriber } from "./subscribers/projectMetadata.s
 import { createSpanStorageBroadcastSubscriber } from "./subscribers/spanStorageBroadcast.subscriber";
 import { createTopicClusteringBootstrapSubscriber } from "./subscribers/topicClusteringBootstrap.subscriber";
 import { createTraceUpdateBroadcastSubscriber } from "./subscribers/traceUpdateBroadcast.subscriber";
-import { TraceRequestUtils } from "./utils/traceRequest.utils";
 
 /**
- * ADR-082 Rule 1 — nothing crossing this boundary is a value the builder
- * registers. The four subscribers, the three process managers and the billing
- * poke are all constructed here from imported factories, so this file states
- * the whole topology: what the pipeline folds, what it maps, what it dispatches
- * and what it defers.
+ * ADR-082 Rule 1, with one acknowledged exception — the enterprise block.
+ *
+ * Every OSS mount below is constructed here from an imported factory: the six
+ * subscribers, the three process managers, the four projections and the nine
+ * commands. So for the OSS half this file states the whole topology — what the
+ * pipeline folds, what it maps, what it dispatches and what it defers.
+ *
+ * The exception is the five `@ee`-owned members — `automations.triggerMatchSubscriber`,
+ * `gatewayBudgetDebitsProjection`, `virtualKeyLastUsedSubscriber`,
+ * `governanceKpisProjection` and `governanceOcsfEventsProjection`. Each IS a
+ * value the builder registers, which Rule 1 forbids, and each stays that way
+ * deliberately: ADR-082's "What does not move" holds that `ee/` cannot be
+ * imported unconditionally from an OSS pipeline file, so an enterprise
+ * definition crosses this boundary whole or the OSS build does not compile.
+ * They are the remaining ADR-082 step-7 work, and closing them needs an
+ * enterprise composition seam rather than a move.
  */
 export interface TraceProcessingPipelineDeps {
   spanAppendStore: AppendStore<NormalizedSpan>;
@@ -109,8 +84,9 @@ export interface TraceProcessingPipelineDeps {
   /**
    * ADR-082 §5 — identity-keyed command dispatch. Used here for a *self*
    * reference: the `originGate` process dispatches `resolveOrigin`, which this
-   * same pipeline registers, and for the billing poke's cross-pipeline hop into
-   * billing-reporting. Binding is eager, resolution is not.
+   * same pipeline registers; for the billing poke's cross-pipeline hop into
+   * billing-reporting; and for the coding-agent span-facts hop (ADR-056).
+   * Binding is eager, resolution is not.
    */
   commands: CommandBus;
   /** SSE fan-out for the trace drawer and the span tree. */
@@ -124,6 +100,17 @@ export interface TraceProcessingPipelineDeps {
   projects: ProjectService;
   /** ADR-051: (re-)arms this project's daily topic-clustering wake. */
   bootstrapTopicClustering: (projectId: string) => Promise<void>;
+  /**
+   * ADR-069's claim-check for the coding-agent span-facts dispatch: the staged
+   * job carries the span's identity and the handler reads the canonical row
+   * back out of the span store.
+   */
+  getNormalizedSpanById: (params: {
+    tenantId: string;
+    traceId: string;
+    spanId: string;
+    occurredAtMs: number;
+  }) => Promise<NormalizedSpan | null>;
   /** Monitor lookup, trace read-back and evaluation dispatch (ADR-075 Class D). */
   evaluationTriggerDispatch: EvaluationTriggerDispatchDeps;
   /** Span read-back and evaluation reporting for SDK-run evaluations. */
@@ -144,7 +131,8 @@ export interface TraceProcessingPipelineDeps {
   };
   /**
    * ADR-075 Class C: gateway spend is derived state, so it is a projection and
-   * a replay rebuilds it. Absent when ClickHouse is disabled.
+   * a replay rebuilds it. Absent when ClickHouse is disabled. EE-owned, so the
+   * definition crosses whole (see the interface docblock).
    */
   gatewayBudgetDebitsProjection?: MapProjectionDefinition<
     unknown,
@@ -163,19 +151,19 @@ export interface TraceProcessingPipelineDeps {
    * the historic per-trace group key; `> 1` spreads a trace's spans across
    * `traceId:<shard>` groups so a hot trace drains in parallel. The trace-summary
    * fold is unaffected — it runs on its own aggregate-keyed queue. See
-   * spanCommandGroupKey.ts.
+   * recordSpanOptions.ts and spanCommandGroupKey.ts.
    */
   spanCommandShardCount?: number;
+  /** EE-owned governance KPI stream; the definition crosses whole. */
   governanceKpisProjection?: MapProjectionDefinition<
     unknown,
     TraceProcessingEvent
   >;
+  /** EE-owned OCSF audit stream; the definition crosses whole. */
   governanceOcsfEventsProjection?: MapProjectionDefinition<
     unknown,
     TraceProcessingEvent
   >;
-  /** Cross-pipeline dispatchers (e.g. coding-agent span-facts, ADR-056). */
-  subscribers?: EventSubscriberDefinition<TraceProcessingEvent>[];
 }
 
 /**
@@ -215,62 +203,6 @@ export function createTraceProcessingPipeline(
         store: deps.traceAnalyticsRollupAppendStore,
       }),
     )
-    // A trace that never said where it came from gets an `application` origin
-    // once its grace period elapses. The wait is a durable deadline on the
-    // process instance, not a delayed job (ADR-073).
-    .withProcessManager(
-      ORIGIN_GATE_PROCESS_NAME,
-      originGatePM({
-        resolveOrigin: deps.commands.port(ResolveOriginCommand),
-      }),
-    )
-    // The project's on-message monitors run once the trace has gone quiet for a
-    // full period. The quiet period is re-armed by every message, so a
-    // conversation that resumes pushes its own evaluation out; every fallible
-    // guard lives in the intent handler, where a failure retries the ask
-    // instead of dropping it (ADR-075 Class D).
-    .withProcessManager(EVALUATION_TRIGGER_PROCESS_NAME, (pm) =>
-      pm
-        .state(INITIAL_EVALUATION_TRIGGER_STATE)
-        .intent(
-          EVALUATION_TRIGGER_INTENT_TYPES.REQUEST_EVALUATIONS,
-          evaluationTriggerRequestIntentSchema,
-          createEvaluationTriggerRequestHandler(deps.evaluationTriggerDispatch),
-        )
-        .on(SPAN_RECEIVED_EVENT_TYPE, handleEvaluationTriggerActivity)
-        .on(ORIGIN_RESOLVED_EVENT_TYPE, handleEvaluationTriggerActivity)
-        .onWake(evaluationTriggerWake)
-        .toPayload(buildEvaluationTriggerEventView)
-        .enqueue(EVALUATION_TRIGGER_ENQUEUE)
-        .outbox({
-          maxAttempts: EVALUATION_TRIGGER_MAX_ATTEMPTS,
-          leaseDurationMs: EVALUATION_TRIGGER_LEASE_DURATION_MS,
-        }),
-    )
-    // Evaluations an SDK ran itself arrive stapled to a span. The intent
-    // carries the span's identity alone and reads the verdicts back out of the
-    // span store (ADR-069's claim-check), so the retries are sized for losing
-    // the race against the sibling span write rather than for a failing
-    // command.
-    .withProcessManager(CUSTOM_EVALUATION_SYNC_PROCESS_NAME, (pm) =>
-      pm
-        .state(INITIAL_CUSTOM_EVALUATION_SYNC_STATE)
-        .intent(
-          CUSTOM_EVALUATION_SYNC_INTENT_TYPES.REPORT_EVALUATIONS,
-          customEvaluationReportIntentSchema,
-          createCustomEvaluationReportHandler(
-            deps.customEvaluationSyncDispatch,
-          ),
-        )
-        .on(SPAN_RECEIVED_EVENT_TYPE, handleCustomEvaluationSpanReceived)
-        .toPayload(buildCustomEvaluationSyncEventView)
-        .enqueue(CUSTOM_EVALUATION_SYNC_ENQUEUE)
-        .outbox({
-          maxAttempts: CUSTOM_EVALUATION_SYNC_MAX_ATTEMPTS,
-          leaseDurationMs: CUSTOM_EVALUATION_SYNC_LEASE_DURATION_MS,
-          retryDelayMs: customEvaluationSyncRetryDelayMs,
-        }),
-    )
     .withEventSubscriber(
       "traceUpdateBroadcast",
       createTraceUpdateBroadcastSubscriber({
@@ -308,6 +240,16 @@ export function createTraceProcessingPipeline(
         isSaas: deps.isSaas,
       }),
     )
+    // Cross-pipeline dispatch (ADR-056 §2): coding-agent span facts. The port
+    // binds now and resolves on first dispatch, so coding-agent registration
+    // order relative to this pipeline carries no meaning.
+    .withEventSubscriber(
+      "codingAgentSpanFactsDispatch",
+      createCodingAgentSpanFactsDispatchSubscriber({
+        contributeSpanFacts: deps.commands.port(ContributeSpanFactsCommand),
+        getNormalizedSpanById: deps.getNormalizedSpanById,
+      }),
+    )
     .withEventSubscriber(
       "triggerMatch",
       deps.automations.triggerMatchSubscriber,
@@ -318,8 +260,29 @@ export function createTraceProcessingPipeline(
         eventTypes: [SPAN_RECEIVED_EVENT_TYPE, ORIGIN_RESOLVED_EVENT_TYPE],
         handler: deps.automations.graphActivityHandler,
       }),
+    )
+    // A trace that never said where it came from gets an `application` origin
+    // once its grace period elapses. The wait is a durable deadline on the
+    // process instance, not a delayed job (ADR-073).
+    .withProcessManager(
+      ORIGIN_GATE_PROCESS_NAME,
+      originGatePM({
+        resolveOrigin: deps.commands.port(ResolveOriginCommand),
+      }),
+    )
+    .withProcessManager(
+      EVALUATION_TRIGGER_PROCESS_NAME,
+      evaluationTriggerPM(deps.evaluationTriggerDispatch),
+    )
+    .withProcessManager(
+      CUSTOM_EVALUATION_SYNC_PROCESS_NAME,
+      customEvaluationSyncPM(deps.customEvaluationSyncDispatch),
     );
 
+  // The enterprise block. Each of these IS a value the builder registers, which
+  // ADR-082 Rule 1 forbids everywhere else in this file — see the `Deps`
+  // docblock for why the OSS/EE boundary keeps them injected, and the `if`
+  // guard for how an OSS build stays free of them.
   if (deps.gatewayBudgetDebitsProjection) {
     builder = builder.withMapProjection(
       "gatewayBudgetDebits",
@@ -348,55 +311,22 @@ export function createTraceProcessingPipeline(
     );
   }
 
-  for (const subscriber of deps.subscribers ?? []) {
-    builder = builder.withEventSubscriber(subscriber.name, subscriber);
-  }
-
-  // Span-command sharding: when the shard count is > 1, install a getGroupKey
-  // that spreads a trace's recordSpan commands across `traceId:<shard>`
-  // GroupQueue groups so a hot trace drains in parallel instead of one span at a
-  // time. When disabled (the default), install NO getGroupKey — the command
-  // falls back to getAggregateId, byte-identical to the historic per-trace key
-  // and with zero extra work on the span-ingest hot path. The count is clamped
-  // defensively so a caller constructing the pipeline directly (bypassing
-  // PipelineRegistry's env resolver) can't explode the number of groups. The
-  // command handler reads no trace state and the emitted span_received event
-  // still carries aggregateId = traceId, so the trace-summary fold (its own
-  // aggregate-keyed queue) is unaffected and the summary stays exact. See
-  // spanCommandGroupKey.ts and specs/event-sourcing/span-command-sharding.feature.
-  const spanCommandShardCount = clampSpanShardCount(
-    deps.spanCommandShardCount ?? 1,
-  );
-  const recordSpanOptions: {
-    deduplication: typeof RECORD_SPAN_DEDUPLICATION;
-    getGroupKey?: (payload: RecordSpanCommandData) => string;
-  } = { deduplication: RECORD_SPAN_DEDUPLICATION };
-  if (spanCommandShardCount > 1) {
-    recordSpanOptions.getGroupKey = (payload) => {
-      const { traceId, spanId } = TraceRequestUtils.normalizeOtlpSpanIds(
-        payload.span,
-      );
-      return spanCommandGroupKey({
-        traceId,
-        spanId,
-        shardCount: spanCommandShardCount,
-      });
-    };
-  }
-
   // ADR-022: When blobStore is provided, inject it into a pre-constructed
   // RecordSpanCommand instance so the worker can reconstitute oversized commands
   // (S3 spool fetch + best-effort delete). Falls back to zero-arg construction
-  // (no spool support) when blobStore is absent. Either way the recordSpan
-  // command carries the dedup config and span-command sharding from main.
+  // (no spool support) when blobStore is absent — which is not the same call, so
+  // this stays a branch rather than becoming an argument.
+  const options = recordSpanOptions({
+    spanCommandShardCount: deps.spanCommandShardCount,
+  });
   const recordSpanBuilder = deps.blobStore
     ? builder.withCommandInstance(
         "recordSpan",
         RecordSpanCommand,
         new RecordSpanCommand({ blobStore: deps.blobStore }),
-        recordSpanOptions,
+        options,
       )
-    : builder.withCommand("recordSpan", RecordSpanCommand, recordSpanOptions);
+    : builder.withCommand("recordSpan", RecordSpanCommand, options);
 
   return recordSpanBuilder
     .withCommand("assignTopic", AssignTopicCommand)

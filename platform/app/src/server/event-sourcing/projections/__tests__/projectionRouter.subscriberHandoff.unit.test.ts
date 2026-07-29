@@ -121,7 +121,7 @@ function collapsibleSubscriber(
   };
 }
 
-async function enqueueOutcomeCount(outcome: string): Promise<number> {
+async function enqueueOutcomeCount(outcome?: string): Promise<number> {
   const metric = register.getSingleMetric("es_subscriber_enqueue_total");
   if (!metric) return 0;
   const snapshot = (await metric.get()) as {
@@ -130,10 +130,21 @@ async function enqueueOutcomeCount(outcome: string): Promise<number> {
   return snapshot.values
     .filter(
       (v) =>
-        v.labels.subscriber_name === SUBSCRIBER && v.labels.outcome === outcome,
+        v.labels.subscriber_name === SUBSCRIBER &&
+        (outcome === undefined || v.labels.outcome === outcome),
     )
     .reduce((sum, v) => sum + v.value, 0);
 }
+
+/**
+ * Every outcome this subscriber has recorded, summed.
+ *
+ * The documented invariant is that the outcomes sum to the events routed to a
+ * subscriber, so this — not any single series — is what pins it. Summing over
+ * whatever labels exist also means a future outcome cannot restore the total
+ * by accident: it has to be reachable from a real dispatch to move this.
+ */
+const enqueueOutcomeTotal = (): Promise<number> => enqueueOutcomeCount();
 
 describe("subscriber queue hand-off", () => {
   describe("given a queue that fails one attempt and then accepts", () => {
@@ -387,7 +398,7 @@ describe("subscriber queue hand-off", () => {
     describe("when a burst about that aggregate is published", () => {
       /** @scenario "a burst that collapses to one piece of work is only published once" */
       it("hands the queue one piece of work while still accounting for every event", async () => {
-        const before = await enqueueOutcomeCount("staged");
+        const before = await enqueueOutcomeTotal();
         const { router, batches } = makeQueuedRouter({
           subscriber: collapsibleSubscriber(
             (event) => `burst:${String(event.aggregateId)}`,
@@ -410,10 +421,55 @@ describe("subscriber queue hand-off", () => {
         // queue's own squash would have left behind. Five sends reaching the
         // same state is exactly the churn this collapse removes.
         expect(batches).toEqual([["evt-5"]]);
-        // The collapse changes what is PAID, never what is OWED: every event
-        // still counts as queued, as it did when the queue did the squashing a
-        // moment later. A dip here would read to an operator as lost work.
-        expect(await enqueueOutcomeCount("staged")).toBe(before + 5);
+        // The collapse changes what is PAID, never what is OWED: all five
+        // events are still accounted for, as they were when the queue did the
+        // squashing a moment later. A dip in the TOTAL would read to an
+        // operator as lost work. Which outcomes carry the five is the next
+        // test's subject.
+        expect(await enqueueOutcomeTotal()).toBe(before + 5);
+      });
+
+      /** @scenario "the work a collapse avoided is visible to operators" */
+      it("counts the folded-away events as work avoided rather than as work queued", async () => {
+        const before = {
+          total: await enqueueOutcomeTotal(),
+          staged: await enqueueOutcomeCount("staged"),
+          collapsed: await enqueueOutcomeCount("collapsed"),
+        };
+        const { router, batches } = makeQueuedRouter({
+          subscriber: collapsibleSubscriber(
+            (event) => `saving:${String(event.aggregateId)}`,
+          ),
+          sendBatch: async () => undefined,
+        });
+
+        await router.dispatch(
+          [
+            makeEvent("evt-s1"),
+            makeEvent("evt-s2"),
+            makeEvent("evt-s3"),
+            makeEvent("evt-s4"),
+            makeEvent("evt-s5"),
+          ],
+          readContext,
+        );
+
+        expect(batches).toEqual([["evt-s5"]]);
+        // The exact split is the point. `staged` counts the payload that was
+        // actually serialised, compressed and handed over — one — so it now
+        // means what a dashboard reader assumes it means. The four events
+        // whose payloads were never built count `collapsed`, which is the
+        // saving made legible: it is the only series that moves when the
+        // collapse works, and the only one that stops moving if a change
+        // silently disables it.
+        expect(await enqueueOutcomeCount("staged")).toBe(before.staged + 1);
+        expect(await enqueueOutcomeCount("collapsed")).toBe(
+          before.collapsed + 4,
+        );
+        // Instead of, never in addition to: counting a folded-away event as
+        // both would make the outcomes sum to nine for five routed events and
+        // quietly break `failed`'s denominator.
+        expect(await enqueueOutcomeTotal()).toBe(before.total + 5);
       });
     });
 

@@ -579,6 +579,7 @@ describe("QueueManager", () => {
       expect(dedupId).toBe("test-pipeline/handler/handler1/custom-dedup-id");
     });
 
+    /** @scenario "Default behavior processes every event" */
     it("uses no deduplication by default", async () => {
       const mockQueueProcessor = createMockSharedQueue();
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
@@ -607,6 +608,7 @@ describe("QueueManager", () => {
       expect(sendOptions?.deduplication).toBeUndefined();
     });
 
+    /** @scenario "Aggregate deduplication batches events by aggregate" */
     it('uses aggregate deduplication when strategy is "aggregate"', async () => {
       const mockQueueProcessor = createMockSharedQueue();
       const globalJobRegistry = new Map<string, JobRegistryEntry>();

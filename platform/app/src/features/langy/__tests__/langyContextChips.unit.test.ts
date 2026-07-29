@@ -175,6 +175,7 @@ describe("traceContextChip", () => {
   });
 
   describe("given a human-readable trace name", () => {
+    /** @scenario "A trace context chip is named for humans, with the id secondary" */
     it("shows the name while keeping the full id as the tool ref", () => {
       expect(traceContextChip("abc123def456", "gen_ai.responses")).toEqual({
         id: "trace:abc123def456",

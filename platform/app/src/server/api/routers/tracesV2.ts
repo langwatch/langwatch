@@ -25,7 +25,10 @@ import {
   type CodingAgentTranscript,
 } from "~/server/app-layer/traces/coding-agent-transcript.derivation";
 import { deriveTraceStatus } from "~/server/app-layer/traces/derive-trace-status";
-import { TraceNotFoundError } from "~/server/app-layer/traces/errors";
+import {
+  SpanNotFoundError,
+  TraceNotFoundError,
+} from "~/server/app-layer/traces/errors";
 import { translateFilterToClickHouse } from "~/server/app-layer/traces/filter-to-clickhouse";
 import {
   DERIVED_INPUT_ATTR_PREFIX,
@@ -1723,8 +1726,18 @@ export const tracesV2Router = createTRPCRouter({
         }),
       ]);
 
+      // The trace is still there — the drawer is rendering its waterfall. Only
+      // the span is gone, which in practice means a stale `drawer.span` in a
+      // shared link. Naming this `trace_not_found` told the reader a trace
+      // plainly on screen had been deleted, and put the span id in
+      // `meta.traceId`.
+      //
+      // A span the viewer's visibility window hides does NOT arrive here.
+      // `applyVisibilityGate` teaser-redacts an out-of-window span and returns
+      // it present (`span-storage.service.ts`), so it renders redacted rather
+      // than missing. Only a genuinely absent span reaches this branch.
       if (!span) {
-        throw new TraceNotFoundError(input.spanId);
+        throw new SpanNotFoundError(input.spanId);
       }
 
       // Coding-agent spans store their content in the trace's OTLP LOGS, not

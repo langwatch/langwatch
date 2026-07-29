@@ -128,7 +128,7 @@ services:
       resources:
         limits:
           # Eval-rich seed loads (1–4 evaluation_runs per trace, async
-          # inserts queued up via the customEvaluationSync reactor) were
+          # inserts queued up via the customEvaluationSync process manager) were
           # pushing CH past the 2g ceiling during BGSAVE / merges and
           # the OvercommitTracker started killing inserts. 4g keeps the
           # dev stack stable under the worst seed we've thrown at it.

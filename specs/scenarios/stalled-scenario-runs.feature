@@ -1,55 +1,35 @@
-Feature: Detect and display stalled scenario runs
+Feature: Show a stalled scenario run for what it is
   As a LangWatch user
-  I want stalled scenario runs to be detected and clearly distinguished from active runs
-  So that I understand when a run will never complete due to infrastructure issues
+  I want a run that will never finish to be clearly distinguished from an active run
+  So that I understand when a run has died rather than waiting on it
 
-  # Per AUDIT_MANIFEST.md: 12 scenarios → 10 DUPLICATE (now bound via @scenario
-  # JSDoc against stall-detection.unit.test.ts, stall-detection-batch.unit.test.ts,
-  # stalled-status-display.integration.test.ts) + 1 UPDATE (10min vs 30min
-  # threshold drift) + 1 KEEP-E2E. The 2 remaining @unimplemented scenarios
-  # are pending rewrite/E2E coverage in PR #3458.
-
-  # Context: When a worker dies (OOM, container kill, stalled job) the RUN_FINISHED
-  # event never reaches the event store. Without detection, these runs appear as
-  # "in progress" forever. This feature derives a STALLED status at read time
-  # when a run has RUN_STARTED but no RUN_FINISHED and enough time has passed.
+  # Context: when a worker dies (OOM, container kill, redeploy) the run's own
+  # "finished" report never arrives. Without something ending it, the run
+  # appears to be in progress forever.
   #
-  # The stall threshold is ~10 minutes (job timeout is 5 minutes, so 2x covers
-  # all reasonable completion scenarios). No new events are written, no
-  # cron jobs, no extra infrastructure.
-
-  # ============================================================================
-  # Stall Detection Logic - Unit Tests
-  # ============================================================================
-  # Pure logic: given event timestamps and current time, derive the correct status.
-
-  @unit @unimplemented
-  Scenario: Run at exactly the threshold boundary becomes STALLED
-    Given a scenario run has RUN_STARTED at exactly 10 minutes ago
-    And no RUN_FINISHED event exists
-    When the service resolves the run status
-    Then the status is STALLED
-
-  # ============================================================================
-  # Batch Status Resolution - Unit Tests
-  # ============================================================================
-  # The batch query path must also apply stall detection consistently.
-
-  # ============================================================================
-  # UI Display - Integration Tests
-  # ============================================================================
-  # Verify that STALLED status renders with the correct visual treatment.
+  # STALLED USED TO BE DERIVED AT READ TIME AND IS NOW STORED. `resolveRunStatus`
+  # compared a run's last event against a threshold on every read and returned
+  # STALLED without writing anything, so the stored status and the displayed
+  # status disagreed by design and nothing downstream ever fired. ADR-073
+  # replaced it: the `scenarioExecution` process manager arms a durable
+  # deadline that the run's own progress re-arms, and writes STALLED as the
+  # run's terminal status when one fires. The derivation and its last consumer
+  # are gone.
+  #
+  # What ends a run therefore belongs to
+  # specs/scenarios/scenario-execution-process-manager.feature (the deadline and
+  # the shutdown that beats it on a deploy). What is left here is what the user
+  # sees once a run carries that status — still an E2E gap.
 
   # ============================================================================
   # End-to-End - User Workflow
   # ============================================================================
-  # Full user-visible flow: user sees a stalled run and understands what happened.
 
   @e2e @unimplemented
-  Scenario: User sees stalled indicator for a run that never completed
+  Scenario: User sees a stalled indicator for a run that never completed
     Given I am logged into project "my-project"
-    And scenario "Flaky Agent" had a run that started over 10 minutes ago
-    And no RUN_FINISHED event was recorded for that run
+    And scenario "Flaky Agent" had a run whose worker disappeared
+    And the run has since been recorded as stalled
     When I view the run history for "Flaky Agent"
     Then I see the run displayed with a stalled warning indicator
     And the run is not shown as actively in progress

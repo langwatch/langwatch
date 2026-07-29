@@ -67,7 +67,7 @@ Add **two timing knobs** to the `Trigger` row, both per-trigger and independentl
 | `traceDebounceMs`     | Before filter evaluation | Wait for the trace to settle so the filter sees the final state |
 | `notificationCadence` | After dispatch decision  | Batch matches inside a wall-clock window into one digest        |
 
-Both knobs ride the ADR-030 outbox queue: `traceDebounceMs` drives the `stage: "settle"` dedup TTL; `notificationCadence` drives the `stage: "cadence"` delay snapping.
+Both knobs ride the ADR-095 outbox queue: `traceDebounceMs` drives the `stage: "settle"` dedup TTL; `notificationCadence` drives the `stage: "cadence"` delay snapping.
 
 ### Action classification (the contract `notificationCadence` rides on)
 
@@ -132,7 +132,7 @@ Daily and weekly digests aren't included in v1 — they cross the "is this still
 
 ### Historical Redis debounce mechanics (superseded by ADR-052)
 
-The settle stage rides the **main event-sourcing queue** (`event-sourcing/jobs`) as a stage-discriminated outbox payload, per ADR-030's 2026-06-02 revision — there is no `langwatch:outbox` queue and no separate `langwatch:trigger-evaluation` queue.
+The settle stage rides the **main event-sourcing queue** (`event-sourcing/jobs`) as a stage-discriminated outbox payload, per ADR-095's 2026-06-02 revision — there is no `langwatch:outbox` queue and no separate `langwatch:trigger-evaluation` queue.
 
 The settle payload uses Debounce Mode keyed on `(projectId, triggerId, traceId)`:
 
@@ -186,7 +186,7 @@ When the settle process callback matches, it re-enqueues a `stage: "cadence"` pa
 
 1. Re-reading the (now-settled) trace fold state.
 2. Running `matchesTriggerFilters` / `matchesEvaluationFilters`.
-3. Calling `triggers.claimSend(...)` for the ADR-030 at-most-once gate.
+3. Calling `triggers.claimSend(...)` for the ADR-095 at-most-once gate.
 4. Calling `dispatchTriggerAction(...)` — which itself routes to the outbox or inline path based on action class.
 
 The two reactors (`alertTrigger`, `evaluationAlertTrigger`) keep doing the pre-filter scan that decides _which_ triggers are candidates for a given event (trace-only vs evaluation-required), but they no longer own the evaluation itself — they only emit enqueue requests.
@@ -237,7 +237,7 @@ A bespoke per-trace "expected span count" or "OTel batch end" signal would be mo
 
 ### Why both knobs ride one queue (stage-discriminated)
 
-The earlier design used a separate `langwatch:trigger-evaluation` queue for settle. They were folded onto the one outbox queue on 2026-06-01 because the maintenance surface (Redis prefixes, metrics, deploy gates, audit adapter wiring) doubles with no behavior gain — a `stage:` field in the payload achieves the same separation with one queue. See ADR-030 for the queue design.
+The earlier design used a separate `langwatch:trigger-evaluation` queue for settle. They were folded onto the one outbox queue on 2026-06-01 because the maintenance surface (Redis prefixes, metrics, deploy gates, audit adapter wiring) doubles with no behavior gain — a `stage:` field in the payload achieves the same separation with one queue. See ADR-095 for the queue design.
 
 ### Why these two knobs are independent
 
@@ -266,12 +266,12 @@ A trigger configured `traceDebounceMs: 60000` + `notificationCadence: 5min_diges
 - **Future action types** (a hypothetical `SEND_WEBHOOK`, `OPEN_INCIDENT`) must be classified at the point of introduction. The two sets together must cover every `TriggerAction` enum value — enforced by a unit test that asserts the union has the same size as `allTriggerActions` and that every element is present.
 - **Latency floor.** Operators who set 5min debounce + 1h digest cadence will see notifications up to ~65 minutes after the trace start. This is a deliberate trade-off — settings UI surfaces both numbers so the total budget is visible.
 - **Memory pressure on the dedup index.** Each in-flight (trigger, trace) pair holds one Redis entry for `debounceMs`. At 5-minute debounce + 100K active traces × N triggers, the dedup-index size grows linearly. The existing GroupQueue ops dashboard (`gq:dedup-index:*`) already exposes this — wire an alert on the count, not just a hard cap.
-- **Replay safety unchanged.** ADR-030's `TriggerSent` claim still gates the actual side effect, so a re-fired event after the debounce window (e.g. on a re-ingested trace) still no-ops if the dispatch already happened.
+- **Replay safety unchanged.** ADR-095's `TriggerSent` claim still gates the actual side effect, so a re-fired event after the debounce window (e.g. on a re-ingested trace) still no-ops if the dispatch already happened.
 - **Multi-destination fan-out is a notify-side concern, not persist-side.** NOTIFY actions will eventually want one trigger → multiple destinations, potentially with different cadences each. Today's workaround is duplicating the trigger. PERSIST actions stay 1-destination by design. When fan-out lands, it lives on the notify path; no outbox-framework change required — the schema split (per-trigger row → notify-policy-with-channels) is the work.
 
 ## References
 
-- [ADR-030](./030-transactional-outbox-for-stake-sensitive-dispatch.md) — outbox queue these knobs ride
+- [ADR-095](./095-transactional-outbox-for-stake-sensitive-dispatch.md) — outbox queue these knobs ride
 - [ADR-036](./036-liquid-templates-for-trigger-notifications.md) — template engine that consumes the digest `matches[]` payload
 - [ADR-037](./037-automation-operator-surfaces.md) — authoring drawer that exposes both fields
 - `src/automations/cadences.ts` — where the constants live (shared client/server)

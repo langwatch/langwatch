@@ -1008,6 +1008,7 @@ describe("PromptEditorDrawer", () => {
       });
     });
 
+    /** @scenario "Prompt editor drawer keeps the model selector in the header and the actions in the footer" */
     it("has model selector in the body (model-only header)", () => {
       renderWithProviders(
         <PromptEditorDrawer open={true} promptId="prompt-123" />,
@@ -1015,6 +1016,7 @@ describe("PromptEditorDrawer", () => {
       expect(screen.getByTestId("model-select")).toBeInTheDocument();
     });
 
+    /** @scenario "Prompt editor drawer keeps the model selector in the header and the actions in the footer" */
     it("renders version history button in the footer when editing", () => {
       renderWithProviders(
         <PromptEditorDrawer open={true} promptId="prompt-123" />,
@@ -1022,6 +1024,7 @@ describe("PromptEditorDrawer", () => {
       expect(screen.getByTestId("version-history-button")).toBeInTheDocument();
     });
 
+    /** @scenario "Prompt editor drawer keeps the model selector in the header and the actions in the footer" */
     it("renders save button in the footer", () => {
       renderWithProviders(
         <PromptEditorDrawer open={true} promptId="prompt-123" />,
@@ -1029,6 +1032,7 @@ describe("PromptEditorDrawer", () => {
       expect(screen.getByTestId("save-prompt-button")).toBeInTheDocument();
     });
 
+    /** @scenario "Prompt editor drawer keeps the model selector in the header and the actions in the footer" */
     it("renders exactly one save button (in footer, not header)", () => {
       renderWithProviders(
         <PromptEditorDrawer open={true} promptId="prompt-123" />,

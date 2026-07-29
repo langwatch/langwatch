@@ -150,7 +150,7 @@ Both server-side dispatch (renders the actual notification) and the UI (renders 
 
 ## References
 
-- [ADR-030](./030-transactional-outbox-for-stake-sensitive-dispatch.md) — outbox dispatch is the renderer's caller
+- [ADR-095](./095-transactional-outbox-for-stake-sensitive-dispatch.md) — outbox dispatch is the renderer's caller
 - [ADR-026](./026-per-trigger-dispatch-timing.md) — cadence model that produces `matches[]` of varying length
 - [ADR-037](./037-automation-operator-surfaces.md) — drawer that surfaces the live preview and template-health warnings
 - `liquidjs` — https://liquidjs.com (engine choice)

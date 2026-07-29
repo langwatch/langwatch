@@ -52,6 +52,7 @@ describe("getVercelAIModel", () => {
   });
 
   describe("when project uses Azure provider", () => {
+    /** @scenario "An explicit model whose provider is not configured is refused" */
     it("throws descriptive error when azure provider is not configured", async () => {
       mockGetProjectModelProviders.mockResolvedValue({});
 
@@ -65,6 +66,7 @@ describe("getVercelAIModel", () => {
       );
     });
 
+    /** @scenario "An explicit model whose provider is disabled is refused" */
     it("throws descriptive error when azure provider is disabled", async () => {
       mockGetProjectModelProviders.mockResolvedValue({
         azure: { provider: "azure", enabled: false, customKeys: null },
@@ -142,6 +144,7 @@ describe("getVercelAIModel", () => {
     });
 
     describe("when azure provider is enabled with custom models", () => {
+      /** @scenario "An enabled provider with a usable custom model rescues an unresolvable default" */
       it("resolves model from azure custom models", async () => {
         mockGetProjectModelProviders.mockResolvedValue({
           azure: {
@@ -165,6 +168,7 @@ describe("getVercelAIModel", () => {
     });
 
     describe("when openai provider is enabled but has no usable models", () => {
+      /** @scenario "An enabled provider with no usable model is not rescued by a global default" */
       it("throws because no global default fallback exists", async () => {
         // With the no-global-fallback contract, "openai is enabled but
         // has no custom models and no ModelDefaultConfig entry" is the
@@ -188,6 +192,7 @@ describe("getVercelAIModel", () => {
     });
 
     describe("when no providers are configured", () => {
+      /** @scenario "A project with no providers at all is told to add one" */
       it("throws error about no providers configured", async () => {
         mockGetProjectModelProviders.mockResolvedValue({});
 
@@ -198,6 +203,7 @@ describe("getVercelAIModel", () => {
     });
 
     describe("when providers exist but all are disabled", () => {
+      /** @scenario "A project whose providers are all disabled is told they are disabled" */
       it("throws error about disabled providers", async () => {
         mockGetProjectModelProviders.mockResolvedValue({
           azure: {
@@ -221,6 +227,7 @@ describe("getVercelAIModel", () => {
     });
 
     describe("when defaultModel provider is not configured but another is", () => {
+      /** @scenario "A stale legacy project default does not steer the resolved handle" */
       it("resolves from the available provider", async () => {
         mockPrismaFindUnique.mockResolvedValue({
           id: "project-123",

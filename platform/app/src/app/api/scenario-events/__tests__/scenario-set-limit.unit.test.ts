@@ -122,6 +122,7 @@ describe("checkScenarioSetLimitForRunStarted()", () => {
   });
 
   describe("when event type is not SCENARIO_RUN_STARTED", () => {
+    /** @scenario "Message snapshot events pass through without limit check" */
     it("skips the limit check for MESSAGE_SNAPSHOT", async () => {
       mockCtx.event.type = ScenarioEventType.MESSAGE_SNAPSHOT;
 
@@ -133,6 +134,7 @@ describe("checkScenarioSetLimitForRunStarted()", () => {
       expect(resolveOrganizationId).not.toHaveBeenCalled();
     });
 
+    /** @scenario "Run-finished events pass through without limit check" */
     it("skips the limit check for RUN_FINISHED", async () => {
       mockCtx.event.type = ScenarioEventType.RUN_FINISHED;
 

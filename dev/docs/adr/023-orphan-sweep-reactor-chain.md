@@ -6,7 +6,7 @@
 
 ## Context
 
-ADR-022 enforces retention by stamping `_retention_days` on every row and
+ADR-089 enforces retention by stamping `_retention_days` on every row and
 letting ClickHouse's merge-time TTL drop expired rows. PostgreSQL still
 holds rows that reference those traces by `traceId`:
 
@@ -166,7 +166,7 @@ structured logs + posthog. We don't query the queue for history anyway.
 
 ## References
 
-- Related ADRs: ADR-022 (data retention, umbrella), ADR-019
+- Related ADRs: ADR-089 (data retention, umbrella), ADR-019
   (repository-service layering)
 - Code:
   - `platform/app/src/server/data-retention/orphan-sweep/retentionOrphanSweep.reactor.ts`

@@ -4,7 +4,7 @@
 
 **Status:** Accepted
 
-**Relates to:** [ADR-026](./026-groupqueue-payload-envelope.md) (the envelope whose header this promotes to a control-flow input), [ADR-029](./029-groupqueue-content-addressed-payload-store.md) (the content hash the body must not perturb), [ADR-030](./030-groupqueue-blob-handling-hardening.md) §2 (the transient-versus-missing distinction whose fail-safe this relocates).
+**Relates to:** [ADR-090](./090-groupqueue-payload-envelope.md) (the envelope whose header this promotes to a control-flow input), [ADR-029](./029-groupqueue-content-addressed-payload-store.md) (the content hash the body must not perturb), [ADR-030](./030-groupqueue-blob-handling-hardening.md) §2 (the transient-versus-missing distinction whose fail-safe this relocates).
 
 Behavioural contract: [specs/event-sourcing/staged-job-id-identity.feature](../../../specs/event-sourcing/staged-job-id-identity.feature).
 
@@ -72,5 +72,5 @@ Jobs already staged under grown ids keep working: a worker uses whatever id it w
 
 ## References
 
-- Related ADRs: [ADR-026](./026-groupqueue-payload-envelope.md), [ADR-029](./029-groupqueue-content-addressed-payload-store.md), [ADR-030](./030-groupqueue-blob-handling-hardening.md)
+- Related ADRs: [ADR-090](./090-groupqueue-payload-envelope.md), [ADR-029](./029-groupqueue-content-addressed-payload-store.md), [ADR-030](./030-groupqueue-blob-handling-hardening.md)
 - Specs: [staged-job-id-identity](../../../specs/event-sourcing/staged-job-id-identity.feature), [groupqueue-decode-drop-durability](../../../specs/event-sourcing/groupqueue-decode-drop-durability.feature), [pending-counter-conservation](../../../specs/event-sourcing/pending-counter-conservation.feature), [poison-group-park-guard](../../../specs/event-sourcing/poison-group-park-guard.feature)

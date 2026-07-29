@@ -13,7 +13,7 @@
  * This module is intentionally dependency-free (no React, no TanStack) so
  * both the lens layer (`capabilities.reconcileColumns`) and the table
  * layer (`evalColumns.buildEvalColumnDef`) can import it without creating a
- * layering inversion. See dev/docs/adr/029-trace-table-per-evaluator-columns.md.
+ * layering inversion. See dev/docs/adr/094-trace-table-per-evaluator-columns.md.
  */
 
 export type EvalColumnField = "score" | "verdict" | "label";

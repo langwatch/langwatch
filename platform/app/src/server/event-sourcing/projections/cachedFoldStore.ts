@@ -51,6 +51,45 @@ interface CachedFoldStoreOptions<State = unknown> {
  * dropping it below the replication lag is a correctness bug, so a configured
  * override below the floor is clamped up to it rather than honoured. The default
  * therefore equals the floor, and the override can only raise the TTL.
+ *
+ * ONE MISS DOES NOT CARRY THAT IMPLICATION, and it is a deploy-time event.
+ * "The last write is at least a TTL old" only follows within a single key
+ * namespace, and the projection version is part of the key (see
+ * {@link CachedFoldStore.cacheKey}). A release that changes a fold's projection
+ * version — including the release that first put the version in the key at all
+ * — moves every one of that fold's aggregates to a fresh namespace, so the
+ * first read of each in-flight aggregate misses with a write that may be
+ * seconds old. What that costs, exactly once per aggregate:
+ *
+ * - the read falls through to the durable tier, which for a read-back store
+ *   (ADR-066) answers from its last committed row. The reads resolve through
+ *   `resolveClickHouseClient` with no primary pinning, so a mid-ingest
+ *   aggregate can be answered by a replica that has not caught up and resume
+ *   from older state — accumulating counters then re-accumulate what the lagging
+ *   row is missing; and
+ * - the applied-event-id set starts empty in the new namespace, so a redelivery
+ *   inside that window dedups only if the durable tier persists the set next to
+ *   its row (`getWithApplied`) and that row is the current one. Where it does
+ *   not, the redelivery blind-re-applies and is counted
+ *   (`es_fold_dedup_unavailable{reason="cache_miss"}`).
+ *
+ * Both self-heal on the aggregate's next write, which lands in the new
+ * namespace, so the exposure is one fold step per in-flight aggregate rather
+ * than a window that persists. Operators see it as a correlated spike in
+ * `es_fold_cache_total{result="miss"}` and in the clickhouse-tier
+ * `es_fold_cache_get_duration_milliseconds` at deploy time, decaying to the
+ * steady state within one TTL.
+ *
+ * There is deliberately NO fallback read of the previous namespace. A cache
+ * entry carries the fold's state and nothing that says which shape it is in —
+ * the stores gate on the projection version stamped on their ROW, which an
+ * entry from the previous namespace does not have — so adopting one would be
+ * exactly the laundering the version key exists to prevent, decided on a guess.
+ * Nor can the durable read stand in for that check: it is the read the entry
+ * would be preferred over, so combining "the entry is fresher than the row" with
+ * a possibly-lagging row cannot tell a fresher entry from a stale one, and
+ * getting it wrong drops a committed fold step. A version bump is an
+ * invalidation by intent; this is the price of it being honest.
  */
 const FOLD_CACHE_REPLICATION_LAG_SECONDS = 300;
 const DEFAULT_FOLD_CACHE_TTL_SECONDS = FOLD_CACHE_REPLICATION_LAG_SECONDS;
@@ -406,6 +445,13 @@ export class CachedFoldStore<State> implements FoldProjectionStore<State> {
    *
    * A store that declares no version keeps the pre-version key exactly, so an
    * unversioned fold is unaffected and no adopter's keys move by accident.
+   *
+   * The cost is a namespace rotation on every version change: the entries under
+   * the previous version are still warm and are passed over, not waited out. A
+   * version bump is therefore a deploy-time event with read-your-write
+   * consequences for whatever is mid-flight, not a free relabel — see the
+   * TTL contract above for what exactly it costs and why nothing reads the
+   * previous namespace to soften it.
    */
   private cacheKey(
     aggregateId: string,

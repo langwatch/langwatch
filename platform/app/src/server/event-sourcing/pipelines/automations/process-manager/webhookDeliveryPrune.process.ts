@@ -5,6 +5,9 @@ import type {
   WakeHandler,
 } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 
+import { toSafeFailureDiagnostic } from "../../../process-manager/failureDiagnostic";
+import { TRIGGER_SETTLEMENT_PROCESS_NAME } from "./triggerSettlement.process";
+
 const logger = createLogger("langwatch:triggers:webhook-delivery-prune");
 
 export const WEBHOOK_DELIVERY_PRUNE_PROCESS_NAME =
@@ -63,4 +66,61 @@ export function runWebhookDeliveryPrune(deps: WebhookDeliveryPruneDeps) {
       );
     }
   };
+}
+
+/** triggerSettlement is keyed per-trigger (aggregateType "trigger") and only
+ *  wakes when it has pending matches, so — unlike graphAlertSweep/
+ *  webhookDeliveryPrune — it has no singleton schedule of its own to hang
+ *  outbox retention off. Pruning it from its own onWake would fire a global
+ *  cross-tenant delete from every single trigger's wake (a thundering herd),
+ *  so instead we piggyback on webhookDeliveryPrune's existing daily wake —
+ *  the same singleton-PM retention mechanism sweep/prune already use for
+ *  themselves — to also prune triggerSettlement's dispatched outbox rows,
+ *  the highest-volume PM in that pipeline. */
+const TRIGGER_SETTLEMENT_OUTBOX_RETENTION_MS = 24 * 60 * 60 * 1000;
+
+function runWebhookDeliveryPruneWithTriggerSettlementRetention(
+  deps: WebhookDeliveryPruneDeps,
+) {
+  const pruneWebhookDeliveries = runWebhookDeliveryPrune(deps);
+  return async (): Promise<void> => {
+    await pruneWebhookDeliveries();
+    const startedAt = (deps.now ?? Date.now)();
+    try {
+      await deps.deleteDispatchedBefore({
+        processName: TRIGGER_SETTLEMENT_PROCESS_NAME,
+        before: startedAt - TRIGGER_SETTLEMENT_OUTBOX_RETENTION_MS,
+      });
+    } catch (error) {
+      logger.warn(
+        toSafeFailureDiagnostic(error),
+        "triggerSettlement outbox retention failed",
+      );
+    }
+  };
+}
+
+/**
+ * The `webhookDeliveryPrune` process-manager topology, exported standalone so
+ * the pipeline mounts one expression of it and tests can build the exact
+ * definition the runtime runs. `automations/pipeline.ts` mounts it as
+ * `.withProcessManager(WEBHOOK_DELIVERY_PRUNE_PROCESS_NAME,
+ * webhookDeliveryPrunePM(deps.prune))`.
+ *
+ * Its daily wake carries triggerSettlement's outbox retention too — see the
+ * note above.
+ */
+export function webhookDeliveryPrunePM(
+  deps: WebhookDeliveryPruneDeps,
+): ProcessManagerApplier<AutomationEvent> {
+  return (pm) =>
+    pm
+      .state<WebhookDeliveryPruneState>({ lastPruneAt: null })
+      .schedule({ everyMs: WEBHOOK_DELIVERY_PRUNE_INTERVAL_MS })
+      .onWake(webhookDeliveryPruneWake)
+      .intent(
+        "prune",
+        pruneSchema,
+        runWebhookDeliveryPruneWithTriggerSettlementRetention(deps),
+      );
 }

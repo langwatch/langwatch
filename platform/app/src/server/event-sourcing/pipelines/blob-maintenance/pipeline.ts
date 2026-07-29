@@ -1,13 +1,9 @@
 import type { Event } from "../../domain/types";
 import { definePipeline } from "../../pipeline/staticBuilder";
-import { BLOB_SWEEP_INTERVAL_MS } from "../../queues/groupQueue/blobConstants";
 import {
   BLOB_CLEANUP_PROCESS_NAME,
   type BlobCleanupDeps,
-  type BlobCleanupState,
-  blobCleanupSchema,
-  blobCleanupWake,
-  runBlobCleanup,
+  blobCleanupPM,
 } from "./process-manager/blobCleanup.process";
 
 export interface BlobMaintenancePipelineDeps {
@@ -40,16 +36,9 @@ export function createBlobMaintenancePipeline(
       // debt for nothing. The sweep is genuinely global — it belongs to the queue,
       // not to a tenant.
       .withAggregateType("global")
-      .withProcessManager(BLOB_CLEANUP_PROCESS_NAME, (pm) =>
-        pm
-          .state<BlobCleanupState>({ lastSweepAt: null })
-          .schedule({ everyMs: BLOB_SWEEP_INTERVAL_MS })
-          .onWake(blobCleanupWake)
-          .intent("sweep", blobCleanupSchema, runBlobCleanup(deps.cleanup))
-          // A full keyspace pass is minutes of work in the worst case, so the
-          // lease has to outlast it or a second worker re-leases mid-sweep and
-          // both walk the same keys.
-          .outbox({ leaseDurationMs: 15 * 60 * 1000, maxAttempts: 3 }),
+      .withProcessManager(
+        BLOB_CLEANUP_PROCESS_NAME,
+        blobCleanupPM(deps.cleanup),
       )
       .build()
   );

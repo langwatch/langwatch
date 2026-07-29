@@ -392,4 +392,4 @@ observed-liveness input contract, and is the natural follow-up.
 - Current process manager: `platform/app/src/server/event-sourcing/pipelines/langy-conversation-processing/process-manager/`
 - Current direct subscribers: `platform/app/src/server/app-layer/langy/subscribers/`
 - Current registration: `platform/app/src/server/event-sourcing/pipelineRegistry.ts`
-- Related ADRs: ADR-030 (alert outbox), ADR-034 (ClickHouse analytics materialization), ADR-046 (Langy event-sourced conversations)
+- Related ADRs: ADR-095 (alert outbox), ADR-034 (ClickHouse analytics materialization), ADR-046 (Langy event-sourced conversations)

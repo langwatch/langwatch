@@ -49,6 +49,7 @@ describe("buildPipelineTree", () => {
   });
 
   describe("when given queues with groups", () => {
+    /** @scenario "The ops dashboard shows routing fields for envelope jobs" */
     it("builds tree with pipeline > type > name hierarchy", () => {
       const queue = createQueue({
         groups: [

@@ -26,6 +26,7 @@ describe("FoldProjectionExecutor.execute", () => {
   });
 
   describe("when no prior state exists", () => {
+    /** @scenario "Incremental state update" */
     it("initializes state and applies event", async () => {
       const store = createMockFoldProjectionStore<{ count: number }>();
       (store.get as ReturnType<typeof vi.fn>).mockResolvedValue(null);
@@ -364,6 +365,7 @@ describe("FoldProjectionExecutor.executeBatch", () => {
 
   describe("when events arrive out of occurredAt order", () => {
     /** @scenario 'Out-of-order events are folded in occurredAt order' */
+    /** @scenario "Sequential processing (FIFO)" */
     it("folds them in occurredAt order", async () => {
       const store = createMockFoldProjectionStore<BatchState>();
       (store.get as ReturnType<typeof vi.fn>).mockResolvedValue(null);

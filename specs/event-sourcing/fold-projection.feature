@@ -6,6 +6,7 @@ Feature: Fold Projections
   Background:
     Given a registered fold projection "traceSummary" for aggregate type "trace"
 
+  @unit
   Scenario: Incremental state update
     Given no existing state for trace "trace-123"
     When a "span_received" event arrives for "trace-123"
@@ -13,6 +14,7 @@ Feature: Fold Projections
     And the "apply(state, event)" function is called
     And the resulting state is persisted to the fold store
 
+  @unit
   Scenario: Sequential processing (FIFO)
     Given multiple events arrive for the same aggregate "trace-456"
     When the events are dispatched to the projection queue
@@ -20,6 +22,7 @@ Feature: Fold Projections
     And they are processed in the order they arrived
     And each event is applied to the state produced by the previous event
 
+  @unit
   Scenario: Error handling and retries
     Given an event being processed for aggregate "trace-789"
     When the "apply" function or "store" operation fails
@@ -27,6 +30,7 @@ Feature: Fold Projections
     And the fold state remains at the last successfully persisted version
     And subsequent events for the same aggregate wait in the queue until retry succeeds
 
+  @unit
   Scenario: Rebuilding from events
     Given an existing fold projection with history
     When I trigger a manual update for an aggregate

@@ -7,12 +7,8 @@ import type { CommandBus } from "../../commands/commandBus";
 import type { Event } from "../../domain/types";
 import { ReportUsageForMonthCommand } from "./commands/reportUsageForMonth.command";
 import {
-  BILLING_METER_SWEEP_INTERVAL_MS,
   BILLING_METER_SWEEP_PROCESS_NAME,
-  type BillingMeterSweepState,
-  billingMeterSweepSchema,
-  billingMeterSweepWake,
-  runBillingMeterSweep,
+  billingMeterSweepPM,
 } from "./process-manager/billingMeterSweep.process";
 
 export const BILLING_REPORTING_PIPELINE_NAME = "billing_reporting" as const;
@@ -144,21 +140,13 @@ export function createBillingReportingPipeline(
   // Unconditional. The sweep IS the delivery guarantee, so mounting it must not
   // depend on a caller remembering to ask for it — that conditional is how it
   // shipped unmounted, with every one of its own tests still green.
-  const sweep = deps.sweep;
-  builder = builder.withProcessManager(BILLING_METER_SWEEP_PROCESS_NAME, (pm) =>
-    pm
-      .state<BillingMeterSweepState>({ lastSweepAt: null })
-      .schedule({ everyMs: BILLING_METER_SWEEP_INTERVAL_MS })
-      .onWake(billingMeterSweepWake)
-      .intent(
-        "sweep",
-        billingMeterSweepSchema,
-        runBillingMeterSweep({
-          listOrganizationsToReport: sweep.listOrganizationsToReport,
-          dispatchReport: reportUsageForMonth,
-          deleteDispatchedBefore: sweep.deleteDispatchedBefore,
-        }),
-      ),
+  builder = builder.withProcessManager(
+    BILLING_METER_SWEEP_PROCESS_NAME,
+    billingMeterSweepPM({
+      listOrganizationsToReport: deps.sweep.listOrganizationsToReport,
+      dispatchReport: reportUsageForMonth,
+      deleteDispatchedBefore: deps.sweep.deleteDispatchedBefore,
+    }),
   );
 
   return builder.build();

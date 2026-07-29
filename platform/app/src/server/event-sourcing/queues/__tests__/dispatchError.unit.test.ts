@@ -107,6 +107,7 @@ describe("toDispatchError", () => {
   });
 
   describe("when the failure has a retryable status", () => {
+    /** @scenario "Rate-limit and server errors are retryable" */
     it("produces a retryable DispatchError", () => {
       const err = toDispatchError(
         { $metadata: { httpStatusCode: 503 } },
@@ -119,6 +120,7 @@ describe("toDispatchError", () => {
   });
 
   describe("when the failure has a terminal status", () => {
+    /** @scenario "Client errors are terminal" */
     it("produces a non-retryable DispatchError", () => {
       const err = toDispatchError(
         { response: { status: 404 } },
@@ -129,6 +131,7 @@ describe("toDispatchError", () => {
   });
 
   describe("when the failure has no recognizable status", () => {
+    /** @scenario "Unclassifiable failures default to retryable" */
     it("defaults to retryable and preserves the cause", () => {
       const cause = new Error("connection refused");
       const err = toDispatchError(cause, { message: "send failed" });

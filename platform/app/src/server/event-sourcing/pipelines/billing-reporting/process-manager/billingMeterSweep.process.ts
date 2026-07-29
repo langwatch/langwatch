@@ -1,6 +1,8 @@
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 
+import type { Event } from "~/server/event-sourcing/domain/types";
+import type { ProcessManagerApplier } from "~/server/event-sourcing/pipeline/processBuilder";
 import type {
   IntentSpec,
   WakeHandler,
@@ -201,4 +203,22 @@ export function runBillingMeterSweep(deps: BillingMeterSweepDeps) {
       "Billing meter sweep dispatched usage reports",
     );
   };
+}
+
+/**
+ * The `billingMeterSweep` process-manager topology, exported standalone so the
+ * pipeline mounts one expression of it and tests can build the exact definition
+ * the runtime runs. `billing-reporting/pipeline.ts` mounts it as
+ * `.withProcessManager(BILLING_METER_SWEEP_PROCESS_NAME,
+ * billingMeterSweepPM({ ...deps.sweep, dispatchReport }))`.
+ */
+export function billingMeterSweepPM(
+  deps: BillingMeterSweepDeps,
+): ProcessManagerApplier<Event> {
+  return (pm) =>
+    pm
+      .state<BillingMeterSweepState>({ lastSweepAt: null })
+      .schedule({ everyMs: BILLING_METER_SWEEP_INTERVAL_MS })
+      .onWake(billingMeterSweepWake)
+      .intent("sweep", billingMeterSweepSchema, runBillingMeterSweep(deps));
 }

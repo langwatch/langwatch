@@ -9,12 +9,12 @@
  * together. The number that comes out of that sum is what fires a
  * customer-facing anomaly alert and what lands in `AnomalyAlert.triggerSpendUsd`.
  *
- * Both grains are covered, because migration 00058 only narrows the defect:
+ * Both grains are covered, because migration 00063 only narrows the defect:
  *
- *   - post-00058 event grain: a re-derived span writes a byte-identical row
+ *   - post-00063 event grain: a re-derived span writes a byte-identical row
  *     under the same key. Identical rows still SUM.
- *   - pre-00058 trace grain: rows carry the trace's RUNNING totals under one
- *     key, all stamped with the same `LastEventOccurredAt` (00058's header
+ *   - pre-00063 trace grain: rows carry the trace's RUNNING totals under one
+ *     key, all stamped with the same `LastEventOccurredAt` (00063's header
  *     records that the version is constant across firings), so the duplicates
  *     are not even equal — the sum is running-total-plus-running-total.
  *
@@ -120,8 +120,8 @@ describe("SpendSpikeAnomalyEvaluator — unmerged governance_kpis duplicates", (
 
     const inCurrentWindow = new Date(NOW.getTime() - 30 * 60 * 1000);
 
-    // Post-00058 event grain: ONE $6 span contribution, re-derived twice.
-    // The two rows are byte-identical under one key — the exact shape 00058
+    // Post-00063 event grain: ONE $6 span contribution, re-derived twice.
+    // The two rows are byte-identical under one key — the exact shape 00063
     // makes rebuilds produce.
     for (let attempt = 0; attempt < 2; attempt++) {
       await insertGovernanceKpiRow(maybeCh, project.id, {
@@ -133,7 +133,7 @@ describe("SpendSpikeAnomalyEvaluator — unmerged governance_kpis duplicates", (
       });
     }
 
-    // Pre-00058 trace grain: EventId = '' and the trace's RUNNING totals
+    // Pre-00063 trace grain: EventId = '' and the trace's RUNNING totals
     // written on successive firings, all stamped with the same version. Only
     // the $4 total is real — it is the trace's final one, and the read's
     // tie-break has to elect it deterministically rather than pick whichever

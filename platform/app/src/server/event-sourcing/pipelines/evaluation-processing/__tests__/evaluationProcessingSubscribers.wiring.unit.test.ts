@@ -1,10 +1,13 @@
+import { TriggerAction, TriggerKind } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
 
+import type { TriggerSummary } from "~/server/app-layer/automations/repositories/trigger.repository";
 import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
+import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import { RecordTriggerMatchCommand } from "~/server/event-sourcing/pipelines/automations/commands/recordTriggerMatch.command";
 import { GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS } from "~/server/event-sourcing/pipelines/automations/subscribers/graphTriggerActivity.subscriber";
 import { createTenantId } from "../../../domain/tenantId";
 import type { FoldProjectionStore } from "../../../projections/foldProjection.types";
-import type { EventSubscriberDefinition } from "../../../subscribers/eventSubscriber.types";
 import { createEvaluationProcessingPipeline } from "../pipeline";
 import type { EvaluationAnalyticsData } from "../projections/evaluationAnalytics.foldProjection";
 import {
@@ -25,63 +28,142 @@ function foldStore<State>(): FoldProjectionStore<State> {
   };
 }
 
-function completedEvent(): EvaluationCompletedEvent {
+function completedEvent(occurredAt = 1_000): EvaluationCompletedEvent {
   return {
     id: "evt-completed",
     aggregateId: "eval-1",
     aggregateType: "evaluation",
     tenantId,
-    createdAt: 1_000,
-    occurredAt: 1_000,
+    createdAt: occurredAt,
+    occurredAt,
     type: EVALUATION_COMPLETED_EVENT_TYPE,
     version: "2025-01-14",
     data: {
       evaluationId: "eval-1",
+      traceId: "trace-1",
       status: "processed",
     },
   };
 }
 
+/** One automation that reads evaluations, so the trigger match has a match. */
+function evaluationTrigger(): TriggerSummary {
+  return {
+    id: "trigger-1",
+    projectId: String(tenantId),
+    name: "Evaluation automation",
+    action: TriggerAction.ADD_TO_DATASET,
+    triggerKind: TriggerKind.AUTOMATION,
+    actionParams: {},
+    filters: { "evaluations.passed": { "evaluator-1": ["true"] } },
+    alertType: "WARNING",
+    message: "",
+    customGraphId: null,
+    notificationCadence: "immediate",
+    filterQuery: null,
+    traceDebounceMs: 30_000,
+    templates: {
+      slackTemplateType: null,
+      slackTemplate: null,
+      emailSubjectTemplate: null,
+      emailBodyTemplate: null,
+    },
+  };
+}
+
 function buildPipeline({ isSaas = true }: { isSaas?: boolean } = {}) {
-  const triggerMatchSubscriber: EventSubscriberDefinition<EvaluationProcessingEvent> =
-    {
-      name: "triggerMatch",
-      eventTypes: [
-        EVALUATION_COMPLETED_EVENT_TYPE,
-        EVALUATION_REPORTED_EVENT_TYPE,
-      ],
-      options: { delay: 10_000 },
-      handle: async () => {},
-    };
   const graphActivityHandler = vi.fn().mockResolvedValue(undefined);
+  const readTraceSummary = vi
+    .fn()
+    .mockResolvedValue({ traceId: "trace-1" } as TraceSummaryData);
+  const getActiveTraceTriggersForProject = vi
+    .fn()
+    .mockResolvedValue([evaluationTrigger()]);
+
+  // One dispatcher per command class, so a test can name the command the
+  // pipeline bound its port to rather than trusting "some port was taken".
+  const dispatchers = new Map<unknown, ReturnType<typeof vi.fn>>();
+  const port = vi.fn((command: unknown) => {
+    const existing = dispatchers.get(command);
+    if (existing) return existing;
+    const dispatch = vi.fn().mockResolvedValue(undefined);
+    dispatchers.set(command, dispatch);
+    return dispatch;
+  });
+
   const pipeline = createEvaluationProcessingPipeline({
     evalRunStore: foldStore<EvaluationRunData>(),
     evaluationAnalyticsStore: foldStore<EvaluationAnalyticsData>(),
     evaluationAnalyticsRollupAppendStore: {
       append: vi.fn().mockResolvedValue(undefined),
     },
-    executeEvaluationCommand: {} as never,
-    commands: { port: () => async () => {} } as never,
+    executeEvaluation: {} as never,
+    commands: { port } as never,
     isSaas,
     automations: {
-      triggerMatchSubscriber,
+      triggers: { getActiveTraceTriggersForProject } as never,
+      readTraceSummary,
       graphActivityHandler,
     },
   });
-  return { pipeline, triggerMatchSubscriber, graphActivityHandler };
+
+  return {
+    pipeline,
+    graphActivityHandler,
+    readTraceSummary,
+    getActiveTraceTriggersForProject,
+    recordTriggerMatch: dispatchers.get(RecordTriggerMatchCommand),
+  };
 }
 
 describe("evaluation processing pipeline subscriber wiring", () => {
   describe("given the triggerMatch subscriber", () => {
-    it("registers the injected definition verbatim, adding no delay or dedup of its own", () => {
-      const { pipeline, triggerMatchSubscriber } = buildPipeline();
+    it("mounts the evaluation-alert subscriber it builds itself over both terminal events", () => {
+      const { pipeline } = buildPipeline();
+      const entry = pipeline.eventSubscribers.get("triggerMatch");
 
       // The delay, the dedup key and the enqueue filter belong to the
-      // subscriber now, not to this mount, and are tested where they are
-      // authored. What matters here is that the pipeline registers exactly
-      // what it was handed.
-      expect(pipeline.eventSubscribers.get("triggerMatch")).toBe(
-        triggerMatchSubscriber,
+      // subscriber, not to this mount, and are tested where they are authored
+      // (`automations/subscribers/__tests__`). What matters here is that the
+      // pipeline constructs it rather than receiving it built (ADR-082 Rule 1).
+      expect(entry?.name).toBe("triggerMatch");
+      expect([...(entry?.eventTypes ?? [])].sort()).toEqual(
+        [
+          EVALUATION_COMPLETED_EVENT_TYPE,
+          EVALUATION_REPORTED_EVENT_TYPE,
+        ].sort(),
+      );
+    });
+
+    it("binds it to the trigger service, the trace-summary reader and the recordTriggerMatch port", async () => {
+      const {
+        pipeline,
+        readTraceSummary,
+        getActiveTraceTriggersForProject,
+        recordTriggerMatch,
+      } = buildPipeline();
+      const occurredAt = Date.now();
+
+      await pipeline.eventSubscribers
+        .get("triggerMatch")
+        ?.handle(completedEvent(occurredAt), {
+          tenantId,
+          aggregateId: "eval-1",
+        });
+
+      expect(readTraceSummary).toHaveBeenCalledWith({
+        tenantId,
+        traceId: "trace-1",
+        occurredAtMs: occurredAt,
+      });
+      expect(getActiveTraceTriggersForProject).toHaveBeenCalledWith(tenantId);
+      expect(recordTriggerMatch).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenantId,
+          occurredAt,
+          triggerId: "trigger-1",
+          traceId: "trace-1",
+        }),
       );
     });
   });

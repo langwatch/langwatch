@@ -175,6 +175,7 @@ describe("ProcessRuntime", () => {
   });
 
   describe("given a scheduled process manager is registered with consumers enabled", () => {
+    /** @scenario a schedule with no deadline yet is armed by a worker boot */
     it("arms nextWakeAt on the singleton scheduled process", async () => {
       const store = new InMemoryProcessStore();
       const runtime = new ProcessRuntime({ store, consumersEnabled: true });
@@ -208,7 +209,88 @@ describe("ProcessRuntime", () => {
     });
   });
 
+  describe("given a daily schedule and a fleet that boots a worker every day", () => {
+    /**
+     * The arm is inbox-deduped per calendar day, so exactly one arm commits per
+     * day — but an arm that recomputes the deadline from `now` pushes it out by
+     * another whole interval every time. At a 24h interval that is a deadline
+     * that never matures: no error, no metric, just maintenance work that never
+     * runs. Days are walked here rather than a conditional asserted, because
+     * the defect only shows up across repeated arms.
+     *
+     * @scenario a schedule longer than the gap between worker boots still comes due
+     */
+    it("keeps the deadline the first arm set, so the schedule still comes due", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      try {
+        const store = new InMemoryProcessStore();
+        const everyMs = 24 * 60 * 60 * 1000;
+        const definition = buildProcessManager<AutomationEvent>({
+          name: "dailyPrune",
+          applier: (pm) =>
+            pm
+              .state({ count: 0 })
+              // The count is the maintenance work itself: a schedule whose
+              // deadline is pushed out on every arm never increments it.
+              .onWake((state) => ({ state: { count: state.count + 1 } }))
+              .schedule({ everyMs })
+              .intent("noop", z.object({}), async () => {}),
+        });
+        const ref = {
+          processName: "dailyPrune",
+          projectId: SCHEDULED_SINGLETON_PROJECT_ID,
+          processKey: "dailyPrune",
+        };
+
+        // Each boot is a fresh runtime over the shared store, which is what a
+        // worker restart is. The hour walks BACKWARDS across days: a fleet
+        // whose first boot of the day lands earlier than the previous day's
+        // arm is the ordinary case, and it is exactly the one that outruns the
+        // deadline.
+        const boot = async (at: string) => {
+          vi.setSystemTime(new Date(at));
+          const runtime = new ProcessRuntime({ store, consumersEnabled: true });
+          runtime.registerPipeline<AutomationEvent>({
+            pipelineName: "automations",
+            processManagers: new Map([["dailyPrune", definition]]),
+          });
+          // The arm is fire-and-forget over an in-memory store, so every step
+          // of it is a microtask; one macrotask tick drains them all.
+          await new Promise((resolve) => setImmediate(resolve));
+          await runtime.stop();
+        };
+
+        await boot("2026-01-01T09:00:00.000Z");
+        const armedDeadline = (await store.findByRef({ ref }))?.nextWakeAt;
+        expect(armedDeadline).toBe(
+          new Date("2026-01-01T09:00:00.000Z").getTime() + everyMs,
+        );
+
+        // A boot on the next calendar day, still short of the deadline: the
+        // arm must not move it, or it never matures.
+        await boot("2026-01-02T08:00:00.000Z");
+        const beforeMaturity = await store.findByRef<{ count: number }>({
+          ref,
+        });
+        expect(beforeMaturity?.nextWakeAt).toBe(armedDeadline);
+        expect(beforeMaturity?.state).toEqual({ count: 0 });
+
+        // An hour past the deadline the wake worker finds it due and the work
+        // runs — once, and re-armed a whole interval on from the slot served.
+        await boot("2026-01-02T10:00:00.000Z");
+        const afterMaturity = await store.findByRef<{ count: number }>({ ref });
+        expect(afterMaturity?.state).toEqual({ count: 1 });
+        expect(afterMaturity?.nextWakeAt).toBe(
+          new Date("2026-01-02T10:00:00.000Z").getTime() + everyMs,
+        );
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
   describe("given schedule arming rejects", () => {
+    /** @scenario a schedule that cannot be armed leaves the worker running */
     it("logs the failure via the runtime logger instead of throwing", async () => {
       const store = makeStubStore({
         commit: async () => {

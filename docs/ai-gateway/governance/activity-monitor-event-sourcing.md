@@ -1,6 +1,6 @@
 ---
 title: Activity Monitor — event-sourcing architecture
-description: Why the receiver → event_log → projection reactor → anomaly reactor pipeline replaces the original direct-CH-write design, and how to extend it.
+description: Why Activity Monitor ingestion goes through the event log and derived projections instead of writing ClickHouse from the request handler, and how to extend it.
 ---
 
 # Activity Monitor — event-sourcing architecture
@@ -18,10 +18,14 @@ Per @rchaves's 2026-04-27 directive — *"event sourcing is the one
 true way"* — and @master_orchestrator's follow-up (rebase/learn from
 [PR #3351](https://github.com/langwatch/langwatch/pull/3351)) we
 redesigned the trigger architecture before the eval engine landed.
-The receiver now appends an `ActivityEventReceived` event to
-`event_log`, and a dedicated `activity-monitor-processing` pipeline
-takes over from there. Anomaly detection becomes a reactor that
-fires *as new events arrive*, not a worker that polls.
+The receiver stopped writing ClickHouse from the request handler:
+governed activity is appended to `event_log`, and everything read
+later is derived from it by a projection.
+
+> **The pipeline drawn below is the April 2026 design as it was first
+> sliced, and the product took a different route through it.** Read
+> [What shipped instead](#what-shipped-instead) before treating any of
+> it as the current architecture.
 
 ## The pipeline
 
@@ -53,7 +57,7 @@ fires *as new events arrive*, not a worker that polls.
          │ wakes:                            │ wakes:
          ▼                                   ▼
 ┌──────────────────────────┐      ┌──────────────────────────────┐
-│ Reactor                  │      │ Reactor                      │
+│ Event subscriber         │      │ Process manager              │
 │  activityEventBroadcast  │      │  anomalyDetection            │
 │  (real-time UI push for  │      │  - load active AnomalyRules  │
 │   /governance dashboard) │      │  - evaluate per-rule type    │
@@ -64,11 +68,50 @@ fires *as new events arrive*, not a worker that polls.
                                   └──────────────────────────────┘
 ```
 
-The shape mirrors `pipelines/trace-processing/` (PR #3351's
-alertTrigger reactor) — same `definePipeline().withFoldProjection().
-withMapProjection().withReactor()` builder, same
-`ReactorDefinition<EventShape, FoldState>` contract, same
+The shape mirrors `pipelines/trace-processing/` — same
+`definePipeline().withFoldProjection().withMapProjection().
+withEventSubscriber()` builder, same
+`EventSubscriberDefinition<EventShape>` contract, same
 `triggerActionDispatch.ts` shared helper.
+
+## What shipped instead
+
+Two things in the plan above changed on the way to production, and
+both are worth knowing before you extend this surface.
+
+**There is no separate activity-event store or pipeline.** The
+dedicated `gateway_activity_events` table was dropped, and governed
+activity now rides the platform's ordinary trace ingestion: the
+receiver stamps origin metadata on each span and log record
+(`langwatch.origin.kind = "ingestion_source"`, plus the source's id,
+organization and type) and hands the payload to the same trace
+collection path `/api/otel/v1/traces` uses. A hidden per-organization
+Governance Project carries the access control so governance data never
+appears among a customer's own projects.
+
+**The derived governance streams are map projections on the trace
+pipeline.** `governance_kpis` (per-span spend and token contributions,
+summed per source and hour at read time) and `governance_ocsf_events`
+(one OCSF v1.1 audit row per governed span) are registered on
+`trace-processing` as `governanceKpis` and `governanceOcsfEvents`.
+Being projections is what makes them **rebuildable**: replaying a
+window of the event log re-derives every row in it, so a write lost to
+an outage is recoverable rather than a permanent hole in the audit
+trail. Both derivations are pure functions of a single span, so a
+rebuild reproduces the live row exactly.
+
+**Anomaly evaluation is periodic, not event-driven.** The spend-spike
+evaluator runs on its own five-minute tick and queries `governance_kpis`
+for the current window and the six preceding ones; it does not fire per
+event. An alert lands as an `AnomalyAlert` row.
+
+Post-event work in general is expressed as an **event subscriber**, a
+**projection**, or a **process manager**, and nothing else — see
+[ADR-075](https://github.com/langwatch/langwatch/blob/main/dev/docs/adr/075-post-event-work-subscribers-and-process-managers.md).
+Subscribers and process managers run on the live event path only;
+replay never re-runs them. Projections are the substrate for anything
+someone later reads as fact, precisely because replay does rebuild
+them.
 
 ## Why a dedicated pipeline (not bolted onto trace-processing)
 
@@ -93,6 +136,12 @@ between independently-evolving subsystems. A dedicated
 `activity-monitor-processing` pipeline keeps each surface's
 aggregate semantics clean.
 
+That was the reasoning behind the plan below. In the end the
+discriminator turned out to be cheap — origin metadata stamped on the
+span itself — so governed activity rides `trace-processing` after all,
+and the governance streams are derived from it by their own
+projections rather than by a pipeline of their own.
+
 ## Aggregate identity
 
 ```
@@ -111,19 +160,21 @@ machinery, different aggregate semantics.
 
 ## Slicing the redesign
 
-Per @master_orchestrator's C0/C1/C2/C3 sequence:
+Per @master_orchestrator's C0/C1/C2/C3 sequence. Kept as the record of
+how the work was cut; the store and the anomaly path both landed
+differently, as described above.
 
 ### C0 — this doc + spec updates
 - This architecture doc.
 - `specs/ai-gateway/governance/anomaly-detection.feature` updated to
-  drop poller language; reactor framing throughout.
+  drop poller language; event-driven framing throughout.
 - `AnomalyAlert` Prisma model + migration `20260427020000_add_anomaly_alert/`
-  doc-comment updated to reference the reactor as producer.
+  doc-comment updated to name the pipeline as producer.
 - Existing receivers continue to write CH directly until C1 lands —
   this slice is doc-only so the team can review the architecture
   before more code moves.
 
-### C1 — receiver → event_log → projection reactor
+### C1 — receiver → event_log → projection
 - New event schema: `ActivityEventReceived` with the OCSF-normalised
   ActivityEventRow shape.
 - New command: `RecordActivityEventCommand` wired into the
@@ -136,11 +187,11 @@ Per @master_orchestrator's C0/C1/C2/C3 sequence:
 - Dogfood: curl → 202 → row visible in CH (same as today, just via
   event-sourced path).
 
-### C2 — AnomalyAlert + anomaly reactor for one rule type
+### C2 — AnomalyAlert + anomaly detection for one rule type
 - Apply the AnomalyAlert migration that's already drafted but
   doesn't ship behaviour yet.
 - Add `anomalyWindow` fold projection (per-tenant rolling totals).
-- Add `anomalyDetection` reactor for `spend_spike` only first
+- Add `anomalyDetection` for `spend_spike` only first
   (cleanest mapping to the existing CostUSD field).
 - Wire into `api.activityMonitor.recentAnomalies` (replaces current
   `[]` stub).
@@ -151,7 +202,7 @@ Per @master_orchestrator's C0/C1/C2/C3 sequence:
 - Generic webhook + log-only first (matches PR #3351's
   triggerActionDispatch shape).
 - Slack / PagerDuty / SIEM / email follow as per-destination
-  adapter slices once the reactor pattern is proven.
+  adapter slices once the detection path is proven.
 
 ## What we keep from the v0 receiver code
 
@@ -169,8 +220,10 @@ Per @master_orchestrator's C0/C1/C2/C3 sequence:
 - The direct `ActivityEventRepository.insert(...)` call from the
   receiver handler. The receiver instead enqueues an event into
   the pipeline; the map projection does the actual CH insert.
-- The poller-based AnomalyEvaluatorService design that was sketched
-  but never shipped. Replaced by the anomaly reactor.
+- The AnomalyEvaluatorService sketch that swept a bespoke activity
+  table. The periodic sweep itself survived — the shipped evaluator
+  still runs on a timer — but it reads the derived `governance_kpis`
+  rows rather than a store of its own.
 
 ## Test strategy per slice
 
@@ -178,13 +231,13 @@ Per @master_orchestrator's C0/C1/C2/C3 sequence:
 |-------|----------|------------------|---------|
 | C0 (this) | anomaly-detection.feature updated | n/a (doc + schema) | architecture review in-channel |
 | C1 | activity-monitor pipeline scenarios in `activity-monitor.feature` | pipeline test: append event → projection fires → CH row | curl → 202 → CH SELECT |
-| C2 | spend_spike scenario in anomaly-detection.feature | reactor test: violating fold state → AnomalyAlert.upsert called | UI rule + violating event → /governance shows alert |
-| C3 | dispatch scenarios in anomaly-detection.feature | reactor test: dispatch helper called with right shape | webhook receives canonical body |
+| C2 | spend_spike scenario in anomaly-detection.feature | evaluator test: violating window → AnomalyAlert.upsert called | UI rule + violating event → /governance shows alert |
+| C3 | dispatch scenarios in anomaly-detection.feature | dispatch test: dispatch helper called with right shape | webhook receives canonical body |
 
 Each slice ships its own BDD + integration coverage before code
-lands; production architecture is reactor-only — `evaluateNow`
-appends a synthetic event and lets the reactor handle it (test
-harness, not parallel code path).
+lands, and there is exactly one production path: a test drives the
+same evaluator the scheduled tick drives, never a parallel
+implementation kept alive for the test suite.
 
 ## Cross-references
 

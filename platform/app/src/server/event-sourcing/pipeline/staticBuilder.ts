@@ -281,21 +281,18 @@ class StaticPipelineBuilderWithNameAndType<
    * where the domain exports `(deps) => (pm) => pm.state(…).intent(…)…`.
    * The runtime owns its manager, the shared process-outbox and wake
    * workers, and the trigger adapters generated from its triggers.
+   *
+   * Name-and-applier is the only form. A second overload taking a pre-built
+   * `ProcessManagerDefinition` had no production caller, and accepting one is
+   * the ADR-082 Rule 1 hole: a pipeline registering behaviour it did not
+   * author. Tests that want the bare definition call `buildProcessManager`
+   * directly, which is what this delegates to.
    */
   withProcessManager(
     name: string,
     applier: ProcessManagerApplier<EventType>,
-  ): this;
-  withProcessManager(definition: ProcessManagerDefinition<any, any, any>): this;
-  withProcessManager(
-    definitionOrName: ProcessManagerDefinition<any, any, any> | string,
-    applier?: ProcessManagerApplier<EventType>,
   ): this {
-    const definition =
-      typeof definitionOrName === "string"
-        ? buildProcessManager({ name: definitionOrName, applier: applier! })
-        : definitionOrName;
-    const name = definition.config.name;
+    const definition = buildProcessManager({ name, applier });
     if (this.processManagers.has(name)) {
       throw new ConfigurationError(
         "StaticPipelineBuilder",

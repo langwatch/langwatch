@@ -305,7 +305,7 @@ Feature: AI Gateway Governance — UI Contract (Lane B)
   # Deferred items — explicitly NOT in this PR
   # ---------------------------------------------------------------------------
 
-  @bdd @ui @ui-contract @deferred
+  @bdd @ui @ui-contract @deferred @unimplemented
   Scenario: Cryptographic tamper-evidence is NOT exposed in the UI
     When the admin navigates to any governance surface
     Then there is NO "Verify integrity" button, "Merkle root" display,

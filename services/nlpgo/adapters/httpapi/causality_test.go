@@ -41,7 +41,8 @@ func TestApplyInboundCausality_HeaderToBaggage_DepthPlusOne(t *testing.T) {
 // Header gate: missing header → no baggage stamp at all. This is what
 // prevents non-evaluator workflow runs (playground, scenarios, customer
 // workflow runs) from polluting their spans with causality_depth and
-// silently tripping the TS reactor's depth_direct guard.
+// silently tripping the TS evaluation-trigger process manager's
+// depth_direct guard.
 func TestApplyInboundCausality_MissingHeader_NoStamp(t *testing.T) {
 	otelapi.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
 		propagation.TraceContext{},

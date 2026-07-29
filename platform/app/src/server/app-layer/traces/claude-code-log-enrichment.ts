@@ -154,16 +154,6 @@ export function mapSpansToClaudeRefs(spans: Span[]): ClaudeSpanRef[] {
     }));
 }
 
-/**
- * True when the trace carries Claude Code model-call spans — i.e. at least one
- * span has a `request_id` for the logs to join onto.
- */
-export function hasClaudeModelCallSpans(spans: Span[]): boolean {
-  return spans.some(
-    (span) => readStringParam(span.params, SPAN_REQUEST_ID_KEY) !== null,
-  );
-}
-
 function spanToolUseId(span: Span): string | null {
   return (
     readStringParam(span.params, SPAN_TOOL_USE_ID_KEY) ??

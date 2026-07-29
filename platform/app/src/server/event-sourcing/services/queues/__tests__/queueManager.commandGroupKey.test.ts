@@ -287,6 +287,7 @@ describe("QueueManager.initializeCommandQueues append coalescing", () => {
 
   describe("given a command that does not coalesce", () => {
     describe("when the command queue is initialized", () => {
+      /** @scenario 'a low-fan-in producer is left alone' */
       it("leaves processBatch and the coalesce bounds unset", () => {
         const { manager, globalJobRegistry } = buildManager();
 

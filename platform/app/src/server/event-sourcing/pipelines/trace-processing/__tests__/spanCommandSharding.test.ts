@@ -60,6 +60,7 @@ function buildTraceDeps(
     hasRedis: true,
     projects: {} as any,
     bootstrapTopicClustering: async () => {},
+    getNormalizedSpanById: async () => null,
     evaluationTriggerDispatch: {
       monitors: {} as any,
       readTraceSummary: async () => null,

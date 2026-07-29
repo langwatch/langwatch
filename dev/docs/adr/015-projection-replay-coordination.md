@@ -111,7 +111,7 @@ After all projections complete, the service runs `OPTIMIZE TABLE {table}` (witho
 **Negative:**
 - Added complexity in the live event path — `RedisReplayMarkerChecker` adds a Redis HGET per event (mitigated: ~0.1ms when no replay active, returns null immediately)
 - GroupQueue pause affects all events for the projection, not just the replayed aggregates — brief pause window minimizes impact
-- Redis becomes a coordination dependency — if Redis is down, replay cannot run (but live processing continues via `NoopReplayMarkerChecker` fallback)
+- Redis becomes a coordination dependency — if Redis is down, replay cannot run (but live processing continues: `replayMarkerChecker` is an optional dependency, and the router treats an absent checker as "process")
 
 **Neutral:**
 - The CLI package still exists for the TUI experience but contains no business logic — it delegates entirely to the framework service
@@ -186,7 +186,7 @@ so a re-run still skips completed aggregates (resume). Cleanup is best-effort
 
 - Related ADRs:
   - [ADR-007: Event Sourcing Architecture](./007-event-sourcing-architecture.md) — the event-sourcing foundation this replay tooling operates on
-  - [ADR-066: Projection state storage](./066-projection-clickhouse-cached-store.md) — the read-back fold store whose version-migration rebuilds are coordinated through this replay protocol (supersedes ADR-021's fold cache)
+  - [ADR-066: Projection state storage](./066-projection-clickhouse-cached-store.md) — the read-back fold store whose version-migration rebuilds are coordinated through this replay protocol (supersedes ADR-088's fold cache)
   - [ADR-022: event_log as single source of truth](./022-event-log-source-of-truth.md) — the event log replays read from
   - [ADR-024: Cold-path tiered storage](./024-cold-path-tiered-storage.md) — the S3 cold storage that the amendment's partition pruning avoids scanning
   - [ADR-034: Event-Sourced Analytics Materialization](./034-event-sourced-analytics-materialization.md) — analytics projections rebuilt via this replay mechanism

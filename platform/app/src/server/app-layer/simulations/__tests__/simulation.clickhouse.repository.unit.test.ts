@@ -190,6 +190,7 @@ describe("SimulationClickHouseRepository", () => {
 
         expect(result).toEqual({
           runs: [],
+          expectedCounts: {},
           nextCursor: undefined,
           hasMore: false,
         });
@@ -398,6 +399,7 @@ describe("SimulationClickHouseRepository", () => {
           lastUpdatedAt: 0,
           runs: [],
           scenarioSetIds: {},
+          expectedCounts: {},
           nextCursor: undefined,
           hasMore: false,
         });

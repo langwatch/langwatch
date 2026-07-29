@@ -45,6 +45,9 @@ export function GroupRow({
 }: GroupRowProps) {
   const runCount = group.scenarioRuns.length;
 
+  // No expected totals here on purpose: a scenario or target group holds a
+  // slice of each batch, so the batch's own total would read as a shortfall
+  // against runs this group was never going to show.
   const batches = useMemo(
     () => groupRunsByBatchId({ runs: group.scenarioRuns }),
     [group.scenarioRuns],

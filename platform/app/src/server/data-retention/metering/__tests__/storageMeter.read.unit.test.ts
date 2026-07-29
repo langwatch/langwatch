@@ -45,6 +45,8 @@ describe("resolveScopeStorageUsage", () => {
   });
 
   describe("given an organization scope", () => {
+    /** @scenario "Storage for an organization scope sums its projects" */
+    /** @scenario "Storage never counts a project the caller cannot read" */
     it("sums every org project the caller can read", async () => {
       prisma.project.findMany.mockResolvedValue([
         { id: "proj_a", teamId: "team_a" },

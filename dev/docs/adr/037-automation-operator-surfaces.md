@@ -26,7 +26,7 @@ This split has three problems:
 
 The settings automations list (`/[project]/automations`) shows name, action, destination, filters, last-run timestamp, and an active toggle. That is enough to see *that* an automation exists, but nothing about whether it is *working*.
 
-As automations gain templates ([ADR-036](./036-liquid-templates-for-trigger-notifications.md)), cadence + debounce ([ADR-026](./026-per-trigger-dispatch-timing.md)), and outbox-backed dispatch ([ADR-030](./030-transactional-outbox-for-stake-sensitive-dispatch.md)), the operator's real questions are operational:
+As automations gain templates ([ADR-036](./036-liquid-templates-for-trigger-notifications.md)), cadence + debounce ([ADR-026](./026-per-trigger-dispatch-timing.md)), and outbox-backed dispatch ([ADR-095](./095-transactional-outbox-for-stake-sensitive-dispatch.md)), the operator's real questions are operational:
 
 - When did this last fire, and how often is it firing?
 - Is anything **pending** (queued / in-flight) or **stuck** (failed / dead)?
@@ -81,8 +81,8 @@ The existing `previewTemplate` / `testFireTemplate` procedures read a *saved* `T
 
 Enrich the automations list, plus a per-automation detail panel, with an operational view sourced from the existing dispatch records:
 
-- **Last triggered** and **fired count** — from `TriggerSent` ([ADR-030](./030-transactional-outbox-for-stake-sensitive-dispatch.md)), which already records every `(triggerId, traceId)` dispatch. Available immediately.
-- **Pending / failed / dead** — counts from `ReactorOutbox` ([ADR-030](./030-transactional-outbox-for-stake-sensitive-dispatch.md)) grouped by `status` for the trigger.
+- **Last triggered** and **fired count** — from `TriggerSent` ([ADR-095](./095-transactional-outbox-for-stake-sensitive-dispatch.md)), which already records every `(triggerId, traceId)` dispatch. Available immediately.
+- **Pending / failed / dead** — counts from `ReactorOutbox` ([ADR-095](./095-transactional-outbox-for-stake-sensitive-dispatch.md)) grouped by `status` for the trigger.
 - **Template-health warnings** — "rendered with the default due to a template error" and "N missing variables", the ADR-036 operator signals, surfaced from the outbox row's `lastError` / its `renderDiagnostics` field. The "N missing variables" count is now persisted: the dispatcher captures `missingVariables` from each custom email/Slack template render and stamps it onto the dispatched payload, and the PG audit adapter writes it to `ReactorOutbox.renderDiagnostics` (`{ missingVariables: string[] }`, NULL on a clean render). This resolves the earlier gap where `renderTriggerEmail` / `renderTriggerSlack` computed the missing-variable set but the dispatcher dropped it before it reached the audit row.
 - **Cadence and debounce** — the ADR-026 `notificationCadence` (notify triggers only) and `traceDebounceMs` shown as columns once those phases ship.
 - **Edit** opens the staged authoring drawer above.
@@ -99,7 +99,7 @@ A read-only `TriggerHealthService` (or an extension of `TriggerService`) reads `
 
 ### Sequencing dependency
 
-The pending/failed/dead and template-health signals require **notify dispatch to flow through `ReactorOutbox`** (ADR-030 + ADR-026 fully wired). Therefore:
+The pending/failed/dead and template-health signals require **notify dispatch to flow through `ReactorOutbox`** (ADR-095 + ADR-026 fully wired). Therefore:
 
 - **Ship now:** last-triggered and fired-count (from `TriggerSent`).
 - **Ship with outbox-backed notify dispatch:** pending / failed / dead and template-health warnings.
@@ -149,14 +149,14 @@ We do not block the management surface on the deferred dispatch wiring: the alwa
 - **The drawer becomes launchable from settings**, not just the traces view, because conditions are now an in-drawer section.
 - **A new read path over `ReactorOutbox`** — a `TriggerHealthService` + repository method + tRPC query — plus an indexed `subjectId` column on the outbox table.
 - **The automations list page becomes the operator activity surface** referenced by ADR-036.
-- **Outbox-derived columns depend on outbox-backed notify dispatch.** Until ADR-030 + ADR-026 fully wire, they render as "—"/empty; only `TriggerSent`-derived columns are populated. This is an explicit, documented two-phase rollout, not a bug.
+- **Outbox-derived columns depend on outbox-backed notify dispatch.** Until ADR-095 + ADR-026 fully wire, they render as "—"/empty; only `TriggerSent`-derived columns are populated. This is an explicit, documented two-phase rollout, not a bug.
 - **Migration**: existing triggers open in the new drawer with every section pre-filled; no data migration is required (the drawer reads the same `Trigger` columns, including the ADR-036 template columns and the ADR-026 cadence/debounce columns).
 - **A new domain folder `src/automations/`** holds the provider model + `cadences.ts` (the shared cadence constants). The drawer + UI live under `src/features/automations/`. Keeps client-only UI separate from cross-cutting domain types.
   - *Implementation note (PR #5911):* the provider model later split per side — pure definitions + `cadences.ts` in `src/shared/automations/`, client halves + registry in `src/features/automations/providers/`, server halves (persistence/secret hooks) + registry in `src/server/app-layer/automations/providers/`. `src/automations/` no longer exists.
 
 ## References
 
-- [ADR-030](./030-transactional-outbox-for-stake-sensitive-dispatch.md) — `TriggerSent` + `ReactorOutbox` schemas the dispatch-health view reads; `subjectId` extension
+- [ADR-095](./095-transactional-outbox-for-stake-sensitive-dispatch.md) — `TriggerSent` + `ReactorOutbox` schemas the dispatch-health view reads; `subjectId` extension
 - [ADR-026](./026-per-trigger-dispatch-timing.md) — cadence + debounce columns the cadence secondary edits
 - [ADR-036](./036-liquid-templates-for-trigger-notifications.md) — Liquid templates + test-fire banner the Configuration secondary edits
 - Code touched: `src/components/AddAutomationDrawer.tsx`, `src/components/EditTriggerTemplatesDrawer.tsx`, `src/pages/[project]/automations.tsx`, `src/server/api/routers/automations.ts`, `src/server/app-layer/automations/trigger-template.service.ts`, `src/automations/**`, `src/features/automations/**`

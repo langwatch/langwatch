@@ -8,7 +8,7 @@
 
 **Re-affirms & hardens:** [ADR-007](./007-event-sourcing-architecture.md) §"Fold Projections", §"No Checkpoints" ("fold state = stored data"; "`store.get()` loads last state").
 
-**Supersedes:** [ADR-021](./021-lean-fold-cache.md) (the fold-cache *mechanics*; its content-leanness decisions live on in [ADR-022](./022-event-log-source-of-truth.md)).
+**Supersedes:** [ADR-088](./088-lean-fold-cache.md) (the fold-cache *mechanics*; its content-leanness decisions live on in [ADR-022](./022-event-log-source-of-truth.md)).
 
 **Amends:** [ADR-034](./034-event-sourced-analytics-materialization.md) — replaces its `refoldOnStoreMiss` store-continuity mechanism with read-back (the analytics-materialisation shape itself stands).
 
@@ -158,7 +158,7 @@ Independently of the store: fix the **session = traceId fallback** so one large 
    **Deletion condition:** the same as for #2 & #3 — `refoldOnStoreMiss` (and its executor support) can be removed once `coding_agent_sessions` retention has aged out every row written before migration 00053, and the same holds for the analytics tables against 00056. **Checkable, not assumed:** `es_fold_refold_on_miss_total{projection_name, outcome="performed"}` counts exactly this path, so the condition is "the `performed` rate for the projection has been flat at zero for a full retention period", not "enough time has probably passed". Removing it earlier re-opens the defects above for any surviving old row. A `performed` rate that RISES rather than decays is the regression signal — it means misses are being served by `event_log` again, which is the pre-ADR-066 steady state and the shape of the 2026-07-23 outage.
    - **Pillar 1, adopters #2 & #3 — shipped:** ADR-034's slim analytics folds, `traceAnalytics` (`trace_analytics`) and `evaluationAnalytics` (`evaluation_analytics`), migration 00056. These were the last two folds that refolded `event_log` on the delivery path (observed cold-scanning S3 partitions continuously in prod worker logs, 2026-07-24 — the same pattern as the 2026-07-23 outage). Each now reads its own last committed row back via typed read-back columns: `traceAnalytics` persists the span count, the annotation id set, the four name-resolution bookkeeping fields, and the out-of-order checkpoint, and re-injects the hoisted dimensions into the trimmed attribute map on decode; `evaluationAnalytics` persists the started/completed lifecycle operands `DurationMs` is derived from. Both carry the `AppliedEventIds` durable watermark, bounded per row by an explicit `coalesceMaxBatch` (128) rather than the platform default, since for these folds the coalesce ceiling *is* the watermark size written into every superseded ClickHouse row version.
 
-     **`refoldOnStoreMiss` is NOT yet deletable; these two are its remaining adopters alongside `codingAgentSession` (see #1 above, which carries the identical net for the identical reason).** The read-back columns are only trustworthy on rows the new build wrote: every pre-existing row decodes with `SpanCount` 0, no annotation ids, no root claimed, and all three name-resolution booleans false — which would let one late non-root span overwrite a user-renamed trace, freeze a fallback-named trace against a real root, reset the `MAX_PROCESSED_SPANS` cap so committed cost/tokens are counted twice, and (on the eval side) compute a zero duration over a real one. So both folds' **projection version is the discriminator**: bumped to `2026-07-27` with the row-shape change (which is what the stamp records — ADR-021/022), and each store's read-back path decodes a row only at that version, reporting any other stamp as a store miss. `refoldOnStoreMiss: true` is restored on both folds to catch exactly those misses.
+     **`refoldOnStoreMiss` is NOT yet deletable; these two are its remaining adopters alongside `codingAgentSession` (see #1 above, which carries the identical net for the identical reason).** The read-back columns are only trustworthy on rows the new build wrote: every pre-existing row decodes with `SpanCount` 0, no annotation ids, no root claimed, and all three name-resolution booleans false — which would let one late non-root span overwrite a user-renamed trace, freeze a fallback-named trace against a real root, reset the `MAX_PROCESSED_SPANS` cap so committed cost/tokens are counted twice, and (on the eval side) compute a zero duration over a real one. So both folds' **projection version is the discriminator**: bumped to `2026-07-27` with the row-shape change (which is what the stamp records — ADR-088/022), and each store's read-back path decodes a row only at that version, reporting any other stamp as a store miss. `refoldOnStoreMiss: true` is restored on both folds to catch exactly those misses.
 
      This is cheap and self-expiring: in steady state every row carries the current version, `get()` hits, and nothing refolds; a pre-existing row refolds exactly ONCE, on its next event, and is rewritten at the new version — so the population self-heals per aggregate with no backfill migration. It also closes the second gap the read-back PR opened: a state carrying only topic/annotation/name signal fails the store's persistable-signal predicate and writes no row at all, so before the gate it lived in Redis alone and was lost on eviction; now the missing row *is* a store miss and the refold rebuilds the signal from `event_log`.
 
@@ -253,12 +253,55 @@ understand writes a current-stamped partial state over a complete one, and that
 corruption is undetectable afterwards — which is why the executor refuses to
 fold onto an empty state when a row was found, refused, and has no re-fold path.
 
+## Deploying a projection-version bump (2026-07-29)
+
+The fold cache key includes the wrapped store's `projectionVersion`. Five stores
+declare one — `traceSummary`, `traceAnalytics`, `evaluationAnalytics`,
+`codingAgentSession`, and every `RepositoryFoldStore` — so **bumping a stamp
+rotates that projection's whole cache namespace in one deploy.** This is
+deliberate, and it is the reason the gate works at all: a rotated key cannot
+serve state in the old shape past the store's decodability check. But it has a
+cost worth knowing before you ship one.
+
+The TTL contract above lets a miss be treated as authoritative *because* a miss
+implies the last write is at least a TTL old and has therefore settled across
+replicas. That inference holds **within one key namespace**. A rotation moves
+every in-flight aggregate into a namespace where a seconds-old write reads as a
+miss, and the durable read behind that miss goes through
+`resolveClickHouseClient`, which is not pinned to a primary. So for one deploy
+window a hot aggregate can resume from a lagging replica's row and re-accumulate,
+and the applied-event-id set rides the same entry — so a redelivery inside the
+window is not recognised (`es_fold_dedup_unavailable{reason="cache_miss"}`).
+
+**It self-heals on each aggregate's next write**, and only aggregates written
+during the window are exposed at all.
+
+**What to expect:** a spike in `es_fold_cache_total{result="miss"}` and in the
+ClickHouse-tier read duration for that projection, starting at rollout and
+decaying as traffic rewrites the population. Neither is an incident on its own.
+
+**Prefer** bumping a stamp in a quiet window, and not alongside another change
+that also raises ClickHouse read load.
+
+**There is deliberately no fallback read at the unversioned key.** It was
+designed and rejected: a cache entry carries `{state, updatedAt, appliedEventIds}`
+and *no evidence of its shape*, so the decodability check the stores apply to a
+ClickHouse row — which reads the version stamped on that row — has nothing to
+apply to. Adopting an old-namespace entry would be a guess, which is precisely
+the laundering the version key exists to prevent. Two shape-independent gates
+were worked through and are unsound: adopting on freshness can drop a committed
+fold step (`readUpdatedAt` falls back to `Date.now()` for states without an
+`UpdatedAt` field, so a legacy entry carries wall-clock rather than a state
+stamp), and adopting only the `appliedEventIds` makes the executor skip events
+the durable row does not contain — permanent loss. A one-deploy miss storm is
+the cheaper failure.
+
 ## References
 
 - **Behavioural contract:** [specs/event-sourcing/fold-read-back-store.feature](../../../specs/event-sourcing/fold-read-back-store.feature) (pillar 1), [specs/event-sourcing/producer-append-coalescing.feature](../../../specs/event-sourcing/producer-append-coalescing.feature) (pillar 2), [specs/event-sourcing/fold-coalescing.feature](../../../specs/event-sourcing/fold-coalescing.feature) (the shared count+byte-bounded drain both sides ride)
 - [ADR-007](./007-event-sourcing-architecture.md) — event-sourcing architecture (this ADR hardens its storage model)
 - [ADR-015](./015-projection-replay-coordination.md) — replay coordination (narrowed to off-hot-path)
-- [ADR-021](./021-lean-fold-cache.md) — lean fold cache (fold-cache mechanics superseded here)
+- [ADR-088](./088-lean-fold-cache.md) — lean fold cache (fold-cache mechanics superseded here)
 - [ADR-022](./022-event-log-source-of-truth.md) — event_log as source of truth (heavy-content axis)
 - [ADR-034](./034-event-sourced-analytics-materialization.md) — analytics materialisation (its `refoldOnStoreMiss` continuity mechanism amended here)
 - [ADR-049](./049-langy-projection-independent-reactions.md) — Postgres operational-projection store (sibling implementation of the read-back principle)

@@ -4,7 +4,7 @@
 
 **Status:** Accepted
 
-**Supersedes:** ADR-030's `ReactorOutbox` mechanism and `.withOutbox`
+**Supersedes:** ADR-095's `ReactorOutbox` mechanism and `.withOutbox`
 pipeline primitive. ADR-026/027, ADR-031, ADR-034, ADR-035, ADR-036/041,
 ADR-040, and ADR-043 remain behavioral contracts, subject to ADR-026's
 2026-07-18 deterministic settle-window amendment.

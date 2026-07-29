@@ -92,7 +92,7 @@ interface ActionParams {
 
 /**
  * Everything the settled dispatch needs. Mirrors the legacy outbox
- * dispatcher's deps (ADR-030/031/035/036/040/041 contracts) minus the
+ * dispatcher's deps (ADR-095/031/035/036/040/041 contracts) minus the
  * queue transport — the ProcessManagerOutbox owns retry now.
  */
 export interface TriggerSettlementDispatchDeps extends ConfirmSettledMatchDeps {
@@ -211,7 +211,7 @@ export function createPersistMatchHandler(
 }
 
 /**
- * The ADR-027 cadence digest, dispatched from the process outbox. Behavior
+ * The ADR-026 cadence digest, dispatched from the process outbox. Behavior
  * is the legacy cadence handler's, unchanged: settle-confirm each trace,
  * dedup against `TriggerSent` claims, ADR-031 suppression + caps keyed on
  * the dispatch digest, ADR-036/041 template render or legacy senders,

@@ -580,6 +580,29 @@ model Cost {
   updatedAt     DateTime          @default(now()) @updatedAt
   extraInfo     Json?
 
+  /// Natural key of the unit of work that produced this row, for writers that
+  /// run under at-least-once delivery. Rows are money — every one of them is
+  /// summed by `license-enforcement.repository.ts` for limit enforcement and
+  /// reported by `api/routers/costs.ts` — so a redelivered job must land on
+  /// the SAME row rather than a second one.
+  ///
+  /// Deliberately NOT a unique over the business columns
+  /// (projectId, referenceType, referenceId, costType, extraInfo->trace_id).
+  /// Three of the four writers legitimately produce many rows under one such
+  /// tuple: `topic-clustering/clustering.ts` writes one CLUSTERING/PROJECT row
+  /// per clustering run against the same projectId, `evaluations-legacy.ts`
+  /// writes one BATCH_EVALUATION/BATCH row per datapoint against the same
+  /// experiment, and the legacy single-evaluation route can be called
+  /// repeatedly for the same (evaluator, trace). Constraining those columns
+  /// would reject legitimate writes and would also be blocked outright by the
+  /// duplicates already in the table.
+  ///
+  /// NULL means "this writer makes no idempotency claim". Postgres treats NULLs
+  /// as distinct in a unique index, so the three writers above are unaffected
+  /// and no historical row can block the index being built.
+  idempotencyKey String?
+
+  @@unique([projectId, idempotencyKey])
   @@index([referenceType, referenceId])
   @@index([costType])
   @@index([projectId])
@@ -2738,10 +2761,10 @@ model AnomalyRule {
   @@index([status])
 }
 
-/// Persisted anomaly detection. Inserted by the anomaly-detection
-/// reactor (event-sourcing pipeline; modeled on PR #3351's
-/// alertTrigger pattern) when a rule's threshold trips while
-/// processing a freshly-arrived ActivityEventReceived event.
+/// Persisted anomaly detection. Inserted by SpendSpikeAnomalyEvaluator
+/// (ee/governance/services/spendSpikeAnomalyEvaluator.service.ts) on the
+/// spendSpikeAnomalyWorker tick, when a rule's threshold trips against
+/// the governance_kpis projection.
 /// Read by api.activityMonitor.recentAnomalies for the admin dashboard.
 ///
 /// Dedup: (ruleId, triggerWindowStart) - re-evaluating the same

@@ -55,6 +55,7 @@ function agentSpan(
 
 describe("aggregateScenarioRoleMetrics", () => {
   describe("given a non-scenario trace (no role-bearing spans)", () => {
+    /** @scenario "A trace with no roles produces no role metrics" */
     it("returns empty cost and latency maps", () => {
       const inputs: ScenarioRoleSpanInput[] = [
         {
@@ -81,6 +82,7 @@ describe("aggregateScenarioRoleMetrics", () => {
   });
 
   describe("given a child LLM span under a role-bearing agent span", () => {
+    /** @scenario "A costed span is charged to the role above it" */
     it("attributes the child cost to the ancestor's role", () => {
       const inputs: ScenarioRoleSpanInput[] = [
         {
@@ -107,6 +109,7 @@ describe("aggregateScenarioRoleMetrics", () => {
   });
 
   describe("given deeply nested spans under a role", () => {
+    /** @scenario "A role reaches every span beneath it, however deep" */
     it("propagates the role transitively to all descendants", () => {
       const inputs: ScenarioRoleSpanInput[] = [
         {
@@ -139,6 +142,7 @@ describe("aggregateScenarioRoleMetrics", () => {
   });
 
   describe("given two roles in one trace", () => {
+    /** @scenario "Two roles in one trace are charged separately" */
     it("sums cost under each span's nearest role ancestor", () => {
       const inputs: ScenarioRoleSpanInput[] = [
         {
@@ -179,6 +183,7 @@ describe("aggregateScenarioRoleMetrics", () => {
   });
 
   describe("given a span whose parent is missing from the trace", () => {
+    /** @scenario "A span with no reachable parent is left unattributed" */
     it("does not assign a role and terminates without recursing", () => {
       const inputs: ScenarioRoleSpanInput[] = [
         {
@@ -198,6 +203,7 @@ describe("aggregateScenarioRoleMetrics", () => {
   });
 
   describe("given a parent cycle (malformed parent links)", () => {
+    /** @scenario "A cycle in the parent links terminates instead of hanging" */
     it("terminates instead of recursing forever", () => {
       const inputs: ScenarioRoleSpanInput[] = [
         {
@@ -236,6 +242,7 @@ describe("deriveScenarioRoleMetricsFromSpans", () => {
   const outOfOrder = [userLlm, asstLlm, asstNestedLlm, userAgent, asstAgent];
 
   describe("when spans arrive in any order", () => {
+    /** @scenario "Role metrics do not depend on the order spans arrived in" */
     it("produces the same result (operates over the complete set)", () => {
       const a = deriveScenarioRoleMetricsFromSpans({
         spans: inOrder,
@@ -250,6 +257,7 @@ describe("deriveScenarioRoleMetricsFromSpans", () => {
   });
 
   describe("when role-bearing spans carry durations", () => {
+    /** @scenario "A role's latency is taken from the role span itself" */
     it("sums latency per direct role from the role span itself", () => {
       const { scenarioRoleLatencies } = deriveScenarioRoleMetricsFromSpans({
         spans: inOrder,
@@ -260,6 +268,7 @@ describe("deriveScenarioRoleMetricsFromSpans", () => {
   });
 
   describe("when costed LLM spans nest under roles", () => {
+    /** @scenario "A costed span is charged to the role above it" */
     it("attributes each LLM's cost to its nearest role ancestor and sums per role", () => {
       const perLlmCost = spanCostService.extractTokenMetrics(userLlm).cost;
       const { scenarioRoleCosts } = deriveScenarioRoleMetricsFromSpans({
@@ -279,6 +288,7 @@ describe("deriveScenarioRoleMetricsFromSpans", () => {
   });
 
   describe("when the trace has no scenario roles", () => {
+    /** @scenario "A trace with no roles produces no role metrics" */
     it("produces empty maps", () => {
       const plain = [llmSpan("a", null), llmSpan("b", "a")];
       expect(

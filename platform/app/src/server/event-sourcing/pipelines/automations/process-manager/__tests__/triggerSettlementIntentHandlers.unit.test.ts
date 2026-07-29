@@ -198,6 +198,7 @@ describe("trigger settlement intent handlers integration", () => {
   });
 
   describe("given a notify digest with passing, failing, and claimed traces", () => {
+    /** @scenario "An automation does not fire when its condition is unmet" */
     it("confirms, renders, sends, claims only candidates, and drops the rest", async () => {
       const activeTrigger = trigger(TriggerAction.SEND_EMAIL, {
         actionParams: { members: ["ops@example.com"] },
@@ -306,6 +307,7 @@ describe("trigger settlement intent handlers integration", () => {
   });
 
   describe("given a notify trace was sent in an earlier settle window", () => {
+    /** @scenario "An automation fires at most once per trace" */
     it("uses the send claim to suppress a duplicate across windows", async () => {
       const activeTrigger = trigger(TriggerAction.SEND_EMAIL, {
         actionParams: { members: ["ops@example.com"] },

@@ -34,6 +34,7 @@ describe("PrismaTriggerFireHistoryRepository", () => {
         );
       });
 
+      /** @scenario "History never exposes trace content" */
       it("selects fire metadata only, never traceId or captured trace content", async () => {
         const { repo, findMany } = makeRepo();
 

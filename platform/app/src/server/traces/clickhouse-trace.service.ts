@@ -61,7 +61,7 @@ import type {
 
 /**
  * Callback injected from TraceService that resolves offloaded blob refs for
- * a single trace's normalized spans (ADR-021 decision B: read-time recompute).
+ * a single trace's normalized spans (ADR-088 decision B: read-time recompute).
  * When present, called after fetching spans but before mapping to legacy Span.
  */
 export type ResolveTraceSpansFn = (

@@ -27,6 +27,7 @@ afterEach(() => vi.clearAllMocks());
 
 describe("postSlackChatMessage", () => {
   describe("when Slack accepts the message", () => {
+    /** @scenario "An automation delivers through a Slack bot connection" */
     it("resolves and sends channel + payload with a bearer token via the shared HTTP primitive", async () => {
       respond(200, { ok: true });
       await expect(call()).resolves.toBeUndefined();

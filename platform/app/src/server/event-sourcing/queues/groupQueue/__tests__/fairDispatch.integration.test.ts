@@ -172,6 +172,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 describe("work-conserving fair dispatch", () => {
   describe("Rule: idle capacity is always used (work-conserving)", () => {
     describe("when only one tenant has work and slots are free", () => {
+      /** @scenario "A single bursty tenant uses all the spare capacity" */
       it("dispatches that tenant into every idle slot", async () => {
         await stageForTenant("tenantA", 50);
 
@@ -182,6 +183,7 @@ describe("work-conserving fair dispatch", () => {
     });
 
     describe("when one tenant under-demands and another wants more (max-min)", () => {
+      /** @scenario "A small tenant's unused share is given to a bigger one (max-min)" */
       it("gives the small tenant all its demand and the rest to the big one", async () => {
         await stageForTenant("small", 3);
         await stageForTenant("big", 50);
@@ -209,6 +211,7 @@ describe("work-conserving fair dispatch", () => {
       // fires while the burster is still inside the claimant window, so the test
       // waits past the reconcile gate (RECONCILE_GATE_MS) after the busy tenant
       // arrives, with the burster still fresh.
+      /** @scenario "A tenant past any fair share still dispatches while slots are free" */
       it("does not let the idle tenant's stale claim cap the busy one", async () => {
         // burster bursts and fully drains: no active, no parked, but still fresh
         await stageForTenant("burster", 10);
@@ -237,6 +240,7 @@ describe("work-conserving fair dispatch", () => {
 
   describe("Rule: fairness engages only under contention", () => {
     describe("when two equally-demanding tenants saturate the fleet", () => {
+      /** @scenario "Two equally-demanding tenants split a saturated fleet evenly" */
       it("splits the slots about evenly", async () => {
         await stageForTenant("tenantA", 50);
         await stageForTenant("tenantB", 50);
@@ -252,6 +256,7 @@ describe("work-conserving fair dispatch", () => {
     });
 
     describe("when a runaway tenant and a small tenant compete", () => {
+      /** @scenario "A runaway tenant is clamped only to protect a co-waiting tenant" */
       it("serves the small tenant promptly and holds the runaway to its fair share", async () => {
         await stageForTenant("runaway", 100);
         await stageForTenant("small", 2);
@@ -269,6 +274,7 @@ describe("work-conserving fair dispatch", () => {
 
   describe("Rule: a newcomer is served as capacity frees, without holding slots idle", () => {
     describe("when a newcomer arrives after an incumbent has saturated the fleet", () => {
+      /** @scenario "A newcomer is served on the next freed slots, not made to wait for a full drain" */
       it("serves the newcomer up to its fair share over sustained operation, having held no slot in reserve", async () => {
         // Work-conserving when alone: the lone incumbent uses every slot. No
         // capacity was held empty in reserve for a tenant that had not arrived.
@@ -304,6 +310,8 @@ describe("work-conserving fair dispatch", () => {
 
   describe("Rule: throttling is released the moment contention ends", () => {
     describe("when the competing tenant runs out of work", () => {
+      /** @scenario "A clamped tenant reclaims full capacity when others go idle" */
+      /** @scenario "A tenant stops competing the moment its work is exhausted" */
       it("lets the remaining tenant expand into all freed capacity", async () => {
         await stageForTenant("steady", 50);
         await stageForTenant("burst", 8);
@@ -324,6 +332,7 @@ describe("work-conserving fair dispatch", () => {
 
   describe("Rule: a tenant's own work keeps its priority order", () => {
     describe("when one tenant has groups queued at different priorities", () => {
+      /** @scenario "Within one tenant, higher-priority groups dispatch first" */
       it("dispatches that tenant's groups in priority order", async () => {
         // lower dispatchAfterMs == higher priority (earlier due)
         await scripts.stage({
@@ -428,6 +437,7 @@ describe("work-conserving fair dispatch", () => {
   // separate structure to migrate. Modelled by toggling the budget env between
   // the enqueue (old pod) and the dispatch (new pod).
   describe("Rule: upgrading the dispatch path loses no in-flight work", () => {
+    /** @scenario "Work queued before the upgrade still dispatches after it" */
     it("dispatches every group queued before the upgrade", async () => {
       // old pod, feature off: groups land on the shared ready zset (and are NOT
       // added to demanding-tenants)
@@ -443,6 +453,7 @@ describe("work-conserving fair dispatch", () => {
       expect((await inFlightByTenant()).pre).toBe(12);
     });
 
+    /** @scenario "Work added to legacy-ready during the rollout is still picked up" */
     it("keeps draining legacy-ready continuously-until-empty during the rollout", async () => {
       let staged = 0;
       let dispatched = 0;

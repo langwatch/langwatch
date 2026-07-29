@@ -4,11 +4,11 @@
 
 **Status:** Accepted
 
-**Supersedes:** the v1 inline-dispatch shortcut for persist-class actions described in ADR-026 (§"Half-formed persist") and ADR-030 (`alertTrigger` / `evaluationAlertTrigger` inline reactors).
+**Supersedes:** the v1 inline-dispatch shortcut for persist-class actions described in ADR-026 (§"Half-formed persist") and ADR-095 (`alertTrigger` / `evaluationAlertTrigger` inline reactors).
 
 ## Context
 
-ADR-026 §"Problem 2 — half-formed dispatch" identifies that `ADD_TO_DATASET` (and `ADD_TO_ANNOTATION_QUEUE`) snapshot the trace **at dispatch time**. If a trigger fires on the first matching event, the persisted row is truncated relative to the trace an operator browses a minute later — the dataset diverges from the trace. ADR-026 says `traceDebounceMs` exists to fix exactly this: *"wait for the trace to settle so the filter sees the final state"*, and that the knob *"drives the `stage: "settle"` dedup TTL"* on the ADR-030 outbox queue.
+ADR-026 §"Problem 2 — half-formed dispatch" identifies that `ADD_TO_DATASET` (and `ADD_TO_ANNOTATION_QUEUE`) snapshot the trace **at dispatch time**. If a trigger fires on the first matching event, the persisted row is truncated relative to the trace an operator browses a minute later — the dataset diverges from the trace. ADR-026 says `traceDebounceMs` exists to fix exactly this: *"wait for the trace to settle so the filter sees the final state"*, and that the knob *"drives the `stage: "settle"` dedup TTL"* on the ADR-095 outbox queue.
 
 The v1 implementation wired this for **notify-class** actions (`SEND_EMAIL` / `SEND_SLACK_MESSAGE`) — they enqueue a settle payload, the trace settles over `traceDebounceMs`, then dispatch. But **persist-class** actions were kept on the **inline** path (`alertTrigger.reactor.ts`): filter-check against the current (possibly half-formed) fold → `claimSend` → `dispatchTriggerAction`, with the comment *"Persist actions don't pay the settle-stage re-read because the side effect is idempotent at the `TriggerSent` gate."*
 
@@ -36,7 +36,7 @@ The dispatcher gains the persist-dispatch dependencies it previously did not nee
 
 ### Why route persist through the existing settle stage rather than a separate mechanism
 
-The settle/cadence machinery (debounce TTL, fold re-read, audit projection, retry) already exists and is the canonical place trace-readiness debounce lives (ADR-026 + ADR-030). A parallel persist-only debounce path would duplicate all of it and drift. The cost is that `handleSettle` / `handleCadenceBatch` become action-class-aware — but they already branch on action (email vs Slack), so a persist branch is incremental, not novel.
+The settle/cadence machinery (debounce TTL, fold re-read, audit projection, retry) already exists and is the canonical place trace-readiness debounce lives (ADR-026 + ADR-095). A parallel persist-only debounce path would duplicate all of it and drift. The cost is that `handleSettle` / `handleCadenceBatch` become action-class-aware — but they already branch on action (email vs Slack), so a persist branch is incremental, not novel.
 
 ### Why not a static reactor delay
 

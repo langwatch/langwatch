@@ -12,7 +12,7 @@ import { HandledError } from "@langwatch/handled-error";
  * changed, so trying again (or exporting a smaller slice) is safe.
  *
  * Deliberately NOT a wrapper for every infra fault. A failure that is ALREADY
- * handled — `query_timeout`, `clickhouse_unavailable`, `time_range_too_wide` —
+ * handled — `query_timeout`, `clickhouse_unavailable`, `query_memory_exceeded` —
  * says something more specific than this does and travels on its own; dressing
  * it up as an export failure would hide the sentence that actually helps. The
  * unhandled cause rides the reason chain instead, so the log line keeps it

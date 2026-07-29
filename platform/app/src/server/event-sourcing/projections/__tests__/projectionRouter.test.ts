@@ -487,6 +487,7 @@ describe("ProjectionRouter", () => {
 
   describe("replay marker on map projections", () => {
     describe("when marker returns 'skip'", () => {
+      /** @scenario "Live events at or before the cutoff are skipped during replay" */
       it("does not invoke map.append for that event", async () => {
         const queueManager = createMockQueueManager();
         const markerChecker = {
@@ -555,6 +556,7 @@ describe("ProjectionRouter", () => {
     });
 
     describe("when marker throws ReplayDeferralError", () => {
+      /** @scenario "Live events after the cutoff are deferred until the replay completes" */
       it("surfaces the deferral inside the AggregateError so the queue retries the event", async () => {
         const queueManager = createMockQueueManager();
         const deferError = new ReplayDeferralError(

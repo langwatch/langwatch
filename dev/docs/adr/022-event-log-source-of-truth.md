@@ -4,20 +4,20 @@
 
 **Status:** Proposed (issue [#4215](https://github.com/langwatch/langwatch/issues/4215))
 
-**Supersedes:** [ADR-021](./021-lean-fold-cache.md) (jointly with [ADR-066](./066-projection-clickhouse-cached-store.md)). This ADR owns the heavy-content decisions; the rules still in force are restated below, so ADR-021 is not required reading.
+**Supersedes:** [ADR-088](./088-lean-fold-cache.md) (jointly with [ADR-066](./066-projection-clickhouse-cached-store.md)). This ADR owns the heavy-content decisions; the rules still in force are restated below, so ADR-088 is not required reading.
 
-**Relates to:** [ADR-007](./007-event-sourcing-architecture.md) (event sourcing), [ADR-015](./015-projection-replay-coordination.md) (replay), [ADR-017](./017-gateway-trace-payload-capture.md) (gateway payload capture), [ADR-066](./066-projection-clickhouse-cached-store.md) (projection store — the fold-cache mechanics that used to live in ADR-021).
+**Relates to:** [ADR-007](./007-event-sourcing-architecture.md) (event sourcing), [ADR-015](./015-projection-replay-coordination.md) (replay), [ADR-017](./017-gateway-trace-payload-capture.md) (gateway payload capture), [ADR-066](./066-projection-clickhouse-cached-store.md) (projection store — the fold-cache mechanics that used to live in ADR-088).
 
 ## Context
 
-ADR-021 leans the fold cache by **offloading over-threshold field values to S3 permanently** at the edge. Implementation surfaced two design facts ADR-021 didn't account for:
+ADR-088 leans the fold cache by **offloading over-threshold field values to S3 permanently** at the edge. Implementation surfaced two design facts ADR-088 didn't account for:
 
 1. **A 256 KB cap already exists** at `recordSpanCommand.ts:146` (`capOversizedAttributes`). Anything downstream of the command worker is already bounded today. The unbounded-payload problem is narrower than the ADR framed: it's the **edge → command queue** leg, where the full OTLP request rides through Redis as a BullMQ-style job payload before the cap fires.
 2. **Commands go through a queue.** `commands.traces.recordSpan(data).send()` puts the full command payload into the global GroupQueueProcessor. The event isn't in `event_log` yet when `.send()` returns. Anything we want to lean MUST be leaned before `.send()`, because the queue stage is the Redis pressure point.
 
-A direct sync write to ClickHouse via `event_log` (with `async_insert: 1, wait_for_async_insert: 1`, which langwatch already uses) is ~20–50 ms at p50 — **faster** than an S3 PUT (~50–150 ms). The "S3 is naturally sync-friendly" argument ADR-021 implicitly leaned on doesn't hold: CH inserts are equally sync-friendly here, with a cleaner durability story (event_log alone is replay-sufficient).
+A direct sync write to ClickHouse via `event_log` (with `async_insert: 1, wait_for_async_insert: 1`, which langwatch already uses) is ~20–50 ms at p50 — **faster** than an S3 PUT (~50–150 ms). The "S3 is naturally sync-friendly" argument ADR-088 implicitly leaned on doesn't hold: CH inserts are equally sync-friendly here, with a cleaner durability story (event_log alone is replay-sufficient).
 
-Search is also a real concern under ADR-021: `translateFreeText` does `ILIKE` on the `trace_summaries.ComputedInput/Output` preview column, so search becomes lossy past the preview boundary. The cleanest answer is "extend the preview budget to cover a standard Claude response," not "send users to a second backend."
+Search is also a real concern under ADR-088: `translateFreeText` does `ILIKE` on the `trace_summaries.ComputedInput/Output` preview column, so search becomes lossy past the preview boundary. The cleanest answer is "extend the preview budget to cover a standard Claude response," not "send users to a second backend."
 
 ## Decision
 
@@ -115,7 +115,7 @@ LEAN BOUNDARIES  (what stays small at each hop)
 
 ## Rules in force
 
-*(These were first written in ADR-021 and remain the rules; restated here so this ADR is self-contained.)*
+*(These were first written in ADR-088 and remain the rules; restated here so this ADR is self-contained.)*
 
 - **Reserved-namespace edge strip** (already at command worker via `RecordSpanCommand.stripReservedAttributes`, with `langwatch.reserved.causality_depth` passthrough).
 - **Reserved-namespace exclusion from user-visible facet enumeration** (`buildSpanAttributeKeysFacetQuery` filters `langwatch.reserved.*`).
@@ -157,7 +157,7 @@ LEAN BOUNDARIES  (what stays small at each hop)
 - `langwatch.reserved.eventref.<attrKey>` carries `{ field: <attrKey> }` only — the `eventId` is implicit in the row carrying the eventref (it's the same span). `BlobStore.get` derives `(TenantId, AggregateType, AggregateId, EventId)` from the read context.
 - S3 spool objects MUST be eagerly DELETEd after `storeEvents()` succeeds. Bucket MUST have a 24h lifecycle policy as a safety net for orphans (edge crash between PUT and command processing).
 - On edge S3 PUT failure (oversize protection unavailable): **fail open** — send the regular RecordSpan command with full inline payload, log at `warn`. Ingestion is never blocked by oversize protection.
-- Any user-visible enumeration of `stored_spans.SpanAttributes` keys MUST exclude `langwatch.reserved.*`. (Survived from ADR-021.)
+- Any user-visible enumeration of `stored_spans.SpanAttributes` keys MUST exclude `langwatch.reserved.*`. (Survived from ADR-088.)
 - `event_log` retention drives the durability ceiling for "show full" reads. There is no longer a separate S3 retention to coordinate.
 
 <!-- ci-trigger: force workflows to fire on this head -->

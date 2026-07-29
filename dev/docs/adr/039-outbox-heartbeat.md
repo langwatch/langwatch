@@ -2,7 +2,7 @@
 
 - **Status:** Superseded by [ADR-052](052-automations-on-process-manager-substrate.md)
 - **Date:** 2026-07-07
-- **Related:** ADR-030 (transactional outbox), ADR-034 (event-sourced analytics materialization — the consumer that motivated this primitive)
+- **Related:** ADR-095 (transactional outbox), ADR-034 (event-sourced analytics materialization — the consumer that motivated this primitive)
 - **Behavioural contract:** [specs/triggers/event-sourced-graph-triggers.feature](../../../specs/triggers/event-sourced-graph-triggers.feature)
 
 > **Superseded (2026-07-18).** ADR-052 moves automations onto the
@@ -22,7 +22,7 @@
 
 ## Context
 
-The transactional outbox (ADR-030) drives dispatch off events: a span lands, a fold updates, a reactor's `decide` returns enqueue requests. That covers everything *with* a triggering event.
+The transactional outbox (ADR-095) drives dispatch off events: a span lands, a fold updates, a reactor's `decide` returns enqueue requests. That covers everything *with* a triggering event.
 
 Two real cases have no triggering event:
 

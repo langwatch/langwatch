@@ -221,9 +221,11 @@ export function createSimulationProcessingPipeline(
         SCENARIO_EXECUTION_PROCESS_NAME,
         scenarioExecutionPM(deps.scenarioExecutionDispatch),
       )
-      // The run's metrics are measured once, after it settles — the durable
-      // deadline replaces the per-trace accumulator that could never correct
-      // itself once a partial answer had been recorded.
+      // The run's metrics are measured after it settles, over all of its traces
+      // at once — the durable deadline replaces the per-trace accumulator that
+      // could never correct itself once a partial answer had been recorded. A
+      // measurement that comes back empty re-arms a bounded number of times, so
+      // cost that lands after the settle period is still recorded.
       .withProcessManager(
         RUN_METRICS_PROCESS_NAME,
         runMetricsPM({

@@ -77,6 +77,7 @@ describe("OtlpSpanPiiRedactionService", () => {
 
   describe("redactSpan", () => {
     describe("when the strict-PII analysis kill switch is enabled", () => {
+      /** @scenario "Operator kill switch skips the strict analysis-service redaction" */
       it("does not modify the span regardless of redaction level", async () => {
         process.env.OPS_PII_STRICT_PRESIDIO_REDACTION_DISABLED = "1";
         const span = createMockOtlpSpan([
@@ -105,6 +106,7 @@ describe("OtlpSpanPiiRedactionService", () => {
     });
 
     describe("when piiRedactionLevel is DISABLED", () => {
+      /** @scenario "Skips redaction when level is DISABLED" */
       it("does not modify the span", async () => {
         const span = createMockOtlpSpan([
           { key: "gen_ai.prompt", value: { stringValue: "sensitive data" } },
@@ -119,6 +121,7 @@ describe("OtlpSpanPiiRedactionService", () => {
     });
 
     describe("when piiRedactionLevel is ESSENTIAL or STRICT", () => {
+      /** @scenario "Redacts PII from known attribute keys" */
       it.each([
         "ESSENTIAL",
         "STRICT",
@@ -173,6 +176,7 @@ describe("OtlpSpanPiiRedactionService", () => {
         expect(span.attributes[0]!.value.stringValue).toBe("[REDACTED]");
       });
 
+      /** @scenario "Scans all string attributes for PII" */
       it("redacts all string attributes regardless of key name", async () => {
         const span = createMockOtlpSpan([
           { key: "gen_ai.prompt", value: { stringValue: "prompt PII" } },
@@ -216,6 +220,7 @@ describe("OtlpSpanPiiRedactionService", () => {
         expect(span.attributes[2]!.value.stringValue).toBe("[REDACTED]");
       });
 
+      /** @scenario "Sends all string values in a single batch call" */
       it("sends all string values in a single batch call", async () => {
         const span = createMockOtlpSpan([
           { key: "gen_ai.prompt", value: { stringValue: "first" } },
@@ -233,6 +238,7 @@ describe("OtlpSpanPiiRedactionService", () => {
         ]);
       });
 
+      /** @scenario "Does not mark span when all attributes are within size" */
       it("does not add pii_redaction_status attribute when redaction succeeds", async () => {
         const span = createMockOtlpSpan([
           { key: "gen_ai.prompt", value: { stringValue: "user@email.com" } },
@@ -355,6 +361,7 @@ describe("OtlpSpanPiiRedactionService", () => {
         );
       });
 
+      /** @scenario "Redacts PII from resource attributes" */
       it("redacts resource attributes", async () => {
         const span = createMockOtlpSpan([
           { key: "gen_ai.prompt", value: { stringValue: "span content" } },
@@ -454,6 +461,7 @@ describe("OtlpSpanPiiRedactionService", () => {
       expect(maxLengthBatchSpy).not.toHaveBeenCalled();
     });
 
+    /** @scenario 'Marks span with "none" status when all attributes exceed size' */
     it("sets pii_redaction_status to 'none' when all string attributes exceed max length", async () => {
       const oversizedValue = "x".repeat(MAX_LENGTH + 1);
       const span = createMockOtlpSpan([
@@ -485,6 +493,7 @@ describe("OtlpSpanPiiRedactionService", () => {
       expect(statusAttr).toBeUndefined();
     });
 
+    /** @scenario 'Marks span with "partial" status when some attributes exceed size' */
     it("sets pii_redaction_status to 'partial' when some attributes exceed size and others are redacted", async () => {
       const oversizedValue = "x".repeat(MAX_LENGTH + 1);
       const normalValue = "short";

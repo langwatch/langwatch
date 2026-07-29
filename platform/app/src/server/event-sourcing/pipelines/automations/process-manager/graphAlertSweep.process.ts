@@ -92,3 +92,21 @@ export function runGraphAlertSweep(deps: GraphAlertSweepDeps) {
     }
   };
 }
+
+/**
+ * The `graphAlertSweep` process-manager topology, exported standalone so the
+ * pipeline mounts one expression of it and tests can build the exact definition
+ * the runtime runs. `automations/pipeline.ts` mounts it as
+ * `.withProcessManager(GRAPH_ALERT_SWEEP_PROCESS_NAME,
+ * graphAlertSweepPM(deps.sweep))`.
+ */
+export function graphAlertSweepPM(
+  deps: GraphAlertSweepDeps,
+): ProcessManagerApplier<AutomationEvent> {
+  return (pm) =>
+    pm
+      .state<GraphAlertSweepState>({ lastSweepAt: null })
+      .schedule({ everyMs: GRAPH_ALERT_SWEEP_INTERVAL_MS })
+      .onWake(graphAlertSweepWake)
+      .intent("evaluateGraph", sweepSchema, runGraphAlertSweep(deps));
+}

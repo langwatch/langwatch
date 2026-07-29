@@ -1,10 +1,13 @@
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 
+import type { Event } from "~/server/event-sourcing/domain/types";
+import type { ProcessManagerApplier } from "~/server/event-sourcing/pipeline/processBuilder";
 import type {
   IntentSpec,
   WakeHandler,
 } from "~/server/event-sourcing/pipeline/processManagerDefinition";
+import { BLOB_SWEEP_INTERVAL_MS } from "~/server/event-sourcing/queues/groupQueue/blobConstants";
 import type { BlobSweepReport } from "~/server/event-sourcing/queues/groupQueue/blobSweeper";
 
 const logger = createLogger("langwatch:group-queue:blob-cleanup");
@@ -89,4 +92,25 @@ export function runBlobCleanup(deps: BlobCleanupDeps) {
       );
     }
   };
+}
+
+/**
+ * The `blobCleanup` process-manager topology, exported standalone so the
+ * pipeline mounts one expression of it and tests can build the exact definition
+ * the runtime runs. `blob-maintenance/pipeline.ts` mounts it as
+ * `.withProcessManager(BLOB_CLEANUP_PROCESS_NAME, blobCleanupPM(deps.cleanup))`.
+ */
+export function blobCleanupPM(
+  deps: BlobCleanupDeps,
+): ProcessManagerApplier<Event> {
+  return (pm) =>
+    pm
+      .state<BlobCleanupState>({ lastSweepAt: null })
+      .schedule({ everyMs: BLOB_SWEEP_INTERVAL_MS })
+      .onWake(blobCleanupWake)
+      .intent("sweep", blobCleanupSchema, runBlobCleanup(deps))
+      // A full keyspace pass is minutes of work in the worst case, so the
+      // lease has to outlast it or a second worker re-leases mid-sweep and
+      // both walk the same keys.
+      .outbox({ leaseDurationMs: 15 * 60 * 1000, maxAttempts: 3 });
 }

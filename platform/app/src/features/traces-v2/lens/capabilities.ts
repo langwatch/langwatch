@@ -190,7 +190,7 @@ export function getCapability(grouping: GroupingMode): LensCapability {
  * they are dropped from conversation/group lenses where they'd be dead ids.
  * A retained eval column whose evaluator has no runs in range renders
  * em-dashes rather than vanishing (see
- * dev/docs/adr/029-trace-table-per-evaluator-columns.md).
+ * dev/docs/adr/094-trace-table-per-evaluator-columns.md).
  */
 export function reconcileColumns({
   ids,

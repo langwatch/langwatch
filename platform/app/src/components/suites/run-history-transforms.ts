@@ -5,20 +5,12 @@
  * Computes pass rates and calculates totals.
  */
 
-import {
-  computeMetricStats,
-  type MetricStats,
-} from "~/components/shared/MetricStatsTooltip";
-import {
-  isOnPlatformSet,
-  ON_PLATFORM_DISPLAY_NAME,
-} from "~/server/scenarios/internal-set-id";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
-import type {
-  ScenarioRunData,
-  SuiteRunSummary,
-} from "~/server/scenarios/scenario-event.types";
+import type { ScenarioRunData, SuiteRunSummary } from "~/server/scenarios/scenario-event.types";
+import { isOnPlatformSet, ON_PLATFORM_DISPLAY_NAME } from "~/server/scenarios/internal-set-id";
+import { computeMetricStats, type MetricStats } from "~/components/shared/MetricStatsTooltip";
 import { extractSuiteId, isSuiteSetId } from "~/server/suites/suite-set-id";
+
 
 /** Valid values for the grouping dimension. */
 export const RUN_GROUP_TYPES = ["none", "scenario", "target"] as const;
@@ -53,6 +45,15 @@ export type RunGroup = {
   groupType: RunGroupType;
   timestamp: number;
   scenarioRuns: ScenarioRunData[];
+  /**
+   * How many runs the batch set out to queue (ADR-072).
+   *
+   * Only batch groups carry one — a scenario or target group is a slice across
+   * batches, so there is no single number it could be. Absent for batches
+   * queued before the total was recorded, in which case the summary counts the
+   * runs it can see instead.
+   */
+  expectedCount?: number;
 };
 
 /** A batch run groups all scenario runs that share the same batchRunId. Extends RunGroup for backward compatibility. */
@@ -72,6 +73,13 @@ export type RunGroupSummary = {
   /** Runs with an actual verdict: passed + failed (SUCCESS + FAILED + ERROR). */
   completedCount: number;
   totalCount: number;
+  /**
+   * The denominator to show the user: how many runs the group was meant to
+   * have. Equal to `totalCount` for a group that got everything it asked for,
+   * and larger when part of a batch never started — the difference between
+   * "this run was five scenarios" and "this run lost one of six".
+   */
+  expectedCount: number;
   inProgressCount: number;
   queuedCount: number;
   totalCost: number | null;
@@ -103,13 +111,8 @@ export function worstStatus(summary: RunGroupSummary): ScenarioRunStatus {
   return ScenarioRunStatus.SUCCESS;
 }
 
-type RunStatusCategory =
-  | "success"
-  | "failure"
-  | "stalled"
-  | "cancelled"
-  | "in_progress"
-  | "queued";
+
+type RunStatusCategory = "success" | "failure" | "stalled" | "cancelled" | "in_progress" | "queued";
 
 function categorizeRunStatus(status: ScenarioRunStatus): RunStatusCategory {
   switch (status) {
@@ -169,9 +172,11 @@ function sortByTimestampDesc<T extends RunGroup>(groups: T[]): T[] {
 export function groupRunsByBatchId({
   runs,
   scenarioSetIds,
+  expectedCounts,
 }: {
   runs: ScenarioRunData[];
   scenarioSetIds?: Record<string, string>;
+  expectedCounts?: Record<string, number>;
 }): BatchRun[] {
   const batchMap = new Map<string, ScenarioRunData[]>();
 
@@ -196,6 +201,7 @@ export function groupRunsByBatchId({
       timestamp,
       scenarioRuns,
       scenarioSetId,
+      expectedCount: expectedCounts?.[batchRunId],
     });
   }
 
@@ -277,7 +283,7 @@ export function groupRunsByTarget({
     const label =
       targetId === UNKNOWN_GROUP_KEY
         ? "Unknown"
-        : (targetNameMap.get(targetId) ?? targetId);
+        : targetNameMap.get(targetId) ?? targetId;
     groups.push({
       groupKey: targetId,
       groupLabel: label,
@@ -351,15 +357,16 @@ export function computeGroupSummary({
   }
 
   const completedCount = passedCount + failedCount;
-  const settledCount =
-    passedCount + failedCount + stalledCount + cancelledCount;
+  const settledCount = passedCount + failedCount + stalledCount + cancelledCount;
   const totalCount = group.scenarioRuns.length;
-  const passRate =
-    settledCount > 0
-      ? (passedCount / settledCount) * 100
-      : totalCount > 0
-        ? null
-        : 0;
+  // The group's own total when it has one, and never below the runs actually
+  // in hand: a group with no recorded total (queued before it was recorded, or
+  // a scenario/target slice that spans batches) must count its runs rather than
+  // report a denominator of zero.
+  const expectedCount = Math.max(group.expectedCount ?? 0, totalCount);
+  const passRate = settledCount > 0
+    ? (passedCount / settledCount) * 100
+    : (totalCount > 0 ? null : 0);
 
   let totalCost = 0;
   let totalDurationMs = 0;
@@ -368,11 +375,11 @@ export function computeGroupSummary({
   for (const run of group.scenarioRuns) {
     if (run.totalCost != null) totalCost += run.totalCost;
     if (run.durationInMs > 0) totalDurationMs += run.durationInMs;
-    const agentLatencies = run.roleLatencies?.Agent;
+    const agentLatencies = run.roleLatencies?.["Agent"];
     if (agentLatencies) {
       allAgentLatencies.push(...agentLatencies);
     }
-    const agentCosts = run.roleCosts?.Agent;
+    const agentCosts = run.roleCosts?.["Agent"];
     if (agentCosts) {
       allAgentCosts.push(...agentCosts);
     }
@@ -389,6 +396,7 @@ export function computeGroupSummary({
     cancelledCount,
     completedCount,
     totalCount,
+    expectedCount,
     inProgressCount,
     queuedCount,
     totalCost: totalCost > 0 ? totalCost : null,
@@ -531,14 +539,8 @@ export function computeRunHistoryTotals({
   for (const run of runs) {
     const category = categorizeRunStatus(run.status);
     if (category === "success") passedCount++;
-    else if (
-      category === "failure" ||
-      category === "stalled" ||
-      category === "cancelled"
-    )
-      failedCount++;
-    else if (category === "queued" || category === "in_progress")
-      pendingCount++;
+    else if (category === "failure" || category === "stalled" || category === "cancelled") failedCount++;
+    else if (category === "queued" || category === "in_progress") pendingCount++;
   }
 
   return {

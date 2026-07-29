@@ -14,6 +14,28 @@ Each row classifies one `@unimplemented` scenario in `specs/traces/` into:
 
 This PR adds the manifest only — no `.feature` files are modified. Phase 1 soldiers will execute the actions.
 
+> **Superseded in part, 2026-07-29 — the evidence links no longer resolve.**
+> Roughly seventeen rows below cite reactor files and line ranges as the
+> evidence behind their UPDATE / DUPLICATE / KEEP classification:
+> `evaluationTrigger.reactor.ts`, `originGate.reactor.ts`,
+> `projectMetadata.reactor.ts` and the matching `*.reactor.unit.test.ts`
+> ranges. [ADR-075](../../dev/docs/adr/075-post-event-work-subscribers-and-process-managers.md)
+> retired the reactor as a concept and deleted the whole `reactors/`
+> directory, so those paths and every line number attached to them are dead.
+>
+> **The classifications themselves still stand** — they were judgments about
+> scenarios, not about files — but the audit trail behind them has to be
+> re-derived. Each cited reactor has a successor on the surviving substrate,
+> generally under
+> `src/server/event-sourcing/pipelines/trace-processing/process-manager/`
+> (`evaluationTrigger`, `originGate`) or `subscribers/`
+> (`projectMetadata`'s two halves, split by ADR-075). Follow the successor
+> rather than the path in the row.
+>
+> Rows are deliberately left in place rather than edited: they are a record
+> of what was decided and why, and rewriting the evidence after the fact
+> would destroy the thing the manifest exists to preserve.
+
 | File | Scenario | Class | Rationale |
 |------|----------|-------|-----------|
 | specs/traces/evaluation-history-grouping.feature | "Evaluator with multiple runs shows only the latest result" | UPDATE | Already covered by `platform/app/src/components/traces/__tests__/Evaluations.integration.test.tsx` "when an evaluator has multiple runs > displays a single entry / displays the score from the most recent run" |

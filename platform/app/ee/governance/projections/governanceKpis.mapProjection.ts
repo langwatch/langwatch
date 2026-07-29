@@ -38,7 +38,7 @@
  *
  * Each governance span contributes ONE row carrying that span's own cost
  * and tokens, keyed by `(TenantId, SourceId, HourBucket, TraceId, EventId)`
- * where `EventId` is the span id (migration 00058 adds the column and
+ * where `EventId` is the span id (migration 00063 adds the column and
  * extends the sorting key). Re-deriving a span produces a byte-identical
  * row under the same key, so a rebuild is a set-union of elements the set
  * already contains — idempotent by construction, whatever order rebuild

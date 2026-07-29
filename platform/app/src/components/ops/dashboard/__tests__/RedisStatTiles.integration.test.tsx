@@ -34,6 +34,7 @@ afterEach(cleanup);
 describe("RedisStatTiles", () => {
   describe("given normal Redis pressure", () => {
     describe("when the tiles render", () => {
+      /** @scenario "Memory tile shows used as the primary value" */
       it("shows the memory used as a single MB/GB value", () => {
         renderTiles({ redisMemoryUsedBytes: 3_200_000_000 });
         const memoryStat = screen.getByTestId("redis-memory-stat");
@@ -41,6 +42,7 @@ describe("RedisStatTiles", () => {
         expect(memoryStat.textContent).toContain("2.98GB");
       });
 
+      /** @scenario "Memory tile shows used as the primary value" */
       it("shows the memory percent + max in the sublabel", () => {
         renderTiles({
           redisMemoryUsedBytes: 3_200_000_000,
@@ -59,6 +61,7 @@ describe("RedisStatTiles", () => {
         expect(cpuStat.textContent).toContain("main-thread");
       });
 
+      /** @scenario "Connected clients count is visible" */
       it("shows the connected-client count with a clients sublabel", () => {
         renderTiles({ redisConnectedClients: 24 });
         const connStat = screen.getByTestId("redis-clients-stat");
@@ -70,6 +73,7 @@ describe("RedisStatTiles", () => {
 
   describe("given the engine-CPU sample is not ready yet", () => {
     describe("when the tiles render on the first collection cycle", () => {
+      /** @scenario "Engine CPU percent is null on the first collection cycle" */
       it('shows "-" with a "sampling…" sublabel', () => {
         renderTiles({ redisEngineCpuPercent: null });
         const cpuStat = screen.getByTestId("redis-engine-cpu-stat");
@@ -81,6 +85,7 @@ describe("RedisStatTiles", () => {
 
   describe("given Redis memory is near eviction", () => {
     describe("when the used:max ratio crosses the 80% threshold", () => {
+      /** @scenario "Memory tile turns red when Redis is near eviction" */
       it("marks the memory tile as warning", () => {
         renderTiles({
           redisMemoryUsedBytes: 9_500_000_000,
@@ -103,6 +108,7 @@ describe("RedisStatTiles", () => {
         expect(memoryStat.getAttribute("data-warning")).toBe("false");
       });
 
+      /** @scenario "Memory warning uses the raw ratio so 79.95% does not round up to 80%" */
       it("uses the raw ratio (79.95% does not round up to 80% and trigger warning)", () => {
         renderTiles({
           redisMemoryUsedBytes: 7_995_000_000,
@@ -119,6 +125,7 @@ describe("RedisStatTiles", () => {
 
   describe("given Redis has no maxmemory configured (unlimited)", () => {
     describe("when the tiles render", () => {
+      /** @scenario "Memory tile handles missing maxmemory configuration" */
       it("omits the percent sublabel and falls back to peak", () => {
         renderTiles({
           redisMemoryUsedBytes: 3_200_000_000,
@@ -135,6 +142,7 @@ describe("RedisStatTiles", () => {
 
   describe("given Redis engine CPU is saturated", () => {
     describe("when CPU is at 95%", () => {
+      /** @scenario "Engine CPU turns red when sustained load saturates the Redis main thread" */
       it("marks the engine-CPU tile as warning", () => {
         renderTiles({ redisEngineCpuPercent: 95 });
         const cpuStat = screen.getByTestId("redis-engine-cpu-stat");

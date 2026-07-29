@@ -339,7 +339,7 @@ Feature: AI Gateway Governance — Architecture Invariants
       market's SOC2 Type II / ISO 27001 / EU AI Act / GDPR /
       HIPAA-most-uses contractual posture
 
-  @bdd @architecture @compliance @deferred
+  @bdd @architecture @compliance @deferred @unimplemented
   Scenario: Cryptographic tamper-evidence is filed as follow-up
     When the codebase + docs are inspected
     Then there is NO Merkle-tree integrity table

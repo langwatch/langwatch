@@ -183,6 +183,7 @@ describe.skipIf(!hasTestcontainers)(
     });
 
     describe("when agent span with role has child LLM spans", () => {
+      /** @scenario "A stored trace's nested LLM cost reaches its agent role end to end" */
       it("accumulates child LLM costs into the agent role", async () => {
         const traceId = generateId("trace");
         const rootSpanId = generateId("root");

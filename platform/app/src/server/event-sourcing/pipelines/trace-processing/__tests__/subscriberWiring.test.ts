@@ -17,9 +17,9 @@ import type { TraceProcessingEvent } from "../schemas/events";
 /**
  * Wiring-level unit test: builds the REAL trace-processing pipeline and asserts
  * the composition root mounts what ADR-075/ADR-082 say it should — the three
- * process managers, the four event subscribers, the billing poke, and the
- * automations mounts. `build()` only stores references, so no store, process or
- * subscriber is ever invoked.
+ * process managers, the four at-most-once subscribers, the billing poke, the
+ * coding-agent span-facts dispatch, and the automations mounts. `build()` only
+ * stores references, so no store, process or subscriber is ever invoked.
  *
  * `triggerMatch` is asserted as a MOUNT, not as a shape: its delay, dedup key
  * and enqueue filter belong to the enterprise subscriber definition now, and
@@ -45,11 +45,12 @@ function buildTraceDeps(
     traceSummaryStore: store,
     traceAnalyticsStore: store,
     traceAnalyticsRollupAppendStore: store,
-    commands: { port: () => async () => {} } as any,
+    commands: { port: vi.fn(() => async () => {}) } as any,
     broadcast: {} as any,
     hasRedis: true,
     projects: {} as any,
     bootstrapTopicClustering: async () => {},
+    getNormalizedSpanById: async () => null,
     evaluationTriggerDispatch: {
       monitors: {} as any,
       readTraceSummary: async () => null,
@@ -154,6 +155,22 @@ describe("trace-processing pipeline wiring", () => {
       expect(
         definition.eventSubscribers.get("billingMeterPoke")!.options?.disabled,
       ).toBe(true);
+    });
+  });
+
+  describe("given the coding-agent span-facts dispatch", () => {
+    it("mounts it from this pipeline, bound through the command bus", () => {
+      const deps = buildTraceDeps();
+      const definition = createTraceProcessingPipeline(deps);
+      const dispatch = definition.eventSubscribers.get(
+        "codingAgentSpanFactsDispatch",
+      );
+
+      expect(dispatch).toBeDefined();
+      expect(dispatch!.eventTypes).toEqual([SPAN_RECEIVED_EVENT_TYPE]);
+      // ADR-082 §5: the port is bound while this pipeline is being built, so
+      // coding-agent registration order relative to it carries no meaning.
+      expect(deps.commands.port).toHaveBeenCalled();
     });
   });
 

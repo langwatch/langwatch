@@ -115,7 +115,8 @@ function makePool() {
     deregisterChild: () => undefined,
     markCancelled: () => undefined,
     drain: () => undefined,
-    runningChildren: new Map(),
+    findChild: () => undefined,
+    inFlightJobs: [],
   };
 }
 

@@ -2,7 +2,7 @@
  * @vitest-environment node
  * @integration
  *
- * Integration test for the storage-accounting byte ledger (ADR-040):
+ * Integration test for the storage-accounting byte ledger (ADR-096):
  * StoredObjectsService.getStorageUsageByProject sums size_bytes of a project's
  * live objects, deduped across ReplacingMergeTree versions and optionally
  * scoped to one purpose. Real ClickHouse + LocalFilesystemDriver; only

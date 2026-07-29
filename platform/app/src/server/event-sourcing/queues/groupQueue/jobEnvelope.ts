@@ -139,7 +139,7 @@ function assertDecodeWithinCap(byteLength: number): void {
  * or empty when offloaded to a standalone blob whose reference the header
  * carries.
  *
- * - **GQ1** (ADR-026): offloads bodies > 32 KiB to a `randomUUID()` Redis key
+ * - **GQ1** (ADR-090): offloads bodies > 32 KiB to a `randomUUID()` Redis key
  *   via {@link JobBlobStore} (`e:"ref"`, header `r`). No content identity.
  * - **GQ2** (ADR-029): offloads bodies > 4 KiB to a **content-addressed,
  *   tenant-namespaced** blob via {@link TieredBlobStore}, tiered Redis→object
@@ -169,7 +169,7 @@ const BLOB_OFFLOAD_THRESHOLD_BYTES = 32 * 1024;
 const INLINE_CEILING_BYTES = 4 * 1024;
 
 /**
- * Phase gate for the format rollout (ADR-026). Readers are always
+ * Phase gate for the format rollout (ADR-090). Readers are always
  * envelope-aware, but writes stay legacy bare JSON until every consumer in the
  * fleet is known to read envelopes. Read at call time so tests can toggle it
  * without module reloads.

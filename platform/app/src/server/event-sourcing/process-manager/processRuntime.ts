@@ -20,6 +20,7 @@ import type {
 } from "./processManager.types";
 import { ProcessManagerService } from "./processManagerService";
 import type { ProcessStore } from "./stores/processStore.types";
+import { processManagerSubscriberName } from "./subscriberName";
 import {
   ProcessWakeWorker,
   type WakeHandlerPort,
@@ -131,6 +132,11 @@ export function buildProcessDefinition(
 
       const envelope = input.event;
       if (envelope.eventType === SCHEDULE_ARM_EVENT_TYPE) {
+        // Sets the FIRST deadline, and only ever that: `evolve` cannot see the
+        // stored one, so this branch has no way to preserve it. Whether an
+        // instance still needs a deadline is decided where the instance IS
+        // readable — see `ProcessRuntime.armSchedule`, which is the only
+        // producer of this event and emits it solely for an unarmed instance.
         return {
           state: previousState,
           nextWakeAt:
@@ -194,7 +200,7 @@ export class ProcessRuntime {
       const registered = this.registerProcessManager(definition);
       if (definition.config.eventTypes.length === 0) continue;
       subscribers.push({
-        name: `pm:${definition.config.name}`,
+        name: processManagerSubscriberName(definition.config.name),
         eventTypes: definition.config.eventTypes,
         options: buildSubscriberOptions(
           definition.config,
@@ -300,16 +306,47 @@ export class ProcessRuntime {
     return registered;
   }
 
+  /**
+   * Gives a scheduled singleton its FIRST deadline. Bootstrap only — once a
+   * deadline exists the schedule keeps itself going, because the wake branch of
+   * {@link buildProcessDefinition} re-arms from the slot it just served.
+   *
+   * Deliberately non-destructive, and that is the whole contract. The arm is
+   * inbox-deduped on `schedule-arm:<day>`, so at most one commits per calendar
+   * day — but the arm event rewrites `nextWakeAt` to `now + everyMs`, and an
+   * unconditional rewrite outruns any interval longer than the gap between
+   * worker boots. At `everyMs = 24h` a fleet that boots a worker at least once
+   * a day pushes the deadline forward before the previous one matures, forever:
+   * no error, no metric, just maintenance work that never runs (the
+   * `webhookDeliveryPrune` prune, whose CronJob the chart never shipped). So an
+   * instance that already carries a deadline is left exactly as it is.
+   *
+   * A deadline already in the PAST is left alone too, rather than re-armed. It
+   * is due, and {@link ProcessWakeWorker} scans for exactly that; recomputing it
+   * from `now` would delay overdue maintenance by another full interval — the
+   * same starvation in slower motion.
+   */
   private armSchedule({
     registered,
   }: {
     registered: RegisteredProcessManager;
   }): void {
-    const now = Date.now();
-    const day = new Date(now).toISOString().slice(0, 10);
     const processName = registered.definition.config.name;
-    void registered.manager
-      .handleEvent({
+    const ref = {
+      processName,
+      projectId: SCHEDULED_SINGLETON_PROJECT_ID,
+      processKey: processName,
+    };
+
+    void (async () => {
+      const existing = await this.store.findByRef({ ref });
+      if (existing?.nextWakeAt != null) return;
+
+      const now = Date.now();
+      const day = new Date(now).toISOString().slice(0, 10);
+      // Still inbox-deduped: two workers booting together both read "no
+      // deadline", and the inbox is what makes exactly one of them commit.
+      await registered.manager.handleEvent({
         envelope: {
           eventId: `schedule-arm:${day}`,
           eventType: SCHEDULE_ARM_EVENT_TYPE,
@@ -320,15 +357,15 @@ export class ProcessRuntime {
           payload: {},
         },
         now,
-      })
-      .catch((error: unknown) => {
-        this.logger.error(
-          {
-            processName,
-            error: error instanceof Error ? error.message : String(error),
-          },
-          "Schedule arming failed; the next worker boot will retry",
-        );
       });
+    })().catch((error: unknown) => {
+      this.logger.error(
+        {
+          processName,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "Schedule arming failed; the next worker boot will retry",
+      );
+    });
   }
 }

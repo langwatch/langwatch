@@ -1,6 +1,8 @@
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 
+import type { Event } from "~/server/event-sourcing/domain/types";
+import type { ProcessManagerApplier } from "~/server/event-sourcing/pipeline/processBuilder";
 import type {
   IntentSpec,
   WakeHandler,
@@ -81,4 +83,28 @@ export function runLangySessionKeyReap(deps: LangySessionKeyReapDeps) {
       );
     }
   };
+}
+
+/**
+ * The `langySessionKeyReap` process-manager topology, exported standalone so
+ * the pipeline mounts one expression of it and tests can build the exact
+ * definition the runtime runs. `langy-maintenance/pipeline.ts` mounts it as
+ * `.withProcessManager(LANGY_SESSION_KEY_REAP_PROCESS_NAME,
+ * langySessionKeyReapPM(deps.sessionKeyReap))`.
+ */
+export function langySessionKeyReapPM(
+  deps: LangySessionKeyReapDeps,
+): ProcessManagerApplier<Event> {
+  return (pm) =>
+    pm
+      .state<LangySessionKeyReapState>({ lastReapAt: null })
+      .schedule({ everyMs: LANGY_SESSION_KEY_REAP_INTERVAL_MS })
+      .onWake(langySessionKeyReapWake)
+      .intent("reap", langySessionKeyReapSchema, runLangySessionKeyReap(deps))
+      // One bounded UPDATE over the (name, revokedAt, expiresAt) index added
+      // in 20260728120000 — nothing like the blob sweep's keyspace walk, so
+      // the default-ish lease is ample. NOTE the FIRST tick after deploy also
+      // clears the historical backlog of keys this reaper never reached while
+      // it was rejected by the tenancy guard, so that one runs long.
+      .outbox({ leaseDurationMs: 60 * 1000, maxAttempts: 3 });
 }

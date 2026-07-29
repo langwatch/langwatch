@@ -76,7 +76,7 @@ const codingAgentSessionEvents = [
  *  2026-07-27 — the read-back columns of migrations 00053 (`SubAgentIds`,
  *  `PreviousCallContextTokens`, `StepStartedAt`, `MetricSeries`,
  *  `LastEventOccurredAt`) and 00054 (`AppliedEventIds`) joined the projected row
- *  shape. That shape change is exactly what this stamp records (ADR-021/022). */
+ *  shape. That shape change is exactly what this stamp records (ADR-088/022). */
 export const CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST = "2026-07-28";
 
 /**

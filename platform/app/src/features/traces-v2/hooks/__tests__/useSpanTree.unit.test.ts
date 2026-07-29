@@ -193,6 +193,7 @@ describe("useSpanTree", () => {
       sseConnectionState = "disconnected";
     });
 
+    /** @scenario "Live fallback polling fetches only what changed" */
     it("polls spanTreeDelta from the loaded tree's high-water mark instead of re-walking every page", () => {
       treeData = [node("a", 100), node("b", 300)];
 
@@ -246,6 +247,7 @@ describe("useSpanTree", () => {
       expect(lastDeltaCall().options.enabled).toBe(false);
     });
 
+    /** @scenario "Live fallback polling fetches only what changed" */
     it("merges delta spans into the shared cache entry", () => {
       const existing = [node("a", 100)];
       getQueryData.mockReturnValue(existing);
@@ -271,6 +273,7 @@ describe("useSpanTree", () => {
   });
 
   describe("when SSE reconnects after being down", () => {
+    /** @scenario "Reconnecting picks up whatever was missed" */
     it("fetches one catch-up delta, since a span that landed during the gap raises no event of its own", () => {
       sseConnectionState = "disconnected";
       const { rerender } = renderHook(() => useSpanTree());

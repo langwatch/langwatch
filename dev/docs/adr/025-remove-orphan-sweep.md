@@ -6,7 +6,7 @@
 
 ## Context
 
-ADR-022 enforces retention with ClickHouse-native TTL: expired trace rows are
+ADR-089 enforces retention with ClickHouse-native TTL: expired trace rows are
 dropped at merge time. PostgreSQL rows that reference traces by `traceId`
 (`Annotation`, `AnnotationQueueItem`, `PublicShare`, `TriggerSent`, `PinnedTrace`)
 are *not* dropped by that TTL, so they can outlive the trace they point at.
@@ -71,7 +71,7 @@ trace volume that drove the retention work in the first place.
 
 **Positive.** The ingestion path can never again be coupled to a heavy
 multi-table cleanup. One fewer queue, worker, reactor, and Redis cursor to
-operate. The retention story is now purely ClickHouse-native TTL (ADR-022).
+operate. The retention story is now purely ClickHouse-native TTL (ADR-089).
 
 **If it ever needs to come back.** Prefer **read-time filtering** (skip/hide PG
 rows whose trace no longer exists, at the point of display) over a background
@@ -83,6 +83,6 @@ matters. Either would get its own ADR.
 
 - Supersedes: ADR-023 (orphan-sweep BullMQ chain). The groupQueue migration
   (PR #4524) was never merged — no ADR number was assigned on `main`.
-- Related: ADR-022 (data retention, CH-native TTL).
+- Related: ADR-089 (data retention, CH-native TTL).
 - Incident: `EPIC/Q2/data-retention/errors/postmortem.md` (RC #2).
 - PRs: #4518 (hot-fix), #4524 (groupQueue migration — closed).

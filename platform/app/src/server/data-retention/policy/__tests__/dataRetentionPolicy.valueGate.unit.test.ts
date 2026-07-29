@@ -126,6 +126,7 @@ describe("assertRetentionWriteAllowed", () => {
     expect(planMocks.getActivePlan).toHaveBeenCalledTimes(1);
   });
 
+  /** @scenario "A paid organization cannot save an off-menu retention value" */
   it("rejects a paid org's off-menu value end-to-end", async () => {
     planMocks.getActivePlan.mockResolvedValue(paidPlan);
     await expect(

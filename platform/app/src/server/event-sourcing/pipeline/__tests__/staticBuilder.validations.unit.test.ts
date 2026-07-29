@@ -89,6 +89,7 @@ describe("StaticPipelineBuilder validations", () => {
       aggregateId: "trace-1",
     } as Event;
 
+    /** @scenario "Custom deduplication uses provided ID function" */
     it("preserves the full deduplication contract as the definition authored it", () => {
       const pipeline = definePipeline<Event>()
         .withName("test-pipeline")

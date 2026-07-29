@@ -244,6 +244,7 @@ describe("RecordSpanCommand", () => {
         expect(event.data).toHaveProperty("instrumentationScope");
       });
 
+      /** @scenario "Does not mutate original command data" */
       it("does not mutate the original command data", async () => {
         mockRedactSpan.mockImplementation(async (span: { name: string }) => {
           span.name = "[REDACTED]";
@@ -260,6 +261,7 @@ describe("RecordSpanCommand", () => {
     });
 
     describe("when reserved attributes are present", () => {
+      /** @scenario "Strips user-submitted langwatch.reserved.* attributes from spans" */
       it("strips langwatch.reserved.* attributes from span before processing", async () => {
         const command = createMockCommand("project-123", "trace-1", "span-1", [
           {

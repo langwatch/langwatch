@@ -381,7 +381,7 @@ Rule: Feedback is displayed as events
 # ─────────────────────────────────────────────────────────────────────────────
 # TABLE INTEGRATION: PER-EVALUATOR EVAL COLUMNS
 # ─────────────────────────────────────────────────────────────────────────────
-# See dev/docs/adr/029-trace-table-per-evaluator-columns.md for the architecture
+# See dev/docs/adr/094-trace-table-per-evaluator-columns.md for the architecture
 # (dynamic `eval:<field>:<evaluatorKey>` column ids, makeEvalCellDef factory).
 
 Rule: Adding a per-evaluator eval column

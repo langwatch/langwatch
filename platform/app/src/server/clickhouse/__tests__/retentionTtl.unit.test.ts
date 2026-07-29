@@ -82,6 +82,7 @@ describe("hasRetentionTTL", () => {
 });
 
 describe("RETENTION_MANAGED_TABLES", () => {
+  /** @scenario "suite_runs is included in TTL configuration" */
   it("includes all 19 retention-managed tables", () => {
     expect(RETENTION_MANAGED_TABLES).toHaveLength(19);
     expect(RETENTION_MANAGED_TABLES).toContain("stored_spans");

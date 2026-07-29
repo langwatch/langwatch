@@ -45,6 +45,7 @@ describe("jobEnvelope", () => {
     });
 
     describe("when encoding", () => {
+      /** @scenario "Envelope writes stay off until the whole fleet reads envelopes" */
       it("writes legacy bare JSON that a previous-release JSON.parse reader accepts", async () => {
         const encoded = await encodeJobEnvelope({ jobData: payload });
         expect(encoded.startsWith("GQ1|")).toBe(false);
@@ -73,6 +74,7 @@ describe("jobEnvelope", () => {
     };
 
     describe("when encoded and decoded", () => {
+      /** @scenario "A staged payload round-trips through the envelope unchanged" */
       it("round-trips the payload deep-equal", async () => {
         const encoded = await encodeJobEnvelope({ jobData: largePayload });
         expect(await decodeJobEnvelope({ value: encoded })).toEqual(
@@ -80,6 +82,7 @@ describe("jobEnvelope", () => {
         );
       });
 
+      /** @scenario "Large payloads are compressed at stage time" */
       it("stores the body gzip-compressed and smaller than the raw JSON", async () => {
         const encoded = await encodeJobEnvelope({ jobData: largePayload });
         expect(encoded.startsWith("GQ1|")).toBe(true);
@@ -89,6 +92,7 @@ describe("jobEnvelope", () => {
         );
       });
 
+      /** @scenario "Pause checks read only the envelope header" */
       it("exposes routing fields from the header without decoding the body", async () => {
         const encoded = await encodeJobEnvelope({ jobData: largePayload });
         expect(readJobRoutingMeta(encoded)).toEqual({
@@ -104,6 +108,7 @@ describe("jobEnvelope", () => {
     const smallPayload = { __jobName: "tiny", value: 1 };
 
     describe("when encoded", () => {
+      /** @scenario "Small payloads stay uncompressed" */
       it("keeps the body as raw JSON", async () => {
         const encoded = await encodeJobEnvelope({ jobData: smallPayload });
         expect(encoded).toContain('"e":"j"');
@@ -127,6 +132,7 @@ describe("jobEnvelope", () => {
       data: true,
     });
 
+    /** @scenario "Legacy bare-JSON jobs staged before the deploy still process" */
     it("decodes as plain JSON", async () => {
       expect(await decodeJobEnvelope({ value: legacy })).toEqual(
         JSON.parse(legacy),
@@ -174,6 +180,7 @@ describe("jobEnvelope", () => {
     };
 
     describe("when a blob store is provided", () => {
+      /** @scenario "Very large payloads are offloaded out of the queue hash" */
       it("offloads the body to the store and leaves a tiny ref envelope", async () => {
         const blobs = new InMemoryJobBlobStore();
         const encoded = await encodeJobEnvelope({
@@ -201,6 +208,7 @@ describe("jobEnvelope", () => {
         );
       });
 
+      /** @scenario "Offloaded blobs are cleaned up when the job completes" */
       it("exposes the blob id for completion-time deletion", async () => {
         const blobs = new InMemoryJobBlobStore();
         const encoded = await encodeJobEnvelope({
@@ -251,6 +259,7 @@ describe("jobEnvelope", () => {
   });
 
   describe("given a large incompressible payload", () => {
+    /** @scenario "Incompressible payloads stay uncompressed" */
     it("keeps the body raw when gzip+base64 would grow it", async () => {
       // Simulates inline base64-ish data below the S3 spool threshold:
       // high-entropy strings gain ~37% through gzip+base64.
@@ -334,6 +343,7 @@ describe("jobEnvelope", () => {
       ).rejects.toThrow();
     });
 
+    /** @scenario "A corrupt stored value does not wedge the group" */
     it("readJobRoutingMeta returns nulls instead of throwing", () => {
       expect(readJobRoutingMeta("GQ1|nonsense")).toEqual({
         pipelineName: null,

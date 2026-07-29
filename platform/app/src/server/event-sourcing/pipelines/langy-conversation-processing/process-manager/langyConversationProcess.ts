@@ -1,23 +1,28 @@
-import type {
-  EventHandler,
-  IntentExecutor,
-} from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import {
   LANGY_CONVERSATION_EVENT_TYPES,
   LANGY_TITLE_SOURCE,
 } from "@langwatch/langy";
+import type { ProcessManagerApplier } from "~/server/event-sourcing/pipeline/processBuilder";
+import type {
+  EventHandler,
+  IntentExecutor,
+} from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
 
 import {
   LANGY_PROCESS_INTENT_TYPES,
-  langyGenerateTitleIntentSchema,
-  langyProcessEventViewSchema,
-  langyWorkerDispatchIntentSchema,
   type LangyConversationProcessState,
   type LangyGenerateTitleIntent,
   type LangyProcessEventView,
   type LangyWorkerDispatchIntent,
+  langyGenerateTitleIntentSchema,
+  langyProcessEventViewSchema,
+  langyWorkerDispatchIntentSchema,
 } from "./langyConversationProcess.types";
+import {
+  LANGY_OUTBOX_LEASE_DURATION_MS,
+  type LangyEffectPorts,
+} from "./langyEffectPorts";
 
 /**
  * The content boundary (`toPayload`): narrows a committed Langy pipeline event
@@ -84,7 +89,8 @@ type LangyHandler = EventHandler<
  */
 function shouldGenerateTitle(state: LangyConversationProcessState): boolean {
   return (
-    state.titleSource === LANGY_TITLE_SOURCE.DERIVED && !state.autoTitleRequested
+    state.titleSource === LANGY_TITLE_SOURCE.DERIVED &&
+    !state.autoTitleRequested
   );
 }
 
@@ -181,4 +187,74 @@ export const handleHandoffConsumed: LangyHandler = (state) => ({
   state: { ...state, pendingHandoffTurnId: null },
 });
 
-
+/**
+ * The `langyConversation` process-manager topology, exported standalone so the
+ * pipeline mounts one expression of it and tests can build the exact definition
+ * the runtime runs. `langy-conversation-processing/pipeline.ts` mounts it as
+ * `.withProcessManager(LANGY_CONVERSATION_PROCESS_NAME,
+ * langyConversationPM(effects))` (ADR-052: the whole topology — state, intents,
+ * the content boundary, every event decision and the outbox lease).
+ */
+export function langyConversationPM(
+  effects: LangyEffectPorts,
+): ProcessManagerApplier<LangyConversationProcessingEvent> {
+  return (pm) =>
+    pm
+      .state<LangyConversationProcessState>(INITIAL_LANGY_PROCESS_STATE)
+      .intent(
+        LANGY_PROCESS_INTENT_TYPES.WORKER_DISPATCH,
+        langyWorkerDispatchIntentSchema,
+        (intent, { projectId }) =>
+          effects.workerDispatch.dispatchTurn({ ...intent, projectId }),
+      )
+      .intent(
+        LANGY_PROCESS_INTENT_TYPES.GENERATE_TITLE,
+        langyGenerateTitleIntentSchema,
+        (intent, { projectId }) =>
+          effects.titleGeneration.generateTitle({ ...intent, projectId }),
+      )
+      .toPayload(buildLangyProcessEventView)
+      .on(
+        LANGY_CONVERSATION_EVENT_TYPES.AGENT_TURN_ACCEPTED,
+        handleAgentTurnAccepted,
+      )
+      .on(LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONDED, handleAgentResponded)
+      .on(
+        LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONSE_FAILED,
+        handleAgentResponseFailed,
+      )
+      .on(LANGY_CONVERSATION_EVENT_TYPES.ARCHIVED, handleArchived)
+      .on(
+        LANGY_CONVERSATION_EVENT_TYPES.METADATA_UPDATED,
+        handleMetadataUpdated,
+      )
+      .on(LANGY_CONVERSATION_EVENT_TYPES.TITLE_GENERATED, handleTitleGenerated)
+      .on(
+        LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_HANDOFF_PENDING,
+        handleHandoffPending,
+      )
+      .on(
+        LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_HANDOFF_CONSUMED,
+        handleHandoffConsumed,
+      )
+      // Conversation-level and turn-progress activity with no process
+      // decision to make. Tool and plan events land here — they only ever
+      // mattered to the liveness window, which the heartbeat-aware
+      // subscriber owns.
+      .ignores(
+        LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_STARTED,
+        LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_FORKED,
+        LANGY_CONVERSATION_EVENT_TYPES.MESSAGE_RECORDED,
+        LANGY_CONVERSATION_EVENT_TYPES.MESSAGE_IMPORTED,
+        LANGY_CONVERSATION_EVENT_TYPES.TOOL_CALL_INITIATED,
+        LANGY_CONVERSATION_EVENT_TYPES.TOOL_CALL_SUCCEEDED,
+        LANGY_CONVERSATION_EVENT_TYPES.TOOL_CALL_FAILED,
+        LANGY_CONVERSATION_EVENT_TYPES.PLAN_UPDATED,
+      )
+      // The lease MUST outlive the slowest accepted dispatch, or a healthy
+      // long-running turn loses its lease mid-flight and a second instance
+      // re-delivers it concurrently (the completing handler is then fenced
+      // out and the message never retires). The generic 30s default is
+      // unsafe against the dispatch budget.
+      .outbox({ leaseDurationMs: LANGY_OUTBOX_LEASE_DURATION_MS });
+}

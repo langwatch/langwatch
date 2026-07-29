@@ -172,6 +172,7 @@ describe("sharedTrace share-safe gates", () => {
     });
 
     describe("when the event predates the visibility cutoff", () => {
+      /** @scenario "Public share links redact old content" */
       it("blanks the attributes even for a content-visible viewer", () => {
         const out = applyDerivedTraceEventProtections(events, {
           ...memberProtections,

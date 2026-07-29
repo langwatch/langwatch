@@ -227,6 +227,7 @@ describe("buildBriefingReceipts", () => {
     receipts.find((r) => r.id === id);
 
   describe("given a shape absent from the prior window", () => {
+    /** @scenario "A new error shape leads the attention inbox" */
     it("leads with the new shape and carries the exact search into both actions", () => {
       const receipts = buildBriefingReceipts({
         ...base,
@@ -243,6 +244,7 @@ describe("buildBriefingReceipts", () => {
       expect(item?.askPrompt).toContain("do not claim a root cause");
     });
 
+    /** @scenario "An incomplete prior facet does not prove an error shape is new" */
     it("does not call a shape new when the prior top-N facet was incomplete", () => {
       const receipts = buildBriefingReceipts({
         ...base,
@@ -256,6 +258,7 @@ describe("buildBriefingReceipts", () => {
   });
 
   describe("given a shape that materially increased", () => {
+    /** @scenario "A materially regressed error shape compares periods" */
     it("marks the shape regressed and compares its counts", () => {
       const receipts = buildBriefingReceipts({
         ...base,
@@ -293,6 +296,7 @@ describe("buildBriefingReceipts", () => {
   });
 
   describe("given multiple errors with a shared trace name", () => {
+    /** @scenario "Shared evidence is not presented as a proven cause" */
     it("surfaces correlation as a signal without claiming it is the cause", () => {
       const receipts = buildBriefingReceipts({
         ...base,
@@ -310,6 +314,7 @@ describe("buildBriefingReceipts", () => {
   });
 
   describe("given a meaningful p50 regression", () => {
+    /** @scenario "Latency needs a meaningful comparable regression" */
     it("compares periods instead of promoting the single slowest trace", () => {
       const receipts = buildBriefingReceipts({
         ...base,
@@ -322,6 +327,7 @@ describe("buildBriefingReceipts", () => {
       expect(latency?.context?.query).toBe("duration:>2000");
     });
 
+    /** @scenario "Latency needs a meaningful comparable regression" */
     it("omits small/noisy changes and a latency value with no baseline", () => {
       const receipts = buildBriefingReceipts({
         ...base,
@@ -343,6 +349,7 @@ describe("buildBriefingReceipts", () => {
   });
 
   describe("when errors exist but shape/cause inputs are unavailable", () => {
+    /** @scenario "Missing shape evidence degrades honestly" */
     it("shows an honest triage fallback linked to the error search", () => {
       const receipts = buildBriefingReceipts({
         ...base,

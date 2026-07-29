@@ -61,6 +61,7 @@ describe("rename code blocks", () => {
   });
 
   describe("when renaming a code block via setNode", () => {
+    /** @scenario "Rename updates the node ID and Python class name" */
     it("updates the node name and id", () => {
       const nodes = [
         makeCodeNode({
@@ -85,6 +86,7 @@ describe("rename code blocks", () => {
       expect(state.nodes.find((n) => n.id === "code1")).toBeFalsy();
     });
 
+    /** @scenario "Rename updates the node ID and Python class name" */
     it("updates the Python class name in the code", () => {
       const nodes = [
         makeCodeNode({
@@ -110,6 +112,7 @@ describe("rename code blocks", () => {
       expect(codeParam?.value).toContain("class DataProcessor(dspy.Module):");
     });
 
+    /** @scenario "Renaming a wired-up block keeps its connections" */
     it("updates connected edge references", () => {
       const nodes = [
         makeCodeNode({
@@ -157,6 +160,7 @@ describe("rename code blocks", () => {
   });
 
   describe("when duplicating a code block", () => {
+    /** @scenario "Duplicate code block gets unique name" */
     it("gives the duplicate a unique name", () => {
       const nodes = [
         makeCodeNode({
@@ -196,6 +200,7 @@ describe("rename code blocks", () => {
       expect(codeParam?.value).not.toContain("class Code1(dspy.Module):");
     });
 
+    /** @scenario "A duplicate is named after what the block is called now" */
     it("bases the new name on a renamed block's current name", () => {
       const nodes = [
         makeCodeNode({

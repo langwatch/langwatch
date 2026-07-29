@@ -10,7 +10,7 @@
 
 Custom graphs and threshold triggers read analytics by aggregating over time. Today that re-scans + re-dedups `trace_summaries` on every render — wide rows, `ORDER BY (TenantId, TraceId)` (wrong for time scans), un-deduped `stored_spans` joins pulling heavy `SpanAttributes`, `quantileExact` over raw rows. "Huge queries all the time," and threshold triggers poll that path on a 3-minute K8s cron.
 
-We want analytics + triggers cheap and real-time, using ClickHouse's native engines, with the **idempotency the platform actually requires** (delivery is at-least-once; replay re-applies events — ADR-021/022/015). This is the materialization for **traces, evaluations, scenarios, experiments** — a shared primitive, traces first.
+We want analytics + triggers cheap and real-time, using ClickHouse's native engines, with the **idempotency the platform actually requires** (delivery is at-least-once; replay re-applies events — ADR-088/022/015). This is the materialization for **traces, evaluations, scenarios, experiments** — a shared primitive, traces first.
 
 ## Decision
 
@@ -113,7 +113,7 @@ sums:    CostSum, NonBilledCostSum, DurationSum (root span),
 
 ## Related
 
-ADR-002/007 (event sourcing), **ADR-021 (lean fold cache — folds idempotent under replay)**, **ADR-022 (event log source of truth — at-least-once re-apply)**, **ADR-015 (projection replay — folds + map projections; coordinated dedup)**, ADR-024 (cold-path tiered storage), **ADR-039 (outbox heartbeat primitive — the absence-detection consumer Phase 5 motivated)**. ADR-018 (governance flat substrate) — considered, deliberately **not** shared.
+ADR-002/007 (event sourcing), **ADR-088 (lean fold cache — folds idempotent under replay)**, **ADR-022 (event log source of truth — at-least-once re-apply)**, **ADR-015 (projection replay — folds + map projections; coordinated dedup)**, ADR-024 (cold-path tiered storage), **ADR-039 (outbox heartbeat primitive — the absence-detection consumer Phase 5 motivated)**. ADR-018 (governance flat substrate) — considered, deliberately **not** shared.
 
 ## Implementation status
 

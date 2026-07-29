@@ -318,7 +318,7 @@ export class SpendSpikeAnomalyEvaluator {
    * firings of a pre-cutover trace-grain row carrying running totals of $3 then
    * $7 report $10 where the merged truth is $7.
    *
-   * Migration 00058 moved the key to event grain, which makes re-derived rows
+   * Migration 00063 moved the key to event grain, which makes re-derived rows
    * byte-identical rather than divergent, but byte-identical duplicates still
    * SUM. It narrows the error, it does not remove it, and rows written before
    * that cutover remain at trace grain with divergent totals under one key.
@@ -328,7 +328,7 @@ export class SpendSpikeAnomalyEvaluator {
    *   - IN-tuple does not work here. It excludes OLDER versions; it does not
    *     collapse versions that TIE on the version column. Both cases above tie
    *     — a re-derived span re-stamps the same `LastEventOccurredAt`, and
-   *     00058's own header records that the value is constant across firings
+   *     00063's own header records that the value is constant across firings
    *     for trace-grain rows. Every tied row satisfies the tuple and every one
    *     of them is summed, so the pattern is a no-op against this defect
    *     (verified: still $20 of the $10).  IN-tuple is a pattern for fetching
@@ -348,8 +348,8 @@ export class SpendSpikeAnomalyEvaluator {
    *     which is a customer-facing spend figure and an alert threshold moving
    *     because a query re-ran.
    *
-   *     Post-00058 the tied rows are byte-identical, so the tie-break cannot
-   *     change the number; it only makes it repeatable. Pre-00058 trace-grain
+   *     Post-00063 the tied rows are byte-identical, so the tie-break cannot
+   *     change the number; it only makes it repeatable. Pre-00063 trace-grain
    *     rows tie on a constant version while carrying the trace's RUNNING
    *     totals, so the largest tied row IS the trace's final total — the
    *     complete figure rather than a partial one caught mid-flight.

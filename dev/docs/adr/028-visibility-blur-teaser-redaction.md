@@ -8,7 +8,7 @@
 
 ## Context
 
-Issue #4745. PR #4720 provisions organization-scoped retention policies at the 49-day platform floor on paid entry points — behaviorally inert today; this ADR is the feature it was built for. [ADR-027](./027-storage-gb-billing.md) (storage billing) references the 14-day Free visibility window in its customer matrix and explicitly defers the read-path mechanism to this decision.
+Issue #4745. PR #4720 provisions organization-scoped retention policies at the 49-day platform floor on paid entry points — behaviorally inert today; this ADR is the feature it was built for. The storage GB-hours billing ADR (an unmerged draft — see References) references the 14-day Free visibility window in its customer matrix and explicitly defers the read-path mechanism to this decision.
 
 The model (from #4745): the 49-day deletion floor is **not** a limitation — it is the *action window*. Pricing tiers are expressed as **visibility** windows on top of a fixed deletion policy. Free users' data past 14 days is not gone; it is held as a recoverable upgrade incentive until retention deletes it at 49 days.
 
@@ -17,7 +17,7 @@ Hard constraints (locked):
 1. **49-day deletion floor stays.** `MIN_RETENTION_DAYS = 49` and weekly partitions unchanged; pricing-page numbers are blur thresholds, never retention policies.
 2. **Instant recovery on upgrade.** No restore job, no rehydration — upgrade lifts the blur on the next read.
 3. **Reuse plan resolution.** Thresholds resolve through the existing composite `planProvider.getActivePlan()` (Stripe / license); no new plan source.
-4. **Self-hosted unlicensed gets the Free experience.** Visibility windows are a license lever, consistent with ADR-027's license-as-feature-gate.
+4. **Self-hosted unlicensed gets the Free experience.** Visibility windows are a license lever, consistent with the storage-billing draft's license-as-feature-gate.
 
 Blast radius is customer data access: over-redaction reads as data loss for paying customers; under-redaction gives Free the paid feature; a misplaced gate is a leak. Full rigor: invariants with test anchors, mandatory red-team.
 
@@ -100,7 +100,7 @@ None. No Prisma migration, no ClickHouse migration, no new columns — the desig
 - The 49d floor + 14d blur turns retention into a recoverable upgrade window instead of silent data loss — the exact intent of #4745, with the teaser as a concrete memory hook.
 - Zero state: no migrations, no jobs, instant plan-change semantics both directions by construction.
 - Plan logic in exactly one new service; repositories untouched and plan-blind.
-- ADR-027's customer-matrix story (14d visibility / 45–49d recovery) becomes real before the billing notice goes out.
+- The storage-billing draft's customer-matrix story (14d visibility / 45–49d recovery) becomes real before the billing notice goes out.
 
 **Negative.**
 - Redaction cost is per-read CPU on the service layer (string slicing per text field). Negligible per trace; bounded on lists by page size.
@@ -110,7 +110,7 @@ None. No Prisma migration, no ClickHouse migration, no new columns — the desig
 
 **Neutral.**
 - Aggregates remaining full means a determined Free user can mine some signal (counts, costs) from old periods. Accepted — that signal is the dashboard's value, not the trace content's.
-- Self-hosted unlicensed sees the blur on their own hardware; consistent with license-as-feature-gate (ADR-027), and the unlock is the license, not a config flag.
+- Self-hosted unlicensed sees the blur on their own hardware; consistent with license-as-feature-gate (the storage-billing draft), and the unlock is the license, not a config flag.
 
 ## Open questions
 
@@ -148,5 +148,6 @@ Rejected: client-side fabricated filler (v3 of this section — superseded; an e
 ## References
 
 - Issue: [#4745](https://github.com/langwatch/langwatch/issues/4745) · Provisioning mechanism: PR #4720
-- Related ADRs: [ADR-019](./019-repository-service-layering.md) (layering), [ADR-022](./022-data-retention.md) (retention/TTL), [ADR-027](./027-storage-gb-billing.md) (storage billing; defers this decision)
+- Related ADRs: [ADR-019](./019-repository-service-layering.md) (layering), [ADR-089](./089-data-retention.md) (retention/TTL)
+- **Dangling reference — storage GB-hours billing.** The storage-billing ADR this document leans on is **not part of this series**. It exists only as an unmerged draft (`dev/docs/adr/027-storage-gb-billing.md` on `origin/feat/stripe-gb-reporting-adr` and the `origin/feat/storage-billing-*` branches) and has never landed on `main`. It once carried number 027; 027 here is the typed `DispatchError` contract, so do not cite it by that number. If the draft lands, it takes the next free number and these mentions become links.
 - Code: `src/server/analytics/types.ts` (shared filters), `src/server/traces/trace.service.ts`, `src/server/app-layer/traces/trace-list.service.ts`, `src/server/app-layer/traces/repositories/trace-list.clickhouse.repository.ts`, `src/server/app-layer/subscription/plan-provider.ts`, `src/server/organizations/resolveOrganizationId.ts`, `src/server/data-retention/retentionPolicy.schema.ts`

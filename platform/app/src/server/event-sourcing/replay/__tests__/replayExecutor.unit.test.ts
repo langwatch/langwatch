@@ -222,6 +222,7 @@ describe("FoldAccumulator", () => {
 
   describe("when a rebuild re-folds an aggregate that already has committed state", () => {
     /** @scenario the event log is read only for a deliberate rebuild */
+    /** @scenario "Rebuilding from events" */
     it("always starts from init state, never loads existing", async () => {
       const { projection, storeBatchSpy } = createTestProjection();
       const accumulator = new FoldAccumulator(projection);
@@ -347,6 +348,7 @@ describe("MapAccumulator", () => {
   });
 
   describe("when events span multiple aggregates of one tenant", () => {
+    /** @scenario "Rebuilt records are written in bulk" */
     it("flushes them in a single tenant-scoped bulkAppend call, never one per aggregate", async () => {
       // Regression: drain used to group buffered records per AGGREGATE and
       // sequentially await one bulkAppend per group. For spanStorage the

@@ -24,14 +24,14 @@ network endpoint**. Every existing outbound goes to infrastructure we or the
 customer's SaaS vendor control: SES for email, `hooks.slack.com` for Slack
 (host-pinned by `slackWebhookGuard.ts`). A user-supplied URL fired from our
 worker fleet is a Server-Side Request Forgery (SSRF) and third-party-DDoS
-primitive unless fenced. ADR-030 foreshadowed exactly this work:
+primitive unless fenced. ADR-095 foreshadowed exactly this work:
 
 > "The moment a customer-defined webhook URL lands as a trigger
 > destination, the framework needs SSRF blocking, HMAC request signing,
 > payload size caps, per-destination secret encryption at rest. These are
 > framework concerns — every future customer-webhook-like dispatch should
 > share one outbound utility rather than each `dispatch` reinventing them."
-> — ADR-030 Consequences
+> — ADR-095 Consequences
 
 The framework mostly exists; the job is to *compose* it, not invent it:
 
@@ -295,7 +295,7 @@ atomic `ssrfSafeFetch`), the primitive `httpProxy.ts:187` already ships to prod.
 `src/server/app-layer/automations/delivery/sendWebhook.ts` (sibling to `sendSlackWebhook.ts`), wrapping
 `ssrfProtection` + signing + size/timeout caps + `DispatchError` classification
 (`toDispatchError`, `sendSlackWebhook.ts:143`). This is the "one outbound utility
-every future customer-webhook dispatch shares" ADR-030 asked for.
+every future customer-webhook dispatch shares" ADR-095 asked for.
 
 ---
 
@@ -390,7 +390,7 @@ enum WebhookDeliveryOutcome { success  retryable  terminal  pending }
   an operator see "the receiver said `{"error":"bad schema"}`" without re-firing.
 - **Retention / pruning.** Postgres is outside the ClickHouse retention sweep, so
   `WebhookDelivery` needs its own prune — a scheduled delete of rows older than 30
-  days (align with the ADR-030 `dispatched` window). Note it alongside the
+  days (align with the ADR-095 `dispatched` window). Note it alongside the
   `LangyConversation` PII-purge concern so it isn't forgotten.
 - **Rendering.** Extend the drawer's "Recent fires" panel (`ViewAutomationDrawer.tsx`,
   backed by `TriggerFireHistoryService.getAllRecentFiresForTrigger`) so a webhook
@@ -491,7 +491,7 @@ path" rule.
   entry** — minimal blast radius; the notify/persist exhaustiveness test forces
   classification at introduction.
 - **One shared outbound utility (`sendWebhook.ts`)** becomes the home every future
-  customer-endpoint dispatch reuses — the ADR-030 ask, discharged.
+  customer-endpoint dispatch reuses — the ADR-095 ask, discharged.
 - **`ssrfProtection.ts` grows a webhook-tuned validator config and (ideally)
   response-size + timeout + port options** usable by other callers (`httpProxy.ts`
   too).
@@ -591,7 +591,7 @@ and the `ProjectSecret`-ref auth union — the only remaining Phase 2 gap.
 
 ## References
 
-- [ADR-030](./030-transactional-outbox-for-stake-sensitive-dispatch.md) —
+- [ADR-095](./095-transactional-outbox-for-stake-sensitive-dispatch.md) —
   transactional outbox this dispatch rides; its Consequences foreshadow this
   webhook work (SSRF, HMAC, size caps, secret encryption).
 - [ADR-036](./036-liquid-templates-for-trigger-notifications.md) — Liquid engine +

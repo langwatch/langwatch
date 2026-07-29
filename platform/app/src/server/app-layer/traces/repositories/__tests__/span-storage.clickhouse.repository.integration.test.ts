@@ -822,6 +822,7 @@ describe("SpanStorageClickHouseRepository cursor-paged span summaries (integrati
       expect(all.filter((r) => r.spanId === spanIdFor(25))).toHaveLength(1);
     });
 
+    /** @scenario "Finishing pagination never widens into an unbounded storage scan" */
     it("reports the final full page as terminal instead of requiring an empty follow-up fetch", async () => {
       const pages = await walkSpanSummaries(exactTraceId, PAGE);
 
@@ -843,6 +844,7 @@ describe("SpanStorageClickHouseRepository cursor-paged span summaries (integrati
   });
 
   describe("when a long-running trace has spans past the occurredAt hint's window", () => {
+    /** @scenario "Pagination reaches spans recorded long after the trace began" */
     it("the walk still reaches them instead of ending at the window edge", async () => {
       const pages = await walkSpanSummaries(longTraceId, 2);
 

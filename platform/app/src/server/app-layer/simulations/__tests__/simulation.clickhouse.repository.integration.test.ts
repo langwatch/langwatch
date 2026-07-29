@@ -1340,6 +1340,7 @@ describe("SimulationClickHouseRepository (integration)", () => {
     });
 
     describe("when the batch's runs are read", () => {
+      /** @scenario "A repeated run update does not inflate progress" */
       it("returns the run once, at its latest version", async () => {
         const tenant = isolatedTenant("split-batch");
         const scenarioSetId = `set-split-${nanoid()}`;
@@ -1412,6 +1413,7 @@ describe("SimulationClickHouseRepository (integration)", () => {
     }
 
     describe("when the batch is polled with the pre-archive timestamp", () => {
+      /** @scenario "Archived runs are left out of the batch" */
       it("reports the archive as a change and drops the run from the list", async () => {
         const tenant = isolatedTenant("archived-batch");
         const scenarioSetId = `set-archived-${nanoid()}`;

@@ -238,15 +238,14 @@ describe("evaluation processing live FIFO", () => {
       evaluationAnalyticsRollupAppendStore: {
         append: vi.fn().mockResolvedValue(undefined),
       },
-      executeEvaluationCommand: {} as never,
+      executeEvaluation: {} as never,
       commands: { port: () => async () => {} } as never,
       isSaas: false,
       automations: {
-        triggerMatchSubscriber: {
-          name: "triggerMatch",
-          eventTypes: [],
-          handle: async () => {},
-        },
+        triggers: {
+          getActiveTraceTriggersForProject: vi.fn().mockResolvedValue([]),
+        } as never,
+        readTraceSummary: vi.fn().mockResolvedValue(null),
         graphActivityHandler: vi.fn().mockResolvedValue(undefined),
       },
     });

@@ -1,7 +1,10 @@
 name: migration-order
 
 # Fails a PR that adds a migration numbered below one already on the base branch,
-# and comments with the rename that fixes it.
+# and comments with the rename that fixes it. It also fails a ClickHouse
+# migration whose Down block ships live SQL, which one `goose down` turns into
+# data loss, and a goose statement block holding more than the one statement
+# ClickHouse accepts per query.
 #
 # Migrations run in key order — Prisma by timestamp, ClickHouse by goose sequence
 # number. Goose only runs migrations above the version a database is already on,
@@ -113,16 +116,19 @@ jobs:
 
             const body = [
               MARKER,
-              `### Migrations are out of order with \`${pr.base.ref}\``,
+              `### Migration checks failed against \`${pr.base.ref}\``,
               "",
               ...findings.flatMap((f) => [
                 `**${f.set}: ${f.entry}** ${f.problem}`,
                 ...(f.fix ? ["", "```bash", f.fix, "```"] : []),
                 "",
               ]),
-              "Migrations run in the order their names sort. A migration numbered below one that " +
-                "already merged is skipped outright on any database that has run the newer one, so it " +
-                "passes locally and never runs in production.",
+              "A migration is history the moment it merges, so nothing found here can be fixed after " +
+                "the fact — only on this branch. Migrations run in the order their names sort, and one " +
+                "numbered below a migration that already merged is skipped outright on any database " +
+                "that has run the newer one, so it passes locally and never runs in production. A Down " +
+                "block is written commented out for the same reason: rolling one back is a decision an " +
+                "operator takes, not something a tool does by accident.",
             ].join("\n");
 
             // Edited in place when nothing changed, so a push does not re-notify

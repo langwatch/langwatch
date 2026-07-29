@@ -18,7 +18,7 @@ End state: **no dataset *content* in Postgres.** Dataset *metadata* (id, name, s
 
 **Prior art / related decisions.**
 - **ADR-024 (cold-path tiered storage)** — precedent that object storage is "deployment shape, not a customer feature," with self-hosted-may-not-have-S3 gated by env. Our storage-gating mirrors it.
-- **ADR-022 (data retention)** — "retention *charging*, not auto-deletion" is the model for the deferred dataset-storage billing.
+- **ADR-089 (data retention)** — "retention *charging*, not auto-deletion" is the model for the deferred dataset-storage billing.
 - **ADR-007 / 023 / 026 (event sourcing, GroupQueue)** — the GroupQueue is the in-house Redis FIFO substrate that replaced BullMQ; `registerJob` schedules standalone one-shot work on it.
 - **#4547** removes the BullMQ legacy stack (`src/server/background/`); **#4498 (outbox)** and **#4743** build the GroupQueue-based replacement. New async work must not use BullMQ.
 - **ADR-019** + `CLAUDE.md` — Hono route → service → repository; `projectId` on every query.

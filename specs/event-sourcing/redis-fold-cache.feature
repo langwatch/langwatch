@@ -32,42 +32,49 @@ Feature: Redis write-through cache for fold state
     Given a fold projection with a cached store
     And a durable store behind it
 
+  @unit
   Scenario: A cached entry is served without reading the durable store
     Given the fold state for aggregate "trace-1" is cached
     When the fold reads state for "trace-1"
     Then the cached state is returned
     And the durable store is not read
 
+  @unit
   Scenario: A miss reads the durable store
     Given the fold state for aggregate "trace-1" is not cached
     And the durable store holds state for "trace-1"
     When the fold reads state for "trace-1"
     Then the state is returned from the durable store
 
+  @integration
   Scenario: A redelivered event is not applied twice
     Given a fold job for aggregate "trace-1" failed after its state was stored
     When the job is retried with the same events
     Then those events are recognised as already applied
     And the aggregate reflects each event exactly once
 
+  @integration
   Scenario: A retry chain remembers everything it has applied
     Given a fold job failed after storing, and new events arrived before it retried
     When the retry applies the new events and fails again
     And the whole set is delivered once more
     Then no event is applied twice across the chain
 
+  @integration
   Scenario: A fresh delivery forgets what an acked batch applied
     Given consecutive batches for one aggregate that all succeed
     When each batch is stored
     Then the recorded event ids are only those of the most recent batch
     And the record does not grow with the number of batches
 
+  @integration
   Scenario: A sibling leading a retry is still recognised as a retry
     Given a coalesced batch failed and its drained siblings were re-staged
     When a sibling is dispatched first on the next attempt
     Then it is treated as a continuation of the retry chain
     And the events the chain already applied are not applied again
 
+  @unit
   Scenario: A corrupt cached entry is treated as a miss
     Given the cached entry for aggregate "trace-1" cannot be read back
     When the fold reads state for "trace-1"
@@ -79,6 +86,7 @@ Feature: Redis write-through cache for fold state
   # not accepted retry behaviour. A fold that persists its applied-event set
   # durably next to its state keeps exact dedup across cache loss instead
   # (fold-read-back-store.feature).
+  @integration
   Scenario: Losing the cached entry loses the protection
     Given a fold that keeps its applied-event set in the cache entry only
     And a fold job failed after its state was stored

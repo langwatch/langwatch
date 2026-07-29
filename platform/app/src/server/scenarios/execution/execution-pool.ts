@@ -6,8 +6,9 @@
  * hard kill lost. Dispatch is now a leased process-outbox message (ADR-073
  * step 2), so pending work is a Postgres row and concurrency is the
  * dispatcher's — what remains here is the one thing an in-process object is
- * actually the right home for: the map cancellation uses to find a live child
- * and signal it.
+ * actually the right home for: the map of live children, which cancellation
+ * uses to find and signal one, and which shutdown uses to know which runs it is
+ * about to abandon.
  *
  * @see specs/scenarios/scenario-execution-process-manager.feature
  */
@@ -30,8 +31,14 @@ export interface ExecutionJobData {
   };
 }
 
+/** A live child, and the job it is running. */
+export interface RunningChild {
+  job: ExecutionJobData;
+  child: ChildProcess;
+}
+
 export class ScenarioExecutionPool {
-  private readonly _running = new Map<string, ChildProcess>();
+  private readonly _running = new Map<string, RunningChild>();
   private readonly _cancelled = new Set<string>();
 
   /** Number of currently running child processes. */
@@ -39,9 +46,20 @@ export class ScenarioExecutionPool {
     return this._running.size;
   }
 
-  /** Access running children map (used by the cancel subscription). */
-  get runningChildren(): Map<string, ChildProcess> {
-    return this._running;
+  /**
+   * The job behind every child this worker still holds.
+   *
+   * A snapshot, not a view: shutdown reads it before signalling the children,
+   * and each child's exit removes itself from the registry while that is in
+   * progress.
+   */
+  get inFlightJobs(): ExecutionJobData[] {
+    return [...this._running.values()].map((entry) => entry.job);
+  }
+
+  /** The live child for a run, if this worker is the one holding it. */
+  findChild(scenarioRunId: string): ChildProcess | undefined {
+    return this._running.get(scenarioRunId)?.child;
   }
 
   /**
@@ -63,8 +81,8 @@ export class ScenarioExecutionPool {
    * Register a child process as running.
    * Called by the spawn function after the child is created.
    */
-  registerChild(scenarioRunId: string, child: ChildProcess): void {
-    this._running.set(scenarioRunId, child);
+  registerChild({ job, child }: RunningChild): void {
+    this._running.set(job.scenarioRunId, { job, child });
   }
 
   /** Deregister a child process (called when the child exits). */
@@ -75,16 +93,18 @@ export class ScenarioExecutionPool {
   /**
    * Kill every child this worker still holds.
    *
-   * This is an OS-resource obligation on shutdown, not a durability mechanism.
-   * It no longer emits terminal events for the runs it kills: their dispatch
-   * messages are still leased, and their process instances still hold armed
-   * deadlines, so the terminal state is written by whichever of those resolves
-   * first rather than by a shutdown path racing the exit.
+   * This is an OS-resource obligation, and on its own it is not a durability
+   * mechanism: it signals the children and returns, so whether a terminal event
+   * follows is a race with the process exiting. The shutdown path therefore
+   * pairs it with an awaited terminal write per run
+   * (`settleInFlightRuns` in `scenario.processor.ts`), and the process
+   * manager's armed deadline remains the backstop for everything neither of
+   * those reaches — a hard kill, most of all.
    */
   drain(): void {
-    for (const [id, child] of this._running) {
+    for (const [id, entry] of this._running) {
       logger.info({ scenarioRunId: id }, "Draining: killing child process");
-      child.kill("SIGTERM");
+      entry.child.kill("SIGTERM");
     }
   }
 }

@@ -115,6 +115,18 @@ Feature: Payload cost governs the scheduling plane
     Then the subscriber neither judges the event nor receives work for it
     And no event is recorded as discarded on that tenant's behalf
 
+  # ...but stopping is for work that can be discarded. Durable work cannot: the
+  # events feeding a state machine carry a deadline, and a dropped one is
+  # retried by nothing and reconciled by nothing afterwards. There is no
+  # "stopped" state for it to be in — the way to stop that work is to stop
+  # producing it.
+  @unit
+  Scenario: durable process work has no stop switch to reach for
+    Given a state machine fed by the events of its pipeline
+    When every switch the publishing path consults is turned off
+    Then the state machine still receives its events
+    And nothing asks whether that work was stopped
+
   # --- Waiting work costs a pointer, not a payload ---
 
   @unit
@@ -156,9 +168,82 @@ Feature: Payload cost governs the scheduling plane
     Then publishing reports the failure
     And the subscriber never processes that event
 
+  # Deferred work — a decision that waits, keeps its own durable record of what
+  # it has seen, and acts later — is the same economics one plane down. Every
+  # event it accepts costs a durable write as well as a queued job, so an
+  # irrelevant event is more expensive here than anywhere else, not less.
+  @unit
+  Scenario: deferred work declines an irrelevant event before it is queued
+    Given a decision that waits, and only some events can affect it
+    And an event that cannot affect it
+    When the event is published
+    Then no work is queued for that decision
+    And the decision keeps no record of that event
+
+  @unit
+  Scenario: a burst about one subject costs deferred work one unit, not one each
+    Given a decision that waits on a stream of events about one subject
+    When many events about that subject arrive inside one collapse window
+    Then the decision is asked once for that window
+    And an event that would lead it somewhere different is still delivered
+
+  # --- Publishing a burst costs what the burst is worth, not what it weighs ---
+  #
+  # A collapse window bounds the JOBS a burst leaves behind. It does not bound
+  # what publishing them costs, because the collapse happens at the far end:
+  # each hand-off serialises its payload, compresses it and — past the inline
+  # ceiling — writes it away before the queue is in a position to recognise the
+  # duplicate and reclaim what it just wrote. A burst worth one job was paying
+  # for every event in it, and a backed-up subject drains in batches of
+  # hundreds, so the multiplier is the batch size.
+  #
+  # The rule is that publishing reproduces the collapse the queue would have
+  # applied, by the queue's own key, before paying for it — and that deciding
+  # what collapses is itself allowed to fail without costing anyone their work.
+
+  @unit
+  Scenario: a burst that collapses to one piece of work is only published once
+    Given a stream of events about one subject that share one collapse window
+    When they are published
+    Then the queue is handed one piece of work, not one per event
+    And every event in the burst is still accounted for
+
+  # A saving nobody can see is a saving nobody will notice losing. The counts
+  # have to separate the work that was actually paid for from the work the
+  # collapse avoided — and separate them, not double-count them, so the
+  # outcomes keep summing to the events routed and a loss rate stays readable
+  # against that denominator.
+  @unit
+  Scenario: the work a collapse avoided is visible to operators
+    Given a stream of events about one subject that share one collapse window
+    When they are published
+    Then an operator-visible count separates the work handed to the queue from the work the collapse avoided
+    And no event is counted both as handed over and as avoided
+    And the counted outcomes still account for every event routed to that subscriber
+
+  @unit
+  Scenario: events that collapse to different pieces of work are all published
+    Given events about one subject that fall into different collapse windows
+    When they are published
+    Then each window's work is handed to the queue
+
+  @unit
+  Scenario: work that collapses to nothing is published for every event, in one exchange
+    Given a subscriber whose work carries no collapse window
+    When several events it cares about are published
+    Then each event's work is handed to the queue
+    And they are handed over in one exchange rather than one apiece
+
+  @unit
+  Scenario: a subscriber that cannot decide what its work collapses to publishes everything
+    Given a subscriber that errors while deciding what its work collapses to
+    When a burst it cares about is published
+    Then every event's work is still handed to the queue
+    And nothing is dropped on account of that failure
+
   # --- Phases 2-4: the remaining ADR-069 invariants ---
 
-  @planned
+  @unimplemented @planned
   # Not yet implemented as of 2026-07-28 — ADR-069 phase 2: offloaded payloads
   # stage as small stubs, and byte budgets count the stub, not the payload.
   Scenario: an offloaded payload's reference advertises its true cost
@@ -167,7 +252,7 @@ Feature: Payload cost governs the scheduling plane
     Then its reference declares the payload's true byte size
     And every byte budget the job passes through counts that size, not the size of the reference
 
-  @planned
+  @unimplemented @planned
   # Not yet implemented as of 2026-07-28 — ADR-069 phase 2: only coalesced
   # drains are byte-bounded; in-flight dispatch and retry buffers bound by count.
   Scenario: every stage that holds payloads is bounded in bytes
@@ -176,7 +261,7 @@ Feature: Payload cost governs the scheduling plane
     Then each stage admits work up to a byte budget
     And never up to an item count alone
 
-  @planned
+  @unimplemented @planned
   # Not yet implemented as of 2026-07-28 — ADR-069 phase 3: memory grants.
   Scenario: a job acquires memory before it hydrates
     Given a bounded per-process memory pool
@@ -185,7 +270,7 @@ Feature: Payload cost governs the scheduling plane
     Then it waits in the queue as a reference
     And it hydrates only once a grant for its declared cost is acquired
 
-  @planned
+  @unimplemented @planned
   # Not yet implemented as of 2026-07-28 — ADR-069 phase 3: overload still
   # presents as allocator pressure before it presents as backlog.
   Scenario: overload presents as queue depth, never as memory pressure
@@ -194,7 +279,7 @@ Feature: Payload cost governs the scheduling plane
     Then the excess is visible as queue depth
     And the process's memory use stays inside its budget
 
-  @planned
+  @unimplemented @planned
   # Not yet implemented as of 2026-07-28 — ADR-069 phase 4: per-key fairness
   # across groups.
   Scenario: a hot aggregate degrades itself, not the fleet
@@ -203,7 +288,7 @@ Feature: Payload cost governs the scheduling plane
     Then the hot aggregate's own backlog grows
     And the other aggregates' work keeps draining
 
-  @planned
+  @unimplemented @planned
   # Not yet implemented as of 2026-07-28 — ADR-069 phase 4: bulkheads for the
   # heavy workload class.
   Scenario: heavy-class overload stays a heavy-class incident
@@ -212,7 +297,7 @@ Feature: Payload cost governs the scheduling plane
     Then the overload is contained to that class's own pool and budget
     And the rest of the platform's work is unaffected
 
-  @planned
+  @unimplemented @planned
   # Not yet implemented as of 2026-07-28 — ADR-069 phase 4: the shedding
   # ladder; today the kubelet is the shedding layer.
   Scenario: the system sheds itself before the platform sheds it

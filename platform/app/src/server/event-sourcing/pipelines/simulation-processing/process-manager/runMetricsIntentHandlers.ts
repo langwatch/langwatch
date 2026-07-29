@@ -20,13 +20,14 @@ export interface RunMetricsDispatchDeps {
 
 /**
  * Executes the `computeRunMetrics` intent: asks for a finished run's cost and
- * latency, once, for the whole run.
+ * latency, for the whole run at once.
  *
  * The handler does one queue send and returns — it holds nothing while the
  * command runs. A rejection re-leases the message, which is safe because the
  * command is a pure read-and-emit whose event is keyed on the values it
  * computed: a repeat that computes the same answer collapses, and one that
- * computes a better answer replaces.
+ * computes a better answer replaces. That is also what lets the process ask
+ * again when a measurement finds nothing to record.
  */
 export function createRunMetricsComputeHandler(
   deps: RunMetricsDispatchDeps,

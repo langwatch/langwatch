@@ -11,6 +11,7 @@
 import type { ChildProcess } from "child_process";
 import { EventEmitter } from "events";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { ExecutionJobData } from "../execution-pool";
 import { ScenarioExecutionPool } from "../execution-pool";
 
 function makeFakeChild(): ChildProcess {
@@ -18,6 +19,17 @@ function makeFakeChild(): ChildProcess {
   (child as any).kill = vi.fn();
   (child as any).pid = Math.floor(Math.random() * 100000);
   return child;
+}
+
+function makeJob(scenarioRunId: string): ExecutionJobData {
+  return {
+    projectId: "proj-1",
+    scenarioId: `scen-${scenarioRunId}`,
+    scenarioRunId,
+    batchRunId: "batch-1",
+    setId: "set-1",
+    target: { type: "http", referenceId: "agent-1" },
+  };
 }
 
 describe("ScenarioExecutionPool", () => {
@@ -30,19 +42,30 @@ describe("ScenarioExecutionPool", () => {
   describe("when a child is registered", () => {
     it("makes it findable by run id so a cancel can signal it", () => {
       const child = makeFakeChild();
-      pool.registerChild("run-1", child);
+      pool.registerChild({ job: makeJob("run-1"), child });
 
-      expect(pool.runningChildren.get("run-1")).toBe(child);
+      expect(pool.findChild("run-1")).toBe(child);
       expect(pool.activeCount).toBe(1);
+    });
+
+    it("keeps the job behind it, so a shutdown can end the run it belongs to", () => {
+      pool.registerChild({ job: makeJob("run-1"), child: makeFakeChild() });
+      pool.registerChild({ job: makeJob("run-2"), child: makeFakeChild() });
+
+      expect(pool.inFlightJobs.map((job) => job.scenarioRunId)).toEqual([
+        "run-1",
+        "run-2",
+      ]);
     });
   });
 
   describe("when a child exits", () => {
     it("drops it from the registry", () => {
-      pool.registerChild("run-1", makeFakeChild());
+      pool.registerChild({ job: makeJob("run-1"), child: makeFakeChild() });
       pool.deregisterChild("run-1");
 
-      expect(pool.runningChildren.has("run-1")).toBe(false);
+      expect(pool.findChild("run-1")).toBeUndefined();
+      expect(pool.inFlightJobs).toEqual([]);
       expect(pool.activeCount).toBe(0);
     });
   });
@@ -72,8 +95,8 @@ describe("ScenarioExecutionPool", () => {
     it("kills every running child", () => {
       const child1 = makeFakeChild();
       const child2 = makeFakeChild();
-      pool.registerChild("run-1", child1);
-      pool.registerChild("run-2", child2);
+      pool.registerChild({ job: makeJob("run-1"), child: child1 });
+      pool.registerChild({ job: makeJob("run-2"), child: child2 });
 
       pool.drain();
 

@@ -134,6 +134,7 @@ describe("applySpanToSummary PII redaction status tracking", () => {
       expect(getSkippedSpanIds(state)).toEqual(["skipped-1", "skipped-2"]);
     });
 
+    /** @scenario "Trace summary separates partial and fully-skipped span IDs" */
     it("separates partial and fully-skipped spans in a mixed trace", () => {
       const partialSpan = createTestSpan({
         spanId: "partial-span",

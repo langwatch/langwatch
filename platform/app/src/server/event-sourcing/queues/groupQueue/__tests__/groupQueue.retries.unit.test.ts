@@ -82,6 +82,7 @@ describe("groupQueue retry categorization", () => {
       expect(isRetryableJobError(error)).toBe(true);
     });
 
+    /** @scenario "Error handling and retries" */
     it("allows retries for generic errors", () => {
       const error = new Error("unknown");
 

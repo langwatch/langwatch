@@ -58,6 +58,7 @@ describe("RemoveScopeConfirmDialog", () => {
         expect(screen.getByText(/No data is deleted/i)).toBeTruthy();
       });
 
+      /** @scenario "Removal asks for confirmation and previews the real fallback value" */
       it("shows the current value falling back to the resolved value", () => {
         queryMock.mockReturnValue({
           data: { traces: 49, scenarios: 49, experiments: 49 },

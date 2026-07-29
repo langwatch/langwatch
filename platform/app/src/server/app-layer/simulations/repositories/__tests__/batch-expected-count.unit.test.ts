@@ -108,3 +108,80 @@ describe("batch history expected count", () => {
     });
   });
 });
+
+/**
+ * The in-app run history reads the flat run list, not the batch history above,
+ * so the denominator has to reach it by its own route: a per-batch map keyed by
+ * BatchRunId. A batch with no recorded total is left out of the map entirely
+ * rather than published as zero — absence is what tells the reader to count the
+ * runs it can see.
+ */
+async function expectedCountsFor(rows: Record<string, string>[]) {
+  const client = {
+    query: vi.fn().mockImplementation(({ query }: { query: string }) => {
+      const result = query.includes("ExpectedCount") ? rows : [];
+      return Promise.resolve({ json: () => Promise.resolve(result) });
+    }),
+  } as unknown as ClickHouseClient;
+  const repository = new SimulationClickHouseRepository(
+    vi.fn().mockResolvedValue(client),
+  );
+
+  const { expectedCounts } = await repository.getRunDataForScenarioSet({
+    projectId: "project-1",
+    scenarioSetId: "set-1",
+  });
+  return expectedCounts;
+}
+
+/** A step-1 row from the flat run-list read, which carries no TotalCount. */
+function listBatchRow(overrides: {
+  BatchRunId: string;
+  ExpectedCount: string;
+}) {
+  return {
+    MaxCreatedAt: "1000",
+    MinStartedAt: "1000",
+    MaxStartedAt: "1000",
+    ...overrides,
+  };
+}
+
+describe("run list expected counts", () => {
+  describe("given a batch that recorded how many runs it would queue", () => {
+    describe("when the run list is read", () => {
+      it("carries that total through to the reader", async () => {
+        const expectedCounts = await expectedCountsFor([
+          listBatchRow({ BatchRunId: "batch-1", ExpectedCount: "6" }),
+        ]);
+
+        expect(expectedCounts).toEqual({ "batch-1": 6 });
+      });
+    });
+  });
+
+  describe("given a batch queued before the denominator was recorded", () => {
+    describe("when the run list is read", () => {
+      it("omits it rather than reporting a total of zero", async () => {
+        const expectedCounts = await expectedCountsFor([
+          listBatchRow({ BatchRunId: "batch-old", ExpectedCount: "0" }),
+        ]);
+
+        expect(expectedCounts).toEqual({});
+      });
+    });
+  });
+
+  describe("given a page mixing recorded and unrecorded batches", () => {
+    describe("when the run list is read", () => {
+      it("carries only the totals it actually has", async () => {
+        const expectedCounts = await expectedCountsFor([
+          listBatchRow({ BatchRunId: "batch-new", ExpectedCount: "3" }),
+          listBatchRow({ BatchRunId: "batch-old", ExpectedCount: "0" }),
+        ]);
+
+        expect(expectedCounts).toEqual({ "batch-new": 3 });
+      });
+    });
+  });
+});

@@ -6,7 +6,7 @@
 
 ## Context
 
-Trigger notifications (ADR-026/028/030) send customer-authored email to
+Trigger notifications (ADR-026/036/095) send customer-authored email to
 recipient lists the customer types in freely. Three abuse/cost surfaces are
 currently unprotected:
 
@@ -262,6 +262,6 @@ price, bounded by the hourly cap.
 - [ADR-026](./026-per-trigger-dispatch-timing.md) — cadence/digest mechanics the cap composes with
 - [ADR-036](./036-liquid-templates-for-trigger-notifications.md) — template rendering the footer wraps
 - [ADR-037](./037-automation-operator-surfaces.md) — health surface that displays cap drops
-- [ADR-030](./030-transactional-outbox-for-stake-sensitive-dispatch.md) — dispatcher stage carrying the cap check
+- [ADR-095](./095-transactional-outbox-for-stake-sensitive-dispatch.md) — dispatcher stage carrying the cap check
 - `src/server/rateLimit.ts` — sliding-window limiter reused for test fire
 - `src/server/mailer/triggerNoReply.ts` — existing HMAC keyed-hash pattern the unsubscribe token follows

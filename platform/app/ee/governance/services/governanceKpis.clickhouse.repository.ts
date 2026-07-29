@@ -34,7 +34,7 @@ export interface GovernanceKpiContribution {
    * Identity of the SOURCE EVENT this contribution was derived from — the
    * span id (hex) for span-shaped governance ingest.
    *
-   * Part of the sorting key since migration 00058, which is what makes a
+   * Part of the sorting key since migration 00063, which is what makes a
    * re-derivation collapse onto the row it re-derives instead of adding a
    * second one. Optional so pre-ADR-075 writers (the retired reactor,
    * whose rows are trace-grained) still type-check; those rows carry the

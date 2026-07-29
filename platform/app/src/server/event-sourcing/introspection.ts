@@ -232,6 +232,16 @@ export function getKillSwitchDescriptors(): KillSwitchDescriptor[] {
     // A subscriber may override its key via `options.killSwitch.customKey`;
     // emit the key the router will actually read, or the page would offer one
     // nothing consults.
+    //
+    // The process-manager runtime's generated `pm:*` subscribers are absent
+    // from this list because they are absent from the static definition — but
+    // that absence is NOT what makes them unkillable. The router skips the
+    // switch for them outright (`isProcessManagerSubscriberName`), because a
+    // process manager's events are durable work with a deadline behind them and
+    // a dropped one is neither retried nor reconciled. Were the skip removed,
+    // the switch would be live again and merely unlisted here — reachable
+    // through the flag store or the force-enable env, which is the worst of
+    // both: droppable, and invisible to the operator who dropped it.
     for (const definition of def.eventSubscribers.values()) {
       out.push({
         // Generated, never re-spelled: the comment above is the reason. A

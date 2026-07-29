@@ -62,6 +62,7 @@ describe("jobEnvelope decode failures", () => {
   describe("given an envelope whose referenced blob is gone", () => {
     describe("when it is decoded", () => {
       /** @scenario an envelope whose referenced blob is gone is classified as a missing blob */
+      /** @scenario "A missing blob does not wedge the group" */
       it("names the failure missing_blob", async () => {
         const { tieredBlobs, redisBlobs } = makeTiered();
         const encoded = await encodeJobEnvelope({

@@ -89,7 +89,20 @@ export function createExperimentRunStateFoldStore(
 
       await repository.storeProjection(
         projection,
-        { tenantId: context.tenantId },
+        {
+          tenantId: context.tenantId,
+          // `experiment_runs` is a retention-managed table in the `experiments`
+          // category, and the repository reads its day count from here. Omit it
+          // and the repository's `?? PLATFORM_DEFAULT_RETENTION_DAYS` fallback
+          // fires on every write, so the run header ages on the platform
+          // schedule while `experiment_run_items` — written from the same
+          // delivery, through `retentionDaysFrom(context, "experiments")` —
+          // ages on the tenant's. Same shape `RepositoryFoldStore` passes for
+          // the scenario pipeline's `simulation_runs`.
+          metadata: context.retentionPolicy
+            ? { retentionPolicy: context.retentionPolicy }
+            : undefined,
+        },
         // The executor's redelivery-dedup watermark, persisted next to the row
         // so a retry with a cold cache still recognises a batch it committed.
         context.appliedEventIds ?? [],

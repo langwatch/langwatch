@@ -151,8 +151,9 @@ export interface SimulationRunStateData {
   /**
    * The run's cost and latency, assigned wholesale from a single
    * `metrics_recorded` event (see `handleSimulationRunMetricsRecorded`). There is
-   * deliberately no per-trace accumulator behind them: the run is measured once,
-   * from all of its traces at once, so re-measuring replaces rather than merges.
+   * deliberately no per-trace accumulator behind them: every measurement covers
+   * all of the run's traces at once, so a re-measure replaces rather than
+   * merges.
    */
   TotalCost: number | null;
   RoleCosts: Record<string, number[]>;
@@ -733,6 +734,13 @@ export class SimulationRunStateFoldProjection
    * happened to land: a first one emitted before cost enrichment finished was
    * kept by the event store's idempotency rule and no correction could ever
    * replace it. Assigning from one event means a re-measure simply wins.
+   *
+   * A re-measure has to be asked for, and this fold is not what asks: the
+   * `runMetrics` process manager re-arms while a run's measurement keeps coming
+   * back empty, along a short finite ladder
+   * (`process-manager/runMetricsProcess.types.ts`). What is guaranteed here is
+   * only that a correction is free to land when it does — the fold takes the
+   * newest answer whole, with nothing of the previous one surviving underneath.
    */
   handleSimulationRunMetricsRecorded(
     event: SimulationRunMetricsRecordedEvent,

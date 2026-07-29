@@ -69,7 +69,7 @@ Feature: Work-conserving max-min fair dispatch
   #     demand_i is in-flight + parked per tenant (from tenant_active_z and the
   #     parked set); a ready-only newcomer enters the fill via fresh presence in
   #     demanding-tenants, never via a ready count, so the gate never reads ready
-  #     for fairness. The queue-depth autoscaler (ADR-021) reads a separate
+  #     for fairness. The queue-depth autoscaler (no ADR yet) reads a separate
   #     primitive: the full pending depth ready + parked + in-flight.
 
   Background:
@@ -77,6 +77,7 @@ Feature: Work-conserving max-min fair dispatch
 
   Rule: Idle capacity is always used (work-conserving)
 
+    @integration
     Scenario: A single bursty tenant uses all the spare capacity
       Given only one tenant has groups waiting
       And the worker fleet has idle slots
@@ -84,6 +85,7 @@ Feature: Work-conserving max-min fair dispatch
       Then that tenant is dispatched into every idle slot
       And no group of that tenant is parked while a slot sits idle
 
+    @integration
     Scenario: A tenant past any fair share still dispatches while slots are free
       Given a tenant already holds more in-flight groups than an equal share
       And the fleet still has idle slots
@@ -91,6 +93,7 @@ Feature: Work-conserving max-min fair dispatch
       When dispatch runs
       Then that tenant keeps being dispatched into the idle slots
 
+    @integration
     Scenario: A small tenant's unused share is given to a bigger one (max-min)
       Given the fleet is saturated
       And two tenants are competing
@@ -102,12 +105,14 @@ Feature: Work-conserving max-min fair dispatch
 
   Rule: Fairness engages only under contention (saturation and competing tenants)
 
+    @integration
     Scenario: Two equally-demanding tenants split a saturated fleet evenly
       Given the fleet is saturated
       And two tenants each have more waiting groups than half the capacity
       When dispatch runs over time
       Then each tenant converges to about half the in-flight slots
 
+    @integration
     Scenario: A runaway tenant is clamped only to protect a co-waiting tenant
       Given the fleet is saturated
       And one tenant has a very large backlog at the head of the queue
@@ -118,6 +123,7 @@ Feature: Work-conserving max-min fair dispatch
 
   Rule: Throttling is released the moment contention ends
 
+    @integration
     Scenario: A clamped tenant reclaims full capacity when others go idle
       Given a tenant was being held to a fair share under contention
       When the other tenants run out of waiting work
@@ -126,12 +132,14 @@ Feature: Work-conserving max-min fair dispatch
 
   Rule: A newcomer is served as capacity frees, without holding slots idle
 
+    @integration
     Scenario: A newcomer is served on the next freed slots, not made to wait for a full drain
       Given the fleet is saturated by one incumbent tenant
       When a new tenant arrives with waiting work
       Then the newcomer wins the slots freed by natural drain ahead of the incumbent
       And no slot was held empty in reserve before the newcomer arrived
 
+    @unimplemented
     Scenario: An operator can guarantee newcomers a minimum capacity when long jobs starve them
       Given the newcomer minimum-capacity guarantee is disabled by default
       When monitoring shows newcomers are starved because long-running jobs hold their slots
@@ -141,6 +149,7 @@ Feature: Work-conserving max-min fair dispatch
 
   Rule: A tenant's own work keeps its priority order
 
+    @integration
     Scenario: Within one tenant, higher-priority groups dispatch first
       Given a tenant has several groups queued at different priorities
       When that tenant is dispatched
@@ -149,18 +158,21 @@ Feature: Work-conserving max-min fair dispatch
 
   Rule: A tenant leaves and rejoins contention cleanly
 
+    @integration
     Scenario: A tenant stops competing the moment its work is exhausted
       Given two tenants competing under saturation
       When one tenant's waiting work is fully dispatched
       Then it ages out of the demand set and stops pulling a fair share
       And the remaining tenant expands into the freed capacity
 
+    @unimplemented
     Scenario: A tenant whose work is abandoned by a crash is swept from contention
       Given a tenant holds in-flight work while competing for capacity
       When its worker crashes without completing that work
       Then the abandoned slots lapse out of the in-flight truth
       And that tenant no longer pulls a fair share
 
+    @unimplemented
     Scenario: A stale dynamic cap fails safe and is rebuilt from truth
       Given the dynamic-cap value has lapsed after a stalled recompute
       When dispatch runs before the next reconcile
@@ -172,6 +184,7 @@ Feature: Work-conserving max-min fair dispatch
   # clamp state is unavailable it fails to the protective (low) side.
   Rule: An operator can still hard-clamp a pathological tenant
 
+    @unimplemented
     Scenario: An explicit per-tenant ceiling caps a tenant when set
       Given the emergency hard ceiling is disabled by default
       When an operator sets an explicit ceiling for one tenant
@@ -185,12 +198,14 @@ Feature: Work-conserving max-min fair dispatch
   # not a one-shot backfill.
   Rule: Upgrading the dispatch path loses no in-flight work
 
+    @integration
     Scenario: Work queued before the upgrade still dispatches after it
       Given groups were queued under the pre-upgrade structure
       When the new dispatcher runs
       Then every previously-queued group is still dispatched
       And none is stranded outside fair selection
 
+    @integration
     Scenario: Work added to legacy-ready during the rollout is still picked up
       Given the new dispatcher is selecting tenants fairly
       And an old pod is still writing groups to the legacy single-ready

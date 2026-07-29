@@ -86,11 +86,28 @@ LIMIT 1
 |-------|--------|---------------|-----------|
 | `simulation_runs` | `ReplacingMergeTree(UpdatedAt)` | `UpdatedAt` | `(TenantId, ScenarioSetId, BatchRunId, ScenarioRunId)` |
 | `trace_summaries` | `ReplacingMergeTree(UpdatedAt)` | `UpdatedAt` | `(TenantId, TraceId)` |
-| `stored_spans` | `ReplacingMergeTree(StartTime)` | `StartTime` | `(TenantId, TraceId, SpanId)` |
+| `stored_spans` | `ReplacingMergeTree(StartTime)` ⚠ | `UpdatedAt` | `(TenantId, TraceId, SpanId)` |
 | `evaluation_runs` | `ReplacingMergeTree(UpdatedAt)` | `UpdatedAt` | `(TenantId, EvaluationId)` |
 | `experiment_runs` | `ReplacingMergeTree(UpdatedAt)` | `UpdatedAt` | `(TenantId, RunId, ExperimentId)` |
 
-**Note:** `stored_spans` uses `StartTime` as the version column, NOT `UpdatedAt`. Use `max(StartTime)` for dedup on that table.
+⚠ **`stored_spans` is the one table where the engine's version column and the
+correct one differ.** Its DDL says `ReplacingMergeTree(StartTime)`; dedup with
+**`max(UpdatedAt)`** anyway. `StartTime` is the span's own business time and is
+*unchanged* when an emitter re-reports a span, so every version of that span
+ties on it — which means `max(StartTime)` is not a dedup at all. Every tied row
+satisfies the IN-tuple, and the read returns the span once per unmerged version
+(measured: two versions in, two rows out). On the rarer re-report that does move
+`StartTime`, electing the greatest one prefers the *stale* row. `UpdatedAt` is
+stamped fresh on every insert, so it is the only column on this table that
+records *when a report was written* — which makes it the correct version
+column, not a total order. Two writers can still land on the same millisecond
+and tie; see "UpdatedAt is Monotonically Increasing" below for the
+deterministic tie-break a reader that must pick exactly one row still needs.
+
+This is a defect in the DDL, not in the readers. ClickHouse cannot `ALTER` an
+engine argument, so fixing it needs a full rebuild of the largest table in the
+system; the readers were corrected first. Do not "make them agree" by switching
+a reader to `max(StartTime)`. See [ADR-083](../adr/083-stored-spans-version-column.md).
 
 ## UpdatedAt is Monotonically Increasing
 

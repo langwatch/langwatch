@@ -13,6 +13,11 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
+import {
+  SPEND_SPIKE_THRESHOLD_TEMPLATE,
+  ThresholdPreview,
+} from "@ee/governance/dashboard/components/ThresholdPreview";
+import { SUPPORTED_RULE_TYPES } from "@ee/governance/services/activity-monitor/thresholdConfig.schema";
 import { Info, Pencil, Plus, RotateCw, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { EnterpriseLockedSurface } from "~/components/enterprise/EnterpriseLockedSurface";
@@ -62,113 +67,12 @@ const SCOPE_OPTIONS: Array<{ value: Scope; label: string }> = [
 
 // Only spend_spike has a wired evaluator today; the other rule types accept
 // persistence but the evaluation tick never selects them — the evaluator
-// queries `ruleType: "spend_spike"` and nothing else. The
-// composer offers only the live type — admins typing a custom value can
-// still override (the field stays freeform), but autocomplete won't
-// promise something the runtime doesn't deliver. Doc page lists the full
-// preview roadmap.
-const RULE_TYPE_SUGGESTIONS = ["spend_spike"];
-
-const SPEND_SPIKE_THRESHOLD_TEMPLATE = JSON.stringify(
-  {
-    windowSec: 86400,
-    ratioVsBaseline: 2.0,
-    minBaselineUsd: 1.0,
-    baselineOffsetSec: 604800,
-  },
-  null,
-  2,
-);
-
-/**
- * Plain-English summary of a threshold config — rendered live below
- * the JSON Textarea so admins see what their rule will actually
- * evaluate before they save (rchaves QA: "a preview would be great").
- *
- * Returns:
- *   - { kind: "ok", english } when the JSON parses + the rule type is
- *     known + every required field is present + has the right shape
- *   - { kind: "error", message } when JSON is invalid or required
- *     fields are missing/wrong type
- *   - { kind: "unsupported", english } when the rule type is in the
- *     UI suggestions but not yet wired to a detector — admin gets a
- *     clear "this won't fire" signal at compose time
- */
-function summariseThresholdConfig(
-  ruleType: string,
-  raw: string,
-):
-  | { kind: "ok" | "unsupported"; english: string }
-  | { kind: "error"; message: string } {
-  // Order matters: non-spend_spike rule types are persisted as
-  // preview-mode (Sergey 5f416d410 — server accepts any
-  // thresholdConfig shape for non-detector-wired types). So check
-  // ruleType FIRST. Empty `{}` on rate_limit / after_hours /
-  // model_drift / error_rate is a valid save — surface it as
-  // "Won't fire" rather than the spend_spike-shape "Empty config"
-  // error.
-  if (ruleType !== "spend_spike") {
-    if (raw.trim() !== "" && raw.trim() !== "{}") {
-      try {
-        JSON.parse(raw);
-      } catch (err) {
-        return {
-          kind: "error",
-          message: `Invalid JSON: ${err instanceof Error ? err.message : "parse failed"}`,
-        };
-      }
-    }
-    return {
-      kind: "unsupported",
-      english: `\`${ruleType}\` is in preview — the rule will save but no detector runs against it yet. \`spend_spike\` is the only type evaluated today; the others (\`rate_limit\`, \`after_hours\`, \`model_drift\`, \`error_rate\`) ship as detectors land.`,
-    };
-  }
-  if (raw.trim() === "" || raw.trim() === "{}") {
-    return {
-      kind: "error",
-      message:
-        "Empty config — fill in the rule-type-specific fields below or click the rule type to load the template.",
-    };
-  }
-  let parsed: Record<string, unknown>;
-  try {
-    parsed = JSON.parse(raw);
-  } catch (err) {
-    return {
-      kind: "error",
-      message: `Invalid JSON: ${err instanceof Error ? err.message : "parse failed"}`,
-    };
-  }
-  const windowSec = parsed.windowSec;
-  const ratio = parsed.ratioVsBaseline;
-  const minBaseline = parsed.minBaselineUsd;
-  const baselineOffset = parsed.baselineOffsetSec;
-  if (
-    typeof windowSec !== "number" ||
-    typeof ratio !== "number" ||
-    typeof minBaseline !== "number" ||
-    typeof baselineOffset !== "number"
-  ) {
-    return {
-      kind: "error",
-      message:
-        "spend_spike requires numeric `windowSec`, `ratioVsBaseline`, `minBaselineUsd`, and `baselineOffsetSec`.",
-    };
-  }
-  const fmtDuration = (sec: number): string => {
-    if (sec >= 86400)
-      return `${Math.round((sec / 86400) * 10) / 10} day${sec === 86400 ? "" : "s"}`;
-    if (sec >= 3600)
-      return `${Math.round((sec / 3600) * 10) / 10} hour${sec === 3600 ? "" : "s"}`;
-    if (sec >= 60)
-      return `${Math.round((sec / 60) * 10) / 10} minute${sec === 60 ? "" : "s"}`;
-    return `${sec} second${sec === 1 ? "" : "s"}`;
-  };
-  return {
-    kind: "ok",
-    english: `Fires when spend in the last ${fmtDuration(windowSec)} is at least ${ratio}× the spend in the equivalent ${fmtDuration(windowSec)} window from ${fmtDuration(baselineOffset)} ago, AND that baseline is at least $${minBaseline}. Otherwise the baseline is too noisy and the rule stays quiet.`,
-  };
-}
+// queries `ruleType: "spend_spike"` and nothing else. The composer offers
+// only the live types — admins typing a custom value can still override (the
+// field stays freeform), but autocomplete won't promise something the runtime
+// doesn't deliver, and the preview below the config says plainly what a typed
+// value will do. Doc page lists the full preview roadmap.
+const RULE_TYPE_SUGGESTIONS = SUPPORTED_RULE_TYPES;
 
 interface ComposerState {
   id?: string;
@@ -667,10 +571,11 @@ function RuleComposer({
                 </datalist>
                 <Text fontSize="xs" color="fg.muted">
                   Only <code>spend_spike</code> is evaluated today. Other rule
-                  types (<code>rate_limit</code>,
-                  <code>after_hours</code>, …) are{" "}
+                  types (<code>rate_limit</code>, <code>after_hours</code>, …)
+                  are{" "}
                   <Link
-                    href="/ai-gateway/governance/anomaly-rules"
+                    href={docsUrl("/ai-governance/anomaly-rules")}
+                    isExternal
                     color="blue.600"
                   >
                     preview
@@ -834,7 +739,8 @@ function RuleComposer({
                 a follow-up release — the composer will gain structured
                 destination fields then. (See{" "}
                 <Link
-                  href="/ai-gateway/governance/anomaly-rules"
+                  href={docsUrl("/ai-governance/anomaly-rules")}
+                  isExternal
                   color="blue.600"
                 >
                   anomaly rules docs
@@ -876,56 +782,6 @@ const selectStyle = {
   background: "white",
   fontSize: "14px",
 };
-
-function ThresholdPreview({
-  ruleType,
-  raw,
-}: {
-  ruleType: string;
-  raw: string;
-}) {
-  const summary = summariseThresholdConfig(ruleType, raw);
-  const palette =
-    summary.kind === "ok"
-      ? { bg: "blue.50", border: "blue.300", fg: "blue.900", label: "Preview" }
-      : summary.kind === "unsupported"
-        ? {
-            bg: "orange.50",
-            border: "orange.300",
-            fg: "orange.900",
-            label: "Won't fire",
-          }
-        : { bg: "red.50", border: "red.300", fg: "red.900", label: "Invalid" };
-  return (
-    <Box
-      borderWidth="1px"
-      borderColor={palette.border}
-      backgroundColor={palette.bg}
-      padding={2}
-      borderRadius="sm"
-      marginTop={1}
-    >
-      <HStack alignItems="start" gap={2}>
-        <Badge
-          colorPalette={
-            palette.label === "Won't fire"
-              ? "orange"
-              : palette.label === "Invalid"
-                ? "red"
-                : "blue"
-          }
-          size="xs"
-          variant="subtle"
-        >
-          {palette.label}
-        </Badge>
-        <Text fontSize="xs" color={palette.fg} flex={1}>
-          {summary.kind === "error" ? summary.message : summary.english}
-        </Text>
-      </HStack>
-    </Box>
-  );
-}
 
 export default withFeatureFlagGuard("release_ui_ai_governance_enabled", {
   bypassOnboardingRedirect: true,

@@ -125,7 +125,7 @@ async function readCappedBody({
 
 /**
  * The one SSRF-fenced outbound HTTP utility every customer-endpoint dispatch
- * shares (ADR-030 Consequences / ADR-040 §4). All outbound goes through the
+ * shares (ADR-095 Consequences / ADR-040 §4). All outbound goes through the
  * audited {@link ssrfSafeFetch} — cloud-metadata denylist, private-IP blocking,
  * DNS-rebinding defeat via IP pinning, and redirect re-validation — never a
  * hand-rolled `fetch`. A total-request timeout bounds slow endpoints (enforced

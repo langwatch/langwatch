@@ -72,6 +72,14 @@ Feature: Fold projections read back their own state
     And it rebuilds that aggregate's state from the event log
     And the bookkeeping the older shape never recorded is recovered
 
+  Scenario: state cached under an older shape is passed over even while it is still warm
+    Given a fold whose recent state is served from a cache ahead of its store
+    And an aggregate whose state was cached moments ago
+    And a fold that has since changed the shape of the state it stores
+    When the next event for that aggregate arrives
+    Then the fold recovers from its own store rather than from the cached state
+    And the cached state is passed over however recently it was written
+
   Scenario: a state that cannot be read back is never quietly replaced by a partial one
     Given a fold that has since changed the shape of the state it stores
     And an aggregate whose committed state was written under the older shape

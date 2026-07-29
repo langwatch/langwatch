@@ -64,6 +64,7 @@ afterEach(cleanup);
 describe("BulkActionBar Add to context", () => {
   describe("given trace rows are selected and Langy is available", () => {
     describe("when Add to context is clicked", () => {
+      /** @scenario "The trace list adds context through the selection bar, not a hover" */
       it("attaches every selected trace by human name and opens Langy", () => {
         useSelectionStore.getState().setMany(["t1", "t2"], true);
         renderBar({ t1: "Checkout agent", t2: undefined });
@@ -86,6 +87,7 @@ describe("BulkActionBar Add to context", () => {
   });
 
   describe("given Langy is not available", () => {
+    /** @scenario "The trace list adds context through the selection bar, not a hover" */
     it("does not offer the Add to context action", () => {
       langyMock.showLangy = false;
       useSelectionStore.getState().setMany(["t1"], true);

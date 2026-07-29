@@ -1,7 +1,9 @@
 Feature: Migration order check
   As a developer
-  I want a PR to fail when its migrations are numbered below ones already on main
-  So that a migration I wrote cannot merge in an order that stops it ever running
+  I want a PR to fail when its migrations are numbered below ones already on main,
+  or when one ships a Down block that would run
+  So that a migration I wrote cannot merge in an order that stops it ever running,
+  and cannot be rolled back into data loss by accident
 
   # The comment lifecycle deliberately differs from pr-impact-map.feature: an
   # impact map is informational, so it stays up and forks skip it silently; an
@@ -22,6 +24,7 @@ Feature: Migration order check
     Then the check passes
     And no comment is posted
 
+  @unit
   Scenario: A migration numbered below the newest on main fails
     Given the newest migration on main is numbered 42
     When the PR adds a migration numbered 39
@@ -72,3 +75,53 @@ Feature: Migration order check
     When the migration-order workflow runs
     Then no comment is attempted
     And the check still fails with the reason in the job log
+
+  # A ClickHouse Down block is written commented out, with a note saying to roll
+  # back, uncomment and run manually, so reverting is a decision an operator
+  # takes rather than something a tool does by accident. The rule is judged on
+  # every migration in the tree and not only the ones a PR adds, because the
+  # migrations that already break it cannot be edited — they are deployed.
+  Rule: A Down block that would run fails the check
+
+    @unit
+    Scenario: A Down block that is commented out passes
+      When the PR adds a migration whose Down section is comments and blank lines
+      Then the check passes
+
+    @unit
+    Scenario: A Down block that ships a live statement fails
+      When the PR adds a migration whose Down section holds an uncommented statement
+      Then the check fails
+      And the comment gives the line the statement is on
+      And the comment says to comment the block out and add the rollback note
+      And the comment names the migration to copy that note from
+
+    @unit
+    Scenario: The migrations that already break the rule are named, not skipped
+      Given a migration with a live Down block merged before the check existed
+      Then it is listed by path as an exception, with why it cannot be fixed
+      And every other migration is still judged
+
+    @unit
+    Scenario: An exception that no longer applies fails the check
+      Given a migration listed as an exception
+      When its Down block is no longer live
+      Then the check fails until it is dropped from the list
+
+  # ClickHouse takes one statement per query, so a block holding two fails when
+  # it runs rather than when it is reviewed. One ALTER TABLE with several
+  # comma-separated actions is one statement, and is sometimes the only thing
+  # that works — adding a column and folding it into the sorting key has to
+  # happen in a single ALTER.
+  Rule: A goose statement block holds one statement
+
+    @unit
+    Scenario: Two statements in one block fail
+      When the PR adds a migration with two statements between StatementBegin and StatementEnd
+      Then the check fails
+      And the comment says to give each statement its own block
+
+    @unit
+    Scenario: One statement with several actions passes
+      When the PR adds a migration whose block holds one ALTER TABLE with two actions
+      Then the check passes

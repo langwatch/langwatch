@@ -251,6 +251,29 @@ export const evaluatorLoopBlockedCounter = new Counter({
   labelNames: ["reason"] as const,
 });
 
+// Custom SDK evaluations the trace pipeline declined to relay. Each increment
+// is a verdict the CUSTOMER's SDK already computed that the platform will now
+// never show — which reads to them as an evaluation that never ran — so the
+// drop is counted as well as logged rather than being inferable only from a
+// missing row.
+//
+// Per-tenant attribution lives in the structured log line beside each
+// increment, NOT as a Prometheus label, for the same cardinality reason as
+// langwatch_evaluator_loop_blocked_total above.
+//
+// labels.reason ∈ "stale"           (the span's own business time is older than
+//                                    STALE_TRACE_THRESHOLD_MS at handling time —
+//                                    a batch-exporting SDK, a skewed client
+//                                    clock, or a group parked past the window)
+//               | "unreferenceable" (the span carried verdicts but cannot be
+//                                    addressed for read-back)
+register.removeSingleMetric("langwatch_custom_evaluation_sync_dropped_total");
+export const customEvaluationSyncDroppedCounter = new Counter({
+  name: "langwatch_custom_evaluation_sync_dropped_total",
+  help: "Custom SDK evaluation reports the trace pipeline declined to relay",
+  labelNames: ["reason"] as const,
+});
+
 // Histogram for evaluation duration
 register.removeSingleMetric("evaluation_duration_milliseconds");
 export const evaluationDurationHistogram = new Histogram({
@@ -617,14 +640,23 @@ export const observeEsSubscriberDuration = ({
  *   subscriber's lane.
  * - `referenced` — a job carrying a claim-check reference instead of the
  *   payload was handed off.
+ * - `collapsed` — another event in the same handoff was already queueing the
+ *   identical unit of work (the same subscriber dedup id), so this event's
+ *   payload was never serialised, compressed or written away. Its work is not
+ *   lost: the surviving job covers it, exactly as it would have when the queue
+ *   squashed the duplicate itself a moment later. This is the ONLY series that
+ *   shows the saving — the collapse is otherwise invisible, and a change that
+ *   silently disabled it would reintroduce the cost with no series moving.
  *
  * - `failed` — the filter, the stage hook or the handoff threw. The routing
  *   path has no retry, so this subscriber's job for this event is gone.
  *
- * `staged` and `referenced` are counted only after the handoff succeeded: the
- * queue accepted the job, or (in the no-queue configuration) the handler ran
- * inline. A handoff that throws counts `failed` instead, so a queue outage
- * cannot inflate either.
+ * `staged`, `referenced` and `collapsed` are counted only after the handoff
+ * succeeded: the queue accepted the job, or (in the no-queue configuration) the
+ * handler ran inline. A handoff that throws counts `failed` for every event the
+ * batch carried, the collapsed-away ones included — nothing reached the queue,
+ * so no survivor is covering them and the loss is real. That is why a queue
+ * outage cannot inflate any of the three.
  *
  * - `killed` — an operator disabled this subscriber for the event's tenant, so
  *   the seam never judged relevance. Counted rather than skipped silently:
@@ -632,24 +664,36 @@ export const observeEsSubscriberDuration = ({
  *   events permanently, and an operator must be able to tell a killed
  *   subscriber from an idle one — which is exactly when they are looking.
  *
- * The five outcomes therefore DO sum to "events routed to this subscriber",
+ * The six outcomes therefore DO sum to "events routed to this subscriber",
  * which is what makes `failed` readable as a rate: it is the only outcome that
  * loses work unintentionally, and it is otherwise invisible — a permanent drop
  * that moved no series looked exactly like a quiet day. `killed` loses work
  * too, but deliberately, which is why it is its own outcome and not `filtered`:
  * conflating "an operator stopped this" with "the subscriber judged it
  * irrelevant" would hide the kill behind an ordinary-looking series.
+ *
+ * `collapsed` is counted INSTEAD OF the `staged`/`referenced` the event's own
+ * staging produced, never in addition to it. Counting both would sum to more
+ * than the events routed and silently change the denominator every other
+ * outcome is read against. Instead-of also repairs an existing mis-attribution
+ * rather than merely adding a series: the collapsed-away events were being
+ * counted `staged` although nothing was ever staged for them, so on a hot
+ * aggregate the series read thousands while the queue was handed tens.
+ * `staged` + `referenced` is now exactly the payloads handed over, and
+ * `collapsed / (all outcomes)` is the share of the fan-out the collapse
+ * avoided paying for.
  */
 type SubscriberEnqueueOutcome =
   | "filtered"
   | "staged"
   | "referenced"
+  | "collapsed"
   | "failed"
   | "killed";
 register.removeSingleMetric("es_subscriber_enqueue_total");
 const esSubscriberEnqueueTotal = new Counter({
   name: "es_subscriber_enqueue_total",
-  help: "Event-sourcing subscriber fan-out outcomes decided at enqueue time (ADR-069): filtered before staging, staged as a full event or referenced as a claim-check once the handoff succeeded, failed — the retry-less routing path lost the job — or killed, an operator disabled the subscriber for that tenant",
+  help: "Event-sourcing subscriber fan-out outcomes decided at enqueue time (ADR-069), one count per event routed to the subscriber: filtered before staging, staged as a full event or referenced as a claim-check once the handoff succeeded, collapsed — another event in the batch was already queueing the identical work, so this one cost no payload — failed, the retry-less routing path lost the job, or killed, an operator disabled the subscriber for that tenant",
   labelNames: ["pipeline_name", "subscriber_name", "outcome"] as const,
 });
 

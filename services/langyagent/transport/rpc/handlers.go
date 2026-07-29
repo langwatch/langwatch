@@ -44,7 +44,8 @@ type chatRequest struct {
 	ResumeToken string `json:"resumeToken,omitempty"`
 	// TurnID is the control plane's per-turn idempotency key. The agent echoes it
 	// back on the durable final POST. Not required: an older control plane omits
-	// it, and the agent then skips the durable final (relay + reactor still run).
+	// it, and the agent then skips the durable final (relay + liveness
+	// subscriber still run).
 	TurnID string `json:"turnId,omitempty"`
 	// RunToken is the per-conversation secret (frameauth) the manager SIGNS every
 	// pushed output frame with. Minted server-only at conversation_started,

@@ -14,8 +14,11 @@ import (
 type BudgetPrecheckFunc func(ctx context.Context, bundle *domain.Bundle) (domain.BudgetDecision, error)
 
 // Budget creates an interceptor that prechecks budget before dispatch.
-// Cost recording is NOT done here — the trace-fold reactor on the control
-// plane folds OTel span usage attributes into the ClickHouse budget ledger.
+// Cost recording is NOT done here — the gatewayBudgetDebits map projection
+// on the control plane derives each request's spend from its own OTel span
+// usage attributes and writes the ClickHouse budget ledger. Being a
+// projection it is replayable, so a debit lost to a failed write is
+// re-derived from the event log rather than lost for good.
 //
 // Provider-filtered budgets (contract §4.6) do not block here: their breach
 // is recorded on the Call as an excluded provider, the terminal dispatch

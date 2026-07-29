@@ -14,7 +14,7 @@
  *
  * The REAL projection runs through the REAL `MapProjectionExecutor` and
  * the REAL `AppendStore` into a ClickHouse engine double modelling
- * `governance_kpis` exactly as migrations 00031 + 00058 declare it:
+ * `governance_kpis` exactly as migrations 00031 + 00063 declare it:
  * `ReplacingMergeTree(LastEventOccurredAt)`
  * `ORDER BY (TenantId, SourceId, HourBucket, TraceId, EventId)`.
  *
@@ -69,7 +69,7 @@ function governanceSpanEvent(
   });
 }
 
-/** `governance_kpis` as migrations 00031 + 00058 declare it. */
+/** `governance_kpis` as migrations 00031 + 00063 declare it. */
 function kpiTable() {
   return new ReplacingMergeTreeDouble<GovernanceKpiContribution>({
     orderBy: (row) =>
@@ -84,7 +84,7 @@ function kpiTable() {
   });
 }
 
-/** The pre-00058 sorting key, for the test that shows why it had to change. */
+/** The pre-00063 sorting key, for the test that shows why it had to change. */
 function preMigrationKpiTable() {
   return new ReplacingMergeTreeDouble<GovernanceKpiContribution>({
     orderBy: (row) =>
@@ -341,7 +341,7 @@ describe("GovernanceKpisMapProjection", () => {
       expect(bucketSpend(table.merged())).toBe(3);
     });
 
-    it("would have collapsed to one under the pre-00058 sorting key — the migration is load-bearing", async () => {
+    it("would have collapsed to one under the pre-00063 sorting key — the migration is load-bearing", async () => {
       const events = [
         governanceSpanEvent({
           eventId: "evt-1",

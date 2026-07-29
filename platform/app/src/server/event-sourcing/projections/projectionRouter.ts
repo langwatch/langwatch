@@ -20,6 +20,7 @@ import type { RetentionPolicyResolver } from "../../data-retention/retentionPoli
 import type { AggregateType } from "../domain/aggregateType";
 import type { Event, Projection } from "../domain/types";
 import type { KillSwitchOptions } from "../pipeline/staticBuilder.types";
+import { isProcessManagerSubscriberName } from "../process-manager/subscriberName";
 import type { DeduplicationStrategy } from "../queues";
 import {
   ConfigurationError,
@@ -996,8 +997,22 @@ export class ProjectionRouter<
       // resolution put a lookup on the hottest path in the product to answer a
       // question whose answer cannot change within one batch — the opposite of
       // the "an irrelevant event costs nothing" doctrine this seam exists for.
+      //
+      // EXCEPT for a process manager's generated subscriber, which has no kill
+      // switch at all. `ProcessManagerEnqueueOptions` states that `disabled` /
+      // `killSwitch` are not offered to a process manager, because a killed
+      // subscriber drops events and a process manager's events are durable work
+      // with a deadline behind them — nothing retries the drop and nothing
+      // reconciles it afterwards. That claim was only true of what a definition
+      // could DECLARE: `isComponentDisabled` derives a key when none is given,
+      // so `es-<agg>-subscriber-pm:<name>-killswitch` was a live switch on the
+      // durable path. Skipped here rather than merely left off the Ops page: an
+      // unlisted switch is still reachable through the flag store and the
+      // force-enable env, and the design's answer is that it must not exist.
+      const isProcessManagerSubscriber = isProcessManagerSubscriberName(name);
       const killedByTenant = new Map<string, boolean>();
       const isKilledFor = async (tenantId: string): Promise<boolean> => {
+        if (isProcessManagerSubscriber) return false;
         const cached = killedByTenant.get(tenantId);
         if (cached !== undefined) return cached;
         const disabled = await isComponentDisabled({
@@ -1156,22 +1171,41 @@ export class ProjectionRouter<
           queue,
           payloads: survivors.map((entry) => entry.staged),
         });
-        // Counted per ORIGINAL event, only once the hand-off succeeded. A
-        // collapsed-away event is counted with the outcome its own staging
-        // produced, exactly as it was when the queue did the squashing a
-        // moment later: the collapse changes what is PAID, never what is
-        // OWED, so it must not show up as a dip in this series.
-        for (const entry of admitted) {
+        // Counted per ORIGINAL event, only once the hand-off succeeded, and
+        // split by whether this event's own payload is the one that went over.
+        //
+        // A survivor carries the outcome its staging produced, so
+        // `staged` + `referenced` is exactly the payloads paid for. Everything
+        // folded onto a survivor counts `collapsed` INSTEAD — no payload was
+        // ever built for it, and counting it `staged` claimed a cost that was
+        // never paid, which on a hot aggregate read as thousands staged while
+        // the queue was handed tens. The collapse still changes only what is
+        // PAID, never what is OWED: `survivors + collapsed === admitted`, so
+        // the outcomes go on summing to the events routed here and the saving
+        // becomes visible instead of being hidden inside `staged`.
+        for (const entry of survivors) {
           incrementEsSubscriberEnqueueTotal({
             pipelineName: this.pipelineName,
             subscriberName: name,
             outcome: entry.outcome,
           });
         }
+        const collapsedAway = admitted.length - survivors.length;
+        for (let counted = 0; counted < collapsedAway; counted++) {
+          incrementEsSubscriberEnqueueTotal({
+            pipelineName: this.pipelineName,
+            subscriberName: name,
+            outcome: "collapsed",
+          });
+        }
       } catch (error) {
         // The re-attempts are spent. Every event this batch carried — the
         // survivors and the ones collapsed onto them — has lost its job, so
         // each is counted, not just the payloads that were actually sent.
+        // Note the collapsed-away events count `failed` here rather than
+        // `collapsed`: `collapsed` asserts that a surviving job covers this
+        // event's work, and nothing survived. Work avoided is only a saving
+        // when the work it stood in for actually reached the queue.
         for (const _lost of admitted) {
           incrementEsSubscriberEnqueueTotal({
             pipelineName: this.pipelineName,

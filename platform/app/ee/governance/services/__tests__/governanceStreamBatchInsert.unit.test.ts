@@ -94,7 +94,7 @@ describe("GovernanceKpisClickHouseRepository.insertContributions", () => {
       expect(insert.mock.calls[0]![0].values).toHaveLength(2);
     });
 
-    it("sends the span id as EventId so migration 00058's key can dedup the row", async () => {
+    it("sends the span id as EventId so migration 00063's key can dedup the row", async () => {
       const { insert, resolveClient } = fakeClient();
       const repository = new GovernanceKpisClickHouseRepository(resolveClient);
 

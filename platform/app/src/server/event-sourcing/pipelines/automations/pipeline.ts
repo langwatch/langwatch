@@ -1,88 +1,27 @@
-import { createLogger } from "@langwatch/observability";
-
 import { definePipeline } from "../../pipeline/staticBuilder";
-import { toSafeFailureDiagnostic } from "../../process-manager/failureDiagnostic";
 import { RecordTriggerMatchCommand } from "./commands/recordTriggerMatch.command";
 import {
-  GRAPH_ALERT_SWEEP_INTERVAL_MS,
+  GRAPH_ALERT_SWEEP_PROCESS_NAME,
   type GraphAlertSweepDeps,
-  type GraphAlertSweepState,
-  graphAlertSweepWake,
-  runGraphAlertSweep,
-  sweepSchema,
+  graphAlertSweepPM,
 } from "./process-manager/graphAlertSweep.process";
 import {
-  addPending,
-  digestBatchKey,
-  drainDue,
-  INITIAL_SETTLEMENT_STATE,
-  type SettlementState,
-  settleBoundary,
   TRIGGER_SETTLEMENT_PROCESS_NAME,
+  triggerSettlementPM,
 } from "./process-manager/triggerSettlement.process";
+import type { TriggerSettlementDispatchDeps } from "./process-manager/triggerSettlementIntentHandlers";
 import {
-  createLogOverflowHandler,
-  createNotifyDigestHandler,
-  createPersistMatchHandler,
-  type TriggerSettlementDispatchDeps,
-} from "./process-manager/triggerSettlementIntentHandlers";
-import {
-  logOverflowIntentSchema,
-  notifyDigestIntentSchema,
-  persistMatchIntentSchema,
-  TRIGGER_SETTLEMENT_INTENT_TYPES,
-} from "./process-manager/triggerSettlementProcess.types";
-import {
-  pruneSchema,
-  runWebhookDeliveryPrune,
-  WEBHOOK_DELIVERY_PRUNE_INTERVAL_MS,
+  WEBHOOK_DELIVERY_PRUNE_PROCESS_NAME,
   type WebhookDeliveryPruneDeps,
-  type WebhookDeliveryPruneState,
-  webhookDeliveryPruneWake,
+  webhookDeliveryPrunePM,
 } from "./process-manager/webhookDeliveryPrune.process";
-import {
-  TRIGGER_MATCH_COALESCE_MAX_BATCH,
-  TRIGGER_MATCH_RECORDED_EVENT_TYPE,
-} from "./schemas/constants";
+import { TRIGGER_MATCH_COALESCE_MAX_BATCH } from "./schemas/constants";
 import type { AutomationEvent } from "./schemas/events";
-
-const logger = createLogger("langwatch:triggers:automations-pipeline");
-
-/** triggerSettlement is keyed per-trigger (aggregateType "trigger") and only
- *  wakes when it has pending matches, so — unlike graphAlertSweep/
- *  webhookDeliveryPrune — it has no singleton schedule of its own to hang
- *  outbox retention off. Pruning it from its own onWake would fire a global
- *  cross-tenant delete from every single trigger's wake (a thundering herd),
- *  so instead we piggyback on webhookDeliveryPrune's existing daily wake —
- *  the same singleton-PM retention mechanism sweep/prune already use for
- *  themselves — to also prune triggerSettlement's dispatched outbox rows,
- *  the highest-volume PM in this pipeline. */
-const TRIGGER_SETTLEMENT_OUTBOX_RETENTION_MS = 24 * 60 * 60 * 1000;
-
-function runWebhookDeliveryPruneWithTriggerSettlementRetention(
-  deps: WebhookDeliveryPruneDeps,
-) {
-  const pruneWebhookDeliveries = runWebhookDeliveryPrune(deps);
-  return async (): Promise<void> => {
-    await pruneWebhookDeliveries();
-    const startedAt = (deps.now ?? Date.now)();
-    try {
-      await deps.deleteDispatchedBefore({
-        processName: TRIGGER_SETTLEMENT_PROCESS_NAME,
-        before: startedAt - TRIGGER_SETTLEMENT_OUTBOX_RETENTION_MS,
-      });
-    } catch (error) {
-      logger.warn(
-        toSafeFailureDiagnostic(error),
-        "triggerSettlement outbox retention failed",
-      );
-    }
-  };
-}
 
 /** Only the executor dependencies are injected — the process-manager
  *  topology itself (states, intents, evolve/wake handlers, outbox tuning)
- *  is defined inline below, ADR-052 "Approved builder API". */
+ *  is defined by the `*PM` factory beside each process module, ADR-052
+ *  "Approved builder API" and ADR-082 Rule 1. */
 export interface AutomationsPipelineDeps {
   dispatch: TriggerSettlementDispatchDeps;
   sweep: GraphAlertSweepDeps;
@@ -90,126 +29,31 @@ export interface AutomationsPipelineDeps {
 }
 
 export function createAutomationsPipeline(deps: AutomationsPipelineDeps) {
-  return definePipeline<AutomationEvent>()
-    .withName("automations")
-    .withAggregateType("trigger")
-    .withCommand("recordTriggerMatch", RecordTriggerMatchCommand, {
-      serializeByAggregate: true,
-      // ADR-066 pillar 2: a hot trigger appends one match per trace. Coalesce a
-      // backed-up trigger's matches into one multi-row insert instead of one
-      // tiny insert per match.
-      coalesceMaxBatch: TRIGGER_MATCH_COALESCE_MAX_BATCH,
-    })
-    .withProcessManager("triggerSettlement", (pm) =>
-      pm
-        .state<SettlementState>(INITIAL_SETTLEMENT_STATE)
-        .intent(
-          TRIGGER_SETTLEMENT_INTENT_TYPES.NOTIFY_DIGEST,
-          notifyDigestIntentSchema,
-          createNotifyDigestHandler(deps.dispatch),
-        )
-        .intent(
-          TRIGGER_SETTLEMENT_INTENT_TYPES.PERSIST_MATCH,
-          persistMatchIntentSchema,
-          createPersistMatchHandler(deps.dispatch),
-        )
-        .intent(
-          TRIGGER_SETTLEMENT_INTENT_TYPES.LOG_OVERFLOW,
-          logOverflowIntentSchema,
-          createLogOverflowHandler(),
-        )
-        .on(TRIGGER_MATCH_RECORDED_EVENT_TYPE, (state, data, ctx) => {
-          // Schedule from max(at, now), never `at` alone — see `now`'s docblock
-          // on EventContext. A lagged match otherwise settles on a boundary
-          // already in the past, and `computeScheduledFor` returns a due time
-          // behind the present, so every trace flushes as its own digest during
-          // exactly the backlog the coalescing exists for.
-          const handledAt = Math.max(ctx.at, ctx.now);
-          const { state: nextState, flushed } = addPending(state, data, handledAt);
-          return {
-            state: nextState,
-            // Cap hit: the oldest matches dispatch NOW instead of being
-            // discarded — degraded batching under extreme load, never loss.
-            intents:
-              flushed.length > 0
-                ? [
-                    ...flushed.map(({ traceId, match }) =>
-                      match.actionClass === "persist"
-                        ? ctx.intents.persistMatch(
-                            `persist:${traceId}:${match.settleWindowBucket}`,
-                            { triggerId: ctx.key, traceId },
-                          )
-                        : ctx.intents.notifyDigest(
-                            `digest:${match.dispatchDueAt}:${digestBatchKey([traceId])}`,
-                            {
-                              triggerId: ctx.key,
-                              traceIds: [traceId],
-                              boundary: match.dispatchDueAt,
-                            },
-                          ),
-                    ),
-                    ctx.intents.logOverflow(
-                      `overflow:${nextState.overflowFlushed}`,
-                      {
-                        triggerId: ctx.key,
-                        flushed: flushed.length,
-                        totalFlushed: nextState.overflowFlushed,
-                      },
-                    ),
-                  ]
-                : undefined,
-            nextWakeAt: settleBoundary(nextState),
-          };
-        })
-        .onWake((state, ctx) => {
-          // Same clamp as the match path: a wake delivered late must drain what
-          // is due NOW, not what was due when the wake was written.
-          const due = drainDue(state, Math.max(ctx.at, ctx.now));
-          return {
-            state: due.state,
-            intents: [
-              ...due.boundaries.map((boundary) =>
-                ctx.intents.notifyDigest(
-                  `digest:${boundary.key}:${digestBatchKey(boundary.traceIds)}`,
-                  {
-                    triggerId: ctx.key,
-                    traceIds: boundary.traceIds,
-                    boundary: boundary.key,
-                  },
-                ),
-              ),
-              ...due.settledMatches.map((match) =>
-                ctx.intents.persistMatch(
-                  `persist:${match.traceId}:${match.settleWindowBucket}`,
-                  {
-                    triggerId: ctx.key,
-                    traceId: match.traceId,
-                  },
-                ),
-              ),
-            ],
-            nextWakeAt: due.nextBoundary,
-          };
-        })
-        .outbox({ maxAttempts: 8, leaseDurationMs: 120_000 }),
-    )
-    .withProcessManager("graphAlertSweep", (pm) =>
-      pm
-        .state<GraphAlertSweepState>({ lastSweepAt: null })
-        .schedule({ everyMs: GRAPH_ALERT_SWEEP_INTERVAL_MS })
-        .onWake(graphAlertSweepWake)
-        .intent("evaluateGraph", sweepSchema, runGraphAlertSweep(deps.sweep)),
-    )
-    .withProcessManager("webhookDeliveryPrune", (pm) =>
-      pm
-        .state<WebhookDeliveryPruneState>({ lastPruneAt: null })
-        .schedule({ everyMs: WEBHOOK_DELIVERY_PRUNE_INTERVAL_MS })
-        .onWake(webhookDeliveryPruneWake)
-        .intent(
-          "prune",
-          pruneSchema,
-          runWebhookDeliveryPruneWithTriggerSettlementRetention(deps.prune),
-        ),
-    )
-    .build();
+  return (
+    definePipeline<AutomationEvent>()
+      .withName("automations")
+      .withAggregateType("trigger")
+      .withCommand("recordTriggerMatch", RecordTriggerMatchCommand, {
+        serializeByAggregate: true,
+        // ADR-066 pillar 2: a hot trigger appends one match per trace. Coalesce a
+        // backed-up trigger's matches into one multi-row insert instead of one
+        // tiny insert per match.
+        coalesceMaxBatch: TRIGGER_MATCH_COALESCE_MAX_BATCH,
+      })
+      .withProcessManager(
+        TRIGGER_SETTLEMENT_PROCESS_NAME,
+        triggerSettlementPM(deps.dispatch),
+      )
+      .withProcessManager(
+        GRAPH_ALERT_SWEEP_PROCESS_NAME,
+        graphAlertSweepPM(deps.sweep),
+      )
+      // Its daily wake also carries triggerSettlement's outbox retention, which
+      // has no singleton schedule of its own to hang it off.
+      .withProcessManager(
+        WEBHOOK_DELIVERY_PRUNE_PROCESS_NAME,
+        webhookDeliveryPrunePM(deps.prune),
+      )
+      .build()
+  );
 }

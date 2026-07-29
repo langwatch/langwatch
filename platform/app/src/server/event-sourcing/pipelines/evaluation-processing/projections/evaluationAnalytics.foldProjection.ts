@@ -65,7 +65,7 @@ import {
  * (`evaluationAnalytics.parity-vs-evaluation-run-state.unit.test.ts`)
  * locks this against drift.
  *
- * Re-fold safety (ADR-021/022): same state → same canonical projection →
+ * Re-fold safety (ADR-088/022): same state → same canonical projection →
  * same Version → ReplacingMergeTree collapses duplicates. No explicit
  * truncate, no settle, no signs.
  */
@@ -87,7 +87,7 @@ const evaluationAnalyticsEvents = [
  *
  *  2026-07-27 — the read-back columns of migration 00056 (the StartedAt /
  *  CompletedAt lifecycle operands) joined the projected row shape. That shape
- *  change is exactly what this stamp records (ADR-021/022), and the store's
+ *  change is exactly what this stamp records (ADR-088/022), and the store's
  *  read-back path uses it as the discriminator: a row carrying an OLDER version
  *  predates those columns, so its nulls cannot be told apart from a genuinely
  *  unstarted evaluation and it is treated as a store miss (see

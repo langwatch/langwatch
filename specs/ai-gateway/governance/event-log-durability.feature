@@ -54,13 +54,25 @@ Feature: Append-only event_log durability for governance ingestion
       And an erasure-audit-trail is recorded
       And the erasure procedure is described in the customer-facing compliance doc
 
-  Rule: folds and reads are rebuildable from event_log
+  Rule: derived reads are rebuildable from event_log
 
-    Scenario: a fold drift triggers rebuild
-      Given the governance_kpis fold has drifted (replication delay, CH outage, etc.)
+    # CORRECTION (2026-07-28): this rule does not hold for the two governance
+    # streams today. governance_kpis and governance_ocsf_events are written by
+    # reactors, and the projection router never dispatches a reactor on the
+    # replay path, so neither can be rebuilt from the log it derives from.
+    # ADR-075 (Class C) converts both to real projections and makes this rule
+    # true. Until then the scenario is @unimplemented — an auditor should be
+    # told the target state is not yet the current one.
+    #
+    # See specs/ai-gateway/governance/folds.feature for the full contract and
+    # dev/docs/adr/075-post-event-work-subscribers-and-process-managers.md.
+
+    @integration @unimplemented
+    Scenario: a drifted derived stream triggers rebuild
+      Given the governance_kpis stream has drifted (replication delay, CH outage, etc.)
       When operators trigger a rebuild
       Then the rebuild reads events from event_log for the affected aggregate
-      And produces identical fold state to a fresh write path
+      And produces state identical to a fresh write path
       And the read API resumes serving correct values without data loss
 
   Rule: cryptographic tamper-evidence is a deferred hardening layer

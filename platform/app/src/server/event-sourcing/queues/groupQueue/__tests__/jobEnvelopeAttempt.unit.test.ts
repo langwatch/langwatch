@@ -77,6 +77,7 @@ describe("job envelope retry attempt", () => {
 
     describe("when its attempt is read while the body is unreachable", () => {
       /** @scenario A retried job's attempt is readable without fetching its body */
+      /** @scenario "Exhausted-retry accounting reads only the envelope header" */
       it("reports the attempt from the message alone", async () => {
         const encoded = await offloaded(7);
 
@@ -90,6 +91,7 @@ describe("job envelope retry attempt", () => {
   describe("given a staged job carrying an attempt", () => {
     describe("when the queue advances that job to its next attempt", () => {
       /** @scenario Advancing a job's attempt leaves its payload bytes untouched */
+      /** @scenario "Retried jobs are re-staged as envelopes" */
       it("leaves the body bytes untouched", async () => {
         const encoded = await encodeGq2(jobData(3));
         const advanced = withJobAttempt({ value: encoded, attempt: 4 });

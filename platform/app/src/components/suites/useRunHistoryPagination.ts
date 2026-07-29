@@ -13,6 +13,8 @@ import { useSuiteRunFreshness } from "./useSuiteRunFreshness";
 type PageData = {
   runs: ScenarioRunData[];
   scenarioSetIds: Record<string, string>;
+  /** Per batch, how many runs it set out to queue. Absent for older batches. */
+  expectedCounts?: Record<string, number>;
   hasMore: boolean;
   nextCursor?: string;
 };
@@ -103,6 +105,14 @@ export function useRunHistoryPagination({
     return merged;
   }, [pages]);
 
+  const allExpectedCounts = useMemo(() => {
+    const merged: Record<string, number> = {};
+    for (const page of pages) {
+      Object.assign(merged, page.expectedCounts);
+    }
+    return merged;
+  }, [pages]);
+
   const hasMore =
     pages.length > 0 ? (pages[pages.length - 1]?.hasMore ?? false) : false;
 
@@ -116,6 +126,7 @@ export function useRunHistoryPagination({
   return {
     allRuns,
     allScenarioSetIds,
+    allExpectedCounts,
     hasMore,
     loadMore,
     isLoading: isLoading && pages.length === 0,

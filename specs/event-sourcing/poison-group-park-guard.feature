@@ -50,6 +50,7 @@ Feature: GroupQueue poison-group park guard
   Background:
     Given a GroupQueue with jobs routed through queue-manager facades
 
+  @integration
   Scenario: a group whose jobs repeatedly kill the worker is parked at claim
     Given a group whose staged job blocks the event loop until the process is killed
     And the group has accumulated claim strikes at or above the poison threshold
@@ -59,18 +60,21 @@ Feature: GroupQueue poison-group park guard
     And the staged job remains staged for operator inspection or replay
     And other groups continue to dispatch and process normally
 
+  @integration
   Scenario: claim strikes are cleared when processing survives
     Given a group whose job is claimed and processed to completion
     When the same group is claimed again later
     Then its claim strike count starts from zero
     And the group is not parked
 
+  @integration
   Scenario: a failing-but-not-crashing job does not accumulate claim strikes
     Given a group whose job throws an error on every attempt
     When the job exhausts its retry budget
     Then the group is parked by the existing exhausted-retries path
     And the claim strikes recorded for the group have been cleared on each surviving attempt
 
+  @integration
   Scenario: a group that fails on every attempt without draining is quarantined
     Given a group receiving a stream of fresh jobs that each fail on every attempt
     And no job in the group ever completes successfully
@@ -82,12 +86,14 @@ Feature: GroupQueue poison-group park guard
     And the group's failure streak is cleared as it is parked, so an operator's
       unblock gets a fresh run instead of re-quarantining on the next failure
 
+  @integration
   Scenario: a group's success clears its failure streak
     Given a group that has accumulated a failure streak below the quarantine threshold
     When one of the group's jobs completes successfully
     Then the group's failure streak is cleared
     And a later transient failure starts the streak from zero rather than compounding
 
+  @integration
   Scenario: the failure-streak quarantine is disabled by setting the threshold to 0
     Given the quarantine kill switch is set to 0
     And a group whose jobs fail on every attempt far beyond the former threshold
@@ -95,18 +101,21 @@ Feature: GroupQueue poison-group park guard
     Then the group is retried under the normal per-job budget instead of being quarantined
     And the group is never parked into the blocked set by the failure-streak guard
 
+  @integration
   Scenario: graceful shutdown mid-job does not count as a poison strike
     Given a group whose job is in flight when the worker begins a graceful shutdown
     When the shutdown drains or abandons the in-flight job with the event loop alive
     Then the group's claim strike is cleared
     And the group is dispatched normally after the worker restarts
 
+  @unimplemented
   Scenario: a claim made during a graceful shutdown records no strike
     Given a worker that has begun a graceful shutdown with jobs still queued
     When the worker claims one of those jobs while draining
     Then no claim strike is recorded for the job's group
     And a group already at the strike threshold is parked by the next boot's claim, not during the drain
 
+  @integration @unit
   Scenario: an oversized staged value is parked without being parsed
     Given a staged value whose serialized size exceeds the decode-side cap
     When a worker claims the group
@@ -114,6 +123,7 @@ Feature: GroupQueue poison-group park guard
     And the stored group error names the observed size and the cap
     And the worker's event loop remains responsive throughout
 
+  @integration
   Scenario: an oversized coalesced sibling parks the group without losing the batch
     Given a group whose dispatched job is small but a staged sibling exceeds the decode-side cap
     When a worker claims the group and coalesces a batch
@@ -122,6 +132,7 @@ Feature: GroupQueue poison-group park guard
     And when the oversized sibling's own turn comes, the group is moved to the blocked set without JSON-parsing it
     And the stored group error explains why it was parked
 
+  @integration
   Scenario: the poison guard is disabled by setting the strike threshold to 0
     Given the strike-threshold kill switch is set to 0
     And a group has accumulated claim strikes at or above the former poison threshold
@@ -129,24 +140,28 @@ Feature: GroupQueue poison-group park guard
     Then the group is dispatched and processed instead of being parked
     And no claim strike is recorded or enforced for the group
 
+  @unit
   Scenario: a compressed staged value that would decompress past the cap is parked
     Given a staged envelope whose gzip body would inflate beyond the decode-side cap
     When a worker claims the group
     Then decompression stops at the bound instead of materializing the full value
     And the group is moved to the blocked set
 
+  @integration
   Scenario: a parked poison group can be unblocked by an operator
     Given a group parked by the poison guard
     When an operator unblocks the group via the ops surface
     Then its claim strikes are reset
     And the group returns to normal dispatch
 
+  @integration
   Scenario: draining a parked poison group resets its claim strikes
     Given a group parked by the poison guard
     When an operator drains the group via the ops surface
     Then its claim strikes are reset
     And a new job arriving under the same group id is dispatched normally
 
+  @integration
   Scenario: moving a parked poison group to the dead-letter queue resets its claim strikes
     Given a group parked by the poison guard
     When an operator moves the group to the dead-letter queue via the ops surface

@@ -384,7 +384,7 @@ end
 `;
 
 // Reads routing metadata (pipelineName, jobType, jobName) from a stored job
-// value. Envelope values (ADR-026/029, "GQ<v>|<headerLen>|<headerJson><body>")
+// value. Envelope values (ADR-090/029, "GQ<v>|<headerLen>|<headerJson><body>")
 // expose it in the tiny header so the payload body is never decoded on Redis's
 // thread; legacy bare-JSON values fall back to a full decode. GQ1 and GQ2 share
 // the header layout (p/t/n routing fields), so one parse covers both — a

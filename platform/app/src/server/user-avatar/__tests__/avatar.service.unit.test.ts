@@ -27,6 +27,7 @@ function makeService({
 describe("UserAvatarService", () => {
   describe("setAvatar", () => {
     describe("given a valid image and organization", () => {
+      /** @scenario "Uploading a photo stores it and sets it as the user's avatar" */
       it("stores the bytes under the user's personal project tagged as a user avatar", async () => {
         const { service, storeAvatarBytes, ensureWorkspaceProject } =
           makeService({ projectId: "proj_personal" });
@@ -52,6 +53,7 @@ describe("UserAvatarService", () => {
         );
       });
 
+      /** @scenario "Uploading a photo stores it and sets it as the user's avatar" */
       it("writes the serve URL to User.image and returns it", async () => {
         const { service, userUpdate } = makeService({
           projectId: "proj_personal",
@@ -105,6 +107,7 @@ describe("UserAvatarService", () => {
 
   describe("removeAvatar", () => {
     describe("given a user with an avatar", () => {
+      /** @scenario "Removing the photo clears the uploaded avatar" */
       it("clears User.image", async () => {
         const { service, userUpdate } = makeService();
 

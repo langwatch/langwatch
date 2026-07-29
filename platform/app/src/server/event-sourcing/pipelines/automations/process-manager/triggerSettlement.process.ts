@@ -131,3 +131,111 @@ export function drainDue(state: SettlementState, at: number) {
     nextBoundary: nextWakeFrom(nextState),
   };
 }
+
+/**
+ * The `triggerSettlement` process-manager topology, exported standalone so the
+ * pipeline mounts one expression of it and tests can build the exact definition
+ * the runtime runs. `automations/pipeline.ts` mounts it as
+ * `.withProcessManager(TRIGGER_SETTLEMENT_PROCESS_NAME,
+ * triggerSettlementPM(deps.dispatch))`.
+ */
+export function triggerSettlementPM(
+  dispatch: TriggerSettlementDispatchDeps,
+): ProcessManagerApplier<AutomationEvent> {
+  return (pm) =>
+    pm
+      .state<SettlementState>(INITIAL_SETTLEMENT_STATE)
+      .intent(
+        TRIGGER_SETTLEMENT_INTENT_TYPES.NOTIFY_DIGEST,
+        notifyDigestIntentSchema,
+        createNotifyDigestHandler(dispatch),
+      )
+      .intent(
+        TRIGGER_SETTLEMENT_INTENT_TYPES.PERSIST_MATCH,
+        persistMatchIntentSchema,
+        createPersistMatchHandler(dispatch),
+      )
+      .intent(
+        TRIGGER_SETTLEMENT_INTENT_TYPES.LOG_OVERFLOW,
+        logOverflowIntentSchema,
+        createLogOverflowHandler(),
+      )
+      .on(TRIGGER_MATCH_RECORDED_EVENT_TYPE, (state, data, ctx) => {
+        // Schedule from max(at, now), never `at` alone — see `now`'s docblock
+        // on EventContext. A lagged match otherwise settles on a boundary
+        // already in the past, and `computeScheduledFor` returns a due time
+        // behind the present, so every trace flushes as its own digest during
+        // exactly the backlog the coalescing exists for.
+        const handledAt = Math.max(ctx.at, ctx.now);
+        const { state: nextState, flushed } = addPending(
+          state,
+          data,
+          handledAt,
+        );
+        return {
+          state: nextState,
+          // Cap hit: the oldest matches dispatch NOW instead of being
+          // discarded — degraded batching under extreme load, never loss.
+          intents:
+            flushed.length > 0
+              ? [
+                  ...flushed.map(({ traceId, match }) =>
+                    match.actionClass === "persist"
+                      ? ctx.intents.persistMatch(
+                          `persist:${traceId}:${match.settleWindowBucket}`,
+                          { triggerId: ctx.key, traceId },
+                        )
+                      : ctx.intents.notifyDigest(
+                          `digest:${match.dispatchDueAt}:${digestBatchKey([traceId])}`,
+                          {
+                            triggerId: ctx.key,
+                            traceIds: [traceId],
+                            boundary: match.dispatchDueAt,
+                          },
+                        ),
+                  ),
+                  ctx.intents.logOverflow(
+                    `overflow:${nextState.overflowFlushed}`,
+                    {
+                      triggerId: ctx.key,
+                      flushed: flushed.length,
+                      totalFlushed: nextState.overflowFlushed,
+                    },
+                  ),
+                ]
+              : undefined,
+          nextWakeAt: settleBoundary(nextState),
+        };
+      })
+      .onWake((state, ctx) => {
+        // Same clamp as the match path: a wake delivered late must drain what
+        // is due NOW, not what was due when the wake was written.
+        const due = drainDue(state, Math.max(ctx.at, ctx.now));
+        return {
+          state: due.state,
+          intents: [
+            ...due.boundaries.map((boundary) =>
+              ctx.intents.notifyDigest(
+                `digest:${boundary.key}:${digestBatchKey(boundary.traceIds)}`,
+                {
+                  triggerId: ctx.key,
+                  traceIds: boundary.traceIds,
+                  boundary: boundary.key,
+                },
+              ),
+            ),
+            ...due.settledMatches.map((match) =>
+              ctx.intents.persistMatch(
+                `persist:${match.traceId}:${match.settleWindowBucket}`,
+                {
+                  triggerId: ctx.key,
+                  traceId: match.traceId,
+                },
+              ),
+            ),
+          ],
+          nextWakeAt: due.nextBoundary,
+        };
+      })
+      .outbox({ maxAttempts: 8, leaseDurationMs: 120_000 });
+}

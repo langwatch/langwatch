@@ -105,6 +105,7 @@ function makeTraceSummary(
 describe("ComputeRunMetricsCommand", () => {
   describe("given a run with a single measurable trace", () => {
     describe("when the trace has a cost and role-bearing spans", () => {
+      /** @scenario "A measured run records one event for the whole run" */
       it("emits one metrics_recorded event carrying the aggregate", async () => {
         const deps = makeDeps({
           traceSummaryStore: {
@@ -136,6 +137,7 @@ describe("ComputeRunMetricsCommand", () => {
         });
       });
 
+      /** @scenario "Each trace is measured within its own partition" */
       it("passes the summary's partition hint and fold watermark to the derivation", async () => {
         const deps = makeDeps({
           traceSummaryStore: {
@@ -164,6 +166,7 @@ describe("ComputeRunMetricsCommand", () => {
     });
 
     describe("when the trace has role latency but no cost", () => {
+      /** @scenario "A run with latency but nothing priced records the latency and no cost" */
       it("records the latency with a null total cost", async () => {
         const deps = makeDeps({
           traceSummaryStore: {
@@ -192,6 +195,7 @@ describe("ComputeRunMetricsCommand", () => {
     });
 
     describe("when no trace summary exists yet", () => {
+      /** @scenario "Role metrics are derived even when the trace summary has not landed" */
       it("still derives role metrics from the stored spans", async () => {
         const deps = makeDeps({
           deriveScenarioRoleMetrics: vi.fn().mockResolvedValue({
@@ -236,6 +240,7 @@ describe("ComputeRunMetricsCommand", () => {
     };
 
     describe("when each trace contributes cost and latency", () => {
+      /** @scenario "A run's cost is the sum across all of its traces" */
       it("sums the cost and keeps one array entry per trace", async () => {
         const deps = makeDeps({
           simulationRunStore: runStoreOf(
@@ -265,6 +270,7 @@ describe("ComputeRunMetricsCommand", () => {
         });
       });
 
+      /** @scenario "Aggregated role values follow the run's trace order, not the order the reads finished" */
       it("orders the aggregated arrays by the run's traceIds, not by read completion", async () => {
         const delays: Record<string, number> = { "trace-1": 20, "trace-2": 0 };
         const costs: Record<string, number> = { "trace-1": 1, "trace-2": 2 };
@@ -304,6 +310,7 @@ describe("ComputeRunMetricsCommand", () => {
 
   describe("given the run's traces are read at measure time", () => {
     describe("when a trace landed after the run finished", () => {
+      /** @scenario "A trace that arrived after the run finished is still measured" */
       it("measures it too, because the trace list comes from the stored run", async () => {
         const deps = makeDeps({
           simulationRunStore: runStoreOf(
@@ -331,6 +338,7 @@ describe("ComputeRunMetricsCommand", () => {
 
   describe("given nothing measurable came back", () => {
     describe("when no trace reports a cost and no span carries a role", () => {
+      /** @scenario "A run that cannot be measured keeps the metrics it already shows" */
       it("emits no event rather than blanking the run's stored metrics", async () => {
         const deps = makeDeps({
           traceSummaryStore: {
@@ -350,6 +358,7 @@ describe("ComputeRunMetricsCommand", () => {
     });
 
     describe("when the run produced no traces at all", () => {
+      /** @scenario "A run with no traces is not measured" */
       it("reads no traces and emits nothing", async () => {
         const deps = makeDeps({
           simulationRunStore: runStoreOf(makeRun({ TraceIds: [] })),
@@ -366,6 +375,7 @@ describe("ComputeRunMetricsCommand", () => {
     });
 
     describe("when nothing has been folded for the run", () => {
+      /** @scenario "A run with nothing folded for it is not measured" */
       it("emits nothing", async () => {
         const deps = makeDeps({ simulationRunStore: runStoreOf(null) });
 
@@ -381,6 +391,7 @@ describe("ComputeRunMetricsCommand", () => {
 
   describe("given the run was deleted during the settle period", () => {
     describe("when the measurement runs", () => {
+      /** @scenario "A run deleted during the settle period is never measured" */
       it("spends no reads and emits nothing", async () => {
         const deps = makeDeps({
           simulationRunStore: runStoreOf(makeRun({ ArchivedAt: 9_999 })),
@@ -399,6 +410,7 @@ describe("ComputeRunMetricsCommand", () => {
 
   describe("given a trace read fails", () => {
     describe("when the derivation rejects", () => {
+      /** @scenario "A failed trace read retries rather than recording a partial run" */
       it("propagates so the queue retries instead of recording a partial run", async () => {
         const deps = makeDeps({
           deriveScenarioRoleMetrics: vi
@@ -428,6 +440,7 @@ describe("ComputeRunMetricsCommand", () => {
     }
 
     describe("when both measurements produce the same values", () => {
+      /** @scenario "Measuring the same run twice with the same answer records it once" */
       it("reuses the idempotency key so the second collapses onto the first", async () => {
         const first = await new ComputeRunMetricsCommand(
           depsProducing(0.003),
@@ -441,6 +454,7 @@ describe("ComputeRunMetricsCommand", () => {
     });
 
     describe("when the second measurement corrects the first", () => {
+      /** @scenario "A corrected measurement replaces the earlier one" */
       it("takes a different idempotency key so the correction is not discarded", async () => {
         const first = await new ComputeRunMetricsCommand(
           depsProducing(0),
@@ -454,6 +468,7 @@ describe("ComputeRunMetricsCommand", () => {
     });
 
     describe("when the same values arrive with role keys in a different order", () => {
+      /** @scenario "The same answer with roles in a different order is the same answer" */
       it("fingerprints them alike", async () => {
         const build = (roleCosts: Record<string, number>) =>
           new ComputeRunMetricsCommand(

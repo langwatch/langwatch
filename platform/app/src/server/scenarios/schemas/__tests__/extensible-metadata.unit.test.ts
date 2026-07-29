@@ -201,6 +201,7 @@ describe("extensible scenario metadata", () => {
     };
 
     describe("when scenarioSetId is an empty string", () => {
+      /** @scenario "scenarioSetId is empty string" */
       it("coerces to 'default' at schema validation", () => {
         const event = { ...validEvent, scenarioSetId: "" };
 
@@ -212,6 +213,7 @@ describe("extensible scenario metadata", () => {
         }
       });
 
+      /** @scenario "scenarioSetId is empty string" */
       it("coerces to 'default' in the individual run started schema", () => {
         const event = { ...validEvent, scenarioSetId: "" };
 
@@ -225,6 +227,7 @@ describe("extensible scenario metadata", () => {
     });
 
     describe("when scenarioSetId is omitted", () => {
+      /** @scenario "scenarioSetId omitted from event" */
       it("defaults to 'default'", () => {
         const event = { ...validEvent };
 
@@ -238,6 +241,7 @@ describe("extensible scenario metadata", () => {
     });
 
     describe("when scenarioSetId is a valid non-empty string", () => {
+      /** @scenario "scenarioSetId is a valid string" */
       it("preserves the value", () => {
         const event = { ...validEvent, scenarioSetId: "my-set" };
 
@@ -251,6 +255,7 @@ describe("extensible scenario metadata", () => {
     });
 
     describe("when MESSAGE_SNAPSHOT event omits scenarioSetId", () => {
+      /** @scenario "MESSAGE_SNAPSHOT event omits scenarioSetId" */
       it("defaults to 'default'", () => {
         const result = scenarioMessageSnapshotSchema.safeParse({
           type: ScenarioEventType.MESSAGE_SNAPSHOT,

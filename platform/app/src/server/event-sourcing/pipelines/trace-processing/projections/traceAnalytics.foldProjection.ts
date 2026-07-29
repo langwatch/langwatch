@@ -110,7 +110,7 @@ import {
  * jobs is what wrote a log-only trace into partition 196952 with an
  * already-expired TTL deadline.
  *
- * Re-fold safety (ADR-021/022): a re-fold produces the same canonical state,
+ * Re-fold safety (ADR-088/022): a re-fold produces the same canonical state,
  * written with a later UpdatedAt — the LWW column readers dedup on. Note the
  * ENGINE only physically collapses rows sharing the full sort key
  * `(TenantId, OccurredAt, TraceId)`. Freezing the anchor is what lets versions
@@ -151,7 +151,7 @@ const traceAnalyticsEvents = [
  *  2026-07-27 — the read-back columns of migration 00056 (span count,
  *  annotation ids, the four name-resolution fields, the checkpoint) joined the
  *  projected row shape. That shape change is exactly what this stamp records
- *  (ADR-021/022), and the store's read-back path uses it as the discriminator:
+ *  (ADR-088/022), and the store's read-back path uses it as the discriminator:
  *  a row carrying an OLDER version predates those columns, so its defaults
  *  cannot be told apart from real zeroes and it is treated as a store miss
  *  (see `TraceAnalyticsStore.getWithApplied`).

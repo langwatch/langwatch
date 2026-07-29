@@ -9,17 +9,18 @@
  */
 
 import { Box, Button, HStack, Spinner, Text } from "@chakra-ui/react";
+import { Dialog } from "~/components/ui/dialog";
+import { Tooltip } from "~/components/ui/tooltip";
 import { ChevronDown, ChevronRight, Square } from "lucide-react";
 import { useMemo, useState } from "react";
-import { Dialog } from "~/components/ui/dialog";
 import { useNow } from "~/hooks/useNow";
-import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
-import { RunMetricsSummary } from "./RunMetricsSummary";
 import type { BatchRun, BatchRunSummary } from "./run-history-transforms";
 import { computeIterationMap } from "./run-history-transforms";
 import { ScenarioRunContent } from "./ScenarioRunContent";
+import { RunMetricsSummary } from "./RunMetricsSummary";
 import { isCancellableStatus } from "./useCancelScenarioRun";
+import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import type { ViewMode } from "./useRunHistoryStore";
 
 type RunRowLoadingProps = {
@@ -35,7 +36,6 @@ type RunRowDataProps = {
   onToggle: () => void;
   resolveTargetName: (scenarioRun: ScenarioRunData) => string | null;
   onScenarioRunClick: (scenarioRun: ScenarioRunData) => void;
-  expectedJobCount?: number;
   suiteName?: string;
   viewMode?: ViewMode;
   onCancelRun?: (scenarioRun: ScenarioRunData) => void;
@@ -57,14 +57,7 @@ export function RunRow(props: RunRowProps) {
 function RunRowLoading({ suiteName }: { suiteName?: string }) {
   return (
     <Box>
-      <Box
-        padding={2}
-        paddingBottom={0}
-        width="full"
-        position="sticky"
-        top={0}
-        zIndex={20}
-      >
+      <Box padding={2} paddingBottom={0} width="full" position="sticky" top={0} zIndex={20}>
         <HStack
           width="full"
           paddingX={4}
@@ -79,19 +72,10 @@ function RunRowLoading({ suiteName }: { suiteName?: string }) {
           borderRadius="lg"
           boxShadow="xs"
         >
-          <Spinner
-            size="xs"
-            color="fg.muted"
-            css={{ flexShrink: 0, height: "14px", width: "14px" }}
-          />
+          <Spinner size="xs" color="fg.muted" css={{ flexShrink: 0, height: "14px", width: "14px" }} />
           {suiteName && (
             <>
-              <Text
-                fontSize="sm"
-                fontWeight="medium"
-                color="fg.default"
-                flexShrink={0}
-              >
+              <Text fontSize="sm" fontWeight="medium" color="fg.default" flexShrink={0}>
                 {suiteName}
               </Text>
               <Text fontSize="sm" color="fg.muted" flexShrink={0}>
@@ -104,15 +88,8 @@ function RunRowLoading({ suiteName }: { suiteName?: string }) {
           </Text>
           <Box flex={1} />
           {/* Invisible spacer matching RunMetricsSummary pill height */}
-          <Box
-            paddingY={1}
-            paddingX={2}
-            borderRadius="lg"
-            border="1px solid transparent"
-          >
-            <Text fontSize="12px" visibility="hidden">
-              &nbsp;
-            </Text>
+          <Box paddingY={1} paddingX={2} borderRadius="lg" border="1px solid transparent">
+            <Text fontSize="12px" visibility="hidden">&nbsp;</Text>
           </Box>
         </HStack>
       </Box>
@@ -128,7 +105,6 @@ function RunRowData({
   onToggle,
   resolveTargetName,
   onScenarioRunClick,
-  expectedJobCount,
   suiteName,
   viewMode = "grid",
   onCancelRun,
@@ -147,9 +123,7 @@ function RunRowData({
   );
 
   const cancellableCount = useMemo(
-    () =>
-      batchRun.scenarioRuns.filter((run) => isCancellableStatus(run.status))
-        .length,
+    () => batchRun.scenarioRuns.filter((run) => isCancellableStatus(run.status)).length,
     [batchRun.scenarioRuns],
   );
   const hasCancellableRuns = cancellableCount > 0;
@@ -157,27 +131,16 @@ function RunRowData({
   return (
     <Box
       data-batch-id={batchRun.batchRunId}
-      css={
-        isHighlighted
-          ? {
-              "@keyframes yellowFlash": {
-                "0%": { backgroundColor: "rgba(234, 179, 8, 0.3)" },
-                "100%": { backgroundColor: "transparent" },
-              },
-              animation: "yellowFlash 2s ease-out",
-            }
-          : undefined
-      }
+      css={isHighlighted ? {
+        "@keyframes yellowFlash": {
+          "0%": { backgroundColor: "rgba(234, 179, 8, 0.3)" },
+          "100%": { backgroundColor: "transparent" },
+        },
+        animation: "yellowFlash 2s ease-out",
+      } : undefined}
     >
       {/* Run header - clickable to expand/collapse, sticky within scroll container */}
-      <Box
-        padding={2}
-        paddingBottom={0}
-        width="full"
-        position="sticky"
-        top={0}
-        zIndex={20}
-      >
+      <Box padding={2} paddingBottom={0} width="full" position="sticky" top={0} zIndex={20}>
         <HStack
           as="button"
           width="full"
@@ -207,12 +170,7 @@ function RunRowData({
           )}
           {suiteName && (
             <>
-              <Text
-                fontSize="sm"
-                fontWeight="medium"
-                color="fg.default"
-                flexShrink={0}
-              >
+              <Text fontSize="sm" fontWeight="medium" color="fg.default" flexShrink={0}>
                 {suiteName}
               </Text>
               <Text fontSize="sm" color="fg.muted" flexShrink={0}>
@@ -223,12 +181,21 @@ function RunRowData({
           <Text fontSize="xs" color="fg.subtle" flexShrink={0}>
             {timeAgo}
           </Text>
-          {expectedJobCount != null &&
-            summary.totalCount < expectedJobCount && (
-              <Text fontSize="xs" color="fg.muted" flexShrink={0}>
-                {summary.totalCount} of {expectedJobCount}
+          {summary.totalCount < summary.expectedCount && (
+            <Tooltip
+              content={`${summary.expectedCount - summary.totalCount} of the ${summary.expectedCount} scenarios in this run never started. Run the suite again to retry them.`}
+            >
+              <Text
+                as="span"
+                fontSize="xs"
+                color="yellow.fg"
+                flexShrink={0}
+                data-testid="batch-shortfall"
+              >
+                {summary.totalCount} of {summary.expectedCount} started
               </Text>
-            )}
+            </Tooltip>
+          )}
           {onCancelAll && hasCancellableRuns && (
             <HStack
               as="span"
@@ -245,20 +212,13 @@ function RunRowData({
               cursor={isCancellingBatch ? "default" : "pointer"}
               flexShrink={0}
               opacity={isCancellingBatch ? 0.6 : 1}
-              _hover={
-                isCancellingBatch
-                  ? undefined
-                  : { bg: "bg.muted", borderColor: "border.emphasized" }
-              }
+              _hover={isCancellingBatch ? undefined : { bg: "bg.muted", borderColor: "border.emphasized" }}
               onClick={(e: React.MouseEvent) => {
                 e.stopPropagation();
                 if (!isCancellingBatch) setIsCancelAllDialogOpen(true);
               }}
               onKeyDown={(e: React.KeyboardEvent) => {
-                if (
-                  !isCancellingBatch &&
-                  (e.key === "Enter" || e.key === " ")
-                ) {
+                if (!isCancellingBatch && (e.key === "Enter" || e.key === " ")) {
                   e.stopPropagation();
                   e.preventDefault();
                   setIsCancelAllDialogOpen(true);
@@ -331,8 +291,7 @@ function RunRowData({
                 }}
                 data-testid="confirm-cancel-all-button"
               >
-                Cancel {cancellableCount}{" "}
-                {cancellableCount === 1 ? "job" : "jobs"}
+                Cancel {cancellableCount} {cancellableCount === 1 ? "job" : "jobs"}
               </Button>
             </Dialog.Footer>
           </Dialog.Content>

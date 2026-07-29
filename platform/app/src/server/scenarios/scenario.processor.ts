@@ -58,7 +58,7 @@ import type {
   ChildProcessJobData,
   ScenarioExecutionResult,
 } from "./execution/types";
-import { CHILD_PROCESS } from "./scenario.constants";
+import { CHILD_PROCESS, SCENARIO_WORKER } from "./scenario.constants";
 import { ScenarioService } from "./scenario.service";
 import {
   type FailureEventParams,
@@ -167,6 +167,91 @@ export async function handleCancelledJobResult(
 }
 
 const logger = createLogger("langwatch:scenarios:processor");
+
+/**
+ * Kill every child this worker holds, and record a terminal state for each of
+ * their runs before the process leaves.
+ *
+ * A deploy is the most common way a run loses its worker, and the only one
+ * where the worker is still alive to say so. Killing the children and exiting
+ * leaves the write to a race — each child's own close handler tries to record
+ * the failure, but nothing waits for it — and when that race is lost the run
+ * sits non-terminal until the process manager's deadline fires against it,
+ * roughly half an hour later. Writing it here costs a second. This is the
+ * mitigation ADR-073 names in "Deleting the drain costs deploy latency".
+ *
+ * It does NOT replace the deadline, and is not written as though it could: a
+ * hard kill reaches none of this, `finishRun` is idempotent so a child that
+ * records its own death first simply wins, and anything this cannot finish
+ * inside `timeoutMs` is left to the deadline rather than allowed to hold the
+ * shutdown open past the pod's termination grace period.
+ *
+ * Runs still in their prefetch window are deliberately out of scope: nothing
+ * has been spawned for them, so their dispatch is still a leased outbox row
+ * that is redelivered and executed for real — a better outcome than recording
+ * a failure for a run the customer never got.
+ */
+export async function settleInFlightRuns({
+  pool,
+  deps,
+  timeoutMs = SCENARIO_WORKER.SHUTDOWN_SETTLE_TIMEOUT_MS,
+}: {
+  pool: ScenarioExecutionPool;
+  deps: ProcessorDependencies;
+  timeoutMs?: number;
+}): Promise<void> {
+  // Read before signalling: an exiting child removes itself from the registry,
+  // so a view taken after `drain()` is already losing entries.
+  const inFlight = pool.inFlightJobs;
+  pool.drain();
+  if (inFlight.length === 0) return;
+
+  logger.info(
+    { count: inFlight.length, timeoutMs },
+    "Shutting down: recording a terminal state for the runs this worker holds",
+  );
+
+  // Per-run isolation, so one rejected write cannot strand the others.
+  const recorded = Promise.all(
+    inFlight.map(async (jobData) => {
+      try {
+        if (pool.wasCancelled(jobData.scenarioRunId)) {
+          await handleCancelledJobResult(
+            jobData,
+            "Cancelled before execution finished",
+            deps,
+          );
+        } else {
+          await handleFailedJobResult(
+            jobData,
+            "Worker restarting — scenario run terminated before completion",
+            deps,
+          );
+        }
+      } catch (err) {
+        logger.warn(
+          { err, scenarioRunId: jobData.scenarioRunId },
+          "Could not record a terminal state on shutdown — leaving the run to its deadline",
+        );
+      }
+    }),
+  );
+
+  let budget: ReturnType<typeof setTimeout> | undefined;
+  await Promise.race([
+    recorded,
+    new Promise<void>((resolve) => {
+      budget = setTimeout(() => {
+        logger.warn(
+          { count: inFlight.length, timeoutMs },
+          "Shutdown budget spent before every run was recorded — the rest keep their deadlines",
+        );
+        resolve();
+      }, timeoutMs);
+    }),
+  ]);
+  if (budget) clearTimeout(budget);
+}
 
 /**
  * Creates a child logger with scenario job context bound.
@@ -474,8 +559,9 @@ async function spawnScenarioChildProcess(
       spawnMs: Date.now() - spawnStart,
     });
 
-    // Register in the pool so cancel broadcasts can find this child
-    pool.registerChild(jobData.scenarioRunId, child);
+    // Register in the pool so cancel broadcasts can find this child, and so a
+    // shutdown knows which run it is about to abandon.
+    pool.registerChild({ job: jobData, child });
 
     let stderr = "";
     let stdout = "";
@@ -626,7 +712,7 @@ export async function startScenarioProcessor(
   const unsubscribe = await subscribeToCancellations({
     subscriber,
     onCancel: (message: CancellationMessage) => {
-      const child = pool.runningChildren.get(message.scenarioRunId);
+      const child = pool.findChild(message.scenarioRunId);
       if (child) {
         logger.info(
           { scenarioRunId: message.scenarioRunId, pid: child.pid },
@@ -644,13 +730,15 @@ export async function startScenarioProcessor(
   // ClickHouse sweeps used to run at this point — one for runs orphaned at
   // QUEUED, one for runs orphaned at IN_PROGRESS — and because they ran only
   // at boot, the recovery bound was the deploy cadence: a run abandoned an
-  // hour after the last restart waited for the next one. A third mechanism, a
-  // graceful drain that emitted a terminal failure per in-flight run, has gone
-  // with them.
+  // hour after the last restart waited for the next one.
   //
   // The `scenarioExecution` process manager on the simulation pipeline holds
   // that guarantee continuously now. Every progress event re-arms its durable
   // deadline; when one fires, it writes the terminal state itself. See ADR-073.
+  // The graceful drain survives alongside it (`settleInFlightRuns`, on
+  // `close()` below) — not as the guarantee, but because waiting out a
+  // half-hour deadline for something the worker knew at SIGTERM is a bad deal
+  // on the one path that happens every deploy.
   //
   // ── CUTOVER AID — DELETE ONE RELEASE AFTER ADR-073 SHIPS ──────────────────
   //
@@ -666,6 +754,22 @@ export async function startScenarioProcessor(
   // So they are kept as a drain, not as the mechanism. Once a release has
   // passed with the process manager live, no run predating it can still be
   // open, this block and the three modules it calls are dead, and they go.
+  //
+  // BOOT-ONLY AND THRESHOLDED IS A DELIBERATE GAP, NOT AN OVERSIGHT. A run
+  // that went quiet less than `ORPHAN_QUEUED_THRESHOLD_MS` (30 min) before the
+  // cutover rollout is under the threshold at every boot in that rollout, so
+  // no sweep in it takes the run terminal, and the next sweep is the next
+  // restart. Three things make that acceptable rather than worth a repeating
+  // timer. The release being replaced settles its own in-flight runs on
+  // SIGTERM, and a rolling deploy is graceful, so the pods on the way out
+  // terminalise exactly this population themselves. What survives that is the
+  // hard-kill case, whose STORED status was already stuck before this change —
+  // the read-time derivation that showed it as STALLED wrote nothing and fired
+  // nothing downstream, so only the display regresses, and only until the next
+  // restart inside `LOOKBACK_MS`. And a timer would cost an unfiltered
+  // cross-tenant 7-day aggregation over `simulation_runs` per worker per tick,
+  // unsynchronised across pods — reinstating the periodic scan ADR-073 exists
+  // to retire, to cover one deploy's worth of exposure.
   const sharedClickHouseClient = getSharedClickHouseClient();
   if (sharedClickHouseClient) {
     const reconcilerNow = Date.now();
@@ -700,10 +804,13 @@ export async function startScenarioProcessor(
 
   return {
     close: async () => {
-      // Release the OS resources this worker holds. The runs whose children
-      // are killed here keep their armed deadlines, so each still reaches a
-      // terminal state without a shutdown path racing the exit to write it.
-      pool.drain();
+      // Kill the children this worker holds, then wait — within a bounded
+      // budget — for each of their runs to be recorded as finished. The armed
+      // deadline is what covers a hard kill and anything the budget does not
+      // reach; it is NOT a reason to skip this, because on the common path
+      // (a deploy) it means half an hour of a run displaying as live when the
+      // worker knew it was dead the moment it was asked to stop.
+      await settleInFlightRuns({ pool, deps });
       await unsubscribe().catch((err: unknown) =>
         logger.warn({ err }, "Error closing cancellation subscriber"),
       );

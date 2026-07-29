@@ -78,10 +78,12 @@ do not re-derive them.
    parse-accepted; derive `derived_from` from `ProviderKind`).
 7. **Personal usage.** `/me` card off `listByUser` (+ the
    `PersonalTracesEmptyState` / `IngestionTemplateInstallDrawer` diffs).
-8. **Retire legacy + aftercare.** Delete from main:
-   `claudeCodeSpanSync.reactor.ts`, `claude-code-log-to-span.ts`, their
-   pipeline registration + tests, `specs/traces-v2/claude-code-log-conversion.feature`,
-   and any `CLAUDE_CODE_LOG_RETENTION_DAYS` floor. Port dogfood matrix
+8. **Retire legacy + aftercare.** ✅ **the deletions are done** —
+   `claudeCodeSpanSync.reactor.ts` went with the reactor concept itself, and
+   `claude-code-log-to-span.ts`,
+   `specs/traces-v2/claude-code-log-conversion.feature` and the
+   `CLAUDE_CODE_LOG_RETENTION_DAYS` floor are all gone from main. Remaining:
+   port dogfood matrix
    (`dev/scripts/dogfood/coding-agent-matrix.sh`, `e2e/capture-coding-agent-matrix.ts`)
    and run it end-to-end. Release note: log-only installs must re-run
    `langwatch claude`. Close #5708, delete its branch.
@@ -165,8 +167,11 @@ files. Full dogfood only at slice 8.
 - old branch's `dev/docs/claude-code-*-plan.md` + draft ADR-041 (superseded
   by ADR-056 + this plan)
 
-### DELETE from main (slice 8)
-- `trace-processing/reactors/claudeCodeSpanSync.reactor.ts` (+ registration, tests)
-- `app-layer/traces/claude-code-log-to-span.ts`
-- `specs/traces-v2/claude-code-log-conversion.feature`
-- any remaining `CLAUDE_CODE_LOG_RETENTION_DAYS` floor
+### DELETE from main (slice 8) — ✅ all done
+- ~~`trace-processing/reactors/claudeCodeSpanSync.reactor.ts` (+ registration,
+  tests)~~ — removed with the whole `reactors/` directory by ADR-075, which
+  retired the reactor as a concept. This is why "No reactors in the new
+  pipeline" above is now a statement about main, not just about this plan.
+- ~~`app-layer/traces/claude-code-log-to-span.ts`~~
+- ~~`specs/traces-v2/claude-code-log-conversion.feature`~~
+- ~~any remaining `CLAUDE_CODE_LOG_RETENTION_DAYS` floor~~

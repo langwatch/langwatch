@@ -437,6 +437,7 @@ describe("simulation run fold — event ordering invariants", () => {
 
   // Specific production-observed orderings
   describe("when processing in production-observed orderings", () => {
+    /** @scenario "A measurement taken after the run finished leaves its status alone" */
     it("started → snapshot → finished → metrics (happy path)", async () => {
       const state = await processFold(
         [
@@ -465,6 +466,7 @@ describe("simulation run fold — event ordering invariants", () => {
       assertCorrectFinalState(state, "finished before snapshot");
     });
 
+    /** @scenario "A measurement that overtakes the lifecycle does not pre-empt it" */
     it("started → metrics → snapshot → finished (metrics ahead of the lifecycle)", async () => {
       const state = await processFold(
         [
@@ -483,6 +485,7 @@ describe("simulation run fold — event ordering invariants", () => {
   // A re-measure carries the whole aggregate, so it replaces rather than
   // compounds — the property the per-trace accumulator could not offer.
   describe("when the run is measured a second time", () => {
+    /** @scenario "A second measurement replaces the first rather than adding to it" */
     it("takes the later measurement's values", async () => {
       const state = await processFold(
         [
@@ -500,6 +503,7 @@ describe("simulation run fold — event ordering invariants", () => {
       expect(state.TotalCost, "later measurement wins").toBe(0.008);
     });
 
+    /** @scenario "Re-measuring does not compound the per-role values" */
     it("does not compound the earlier measurement's per-role arrays", async () => {
       const state = await processFold(
         [
@@ -522,6 +526,7 @@ describe("simulation run fold — event ordering invariants", () => {
 
   // Late-arriving lifecycle events are applied on top of the stored state
   describe("when started event arrives after finished (late delivery)", () => {
+    /** @scenario "A late start does not resurrect a run that already failed" */
     it("keeps the ERROR the finished event set", async () => {
       // Reproduces: queued processed → finished processed → started arrives late
       const state = await processFold(
@@ -543,6 +548,7 @@ describe("simulation run fold — event ordering invariants", () => {
       ).not.toBeNull();
     });
 
+    /** @scenario "A late start does not unsettle a run that already succeeded" */
     it("keeps the SUCCESS the finished event set", async () => {
       const state = await processFold(
         [
@@ -558,6 +564,7 @@ describe("simulation run fold — event ordering invariants", () => {
       expect(state.FinishedAt, "FinishedAt must be set").not.toBeNull();
     });
 
+    /** @scenario "A late start does not cost the run the details the other events carried" */
     it("preserves metadata from all events", async () => {
       const state = await processFold(
         [
@@ -581,6 +588,7 @@ describe("simulation run fold — event ordering invariants", () => {
     // it never constructs a cancelled run. That scenario is bound in
     // simulationRunState.foldProjection.unit.test.ts, where the fold's own
     // terminal-status tests live.
+    /** @scenario "A late queue event does not put a finished run back in the queue" */
     it("keeps the ERROR the finished event set instead of resurrecting QUEUED", async () => {
       const state = await processFold(
         [
@@ -604,6 +612,7 @@ describe("simulation run fold — event ordering invariants", () => {
   // arrival and not a replay: without it a run the user cancelled would read
   // back SUCCESS to billing, suite rollups and the run list.
   describe("when a late success is delivered before the cancel that preceded it", () => {
+    /** @scenario "A cancel delivered after the success it overrode still wins" */
     it("takes the cancel rather than keeping the success", async () => {
       const state = await processFold(
         [
@@ -689,6 +698,7 @@ describe("simulation run fold — event ordering invariants", () => {
     }
 
     describe("when an event that occurred before the checkpoint arrives", () => {
+      /** @scenario "A run measured under the retired per-trace event keeps its cost on replay" */
       it("keeps the cost on the row instead of rebuilding it as blank", async () => {
         const state = await deliverBackdated(createStartedEvent(1000));
 
@@ -702,6 +712,7 @@ describe("simulation run fold — event ordering invariants", () => {
       // Declining the replay is not declining the event: it is applied on top
       // of the state that was loaded, so a backdated cancel still outranks the
       // success already stored — and still does not cost the run its metrics.
+      /** @scenario "An event older than the checkpoint is still applied to the state that was loaded" */
       it("still applies the event on top of the state it loaded", async () => {
         const state = await deliverBackdated(
           createCancelledFinishedEvent(3000),
@@ -725,6 +736,7 @@ describe("simulation run fold — event ordering invariants", () => {
 
     const allPerms = permutations(events);
 
+    /** @scenario "Every arrival order of a run's lifecycle converges on the same result" */
     it.each(
       allPerms.map((perm, i) => ({
         name: `[${i}] ${perm.map(eventLabel).join(" → ")}`,

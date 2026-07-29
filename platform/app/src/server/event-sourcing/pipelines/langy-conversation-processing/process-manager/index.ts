@@ -9,6 +9,7 @@ export {
   handleMetadataUpdated,
   handleTitleGenerated,
   INITIAL_LANGY_PROCESS_STATE,
+  langyConversationPM,
 } from "./langyConversationProcess";
 export {
   LANGY_CONVERSATION_PROCESS_NAME,

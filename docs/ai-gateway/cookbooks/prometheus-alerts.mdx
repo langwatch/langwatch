@@ -86,8 +86,8 @@ groups:
             See /ai-gateway/streaming#usage-extraction-critical-for-streaming-budgets.
 
       # The gateway does not debit budgets. Cost rides the OTel span and the
-      # control plane's trace-fold reactor writes the ClickHouse ledger, so
-      # there is no gateway-side queue to alert on. The signal that
+      # control plane's budget-debit projection writes the ClickHouse ledger,
+      # so there is no gateway-side queue to alert on. The signal that
       # enforcement is actually firing is the block counter below.
       - alert: BudgetBlockSpike
         expr: |
@@ -124,7 +124,8 @@ groups:
       # Note: the registry carries no per-request cost metric, by design.
       # Cost anomalies are easier to derive from the ledger table in the
       # control-plane warehouse than from Prometheus, since cost attribution
-      # happens control-plane side when the trace-fold reactor folds the span.
+      # happens control-plane side when the budget-debit projection derives
+      # the ledger row from the span.
       # See /gateway/usage UI for the visual equivalent.
 
       # ─── Blocked-by-policy noise ────────────────────────────────────────

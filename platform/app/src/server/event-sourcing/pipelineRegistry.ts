@@ -72,7 +72,6 @@ import { TraceReadDerivationService } from "../app-layer/traces/trace-read-deriv
 import type { TraceSummaryService } from "../app-layer/traces/trace-summary.service";
 import type { TraceSummaryData } from "../app-layer/traces/types";
 import type { AutomationDispatchPorts } from "../event-sourcing/pipelines/automations/automationDispatch.adapter";
-import { createEvaluationAlertTriggerMatchSubscriber } from "../event-sourcing/pipelines/automations/subscribers/evaluationAlertTriggerMatch.subscriber";
 import { createGraphTriggerActivityHandler } from "../event-sourcing/pipelines/automations/subscribers/graphTriggerActivity.subscriber";
 import type { TopicClusteringRunPort } from "../event-sourcing/pipelines/topic-clustering-processing/process-manager";
 import { createScenarioExecutionDispatcher } from "../scenarios/execution/execution-dispatcher";
@@ -87,8 +86,6 @@ import { createAutomationsPipeline } from "./pipelines/automations/pipeline";
 import { createBillingReportingPipeline } from "./pipelines/billing-reporting/pipeline";
 import { createBlobMaintenancePipeline } from "./pipelines/blob-maintenance/pipeline";
 import { createCodingAgentProcessingPipeline } from "./pipelines/coding-agent-processing/pipeline";
-import { createCodingAgentSpanFactsDispatchSubscriber } from "./pipelines/coding-agent-processing/subscribers/codingAgentSpanFactsDispatch.subscriber";
-import { ExecuteEvaluationCommand } from "./pipelines/evaluation-processing/commands/executeEvaluation.command";
 import {
   createEvaluationProcessingPipeline,
   type EvaluationProcessingPipelineDeps,
@@ -336,9 +333,11 @@ export class PipelineRegistry {
     );
 
     const automationCommands = mapCommands(automationPipeline.commands);
-    // The committed trace summary, read by identity. Shared by the two
-    // trace-alert paths and by the evaluation trigger's dispatch, so all three
-    // read the same tier — the Redis-cached fold store, not ClickHouse.
+    // The committed trace summary, read by identity. The one contract for all
+    // three readers of it — the trace-alert subscriber, the evaluation-alert
+    // subscriber and the evaluation trigger's dispatch — so they cannot
+    // disagree about the tier (the cached fold store, not ClickHouse) and none
+    // of them holds a store it could write through.
     const readTraceSummary = ({
       tenantId,
       traceId,
@@ -356,23 +355,12 @@ export class PipelineRegistry {
 
     const evalPipeline = this.registerEvaluationPipeline({
       automations: {
-        triggerMatchSubscriber: createEvaluationAlertTriggerMatchSubscriber({
-          triggers: this.deps.triggers,
-          traceSummaryStore,
-          recordTriggerMatch: {
-            send: automationCommands.recordTriggerMatch,
-          },
-        }),
+        triggers: this.deps.triggers,
+        readTraceSummary,
         graphActivityHandler,
       },
     });
-    // Registered BEFORE the trace pipeline: its coding-agent span-facts
-    // dispatch subscriber is built here, out of the pipeline, and so closes
-    // over this pipeline's contribution command eagerly. Metric and log no
-    // longer care — they bind their dispatch through the command bus, which
-    // resolves at send time (ADR-082 §5).
     const codingAgentPipeline = this.registerCodingAgentPipeline();
-    const codingAgentCommands = mapCommands(codingAgentPipeline.commands);
     const metricPipeline = this.registerMetricPipeline();
     const logPipeline = this.registerLogPipeline();
     const { pipeline: tracePipeline } = this.registerTracePipeline({
@@ -389,13 +377,6 @@ export class PipelineRegistry {
         }),
         graphActivityHandler,
       },
-      codingAgentSubscribers: [
-        createCodingAgentSpanFactsDispatchSubscriber({
-          contributeSpanFacts: codingAgentCommands.contributeSpanFacts,
-          getNormalizedSpanById: (params) =>
-            this.deps.traces.spans.getNormalizedSpanById(params),
-        }),
-      ],
     });
     const { pipeline: simulationPipeline, scenarioExecutionHandle } =
       this.registerSimulationPipeline({
@@ -544,10 +525,10 @@ export class PipelineRegistry {
    * ADR-056: the session-aggregate pipeline. Contribution commands are its
    * write surface; the session fold and the (trace → session) map are its
    * projections. The dispatch subscribers that feed it mount on the source
-   * pipelines; metric and log reach it through the command bus, and trace's
-   * span-facts subscriber is still built here, closing over
-   * `contributeSpanFacts` eagerly — which is why this registration stays ahead
-   * of trace's.
+   * pipelines — trace, metric and log — and all three reach it through the
+   * command bus, which resolves at send time (ADR-082 §5). Nothing here closes
+   * over a contribution command eagerly any more, so where this call sits
+   * relative to those three registrations carries no meaning.
    */
   private registerCodingAgentPipeline() {
     return this.deps.eventSourcing.register(
@@ -580,57 +561,64 @@ export class PipelineRegistry {
   }: {
     automations: EvaluationProcessingPipelineDeps["automations"];
   }) {
-    const executeEvaluationCommand = new ExecuteEvaluationCommand({
-      monitors: this.deps.monitors,
-      spanStorage: this.deps.traces.spans,
-      traceEvents: this.deps.traces.spans,
-      evaluationExecution: this.deps.evaluations.execution,
-      costRecorder: this.deps.costRecorder,
-      azureSafetyEnvResolver: getAzureSafetyEnvFromProject,
-      // ADR-040: offload oversized evaluator inputs to durable object storage
-      // before the event is built. ON by default (this bounds the fat-payload
-      // class behind the 2026-07-10 outage); the SYSTEM flag
-      // ops_evaluation_payload_offload_disabled is the operator kill switch.
-      // A flag-store error keeps the DEFAULT (offload runs): the kill switch
-      // failing to read must not silently drop the protection. Storage errors
-      // are handled INSIDE offloadInputsIfOversized, which degrades to a
-      // bounded preview-only marker so the event stays lean even when S3 is
-      // down. The catch below is the wiring-level fail-open for unexpected
-      // errors only (service construction, serialization); there the inputs
-      // stay inline and the unconditional repository belt-and-braces cap
-      // keeps the ClickHouse row merge-safe.
-      offloadInputs: async ({ projectId, evaluationId, inputs }) => {
-        try {
-          let disabled = false;
+    // ADR-082 Rule 1: the command itself is constructed by the pipeline. What
+    // is assembled here is only what it runs on — the app-layer services this
+    // composition root owns, plus the two function ports below.
+    const executeEvaluation: EvaluationProcessingPipelineDeps["executeEvaluation"] =
+      {
+        monitors: this.deps.monitors,
+        spanStorage: this.deps.traces.spans,
+        traceEvents: this.deps.traces.spans,
+        evaluationExecution: this.deps.evaluations.execution,
+        costRecorder: this.deps.costRecorder,
+        azureSafetyEnvResolver: getAzureSafetyEnvFromProject,
+        // ADR-096: offload oversized evaluator inputs to durable object storage
+        // before the event is built. ON by default (this bounds the fat-payload
+        // class behind the 2026-07-10 outage); the SYSTEM flag
+        // ops_evaluation_payload_offload_disabled is the operator kill switch.
+        // A flag-store error keeps the DEFAULT (offload runs): the kill switch
+        // failing to read must not silently drop the protection. Storage errors
+        // are handled INSIDE offloadInputsIfOversized, which degrades to a
+        // bounded preview-only marker so the event stays lean even when S3 is
+        // down. The catch below is the wiring-level fail-open for unexpected
+        // errors only (service construction, serialization); there the inputs
+        // stay inline and the unconditional repository belt-and-braces cap
+        // keeps the ClickHouse row merge-safe.
+        offloadInputs: async ({ projectId, evaluationId, inputs }) => {
           try {
-            disabled = await featureFlagService.isEnabled(
-              "ops_evaluation_payload_offload_disabled",
-              { distinctId: "evaluation-inputs-offload", defaultValue: false },
-            );
-          } catch {
-            // Unreadable kill switch: stay on the default (offload enabled).
-          }
-          if (disabled) return inputs;
-          const { inputs: maybeOffloaded } = await offloadInputsIfOversized({
-            inputs,
-            projectId,
-            evaluationId,
-            storedObjects: createStoredObjectsService({ projectId }),
-          });
-          return maybeOffloaded;
-        } catch (error) {
-          createLogger("langwatch:evaluations:inputs-offload-fail-open").warn(
-            {
+            let disabled = false;
+            try {
+              disabled = await featureFlagService.isEnabled(
+                "ops_evaluation_payload_offload_disabled",
+                {
+                  distinctId: "evaluation-inputs-offload",
+                  defaultValue: false,
+                },
+              );
+            } catch {
+              // Unreadable kill switch: stay on the default (offload enabled).
+            }
+            if (disabled) return inputs;
+            const { inputs: maybeOffloaded } = await offloadInputsIfOversized({
+              inputs,
               projectId,
               evaluationId,
-              error: error instanceof Error ? error.message : String(error),
-            },
-            "Evaluation inputs offload gate failed; keeping inputs inline (fail-open)",
-          );
-          return inputs;
-        }
-      },
-    });
+              storedObjects: createStoredObjectsService({ projectId }),
+            });
+            return maybeOffloaded;
+          } catch (error) {
+            createLogger("langwatch:evaluations:inputs-offload-fail-open").warn(
+              {
+                projectId,
+                evaluationId,
+                error: error instanceof Error ? error.message : String(error),
+              },
+              "Evaluation inputs offload gate failed; keeping inputs inline (fail-open)",
+            );
+            return inputs;
+          }
+        },
+      };
 
     return this.deps.eventSourcing.register(
       createEvaluationProcessingPipeline({
@@ -652,7 +640,7 @@ export class PipelineRegistry {
           new EvaluationAnalyticsRollupAppendStore(
             this.deps.repositories.evaluationAnalyticsRollup,
           ),
-        executeEvaluationCommand,
+        executeEvaluation,
         commands: this.deps.eventSourcing.commandBus,
         isSaas: this.deps.isSaas,
         automations,
@@ -665,13 +653,11 @@ export class PipelineRegistry {
     traceSummaryStore,
     readTraceSummary,
     automations,
-    codingAgentSubscribers,
   }: {
     evalPipeline: ReturnType<PipelineRegistry["registerEvaluationPipeline"]>;
     traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
     readTraceSummary: EvaluationTriggerDispatchDeps["readTraceSummary"];
     automations: TraceProcessingPipelineDeps["automations"];
-    codingAgentSubscribers: TraceProcessingPipelineDeps["subscribers"];
   }) {
     const evalCommands = mapCommands(evalPipeline.commands);
 
@@ -725,6 +711,10 @@ export class PipelineRegistry {
         projects: this.deps.projects,
         bootstrapTopicClustering: (projectId) =>
           this.bootstrapTopicClustering.fn(projectId),
+        // ADR-069's claim-check for the coding-agent span-facts dispatch the
+        // pipeline mounts: the canonical span, read back by identity.
+        getNormalizedSpanById: (params) =>
+          this.deps.traces.spans.getNormalizedSpanById(params),
         // The dispatch reads the trace back at request time rather than
         // carrying it on the intent: everything a process holds is persisted
         // verbatim into its instance row and outbox (ADR-069).
@@ -756,7 +746,6 @@ export class PipelineRegistry {
         ),
         governanceKpisProjection,
         governanceOcsfEventsProjection,
-        subscribers: codingAgentSubscribers,
       }),
     );
 

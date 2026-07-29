@@ -12,6 +12,7 @@ Feature: Projection replay
   Background:
     Given a registered map projection "spanStorage" for aggregate type "trace"
 
+  @integration
   Scenario: Replaying a map projection rebuilds its records from history
     Given aggregates with existing event history
     When an operator starts a replay of the "spanStorage" projection
@@ -20,12 +21,14 @@ Feature: Projection replay
     And the projection's records are rewritten from the event history up to the cutoff
     And live processing for those aggregates resumes as soon as their batch is replayed
 
+  @unit
   Scenario: Live events at or before the cutoff are skipped during replay
     Given a replay of the "spanStorage" projection is in progress
     When a live event arrives that is at or before the replay cutoff
     Then the live handler does not write a record for that event
     And the replay produces the record for that event instead
 
+  @unit
   Scenario: Live events after the cutoff are deferred until the replay completes
     Given a replay of the "spanStorage" projection is in progress
     When a live event arrives that is after the replay cutoff
@@ -33,6 +36,7 @@ Feature: Projection replay
     And it is retried until the replay for its aggregate completes
     And it is then processed normally
 
+  @integration
   Scenario: Resuming an interrupted replay skips completed aggregates
     Given a replay of the "spanStorage" projection was interrupted partway through
     And some aggregates were already fully replayed
@@ -40,6 +44,7 @@ Feature: Projection replay
     Then aggregates that already completed are not replayed again
     And the remaining aggregates are replayed to completion
 
+  @integration
   Scenario: Replaying fold and map projections together
     Given a registered fold projection "traceSummary" for aggregate type "trace"
     When an operator starts a replay covering both "traceSummary" and "spanStorage"
@@ -47,6 +52,7 @@ Feature: Projection replay
     And live events for the affected aggregates are skipped or deferred for both projections
     And live processing for both projections resumes as soon as each batch is replayed
 
+  @integration
   Scenario: Only the batch being replayed pauses live processing
     Given a replay of the "spanStorage" projection spanning multiple batches
     When the replay works through its batches
@@ -54,6 +60,7 @@ Feature: Projection replay
     And live processing resumes between batches
     And live processing is never paused for the whole run at once
 
+  @integration
   Scenario: A batch failure resumes live processing
     Given a replay of the "spanStorage" projection is in progress
     When a batch fails partway through
@@ -61,12 +68,14 @@ Feature: Projection replay
     And live processing for the affected projections resumes
     And live events for the failed batch's aggregates are processed normally right away
 
+  @unit
   Scenario: Rebuilt records are written in bulk
     Given aggregates with existing event history across many traces
     When the replay rebuilds the "spanStorage" projection
     Then rebuilt records land in large batched writes per tenant
     And the rebuild does not wait on one write per trace
 
+  @unimplemented
   Scenario: A long replay keeps reporting progress until it finishes
     Given a replay is running for longer than its coordination lock's initial lifetime
     When the run continues past that lifetime

@@ -143,10 +143,6 @@ const presentations = {
     describe: () =>
       "Narrow the time range, add a filter, or select fewer fields.",
   },
-  time_range_too_wide: {
-    title: "Time range is too wide",
-    describe: () => "Pick a shorter range and try again.",
-  },
   filter_parse_error: {
     title: "This filter isn't valid",
     describe: () => "Check the syntax and try again.",

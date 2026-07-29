@@ -24,8 +24,9 @@ type ProviderRouter interface {
 }
 
 // BudgetChecker validates spending pre-flight. Cost recording is handled
-// by the trace-fold reactor on the control plane (folds OTel span usage
-// into the ClickHouse budget ledger), not on the gateway hot path.
+// by the gatewayBudgetDebits map projection on the control plane (derives
+// each request's spend from its own OTel span attributes and writes the
+// ClickHouse budget ledger), not on the gateway hot path.
 type BudgetChecker interface {
 	Precheck(ctx context.Context, bundle *domain.Bundle) (domain.BudgetDecision, error)
 }

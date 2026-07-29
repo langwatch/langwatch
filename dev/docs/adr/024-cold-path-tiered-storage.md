@@ -6,7 +6,7 @@
 
 ## Context
 
-ADR-022 stamps `_retention_days` on every row and lets ClickHouse-native TTL
+ADR-089 stamps `_retention_days` on every row and lets ClickHouse-native TTL
 drop expired rows at merge time. That covers the *deletion* half of retention.
 The *storage cost* half — what we pay to keep N days of data on hot SSD versus
 cheaper object storage — is a separate, operator-facing concern.
@@ -29,7 +29,7 @@ Three forces shape the cold path:
 ClickHouse already supports tiered storage natively (multi-volume storage
 policies + `TTL ... TO VOLUME ...`). The question is how to wire it into
 our chart, our image, and our reconciler so that it composes cleanly with
-ADR-022's row-level retention without forcing every deployment to pay for
+ADR-089's row-level retention without forcing every deployment to pay for
 S3.
 
 ## Decision
@@ -51,7 +51,7 @@ toDateTime(<coldCol>) + INTERVAL <hotDays> DAY TO VOLUME 'cold'
 The `local_primary` storage policy has two volumes — `hot` on local SSD,
 `cold` on an S3 object disk with a local SSD cache. Data ages hot → cold
 by time (cold-day count from env vars), then expires by `_retention_days`
-(per-row, from the ADR-022 cascade). The retention DELETE clause is the
+(per-row, from the ADR-089 cascade). The retention DELETE clause is the
 only enforcement of retention; the cold MOVE clause is a storage-cost
 optimization that can be enabled or disabled independently.
 
@@ -90,7 +90,7 @@ immediately — on 100 TB that's tens of thousands of mutations, one S3
 GET per cold part. We always pass `= 0` to stay in metadata-only mode.
 
 The only path that DOES scale with data size is the retroactive UPDATE
-(`ALTER TABLE … UPDATE _retention_days = N`) from ADR-022. That's
+(`ALTER TABLE … UPDATE _retention_days = N`) from ADR-089. That's
 user-triggered, gated by the concurrent-mutation guard, shows a
 parts-remaining countdown, and is cancelable. It never auto-fires on
 deploy.
@@ -117,7 +117,7 @@ TTL-only merges are scheduled by `merge_with_ttl_timeout` (CH default
 passing, not instantly. No app cron, no `DELETE FROM`, no per-part S3
 API call from us — CH owns the deletion path end-to-end.
 
-For retroactive shrink (e.g. 70d → 35d on day 60), see ADR-022 §
+For retroactive shrink (e.g. 70d → 35d on day 60), see ADR-089 §
 Retroactive. The mutation rewrites parts across all volumes, including
 cold ones. Cost: S3 GET + decompress + recompress + PUT per cold part.
 After the mutation finishes, the TTL DELETE re-evaluates on the next
@@ -274,7 +274,7 @@ plays out over hours, but throttled — not as a thundering herd.
 
 ## References
 
-- Related ADRs: ADR-022 (data retention, umbrella), ADR-023
+- Related ADRs: ADR-089 (data retention, umbrella), ADR-023
   (orphan-sweep reactor + chain — superseded), ADR-025 (orphan sweep removed)
 - Chart: `charts/clickhouse-serverless/{values.yaml,
   templates/statefulset.yaml, templates/_helpers.tpl}`

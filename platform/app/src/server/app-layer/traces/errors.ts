@@ -111,27 +111,13 @@ export class FilterFieldUnknownError extends HandledError {
   }
 }
 
-export class TimeRangeTooWideError extends HandledError {
-  declare readonly code: "time_range_too_wide";
-
-  constructor(maxDays: number) {
-    const base = remediation("time_range_too_wide");
-    super(
-      "time_range_too_wide",
-      `Maximum ${maxDays} days. Narrow time range.`,
-      {
-        httpStatus: 422,
-        meta: { maxDays },
-        tips: [
-          `Narrow the time range to ${maxDays} days or less`,
-          ...(base.tips ?? []),
-        ],
-        ...(base.docsUrl ? { docsUrl: base.docsUrl } : {}),
-      },
-    );
-    this.name = "TimeRangeTooWideError";
-  }
-}
+// No `TimeRangeTooWideError` here. Nothing in the product caps how wide a
+// query's time range may be — there is no max-days policy to quote, and
+// ADR-028 turned clamping the window down on purpose ("full hiding (clamping
+// the time window) kills the upsell"). A range too wide to SERVE is already
+// named where it actually fails: the ClickHouse error translator raises
+// `QueryMemoryExceededError` or `QueryTimeoutError`, whose copy is the same
+// advice a width guard would have given — narrow the range, add a filter.
 
 export class ClickHouseUnavailableError extends HandledError {
   declare readonly code: "clickhouse_unavailable";

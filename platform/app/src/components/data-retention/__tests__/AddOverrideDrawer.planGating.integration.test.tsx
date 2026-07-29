@@ -54,6 +54,8 @@ describe("AddOverrideDrawer plan-gated behavior", () => {
   afterEach(cleanup);
 
   describe("the apply-to-existing toggle", () => {
+    /** @scenario "Saving without retroactive apply leaves existing data untouched" */
+    /** @scenario "Applying a change to existing data is opt-in, not automatic" */
     it("defaults OFF, so saving a new policy never triggers a rewrite unasked", () => {
       const onSave = vi.fn();
       // Add mode defaults the scope to the current project and the retention to
@@ -76,6 +78,7 @@ describe("AddOverrideDrawer plan-gated behavior", () => {
       retentionDays: 371, // enterprise-only value, not on the paid menu
     };
 
+    /** @scenario "A grandfathered value is shown but never silently changed" */
     it("surfaces it as read-only 'current (legacy)' and disables Save until changed", () => {
       renderDrawer({ isEnterprise: false, editTarget: legacyTarget });
       // The label shows in both the selected-value readout and the option list,

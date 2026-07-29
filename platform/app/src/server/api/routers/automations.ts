@@ -96,7 +96,7 @@ const templateDraftSchema = z.object({
 
 const notificationCadenceSchema = z.enum(NOTIFICATION_CADENCES);
 
-// ADR-030: per-trigger trace-readiness debounce. Constrained on the wire so a
+// ADR-026: per-trigger trace-readiness debounce. Constrained on the wire so a
 // hostile or buggy client can't pin a trace in the settle stage indefinitely.
 const traceDebounceMsSchema = z
   .number()
