@@ -1,3 +1,4 @@
+import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
@@ -199,13 +200,18 @@ export const licenseRouter = createTRPCRouter({
 
         return { licenseKey };
       } catch (error) {
-        // Real copy on a 4xx, so the authored-prose channel renders it as-is;
-        // the cause rides along for the logs rather than being discarded, and
-        // is never shown (its message would be a crypto diagnostic).
         logger.error(
           { organizationId: input.organizationId, error },
           "[license] Failed to sign license",
         );
+        // A signing-key failure already says which of the three things went
+        // wrong, and the handled-error middleware maps it to a 400 with that
+        // code intact. Re-wrapping would flatten all three into one message
+        // the UI cannot key off.
+        if (HandledError.isHandled(error)) throw error;
+        // Real copy on a 4xx, so the authored-prose channel renders it as-is;
+        // the cause rides along for the logs rather than being discarded, and
+        // is never shown (its message would be a crypto diagnostic).
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: "Failed to sign license. Please check your private key.",
