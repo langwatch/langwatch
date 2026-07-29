@@ -122,7 +122,9 @@ describe("Azure byte paths without an account key", () => {
 
       expect(credentials.mode).toBe("workloadIdentity");
       expect(credentials).not.toHaveProperty("accountKey");
-      expect(destination).toMatchObject({ accountName: credentials.accountName });
+      expect(destination).toMatchObject({
+        accountName: credentials.accountName,
+      });
     });
   });
 
@@ -136,7 +138,9 @@ describe("Azure byte paths without an account key", () => {
 
       expect(credentials.mode).toBe("sharedKey");
       expect(maybeAzureDriver()).toBeDefined();
-      await expect(resolveProjectStorageDestination("proj-1")).resolves.toMatchObject({
+      await expect(
+        resolveProjectStorageDestination("proj-1"),
+      ).resolves.toMatchObject({
         kind: "azure",
       });
     });

@@ -189,23 +189,22 @@ function assertWorkloadIdentityInjectedValues(): void {
  * we still read what was written before". They are not symmetric: a
  * deployment can legitimately need the second without the first.
  */
-export function resolveAzureCredentials({
-  purpose = "write",
-}: { purpose?: "read" | "write" } = {}): AzureCredentials {
-  // env.mjs is JavaScript, so TypeScript infers `any` for its values. Pinning
-  // the type here is what makes the exhaustiveness check at the bottom of this
-  // function real — against `any` it would silently pass.
-  const mode: AzureCredentials["mode"] =
-    (env.AZURE_BLOB_AUTH_MODE as AzureCredentials["mode"] | undefined) ??
-    "sharedKey";
-
-  // Dead-config guard, for WRITE resolution only. Reads are deliberately
-  // exempt (`purpose: "read"`): an operator migrating OFF Azure flips the
-  // backend toggle to s3 and leaves the AZURE_BLOB_* values in place so the
-  // objects already written stay readable — the mirror image of the
-  // legacyS3ReadBucket path we document for the S3->Azure direction.
-  // Refusing to build a read driver there would strand every historical
-  // azure-blob:// object behind an "unregistered scheme" error.
+/**
+ * Dead-config guard, for WRITE resolution only. Reads are deliberately
+ * exempt (`purpose: "read"`): an operator migrating OFF Azure flips the
+ * backend toggle to s3 and leaves the AZURE_BLOB_* values in place so the
+ * objects already written stay readable — the mirror image of the
+ * legacyS3ReadBucket path we document for the S3->Azure direction.
+ * Refusing to build a read driver there would strand every historical
+ * azure-blob:// object behind an "unregistered scheme" error.
+ */
+function assertTokenModeIsSelected({
+  purpose,
+  mode,
+}: {
+  purpose: "read" | "write";
+  mode: AzureCredentials["mode"];
+}): void {
   if (
     purpose === "write" &&
     isTokenMode(mode) &&
@@ -216,14 +215,19 @@ export function resolveAzureCredentials({
         "Set STORED_OBJECTS_BACKEND=azure to use it, or unset AZURE_BLOB_AUTH_MODE.",
     );
   }
+}
 
-  const accountName = env.AZURE_BLOB_ACCOUNT_NAME?.trim();
-  const accountKey = env.AZURE_BLOB_ACCOUNT_KEY?.trim();
-  const container = env.AZURE_BLOB_CONTAINER?.trim();
-  const endpointBaseUrl = env.AZURE_BLOB_ENDPOINT?.trim() || undefined;
-  const authorityHost = env.AZURE_BLOB_AUTHORITY_HOST?.trim() || undefined;
-  const audience = env.AZURE_BLOB_TOKEN_AUDIENCE?.trim() || undefined;
-
+/**
+ * A shared key alongside a token mode is refused rather than ignored: silently
+ * dropping it leaves the operator guessing which credential is actually in use.
+ */
+function assertNoRedundantAccountKey({
+  mode,
+  accountKey,
+}: {
+  mode: AzureCredentials["mode"];
+  accountKey: string | undefined;
+}): void {
   if (isTokenMode(mode) && accountKey) {
     throw new AzureBackendMisconfiguredError(
       `AZURE_BLOB_ACCOUNT_KEY is set alongside AZURE_BLOB_AUTH_MODE=${mode}. A ` +
@@ -232,7 +236,20 @@ export function resolveAzureCredentials({
         "in use. Remove AZURE_BLOB_ACCOUNT_KEY.",
     );
   }
+}
 
+/** Names every missing required variable at once, rather than one per retry. */
+function assertRequiredVariablesPresent({
+  mode,
+  accountName,
+  container,
+  accountKey,
+}: {
+  mode: AzureCredentials["mode"];
+  accountName: string | undefined;
+  container: string | undefined;
+  accountKey: string | undefined;
+}): void {
   const missingVariables: string[] = [];
   if (!accountName) missingVariables.push("AZURE_BLOB_ACCOUNT_NAME");
   if (!container) missingVariables.push("AZURE_BLOB_CONTAINER");
@@ -247,6 +264,31 @@ export function resolveAzureCredentials({
       missingVariables,
     );
   }
+}
+
+export function resolveAzureCredentials({
+  purpose = "write",
+}: {
+  purpose?: "read" | "write";
+} = {}): AzureCredentials {
+  // env.mjs is JavaScript, so TypeScript infers `any` for its values. Pinning
+  // the type here is what makes the exhaustiveness check at the bottom of this
+  // function real — against `any` it would silently pass.
+  const mode: AzureCredentials["mode"] =
+    (env.AZURE_BLOB_AUTH_MODE as AzureCredentials["mode"] | undefined) ??
+    "sharedKey";
+
+  assertTokenModeIsSelected({ purpose, mode });
+
+  const accountName = env.AZURE_BLOB_ACCOUNT_NAME?.trim();
+  const accountKey = env.AZURE_BLOB_ACCOUNT_KEY?.trim();
+  const container = env.AZURE_BLOB_CONTAINER?.trim();
+  const endpointBaseUrl = env.AZURE_BLOB_ENDPOINT?.trim() || undefined;
+  const authorityHost = env.AZURE_BLOB_AUTHORITY_HOST?.trim() || undefined;
+  const audience = env.AZURE_BLOB_TOKEN_AUDIENCE?.trim() || undefined;
+
+  assertNoRedundantAccountKey({ mode, accountKey });
+  assertRequiredVariablesPresent({ mode, accountName, container, accountKey });
 
   if (mode === "sharedKey") {
     return {

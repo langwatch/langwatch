@@ -62,7 +62,10 @@ function newDriver() {
 }
 
 function newTokenModeDriver(
-  mode: "workloadIdentity" | "managedIdentity" | "azureCli" = "workloadIdentity",
+  mode:
+    | "workloadIdentity"
+    | "managedIdentity"
+    | "azureCli" = "workloadIdentity",
 ) {
   return new AzureBlobDriver({
     mode,
@@ -600,7 +603,11 @@ describe("AzureBlobDriver", () => {
       return newTokenModeDriver().get(URI);
     }
     function driverPut() {
-      return newTokenModeDriver().put(URI, Buffer.from("x"), "application/octet-stream");
+      return newTokenModeDriver().put(
+        URI,
+        Buffer.from("x"),
+        "application/octet-stream",
+      );
     }
     function driverDelete() {
       return newTokenModeDriver().delete(URI);
@@ -626,8 +633,15 @@ describe("AzureBlobDriver", () => {
         accountName: ACCOUNT_NAME,
       });
       fetchSpy.mockResolvedValueOnce(new Response("", { status: 201 }));
-      await hostStyleDriver.put(URI, Buffer.from("x"), "application/octet-stream");
-      const hostHeaders = fetchSpy.mock.calls[0]![1].headers as Record<string, string>;
+      await hostStyleDriver.put(
+        URI,
+        Buffer.from("x"),
+        "application/octet-stream",
+      );
+      const hostHeaders = fetchSpy.mock.calls[0]![1].headers as Record<
+        string,
+        string
+      >;
 
       const pathStyleDriver = new AzureBlobDriver({
         mode: "workloadIdentity",
@@ -635,8 +649,15 @@ describe("AzureBlobDriver", () => {
         endpointBaseUrl: "http://127.0.0.1:10000/devstoreaccount1",
       });
       fetchSpy.mockResolvedValueOnce(new Response("", { status: 201 }));
-      await pathStyleDriver.put(URI, Buffer.from("x"), "application/octet-stream");
-      const pathHeaders = fetchSpy.mock.calls[1]![1].headers as Record<string, string>;
+      await pathStyleDriver.put(
+        URI,
+        Buffer.from("x"),
+        "application/octet-stream",
+      );
+      const pathHeaders = fetchSpy.mock.calls[1]![1].headers as Record<
+        string,
+        string
+      >;
 
       expect(hostHeaders.Authorization).toBe("Bearer same-bearer-token");
       expect(pathHeaders.Authorization).toBe("Bearer same-bearer-token");
@@ -682,7 +703,9 @@ describe("AzureBlobDriver", () => {
     /** @scenario "A permission rejection is not retried and names the missing role assignment" */
     it("does not acquire a new token or retry, and names the required role assignment and scope", async () => {
       getAzureBlobTokenMock.mockResolvedValue("token-without-permission");
-      fetchSpy.mockResolvedValueOnce(new Response("Forbidden", { status: 403 }));
+      fetchSpy.mockResolvedValueOnce(
+        new Response("Forbidden", { status: 403 }),
+      );
 
       let message = "";
       try {
@@ -709,7 +732,10 @@ describe("AzureBlobDriver", () => {
     it("never includes the bearer token value in a thrown error message", async () => {
       getAzureBlobTokenMock.mockResolvedValue("super-secret-bearer-token");
       fetchSpy.mockResolvedValueOnce(
-        new Response("denied", { status: 500, statusText: "Internal Server Error" }),
+        new Response("denied", {
+          status: 500,
+          statusText: "Internal Server Error",
+        }),
       );
 
       let message = "";
@@ -725,7 +751,10 @@ describe("AzureBlobDriver", () => {
     /** @scenario "Authorization material never reaches logs, errors, or traces" */
     it("never includes the SharedKey account key or signature value in a thrown error message", async () => {
       fetchSpy.mockResolvedValueOnce(
-        new Response("denied", { status: 500, statusText: "Internal Server Error" }),
+        new Response("denied", {
+          status: 500,
+          statusText: "Internal Server Error",
+        }),
       );
 
       let message = "";
@@ -741,15 +770,22 @@ describe("AzureBlobDriver", () => {
     /** @scenario "Authorization material never reaches logs, errors, or traces" */
     it("redacts storage URIs embedded in a failing response body via redactStorageUrisInText", async () => {
       fetchSpy.mockResolvedValueOnce(
-        new Response(`blocked by policy for azure-blob://${ACCOUNT_NAME}/${CONTAINER}/${BLOB_PATH}`, {
-          status: 500,
-          statusText: "Internal Server Error",
-        }),
+        new Response(
+          `blocked by policy for azure-blob://${ACCOUNT_NAME}/${CONTAINER}/${BLOB_PATH}`,
+          {
+            status: 500,
+            statusText: "Internal Server Error",
+          },
+        ),
       );
 
       let message = "";
       try {
-        await newDriver().put(URI, Buffer.from("x"), "application/octet-stream");
+        await newDriver().put(
+          URI,
+          Buffer.from("x"),
+          "application/octet-stream",
+        );
       } catch (error) {
         message = (error as Error).message;
       }

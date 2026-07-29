@@ -193,62 +193,69 @@ describeRealAzure(
   },
 );
 
-describeTokenAzure("AzureBlobDriver against real Azure Blob using an Entra identity", () => {
-  const tokenUris: string[] = [];
+describeTokenAzure(
+  "AzureBlobDriver against real Azure Blob using an Entra identity",
+  () => {
+    const tokenUris: string[] = [];
 
-  function tokenDriver() {
-    return new AzureBlobDriver({
-      mode: "azureCli",
-      accountName: TOKEN_MODE_ACCOUNT!,
+    function tokenDriver() {
+      return new AzureBlobDriver({
+        mode: "azureCli",
+        accountName: TOKEN_MODE_ACCOUNT!,
+      });
+    }
+
+    function tokenUriFor(bytes: Buffer): string {
+      const uri = mintAzureBlobUri({
+        accountName: TOKEN_MODE_ACCOUNT!,
+        container: CONTAINER!,
+        projectId: `test-token-${RUN_ID}`,
+        sha256: crypto.createHash("sha256").update(bytes).digest("hex"),
+      });
+      tokenUris.push(uri);
+      return uri;
+    }
+
+    afterAll(async () => {
+      if (!hasTokenModeAzure) return;
+      await Promise.allSettled(
+        tokenUris.map((uri) => tokenDriver().delete(uri)),
+      );
     });
-  }
 
-  function tokenUriFor(bytes: Buffer): string {
-    const uri = mintAzureBlobUri({
-      accountName: TOKEN_MODE_ACCOUNT!,
-      container: CONTAINER!,
-      projectId: `test-token-${RUN_ID}`,
-      sha256: crypto.createHash("sha256").update(bytes).digest("hex"),
+    describe("given an account that refuses shared-key authentication", () => {
+      /** @scenario "Blobs round-trip against a real storage account with shared-key access disabled" */
+      it("writes, reads, sizes and deletes using a bearer token", async () => {
+        const driver = tokenDriver();
+        const bytes = Buffer.from(`entra round-trip ${RUN_ID}`, "utf8");
+        const uri = tokenUriFor(bytes);
+
+        await driver.put(uri, bytes, "text/plain");
+        expect(await driver.exists(uri)).toBe(true);
+        expect(await driver.head(uri)).toBe(bytes.length);
+
+        const stream = await driver.get(uri);
+        const chunks: Buffer[] = [];
+        for await (const chunk of stream) chunks.push(chunk as Buffer);
+        expect(Buffer.concat(chunks).toString("utf8")).toBe(
+          bytes.toString("utf8"),
+        );
+
+        await driver.delete(uri);
+        expect(await driver.exists(uri)).toBe(false);
+      }, 60_000);
+
+      /** @scenario "Blobs round-trip against a real storage account with shared-key access disabled" */
+      it("stores a zero-byte blob, the case that broke shared-key signing", async () => {
+        const driver = tokenDriver();
+        const bytes = Buffer.alloc(0);
+        const uri = tokenUriFor(bytes);
+
+        await driver.put(uri, bytes, "application/octet-stream");
+
+        expect(await driver.exists(uri)).toBe(true);
+        expect(await driver.head(uri)).toBe(0);
+      }, 60_000);
     });
-    tokenUris.push(uri);
-    return uri;
-  }
-
-  afterAll(async () => {
-    if (!hasTokenModeAzure) return;
-    await Promise.allSettled(tokenUris.map((uri) => tokenDriver().delete(uri)));
-  });
-
-  describe("given an account that refuses shared-key authentication", () => {
-    /** @scenario "Blobs round-trip against a real storage account with shared-key access disabled" */
-    it("writes, reads, sizes and deletes using a bearer token", async () => {
-      const driver = tokenDriver();
-      const bytes = Buffer.from(`entra round-trip ${RUN_ID}`, "utf8");
-      const uri = tokenUriFor(bytes);
-
-      await driver.put(uri, bytes, "text/plain");
-      expect(await driver.exists(uri)).toBe(true);
-      expect(await driver.head(uri)).toBe(bytes.length);
-
-      const stream = await driver.get(uri);
-      const chunks: Buffer[] = [];
-      for await (const chunk of stream) chunks.push(chunk as Buffer);
-      expect(Buffer.concat(chunks).toString("utf8")).toBe(bytes.toString("utf8"));
-
-      await driver.delete(uri);
-      expect(await driver.exists(uri)).toBe(false);
-    }, 60_000);
-
-    /** @scenario "Blobs round-trip against a real storage account with shared-key access disabled" */
-    it("stores a zero-byte blob, the case that broke shared-key signing", async () => {
-      const driver = tokenDriver();
-      const bytes = Buffer.alloc(0);
-      const uri = tokenUriFor(bytes);
-
-      await driver.put(uri, bytes, "application/octet-stream");
-
-      expect(await driver.exists(uri)).toBe(true);
-      expect(await driver.head(uri)).toBe(0);
-    }, 60_000);
-  });
-});
+  },
+);

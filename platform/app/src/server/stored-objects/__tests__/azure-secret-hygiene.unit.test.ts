@@ -40,8 +40,12 @@ afterEach(() => {
 });
 
 function stubFetchReturning(body: string) {
-  globalThis.fetch = vi.fn(async () =>
-    new Response(body, { status: 403, statusText: "Server failed to authenticate" }),
+  globalThis.fetch = vi.fn(
+    async () =>
+      new Response(body, {
+        status: 403,
+        statusText: "Server failed to authenticate",
+      }),
   ) as unknown as typeof fetch;
 }
 
@@ -86,7 +90,9 @@ describe("redactAuthorizationMaterial()", () => {
       );
 
       expect(redacted).not.toContain("MAC signature computed");
-      expect(redacted).toContain("<AuthenticationErrorDetail>***</AuthenticationErrorDetail>");
+      expect(redacted).toContain(
+        "<AuthenticationErrorDetail>***</AuthenticationErrorDetail>",
+      );
     });
   });
 

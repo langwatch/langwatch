@@ -59,8 +59,8 @@ vi.mock("~/server/dataplane-s3", () => ({
   getS3ConfigForProject: vi.fn().mockResolvedValue(null),
 }));
 
-import { maybeAzureDriver } from "../stored-objects-factory";
 import { resolveProjectStorageDestination } from "../project-storage-destination";
+import { maybeAzureDriver } from "../stored-objects-factory";
 
 const INJECTED_WORKLOAD_IDENTITY_VARS = [
   "AZURE_CLIENT_ID",
@@ -170,28 +170,21 @@ describe("maybeAzureDriver / resolveProjectStorageDestination parity", () => {
       },
       false,
     ],
-    [
-      "backend not azure at all",
-      {},
-      false,
-    ],
-  ] as const)(
-    "given %s",
-    (_label, env, expectedUsable) => {
-      /** @scenario "A resolvable Azure destination always comes with a usable Azure driver" */
-      it(`reports azure as usable=${String(expectedUsable)} identically for both the destination resolver and the driver registration`, async () => {
-        Object.assign(mockEnv, env);
+    ["backend not azure at all", {}, false],
+  ] as const)("given %s", (_label, env, expectedUsable) => {
+    /** @scenario "A resolvable Azure destination always comes with a usable Azure driver" */
+    it(`reports azure as usable=${String(expectedUsable)} identically for both the destination resolver and the driver registration`, async () => {
+      Object.assign(mockEnv, env);
 
-        const { isDestinationAzure, isDriverRegistered } =
+      const { isDestinationAzure, isDriverRegistered } =
         await evaluateAzureUsability();
 
-        expect(isDestinationAzure).toBe(expectedUsable);
-        expect(isDriverRegistered).toBe(expectedUsable);
-        // The invariant itself: never one true and the other false.
-        expect(isDestinationAzure).toBe(isDriverRegistered);
-      });
-    },
-  );
+      expect(isDestinationAzure).toBe(expectedUsable);
+      expect(isDriverRegistered).toBe(expectedUsable);
+      // The invariant itself: never one true and the other false.
+      expect(isDestinationAzure).toBe(isDriverRegistered);
+    });
+  });
 
   describe("given azure backend with complete workloadIdentity config (AKS-injected values present)", () => {
     /** @scenario "A resolvable Azure destination always comes with a usable Azure driver" */
@@ -202,7 +195,8 @@ describe("maybeAzureDriver / resolveProjectStorageDestination parity", () => {
       mockEnv.AZURE_BLOB_CONTAINER = "lw-container";
       process.env.AZURE_CLIENT_ID = "client-id";
       process.env.AZURE_TENANT_ID = "tenant-id";
-      process.env.AZURE_FEDERATED_TOKEN_FILE = "/var/run/secrets/azure/tokens/azure-identity-token";
+      process.env.AZURE_FEDERATED_TOKEN_FILE =
+        "/var/run/secrets/azure/tokens/azure-identity-token";
 
       const { isDestinationAzure, isDriverRegistered } =
         await evaluateAzureUsability();

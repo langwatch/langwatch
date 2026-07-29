@@ -49,12 +49,16 @@ function chartDepsReady(): boolean {
   // then fail the render on "missing in charts/ directory".
   const builtDir = path.join(CHART_DIR, "charts");
   const declared = (
-    fs.readFileSync(path.join(CHART_DIR, "Chart.yaml"), "utf-8").match(/^\s*-\s*name:\s*(\S+)/gm) ?? []
+    fs
+      .readFileSync(path.join(CHART_DIR, "Chart.yaml"), "utf-8")
+      .match(/^\s*-\s*name:\s*(\S+)/gm) ?? []
   ).map((line) => line.replace(/^\s*-\s*name:\s*/, "").trim());
   const built = fs.existsSync(builtDir) ? fs.readdirSync(builtDir) : [];
   const allPresent =
     declared.length > 0 &&
-    declared.every((dep) => built.some((f) => f.startsWith(`${dep}-`) && f.endsWith(".tgz")));
+    declared.every((dep) =>
+      built.some((f) => f.startsWith(`${dep}-`) && f.endsWith(".tgz")),
+    );
   if (allPresent) return true;
   try {
     execFileSync("helm", ["dependency", "build", CHART_DIR], {
@@ -75,7 +79,11 @@ function render(setArgs: string[]): string {
   return execFileSync(
     "helm",
     ["template", "t", CHART_DIR, "-f", BASE_VALUES, ...setArgs],
-    { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"], maxBuffer: 32 * 1024 * 1024 },
+    {
+      encoding: "utf-8",
+      stdio: ["pipe", "pipe", "pipe"],
+      maxBuffer: 32 * 1024 * 1024,
+    },
   );
 }
 
@@ -91,7 +99,11 @@ function renderExpectingFailure(setArgs: string[]): string {
   try {
     render(setArgs);
   } catch (error: unknown) {
-    const e = error as { stderr?: Buffer | string; stdout?: Buffer | string; message?: string };
+    const e = error as {
+      stderr?: Buffer | string;
+      stdout?: Buffer | string;
+      message?: string;
+    };
     return [e.stderr, e.stdout, e.message]
       .map((part) => (part == null ? "" : String(part)))
       .join("\n");
@@ -101,9 +113,12 @@ function renderExpectingFailure(setArgs: string[]): string {
 
 /** Every workload that touches object storage, so none is silently skipped. */
 const ALL_WORKLOADS = [
-  "--set", "workers.enabled=true",
-  "--set", "cronjobs.enabled=true",
-  "--set", "cronjobs.jobs.topicClustering.enabled=true",
+  "--set",
+  "workers.enabled=true",
+  "--set",
+  "cronjobs.enabled=true",
+  "--set",
+  "cronjobs.jobs.topicClustering.enabled=true",
 ];
 
 describeHelm("Helm ServiceAccount surface for cloud identity", () => {
@@ -124,7 +139,8 @@ describeHelm("Helm ServiceAccount surface for cloud identity", () => {
     it("names the same account on the app and the workers, and not on cron pods", () => {
       const out = render([
         ...ALL_WORKLOADS,
-        "--set", "global.serviceAccount.create=true",
+        "--set",
+        "global.serviceAccount.create=true",
       ]);
 
       const named = out.match(/serviceAccountName: t$/gm) ?? [];
@@ -144,8 +160,10 @@ describeHelm("Helm ServiceAccount surface for cloud identity", () => {
     it("carries the identity client-id annotation on the rendered account", () => {
       const out = render([
         ...ALL_WORKLOADS,
-        "--set", "global.serviceAccount.create=true",
-        "--set", String.raw`global.serviceAccount.annotations.azure\.workload\.identity/client-id=00000000-1111-2222-3333-444444444444`,
+        "--set",
+        "global.serviceAccount.create=true",
+        "--set",
+        String.raw`global.serviceAccount.annotations.azure\.workload\.identity/client-id=00000000-1111-2222-3333-444444444444`,
       ]);
 
       expect(out).toContain("kind: ServiceAccount");
@@ -165,14 +183,21 @@ describeHelm("Helm ServiceAccount surface for cloud identity", () => {
       // is emitted anywhere, so asserting its absence on cron would prove
       // nothing at all.
       const out = render([
-        "--set", "app.dataplane.enabled=true",
-        "--set", "app.dataplane.provider=azureBlob",
-        "--set", "app.dataplane.providers.azureBlob.authMode=workloadIdentity",
-        "--set", "app.dataplane.providers.azureBlob.accountName.value=acct",
-        "--set", "app.dataplane.providers.azureBlob.container.value=cont",
-        "--set", "app.storedObjects.localFilesystem.enabled=false",
+        "--set",
+        "app.dataplane.enabled=true",
+        "--set",
+        "app.dataplane.provider=azureBlob",
+        "--set",
+        "app.dataplane.providers.azureBlob.authMode=workloadIdentity",
+        "--set",
+        "app.dataplane.providers.azureBlob.accountName.value=acct",
+        "--set",
+        "app.dataplane.providers.azureBlob.container.value=cont",
+        "--set",
+        "app.storedObjects.localFilesystem.enabled=false",
         ...ALL_WORKLOADS,
-        "--set", "global.serviceAccount.create=true",
+        "--set",
+        "global.serviceAccount.create=true",
       ]);
 
       // The label must exist SOMEWHERE, or the negative assertions below are
@@ -196,7 +221,8 @@ describeHelm("Helm ServiceAccount surface for cloud identity", () => {
     it("does not hand-mount a projected identity token volume", () => {
       const out = render([
         ...ALL_WORKLOADS,
-        "--set", "global.serviceAccount.create=true",
+        "--set",
+        "global.serviceAccount.create=true",
       ]);
 
       // The platform webhook injects its own projected volume; a second one
@@ -216,19 +242,26 @@ describeHelm("Helm ServiceAccount surface for cloud identity", () => {
 
   describe("given the azureBlob provider under a token-based auth mode", () => {
     const AZURE = [
-      "--set", "app.dataplane.enabled=true",
-      "--set", "app.dataplane.provider=azureBlob",
-      "--set", "app.dataplane.providers.azureBlob.accountName.value=acct",
-      "--set", "app.dataplane.providers.azureBlob.container.value=cont",
-      "--set", "app.storedObjects.localFilesystem.enabled=false",
+      "--set",
+      "app.dataplane.enabled=true",
+      "--set",
+      "app.dataplane.provider=azureBlob",
+      "--set",
+      "app.dataplane.providers.azureBlob.accountName.value=acct",
+      "--set",
+      "app.dataplane.providers.azureBlob.container.value=cont",
+      "--set",
+      "app.storedObjects.localFilesystem.enabled=false",
     ];
 
     /** @scenario "The chart does not require an account key under a token-based mode" */
     it("renders with no account key and emits the auth mode instead", () => {
       const out = render([
         ...AZURE,
-        "--set", "app.dataplane.providers.azureBlob.authMode=workloadIdentity",
-        "--set", "global.serviceAccount.create=true",
+        "--set",
+        "app.dataplane.providers.azureBlob.authMode=workloadIdentity",
+        "--set",
+        "global.serviceAccount.create=true",
       ]);
 
       expect(out).toContain("name: AZURE_BLOB_AUTH_MODE");
@@ -241,8 +274,10 @@ describeHelm("Helm ServiceAccount surface for cloud identity", () => {
       const out = render([
         ...AZURE,
         ...ALL_WORKLOADS,
-        "--set", "app.dataplane.providers.azureBlob.authMode=workloadIdentity",
-        "--set", "global.serviceAccount.create=true",
+        "--set",
+        "app.dataplane.providers.azureBlob.authMode=workloadIdentity",
+        "--set",
+        "global.serviceAccount.create=true",
       ]);
 
       // One per pod template: app, workers, cronjob. A count short means a
@@ -256,40 +291,60 @@ describeHelm("Helm ServiceAccount surface for cloud identity", () => {
 
     /** @scenario "The chart does not require an account key under a token-based mode" */
     it("refuses a stray account key that would be silently ignored", () => {
-      expect(renderExpectingFailure([
+      expect(
+        renderExpectingFailure([
           ...AZURE,
-          "--set", "app.dataplane.providers.azureBlob.authMode=workloadIdentity",
-          "--set", "global.serviceAccount.create=true",
-          "--set", "app.dataplane.providers.azureBlob.accountKey.value=leftover",
-        ])).toMatch(/accountKey is also configured/)
+          "--set",
+          "app.dataplane.providers.azureBlob.authMode=workloadIdentity",
+          "--set",
+          "global.serviceAccount.create=true",
+          "--set",
+          "app.dataplane.providers.azureBlob.accountKey.value=leftover",
+        ]),
+      ).toMatch(/accountKey is also configured/);
     });
 
     /** @scenario "The chart does not require an account key under a token-based mode" */
     it("refuses workload identity with no service account to bind the identity to", () => {
-      expect(renderExpectingFailure([
+      expect(
+        renderExpectingFailure([
           ...AZURE,
-          "--set", "app.dataplane.providers.azureBlob.authMode=workloadIdentity",
-        ])).toMatch(/requires global\.serviceAccount/)
+          "--set",
+          "app.dataplane.providers.azureBlob.authMode=workloadIdentity",
+        ]),
+      ).toMatch(/requires global\.serviceAccount/);
     });
 
     /** @scenario "An unrecognized AZURE_BLOB_AUTH_MODE value is rejected, not ignored" */
     it("refuses an auth mode outside the supported set", () => {
-      expect(renderExpectingFailure([
+      expect(
+        renderExpectingFailure([
           ...AZURE,
-          "--set", "app.dataplane.providers.azureBlob.authMode=nonsense",
-        ])).toMatch(/must be one of sharedKey, workloadIdentity, managedIdentity, azureCli/)
+          "--set",
+          "app.dataplane.providers.azureBlob.authMode=nonsense",
+        ]),
+      ).toMatch(
+        /must be one of sharedKey, workloadIdentity, managedIdentity, azureCli/,
+      );
     });
   });
 
   describe("given a sovereign-cloud endpoint under a token-based mode", () => {
     const SOVEREIGN = [
-      "--set", "app.dataplane.enabled=true",
-      "--set", "app.dataplane.provider=azureBlob",
-      "--set", "app.dataplane.providers.azureBlob.authMode=managedIdentity",
-      "--set", "app.dataplane.providers.azureBlob.accountName.value=acct",
-      "--set", "app.dataplane.providers.azureBlob.container.value=cont",
-      "--set", "app.dataplane.providers.azureBlob.endpoint.value=https://acct.blob.core.usgovcloudapi.net",
-      "--set", "app.storedObjects.localFilesystem.enabled=false",
+      "--set",
+      "app.dataplane.enabled=true",
+      "--set",
+      "app.dataplane.provider=azureBlob",
+      "--set",
+      "app.dataplane.providers.azureBlob.authMode=managedIdentity",
+      "--set",
+      "app.dataplane.providers.azureBlob.accountName.value=acct",
+      "--set",
+      "app.dataplane.providers.azureBlob.container.value=cont",
+      "--set",
+      "app.dataplane.providers.azureBlob.endpoint.value=https://acct.blob.core.usgovcloudapi.net",
+      "--set",
+      "app.storedObjects.localFilesystem.enabled=false",
     ];
 
     /**
@@ -307,8 +362,10 @@ describeHelm("Helm ServiceAccount surface for cloud identity", () => {
     it("emits the authority and audience when they are configured", () => {
       const out = render([
         ...SOVEREIGN,
-        "--set", "app.dataplane.providers.azureBlob.authorityHost.value=https://login.microsoftonline.us",
-        "--set", "app.dataplane.providers.azureBlob.tokenAudience.value=https://storage.azure.us",
+        "--set",
+        "app.dataplane.providers.azureBlob.authorityHost.value=https://login.microsoftonline.us",
+        "--set",
+        "app.dataplane.providers.azureBlob.tokenAudience.value=https://storage.azure.us",
       ]);
 
       expect(out).toContain("name: AZURE_BLOB_AUTHORITY_HOST");
@@ -321,13 +378,20 @@ describeHelm("Helm ServiceAccount surface for cloud identity", () => {
   describe("given the azureBlob provider under shared-key auth", () => {
     /** @scenario "The chart still demands an account key under shared-key auth" */
     it("fails with an error naming the missing accountKey", () => {
-      expect(renderExpectingFailure([
-          "--set", "app.dataplane.enabled=true",
-          "--set", "app.dataplane.provider=azureBlob",
-          "--set", "app.dataplane.providers.azureBlob.accountName.value=acct",
-          "--set", "app.dataplane.providers.azureBlob.container.value=cont",
-          "--set", "app.storedObjects.localFilesystem.enabled=false",
-        ])).toMatch(/accountKey is not configured/)
+      expect(
+        renderExpectingFailure([
+          "--set",
+          "app.dataplane.enabled=true",
+          "--set",
+          "app.dataplane.provider=azureBlob",
+          "--set",
+          "app.dataplane.providers.azureBlob.accountName.value=acct",
+          "--set",
+          "app.dataplane.providers.azureBlob.container.value=cont",
+          "--set",
+          "app.storedObjects.localFilesystem.enabled=false",
+        ]),
+      ).toMatch(/accountKey is not configured/);
     });
   });
 
@@ -343,20 +407,30 @@ describeHelm("Helm ServiceAccount surface for cloud identity", () => {
     /** The migration itself, with no identity backing it. */
     const MIGRATION_WITHOUT_SERVICE_ACCOUNT = [
       ...ALL_WORKLOADS,
-      "--set", "app.dataplane.enabled=true",
-      "--set", "app.dataplane.provider=awsS3",
-      "--set", "app.dataplane.providers.awsS3.bucket.value=bucket",
-      "--set", "app.dataplane.providers.awsS3.region=us-east-1",
-      "--set", "app.dataplane.legacyAzureRead=true",
-      "--set", "app.dataplane.providers.azureBlob.authMode=workloadIdentity",
-      "--set", "app.dataplane.providers.azureBlob.accountName.value=acct",
-      "--set", "app.dataplane.providers.azureBlob.container.value=cont",
-      "--set", "app.storedObjects.localFilesystem.enabled=false",
+      "--set",
+      "app.dataplane.enabled=true",
+      "--set",
+      "app.dataplane.provider=awsS3",
+      "--set",
+      "app.dataplane.providers.awsS3.bucket.value=bucket",
+      "--set",
+      "app.dataplane.providers.awsS3.region=us-east-1",
+      "--set",
+      "app.dataplane.legacyAzureRead=true",
+      "--set",
+      "app.dataplane.providers.azureBlob.authMode=workloadIdentity",
+      "--set",
+      "app.dataplane.providers.azureBlob.accountName.value=acct",
+      "--set",
+      "app.dataplane.providers.azureBlob.container.value=cont",
+      "--set",
+      "app.storedObjects.localFilesystem.enabled=false",
     ];
 
     const MIGRATION = [
       ...MIGRATION_WITHOUT_SERVICE_ACCOUNT,
-      "--set", "global.serviceAccount.create=true",
+      "--set",
+      "global.serviceAccount.create=true",
     ];
 
     /** @scenario "Historical Azure objects stay readable after moving writes to S3" */
@@ -392,9 +466,9 @@ describeHelm("Helm ServiceAccount surface for cloud identity", () => {
 
     /** @scenario "The chart refuses a workload-identity install with no service account" */
     it("refuses to render when no service account backs the identity", () => {
-      expect(
-        renderExpectingFailure(MIGRATION_WITHOUT_SERVICE_ACCOUNT),
-      ).toMatch(/ServiceAccount to bind to/);
+      expect(renderExpectingFailure(MIGRATION_WITHOUT_SERVICE_ACCOUNT)).toMatch(
+        /ServiceAccount to bind to/,
+      );
     });
   });
 
@@ -403,12 +477,17 @@ describeHelm("Helm ServiceAccount surface for cloud identity", () => {
     it("uses that name without rendering an account of its own", () => {
       const out = render([
         ...ALL_WORKLOADS,
-        "--set", "global.serviceAccount.name=preexisting-identity",
+        "--set",
+        "global.serviceAccount.name=preexisting-identity",
       ]);
 
-      expect(out.match(/serviceAccountName: preexisting-identity$/gm) ?? []).toHaveLength(2);
+      expect(
+        out.match(/serviceAccountName: preexisting-identity$/gm) ?? [],
+      ).toHaveLength(2);
       // create=false, so we must not manufacture the account.
-      expect(out).not.toMatch(/kind: ServiceAccount\n[\s\S]{0,200}?name: preexisting-identity\n/);
+      expect(out).not.toMatch(
+        /kind: ServiceAccount\n[\s\S]{0,200}?name: preexisting-identity\n/,
+      );
     });
   });
 });

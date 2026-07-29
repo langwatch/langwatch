@@ -189,7 +189,10 @@ describe("getAzureBlobToken", () => {
   describe("given many storage operations begin simultaneously with an empty token cache", () => {
     /** @scenario "Concurrent cold-start operations trigger a single token exchange" */
     it("performs exactly one token exchange and every caller proceeds with the resulting token", async () => {
-      let resolveExchange!: (value: { token: string; expiresOnTimestamp: number }) => void;
+      let resolveExchange!: (value: {
+        token: string;
+        expiresOnTimestamp: number;
+      }) => void;
       workloadGetToken.mockImplementation(
         () =>
           new Promise((resolve) => {
@@ -242,7 +245,8 @@ describe("getAzureBlobToken", () => {
   describe("given workloadIdentity mode and the projected token has rotated on disk", () => {
     /** @scenario "The federated assertion is re-read for every token exchange" */
     it("passes the CURRENT AZURE_FEDERATED_TOKEN_FILE path fresh on every exchange rather than caching content itself", async () => {
-      process.env.AZURE_FEDERATED_TOKEN_FILE = "/var/run/secrets/tokens/original";
+      process.env.AZURE_FEDERATED_TOKEN_FILE =
+        "/var/run/secrets/tokens/original";
       workloadGetToken.mockResolvedValueOnce(futureToken("token-1", 60 * 1000));
 
       await getAzureBlobToken(workloadIdentityCredentials);
@@ -251,7 +255,8 @@ describe("getAzureBlobToken", () => {
       // path, but for a long-running worker the env var itself could also
       // be re-pointed across a pod restart. Change it and force a refresh
       // (the token above is within the safety margin already).
-      process.env.AZURE_FEDERATED_TOKEN_FILE = "/var/run/secrets/tokens/rotated";
+      process.env.AZURE_FEDERATED_TOKEN_FILE =
+        "/var/run/secrets/tokens/rotated";
       workloadGetToken.mockResolvedValueOnce(futureToken("token-2"));
 
       await getAzureBlobToken(workloadIdentityCredentials);

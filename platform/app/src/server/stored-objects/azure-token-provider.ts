@@ -23,8 +23,8 @@
 import {
   AzureCliCredential,
   ManagedIdentityCredential,
-  WorkloadIdentityCredential,
   type TokenCredential,
+  WorkloadIdentityCredential,
 } from "@azure/identity";
 import type { AzureCredentials, AzureTokenAuthMode } from "./azure-credentials";
 

@@ -196,24 +196,29 @@ const XML_ASSERTION_IN_TEXT =
   /<(AuthenticationErrorDetail|assertion|client_assertion)\b[^>]*>[\s\S]*?<\/\1>/gi;
 
 export function redactAuthorizationMaterial(text: string): string {
-  return text
-    .replace(AUTHORIZATION_MATERIAL_IN_TEXT, (_m, scheme: string) => `${scheme} ***`)
-    // Each quote is captured and re-emitted rather than assumed: consuming the
-    // key's closing quote without restoring it turned
-    // `"access_token":"…"` into `"access_token:"***"`, which redacts the
-    // token but leaves JSON a downstream log parser can no longer read.
-    .replace(
-      CREDENTIAL_FIELD_IN_TEXT,
-      (
-        _m,
-        field: string,
-        keyQuote: string,
-        separator: string,
-        openQuote: string,
-        closeQuote: string,
-      ) => `${field}${keyQuote}${separator}${openQuote}***${closeQuote}`,
-    )
-    .replace(XML_ASSERTION_IN_TEXT, (_m, tag: string) => `<${tag}>***</${tag}>`);
+  return (
+    text
+      .replace(
+        AUTHORIZATION_MATERIAL_IN_TEXT,
+        (_m, scheme: string) => `${scheme} ***`,
+      )
+      // Each quote is captured and re-emitted rather than assumed: consuming the
+      // key's closing quote without restoring it turned
+      // `"access_token":"…"` into `"access_token:"***"`, which redacts the
+      // token but leaves JSON a downstream log parser can no longer read.
+      // Captures arrive as a rest array: `String.replace` fixes this callback's
+      // arity at one-per-group (plus offset and subject), so naming each group
+      // as its own parameter trips the max-parameter rule on a signature the
+      // regex dictates rather than the design.
+      .replace(CREDENTIAL_FIELD_IN_TEXT, (_m, ...captures: string[]) => {
+        const [field, keyQuote, separator, openQuote, closeQuote] = captures;
+        return `${field}${keyQuote}${separator}${openQuote}***${closeQuote}`;
+      })
+      .replace(
+        XML_ASSERTION_IN_TEXT,
+        (_m, tag: string) => `<${tag}>***</${tag}>`,
+      )
+  );
 }
 
 /**

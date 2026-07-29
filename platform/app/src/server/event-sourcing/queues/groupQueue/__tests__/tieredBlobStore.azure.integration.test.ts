@@ -19,21 +19,21 @@
  * destination and NO S3 configured, through the actual production types.
  */
 import crypto from "node:crypto";
-import { Readable } from "node:stream";
+import type { Readable } from "node:stream";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 vi.mock("~/env.mjs", () => ({ env: { S3_BUCKET_NAME: "" } }));
 
-import { AzureBlobDriver } from "~/server/stored-objects/azure-blob-driver";
-import { StorageRegistry } from "~/server/stored-objects/storage-registry";
-import type { ProjectStorageDestination } from "~/server/stored-objects/project-storage-destination";
+import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
 import {
   ensureAzuriteContainer,
+  type StartedAzurite,
   startAzurite,
   stopAzurite,
-  type StartedAzurite,
 } from "~/server/stored-objects/__tests__/azurite-test-support";
-import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
+import { AzureBlobDriver } from "~/server/stored-objects/azure-blob-driver";
+import type { ProjectStorageDestination } from "~/server/stored-objects/project-storage-destination";
+import { StorageRegistry } from "~/server/stored-objects/storage-registry";
 import { TieredBlobStore } from "../tieredBlobStore";
 
 const CONTAINER = "stored-objects";
