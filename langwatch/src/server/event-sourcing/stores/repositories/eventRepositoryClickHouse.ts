@@ -170,15 +170,34 @@ export class EventRepositoryClickHouse implements EventRepository {
     }
   }
 
-  async getEventRecordsUpTo(
-    tenantId: string,
-    aggregateType: string,
-    aggregateId: string,
-    upToTimestamp: number,
-    upToEventId: string,
-  ): Promise<EventRecord[]> {
+  async getEventRecordsUpTo(request: {
+    tenantId: string;
+    aggregateType: string;
+    aggregateId: string;
+    upToTimestamp: number;
+    upToEventId: string;
+    occurredAtFromMs?: number;
+  }): Promise<EventRecord[]> {
+    const {
+      tenantId,
+      aggregateType,
+      aggregateId,
+      upToTimestamp,
+      upToEventId,
+      occurredAtFromMs,
+    } = request;
     try {
       const client = await this.getClient(tenantId);
+      // Same partition-pruning bound as `getEventRecords`, and for the same
+      // reason: the upper bound is on EventTimestamp (acceptance order), but the
+      // table is PARTITION BY toYearWeek(EventOccurredAt), so ONLY an
+      // EventOccurredAt predicate prunes. Without one this walks every weekly
+      // partition ever written, including the cold tier on S3.
+      const hasLowerBound =
+        typeof occurredAtFromMs === "number" && occurredAtFromMs > 0;
+      const occurredAtFilter = hasLowerBound
+        ? "AND (EventOccurredAt = 0 OR EventOccurredAt >= {occurredAtFromMs:UInt64})"
+        : "";
       const result = await client.query({
         query: `
           SELECT
@@ -194,6 +213,7 @@ export class EventRepositoryClickHouse implements EventRepository {
           WHERE TenantId = {tenantId:String}
             AND AggregateType = {aggregateType:String}
             AND AggregateId = {aggregateId:String}
+            ${occurredAtFilter}
             AND (
               EventTimestamp < {upToTimestamp:UInt64}
               OR (
@@ -209,6 +229,7 @@ export class EventRepositoryClickHouse implements EventRepository {
           aggregateId: String(aggregateId),
           upToTimestamp,
           upToEventId,
+          ...(hasLowerBound ? { occurredAtFromMs } : {}),
         },
         format: "JSONEachRow",
       });
@@ -273,6 +294,7 @@ export class EventRepositoryClickHouse implements EventRepository {
     upToEventId: string;
     after: { timestamp: number; eventId: string } | undefined;
     limit: number;
+    occurredAtFromMs?: number;
   }): Promise<EventRecord[]> {
     const { tenantId, aggregateType, aggregateId } = request;
     try {
@@ -303,6 +325,7 @@ export class EventRepositoryClickHouse implements EventRepository {
     upToEventId: string;
     after: { timestamp: number; eventId: string } | undefined;
     limit: number;
+    occurredAtFromMs?: number;
   }): { query: string; query_params: Record<string, unknown> } {
     const {
       tenantId,
@@ -312,6 +335,7 @@ export class EventRepositoryClickHouse implements EventRepository {
       upToEventId,
       after,
       limit,
+      occurredAtFromMs,
     } = request;
     const afterClause = after
       ? `AND (
@@ -321,6 +345,13 @@ export class EventRepositoryClickHouse implements EventRepository {
               AND EventId > {afterEventId:String}
             )
           )`
+      : "";
+    // The cursor and the upper bound are both on EventTimestamp, which is NOT
+    // the partition key — so neither prunes. Only EventOccurredAt does.
+    const hasLowerBound =
+      typeof occurredAtFromMs === "number" && occurredAtFromMs > 0;
+    const occurredAtFilter = hasLowerBound
+      ? "AND (EventOccurredAt = 0 OR EventOccurredAt >= {occurredAtFromMs:UInt64})"
       : "";
     return {
       query: `
@@ -337,6 +368,7 @@ export class EventRepositoryClickHouse implements EventRepository {
         WHERE TenantId = {tenantId:String}
           AND AggregateType = {aggregateType:String}
           AND AggregateId = {aggregateId:String}
+          ${occurredAtFilter}
           AND (
             EventTimestamp < {upToTimestamp:UInt64}
             OR (
@@ -354,6 +386,7 @@ export class EventRepositoryClickHouse implements EventRepository {
         aggregateId: String(aggregateId),
         upToTimestamp,
         upToEventId,
+        ...(hasLowerBound ? { occurredAtFromMs } : {}),
         ...(after
           ? { afterTimestamp: after.timestamp, afterEventId: after.eventId }
           : {}),
