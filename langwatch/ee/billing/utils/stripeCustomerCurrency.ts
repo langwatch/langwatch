@@ -2,13 +2,18 @@ import { createLogger } from "@langwatch/observability";
 import { Currency } from "@prisma/client";
 import type Stripe from "stripe";
 import { toError } from "../../../src/utils/posthogErrorCapture";
+import {
+  BillingCurrencyUnavailableError,
+  BillingCustomerDeletedError,
+  UnsupportedBillingCurrencyError,
+} from "../errors";
 
 const logger = createLogger("langwatch:billing:stripeCustomerCurrency");
 
 /**
  * What we were able to establish about the currency a checkout must use.
  *
- * The three cases are kept apart on purpose. Collapsing them into "a currency,
+ * The four cases are kept apart on purpose. Collapsing them into "a currency,
  * or else the one the caller asked for" is what the original bug looked like:
  * Stripe fixes a customer's currency once they have an invoice and rejects
  * sessions in any other one, so guessing wrong is not a degraded result, it is
@@ -91,4 +96,30 @@ export const resolveCheckoutCurrency = async ({
   }
 
   return { status: "resolved", currency };
+};
+
+/**
+ * The currency to build the checkout in, or the handled error explaining why
+ * there isn't one.
+ *
+ * Exhaustive over the resolution so a status added later cannot quietly fall
+ * through to "carry on and let Checkout reject it" — which is the shape of the
+ * bug this whole preflight exists to prevent. Callers must invoke this before
+ * any write: every failure here is one no database change can help.
+ */
+export const requireCheckoutCurrency = (
+  resolution: CheckoutCurrencyResolution,
+): Currency => {
+  switch (resolution.status) {
+    case "resolved":
+      return resolution.currency;
+    case "unsupported":
+      throw new UnsupportedBillingCurrencyError();
+    case "deleted":
+      throw new BillingCustomerDeletedError();
+    case "unavailable":
+      throw new BillingCurrencyUnavailableError({
+        reasons: [resolution.cause],
+      });
+  }
 };

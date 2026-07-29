@@ -6,11 +6,8 @@ import {
 import { nanoid } from "nanoid";
 import type Stripe from "stripe";
 import {
-  BillingCurrencyUnavailableError,
-  BillingCustomerDeletedError,
   NoActiveSubscriptionError,
   SubscriptionItemNotFoundError,
-  UnsupportedBillingCurrencyError,
 } from "../errors";
 import { SubscriptionStatus } from "../planTypes";
 import type { BillingInterval } from "../utils/growthSeatEvent";
@@ -20,7 +17,10 @@ import {
   isGrowthSeatPrice,
   resolveGrowthSeatPlanType,
 } from "../utils/growthSeatEvent";
-import { resolveCheckoutCurrency } from "../utils/stripeCustomerCurrency";
+import {
+  requireCheckoutCurrency,
+  resolveCheckoutCurrency,
+} from "../utils/stripeCustomerCurrency";
 
 type InviteInput = {
   email: string;
@@ -61,26 +61,14 @@ export const createSeatEventSubscriptionFns = ({
     // Resolve the currency before touching the database. A checkout we cannot
     // build in the customer's own currency will be rejected outright, and every
     // write below this point would have to be cleaned up afterwards.
-    const resolution = await resolveCheckoutCurrency({
-      stripe,
-      customerId,
-      organizationId,
-      requestedCurrency: currency,
-    });
-
-    if (resolution.status === "unsupported") {
-      throw new UnsupportedBillingCurrencyError();
-    }
-    if (resolution.status === "deleted") {
-      throw new BillingCustomerDeletedError();
-    }
-    if (resolution.status === "unavailable") {
-      throw new BillingCurrencyUnavailableError({
-        reasons: [resolution.cause],
-      });
-    }
-
-    const checkoutCurrency = resolution.currency;
+    const checkoutCurrency = requireCheckoutCurrency(
+      await resolveCheckoutCurrency({
+        stripe,
+        customerId,
+        organizationId,
+        requestedCurrency: currency,
+      }),
+    );
 
     // Find stale PENDING subs so we can clean up their PAYMENT_PENDING invites too
     const staleSubs = await db.subscription.findMany({
