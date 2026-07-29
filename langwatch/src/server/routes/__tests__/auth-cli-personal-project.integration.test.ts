@@ -21,14 +21,7 @@
  * Spec: specs/ai-governance/cli-onboarding/me-credentials.feature
  * Spec: specs/ai-governance/cli-onboarding/login-unified.feature
  */
-import {
-  afterAll,
-  beforeAll,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 const ids = vi.hoisted(() => {
   const s = Math.random().toString(36).slice(2, 10);
@@ -60,8 +53,8 @@ import {
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
 import { connection as redisConnection } from "~/server/redis";
-import { app } from "../auth-cli";
 import { app as meApp } from "../../../app/api/me/[[...route]]/app";
+import { app } from "../auth-cli";
 
 const suffix = ids.suffix;
 const USER_ID = ids.USER_ID;
@@ -128,7 +121,10 @@ async function projectKey(
     },
     body: JSON.stringify({ slug }),
   });
-  return { status: res.status, json: (await res.json()) as Record<string, unknown> };
+  return {
+    status: res.status,
+    json: (await res.json()) as Record<string, unknown>,
+  };
 }
 
 describe("/me credentials delivery over the CLI auth surface", () => {
@@ -137,7 +133,11 @@ describe("/me credentials delivery over the CLI auth surface", () => {
   beforeAll(async () => {
     await startTestContainers();
     await prisma.organization.create({
-      data: { id: ORG_ID, name: `MeCred Org ${suffix}`, slug: `mecred-${suffix}` },
+      data: {
+        id: ORG_ID,
+        name: `MeCred Org ${suffix}`,
+        slug: `mecred-${suffix}`,
+      },
     });
     await prisma.user.create({
       data: { id: USER_ID, email: ids.EMAIL, name: ids.NAME },
@@ -342,7 +342,11 @@ describe("/me credentials delivery over the CLI auth surface", () => {
 
     const personalTeamCount = (userId: string) =>
       prisma.team.count({
-        where: { organizationId: ORG_ID, ownerUserId: userId, isPersonal: true },
+        where: {
+          organizationId: ORG_ID,
+          ownerUserId: userId,
+          isPersonal: true,
+        },
       });
 
     /** @scenario an offboarded user's pre-removal token cannot mint or return a personal key */
@@ -382,7 +386,9 @@ describe("/me credentials delivery over the CLI auth surface", () => {
       });
       expect(after.status).toBe(401);
 
-      await prisma.user.deleteMany({ where: { id: offboardId } }).catch(() => {});
+      await prisma.user
+        .deleteMany({ where: { id: offboardId } })
+        .catch(() => {});
     });
 
     /** @scenario a deactivated user's token cannot mint or return a personal key */
@@ -434,7 +440,9 @@ describe("/me credentials delivery over the CLI auth surface", () => {
       expect(status).toBe(403);
       expect(await redisConnection!.get(`lwcli:access:${token}`)).toBeNull();
 
-      await prisma.user.deleteMany({ where: { id: outsiderId } }).catch(() => {});
+      await prisma.user
+        .deleteMany({ where: { id: outsiderId } })
+        .catch(() => {});
     });
   });
 

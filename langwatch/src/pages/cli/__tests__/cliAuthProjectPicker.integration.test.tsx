@@ -326,9 +326,7 @@ describe("/cli/auth project picker", () => {
       // offered projects cannot match the ambient project (Home Org's), so
       // the picker legitimately starts with nothing selected.
       await waitFor(() =>
-        expect(
-          screen.getByRole("button", { name: "Acme Org" }),
-        ).toBeDefined(),
+        expect(screen.getByRole("button", { name: "Acme Org" })).toBeDefined(),
       );
       await user.click(screen.getByRole("button", { name: "Acme Org" }));
     });
@@ -353,9 +351,9 @@ describe("/cli/auth project picker", () => {
       expect(screen.getAllByText("Engineering").length).toBeGreaterThan(0);
       // The personal entry rides its own explicit group label.
       expect(screen.getAllByText("Personal").length).toBeGreaterThan(0);
-      expect(
-        screen.getAllByText("Personal Workspace").length,
-      ).toBeGreaterThan(0);
+      expect(screen.getAllByText("Personal Workspace").length).toBeGreaterThan(
+        0,
+      );
     });
 
     it("approves with an explicitly picked personal project", async () => {

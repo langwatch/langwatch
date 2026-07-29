@@ -1313,7 +1313,11 @@ secured.access(CLI_POLICY).post("/project-key", async (c: Context) => {
       404,
     );
   }
-  const refusal = await refuseProjectKeyHandout(c, project, tokenRecord.user_id);
+  const refusal = await refuseProjectKeyHandout(
+    c,
+    project,
+    tokenRecord.user_id,
+  );
   if (refusal) return refusal;
   return c.json(
     {

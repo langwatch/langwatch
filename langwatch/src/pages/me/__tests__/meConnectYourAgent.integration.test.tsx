@@ -12,10 +12,11 @@
  * authorize page's first-trace watch polls, reused here as the button's
  * appearance gate.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";

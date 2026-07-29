@@ -787,7 +787,9 @@ export function ScopeChipPicker<
             >
               <HStack gap={1}>
                 <CheckCheck size={14} aria-hidden />
-                <Text>{scopes.length === 0 ? "None selected" : "Multiple"}</Text>
+                <Text>
+                  {scopes.length === 0 ? "None selected" : "Multiple"}
+                </Text>
               </HStack>
             </Button>
           )}
