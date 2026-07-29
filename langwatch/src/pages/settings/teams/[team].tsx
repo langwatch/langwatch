@@ -16,6 +16,7 @@ import { type SubmitHandler, useForm, useWatch } from "react-hook-form";
 import { useDebouncedCallback } from "use-debounce";
 import { PermissionAlert } from "~/components/PermissionAlert";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import { showErrorToast } from "~/features/errors";
 import { useRouter } from "~/utils/compat/next-router";
 import { ConfirmDialog } from "../../../components/gateway/ConfirmDialog";
 import SettingsLayout from "../../../components/SettingsLayout";
@@ -233,7 +234,12 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembersAndUsers }) {
               error.data?.code === "FORBIDDEN"
             ) {
               toaster.create({
-                title: error.message,
+                // FORBIDDEN on this mutation is only ever raised by our own
+                // personal-workspace guards, and its message is a sentence
+                // written for the customer that says what to do instead. RBAC
+                // failures arrive as UNAUTHORIZED and are handled below, so
+                // nothing unauthored reaches this line.
+                title: error.message, // no-raw-error-toast-ok
                 type: "error",
                 duration: 8000,
                 meta: {
@@ -280,11 +286,19 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembersAndUsers }) {
         onError: (error) => {
           if (isHandledByGlobalHandler(error)) return;
           const refused =
-            error instanceof TRPCClientError && error.data?.code === "FORBIDDEN";
+            error instanceof TRPCClientError &&
+            error.data?.code === "FORBIDDEN";
+          if (!refused) {
+            showErrorToast({ error, fallbackTitle: "Failed to archive team" });
+            return;
+          }
           toaster.create({
-            title: refused ? error.message : "Failed to archive team",
+            // Same as the save path: a FORBIDDEN here is our own guard
+            // refusing to archive a personal workspace, and its message is
+            // the sentence explaining why.
+            title: error.message, // no-raw-error-toast-ok
             type: "error",
-            duration: refused ? 8000 : 5000,
+            duration: 8000,
             meta: { closable: true },
           });
         },

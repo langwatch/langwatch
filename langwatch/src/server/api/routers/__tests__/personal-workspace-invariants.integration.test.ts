@@ -27,12 +27,13 @@
  *
  * Requires: PostgreSQL database (Prisma)
  */
+
+import { generate } from "@langwatch/ksuid";
 import {
   OrganizationUserRole,
   RoleBindingScopeType,
   TeamUserRole,
 } from "@prisma/client";
-import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
 import {
   afterAll,
@@ -44,17 +45,16 @@ import {
   it,
   vi,
 } from "vitest";
-
+import { KSUID_RESOURCES } from "~/utils/constants";
 import { PersonalWorkspaceService } from "../../../../../ee/governance/services/personalWorkspace.service";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import { globalForApp, resetApp } from "../../../app-layer/app";
 import { createTestApp } from "../../../app-layer/presets";
 import { PlanProviderService } from "../../../app-layer/subscription/plan-provider";
+import { prisma } from "../../../db";
 import { LicenseEnforcementRepository } from "../../../license-enforcement/license-enforcement.repository";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
-import { prisma } from "../../../db";
-import { KSUID_RESOURCES } from "~/utils/constants";
 
 vi.mock("../../../auditLog", () => ({
   auditLog: vi.fn(() => Promise.resolve()),
