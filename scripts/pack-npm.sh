@@ -176,10 +176,20 @@ if [ -z "$tarball" ]; then
 fi
 
 if [ -f "$ROOT/langwatch/dist/client/index.html" ]; then
-  if ! tar -tzf "$tarball" | grep -qx "package/app/langwatch/dist/client/index.html"; then
+  # List once into a file rather than piping into `grep -q`. grep -q exits at
+  # the first match, which SIGPIPEs tar; under `pipefail` that non-zero tar
+  # fails the pipeline even though the match succeeded, so the check reported
+  # the file missing when it was present. It fired on linux and not macos —
+  # the race depends on how much tar writes before grep exits, which is
+  # exactly the kind of check that must not be timing-dependent.
+  listing="$(mktemp)"
+  tar -tzf "$tarball" > "$listing"
+  if ! grep -qx "package/app/langwatch/dist/client/index.html" "$listing"; then
+    rm -f "$listing"
     echo "✗ the repo has a built langwatch/dist/client but the tarball does not ship it." >&2
     echo "  Something filtered it out after staging — check for an ignore file in the staged tree." >&2
     exit 1
   fi
+  rm -f "$listing"
   echo "→ verified: tarball ships the prebuilt langwatch/dist/client"
 fi
