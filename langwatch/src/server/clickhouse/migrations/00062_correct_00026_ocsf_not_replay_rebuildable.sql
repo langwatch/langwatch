@@ -13,7 +13,7 @@
 --   1. The table is REACTOR-populated (governanceOcsfEventsSync, registered via
 --      builder.withReactor("traceSummary", …)), NOT a fold projection. Event
 --      replay rebuilds fold/map projections and NEVER invokes reactors
---      (projections/projectionRouter.ts; ADR-046), so a rebuild from event_log
+--      (projections/projectionRouter.ts; ADR-081), so a rebuild from event_log
 --      produces ZERO OCSF rows for event-sourced audit events.
 --   2. Two of its three writers never touch event_log at all —
 --      adminWorkspaceViewAudit.service.ts (admin drill-in audit) and
@@ -21,7 +21,7 @@
 --      representation, so no replay however capable could reconstruct them.
 --
 -- DO NOT drop + rebuild governance_ocsf_events from event_log. It is a durable
--- audit sink, not derived data. See dev/docs/adr/046-drop-to-replay-not-recovery
+-- audit sink, not derived data. See dev/docs/adr/081-drop-to-replay-not-recovery
 -- -for-reactors.md for the full decision record.
 -- +goose StatementBegin
 SELECT 1;

@@ -6,7 +6,7 @@ import { createLogger } from "@langwatch/observability";
  * `governance_ocsf_events` — a REACTOR-populated table (NOT a fold
  * projection: it is registered via `builder.withReactor("traceSummary", …)`,
  * and two of its writers — adminWorkspaceViewAudit + pullerWorker — never touch
- * `event_log` at all, so it cannot be rebuilt from `event_log`; see ADR-046).
+ * `event_log` at all, so it cannot be rebuilt from `event_log`; see ADR-081).
  * Each call inserts ONE
  * OCSF row keyed by (TenantId, EventId) so reactor replays of the
  * same event collapse at merge time.

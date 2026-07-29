@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-// #721 / ADR-046: "recover via event replay" is FALSE for reactors, and that
+// #721 / ADR-081: "recover via event replay" is FALSE for reactors, and that
 // premise re-justified this module's silent drop from six places before it was
 // caught. This guard fails if the claim reappears in the queue module WITHOUT a
 // caveat scoping it to fold/map (or denying it for reactors). A guard that cannot
@@ -22,14 +22,25 @@ const CLAIM =
 /**
  * Tokens that genuinely SCOPE or DENY the claim on the SAME line. Deliberately
  * NOT `reactor` (a claim stated affirmatively *about* a reactor is the single most
- * dangerous case — ADR-046) and NOT a bare `only` (an unrelated "only high-priority
+ * dangerous case — ADR-081) and NOT a bare `only` (an unrelated "only high-priority
  * jobs" must not silence it). Every real correction site in this module carries one
  * of these on the same line as the claim, so a same-line check needs no ±1 window —
  * which is what let an unrelated `not`/`only` on an adjacent line create a
  * false-negative (hygiene review, PR #5853).
  */
-const CAVEAT =
-  /\bnot\b|\bnever\b|used to|n['’]t|adr-046|permanent loss|fold\/map|justified|once claimed/i;
+const CAVEAT_STRONG =
+  /used to|adr-081|permanent loss|fold\/map|justified|once claimed/i;
+/**
+ * Negations that are only meaningful ADJACENT to the claim. A bare `not`/`never`
+ * anywhere on the line is not evidence of a caveat — it is the same
+ * unrelated-token false-negative the ±1 line window used to have, moved onto one
+ * line. Review of PR #5853 showed 4 of 5 realistic phrasings slipping past a
+ * whole-line test, e.g. `// This never blocks the group, and the job recovers via
+ * event replay.` So these count only inside {@link CAVEAT_WINDOW} of the match.
+ */
+const CAVEAT_WEAK = /\bnot\b|\bnever\b|n['’]t/i;
+/** Chars either side of the claim in which a weak negation still scopes it. */
+const CAVEAT_WINDOW = 24;
 
 /**
  * Lines that ASSERT replay recovers a drop, with no scoping/denying caveat on the
@@ -39,15 +50,22 @@ const CAVEAT =
 function replayClaimViolations(source: string): string[] {
   return source
     .split("\n")
-    .filter((line) => CLAIM.test(line) && !CAVEAT.test(line))
+    .filter((line) => {
+      const match = CLAIM.exec(line);
+      if (!match) return false;
+      if (CAVEAT_STRONG.test(line)) return false;
+      const from = Math.max(0, match.index - CAVEAT_WINDOW);
+      const to = match.index + match[0].length + CAVEAT_WINDOW;
+      return !CAVEAT_WEAK.test(line.slice(from, to));
+    })
     .map((line) => line.trim());
 }
 
-describe("replay-recovery premise guard (#721 / ADR-046)", () => {
+describe("replay-recovery premise guard (#721 / ADR-081)", () => {
   describe("given the queue module source as shipped", () => {
     /** @scenario the replay-premise guard passes on the corrected tree */
     it("contains no un-caveated replay-recovery claim", () => {
-      // Scan .md too: groupQueue/ARCHITECTURE.md is one of ADR-046's corrected
+      // Scan .md too: groupQueue/ARCHITECTURE.md is one of ADR-081's corrected
       // sites and lives in this exact directory — the guard must protect it.
       const files = readdirSync(MODULE_DIR).filter(
         (f) =>
@@ -72,6 +90,11 @@ describe("replay-recovery premise guard (#721 / ADR-046)", () => {
         "// the work recovers via event replay, so the drop is safe",
         "// A reactor job recovers via event replay like everything else.",
         "// handles only high-priority jobs and recovers via event replay",
+        // Same-line but UNRELATED negations — a whole-line caveat test silenced
+        // all of these (test review, PR #5853).
+        "// This never blocks the group, and the job recovers via event replay.",
+        "// Retries do not affect this: the job recovers via event replay.",
+        "// This is not a fold, and the reactor job recovers via event replay.",
       ]) {
         expect(replayClaimViolations(planted)).toHaveLength(1);
       }
@@ -86,7 +109,7 @@ describe("replay-recovery premise guard (#721 / ADR-046)", () => {
 
       // MUST stay silent — genuinely scoped or denied on the same line.
       for (const caveated of [
-        "// NOT recoverable via replay for a reactor job (see ADR-046)",
+        "// NOT recoverable via replay for a reactor job (see ADR-081)",
         "// recover via replay for fold/map only",
         "// This used to say 'recoverable via event replay'. It is not.",
       ]) {

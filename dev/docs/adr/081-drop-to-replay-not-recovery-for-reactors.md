@@ -1,4 +1,4 @@
-# ADR-046: Drop-to-replay is not a recovery strategy for reactor-bearing folds
+# ADR-081: Drop-to-replay is not a recovery strategy for reactor-bearing folds
 
 **Date:** 2026-07-16
 
