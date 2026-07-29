@@ -109,7 +109,7 @@ describe("TraceAnalyticsClickHouseRepository DateTime64 decode", () => {
 });
 
 /**
- * An unmaterialised variable-size column (see migrations 00014 / 00057 / 00062)
+ * An unmaterialised variable-size column (see migrations 00014 / 00057 / 00064)
  * makes ClickHouse decode a size header that was never written and request an
  * absurd allocation. Retrying cannot repair it, so the read has to be reported
  * as a MISS — the refold-from-event_log path then writes a fresh version whose

@@ -29,7 +29,7 @@ const logger = createLogger(
  * The shape this exists for: an `ADD COLUMN` of a variable-size type without a
  * DEFAULT leaves the column unmaterialised in parts written before the ALTER,
  * so a read decodes a size header that was never written and asks for an absurd
- * allocation (migrations 00014, 00057, 00062). It has surfaced twice in
+ * allocation (migrations 00014, 00057, 00064). It has surfaced twice in
  * production on this table's `AnnotationIds`.
  *
  * BOTH conditions are required, and the pairing is the point:
@@ -54,8 +54,7 @@ function isUnreadableColumnError(error: unknown): boolean {
   const message = error.message;
 
   return (
-    /\bCode:\s*173\b/.test(message) &&
-    message.includes("while reading column")
+    /\bCode:\s*173\b/.test(message) && message.includes("while reading column")
   );
 }
 
