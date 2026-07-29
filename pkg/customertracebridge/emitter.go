@@ -490,11 +490,18 @@ func endUserID(ctx context.Context, params domain.AITraceParams) string {
 	switch params.RequestType {
 	case domain.RequestTypeChat, domain.RequestTypeEmbeddings,
 		domain.RequestTypeResponses, domain.RequestTypeSpeech:
-		// OpenAI-wire shapes carry a top-level `user` string for abuse
-		// attribution; it is forwarded upstream unchanged and mirrored here.
-		if user := gjson.GetBytes(params.RequestBody, "user").String(); user != "" {
-			return SanitizeEndUserID(user)
-		}
+		return EndUserIDFromBody(params.RequestBody)
+	}
+	return ""
+}
+
+// EndUserIDFromBody reads the OpenAI-wire top-level `user` string (the
+// abuse-attribution param, forwarded upstream unchanged) and sanitizes it.
+// Shared by the span emitter and the spend emitter so both attribute the
+// same request to the same id.
+func EndUserIDFromBody(body []byte) string {
+	if user := gjson.GetBytes(body, "user").String(); user != "" {
+		return SanitizeEndUserID(user)
 	}
 	return ""
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/oklog/ulid/v2"
@@ -32,6 +33,7 @@ import (
 	"github.com/langwatch/langwatch/services/aigateway/adapters/policy"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/providers"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/ratelimit"
+	"github.com/langwatch/langwatch/services/aigateway/adapters/spendemitter"
 )
 
 // Deps holds validated infrastructure adapters needed by the gateway.
@@ -52,6 +54,10 @@ type Deps struct {
 	Health        *health.Registry
 	Metrics       *gatewaymetrics.Recorder
 	Breaker       *breaker.Registry
+	// Spend emission (nil when LW_GATEWAY_SPEND_ENABLED is off).
+	SpendEmitter *spendemitter.Emitter
+	SpendSpool   *spendemitter.Spool
+	SpendDrainer *spendemitter.Drainer
 }
 
 // NewDeps builds all infrastructure adapters from the given config.
@@ -209,6 +215,41 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 	metrics.TrackDraining(probes.Draining)
 	metrics.TrackAuthCacheSize(authSvc.CacheLen)
 
+	var spendSpool *spendemitter.Spool
+	var spendEmitterAdapter *spendemitter.Emitter
+	var spendDrainer *spendemitter.Drainer
+	if cfg.SpendEmitter.Enabled {
+		spoolDir := cfg.SpendEmitter.SpoolDir
+		if spoolDir == "" {
+			spoolDir = filepath.Join(os.TempDir(), "langwatch-gateway-spend-spool")
+		}
+		flushEvery := time.Duration(cfg.SpendEmitter.FlushIntervalSeconds) * time.Second
+		spendSpool, err = spendemitter.Open(spendemitter.SpoolOptions{
+			Dir:             spoolDir,
+			MaxTotalBytes:   cfg.SpendEmitter.SpoolMaxBytes,
+			FlushEvery:      flushEvery,
+			PodID:           nodeID,
+			Logf:            func(format string, args ...any) { logger.Sugar().Warnf(format, args...) },
+		})
+		if err != nil {
+			return ctx, nil, fmt.Errorf("spend spool: %w", err)
+		}
+		ingestBase := cfg.SpendEmitter.IngestBaseURL
+		if ingestBase == "" {
+			ingestBase = cfg.ControlPlane.BaseURL
+		}
+		ingestClient, err := spendemitter.NewIngestClient(ingestBase, signer)
+		if err != nil {
+			return ctx, nil, fmt.Errorf("spend ingest client: %w", err)
+		}
+		spendEmitterAdapter = spendemitter.NewEmitter(spendSpool)
+		spendDrainer = spendemitter.NewDrainer(spendemitter.DrainerOptions{
+			Spool:   spendSpool,
+			Shipper: ingestClient,
+			Logf:    func(format string, args ...any) { logger.Sugar().Warnf(format, args...) },
+		})
+	}
+
 	return ctx, &Deps{
 		Logger:        logger,
 		NodeID:        nodeID,
@@ -226,6 +267,9 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 		Health:        probes,
 		Metrics:       metrics,
 		Breaker:       circuits,
+		SpendEmitter:  spendEmitterAdapter,
+		SpendSpool:    spendSpool,
+		SpendDrainer:  spendDrainer,
 	}, nil
 }
 
