@@ -1,4 +1,4 @@
-import type { Annotation, AnnotationScore, User } from "@prisma/client";
+import type { Annotation, AnnotationScore } from "@prisma/client";
 import { z } from "zod";
 import { getSpanNameOrModel } from "../../utils/trace";
 import { datasetSpanSchema } from "../datasets/types";
@@ -562,12 +562,10 @@ export const TRACE_EXPANSIONS = {
     label: "annotation",
     expansion: (trace: TraceWithAnnotations) => {
       const annotations = trace.annotations ?? [];
-      return annotations.map(
-        (annotation: Annotation & { user?: User | null }) => ({
-          ...trace,
-          annotations: [annotation],
-        }),
-      );
+      return annotations.map((annotation) => ({
+        ...trace,
+        annotations: [annotation],
+      }));
     },
   },
   "events.event_id": {
