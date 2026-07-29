@@ -57,8 +57,8 @@ const OUTBOX_ROW_RETENTION_MS = 24 * 60 * 60 * 1000;
 /**
  * The Stripe-shaped retry ladder. `attempt` is the 1-based attempt that
  * just failed: the delay to the next one. After the sixth failure the
- * cadence holds at 12h; 12 attempts keep the last retry inside 72h of the
- * first failure (1m + 5m + 30m + 2h + 6h + 12h + 5 * 12h = 68h36m).
+ * cadence holds at 12h; 11 attempts keep the last retry inside 72h of the
+ * first failure (1m + 5m + 30m + 2h + 6h + 12h + 4 * 12h = 68h36m).
  */
 export const WEBHOOK_RETRY_LADDER_MS: readonly number[] = [
   60_000,
@@ -68,7 +68,7 @@ export const WEBHOOK_RETRY_LADDER_MS: readonly number[] = [
   6 * 60 * 60_000,
   12 * 60 * 60_000,
 ];
-export const WEBHOOK_SEND_MAX_ATTEMPTS = 12;
+export const WEBHOOK_SEND_MAX_ATTEMPTS = 11;
 
 export function webhookRetryDelayMs({ attempt }: { attempt: number }): number {
   return (
@@ -320,14 +320,32 @@ async function scanProject({
   });
   if (outcome !== "committed") return;
 
-  await deps.eventsRepository.markEnqueued(
-    freshRows.map((row) => ({
-      tenantId: projectId,
-      gatewayRequestId: row.gatewayRequestId,
-      eventType: "gateway.request.completed",
-      batchId: `scan:${now}`,
-    })),
-  );
+  // The commit above is the atomic boundary: batches and cursor land
+  // together, so the events are enqueued no matter what happens next. The
+  // markers only guard future re-emission, so their write is retried here
+  // rather than failing the (already-committed) scan.
+  const markers = freshRows.map((row) => ({
+    tenantId: projectId,
+    gatewayRequestId: row.gatewayRequestId,
+    eventType: "gateway.request.completed",
+    batchId: `scan:${now}`,
+  }));
+  let lastMarkerError: unknown;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      await deps.eventsRepository.markEnqueued(markers);
+      lastMarkerError = undefined;
+      break;
+    } catch (error) {
+      lastMarkerError = error;
+    }
+  }
+  if (lastMarkerError !== undefined) {
+    logger.error(
+      { projectId, count: markers.length, error: lastMarkerError },
+      "webhook first-sight markers failed after the batch commit; a future restatement of these ids could re-emit",
+    );
+  }
 }
 
 async function commitScan({

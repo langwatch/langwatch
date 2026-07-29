@@ -138,6 +138,11 @@ export const ORG_TENANCY_EXEMPT: readonly string[] = [
   "DataPrivacyPolicy",
   "ModelProvider",
   "ModelDefaultConfig",
+  // Webhook platform: enforced by guardProjectId's SCOPED_MODELS (org id,
+  // row id, or endpoint FK required on every query; creates must carry the
+  // org); the delivery sweep and retention prune use the raw-SQL opt-out.
+  "WebhookEndpoint",
+  "WebhookEndpointDelivery",
   // organizationId is NULLABLE here (NULL = platform-published default), so a
   // mandatory-organizationId guard cannot apply.
   "IngestionTemplate",

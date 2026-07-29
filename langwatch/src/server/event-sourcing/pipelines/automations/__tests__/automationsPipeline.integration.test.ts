@@ -35,12 +35,10 @@ const pipelineDeps = (): AutomationsPipelineDeps => ({
     decideSweepCandidates: vi.fn().mockResolvedValue([]),
     evaluateGraphTrigger: vi.fn().mockResolvedValue(undefined),
     deleteDispatchedBefore: vi.fn().mockResolvedValue(0),
-    requeueDeadMessages: vi.fn().mockResolvedValue(0),
   },
   prune: {
     pruneExpired: vi.fn().mockResolvedValue(0),
     deleteDispatchedBefore: vi.fn().mockResolvedValue(0),
-    requeueDeadMessages: vi.fn().mockResolvedValue(0),
   },
 });
 

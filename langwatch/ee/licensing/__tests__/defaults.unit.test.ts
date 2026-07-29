@@ -173,6 +173,7 @@ describe("resolvePlanDefaults", () => {
       maxProjects: resolved.maxProjects,
       maxMessagesPerMonth: resolved.maxMessagesPerMonth,
       maxWorkflows: resolved.maxWorkflows,
+      webhookEndpoints: resolved.webhookEndpoints,
       maxPrompts: resolved.maxPrompts,
       maxEvaluators: resolved.maxEvaluators,
       maxScenarios: resolved.maxScenarios,
