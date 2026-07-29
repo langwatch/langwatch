@@ -1,9 +1,8 @@
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
+import { apiRequest } from "../../utils/apiClient";
 import { checkApiKey } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
-import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import type { CommandResult } from "../../utils/output";
@@ -28,22 +27,13 @@ export const updateSecretCommand = async (
   const spinner = createSpinner(`Updating secret "${id}"...`).start();
 
   try {
-    const response = await fetch(`${endpoint}/api/secrets/${id}`, {
+    const secret = (await apiRequest({
       method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-        ...buildAuthHeaders({ apiKey }),
-      },
-      body: JSON.stringify({ value: options.value }),
-    });
-
-    if (!response.ok) {
-      const message = await formatFetchError(response);
-      failSpinner({ spinner, error: new Error(message), action: "update secret" });
-      process.exit(1);
-    }
-
-    const secret = (await response.json()) as {
+      path: `/api/secrets/${encodeURIComponent(id)}`,
+      apiKey,
+      endpoint,
+      body: { value: options.value },
+    })) as {
       id: string;
       name: string;
     };

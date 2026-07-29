@@ -1,10 +1,9 @@
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
+import { apiRequest } from "../../utils/apiClient";
 import { checkApiKey } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
 import { commandValidationError } from "../../utils/errorOutput";
-import { buildAuthHeaders } from "@/internal/api/auth";
 import type { CommandResult } from "../../utils/output";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
@@ -36,25 +35,13 @@ export const updateWorkflowCommand = async (
       process.exit(1);
     }
 
-    const response = await fetch(
-      `${endpoint}/api/workflows/${encodeURIComponent(id)}`,
-      {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          ...buildAuthHeaders({ apiKey }),
-        },
-        body: JSON.stringify(body),
-      },
-    );
-
-    if (!response.ok) {
-      const message = await formatFetchError(response);
-      failSpinner({ spinner, error: new Error(message), action: "update workflow" });
-      process.exit(1);
-    }
-
-    const workflow = await response.json() as {
+    const workflow = (await apiRequest({
+      method: "PATCH",
+      path: `/api/workflows/${encodeURIComponent(id)}`,
+      apiKey,
+      endpoint,
+      body,
+    })) as {
       id: string;
       name: string;
       icon: string | null;

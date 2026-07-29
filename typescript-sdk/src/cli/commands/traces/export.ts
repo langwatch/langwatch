@@ -1,11 +1,10 @@
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
 import fs from "fs";
+import { apiRequest } from "../../utils/apiClient";
 import { checkApiKey } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
 import { createCommandEvents, type CommandEvents } from "../../telemetry/events";
-import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import { parseOriginOption } from "./origin-filter";
@@ -58,46 +57,20 @@ export const exportTracesCommand = async (options: {
   try {
     events.started(`Exporting traces as ${format}…`);
 
-    const response = await fetch(`${endpoint}/api/traces/search`, {
+    const data = (await apiRequest({
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...buildAuthHeaders({ apiKey }),
-      },
-      body: JSON.stringify({
+      path: "/api/traces/search",
+      apiKey,
+      endpoint,
+      body: {
         query: options.query,
         startDate,
         endDate,
         pageSize: Math.min(limit, 100),
         format: "json",
         ...(originFilter ? { filters: { "traces.origin": originFilter } } : {}),
-      }),
-    });
-
-    if (!response.ok) {
-      // Read the body off a CLONE before `formatFetchError` consumes it, so the
-      // event keeps the platform's real error kind instead of degrading to one
-      // guessed from the status.
-      const body: unknown = await response
-        .clone()
-        .json()
-        .catch(() => undefined);
-
-      const message = await formatFetchError(response);
-      events.failed({
-        error: Object.assign(new Error(message), {
-          status: response.status,
-          originalError: body,
-        }),
-        message: "Trace export failed",
-      });
-      await events.flush();
-
-      failSpinner({ spinner, error: new Error(message), action: "export traces" });
-      process.exit(1);
-    }
-
-    const data = await response.json() as {
+      },
+    })) as {
       traces: ExportedTrace[];
       pagination?: { totalHits?: number };
     };

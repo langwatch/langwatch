@@ -1,10 +1,9 @@
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
+import { apiRequest } from "../../utils/apiClient";
 import { checkApiKey } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
-import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 /**
@@ -37,17 +36,12 @@ export const getMonitorCommand = async (
     platformUrl?: string;
   };
   try {
-    const response = await fetch(`${endpoint}/api/monitors/${id}`, {
-      headers: buildAuthHeaders({ apiKey }),
-    });
-
-    if (!response.ok) {
-      const message = await formatFetchError(response);
-      failSpinner({ spinner, error: new Error(message), action: "fetch monitor" });
-      process.exit(1);
-    }
-
-    monitor = (await response.json()) as {
+    monitor = (await apiRequest({
+      method: "GET",
+      path: `/api/monitors/${encodeURIComponent(id)}`,
+      apiKey,
+      endpoint,
+    })) as {
       id: string;
       name: string;
       slug: string;

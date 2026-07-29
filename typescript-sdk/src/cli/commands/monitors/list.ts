@@ -1,11 +1,10 @@
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
+import { apiRequest } from "../../utils/apiClient";
 import { checkApiKey } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
 import { formatTable } from "../../utils/formatting";
 import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
-import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 /**
@@ -31,17 +30,12 @@ export const listMonitorsCommand = async (): Promise<CommandResult | void> => {
     sample: number;
   }>;
   try {
-    const response = await fetch(`${endpoint}/api/monitors`, {
-      headers: buildAuthHeaders({ apiKey }),
-    });
-
-    if (!response.ok) {
-      const message = await formatFetchError(response);
-      failSpinner({ spinner, error: new Error(message), action: "fetch monitors" });
-      process.exit(1);
-    }
-
-    monitors = (await response.json()) as Array<{
+    monitors = (await apiRequest({
+      method: "GET",
+      path: "/api/monitors",
+      apiKey,
+      endpoint,
+    })) as Array<{
       id: string;
       name: string;
       checkType: string;

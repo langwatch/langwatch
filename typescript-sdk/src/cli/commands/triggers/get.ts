@@ -1,9 +1,8 @@
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
+import { apiRequest } from "../../utils/apiClient";
 import { checkApiKey } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
-import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import type { CommandResult } from "../../utils/output";
@@ -26,17 +25,12 @@ export const getTriggerCommand = async (
   const spinner = createSpinner(`Fetching trigger "${id}"...`).start();
 
   try {
-    const response = await fetch(`${endpoint}/api/triggers/${encodeURIComponent(id)}`, {
-      headers: buildAuthHeaders({ apiKey }),
-    });
-
-    if (!response.ok) {
-      const message = await formatFetchError(response);
-      failSpinner({ spinner, error: new Error(message), action: `fetch trigger "${id}"` });
-      process.exit(1);
-    }
-
-    const trigger = await response.json() as {
+    const trigger = (await apiRequest({
+      method: "GET",
+      path: `/api/triggers/${encodeURIComponent(id)}`,
+      apiKey,
+      endpoint,
+    })) as {
       id: string;
       name: string;
       action: string;
@@ -80,7 +74,7 @@ export const getTriggerCommand = async (
       },
     };
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch trigger" });
+    failSpinner({ spinner, error, action: `fetch trigger "${id}"` });
     process.exit(1);
   }
 };

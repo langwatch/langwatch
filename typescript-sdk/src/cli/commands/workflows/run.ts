@@ -1,10 +1,9 @@
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
+import { apiRequest } from "../../utils/apiClient";
 import { checkApiKey } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
 import { commandValidationError, reportCommandError } from "../../utils/errorOutput";
-import { buildAuthHeaders } from "@/internal/api/auth";
 import type { CommandResult } from "../../utils/output";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
@@ -36,22 +35,13 @@ export const runWorkflowCommand = async (
     const apiKey = process.env.LANGWATCH_API_KEY ?? "";
     const endpoint = resolveControlPlaneUrl();
 
-    const response = await fetch(`${endpoint}/api/workflows/${encodeURIComponent(id)}/run`, {
+    const result = (await apiRequest({
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...buildAuthHeaders({ apiKey }),
-      },
-      body: JSON.stringify(input),
-    });
-
-    if (!response.ok) {
-      const message = await formatFetchError(response);
-      failSpinner({ spinner, error: new Error(message), action: "run workflow" });
-      process.exit(1);
-    }
-
-    const result = await response.json() as Record<string, unknown>;
+      path: `/api/workflows/${encodeURIComponent(id)}/run`,
+      apiKey,
+      endpoint,
+      body: input,
+    })) as Record<string, unknown>;
 
     spinner.succeed(`Workflow "${id}" executed successfully`);
 

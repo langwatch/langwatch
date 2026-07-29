@@ -1,10 +1,9 @@
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
 import { AgentsApiService } from "@/client-sdk/services/agents/agents-api.service";
+import { apiRequest } from "../../utils/apiClient";
 import { checkApiKey } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
-import { buildAuthHeaders } from "@/internal/api/auth";
 import type { CommandResult } from "../../utils/output";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
@@ -99,25 +98,13 @@ export const runAgentCommand = async (
 
     const runSpinner = createSpinner(`Running agent via workflow ${workflowId}...`).start();
     try {
-      const response = await fetch(
-        `${endpoint}/api/workflows/${encodeURIComponent(workflowId)}/run`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...buildAuthHeaders({ apiKey }),
-          },
-          body: JSON.stringify(input),
-        },
-      );
-
-      if (!response.ok) {
-        const message = await formatFetchError(response);
-        failSpinner({ spinner: runSpinner, error: new Error(message), action: "run agent" });
-        process.exit(1);
-      }
-
-      const result = await response.json() as Record<string, unknown>;
+      const result = (await apiRequest({
+        method: "POST",
+        path: `/api/workflows/${encodeURIComponent(workflowId)}/run`,
+        apiKey,
+        endpoint,
+        body: input,
+      })) as Record<string, unknown>;
       runSpinner.succeed(`Agent "${agent.name}" executed successfully`);
 
       return {

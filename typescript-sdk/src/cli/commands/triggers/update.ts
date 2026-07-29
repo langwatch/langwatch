@@ -1,9 +1,8 @@
 import { createSpinner } from "../../utils/spinner";
+import { apiRequest } from "../../utils/apiClient";
 import { checkApiKey } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
 import { commandValidationError } from "../../utils/errorOutput";
-import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import type { CommandResult } from "../../utils/output";
@@ -46,22 +45,13 @@ export const updateTriggerCommand = async (
       process.exit(1);
     }
 
-    const response = await fetch(`${endpoint}/api/triggers/${encodeURIComponent(id)}`, {
+    const trigger = (await apiRequest({
       method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        ...buildAuthHeaders({ apiKey }),
-      },
-      body: JSON.stringify(body),
-    });
-
-    if (!response.ok) {
-      const message = await formatFetchError(response);
-      failSpinner({ spinner, error: new Error(message), action: "update trigger" });
-      process.exit(1);
-    }
-
-    const trigger = await response.json() as { id: string; name: string; active: boolean };
+      path: `/api/triggers/${encodeURIComponent(id)}`,
+      apiKey,
+      endpoint,
+      body,
+    })) as { id: string; name: string; active: boolean };
     spinner.succeed(`Trigger "${trigger.name}" updated`);
 
     return {

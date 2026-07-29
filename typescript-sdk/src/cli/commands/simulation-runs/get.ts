@@ -1,10 +1,9 @@
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
+import { apiRequest } from "../../utils/apiClient";
 import { checkApiKey } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
-import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 /**
@@ -66,21 +65,12 @@ export const getSimulationRunCommand = async (
   const spinner = createSpinner(`Fetching simulation run "${runId}"...`).start();
 
   try {
-    const response = await fetch(
-      `${endpoint}/api/simulation-runs/${encodeURIComponent(runId)}`,
-      {
-        method: "GET",
-        headers: buildAuthHeaders({ apiKey }),
-      },
-    );
-
-    if (!response.ok) {
-      const message = await formatFetchError(response);
-      failSpinner({ spinner, error: new Error(message), action: "fetch simulation run" });
-      process.exit(1);
-    }
-
-    const run = await response.json() as {
+    const run = (await apiRequest({
+      method: "GET",
+      path: `/api/simulation-runs/${encodeURIComponent(runId)}`,
+      apiKey,
+      endpoint,
+    })) as {
       scenarioRunId: string;
       scenarioId: string;
       batchRunId: string;
