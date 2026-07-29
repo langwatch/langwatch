@@ -615,7 +615,7 @@ async function spawnScenarioChildProcess(
  */
 export async function startScenarioProcessor(
   pool: ScenarioExecutionPool,
-  _deps: ProcessorDependencies = createProcessorDependencies(),
+  deps: ProcessorDependencies = createProcessorDependencies(),
 ): Promise<{ close: () => Promise<void> } | undefined> {
   if (!connection) {
     logger.info("No Redis connection, skipping scenario processor");
