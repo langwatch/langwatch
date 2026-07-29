@@ -166,7 +166,7 @@ async function main() {
 
   // ── Mobile 390px ──────────────────────────────────────────────────
   const mobile = await browser.newContext({
-    viewport: { width: 390, height: 2600 },
+    viewport: { width: 390, height: 844 },
     deviceScaleFactor: 2,
     isMobile: true,
     hasTouch: true,
@@ -175,8 +175,21 @@ async function main() {
     { ...cookie, domain: "localhost", path: "/", httpOnly: true, secure: false },
   ]);
   const mpage = await mobile.newPage();
+  // A fresh context starts with empty storage, so it would resolve to
+  // whichever org sorts first rather than the one under test.
+  await mpage.goto(`${BASE_URL}/settings`, { waitUntil: "domcontentloaded" });
+  await mpage.evaluate(
+    ([org, slug]) => {
+      localStorage.setItem("selectedOrganizationId", JSON.stringify(org));
+      localStorage.setItem("selectedProjectSlug", JSON.stringify(slug));
+    },
+    [ORG_ID, VIEWER_PROJECT_SLUG],
+  );
   await mpage.goto(`${BASE_URL}/settings/gateway/usage?vk=${targetVk}&days=30`, { waitUntil: "domcontentloaded" });
-  await mpage.waitForTimeout(3000);
+  await mpage.waitForTimeout(4000);
+  const mobileEmpty = await mpage.locator("text=No usage in this window").count();
+  const mobileError = await mpage.locator("text=Failed to load").count();
+  check("mobile usage renders data", mobileEmpty === 0 && mobileError === 0);
   await mpage.screenshot({ path: `${SHOT_DIR}/05-usage-mobile.png`, fullPage: true });
   console.log("   shot 05-usage-mobile.png");
   await mpage.goto(`${BASE_URL}/settings/gateway/virtual-keys`, { waitUntil: "domcontentloaded" });
