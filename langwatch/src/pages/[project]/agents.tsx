@@ -7,22 +7,22 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { Bot, Plus } from "lucide-react";
-import { useRouter } from "~/utils/compat/next-router";
 import { useCallback, useState } from "react";
 import { AgentCard } from "~/components/agents/AgentCard";
-import { getAgentEditorDrawer } from "~/components/agents/getAgentEditorDrawer";
 import { CopyAgentDialog } from "~/components/agents/CopyAgentDialog";
+import { getAgentEditorDrawer } from "~/components/agents/getAgentEditorDrawer";
 import { PushToCopiesDialog } from "~/components/agents/PushToCopiesDialog";
 import { CascadeArchiveDialog } from "~/components/CascadeArchiveDialog";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { toaster } from "~/components/ui/toaster";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import { showErrorToast } from "~/features/errors";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import { api } from "~/utils/api";
-import { isHandledByGlobalHandler } from "~/utils/trpcError";
+import { useRouter } from "~/utils/compat/next-router";
 
 /**
  * Agents management page
@@ -36,7 +36,6 @@ function Page() {
   const { openDrawer } = useDrawer();
   const utils = api.useContext();
   const router = useRouter();
-
 
   // State for tracking which agent is being deleted
   const [agentToDelete, setAgentToDelete] = useState<TypedAgent | null>(null);
@@ -63,14 +62,11 @@ function Page() {
         meta: { closable: true },
       });
     },
-    onError: (error) => {
-      if (isHandledByGlobalHandler(error)) return;
-      toaster.create({
-        title: "Error updating agent",
-        description: error.message ?? "Please try again later.",
-        type: "error",
-      });
-    },
+    onError: (error) =>
+      showErrorToast({
+        error,
+        fallbackTitle: "Couldn't update agent from source",
+      }),
   });
 
   const handleSyncFromSource = useCallback(
@@ -114,13 +110,8 @@ function Page() {
         meta: { closable: true },
       });
     },
-    onError: () => {
-      toaster.create({
-        title: "Error deleting agent",
-        description: "Please try again later.",
-        type: "error",
-      });
-    },
+    onError: (error) =>
+      showErrorToast({ error, fallbackTitle: "Couldn't delete agent" }),
   });
 
   const handleEditAgent = (agent: TypedAgent) => {
@@ -158,13 +149,8 @@ function Page() {
               meta: { closable: true },
             });
           },
-          onError: () => {
-            toaster.create({
-              title: "Error deleting agent",
-              description: "Please try again later.",
-              type: "error",
-            });
-          },
+          onError: (error) =>
+            showErrorToast({ error, fallbackTitle: "Couldn't delete agent" }),
         },
       );
     }

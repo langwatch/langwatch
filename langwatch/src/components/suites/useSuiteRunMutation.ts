@@ -6,6 +6,7 @@
 
 import { api } from "~/utils/api";
 import { toaster } from "../ui/toaster";
+import { showSuiteRunError } from "./showSuiteRunError";
 
 interface UseSuiteRunMutationOptions {
   onEditSuite: (suiteId: string) => void;
@@ -56,24 +57,10 @@ export function useSuiteRunMutation({
       }
     },
     onError: (err, variables) => {
-      const isAllArchived =
-        err.data?.code === "BAD_REQUEST" &&
-        (err.message.includes("All scenarios") ||
-          err.message.includes("All targets"));
-
-      toaster.create({
-        title: isAllArchived ? "Cannot execute run plan" : "Failed to execute run plan",
-        description: err.message,
-        type: "error",
-        meta: { closable: true },
-        ...(isAllArchived
-          ? {
-              action: {
-                label: "Edit Run Plan",
-                onClick: () => onEditSuite(variables.id),
-              },
-            }
-          : {}),
+      showSuiteRunError({
+        error: err,
+        fallbackTitle: "Couldn't execute run plan",
+        onEditRunPlan: () => onEditSuite(variables.id),
       });
     },
   });

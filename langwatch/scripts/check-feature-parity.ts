@@ -76,6 +76,7 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   "services/aigateway",
   "pkg",
   "tools/thuishaven",
+  "tools/herrgen",
 ];
 
 /**

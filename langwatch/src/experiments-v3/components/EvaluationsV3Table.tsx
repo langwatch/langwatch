@@ -84,17 +84,17 @@ import {
   convertHttpComponentConfig,
 } from "../utils/httpAgentUtils";
 import { evaluatorHasMissingMappings } from "../utils/mappingValidation";
-import {
-  toTargetOutputFields,
-  type PromptOutputField,
-} from "../utils/targetOutputFields";
 import { toComparisonConfig } from "../utils/normalizeComparison";
 import { createPromptEditorCallbacks } from "../utils/promptEditorCallbacks";
+import {
+  type PromptOutputField,
+  toTargetOutputFields,
+} from "../utils/targetOutputFields";
 import { ColumnTypeIcon } from "./ColumnTypeIcon";
-import { DatasetSuperHeader } from "./DatasetSuperHeader";
-import { EvaluationsV3DatasetTableProvider } from "./EvaluationsV3DatasetTableProvider";
 import { ComparisonCell } from "./ComparisonCell";
 import { ComparisonColumnHeader } from "./ComparisonColumnHeader";
+import { DatasetSuperHeader } from "./DatasetSuperHeader";
+import { EvaluationsV3DatasetTableProvider } from "./EvaluationsV3DatasetTableProvider";
 import { SelectionToolbar } from "./SelectionToolbar";
 import {
   CheckboxCellFromMeta,
@@ -1331,8 +1331,11 @@ export function EvaluationsV3Table({
                 results,
                 index,
               ),
-              // Error for this target/row
+              // Error for this target/row: the engine's raw string, plus the
+              // code the cell reads its customer-facing copy from.
               error: results.errors[target.id]?.[index] ?? null,
+              domainError:
+                results.targetMetadata?.[target.id]?.[index]?.domainError,
               // Loading if this specific cell is in the executing set AND has no output/error yet
               // Once target output or error arrives, show it instead of skeleton
               isLoading:
@@ -1739,9 +1742,7 @@ export function EvaluationsV3Table({
       if (columnType === "comparison") return COMPARISON_COL_MIN_PCT;
       if (columnType === "target") {
         const targetId = columnId.replace(/^target\./, "");
-        return comparisonTargetIds.has(targetId)
-          ? COMPARISON_COL_MIN_PCT
-          : 10;
+        return comparisonTargetIds.has(targetId) ? COMPARISON_COL_MIN_PCT : 10;
       }
       return 10;
     },
@@ -1925,7 +1926,8 @@ export function EvaluationsV3Table({
     // character per line.
     for (const compEval of stableComparisonEvaluators) {
       const colId = `comparison.${compEval.id}`;
-      total += columnSizing[colId] ?? getDefaultPctForColumn(colId, "comparison");
+      total +=
+        columnSizing[colId] ?? getDefaultPctForColumn(colId, "comparison");
     }
 
     return total;

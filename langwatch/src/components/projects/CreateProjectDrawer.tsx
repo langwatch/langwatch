@@ -4,7 +4,6 @@ import { useDrawer } from "../../hooks/useDrawer";
 import { useLicenseEnforcement } from "../../hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
-import { isHandledByGlobalHandler } from "../../utils/trpcError";
 import { trackEvent } from "../../utils/tracking";
 import { Drawer } from "../ui/drawer";
 import { toaster } from "../ui/toaster";
@@ -29,8 +28,7 @@ export function CreateProjectDrawer({
 }): React.ReactElement {
   const { organization: currentOrganization } = useOrganizationTeamProject();
 
-  const effectiveOrganizationId =
-    organizationIdProp ?? currentOrganization?.id;
+  const effectiveOrganizationId = organizationIdProp ?? currentOrganization?.id;
   const { closeDrawer } = useDrawer();
   const queryClient = api.useContext();
   const { checkAndProceed } = useLicenseEnforcement("projects");
@@ -56,9 +54,7 @@ export function CreateProjectDrawer({
     // defaultValues seed and covers the race where useForm momentarily
     // holds the "" before the seed lands.
     const resolvedTeamId =
-      data.teamId === NEW_TEAM_VALUE
-        ? undefined
-        : data.teamId || defaultTeamId;
+      data.teamId === NEW_TEAM_VALUE ? undefined : data.teamId || defaultTeamId;
 
     checkAndProceed(() => {
       createProject.mutate(
@@ -100,15 +96,10 @@ export function CreateProjectDrawer({
 
             handleClose();
           },
-          onError: (error) => {
-            if (isHandledByGlobalHandler(error)) return;
-            toaster.create({
-              title: "Error creating project",
-              description: error.message,
-              type: "error",
-              meta: { closable: true },
-            });
-          },
+          // No toast: `ProjectForm` renders `<HandledErrorAlert>` for this
+          // same error. A failed create is a state that is still true, not a
+          // moment that just passed, so the inline alert is the right surface
+          // — and it already carries the tips, docs link and error id.
         },
       );
     });
@@ -134,7 +125,7 @@ export function CreateProjectDrawer({
           <ProjectForm
             onSubmit={handleSubmit}
             isLoading={createProject.isLoading}
-            error={createProject.error?.message}
+            error={createProject.error}
             defaultTeamId={defaultTeamId}
             organizationId={effectiveOrganizationId}
           />

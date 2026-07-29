@@ -471,8 +471,12 @@ func TestLLMProxy_ErrorCapture(t *testing.T) {
 				if string(e.Code) != string(llmUpstreamErrorCode) {
 					t.Errorf("captured code = %q, want %q", e.Code, llmUpstreamErrorCode)
 				}
-				if e.Meta["message"] != tc.want {
-					t.Errorf("captured message = %q, want %q", e.Meta["message"], tc.want)
+				// The provider's prose never reaches the frame — see
+				// decodeLLMErrorBody. `tc.want` is retained as the sentence
+				// that USED to be captured, so each case still names the body
+				// it is about and this assertion stays legible.
+				if _, hasMessage := e.Meta["message"]; hasMessage {
+					t.Errorf("captured message = %q, want the provider's prose dropped (was %q)", e.Meta["message"], tc.want)
 				}
 				if e.Meta["http_status"] != http.StatusBadRequest {
 					t.Errorf("captured http_status = %v, want 400", e.Meta["http_status"])

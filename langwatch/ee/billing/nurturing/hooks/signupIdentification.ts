@@ -19,8 +19,7 @@ function pickDefined<T extends Record<string, unknown>>(
   obj: T,
 ): { [K in keyof T]?: NonNullable<T[K]> } {
   const result: Record<string, unknown> = {};
-  for (const key in obj) {
-    const value = obj[key];
+  for (const [key, value] of Object.entries(obj)) {
     if (value !== undefined && value !== null && value !== "") {
       result[key] = value;
     }

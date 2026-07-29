@@ -82,9 +82,7 @@ export class RoutingPolicyMustHaveProviderError extends Error {
 
 export class RoutingPolicyMustHaveScopeError extends Error {
   readonly code = "routing_policy_must_have_scope" as const;
-  constructor(
-    message = "Routing policy must include at least one scope",
-  ) {
+  constructor(message = "Routing policy must include at least one scope") {
     super(message);
     this.name = "RoutingPolicyMustHaveScopeError";
   }
@@ -161,7 +159,9 @@ export class RoutingPolicyService {
     });
   }
 
-  async create(input: CreateRoutingPolicyInput): Promise<RoutingPolicyWithScopes> {
+  async create(
+    input: CreateRoutingPolicyInput,
+  ): Promise<RoutingPolicyWithScopes> {
     if (input.scopes.length === 0) {
       throw new RoutingPolicyMustHaveScopeError();
     }
@@ -216,7 +216,9 @@ export class RoutingPolicyService {
     });
   }
 
-  async update(input: UpdateRoutingPolicyInput): Promise<RoutingPolicyWithScopes> {
+  async update(
+    input: UpdateRoutingPolicyInput,
+  ): Promise<RoutingPolicyWithScopes> {
     const existing = await this.requireOwn(input.id, input.organizationId);
     if (input.modelProviderIds !== undefined) {
       if (input.modelProviderIds.length === 0) {
@@ -234,8 +236,7 @@ export class RoutingPolicyService {
     if (input.name !== undefined) data.name = input.name;
     if (input.description !== undefined) data.description = input.description;
     if (input.modelProviderIds !== undefined)
-      data.modelProviderIds =
-        input.modelProviderIds as Prisma.InputJsonValue;
+      data.modelProviderIds = input.modelProviderIds as Prisma.InputJsonValue;
     if (input.modelAllowlist !== undefined)
       data.modelAllowlist = input.modelAllowlist
         ? (input.modelAllowlist as Prisma.InputJsonValue)
@@ -325,7 +326,10 @@ export class RoutingPolicyService {
           organizationId,
           isDefault: true,
           scopes: {
-            some: { scopeType: RoutingPolicyScopeType.TEAM, scopeId: personalTeamId },
+            some: {
+              scopeType: RoutingPolicyScopeType.TEAM,
+              scopeId: personalTeamId,
+            },
           },
         },
         // Deterministic tiebreak: if a concurrent setDefault briefly left
@@ -341,7 +345,10 @@ export class RoutingPolicyService {
         organizationId,
         isDefault: true,
         scopes: {
-          some: { scopeType: RoutingPolicyScopeType.ORGANIZATION, scopeId: organizationId },
+          some: {
+            scopeType: RoutingPolicyScopeType.ORGANIZATION,
+            scopeId: organizationId,
+          },
         },
       },
       orderBy: [{ updatedAt: "desc" }, { id: "asc" }],
@@ -379,19 +386,31 @@ export class RoutingPolicyService {
     scope: { scopeType: RoutingPolicyScopeType; scopeId: string },
   ): Promise<Prisma.RoutingPolicyScopeWhereInput[]> {
     const predicates: Prisma.RoutingPolicyScopeWhereInput[] = [
-      { scopeType: RoutingPolicyScopeType.ORGANIZATION, scopeId: organizationId },
+      {
+        scopeType: RoutingPolicyScopeType.ORGANIZATION,
+        scopeId: organizationId,
+      },
     ];
     if (scope.scopeType === RoutingPolicyScopeType.TEAM) {
-      predicates.push({ scopeType: RoutingPolicyScopeType.TEAM, scopeId: scope.scopeId });
+      predicates.push({
+        scopeType: RoutingPolicyScopeType.TEAM,
+        scopeId: scope.scopeId,
+      });
     } else if (scope.scopeType === RoutingPolicyScopeType.PROJECT) {
       const project = await this.prisma.project.findUnique({
         where: { id: scope.scopeId },
         select: { teamId: true },
       });
       if (project) {
-        predicates.push({ scopeType: RoutingPolicyScopeType.TEAM, scopeId: project.teamId });
+        predicates.push({
+          scopeType: RoutingPolicyScopeType.TEAM,
+          scopeId: project.teamId,
+        });
       }
-      predicates.push({ scopeType: RoutingPolicyScopeType.PROJECT, scopeId: scope.scopeId });
+      predicates.push({
+        scopeType: RoutingPolicyScopeType.PROJECT,
+        scopeId: scope.scopeId,
+      });
     } else {
       // ORG scope sees only ORG-scoped policies (no descent leakage).
     }
@@ -429,7 +448,12 @@ export class RoutingPolicyService {
                 ? [{ scopeType: "TEAM" as const, scopeId: { in: teamIds } }]
                 : []),
               ...(projectIds.length > 0
-                ? [{ scopeType: "PROJECT" as const, scopeId: { in: projectIds } }]
+                ? [
+                    {
+                      scopeType: "PROJECT" as const,
+                      scopeId: { in: projectIds },
+                    },
+                  ]
                 : []),
             ],
           },

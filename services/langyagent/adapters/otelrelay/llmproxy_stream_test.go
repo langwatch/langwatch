@@ -62,13 +62,16 @@ func TestLLMProxyStreamCut_InStreamHardLimit(t *testing.T) {
 	if !ok {
 		t.Fatal("an in-stream error event must leave a captured cause")
 	}
-	if e.Meta["message"] != "You exceeded your current quota, please check your plan and billing details." {
-		t.Errorf("captured message = %v, want the provider's own quota message", e.Meta["message"])
+	// The provider's prose stays out of the frame. OpenAI's quota body sets
+	// type == code, the exact shape isGatewayEnvelope reads as the gateway's
+	// own, so this event used to decode "typed" and carry its sentence through
+	// as though we had written it. The sniffer now decodes provider-native
+	// outright (see decodeProviderErrorBody): an error event inside a 200
+	// stream is never our envelope.
+	if _, hasMessage := e.Meta["message"]; hasMessage {
+		t.Errorf("captured message = %v, want the provider's prose dropped", e.Meta["message"])
 	}
-	// OpenAI's quota body has type == code, so it decodes as a typed envelope
-	// with the discriminant on the code itself (see isGatewayEnvelope); other
-	// dialects carry it as a typed reason. Accept the discriminant wherever
-	// hasHardLimitReason would find it.
+	// The discriminant is what survives, and it is all the panel needs.
 	hasDiscriminant := e.Code == "insufficient_quota"
 	for _, reason := range e.Reasons {
 		var cause herr.E

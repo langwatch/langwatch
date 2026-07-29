@@ -2,7 +2,6 @@ import { createLogger } from "@langwatch/observability";
 import { HTTPException } from "hono/http-exception";
 import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi/zod";
-import { validator as zValidator } from "~/server/api/validation";
 import { z } from "zod";
 import { afterPromptCreated } from "~/../ee/billing/nurturing/hooks/promptCreation";
 import { badRequestSchema, successSchema } from "~/app/api/shared/schemas";
@@ -11,11 +10,9 @@ import {
   versionSchema,
 } from "~/prompts/schemas/field-schemas";
 import { requires, type SecuredApp } from "~/server/api/security";
+import { validator as zValidator } from "~/server/api/validation";
 import { prisma } from "~/server/db";
-import {
-  NotFoundError,
-  ShorthandParseError,
-} from "~/server/prompt-config/errors";
+import { ShorthandParseError } from "~/server/prompt-config/errors";
 import { parsePromptShorthand } from "~/server/prompt-config/parsePromptShorthand";
 import {
   PromptTagConflictError,
@@ -519,31 +516,29 @@ export function registerPromptRoutes(
         "Restoring prompt version",
       );
 
-      try {
-        const restored = await service.restoreVersion({
-          versionId,
-          projectId: project.id,
-          organizationId: organization.id,
-        });
+      // A missing prompt/version arrives as a `NotFoundError`, which is a
+      // `HandledError` — the app's `onError` serialises it into the standard
+      // body (code `prompt_not_found`, 404, trace ids). Hand-rolling
+      // `c.json({ error: message }, 404)` here shipped untyped prose instead,
+      // which nothing downstream could branch on.
+      const restored = await service.restoreVersion({
+        versionId,
+        projectId: project.id,
+        organizationId: organization.id,
+      });
 
-        logger.info(
-          { projectId: project.id, promptId: id, versionId },
-          "Successfully restored prompt version",
-        );
+      logger.info(
+        { projectId: project.id, promptId: id, versionId },
+        "Successfully restored prompt version",
+      );
 
-        return c.json({
-          ...apiResponsePromptWithVersionDataSchema.parse(restored),
-          platformUrl: platformUrl({
-            projectSlug: project.slug,
-            path: `/prompts`,
-          }),
-        });
-      } catch (error) {
-        if (error instanceof NotFoundError) {
-          return c.json({ error: error.message }, 404);
-        }
-        throw error;
-      }
+      return c.json({
+        ...apiResponsePromptWithVersionDataSchema.parse(restored),
+        platformUrl: platformUrl({
+          projectSlug: project.slug,
+          path: `/prompts`,
+        }),
+      });
     },
   );
 
@@ -666,11 +661,10 @@ export function registerPromptRoutes(
             message: error.message,
           });
         }
-        if (error instanceof NotFoundError) {
-          throw new HTTPException(404, {
-            message: error.message,
-          });
-        }
+        // `NotFoundError` is a `HandledError` and is left to propagate: the
+        // app's `onError` serialises it with its `prompt_not_found` code, and
+        // re-wrapping it as an `HTTPException` would flatten that back down to
+        // a bare status + prose.
         if (error instanceof ShorthandParseError) {
           throw new HTTPException(422, {
             message: error.message,

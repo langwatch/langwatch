@@ -14,6 +14,7 @@ import {
 import { Clipboard, Key, Pencil, Plus, RotateCw, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { ScopeFilter as ScopeFilterComponent } from "~/components/settings/ScopeFilter";
+import { showErrorToast } from "~/features/errors";
 import { useAvailableScopes } from "~/hooks/useAvailableScopes";
 import { useUrlScopeFilter } from "~/hooks/useUrlScopeFilter";
 import { useSession } from "~/utils/auth-client";
@@ -244,15 +245,8 @@ export function ApiKeysSection({
           setNewKeyInput(input);
           void queryClient.apiKey.list.invalidate();
         },
-        onError: (error) => {
-          toaster.create({
-            title: "Failed to create API key",
-            description: error.message,
-            type: "error",
-            duration: 5000,
-            meta: { closable: true },
-          });
-        },
+        onError: (error) =>
+          showErrorToast({ error, fallbackTitle: "Couldn't create API key" }),
       },
     );
   };
@@ -292,15 +286,8 @@ export function ApiKeysSection({
           });
           void queryClient.apiKey.list.invalidate();
         },
-        onError: (error) => {
-          toaster.create({
-            title: "Failed to update API key",
-            description: error.message,
-            type: "error",
-            duration: 5000,
-            meta: { closable: true },
-          });
-        },
+        onError: (error) =>
+          showErrorToast({ error, fallbackTitle: "Couldn't update API key" }),
       },
     );
   };
@@ -319,15 +306,8 @@ export function ApiKeysSection({
           });
           void queryClient.apiKey.list.invalidate();
         },
-        onError: (error) => {
-          toaster.create({
-            title: "Failed to revoke API key",
-            description: error.message,
-            type: "error",
-            duration: 5000,
-            meta: { closable: true },
-          });
-        },
+        onError: (error) =>
+          showErrorToast({ error, fallbackTitle: "Couldn't revoke API key" }),
       },
     );
   };
@@ -356,12 +336,9 @@ export function ApiKeysSection({
         },
         onError: (error) => {
           setIsRotateConfirmOpen(false);
-          toaster.create({
-            title: "Failed to rotate project API key",
-            description: error.message,
-            type: "error",
-            duration: 5000,
-            meta: { closable: true },
+          showErrorToast({
+            error,
+            fallbackTitle: "Couldn't rotate the project API key",
           });
         },
       },

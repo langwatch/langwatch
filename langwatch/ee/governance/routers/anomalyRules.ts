@@ -16,14 +16,15 @@
  *
  * Spec: specs/ai-gateway/governance/anomaly-rules.feature
  */
-import { TRPCError } from "@trpc/server";
-import { z } from "zod";
 
 import {
+  AnomalyRuleNotFoundError,
   AnomalyRuleService,
   SUPPORTED_SCOPES,
   SUPPORTED_SEVERITIES,
 } from "@ee/governance/services/activity-monitor/anomalyRule.service";
+import { ValidationError } from "@langwatch/handled-error";
+import { z } from "zod";
 
 import {
   ENTERPRISE_FEATURE_ERRORS,
@@ -37,17 +38,31 @@ const enterpriseGate = requireEnterprisePlan(
 );
 
 /**
- * Translate threshold-config validation failures from the service
- * layer into a TRPCError BAD_REQUEST. Mirrors the aiTools router
- * pattern (`5a3219ae0`). Two error shapes are expected:
- *   - z.ZodError when the config shape is wrong (missing fields, wrong
- *     types, negative numbers)
- *   - plain Error when ruleType is unknown
+ * Translate threshold-config shape failures from the service layer into a
+ * `ValidationError` that names which config the issues belong to.
  *
- * Anything else re-throws unchanged so genuine internal errors stay
- * visible.
+ * This used to build a `TRPCError` whose hand-composed message never reached
+ * anyone. The formatter promotes a `ZodError` cause to
+ * `ValidationError.fromZodError` and replaces the wire message with the code
+ * slug, so `Invalid thresholdConfig for spend_spike: windowSec must be
+ * positive` was discarded — and `fromZodError` files the issues under
+ * `meta.fieldErrors` keyed `windowSec` / `ratioVsBaseline`, none of which the
+ * registry knows how to name, with `formErrors` empty for path-bearing
+ * issues. The admin read "Some of the values aren't valid." and nothing else.
+ *
+ * So the complaint is composed here and carried in `meta.formErrors`, which
+ * the `validation_error` registry entry renders verbatim — the same shape
+ * `assertPullSchedule` uses.
+ *
+ * Only ZodErrors are handled here. An unknown ruleType already arrives as a
+ * `ValidationError` from `thresholdConfig.schema.ts`, so it falls through the
+ * re-throw below and the boundary serialises it with its own `meta`.
+ * Anything else re-throws unchanged so genuine internal errors stay visible.
  */
-function translateConfigValidationError(err: unknown, ruleType?: string): never {
+function translateConfigValidationError(
+  err: unknown,
+  ruleType?: string,
+): never {
   if (err instanceof z.ZodError) {
     // Detect which config the issues belong to so the error message
     // points the admin at the right field. Both threshold-config and
@@ -60,22 +75,11 @@ function translateConfigValidationError(err: unknown, ruleType?: string): never 
     const configName = isDestinationConfig
       ? "destinationConfig"
       : "thresholdConfig";
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: `Invalid ${configName}${
-        !isDestinationConfig && ruleType ? ` for ${ruleType}` : ""
-      }: ${err.issues.map((i) => i.message).join("; ")}`,
-      cause: err,
-    });
-  }
-  if (
-    err instanceof Error &&
-    /Unsupported ruleType/i.test(err.message)
-  ) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: err.message,
-      cause: err,
+    const complaint = `Invalid ${configName}${
+      !isDestinationConfig && ruleType ? ` for ${ruleType}` : ""
+    }: ${err.issues.map((i) => i.message).join("; ")}`;
+    throw new ValidationError(complaint, {
+      meta: { formErrors: [complaint] },
     });
   }
   throw err;
@@ -84,9 +88,7 @@ function translateConfigValidationError(err: unknown, ruleType?: string): never 
 const severitySchema = z.enum(
   SUPPORTED_SEVERITIES as readonly [string, ...string[]],
 );
-const scopeSchema = z.enum(
-  SUPPORTED_SCOPES as readonly [string, ...string[]],
-);
+const scopeSchema = z.enum(SUPPORTED_SCOPES as readonly [string, ...string[]]);
 const statusSchema = z.enum(["active", "disabled"]);
 
 function toDto(row: {
@@ -143,7 +145,9 @@ export const anomalyRulesRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const service = AnomalyRuleService.create(ctx.prisma);
       const row = await service.findById(input.id, input.organizationId);
-      if (!row) throw new TRPCError({ code: "NOT_FOUND" });
+      // Same named failure the mutations raise via `requireById`, so the
+      // client reads one channel and the registry supplies the words.
+      if (!row) throw new AnomalyRuleNotFoundError(input.id);
       return toDto(row);
     }),
 
@@ -212,7 +216,9 @@ export const anomalyRulesRouter = createTRPCRouter({
           organizationId: input.organizationId,
           name: input.name,
           description: input.description,
-          severity: input.severity as (typeof SUPPORTED_SEVERITIES)[number] | undefined,
+          severity: input.severity as
+            | (typeof SUPPORTED_SEVERITIES)[number]
+            | undefined,
           ruleType: input.ruleType,
           scope: input.scope as (typeof SUPPORTED_SCOPES)[number] | undefined,
           scopeId: input.scopeId,
@@ -232,10 +238,7 @@ export const anomalyRulesRouter = createTRPCRouter({
     .use(enterpriseGate)
     .mutation(async ({ ctx, input }) => {
       const service = AnomalyRuleService.create(ctx.prisma);
-      const archived = await service.archive(
-        input.id,
-        input.organizationId,
-      );
+      const archived = await service.archive(input.id, input.organizationId);
       return toDto(archived);
     }),
 });

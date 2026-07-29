@@ -5,8 +5,8 @@ import {
   Button,
   Code,
   EmptyState,
-  HStack,
   Heading,
+  HStack,
   Progress,
   Separator,
   Spacer,
@@ -19,14 +19,14 @@ import { Archive, ArrowLeft, FileClock, Pencil, Receipt } from "lucide-react";
 import { useState } from "react";
 
 import AiGatewayLayout from "~/components/gateway/AiGatewayLayout";
-import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { BudgetEditDrawer } from "~/components/gateway/BudgetEditDrawer";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import { formatBudgetUsd } from "~/components/gateway/formatBudgetUsd";
-import { Link } from "~/components/ui/link";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
-import { toaster } from "~/components/ui/toaster";
+import { Link } from "~/components/ui/link";
 import { Tooltip } from "~/components/ui/tooltip";
+import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
@@ -73,9 +73,9 @@ function BudgetDetailPage() {
       });
       setArchiving(false);
     } catch (err) {
-      toaster.create({
-        title: err instanceof Error ? err.message : "Failed to archive",
-        type: "error",
+      showErrorToast({
+        error: err,
+        fallbackTitle: "Couldn't archive the budget",
       });
     }
   };
@@ -160,8 +160,8 @@ function BudgetDetailPage() {
                   <Alert.Content>
                     <Alert.Title>Spend figures are unavailable</Alert.Title>
                     <Alert.Description>
-                      Spend cannot be totalled right now, so this budget is
-                      not stopping or warning about anything.
+                      Spend cannot be totalled right now, so this budget is not
+                      stopping or warning about anything.
                     </Alert.Description>
                   </Alert.Content>
                 </Alert.Root>
@@ -185,40 +185,40 @@ function BudgetDetailPage() {
               <Section title="Utilization">
                 <VStack align="stretch" gap={2}>
                   {!budget.spendAvailable ? (
-                  <HStack>
-                    <Text fontWeight="medium" fontSize="2xl" color="fg.muted">
-                      Unavailable
-                    </Text>
-                    <Text color="fg.muted">/ {formatBudgetUsd(limit)}</Text>
-                  </HStack>
+                    <HStack>
+                      <Text fontWeight="medium" fontSize="2xl" color="fg.muted">
+                        Unavailable
+                      </Text>
+                      <Text color="fg.muted">/ {formatBudgetUsd(limit)}</Text>
+                    </HStack>
                   ) : (
-                  <>
-                  <HStack>
-                    <Text fontWeight="medium" fontSize="2xl">
-                      {formatBudgetUsd(spent)}
-                    </Text>
-                    <Text color="fg.muted">/ {formatBudgetUsd(limit)}</Text>
-                    <Spacer />
-                    <Badge
-                      colorPalette={
-                        pct >= 100 ? "red" : pct >= 80 ? "orange" : "green"
-                      }
-                    >
-                      {pct.toFixed(1)}% used
-                    </Badge>
-                  </HStack>
-                  <Progress.Root
-                    value={pct}
-                    size="sm"
-                    colorPalette={
-                      pct >= 100 ? "red" : pct >= 80 ? "orange" : "green"
-                    }
-                  >
-                    <Progress.Track>
-                      <Progress.Range />
-                    </Progress.Track>
-                  </Progress.Root>
-                  </>
+                    <>
+                      <HStack>
+                        <Text fontWeight="medium" fontSize="2xl">
+                          {formatBudgetUsd(spent)}
+                        </Text>
+                        <Text color="fg.muted">/ {formatBudgetUsd(limit)}</Text>
+                        <Spacer />
+                        <Badge
+                          colorPalette={
+                            pct >= 100 ? "red" : pct >= 80 ? "orange" : "green"
+                          }
+                        >
+                          {pct.toFixed(1)}% used
+                        </Badge>
+                      </HStack>
+                      <Progress.Root
+                        value={pct}
+                        size="sm"
+                        colorPalette={
+                          pct >= 100 ? "red" : pct >= 80 ? "orange" : "green"
+                        }
+                      >
+                        <Progress.Track>
+                          <Progress.Range />
+                        </Progress.Track>
+                      </Progress.Root>
+                    </>
                   )}
                   <HStack fontSize="xs" color="fg.muted">
                     <Text>
@@ -232,9 +232,7 @@ function BudgetDetailPage() {
                           "never"
                         ) : (
                           <Tooltip
-                            content={new Date(
-                              budget.resetsAt,
-                            ).toLocaleString()}
+                            content={new Date(budget.resetsAt).toLocaleString()}
                           >
                             <span>
                               {formatTimeAgo(
@@ -270,7 +268,9 @@ function BudgetDetailPage() {
                   />
                 </DetailRow>
                 <DetailRow label="Created">
-                  <Tooltip content={new Date(budget.createdAt).toLocaleString()}>
+                  <Tooltip
+                    content={new Date(budget.createdAt).toLocaleString()}
+                  >
                     <Text fontSize="sm" color="fg.muted">
                       {formatTimeAgo(new Date(budget.createdAt).getTime())}
                     </Text>
@@ -282,9 +282,7 @@ function BudgetDetailPage() {
                       content={new Date(budget.lastResetAt).toLocaleString()}
                     >
                       <Text fontSize="sm" color="fg.muted">
-                        {formatTimeAgo(
-                          new Date(budget.lastResetAt).getTime(),
-                        )}
+                        {formatTimeAgo(new Date(budget.lastResetAt).getTime())}
                       </Text>
                     </Tooltip>
                   </DetailRow>

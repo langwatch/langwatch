@@ -14,34 +14,37 @@
  * derivation; the legacy `providerCredentialIds`/`providerChain`
  * fields are no longer surfaced.
  */
-import { TRPCError } from "@trpc/server";
-import { z } from "zod";
 
 import type { PrismaClient } from "@prisma/client";
-
+import { z } from "zod";
 import type { Session } from "~/server/auth";
-
 import { resolveApplicableBudgetsForDraftKey } from "~/server/gateway/applicableBudgets.service";
-import { GatewayUsageService } from "~/server/gateway/usage.service";
-import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
-import { startOfCurrentMonthUTC } from "~/server/gateway/virtualKeySpend.clickhouse.repository";
 import {
-  parseVirtualKeyConfig,
-  virtualKeyConfigSchema,
-  type GuardrailAttachment,
-} from "~/server/gateway/virtualKey.config";
-import { toVirtualKeyCamelDto } from "~/server/gateway/virtualKey.dto";
-import { scopeAssignmentSchema } from "~/server/scopes/scope.types";
-
-import { authorizeInResolver, hasProjectPermission } from "../rbac";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
-import { chRepoOrUndefined, spendRepoOrUndefined } from "./gatewayUsage";
+  GatewayGuardrailProjectMismatchError,
+  GatewayScopeOrgMismatchError,
+  GatewaySpendUnavailableError,
+  GuardrailAttachForbiddenError,
+  VirtualKeyNotFoundError,
+} from "~/server/gateway/errors";
+import { GatewayUsageService } from "~/server/gateway/usage.service";
 import {
   assertCanManageAllScopes,
   assertCanOperateOnAnyScope,
   isVisibleToMembership,
   loadMembershipSet,
 } from "~/server/gateway/virtualKey.authz";
+import {
+  type GuardrailAttachment,
+  parseVirtualKeyConfig,
+  virtualKeyConfigSchema,
+} from "~/server/gateway/virtualKey.config";
+import { toVirtualKeyCamelDto } from "~/server/gateway/virtualKey.dto";
+import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
+import { startOfCurrentMonthUTC } from "~/server/gateway/virtualKeySpend.clickhouse.repository";
+import { scopeAssignmentSchema } from "~/server/scopes/scope.types";
+import { authorizeInResolver, hasProjectPermission } from "../rbac";
+import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { chRepoOrUndefined, spendRepoOrUndefined } from "./gatewayUsage";
 
 const scopeInputSchema = scopeAssignmentSchema;
 
@@ -120,10 +123,7 @@ async function assertTraceProjectBelongsToOrg(
     select: { id: true },
   });
   if (!project) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: `scope_org_mismatch: trace project ${traceProjectId} is not in organization ${organizationId}`,
-    });
+    throw new GatewayScopeOrgMismatchError("project");
   }
 }
 
@@ -149,10 +149,7 @@ async function assertScopesBelongToOrg(
 
   for (const s of scopes) {
     if (s.scopeType === "ORGANIZATION" && s.scopeId !== organizationId) {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message: `scope_org_mismatch: scope ${s.scopeId} is not in organization ${organizationId}`,
-      });
+      throw new GatewayScopeOrgMismatchError("organization");
     }
   }
 
@@ -164,10 +161,7 @@ async function assertScopesBelongToOrg(
     const foundIds = new Set(found.map((t) => t.id));
     for (const id of teamIds) {
       if (!foundIds.has(id)) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: `scope_org_mismatch: team ${id} is not in organization ${organizationId}`,
-        });
+        throw new GatewayScopeOrgMismatchError("team");
       }
     }
   }
@@ -180,10 +174,7 @@ async function assertScopesBelongToOrg(
     const foundIds = new Set(found.map((p) => p.id));
     for (const id of projectIds) {
       if (!foundIds.has(id)) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: `scope_org_mismatch: project ${id} is not in organization ${organizationId}`,
-        });
+        throw new GatewayScopeOrgMismatchError("project");
       }
     }
   }
@@ -212,11 +203,7 @@ async function assertGuardrailAttachmentsAllowed(
   if (referencedIds.length === 0) return;
 
   if (!vkProjectId) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message:
-        "guardrail_project_mismatch: virtual key is not scoped to a single project",
-    });
+    throw new GatewayGuardrailProjectMismatchError();
   }
 
   // Scope the lookup to the VK's own project. Any referenced guardrail
@@ -231,10 +218,7 @@ async function assertGuardrailAttachmentsAllowed(
 
   for (const id of referencedIds) {
     if (!foundIds.has(id)) {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message: `guardrail_project_mismatch: guardrail ${id} is not in the virtual key's project`,
-      });
+      throw new GatewayGuardrailProjectMismatchError();
     }
   }
 
@@ -244,10 +228,7 @@ async function assertGuardrailAttachmentsAllowed(
     "gatewayGuardrails:attach",
   );
   if (!allowed) {
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message: "missing_perm:gatewayGuardrails:attach",
-    });
+    throw new GuardrailAttachForbiddenError();
   }
 }
 
@@ -283,7 +264,7 @@ export const virtualKeysRouter = createTRPCRouter({
       // A key the caller can't see is indistinguishable from one that
       // doesn't exist — same NOT_FOUND, no existence leak.
       if (!vk) {
-        throw new TRPCError({ code: "NOT_FOUND" });
+        throw new VirtualKeyNotFoundError();
       }
       const membership = await loadMembershipSet(
         ctx.prisma,
@@ -291,7 +272,7 @@ export const virtualKeysRouter = createTRPCRouter({
         ctx.session.user.id,
       );
       if (!isVisibleToMembership(membership, vk.scopes)) {
-        throw new TRPCError({ code: "NOT_FOUND" });
+        throw new VirtualKeyNotFoundError();
       }
       return toVirtualKeyCamelDto(vk);
     }),
@@ -311,10 +292,7 @@ export const virtualKeysRouter = createTRPCRouter({
       // confident $0.00 that cannot be told apart from a zero-spend key.
       const spendRepo = spendRepoOrUndefined();
       if (!spendRepo) {
-        throw new TRPCError({
-          code: "PRECONDITION_FAILED",
-          message: "spend_source_unavailable",
-        });
+        throw new GatewaySpendUnavailableError();
       }
       const membership = await loadMembershipSet(
         ctx.prisma,
@@ -389,7 +367,7 @@ export const virtualKeysRouter = createTRPCRouter({
           },
         });
         if (!vk) {
-          throw new TRPCError({ code: "NOT_FOUND" });
+          throw new VirtualKeyNotFoundError();
         }
         const membership = await loadMembershipSet(
           ctx.prisma,
@@ -399,17 +377,23 @@ export const virtualKeysRouter = createTRPCRouter({
         if (
           !isVisibleToMembership(
             membership,
-            vk.scopes as { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }[],
+            vk.scopes as {
+              scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+              scopeId: string;
+            }[],
           )
         ) {
-          throw new TRPCError({ code: "NOT_FOUND" });
+          throw new VirtualKeyNotFoundError();
         }
         return resolveApplicableBudgetsForDraftKey(
           ctx.prisma,
           {
             organizationId: input.organizationId,
             virtualKeyId: vk.id,
-            scopes: vk.scopes as { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }[],
+            scopes: vk.scopes as {
+              scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+              scopeId: string;
+            }[],
             traceProjectId: vk.traceProjectId,
             principalUserId: vk.principalUserId,
           },
@@ -452,11 +436,7 @@ export const virtualKeysRouter = createTRPCRouter({
           select: { userId: true },
         });
         if (!membership) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message:
-              "principalUserId is not a member of this organization.",
-          });
+          throw new GatewayScopeOrgMismatchError("user");
         }
       }
       return resolveApplicableBudgetsForDraftKey(
@@ -566,7 +546,7 @@ export const virtualKeysRouter = createTRPCRouter({
       const service = VirtualKeyService.create(ctx.prisma);
       const existing = await service.getById(input.id, input.organizationId);
       if (!existing) {
-        throw new TRPCError({ code: "NOT_FOUND" });
+        throw new VirtualKeyNotFoundError();
       }
       // Mutating an existing key needs virtualKeys:update on one of the
       // scopes it already lives in.
@@ -652,7 +632,7 @@ export const virtualKeysRouter = createTRPCRouter({
       const service = VirtualKeyService.create(ctx.prisma);
       const existing = await service.getById(input.id, input.organizationId);
       if (!existing) {
-        throw new TRPCError({ code: "NOT_FOUND" });
+        throw new VirtualKeyNotFoundError();
       }
       await assertCanOperateOnAnyScope(
         { prisma: ctx.prisma, session: ctx.session },
@@ -674,7 +654,7 @@ export const virtualKeysRouter = createTRPCRouter({
       const service = VirtualKeyService.create(ctx.prisma);
       const existing = await service.getById(input.id, input.organizationId);
       if (!existing) {
-        throw new TRPCError({ code: "NOT_FOUND" });
+        throw new VirtualKeyNotFoundError();
       }
       await assertCanOperateOnAnyScope(
         { prisma: ctx.prisma, session: ctx.session },

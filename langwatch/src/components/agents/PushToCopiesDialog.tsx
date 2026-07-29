@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { usePushAgentToCopies } from "~/hooks/usePushAgentToCopies";
+import { api } from "~/utils/api";
 import {
   PushToCopiesDialog as GenericPushToCopiesDialog,
   type PushToCopiesCopyItem,
 } from "../ui/PushToCopiesDialog";
-import { usePushAgentToCopies } from "~/hooks/usePushAgentToCopies";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { api } from "~/utils/api";
 
 export const PushToCopiesDialog = ({
   open,
@@ -66,7 +66,7 @@ export const PushToCopiesDialog = ({
       sourceName={agentName}
       copies={availableCopies}
       isLoading={isLoading}
-      error={error ? { message: error.message } : null}
+      error={error}
       selectedCopyIds={selectedCopyIds}
       onToggleCopy={handleToggleCopy}
       onPush={async () =>

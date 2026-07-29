@@ -31,6 +31,7 @@ import { modelSelectorOptions } from "~/components/ModelSelector";
 import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
+import { showErrorToast } from "~/features/errors";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
@@ -361,12 +362,11 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
       onSaved();
       onClose();
     } catch (err) {
-      toaster.create({
-        title: "Failed to save",
-        description: err instanceof Error ? err.message : String(err),
-        type: "error",
-        duration: 6000,
-        meta: { closable: true },
+      showErrorToast({
+        error: err,
+        fallbackTitle: editing
+          ? "Couldn't save the default model"
+          : "Couldn't add the default model",
       });
     } finally {
       setBusy(false);

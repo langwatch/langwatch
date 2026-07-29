@@ -42,6 +42,7 @@ import type {
   ValueType,
 } from "recharts/types/component/DefaultTooltipContent";
 import type { z } from "zod";
+import { describeError } from "~/features/errors";
 import { availableFilters } from "~/server/filters/registry";
 import type { FilterField } from "~/server/filters/types";
 import { useRouter } from "~/utils/compat/next-router";
@@ -429,6 +430,13 @@ const CustomGraph_ = React.memo(
       { ...queryOpts, enabled: queryOpts.enabled && load },
     );
 
+    // The stale-data retry badge is a one-line `title` tooltip — a string-only
+    // slot, which is exactly what `describeError` exists for.
+    const timeseriesErrorDescription = describeError({
+      error: timeseries.error,
+      fallbackTitle: "Couldn't refresh this chart",
+    });
+
     // Monitor cards headline the value over the WHOLE period as one "full"
     // bucket, which run-weights it by construction. Averaging the daily
     // buckets instead would weigh a 1-run day the same as a 100-run day and
@@ -695,7 +703,7 @@ const CustomGraph_ = React.memo(
           )}
           {timeseries.error && !timeseries.data ? (
             <ChartErrorState
-              errorMessage={timeseries.error.message}
+              error={timeseries.error}
               onRetry={() => void timeseries.refetch()}
             />
           ) : (
@@ -715,7 +723,7 @@ const CustomGraph_ = React.memo(
                   }}
                   aria-label="Retry loading chart data"
                   onClick={() => void timeseries.refetch()}
-                  title={timeseries.error.message}
+                  title={timeseriesErrorDescription}
                 >
                   <Badge colorPalette="red" variant="solid" fontSize="xs">
                     Refresh failed — click to retry

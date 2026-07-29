@@ -10,6 +10,7 @@
  * - src/pages/api/dataset/evaluate.ts
  */
 
+import { HandledError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import type { Project } from "@prisma/client";
@@ -40,7 +41,6 @@ import {
 } from "~/server/api-key/auth-middleware";
 import { TokenResolver } from "~/server/api-key/token-resolver";
 import { getApp } from "~/server/app-layer/app";
-import { HandledError } from "@langwatch/handled-error";
 import { EvaluatorMissingFieldError } from "~/server/app-layer/evaluations/errors";
 import { prisma } from "~/server/db";
 import {
@@ -97,10 +97,11 @@ const AUTH_REASON = "project API key resolved in-handler";
 /**
  * Authenticates via the unified API-key + legacy-key path and enforces the given
  * permission ceiling. Returns either a `{ project, markUsed }` context on
- * success or `{ error, status }` for the caller to short-circuit with
- * c.json(...). `markUsed` is a no-op for legacy keys and a fire-and-forget
- * lastUsedAt bump for API keys — callers invoke it after building a success
- * response.
+ * success or `{ error, status, body }` for the caller to short-circuit with
+ * c.json(...) — `body` is a bare sentence for an unauthenticated call, and the
+ * full handled payload (code, permission, tips) for a permission denial.
+ * `markUsed` is a no-op for legacy keys and a fire-and-forget lastUsedAt bump
+ * for API keys — callers invoke it after building a success response.
  */
 async function authenticateRequest(
   c: Context,
@@ -110,15 +111,13 @@ async function authenticateRequest(
       project: Project & { team?: { id: string; organizationId: string } };
       markUsed: () => void;
     }
-  | { error: string; status: 401 | 403 }
+  | { error: string; status: 401 | 403; body: object }
 > {
   const credentials = extractCredentials((name) => c.req.header(name));
   if (!credentials) {
-    return {
-      error:
-        "Authentication token is required. Use X-Auth-Token header, Authorization: Bearer token, or Authorization: Basic base64(projectId:token).",
-      status: 401,
-    };
+    const message =
+      "Authentication token is required. Use X-Auth-Token header, Authorization: Bearer token, or Authorization: Basic base64(projectId:token).";
+    return { error: message, status: 401, body: { message } };
   }
 
   const resolved = await tokenResolver.resolve({
@@ -126,14 +125,17 @@ async function authenticateRequest(
     projectId: credentials.projectId,
   });
   if (!resolved) {
-    return { error: "Invalid auth token.", status: 401 };
+    const message = "Invalid auth token.";
+    return { error: message, status: 401, body: { message } };
   }
 
   try {
     await enforceApiKeyCeiling({ prisma, resolved, permission });
   } catch (error) {
     const denial = apiKeyCeilingDenialResponse(error);
-    return { error: denial.message, status: denial.status };
+    // The ceiling only ever denies with 403; narrowed here so the descriptor
+    // keeps its `401 | 403` contract with the routes.
+    return { error: denial.message, status: 403, body: denial.body };
   }
 
   const markUsed = () => {
@@ -186,7 +188,7 @@ secured
     async (c) => {
       const auth = await authenticateRequest(c, "evaluations:manage");
       if ("error" in auth) {
-        return c.json({ message: auth.error }, auth.status);
+        return c.json(auth.body, auth.status);
       }
       const { project, markUsed } = auth;
 
@@ -341,7 +343,7 @@ secured
   .post("/dataset/evaluate", async (c) => {
     const auth = await authenticateRequest(c, "evaluations:manage");
     if ("error" in auth) {
-      return c.json({ message: auth.error }, auth.status);
+      return c.json(auth.body, auth.status);
     }
     const { markUsed } = auth;
     // dataset/evaluate needs the full team relation for downstream queries.
@@ -787,7 +789,7 @@ async function handleEvaluatorCall(
 ) {
   const auth = await authenticateRequest(c, "evaluations:manage");
   if ("error" in auth) {
-    return c.json({ message: auth.error }, auth.status);
+    return c.json(auth.body, auth.status);
   }
   const { project, markUsed } = auth;
 

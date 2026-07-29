@@ -21,6 +21,7 @@ import {
   DrawerTitle,
 } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
+import { HandledErrorAlert } from "~/features/errors";
 
 const SECRET_MASK = "•".repeat(48);
 
@@ -172,7 +173,8 @@ export function IngestionTemplateInstallDrawer({
   /** Set by parent when onInstall resolves. Cleared on close. */
   installResult: IngestionBindingResult | null;
   isInstalling: boolean;
-  installError: string | null;
+  /** The install/rotate mutation's error, passed straight through. */
+  installError: unknown;
   /**
    * True when the user already has an ingestion key for this source. Drives
    * the CTA copy: 'Use this template' (fresh) vs 'Rotate token' (replace).
@@ -206,9 +208,7 @@ export function IngestionTemplateInstallDrawer({
     toaster.create({ title: `${label} copied to clipboard`, type: "success" });
   };
 
-  const renderedToken = showSecret
-    ? installResult?.token ?? ""
-    : SECRET_MASK;
+  const renderedToken = showSecret ? (installResult?.token ?? "") : SECRET_MASK;
   const copyToken = installResult?.token ?? "";
 
   // Claude Code only emits OTLP when CLAUDE_CODE_ENABLE_TELEMETRY=1 plus
@@ -238,9 +238,7 @@ export function IngestionTemplateInstallDrawer({
     >
       <DrawerContent>
         <DrawerHeader>
-          <DrawerTitle>
-            Connect {template.displayName}, auto-shaped
-          </DrawerTitle>
+          <DrawerTitle>Connect {template.displayName}, auto-shaped</DrawerTitle>
           <DrawerCloseTrigger />
         </DrawerHeader>
         <DrawerBody>
@@ -250,24 +248,24 @@ export function IngestionTemplateInstallDrawer({
               request, no change to how you call the API.
             </Text>
 
-            {installError && (
-              <Alert.Root status="error" variant="surface">
-                <Alert.Content>
-                  <Text fontSize="sm">{installError}</Text>
-                </Alert.Content>
-              </Alert.Root>
+            {!!installError && (
+              <HandledErrorAlert
+                error={installError}
+                fallbackTitle="Couldn't set up this integration"
+              />
             )}
 
-            {!installResult && !isInstalling && template.credentialSchema === null && (
-              hasExistingKey ? (
+            {!installResult &&
+              !isInstalling &&
+              template.credentialSchema === null &&
+              (hasExistingKey ? (
                 <VStack align="stretch" gap={2}>
                   <Alert.Root status="warning" variant="surface">
                     <Alert.Indicator />
                     <Alert.Content>
                       <Text fontSize="sm">
                         An ingestion key already exists for this source.
-                        Rotating will invalidate the existing token
-                        immediately.
+                        Rotating will invalidate the existing token immediately.
                       </Text>
                     </Alert.Content>
                   </Alert.Root>
@@ -279,8 +277,7 @@ export function IngestionTemplateInstallDrawer({
                 <Button onClick={onInstall} colorPalette="orange">
                   Use this template
                 </Button>
-              )
-            )}
+              ))}
 
             {isInstalling && (
               <Text fontSize="sm" color="fg.muted">
@@ -309,9 +306,7 @@ export function IngestionTemplateInstallDrawer({
                 />
                 <Field
                   label="Token"
-                  value={
-                    showSecret ? installResult.token : SECRET_MASK
-                  }
+                  value={showSecret ? installResult.token : SECRET_MASK}
                   onCopy={() => copy(installResult.token, "Token")}
                   trailing={
                     <Button
@@ -333,11 +328,7 @@ export function IngestionTemplateInstallDrawer({
                   backgroundColor="bg.subtle"
                 >
                   <HStack alignItems="start" marginBottom={2}>
-                    <Text
-                      fontSize="xs"
-                      color="fg.muted"
-                      fontWeight="semibold"
-                    >
+                    <Text fontSize="xs" color="fg.muted" fontWeight="semibold">
                       .env (bash)
                     </Text>
                     <Spacer />
@@ -370,8 +361,8 @@ export function IngestionTemplateInstallDrawer({
 
                 <Text fontSize="xs" color="fg.muted">
                   To keep this across new terminals, add these lines to your{" "}
-                  <code>~/.zshrc</code> (or <code>~/.bashrc</code>), then open
-                  a new shell.
+                  <code>~/.zshrc</code> (or <code>~/.bashrc</code>), then open a
+                  new shell.
                 </Text>
 
                 <HStack>

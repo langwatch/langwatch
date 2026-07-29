@@ -13,6 +13,7 @@ import { KSUID_RESOURCES } from "~/utils/constants";
 import { LimitExceededError } from "../license-enforcement/errors";
 import { RoleService } from "../role/role.service";
 import {
+  AlreadyOrganizationMemberError,
   DuplicateInviteError,
   InviteNotFoundError,
   InviteNotReadyError,
@@ -197,6 +198,41 @@ export class InviteService {
         OR: [{ expiration: { gt: new Date() } }, { expiration: null }],
       },
     });
+  }
+
+  /**
+   * Refuses any address that already belongs to a member of this organization.
+   *
+   * Runs before the invites are written, and refuses the whole batch rather
+   * than quietly dropping the offending row: an admin who typed five addresses
+   * and got four invites with no comment on the fifth has been told nothing.
+   *
+   * Membership is by user, and an invite is by email, so the two are joined
+   * through `User.email`. An address with no account cannot be a member yet, so
+   * it is simply absent from the lookup.
+   */
+  async assertNotAlreadyMembers({
+    emails,
+    organizationId,
+  }: {
+    emails: string[];
+    organizationId: string;
+  }): Promise<void> {
+    if (emails.length === 0) return;
+
+    const existing = await this.prisma.organizationUser.findFirst({
+      where: {
+        organizationId,
+        user: { email: { in: emails, mode: "insensitive" } },
+      },
+      select: { user: { select: { email: true } } },
+    });
+
+    if (existing) {
+      // The stored address, not the typed one: it is the one shown in the
+      // members table the admin is being sent back to.
+      throw new AlreadyOrganizationMemberError(existing.user.email ?? "");
+    }
   }
 
   /**

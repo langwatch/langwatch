@@ -1,6 +1,6 @@
-import type { LicenseData } from "./types";
-import { signLicense, encodeLicenseKey, generateLicenseId } from "./signing";
 import { getPlanTemplate } from "./planTemplates";
+import { encodeLicenseKey, generateLicenseId, signLicense } from "./signing";
+import type { LicenseData } from "./types";
 
 interface GenerateLicenseKeyParams {
   organizationName: string;

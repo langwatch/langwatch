@@ -221,7 +221,9 @@ describe("budgets on every dimension (real PG + real CH)", () => {
         where: { id: { in: createdVirtualKeyIds } },
       });
     }
-    await prisma.gatewayBudget.deleteMany({ where: { organizationId: ORG_ID } });
+    await prisma.gatewayBudget.deleteMany({
+      where: { organizationId: ORG_ID },
+    });
     await prisma.gatewayChangeEvent.deleteMany({
       where: { organizationId: ORG_ID },
     });
@@ -319,7 +321,12 @@ describe("budgets on every dimension (real PG + real CH)", () => {
           limitUsd: "25.00",
           actorUserId: USER_ID,
         }),
-      ).rejects.toThrow(/group_budget_requires_clickhouse/);
+      ).rejects.toMatchObject({
+        // A limit of the deployment, not the admin's mistake — and the copy no
+        // longer names the storage engine that cannot do it.
+        code: "gateway_group_budget_unsupported",
+        fault: "platform",
+      });
 
       const rows = await prisma.gatewayBudget.findMany({
         where: { organizationId: ORG_ID, name: `No ledger ${suffix}` },
@@ -496,9 +503,10 @@ describe("budgets on every dimension (real PG + real CH)", () => {
     it("ships provider_key, the group bucket and routing_mode", async () => {
       const repo = new VirtualKeyRepository(prisma);
       const vk = await repo.findById(VK_PERSONAL_ID, ORG_ID);
-      const bundle = await new GatewayConfigMaterialiser(prisma, null).materialise(
-        vk!,
-      );
+      const bundle = await new GatewayConfigMaterialiser(
+        prisma,
+        null,
+      ).materialise(vk!);
 
       const openAiBudget = bundle.budgets.find(
         (b) => b.id === BUDGET_PROJECT_OPENAI_ID,
@@ -640,9 +648,10 @@ describe("budgets on every dimension (real PG + real CH)", () => {
     it("pins max_attempts to 1 when routing mode is NONE", async () => {
       const repo = new VirtualKeyRepository(prisma);
       const vk = await repo.findById(VK_PERSONAL_ID, ORG_ID);
-      const bundle = await new GatewayConfigMaterialiser(prisma, null).materialise(
-        vk!,
-      );
+      const bundle = await new GatewayConfigMaterialiser(
+        prisma,
+        null,
+      ).materialise(vk!);
       expect(bundle.fallback.max_attempts).toBe(1);
 
       await prisma.virtualKey.update({
@@ -656,7 +665,6 @@ describe("budgets on every dimension (real PG + real CH)", () => {
       ).materialise(fallbackVk!);
       expect(fallbackBundle.routing_mode).toBe("fallback_all");
       expect(fallbackBundle.fallback.max_attempts).toBeGreaterThan(1);
-
     });
 
     /** @scenario "An explicit provider list narrows what the key can reach" */
@@ -684,7 +692,6 @@ describe("budgets on every dimension (real PG + real CH)", () => {
       ).materialise(narrowedVk!);
       expect(narrowedBundle.providers_allowed).toEqual([MP_OPENAI_ID]);
       expect(narrowedBundle.providers.map((p) => p.id)).toEqual([MP_OPENAI_ID]);
-
     });
 
     /** @scenario "Allowing all providers keeps future providers included" */
@@ -723,7 +730,6 @@ describe("budgets on every dimension (real PG + real CH)", () => {
       expect(narrowedBundle.providers.map((p) => p.id)).not.toContain(
         lateProviderId,
       );
-
     });
   });
 
@@ -752,8 +758,14 @@ describe("budgets on every dimension (real PG + real CH)", () => {
       expect(budget!.window).toBe("DAY");
       expect(budget!.archivedAt).toBeNull();
       // The cap has to reach the gateway, not just the database.
-      const bundle = await new GatewayConfigMaterialiser(prisma, null).materialise(
-        (await new VirtualKeyRepository(prisma).findById(virtualKey.id, ORG_ID))!,
+      const bundle = await new GatewayConfigMaterialiser(
+        prisma,
+        null,
+      ).materialise(
+        (await new VirtualKeyRepository(prisma).findById(
+          virtualKey.id,
+          ORG_ID,
+        ))!,
       );
       expect(bundle.budgets.map((b) => b.id)).toContain(budget!.id);
     });
@@ -861,7 +873,9 @@ describe("budgets on every dimension (real PG + real CH)", () => {
           config: { providersAllowed: [otherOrgProvider] },
         }),
       ).rejects.toThrow(/providers_not_in_scope/);
-      await prisma.modelProvider.deleteMany({ where: { id: otherOrgProvider } });
+      await prisma.modelProvider.deleteMany({
+        where: { id: otherOrgProvider },
+      });
       await prisma.team.deleteMany({ where: { id: strangerTeamId } });
     });
 

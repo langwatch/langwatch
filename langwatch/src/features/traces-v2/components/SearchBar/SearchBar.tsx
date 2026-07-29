@@ -14,6 +14,7 @@ import type React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Kbd } from "~/components/ops/shared/Kbd";
 import { IsolatedErrorBoundary } from "~/components/ui/IsolatedErrorBoundary";
+import { explainAnyError } from "~/features/errors";
 import { useLangyStore } from "~/features/langy/stores/langyStore";
 import { useModelProvidersSettings } from "~/hooks/useModelProvidersSettings";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -28,10 +29,9 @@ import { ActiveSearchEditor } from "./ActiveSearchEditor";
 import { AiErrorDetails, hasAiErrorDetails } from "./ErrorBannerDetail";
 import { editorStyles } from "./editorStyles";
 import { FloatingAiBar } from "./FloatingAiBar";
-import { setFilterChipLabels } from "./filterHighlight";
 import { FloatingLangyBar } from "./FloatingLangyBar";
+import { setFilterChipLabels } from "./filterHighlight";
 import { PlaceholderEditor, searchBarPlaceholder } from "./PlaceholderEditor";
-import { useAskLangyFromSearch } from "./useAskLangyFromSearch";
 import {
   ClearButton,
   type SearchBarStatus,
@@ -44,6 +44,7 @@ import {
   TokenValuePicker,
   type TokenValuePickerAnchor,
 } from "./TokenValuePicker";
+import { useAskLangyFromSearch } from "./useAskLangyFromSearch";
 import type { ValueResolver } from "./useFilterEditor";
 import { useFloatRect } from "./useFloatRect";
 import { useGlobalAiShortcut } from "./useGlobalAiShortcut";
@@ -474,7 +475,10 @@ export const SearchBar: React.FC = () => {
                 editorFocused &&
                 !suggestionOpen &&
                 !askAiNeedsProviderPrimer && (
-                  <SearchSubmitHint anchorX={cursorAnchorX} askLabel={askLabel} />
+                  <SearchSubmitHint
+                    anchorX={cursorAnchorX}
+                    askLabel={askLabel}
+                  />
                 )}
             </Box>
 
@@ -516,6 +520,11 @@ export const SearchBar: React.FC = () => {
  * errors (plain message only). AI error takes priority when both are set.
  * Each error type has its own dismiss button.
  */
+function aiErrorMessage(error: AiActionError): string {
+  const { title, description } = explainAnyError(error.cause);
+  return description ? `${title}. ${description}` : title;
+}
+
 const UnifiedErrorBanner: React.FC<{
   parseError: string | null;
   aiError: AiActionError | null;
@@ -536,7 +545,12 @@ const UnifiedErrorBanner: React.FC<{
 
   const showBanner = Boolean(activeAiError ?? activeParseError);
   const canExpand = Boolean(activeAiError && hasAiErrorDetails(activeAiError));
-  const message = activeAiError ? activeAiError.message : activeParseError;
+  // An AI failure's words come from the code-keyed registry via
+  // `explainAnyError`, never from a sentence the server or the provider wrote.
+  // A parse error is our own local copy and is rendered as-is.
+  const message = activeAiError
+    ? aiErrorMessage(activeAiError)
+    : activeParseError;
   const handleDismiss = activeAiError ? onDismissAiError : onDismissParseError;
 
   return (

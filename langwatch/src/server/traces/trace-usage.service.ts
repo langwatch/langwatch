@@ -7,6 +7,11 @@ import {
   getBillingMonth,
   queryTraceSummariesTotalUniq,
 } from "../../../ee/billing/services/billableEventsQuery";
+import {
+  type ProjectUsageCounts,
+  USAGE_UNKNOWN,
+  type UsageCount,
+} from "./usage-count";
 
 const logger = createLogger("langwatch:traces:traceUsage");
 
@@ -30,7 +35,7 @@ export class TraceUsageService {
     organizationId,
   }: {
     organizationId: string;
-  }): Promise<number> {
+  }): Promise<UsageCount> {
     const billingMonth = getBillingMonth();
     const cacheKey = `${organizationId}:traces:${billingMonth}`;
 
@@ -56,15 +61,15 @@ export class TraceUsageService {
 
     if (total === null) {
       // queryTraceSummariesTotalUniq returns null only when no ClickHouse
-      // client is available. Fail open (report 0), mirroring
-      // event-usage.service.ts — but do NOT cache the failure-derived zero:
-      // a cached 0 would keep license/limit enforcement reading "no usage"
-      // for the full 5-minute TTL even after ClickHouse recovers.
+      // client is available — the count is unknown, which is not the same
+      // fact as zero and must not be reported as one. Nothing is cached
+      // either way: caching an unknown would make a five-minute TTL out of a
+      // condition that may clear on the next call.
       logger.warn(
         { organizationId, billingMonth },
-        "getCurrentMonthCount: ClickHouse unavailable, returning 0 (fail-open, not cached)",
+        "getCurrentMonthCount: ClickHouse unavailable, usage is unknown",
       );
-      return 0;
+      return USAGE_UNKNOWN;
     }
 
     await monthCountCache.set(cacheKey, total);
@@ -77,7 +82,7 @@ export class TraceUsageService {
   }: {
     organizationId: string;
     projectIds: string[];
-  }): Promise<Array<{ projectId: string; count: number }>> {
+  }): Promise<ProjectUsageCounts> {
     if (projectIds.length === 0) return [];
 
     // The signature advertises organization scoping — enforce it. Current
@@ -97,17 +102,33 @@ export class TraceUsageService {
     }
 
     const billingMonth = getBillingMonth();
-    return Promise.all(
-      projectIds.map(async (projectId) => {
-        // null means ClickHouse is unavailable — fail open per-project with 0
-        // (matching event-usage.service.ts); nothing is cached on this path.
-        const count =
-          (await queryTraceSummariesTotalUniq({
-            projectIds: [projectId],
-            billingMonth,
-          })) ?? 0;
-        return { projectId, count };
-      }),
+    const counts = await Promise.all(
+      projectIds.map(async (projectId) => ({
+        projectId,
+        // null means ClickHouse is unavailable, so this project's count is
+        // unknown rather than zero.
+        count: await queryTraceSummariesTotalUniq({
+          projectIds: [projectId],
+          billingMonth,
+        }),
+      })),
     );
+
+    // One unreachable project makes the whole set untrustworthy: a caller
+    // comparing projects, or summing them against a cap, would silently be
+    // working from a partial total. Better to say the answer is unknown than
+    // to hand back a set that looks complete and is not.
+    if (counts.some(({ count }) => count === null || count === undefined)) {
+      logger.warn(
+        { organizationId, billingMonth },
+        "getCountByProjects: ClickHouse unavailable, usage is unknown",
+      );
+      return USAGE_UNKNOWN;
+    }
+
+    return counts.map(({ projectId, count }) => ({
+      projectId,
+      count: count as number,
+    }));
   }
 }

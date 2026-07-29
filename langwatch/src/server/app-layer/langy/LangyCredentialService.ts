@@ -1,11 +1,9 @@
+import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { z } from "zod";
-
-import type { Session } from "~/server/auth";
 import { getApp } from "~/server/app-layer";
-import { LANGY_GITHUB_ENABLED } from "./langyGithub.enabled";
-import { HandledError } from "@langwatch/handled-error";
+import type { Session } from "~/server/auth";
 import { parseVirtualKeyConfig } from "~/server/gateway/virtualKey.config";
 import { ProjectRepository } from "~/server/projects/project.repository";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
@@ -13,6 +11,7 @@ import {
   LangySessionKeyScopeError,
   mintLangySessionApiKey,
 } from "./langyApiKey";
+import { LANGY_GITHUB_ENABLED } from "./langyGithub.enabled";
 import { provisionLangyVirtualKey } from "./langyVirtualKey";
 
 const logger = createLogger("langwatch:langy:credentials");
@@ -138,13 +137,20 @@ export function resolveWorkerGatewayBaseUrl(
 }
 
 /**
- * Thrown when credential resolution can't complete — missing project,
- * missing provider credential, missing env config. A `HandledError` (kind
+ * Thrown when credential resolution can't complete for a reason the CALLER can
+ * do something about — an unknown project, a missing provider credential, a
+ * user who holds none of the permissions Langy needs. A `HandledError` (code
  * `langy_credential_resolution`, httpStatus 409) so it serialises uniformly
- * through the shared `onError → handleError` path with a proper status/kind,
+ * through the shared `onError → handleError` path with a proper status/code,
  * and `classifyLangyTurnError` renders it on the chat stream — instead of the
- * /chat route hand-mapping it to a 409. The message is user-safe by
- * construction (it is the copy shown to the user); nothing internal is carried.
+ * /chat route hand-mapping it to a 409.
+ *
+ * NOT for our own misconfiguration. A control-plane env var we failed to set is
+ * a failure the customer cannot act on, and `langy_credential_resolution`'s
+ * remediation ("sign out and back in") would send them somewhere useless — so
+ * those stay plain `Error`s that degrade to the generic unknown plus a trace
+ * id, with the variable named in the log line (ADR-045). The message is
+ * user-safe by construction; nothing internal is carried.
  */
 export class LangyCredentialResolutionError extends HandledError {
   constructor(message: string) {
@@ -320,15 +326,26 @@ export class LangyCredentialService {
     // control-plane origins. See resolveWorkerCallbackUrl / resolveWorkerGatewayBaseUrl.
     const langwatchEndpoint = resolveWorkerCallbackUrl();
     const gatewayBaseUrl = resolveWorkerGatewayBaseUrl();
+    // Deliberately PLAIN errors, not handled ones (ADR-045). A control-plane
+    // env var we failed to set is a failure the customer cannot act on, so it
+    // fails the "the caller can act on it" test — dressing it up as
+    // `langy_credential_resolution` sent them to sign out and back in, which
+    // could never fix our deployment. It degrades to the generic unknown plus a
+    // trace id, and the variable name lives in the log line beside the throw,
+    // which is where the trace id ties it back.
     if (!langwatchEndpoint) {
-      throw new LangyCredentialResolutionError(
-        "Neither LANGWATCH_ENDPOINT nor LANGWATCH_API_URL is configured on the control plane.",
+      logger.error(
+        { projectId, envVars: ["LANGWATCH_ENDPOINT", "LANGWATCH_API_URL"] },
+        "no worker callback origin configured on the control plane",
       );
+      throw new Error("Langy worker callback origin is not configured");
     }
     if (!gatewayBaseUrl) {
-      throw new LangyCredentialResolutionError(
-        "LW_GATEWAY_BASE_URL is not configured on the control plane.",
+      logger.error(
+        { projectId, envVars: ["LW_GATEWAY_BASE_URL"] },
+        "no gateway base URL configured on the control plane",
       );
+      throw new Error("Langy gateway base URL is not configured");
     }
 
     // Mint a per-session key scoped to THIS user's own permissions (ADR-047).
@@ -387,11 +404,10 @@ export class LangyCredentialService {
     let githubRepoScopeKey: string | undefined;
     if (LANGY_GITHUB_ENABLED) {
       try {
-        const minted =
-          await getApp().langy.githubInstallations.mintTurnToken({
-            organizationId: project.organizationId,
-            ...(repositoryFullName ? { repositoryFullName } : {}),
-          });
+        const minted = await getApp().langy.githubInstallations.mintTurnToken({
+          organizationId: project.organizationId,
+          ...(repositoryFullName ? { repositoryFullName } : {}),
+        });
         if (minted) {
           githubToken = minted.token;
           githubRepoScopeKey = minted.repoScopeKey;

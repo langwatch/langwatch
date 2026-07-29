@@ -103,8 +103,16 @@ export function HorizontalFormControl({
           }
         >
           {children}
+          {/*
+            Under the field it belongs to, not beside it. As a sibling of this
+            Box it was a third column in the row, so it took whatever width was
+            left over — "Passwords don't match" arrived as three stacked words
+            in a gutter next to the input, which reads as damage rather than as
+            an explanation. Inside the Box it takes the input's own width and
+            sits directly beneath it, where the eye already is.
+          */}
+          <FormErrorDisplay error={error} />
         </Box>
-        <FormErrorDisplay error={error} />
       </HStack>
     </Field.Root>
   );

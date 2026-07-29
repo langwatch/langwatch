@@ -4,7 +4,7 @@ import { useState } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { DatasetEditorTable } from "~/components/datasets/editor/DatasetEditorTable";
 import { retryDatasetNormalize } from "~/components/datasets/services/directUpload";
-import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
@@ -60,14 +60,9 @@ export default function Dataset() {
       await retryDatasetNormalize({ projectId: project.id, datasetId });
       await datasetQuery.refetch();
     } catch (error) {
-      toaster.create({
-        title: "Could not retry",
-        description:
-          error instanceof Error
-            ? error.message
-            : "Please try again in a moment.",
-        type: "error",
-        meta: { closable: true },
+      showErrorToast({
+        error,
+        fallbackTitle: "Couldn't retry preparing this dataset",
       });
     } finally {
       setIsRetrying(false);
