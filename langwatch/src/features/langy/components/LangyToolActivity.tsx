@@ -246,8 +246,14 @@ function outputText(output: unknown): string | undefined {
 
 /**
  * The CONSOLE of a call that came through the CLI ENVELOPE — the
- * `{ kind: "text", text }` result, unwrapped from the JSON string it travels
- * as. `null` for anything else, and that is the whole point of the function.
+ * `{ kind: "text", text }` result. `null` for anything else, and that is the
+ * whole point of the function.
+ *
+ * Takes the ALREADY-PARSED document rather than the part: the envelope travels
+ * as a JSON string, and the caller has to parse that string anyway to look for
+ * a handled-failure document. Re-parsing it here meant a second full
+ * balanced-brace scan of every multi-KB CLI result, per failing part, on every
+ * uncached read.
  *
  * Unwrapping is what makes line anchoring mean anything: inside that JSON
  * string every newline is an escaped `\n`, so the whole console reads as one
@@ -263,9 +269,7 @@ function outputText(output: unknown): string | undefined {
  * about the command. Reading it drew a red error card for a step that worked
  * and dropped that step from the completed receipt.
  */
-function cliConsoleTextOf(part: ToolPartLike): string | null {
-  const raw = part.output;
-  const document = typeof raw === "string" ? parseCliJson(raw) : raw;
+function cliConsoleTextOf(document: unknown): string | null {
   if (!document || typeof document !== "object" || Array.isArray(document)) {
     return null;
   }
@@ -291,11 +295,18 @@ function cliConsoleTextOf(part: ToolPartLike): string | null {
 function renderedToolFailure(part: ToolPartLike): boolean {
   if (FAILED_STATES.has(part.state ?? "")) return true;
 
-  const text = outputText(part.output);
-  const document = text !== undefined ? parseCliJson(text) : part.output;
+  const raw = part.output;
+  const text = outputText(raw);
+  const document = text !== undefined ? parseCliJson(text) : raw;
   if (readCliErrorDocument(document)) return true;
 
-  const consoleText = cliConsoleTextOf(part);
+  // ONE parse, read twice. An output that IS the JSON string has already been
+  // parsed into `document`, and that parse is the envelope the console read
+  // wants; an output that is already an object IS the envelope, and `document`
+  // is the parse of the text it carries — which is where a nested handled
+  // failure hides, and not the envelope at all.
+  const envelope = typeof raw === "string" ? document : raw;
+  const consoleText = cliConsoleTextOf(envelope);
   if (consoleText === null) return false;
   return CLI_FAILURE_LINE.test(consoleText);
 }

@@ -130,15 +130,26 @@ export function useLangyTurnRecovery({
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onRetryRef = useRef(onRetry);
   onRetryRef.current = onRetry;
-  // An ARMING-TIME input, deliberately kept out of the effect's dep array.
+  // The one input that arrives LATE by construction, so it is read TWICE and is
+  // deliberately kept out of the effect's dep array.
   //
   // The caller derives it from the engine's messages (`turnHadSideEffects`), and
   // those are replaced wholesale whenever the 3s `langy.messages` poll lands —
   // well inside this hook's 1500/4000ms waits. As a dep it therefore re-ran the
-  // effect mid-wait for the SAME failure, and the effect has nothing to do on
-  // that re-run: whether this failure may auto-retry was already decided when
-  // the timer was armed. Read it off a ref so a mid-flight history poll cannot
+  // effect mid-wait for the SAME failure, and the re-run could only make things
+  // worse: the effect's own short-circuit treats an already-handled (kind, id)
+  // as nothing to do, so with a cleanup attached the re-render killed the armed
+  // timer and re-armed nothing. Read off a ref, a mid-flight history poll cannot
   // disturb a retry that is already scheduled.
+  //
+  // The arming-time read is therefore NOT the safety check — it cannot be. When
+  // the timer arms, the evidence that this turn already mutated the project may
+  // still be in flight, and `canAutoRecover` opens with `sideEffectsObserved`
+  // for a reason: re-driving a turn that opened a PR can open a second one. So
+  // the ref is read again inside the timer callback, immediately before the
+  // retry fires, and a turn revealed as mutating in the meantime falls through
+  // to the error card exactly as an arming-time rejection would. Arming is the
+  // early exit; the callback is the invariant.
   const sideEffectsObservedRef = useRef(sideEffectsObserved);
   sideEffectsObservedRef.current = sideEffectsObserved;
 
@@ -199,6 +210,20 @@ export function useLangyTurnRecovery({
     setPending({ kind: errorKind, attempt });
     timerRef.current = setTimeout(() => {
       clearTimer();
+      // LAST-MOMENT SAFETY RE-READ. Everything else the policy weighs was
+      // settled when the timer armed; this one was not. The evidence that the
+      // dead turn already ran a project-mutating tool rides in on the history
+      // poll, which lands INSIDE this wait, so a turn that looked inert at
+      // arming time can be known to have opened a PR by the time the timer
+      // fires. Re-driving it then is the exact thing `canAutoRecover`'s
+      // `sideEffectsObserved` guard exists to prevent — a second PR, a second
+      // prompt — so abandon the retry and hand the decision to the user via the
+      // card, the same landing as an arming-time rejection. No attempt is
+      // charged, because none was made.
+      if (sideEffectsObservedRef.current) {
+        setPending(null);
+        return;
+      }
       attemptsUsedRef.current = attempt;
       setPending(null);
       // `regenerate` clears useChat's error and flips status to "submitted", so
@@ -211,8 +236,9 @@ export function useLangyTurnRecovery({
     // can legitimately be cancelled already clears it by hand: the failure
     // clearing or the hook being disabled (the first branch), a NEW failure
     // arriving — including the same Error reclassified — or one that turns out
-    // to be terminal (both above), `reset()` when the conversation changes, and
-    // the unmount effect below.
+    // to be terminal (both above), late-arriving side-effect evidence (the
+    // callback's own re-read), `reset()` when the conversation changes, and the
+    // unmount effect below.
     //
     // Returning `clearTimer` here instead is what wedged the panel: React runs
     // the previous cleanup on ANY dep change, so a re-render killed the pending

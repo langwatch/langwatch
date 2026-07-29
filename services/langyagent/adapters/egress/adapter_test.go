@@ -113,12 +113,6 @@ func startEchoUpstream(t *testing.T) *echoUpstream {
 	return e
 }
 
-func (e *echoUpstream) accepts() int32 {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	return e.accepted
-}
-
 // dialRecorder wraps a dial func to (a) record which authorities were dialed
 // and (b) route every dial to the echo upstream regardless of the requested
 // host, so realistic FQDNs can be used while everything lands on loopback.
@@ -444,8 +438,16 @@ func TestEgress_NonTLSPortIsRefusedWhenRequireTLS(t *testing.T) {
 	}
 }
 
-// ---- Rung 3 cross-check: SNI must match the authorised authority ----
+// ---- Rung 3 cross-check: SNI must match the authorized authority ----
 
+// The base case of the anti-fronting refusal, driven by a REAL tls.Client so
+// the bytes on the wire are a genuine handshake rather than a fixture: a
+// mismatching SNI is refused before the dial, and flagged as an SNI mismatch —
+// the two Then clauses of the scenario below. The scenario's FRAGMENTATION
+// clause is pinned separately, by TestEgress_FragmentedSNIMismatchIsRefused-
+// BeforeDial and by TestPeekClientHelloSNI_ReassemblesAFragmentedHello; this
+// test is the unfragmented sibling, not a substitute for either.
+// @scenario "A ClientHello split across TLS records still reveals its SNI"
 func TestEgress_SNIMismatchIsRefusedBeforeDial(t *testing.T) {
 	cfg := baseCfg()
 	cfg.sniCrossCheck = true
@@ -544,6 +546,18 @@ func TestEgress_ImplausibleRecordVersionIsRefusedBeforeDial(t *testing.T) {
 // `a.cfg.policy.enforcing()` from the guard would turn every monitor-only
 // install into one that hard-denies unreadable handshakes — a silent breach of
 // the ADR's "unset = watch" guarantee.
+//
+// The hello is deliberately UNREADABLE — the same one-byte
+// legacy_record_version mangling the sibling implausible-version test uses — so
+// the peek returns no SNI and reports the stream as unreadable. That drives
+// execution into `case sni == "" && sniUnreadable(...)` with every other
+// conjunct satisfied (`sni` is empty, the peek errored, and the authority is a
+// name rather than an IP literal), leaving `enforcing()` as the ONE term
+// deciding allow vs. deny. Delete it and this test denies and never dials.
+//
+// A READABLE hello whose SNI equals the authority — what this test used to send
+// — reaches neither arm of the switch, so it could not fail for that property
+// however the guard were rewritten.
 // @scenario "An unreadable ClientHello is left alone under monitor-only"
 func TestEgress_UnreadableClientHelloIsAllowedUnderMonitorOnly(t *testing.T) {
 	cfg := baseCfg()
@@ -557,7 +571,9 @@ func TestEgress_UnreadableClientHelloIsAllowedUnderMonitorOnly(t *testing.T) {
 	if status != 200 {
 		t.Fatalf("monitor-only must not block, got %d", status)
 	}
-	if _, err := conn.Write(clientHelloFor(t, "anywhere.example")); err != nil {
+	hello := clientHelloFor(t, "anywhere.example")
+	hello[2] = 5 // 0x0301 -> 0x0305: a version no TLS record uses.
+	if _, err := conn.Write(hello); err != nil {
 		t.Fatalf("write hello: %v", err)
 	}
 
@@ -565,6 +581,91 @@ func TestEgress_UnreadableClientHelloIsAllowedUnderMonitorOnly(t *testing.T) {
 		func() string { return "monitor-only must still dial the destination" })
 	if h.monitor.has(egressDeniedSNIUnreadable) {
 		t.Fatalf("monitor-only must not deny, got %v", h.monitor.decisions())
+	}
+	// "the flow is still monitored and attributable": allowed, and flagged.
+	if !h.monitor.has(egressAllowedMonitor) {
+		t.Fatalf("expected an allowed_monitor flag, got %v", h.monitor.decisions())
+	}
+}
+
+// ---- Rung 3 cross-check: the exemptions, pinned at the adapter ----
+
+// The adapter-level half of the fragmentation regression. The peek-level test
+// proves the SNI is recovered out of record 2; this proves the adapter ACTS on
+// what it recovered — a hostile client that hides its SNI behind a record
+// boundary is refused, and the destination is never dialed.
+// @scenario "A ClientHello split across TLS records still reveals its SNI"
+func TestEgress_FragmentedSNIMismatchIsRefusedBeforeDial(t *testing.T) {
+	h := newHarness(t, enforcingSNICfg())
+
+	conn, status := h.sendCONNECT(t, "allowed.example:443")
+	defer conn.Close()
+	if status != 200 {
+		t.Fatalf("authority is allow-listed but CONNECT got %d, want 200", status)
+	}
+
+	// Split right after the handshake header, so the server_name extension lands
+	// wholly in the second record — the shape a single-record peek walked past.
+	fragmented := refragment(t, clientHelloFor(t, "attacker.example"), 8)
+	if _, err := conn.Write(fragmented); err != nil {
+		t.Fatalf("write fragmented hello: %v", err)
+	}
+	waitForDecision(t, h, egressDeniedSNIMismatch)
+
+	if h.dialer.dialedAuthority("allowed.example:443") {
+		t.Fatal("a fragmented mismatching SNI must be refused BEFORE dialing the destination")
+	}
+}
+
+// The cross-check governs TLS and nothing else. A stream that is CLEANLY not
+// TLS — a complete record header carrying a non-handshake content type — must
+// still tunnel under an enforcing policy, because require-TLS is the rung that
+// governs cleartext. Make the not-TLS exit an error (or drop the clean-exit
+// case from sniUnreadable) and this denies an allow-listed destination.
+// @scenario "A tunnel that is not TLS at all is unaffected by the cross-check"
+func TestEgress_NonTLSTunnelIsNotRefusedByTheCrossCheck(t *testing.T) {
+	h := newHarness(t, enforcingSNICfg())
+
+	conn, status := h.sendCONNECT(t, "allowed.example:443")
+	defer conn.Close()
+	if status != 200 {
+		t.Fatalf("authority is allow-listed but CONNECT got %d, want 200", status)
+	}
+	if _, err := conn.Write([]byte("GET / HTTP/1.1\r\nHost: allowed.example\r\n\r\n")); err != nil {
+		t.Fatalf("write non-tls bytes: %v", err)
+	}
+
+	waitFor(t, func() bool { return h.dialer.dialedAuthority("allowed.example:443") },
+		func() string { return "a cleanly non-TLS tunnel must still reach its destination" })
+	if h.monitor.has(egressDeniedSNIUnreadable) {
+		t.Fatalf("the cross-check must not refuse a non-TLS tunnel, got %v", h.monitor.decisions())
+	}
+}
+
+// RFC 6066 forbids server_name for a bare address, so a conforming client sends
+// none and the peek can only report "unreadable". Sending nothing at all here
+// satisfies every other conjunct of the fail-closed guard — empty SNI, a peek
+// that errored, an enforcing policy — which leaves `!isIPLiteral(host)` as the
+// only term keeping an allow-listed IP out of a deny. Delete it and every
+// spec-conforming client on a bare-IP authority is refused.
+// @scenario "A bare IP authority is exempt from the SNI requirement"
+func TestEgress_BareIPAuthorityIsNotRefusedOnSNIGrounds(t *testing.T) {
+	cfg := baseCfg()
+	cfg.sniCrossCheck = true
+	cfg.sniPeekTimeout = 250 * time.Millisecond
+	cfg.policy = egressPolicy{allowlist: []string{"203.0.113.10"}}
+	h := newHarness(t, cfg)
+
+	conn, status := h.sendCONNECT(t, "203.0.113.10:443")
+	defer conn.Close()
+	if status != 200 {
+		t.Fatalf("allow-listed bare IP got status %d, want 200", status)
+	}
+
+	waitFor(t, func() bool { return h.dialer.dialedAuthority("203.0.113.10:443") },
+		func() string { return "an allow-listed bare IP must not be refused for sending no SNI" })
+	if h.monitor.has(egressDeniedSNIUnreadable) {
+		t.Fatalf("a bare IP authority must not be denied on SNI grounds, got %v", h.monitor.decisions())
 	}
 }
 

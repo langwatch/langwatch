@@ -385,6 +385,27 @@ describe("guardOrganizationId — platform-owned API-key sweeps", () => {
     return { client, calls };
   }
 
+  /**
+   * The where clause the REAL reaper writes, captured by running it through the
+   * guarded stand-in above.
+   *
+   * Every denied case below starts from THIS object rather than a re-typed copy
+   * of it. Re-typed literals are how the escape hatch drifted wider than the
+   * sweep it claimed to match: the guard's predicate was written to describe the
+   * reaper's and then only ever compared to it by eye, so it went on admitting
+   * shapes — un-expired keys, on any action — the reaper never writes. Deriving
+   * the attack shapes from the reaper keeps them tracking it: change the sweep
+   * and these cases change with it, or fail.
+   */
+  async function captureSweepWhere(): Promise<Record<string, unknown>> {
+    const { client, calls } = guardedPrisma(0);
+    await reapExpiredLangySessionApiKeys({
+      prisma: client as unknown as PrismaClient,
+      now: new Date("2026-07-28T12:00:00Z"),
+    });
+    return (calls[0] as { where: Record<string, unknown> }).where;
+  }
+
   describe("when the expired-Langy-session reaper runs its real hourly sweep", () => {
     /**
      * The REAL reaper, not a re-typed copy of its where clause.
@@ -408,6 +429,61 @@ describe("guardOrganizationId — platform-owned API-key sweeps", () => {
       ).resolves.toBe(2);
 
       expect(calls).toHaveLength(1);
+    });
+  });
+
+  describe("when the sweep's own shape is replayed as a cross-tenant read", () => {
+    it("THROWS — the hatch is granted to the sweep's updateMany, never to findMany", async () => {
+      // Exactly the predicate the guard admits for the reaper. Run as a read it
+      // hands back every organization's platform-minted keys, which is not a
+      // sweep — so the action, not just the shape, has to match.
+      const where = await captureSweepWhere();
+
+      await expect(
+        runGuard({ model: "ApiKey", action: "findMany", args: { where } }),
+      ).rejects.toThrow(/tenancy key/);
+    });
+  });
+
+  describe("when the sweep's own shape is replayed as a cross-tenant delete", () => {
+    it("THROWS — the reaper revokes rows, so nothing here authorises removing them", async () => {
+      const where = await captureSweepWhere();
+
+      await expect(
+        runGuard({ model: "ApiKey", action: "deleteMany", args: { where } }),
+      ).rejects.toThrow(/tenancy key/);
+    });
+  });
+
+  describe("when an updateMany carries the sweep's name and un-revoked clause but no expiry bound", () => {
+    it("THROWS — that predicate is every LIVE session key, in every organization", async () => {
+      const { expiresAt: _elapsed, ...withoutExpiryBound } =
+        await captureSweepWhere();
+
+      await expect(
+        runGuard({
+          model: "ApiKey",
+          action: "updateMany",
+          args: {
+            where: withoutExpiryBound,
+            data: { revokedAt: new Date() },
+          },
+        }),
+      ).rejects.toThrow(/tenancy key/);
+    });
+  });
+
+  describe("when an updateMany keeps an expiresAt clause but drops its elapsed bound", () => {
+    it("THROWS — 'has an expiry' still names live keys; only 'already passed' does not", async () => {
+      const where = { ...(await captureSweepWhere()), expiresAt: { not: null } };
+
+      await expect(
+        runGuard({
+          model: "ApiKey",
+          action: "updateMany",
+          args: { where, data: { revokedAt: new Date() } },
+        }),
+      ).rejects.toThrow(/tenancy key/);
     });
   });
 

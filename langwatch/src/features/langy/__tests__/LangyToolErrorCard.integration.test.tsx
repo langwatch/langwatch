@@ -290,6 +290,23 @@ describe("Langy tool failure card", () => {
 
       expect(screen.queryByRole("alert")).toBeNull();
     });
+
+    it("keeps the step in the completed receipt", () => {
+      // The other half of the same defect, and the half an absence assertion
+      // cannot see: a misclassified call did not merely gain a red card, it
+      // also DROPPED OUT of the receipt. Pinning only "no alert" would pass for
+      // a reader that rendered nothing at all, so the step has to be visibly
+      // accounted for as one that ran and finished.
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <LangyToolActivity message={grepForThePhrase} />
+        </ChakraProvider>,
+      );
+
+      expect(
+        screen.getByRole("button", { name: /1 action completed/i }),
+      ).toBeTruthy();
+    });
   });
 
   it("collapses a mis-associated trace-search payload into a receipt", () => {

@@ -64,7 +64,7 @@ type Guard interface {
 	PrepareWorker(ctx context.Context, w WorkerContext) (WorkerEgress, error)
 }
 
-// PassThrough is the no-op Guard: it runs no proxy and changes no behaviour —
+// PassThrough is the no-op Guard: it runs no proxy and changes no behavior —
 // the worker egresses direct, exactly as before. Used in tests and partial
 // wiring.
 type PassThrough struct{}

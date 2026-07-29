@@ -66,6 +66,7 @@ Feature: CLI daemon mode
       Then the command runs in-process
       And every record I piped in is added, exactly as with no daemon running
 
+    @unit
     Scenario: A command asks me a question at a prompt
       Given a daemon is running
       And no TTY is attached to any of my streams

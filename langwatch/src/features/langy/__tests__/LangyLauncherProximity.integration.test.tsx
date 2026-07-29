@@ -20,10 +20,12 @@
  * `isOpen`, by driving a real open/close cycle and asking the orb you get back
  * whether it still reacts to the pointer.
  *
- * Boundary mocks are the established Langy panel harness (mirrors
- * LangyPanelPeek / LangyInlineModelSetup): project, useChat, the `~/utils/api`
- * surface, drawer, shaders. The one this suite fixes rather than drives is the
- * peek rollout flag — OFF, which is what puts the launcher orb on screen at all.
+ * Boundary mocks only: project, useChat, drawer, shaders, and the `~/utils/api`
+ * surface — which comes from the shared `support/langyApiMock` harness rather
+ * than another hand-written copy of the panel's whole tRPC surface, so a query
+ * the panel adds tomorrow is answered here without this file being touched. The
+ * one this suite fixes rather than drives is the peek rollout flag — OFF, which
+ * is what puts the launcher orb on screen at all.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { act, cleanup, render, waitFor } from "@testing-library/react";
@@ -102,122 +104,39 @@ vi.mock(
   }),
 );
 
-vi.mock("~/utils/api", () => ({
-  api: {
-    useUtils: () => ({
-      langy: {
-        list: { invalidate: () => Promise.resolve() },
-      },
-      langyGithub: {
-        getInstallStatus: { invalidate: () => Promise.resolve() },
-      },
-    }),
-    useContext: () => ({
-      langy: {
-        list: {
-          getInfiniteData: () => undefined,
-          setInfiniteData: () => undefined,
-          cancel: () => Promise.resolve(),
-          invalidate: () => Promise.resolve(),
+// The whole tRPC surface the panel touches comes from the shared harness, which
+// answers anything a suite has not spoken for with a settled-idle query, a no-op
+// mutation or a no-op subscription. This suite is about a button's pointer
+// wiring, so it speaks for exactly one procedure and lets the rest stay inert.
+//
+// Imported INSIDE the factory: `vi.mock` is hoisted above the imports, so a
+// top-level binding is still in its temporal dead zone when this runs.
+vi.mock("~/utils/api", async () => {
+  const { createTrpcUtils, idleQuery, withFallback } = await import(
+    "./support/langyApiMock"
+  );
+  const trpcUtils = createTrpcUtils();
+
+  return {
+    api: withFallback({
+      useUtils: () => trpcUtils,
+      useContext: () => trpcUtils,
+      modelProvider: withFallback({
+        // The one override. Without a resolved model the panel renders the
+        // inline model-setup branch instead of its ordinary surface, and the
+        // open/close cycle this suite drives never happens.
+        getResolvedDefault: {
+          useQuery: () => ({
+            ...idleQuery(),
+            data: { model: "gpt-5-mini" },
+            isSuccess: true,
+            refetch: () => Promise.resolve({ data: { model: "gpt-5-mini" } }),
+          }),
         },
-        messages: { invalidate: () => Promise.resolve() },
-        detail: { setData: () => undefined },
-      },
+      }),
     }),
-    langyGithub: {
-      getInstallStatus: {
-        useQuery: () => ({ data: undefined, isLoading: false, isError: true }),
-      },
-      disconnect: {
-        useMutation: () => ({ mutate: () => undefined, isPending: false }),
-      },
-    },
-    langy: {
-      messages: {
-        useQuery: () => ({
-          data: undefined,
-          isLoading: false,
-          isFetching: false,
-          isError: false,
-        }),
-      },
-      modelsAllowed: {
-        useQuery: () => ({
-          data: { modelsAllowed: null },
-          isLoading: false,
-          isError: false,
-        }),
-      },
-      onConversationUpdate: {
-        useSubscription: () => undefined,
-      },
-      stopTurn: {
-        useMutation: () => ({ mutateAsync: () => Promise.resolve() }),
-      },
-      deleteConversation: {
-        useMutation: () => ({ mutateAsync: () => Promise.resolve() }),
-      },
-      renameConversation: {
-        useMutation: () => ({ mutateAsync: () => Promise.resolve() }),
-      },
-      list: {
-        useInfiniteQuery: () => ({
-          data: { pages: [{ items: [], nextCursor: null }] },
-          isInitialLoading: false,
-          isFetching: false,
-          isPreviousData: false,
-          isFetched: true,
-          isError: false,
-          error: null,
-          refetch: () => Promise.resolve(),
-          fetchNextPage: () => Promise.resolve(),
-          hasNextPage: false,
-          isFetchingNextPage: false,
-        }),
-      },
-    },
-    modelProvider: {
-      // A resolved model keeps the panel on its ordinary surface rather than
-      // the inline model-setup branch.
-      getResolvedDefault: {
-        useQuery: () => ({
-          data: { model: "gpt-5-mini" },
-          isLoading: false,
-          refetch: () => Promise.resolve({ data: { model: "gpt-5-mini" } }),
-        }),
-      },
-      listAllForProjectForFrontend: {
-        useQuery: () => ({ data: { providers: [] }, isLoading: false }),
-      },
-    },
-    virtualKeys: {
-      list: {
-        useQuery: () => ({ data: undefined, isLoading: false }),
-      },
-    },
-    integrationsChecks: {
-      getCheckStatus: {
-        useQuery: () => ({
-          data: {
-            firstMessage: true,
-            onlineEvaluations: 1,
-            simulations: 1,
-            datasets: 1,
-          },
-          isLoading: false,
-        }),
-      },
-    },
-    ops: {
-      getScope: {
-        useQuery: () => ({
-          data: { scope: { kind: "none" } },
-          isLoading: false,
-        }),
-      },
-    },
-  },
-}));
+  };
+});
 
 import { LangySidecar } from "../components/LangyPanel";
 import { LangyProvider } from "../LangyContext";

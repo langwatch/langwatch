@@ -136,6 +136,7 @@ describe("evaluateEligibility", () => {
   });
 
   describe("when the command prompts on stdin", () => {
+    /** @scenario "A command asks me a question at a prompt" */
     it("refuses push, whose conflict prompt would never be answered", () => {
       expect(evaluateEligibility(piped({ args: ["push"] }))).toEqual({
         eligible: false,
@@ -143,6 +144,7 @@ describe("evaluateEligibility", () => {
       });
     });
 
+    /** @scenario "A command asks me a question at a prompt" */
     it("refuses prompt tag delete, which confirms by typing the tag name", () => {
       expect(
         evaluateEligibility(piped({ args: ["prompt", "tag", "delete", "prod"] })),

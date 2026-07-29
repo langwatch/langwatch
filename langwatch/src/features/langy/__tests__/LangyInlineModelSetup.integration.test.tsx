@@ -425,9 +425,23 @@ describe("Feature: Langy prompts for a model when the project has none configure
 
         renderPanel();
 
+        // A POSITIVE anchor first. On its own, "the setup screen is absent"
+        // also holds for a panel that rendered nothing at all, so the
+        // regression could come back behind a blank surface and still pass.
+        // The panel's ordinary empty state is what a failed lookup must fall
+        // back to, so pin that it is really there.
+        expect(
+          await screen.findByText(
+            "Just type away, or start with one of these.",
+          ),
+        ).toBeInTheDocument();
+
         await waitFor(() => {
           expect(screen.queryByTestId("model-provider-screen")).toBeNull();
         });
+        expect(
+          screen.queryByText("Langy needs a model to get started"),
+        ).not.toBeInTheDocument();
       });
     });
   });

@@ -429,6 +429,14 @@ describe("explainLangyError", () => {
           }),
         );
 
+        // The copy has to name THROTTLING, not just differ from the generic
+        // card: "Something went wrong" is exactly the wrong story for a
+        // message that was refused because it arrived too fast.
+        expect(presentation.title).toBe("You're sending messages too quickly");
+        expect(presentation.description).toContain("in a few seconds");
+        // ...and it has to say the draft survived, because it does — the notice
+        // rides above the composer with the message still in the box.
+        expect(presentation.description).toContain("still in the box");
         expect(presentation.title).not.toBe(generic.title);
         // A retry is the one action that makes throttling worse — it spends
         // another request against the limit that just refused this one.

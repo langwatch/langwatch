@@ -15,7 +15,7 @@ import type { TimeRange } from "../stores/filterStore";
 import { useFilterStore } from "../stores/filterStore";
 import type { LensConfig } from "../stores/viewStore";
 import { getPersistedActiveLensId, useViewStore } from "../stores/viewStore";
-import { getPresetById, matchPreset } from "../utils/timeRangePresets";
+import { getPresetById } from "../utils/timeRangePresets";
 import type { BarStateOverrides, FragmentState } from "../utils/urlState";
 import {
   buildFragment,
@@ -67,6 +67,25 @@ function canonicalBody(state: BarState): string {
   return buildFragment(state.lensId, overrides);
 }
 
+/**
+ * The canonical body of the bar state the store holds right now. Every
+ * comparison in this file is target-vs-live, and running both sides through
+ * `canonicalBody` is what makes them comparable — a target that had been
+ * canonicalised differently (a preset stamped onto an absolute window, say)
+ * would never read as equal however unchanged the state was.
+ */
+function liveBody(state: {
+  activeLensId: string;
+  queryText: string;
+  timeRange: TimeRange;
+}): string {
+  return canonicalBody({
+    lensId: state.activeLensId,
+    query: state.queryText,
+    timeRange: state.timeRange,
+  });
+}
+
 /** The default window, recomputed at read time so it stays anchored to now. */
 function defaultTimeRange(): TimeRange | null {
   const preset = getPresetById(DEFAULT_PRESET_ID);
@@ -76,16 +95,33 @@ function defaultTimeRange(): TimeRange | null {
 }
 
 /**
- * The concrete range a fragment's overrides denote.
+ * The concrete range a URL denotes, or `null` when it denotes none at all.
  *
- * An absent preset / from-to pair means the DEFAULT window — not "whatever the
- * store happens to hold". `computeOverrides` omits the preset when it equals
- * the default, so absence is a positive statement about the state, and reading
- * it as "no opinion" is what let a `popstate` apply half a state: the lens and
- * the pagination moved while the time range stayed on the value the entry had
- * already navigated away from.
+ * INSIDE a fragment, an absent preset / from-to pair means the DEFAULT window
+ * — not "whatever the store happens to hold". `computeOverrides` omits the
+ * preset when it equals the default, so absence there is a positive statement
+ * about the state, and reading it as "no opinion" is what let a `popstate`
+ * apply half a state: the lens and the pagination moved while the time range
+ * stayed on the value the entry had already navigated away from.
+ *
+ * A URL carrying NO fragment only makes that statement on a `popstate`, where
+ * the empty body is exactly what the writer below emits for the default bar
+ * state. On the FIRST apply the URL is an arrival address rather than an entry
+ * this page wrote — "Observe" in the sidebar is a bare link — so it says
+ * nothing about time and the window the user is already on stands. Reading it
+ * as the default there silently snapped every in-app arrival back to 30 days
+ * and re-queried a window 30x wider than the one the user had chosen.
  */
-function resolveTimeRange(overrides: BarStateOverrides): TimeRange | null {
+function resolveTimeRange({
+  parsed,
+  isFirstApply,
+}: {
+  parsed: FragmentState | null;
+  isFirstApply: boolean;
+}): TimeRange | null {
+  if (!parsed) return isFirstApply ? null : defaultTimeRange();
+
+  const overrides = parsed.overrides;
   if (overrides.preset !== undefined) {
     const preset = getPresetById(overrides.preset);
     if (preset) {
@@ -98,11 +134,16 @@ function resolveTimeRange(overrides: BarStateOverrides): TimeRange | null {
     return defaultTimeRange();
   }
   if (overrides.timeFrom !== undefined && overrides.timeTo !== undefined) {
-    const range = { from: overrides.timeFrom, to: overrides.timeTo };
-    const preset = matchPreset(range);
-    return preset
-      ? { ...range, label: preset.label, presetId: preset.id }
-      : range;
+    // Verbatim, and deliberately NOT run past `matchPreset`. The writer emits
+    // from/to only for a range the store holds WITHOUT a preset id, so
+    // stamping one back on is a lossy round-trip that costs twice: the pinned
+    // window starts rolling (`useRollingTimeRange` moves anything carrying a
+    // preset id), and this side stops canonicalising to the same body as the
+    // live side, so the guard below never reports "in sync" and a Back that
+    // only dismissed the drawer throws the user from page 3 to page 1. A
+    // window that happens to line up with a preset is still LABELLED as one —
+    // `TimeRangePicker` matches for display, which is where that belongs.
+    return { from: overrides.timeFrom, to: overrides.timeTo };
   }
   return defaultTimeRange();
 }
@@ -116,6 +157,12 @@ interface FragmentTarget {
    * `setUserLenses` is waiting to restore.
    */
   persistLens: boolean;
+  /**
+   * The lens the fragment named when the list doesn't hold it yet, so the
+   * apply can be replayed once it does. `null` when the URL named no lens, or
+   * when the one it named resolved.
+   */
+  pendingLensId: string | null;
   overrides: BarStateOverrides;
 }
 
@@ -142,6 +189,10 @@ function resolveTarget({
     return {
       lensId: restoredId ?? DEFAULT_LENS_ID,
       persistLens: restoredId !== null && restoredId !== DEFAULT_LENS_ID,
+      // A persisted lens that hasn't hydrated needs no replay of ours —
+      // `setUserLenses` restores the stored preference itself. Only a lens the
+      // URL named is this hook's to chase.
+      pendingLensId: null,
       overrides: {},
     };
   }
@@ -150,11 +201,13 @@ function resolveTarget({
   // `#custom-…` link lands here before `useLensSync` has fetched anything —
   // gets the same treatment as the bare-URL branch above: show the default,
   // but leave the stored preference alone so the real lens can still be
-  // restored once it arrives.
+  // restored once it arrives. The id is carried out as `pendingLensId` so the
+  // apply can be replayed the moment the list holds it.
   const lensExists = allLenses.some((l) => l.id === parsed.lensId);
   return {
     lensId: lensExists ? parsed.lensId : DEFAULT_LENS_ID,
     persistLens: lensExists,
+    pendingLensId: lensExists ? null : parsed.lensId,
     overrides: parsed.overrides,
   };
 }
@@ -166,9 +219,14 @@ function resolveTarget({
 export function useURLSync(): void {
   // Whether the fragment has been reconciled with the store even once. The
   // very first apply is unconditional — a bare URL on mount still has to
-  // restore the last-used lens and start from page 1 — and the URL writer
-  // stays quiet until it has happened, so it can never write out a bar state
-  // the fragment hasn't had its say on.
+  // restore the last-used lens and start from page 1 — and it is also the
+  // only apply that reads the URL as an arrival rather than as a history
+  // entry this page wrote (see `resolveTimeRange`).
+  //
+  // The mount effect is declared ahead of the URL writer, so by the time the
+  // writer first runs this is already true; the writer's own check on it is
+  // belt-and-braces, holding "never write out a bar state the fragment hasn't
+  // had its say on" if the two are ever reordered.
   const hasAppliedFragment = useRef(false);
 
   const queryText = useFilterStore((s) => s.queryText);
@@ -193,7 +251,14 @@ export function useURLSync(): void {
     queryText,
     timeRange,
   });
+  // The same snapshot, one render older. `setUserLenses` restores the
+  // last-used lens in the very store write that hydrates the list, so by the
+  // first render that sees the new list the active lens may already have moved
+  // without the user touching anything. "Had the user gone somewhere else?"
+  // is therefore only answerable from the render BEFORE that one.
+  const previousState = useRef(liveState.current);
   useEffect(() => {
+    previousState.current = liveState.current;
     liveState.current = {
       activeLensId,
       allLenses,
@@ -203,21 +268,61 @@ export function useURLSync(): void {
     };
   });
 
+  /**
+   * A fragment naming a lens the list doesn't hold yet, kept so the apply can
+   * be replayed once it does.
+   *
+   * `useLensSync` fetches custom lenses long after the first apply, so a
+   * shared `#custom-…` link necessarily lands before the lens it names exists
+   * and the first apply can only show the default. Without this the link is
+   * lost twice over: nothing revisits it, and the writer below overwrites the
+   * fragment 150ms later, so the address is gone before the lens arrives.
+   */
+  const pendingLens = useRef<{
+    lensId: string;
+    /** The list it was judged against; the replay waits for a different one. */
+    lenses: LensConfig[];
+    /**
+     * The bar state that apply installed. Anything else in the store by the
+     * time the list moves means the user chose for themselves while we waited,
+     * and their choice outranks the link.
+     */
+    applied: BarState;
+  } | null>(null);
+
   const applyFromFragment = useCallback(() => {
     const isFirstApply = !hasAppliedFragment.current;
     hasAppliedFragment.current = true;
 
     const live = liveState.current;
+    const parsed = parseFragment(readFragment());
     const target = resolveTarget({
-      parsed: parseFragment(readFragment()),
+      parsed,
       allLenses: live.allLenses,
       persistedLensId: getPersistedActiveLensId(),
     });
-    const targetTimeRange = resolveTimeRange(target.overrides);
-    // Needed for the query fallback below — an absent `q` denotes the target
-    // lens's own filter text, so the guard can only run once that lens has
-    // actually hydrated.
+    const targetTimeRange = resolveTimeRange({ parsed, isFirstApply });
     const targetLens = live.allLenses.find((l) => l.id === target.lensId);
+    // An absent `q` denotes the target lens's own filter — the value
+    // `selectLens` installs below — not "keep the current query". Only a lens
+    // that has actually hydrated can supply it, which is why the guard below
+    // waits for one.
+    const lensQuery = targetLens
+      ? (live.draftState.get(target.lensId)?.filter ?? targetLens.filterText)
+      : live.queryText;
+
+    /**
+     * The bar state this apply leaves behind, in full: what the guard below
+     * compares the store against, and what the replay effect later compares
+     * the store against to tell "nobody touched it" from "the user moved on".
+     */
+    const applied: BarState = {
+      lensId: target.lensId,
+      query: target.overrides.query ?? lensQuery,
+      // Null only on the first apply, where the URL carries no time-range
+      // statement at all and the window the store holds is the answer.
+      timeRange: targetTimeRange ?? live.timeRange,
+    };
 
     // `popstate` fires for every history entry this page owns, and the trace
     // drawer pushes one of its own — its state lives in the query string,
@@ -237,36 +342,30 @@ export function useURLSync(): void {
     // No need to also check that a cursor survived for the current page —
     // `useTraceListQuery` already snaps back to page 1 whenever
     // `pageCursors[page]` is missing, which is the same guard one layer down.
-    if (!isFirstApply && targetLens && targetTimeRange) {
-      const draft = live.draftState.get(target.lensId);
-      // An absent `q` denotes the target lens's own filter — the value
-      // `selectLens` installs below — not "keep the current query".
-      const targetQuery =
-        target.overrides.query ?? draft?.filter ?? targetLens.filterText;
-      const alreadyInSync =
-        canonicalBody({
-          lensId: target.lensId,
-          query: targetQuery,
-          timeRange: targetTimeRange,
-        }) ===
-        canonicalBody({
-          lensId: live.activeLensId,
-          query: live.queryText,
-          timeRange: live.timeRange,
-        });
-      if (alreadyInSync) return;
+    if (
+      !isFirstApply &&
+      targetLens &&
+      canonicalBody(applied) === liveBody(live)
+    ) {
+      return;
     }
 
     // The apply is TOTAL: every axis the fragment can carry is written from
-    // it, so nothing of the entry we navigated away from survives. The query
-    // axis is total via `selectLens`, which re-installs the lens's own filter
-    // text (or its draft) before any `q` override lands on top.
+    // it, so no axis is left holding the value the entry we navigated away
+    // from put there. Total is not the same as pristine on the query axis —
+    // with no `q` to apply, `selectLens` installs the lens's DRAFT filter
+    // where it has one, and drafts are per-lens and persisted, so a filter
+    // typed on this lens does come back with it.
     selectLens(target.lensId, { persist: target.persistLens });
     if (target.overrides.query !== undefined) {
       applyQueryText(target.overrides.query);
     }
     if (targetTimeRange) setTimeRange(targetTimeRange);
     resetPagination();
+
+    pendingLens.current = target.pendingLensId
+      ? { lensId: target.pendingLensId, lenses: live.allLenses, applied }
+      : null;
   }, [selectLens, applyQueryText, setTimeRange, resetPagination]);
 
   // Initialize from fragment on mount
@@ -274,6 +373,31 @@ export function useURLSync(): void {
     if (hasAppliedFragment.current) return;
     applyFromFragment();
   }, [applyFromFragment]);
+
+  // Replay the fragment once the lens list moves under it — the other half of
+  // honouring a shared `#custom-…` link, whose lens cannot possibly be loaded
+  // at mount. Nothing else revisits the fragment: `applyFromFragment` doesn't
+  // depend on the lens list, and the mount effect above is one-shot.
+  useEffect(() => {
+    const pending = pendingLens.current;
+    // Still the list the apply was judged against: nothing has hydrated, so
+    // there is nothing new to say about the lens it named.
+    if (!pending || pending.lenses === allLenses) return;
+    // Whatever happens next, this was the one chance. Either the lens has
+    // arrived, or it never existed here at all — deleted by a teammate, or
+    // another project's id — and the writer below takes the URL back.
+    pendingLens.current = null;
+    if (!allLenses.some((l) => l.id === pending.lensId)) return;
+    // A lens the user picked, a query they typed or a window they moved while
+    // the list loaded outranks the link. The comparison is against the render
+    // BEFORE this one because `setUserLenses` restores the last-used lens in
+    // the same write that hydrates the list, and that restore is a fallback
+    // preference, not the user choosing anything — the URL outranks it.
+    if (liveBody(previousState.current) !== canonicalBody(pending.applied)) {
+      return;
+    }
+    applyFromFragment();
+  }, [allLenses, applyFromFragment]);
 
   // Restore state on browser back/forward navigation within the page.
   useEffect(() => {
@@ -291,6 +415,14 @@ export function useURLSync(): void {
     if (!hasAppliedFragment.current) return;
 
     const handle = window.setTimeout(() => {
+      // A fragment naming a lens that hasn't hydrated is a live deep link, not
+      // stale state. Collapsing it to whatever live state currently spells —
+      // for the default fallback, the empty body — is what made a shared
+      // `#custom-…` link unopenable: the address was gone 150ms in, long
+      // before the lens it named arrived. Hold the URL until the replay above
+      // has had its turn.
+      if (pendingLens.current) return;
+
       // Never name a lens the list doesn't hold. The fragment is the shareable
       // address of the view, and an id nothing resolves to just makes the next
       // read fall back to the default — better to leave the previous, still
@@ -300,9 +432,7 @@ export function useURLSync(): void {
       // Same encoder the popstate guard compares against, so this entry now
       // reads back as "nothing left to apply" — and only this entry: older
       // ones keep whatever body they were written with.
-      writeFragment(
-        canonicalBody({ lensId: activeLensId, query: queryText, timeRange }),
-      );
+      writeFragment(liveBody({ activeLensId, queryText, timeRange }));
     }, 150);
 
     return () => window.clearTimeout(handle);

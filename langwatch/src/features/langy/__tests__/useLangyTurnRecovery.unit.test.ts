@@ -122,26 +122,86 @@ describe("useLangyTurnRecovery", () => {
   });
 
   describe("when the history poll lands while a retry is already armed", () => {
-    // The wedge. `sideEffectsObserved` is derived from the engine's messages,
-    // and the 3s `langy.messages` poll replaces those wholesale — well inside
-    // the 1500/4000ms waits. Cancelling the armed timer on that churn and then
-    // short-circuiting on "same failure" left `pending` set forever: the
-    // recovering line stayed up, the retry never fired, and the error card was
-    // suppressed behind it. The only escape was sending a new message.
-    it("still fires the retry it armed", () => {
-      const errorId = { id: 1 };
-      const { result, rerender, onRetry } = setup({ errorId });
-      expect(result.current.isRecovering).toBe(true);
+    // `sideEffectsObserved` is derived from the engine's messages, and the 3s
+    // `langy.messages` poll replaces those wholesale — well inside the
+    // 1500/4000ms waits. So this is the ONE input that arrives after the timer
+    // arms, and the two ways of getting it wrong are opposite failures.
+    //
+    // Cancelling the armed timer on that churn and then short-circuiting on
+    // "same failure" left `pending` set forever: the recovering line stayed up,
+    // the retry never fired, and the error card was suppressed behind it — the
+    // only escape was sending a new message. Ignoring the churn entirely is the
+    // other one: the retry fires on evidence it has already been shown to be
+    // wrong about, and re-drives a turn that opened a PR.
+    describe("when the poll shows nothing that changed the project", () => {
+      it("still fires the retry it armed", () => {
+        const errorId = { id: 1 };
+        const { result, rerender, onRetry } = setup({ errorId });
+        expect(result.current.isRecovering).toBe(true);
 
-      // Same failure, new message list: the flip that used to kill the timer.
-      rerender({ errorKind: RESTARTING, errorId, sideEffectsObserved: true });
+        // Same failure, fresh message list, same verdict: nothing here may
+        // disturb a retry that is already scheduled.
+        rerender({
+          errorKind: RESTARTING,
+          errorId,
+          sideEffectsObserved: false,
+        });
 
-      act(() => {
-        vi.advanceTimersByTime(langyRecoveryPolicy(RESTARTING).delayMs(1));
+        act(() => {
+          vi.advanceTimersByTime(langyRecoveryPolicy(RESTARTING).delayMs(1));
+        });
+
+        expect(onRetry).toHaveBeenCalledTimes(1);
+        expect(result.current.isRecovering).toBe(false);
+      });
+    });
+
+    describe("when the poll reveals the turn already changed something", () => {
+      it("abandons the armed retry rather than replay a mutating turn", () => {
+        // The evidence is LATE by construction: the mutating tool call reaches
+        // the browser on the poll, seconds after the stream died. Read only at
+        // arming time, the guard misses it entirely and the timer re-drives a
+        // turn that already opened a PR — a second PR, with no idempotency key
+        // anywhere in the loop to collapse them.
+        const errorId = { id: 1 };
+        const { result, rerender, onRetry } = setup({ errorId });
+        expect(result.current.isRecovering).toBe(true);
+
+        rerender({ errorKind: RESTARTING, errorId, sideEffectsObserved: true });
+
+        act(() => {
+          vi.advanceTimersByTime(langyRecoveryPolicy(RESTARTING).delayMs(1));
+        });
+
+        expect(onRetry).not.toHaveBeenCalled();
+        // And it lands where an arming-time rejection lands: no recovering
+        // line, so the caller falls through to the card and the replay becomes
+        // the user's call.
+        expect(result.current.isRecovering).toBe(false);
+        expect(result.current.willAutoRecover).toBe(false);
+        expect(result.current.message).toBeNull();
       });
 
-      expect(onRetry).toHaveBeenCalledTimes(1);
-      expect(result.current.isRecovering).toBe(false);
+      it("charges no attempt for the retry it did not run", () => {
+        // The budget belongs to attempts actually made. Burning one here would
+        // silently halve what a genuinely retryable failure gets next.
+        const errorId = { id: 1 };
+        const { result, rerender } = setup({ errorId });
+
+        rerender({ errorKind: RESTARTING, errorId, sideEffectsObserved: true });
+        act(() => {
+          vi.advanceTimersByTime(langyRecoveryPolicy(RESTARTING).delayMs(1));
+        });
+
+        // A fresh failure, with the mutating turn behind it: full budget back.
+        rerender({
+          errorKind: RESTARTING,
+          errorId: { id: 2 },
+          sideEffectsObserved: false,
+        });
+        expect(result.current.isRecovering).toBe(true);
+        expect(result.current.attempt).toBe(1);
+      });
     });
 
     it("never leaves the panel stuck on the recovering line", () => {

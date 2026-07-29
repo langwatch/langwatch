@@ -41,7 +41,7 @@ const maxClientHelloBytes = 64 << 10
 func peekClientHelloSNI(conn net.Conn, deadline time.Duration) (sni string, sawHandshake bool, replayed net.Conn, err error) {
 	if deadline > 0 {
 		_ = conn.SetReadDeadline(time.Now().Add(deadline))
-		defer conn.SetReadDeadline(time.Time{})
+		defer func() { _ = conn.SetReadDeadline(time.Time{}) }()
 	}
 	raw, handshake, sawHandshake, err := readClientHelloRecords(conn)
 	// Whatever we managed to read must be replayed, even on error, so the

@@ -25,8 +25,19 @@ type OrgScopedModelConfig = {
    * Extra single-org-bounding predicates beyond organizationId / row id /
    * composite-org key. Used for parent foreign keys and globally-unique
    * secret columns that each resolve to exactly one organization.
+   *
+   * Receives the ACTION as well as the clause, because a bound that exists to
+   * admit one specific platform query should be granted to that query's action
+   * only. A predicate that is sound to write with is not automatically sound to
+   * read every matching row with, and the default set of actions an ApiKey
+   * bound would otherwise unlock is `findMany` / `updateMany` / `deleteMany`
+   * alike. Bounds that genuinely resolve a single row for any action (a parent
+   * FK, a globally-unique secret) simply ignore the argument.
    */
-  extraBound?: (clause: any) => boolean;
+  extraBound?: (args: {
+    clause: any;
+    action: Prisma.MiddlewareParams["action"];
+  }) => boolean;
 };
 
 /**
@@ -39,25 +50,58 @@ const isSystemManagedKeyName = (value: unknown): boolean =>
   typeof value === "string" && HIDDEN_SYSTEM_KEY_NAMES.includes(value);
 
 /**
+ * The elapsed-expiry half of the sweep's predicate:
+ * `expiresAt: { not: null, lte: <Date> }` — "has an expiry, and it has already
+ * passed". Matched as exactly that pair, for the same reason `revokedAt` is
+ * matched as a literal below: any looser check (merely having an `expiresAt`
+ * key, or an unbounded matcher) readmits the live, un-expired keys this clause
+ * exists to exclude.
+ */
+const isElapsedExpiryBound = (value: unknown): boolean => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const bound = value as Record<string, unknown>;
+  return (
+    Object.keys(bound).length === 2 &&
+    bound.not === null &&
+    bound.lte instanceof Date
+  );
+};
+
+/**
  * The shape of the platform's own maintenance sweep over system-managed keys:
- * a reserved NAME **and** `revokedAt: null`.
+ * a reserved NAME, `revokedAt: null`, **and** an elapsed-expiry bound. Those
+ * are the three clauses `reapExpiredLangySessionApiKeys` writes and the only
+ * ones this admits; the ApiKey entry below additionally grants it for the one
+ * action that sweep performs, `updateMany`.
  *
  * The name alone would already be sound for tenancy — no customer row can carry
  * one — but sound is not narrow, and this predicate is the only bound the
- * ApiKey model requires, on `findMany`, `updateMany` and `deleteMany` alike.
- * Requiring the un-revoked clause admits exactly the sweep's shape ("revoke what
- * has not been revoked") and turns away a read of every such key that ever
- * existed, which no sweep needs and an exfiltration would want. The reserved-name
- * list is a tenancy boundary either way — see the note on
- * `HIDDEN_SYSTEM_KEY_NAMES` before adding to it.
+ * ApiKey model requires. Each remaining clause is load-bearing:
  *
- * `=== null` is deliberate: the sweep writes the literal, and accepting
- * `{ not: ... }`-style matchers here would give back the width just removed.
+ *   - `revokedAt: null` is "revoke what has not been revoked". Without it the
+ *     hatch reaches every such key that ever existed, which no sweep needs and
+ *     an exfiltration would want.
+ *   - `expiresAt: { not: null, lte: <now> }` is "…whose lifetime has elapsed".
+ *     Without it the hatch reaches every LIVE session key in every
+ *     organization — the exact set the sweep never touches, and the one worth
+ *     stealing.
+ *
+ * The literal matching is deliberate: the sweep writes literals, and accepting
+ * `{ not: ... }`-style matchers or extra operators would give back the width
+ * just removed. A sweep that legitimately changes shape must change this
+ * predicate with it, and `dbOrganizationIdProtection.unit.test.ts` drives the
+ * real reaper through the real middleware so that drift fails there rather than
+ * silently widening the hatch. The reserved-name list is a tenancy boundary
+ * either way — see the note on `HIDDEN_SYSTEM_KEY_NAMES` before adding to it.
  */
 const isSystemManagedKeySweep = (clause: unknown): boolean => {
   if (!clause || typeof clause !== "object") return false;
   const where = clause as Record<string, unknown>;
-  return isSystemManagedKeyName(where.name) && where.revokedAt === null;
+  return (
+    isSystemManagedKeyName(where.name) &&
+    where.revokedAt === null &&
+    isElapsedExpiryBound(where.expiresAt)
+  );
 };
 
 const isNonEmptyStringList = (value: any): boolean =>
@@ -118,7 +162,7 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   OrganizationInvite: {
     // inviteCode is a globally-unique acceptance token; the invite row it
     // names belongs to exactly one organization.
-    extraBound: (c) => typeof c?.inviteCode === "string",
+    extraBound: ({ clause }) => typeof clause?.inviteCode === "string",
   },
   // Org-scoped RBAC + config models, audited to already carry a bounded
   // predicate (organizationId, a row id, a compound org key, a parent FK, or
@@ -129,10 +173,10 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
     // Reachable by its parent api key / group (each owned by one org) or by
     // its inline (scopeType, scopeId) target (a team / project id unique
     // across the platform), all of which bound to a single organization.
-    extraBound: (c) =>
-      typeof c?.apiKeyId === "string" ||
-      typeof c?.groupId === "string" ||
-      hasInlineScope(c),
+    extraBound: ({ clause }) =>
+      typeof clause?.apiKeyId === "string" ||
+      typeof clause?.groupId === "string" ||
+      hasInlineScope(clause),
   },
   ApiKey: {
     // lookupId is the globally-unique public half of an API token; the auth
@@ -145,11 +189,19 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
     // That makes such a query platform-owned by construction — which is what
     // the expired-Langy-session sweep is. Without it the sweep, whose whole job
     // is to be cross-tenant, was rejected by this guard on every run and had
-    // never revoked a key. It must carry the sweep's un-revoked clause too, so
-    // the escape is the sweep's shape rather than any query naming a reserved
-    // key.
-    extraBound: (c) =>
-      typeof c?.lookupId === "string" || isSystemManagedKeySweep(c),
+    // never revoked a key.
+    //
+    // It is granted on the sweep's TERMS, not the sweep's name: the full
+    // predicate (see isSystemManagedKeySweep) and `updateMany`, the single
+    // action `reapExpiredLangySessionApiKeys` performs. Action-gating is what
+    // stops the same shape being replayed as a cross-tenant `findMany` that
+    // reads every organization's keys, or a `deleteMany` that removes them —
+    // neither of which is a sweep, and both of which this bound would otherwise
+    // have authorised. A new platform maintenance query does not inherit the
+    // hatch; it is a deliberate widening here, with its own shape and action.
+    extraBound: ({ clause, action }) =>
+      typeof clause?.lookupId === "string" ||
+      (action === "updateMany" && isSystemManagedKeySweep(clause)),
   },
   RoutingPolicy: {},
   AiToolEntry: {},
@@ -159,7 +211,7 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   // (webhook + mint paths). Issue #4747; spec
   // specs/langy/langy-github-install.feature.
   LangyGithubInstallation: {
-    extraBound: (c) => typeof c?.installationId === "string",
+    extraBound: ({ clause }) => typeof clause?.installationId === "string",
   },
 };
 
@@ -309,7 +361,7 @@ const _guardOrganizationId = ({
 
   const passes = (clause: any) =>
     boundsToSingleOrg(clause) ||
-    (config.extraBound ? config.extraBound(clause) : false);
+    (config.extraBound ? config.extraBound({ clause, action }) : false);
 
   if (!validateRecursive(where, passes)) {
     throw new Error(
