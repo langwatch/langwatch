@@ -96,6 +96,20 @@ and it replaces both boot sweeps and the read-time `STALLED` derivation with
 one mechanism that *writes* the terminal state instead of inferring it per
 read.
 
+**The queued window is derived from the batch, not fixed.** The other
+deadlines bound a run that has stopped talking; the queued one bounds a run
+that has not started. Those are different problems. A run sits in the queue
+behind its own batch siblings for as long as the batch takes to drain, so a
+fixed queued window is unfalsifiable as a liveness signal: set it tight and it
+terminalises the tail of a large healthy batch before it ever runs, set it
+slack and it is useless against a small abandoned one. Since ADR-072 puts
+`batchTotal` on the `queued` event itself, the window is sized from the batch
+the run queued with — a floor matching the progress window, plus an allowance
+per sibling, capped. No read, no extra state, and a run whose event predates
+the denominator gets the floor, which is the bound it had before. Being late
+to an undispatched run costs a stuck row; being early costs a healthy run its
+result, so the arithmetic is deliberately biased late.
+
 **Dispatch is at-most-once, on purpose.** `maxAttempts: 1` preserves the
 existing no-retry contract that `scenario-stalled-no-retry.unit.test.ts` pins:
 a scenario that fails is not re-run, because it costs money and may have

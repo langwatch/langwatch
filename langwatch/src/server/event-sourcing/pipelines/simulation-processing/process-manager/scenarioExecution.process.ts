@@ -8,8 +8,8 @@ import type {
 
 import type { SimulationProcessingEvent } from "../schemas/events";
 import {
+  dispatchDeadlineMsFor,
   SCENARIO_CANCEL_DEADLINE_MS,
-  SCENARIO_DISPATCH_DEADLINE_MS,
   SCENARIO_PROGRESS_DEADLINE_MS,
   scenarioExecutionEventViewSchema,
   type ScenarioExecutionState,
@@ -50,6 +50,10 @@ type Ctx = ProcessHandlerContext<ScenarioExecutionIntents>;
  * Narrows a committed simulation event to identities. Mandatory here:
  * message-bearing events would otherwise persist conversation content into
  * process state and outbox rows.
+ *
+ * `batchTotal` is the one non-identity field that crosses: it is a bounded
+ * integer, and {@link handleQueued} cannot size the dispatch deadline without
+ * it. Anything wider stays on the far side of this narrowing.
  */
 export function buildProcessEventView(event: SimulationProcessingEvent) {
   const data = event.data as Record<string, unknown>;
@@ -61,6 +65,15 @@ export function buildProcessEventView(event: SimulationProcessingEvent) {
     scenarioId: read("scenarioId"),
     batchRunId: read("batchRunId"),
     scenarioSetId: read("scenarioSetId"),
+    // Guarded rather than passed through: the view schema rejects a negative
+    // or fractional total, and a malformed legacy row must degrade to "unknown
+    // batch size" rather than throw and wedge the run's process instance.
+    batchTotal:
+      typeof data.batchTotal === "number" &&
+      Number.isInteger(data.batchTotal) &&
+      data.batchTotal >= 0
+        ? data.batchTotal
+        : null,
   };
 }
 
@@ -133,12 +146,24 @@ const refreshDeadline: EventHandler<
 > = (state, payload, ctx) =>
   armed(withIdentities(state, payload, ctx), ctx, SCENARIO_PROGRESS_DEADLINE_MS);
 
+/**
+ * A run entered the queue. The deadline it arms is derived from the batch it
+ * queued with, not from a fixed window: a run waits behind its siblings for as
+ * long as the batch takes, so a fixed window would declare the tail of a large
+ * healthy batch dead. See {@link dispatchDeadlineMsFor}.
+ */
 export const handleQueued: EventHandler<
   ScenarioExecutionState,
   unknown,
   ScenarioExecutionIntents
-> = (state, payload, ctx) =>
-  armed(withIdentities(state, payload, ctx), ctx, SCENARIO_DISPATCH_DEADLINE_MS);
+> = (state, payload, ctx) => {
+  const view = scenarioExecutionEventViewSchema.parse(payload);
+  return armed(
+    withIdentities(state, payload, ctx),
+    ctx,
+    dispatchDeadlineMsFor(view.batchTotal ?? 0),
+  );
+};
 
 export const handleStarted = refreshDeadline;
 export const handleMessageSnapshot = refreshDeadline;
