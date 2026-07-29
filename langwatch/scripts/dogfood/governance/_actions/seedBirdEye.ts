@@ -13,19 +13,22 @@
  * without 480-row CH inserts.
  */
 
-import { runSeedBirdEye } from "../seed-bird-eye";
 import type {
   SeedAction,
   SeedActionContext,
   SeedActionOutcome,
 } from "../_lib/seedRunner";
+import { runSeedBirdEye } from "../seed-bird-eye";
 
 const DEFAULT_DASHBOARD_DAYS = 30;
 const DEFAULT_ROWS = 480;
 
 export const seedBirdEye: SeedAction = {
   name: "seedBirdEye",
-  async run({ organization, execute }: SeedActionContext): Promise<SeedActionOutcome> {
+  async run({
+    organization,
+    execute,
+  }: SeedActionContext): Promise<SeedActionOutcome> {
     if (!execute) {
       return {
         status: "skipped",

@@ -1,4 +1,4 @@
-import { Box, HStack, Heading, Spacer, Text, VStack } from "@chakra-ui/react";
+import { Box, Heading, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import numeral from "numeral";
 
 import { getHexColorForString } from "~/utils/rotatingColors";

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from "vitest";
-import { InMemoryDspyStepRepository } from "../dspy-step.repository";
 import type { DspyStepData } from "../../types";
+import { InMemoryDspyStepRepository } from "../dspy-step.repository";
 
 function makeStep(overrides: Partial<DspyStepData> = {}): DspyStepData {
   return {

@@ -146,9 +146,9 @@ describe("buildTimeTravelView", () => {
         { type: "text", text: "the full answer" },
       ]);
       // The partial never double-renders alongside the settled answer.
-      expect(
-        view!.messages.filter((m) => m.role === "assistant"),
-      ).toHaveLength(1);
+      expect(view!.messages.filter((m) => m.role === "assistant")).toHaveLength(
+        1,
+      );
     });
 
     it("dedupes the recorded answer against a history row with the same id", () => {
@@ -161,9 +161,7 @@ describe("buildTimeTravelView", () => {
           historyRow("msg-t1", "assistant", 1_999, "the full answer"),
         ],
       });
-      expect(
-        view!.messages.filter((m) => m.id === "msg-t1"),
-      ).toHaveLength(1);
+      expect(view!.messages.filter((m) => m.id === "msg-t1")).toHaveLength(1);
     });
   });
 
@@ -200,9 +198,7 @@ describe("buildTimeTravelView", () => {
         scrubSeq: 3,
         historyMessages: [historyRow("q1", "user", 1_500, "same question")],
       });
-      expect(
-        view!.messages.filter((m) => m.role === "user"),
-      ).toHaveLength(1);
+      expect(view!.messages.filter((m) => m.role === "user")).toHaveLength(1);
       expect(view!.messages[0]!.id).toBe("q1");
     });
   });
@@ -232,12 +228,10 @@ describe("buildTimeTravelView", () => {
           historyRow("a1", "assistant", 1_390, "How can I help?"),
         ],
       });
-      expect(
-        view!.messages.filter((m) => m.role === "assistant"),
-      ).toHaveLength(1);
-      expect(view!.messages.find((m) => m.role === "assistant")?.id).toBe(
-        "a1",
+      expect(view!.messages.filter((m) => m.role === "assistant")).toHaveLength(
+        1,
       );
+      expect(view!.messages.find((m) => m.role === "assistant")?.id).toBe("a1");
       expect(view!.isTurnInFlight).toBe(false);
       expect(view!.signals.status).toBeNull();
     });
@@ -284,9 +278,9 @@ describe("buildTimeTravelView", () => {
         ],
       });
       // The landed answer suppresses ITS partial, not the follow-up question.
-      expect(
-        view!.messages.filter((m) => m.role === "assistant"),
-      ).toHaveLength(1);
+      expect(view!.messages.filter((m) => m.role === "assistant")).toHaveLength(
+        1,
+      );
       expect(view!.messages.at(-1)?.role).toBe("user");
       expect(view!.messages.at(-1)?.parts).toEqual([
         { type: "text", text: "and now?" },

@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from "react";
 import type React from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import { COMPOSER_ANCHOR_ATTR } from "../components/Composer";
 import {
   glowRectFor,
-  midpointRect,
   type MorphRect,
+  midpointRect,
   readRect,
   readRectAtRest,
 } from "../logic/composerMorphGeometry";
@@ -129,9 +129,7 @@ export function useComposerMorph({
         const anchor = findPanelComposer();
         if (!anchor) return;
         const measured = readRectAtRest(anchor);
-        const destination = hold
-          ? midpointRect(origin, measured)
-          : measured;
+        const destination = hold ? midpointRect(origin, measured) : measured;
 
         setFlight({
           origin,

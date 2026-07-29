@@ -1,14 +1,19 @@
-import { RoleBindingScopeType, TeamUserRole, type PrismaClient, type Project } from "@prisma/client";
+import {
+  type PrismaClient,
+  type Project,
+  RoleBindingScopeType,
+  TeamUserRole,
+} from "@prisma/client";
 import type {
   CreateProjectInput,
   CreateTeamWithBindingInput,
   PaginatedResult,
   PresenceConfig,
-  TraceSharingConfig,
   ProjectRepository,
   ProjectWithOrgAdmin,
   ProjectWithTeam,
   SearchProjectsResult,
+  TraceSharingConfig,
   UpdateProjectInput,
   UpdateProjectMetadataInput,
 } from "./project.repository";
@@ -27,7 +32,10 @@ export class PrismaProjectRepository implements ProjectRepository {
     });
   }
 
-  async updateMetadata({ id, data }: UpdateProjectMetadataInput): Promise<void> {
+  async updateMetadata({
+    id,
+    data,
+  }: UpdateProjectMetadataInput): Promise<void> {
     await this.prisma.project.update({ where: { id }, data });
   }
 
@@ -81,9 +89,7 @@ export class PrismaProjectRepository implements ProjectRepository {
     };
   }
 
-  async getTraceSharingConfig(
-    id: string,
-  ): Promise<TraceSharingConfig | null> {
+  async getTraceSharingConfig(id: string): Promise<TraceSharingConfig | null> {
     const project = await this.prisma.project.findUnique({
       where: { id },
       select: {
@@ -222,7 +228,9 @@ export class PrismaProjectRepository implements ProjectRepository {
     });
   }
 
-  async createTeamWithRoleBinding(input: CreateTeamWithBindingInput): Promise<{ id: string }> {
+  async createTeamWithRoleBinding(
+    input: CreateTeamWithBindingInput,
+  ): Promise<{ id: string }> {
     const team = await this.prisma.team.create({
       data: {
         id: input.teamId,

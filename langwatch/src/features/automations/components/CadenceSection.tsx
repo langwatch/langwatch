@@ -7,8 +7,8 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useEffect, useState } from "react";
 import { CADENCE_LABELS } from "@langwatch/automations/cadences";
+import { useEffect, useState } from "react";
 import {
   GRAPH_ALERT_TIME_PERIODS,
   type GraphAlertOperator,
@@ -24,7 +24,7 @@ import { describeCron } from "../logic/reportSchedule";
 import { useAutomationStore } from "../state/automationStore";
 import { useDraft } from "../state/selectors";
 import { CadenceField } from "./CadenceField";
-import { FacetSection, type FacetAccordionProps } from "./FacetSection";
+import { type FacetAccordionProps, FacetSection } from "./FacetSection";
 import { ReportScheduleField } from "./ReportScheduleField";
 import { TraceDebounceField } from "./TraceDebounceField";
 

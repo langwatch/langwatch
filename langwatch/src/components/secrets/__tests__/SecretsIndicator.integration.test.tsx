@@ -31,7 +31,9 @@ const mockOnInsertSecret = vi.fn();
 
 function renderIndicator({
   onInsertSecret,
-}: { onInsertSecret?: (name: string) => void } = {}) {
+}: {
+  onInsertSecret?: (name: string) => void;
+} = {}) {
   return render(
     <ChakraProvider value={defaultSystem}>
       <SecretsIndicator

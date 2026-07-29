@@ -12,16 +12,14 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { Dialog } from "../dialog";
 import { cssRulesForElement } from "~/utils/emotionTestCss";
+import { Dialog } from "../dialog";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
 
-function renderOpenDialog(
-  extra?: Parameters<typeof Dialog.Content>[0],
-) {
+function renderOpenDialog(extra?: Parameters<typeof Dialog.Content>[0]) {
   render(
     <Dialog.Root open={true}>
       <Dialog.Content bg="bg" {...extra}>

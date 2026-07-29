@@ -1,19 +1,20 @@
 import { createLogger } from "@langwatch/observability";
-import type { ReactorContext, ReactorDefinition } from "../../../reactors/reactor.types";
+import type {
+  ReactorContext,
+  ReactorDefinition,
+} from "../../../reactors/reactor.types";
 import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
 import type { ResolveOriginCommandData } from "../schemas/commands";
 import { STALE_TRACE_THRESHOLD_MS } from "../schemas/constants";
 import type { TraceProcessingEvent } from "../schemas/events";
 
-const logger = createLogger(
-  "langwatch:trace-processing:origin-gate-reactor",
-);
+const logger = createLogger("langwatch:trace-processing:origin-gate-reactor");
 
 /** Delay (ms) before the deferred origin resolution fires */
 export const DEFERRED_CHECK_DELAY_MS = 5 * 60 * 1000; // 5 minutes
 
 export type DeferredOriginPayload = {
-  id: string;       // traceId — used as staged job ID for debuggability
+  id: string; // traceId — used as staged job ID for debuggability
   tenantId: string;
   traceId: string;
 };
@@ -56,8 +57,8 @@ export function createOriginGateReactor(
     options: {
       makeJobId: (payload) =>
         `origin-gate:${payload.event.tenantId}:${payload.event.aggregateId}`,
-      ttl: 15_000,   // 15s dedup — debounce multi-span trace bursts
-      delay: 5_000,  // 5s delay — settle before checking origin
+      ttl: 15_000, // 15s dedup — debounce multi-span trace bursts
+      delay: 5_000, // 5s delay — settle before checking origin
     },
 
     async handle(

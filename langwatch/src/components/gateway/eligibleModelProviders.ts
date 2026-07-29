@@ -1,6 +1,14 @@
 import { modelProviderRegistry } from "~/features/onboarding/regions/model-providers/registry";
 
-import type { VirtualKeyScopeEntry } from "./VirtualKeyScopePicker";
+/**
+ * A scope a VirtualKey is reachable from: the org/team/project triad the
+ * key's ownership persists as. Owned here (rather than by a picker
+ * component) because everything provider-eligibility touches keys on it.
+ */
+export type VirtualKeyScopeEntry = {
+  scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+  scopeId: string;
+};
 
 /**
  * A scope a ModelProvider is attached to. Same triad as the VK's own

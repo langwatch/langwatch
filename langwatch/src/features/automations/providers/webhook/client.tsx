@@ -8,24 +8,6 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Plus, Trash2, Webhook } from "lucide-react";
-import { useMemo } from "react";
-import { SegmentedControl } from "~/components/ui/segmented-control";
-import { VariableInfoIcon } from "~/features/automations/components/VariableInfoIcon";
-import { LIQUID_JSON_LANGUAGE_ID } from "~/features/automations/editors/liquidMonaco";
-import {
-  FieldHeader,
-  LiquidEditor,
-} from "~/features/automations/editors/templateAuthoring";
-import { defaultsForSourceKind } from "@langwatch/automations/templating/defaults";
-import { filterVariablesForCadence } from "@langwatch/automations/templating/exampleContext";
-import { TestFireButton } from "../TestFireButton";
-import type {
-  ConfigFormCtx,
-  ConfigFormProps,
-  NotifyClientDef,
-  SummaryIdentity,
-} from "../types";
 import type { SavedTriggerRow } from "@langwatch/automations/providers/types";
 import {
   isReservedWebhookHeader,
@@ -36,6 +18,24 @@ import {
   type WebhookMethod,
   type WebhookPreview,
 } from "@langwatch/automations/providers/webhook";
+import { defaultsForSourceKind } from "@langwatch/automations/templating/defaults";
+import { filterVariablesForCadence } from "@langwatch/automations/templating/exampleContext";
+import { Plus, Trash2, Webhook } from "lucide-react";
+import { useMemo } from "react";
+import { SegmentedControl } from "~/components/ui/segmented-control";
+import { VariableInfoIcon } from "~/features/automations/components/VariableInfoIcon";
+import { LIQUID_JSON_LANGUAGE_ID } from "~/features/automations/editors/liquidMonaco";
+import {
+  FieldHeader,
+  LiquidEditor,
+} from "~/features/automations/editors/templateAuthoring";
+import { TestFireButton } from "../TestFireButton";
+import type {
+  ConfigFormCtx,
+  ConfigFormProps,
+  NotifyClientDef,
+  SummaryIdentity,
+} from "../types";
 
 /** A template field, mirroring the Slack provider's `FieldDraft`: empty +
  *  `usingDefault` means the framework default envelope applies. */
@@ -212,7 +212,10 @@ function HeadersEditor({
     onChange({ ...slice, headers });
   };
   const removeRow = (index: number) =>
-    onChange({ ...slice, headers: slice.headers.filter((_, i) => i !== index) });
+    onChange({
+      ...slice,
+      headers: slice.headers.filter((_, i) => i !== index),
+    });
 
   return (
     <Field.Root>

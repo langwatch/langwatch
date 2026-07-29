@@ -3,8 +3,8 @@ import {
   Box,
   Button,
   Code,
-  HStack,
   Heading,
+  HStack,
   Skeleton,
   Spacer,
   Text,
@@ -14,7 +14,6 @@ import { TriggerKind } from "@prisma/client";
 import { differenceInMinutes, differenceInSeconds } from "date-fns";
 import { useState } from "react";
 import { Calendar, TrendingUp } from "react-feather";
-import { CLIENT_PROVIDERS } from "~/features/automations/providers/registry";
 import { FilterDisplay } from "~/components/automations/FilterDisplay";
 import { Drawer } from "~/components/ui/drawer";
 import { Tooltip } from "~/components/ui/tooltip";
@@ -24,6 +23,7 @@ import {
 } from "~/features/automations/logic/draftReducer";
 import { resolveSeriesLabel } from "~/features/automations/logic/seriesOptions";
 import type { TriggerActionParams } from "~/features/automations/logic/triggerActionParams";
+import { CLIENT_PROVIDERS } from "~/features/automations/providers/registry";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
@@ -80,8 +80,7 @@ export function ViewAutomationDrawer({
   const webhookDeliveriesQuery = api.automation.getWebhookDeliveries.useQuery(
     { triggerId: automationId, projectId: project?.id ?? "", limit: 50 },
     {
-      enabled:
-        !!project?.id && triggerQuery.data?.action === "SEND_WEBHOOK",
+      enabled: !!project?.id && triggerQuery.data?.action === "SEND_WEBHOOK",
     },
   );
 
@@ -115,7 +114,12 @@ export function ViewAutomationDrawer({
         // full URL only on hover, mirroring the list page's Slack cell.
         return actionParams.slackWebhook ? (
           <Tooltip content={actionParams.slackWebhook}>
-            <Text textStyle="sm" lineClamp={1} width="fit-content" cursor="help">
+            <Text
+              textStyle="sm"
+              lineClamp={1}
+              width="fit-content"
+              cursor="help"
+            >
               Slack webhook
             </Text>
           </Tooltip>
@@ -166,8 +170,10 @@ export function ViewAutomationDrawer({
         ? TIME_PERIOD_LABELS[actionParams.timePeriod]
         : null;
       const seriesLabel = actionParams.seriesName
-        ? (resolveSeriesLabel(graphQuery.data?.graph, actionParams.seriesName) ??
-          actionParams.seriesName)
+        ? (resolveSeriesLabel(
+            graphQuery.data?.graph,
+            actionParams.seriesName,
+          ) ?? actionParams.seriesName)
         : "Metric";
       return (
         <Text textStyle="sm">
@@ -228,7 +234,11 @@ export function ViewAutomationDrawer({
             ) : (
               <Heading size="md">
                 {trigger?.name ??
-                  (isGraphAlert ? "Alert" : isSchedule ? "Schedule" : "Automation")}
+                  (isGraphAlert
+                    ? "Alert"
+                    : isSchedule
+                      ? "Schedule"
+                      : "Automation")}
               </Heading>
             )}
             {isGraphAlert ? (
@@ -524,7 +534,11 @@ function DeliveryAttemptRow({
   const hasDetail = Boolean(attempt.error ?? guidance ?? attempt.response);
 
   return (
-    <Box borderBottomWidth="1px" borderColor="border" _last={{ borderBottomWidth: 0 }}>
+    <Box
+      borderBottomWidth="1px"
+      borderColor="border"
+      _last={{ borderBottomWidth: 0 }}
+    >
       <HStack
         as="button"
         gap={2.5}
@@ -545,7 +559,12 @@ function DeliveryAttemptRow({
           {total > 1 ? `Attempt ${index + 1} · ` : ""}
           {statusText}
         </Text>
-        <Text textStyle="xs" color="fg.muted" flexShrink={0} whiteSpace="nowrap">
+        <Text
+          textStyle="xs"
+          color="fg.muted"
+          flexShrink={0}
+          whiteSpace="nowrap"
+        >
           {attempt.latencyMs != null ? `${attempt.latencyMs}ms · ` : ""}
           {formatTimeAgo(new Date(attempt.firedAt).getTime())}
         </Text>
@@ -575,7 +594,12 @@ function DeliveryAttemptRow({
           {attempt.response?.headers ? (
             <VStack align="stretch" gap={0.5}>
               {Object.entries(attempt.response.headers).map(([name, value]) => (
-                <Code key={name} fontSize="xs" width="full" whiteSpace="pre-wrap">
+                <Code
+                  key={name}
+                  fontSize="xs"
+                  width="full"
+                  whiteSpace="pre-wrap"
+                >
                   {name}: {value}
                 </Code>
               ))}

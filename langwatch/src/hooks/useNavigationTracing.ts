@@ -20,13 +20,12 @@
  * See ADR-058 and specs/observability/browser-rum-trace-correlation.feature.
  */
 
-import { useEffect, useRef } from "react";
-import { useLocation, useMatches, useNavigation } from "react-router";
-
 import {
   type NavigationSpanHandle,
   startNavigationSpan,
 } from "@langwatch/react-rum";
+import { useEffect, useRef } from "react";
+import { useLocation, useMatches, useNavigation } from "react-router";
 import { usePublicEnv } from "./usePublicEnv";
 
 /**

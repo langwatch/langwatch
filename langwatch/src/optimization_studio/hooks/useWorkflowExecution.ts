@@ -86,10 +86,7 @@ export const useWorkflowExecution = () => {
       }
 
       const trace_id = generateOtelTraceId();
-      logger.info(
-        { trace_id, untilNodeId },
-        "workflow execution starting",
-      );
+      logger.info({ trace_id, untilNodeId }, "workflow execution starting");
 
       setWorkflowExecutionState({
         status: "waiting",

@@ -19,13 +19,10 @@
 import type { Readable } from "node:stream";
 import { nanoid } from "nanoid";
 import { env } from "~/env.mjs";
-import {
-  streamToBuffer,
-  StreamTooLargeError,
-} from "~/utils/streamToBuffer";
 import { AzureBlobDriver } from "~/server/stored-objects/azure-blob-driver";
 import { ObjectNotFoundError } from "~/server/stored-objects/errors";
 import { resolveProjectStorageDestination } from "~/server/stored-objects/project-storage-destination";
+import { StreamTooLargeError, streamToBuffer } from "~/utils/streamToBuffer";
 import {
   assertKeyWithinProject,
   assertNoTraversal,
@@ -143,7 +140,11 @@ export class AzureDatasetStorage implements DatasetStorage {
         container,
         key: chunkKey(projectId, datasetId, chunk.index),
       });
-      await driver.put(uri, Buffer.from(chunk.jsonl, "utf-8"), "application/x-ndjson");
+      await driver.put(
+        uri,
+        Buffer.from(chunk.jsonl, "utf-8"),
+        "application/x-ndjson",
+      );
     }
     return chunks;
   }

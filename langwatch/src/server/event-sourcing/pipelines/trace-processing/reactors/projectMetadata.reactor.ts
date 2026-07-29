@@ -1,6 +1,9 @@
 import { createLogger } from "@langwatch/observability";
 import type { ProjectService } from "~/server/app-layer/projects/project.service";
-import type { ReactorContext, ReactorDefinition } from "../../../reactors/reactor.types";
+import type {
+  ReactorContext,
+  ReactorDefinition,
+} from "../../../reactors/reactor.types";
 import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
 import type { TraceProcessingEvent } from "../schemas/events";
 
@@ -55,8 +58,7 @@ export function createProjectMetadataReactor(
     shouldReact: (_event, context) => isRealFirstIngest(context.foldState),
     options: {
       runIn: ["worker"],
-      makeJobId: (payload) =>
-        `project-meta:${payload.event.tenantId}`,
+      makeJobId: (payload) => `project-meta:${payload.event.tenantId}`,
       ttl: 60_000, // 60s dedup — avoid repeated writes for the same project
     },
 
@@ -73,7 +75,10 @@ export function createProjectMetadataReactor(
         const project = await deps.projects.getById(tenantId);
 
         if (!project) {
-          logger.warn({ tenantId }, "Project not found — skipping metadata update");
+          logger.warn(
+            { tenantId },
+            "Project not found — skipping metadata update",
+          );
           return;
         }
 
@@ -106,14 +111,13 @@ export function createProjectMetadataReactor(
           attrs["langwatch.platform"] === "optimization_studio";
 
         const sdkLanguage = attrs["sdk.language"];
-        const language =
-          isOptimizationStudio
-            ? "other"
-            : sdkLanguage === "python"
-              ? "python"
-              : sdkLanguage === "typescript"
-                ? "typescript"
-                : "other";
+        const language = isOptimizationStudio
+          ? "other"
+          : sdkLanguage === "python"
+            ? "python"
+            : sdkLanguage === "typescript"
+              ? "typescript"
+              : "other";
 
         await deps.projects.updateMetadata({
           id: tenantId,
@@ -123,7 +127,6 @@ export function createProjectMetadataReactor(
             language,
           },
         });
-
       } catch (error) {
         logger.error(
           {

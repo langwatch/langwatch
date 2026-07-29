@@ -13,8 +13,8 @@ import type {
   ShareResourceType,
   ShareWithProject,
 } from "./repositories/share.repository";
-import type { ShareViewDedupeService } from "./share-view-dedupe.service";
 import { generateShareToken } from "./share.token";
+import type { ShareViewDedupeService } from "./share-view-dedupe.service";
 
 const logger = createLogger("langwatch:share-service");
 

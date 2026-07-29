@@ -21,18 +21,17 @@
  */
 import {
   OrganizationUserRole,
-  Prisma,
+  type Prisma,
   RoleBindingScopeType,
   TeamUserRole,
 } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-
-import { prisma } from "~/server/db";
 import { appRouter } from "~/server/api/root";
 import { createInnerTRPCContext } from "~/server/api/trpc";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
+import { prisma } from "~/server/db";
 import { AiToolEntryService } from "../../services/aiToolEntry.service";
 
 describe("aiToolsRouter integration", () => {
@@ -49,7 +48,7 @@ describe("aiToolsRouter integration", () => {
   let liteUserId: string;
 
   beforeAll(async () => {
-    resetApp();
+    await resetApp();
     globalForApp.__langwatch_app = createTestApp();
 
     const organization = await prisma.organization.create({
@@ -93,10 +92,18 @@ describe("aiToolsRouter integration", () => {
     });
     adminUserId = admin.id;
     await prisma.organizationUser.create({
-      data: { userId: admin.id, organizationId, role: OrganizationUserRole.ADMIN },
+      data: {
+        userId: admin.id,
+        organizationId,
+        role: OrganizationUserRole.ADMIN,
+      },
     });
     await prisma.teamUser.create({
-      data: { userId: admin.id, teamId: teamPlatform.id, role: TeamUserRole.ADMIN },
+      data: {
+        userId: admin.id,
+        teamId: teamPlatform.id,
+        role: TeamUserRole.ADMIN,
+      },
     });
     await prisma.roleBinding.create({
       data: {
@@ -178,17 +185,27 @@ describe("aiToolsRouter integration", () => {
   });
 
   afterAll(async () => {
-    await prisma.aiToolEntry.deleteMany({ where: { organizationId } }).catch(() => {});
-    await prisma.roleBinding.deleteMany({ where: { organizationId } }).catch(() => {});
+    await prisma.aiToolEntry
+      .deleteMany({ where: { organizationId } })
+      .catch(() => {});
+    await prisma.roleBinding
+      .deleteMany({ where: { organizationId } })
+      .catch(() => {});
     await prisma.teamUser
       .deleteMany({ where: { team: { slug: { startsWith: `--ait-` } } } })
       .catch(() => {});
-    await prisma.organizationUser.deleteMany({ where: { organizationId } }).catch(() => {});
-    await prisma.department.deleteMany({ where: { organizationId } }).catch(() => {});
+    await prisma.organizationUser
+      .deleteMany({ where: { organizationId } })
+      .catch(() => {});
+    await prisma.department
+      .deleteMany({ where: { organizationId } })
+      .catch(() => {});
     await prisma.team
       .deleteMany({ where: { slug: { startsWith: `--ait-` } } })
       .catch(() => {});
-    await prisma.organization.deleteMany({ where: { slug: `--ait-${ns}` } }).catch(() => {});
+    await prisma.organization
+      .deleteMany({ where: { slug: `--ait-${ns}` } })
+      .catch(() => {});
     await prisma.user
       .deleteMany({
         where: {
@@ -355,7 +372,9 @@ describe("aiToolsRouter integration", () => {
       });
       const platformMatches = platformList.filter((e) => e.slug === sharedSlug);
       expect(platformMatches).toHaveLength(1);
-      expect(platformMatches[0]?.displayName).toBe("OpenAI - Platform override");
+      expect(platformMatches[0]?.displayName).toBe(
+        "OpenAI - Platform override",
+      );
 
       const orphanList = await callerFor(memberOrphanUserId).aiTools.list({
         organizationId,
@@ -951,7 +970,8 @@ describe("aiToolsRouter integration", () => {
         expect(after).toHaveLength(9); // no duplicate row created
 
         const claudeRows = after.filter(
-          (e) => e.type === "coding_assistant" && e.displayName === "Claude Code",
+          (e) =>
+            e.type === "coding_assistant" && e.displayName === "Claude Code",
         );
         expect(claudeRows).toHaveLength(1);
         expect(claudeRows[0]!.id).toBe(adminClaudeRow.id);
@@ -1013,8 +1033,12 @@ describe("aiToolsRouter integration", () => {
       });
       expect(afterList.some((e) => e.id === entry.id)).toBe(false);
 
-      const adminAfter = await adminCaller.aiTools.adminList({ organizationId });
-      expect(adminAfter.some((e) => e.id === entry.id && e.enabled === false)).toBe(true);
+      const adminAfter = await adminCaller.aiTools.adminList({
+        organizationId,
+      });
+      expect(
+        adminAfter.some((e) => e.id === entry.id && e.enabled === false),
+      ).toBe(true);
     });
 
     /** @scenario "Deleted entries are removed from both lists" */
@@ -1031,13 +1055,17 @@ describe("aiToolsRouter integration", () => {
         },
       });
 
-      const adminBefore = await adminCaller.aiTools.adminList({ organizationId });
+      const adminBefore = await adminCaller.aiTools.adminList({
+        organizationId,
+      });
       expect(adminBefore.some((e) => e.id === entry.id)).toBe(true);
 
       await adminCaller.aiTools.remove({ organizationId, id: entry.id });
 
       // Gone from the admin editor - delete is permanent, not a soft hide.
-      const adminAfter = await adminCaller.aiTools.adminList({ organizationId });
+      const adminAfter = await adminCaller.aiTools.adminList({
+        organizationId,
+      });
       expect(adminAfter.some((e) => e.id === entry.id)).toBe(false);
 
       // ...and gone from every member's portal.
@@ -1142,7 +1170,11 @@ describe("aiToolsRouter integration", () => {
         expect(orphan.configuredProviders).not.toContain("openai");
         expect(orphan.configuredProviders).not.toContain("azure");
       } finally {
-        const ids = [orgProvider.id, ownTeamProvider.id, foreignTeamProvider.id];
+        const ids = [
+          orgProvider.id,
+          ownTeamProvider.id,
+          foreignTeamProvider.id,
+        ];
         await prisma.modelProviderScope.deleteMany({
           where: { modelProviderId: { in: ids } },
         });
@@ -1258,7 +1290,10 @@ describe("aiToolsRouter integration", () => {
     it("rejects update binding a department from a foreign org", async () => {
       const adminCaller = callerFor(adminUserId);
       const foreignOrg = await prisma.organization.create({
-        data: { name: `Foreign ${nanoid(4)}`, slug: `--ait-foreign-${nanoid(6)}` },
+        data: {
+          name: `Foreign ${nanoid(4)}`,
+          slug: `--ait-foreign-${nanoid(6)}`,
+        },
       });
       const foreignDept = await prisma.department.create({
         data: {
@@ -1320,7 +1355,9 @@ describe("aiToolsRouter integration", () => {
       });
 
       try {
-        const result = await callerFor(adminUserId).aiTools.routingPolicyOptions({
+        const result = await callerFor(
+          adminUserId,
+        ).aiTools.routingPolicyOptions({
           organizationId,
         });
         expect(result.some((r) => r.id === policy.id)).toBe(true);

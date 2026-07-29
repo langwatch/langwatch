@@ -1,4 +1,12 @@
-import { Box, Button, HStack, Icon, Skeleton, Text, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  HStack,
+  Icon,
+  Skeleton,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { memo, useMemo, useState } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -120,9 +128,7 @@ interface Step {
 /** The turn's model calls and tool runs, in the order they happened. */
 function selectSteps(spans: SpanDetail[]): Step[] {
   return spans
-    .filter(
-      (span) => span.name === LLM_REQUEST_SPAN || span.name === TOOL_SPAN,
-    )
+    .filter((span) => span.name === LLM_REQUEST_SPAN || span.name === TOOL_SPAN)
     .slice()
     .sort((a, b) => a.startTimeMs - b.startTimeMs)
     .map((span) => {
@@ -132,10 +138,10 @@ function selectSteps(spans: SpanDetail[]): Step[] {
         spanId: span.spanId,
         kind: isTool ? ("tool" as const) : ("model" as const),
         label: isTool
-          ? asString(params.tool_name) ?? "Tool"
+          ? (asString(params.tool_name) ?? "Tool")
           : (span.model ?? "model"),
         arg: isTool
-          ? asString(params.full_command) ?? asString(params.file_path)
+          ? (asString(params.full_command) ?? asString(params.file_path))
           : null,
         durationMs: span.durationMs,
         isError: span.status === "error",

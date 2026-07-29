@@ -1,7 +1,10 @@
-import { useRef, useState, useCallback } from "react";
 import { Button, Heading } from "@chakra-ui/react";
+import { useCallback, useRef, useState } from "react";
 import { Drawer } from "~/components/ui/drawer";
-import { LicenseGeneratorForm, type LicenseGeneratorFormRef } from "./LicenseGeneratorForm";
+import {
+  LicenseGeneratorForm,
+  type LicenseGeneratorFormRef,
+} from "./LicenseGeneratorForm";
 
 interface LicenseGeneratorDrawerProps {
   open: boolean;
@@ -23,10 +26,13 @@ export function LicenseGeneratorDrawer({
     formRef.current?.handleGenerate();
   };
 
-  const handleFormStateChange = useCallback((state: { isGenerating: boolean; isFormValid: boolean }) => {
-    setIsGenerating(state.isGenerating);
-    setIsFormValid(state.isFormValid);
-  }, []);
+  const handleFormStateChange = useCallback(
+    (state: { isGenerating: boolean; isFormValid: boolean }) => {
+      setIsGenerating(state.isGenerating);
+      setIsFormValid(state.isFormValid);
+    },
+    [],
+  );
 
   return (
     <Drawer.Root
@@ -50,7 +56,11 @@ export function LicenseGeneratorDrawer({
           />
         </Drawer.Body>
         {!hasGeneratedLicense && (
-          <Drawer.Footer borderTopWidth="1px" borderColor="border" justifyContent="flex-end">
+          <Drawer.Footer
+            borderTopWidth="1px"
+            borderColor="border"
+            justifyContent="flex-end"
+          >
             <Button
               colorPalette="blue"
               onClick={handleGenerate}

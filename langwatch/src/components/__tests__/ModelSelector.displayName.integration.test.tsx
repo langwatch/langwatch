@@ -99,7 +99,9 @@ describe("<ModelSelector/>", () => {
       it("does not list the azure custom model by its raw model id", () => {
         renderSelector();
 
-        expect(within(listbox()).queryByText("gpt-5.1")).not.toBeInTheDocument();
+        expect(
+          within(listbox()).queryByText("gpt-5.1"),
+        ).not.toBeInTheDocument();
       });
     });
   });

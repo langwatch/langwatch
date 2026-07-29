@@ -17,10 +17,10 @@
 
 import crypto from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
 import { SpanStorageClickHouseRepository } from "~/server/app-layer/traces/repositories/span-storage.clickhouse.repository";
-import { TraceSummaryService } from "~/server/app-layer/traces/trace-summary.service";
 import { TraceSummaryClickHouseRepository } from "~/server/app-layer/traces/repositories/trace-summary.clickhouse.repository";
+import { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
+import { TraceSummaryService } from "~/server/app-layer/traces/trace-summary.service";
 import type { AggregateType } from "../../../";
 import { definePipeline } from "../../../";
 import {
@@ -38,15 +38,15 @@ import { EventStoreClickHouse } from "../../../stores/eventStoreClickHouse";
 import { EventRepositoryClickHouse } from "../../../stores/repositories/eventRepositoryClickHouse";
 import { AssignTopicCommand } from "../commands/assignTopicCommand";
 import {
-  RecordSpanCommand,
   RECORD_SPAN_DEDUPLICATION,
+  RecordSpanCommand,
 } from "../commands/recordSpanCommand";
 import { SpanStorageMapProjection } from "../projections/spanStorage.mapProjection";
+import { SpanAppendStore } from "../projections/spanStorage.store";
 import { TraceSummaryFoldProjection } from "../projections/traceSummary.foldProjection";
+import { TraceSummaryStore } from "../projections/traceSummary.store";
 import type { TraceProcessingEvent } from "../schemas/events";
 import type { OtlpSpan } from "../schemas/otlp";
-import { SpanAppendStore } from "../projections/spanStorage.store";
-import { TraceSummaryStore } from "../projections/traceSummary.store";
 
 // ---------------------------------------------------------------------------
 // Test-only RecordSpanCommand subclass
@@ -290,88 +290,73 @@ describe.skipIf(!hasTestcontainers)(
       await cleanupTestDataForTenant(tenantIdString);
     });
 
-    describe(
-      "given the recordSpan command is registered in a trace processing pipeline",
-      () => {
-        describe(
-          "when the same (tenant, trace, span) identity is dispatched multiple times within the dedup window",
-          () => {
-            /** @scenario Repeated dispatches of the same span identity collapse to one staged entry */
-            it(
-              "stores exactly one entry in the group data hash for that identity",
-              async () => {
-                const traceId = randomTraceId();
-                const spanId = randomSpanId();
-                const payload = {
-                  tenantId: tenantIdString,
-                  span: buildTestSpan({ traceId, spanId }),
-                  resource: null,
-                  instrumentationScope: { name: "test" },
-                  piiRedactionLevel: "ESSENTIAL" as const,
-                  occurredAt: Date.now(),
-                };
+    describe("given the recordSpan command is registered in a trace processing pipeline", () => {
+      describe("when the same (tenant, trace, span) identity is dispatched multiple times within the dedup window", () => {
+        /** @scenario Repeated dispatches of the same span identity collapse to one staged entry */
+        it("stores exactly one entry in the group data hash for that identity", async () => {
+          const traceId = randomTraceId();
+          const spanId = randomSpanId();
+          const payload = {
+            tenantId: tenantIdString,
+            span: buildTestSpan({ traceId, spanId }),
+            resource: null,
+            instrumentationScope: { name: "test" },
+            piiRedactionLevel: "ESSENTIAL" as const,
+            occurredAt: Date.now(),
+          };
 
-                // Dispatch the same identity 5 times in quick succession.
-                // Without dedup, each call stages a distinct job → HLEN = 5.
-                // With dedup, all collapse to one → HLEN = 1.
-                for (let i = 0; i < 5; i++) {
-                  await pipeline.commands.recordSpan.send(payload);
-                }
+          // Dispatch the same identity 5 times in quick succession.
+          // Without dedup, each call stages a distinct job → HLEN = 5.
+          // With dedup, all collapse to one → HLEN = 1.
+          for (let i = 0; i < 5; i++) {
+            await pipeline.commands.recordSpan.send(payload);
+          }
 
-                // Wait for at least one staged entry to appear (staging is async).
-                // We wait for at least 1 since that is the minimum whether or not
-                // the fix is in place. We then check the actual count.
-                await waitForStagedEntries(traceId, 1);
+          // Wait for at least one staged entry to appear (staging is async).
+          // We wait for at least 1 since that is the minimum whether or not
+          // the fix is in place. We then check the actual count.
+          await waitForStagedEntries(traceId, 1);
 
-                // Allow a short additional window for all five staging operations
-                // to settle — in the pre-fix case we need HLEN to reach 5 so
-                // the assertion definitively catches the bug.
-                await new Promise((resolve) => setTimeout(resolve, 200));
+          // Allow a short additional window for all five staging operations
+          // to settle — in the pre-fix case we need HLEN to reach 5 so
+          // the assertion definitively catches the bug.
+          await new Promise((resolve) => setTimeout(resolve, 200));
 
-                const hlen = await getGroupDataHlen(traceId);
+          const hlen = await getGroupDataHlen(traceId);
 
-                // FAILS before the fix (hlen === 5), PASSES after (hlen === 1).
-                expect(hlen).toBe(1);
-              },
-            );
-          },
-        );
+          // FAILS before the fix (hlen === 5), PASSES after (hlen === 1).
+          expect(hlen).toBe(1);
+        });
+      });
 
-        describe(
-          "when distinct (tenant, trace, span) identities are dispatched on the same trace",
-          () => {
-            /** @scenario Distinct span identities on the same trace each get their own staged entry */
-            it(
-              "stores one entry per distinct identity in the group data hash",
-              async () => {
-                const traceId = randomTraceId();
-                const spanIds = [randomSpanId(), randomSpanId(), randomSpanId()];
+      describe("when distinct (tenant, trace, span) identities are dispatched on the same trace", () => {
+        /** @scenario Distinct span identities on the same trace each get their own staged entry */
+        it("stores one entry per distinct identity in the group data hash", async () => {
+          const traceId = randomTraceId();
+          const spanIds = [randomSpanId(), randomSpanId(), randomSpanId()];
 
-                for (const spanId of spanIds) {
-                  await pipeline.commands.recordSpan.send({
-                    tenantId: tenantIdString,
-                    span: buildTestSpan({ traceId, spanId }),
-                    resource: null,
-                    instrumentationScope: { name: "test" },
-                    piiRedactionLevel: "ESSENTIAL" as const,
-                    occurredAt: Date.now(),
-                  });
-                }
+          for (const spanId of spanIds) {
+            await pipeline.commands.recordSpan.send({
+              tenantId: tenantIdString,
+              span: buildTestSpan({ traceId, spanId }),
+              resource: null,
+              instrumentationScope: { name: "test" },
+              piiRedactionLevel: "ESSENTIAL" as const,
+              occurredAt: Date.now(),
+            });
+          }
 
-                // Wait for all 3 distinct entries to appear in the staging hash.
-                await waitForStagedEntries(traceId, 3);
-                await new Promise((resolve) => setTimeout(resolve, 200));
+          // Wait for all 3 distinct entries to appear in the staging hash.
+          await waitForStagedEntries(traceId, 3);
+          await new Promise((resolve) => setTimeout(resolve, 200));
 
-                const hlen = await getGroupDataHlen(traceId);
+          const hlen = await getGroupDataHlen(traceId);
 
-                // Each distinct (traceId, spanId) pair is a separate job.
-                // PASSES before and after the fix.
-                expect(hlen).toBe(3);
-              },
-            );
-          },
-        );
-      },
-    );
+          // Each distinct (traceId, spanId) pair is a separate job.
+          // PASSES before and after the fix.
+          expect(hlen).toBe(3);
+        });
+      });
+    });
   },
 );

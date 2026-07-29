@@ -69,6 +69,7 @@ func Trace(begin BeginSpanFunc, end EndSpanFunc) Interceptor {
 							InternalProviderID: internalProviderID,
 							RequestType:        call.Request.Type,
 							VirtualKeyID:       call.Bundle.VirtualKeyID,
+							ModelProviderID:    call.Meta.DispatchedProviderID(),
 							VKTags:             call.Bundle.Config.VKTags,
 							GatewayRequestID:   gatewayRequestID,
 							RequestBody:        call.Request.Body,
@@ -90,6 +91,7 @@ func Trace(begin BeginSpanFunc, end EndSpanFunc) Interceptor {
 						Usage:              resp.Usage,
 						RequestType:        call.Request.Type,
 						VirtualKeyID:       call.Bundle.VirtualKeyID,
+						ModelProviderID:    call.Meta.DispatchedProviderID(),
 						VKTags:             call.Bundle.Config.VKTags,
 						GatewayRequestID:   gatewayRequestID,
 						RequestBody:        call.Request.Body,
@@ -123,6 +125,7 @@ func Trace(begin BeginSpanFunc, end EndSpanFunc) Interceptor {
 							InternalProviderID: internalProviderID,
 							RequestType:        call.Request.Type,
 							VirtualKeyID:       call.Bundle.VirtualKeyID,
+							ModelProviderID:    call.Meta.DispatchedProviderID(),
 							VKTags:             call.Bundle.Config.VKTags,
 							GatewayRequestID:   gatewayRequestID,
 							RequestBody:        call.Request.Body,
@@ -142,6 +145,7 @@ func Trace(begin BeginSpanFunc, end EndSpanFunc) Interceptor {
 					end:                end,
 					bundle:             call.Bundle,
 					req:                call.Request,
+					meta:               call.Meta,
 					gatewayRequestID:   gatewayRequestID,
 					spanCtx:            spanCtx,
 					internalModel:      internalModel,
@@ -182,10 +186,13 @@ const responseBodyCap = 8 * 1024 * 1024
 // extractOutputMessages return "" for every streamed Path A trace — the
 // gen_ai.output.messages key was simply absent from every streaming span.
 type traceStreamWrapper struct {
-	inner              domain.StreamIterator
-	end                EndSpanFunc
-	bundle             *domain.Bundle
-	req                *domain.Request
+	inner  domain.StreamIterator
+	end    EndSpanFunc
+	bundle *domain.Bundle
+	req    *domain.Request
+	// meta is the request's accumulator; read at close for the dispatched
+	// provider id (dispatch has long finished by then, the value is final).
+	meta               *MetaAccumulator
 	gatewayRequestID   string
 	spanCtx            context.Context
 	internalModel      string
@@ -276,6 +283,7 @@ func (w *traceStreamWrapper) onClose() {
 				Usage:              w.inner.Usage(),
 				RequestType:        w.req.Type,
 				VirtualKeyID:       w.bundle.VirtualKeyID,
+				ModelProviderID:    w.meta.DispatchedProviderID(),
 				VKTags:             w.bundle.Config.VKTags,
 				GatewayRequestID:   w.gatewayRequestID,
 				RequestBody:        w.req.Body,

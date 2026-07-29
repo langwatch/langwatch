@@ -9,7 +9,12 @@ import {
 } from "@chakra-ui/react";
 import type { LicenseStatus } from "../../../ee/licensing/client";
 import { CONTACT_SALES_URL } from "../../../ee/licensing/constants";
-import { isLicenseExpired, formatLicenseDate, hasLicenseMetadata, isCorruptedLicense } from "./licenseStatusUtils";
+import {
+  formatLicenseDate,
+  hasLicenseMetadata,
+  isCorruptedLicense,
+  isLicenseExpired,
+} from "./licenseStatusUtils";
 
 interface LicenseDetailsCardProps {
   status: Extract<LicenseStatus, { hasLicense: true }>;
@@ -28,20 +33,10 @@ export function LicenseDetailsCard({
 
   if (isCorrupted) {
     return (
-      <Box
-        borderWidth="1px"
-        borderRadius="lg"
-        padding={6}
-        width="full"
-      >
+      <Box borderWidth="1px" borderRadius="lg" padding={6} width="full">
         <VStack align="start" gap={4}>
           <HStack>
-            <Badge
-              colorPalette="red"
-              fontSize="sm"
-              paddingX={2}
-              paddingY={1}
-            >
+            <Badge colorPalette="red" fontSize="sm" paddingX={2} paddingY={1}>
               Corrupted
             </Badge>
           </HStack>
@@ -69,11 +64,7 @@ export function LicenseDetailsCard({
             >
               Remove License
             </Button>
-            <Button
-              asChild
-              variant="outline"
-              size="sm"
-            >
+            <Button asChild variant="outline" size="sm">
               <Link href={CONTACT_SALES_URL} target="_blank">
                 Contact Sales
               </Link>
@@ -89,12 +80,7 @@ export function LicenseDetailsCard({
   }
 
   return (
-    <Box
-      borderWidth="1px"
-      borderRadius="lg"
-      padding={6}
-      width="full"
-    >
+    <Box borderWidth="1px" borderRadius="lg" padding={6} width="full">
       <VStack align="start" gap={4}>
         <HStack>
           <Badge
@@ -175,11 +161,7 @@ export function LicenseDetailsCard({
           >
             Remove License
           </Button>
-          <Button
-            asChild
-            variant="outline"
-            size="sm"
-          >
+          <Button asChild variant="outline" size="sm">
             <Link href={CONTACT_SALES_URL} target="_blank">
               Contact Sales
             </Link>

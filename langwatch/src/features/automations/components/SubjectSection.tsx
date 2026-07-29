@@ -12,13 +12,13 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import type { NotificationCadence } from "@langwatch/automations/cadences";
 import { useEffect, useMemo, useState } from "react";
-import { Tooltip } from "~/components/ui/tooltip";
-import { ConditionBuilder } from "./ConditionBuilder";
-import { queryIsStructurable } from "../logic/conditionQuery";
 import { FieldsFilters } from "~/components/filters/FieldsFilters";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { Tooltip } from "~/components/ui/tooltip";
+import { describeError } from "~/features/errors";
 import type { FilterParam } from "~/hooks/useFilterParams";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
   type FilterField,
   sanitizeTriggerFilters,
@@ -26,7 +26,7 @@ import {
 } from "~/server/filters/types";
 import { api } from "~/utils/api";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
-import type { NotificationCadence } from "@langwatch/automations/cadences";
+import { queryIsStructurable } from "../logic/conditionQuery";
 import {
   type AutomationDraft,
   filterQueryIsSet,
@@ -39,13 +39,16 @@ import { estimateFiringRate } from "../logic/firingRate";
 import { deriveSeriesOptionsFromGraph } from "../logic/seriesOptions";
 import { useAutomationStore } from "../state/automationStore";
 import { useDraft } from "../state/selectors";
-import { FacetSection, type FacetAccordionProps } from "./FacetSection";
+import { ConditionBuilder } from "./ConditionBuilder";
+import { type FacetAccordionProps, FacetSection } from "./FacetSection";
 import { QueryFilterInput } from "./QueryFilterInput";
 
 /** One-line preview shown when the Subject facet is collapsed. */
 function subjectSummary(draft: AutomationDraft): string {
   if (draft.source === "customGraph") {
-    return subjectIsSet(draft) ? "Watching a graph metric" : "Pick a graph and series";
+    return subjectIsSet(draft)
+      ? "Watching a graph metric"
+      : "Pick a graph and series";
   }
   if (draft.source === "report") {
     return draft.report.sourceKind === "traceQuery"
@@ -511,7 +514,7 @@ function TraceQuerySubject({
         trimmed={trimmed}
         fetching={preview.isFetching}
         hasData={preview.data != null}
-        error={preview.error?.message ?? null}
+        error={preview.error}
         totalHits={preview.data?.totalHits ?? null}
         sample={preview.data?.items ?? []}
         cadence={cadence}
@@ -606,7 +609,8 @@ function TracePreview({
   trimmed: string;
   fetching: boolean;
   hasData: boolean;
-  error: string | null;
+  /** The preview query's error, passed straight through — handled or not. */
+  error: unknown;
   totalHits: number | null;
   sample: PreviewTrace[];
   cadence: NotificationCadence;
@@ -636,9 +640,14 @@ function TracePreview({
     );
   }
   if (error && !hasData) {
+    // A single xs line under the query editor — too tight for an alert, so it
+    // takes the one-string form of the same copy.
     return (
       <Text textStyle="xs" color="fg.error">
-        {error}
+        {describeError({
+          error,
+          fallbackTitle: "Couldn't check matching traces",
+        })}
       </Text>
     );
   }

@@ -5,7 +5,7 @@ import type { Span } from "../../../server/tracer/types";
 import { generateMermaidSyntax, INVISIBLE_RETURN } from "../SequenceDiagram";
 
 describe("generateMermaidSyntax", () => {
-  it("should generate correct Mermaid sequence diagram syntax from spans", () => {
+  it("generates correct Mermaid sequence diagram syntax from spans", () => {
     // Create a sample trace with various span types
     const mockSpans: Span[] = [
       // Root agent span
@@ -179,12 +179,12 @@ describe("generateMermaidSyntax", () => {
     expect(result).toBe(expectedSyntax);
   });
 
-  it("should handle empty spans array", () => {
+  it("handles empty spans array", () => {
     const result = generateMermaidSyntax([]);
     expect(result).toBe("sequenceDiagram\n");
   });
 
-  it("should handle spans with no agent or LLM interactions", () => {
+  it("handles spans with no agent or LLM interactions", () => {
     const mockSpans: Span[] = [
       {
         span_id: "span-1",
@@ -221,7 +221,7 @@ describe("generateMermaidSyntax", () => {
     expect(result).toBe(expectedSyntax);
   });
 
-  it("should sanitize participant names correctly", () => {
+  it("sanitizes participant names correctly", () => {
     const mockSpans: Span[] = [
       {
         span_id: "span-1",
@@ -262,7 +262,7 @@ describe("generateMermaidSyntax", () => {
     expect(result).toBe(expectedSyntax);
   });
 
-  it("should handle tool calls with proper labeling", () => {
+  it("handles tool calls with proper labeling", () => {
     const mockSpans: Span[] = [
       {
         span_id: "span-1",
@@ -299,7 +299,7 @@ describe("generateMermaidSyntax", () => {
     expect(result).toBe(expectedSyntax);
   });
 
-  it("should maintain chronological order of interactions", () => {
+  it("maintains chronological order of interactions", () => {
     const mockSpans: Span[] = [
       {
         span_id: "span-1",
@@ -348,7 +348,7 @@ describe("generateMermaidSyntax", () => {
     ).toBe(true); // Later interaction second
   });
 
-  it("should handle tool calls and subsequent agent calls correctly", () => {
+  it("handles tool calls and subsequent agent calls correctly", () => {
     // This test replicates the banking scenario structure from the user's trace
     const mockSpans: Span[] = [
       // Root agent
@@ -455,7 +455,7 @@ describe("generateMermaidSyntax", () => {
     expect(result).toBe(expectedSyntax);
   });
 
-  it("should handle stacked activations correctly", () => {
+  it("handles stacked activations correctly", () => {
     // Test case where the same participant is called multiple times (stacked activations)
     const mockSpans: Span[] = [
       // Root agent
@@ -513,7 +513,7 @@ describe("generateMermaidSyntax", () => {
     expect(returns.length).toBe(2);
   });
 
-  it("should filter spans based on included span types", () => {
+  it("filters spans based on included span types", () => {
     const mockSpans: Span[] = [
       {
         span_id: "agent-span",
@@ -581,7 +581,7 @@ describe("generateMermaidSyntax", () => {
     expect(defaultResult.includes("generic_span")).toBe(false); // span should be excluded by default
   });
 
-  it("should bridge connections when intermediate spans are filtered out", () => {
+  it("bridges connections when intermediate spans are filtered out", () => {
     const mockSpans: Span[] = [
       // Agent A
       {
@@ -650,7 +650,7 @@ describe("generateMermaidSyntax", () => {
     expect(fullResult).toBe(expectedFull);
   });
 
-  it("should format durations correctly for different time ranges", () => {
+  it("formats durations correctly for different time ranges", () => {
     const mockSpans: Span[] = [
       // Agent with no significant duration (<1s)
       {
@@ -699,7 +699,7 @@ describe("generateMermaidSyntax", () => {
     expect(result.includes("SlowAgent->>claude_3: LLM call (1min)")).toBe(true);
   });
 
-  it("should handle recursive filtering for effective leaf nodes", () => {
+  it("handles recursive filtering for effective leaf nodes", () => {
     const mockSpans: Span[] = [
       // Agent A
       {

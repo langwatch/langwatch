@@ -1,7 +1,7 @@
 import { useCallback, useRef } from "react";
 import { setFlowCallbacks, useDrawer } from "~/hooks/useDrawer";
-import type { Component, Field } from "../types/dsl";
 import type { NodeWithOptionalPosition } from "~/types";
+import type { Component, Field } from "../types/dsl";
 import { useWorkflowStore } from "./useWorkflowStore";
 
 type PromptSelection = {

@@ -1,9 +1,15 @@
 import fs from "node:fs";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createEnv } from "@t3-oss/env-core";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { assertGatewaySecretsAllOrNone, createEnvConfig, gatewaySecretsSchema, rumSampleRatioSchema, storedObjectsBackendSchema } from "../env-create.mjs";
+import {
+  assertGatewaySecretsAllOrNone,
+  createEnvConfig,
+  gatewaySecretsSchema,
+  rumSampleRatioSchema,
+  storedObjectsBackendSchema,
+} from "../env-create.mjs";
 
 // Regression for iter-110: gateway secrets set partially (e.g. only
 // LW_VIRTUAL_KEY_PEPPER, missing the two HMAC/JWT secrets) let the server
@@ -74,7 +80,9 @@ describe("assertGatewaySecretsAllOrNone", () => {
         LW_VIRTUAL_KEY_PEPPER: "a".repeat(32),
       }),
     ).toThrow();
-    const banner = errorSpy.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
+    const banner = errorSpy.mock.calls
+      .map((c: unknown[]) => c.join(" "))
+      .join("\n");
     expect(banner).toMatch(/AI Gateway secrets are partially configured/i);
     expect(banner).toMatch(/openssl rand -hex 32/);
   });
@@ -147,7 +155,8 @@ describe("gatewaySecretsSchema", () => {
           client: {},
           server: {
             LW_VIRTUAL_KEY_PEPPER: gatewaySecretsSchema.LW_VIRTUAL_KEY_PEPPER,
-            LW_GATEWAY_INTERNAL_SECRET: gatewaySecretsSchema.LW_GATEWAY_INTERNAL_SECRET,
+            LW_GATEWAY_INTERNAL_SECRET:
+              gatewaySecretsSchema.LW_GATEWAY_INTERNAL_SECRET,
             LW_GATEWAY_JWT_SECRET: gatewaySecretsSchema.LW_GATEWAY_JWT_SECRET,
           },
           runtimeEnv: {
@@ -162,7 +171,11 @@ describe("gatewaySecretsSchema", () => {
       // The issues logged to console.error contain the field names and the
       // minimum constraint so the user can identify which keys need real secrets.
       const logged = errorSpy.mock.calls
-        .map((c: unknown[]) => c.map((a) => (typeof a === "object" ? JSON.stringify(a) : String(a))).join(" "))
+        .map((c: unknown[]) =>
+          c
+            .map((a) => (typeof a === "object" ? JSON.stringify(a) : String(a)))
+            .join(" "),
+        )
         .join("\n");
       expect(logged).toMatch(/LW_VIRTUAL_KEY_PEPPER/);
       expect(logged).toMatch(/LW_GATEWAY_INTERNAL_SECRET/);
@@ -231,7 +244,9 @@ describe("storedObjectsBackendSchema", () => {
       expect(source).toMatch(
         /STORED_OBJECTS_BACKEND:\s*storedObjectsBackendSchema/,
       );
-      expect(source).toMatch(/AZURE_BLOB_CONTAINER:\s*z\s*\n?\s*\.string\(\)|AZURE_BLOB_CONTAINER:\s*z\.string\(\)/);
+      expect(source).toMatch(
+        /AZURE_BLOB_CONTAINER:\s*z\s*\n?\s*\.string\(\)|AZURE_BLOB_CONTAINER:\s*z\.string\(\)/,
+      );
       expect(source).toMatch(
         /STORED_OBJECTS_BACKEND:\s*process\.env\.STORED_OBJECTS_BACKEND/,
       );
@@ -267,7 +282,9 @@ describe("storedObjectsBackendSchema", () => {
 
     /** @scenario "An unrecognized STORED_OBJECTS_BACKEND value is rejected, not ignored" */
     it("startup fails via createEnv, naming the variable and the supported values", () => {
-      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+      const errorSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => undefined);
       try {
         expect(() =>
           createEnv({
@@ -281,7 +298,11 @@ describe("storedObjectsBackendSchema", () => {
 
         const logged = errorSpy.mock.calls
           .map((c: unknown[]) =>
-            c.map((a) => (typeof a === "object" ? JSON.stringify(a) : String(a))).join(" "),
+            c
+              .map((a) =>
+                typeof a === "object" ? JSON.stringify(a) : String(a),
+              )
+              .join(" "),
           )
           .join("\n");
         expect(logged).toMatch(/STORED_OBJECTS_BACKEND/);

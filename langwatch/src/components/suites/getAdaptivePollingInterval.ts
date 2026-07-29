@@ -4,12 +4,13 @@ import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 const FAST_INTERVAL_MS = 3000;
 const SLOW_INTERVAL_MS = 15000;
 
-const ACTIVE_STATUSES: ReadonlySet<ScenarioRunStatus> = new Set<ScenarioRunStatus>([
-  ScenarioRunStatus.IN_PROGRESS,
-  ScenarioRunStatus.PENDING,
-  ScenarioRunStatus.QUEUED,
-  ScenarioRunStatus.RUNNING,
-]);
+const ACTIVE_STATUSES: ReadonlySet<ScenarioRunStatus> =
+  new Set<ScenarioRunStatus>([
+    ScenarioRunStatus.IN_PROGRESS,
+    ScenarioRunStatus.PENDING,
+    ScenarioRunStatus.QUEUED,
+    ScenarioRunStatus.RUNNING,
+  ]);
 
 /**
  * Computes an adaptive polling interval based on run statuses.

@@ -1,36 +1,44 @@
+import { pMapLimited } from "./pMapLimited";
+import {
+  pauseProjection,
+  unpauseProjection,
+  waitForAllActiveJobs,
+} from "./replayDrain";
 import type {
-  RegisteredFoldProjection,
-  RegisteredMapProjection,
-  ReplayProgress,
-  ReplayConfig,
-  ReplayCallbacks,
-  ReplayResult,
-  BatchPhase,
-  ProjectionKind,
-  ReplayContext,
-} from "./types";
-import type { CutoffInfo, DiscoveredAggregate, ReplayEvent } from "./replayEventLoader";
-import type { OccurredAtBounds } from "./replayEventLoader";
+  CutoffInfo,
+  DiscoveredAggregate,
+  OccurredAtBounds,
+  ReplayEvent,
+} from "./replayEventLoader";
 import {
   discoverAffectedAggregates,
   getBoundedCutoffs,
   loadEventsForAggregatesBulk,
 } from "./replayEventLoader";
-import {
-  aggregateKey,
-  markPendingBatch,
-  markCutoffBatch,
-  markCompletedBatch,
-  unmarkBatch,
-  clearFailedBatchMarkers,
-  getCompletedSet,
-  cleanupAll,
-} from "./replayMarkers";
-import { pauseProjection, unpauseProjection, waitForAllActiveJobs } from "./replayDrain";
 import { FoldAccumulator, MapAccumulator } from "./replayExecutor";
 import type { ReplayLogWriter } from "./replayLog";
 import { nullLog } from "./replayLog";
-import { pMapLimited } from "./pMapLimited";
+import {
+  aggregateKey,
+  cleanupAll,
+  clearFailedBatchMarkers,
+  getCompletedSet,
+  markCompletedBatch,
+  markCutoffBatch,
+  markPendingBatch,
+  unmarkBatch,
+} from "./replayMarkers";
+import type {
+  BatchPhase,
+  ProjectionKind,
+  RegisteredFoldProjection,
+  RegisteredMapProjection,
+  ReplayCallbacks,
+  ReplayConfig,
+  ReplayContext,
+  ReplayProgress,
+  ReplayResult,
+} from "./types";
 
 /**
  * Emit replay-phase progress once per this many completed aggregates (plus
@@ -83,7 +91,9 @@ export async function replayOptimized({
   // Progress/batch reporting kind: "map" for map-only runs, otherwise
   // "fold" (fold-only and mixed runs — fold is the dominant kind).
   const runProjectionKind: ProjectionKind =
-    config.projections.length === 0 && mapProjections.length > 0 ? "map" : "fold";
+    config.projections.length === 0 && mapProjections.length > 0
+      ? "map"
+      : "fold";
 
   // 1. Discover: single pass using the union of all event types (fold + map)
   const allEventTypesForDiscovery = new Set<string>();
@@ -105,18 +115,30 @@ export async function replayOptimized({
   // requirements) for unrelated projections that share no event types.
   const eventTypesByProjection = new Map<string, Set<string>>();
   for (const p of config.projections) {
-    eventTypesByProjection.set(p.projectionName, new Set(p.definition.eventTypes));
+    eventTypesByProjection.set(
+      p.projectionName,
+      new Set(p.definition.eventTypes),
+    );
   }
   for (const p of mapProjections) {
-    eventTypesByProjection.set(p.projectionName, new Set(p.definition.eventTypes));
+    eventTypesByProjection.set(
+      p.projectionName,
+      new Set(p.definition.eventTypes),
+    );
   }
 
   const aggregateProjectionMap = new Map<
     string,
-    { tenantId: string; aggregateId: string; aggregateType: string; projections: string[] }
+    {
+      tenantId: string;
+      aggregateId: string;
+      aggregateType: string;
+      projections: string[];
+    }
   >();
 
-  const discoveryTargets = config.tenantIds.length > 0 ? config.tenantIds : [undefined];
+  const discoveryTargets =
+    config.tenantIds.length > 0 ? config.tenantIds : [undefined];
   for (const tenantId of discoveryTargets) {
     const client = await ctx.resolveClient(tenantId ?? "default");
     const aggregates = await discoverAffectedAggregates({
@@ -178,7 +200,10 @@ export async function replayOptimized({
   // Get completed sets for all projections (fold + map)
   const completedSets = new Map<string, Set<string>>();
   for (const p of [...config.projections, ...mapProjections]) {
-    const completed = await getCompletedSet({ redis: ctx.redis, projectionName: p.projectionName });
+    const completed = await getCompletedSet({
+      redis: ctx.redis,
+      projectionName: p.projectionName,
+    });
     completedSets.set(p.projectionName, completed);
   }
 
@@ -290,7 +315,11 @@ export async function replayOptimized({
         aggregates: batchAggregates,
         projections: pausedProjectionEntries,
       });
-      log.write({ step: "drain-batch", batch: batchNum, aggregateCount: batchAggregates.length });
+      log.write({
+        step: "drain-batch",
+        batch: batchNum,
+        aggregateCount: batchAggregates.length,
+      });
 
       batchResult = await replayBatchOptimized({
         ctx,
@@ -304,7 +333,8 @@ export async function replayOptimized({
           progress.batchPhase = phase;
           if (eventsProcessed !== undefined) {
             progress.batchEventsProcessed = eventsProcessed;
-            progress.totalEventsReplayed = totalEventsReplayed + eventsProcessed;
+            progress.totalEventsReplayed =
+              totalEventsReplayed + eventsProcessed;
           }
           emit();
         },
@@ -349,12 +379,18 @@ export async function replayOptimized({
             step: "error",
             batch: batchNum,
             error: `unpause failed: ${
-              unpauseError instanceof Error ? unpauseError.message : String(unpauseError)
+              unpauseError instanceof Error
+                ? unpauseError.message
+                : String(unpauseError)
             }`,
           });
         });
       }
-      log.write({ step: "unpause-batch", batch: batchNum, projections: allProjectionNames });
+      log.write({
+        step: "unpause-batch",
+        batch: batchNum,
+        projections: allProjectionNames,
+      });
     }
 
     totalEventsReplayed += batchResult.eventsReplayed;
@@ -391,7 +427,8 @@ export async function replayOptimized({
       if (p.targetTable) tables.add(p.targetTable);
     }
 
-    const tenantTargets = touchedTenants.size > 0 ? [...touchedTenants] : ["default"];
+    const tenantTargets =
+      touchedTenants.size > 0 ? [...touchedTenants] : ["default"];
 
     for (const tenantId of tenantTargets) {
       try {
@@ -431,7 +468,12 @@ async function replayBatchOptimized({
   batchKeys: string[];
   aggregateProjectionMap: Map<
     string,
-    { tenantId: string; aggregateId: string; aggregateType: string; projections: string[] }
+    {
+      tenantId: string;
+      aggregateId: string;
+      aggregateType: string;
+      projections: string[];
+    }
   >;
   projectionByName: Map<string, RegisteredFoldProjection>;
   mapProjectionByName: Map<string, RegisteredMapProjection>;
@@ -461,13 +503,29 @@ async function replayBatchOptimized({
   // 1. MARK each projection for its matching aggregates
   onBatchPhase("mark");
   for (const [projName, projAggKeys] of aggKeysByProjection) {
-    await markPendingBatch({ redis, projectionName: projName, aggKeys: projAggKeys });
+    await markPendingBatch({
+      redis,
+      projectionName: projName,
+      aggKeys: projAggKeys,
+    });
   }
-  log.write({ step: "mark-batch-multi", count: batchKeys.length, projections: projNames });
+  log.write({
+    step: "mark-batch-multi",
+    count: batchKeys.length,
+    projections: projNames,
+  });
 
   // 2. CUTOFF — get cutoffs per tenant, per aggregate
   onBatchPhase("cutoff");
-  const byTenant = new Map<string, Array<{ key: string; aggregateId: string; aggregateType: string; projections: string[] }>>();
+  const byTenant = new Map<
+    string,
+    Array<{
+      key: string;
+      aggregateId: string;
+      aggregateType: string;
+      projections: string[];
+    }>
+  >();
   for (const key of batchKeys) {
     const entry = aggregateProjectionMap.get(key)!;
     let list = byTenant.get(entry.tenantId);
@@ -475,7 +533,12 @@ async function replayBatchOptimized({
       list = [];
       byTenant.set(entry.tenantId, list);
     }
-    list.push({ key, aggregateId: entry.aggregateId, aggregateType: entry.aggregateType, projections: entry.projections });
+    list.push({
+      key,
+      aggregateId: entry.aggregateId,
+      aggregateType: entry.aggregateType,
+      projections: entry.projections,
+    });
   }
 
   // Collect ALL event types across all projections (fold + map) for cutoff queries
@@ -502,13 +565,14 @@ async function replayBatchOptimized({
     items: [...byTenant.entries()],
     fn: async ([tenantId, entries]) => {
       const client = await ctx.resolveClient(tenantId);
-      const { cutoffs: tenantCutoffs, occurredAtBounds } = await getBoundedCutoffs({
-        client,
-        tenantId,
-        aggregateTypes: [...new Set(entries.map((e) => e.aggregateType))],
-        aggregateIds: entries.map((e) => e.aggregateId),
-        eventTypes: [...allEventTypes],
-      });
+      const { cutoffs: tenantCutoffs, occurredAtBounds } =
+        await getBoundedCutoffs({
+          client,
+          tenantId,
+          aggregateTypes: [...new Set(entries.map((e) => e.aggregateType))],
+          aggregateIds: entries.map((e) => e.aggregateId),
+          eventTypes: [...allEventTypes],
+        });
       if (!occurredAtBounds) {
         // Zero events for this tenant's aggregates (see getBoundedCutoffs) —
         // no boundsByTenant entry and no allCutoffs entries, so these
@@ -556,7 +620,11 @@ async function replayBatchOptimized({
       const cutoff = allCutoffs.get(key);
       if (cutoff) projCutoffs.set(key, cutoff);
     }
-    await markCutoffBatch({ redis, projectionName: projName, cutoffs: projCutoffs });
+    await markCutoffBatch({
+      redis,
+      projectionName: projName,
+      cutoffs: projCutoffs,
+    });
   }
 
   // 3. REPLAY — load events per tenant, apply all relevant projections
@@ -568,11 +636,17 @@ async function replayBatchOptimized({
   for (const projName of projNames) {
     const foldProj = projectionByName.get(projName);
     if (foldProj) {
-      foldAccumulators.set(projName, new FoldAccumulator(foldProj.definition, ctx.accumulatorOpts));
+      foldAccumulators.set(
+        projName,
+        new FoldAccumulator(foldProj.definition, ctx.accumulatorOpts),
+      );
     }
     const mapProj = mapProjectionByName.get(projName);
     if (mapProj) {
-      mapAccumulators.set(projName, new MapAccumulator(mapProj.definition, ctx.accumulatorOpts));
+      mapAccumulators.set(
+        projName,
+        new MapAccumulator(mapProj.definition, ctx.accumulatorOpts),
+      );
     }
   }
 
@@ -668,9 +742,17 @@ async function replayBatchOptimized({
       const cutoff = allCutoffs.get(key);
       if (cutoff) projCutoffs.set(key, cutoff);
     }
-    await markCompletedBatch({ redis, projectionName: projName, cutoffs: projCutoffs });
+    await markCompletedBatch({
+      redis,
+      projectionName: projName,
+      cutoffs: projCutoffs,
+    });
   }
-  log.write({ step: "unmark-batch-multi", count: withCutoffKeys.length, projections: projNames });
+  log.write({
+    step: "unmark-batch-multi",
+    count: withCutoffKeys.length,
+    projections: projNames,
+  });
 
   return { eventsReplayed: eventsProcessed };
 }

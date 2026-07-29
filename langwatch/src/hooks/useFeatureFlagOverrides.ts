@@ -6,7 +6,9 @@ import {
 
 const STORAGE_KEY = "langwatch:dev:feature-flag-overrides";
 
-export type FeatureFlagOverrides = Partial<Record<FrontendFeatureFlag, boolean>>;
+export type FeatureFlagOverrides = Partial<
+  Record<FrontendFeatureFlag, boolean>
+>;
 
 // Same-tab subscribers — `storage` events only fire on *other* tabs, so we
 // fan out our own writes to consumers in the current tab.

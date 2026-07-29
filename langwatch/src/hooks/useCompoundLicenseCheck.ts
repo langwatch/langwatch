@@ -28,7 +28,7 @@ type EnforcementResult = ReturnType<typeof useLicenseEnforcement>;
  */
 export function checkCompoundLimits(
   enforcements: EnforcementResult[],
-  onAllPassed: () => void
+  onAllPassed: () => void,
 ): void {
   const [first, ...rest] = enforcements;
   if (!first) {

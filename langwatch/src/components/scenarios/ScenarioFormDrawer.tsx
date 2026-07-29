@@ -1,30 +1,51 @@
-import { Button, Grid, GridItem, Heading, HStack, Text } from "@chakra-ui/react";
-import type { Scenario } from "@prisma/client";
+import {
+  Button,
+  Grid,
+  GridItem,
+  Heading,
+  HStack,
+  Text,
+} from "@chakra-ui/react";
 import { generate } from "@langwatch/ksuid";
-import { useRouter } from "~/utils/compat/next-router";
+import type { Scenario } from "@prisma/client";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { KSUID_RESOURCES } from "../../utils/constants";
 import { type UseFormReturn, useWatch } from "react-hook-form";
-import { clearFlowCallbacks, getComplexProps, setFlowCallbacks, useDrawer, useDrawerParams } from "../../hooks/useDrawer";
-import { AgentTypeSelectorDrawer } from "../agents/AgentTypeSelectorDrawer";
+import {
+  applyHandledErrorToForm,
+  FormServerError,
+  showErrorToast,
+} from "~/features/errors";
+import { useRouter } from "~/utils/compat/next-router";
 import { checkCompoundLimits } from "../../hooks/useCompoundLicenseCheck";
+import {
+  clearFlowCallbacks,
+  getComplexProps,
+  setFlowCallbacks,
+  useDrawer,
+  useDrawerParams,
+} from "../../hooks/useDrawer";
 import { useLicenseEnforcement } from "../../hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useRunScenario } from "../../hooks/useRunScenario";
 import { useScenarioTarget } from "../../hooks/useScenarioTarget";
-import { api } from "../../utils/api";
-import { isHandledByGlobalHandler } from "../../utils/trpcError";
-import type { TypedAgent } from "../../server/agents/agent.repository";
 import type { CustomComponentConfig } from "../../optimization_studio/types/dsl";
+import type { TypedAgent } from "../../server/agents/agent.repository";
+import { api } from "../../utils/api";
+import { KSUID_RESOURCES } from "../../utils/constants";
+import { AgentTypeSelectorDrawer } from "../agents/AgentTypeSelectorDrawer";
 import { PromptEditorDrawer } from "../prompts/PromptEditorDrawer";
 import { hasScenarioInputMapping } from "../suites/ScenarioInputMappingSection";
-import { TagList } from "../ui/TagList";
 import { Drawer } from "../ui/drawer";
+import { TagList } from "../ui/TagList";
 import { toaster } from "../ui/toaster";
 import { SaveAndRunMenu } from "./SaveAndRunMenu";
-import { ScenarioRunModelDialog } from "./ScenarioRunModelDialog";
 import { ScenarioEditorSidebar } from "./ScenarioEditorSidebar";
-import { ScenarioForm, type ScenarioFormData, type ScenarioInitialData } from "./ScenarioForm";
+import {
+  ScenarioForm,
+  type ScenarioFormData,
+  type ScenarioInitialData,
+} from "./ScenarioForm";
+import { ScenarioRunModelDialog } from "./ScenarioRunModelDialog";
 import type { TargetValue } from "./TargetSelector";
 
 export type ScenarioFormDrawerProps = {
@@ -35,17 +56,31 @@ export type ScenarioFormDrawerProps = {
 } & Partial<ScenarioInitialData>;
 
 /**
+ * Model overrides chosen in the run dialog. Omitted on a plain save so the
+ * scenario's existing models are left untouched (undefined = no-op in the
+ * Prisma update).
+ */
+type ModelOverrides = {
+  simulatorModel: string | null;
+  judgeModel: string | null;
+};
+
+/**
  * URL-based wrapper for ScenarioFormDrawer.
  * Reads scenarioId from drawer URL params and passes it as a prop.
  * Use this when rendering via the drawer registry / URL navigation.
  */
-export function ScenarioFormDrawerFromUrl(props: Omit<ScenarioFormDrawerProps, "scenarioId">) {
+export function ScenarioFormDrawerFromUrl(
+  props: Omit<ScenarioFormDrawerProps, "scenarioId">,
+) {
   const params = useDrawerParams();
   const { drawerOpen } = useDrawer();
   // When rendered from the drawer registry (CurrentDrawer), no `open` prop is
   // passed.  Fall back to checking the URL so the drawer actually opens.
   const open = props.open ?? drawerOpen("scenarioEditor");
-  return <ScenarioFormDrawer {...props} open={open} scenarioId={params.scenarioId} />;
+  return (
+    <ScenarioFormDrawer {...props} open={open} scenarioId={params.scenarioId} />
+  );
 }
 
 /**
@@ -142,14 +177,16 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
       props.onSuccess?.(data);
     },
     onError: (error) => {
-      // Skip toast if already handled by global license handler (shows modal instead)
-      if (isHandledByGlobalHandler(error)) return;
-      toaster.create({
-        title: "Failed to create scenario",
-        description: error.message,
-        type: "error",
-        meta: { closable: true },
-      });
+      if (
+        formInstance &&
+        applyHandledErrorToForm({
+          error,
+          form: formInstance,
+          hasFormErrorSlot: true,
+        })
+      )
+        return;
+      showErrorToast({ error, fallbackTitle: "Couldn't create scenario" });
     },
   });
   const updateMutation = api.scenarios.update.useMutation({
@@ -162,14 +199,16 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
       props.onSuccess?.(data);
     },
     onError: (error) => {
-      // Skip toast if already handled by global license handler (shows modal instead)
-      if (isHandledByGlobalHandler(error)) return;
-      toaster.create({
-        title: "Failed to update scenario",
-        description: error.message,
-        type: "error",
-        meta: { closable: true },
-      });
+      if (
+        formInstance &&
+        applyHandledErrorToForm({
+          error,
+          form: formInstance,
+          hasFormErrorSlot: true,
+        })
+      )
+        return;
+      showErrorToast({ error, fallbackTitle: "Couldn't save scenario" });
     },
   });
 
@@ -185,10 +224,99 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         {
           urlParams: { scenarioId: newScenarioId },
         },
-        { resetStack: true }
+        { resetStack: true },
       );
     },
     [openDrawer],
+  );
+
+  // Edit mode: the scenario already exists, so the save is a plain update.
+  // Mutation errors are caught here so a save failure never surfaces as
+  // "Failed to run scenario" in the save-and-run path — updateMutation's own
+  // onError toast is what the user sees.
+  const updateExisting = useCallback(
+    async ({
+      projectId,
+      scenarioId,
+      data,
+      models,
+    }: {
+      projectId: string;
+      scenarioId: string;
+      data: ScenarioFormData;
+      models?: ModelOverrides;
+    }): Promise<Scenario | null> => {
+      try {
+        return await updateMutation.mutateAsync({
+          projectId,
+          id: scenarioId,
+          ...data,
+          ...(models ?? {}),
+        });
+      } catch {
+        // Error toast already surfaced by updateMutation.onError; return null
+        // so the save-and-run caller doesn't re-report it as a run failure.
+        return null;
+      }
+    },
+    [updateMutation],
+  );
+
+  const createScenario = useCallback(
+    async ({
+      projectId,
+      data,
+      skipTransition,
+      models,
+    }: {
+      projectId: string;
+      data: ScenarioFormData;
+      skipTransition: boolean;
+      models?: ModelOverrides;
+    }): Promise<Scenario | null> => {
+      try {
+        const result = await createMutation.mutateAsync({
+          projectId,
+          ...data,
+          ...(models ?? {}),
+        });
+        // Transition to edit mode to prevent double-create on subsequent saves.
+        // Skip when the drawer is about to close (save-without-running).
+        if (!skipTransition) {
+          transitionToEditMode(result.id);
+        }
+        return result;
+      } catch {
+        // Error already handled by global mutation cache if license error
+        return null;
+      }
+    },
+    [createMutation, transitionToEditMode],
+  );
+
+  // Create mode: no scenarioId in the URL yet, so the create has to clear the
+  // plan limit before it runs.
+  const createNew = useCallback(
+    (args: {
+      projectId: string;
+      data: ScenarioFormData;
+      skipTransition: boolean;
+      models?: ModelOverrides;
+    }): Promise<Scenario | null> =>
+      new Promise((resolve) => {
+        // checkCompoundLimits takes a synchronous callback, so the create runs
+        // in a fire-and-forget scope that resolves the outer promise on both
+        // paths rather than returning one the caller would drop.
+        checkCompoundLimits([scenarioEnforcement], () => {
+          void createScenario(args).then(resolve);
+        });
+
+        // If limit exceeded, modal is shown and callback won't run - resolve null
+        if (!scenarioEnforcement.isAllowed) {
+          resolve(null);
+        }
+      }),
+    [createScenario, scenarioEnforcement],
   );
 
   const handleSave = useCallback(
@@ -199,59 +327,21 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
     }: {
       data: ScenarioFormData;
       skipTransition?: boolean;
-      /** Model overrides chosen in the run dialog. Omitted on a plain save
-       *  so existing scenario models are left untouched (undefined = no-op
-       *  in the Prisma update). */
-      models?: { simulatorModel: string | null; judgeModel: string | null };
+      models?: ModelOverrides;
     }): Promise<Scenario | null> => {
-      if (!project?.id) return null;
+      const projectId = project?.id;
+      if (!projectId) return null;
 
-      // Edit mode: scenarioId is in URL and scenario data is loaded.
-      // Catch mutation errors here so save failures never surface as "Failed to run scenario"
-      // in the save-and-run path — the mutation's own onError toast handles user feedback.
-      if (scenario) {
-        try {
-          return await updateMutation.mutateAsync({
-            projectId: project.id,
-            id: scenario.id,
-            ...data,
-            ...(models ?? {}),
-          });
-        } catch {
-          // Error toast already surfaced by updateMutation.onError; return null
-          // so the save-and-run caller doesn't re-report it as a run failure.
-          return null;
-        }
-      }
-
-      // Create mode: no scenarioId in URL yet
-      return new Promise((resolve) => {
-        checkCompoundLimits([scenarioEnforcement], async () => {
-          try {
-            const result = await createMutation.mutateAsync({
-              projectId: project.id,
-              ...data,
-              ...(models ?? {}),
-            });
-            // Transition to edit mode to prevent double-create on subsequent saves.
-            // Skip when the drawer is about to close (save-without-running).
-            if (!skipTransition) {
-              transitionToEditMode(result.id);
-            }
-            resolve(result);
-          } catch {
-            // Error already handled by global mutation cache if license error
-            resolve(null);
-          }
-        });
-
-        // If limit exceeded, modal is shown and callback won't run - resolve null
-        if (!scenarioEnforcement.isAllowed) {
-          resolve(null);
-        }
-      });
+      return scenario
+        ? await updateExisting({
+            projectId,
+            scenarioId: scenario.id,
+            data,
+            models,
+          })
+        : await createNew({ projectId, data, skipTransition, models });
     },
-    [project?.id, scenario, createMutation, updateMutation, scenarioEnforcement, transitionToEditMode],
+    [project?.id, scenario, updateExisting, createNew],
   );
   const handleSaveAndRun = useCallback(
     async (target: TargetValue) => {
@@ -365,16 +455,12 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         // Intentionally NOT calling onClose() here: closeDrawer() does its
         // own router.push to strip drawer.* params, which would race with
         // this redirect and silently win (lw#3586 F11).
-        void router.push(`/${project.slug}/simulations?pendingBatch=${batchRunId}`);
+        void router.push(
+          `/${project.slug}/simulations?pendingBatch=${batchRunId}`,
+        );
       })();
     } catch (error) {
-      toaster.create({
-        title: "Failed to run scenario",
-        description:
-          error instanceof Error ? error.message : "An error occurred",
-        type: "error",
-        meta: { closable: true },
-      });
+      showErrorToast({ error, fallbackTitle: "Couldn't run scenario" });
     }
   }, [
     formInstance,
@@ -443,6 +529,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
               borderRightWidth="1px"
               borderColor="border"
             >
+              {formInstance && <FormServerError form={formInstance} />}
               <ScenarioForm
                 key={scenarioId ?? "new"}
                 defaultValues={defaultValues}
@@ -457,9 +544,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         </Drawer.Body>
         {/* Bottom Bar */}
         <Drawer.Footer borderTopWidth="1px" justifyContent="space-between">
-          {formInstance && (
-            <FooterLabels form={formInstance} />
-          )}
+          {formInstance && <FooterLabels form={formInstance} />}
           <HStack gap={2} flexShrink={0}>
             <Button variant="outline" size="sm" onClick={onClose}>
               Cancel
@@ -529,7 +614,10 @@ function FooterLabels({ form }: { form: UseFormReturn<ScenarioFormData> }) {
       <TagList
         labels={labels}
         onRemove={(_label, index) =>
-          form.setValue("labels", labels.filter((_, i) => i !== index))
+          form.setValue(
+            "labels",
+            labels.filter((_, i) => i !== index),
+          )
         }
         onAdd={(label) => form.setValue("labels", [...labels, label])}
       />

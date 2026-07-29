@@ -38,7 +38,10 @@ function makePrismaMock(shape: {
   return mock as unknown as PrismaClient;
 }
 
-function makeContext(execute: boolean, prisma: PrismaClient): SeedActionContext {
+function makeContext(
+  execute: boolean,
+  prisma: PrismaClient,
+): SeedActionContext {
   return {
     prisma,
     scope: new DemoOrgScope([ORG_ID]),
@@ -81,9 +84,7 @@ describe("seedHeavyUsage SeedAction", () => {
 
     it("returns skipped when personal project exists but has no ACTIVE VK", async () => {
       const prisma = makePrismaMock({
-        personalTeams: [
-          { id: "team_1", projects: [{ id: "proj_persona_1" }] },
-        ],
+        personalTeams: [{ id: "team_1", projects: [{ id: "proj_persona_1" }] }],
         vkByProject: { proj_persona_1: null },
       });
       const outcome = await seedHeavyUsage.run(makeContext(true, prisma));

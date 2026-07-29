@@ -101,7 +101,9 @@ describe("GatewayBudgetService — PRINCIPAL cascade", () => {
   });
 
   afterAll(async () => {
-    await prisma.gatewayBudget.deleteMany({ where: { organizationId: ORG_ID } });
+    await prisma.gatewayBudget.deleteMany({
+      where: { organizationId: ORG_ID },
+    });
     await prisma.virtualKey.deleteMany({
       where: { organizationId: ORG_ID, id: VK_ID },
     });
@@ -111,7 +113,9 @@ describe("GatewayBudgetService — PRINCIPAL cascade", () => {
     await prisma.user.deleteMany({
       where: { id: { in: [ALICE_ID, OUTSIDER_ID, ACTOR_ID] } },
     });
-    await prisma.project.deleteMany({ where: { teamId: TEAM_ID, id: PROJECT_ID } });
+    await prisma.project.deleteMany({
+      where: { teamId: TEAM_ID, id: PROJECT_ID },
+    });
     await prisma.team.deleteMany({
       where: { organizationId: ORG_ID, id: TEAM_ID },
     });
@@ -150,8 +154,12 @@ describe("GatewayBudgetService — PRINCIPAL cascade", () => {
           actorUserId: ACTOR_ID,
         }),
       ).rejects.toMatchObject({
-        code: "BAD_REQUEST",
-        message: expect.stringMatching(/not a member of this organization/i),
+        // Raised by the service, so it arrives as the handled error itself —
+        // there is no tRPC boundary in between to wrap it. Asserted on `code`
+        // and the scope KIND in `meta`; the sentence is copy and the ids it
+        // used to carry belonged to another tenant's records.
+        code: "gateway_scope_org_mismatch",
+        meta: { scopeKind: "user" },
       });
 
       const persisted = await prisma.gatewayBudget.findFirst({

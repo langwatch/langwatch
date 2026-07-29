@@ -16,15 +16,15 @@ import type { Experiment, Project } from "@prisma/client";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
-import { useRouter } from "~/utils/compat/next-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Download, ExternalLink } from "react-feather";
+import { useRouter } from "~/utils/compat/next-router";
 import { Link } from "../../components/ui/link";
 import { Tooltip } from "../../components/ui/tooltip";
+import { useDejaViewLink } from "../../hooks/useDejaViewLink";
 import { FormatMoney } from "../../optimization_studio/components/FormatMoney";
 import { VersionBox } from "../../optimization_studio/components/History";
 import type { AppRouter } from "../../server/api/root";
-import { useDejaViewLink } from "../../hooks/useDejaViewLink";
 import { api } from "../../utils/api";
 import { formatTimeAgo } from "../../utils/formatTimeAgo";
 import { getColorForString } from "../../utils/rotatingColors";
@@ -120,11 +120,7 @@ export function BatchEvaluationV2({
             )}
             {dejaView.href && (
               <Link href={dejaView.href}>
-                <Button
-                  size="sm"
-                  colorPalette="gray"
-                  marginBottom="-6px"
-                >
+                <Button size="sm" colorPalette="gray" marginBottom="-6px">
                   DejaView
                 </Button>
               </Link>
@@ -375,9 +371,7 @@ export function BatchEvaluationV2RunList({
                 }
                 _hover={{
                   background:
-                    selectedRun?.runId === run.runId
-                      ? "gray.200"
-                      : "gray.100",
+                    selectedRun?.runId === run.runId ? "gray.200" : "gray.100",
                 }}
                 onClick={(e) => {
                   e.stopPropagation();

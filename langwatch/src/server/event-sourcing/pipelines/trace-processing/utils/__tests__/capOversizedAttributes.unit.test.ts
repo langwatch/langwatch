@@ -228,22 +228,32 @@ describe("valueExceeds", () => {
   describe("given a stringValue", () => {
     describe("when the string exceeds maxBytes", () => {
       it("returns true", () => {
-        const value = { stringValue: "a".repeat(DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES + 1) };
-        expect(valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES)).toBe(true);
+        const value = {
+          stringValue: "a".repeat(DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES + 1),
+        };
+        expect(valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES)).toBe(
+          true,
+        );
       });
     });
 
     describe("when the string is exactly at the limit", () => {
       it("returns false", () => {
-        const value = { stringValue: "a".repeat(DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES) };
-        expect(valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES)).toBe(false);
+        const value = {
+          stringValue: "a".repeat(DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES),
+        };
+        expect(valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES)).toBe(
+          false,
+        );
       });
     });
 
     describe("when the string is small", () => {
       it("returns false", () => {
         const value = { stringValue: "hello" };
-        expect(valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES)).toBe(false);
+        expect(valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES)).toBe(
+          false,
+        );
       });
     });
   });
@@ -251,15 +261,23 @@ describe("valueExceeds", () => {
   describe("given a bytesValue", () => {
     describe("when the Uint8Array exceeds maxBytes", () => {
       it("returns true", () => {
-        const value = { bytesValue: new Uint8Array(DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES + 1) };
-        expect(valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES)).toBe(true);
+        const value = {
+          bytesValue: new Uint8Array(DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES + 1),
+        };
+        expect(valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES)).toBe(
+          true,
+        );
       });
     });
 
     describe("when the Uint8Array is exactly at the limit", () => {
       it("returns false", () => {
-        const value = { bytesValue: new Uint8Array(DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES) };
-        expect(valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES)).toBe(false);
+        const value = {
+          bytesValue: new Uint8Array(DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES),
+        };
+        expect(valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES)).toBe(
+          false,
+        );
       });
     });
   });
@@ -271,11 +289,15 @@ describe("valueExceeds", () => {
           arrayValue: {
             values: [
               { stringValue: "small" },
-              { stringValue: "x".repeat(DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES + 1) },
+              {
+                stringValue: "x".repeat(DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES + 1),
+              },
             ],
           },
         };
-        expect(valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES)).toBe(true);
+        expect(valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES)).toBe(
+          true,
+        );
       });
     });
 
@@ -283,13 +305,12 @@ describe("valueExceeds", () => {
       it("returns false", () => {
         const value = {
           arrayValue: {
-            values: [
-              { stringValue: "a" },
-              { stringValue: "b" },
-            ],
+            values: [{ stringValue: "a" }, { stringValue: "b" }],
           },
         };
-        expect(valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES)).toBe(false);
+        expect(valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES)).toBe(
+          false,
+        );
       });
     });
   });
@@ -301,11 +322,20 @@ describe("valueExceeds", () => {
           kvlistValue: {
             values: [
               { key: "small", value: { stringValue: "ok" } },
-              { key: "big", value: { stringValue: "z".repeat(DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES + 1) } },
+              {
+                key: "big",
+                value: {
+                  stringValue: "z".repeat(
+                    DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES + 1,
+                  ),
+                },
+              },
             ],
           },
         };
-        expect(valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES)).toBe(true);
+        expect(valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES)).toBe(
+          true,
+        );
       });
     });
 
@@ -319,7 +349,9 @@ describe("valueExceeds", () => {
             ],
           },
         };
-        expect(valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES)).toBe(false);
+        expect(valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES)).toBe(
+          false,
+        );
       });
     });
   });
@@ -330,7 +362,9 @@ describe("valueExceeds", () => {
     });
 
     it("returns false for undefined", () => {
-      expect(valueExceeds(undefined, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES)).toBe(false);
+      expect(valueExceeds(undefined, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES)).toBe(
+        false,
+      );
     });
   });
 });
@@ -423,10 +457,7 @@ describe("hasOversizedAttribute", () => {
             key: "nested.attr",
             value: {
               arrayValue: {
-                values: [
-                  { stringValue: "small" },
-                  { stringValue: big },
-                ],
+                values: [{ stringValue: "small" }, { stringValue: big }],
               },
             },
           },
@@ -450,9 +481,7 @@ describe("hasOversizedAttribute", () => {
                 key: "nested.kv",
                 value: {
                   kvlistValue: {
-                    values: [
-                      { key: "inner", value: { stringValue: big } },
-                    ],
+                    values: [{ key: "inner", value: { stringValue: big } }],
                   },
                 },
               },

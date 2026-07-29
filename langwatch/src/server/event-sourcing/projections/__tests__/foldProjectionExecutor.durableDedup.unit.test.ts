@@ -68,13 +68,15 @@ describe("FoldProjectionExecutor durable dedup", () => {
   }
 
   function appendingApply() {
-    return vi.fn((state: FoldState, event: Event): FoldState => ({
-      ids: [...state.ids, event.id],
-      LastEventOccurredAt: Math.max(
-        state.LastEventOccurredAt,
-        event.occurredAt ?? 0,
-      ),
-    }));
+    return vi.fn(
+      (state: FoldState, event: Event): FoldState => ({
+        ids: [...state.ids, event.id],
+        LastEventOccurredAt: Math.max(
+          state.LastEventOccurredAt,
+          event.occurredAt ?? 0,
+        ),
+      }),
+    );
   }
 
   const contextWith = (
@@ -237,7 +239,10 @@ describe("FoldProjectionExecutor durable dedup", () => {
       /** @scenario a redelivered batch after a committed write does not double-count */
       it("does not apply or store and returns the loaded state", async () => {
         const a = makeEvent("a", 1000);
-        const loadedState: FoldState = { ids: ["a"], LastEventOccurredAt: 1000 };
+        const loadedState: FoldState = {
+          ids: ["a"],
+          LastEventOccurredAt: 1000,
+        };
         const { store, storeFn } = durableStore({
           state: loadedState,
           appliedEventIds: ["a"],

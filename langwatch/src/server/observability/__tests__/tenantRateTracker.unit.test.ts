@@ -1,8 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  TenantRateTracker,
-  tenantIdFromGroupId,
-} from "../tenantRateTracker";
+import { TenantRateTracker, tenantIdFromGroupId } from "../tenantRateTracker";
 
 // Pure helper — no Redis needed.
 describe("tenantIdFromGroupId", () => {
@@ -203,7 +200,10 @@ describe("TenantRateTracker", () => {
     it("round-trips a numeric baseline through Redis", async () => {
       const redis = fakeRedis();
       const tracker = new TenantRateTracker(redis, nowFn);
-      await tracker.setCachedBaseline({ tenantId: "proj_acme", baseline: 42.5 });
+      await tracker.setCachedBaseline({
+        tenantId: "proj_acme",
+        baseline: 42.5,
+      });
       expect(await tracker.getCachedBaseline("proj_acme")).toBeCloseTo(42.5);
     });
 

@@ -71,27 +71,27 @@ describe("ClickHouse metrics", () => {
 
   describe("observeClickHouseQueryDuration", () => {
     it("records query duration for SELECT queries", () => {
-      const observeSpy = vi.spyOn(
+      vi.spyOn(
         metrics.clickhouseQueryDurationHistogram.labels("SELECT", "test_table"),
-        "observe"
+        "observe",
       );
 
       // This won't actually call the spy due to how the module works,
       // but we can verify the function exists and is callable
       expect(() =>
-        metrics.observeClickHouseQueryDuration("SELECT", "test_table", 0.5)
+        metrics.observeClickHouseQueryDuration("SELECT", "test_table", 0.5),
       ).not.toThrow();
     });
 
     it("accepts INSERT query type", () => {
       expect(() =>
-        metrics.observeClickHouseQueryDuration("INSERT", "events", 1.2)
+        metrics.observeClickHouseQueryDuration("INSERT", "events", 1.2),
       ).not.toThrow();
     });
 
     it("accepts OTHER query type", () => {
       expect(() =>
-        metrics.observeClickHouseQueryDuration("OTHER", "system", 0.1)
+        metrics.observeClickHouseQueryDuration("OTHER", "system", 0.1),
       ).not.toThrow();
     });
   });
@@ -99,27 +99,29 @@ describe("ClickHouse metrics", () => {
   describe("incrementClickHouseQueryCount", () => {
     it("increments counter for successful queries", () => {
       expect(() =>
-        metrics.incrementClickHouseQueryCount("SELECT", "success")
+        metrics.incrementClickHouseQueryCount("SELECT", "success"),
       ).not.toThrow();
     });
 
     it("increments counter for failed queries", () => {
       expect(() =>
-        metrics.incrementClickHouseQueryCount("INSERT", "error")
+        metrics.incrementClickHouseQueryCount("INSERT", "error"),
       ).not.toThrow();
     });
   });
 
   describe("setClickHouseTableRows", () => {
     it("sets row count gauge", () => {
-      expect(() => metrics.setClickHouseTableRows("traces", 1000)).not.toThrow();
+      expect(() =>
+        metrics.setClickHouseTableRows("traces", 1000),
+      ).not.toThrow();
     });
   });
 
   describe("setClickHouseTableBytes", () => {
     it("sets byte size gauge", () => {
       expect(() =>
-        metrics.setClickHouseTableBytes("spans", 1024 * 1024)
+        metrics.setClickHouseTableBytes("spans", 1024 * 1024),
       ).not.toThrow();
     });
   });
@@ -143,7 +145,7 @@ describe("ClickHouse metrics", () => {
       const result = await metrics.executeWithMetrics(
         mockQueryFn,
         "SELECT",
-        "test_table"
+        "test_table",
       );
 
       expect(result).toEqual({ data: "result" });
@@ -155,7 +157,7 @@ describe("ClickHouse metrics", () => {
       const mockQueryFn = vi.fn().mockRejectedValue(testError);
 
       await expect(
-        metrics.executeWithMetrics(mockQueryFn, "INSERT", "events")
+        metrics.executeWithMetrics(mockQueryFn, "INSERT", "events"),
       ).rejects.toThrow("Query failed");
 
       expect(mockQueryFn).toHaveBeenCalled();
@@ -175,7 +177,7 @@ describe("ClickHouse metrics", () => {
       } as unknown as ClickHouseClient;
 
       expect(() =>
-        metrics.startStorageStatsCollection(mockClient, 60000)
+        metrics.startStorageStatsCollection(mockClient, 60000),
       ).not.toThrow();
     });
 
@@ -206,7 +208,12 @@ describe("ClickHouse metrics", () => {
       const mockResult = {
         json: vi.fn().mockResolvedValue({
           data: [
-            { table: "traces", total_rows: "100", total_bytes: "1024", parts_count: "2" },
+            {
+              table: "traces",
+              total_rows: "100",
+              total_bytes: "1024",
+              parts_count: "2",
+            },
           ],
         }),
       };
@@ -219,7 +226,7 @@ describe("ClickHouse metrics", () => {
       expect(mockClient.query).toHaveBeenCalledWith(
         expect.objectContaining({
           query: expect.stringContaining("system.parts"),
-        })
+        }),
       );
     });
 
@@ -251,12 +258,18 @@ describe("ClickHouse metrics", () => {
           const diskResult = {
             json: vi.fn().mockResolvedValue({
               data: [
-                { name: "default", total_space: "322122547200", free_space: "214748364800", used_space: "107374182400" },
+                {
+                  name: "default",
+                  total_space: "322122547200",
+                  free_space: "214748364800",
+                  used_space: "107374182400",
+                },
               ],
             }),
           };
           const mockClient = {
-            query: vi.fn()
+            query: vi
+              .fn()
               .mockResolvedValueOnce(partsResult)
               .mockResolvedValueOnce(backupResult)
               .mockResolvedValueOnce(diskResult),
@@ -269,12 +282,12 @@ describe("ClickHouse metrics", () => {
           expect(mockClient.query).toHaveBeenCalledWith(
             expect.objectContaining({
               query: expect.stringContaining("system.backup_log"),
-            })
+            }),
           );
           expect(mockClient.query).toHaveBeenCalledWith(
             expect.objectContaining({
               query: expect.stringContaining("system.disks"),
-            })
+            }),
           );
         });
       });
@@ -285,14 +298,19 @@ describe("ClickHouse metrics", () => {
             json: vi.fn().mockResolvedValue({ data: [] }),
           };
           const mockClient = {
-            query: vi.fn()
+            query: vi
+              .fn()
               .mockResolvedValueOnce(partsResult)
               .mockRejectedValueOnce(new Error("system.backup_log not enabled"))
-              .mockResolvedValueOnce({ json: vi.fn().mockResolvedValue({ data: [] }) }),
+              .mockResolvedValueOnce({
+                json: vi.fn().mockResolvedValue({ data: [] }),
+              }),
           } as unknown as ClickHouseClient;
 
           // Should not throw — backup errors are handled gracefully
-          await expect(metrics.collectStorageStats(mockClient)).resolves.toBeUndefined();
+          await expect(
+            metrics.collectStorageStats(mockClient),
+          ).resolves.toBeUndefined();
         });
       });
     });
@@ -303,35 +321,49 @@ describe("ClickHouse metrics", () => {
       } as unknown as ClickHouseClient;
 
       // Should not throw
-      await expect(metrics.collectStorageStats(mockClient)).resolves.toBeUndefined();
+      await expect(
+        metrics.collectStorageStats(mockClient),
+      ).resolves.toBeUndefined();
     });
   });
 
   describe("backup metric setters", () => {
     it("sets backup last success timestamp without throwing", () => {
-      expect(() => metrics.setClickHouseBackupLastSuccessTimestamp(1711929600)).not.toThrow();
+      expect(() =>
+        metrics.setClickHouseBackupLastSuccessTimestamp(1711929600),
+      ).not.toThrow();
     });
 
     it("sets backup last size bytes without throwing", () => {
-      expect(() => metrics.setClickHouseBackupLastSizeBytes(1073741824)).not.toThrow();
+      expect(() =>
+        metrics.setClickHouseBackupLastSizeBytes(1073741824),
+      ).not.toThrow();
     });
 
     it("sets backup status count without throwing", () => {
-      expect(() => metrics.setClickHouseBackupStatusCount("BACKUP_CREATED", 5)).not.toThrow();
+      expect(() =>
+        metrics.setClickHouseBackupStatusCount("BACKUP_CREATED", 5),
+      ).not.toThrow();
     });
   });
 
   describe("disk metric setters", () => {
     it("sets disk total bytes without throwing", () => {
-      expect(() => metrics.setClickHouseDiskTotalBytes("default", 322122547200)).not.toThrow();
+      expect(() =>
+        metrics.setClickHouseDiskTotalBytes("default", 322122547200),
+      ).not.toThrow();
     });
 
     it("sets disk used bytes without throwing", () => {
-      expect(() => metrics.setClickHouseDiskUsedBytes("default", 107374182400)).not.toThrow();
+      expect(() =>
+        metrics.setClickHouseDiskUsedBytes("default", 107374182400),
+      ).not.toThrow();
     });
 
     it("sets disk free bytes without throwing", () => {
-      expect(() => metrics.setClickHouseDiskFreeBytes("default", 214748364800)).not.toThrow();
+      expect(() =>
+        metrics.setClickHouseDiskFreeBytes("default", 214748364800),
+      ).not.toThrow();
     });
   });
 
@@ -458,7 +490,11 @@ describe("ClickHouse metrics", () => {
           // logger.warn signature is (obj, msg). First failure warns;
           // subsequent failures fall through to debug.
           expect(
-            countCallsMatching(loggerMocks.warn.mock.calls, 1, "system.backup_log"),
+            countCallsMatching(
+              loggerMocks.warn.mock.calls,
+              1,
+              "system.backup_log",
+            ),
           ).toBe(1);
         });
       });
@@ -476,7 +512,11 @@ describe("ClickHouse metrics", () => {
           await metrics.collectStorageStats(client); // fail → warn (#2)
 
           expect(
-            countCallsMatching(loggerMocks.warn.mock.calls, 1, "system.backup_log"),
+            countCallsMatching(
+              loggerMocks.warn.mock.calls,
+              1,
+              "system.backup_log",
+            ),
           ).toBe(2);
           // logger.info("ClickHouse backup stats collection recovered ...")
           // is called with the message as the first arg.

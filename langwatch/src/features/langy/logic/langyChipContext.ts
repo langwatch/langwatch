@@ -110,7 +110,8 @@ export function describeChipContext(
 
     case "automation":
       return {
-        action: "Langy will read this automation — what fires it and what it does.",
+        action:
+          "Langy will read this automation — what fires it and what it does.",
         ...(chip.ref ? { payload: chip.ref } : {}),
       };
 

@@ -33,7 +33,9 @@ export interface CanonicalPointValues {
   quantileValues: Array<{ quantile: number | null; value: number | null }>;
 }
 
-function canonicalQuantiles(value: unknown): CanonicalPointValues["quantileValues"] {
+function canonicalQuantiles(
+  value: unknown,
+): CanonicalPointValues["quantileValues"] {
   if (!Array.isArray(value)) return [];
   return value.map((entry) => {
     const quantile = isRecord(entry) ? entry : {};

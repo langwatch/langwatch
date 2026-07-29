@@ -14,14 +14,14 @@
  * - Cancel batch archive dismisses modal and preserves selection
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import type { Scenario } from "@prisma/client";
 import type { RowSelectionState } from "@tanstack/react-table";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ScenarioTable } from "../ScenarioTable";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { BatchActionBar } from "../BatchActionBar";
 import { ScenarioArchiveDialog } from "../ScenarioArchiveDialog";
+import { ScenarioTable } from "../ScenarioTable";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
@@ -29,7 +29,9 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
 
 const now = new Date();
 
-function makeScenario(overrides: Partial<Scenario> & { id: string; name: string }): Scenario {
+function makeScenario(
+  overrides: Partial<Scenario> & { id: string; name: string },
+): Scenario {
   return {
     projectId: "proj-1",
     situation: "test situation",
@@ -46,11 +48,31 @@ function makeScenario(overrides: Partial<Scenario> & { id: string; name: string 
 }
 
 const scenarios: Scenario[] = [
-  makeScenario({ id: "scen_1", name: "Cross-doc synthesis question", labels: ["doc-qa"] }),
-  makeScenario({ id: "scen_2", name: "SaaS documentation guidance", labels: ["saas"] }),
-  makeScenario({ id: "scen_3", name: "Failed booking escalation", labels: ["booking"] }),
-  makeScenario({ id: "scen_4", name: "Angry double-charge refund", labels: ["billing"] }),
-  makeScenario({ id: "scen_5", name: "HTTP troubleshooting request", labels: ["http"] }),
+  makeScenario({
+    id: "scen_1",
+    name: "Cross-doc synthesis question",
+    labels: ["doc-qa"],
+  }),
+  makeScenario({
+    id: "scen_2",
+    name: "SaaS documentation guidance",
+    labels: ["saas"],
+  }),
+  makeScenario({
+    id: "scen_3",
+    name: "Failed booking escalation",
+    labels: ["booking"],
+  }),
+  makeScenario({
+    id: "scen_4",
+    name: "Angry double-charge refund",
+    labels: ["billing"],
+  }),
+  makeScenario({
+    id: "scen_5",
+    name: "HTTP troubleshooting request",
+    labels: ["http"],
+  }),
 ];
 
 // ============================================================================
@@ -168,8 +190,12 @@ describe("<ScenarioTable/>", () => {
       });
 
       // Only "Angry double-charge refund" should be visible
-      expect(screen.getByText("Angry double-charge refund")).toBeInTheDocument();
-      expect(screen.queryByText("Cross-doc synthesis question")).not.toBeInTheDocument();
+      expect(
+        screen.getByText("Angry double-charge refund"),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByText("Cross-doc synthesis question"),
+      ).not.toBeInTheDocument();
 
       const selectAll = screen.getByLabelText("Select all");
       await user.click(selectAll);
@@ -179,11 +205,13 @@ describe("<ScenarioTable/>", () => {
         expect.objectContaining({ scen_4: true }),
       );
       // Other scenarios should NOT be in the selection
-      const lastCall = onSelectionChange.mock.calls[onSelectionChange.mock.calls.length - 1]![0] as RowSelectionState;
-      expect(lastCall["scen_1"]).toBeUndefined();
-      expect(lastCall["scen_2"]).toBeUndefined();
-      expect(lastCall["scen_3"]).toBeUndefined();
-      expect(lastCall["scen_5"]).toBeUndefined();
+      const lastCall = onSelectionChange.mock.calls[
+        onSelectionChange.mock.calls.length - 1
+      ]![0] as RowSelectionState;
+      expect(lastCall.scen_1).toBeUndefined();
+      expect(lastCall.scen_2).toBeUndefined();
+      expect(lastCall.scen_3).toBeUndefined();
+      expect(lastCall.scen_5).toBeUndefined();
     });
   });
 
@@ -196,7 +224,9 @@ describe("<ScenarioTable/>", () => {
       const user = userEvent.setup();
       renderTable();
 
-      const actionButton = screen.getByLabelText("Actions for Angry double-charge refund");
+      const actionButton = screen.getByLabelText(
+        "Actions for Angry double-charge refund",
+      );
       await user.click(actionButton);
 
       await waitFor(() => {
@@ -209,7 +239,9 @@ describe("<ScenarioTable/>", () => {
       const onArchive = vi.fn();
       renderTable({ onArchive });
 
-      const actionButton = screen.getByLabelText("Actions for Angry double-charge refund");
+      const actionButton = screen.getByLabelText(
+        "Actions for Angry double-charge refund",
+      );
       await user.click(actionButton);
 
       await waitFor(() => {
@@ -236,7 +268,9 @@ describe("<ScenarioTable/>", () => {
       const onSelectionChange = vi.fn();
       renderTable({ onRowSelectionChange: onSelectionChange });
 
-      const checkbox = screen.getByLabelText("Select SaaS documentation guidance");
+      const checkbox = screen.getByLabelText(
+        "Select SaaS documentation guidance",
+      );
       await user.click(checkbox);
 
       expect(onSelectionChange).toHaveBeenCalledWith(
@@ -341,7 +375,9 @@ describe("<ScenarioArchiveDialog/>", () => {
   });
 
   describe("when archiving a single scenario", () => {
-    const singleScenario = [{ id: "scen_4", name: "Angry double-charge refund" }];
+    const singleScenario = [
+      { id: "scen_4", name: "Angry double-charge refund" },
+    ];
 
     it("displays 'Archive scenario?' as the title", async () => {
       render(
@@ -371,7 +407,9 @@ describe("<ScenarioArchiveDialog/>", () => {
       );
 
       await waitFor(() => {
-        expect(screen.getByText("Angry double-charge refund")).toBeInTheDocument();
+        expect(
+          screen.getByText("Angry double-charge refund"),
+        ).toBeInTheDocument();
       });
     });
 
@@ -388,7 +426,9 @@ describe("<ScenarioArchiveDialog/>", () => {
 
       await waitFor(() => {
         expect(
-          screen.getByText("Archived scenarios will no longer appear in the library."),
+          screen.getByText(
+            "Archived scenarios will no longer appear in the library.",
+          ),
         ).toBeInTheDocument();
       });
     });
@@ -512,8 +552,12 @@ describe("<ScenarioArchiveDialog/>", () => {
       );
 
       await waitFor(() => {
-        expect(screen.getByText("Cross-doc synthesis question")).toBeInTheDocument();
-        expect(screen.getByText("Failed booking escalation")).toBeInTheDocument();
+        expect(
+          screen.getByText("Cross-doc synthesis question"),
+        ).toBeInTheDocument();
+        expect(
+          screen.getByText("Failed booking escalation"),
+        ).toBeInTheDocument();
       });
     });
 
@@ -530,7 +574,9 @@ describe("<ScenarioArchiveDialog/>", () => {
 
       await waitFor(() => {
         expect(
-          screen.getByText("Archived scenarios will no longer appear in the library."),
+          screen.getByText(
+            "Archived scenarios will no longer appear in the library.",
+          ),
         ).toBeInTheDocument();
       });
     });

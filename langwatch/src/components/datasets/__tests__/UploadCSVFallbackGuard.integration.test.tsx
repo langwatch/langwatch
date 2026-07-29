@@ -365,12 +365,20 @@ describe("UploadCSVForm 409-fallback size guard", () => {
       await user.upload(input, smallFile);
       await user.click(screen.getByRole("button", { name: /upload/i }));
 
-      // The actionable server error is surfaced verbatim...
+      // The failure is surfaced — in the words a customer gets, not the
+      // server's own. Since #5984 a raw `error.message` is either a code slug
+      // or, as here, internal detail (a filesystem path and an env var), so
+      // the call site reads it through `describeError` under its own headline
+      // ("Something went wrong uploading your file"). Do not restore the
+      // verbatim assertion: relaying the message was the bug.
       await waitFor(() => {
         expect(screen.getByTestId("upload-error")).toHaveTextContent(
-          /LANGWATCH_LOCAL_STORAGE_PATH/,
+          /Something went wrong uploading your file/i,
         );
       });
+      expect(screen.getByTestId("upload-error")).not.toHaveTextContent(
+        /LANGWATCH_LOCAL_STORAGE_PATH/,
+      );
       // ...the orphaned `uploading` row is reaped (slug free for retry)...
       expect(abortPendingUpload).toHaveBeenCalledWith({
         projectId: "proj_1",

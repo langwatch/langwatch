@@ -36,9 +36,8 @@
  * secret — pair it with the public key declared in env-create.mjs.
  */
 import type { PrismaClient } from "@prisma/client";
-
-import { generateLicenseKey } from "../ee/licensing/licenseGenerationService";
 import { prisma as defaultPrisma } from "~/server/db";
+import { generateLicenseKey } from "../ee/licensing/licenseGenerationService";
 
 interface ApplyLicenseInput {
   prisma: PrismaClient;

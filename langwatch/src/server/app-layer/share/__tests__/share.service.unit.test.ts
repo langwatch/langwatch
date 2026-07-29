@@ -20,7 +20,9 @@ import {
 const ORG_ID = "org_1";
 const PROJECT_ID = "project_1";
 
-function buildShare(overrides: Partial<ShareWithProject> = {}): ShareWithProject {
+function buildShare(
+  overrides: Partial<ShareWithProject> = {},
+): ShareWithProject {
   return {
     id: "share_1",
     token: "tok_abc",
@@ -162,7 +164,10 @@ describe("ShareService", () => {
         vi.mocked(repo.findByToken).mockResolvedValue(null);
 
         await expect(
-          service.resolveForViewer({ token: "tok_nope", viewer: buildViewer() }),
+          service.resolveForViewer({
+            token: "tok_nope",
+            viewer: buildViewer(),
+          }),
         ).rejects.toThrow(ShareLinkNotFoundError);
       });
     });
@@ -266,7 +271,9 @@ describe("ShareService", () => {
         await expect(
           service.resolveForViewer({
             token: "tok_abc",
-            viewer: buildViewer({ isOrgMember: vi.fn().mockResolvedValue(false) }),
+            viewer: buildViewer({
+              isOrgMember: vi.fn().mockResolvedValue(false),
+            }),
           }),
         ).rejects.toThrow(ShareLinkForbiddenError);
         expect(repo.consumeView).not.toHaveBeenCalled();
@@ -363,7 +370,10 @@ describe("ShareService", () => {
           vi.mocked(repo.consumeView).mockResolvedValue(false);
 
           await expect(
-            service.resolveForViewer({ token: "tok_abc", viewer: buildViewer() }),
+            service.resolveForViewer({
+              token: "tok_abc",
+              viewer: buildViewer(),
+            }),
           ).rejects.toThrow(ShareLinkExhaustedError);
         });
       });

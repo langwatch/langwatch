@@ -134,17 +134,18 @@ describe("POST /api/internal/gateway/guardrail/check", () => {
   describe("given the directions the data plane actually sends", () => {
     /** @scenario "the endpoint accepts the directions the gateway actually sends" */
     /** @scenario "every contract direction is accepted" */
-    it.each(["request", "response", "stream_chunk"])(
-      "accepts direction %s",
-      async (direction) => {
-        const response = await app.request(
-          signedRequest({ ...basePayload, direction }),
-        );
-        expect(response.status).toBe(200);
-        const body = (await response.json()) as { decision: string };
-        expect(["allow", "block", "modify"]).toContain(body.decision);
-      },
-    );
+    it.each([
+      "request",
+      "response",
+      "stream_chunk",
+    ])("accepts direction %s", async (direction) => {
+      const response = await app.request(
+        signedRequest({ ...basePayload, direction }),
+      );
+      expect(response.status).toBe(200);
+      const body = (await response.json()) as { decision: string };
+      expect(["allow", "block", "modify"]).toContain(body.decision);
+    });
 
     it("rejects the storage enum the schema used to accept", async () => {
       const response = await app.request(

@@ -5,9 +5,9 @@
  */
 
 import { HStack, Text } from "@chakra-ui/react";
-import { Tooltip } from "../ui/tooltip";
-import { Check, X, AlertTriangle, Ban, Loader, Clock } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { AlertTriangle, Ban, Check, Clock, Loader, X } from "lucide-react";
+import { Tooltip } from "../ui/tooltip";
 import type { RunGroupSummary } from "./run-history-transforms";
 
 type RunSummaryCountsProps = {
@@ -33,15 +33,14 @@ function CountBadge({
 }) {
   return (
     <Tooltip content={tooltip}>
-      <HStack
-        gap="4px"
-        paddingX="8px"
-        paddingY="2px"
-        borderRadius="md"
-        bg={bg}
-      >
+      <HStack gap="4px" paddingX="8px" paddingY="2px" borderRadius="md" bg={bg}>
         <Icon size={12} style={{ color: `var(--chakra-colors-${color})` }} />
-        <Text fontSize="xs" fontWeight="semibold" color={color} whiteSpace="nowrap">
+        <Text
+          fontSize="xs"
+          fontWeight="semibold"
+          color={color}
+          whiteSpace="nowrap"
+        >
           {count} {label}
         </Text>
       </HStack>

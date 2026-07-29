@@ -27,7 +27,12 @@ async function shoot(page: Page, name: string, fullPage = false) {
   console.log(`captured ${name}.png`);
 }
 
-async function tryGoto(page: Page, name: string, url: string, waitForText?: string | RegExp) {
+async function tryGoto(
+  page: Page,
+  name: string,
+  url: string,
+  waitForText?: string | RegExp,
+) {
   try {
     const resp = await page.goto(`${BASE_URL}${url}`, {
       waitUntil: "domcontentloaded",
@@ -36,9 +41,16 @@ async function tryGoto(page: Page, name: string, url: string, waitForText?: stri
     const status = resp?.status() ?? 0;
     console.log(`[${name}] ${url} -> ${status}`);
     if (waitForText) {
-      await page.waitForSelector(`text=${waitForText instanceof RegExp ? `/${waitForText.source}/${waitForText.flags}` : waitForText}`, {
-        timeout: 15_000,
-      }).catch((e) => console.log(`[${name}] waitForText timed out: ${e.message}`));
+      await page
+        .waitForSelector(
+          `text=${waitForText instanceof RegExp ? `/${waitForText.source}/${waitForText.flags}` : waitForText}`,
+          {
+            timeout: 15_000,
+          },
+        )
+        .catch((e) =>
+          console.log(`[${name}] waitForText timed out: ${e.message}`),
+        );
     }
     await page.waitForTimeout(1500);
     return status;
@@ -69,8 +81,10 @@ void (async () => {
   await shoot(page, "A1-me-portal-cold", true);
 
   // workspace switcher dropdown
-  const switcherTrigger = page.locator('button[aria-label*="Switch workspace"]').first();
-  if (await switcherTrigger.count() > 0) {
+  const switcherTrigger = page
+    .locator('button[aria-label*="Switch workspace"]')
+    .first();
+  if ((await switcherTrigger.count()) > 0) {
     await switcherTrigger.click();
     await page.waitForTimeout(700);
     await shoot(page, "A2-workspace-switcher");
@@ -87,7 +101,12 @@ void (async () => {
   // ============================================================
   // SECTION B — Govern > AI Gateway (NEW SIDEBAR section)
   // ============================================================
-  await tryGoto(page, "B1-vk-list", `/${PROJECT_SLUG}/gateway/virtual-keys`, /Virtual Keys|Generate|No virtual keys/);
+  await tryGoto(
+    page,
+    "B1-vk-list",
+    `/${PROJECT_SLUG}/gateway/virtual-keys`,
+    /Virtual Keys|Generate|No virtual keys/,
+  );
   await shoot(page, "B1-gateway-virtual-keys-list", true);
 
   await tryGoto(page, "B2-budgets", `/${PROJECT_SLUG}/gateway/budgets`);
@@ -99,15 +118,24 @@ void (async () => {
   // ============================================================
   // SECTION C — Govern > Governance (bird-eye + sub-pages)
   // ============================================================
-  await tryGoto(page, "C1-birdeye", "/settings/governance", /teams shown|Engineering|Marketing|OPEN ANOMALIES/);
+  await tryGoto(
+    page,
+    "C1-birdeye",
+    "/settings/governance",
+    /teams shown|Engineering|Marketing|OPEN ANOMALIES/,
+  );
   await shoot(page, "C1-governance-birdeye", true);
 
   await tryGoto(page, "C2-toolcatalog", "/settings/governance/tool-catalog");
   await shoot(page, "C2-tool-catalog-list", true);
 
   // Click "+ New" or first tile to open drawer
-  const newTileBtn = page.locator('button:has-text("New tile"), button:has-text("+ New"), button:has-text("Add tile")').first();
-  if (await newTileBtn.count() > 0) {
+  const newTileBtn = page
+    .locator(
+      'button:has-text("New tile"), button:has-text("+ New"), button:has-text("Add tile")',
+    )
+    .first();
+  if ((await newTileBtn.count()) > 0) {
     await newTileBtn.click().catch(() => {});
     await page.waitForTimeout(1500);
     await shoot(page, "C2b-tool-catalog-create-drawer", true);
@@ -118,8 +146,12 @@ void (async () => {
   await tryGoto(page, "C3-anomalies", "/settings/governance/anomaly-rules");
   await shoot(page, "C3-anomaly-rules-list", true);
 
-  const newAnomalyBtn = page.locator('button:has-text("+ New"), button:has-text("New rule"), button:has-text("Create rule")').first();
-  if (await newAnomalyBtn.count() > 0) {
+  const newAnomalyBtn = page
+    .locator(
+      'button:has-text("+ New"), button:has-text("New rule"), button:has-text("Create rule")',
+    )
+    .first();
+  if ((await newAnomalyBtn.count()) > 0) {
     await newAnomalyBtn.click().catch(() => {});
     await page.waitForTimeout(1500);
     await shoot(page, "C3b-anomaly-rule-create-drawer", true);
@@ -145,15 +177,24 @@ void (async () => {
   await tryGoto(page, "D3-roles", "/settings/access-audit");
   await shoot(page, "D3-role-bindings", true);
 
-  await tryGoto(page, "D4-auditlog", "/settings/audit-log", /Action|Actor|Target/);
+  await tryGoto(
+    page,
+    "D4-auditlog",
+    "/settings/audit-log",
+    /Action|Actor|Target/,
+  );
   await shoot(page, "D4-audit-log", true);
 
   // ============================================================
   // SECTION E — Tile install drawer (Claude Code from /me catalog)
   // ============================================================
   await tryGoto(page, "E0-me-back", "/me", /Claude Code/);
-  const claudeTile = page.locator('button:has-text("Claude Code"), [data-testid*="claude-code"], div:has-text("Claude Code")').first();
-  if (await claudeTile.count() > 0) {
+  const claudeTile = page
+    .locator(
+      'button:has-text("Claude Code"), [data-testid*="claude-code"], div:has-text("Claude Code")',
+    )
+    .first();
+  if ((await claudeTile.count()) > 0) {
     await claudeTile.click().catch(() => {});
     await page.waitForTimeout(2000);
     await shoot(page, "E1-claude-code-install-drawer", true);

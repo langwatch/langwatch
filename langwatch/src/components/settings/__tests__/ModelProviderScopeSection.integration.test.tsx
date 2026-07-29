@@ -2,22 +2,16 @@
  * @vitest-environment jsdom
  */
 import "@testing-library/jest-dom/vitest";
-import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
-import {
-  cleanup,
-  render,
-  screen,
-  fireEvent,
-  within,
-} from "@testing-library/react";
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { ProviderScopeSection } from "../ModelProviderScopeSection";
+import { cleanup, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   ScopeSelection,
   UseModelProviderFormActions,
   UseModelProviderFormState,
 } from "../../../hooks/useModelProviderForm";
 import type { MaybeStoredModelProvider } from "../../../server/modelProviders/registry";
+import { ProviderScopeSection } from "../ModelProviderScopeSection";
 
 const baseProvider: MaybeStoredModelProvider = {
   provider: "openai",
@@ -92,7 +86,9 @@ describe("Model provider scope — dropdown-only picker", () => {
       <ChakraProvider value={defaultSystem}>
         <ProviderScopeSection
           state={baseState()}
-          actions={{ setScopes: vi.fn() } as unknown as UseModelProviderFormActions}
+          actions={
+            { setScopes: vi.fn() } as unknown as UseModelProviderFormActions
+          }
           provider={baseProvider}
           teamId={undefined}
           organizationId={undefined}

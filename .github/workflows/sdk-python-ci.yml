@@ -20,7 +20,10 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  # Supersede an outdated run on a PR branch, never on main: every commit
+  # that lands on main has to keep its own validation, and cancelling here
+  # would let a merge silently void the run for the commit before it.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   changes:
@@ -36,11 +39,24 @@ jobs:
           # step spends real LLM money, so it must not run on pushes or
           # release PRs that touched nothing under python-sdk/. An SDK
           # release PR still matches via python-sdk/CHANGELOG.md.
+          #
+          # NO NEGATION PATTERNS. dorny/paths-filter ORs a filter's patterns
+          # and evaluates each one independently, so a lone `!x` matches every
+          # path that is not `x` — which is every path. This filter carried
+          # `!python-sdk/src/langwatch/__version__.py` to keep a release-please
+          # version bump from paying for the suite; instead it made `relevant`
+          # true on every PR in the repo, and `test` ran its ~9 minutes on
+          # changes that never touched python-sdk/. Measured on a PR with zero
+          # python-sdk files: `Changes output set to ["relevant"]`.
+          #
+          # The exclusion is not expressible under OR semantics, so it is gone
+          # rather than rewritten: a release PR now runs the suite it was meant
+          # to skip, which costs one run per release instead of one per PR.
+          # specs/ci/path-filters.feature already forbids negation here.
           push-strategy: diff
           filters: |
             relevant:
               - 'python-sdk/**'
-              - '!python-sdk/src/langwatch/__version__.py'
               - '.github/workflows/sdk-python-ci.yml'
 
   test:

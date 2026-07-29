@@ -1,6 +1,6 @@
 /**
  * LangyTurnRelay — the control-plane consumer of one worker→relay frame stream
- * (LANGY_WORKER_REDESIGN_PLAN §0/§0b), the successor to `runTurn`'s streaming
+ * the successor to `runTurn`'s streaming
  * role. One instance per pushed connection (one turn). For each authenticated
  * frame it fans out to two places:
  *
@@ -19,39 +19,39 @@
  * turn, the dedup set); the relay instance itself is stateless beyond a cache.
  */
 import {
-  cliToolResultPayload,
   type CliResultDigest,
   type CliToolResult,
+  cliToolResultPayload,
 } from "@langwatch/langy";
-import { resolveCapabilityProgress } from "~/features/langy/components/capabilities/capabilityRegistry";
 import { env } from "~/env.mjs";
-import type { LangyResourceLinkStore } from "./langyResourceLinks";
+import { resolveCapabilityProgress } from "~/features/langy/components/capabilities/capabilityRegistry";
 import {
   extractPlatformUrl,
   isPreciseResourceHref,
   toRelativeSameOriginHref,
 } from "~/utils/platformHref";
-import { verifyFrame } from "./langyFrameAuth";
+import {
+  isSoleLangwatchInvocation,
+  type LangwatchCommand,
+  parseAllLangwatchCommands,
+  parseLangwatchCommand,
+} from "../execution/langwatchCommand";
 import {
   LangyCliEnvelopeService,
   type LangyToolFrame,
 } from "../execution/langy-cli-envelope.service";
 import {
-  isSoleLangwatchInvocation,
-  parseAllLangwatchCommands,
-  parseLangwatchCommand,
-  type LangwatchCommand,
-} from "../execution/langwatchCommand";
-import {
   langyAgentErrorFromErrorFrame,
   serializeLangyTurnError,
 } from "../execution/langy-turn-errors";
+import { verifyFrame } from "./langyFrameAuth";
 import {
-  langyFrameEnvelopeSchema,
-  langyRelayFrameSchema,
   type LangyFrameEnvelope,
   type LangyRelayFrame,
+  langyFrameEnvelopeSchema,
+  langyRelayFrameSchema,
 } from "./langyRelayFrame";
+import type { LangyResourceLinkStore } from "./langyResourceLinks";
 
 /** The CLI grammar the agent uses to say WHICH resource to open — never an
  * address. `langwatch navigate open <resourceId>`; the platform resolves
@@ -140,9 +140,21 @@ function collectItemPlatformLinks(
 
 /** The slice of the token buffer the relay writes (the live edge). */
 export interface LangyRelayBuffer {
-  appendChunk(a: { conversationId: string; turnId: string; text: string }): Promise<void>;
-  appendReasoning(a: { conversationId: string; turnId: string; text: string }): Promise<void>;
-  appendStatus(a: { conversationId: string; turnId: string; status: string }): Promise<void>;
+  appendChunk(a: {
+    conversationId: string;
+    turnId: string;
+    text: string;
+  }): Promise<void>;
+  appendReasoning(a: {
+    conversationId: string;
+    turnId: string;
+    text: string;
+  }): Promise<void>;
+  appendStatus(a: {
+    conversationId: string;
+    turnId: string;
+    status: string;
+  }): Promise<void>;
   appendProgress(a: {
     conversationId: string;
     turnId: string;
@@ -174,7 +186,11 @@ export interface LangyRelayBuffer {
     result?: CliToolResult;
   }): Promise<void>;
   markEnd(a: { conversationId: string; turnId: string }): Promise<void>;
-  markError(a: { conversationId: string; turnId: string; error: string }): Promise<void>;
+  markError(a: {
+    conversationId: string;
+    turnId: string;
+    error: string;
+  }): Promise<void>;
   heartbeat(a: { conversationId: string; turnId: string }): Promise<void>;
   appendNavigate(a: {
     conversationId: string;
@@ -185,7 +201,10 @@ export interface LangyRelayBuffer {
 
 /** The slice of the conversation service the relay dispatches durable events through. */
 export interface LangyRelayConversations {
-  getRunToken(a: { projectId: string; conversationId: string }): Promise<string | null>;
+  getRunToken(a: {
+    projectId: string;
+    conversationId: string;
+  }): Promise<string | null>;
   recordToolCallStarted(a: {
     projectId: string;
     conversationId: string;
@@ -287,7 +306,10 @@ export interface LangyTurnRelayDeps {
     projectId: string;
     resourceId: string;
   }) => Promise<string | null>;
-  logger?: { warn(o: unknown, m: string): void; debug?(o: unknown, m: string): void };
+  logger?: {
+    warn(o: unknown, m: string): void;
+    debug?(o: unknown, m: string): void;
+  };
 }
 
 export type LangyRelayRejection =
@@ -381,7 +403,9 @@ export class LangyTurnRelay {
     });
     if (!fresh) return { status: "duplicate" };
 
-    const frameParse = langyRelayFrameSchema.safeParse(safeJson(envelope.payload));
+    const frameParse = langyRelayFrameSchema.safeParse(
+      safeJson(envelope.payload),
+    );
     if (!frameParse.success) {
       return this.reject({ reason: "invalid-payload", envelope });
     }
@@ -569,7 +593,9 @@ export class LangyTurnRelay {
           turnId,
           status: "completed",
           ...(frame.text !== undefined ? { text: frame.text } : {}),
-          ...(frame.toolCalls !== undefined ? { toolCalls: frame.toolCalls } : {}),
+          ...(frame.toolCalls !== undefined
+            ? { toolCalls: frame.toolCalls }
+            : {}),
         });
         return { status: "terminal" };
 
@@ -707,8 +733,12 @@ export class LangyTurnRelay {
         ...(call.isError !== undefined ? { isError: call.isError } : {}),
         ...(frame.command !== undefined ? { command: frame.command } : {}),
         ...(call.input !== undefined ? { input: call.input } : {}),
-        ...(frame.durationMs !== undefined ? { durationMs: frame.durationMs } : {}),
-        ...(call.isError && call.output !== undefined ? { errorText: call.output } : {}),
+        ...(frame.durationMs !== undefined
+          ? { durationMs: frame.durationMs }
+          : {}),
+        ...(call.isError && call.output !== undefined
+          ? { errorText: call.output }
+          : {}),
       });
     }
     return { status: "applied" };

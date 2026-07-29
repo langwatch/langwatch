@@ -11,7 +11,10 @@ import {
   applySpanToSummary,
   TraceSummaryFoldProjection,
 } from "../traceSummary.foldProjection";
-import { createInitState, createTestSpan } from "./fixtures/trace-summary-test.fixtures";
+import {
+  createInitState,
+  createTestSpan,
+} from "./fixtures/trace-summary-test.fixtures";
 
 function makeTraceNameChangedEvent({
   newName,
@@ -104,7 +107,10 @@ describe("applySpanToSummary() trace name extraction", () => {
         startTimeUnixMs: 1500,
       });
 
-      let state = applySpanToSummary({ state: createInitState(), span: rootSpan });
+      let state = applySpanToSummary({
+        state: createInitState(),
+        span: rootSpan,
+      });
       state = applySpanToSummary({ state, span: childSpan });
 
       expect(state.traceName).toBe("OrderAgent");
@@ -133,7 +139,10 @@ describe("applySpanToSummary() trace name extraction", () => {
       // its name immediately rather than leaving the trace anonymous.
       // The fold projection is incremental so a later real root can
       // still take over.
-      let state = applySpanToSummary({ state: createInitState(), span: childSpan });
+      let state = applySpanToSummary({
+        state: createInitState(),
+        span: childSpan,
+      });
       expect(state.traceName).toBe("child-operation");
       expect(state.traceNameFromFallback).toBe(true);
 
@@ -163,7 +172,10 @@ describe("applySpanToSummary() trace name extraction", () => {
       });
 
       // Process later root first
-      let state = applySpanToSummary({ state: createInitState(), span: laterRoot });
+      let state = applySpanToSummary({
+        state: createInitState(),
+        span: laterRoot,
+      });
       expect(state.traceName).toBe("manual-handler");
 
       // Earlier root arrives second — trace name is sticky, but the
@@ -191,7 +203,10 @@ describe("applySpanToSummary() trace name extraction", () => {
       });
 
       // Process earlier root first
-      let state = applySpanToSummary({ state: createInitState(), span: earlierRoot });
+      let state = applySpanToSummary({
+        state: createInitState(),
+        span: earlierRoot,
+      });
       expect(state.traceName).toBe("auto-instrumented-GET");
 
       // Later root arrives — should NOT overwrite
@@ -217,7 +232,10 @@ describe("applySpanToSummary() trace name extraction", () => {
       });
 
       // Empty-name root arrives first
-      let state = applySpanToSummary({ state: createInitState(), span: emptyNameRoot });
+      let state = applySpanToSummary({
+        state: createInitState(),
+        span: emptyNameRoot,
+      });
       expect(state.traceName).toBe("");
 
       // Named root arrives later — should upgrade from empty
@@ -242,7 +260,10 @@ describe("applySpanToSummary() trace name extraction", () => {
         startTimeUnixMs: 2000,
       });
 
-      let state = applySpanToSummary({ state: createInitState(), span: namedRoot });
+      let state = applySpanToSummary({
+        state: createInitState(),
+        span: namedRoot,
+      });
       expect(state.traceName).toBe("OrderAgent");
 
       // Later empty-named root should NOT overwrite
@@ -266,7 +287,9 @@ describe("applySpanToSummary() trace name extraction", () => {
 
       state = projection.apply(
         state,
-        makeTraceNameChangedEvent({ newName: "Customer support — high priority" }),
+        makeTraceNameChangedEvent({
+          newName: "Customer support — high priority",
+        }),
       );
 
       expect(state.traceName).toBe("Customer support — high priority");
@@ -286,7 +309,10 @@ describe("applySpanToSummary() trace name extraction", () => {
         name: "auto-instrumented-GET",
         startTimeUnixMs: 2000,
       });
-      let state = applySpanToSummary({ state: createInitState(), span: lateRoot });
+      let state = applySpanToSummary({
+        state: createInitState(),
+        span: lateRoot,
+      });
       expect(state.traceName).toBe("auto-instrumented-GET");
 
       state = projection.apply(
@@ -377,7 +403,10 @@ describe("applySpanToSummary() trace name extraction", () => {
         startTimeUnixMs: 1000,
       });
 
-      const state = applySpanToSummary({ state: createInitState(), span: onlySpan });
+      const state = applySpanToSummary({
+        state: createInitState(),
+        span: onlySpan,
+      });
 
       expect(state.traceName).toBe("RequirementsShredding");
       expect(state.traceNameFromFallback).toBe(true);
@@ -402,7 +431,10 @@ describe("applySpanToSummary() trace name extraction", () => {
       });
 
       // Later span lands first, claims the fallback.
-      let state = applySpanToSummary({ state: createInitState(), span: laterSpan });
+      let state = applySpanToSummary({
+        state: createInitState(),
+        span: laterSpan,
+      });
       expect(state.traceName).toBe("LangGraph");
       expect(state.traceNameFromFallback).toBe(true);
 
@@ -430,7 +462,10 @@ describe("applySpanToSummary() trace name extraction", () => {
         startTimeUnixMs: 5000,
       });
 
-      let state = applySpanToSummary({ state: createInitState(), span: earlySpan });
+      let state = applySpanToSummary({
+        state: createInitState(),
+        span: earlySpan,
+      });
       state = applySpanToSummary({ state, span: lateSpan });
 
       // The earlier span stays the fallback — newer non-root span can't
@@ -457,7 +492,10 @@ describe("applySpanToSummary() trace name extraction", () => {
         startTimeUnixMs: 2000,
       });
 
-      let state = applySpanToSummary({ state: createInitState(), span: fallbackSpan });
+      let state = applySpanToSummary({
+        state: createInitState(),
+        span: fallbackSpan,
+      });
       expect(state.traceNameFromFallback).toBe(true);
 
       // A real root arrives *later in time* than the fallback span, but

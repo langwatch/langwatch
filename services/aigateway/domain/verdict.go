@@ -14,17 +14,39 @@ const (
 // BudgetWarning names one budget scope that is close enough to its limit for
 // the caller to be told about it while the request still goes through.
 type BudgetWarning struct {
-	// Scope is the budget's scope kind: org, team, project, virtual_key, principal.
+	// Scope is the budget's scope kind: org, team, project, virtual_key,
+	// principal, group.
 	Scope string
+	// ProviderKey is the ModelProvider row id the budget is filtered to,
+	// empty for budgets that count every provider. Carried so the warning
+	// names WHICH budget is running out when several share a scope kind.
+	ProviderKey string
 	// PctUsed is the share of the limit already spent, truncated to a whole
 	// percent.
 	PctUsed int
 }
 
 // String renders the warning in the wire shape the X-LangWatch-Budget-Warning
-// header carries: "<scope>:<pct>", e.g. "project:95".
+// header carries: "<scope>:<pct>", e.g. "project:95". A provider-filtered
+// budget qualifies the scope segment as "<scope>/<modelProviderId>" (e.g.
+// "project/mp_01H:95"); the pct still sits after the only colon, so clients
+// splitting on ":" keep parsing.
 func (w BudgetWarning) String() string {
-	return w.Scope + ":" + strconv.Itoa(w.PctUsed)
+	scope := w.Scope
+	if w.ProviderKey != "" {
+		scope += "/" + w.ProviderKey
+	}
+	return scope + ":" + strconv.Itoa(w.PctUsed)
+}
+
+// ExcludedProvider is one provider removed from a request's candidate chain
+// because a provider-filtered blocking budget on it is out of money, paired
+// with that budget so an emptied chain can name what emptied it.
+type ExcludedProvider struct {
+	// ProviderKey is the ModelProvider row id dispatch must not use.
+	ProviderKey string
+	// Budget is the exhausted budget that excluded the provider.
+	Budget BudgetScope
 }
 
 // BudgetDecision is the outcome of a budget precheck: whether the request may
@@ -33,6 +55,17 @@ func (w BudgetWarning) String() string {
 type BudgetDecision struct {
 	Verdict  BudgetVerdict
 	Warnings []BudgetWarning
+
+	// BlockedBy is the budget that produced a BudgetBlock verdict, so the
+	// rejection can name it. Nil unless Verdict is BudgetBlock.
+	BlockedBy *BudgetScope
+
+	// ExcludedProviders lists providers that breached provider-filtered
+	// blocking budgets. They are removed from the request's candidate chain
+	// like unavailable providers (contract §4.6): the request still goes
+	// through when another candidate remains, and blocks naming the budget
+	// only when the chain empties.
+	ExcludedProviders []ExcludedProvider
 }
 
 // GuardrailAction is the guardrail decision.
@@ -92,6 +125,15 @@ type AITraceParams struct {
 	// the idempotency key for the CH-fold debit row; replays collapse on the
 	// ReplacingMergeTree's (TenantId, BudgetId, GatewayRequestId) ORDER BY.
 	GatewayRequestID string
+
+	// ModelProviderID is the ModelProvider row id of the provider the request
+	// was actually dispatched to (the credential that served it, or the last
+	// one tried when every attempt failed). Stamped on the customer span as
+	// langwatch.model_provider_id so the control plane's trace fold can debit
+	// provider-filtered budgets; without it those budgets never accrue.
+	// Empty when nothing was dispatched, in which case the fold debits
+	// unfiltered budgets only. Contract §4.5.
+	ModelProviderID string
 
 	// VKTags are the VK's operator-assigned tags, stamped on the customer
 	// span as langwatch.labels so the trace pipeline ingests them into

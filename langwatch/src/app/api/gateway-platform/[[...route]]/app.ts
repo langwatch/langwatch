@@ -15,11 +15,11 @@
  */
 
 import { createLogger } from "@langwatch/observability";
-import type { Prisma } from "@prisma/client";
 import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi/zod";
 import { z } from "zod";
 import { apiKeyPermission, createProjectApp } from "~/server/api/security";
+import { validator as zValidator } from "~/server/api/validation";
 import { prisma } from "~/server/db";
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
 import { GatewayCacheRuleService } from "~/server/gateway/cacheRule.service";
@@ -50,6 +50,10 @@ const virtualKeyDtoSchema = z.object({
   description: z.string().nullable(),
   status: z.enum(["active", "revoked"]),
   principal_user_id: z.string().nullable(),
+  // Where an org- or team-owned key's traces and costs land. Not a
+  // scope: it grants no access to the key.
+  trace_project_id: z.string().nullable(),
+  routing_mode: z.enum(["NONE", "FALLBACK_ALL", "POLICY"]),
   provider_credential_ids: z.array(z.string()),
   revision: z.string(),
   last_used_at: z.string().nullable(),
@@ -67,6 +71,9 @@ const budgetDtoSchema = z.object({
   on_breach: z.enum(["BLOCK", "WARN"]),
   limit_usd: z.string(),
   spent_usd: z.string(),
+  // Null counts every provider; set, only dispatches to that provider
+  // debit this budget.
+  provider_key: z.string().nullable(),
   resets_at: z.string(),
   archived_at: z.string().nullable(),
 });
@@ -170,6 +177,9 @@ const createBudgetSchema = z.object({
     z.object({ kind: z.literal("PROJECT"), project_id: z.string() }),
     z.object({ kind: z.literal("VIRTUAL_KEY"), virtual_key_id: z.string() }),
     z.object({ kind: z.literal("PRINCIPAL"), principal_user_id: z.string() }),
+    // Per member of the group, not a shared pot. Requires the
+    // ClickHouse spend path; refused otherwise.
+    z.object({ kind: z.literal("GROUP"), group_id: z.string() }),
   ]),
   name: z.string().min(1).max(128),
   description: z.string().optional(),
@@ -177,6 +187,9 @@ const createBudgetSchema = z.object({
   limit_usd: z.number().positive().or(z.string()),
   on_breach: z.enum(["BLOCK", "WARN"]).optional(),
   timezone: z.string().nullable().optional(),
+  // Filter the budget to a single model provider; null or omitted
+  // counts every provider.
+  provider_key: z.string().nullable().optional(),
 });
 
 const toVkDto = toVirtualKeySnakeDto;
@@ -576,6 +589,7 @@ secured.access(apiKeyPermission("gatewayBudgets:view")).get(
         on_breach: b.onBreach,
         limit_usd: b.limitUsd.toString(),
         spent_usd: b.spentUsd.toString(),
+        provider_key: b.providerKey,
         resets_at: b.resetsAt.toISOString(),
         archived_at: b.archivedAt?.toISOString() ?? null,
       })),
@@ -588,7 +602,7 @@ secured.access(apiKeyPermission("gatewayBudgets:create")).post(
   describeRoute({
     summary: "Create budget",
     description:
-      "Creates an organization-owned budget. The scope discriminates which resource the budget covers (organization / team / project / virtual_key / principal).",
+      "Creates an organization-owned budget. The scope discriminates which resource the budget covers (organization / team / project / group / virtual_key / principal); group budgets cap each member individually.",
     tags: ["Budgets"],
     responses: {
       ...baseResponses,
@@ -608,21 +622,14 @@ secured.access(apiKeyPermission("gatewayBudgets:create")).post(
       },
     },
   }),
+  zValidator("json", createBudgetSchema),
   async (c) => {
     const project = c.get("project");
-    const body = createBudgetSchema.safeParse(await c.req.json());
-    if (!body.success) {
-      return c.json(
-        {
-          error: {
-            type: "bad_request",
-            code: "validation_error",
-            message: body.error.message,
-          },
-        },
-        400,
-      );
-    }
+    const body = {
+      data: c.req.valid("json" as never) as import("zod").infer<
+        typeof createBudgetSchema
+      >,
+    };
     const organizationId = await orgIdForProject(project.id);
     const service = GatewayBudgetService.create(prisma);
     const row = await service.create({
@@ -634,6 +641,7 @@ secured.access(apiKeyPermission("gatewayBudgets:create")).post(
       limitUsd: body.data.limit_usd,
       onBreach: body.data.on_breach,
       timezone: body.data.timezone ?? null,
+      providerKey: body.data.provider_key ?? null,
       actorUserId: machineActorForProject(project.id),
     });
     return c.json({ budget: toBudgetDto(row) }, 201);
@@ -1044,6 +1052,7 @@ function toBudgetDto(b: import("@prisma/client").GatewayBudget) {
     on_breach: b.onBreach,
     limit_usd: b.limitUsd.toString(),
     spent_usd: b.spentUsd.toString(),
+    provider_key: b.providerKey,
     timezone: b.timezone,
     current_period_started_at: b.currentPeriodStartedAt.toISOString(),
     resets_at: b.resetsAt.toISOString(),
@@ -1067,6 +1076,8 @@ function scopeFromWire(
       return { kind: "VIRTUAL_KEY", virtualKeyId: scope.virtual_key_id };
     case "PRINCIPAL":
       return { kind: "PRINCIPAL", principalUserId: scope.principal_user_id };
+    case "GROUP":
+      return { kind: "GROUP", groupId: scope.group_id };
   }
 }
 

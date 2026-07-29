@@ -5,11 +5,11 @@
  * Feature: specs/features/experiments-v3/thread-variables-in-trace-evaluator.feature
  */
 import { describe, expect, it } from "vitest";
-import {
-  getTraceAvailableSources,
-  getThreadAvailableSources,
-} from "../tracesMapping";
 import { hasThreadMappings } from "~/server/evaluations/threadMappingResolver";
+import {
+  getThreadAvailableSources,
+  getTraceAvailableSources,
+} from "../tracesMapping";
 
 describe("Feature: Thread variables available in trace-level evaluator input mapping", () => {
   describe("getTraceAvailableSources()", () => {

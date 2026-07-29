@@ -69,7 +69,9 @@ describe("useHomeDevState()", () => {
       act(() => setHomeDevState("empty"));
 
       expect(result.current).toBeNull();
-      expect(window.localStorage.getItem("langwatch:dev:home-state")).toBeNull();
+      expect(
+        window.localStorage.getItem("langwatch:dev:home-state"),
+      ).toBeNull();
     });
   });
 });

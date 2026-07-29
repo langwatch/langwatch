@@ -1,8 +1,8 @@
-import { z } from "zod";
-import { TRPCError } from "@trpc/server";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
-import { encrypt } from "~/utils/encryption";
+import { TRPCError } from "@trpc/server";
+import { z } from "zod";
 import { RESERVED_PROJECT_SECRET_NAMES } from "~/server/projects/reserved-secret-names";
+import { encrypt } from "~/utils/encryption";
 import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
@@ -19,7 +19,7 @@ const secretNameSchema = z
   .min(1, "Secret name is required")
   .regex(
     SECRET_NAME_REGEX,
-    "Secret name must contain only uppercase letters, digits, and underscores, and must start with a letter"
+    "Secret name must contain only uppercase letters, digits, and underscores, and must start with a letter",
   );
 
 /**
@@ -73,8 +73,11 @@ export const secretsRouter = createTRPCRouter({
       z.object({
         projectId: z.string(),
         name: secretNameSchema,
-        value: z.string().min(1, "Secret value is required").max(10_000, "Secret value is too long"),
-      })
+        value: z
+          .string()
+          .min(1, "Secret value is required")
+          .max(10_000, "Secret value is too long"),
+      }),
     )
     .use(checkProjectPermission("secrets:manage"))
     .mutation(async ({ ctx, input }) => {
@@ -136,8 +139,11 @@ export const secretsRouter = createTRPCRouter({
       z.object({
         projectId: z.string(),
         secretId: z.string(),
-        value: z.string().min(1, "Secret value is required").max(10_000, "Secret value is too long"),
-      })
+        value: z
+          .string()
+          .min(1, "Secret value is required")
+          .max(10_000, "Secret value is too long"),
+      }),
     )
     .use(checkProjectPermission("secrets:manage"))
     .mutation(async ({ ctx, input }) => {
@@ -178,7 +184,7 @@ export const secretsRouter = createTRPCRouter({
       z.object({
         projectId: z.string(),
         secretId: z.string(),
-      })
+      }),
     )
     .use(checkProjectPermission("secrets:manage"))
     .mutation(async ({ ctx, input }) => {

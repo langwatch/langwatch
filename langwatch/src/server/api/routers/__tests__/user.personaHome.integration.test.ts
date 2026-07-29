@@ -19,19 +19,18 @@ import {
 } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-
-import { prisma } from "../../../db";
-import { appRouter } from "../../root";
-import { createInnerTRPCContext } from "../../trpc";
-import { createTestApp } from "../../../app-layer/presets";
-import { globalForApp, resetApp } from "../../../app-layer/app";
-import { PlanProviderService } from "../../../app-layer/subscription/plan-provider";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import type { PlanInfo } from "../../../../../ee/licensing/planInfo";
+import { globalForApp, resetApp } from "../../../app-layer/app";
+import { createTestApp } from "../../../app-layer/presets";
+import { PlanProviderService } from "../../../app-layer/subscription/plan-provider";
+import { prisma } from "../../../db";
 import {
   startTestContainers,
   stopTestContainers,
 } from "../../../event-sourcing/__tests__/integration/testContainers";
+import { appRouter } from "../../root";
+import { createInnerTRPCContext } from "../../trpc";
 
 describe("user.persona-home customization integration", () => {
   const ns = `phome-${nanoid(8)}`;
@@ -40,8 +39,6 @@ describe("user.persona-home customization integration", () => {
   const USER_EMAIL = `${ns}@example.com`;
 
   let caller: ReturnType<typeof appRouter.createCaller>;
-  let appProjectAlphaId: string;
-  let appProjectBetaId: string;
 
   beforeAll(async () => {
     await startTestContainers();
@@ -95,7 +92,7 @@ describe("user.persona-home customization integration", () => {
     // Two app-kind projects (one updated more recently than the other) +
     // one hidden internal_governance project that MUST be excluded from
     // the userProjects response.
-    const alpha = await prisma.project.create({
+    await prisma.project.create({
       data: {
         id: `proj-alpha-${ns}`,
         name: "Alpha Service",
@@ -108,8 +105,7 @@ describe("user.persona-home customization integration", () => {
         updatedAt: new Date("2026-04-01T00:00:00Z"),
       },
     });
-    appProjectAlphaId = alpha.id;
-    const beta = await prisma.project.create({
+    await prisma.project.create({
       data: {
         id: `proj-beta-${ns}`,
         name: "Beta Pipeline",
@@ -122,7 +118,6 @@ describe("user.persona-home customization integration", () => {
         updatedAt: new Date("2026-05-01T00:00:00Z"),
       },
     });
-    appProjectBetaId = beta.id;
     await prisma.project.create({
       data: {
         id: `proj-hidden-${ns}`,

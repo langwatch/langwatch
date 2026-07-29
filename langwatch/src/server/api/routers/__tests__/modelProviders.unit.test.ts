@@ -5,8 +5,8 @@ import { customModelUpdateInputSchema } from "../../../modelProviders/customMode
 import type { MaybeStoredModelProvider } from "../../../modelProviders/registry";
 import {
   getModelMetadataForFrontend,
-  mergeCustomModelMetadata,
   type ModelMetadataForFrontend,
+  mergeCustomModelMetadata,
   prepareLitellmParams,
 } from "../modelProviders";
 

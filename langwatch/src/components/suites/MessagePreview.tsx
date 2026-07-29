@@ -190,26 +190,37 @@ export function MessagePreview({
     >
       {(messages ?? []).slice(-PREVIEW_TAIL_LENGTH).map((message, index) => {
         // Tool call indicators (assistant messages with tool_calls or toolCalls)
-        const toolCalls = ("tool_calls" in message && message.tool_calls)
-          ? message.tool_calls
-          : ("toolCalls" in message && (message as Record<string, unknown>).toolCalls)
-            ? (message as Record<string, unknown>).toolCalls as Array<{ function?: { name?: string } }>
-            : null;
+        const toolCalls =
+          "tool_calls" in message && message.tool_calls
+            ? message.tool_calls
+            : "toolCalls" in message &&
+                (message as Record<string, unknown>).toolCalls
+              ? ((message as Record<string, unknown>).toolCalls as Array<{
+                  function?: { name?: string };
+                }>)
+              : null;
         if (toolCalls) {
-          return toolCalls.map((tc: { function?: { name?: string } }, tcIdx: number) => (
-            <HStack
-              key={`${message.id ?? index}-tc-${tcIdx}`}
-              alignSelf="flex-start"
-              gap={1}
-            >
-              <Box color="orange.fg">
-                <Settings size={10} />
-              </Box>
-              <Text fontSize="2xs" color="orange.fg" fontWeight="medium" lineClamp={1}>
-                {tc.function?.name ?? "tool"}
-              </Text>
-            </HStack>
-          ));
+          return toolCalls.map(
+            (tc: { function?: { name?: string } }, tcIdx: number) => (
+              <HStack
+                key={`${message.id ?? index}-tc-${tcIdx}`}
+                alignSelf="flex-start"
+                gap={1}
+              >
+                <Box color="orange.fg">
+                  <Settings size={10} />
+                </Box>
+                <Text
+                  fontSize="2xs"
+                  color="orange.fg"
+                  fontWeight="medium"
+                  lineClamp={1}
+                >
+                  {tc.function?.name ?? "tool"}
+                </Text>
+              </HStack>
+            ),
+          );
         }
 
         // Tool results

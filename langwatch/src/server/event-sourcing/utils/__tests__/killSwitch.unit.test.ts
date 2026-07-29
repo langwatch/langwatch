@@ -1,9 +1,6 @@
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import {
-  generateKillSwitchKey,
-  isComponentDisabled,
-} from "../killSwitch";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AggregateType } from "../../domain/aggregateType";
+import { generateKillSwitchKey, isComponentDisabled } from "../killSwitch";
 
 const TEST_AGGREGATE_TYPE = "trace" as AggregateType;
 
@@ -41,7 +38,11 @@ describe("generateKillSwitchKey", () => {
 
   it("works with mapProjection componentType", () => {
     expect(
-      generateKillSwitchKey(TEST_AGGREGATE_TYPE, "mapProjection", "spanStorage"),
+      generateKillSwitchKey(
+        TEST_AGGREGATE_TYPE,
+        "mapProjection",
+        "spanStorage",
+      ),
     ).toBe("es-trace-mapProjection-spanStorage-killswitch");
   });
 });

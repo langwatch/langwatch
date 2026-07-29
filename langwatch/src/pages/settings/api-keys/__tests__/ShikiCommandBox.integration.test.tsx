@@ -214,22 +214,18 @@ describe("<ShikiCommandBox />", () => {
         // Toggle reveal multiple times rapidly
         const eyeBtn = screen.getByRole("button", { name: /show/i });
         fireEvent.click(eyeBtn);
-        await waitFor(() =>
-          screen.getByRole("button", { name: /hide/i }),
-        );
+        await waitFor(() => screen.getByRole("button", { name: /hide/i }));
         const hideBtn = screen.getByRole("button", { name: /hide/i });
         fireEvent.click(hideBtn);
-        await waitFor(() =>
-          screen.getByRole("button", { name: /show/i }),
-        );
+        await waitFor(() => screen.getByRole("button", { name: /show/i }));
         const eyeBtn2 = screen.getByRole("button", { name: /show/i });
         fireEvent.click(eyeBtn2);
-        await waitFor(() =>
-          screen.getByRole("button", { name: /hide/i }),
-        );
+        await waitFor(() => screen.getByRole("button", { name: /hide/i }));
 
         // Total calls must be at most 2 (one for masked, one for unmasked)
-        expect(spy.mock.calls.length).toBeLessThanOrEqual(callCountAfterMount + 1);
+        expect(spy.mock.calls.length).toBeLessThanOrEqual(
+          callCountAfterMount + 1,
+        );
       });
     });
   });
@@ -293,7 +289,9 @@ describe("<ShikiCommandBox />", () => {
 
         await waitFor(() => {
           const revealBtn = screen.getByRole("button", { name: /show/i });
-          const copyBtn = screen.getByRole("button", { name: /^Copy command$/i });
+          const copyBtn = screen.getByRole("button", {
+            name: /^Copy command$/i,
+          });
           expect(revealBtn).toBeInTheDocument();
           expect(copyBtn).toBeInTheDocument();
         });
@@ -320,7 +318,9 @@ describe("<ShikiCommandBox />", () => {
 
         vi.useFakeTimers();
         try {
-          const copyBtn = screen.getByRole("button", { name: /^Copy command$/i });
+          const copyBtn = screen.getByRole("button", {
+            name: /^Copy command$/i,
+          });
           fireEvent.click(copyBtn);
 
           // After click: button flips to copied (success-flash) state.

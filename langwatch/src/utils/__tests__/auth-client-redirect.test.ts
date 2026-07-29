@@ -36,9 +36,9 @@ describe("safeRedirectTarget", () => {
     });
 
     it("allows nested paths with query and hash", () => {
-      expect(
-        safeRedirectTarget("/dashboard?org=acme#section", ORIGIN),
-      ).toBe("/dashboard?org=acme#section");
+      expect(safeRedirectTarget("/dashboard?org=acme#section", ORIGIN)).toBe(
+        "/dashboard?org=acme#section",
+      );
     });
   });
 
@@ -79,9 +79,9 @@ describe("safeRedirectTarget", () => {
     });
 
     it("blocks a subdomain of the same root domain", () => {
-      expect(
-        safeRedirectTarget("https://evil.app.example.com/", ORIGIN),
-      ).toBe("/");
+      expect(safeRedirectTarget("https://evil.app.example.com/", ORIGIN)).toBe(
+        "/",
+      );
     });
   });
 
@@ -125,10 +125,7 @@ describe("safeRedirectTarget", () => {
 
     it("blocks data: URLs", () => {
       expect(
-        safeRedirectTarget(
-          "data:text/html,<script>alert(1)</script>",
-          ORIGIN,
-        ),
+        safeRedirectTarget("data:text/html,<script>alert(1)</script>", ORIGIN),
       ).toBe("/");
     });
 

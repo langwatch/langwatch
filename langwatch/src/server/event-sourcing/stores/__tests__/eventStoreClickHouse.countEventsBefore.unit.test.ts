@@ -1,6 +1,6 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { type AggregateType } from "../../";
+import type { AggregateType } from "../../";
 import { createTenantId } from "../../domain/tenantId";
 import { EventStoreClickHouse } from "../eventStoreClickHouse";
 import { EventRepositoryClickHouse } from "../repositories/eventRepositoryClickHouse";

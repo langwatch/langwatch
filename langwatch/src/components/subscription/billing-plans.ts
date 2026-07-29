@@ -6,21 +6,21 @@
  */
 
 import { Currency } from "@prisma/client";
-import { UNLIMITED_MESSAGES } from "../../../ee/billing/planLimits";
 import { formatNumber } from "~/utils/formatNumber";
+import { UNLIMITED_MESSAGES } from "../../../ee/billing/planLimits";
 
+export { isAnnualTieredPlan } from "../../../ee/billing/planTypes";
 export type { Currency } from "../../../ee/billing/pricing";
 export {
-  getGrowthSeatPriceCents,
-  getAnnualDiscountPercent,
   formatPrice,
+  getAnnualDiscountPercent,
+  getGrowthSeatPriceCents,
 } from "../../../ee/billing/pricing";
+export type { BillingInterval } from "../../../ee/billing/utils/growthSeatEvent";
 export {
   parseGrowthSeatPlanType,
   resolveGrowthSeatPlanType,
 } from "../../../ee/billing/utils/growthSeatEvent";
-export { isAnnualTieredPlan } from "../../../ee/billing/planTypes";
-export type { BillingInterval } from "../../../ee/billing/utils/growthSeatEvent";
 
 export const currencySymbol: Record<Currency, string> = {
   [Currency.EUR]: "\u20AC",
@@ -123,10 +123,5 @@ export function buildTieredCapabilities({
       : maxMembersLite > 0
         ? `Up to ${formatNumber(maxMembersLite)} lite users`
         : "Custom lite user limits";
-  return [
-    coreUsersText,
-    eventsText,
-    projectsText,
-    liteUsersText,
-  ];
+  return [coreUsersText, eventsText, projectsText, liteUsersText];
 }

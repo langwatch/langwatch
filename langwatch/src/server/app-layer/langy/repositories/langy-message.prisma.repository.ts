@@ -1,6 +1,5 @@
-import type { PrismaClient } from "@prisma/client";
-
 import { langyMessagePartSchema } from "@langwatch/langy";
+import type { PrismaClient } from "@prisma/client";
 import type {
   LangyMessageRepository,
   LangyMessageRow,

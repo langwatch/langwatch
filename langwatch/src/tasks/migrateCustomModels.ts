@@ -77,7 +77,9 @@ function convertStringToEntry({
     displayName: modelId,
     mode,
     maxTokens: defaults.maxTokens,
-    supportedParameters: [...defaults.supportedParameters] as CustomModelEntry["supportedParameters"],
+    supportedParameters: [
+      ...defaults.supportedParameters,
+    ] as CustomModelEntry["supportedParameters"],
   };
 }
 
@@ -148,7 +150,10 @@ export function migrateCustomModelsRow({
   });
 
   // If neither field needs migration, return null
-  if (migratedCustomModels === null && migratedCustomEmbeddingsModels === null) {
+  if (
+    migratedCustomModels === null &&
+    migratedCustomEmbeddingsModels === null
+  ) {
     return null;
   }
 

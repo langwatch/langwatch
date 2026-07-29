@@ -1,16 +1,16 @@
-import { describe, expect, it, vi } from "vitest";
 import {
   LANGY_CONVERSATION_EVENT_TYPES,
   LANGY_CONVERSATION_EVENT_VERSIONS,
   LANGY_CONVERSATION_PROCESSING_EVENT_TYPES,
 } from "@langwatch/langy";
+import { describe, expect, it, vi } from "vitest";
+import type { LangyConversationProcessingEvent } from "../../schemas/events";
 import {
   LangyConversationHandoffPendingEventSchema,
   LangyConversationMetadataUpdatedEventSchema,
   LangyToolCallSucceededEventSchema,
 } from "../../schemas/events";
 import { LangyAnalyticsEventMapProjection } from "../langyAnalyticsEvent.mapProjection";
-import type { LangyConversationProcessingEvent } from "../../schemas/events";
 
 const base = {
   aggregateId: "conversation_1",
@@ -44,7 +44,9 @@ describe("LangyAnalyticsEventMapProjection", () => {
           data: { conversationId: "conversation_1", turnId: "turn_1" },
         } as LangyConversationProcessingEvent),
     );
-    expect(records).toHaveLength(LANGY_CONVERSATION_PROCESSING_EVENT_TYPES.length);
+    expect(records).toHaveLength(
+      LANGY_CONVERSATION_PROCESSING_EVENT_TYPES.length,
+    );
     expect(records.every((record) => record !== null)).toBe(true);
   });
 
@@ -102,8 +104,7 @@ describe("LangyAnalyticsEventMapProjection", () => {
         ...base,
         id: "event_handoff",
         type: "lw.langy_conversation.conversation_handoff_pending",
-        version:
-          LANGY_CONVERSATION_EVENT_VERSIONS.CONVERSATION_HANDOFF_PENDING,
+        version: LANGY_CONVERSATION_EVENT_VERSIONS.CONVERSATION_HANDOFF_PENDING,
         data: {
           conversationId: "conversation_1",
           turnId: "turn_1",

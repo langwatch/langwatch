@@ -1,8 +1,8 @@
 import type { z } from "zod";
-import type { PlanInfo } from "../licensing/planInfo";
 import type { LimitType } from "../../src/server/license-enforcement/types";
-import type { PlanTypes } from "./planTypes";
 import type { signUpDataSchema } from "../../src/server/schemas/sign-up-data.schema";
+import type { PlanInfo } from "../licensing/planInfo";
+import type { PlanTypes } from "./planTypes";
 
 export type BillingPlanProvider = {
   getActivePlan(

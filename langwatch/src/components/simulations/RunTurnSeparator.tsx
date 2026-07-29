@@ -98,7 +98,8 @@ export function RunTurnSeparator({
       cursor={hasTrace ? "pointer" : "default"}
       onClick={
         hasTrace
-          ? () => openTraceDetailsDrawer({ traceId, selectedTab: "traceDetails" })
+          ? () =>
+              openTraceDetailsDrawer({ traceId, selectedTab: "traceDetails" })
           : undefined
       }
       onKeyDown={
@@ -106,7 +107,10 @@ export function RunTurnSeparator({
           ? (e) => {
               if (e.key === "Enter" || e.key === " ") {
                 e.preventDefault();
-                openTraceDetailsDrawer({ traceId, selectedTab: "traceDetails" });
+                openTraceDetailsDrawer({
+                  traceId,
+                  selectedTab: "traceDetails",
+                });
               }
             }
           : undefined

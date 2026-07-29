@@ -31,7 +31,7 @@ export const LANGY_CORE_RULE_CRITERIA = [
 export const LANGY_GREETING_CRITERIA = [
   "Langy answers the greeting with a short, friendly reply that introduces itself as Langy or the LangWatch assistant.",
   "The greeting reply names at least one concrete thing Langy can help with (for example traces, evaluations, prompts, or scenarios).",
-  "Langy does NOT answer the greeting or the \"who are you?\" question with a refusal such as \"Can't do that yet.\"",
+  'Langy does NOT answer the greeting or the "who are you?" question with a refusal such as "Can\'t do that yet."',
   "Langy does not dump internal tool mechanics, CLI commands, or its own rule list in response to a plain greeting.",
 ];
 

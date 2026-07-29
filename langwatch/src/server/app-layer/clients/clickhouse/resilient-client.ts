@@ -160,7 +160,8 @@ function extractQueryType(params: unknown): "SELECT" | "INSERT" | "OTHER" {
   const p = params as Record<string, unknown>;
   if (typeof p.query !== "string") return "OTHER";
   const trimmed = p.query.trimStart().toUpperCase();
-  if (trimmed.startsWith("SELECT") || trimmed.startsWith("WITH")) return "SELECT";
+  if (trimmed.startsWith("SELECT") || trimmed.startsWith("WITH"))
+    return "SELECT";
   if (trimmed.startsWith("INSERT")) return "INSERT";
   return "OTHER";
 }
@@ -207,7 +208,7 @@ function logFailure({
         paramKeys: meta.paramKeys,
         error,
       },
-      `ClickHouse ${operation} failed`
+      `ClickHouse ${operation} failed`,
     );
   } catch (loggingError) {
     logger.error({ loggingError }, "Failed to log ClickHouse query failure");
@@ -231,9 +232,8 @@ function logSuccess({
     // column cannot prune partitions, so it walks the whole history including
     // the cold tier on S3 - a burst of S3 GET requests per call. Worth warning
     // even when fast, because the cost is request count, not latency.
-    const coldScanTable = operation === "query"
-      ? detectColdScan(extractRawQuery(params))
-      : null;
+    const coldScanTable =
+      operation === "query" ? detectColdScan(extractRawQuery(params)) : null;
 
     if (coldScanTable !== null) {
       queryLogger.warn(
@@ -248,7 +248,7 @@ function logSuccess({
           coldScan: true,
           coldScanTable,
         },
-        `ClickHouse cold-scan ${operation}: cold scan of ${coldScanTable} (no time filter, walks S3 partitions)`
+        `ClickHouse cold-scan ${operation}: cold scan of ${coldScanTable} (no time filter, walks S3 partitions)`,
       );
     } else {
       queryLogger.debug(
@@ -258,7 +258,7 @@ function logSuccess({
           durationMs: roundedMs,
           queryId: meta.queryId,
         },
-        `ClickHouse ${operation} succeeded`
+        `ClickHouse ${operation} succeeded`,
       );
     }
   } catch (loggingError) {
@@ -288,8 +288,7 @@ export function createResilientClickHouseClient({
     const start = performance.now();
     try {
       const result = await withTransientRetry(
-        () =>
-          client.query(params as Parameters<typeof client.query>[0]),
+        () => client.query(params as Parameters<typeof client.query>[0]),
         { operation: "query", maxRetries, baseDelayMs, maxDelayMs },
       );
       const durationMs = performance.now() - start;
@@ -312,7 +311,9 @@ export function createResilientClickHouseClient({
   };
 
   wrapper.insert = async (params) => {
-    const insertTable = (params as unknown as Record<string, unknown>).table as string ?? "unknown";
+    const insertTable =
+      ((params as unknown as Record<string, unknown>).table as string) ??
+      "unknown";
     const start = performance.now();
     try {
       const result = await withTransientRetry(() => client.insert(params), {

@@ -162,7 +162,7 @@ describe("Feature: base key in the organizations payload", () => {
   });
 
   afterAll(async () => {
-    resetApp();
+    await resetApp();
     await prisma.roleBinding
       .deleteMany({ where: { organizationId } })
       .catch(() => {});

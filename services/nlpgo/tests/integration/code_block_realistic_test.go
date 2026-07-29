@@ -186,8 +186,11 @@ func TestSync_CodeBlock_ThirdPartyImportSkipsCleanly(t *testing.T) {
 	res := postSync(t, stack, body)
 	require.Equal(t, "error", res.Status)
 	require.NotNil(t, res.Error)
-	assert.Equal(t, "ModuleNotFoundError", res.Error.Type)
+	// The Python class names itself in the message; error.type carries the code
+	// the client has customer copy for.
+	assert.Equal(t, "code_runner_error", res.Error.Type)
 	assert.Equal(t, "missing", res.Error.NodeID)
+	assert.Contains(t, res.Error.Message, "ModuleNotFoundError")
 	assert.Contains(t, strings.ToLower(res.Error.Message), "this_package_definitely_does_not_exist_2026")
 }
 

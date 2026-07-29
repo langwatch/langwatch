@@ -72,9 +72,19 @@ export function useSimulationUpdateListener({
   const matchesFilter = useCallback(
     (payload: SimulationBroadcastPayload): boolean => {
       if (!filter) return true;
-      if (filter.scenarioRunId && payload.scenarioRunId !== filter.scenarioRunId) return false;
-      if (filter.batchRunId && payload.batchRunId !== filter.batchRunId) return false;
-      if (filter.scenarioSetId && normalizeSetId(payload.scenarioSetId) !== normalizeSetId(filter.scenarioSetId)) return false;
+      if (
+        filter.scenarioRunId &&
+        payload.scenarioRunId !== filter.scenarioRunId
+      )
+        return false;
+      if (filter.batchRunId && payload.batchRunId !== filter.batchRunId)
+        return false;
+      if (
+        filter.scenarioSetId &&
+        normalizeSetId(payload.scenarioSetId) !==
+          normalizeSetId(filter.scenarioSetId)
+      )
+        return false;
       return true;
     },
     [filter],
@@ -142,7 +152,9 @@ export function useSimulationUpdateListener({
 
         try {
           const parsed =
-            typeof data.event === "string" ? JSON.parse(data.event) : data.event;
+            typeof data.event === "string"
+              ? JSON.parse(data.event)
+              : data.event;
 
           // Tab handoffs address a machine, not a run, so they are matched on
           // the tab key alone and never against the run/batch filter below.
@@ -156,7 +168,8 @@ export function useSimulationUpdateListener({
           // Compact streaming events: { e: "S"|"C"|"E", r, b, m, ... }
           if (isCompactStreamingEvent(parsed)) {
             if (filter?.batchRunId && parsed.b !== filter.batchRunId) return;
-            if (filter?.scenarioRunId && parsed.r !== filter.scenarioRunId) return;
+            if (filter?.scenarioRunId && parsed.r !== filter.scenarioRunId)
+              return;
 
             if (onStreamingEvent) {
               onStreamingEvent(parsed);

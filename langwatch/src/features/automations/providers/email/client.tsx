@@ -8,6 +8,14 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import {
+  EMAIL_RX,
+  type EmailActionParams,
+  type EmailPreview,
+} from "@langwatch/automations/providers/email";
+import type { SavedTriggerRow } from "@langwatch/automations/providers/types";
+import { defaultsForSourceKind } from "@langwatch/automations/templating/defaults";
+import { filterVariablesForCadence } from "@langwatch/automations/templating/exampleContext";
 import { Mail, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { VariableInfoIcon } from "~/features/automations/components/VariableInfoIcon";
@@ -17,8 +25,6 @@ import {
   LiquidEditor,
   TemplateDisclosure,
 } from "~/features/automations/editors/templateAuthoring";
-import { defaultsForSourceKind } from "@langwatch/automations/templating/defaults";
-import { filterVariablesForCadence } from "@langwatch/automations/templating/exampleContext";
 import { api } from "~/utils/api";
 import { TestFireButton } from "../TestFireButton";
 import type {
@@ -26,8 +32,6 @@ import type {
   NotifyClientDef,
   SummaryIdentity,
 } from "../types";
-import type { SavedTriggerRow } from "@langwatch/automations/providers/types";
-import { EMAIL_RX, type EmailActionParams, type EmailPreview } from "@langwatch/automations/providers/email";
 
 /** A "field that defaults to the framework template until the user
  *  edits it" — `usingDefault=true` means the editor renders the default

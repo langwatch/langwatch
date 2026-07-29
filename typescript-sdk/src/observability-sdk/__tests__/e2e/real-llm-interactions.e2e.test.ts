@@ -27,7 +27,7 @@ describe("Real LLM Interactions E2E", () => {
     await delay(30000);
   }, 35000);
 
-  it("should handle chat completion flow", async () => {
+  it("handles chat completion flow", async () => {
     const tracer = createTestTracer("chat-completion");
     const testIds = generateTestIds();
     let traceId: string | undefined;
@@ -101,7 +101,7 @@ describe("Real LLM Interactions E2E", () => {
     expect(span!.metrics).toBeTruthy();
   }, E2E_CONFIG.timeout);
 
-  it("should handle streaming responses", async () => {
+  it("handles streaming responses", async () => {
     const tracer = createTestTracer("streaming");
     const testIds = generateTestIds();
     let traceId: string;
@@ -158,7 +158,7 @@ describe("Real LLM Interactions E2E", () => {
     expect(span!.output).toBeTruthy();
   }, E2E_CONFIG.timeout);
 
-  it("should handle function calling", async () => {
+  it("handles function calling", async () => {
     const tracer = createTestTracer("function-calling");
     const testIds = generateTestIds();
     let traceId: string;
@@ -221,7 +221,7 @@ describe("Real LLM Interactions E2E", () => {
     expect(span!.output).toBeTruthy();
   }, E2E_CONFIG.timeout);
 
-  it("should handle error scenarios", async () => {
+  it("handles error scenarios", async () => {
     const tracer = createTestTracer("llm-error");
     const testIds = generateTestIds();
     let traceId: string;

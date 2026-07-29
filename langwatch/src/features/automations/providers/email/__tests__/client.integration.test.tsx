@@ -10,6 +10,11 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import {
+  ALERT_TRIGGER_DEFAULTS,
+  REPORT_TRIGGER_DEFAULTS,
+  TRACE_TRIGGER_DEFAULTS,
+} from "@langwatch/automations/templating/defaults";
+import {
   cleanup,
   fireEvent,
   render,
@@ -19,11 +24,6 @@ import {
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ConfigFormCtx } from "~/features/automations/providers/types";
-import {
-  ALERT_TRIGGER_DEFAULTS,
-  REPORT_TRIGGER_DEFAULTS,
-  TRACE_TRIGGER_DEFAULTS,
-} from "@langwatch/automations/templating/defaults";
 
 vi.mock("@monaco-editor/react", () => ({ default: () => null }));
 /** The Liquid editor is Monaco-bound and cannot mount in jsdom. Stub just that
@@ -58,8 +58,8 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
-import emailClient, { type EmailSlice } from "../client";
 import type { EmailPreview } from "@langwatch/automations/providers/email";
+import emailClient, { type EmailSlice } from "../client";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

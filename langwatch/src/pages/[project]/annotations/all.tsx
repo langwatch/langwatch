@@ -1,6 +1,5 @@
 import { Button, Container, Heading, HStack, Spacer } from "@chakra-ui/react";
-import type { Annotation, User } from "@prisma/client";
-import { useRouter } from "~/utils/compat/next-router";
+import type { Annotation } from "@prisma/client";
 import Parse from "papaparse";
 import { Download } from "react-feather";
 import AnnotationsLayout from "~/components/AnnotationsLayout";
@@ -14,6 +13,7 @@ import { useFilterParams } from "~/hooks/useFilterParams";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { Trace } from "~/server/tracer/types";
 import { api } from "~/utils/api";
+import { useRouter } from "~/utils/compat/next-router";
 import { getSingleQueryParam } from "~/utils/getSingleQueryParam";
 
 export default function Annotations() {
@@ -197,11 +197,7 @@ export default function Annotations() {
 
   return (
     <AnnotationsLayout>
-      <Container
-        maxW={"calc(100vw - 330px)"}
-        padding={0}
-        margin={0}
-      >
+      <Container maxW={"calc(100vw - 330px)"} padding={0} margin={0}>
         <AnnotationsTable
           groupedAnnotations={groupedAnnotations}
           allAnnotationsLoading={annotationsLoading || traces.isLoading}

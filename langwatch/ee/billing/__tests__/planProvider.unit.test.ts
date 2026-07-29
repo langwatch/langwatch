@@ -1,6 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { PLAN_LIMITS, getFreePlanLimits } from "../planLimits";
+import { getFreePlanLimits, PLAN_LIMITS } from "../planLimits";
 import { NUMERIC_OVERRIDE_FIELDS } from "../planProvider";
 import { PlanTypes, SubscriptionStatus } from "../planTypes";
 
@@ -18,7 +18,10 @@ vi.mock("../../../src/server/db", () => ({
 import { env } from "../../../src/env.mjs";
 import { createSaaSPlanProvider } from "../planProvider";
 
-const mockEnv = env as { IS_SAAS: boolean | undefined; ADMIN_EMAILS: string | undefined };
+const mockEnv = env as {
+  IS_SAAS: boolean | undefined;
+  ADMIN_EMAILS: string | undefined;
+};
 
 const createMockDb = ({
   findFirstResult = null,
@@ -71,7 +74,9 @@ describe("createSaaSPlanProvider", () => {
       const plan = await provider.getActivePlan("org_1");
 
       expect(plan.type).toBe(PlanTypes.ENTERPRISE);
-      expect(plan.maxMembers).toBe(PLAN_LIMITS[PlanTypes.ENTERPRISE].maxMembers);
+      expect(plan.maxMembers).toBe(
+        PLAN_LIMITS[PlanTypes.ENTERPRISE].maxMembers,
+      );
     });
   });
 
@@ -150,7 +155,9 @@ describe("createSaaSPlanProvider", () => {
 
         expect(plan.type).toBe(PlanTypes.LAUNCH);
         expect(plan.maxMembers).toBe(10);
-        expect(plan.maxProjects).toBe(PLAN_LIMITS[PlanTypes.LAUNCH].maxProjects);
+        expect(plan.maxProjects).toBe(
+          PLAN_LIMITS[PlanTypes.LAUNCH].maxProjects,
+        );
       });
 
       describe("when valid subscription exists for SEAT_EVENT org", () => {
@@ -309,9 +316,9 @@ describe("createSaaSPlanProvider", () => {
           status: SubscriptionStatus.ACTIVE,
           ...overrides,
           ...Object.fromEntries(
-            NUMERIC_OVERRIDE_FIELDS.filter(
-              (f) => !(f in overrides),
-            ).map((f) => [f, null]),
+            NUMERIC_OVERRIDE_FIELDS.filter((f) => !(f in overrides)).map(
+              (f) => [f, null],
+            ),
           ),
         };
 
@@ -339,9 +346,7 @@ describe("createSaaSPlanProvider", () => {
         const subscription = {
           plan: PlanTypes.LAUNCH,
           status: SubscriptionStatus.ACTIVE,
-          ...Object.fromEntries(
-            NUMERIC_OVERRIDE_FIELDS.map((f) => [f, null]),
-          ),
+          ...Object.fromEntries(NUMERIC_OVERRIDE_FIELDS.map((f) => [f, null])),
         };
 
         const db = createMockDb({ findFirstResult: subscription });
@@ -362,9 +367,7 @@ describe("createSaaSPlanProvider", () => {
         const subscription = {
           plan: "NONEXISTENT_PLAN",
           status: SubscriptionStatus.ACTIVE,
-          ...Object.fromEntries(
-            NUMERIC_OVERRIDE_FIELDS.map((f) => [f, null]),
-          ),
+          ...Object.fromEntries(NUMERIC_OVERRIDE_FIELDS.map((f) => [f, null])),
         };
 
         const db = createMockDb({ findFirstResult: subscription });

@@ -24,7 +24,7 @@ describe('FilterableBatchSpanProcessor', () => {
     vi.restoreAllMocks();
   });
 
-  it('should export span if no filters match', () => {
+  it('exports span if no filters match', () => {
     const filters: SpanProcessingExcludeRule[] = [
       { fieldName: 'span_name', matchValue: 'foo', matchOperation: 'exact_match' },
     ];
@@ -34,7 +34,7 @@ describe('FilterableBatchSpanProcessor', () => {
     expect(onEndSpy).toHaveBeenCalledWith(span);
   });
 
-  it('should not export span if span_name exact_match filter matches', () => {
+  it('does not export span if span_name exact_match filter matches', () => {
     const filters: SpanProcessingExcludeRule[] = [
       { fieldName: 'span_name', matchValue: 'heartbeat', matchOperation: 'exact_match' },
     ];
@@ -44,7 +44,7 @@ describe('FilterableBatchSpanProcessor', () => {
     expect(onEndSpy).not.toHaveBeenCalled();
   });
 
-  it('should not export span if instrumentation_scope_name starts_with filter matches', () => {
+  it('does not export span if instrumentation_scope_name starts_with filter matches', () => {
     const filters: SpanProcessingExcludeRule[] = [
       { fieldName: 'instrumentation_scope_name', matchValue: 'internal', matchOperation: 'starts_with' },
     ];
@@ -54,7 +54,7 @@ describe('FilterableBatchSpanProcessor', () => {
     expect(onEndSpy).not.toHaveBeenCalled();
   });
 
-  it('should not export span if span_name includes filter matches', () => {
+  it('does not export span if span_name includes filter matches', () => {
     const filters: SpanProcessingExcludeRule[] = [
       { fieldName: 'span_name', matchValue: 'api', matchOperation: 'includes' },
     ];
@@ -64,7 +64,7 @@ describe('FilterableBatchSpanProcessor', () => {
     expect(onEndSpy).not.toHaveBeenCalled();
   });
 
-  it('should not export span if span_name ends_with filter matches', () => {
+  it('does not export span if span_name ends_with filter matches', () => {
     const filters: SpanProcessingExcludeRule[] = [
       { fieldName: 'span_name', matchValue: 'end', matchOperation: 'ends_with' },
     ];
@@ -74,7 +74,7 @@ describe('FilterableBatchSpanProcessor', () => {
     expect(onEndSpy).not.toHaveBeenCalled();
   });
 
-  it('should export span if multiple filters and none match', () => {
+  it('exports span if multiple filters and none match', () => {
     const filters: SpanProcessingExcludeRule[] = [
       { fieldName: 'span_name', matchValue: 'foo', matchOperation: 'exact_match' },
       { fieldName: 'instrumentation_scope_name', matchValue: 'bar', matchOperation: 'includes' },
@@ -85,7 +85,7 @@ describe('FilterableBatchSpanProcessor', () => {
     expect(onEndSpy).toHaveBeenCalledWith(span);
   });
 
-  it('should not export span if any filter matches (OR logic)', () => {
+  it('does not export span if any filter matches (OR logic)', () => {
     const filters: SpanProcessingExcludeRule[] = [
       { fieldName: 'span_name', matchValue: 'baz', matchOperation: 'exact_match' },
       { fieldName: 'instrumentation_scope_name', matchValue: 'scope', matchOperation: 'exact_match' },

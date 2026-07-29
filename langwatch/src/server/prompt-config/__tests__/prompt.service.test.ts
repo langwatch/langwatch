@@ -90,7 +90,7 @@ describe("PromptService", () => {
         (promptService as any).versionService = mockVersionService;
       });
 
-      it("should update handle if provided", async () => {
+      it("updates handle if provided", async () => {
         const updateData = {
           commitMessage: "Updated handle",
           handle: "updated-prompt",
@@ -121,7 +121,7 @@ describe("PromptService", () => {
         );
       });
 
-      it("should update scope if provided", async () => {
+      it("updates scope if provided", async () => {
         const updateData = {
           commitMessage: "Updated scope",
           scope: "ORGANIZATION" as const,
@@ -152,7 +152,7 @@ describe("PromptService", () => {
         );
       });
 
-      it("should create new version with provided version data", async () => {
+      it("creates new version with provided version data", async () => {
         const projectId = "project-1";
         const configId = "config-1";
         const updateData = {

@@ -152,14 +152,13 @@ describe("showMissingModelToast", () => {
 
 describe("showAiCallFailedToast", () => {
   /** @scenario Downstream AI failures surface a hint to verify model configuration */
-  it("surfaces the feature label + hint + provider error message", async () => {
+  it("surfaces the feature label and the hint, never the provider's own words", async () => {
     mountToaster();
     showAiCallFailedToast({
       featureKey: "workflows.commit_message",
       featureDisplayName: "Workflow commit message",
       role: "FAST",
       projectSlug: "acme-app",
-      errorMessage: "401 Unauthorized from provider",
     });
 
     await waitFor(() => {
@@ -170,9 +169,9 @@ describe("showAiCallFailedToast", () => {
     expect(
       screen.getByText(/Double-check your Fast model configuration/i),
     ).toBeInTheDocument();
-    expect(
-      screen.getByText(/401 Unauthorized from provider/i),
-    ).toBeInTheDocument();
+    // A raw provider sentence names deployments, hosts and response bodies.
+    // There is no channel for it to reach this toast any more.
+    expect(screen.queryByText(/401 Unauthorized/i)).not.toBeInTheDocument();
   });
 
   /** @scenario A failed assistive AI call warns, it does not error */
@@ -183,7 +182,6 @@ describe("showAiCallFailedToast", () => {
       featureDisplayName: "Workflow commit message",
       role: "FAST",
       projectSlug: "acme-app",
-      errorMessage: "boom",
     });
 
     const title = await screen.findByText(/Workflow commit message failed/i);
@@ -199,7 +197,6 @@ describe("showAiCallFailedToast", () => {
       featureDisplayName: "Workflow commit message",
       role: "FAST" as const,
       projectSlug: "acme-app",
-      errorMessage: "boom",
     };
     showAiCallFailedToast(info);
     showAiCallFailedToast(info);

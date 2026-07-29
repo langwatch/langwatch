@@ -176,7 +176,13 @@ export const useEvaluationExecution = () => {
         delayMs: 10_000,
       });
     },
-    [socketAvailable, setEvaluationState, postEvent, getWorkflow, scheduleTimeout],
+    [
+      socketAvailable,
+      setEvaluationState,
+      postEvent,
+      getWorkflow,
+      scheduleTimeout,
+    ],
   );
 
   return {

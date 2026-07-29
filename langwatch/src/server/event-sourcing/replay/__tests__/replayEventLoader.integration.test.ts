@@ -1,19 +1,19 @@
-import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
-  discoverAffectedAggregates,
-  countEventsForAggregates,
+  getTestClickHouseClient,
+  startTestContainers,
+  stopTestContainers,
+} from "../../__tests__/integration/testContainers";
+import { generateTestTenantId } from "../../__tests__/integration/testHelpers";
+import {
   batchGetCutoffEventIds,
   batchLoadAggregateEvents,
+  countEventsForAggregates,
+  discoverAffectedAggregates,
   getAggregateOccurredAtBounds,
   getBoundedCutoffs,
   loadEventsForAggregatesBulk,
 } from "../replayEventLoader";
-import {
-  startTestContainers,
-  stopTestContainers,
-  getTestClickHouseClient,
-} from "../../__tests__/integration/testContainers";
-import { generateTestTenantId } from "../../__tests__/integration/testHelpers";
 
 describe("replayEventLoader", () => {
   let tenantId: string;

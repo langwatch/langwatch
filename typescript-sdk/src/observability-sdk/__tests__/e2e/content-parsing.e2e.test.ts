@@ -28,7 +28,7 @@ describe("Content Parsing E2E", () => {
     await delay(30000);
   }, 35000);
 
-  it("should parse and extract chat messages correctly", async () => {
+  it("parses and extract chat messages correctly", async () => {
     const tracer = createTestTracer("chat-messages");
     const logger = getLangWatchLogger("chat-messages");
     const testIds = generateTestIds();
@@ -98,7 +98,7 @@ describe("Content Parsing E2E", () => {
     expect(span!.metrics).toBeTruthy();
   }, E2E_CONFIG.timeout);
 
-  it("should handle RAG contexts", async () => {
+  it("handles RAG contexts", async () => {
     const tracer = createTestTracer("rag-contexts");
     const testIds = generateTestIds();
     let traceId: string;
@@ -149,7 +149,7 @@ describe("Content Parsing E2E", () => {
     expect(span!.output).toBeTruthy();
   }, E2E_CONFIG.timeout);
 
-  it("should handle function calls", async () => {
+  it("handles function calls", async () => {
     const tracer = createTestTracer("function-calls");
     const testIds = generateTestIds();
     let traceId: string;

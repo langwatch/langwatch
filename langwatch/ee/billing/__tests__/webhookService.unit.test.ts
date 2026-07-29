@@ -234,12 +234,13 @@ describe("webhookService", () => {
       it("throws SubscriptionRecordNotFoundError when no subscription matches", async () => {
         subRepo.linkStripeId.mockResolvedValue({ count: 0 });
 
+        // The code is the contract; the sentence beside it is copy.
         await expect(
           service.handleCheckoutCompleted({
             subscriptionId: "sub_stripe_1",
             clientReferenceId: "subscription_setup_sub_db_1",
           }),
-        ).rejects.toThrow("No subscription record found");
+        ).rejects.toMatchObject({ code: "subscription_sync_failed" });
       });
 
       /** @scenario Checkout succeeds even when currency persistence fails */

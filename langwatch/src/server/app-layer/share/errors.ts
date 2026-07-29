@@ -32,11 +32,9 @@ export class ShareLinkExhaustedError extends HandledError {
   declare readonly code: "share_link_exhausted";
 
   constructor() {
-    super(
-      "share_link_exhausted",
-      "This share link has already been viewed.",
-      { httpStatus: 403 },
-    );
+    super("share_link_exhausted", "This share link has already been viewed.", {
+      httpStatus: 403,
+    });
     this.name = "ShareLinkExhaustedError";
   }
 }

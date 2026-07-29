@@ -1,16 +1,16 @@
+import { generate } from "@langwatch/ksuid";
 import {
+  type Organization,
   OrganizationUserRole,
   RoleBindingScopeType,
-  TeamUserRole,
-  type Organization,
   type Team,
+  TeamUserRole,
 } from "@prisma/client";
-import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { KSUID_RESOURCES } from "~/utils/constants";
-import { prisma } from "~/server/db";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
+import { prisma } from "~/server/db";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import { app } from "../[[...route]]/app";
 
 describe("Feature: Projects REST API", () => {

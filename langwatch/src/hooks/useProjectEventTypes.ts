@@ -29,7 +29,10 @@ export function useProjectEventTypes({
   enabled?: boolean;
 }) {
   const endDate = useMemo(() => Date.now(), []);
-  const startDate = useMemo(() => endDate - 30 * 24 * 60 * 60 * 1000, [endDate]);
+  const startDate = useMemo(
+    () => endDate - 30 * 24 * 60 * 60 * 1000,
+    [endDate],
+  );
 
   const query = api.analytics.dataForFilter.useQuery(
     {
@@ -43,7 +46,7 @@ export function useProjectEventTypes({
       enabled: !!projectId && enabled,
       refetchOnWindowFocus: false,
       staleTime: 5 * 60 * 1000, // Cache for 5 minutes
-    }
+    },
   );
 
   const eventTypes = useMemo(
@@ -54,7 +57,7 @@ export function useProjectEventTypes({
           label: option.label,
         }))
         .filter((option) => option.key !== ""),
-    [query.data]
+    [query.data],
   );
 
   return {

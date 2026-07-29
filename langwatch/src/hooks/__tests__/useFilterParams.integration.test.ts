@@ -256,10 +256,7 @@ describe("useFilterParams() saved view localStorage fallback", () => {
 
   describe("when legacy selected key is used", () => {
     it("falls back to the legacy key format", () => {
-      localStorage.setItem(
-        `langwatch-selected-view-test-project`,
-        "app-view",
-      );
+      localStorage.setItem(`langwatch-selected-view-test-project`, "app-view");
       localStorage.setItem(
         cacheKey("test-project"),
         JSON.stringify([

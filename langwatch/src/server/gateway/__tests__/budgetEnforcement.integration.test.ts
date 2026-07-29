@@ -16,10 +16,10 @@
 import { createGatewayBudgetSyncReactor } from "@ee/governance/reactors/gatewayBudgetSync.reactor";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-
+import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import { replayGooseMigrationUp } from "~/server/clickhouse/__tests__/migrationReplay";
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import {
   startTestContainers,
   stopTestContainers,
@@ -40,6 +40,9 @@ const USER_ID = `usr-enf-${suffix}`;
 const VK_ID = `vk_enf_${suffix}`;
 const BUDGET_ID = `bdg-enf-${suffix}`;
 const IDLE_BUDGET_ID = `bdg-idle-${suffix}`;
+const PRE_PROJECT_ID = `proj-preutc-${suffix}`;
+const PRE_VK_ID = `vk_preutc_${suffix}`;
+const PRE_BUDGET_ID = `bdg-preutc-${suffix}`;
 
 /** $0.001 per request against a $0.005 ceiling: 20% a request. */
 const LIMIT_USD = "0.005";
@@ -95,6 +98,7 @@ function foldState(attrs: Record<string, string>): TraceSummaryData {
 describe("given a blocking budget on traffic the gateway is serving", () => {
   let service: GatewayBudgetService;
   let recordOneRequest: () => Promise<void>;
+  let reactor: ReturnType<typeof createGatewayBudgetSyncReactor>;
 
   const decide = async () =>
     await service.check({
@@ -186,7 +190,7 @@ describe("given a blocking budget on traffic the gateway is serving", () => {
     const chRepo = new GatewayBudgetClickHouseRepository(resolveClient);
     service = GatewayBudgetService.create(prisma, chRepo);
 
-    const reactor = createGatewayBudgetSyncReactor({
+    reactor = createGatewayBudgetSyncReactor({
       prisma,
       budgetRepository: new GatewayBudgetRepository(prisma),
       budgetCHRepository: chRepo,
@@ -198,17 +202,24 @@ describe("given a blocking budget on traffic the gateway is serving", () => {
         "langwatch.virtual_key_id": VK_ID,
         "langwatch.gateway_request_id": gatewayRequestId,
       });
-      await reactor.handle({} as TraceProcessingEvent, {
-        tenantId: PROJECT_ID,
-        aggregateId: state.traceId,
-        foldState: state,
-      } as ReactorContext<TraceSummaryData>);
+      await reactor.handle(
+        {} as TraceProcessingEvent,
+        {
+          tenantId: PROJECT_ID,
+          aggregateId: state.traceId,
+          foldState: state,
+        } as ReactorContext<TraceSummaryData>,
+      );
     };
   }, 120_000);
 
   afterAll(async () => {
-    await prisma.gatewayBudget.deleteMany({ where: { organizationId: ORG_ID } });
-    await prisma.virtualKey.deleteMany({ where: { id: VK_ID } });
+    await prisma.gatewayBudget.deleteMany({
+      where: { organizationId: ORG_ID },
+    });
+    await prisma.virtualKey.deleteMany({
+      where: { id: { in: [VK_ID, PRE_VK_ID] } },
+    });
     await prisma.user.deleteMany({ where: { id: USER_ID } });
     await prisma.project.deleteMany({ where: { teamId: TEAM_ID } });
     await prisma.team.deleteMany({ where: { id: TEAM_ID } });
@@ -301,6 +312,202 @@ describe("given a blocking budget on traffic the gateway is serving", () => {
       const budget = budgets.find((b) => b.id === BUDGET_ID);
       expect(budget).toBeDefined();
       expect(Number(budget!.spentUsd)).toBe(0);
+    });
+  });
+
+  describe("given spend recorded before the UTC rollup rebuild", () => {
+    // The upgrade path migration 00058 protects: a deployment whose
+    // ClickHouse ran outside UTC folded its history at local midnight, a
+    // bucket /budget/check never reads. The migration rebuilds the rollup
+    // from the ledger under UTC boundaries, so that history must count
+    // toward warning and blocking together with spend recorded after it.
+    //
+    // $0.004 of the $0.005 ceiling is recorded pre-rebuild: enough that
+    // two ordinary post-rebuild requests cross the cap, while the same
+    // two requests alone would sit at 40% and sail through. Blocking
+    // therefore proves the rebuilt history is enforced, not merely shown.
+    const PRE_SPEND_USD = "0.0040000000";
+
+    // Captured in beforeAll, while the schema is still on the 00055 view,
+    // so the assertions below never depend on live schema mutations from
+    // inside a test body.
+    let preRebuildDecision: Awaited<ReturnType<GatewayBudgetService["check"]>>;
+
+    const decidePreProject = async () =>
+      await service.check({
+        organizationId: ORG_ID,
+        teamId: TEAM_ID,
+        projectId: PRE_PROJECT_ID,
+        virtualKeyId: PRE_VK_ID,
+        principalUserId: USER_ID,
+        projectedCostUsd: "0.000001",
+      });
+
+    const recordOnePreProjectRequest = async () => {
+      const gatewayRequestId = `grq_${nanoid()}`;
+      const state = foldState({
+        "langwatch.virtual_key_id": PRE_VK_ID,
+        "langwatch.gateway_request_id": gatewayRequestId,
+      });
+      await reactor.handle(
+        {} as TraceProcessingEvent,
+        {
+          tenantId: PRE_PROJECT_ID,
+          aggregateId: state.traceId,
+          foldState: state,
+        } as ReactorContext<TraceSummaryData>,
+      );
+    };
+
+    beforeAll(async () => {
+      await prisma.project.create({
+        data: {
+          id: PRE_PROJECT_ID,
+          name: PRE_PROJECT_ID,
+          slug: PRE_PROJECT_ID,
+          teamId: TEAM_ID,
+          language: "en",
+          framework: "openai",
+          apiKey: `key-${PRE_PROJECT_ID}`,
+        },
+      });
+      await prisma.virtualKey.create({
+        data: {
+          id: PRE_VK_ID,
+          organizationId: ORG_ID,
+          name: "pre-rebuild-key",
+          hashedSecret: `hash-pre-${suffix}`,
+          displayPrefix: "vk-lw-yyyyyyy",
+          principalUserId: USER_ID,
+          createdById: USER_ID,
+          scopes: {
+            create: [{ scopeType: "PROJECT", scopeId: PRE_PROJECT_ID }],
+          },
+        },
+      });
+      await prisma.gatewayBudget.create({
+        data: {
+          id: PRE_BUDGET_ID,
+          name: `pre-rebuild-${suffix}`,
+          organizationId: ORG_ID,
+          scopeType: "PROJECT",
+          scopeId: PRE_PROJECT_ID,
+          window: "DAY",
+          limitUsd: LIMIT_USD,
+          onBreach: "BLOCK",
+          createdById: USER_ID,
+          resetsAt: new Date(Date.now() + 86_400_000),
+        },
+      });
+
+      const client = await getClickHouseClientForProject(PRE_PROJECT_ID);
+      if (!client) throw new Error("no ClickHouse client in test environment");
+
+      // Pre-rebuild state: the 00055 view truncates periods in the server
+      // session timezone.
+      await replayGooseMigrationUp({
+        client,
+        fileName: "00055_gateway_budget_scope_totals_period_start.sql",
+      });
+
+      // History folded by the old view as a Sao Paulo server would fold
+      // it: a synchronous insert so the view's SELECT runs under this
+      // session_timezone (an async insert is flushed with server defaults
+      // and would defeat the simulation).
+      const occurredAt = Date.now();
+      await client.insert({
+        table: "gateway_budget_ledger_events",
+        values: [
+          {
+            TenantId: PRE_PROJECT_ID,
+            BudgetId: PRE_BUDGET_ID,
+            Scope: "project",
+            ScopeId: PRE_PROJECT_ID,
+            Window: "DAY",
+            VirtualKeyId: PRE_VK_ID,
+            ProviderCredentialId: "",
+            GatewayRequestId: `grq_pre_${suffix}`,
+            AmountUSD: PRE_SPEND_USD,
+            TokensInput: 300,
+            TokensOutput: 150,
+            TokensCacheRead: 0,
+            TokensCacheWrite: 0,
+            Model: "gpt-5-mini",
+            ProviderSlot: "",
+            DurationMS: 120,
+            Status: "success",
+            OccurredAt: occurredAt,
+            EventTimestamp: occurredAt,
+          },
+        ],
+        format: "JSONEachRow",
+        clickhouse_settings: {
+          session_timezone: "America/Sao_Paulo",
+        },
+      });
+
+      // The decision as a pre-upgrade deployment would compute it, then
+      // the upgrade under test: pin the truncation to UTC and rebuild the
+      // rollup from the ledger.
+      preRebuildDecision = await decidePreProject();
+      await replayGooseMigrationUp({
+        client,
+        fileName: "00058_gateway_budget_scope_totals_utc.sql",
+      });
+    }, 120_000);
+
+    afterAll(async () => {
+      // The replays above mutate shared database schema, not tenant data.
+      // Re-apply the current migration unconditionally so a failure
+      // anywhere in this describe can never leave later suites running
+      // against the 00055 view. Idempotent by the migration's own design.
+      const client = await getClickHouseClientForProject(PRE_PROJECT_ID);
+      await replayGooseMigrationUp({
+        client: client!,
+        fileName: "00058_gateway_budget_scope_totals_utc.sql",
+      });
+    }, 120_000);
+
+    describe("when the rollup rebuild has not run", () => {
+      /** @scenario "Spend recorded before the rollup rebuild still counts after it" */
+      it("lets requests through as if nothing had been spent", () => {
+        // The bug the rebuild exists for: $0.004 of $0.005 is spent, and
+        // the decision neither warns nor blocks because the history sits
+        // in a bucket the reader never asks about.
+        expect(preRebuildDecision.decision).toBe("allow");
+        expect(preRebuildDecision.warnings).toHaveLength(0);
+      });
+    });
+
+    describe("when the rollup rebuild runs", () => {
+      /** @scenario "Spend recorded before the rollup rebuild still counts after it" */
+      it("counts the pre-rebuild spend and warns at 80% of the limit", async () => {
+        const decision = await decidePreProject();
+
+        expect(decision.decision).toBe("soft_warn");
+        expect(decision.warnings.length).toBeGreaterThan(0);
+        expect(decision.warnings[0]!.pctUsed).toBeGreaterThanOrEqual(80);
+        expect(decision.blockedBy).toHaveLength(0);
+      });
+    });
+
+    describe("when new spend joins the pre-rebuild spend", () => {
+      /** @scenario "Spend recorded before the rollup rebuild still counts after it" */
+      it("blocks once the two together pass the limit", async () => {
+        // Two post-rebuild requests: $0.004 + 2 x $0.001 = $0.006 against
+        // the $0.005 ceiling. Alone they are 40% of the limit, so this
+        // block can only come from the rebuilt history.
+        await recordOnePreProjectRequest();
+        await recordOnePreProjectRequest();
+
+        const decision = await decidePreProject();
+
+        expect(decision.decision).toBe("hard_block");
+        expect(decision.blockReason).toBeTruthy();
+        expect(decision.blockedBy.map((b) => b.budgetId)).toContain(
+          PRE_BUDGET_ID,
+        );
+      });
     });
   });
 });

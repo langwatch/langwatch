@@ -14,7 +14,7 @@ vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({ push: pushMock }),
 }));
 
-import { ProposalCard, type LangyProposal } from "../components/MessageContent";
+import { type LangyProposal, ProposalCard } from "../components/MessageContent";
 
 const proposal: LangyProposal = {
   langyProposal: true,

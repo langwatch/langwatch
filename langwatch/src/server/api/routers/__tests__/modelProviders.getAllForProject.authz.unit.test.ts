@@ -171,12 +171,12 @@ describe("modelProviders.getAllForProject authz", () => {
 
   describe("when the user has no access to the project at all", () => {
     /** @scenario A user without project view permission cannot list a project's providers */
-    it("rejects with UNAUTHORIZED", async () => {
+    it("rejects with FORBIDDEN", async () => {
       const caller = callerForUser("user_with_nothing");
 
       await expect(
         caller.getAllForProject({ projectId: "project_a" }),
-      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
 
     it("throws TRPCError (not a generic error) for denied access", async () => {
@@ -190,23 +190,23 @@ describe("modelProviders.getAllForProject authz", () => {
 
   describe("when the user only has access to a sibling project in the same organization", () => {
     /** @scenario Access to a sibling project does not grant access to this project's providers */
-    it("rejects with UNAUTHORIZED", async () => {
+    it("rejects with FORBIDDEN", async () => {
       const caller = callerForUser("user_other_project_admin");
 
       await expect(
         caller.getAllForProject({ projectId: "project_a" }),
-      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
   });
 
   describe("when the user is an admin of a different organization", () => {
     /** @scenario Admin rights in another organization grant nothing across the tenancy boundary */
-    it("rejects with UNAUTHORIZED", async () => {
+    it("rejects with FORBIDDEN", async () => {
       const caller = callerForUser("user_other_org_admin");
 
       await expect(
         caller.getAllForProject({ projectId: "project_a" }),
-      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
   });
 

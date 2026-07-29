@@ -53,9 +53,9 @@ export function profileLangyModel({
   const hasReasoning = metadata?.reasoningConfig?.supported === true;
   const isMultimodal = Boolean(
     metadata?.supportsImageInput ||
-    metadata?.supportsAudioInput ||
-    metadata?.supportsImageOutput ||
-    metadata?.supportsAudioOutput,
+      metadata?.supportsAudioInput ||
+      metadata?.supportsImageOutput ||
+      metadata?.supportsAudioOutput,
   );
 
   const group: LangyModelGroup = isCustom

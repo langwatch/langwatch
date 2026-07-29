@@ -17,9 +17,9 @@ import { Swords } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { ExternalImage, getImageUrl } from "~/components/ExternalImage";
 import { ColumnTypeIcon } from "~/components/shared/ColumnTypeIcon";
-import { ComparisonWinnerCell } from "./ComparisonWinnerCell";
 import { BatchTargetCell } from "./BatchTargetCell";
 import { BatchTargetHeader } from "./BatchTargetHeader";
+import { ComparisonWinnerCell } from "./ComparisonWinnerCell";
 import {
   type BatchTargetAggregate,
   computeAllBatchAggregates,
@@ -33,9 +33,9 @@ import {
   ROW_HEIGHT,
 } from "./tableUtils";
 import type {
+  BatchComparisonColumn,
   BatchDatasetColumn,
   BatchEvaluationData,
-  BatchComparisonColumn,
   BatchResultRow,
   BatchTargetColumn,
 } from "./types";

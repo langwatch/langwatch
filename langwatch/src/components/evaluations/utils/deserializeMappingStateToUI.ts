@@ -18,10 +18,7 @@ export function deserializeMappingStateToUI(
     if (mapping.source) {
       const pathParts: string[] = [mapping.source as string];
       if ("type" in mapping && mapping.type === "thread") {
-        if (
-          "selectedFields" in mapping &&
-          mapping.selectedFields?.length
-        ) {
+        if ("selectedFields" in mapping && mapping.selectedFields?.length) {
           pathParts.push(...mapping.selectedFields);
         }
       } else {
@@ -30,8 +27,7 @@ export function deserializeMappingStateToUI(
           pathParts.push(mapping.subkey);
       }
 
-      const isThreadMapping =
-        "type" in mapping && mapping.type === "thread";
+      const isThreadMapping = "type" in mapping && mapping.type === "thread";
       const sourceId =
         monitorLevel === "thread" || isThreadMapping ? "thread" : "trace";
 

@@ -7,11 +7,7 @@
 
 import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
-import type {
-  Prisma,
-  PrismaClient,
-  SimulationSuite,
-} from "@prisma/client";
+import type { Prisma, PrismaClient, SimulationSuite } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
 import { nanoid } from "nanoid";
 import { ARCHIVED_SLUG_SUFFIX } from "./constants";
@@ -29,9 +25,7 @@ export type UpdateSuiteInput = Partial<Omit<CreateSuiteInput, "projectId">>;
 export class SuiteRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
-  async create(
-    input: CreateSuiteInput,
-  ): Promise<SimulationSuite> {
+  async create(input: CreateSuiteInput): Promise<SimulationSuite> {
     return tracer.withActiveSpan(
       "SuiteRepository.create",
       {
@@ -78,17 +72,20 @@ export class SuiteRepository {
       },
       async (span) => {
         logger.debug(
-          { projectId: params.projectId, suiteId: params.id, operation: "SELECT" },
+          {
+            projectId: params.projectId,
+            suiteId: params.id,
+            operation: "SELECT",
+          },
           "Finding suite by id",
         );
-        const result =
-          await this.prisma.simulationSuite.findFirst({
-            where: {
-              id: params.id,
-              projectId: params.projectId,
-              archivedAt: null,
-            },
-          });
+        const result = await this.prisma.simulationSuite.findFirst({
+          where: {
+            id: params.id,
+            projectId: params.projectId,
+            archivedAt: null,
+          },
+        });
         span.setAttribute("result.found", result !== null);
         return result;
       },
@@ -117,26 +114,27 @@ export class SuiteRepository {
       },
       async (span) => {
         logger.debug(
-          { projectId: params.projectId, slug: params.slug, operation: "SELECT" },
+          {
+            projectId: params.projectId,
+            slug: params.slug,
+            operation: "SELECT",
+          },
           "Finding suite by slug",
         );
-        const result =
-          await this.prisma.simulationSuite.findFirst({
-            where: {
-              slug: params.slug,
-              projectId: params.projectId,
-              archivedAt: null,
-            },
-          });
+        const result = await this.prisma.simulationSuite.findFirst({
+          where: {
+            slug: params.slug,
+            projectId: params.projectId,
+            archivedAt: null,
+          },
+        });
         span.setAttribute("result.found", result !== null);
         return result;
       },
     );
   }
 
-  async findAll(params: {
-    projectId: string;
-  }): Promise<SimulationSuite[]> {
+  async findAll(params: { projectId: string }): Promise<SimulationSuite[]> {
     return tracer.withActiveSpan(
       "SuiteRepository.findAll",
       {
@@ -153,14 +151,13 @@ export class SuiteRepository {
           { projectId: params.projectId, operation: "SELECT" },
           "Finding all suites",
         );
-        const result =
-          await this.prisma.simulationSuite.findMany({
-            where: {
-              projectId: params.projectId,
-              archivedAt: null,
-            },
-            orderBy: { updatedAt: "desc" },
-          });
+        const result = await this.prisma.simulationSuite.findMany({
+          where: {
+            projectId: params.projectId,
+            archivedAt: null,
+          },
+          orderBy: { updatedAt: "desc" },
+        });
         span.setAttribute("result.count", result.length);
         return result;
       },
@@ -186,11 +183,19 @@ export class SuiteRepository {
       },
       async () => {
         logger.debug(
-          { projectId: params.projectId, suiteId: params.id, operation: "UPDATE" },
+          {
+            projectId: params.projectId,
+            suiteId: params.id,
+            operation: "UPDATE",
+          },
           "Updating suite",
         );
         return this.prisma.simulationSuite.update({
-          where: { id: params.id, projectId: params.projectId, archivedAt: null },
+          where: {
+            id: params.id,
+            projectId: params.projectId,
+            archivedAt: null,
+          },
           data: params.data,
         });
       },
@@ -219,13 +224,16 @@ export class SuiteRepository {
       },
       async (span) => {
         logger.debug(
-          { projectId: params.projectId, suiteId: params.id, operation: "UPDATE" },
+          {
+            projectId: params.projectId,
+            suiteId: params.id,
+            operation: "UPDATE",
+          },
           "Archiving suite",
         );
-        const suite =
-          await this.prisma.simulationSuite.findFirst({
-            where: { id: params.id, projectId: params.projectId },
-          });
+        const suite = await this.prisma.simulationSuite.findFirst({
+          where: { id: params.id, projectId: params.projectId },
+        });
         if (!suite) {
           span.setAttribute("result.found", false);
           return null;

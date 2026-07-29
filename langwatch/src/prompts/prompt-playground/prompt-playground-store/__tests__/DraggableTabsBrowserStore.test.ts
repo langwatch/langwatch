@@ -526,8 +526,14 @@ describe("DraggableTabsBrowserStore", () => {
                   id: "window-1",
                   activeTabId: "tab-1",
                   tabs: [
-                    { id: "tab-1", data: createTabData({ meta: { title: "Legacy A" } }) },
-                    { id: "tab-2", data: createTabData({ meta: { title: "Legacy B" } }) },
+                    {
+                      id: "tab-1",
+                      data: createTabData({ meta: { title: "Legacy A" } }),
+                    },
+                    {
+                      id: "tab-2",
+                      data: createTabData({ meta: { title: "Legacy B" } }),
+                    },
                   ],
                 },
               ],
@@ -715,11 +721,15 @@ describe("DraggableTabsBrowserStore", () => {
     it("removes the per-tab localStorage keys of its own tabs", () => {
       store.getState().addTab({ data: createTabData() });
       const tabId = store.getState().windows[0]?.tabs[0]?.id;
-      expect(localStorage.getItem(`${TEST_PROJECT_ID}:tab:${tabId}`)).not.toBeNull();
+      expect(
+        localStorage.getItem(`${TEST_PROJECT_ID}:tab:${tabId}`),
+      ).not.toBeNull();
 
       store.getState().reset();
 
-      expect(localStorage.getItem(`${TEST_PROJECT_ID}:tab:${tabId}`)).toBeNull();
+      expect(
+        localStorage.getItem(`${TEST_PROJECT_ID}:tab:${tabId}`),
+      ).toBeNull();
       expect(
         localStorage.getItem(`${TEST_PROJECT_ID}:draggable-tabs-browser-store`),
       ).toBeNull();

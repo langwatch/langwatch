@@ -145,15 +145,27 @@ describe("Prompt Tags REST API (/api/prompts/tags)", () => {
       it("returns tags with id, name, and createdAt", async () => {
         await prisma.promptTag.createMany({
           data: [
-            { id: `ptag_${nanoid()}`, organizationId: testOrganization.id, name: "canary" },
-            { id: `ptag_${nanoid()}`, organizationId: testOrganization.id, name: "ab-test" },
+            {
+              id: `ptag_${nanoid()}`,
+              organizationId: testOrganization.id,
+              name: "canary",
+            },
+            {
+              id: `ptag_${nanoid()}`,
+              organizationId: testOrganization.id,
+              name: "ab-test",
+            },
           ],
         });
 
         const res = await get("/api/prompts/tags");
 
         expect(res.status).toBe(200);
-        const body = (await res.json()) as Array<{ id: string; name: string; createdAt: string }>;
+        const body = (await res.json()) as Array<{
+          id: string;
+          name: string;
+          createdAt: string;
+        }>;
         const names = body.map((t) => t.name);
         expect(names).toContain("canary");
         expect(names).toContain("ab-test");
@@ -223,7 +235,11 @@ describe("Prompt Tags REST API (/api/prompts/tags)", () => {
       /** @scenario "Creating a duplicate tag returns 409" */
       it("returns 409 conflict", async () => {
         await prisma.promptTag.create({
-          data: { id: `ptag_${nanoid()}`, organizationId: testOrganization.id, name: "canary" },
+          data: {
+            id: `ptag_${nanoid()}`,
+            organizationId: testOrganization.id,
+            name: "canary",
+          },
         });
 
         const res = await post("/api/prompts/tags", { name: "canary" });
@@ -250,7 +266,11 @@ describe("Prompt Tags REST API (/api/prompts/tags)", () => {
     describe("when renaming a valid tag", () => {
       it("returns 200 with new name", async () => {
         await prisma.promptTag.create({
-          data: { id: `ptag_${nanoid()}`, organizationId: testOrganization.id, name: "canary" },
+          data: {
+            id: `ptag_${nanoid()}`,
+            organizationId: testOrganization.id,
+            name: "canary",
+          },
         });
 
         const res = await put("/api/prompts/tags/canary", { name: "beta" });
@@ -263,7 +283,9 @@ describe("Prompt Tags REST API (/api/prompts/tags)", () => {
 
     describe("when old tag does not exist", () => {
       it("returns 404", async () => {
-        const res = await put("/api/prompts/tags/nonexistent", { name: "beta" });
+        const res = await put("/api/prompts/tags/nonexistent", {
+          name: "beta",
+        });
 
         expect(res.status).toBe(404);
       });
@@ -272,7 +294,11 @@ describe("Prompt Tags REST API (/api/prompts/tags)", () => {
     describe("when new name is invalid", () => {
       it("returns 422", async () => {
         await prisma.promptTag.create({
-          data: { id: `ptag_${nanoid()}`, organizationId: testOrganization.id, name: "canary" },
+          data: {
+            id: `ptag_${nanoid()}`,
+            organizationId: testOrganization.id,
+            name: "canary",
+          },
         });
 
         const res = await put("/api/prompts/tags/canary", { name: "INVALID" });
@@ -300,7 +326,11 @@ describe("Prompt Tags REST API (/api/prompts/tags)", () => {
       /** @scenario 'Deleting the seeded "staging" tag succeeds' */
       it("returns 204", async () => {
         await prisma.promptTag.create({
-          data: { id: `ptag_${nanoid()}`, organizationId: testOrganization.id, name: "canary" },
+          data: {
+            id: `ptag_${nanoid()}`,
+            organizationId: testOrganization.id,
+            name: "canary",
+          },
         });
 
         const res = await del("/api/prompts/tags/canary");
@@ -319,7 +349,11 @@ describe("Prompt Tags REST API (/api/prompts/tags)", () => {
       it("cascades to remove PromptTagAssignment rows", async () => {
         const tagId = `ptag_${nanoid()}`;
         await prisma.promptTag.create({
-          data: { id: tagId, organizationId: testOrganization.id, name: "canary" },
+          data: {
+            id: tagId,
+            organizationId: testOrganization.id,
+            name: "canary",
+          },
         });
 
         await prisma.promptTagAssignment.create({
@@ -337,7 +371,11 @@ describe("Prompt Tags REST API (/api/prompts/tags)", () => {
         expect(res.status).toBe(204);
 
         const assignment = await prisma.promptTagAssignment.findFirst({
-          where: { configId: promptConfig.id, tagId, projectId: testProject.id },
+          where: {
+            configId: promptConfig.id,
+            tagId,
+            projectId: testProject.id,
+          },
         });
         expect(assignment).toBeNull();
       });

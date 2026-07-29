@@ -34,8 +34,10 @@ type CachedOrgData = {
   subscriptions: { id: string }[];
 };
 
-const orgCache = new TtlCache<CachedOrgData>(ONE_MINUTE_MS, "ttlcache:billing:orgData:");
-
+const orgCache = new TtlCache<CachedOrgData>(
+  ONE_MINUTE_MS,
+  "ttlcache:billing:orgData:",
+);
 
 export interface ReportUsageForMonthCommandDeps {
   organizations: OrganizationService;
@@ -89,9 +91,7 @@ export class ReportUsageForMonthCommand
 
   constructor(private readonly deps: ReportUsageForMonthCommandDeps) {}
 
-  static getAggregateId(
-    payload: ReportUsageForMonthCommandData,
-  ): string {
+  static getAggregateId(payload: ReportUsageForMonthCommandData): string {
     return payload.organizationId;
   }
 
@@ -114,7 +114,10 @@ export class ReportUsageForMonthCommand
       // 1. Skip conditions
       let org = (await orgCache.get(organizationId)) ?? null;
       if (!org) {
-        org = await this.deps.organizations.getOrganizationForBilling(organizationId);
+        org =
+          await this.deps.organizations.getOrganizationForBilling(
+            organizationId,
+          );
         if (org) {
           await orgCache.set(organizationId, org);
         }
@@ -288,23 +291,22 @@ export class ReportUsageForMonthCommand
     }
 
     try {
-      const results = await usageReportingService
-        .reportUsageDelta({
-          stripeCustomerId,
-          organizationId,
-          events: [
-            {
-              eventName: BILLABLE_EVENTS_EVENT_NAME,
-              identifier,
-              timestamp: Math.floor(Date.now() / 1000),
-              value: delta,
-            },
-          ],
-        });
+      const results = await usageReportingService.reportUsageDelta({
+        stripeCustomerId,
+        organizationId,
+        events: [
+          {
+            eventName: BILLABLE_EVENTS_EVENT_NAME,
+            identifier,
+            timestamp: Math.floor(Date.now() / 1000),
+            value: delta,
+          },
+        ],
+      });
 
       const result = results[0];
 
-      if (!result || !result.reported) {
+      if (!result?.reported) {
         // Permanent Stripe rejection: do NOT update checkpoint.
         logger.error(
           {

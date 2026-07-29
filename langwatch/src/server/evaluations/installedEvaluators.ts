@@ -19,7 +19,8 @@
 
 export const PRESIDIO_ENABLE_ENV_VAR = "LANGWATCH_ENABLE_PRESIDIO";
 export const LINGUA_ENABLE_ENV_VAR = "LANGWATCH_ENABLE_LINGUA";
-export const LEGACY_EVALUATORS_ENABLE_ENV_VAR = "LANGWATCH_ENABLE_LEGACY_EVALUATORS";
+export const LEGACY_EVALUATORS_ENABLE_ENV_VAR =
+  "LANGWATCH_ENABLE_LEGACY_EVALUATORS";
 
 export type EvaluatorUnavailability = {
   /** What is true, in the person's terms. */

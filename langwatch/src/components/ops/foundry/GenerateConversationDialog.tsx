@@ -1,6 +1,14 @@
-import { useState } from "react";
-import { Box, Button, Flex, Text, VStack, HStack, Input } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  Flex,
+  HStack,
+  Input,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import { MessagesSquare } from "lucide-react";
+import { useState } from "react";
 import {
   PopoverBody,
   PopoverContent,
@@ -10,8 +18,8 @@ import {
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useExecutionStore } from "./executionStore";
 import { useFoundryProjectStore } from "./foundryProjectStore";
-import { getFoundryExecutor } from "./traceExecutor";
 import { generateConversation } from "./generateConversation";
+import { getFoundryExecutor } from "./traceExecutor";
 
 const TURN_PRESETS = [10, 25, 50, 100] as const;
 
@@ -93,80 +101,80 @@ export function GenerateConversationDialog() {
           </Text>
 
           <VStack gap={4} align="stretch">
-              <Box>
-                <Flex justify="space-between" mb={1}>
-                  <Text fontSize="xs" color="fg.muted">
-                    Number of turns
-                  </Text>
-                  <Text fontSize="xs" fontFamily="mono" color="fg.default">
-                    {turnCount}
-                  </Text>
-                </Flex>
-                <Input
-                  size="sm"
-                  type="number"
-                  value={turnCount}
-                  onChange={(e) =>
-                    setTurnCount(
-                      Math.max(1, Math.min(200, parseInt(e.target.value) || 1)),
-                    )
-                  }
-                  min={1}
-                  max={200}
-                />
-                <HStack gap={1} mt={1}>
-                  {TURN_PRESETS.map((v) => (
-                    <Button
-                      key={v}
-                      size="xs"
-                      variant={turnCount === v ? "solid" : "ghost"}
-                      colorPalette={turnCount === v ? "orange" : undefined}
-                      onClick={() => setTurnCount(v)}
-                      flex={1}
-                      textStyle="2xs"
-                    >
-                      {v}
-                    </Button>
-                  ))}
-                </HStack>
-              </Box>
-
-              <Box>
-                <Flex justify="space-between" mb={1}>
-                  <Text fontSize="xs" color="fg.muted">
-                    Stagger between turns (ms)
-                  </Text>
-                  <Text fontSize="xs" fontFamily="mono" color="fg.default">
-                    {staggerMs}
-                  </Text>
-                </Flex>
-                <Input
-                  size="sm"
-                  type="number"
-                  value={staggerMs}
-                  onChange={(e) =>
-                    setStaggerMs(Math.max(0, parseInt(e.target.value) || 0))
-                  }
-                  min={0}
-                  step={50}
-                />
-              </Box>
-
-              <Button
-                size="sm"
-                colorPalette="orange"
-                onClick={handleSend}
-                w="full"
-                disabled={!apiKey}
-              >
-                <MessagesSquare size={14} />
-                Send {turnCount} turns
-              </Button>
-              {!apiKey && (
+            <Box>
+              <Flex justify="space-between" mb={1}>
                 <Text fontSize="xs" color="fg.muted">
-                  Navigate to a project first.
+                  Number of turns
                 </Text>
-              )}
+                <Text fontSize="xs" fontFamily="mono" color="fg.default">
+                  {turnCount}
+                </Text>
+              </Flex>
+              <Input
+                size="sm"
+                type="number"
+                value={turnCount}
+                onChange={(e) =>
+                  setTurnCount(
+                    Math.max(1, Math.min(200, parseInt(e.target.value) || 1)),
+                  )
+                }
+                min={1}
+                max={200}
+              />
+              <HStack gap={1} mt={1}>
+                {TURN_PRESETS.map((v) => (
+                  <Button
+                    key={v}
+                    size="xs"
+                    variant={turnCount === v ? "solid" : "ghost"}
+                    colorPalette={turnCount === v ? "orange" : undefined}
+                    onClick={() => setTurnCount(v)}
+                    flex={1}
+                    textStyle="2xs"
+                  >
+                    {v}
+                  </Button>
+                ))}
+              </HStack>
+            </Box>
+
+            <Box>
+              <Flex justify="space-between" mb={1}>
+                <Text fontSize="xs" color="fg.muted">
+                  Stagger between turns (ms)
+                </Text>
+                <Text fontSize="xs" fontFamily="mono" color="fg.default">
+                  {staggerMs}
+                </Text>
+              </Flex>
+              <Input
+                size="sm"
+                type="number"
+                value={staggerMs}
+                onChange={(e) =>
+                  setStaggerMs(Math.max(0, parseInt(e.target.value) || 0))
+                }
+                min={0}
+                step={50}
+              />
+            </Box>
+
+            <Button
+              size="sm"
+              colorPalette="orange"
+              onClick={handleSend}
+              w="full"
+              disabled={!apiKey}
+            >
+              <MessagesSquare size={14} />
+              Send {turnCount} turns
+            </Button>
+            {!apiKey && (
+              <Text fontSize="xs" color="fg.muted">
+                Navigate to a project first.
+              </Text>
+            )}
           </VStack>
         </PopoverBody>
       </PopoverContent>

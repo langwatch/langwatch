@@ -71,9 +71,9 @@ describe("CadenceSection", () => {
         await user.clear(input);
         await user.type(input, "250");
 
-        expect(
-          useAutomationStore.getState().draft.graphAlert.threshold,
-        ).toBe(250);
+        expect(useAutomationStore.getState().draft.graphAlert.threshold).toBe(
+          250,
+        );
       });
     });
 
@@ -87,9 +87,9 @@ describe("CadenceSection", () => {
           "Less than",
         );
 
-        expect(
-          useAutomationStore.getState().draft.graphAlert.operator,
-        ).toBe("lt");
+        expect(useAutomationStore.getState().draft.graphAlert.operator).toBe(
+          "lt",
+        );
       });
     });
   });
@@ -100,7 +100,9 @@ describe("CadenceSection", () => {
       render(<CadenceSection />, { wrapper: Wrapper });
 
       expect(selectContainingOption(/Weekly/i)).toBeInTheDocument();
-      expect(screen.queryByPlaceholderText("0 9 * * 1")).not.toBeInTheDocument();
+      expect(
+        screen.queryByPlaceholderText("0 9 * * 1"),
+      ).not.toBeInTheDocument();
     });
 
     it("commits the cron schedule to the draft in advanced mode", async () => {
@@ -108,9 +110,7 @@ describe("CadenceSection", () => {
       seed({ source: "report" });
       render(<CadenceSection isEdit />, { wrapper: Wrapper });
 
-      await user.click(
-        screen.getByLabelText(/Edit as a cron expression/i),
-      );
+      await user.click(screen.getByLabelText(/Edit as a cron expression/i));
       const cron = screen.getByPlaceholderText("0 9 * * 1");
       await user.clear(cron);
       await user.type(cron, "0 7 * * *");

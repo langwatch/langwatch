@@ -38,7 +38,11 @@ describe("mapZodIssuesToLogContext", () => {
   it("handles multiple issues", () => {
     const result = mapZodIssuesToLogContext([
       { path: ["name"], code: "invalid_type", message: "Required" },
-      { path: ["settings", "model"], code: "invalid_type", message: "Required" },
+      {
+        path: ["settings", "model"],
+        code: "invalid_type",
+        message: "Required",
+      },
     ]);
 
     expect(result).toHaveLength(2);

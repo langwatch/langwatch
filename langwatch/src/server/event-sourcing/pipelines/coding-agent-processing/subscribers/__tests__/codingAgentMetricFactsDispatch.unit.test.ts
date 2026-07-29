@@ -48,6 +48,7 @@ function dataPointEvent({
   valueInt = null,
   pointId = POINT_ID,
   seriesId = SERIES_ID,
+  resourceAttributes = {},
 }: {
   metricName: string;
   attributes?: Record<string, unknown>;
@@ -56,6 +57,7 @@ function dataPointEvent({
   valueInt?: string | null;
   pointId?: string;
   seriesId?: string;
+  resourceAttributes?: Record<string, unknown>;
 }): MetricProcessingEvent {
   return {
     tenantId: createTenantId("tenant-1"),
@@ -71,6 +73,7 @@ function dataPointEvent({
       aggregationTemporality: temporality,
       scopeName: "com.anthropic.claude_code",
       pointAttributesJson: encodeAttributes(attributes),
+      resourceAttributesJson: encodeAttributes(resourceAttributes),
       timeUnixMs: 1_500,
       valueType:
         valueDouble !== null ? "double" : valueInt !== null ? "int" : "none",
@@ -93,6 +96,31 @@ function makeSubscriber() {
 const context = { tenantId: "tenant-1", aggregateId: POINT_ID };
 
 describe("codingAgentMetricFactsDispatch", () => {
+  describe("when a Cowork session's metric arrives", () => {
+    /** @scenario Cowork telemetry that shares Claude Code's event vocabulary is still Cowork */
+    it("labels the contribution claude_cowork from the resource service", async () => {
+      const { subscriber, dispatched } = makeSubscriber();
+
+      // Claude Code's metric vocabulary and scope; only the resource-level
+      // service.name says cowork. Without the service signal this would
+      // first-writer-win the session's agent to claude_code.
+      await subscriber.handle(
+        dataPointEvent({
+          metricName: "claude_code.cost.usage",
+          attributes: { "session.id": "cw-sess-1" },
+          temporality: "cumulative",
+          valueDouble: 0.5,
+          resourceAttributes: { "service.name": "cowork" },
+        }),
+        context,
+      );
+
+      expect(dispatched).toHaveLength(1);
+      expect(dispatched[0]!.agent).toBe("claude_cowork");
+      expect(dispatched[0]!.sessionId).toBe("cw-sess-1");
+    });
+  });
+
   describe("when a cumulative coding-agent metric carries the session key", () => {
     /** @scenario a session that sent only metrics still appears */
     it("contributes the series' converged total, keyed by the series", async () => {

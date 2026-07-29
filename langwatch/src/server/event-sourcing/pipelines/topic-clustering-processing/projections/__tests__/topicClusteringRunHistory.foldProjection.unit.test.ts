@@ -289,9 +289,7 @@ describe("TopicClusteringRunHistoryFoldProjection", () => {
       }
       expect(state.Runs).toHaveLength(TOPIC_CLUSTERING_RUN_HISTORY_LIMIT);
       expect(state.Runs[0]?.runId).toBe(`run-${total - 1}`);
-      expect(
-        state.Runs.some((run) => run.runId === "run-0"),
-      ).toBe(false);
+      expect(state.Runs.some((run) => run.runId === "run-0")).toBe(false);
     });
   });
 });

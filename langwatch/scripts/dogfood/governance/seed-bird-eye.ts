@@ -41,9 +41,8 @@
  *        --org <organizationId> [--days 30] [--rows 240]'
  */
 import { randomBytes } from "crypto";
-
-import { prisma } from "~/server/db";
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import { prisma } from "~/server/db";
 import { ensureHiddenGovernanceProject } from "../../../ee/governance/services/governanceProject.service";
 
 interface Args {
@@ -83,7 +82,7 @@ const MODELS: ModelMix[] = [
     name: "gpt-4o-mini",
     costPerInputToken: 0.00000015,
     costPerOutputToken: 0.0000006,
-    weight: 0.20,
+    weight: 0.2,
     promptRange: [20, 1500],
     completionRange: [10, 1200],
   },
@@ -104,13 +103,15 @@ function parseArgs(argv: string[]): Args {
   // for trend baselines. `--rows N` still overrides for sparse/dense
   // captures.
   const out: Partial<Args> = { days: 30, rows: 480, withAnomaly: true };
+  // biome-ignore lint/style/useForOf: flag parser advances the index (argv[++i]) to consume a value; for...of has no index to advance.
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === "--org") out.organizationId = argv[++i];
     else if (argv[i] === "--days") out.days = Number(argv[++i]);
     else if (argv[i] === "--rows") out.rows = Number(argv[++i]);
     else if (argv[i] === "--no-anomaly") out.withAnomaly = false;
   }
-  if (!out.organizationId) throw new Error("--org <organizationId> is required");
+  if (!out.organizationId)
+    throw new Error("--org <organizationId> is required");
   return out as Args;
 }
 
@@ -324,7 +325,8 @@ async function seedTraceSummaries({
   args: Args;
 }): Promise<{ totalCostUsd: number; rowsInserted: number }> {
   const ch = await getClickHouseClientForProject(govProjectId);
-  if (!ch) throw new Error("ClickHouse client unavailable for governance tenant");
+  if (!ch)
+    throw new Error("ClickHouse client unavailable for governance tenant");
 
   const traceRows: Record<string, unknown>[] = [];
   let totalCostUsd = 0;
@@ -343,7 +345,9 @@ async function seedTraceSummaries({
     // Skew distribution: source 0 (Customer Support) dominates so the
     // rollup has a clear winner and a long tail. Persona skew matches.
     const sourceIdx =
-      Math.random() < 0.5 ? 0 : 1 + (Math.random() < 0.66 ? 0 : Math.random() < 0.5 ? 1 : 2);
+      Math.random() < 0.5
+        ? 0
+        : 1 + (Math.random() < 0.66 ? 0 : Math.random() < 0.5 ? 1 : 2);
     const source = sources[Math.min(sourceIdx, sources.length - 1)]!;
     // Per-source time skew so each team has a distinct trend shape —
     // see SOURCE_TIME_SKEWS for the per-index rationale.
@@ -557,7 +561,10 @@ export async function runSeedBirdEye(args: Args): Promise<SeedBirdEyeSummary> {
       `data-spread=${args.days * 2}d rows=${args.rows}`,
   );
 
-  const govProject = await ensureHiddenGovernanceProject(prisma, args.organizationId);
+  const govProject = await ensureHiddenGovernanceProject(
+    prisma,
+    args.organizationId,
+  );
   console.log(`[seed-bird-eye] hidden Governance Project: id=${govProject.id}`);
 
   const sources = await ensureSourcesAcrossTeams({

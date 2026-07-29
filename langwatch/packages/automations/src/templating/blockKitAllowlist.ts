@@ -252,9 +252,7 @@ function isSafeLinkUrl(url: unknown): url is string {
   return typeof url === "string" && /^https?:\/\//i.test(url);
 }
 
-function sanitizeRichTextInline(
-  el: unknown,
-): Record<string, unknown> | null {
+function sanitizeRichTextInline(el: unknown): Record<string, unknown> | null {
   if (!isBlock(el) || typeof el.type !== "string") return null;
   if (!ALLOWED_RICH_TEXT_INLINE_TYPES.has(el.type)) return null;
   // A link whose URL is not http(s) is dropped entirely rather than rewritten.
@@ -265,9 +263,7 @@ function sanitizeRichTextInline(
 // Every rich_text sub-block carries its own `elements` array, and Slack rejects
 // one that is empty — so a sub-block whose every child was filtered out (a
 // section holding only a mention, say) is DROPPED, not emitted empty.
-function sanitizeRichTextElement(
-  el: unknown,
-): Record<string, unknown> | null {
+function sanitizeRichTextElement(el: unknown): Record<string, unknown> | null {
   if (!isBlock(el) || typeof el.type !== "string") return null;
   if (!ALLOWED_RICH_TEXT_ELEMENT_TYPES.has(el.type)) return null;
   if (!Array.isArray(el.elements)) return null;
@@ -395,11 +391,12 @@ function sanitizeVerifiedBlock(
 
 // A text composition object, trimmed to its shape + boolean flags. Anything not
 // a valid `plain_text` / `mrkdwn` object with a string `text` yields null.
-function sanitizeTextObject(
-  value: unknown,
-): Record<string, unknown> | null {
+function sanitizeTextObject(value: unknown): Record<string, unknown> | null {
   if (!isBlock(value)) return null;
-  if (typeof value.type !== "string" || !ALLOWED_TEXT_OBJECT_TYPES.has(value.type))
+  if (
+    typeof value.type !== "string" ||
+    !ALLOWED_TEXT_OBJECT_TYPES.has(value.type)
+  )
     return null;
   if (typeof value.text !== "string") return null;
   const out: Record<string, unknown> = { type: value.type, text: value.text };
@@ -519,7 +516,8 @@ function sanitizeDataVisualization(
   block: Record<string, unknown>,
 ): Record<string, unknown> | null {
   if (typeof block.title !== "string") return null;
-  if (!isBlock(block.chart) || typeof block.chart.type !== "string") return null;
+  if (!isBlock(block.chart) || typeof block.chart.type !== "string")
+    return null;
   if (!CHART_TYPES.has(block.chart.type)) return null;
   const chart =
     block.chart.type === "pie"
@@ -548,9 +546,10 @@ function sanitizeTableCell(cell: unknown): Record<string, unknown> {
       : placeholder;
   }
   if (cell.type === "raw_number") {
-    const text = typeof cell.text === "string" && cell.text.length > 0
-      ? cell.text
-      : toLabel(cell.value);
+    const text =
+      typeof cell.text === "string" && cell.text.length > 0
+        ? cell.text
+        : toLabel(cell.value);
     if (typeof cell.value !== "number" || text === null) return placeholder;
     return { type: "raw_number", value: cell.value, text };
   }

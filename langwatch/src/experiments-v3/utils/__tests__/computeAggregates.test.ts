@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { EvaluationResults, EvaluatorConfig } from "../../types";
 import {
-  computeMetricStats,
   computeComparisonAggregate,
+  computeMetricStats,
   computeTargetAggregates,
   formatCost,
   formatLatency,

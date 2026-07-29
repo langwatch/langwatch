@@ -11,7 +11,12 @@
 import { promises as fs } from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
-import { chromium, type Browser, type BrowserContext, type Page } from "playwright";
+import {
+  type Browser,
+  type BrowserContext,
+  chromium,
+  type Page,
+} from "playwright";
 import { ADMIN_EMAIL, ADMIN_PASSWORD, APP_BASE, PROJECT_SLUG } from "./config";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -58,7 +63,9 @@ async function getSharedContext(): Promise<BrowserContext> {
 
 /** Call in an `afterAll` if a test file wants a clean browser between files. */
 export async function closeBrowserQA(): Promise<void> {
-  const browser = browserPromise ? await browserPromise.catch(() => null) : null;
+  const browser = browserPromise
+    ? await browserPromise.catch(() => null)
+    : null;
   await browser?.close().catch(() => {});
   browserPromise = null;
   contextPromise = null;
@@ -91,7 +98,9 @@ function slugify(name: string): string {
   );
 }
 
-export async function browserQA(check: BrowserQACheck): Promise<BrowserQAResult> {
+export async function browserQA(
+  check: BrowserQACheck,
+): Promise<BrowserQAResult> {
   await fs.mkdir(SCREENSHOT_DIR, { recursive: true });
   const slug = slugify(check.label);
   let page: Page | null = null;
@@ -108,8 +117,15 @@ export async function browserQA(check: BrowserQACheck): Promise<BrowserQAResult>
     await page.goto(target, { waitUntil: "domcontentloaded", timeout: 30_000 });
     // The app is a client-rendered SPA shell — wait for actual content, not
     // just DOM-ready, or the screenshot captures a blank/loading frame.
-    await page.waitForLoadState("networkidle", { timeout: 15_000 }).catch(() => {});
-    await page.locator("body").getByText(/./).first().waitFor({ timeout: 15_000 }).catch(() => {});
+    await page
+      .waitForLoadState("networkidle", { timeout: 15_000 })
+      .catch(() => {});
+    await page
+      .locator("body")
+      .getByText(/./)
+      .first()
+      .waitFor({ timeout: 15_000 })
+      .catch(() => {});
     await page.waitForTimeout(500);
 
     const verdict: BrowserQAVerdict = check.verify
@@ -124,7 +140,10 @@ export async function browserQA(check: BrowserQACheck): Promise<BrowserQAResult>
     return { ...verdict, screenshotPath };
   } catch (error) {
     const screenshotPath = path.join(SCREENSHOT_DIR, `${slug}-error.png`);
-    if (page) await page.screenshot({ path: screenshotPath, fullPage: true }).catch(() => {});
+    if (page)
+      await page
+        .screenshot({ path: screenshotPath, fullPage: true })
+        .catch(() => {});
     return {
       passed: false,
       notes: `Browser QA threw: ${error instanceof Error ? error.message : String(error)}`,

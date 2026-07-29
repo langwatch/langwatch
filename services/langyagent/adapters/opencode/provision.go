@@ -448,7 +448,7 @@ export default async () => ({
 // OPENCODE_SERVER_PASSWORD. Pure and side-effect free — factored out of Spawn so
 // it's unit-testable without spawning a real subprocess.
 //
-// egressPort is the loopback port of THIS worker's egress adapter (ADR-043),
+// egressPort is the loopback port of THIS worker's egress adapter (ADR-076),
 // 0 when the guard runs no proxy. When set, it is injected as HTTPS_PROXY/
 // HTTP_PROXY so the worker's tools (`gh`, `git`, `npm`, `curl`, `pip`) egress
 // THROUGH the adapter, which enforces the require-TLS / throttle / allow-list /
@@ -541,7 +541,7 @@ func buildWorkerEnv(conversationID, workerHome string, creds domain.Credentials,
 // noProxyHosts is the NO_PROXY list for a worker: loopback plus the in-cluster
 // control-plane and gateway hosts, which egress via their own explicit
 // NetworkPolicy rules and must NOT be funnelled through the per-worker egress
-// adapter (ADR-043: "loopback and the in-cluster control-plane/gateway paths
+// adapter (ADR-076: "loopback and the in-cluster control-plane/gateway paths
 // are unaffected").
 func noProxyHosts(creds domain.Credentials) string {
 	hosts := []string{"127.0.0.1", "localhost", "::1"}

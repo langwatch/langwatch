@@ -24,6 +24,19 @@ type UpstreamError struct {
 	// Message is the provider's error message, used to build a minimal
 	// envelope when Body is empty.
 	Message string
+	// ErrorType and ErrorCode are the provider's own error discriminants
+	// (e.g. OpenAI "insufficient_quota", Anthropic "overloaded_error",
+	// Bedrock "ThrottlingException") as parsed by the provider adapter.
+	// They keep the error's identity on translated lanes where the native
+	// body is not captured: without them the minimal envelope collapses
+	// every provider verdict into a generic "provider_error" and the
+	// client loses the code it dispatches its own handling on.
+	ErrorType string
+	ErrorCode string
+	// Provider names the upstream this error came from (the credential's
+	// provider id), so a multi-provider chain's surviving error says which
+	// account to look at. Empty when the dispatch layer has not stamped it.
+	Provider string
 	// Headers carries the upstream's retry-signaling response headers
 	// (Retry-After, x-should-retry) so the client can honor the provider's
 	// backoff hint and terminal-vs-retryable signal instead of guessing.

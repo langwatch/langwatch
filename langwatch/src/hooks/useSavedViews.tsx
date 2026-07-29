@@ -15,8 +15,8 @@
  */
 
 import { differenceInCalendarDays, subDays } from "date-fns";
-import { useRouter } from "~/utils/compat/next-router";
-import React, {
+import type React from "react";
+import {
   createContext,
   useCallback,
   useContext,
@@ -25,27 +25,26 @@ import React, {
   useRef,
   useState,
 } from "react";
+import { useRouter } from "~/utils/compat/next-router";
+import { availableFilters } from "../server/filters/registry";
+import type { FilterField } from "../server/filters/types";
 import { api } from "../utils/api";
+import {
+  type DefaultView,
+  findMatchingView,
+  MAX_VIEW_NAME_LENGTH,
+  type SavedView,
+} from "./savedViewsLogic";
 import type { FilterParam } from "./useFilterParams";
 import { useFilterParams } from "./useFilterParams";
 import { useOrganizationTeamProject } from "./useOrganizationTeamProject";
-import { availableFilters } from "../server/filters/registry";
-import type { FilterField } from "../server/filters/types";
-import {
-  DEFAULT_VIEWS,
-  findMatchingView,
-  MAX_VIEW_NAME_LENGTH,
-  normalizeFilterValue,
-  type DefaultView,
-  type SavedView,
-} from "./savedViewsLogic";
 
 // Re-export types and constants for consumers
 export {
   DEFAULT_VIEWS,
+  type DefaultView,
   MAX_VIEW_NAME_LENGTH,
   SAVED_VIEWS_SCHEMA_VERSION,
-  type DefaultView,
   type SavedView,
 } from "./savedViewsLogic";
 
@@ -154,9 +153,9 @@ function buildViewQuery({
     }
   }
 
-  if (query) out["query"] = query;
-  if (startDate) out["startDate"] = startDate;
-  if (endDate) out["endDate"] = endDate;
+  if (query) out.query = query;
+  if (startDate) out.startDate = startDate;
+  if (endDate) out.endDate = endDate;
 
   return out;
 }
@@ -177,7 +176,9 @@ function toClientView(dbView: {
     id: dbView.id,
     name: dbView.name,
     userId: dbView.userId,
-    filters: (dbView.filters ?? {}) as Partial<Record<FilterField, FilterParam>>,
+    filters: (dbView.filters ?? {}) as Partial<
+      Record<FilterField, FilterParam>
+    >,
     query: dbView.query ?? undefined,
     period: dbView.period as SavedView["period"],
   };
@@ -266,7 +267,13 @@ function useSavedViewsInternal() {
   // -- Filter actions -------------------------------------------------------
 
   const resetAllFilters = useCallback(() => {
-    const RESET_KEEP = new Set(["project", "view", "group_by", "startDate", "endDate"]);
+    const RESET_KEEP = new Set([
+      "project",
+      "view",
+      "group_by",
+      "startDate",
+      "endDate",
+    ]);
     const cleanQuery = Object.fromEntries(
       Object.entries(router.query).filter(([key]) => RESET_KEEP.has(key)),
     );
@@ -289,7 +296,10 @@ function useSavedViewsInternal() {
       if (period) {
         if (period.relativeDays !== undefined) {
           endDate = new Date().toISOString();
-          startDate = subDays(new Date(), period.relativeDays - 1).toISOString();
+          startDate = subDays(
+            new Date(),
+            period.relativeDays - 1,
+          ).toISOString();
         } else if (period.startDate && period.endDate) {
           startDate = period.startDate;
           endDate = period.endDate;
@@ -297,7 +307,10 @@ function useSavedViewsInternal() {
       }
 
       const queryObj = buildViewQuery({
-        routerQuery: router.query as Record<string, string | string[] | undefined>,
+        routerQuery: router.query as Record<
+          string,
+          string | string[] | undefined
+        >,
         viewFilters,
         query,
         startDate,
@@ -334,8 +347,8 @@ function useSavedViewsInternal() {
     // be populated even when the URL itself is clean.
     const urlQueryString = router.asPath.split("?")[1] ?? "";
     const urlParams = new URLSearchParams(urlQueryString);
-    const hasUrlFilters = Object.values(availableFilters).some(
-      (f) => urlParams.has(f.urlKey),
+    const hasUrlFilters = Object.values(availableFilters).some((f) =>
+      urlParams.has(f.urlKey),
     );
     const hasUrlDates = urlParams.has("startDate") || urlParams.has("endDate");
     const hasUrlQuery = urlParams.has("query");
@@ -344,7 +357,11 @@ function useSavedViewsInternal() {
     const customView = customViews.find((v) => v.id === selectedViewId);
     if (customView) {
       skipNextMatchRef.current = true;
-      void applyViewFilters(customView.filters, customView.query, customView.period);
+      void applyViewFilters(
+        customView.filters,
+        customView.query,
+        customView.period,
+      );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isInitialized, projectId]);
@@ -366,7 +383,11 @@ function useSavedViewsInternal() {
       if (customView) {
         setSelectedViewIdState(viewId);
         writeSelectedViewId(projectId, viewId);
-        void applyViewFilters(customView.filters, customView.query, customView.period);
+        void applyViewFilters(
+          customView.filters,
+          customView.query,
+          customView.period,
+        );
       }
     },
     [customViews, projectId, resetAllFilters, applyViewFilters],
@@ -453,7 +474,15 @@ function useSavedViewsInternal() {
       setSelectedViewIdState(tempId);
       return optimisticView;
     },
-    [filters, router.query.query, router.query.startDate, router.query.endDate, projectId, createMutation, utils.savedViews.getAll],
+    [
+      filters,
+      router.query.query,
+      router.query.startDate,
+      router.query.endDate,
+      projectId,
+      createMutation,
+      utils.savedViews.getAll,
+    ],
   );
 
   const deleteView = useCallback(
@@ -475,7 +504,13 @@ function useSavedViewsInternal() {
 
       deleteMutation.mutate({ projectId, viewId });
     },
-    [selectedViewId, projectId, resetAllFilters, deleteMutation, utils.savedViews.getAll],
+    [
+      selectedViewId,
+      projectId,
+      resetAllFilters,
+      deleteMutation,
+      utils.savedViews.getAll,
+    ],
   );
 
   const renameView = useCallback(
@@ -531,7 +566,14 @@ function useSavedViewsInternal() {
       urlEndDate,
       urlHasDateParams,
     });
-  }, [filters, currentQuery, customViews, urlStartDate, urlEndDate, urlHasDateParams]);
+  }, [
+    filters,
+    currentQuery,
+    customViews,
+    urlStartDate,
+    urlEndDate,
+    urlHasDateParams,
+  ]);
 
   useEffect(() => {
     if (!isInitialized) return;
@@ -552,7 +594,9 @@ function useSavedViewsInternal() {
   }, [matchedViewId, isInitialized, selectedViewId, projectId]);
 
   return {
-    defaultViews: [{ id: "all-traces", name: "All Traces", origin: null }] as DefaultView[],
+    defaultViews: [
+      { id: "all-traces", name: "All Traces", origin: null },
+    ] as DefaultView[],
     customViews,
     selectedViewId,
     isInitialized,
@@ -581,7 +625,6 @@ export function SavedViewsProvider({
     </SavedViewsContext.Provider>
   );
 }
-
 
 export function useSavedViews(): SavedViewsContextValue {
   const context = useContext(SavedViewsContext);

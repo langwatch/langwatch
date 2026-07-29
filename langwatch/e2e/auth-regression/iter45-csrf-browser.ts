@@ -9,8 +9,9 @@
  * headers; BetterAuth should respond with 403 Forbidden and no
  * Set-Cookie header.
  */
-import { chromium } from "playwright";
+
 import { createServer } from "http";
+import { chromium } from "playwright";
 import { prisma } from "../../src/server/db";
 
 const BASE_URL = process.env.NEXTAUTH_URL ?? "http://localhost:5571";
@@ -75,12 +76,18 @@ async function main() {
   const browser = await chromium.launch({ headless: true });
 
   try {
-    console.log("\n[1] Cross-site form POST from evil.localhost → /sign-up/email");
+    console.log(
+      "\n[1] Cross-site form POST from evil.localhost → /sign-up/email",
+    );
     // Use "evil.localhost" so the browser sees it as a distinct site
     // from "localhost" (Sec-Fetch-Site: cross-site).
     const ctx = await browser.newContext();
     const page = await ctx.newPage();
-    const responses: Array<{ url: string; status: number; headers: Record<string, string> }> = [];
+    const responses: Array<{
+      url: string;
+      status: number;
+      headers: Record<string, string>;
+    }> = [];
     page.on("response", (resp) => {
       if (resp.url().includes(BASE_URL)) {
         responses.push({
@@ -127,10 +134,7 @@ async function main() {
     const attackerUser = await prisma.user.findUnique({
       where: { email: ATTACKER_EMAIL },
     });
-    check(
-      "no User row created in DB for attacker email",
-      !attackerUser,
-    );
+    check("no User row created in DB for attacker email", !attackerUser);
 
     // Verify the browser has NOT acquired a session cookie for BASE_URL.
     const cookies = await ctx.cookies(BASE_URL);

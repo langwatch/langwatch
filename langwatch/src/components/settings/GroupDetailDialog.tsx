@@ -10,24 +10,24 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { X } from "lucide-react";
-import { Search } from "lucide-react";
+import type { TeamUserRole } from "@prisma/client";
+import { Search, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { RandomColorAvatar } from "~/components/RandomColorAvatar";
 import { Dialog } from "~/components/ui/dialog";
 import { InputGroup } from "~/components/ui/input-group";
 import { Select } from "~/components/ui/select";
 import { toaster } from "~/components/ui/toaster";
-import { api } from "~/utils/api";
+import { showErrorToast } from "~/features/errors";
 import type { RouterOutputs } from "~/utils/api";
-import { TeamUserRole } from "@prisma/client";
+import { api } from "~/utils/api";
 import {
   BindingInputRow,
-  roleBadgeColor,
-  scopeTypeLabel,
-  SourceBadge,
   type BindingInputRowHandle,
   type PendingBinding,
+  roleBadgeColor,
+  SourceBadge,
+  scopeTypeLabel,
 } from "./GroupBindingInputRow";
 
 type Group = RouterOutputs["group"]["listAll"][number];
@@ -52,11 +52,19 @@ export function GroupDetailDialog({
   const [pendingName, setPendingName] = useState(group.name);
   const [committedName, setCommittedName] = useState(group.name);
 
-  const [pendingBindingRemovals, setPendingBindingRemovals] = useState<Set<string>>(new Set());
-  const [pendingBindingAdditions, setPendingBindingAdditions] = useState<PendingBinding[]>([]);
+  const [pendingBindingRemovals, setPendingBindingRemovals] = useState<
+    Set<string>
+  >(new Set());
+  const [pendingBindingAdditions, setPendingBindingAdditions] = useState<
+    PendingBinding[]
+  >([]);
 
-  const [pendingRemovals, setPendingRemovals] = useState<Set<string>>(new Set());
-  const [pendingAdditions, setPendingAdditions] = useState<PendingAddition[]>([]);
+  const [pendingRemovals, setPendingRemovals] = useState<Set<string>>(
+    new Set(),
+  );
+  const [pendingAdditions, setPendingAdditions] = useState<PendingAddition[]>(
+    [],
+  );
 
   const [addMemberId, setAddMemberId] = useState("");
   const [memberSearch, setMemberSearch] = useState("");
@@ -80,7 +88,8 @@ export function GroupDetailDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, group.id]);
 
-  const nameChanged = pendingName.trim() !== committedName && pendingName.trim() !== "";
+  const nameChanged =
+    pendingName.trim() !== committedName && pendingName.trim() !== "";
   const hasChanges =
     nameChanged ||
     pendingBindingRemovals.size > 0 ||
@@ -94,10 +103,11 @@ export function GroupDetailDialog({
     { enabled: open },
   );
 
-  const orgMembers = api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
-    { organizationId },
-    { enabled: open && canManage },
-  );
+  const orgMembers =
+    api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
+      { organizationId },
+      { enabled: open && canManage },
+    );
 
   // ── mutations ────────────────────────────────────────────────────────────────
   const applyEdits = api.group.applyEdits.useMutation();
@@ -132,8 +142,7 @@ export function GroupDetailDialog({
       toaster.create({ title: "Group updated", type: "success" });
       onClose();
     } catch (e) {
-      const message = e instanceof Error ? e.message : "Failed to save";
-      toaster.create({ title: message, type: "error" });
+      showErrorToast({ error: e, fallbackTitle: "Couldn't update this group" });
     } finally {
       setIsSaving(false);
     }
@@ -178,7 +187,12 @@ export function GroupDetailDialog({
   return (
     <Dialog.Root
       open={open}
-      onOpenChange={(e) => { if (!e.open) { reset(); onClose(); } }}
+      onOpenChange={(e) => {
+        if (!e.open) {
+          reset();
+          onClose();
+        }
+      }}
       size="lg"
     >
       <Dialog.Content bg="bg" maxHeight="90vh" overflowY="auto">
@@ -214,9 +228,12 @@ export function GroupDetailDialog({
 
               {/* ── Access bindings ── */}
               <Box>
-                <Text fontSize="sm" fontWeight="semibold" mb={3}>Access granted</Text>
+                <Text fontSize="sm" fontWeight="semibold" mb={3}>
+                  Access granted
+                </Text>
 
-                {d.bindings.length === 0 && pendingBindingAdditions.length === 0 ? (
+                {d.bindings.length === 0 &&
+                pendingBindingAdditions.length === 0 ? (
                   <Text fontSize="sm" color="fg.muted" fontStyle="italic">
                     No access configured yet.
                   </Text>
@@ -227,7 +244,8 @@ export function GroupDetailDialog({
                       return (
                         <HStack
                           key={b.id}
-                          px={3} py={2}
+                          px={3}
+                          py={2}
                           bg="bg.muted"
                           borderRadius="md"
                           fontSize="sm"
@@ -237,7 +255,9 @@ export function GroupDetailDialog({
                           <Badge
                             colorPalette={roleBadgeColor(b.role)}
                             size="sm"
-                            textDecoration={markedForRemoval ? "line-through" : undefined}
+                            textDecoration={
+                              markedForRemoval ? "line-through" : undefined
+                            }
                           >
                             {b.customRoleName ?? b.role}
                           </Badge>
@@ -245,9 +265,12 @@ export function GroupDetailDialog({
                           <Badge
                             colorPalette="purple"
                             size="sm"
-                            textDecoration={markedForRemoval ? "line-through" : undefined}
+                            textDecoration={
+                              markedForRemoval ? "line-through" : undefined
+                            }
                           >
-                            {scopeTypeLabel(b.scopeType)} {b.scopeName ?? b.scopeId}
+                            {scopeTypeLabel(b.scopeType)}{" "}
+                            {b.scopeName ?? b.scopeId}
                           </Badge>
                           <Spacer />
                           {canManage && (
@@ -255,7 +278,11 @@ export function GroupDetailDialog({
                               size="xs"
                               variant="ghost"
                               color={markedForRemoval ? "blue.500" : "fg.muted"}
-                              aria-label={markedForRemoval ? "Undo removal" : `Remove binding`}
+                              aria-label={
+                                markedForRemoval
+                                  ? "Undo removal"
+                                  : `Remove binding`
+                              }
                               onClick={() => toggleBindingRemoval(b.id)}
                             >
                               <X size={14} />
@@ -268,7 +295,8 @@ export function GroupDetailDialog({
                     {pendingBindingAdditions.map((b, i) => (
                       <HStack
                         key={i}
-                        px={3} py={2}
+                        px={3}
+                        py={2}
                         bg="bg.muted"
                         borderRadius="md"
                         fontSize="sm"
@@ -279,7 +307,8 @@ export function GroupDetailDialog({
                         </Badge>
                         <Text color="fg.muted">on</Text>
                         <Badge colorPalette="purple" size="sm">
-                          {scopeTypeLabel(b.scopeType)} {b.scopeName ?? b.scopeId}
+                          {scopeTypeLabel(b.scopeType)}{" "}
+                          {b.scopeName ?? b.scopeId}
                         </Badge>
                         <Spacer />
                         <Button
@@ -288,7 +317,9 @@ export function GroupDetailDialog({
                           color="fg.muted"
                           aria-label="Undo add"
                           onClick={() =>
-                            setPendingBindingAdditions((prev) => prev.filter((_, j) => j !== i))
+                            setPendingBindingAdditions((prev) =>
+                              prev.filter((_, j) => j !== i),
+                            )
                           }
                         >
                           <X size={14} />
@@ -302,41 +333,71 @@ export function GroupDetailDialog({
                   <BindingInputRow
                     ref={bindingInputRef}
                     organizationId={organizationId}
-                    onAdd={(b) => setPendingBindingAdditions((prev) => [...prev, b])}
+                    onAdd={(b) =>
+                      setPendingBindingAdditions((prev) => [...prev, b])
+                    }
                   />
                 )}
               </Box>
 
               {/* ── Members ── */}
               <Box>
-                <Text fontSize="sm" fontWeight="semibold" mb={3}>Members</Text>
+                <Text fontSize="sm" fontWeight="semibold" mb={3}>
+                  Members
+                </Text>
                 {d.scimSource && (
-                  <Box px={3} py={2} bg="bg.muted" borderRadius="md" mb={3} fontSize="sm" color="fg.muted">
+                  <Box
+                    px={3}
+                    py={2}
+                    bg="bg.muted"
+                    borderRadius="md"
+                    mb={3}
+                    fontSize="sm"
+                    color="fg.muted"
+                  >
                     Membership managed by {d.scimSource.toUpperCase()} via SCIM.
                   </Box>
                 )}
 
                 {d.members.length === 0 && pendingAdditions.length === 0 ? (
-                  <Text fontSize="sm" color="fg.muted" fontStyle="italic">No members yet.</Text>
+                  <Text fontSize="sm" color="fg.muted" fontStyle="italic">
+                    No members yet.
+                  </Text>
                 ) : (
                   <>
                     {d.members.map((m) => {
                       const markedForRemoval = pendingRemovals.has(m.userId);
                       return (
-                        <HStack key={m.userId} py={1} fontSize="sm" opacity={markedForRemoval ? 0.4 : 1} transition="opacity 0.15s">
+                        <HStack
+                          key={m.userId}
+                          py={1}
+                          fontSize="sm"
+                          opacity={markedForRemoval ? 0.4 : 1}
+                          transition="opacity 0.15s"
+                        >
                           <RandomColorAvatar
                             name={m.name ?? m.email ?? "?"}
                             image={m.image}
                             size="xs"
                           />
-                          <Text flex={1} textDecoration={markedForRemoval ? "line-through" : undefined}>
+                          <Text
+                            flex={1}
+                            textDecoration={
+                              markedForRemoval ? "line-through" : undefined
+                            }
+                          >
                             {m.name ?? m.email}
                           </Text>
                           {canManage && !d.scimSource && (
                             <Button
-                              size="xs" variant="ghost"
+                              size="xs"
+                              variant="ghost"
                               color={markedForRemoval ? "blue.500" : "fg.muted"}
-                              aria-label={markedForRemoval ? `Undo removal of ${m.name ?? m.email}` : `Mark ${m.name ?? m.email} for removal`}
+                              aria-label={
+                                markedForRemoval
+                                  ? `Undo removal of ${m.name ?? m.email}`
+                                  : `Mark ${m.name ?? m.email} for removal`
+                              }
                               onClick={() => toggleMemberRemoval(m.userId)}
                             >
                               <X size={14} />
@@ -347,12 +408,24 @@ export function GroupDetailDialog({
                     })}
                     {pendingAdditions.map((a) => (
                       <HStack key={a.userId} py={1} fontSize="sm" opacity={0.7}>
-                        <RandomColorAvatar name={a.label} image={a.image} size="xs" />
-                        <Text flex={1} color="green.600">{a.label}</Text>
+                        <RandomColorAvatar
+                          name={a.label}
+                          image={a.image}
+                          size="xs"
+                        />
+                        <Text flex={1} color="green.600">
+                          {a.label}
+                        </Text>
                         <Button
-                          size="xs" variant="ghost" color="fg.muted"
+                          size="xs"
+                          variant="ghost"
+                          color="fg.muted"
                           aria-label={`Undo adding ${a.label}`}
-                          onClick={() => setPendingAdditions((prev) => prev.filter((x) => x.userId !== a.userId))}
+                          onClick={() =>
+                            setPendingAdditions((prev) =>
+                              prev.filter((x) => x.userId !== a.userId),
+                            )
+                          }
                         >
                           <X size={14} />
                         </Button>
@@ -361,66 +434,94 @@ export function GroupDetailDialog({
                   </>
                 )}
 
-                {canManage && !d.scimSource && (() => {
-                  const allAvailable = (orgMembers.data?.members ?? [])
-                    .filter((m) => !existingMemberIds.has(m.userId))
-                    .map((m) => ({
-                      label: `${m.user.name ?? m.user.email} (${m.user.email})`,
-                      value: m.userId,
-                      image: m.user.image ?? null,
-                    }))
-                    .sort((a, b) => a.label.localeCompare(b.label));
-                  const availableItems = memberSearch
-                    ? allAvailable.filter((m) => m.label.toLowerCase().includes(memberSearch.toLowerCase()))
-                    : allAvailable;
-                  const availableCollection = createListCollection({ items: availableItems });
+                {canManage &&
+                  !d.scimSource &&
+                  (() => {
+                    const allAvailable = (orgMembers.data?.members ?? [])
+                      .filter((m) => !existingMemberIds.has(m.userId))
+                      .map((m) => ({
+                        label: `${m.user.name ?? m.user.email} (${m.user.email})`,
+                        value: m.userId,
+                        image: m.user.image ?? null,
+                      }))
+                      .sort((a, b) => a.label.localeCompare(b.label));
+                    const availableItems = memberSearch
+                      ? allAvailable.filter((m) =>
+                          m.label
+                            .toLowerCase()
+                            .includes(memberSearch.toLowerCase()),
+                        )
+                      : allAvailable;
+                    const availableCollection = createListCollection({
+                      items: availableItems,
+                    });
 
-                  return (
-                    <HStack gap={2} mt={2}>
-                      <Select.Root
-                        collection={availableCollection}
-                        value={addMemberId ? [addMemberId] : []}
-                        onValueChange={(e) => setAddMemberId(e.value[0] ?? "")}
-                        size="sm" flex={1}
-                      >
-                        <Select.Trigger>
-                          <Select.ValueText placeholder="Add member..." />
-                        </Select.Trigger>
-                        <Select.Content>
-                          <Box position="sticky" top={0} zIndex={1} bg="bg" pb={1}>
-                            <InputGroup startElement={<Search size={14} />} startOffset="2px" width="full">
-                              <Input
-                                size="sm" placeholder="Search members..."
-                                value={memberSearch}
-                                onChange={(e) => setMemberSearch(e.target.value)}
-                                onKeyDown={(e) => e.stopPropagation()}
-                              />
-                            </InputGroup>
-                          </Box>
-                          {availableItems.map((item) => (
-                            <Select.Item key={item.value} item={item}>{item.label}</Select.Item>
-                          ))}
-                        </Select.Content>
-                      </Select.Root>
-                      <Button
-                        size="sm"
-                        colorPalette={addMemberId ? "blue" : undefined}
-                        disabled={!addMemberId}
-                        onClick={() => {
-                          const item = allAvailable.find((a) => a.value === addMemberId);
-                          if (item)
-                            stageMemberAdd({
-                              userId: item.value,
-                              label: item.label,
-                              image: item.image,
-                            });
-                        }}
-                      >
-                        Add
-                      </Button>
-                    </HStack>
-                  );
-                })()}
+                    return (
+                      <HStack gap={2} mt={2}>
+                        <Select.Root
+                          collection={availableCollection}
+                          value={addMemberId ? [addMemberId] : []}
+                          onValueChange={(e) =>
+                            setAddMemberId(e.value[0] ?? "")
+                          }
+                          size="sm"
+                          flex={1}
+                        >
+                          <Select.Trigger>
+                            <Select.ValueText placeholder="Add member..." />
+                          </Select.Trigger>
+                          <Select.Content>
+                            <Box
+                              position="sticky"
+                              top={0}
+                              zIndex={1}
+                              bg="bg"
+                              pb={1}
+                            >
+                              <InputGroup
+                                startElement={<Search size={14} />}
+                                startOffset="2px"
+                                width="full"
+                              >
+                                <Input
+                                  size="sm"
+                                  placeholder="Search members..."
+                                  value={memberSearch}
+                                  onChange={(e) =>
+                                    setMemberSearch(e.target.value)
+                                  }
+                                  onKeyDown={(e) => e.stopPropagation()}
+                                />
+                              </InputGroup>
+                            </Box>
+                            {availableItems.map((item) => (
+                              <Select.Item key={item.value} item={item}>
+                                {item.label}
+                              </Select.Item>
+                            ))}
+                          </Select.Content>
+                        </Select.Root>
+                        <Button
+                          size="sm"
+                          colorPalette={addMemberId ? "blue" : undefined}
+                          disabled={!addMemberId}
+                          onClick={() => {
+                            const item = allAvailable.find(
+                              (a) => a.value === addMemberId,
+                            );
+                            if (item)
+                              stageMemberAdd({
+                                userId: item.value,
+                                label: item.label,
+                                image: item.image,
+                              });
+                          }}
+                        >
+                          Add
+                        </Button>
+                      </HStack>
+                    );
+                  })()}
               </Box>
             </VStack>
           )}
@@ -428,7 +529,13 @@ export function GroupDetailDialog({
 
         {canManage && (
           <Dialog.Footer>
-            <Button variant="outline" onClick={() => { reset(); onClose(); }}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                reset();
+                onClose();
+              }}
+            >
               Cancel
             </Button>
             <Button

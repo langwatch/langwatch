@@ -1,8 +1,8 @@
 import type {
-	Projection,
-	ProjectionStore,
-	ProjectionStoreReadContext,
-	ProjectionStoreWriteContext,
+  Projection,
+  ProjectionStore,
+  ProjectionStoreReadContext,
+  ProjectionStoreWriteContext,
 } from "../../../";
 
 export interface ExperimentRunStateRepository<

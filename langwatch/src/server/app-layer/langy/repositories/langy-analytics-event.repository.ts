@@ -1,3 +1,5 @@
+// biome-ignore-all lint/suspicious/noEmptyBlockStatements: Null* repositories implement the interface as intentional no-ops.
+
 export interface LangyAnalyticsEventRecord {
   tenantId: string;
   eventId: string;

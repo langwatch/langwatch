@@ -31,11 +31,11 @@ import {
   showMissingModelToast,
   showProviderDisabledToast,
 } from "../components/MissingModelToast";
+import { useUpgradeModalStore } from "../stores/upgradeModalStore";
 import {
   invalidateModelProviderQueries,
   subscribeToModelProvidersUpdated,
 } from "./modelProviderSync";
-import { useUpgradeModalStore } from "../stores/upgradeModalStore";
 import { sseLink } from "./sseLink";
 import {
   extractAiCallFailedInfo,
@@ -350,9 +350,10 @@ function ModelProviderCrossTabSync() {
   const utils = api.useContext();
 
   useEffect(
-    () => subscribeToModelProvidersUpdated(() => {
-      void invalidateModelProviderQueries(utils);
-    }),
+    () =>
+      subscribeToModelProvidersUpdated(() => {
+        void invalidateModelProviderQueries(utils);
+      }),
     [utils],
   );
 

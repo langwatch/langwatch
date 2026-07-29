@@ -158,7 +158,9 @@ describe("a tool call refused on a plan limit", () => {
 
     it("offers no upgrade action they would be refused at", () => {
       renderTurn();
-      expect(screen.queryByRole("button", { name: /upgrade plan/i })).toBeNull();
+      expect(
+        screen.queryByRole("button", { name: /upgrade plan/i }),
+      ).toBeNull();
     });
 
     it("tells them who to ask", () => {

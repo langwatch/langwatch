@@ -19,7 +19,10 @@ const GENERIC = "Sign in did not go through. Please try again.";
 const isInternalCode = (value: string): boolean => !/\s/.test(value.trim());
 
 const normalize = (value: string | undefined): string =>
-  (value ?? "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+  (value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
 
 export const authFailureMessage = ({
   code,

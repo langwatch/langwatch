@@ -39,7 +39,7 @@ It omits `fsGroup`, since sharing it would reopen the cross-worker file boundary
 
 gVisor's kernel implements **no netfilter**. `iptables` and `nftables` fail in every mode under gVisor, so the usual way to control a container's outbound traffic (an `iptables` OWNER-match DROP or a REDIRECT to a local proxy) is not available here.
 
-That is why Langy enforces egress at the application layer instead: a per-worker CONNECT proxy (ADR-043) that the worker's `HTTPS_PROXY` points at. It checks TLS, checks the destination against the allow-list, and cross-checks the TLS SNI against the CONNECT authority to block domain fronting.
+That is why Langy enforces egress at the application layer instead: a per-worker CONNECT proxy (ADR-076) that the worker's `HTTPS_PROXY` points at. It checks TLS, checks the destination against the allow-list, and cross-checks the TLS SNI against the CONNECT authority to block domain fronting.
 
 The earlier `iptables`-based rule and its `NET_ADMIN` capability were removed because they are dead under gVisor.
 

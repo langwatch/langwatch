@@ -69,7 +69,9 @@ interface TabWindowContextValue {
   activeTabId?: string;
 }
 
-const TabWindowContext = React.createContext<TabWindowContextValue | null>(null);
+const TabWindowContext = React.createContext<TabWindowContextValue | null>(
+  null,
+);
 
 function useTabWindowContext() {
   const context = React.useContext(TabWindowContext);

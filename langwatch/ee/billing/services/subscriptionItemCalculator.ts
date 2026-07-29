@@ -1,6 +1,6 @@
-import Stripe from "stripe";
+import type Stripe from "stripe";
 import { PLAN_LIMITS } from "../planLimits";
-import { PlanTypes, type PlanTypes as PlanType } from "../planTypes";
+import { type PlanTypes as PlanType, PlanTypes } from "../planTypes";
 import { isStripePriceName, prices } from "../stripe/stripePriceCatalog";
 
 export { prices };
@@ -202,7 +202,9 @@ export const calculateQuantityForPrice = ({
     return (quantity ?? 0) + (planLimits?.maxMembers ?? 0);
   }
 
-  return (quantity ?? 0) * config.tracesUnit + (planLimits?.maxMessagesPerMonth ?? 0);
+  return (
+    (quantity ?? 0) * config.tracesUnit + (planLimits?.maxMessagesPerMonth ?? 0)
+  );
 };
 
 export const createItemsToAdd = (

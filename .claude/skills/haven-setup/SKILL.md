@@ -7,7 +7,7 @@ argument-hint: "[--with-observability] [--managed-db] [--foreground]"
 
 # Haven Setup — thuishaven local dev stack
 
-You are bringing up the LangWatch app via haven (ADR-048), not raw `pnpm dev`. Read `dev/haven.mk` and the "Local dev by hostname" section of the root `CLAUDE.md` if you need the command reference — this skill is the field-tested runbook on top of that, including failure modes that are NOT in the docs yet.
+You are bringing up the LangWatch app via haven, not raw `pnpm dev`. Read `dev/haven.mk` and the "Local dev by hostname" section of the root `CLAUDE.md` if you need the command reference — this skill is the field-tested runbook on top of that, including failure modes that are NOT in the docs yet.
 
 ## Step 0: Is it already running?
 
@@ -21,7 +21,7 @@ curl -s -o /dev/null -w "%{http_code}\n" "https://app.<slug>.langwatch.localhost
 
 `~/.portless/proxy.port` holds whatever port the proxy actually bound (443 if sudo elevation worked, 1355 if it fell back — see Gotcha 3). Don't hardcode `:443` or assume no port suffix; read it.
 
-(`<slug>` is the sanitized worktree directory name — `make haven list` shows it if unsure.) If both indicate it's up, stop here and report the URL. A background task ID from an earlier turn is NOT proof it's still alive — session/task boundaries can silently kill orphaned background processes (including the portless proxy daemon, see Gotcha 3). Always verify live state, never trust a remembered task ID.
+(`<slug>` is the sanitized worktree directory name — `make haven status` shows it if unsure.) If both indicate it's up, stop here and report the URL. A background task ID from an earlier turn is NOT proof it's still alive — session/task boundaries can silently kill orphaned background processes (including the portless proxy daemon, see Gotcha 3). Always verify live state, never trust a remembered task ID.
 
 **If that `curl` returns `000`/times out (on WSL2 especially), do NOT conclude "app not up yet" and just wait longer** — confirmed live: this burned many turns and several "is it ready yet?" round-trips where the app had been healthy the whole time and the *DNS resolution itself* was broken (Gotcha 4). Before assuming a slow cold boot, disambiguate in ~5s:
 
@@ -31,13 +31,13 @@ getent hosts app.<slug>.langwatch.localhost   # glibc/curl's actual resolution p
 
 Empty output (while `resolvectl query` for the same name works — see Gotcha 4) means broken DNS, not a slow server — jump to Gotcha 4 immediately rather than polling `curl` in a loop. You can also confirm the app itself is fine in the meantime with `curl --resolve <host>:<port>:127.0.0.1 ...`, which bypasses glibc resolution entirely.
 
-## Step 1: One-time setup
+## Step 1: Bring the stack up
 
 ```bash
-make haven setup
+pnpm dev:haven
 ```
 
-Installs/verifies the `portless` proxy and trusts its CA (needs port 443 + a one-time sudo prompt — see Gotcha 3 if this hangs non-interactively). Idempotent; safe to re-run.
+There is no separate setup step any more (ADR-064 deleted `haven setup`): `up` installs/verifies the `portless` proxy and trusts its CA itself, as an idempotent preflight (needs port 443 + a one-time sudo prompt — see Gotcha 3 if this hangs non-interactively).
 
 ## Step 2: Decide which services haven should manage
 
@@ -82,7 +82,7 @@ install -m0755 opencode ~/.local/bin/opencode   # confirm this dir is on $PATH f
 rm -f opencode opencode.tar.gz
 ```
 
-**Even with `opencode` installed and every DNS issue fixed, the chat can still hang until `AGENT_CHAT_TIMEOUT_MS` (120s) with no visible error** — symptom: worker creates fine (202 on `/worker/create`), SSE connects fine, but the panel sits on "Starting up…" / "Reconnecting to the agent…" forever. Root cause: the per-worker egress adapter (`services/langyagent/adapters/egress/enforcing.go`, ADR-043) enforces `EgressRequireTLS` by default — "only opaque CONNECT :443 tunnels; cleartext forwards... are refused" — and the worker's own `OPENAI_BASE_URL` points at the manager's LOCAL loopback relay over plain `http://` (not `:443`/TLS), so its own legitimate LLM call gets refused by this rung. `NO_PROXY` is supposed to route this call around the egress proxy entirely (`127.0.0.1` is in the list), but something in opencode's Bun runtime still routes it through — not fully root-caused, just confirmed as the trigger. Confirm this is the failure (not DNS, not a missing binary) by tailing opencode's own **unbuffered** per-session log — do NOT rely on `server.log` here, see Gotcha 5:
+**Even with `opencode` installed and every DNS issue fixed, the chat can still hang until `AGENT_CHAT_TIMEOUT_MS` (120s) with no visible error** — symptom: worker creates fine (202 on `/worker/create`), SSE connects fine, but the panel sits on "Starting up…" / "Reconnecting to the agent…" forever. Root cause: the per-worker egress adapter (`services/langyagent/adapters/egress/enforcing.go`, ADR-076) enforces `EgressRequireTLS` by default — "only opaque CONNECT :443 tunnels; cleartext forwards... are refused" — and the worker's own `OPENAI_BASE_URL` points at the manager's LOCAL loopback relay over plain `http://` (not `:443`/TLS), so its own legitimate LLM call gets refused by this rung. `NO_PROXY` is supposed to route this call around the egress proxy entirely (`127.0.0.1` is in the list), but something in opencode's Bun runtime still routes it through — not fully root-caused, just confirmed as the trigger. Confirm this is the failure (not DNS, not a missing binary) by tailing opencode's own **unbuffered** per-session log — do NOT rely on `server.log` here, see Gotcha 5:
 
 ```bash
 find ~/.langwatch/portless/langyagent -iname opencode.log 2>/dev/null | xargs tail -f
@@ -147,10 +147,10 @@ ls -la ~/.portless/    # look for files NOT owned by your user
 
 ```bash
 rm -f ~/.portless/proxy.tls ~/.portless/ca.srl
-make haven setup   # or retry pnpm dev:haven directly
+pnpm dev:haven   # up re-installs and re-trusts the CA by itself
 ```
 
-It'll still fall back to the unprivileged port (1355) since there's no interactive TTY for the sudo *elevation* itself (that part genuinely can't be done non-interactively without the user's password) — that's fine, just means the app URL is `https://app.<slug>.langwatch.localhost:1355` instead of the clean port-443 form. Note the `:1355` in every URL you report back. Only ask the user to run something themselves if `make haven setup` still fails after clearing these files.
+It'll still fall back to the unprivileged port (1355) since there's no interactive TTY for the sudo *elevation* itself (that part genuinely can't be done non-interactively without the user's password) — that's fine, just means the app URL is `https://app.<slug>.langwatch.localhost:1355` instead of the clean port-443 form. Note the `:1355` in every URL you report back. Only ask the user to run something themselves if `pnpm dev:haven` still fails after clearing these files.
 
 ## Gotcha 4: `*.langwatch.localhost` stops resolving (WSL2 resolv.conf drift)
 

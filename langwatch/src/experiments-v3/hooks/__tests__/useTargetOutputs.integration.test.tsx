@@ -135,7 +135,11 @@ describe("useTargetOutputs", () => {
   describe("given a schema-less output and the prompt query resolves with outputs", () => {
     it("returns the prompt's outputs", () => {
       const resolvedOutputs = [
-        { identifier: "output", type: "json_schema", json_schema: { type: "object" } },
+        {
+          identifier: "output",
+          type: "json_schema",
+          json_schema: { type: "object" },
+        },
       ];
       mockQueryResults = [
         { data: { outputs: resolvedOutputs }, isLoading: false },

@@ -3,8 +3,8 @@ import type { Event } from "../../domain/types";
 import { EventSourcingService } from "../eventSourcingService";
 import {
   cleanupTestEnvironment,
-  createMockMapProjectionDefinition,
   createMockEventStore,
+  createMockMapProjectionDefinition,
   createTestContext,
   createTestEvent,
   setupTestEnvironment,

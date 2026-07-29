@@ -1,5 +1,5 @@
 /**
- * SECURITY invariant (LANGY_WORKER_REDESIGN_PLAN §0a): the per-conversation
+ * SECURITY invariant (see `app-layer/langy/streaming/langyFrameAuth.ts`): the per-conversation
  * `runToken` is the HMAC key that authenticates the worker's stream. It must
  * live ONLY on the server-only state column and must NEVER reach a client-facing
  * projection — above all the turn (render) document the browser reads.
@@ -8,15 +8,16 @@
  * field for it and never emits it, even across a full turn lifecycle. If someone
  * later threads the token into the render doc, this fails loudly.
  */
-import { describe, expect, it } from "vitest";
-import { createTenantId } from "../../../../domain/tenantId";
-import type { StateProjectionStore } from "../../../../projections/stateProjection.types";
+
 import {
   LANGY_CONVERSATION_EVENT_TYPES,
   LANGY_CONVERSATION_EVENT_VERSIONS,
   type LangyConversationStateData,
   type LangyConversationTurnData,
 } from "@langwatch/langy";
+import { describe, expect, it } from "vitest";
+import { createTenantId } from "../../../../domain/tenantId";
+import type { StateProjectionStore } from "../../../../projections/stateProjection.types";
 import type { LangyConversationProcessingEvent } from "../../schemas/events";
 import { LangyConversationStateFoldProjection } from "../langyConversationState.foldProjection";
 import { LangyConversationTurnFoldProjection } from "../langyConversationTurn.foldProjection";
@@ -75,7 +76,9 @@ describe("runToken projection exclusion", () => {
     });
 
     it("never lands the token on the turn (render) document, across a full turn", () => {
-      const turn = new LangyConversationTurnFoldProjection({ store: turnStore });
+      const turn = new LangyConversationTurnFoldProjection({
+        store: turnStore,
+      });
       let doc = turn.init();
       // Drive the render doc through a realistic lifecycle. None of these carry
       // the runToken — the turn fold has no field for it — but assert on the

@@ -1,13 +1,13 @@
 import type { z } from "zod";
 import type { AnyEventSchema } from "./abstractFoldProjection";
-import type { AppendStore, MapProjectionOptions } from "./mapProjection.types";
 import {
-  type EventTypeOf,
-  type StripPrefix,
   type DotSnakeToPascal,
-  type UnionToIntersection,
+  type EventTypeOf,
   eventTypeToMapHandlerName,
+  type StripPrefix,
+  type UnionToIntersection,
 } from "./eventTypeTransforms";
+import type { AppendStore, MapProjectionOptions } from "./mapProjection.types";
 
 // ---------------------------------------------------------------------------
 // Map handler name derivation
@@ -113,9 +113,9 @@ export abstract class AbstractMapProjection<
     const handlerName = this.dispatchMap[event.type];
     if (!handlerName) return null;
 
-    const handler = this[handlerName as keyof this] as (
-      e: { type: string },
-    ) => Record | null;
+    const handler = this[handlerName as keyof this] as (e: {
+      type: string;
+    }) => Record | null;
     return handler.call(this, event);
   }
 }

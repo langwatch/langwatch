@@ -32,7 +32,11 @@ describe("summarizeLogEvent", () => {
   describe("given a tool the user approved", () => {
     it("names the tool", () => {
       const summary = summarizeLogEvent(
-        log({ "event.name": "tool_decision", decision: "accept", tool_name: "Read" }),
+        log({
+          "event.name": "tool_decision",
+          decision: "accept",
+          tool_name: "Read",
+        }),
       );
       expect(summary).toBe("Approved Read");
     });
@@ -41,7 +45,11 @@ describe("summarizeLogEvent", () => {
   describe("given a compaction with before/after counts", () => {
     it("reports the token counts", () => {
       const summary = summarizeLogEvent(
-        log({ "event.name": "compaction", pre_tokens: "142000", post_tokens: "18000" }),
+        log({
+          "event.name": "compaction",
+          pre_tokens: "142000",
+          post_tokens: "18000",
+        }),
       );
       expect(summary).toBe("Context compacted: 142k → 18k tokens");
     });
@@ -58,7 +66,9 @@ describe("summarizeLogEvent", () => {
 
   describe("given an event name we don't recognise", () => {
     it("returns null so the caller falls back to a generic view", () => {
-      const summary = summarizeLogEvent(log({ "event.name": "some_future_event" }));
+      const summary = summarizeLogEvent(
+        log({ "event.name": "some_future_event" }),
+      );
       expect(summary).toBeNull();
     });
   });
@@ -74,7 +84,11 @@ describe("logEventTone", () => {
   it("flags a denied tool call as danger", () => {
     expect(
       logEventTone(
-        log({ "event.name": "tool_decision", decision: "reject", tool_name: "Bash" }),
+        log({
+          "event.name": "tool_decision",
+          decision: "reject",
+          tool_name: "Bash",
+        }),
       ),
     ).toBe("danger");
   });
@@ -82,7 +96,11 @@ describe("logEventTone", () => {
   it("leaves an approved tool call neutral", () => {
     expect(
       logEventTone(
-        log({ "event.name": "tool_decision", decision: "accept", tool_name: "Read" }),
+        log({
+          "event.name": "tool_decision",
+          decision: "accept",
+          tool_name: "Read",
+        }),
       ),
     ).toBe("neutral");
   });
@@ -90,7 +108,11 @@ describe("logEventTone", () => {
   it("flags a failed tool result as danger", () => {
     expect(
       logEventTone(
-        log({ "event.name": "tool_result", tool_name: "Bash", error_type: "timeout" }),
+        log({
+          "event.name": "tool_result",
+          tool_name: "Bash",
+          error_type: "timeout",
+        }),
       ),
     ).toBe("danger");
   });

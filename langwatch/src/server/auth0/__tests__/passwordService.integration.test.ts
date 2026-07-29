@@ -8,7 +8,7 @@
  * full HTTP path — body parsing, headers, JSON round-trip, error
  * mapping — without hitting the real Auth0 API.
  */
-import { createServer, type Server, type IncomingMessage } from "node:http";
+import { createServer, type IncomingMessage, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import {
   afterAll,
@@ -37,8 +37,8 @@ vi.mock("../../../env.mjs", () => ({
 }));
 
 import {
-  Auth0ApiError,
   _resetManagementApiTokenCache,
+  Auth0ApiError,
   changeAuth0Password,
   getManagementApiToken,
   updateUserPassword,
@@ -307,8 +307,7 @@ describe("updateUserPassword", () => {
         body: {
           statusCode: 400,
           error: "Bad Request",
-          message:
-            "PasswordHistoryError: Password has previously been used",
+          message: "PasswordHistoryError: Password has previously been used",
         },
       });
 
@@ -480,12 +479,12 @@ describe("changeAuth0Password", () => {
       expect(result).toEqual({ ok: true });
       // 1) ROPG verify, 2) client_credentials, 3) PATCH
       expect(captured).toHaveLength(3);
-      expect(
-        (captured[0]?.body as { grant_type?: string }).grant_type,
-      ).toBe("password");
-      expect(
-        (captured[1]?.body as { grant_type?: string }).grant_type,
-      ).toBe("client_credentials");
+      expect((captured[0]?.body as { grant_type?: string }).grant_type).toBe(
+        "password",
+      );
+      expect((captured[1]?.body as { grant_type?: string }).grant_type).toBe(
+        "client_credentials",
+      );
       expect(captured[2]?.method).toBe("PATCH");
       expect(captured[2]?.headers.authorization).toBe("Bearer mgmt-tok");
       expect(captured[2]?.body).toEqual({

@@ -93,9 +93,22 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
-  await redis.flushall();
+  // Scoped to this suite's hash-tagged namespace, never flushdb(): flushdb
+  // empties the whole logical database, so it does not just reset this
+  // suite — it deletes the in-flight keys of any suite sharing the database,
+  // which is every other integration file once they run concurrently. The
+  // symptom is not a failure here but a failure over there, in a suite that
+  // never called it. Same rule as the rest of groupQueue/__tests__ (see the
+  // README's namespace note).
+  await deleteSuiteKeys();
   scripts = new GroupStagingScripts(redis, QUEUE_NAME);
 });
+
+/** Remove every key this suite owns, leaving other suites' databases alone. */
+async function deleteSuiteKeys(): Promise<void> {
+  const keys = await redis.keys(`${QUEUE_NAME}*`);
+  if (keys.length > 0) await redis.del(...keys);
+}
 
 afterAll(async () => {
   await stopTestContainers();
@@ -852,9 +865,9 @@ describe("GroupStagingScripts", () => {
           });
 
           // B is still staged and still leases the blob — the bytes must live.
-          expect(await redis.zrange(leaseKey({ hash: SHARED }), 0, -1)).toEqual([
-            "t-b",
-          ]);
+          expect(await redis.zrange(leaseKey({ hash: SHARED }), 0, -1)).toEqual(
+            ["t-b"],
+          );
           expect(await redis.exists(blobKey({ hash: SHARED }))).toBe(1);
           expect(await redis.get(blobKey({ hash: SHARED }))).toBe(
             "gzipped-bytes",
@@ -892,9 +905,9 @@ describe("GroupStagingScripts", () => {
             [],
           );
           expect(await redis.exists(blobKey({ hash: SHARED }))).toBe(1);
-          expect(await redis.ttl(blobKey({ hash: SHARED }))).toBeLessThanOrEqual(
-            BLOB_RELEASE_GRACE_TTL_SECONDS,
-          );
+          expect(
+            await redis.ttl(blobKey({ hash: SHARED })),
+          ).toBeLessThanOrEqual(BLOB_RELEASE_GRACE_TTL_SECONDS);
         });
       });
 
@@ -1011,9 +1024,9 @@ describe("GroupStagingScripts", () => {
             );
 
             expect(await redis.exists(blobKey({ hash: "h-grace" }))).toBe(1);
-            expect(await redis.ttl(blobKey({ hash: "h-grace" }))).toBeLessThanOrEqual(
-              BLOB_RELEASE_GRACE_TTL_SECONDS,
-            );
+            expect(
+              await redis.ttl(blobKey({ hash: "h-grace" })),
+            ).toBeLessThanOrEqual(BLOB_RELEASE_GRACE_TTL_SECONDS);
             expect(
               await redis.ttl(blobKey({ hash: "h-grace-new" })),
             ).toBeGreaterThan(BLOB_RELEASE_GRACE_TTL_SECONDS);
@@ -2117,6 +2130,67 @@ describe("GroupStagingScripts", () => {
       });
     });
 
+    describe("when a retry re-stages a job", () => {
+      // The group's retry chain and the re-stage are ONE script (ADR-080).
+      // Since the staged id stopped carrying a `/r/<n>` marker, that chain is
+      // the only attempt carrier a re-staged SIBLING has — it comes back with
+      // its original envelope and no `__attempt`. A chain write that failed
+      // while the re-stage succeeded would hand the next sibling-led claim a
+      // fresh budget: an unbounded ladder, and a fold that re-applies events it
+      // had already recorded as applied.
+      const attemptKey = () => `${keyPrefix()}group:group-a:attempt`;
+
+      /** @scenario A sibling-led claim after a retry still sees the attempt the ladder reached */
+      it("records the attempt the ladder reached in the same step", async () => {
+        await scripts.stage(
+          makeJob({ stagedJobId: "j1", dispatchAfterMs: 100 }),
+        );
+        await scripts.dispatch({ nowMs: 200, activeTtlSec: 300 });
+
+        await scripts.retryRestage({
+          groupId: "group-a",
+          stagedJobId: "j1",
+          newStagedJobId: "j1",
+          dispatchAfterMs: 5_000,
+          jobDataJson: JSON.stringify({ v: 1 }),
+          backoffMs: 3_000,
+          attempt: 4,
+          attemptTtlSec: 1800,
+        });
+
+        // A sibling leading the next claim carries no attempt of its own, so
+        // this key is the only thing standing between it and a fresh budget.
+        expect(await redis.get(attemptKey())).toBe("4");
+        expect(await redis.ttl(attemptKey())).toBeGreaterThan(0);
+      });
+
+      /** @scenario A retry that cannot record its attempt does not re-stage the job */
+      it("advances neither the chain nor the staging set when it does not own the slot", async () => {
+        await scripts.stage(
+          makeJob({ stagedJobId: "j1", dispatchAfterMs: 100 }),
+        );
+        await scripts.dispatch({ nowMs: 200, activeTtlSec: 300 });
+
+        // Another worker owns the slot now: the guard fails and the script
+        // writes nothing. Pre-ADR-080 the attempt was written by the CALLER
+        // before this call, so it advanced even when the re-stage did not —
+        // shortening the next job's budget for a job that was never staged.
+        const restaged = await scripts.retryRestage({
+          groupId: "group-a",
+          stagedJobId: "someone-elses-job",
+          newStagedJobId: "someone-elses-job",
+          dispatchAfterMs: 5_000,
+          jobDataJson: JSON.stringify({ v: 1 }),
+          backoffMs: 3_000,
+          attempt: 9,
+          attemptTtlSec: 1800,
+        });
+
+        expect(restaged).toBe(false);
+        expect(await redis.get(attemptKey())).toBeNull();
+      });
+    });
+
     describe("when a stale heartbeat fires after retryRestage", () => {
       // The worker's heartbeat interval stays armed for a few awaits after
       // retryRestage returns (blob-hold transfer, audit write). Before the
@@ -2138,6 +2212,8 @@ describe("GroupStagingScripts", () => {
           dispatchAfterMs: 5_000,
           jobDataJson: JSON.stringify({ attempt: 2 }),
           backoffMs: 3_000,
+          attempt: 1,
+          attemptTtlSec: 1800,
         });
         expect(restaged).toBe(true);
 
@@ -3386,12 +3462,20 @@ describe("GroupStagingScripts", () => {
       /** @scenario Counter is conserved when the same staged-job id is re-sent */
       it("counts the job once in total-pending", async () => {
         await scripts.stage(
-          makeJob({ stagedJobId: "j-dup", groupId: "g-dup", dispatchAfterMs: 100 }),
+          makeJob({
+            stagedJobId: "j-dup",
+            groupId: "g-dup",
+            dispatchAfterMs: 100,
+          }),
         );
         // Re-delivery of the same event id: the ZADD updates the member in
         // place, so the counter must not INCR a second time.
         await scripts.stage(
-          makeJob({ stagedJobId: "j-dup", groupId: "g-dup", dispatchAfterMs: 150 }),
+          makeJob({
+            stagedJobId: "j-dup",
+            groupId: "g-dup",
+            dispatchAfterMs: 150,
+          }),
         );
 
         expect(await redis.zcard(`${keyPrefix()}group:g-dup:jobs`)).toBe(1);
@@ -3410,7 +3494,9 @@ describe("GroupStagingScripts", () => {
         ]);
 
         expect(newStagedCount).toBe(1);
-        expect(await redis.zcard(`${keyPrefix()}group:g-dup-batch:jobs`)).toBe(1);
+        expect(await redis.zcard(`${keyPrefix()}group:g-dup-batch:jobs`)).toBe(
+          1,
+        );
         expect(await inspectTotalPending()).toBe(1);
       });
     });
@@ -3438,6 +3524,8 @@ describe("GroupStagingScripts", () => {
           dispatchAfterMs: 300,
           jobDataJson: JSON.stringify({ attempt: 2 }),
           backoffMs: 1000,
+          attempt: 1,
+          attemptTtlSec: 1800,
         });
         expect(restaged).toBe(true);
 
@@ -3524,6 +3612,8 @@ describe("GroupStagingScripts", () => {
           dispatchAfterMs: 300,
           jobDataJson: JSON.stringify({ attempt: 2 }),
           backoffMs: 500,
+          attempt: 1,
+          attemptTtlSec: 1800,
         });
         await redis.del(`${keyPrefix()}group:g-multi:active`);
 
@@ -3537,6 +3627,8 @@ describe("GroupStagingScripts", () => {
           dispatchAfterMs: 500,
           jobDataJson: JSON.stringify({ attempt: 3 }),
           backoffMs: 1000,
+          attempt: 1,
+          attemptTtlSec: 1800,
         });
         await redis.del(`${keyPrefix()}group:g-multi:active`);
 
@@ -3550,6 +3642,8 @@ describe("GroupStagingScripts", () => {
           dispatchAfterMs: 700,
           jobDataJson: JSON.stringify({ attempt: 4 }),
           backoffMs: 2000,
+          attempt: 1,
+          attemptTtlSec: 1800,
         });
         await redis.del(`${keyPrefix()}group:g-multi:active`);
 
@@ -3591,6 +3685,8 @@ describe("GroupStagingScripts", () => {
           dispatchAfterMs: 300,
           jobDataJson: JSON.stringify({ attempt: 2 }),
           backoffMs: 500,
+          attempt: 1,
+          attemptTtlSec: 1800,
         });
         expect(await inspectTotalPending()).toBe(1);
 
@@ -3685,6 +3781,8 @@ describe("GroupStagingScripts", () => {
           dispatchAfterMs: 300,
           jobDataJson: JSON.stringify({ attempt: 2 }),
           backoffMs: 500,
+          attempt: 1,
+          attemptTtlSec: 1800,
         });
 
         // retryRestage ZADD'd a new job AND INCR'd the counter.
@@ -4216,6 +4314,8 @@ describe("GroupStagingScripts", () => {
         dispatchAfterMs: 9999,
         jobDataJson: JSON.stringify({ hello: "world" }),
         backoffMs: 30_000,
+        attempt: 1,
+        attemptTtlSec: 1800,
       });
 
       // retryRestage sets the slot expiry to Date.now() + retryTtlSec*1000,
@@ -5183,6 +5283,8 @@ describe("group-key TTL safety net", () => {
         dispatchAfterMs: Date.now() + 5000,
         jobDataJson: JSON.stringify({ retry: true }),
         backoffMs: 5000,
+        attempt: 1,
+        attemptTtlSec: 1800,
       });
 
       expectFreshTtl(await jobsTtl("group-a"));

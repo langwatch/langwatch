@@ -51,7 +51,7 @@ function getParticipantDisplay(span: SpanTreeNode): string | null {
       .replace("invoke_agent ", "");
   }
   if (span.type === "llm" && span.model) {
-    return (span.model);
+    return span.model;
   }
   if (span.type === "tool") return null;
   return span.name ?? null;

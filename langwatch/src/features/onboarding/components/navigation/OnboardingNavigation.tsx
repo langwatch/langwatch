@@ -1,5 +1,4 @@
 import { Button, HStack, VStack } from "@chakra-ui/react";
-import React from "react";
 import { useAnalytics } from "react-contextual-analytics";
 
 interface OnboardingNavigationProps<T extends number = number> {

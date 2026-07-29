@@ -59,9 +59,12 @@ vi.mock("../../pipelines/suite-run-processing/schemas/constants", () => ({
   SUITE_RUN_PROJECTION_VERSIONS: { RUN_STATE: "v1" },
 }));
 
-vi.mock("../../pipelines/trace-processing/projections/traceSummary.store", () => ({
-  TraceSummaryStore: class {},
-}));
+vi.mock(
+  "../../pipelines/trace-processing/projections/traceSummary.store",
+  () => ({
+    TraceSummaryStore: class {},
+  }),
+);
 
 vi.mock("../../projections/repositoryFoldStore", () => ({
   RepositoryFoldStore: class {},

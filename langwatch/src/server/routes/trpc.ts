@@ -61,7 +61,9 @@ function trpcErrorEnvelope(error: unknown) {
 // Lazy-load appRouter to avoid circular dependency issues at startup.
 // The tRPC router imports templates that import UI components (DatasetTable etc.)
 // which cause "Cannot access before initialization" errors in Node/tsx.
-let _appRouter: Awaited<typeof import("~/server/api/root")>["appRouter"] | null = null;
+let _appRouter:
+  | Awaited<typeof import("~/server/api/root")>["appRouter"]
+  | null = null;
 async function getAppRouter() {
   if (!_appRouter) {
     const mod = await import("~/server/api/root");
@@ -150,11 +152,11 @@ const handler = async (c: Context) => {
   }
 };
 
-secured.access(
-  handlerManagedAuth("tRPC enforces per-procedure RBAC internally"),
-).get("/trpc/*", handler);
-secured.access(
-  handlerManagedAuth("tRPC enforces per-procedure RBAC internally"),
-).post("/trpc/*", handler);
+secured
+  .access(handlerManagedAuth("tRPC enforces per-procedure RBAC internally"))
+  .get("/trpc/*", handler);
+secured
+  .access(handlerManagedAuth("tRPC enforces per-procedure RBAC internally"))
+  .post("/trpc/*", handler);
 
 export const app = secured.hono;

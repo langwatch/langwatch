@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { hasThreadMappings } from "../threadMappingResolver";
 import type { MappingState } from "~/server/tracer/tracesMapping";
+import { hasThreadMappings } from "../threadMappingResolver";
 
 describe("hasThreadMappings", () => {
   describe("when mappingState is null", () => {

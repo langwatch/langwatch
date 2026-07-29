@@ -1,7 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "~/utils/compat/next-router";
 import { useCallback, useEffect, useRef } from "react";
 import { useShallow } from "zustand/react/shallow";
+import { useRouter } from "~/utils/compat/next-router";
 import { toaster } from "../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
@@ -262,16 +262,13 @@ export const useAutosaveEvaluationsV3 = () => {
               closable: true,
             },
           });
-          captureException(
-            toError(error),
-            {
-              extra: {
-                context: "Failed to autosave evaluations v3",
-                projectId: project.id,
-                persistedState,
-              },
+          captureException(toError(error), {
+            extra: {
+              context: "Failed to autosave evaluations v3",
+              projectId: project.id,
+              persistedState,
             },
-          );
+          });
         }
       })();
     }, AUTOSAVE_DEBOUNCE_MS);
@@ -308,7 +305,7 @@ export const useAutosaveEvaluationsV3 = () => {
     void trpcUtils.experiments.getEvaluationsV3BySlug.reset({
       projectId: project?.id ?? "",
       experimentSlug: routerSlug ?? "",
-    })
+    });
   }, [project?.id, routerSlug, trpcUtils]);
 
   return {

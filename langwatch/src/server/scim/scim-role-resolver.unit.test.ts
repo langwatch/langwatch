@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
 import { TeamUserRole } from "@prisma/client";
+import { describe, expect, it } from "vitest";
 import { resolveHighestRole } from "./scim-role-resolver";
 
 describe("resolveHighestRole()", () => {
@@ -50,14 +50,14 @@ describe("resolveHighestRole()", () => {
   describe("when verifying hierarchy ordering", () => {
     /** @scenario Role hierarchy ordering */
     it("ranks ADMIN above MEMBER", () => {
-      expect(resolveHighestRole([TeamUserRole.MEMBER, TeamUserRole.ADMIN])).toBe(
-        TeamUserRole.ADMIN
-      );
+      expect(
+        resolveHighestRole([TeamUserRole.MEMBER, TeamUserRole.ADMIN]),
+      ).toBe(TeamUserRole.ADMIN);
     });
 
     it("ranks MEMBER above VIEWER", () => {
       expect(
-        resolveHighestRole([TeamUserRole.VIEWER, TeamUserRole.MEMBER])
+        resolveHighestRole([TeamUserRole.VIEWER, TeamUserRole.MEMBER]),
       ).toBe(TeamUserRole.MEMBER);
     });
   });
@@ -85,7 +85,7 @@ describe("resolveHighestRole()", () => {
   describe("when roles array is empty", () => {
     it("throws an error", () => {
       expect(() => resolveHighestRole([])).toThrow(
-        "Cannot resolve highest role from an empty array"
+        "Cannot resolve highest role from an empty array",
       );
     });
   });

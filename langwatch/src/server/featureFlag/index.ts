@@ -5,6 +5,10 @@ export {
   FeatureFlagStorePostgres,
   getFeatureFlagStore,
 } from "./featureFlagStore.postgres";
+export {
+  FRONTEND_FEATURE_FLAGS,
+  type FrontendFeatureFlag,
+} from "./frontendFeatureFlags";
 export type {
   EsKillSwitchKey,
   FeatureFlagDefinition,
@@ -14,16 +18,18 @@ export type {
   RegisteredFeatureFlagKey,
 } from "./registry";
 export {
-  FEATURE_FLAGS,
   FEATURE_FLAG_FAMILIES,
+  FEATURE_FLAGS,
   listFeatureFlagFamilies,
   listFeatureFlags,
   resolveFlagDefinition,
 } from "./registry";
 export type {
-  FeatureFlagEvaluateOptions,
-  FeatureFlagServiceInterface,
-} from "./types";
+  FeatureFlagRule,
+  FeatureFlagRuleMatch,
+  FeatureFlagRules,
+  RuleEvaluationContext,
+} from "./rules";
 export {
   evaluateRules,
   featureFlagRuleSchema,
@@ -32,12 +38,6 @@ export {
   resolveEffectiveForListing,
 } from "./rules";
 export type {
-  FeatureFlagRule,
-  FeatureFlagRuleMatch,
-  FeatureFlagRules,
-  RuleEvaluationContext,
-} from "./rules";
-export {
-  FRONTEND_FEATURE_FLAGS,
-  type FrontendFeatureFlag,
-} from "./frontendFeatureFlags";
+  FeatureFlagEvaluateOptions,
+  FeatureFlagServiceInterface,
+} from "./types";

@@ -135,7 +135,10 @@ const externalToolConfig = z.object({
 });
 
 export const AiToolConfigSchema = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("coding_assistant"), config: codingAssistantConfig }),
+  z.object({
+    type: z.literal("coding_assistant"),
+    config: codingAssistantConfig,
+  }),
   z.object({ type: z.literal("model_provider"), config: modelProviderConfig }),
   z.object({ type: z.literal("external_tool"), config: externalToolConfig }),
 ]);
@@ -225,7 +228,9 @@ function generateSlug(displayName: string): string {
     .replace(/^-+|-+$/g, "")
     .slice(0, 48);
   const stem = base.length > 0 ? base : "tool";
-  return `${stem}-${nanoid(6).toLowerCase().replace(/[^a-z0-9]/g, "x")}`;
+  return `${stem}-${nanoid(6)
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "x")}`;
 }
 
 /**
@@ -1216,7 +1221,10 @@ export class AiToolEntryService {
     // tile - ORGANIZATION-scoped credentials still count for every member.
     const memberships = await this.prisma.teamUser.findMany({
       where: { userId, team: { organizationId } },
-      select: { teamId: true, team: { select: { projects: { select: { id: true } } } } },
+      select: {
+        teamId: true,
+        team: { select: { projects: { select: { id: true } } } },
+      },
     });
     const teamIds = memberships.map((m) => m.teamId);
     const projectIds = memberships.flatMap((m) =>
@@ -1235,7 +1243,12 @@ export class AiToolEntryService {
                 ? [{ scopeType: "TEAM" as const, scopeId: { in: teamIds } }]
                 : []),
               ...(projectIds.length > 0
-                ? [{ scopeType: "PROJECT" as const, scopeId: { in: projectIds } }]
+                ? [
+                    {
+                      scopeType: "PROJECT" as const,
+                      scopeId: { in: projectIds },
+                    },
+                  ]
                 : []),
             ],
           },

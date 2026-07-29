@@ -119,7 +119,8 @@ secured
           },
           "collector request denied by API key ceiling",
         );
-        return c.json({ message: denial.message }, denial.status);
+        // The full handled body — code, permission, tips — not just a sentence.
+        return c.json(denial.body, denial.status);
       }
 
       const project = resolved.project;

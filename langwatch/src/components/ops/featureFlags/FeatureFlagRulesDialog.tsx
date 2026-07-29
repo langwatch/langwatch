@@ -1,13 +1,13 @@
 import {
   Box,
   Button,
+  createListCollection,
   Field,
   HStack,
   IconButton,
   Input,
   Text,
   VStack,
-  createListCollection,
 } from "@chakra-ui/react";
 import { Plus, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -30,8 +30,9 @@ import {
 } from "~/components/ui/select";
 import { Switch } from "~/components/ui/switch";
 import { toaster } from "~/components/ui/toaster";
-import { api } from "~/utils/api";
+import { showErrorToast } from "~/features/errors";
 import type { FeatureFlagRules } from "~/server/featureFlag";
+import { api } from "~/utils/api";
 
 type ScopeKind = "EVERYONE" | "ORGANIZATION" | "PROJECT";
 
@@ -41,7 +42,10 @@ interface UIRule {
   enabled: boolean;
 }
 
-const SCOPE_COLLECTION = createListCollection<{ value: ScopeKind; label: string }>({
+const SCOPE_COLLECTION = createListCollection<{
+  value: ScopeKind;
+  label: string;
+}>({
   items: [
     { value: "EVERYONE", label: "Everyone (default)" },
     { value: "ORGANIZATION", label: "Organization" },
@@ -109,13 +113,11 @@ export function FeatureFlagRulesDialog({
       await utils.ops.listFeatureFlags.invalidate();
       onOpenChange(false);
     },
-    onError: (error) => {
-      toaster.create({
-        title: "Failed to save rules",
-        description: error.message,
-        type: "error",
-      });
-    },
+    onError: (error) =>
+      showErrorToast({
+        error,
+        fallbackTitle: "Couldn't save the targeting rules",
+      }),
   });
 
   // Re-seed the draft only when the dialog transitions from closed to
@@ -178,10 +180,10 @@ export function FeatureFlagRulesDialog({
         <DialogBody>
           <VStack align="stretch" gap={3}>
             <Text fontSize="sm" color="fg.muted">
-              Rules are evaluated top-to-bottom; the first match wins. When
-              no rule matches, the row-level toggle is used as the
-              fallback. Once a row exists in postgres, PostHog is no
-              longer consulted for this flag.
+              Rules are evaluated top-to-bottom; the first match wins. When no
+              rule matches, the row-level toggle is used as the fallback. Once a
+              row exists in postgres, PostHog is no longer consulted for this
+              flag.
             </Text>
             <Box>
               <Text fontFamily="mono" fontSize="xs" color="fg.muted">
@@ -198,8 +200,8 @@ export function FeatureFlagRulesDialog({
                 borderColor="border.muted"
               >
                 <Text fontSize="sm" color="fg.muted" textAlign="center">
-                  No targeting rules. The row-level toggle decides the
-                  value for everyone.
+                  No targeting rules. The row-level toggle decides the value for
+                  everyone.
                 </Text>
               </Box>
             ) : (
@@ -316,7 +318,9 @@ function RuleRow({
         <HStack height="32px" alignItems="center">
           <Switch
             checked={rule.enabled}
-            onCheckedChange={(details) => onChange({ enabled: details.checked })}
+            onCheckedChange={(details) =>
+              onChange({ enabled: details.checked })
+            }
           />
           <Text fontSize="xs">{rule.enabled ? "on" : "off"}</Text>
         </HStack>

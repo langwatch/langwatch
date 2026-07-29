@@ -99,7 +99,8 @@ export const useTemplateLogicMenu = ({
 
       if (pipeIndex >= 0) {
         // Remove the pipe and calculate cursor position
-        insertText = template.substring(0, pipeIndex) + template.substring(pipeIndex + 1);
+        insertText =
+          template.substring(0, pipeIndex) + template.substring(pipeIndex + 1);
         newCursorPos = before.length + pipeIndex;
       } else {
         insertText = template;

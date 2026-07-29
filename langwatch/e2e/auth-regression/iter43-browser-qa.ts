@@ -44,7 +44,11 @@ async function main() {
   const inputCount = await page.locator("input").count();
   const signupBtn = await page.locator('button:has-text("Sign up")').count();
   check("form present", formCount >= 1, `count=${formCount}`);
-  check("at least 4 inputs (name, email, password, confirm)", inputCount >= 4, `count=${inputCount}`);
+  check(
+    "at least 4 inputs (name, email, password, confirm)",
+    inputCount >= 4,
+    `count=${inputCount}`,
+  );
   check("Sign up button present", signupBtn >= 1);
 
   console.log("\n[2] Fill + submit signup form");
@@ -64,7 +68,9 @@ async function main() {
   await pwFields[1]!.fill(PASSWORD);
   await page.click('button:has-text("Sign up")');
   try {
-    await page.waitForURL((url) => !url.toString().includes("/auth/signup"), { timeout: 15000 });
+    await page.waitForURL((url) => !url.toString().includes("/auth/signup"), {
+      timeout: 15000,
+    });
     check("navigated away from /auth/signup after submit", true, page.url());
   } catch {
     check(
@@ -90,7 +96,9 @@ async function main() {
   }
 
   console.log("\n[4] Session is active via API");
-  const getSessionRes = await page.request.get(`${BASE_URL}/api/auth/get-session`);
+  const getSessionRes = await page.request.get(
+    `${BASE_URL}/api/auth/get-session`,
+  );
   check("GET /api/auth/get-session → 200", getSessionRes.status() === 200);
   const sessionJson = await getSessionRes.json();
   check(
@@ -106,7 +114,9 @@ async function main() {
   check("POST /api/auth/sign-out → 200", signOutRes.status() === 200);
 
   console.log("\n[6] Session is gone after signout");
-  const afterSignout = await page.request.get(`${BASE_URL}/api/auth/get-session`);
+  const afterSignout = await page.request.get(
+    `${BASE_URL}/api/auth/get-session`,
+  );
   const afterJson = await afterSignout.json();
   check("get-session returns null after signout", afterJson === null);
 
@@ -127,14 +137,12 @@ async function main() {
   await page.fill('input[type="password"]', PASSWORD);
   await page.click('button:has-text("Sign in")');
   try {
-    await page.waitForURL((url) => !url.toString().includes("/auth/signin"), { timeout: 15000 });
+    await page.waitForURL((url) => !url.toString().includes("/auth/signin"), {
+      timeout: 15000,
+    });
     check("navigated away from /auth/signin", true, page.url());
   } catch {
-    check(
-      "navigated away from /auth/signin",
-      false,
-      `still at ${page.url()}`,
-    );
+    check("navigated away from /auth/signin", false, `still at ${page.url()}`);
   }
 
   console.log("\n[9] /auth/error page renders with friendly message");
@@ -156,8 +164,7 @@ async function main() {
   const normalizedBody = await page.textContent("body");
   check(
     "error page maps email_doesn't_match → DIFFERENT_EMAIL_NOT_ALLOWED friendly message",
-    !!normalizedBody &&
-      normalizedBody.includes("different email address"),
+    !!normalizedBody && normalizedBody.includes("different email address"),
   );
 
   await browser.close();
@@ -167,7 +174,9 @@ async function main() {
     console.log(`✅ ALL CHECKS PASSED (${passes}/${passes})`);
     process.exit(0);
   } else {
-    console.log(`❌ ${fails} CHECKS FAILED (${passes}/${passes + fails} passed)`);
+    console.log(
+      `❌ ${fails} CHECKS FAILED (${passes}/${passes + fails} passed)`,
+    );
     process.exit(1);
   }
 }

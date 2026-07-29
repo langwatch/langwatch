@@ -9,32 +9,6 @@ import (
 	"testing"
 )
 
-func TestFirstNonFlag(t *testing.T) {
-	cases := []struct {
-		name string
-		args []string
-		want string
-	}{
-		{"bare ref", []string{"4913"}, "4913"},
-		{"flag then ref", []string{"--dry-run", "4913"}, "4913"},
-		{"ref then flag", []string{"4913", "--force"}, "4913"},
-		{"url ref", []string{"https://github.com/o/r/pull/1"}, "https://github.com/o/r/pull/1"},
-		{"no args", nil, ""},
-		{"only flags", []string{"--force", "--no-install"}, ""},
-		// Non-obvious: a leading "-1" reads as a flag and is skipped, so it never
-		// reaches gh. That's fine — looksLikePRRef rejects negatives anyway — but
-		// pin it so the flag-vs-ref boundary can't drift silently.
-		{"negative number is treated as a flag", []string{"-1"}, ""},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			if got := firstNonFlag(tc.args); got != tc.want {
-				t.Errorf("firstNonFlag(%q) = %q, want %q", tc.args, got, tc.want)
-			}
-		})
-	}
-}
-
 func TestStripFlag(t *testing.T) {
 	t.Run("when the flag is present", func(t *testing.T) {
 		out, found := stripFlag([]string{"a", "--force", "b"}, "--force")
@@ -57,71 +31,6 @@ func TestStripFlag(t *testing.T) {
 			t.Errorf("stripFlag changed args to %q", out)
 		}
 	})
-}
-
-func TestFlagValue(t *testing.T) {
-	cases := []struct {
-		name string
-		args []string
-		want string
-	}{
-		{"space-separated value", []string{"--preset", "demo"}, "demo"},
-		{"equals-embedded value", []string{"--preset=demo"}, "demo"},
-		{"absent flag", []string{"--force"}, ""},
-		{"no args", nil, ""},
-		// A trailing --preset has no following value to return; the seed command
-		// rejects this shape via seedPresetArg rather than silently defaulting.
-		{"trailing flag without value", []string{"--preset"}, ""},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			if got := flagValue(tc.args, "--preset"); got != tc.want {
-				t.Errorf("flagValue(%q, --preset) = %q, want %q", tc.args, got, tc.want)
-			}
-		})
-	}
-}
-
-func TestSeedPresetArg(t *testing.T) {
-	t.Run("when --preset carries a value", func(t *testing.T) {
-		for _, args := range [][]string{{"--preset", "demo"}, {"--preset=demo"}} {
-			preset, err := seedPresetArg(args)
-			if err != nil {
-				t.Fatalf("seedPresetArg(%q) = %v, want nil error", args, err)
-			}
-			if preset != "demo" {
-				t.Errorf("seedPresetArg(%q) = %q, want %q", args, preset, "demo")
-			}
-		}
-	})
-	t.Run("when no preset is given, it returns the default empty preset", func(t *testing.T) {
-		preset, err := seedPresetArg(nil)
-		if err != nil {
-			t.Fatalf("seedPresetArg(nil) = %v, want nil error", err)
-		}
-		if preset != "" {
-			t.Errorf("seedPresetArg(nil) = %q, want empty", preset)
-		}
-	})
-	t.Run("when --preset trails without a value, it errors instead of seeding the default", func(t *testing.T) {
-		if _, err := seedPresetArg([]string{"--preset"}); err == nil {
-			t.Error("seedPresetArg accepted a trailing --preset with no value")
-		}
-	})
-	t.Run("when the preset is passed positionally, it errors instead of ignoring it", func(t *testing.T) {
-		if _, err := seedPresetArg([]string{"demo"}); err == nil {
-			t.Error("seedPresetArg accepted a positional preset it would have ignored")
-		}
-	})
-}
-
-func TestHasFlag(t *testing.T) {
-	if !hasFlag([]string{"4913", "--trusted"}, "--trusted") {
-		t.Error("hasFlag missed a present flag")
-	}
-	if hasFlag([]string{"4913"}, "--trusted") {
-		t.Error("hasFlag found an absent flag")
-	}
 }
 
 func TestPRWorktreeBaseHonoursEnvOverride(t *testing.T) {
@@ -346,4 +255,160 @@ func TestProcessOnlyKnobsAreDocumented(t *testing.T) {
 			)
 		}
 	}
+}
+
+// onlyRemovedKnobSet clears every removed selection variable, then sets one.
+// rejectRemovedSelectionEnv reports the FIRST variable that applies, and it
+// resolves through langwatch/.env as well as the environment — so without this
+// a developer whose own .env still carries one of these would see these tests
+// assert against the wrong variable's error.
+func onlyRemovedKnobSet(t *testing.T, name, value string) {
+	t.Helper()
+	for _, knob := range removedSelectionEnv {
+		t.Setenv(knob.name, "")
+	}
+	t.Setenv(name, value)
+}
+
+// The selection env vars are gone, not quietly ignored: a stale export would
+// otherwise start services the developer believes they turned off, and `haven
+// status` would report a selection the env had overridden behind its back.
+//
+// @scenario "Removed selection env vars name their replacement"
+func TestRejectRemovedSelectionEnv(t *testing.T) {
+	t.Run("given a removed selection variable set to the value that used to apply", func(t *testing.T) {
+		for _, tc := range []struct{ name, value, wantReplacement string }{
+			{"LANGWATCH_SKIP_NLP", "1", "haven up -nlp"},
+			{"LANGWATCH_SKIP_AIGATEWAY", "1", "haven up -gateway"},
+			{"LANGWATCH_SKIP_LANGYAGENT", "1", "haven up -langy"},
+			{"WORKERS_IN_PROCESS", "0", "haven up +workers"},
+		} {
+			t.Run("when up runs with "+tc.name, func(t *testing.T) {
+				t.Run("fails naming the sticky command that replaces it", func(t *testing.T) {
+					onlyRemovedKnobSet(t, tc.name, tc.value)
+					err := rejectRemovedSelectionEnv()
+					if err == nil {
+						t.Fatalf("%s=%s was accepted; it no longer selects services", tc.name, tc.value)
+					}
+					if !strings.Contains(err.Error(), tc.wantReplacement) {
+						t.Errorf("error %q does not point at %q", err, tc.wantReplacement)
+					}
+				})
+			})
+		}
+	})
+
+	// START_WORKERS is the one with nothing to point at: it turned the worker
+	// stack off entirely, and there is no way to do that any more. Offering
+	// `+workers` here would be wrong in the opposite direction — that STARTS a
+	// standalone lane, so a developer following it would get more than before,
+	// not less.
+	t.Run("given START_WORKERS=false, which nothing replaces", func(t *testing.T) {
+		t.Run("when up runs", func(t *testing.T) {
+			onlyRemovedKnobSet(t, "START_WORKERS", "false")
+			err := rejectRemovedSelectionEnv()
+			if err == nil {
+				t.Fatal("START_WORKERS=false was accepted; it no longer turns the workers off")
+			}
+
+			t.Run("says it does nothing rather than naming a replacement", func(t *testing.T) {
+				if !strings.Contains(err.Error(), "no longer does anything") {
+					t.Errorf("error %q should say the variable does nothing", err)
+				}
+				if strings.Contains(err.Error(), "run `") {
+					t.Errorf("error %q offers a replacement command; there is none", err)
+				}
+			})
+
+			t.Run("explains where the worker stack lives now", func(t *testing.T) {
+				if !strings.Contains(err.Error(), "part of the app") {
+					t.Errorf("error %q does not say the workers are part of the app now", err)
+				}
+			})
+		})
+	})
+}
+
+// The refusal has to read intent, not one literal. start.sh tests
+// LANGWATCH_SKIP_* against "1" and START_WORKERS against "true" or "1";
+// start.ts tests WORKERS_IN_PROCESS against "1" or "true". Matching any single
+// one of those exactly lets a developer's "off" or "yes" through, and through
+// means haven runs a service they believe they turned off — silently, which is
+// the one outcome this mechanism exists to prevent.
+//
+// @scenario "A removed selection variable is read for intent, not one spelling"
+func TestRemovedSelectionEnvIsReadForIntentNotOneSpelling(t *testing.T) {
+	t.Run("given a value that means off in every spelling but the one that was matched", func(t *testing.T) {
+		for _, value := range []string{"0", "false", "FALSE", "False", "off", "no", "  0  "} {
+			t.Run("when up runs with WORKERS_IN_PROCESS="+value, func(t *testing.T) {
+				onlyRemovedKnobSet(t, "WORKERS_IN_PROCESS", value)
+				err := rejectRemovedSelectionEnv()
+				if err == nil {
+					t.Fatalf("WORKERS_IN_PROCESS=%q was accepted; the app reads it as a standalone workers lane", value)
+				}
+				if !strings.Contains(err.Error(), "haven up +workers") {
+					t.Errorf("error %q does not point at the sticky replacement", err)
+				}
+			})
+		}
+	})
+
+	t.Run("given a value that means on in every spelling", func(t *testing.T) {
+		for _, value := range []string{"yes", "on", "TRUE", "True"} {
+			t.Run("when up runs with LANGWATCH_SKIP_NLP="+value, func(t *testing.T) {
+				onlyRemovedKnobSet(t, "LANGWATCH_SKIP_NLP", value)
+				err := rejectRemovedSelectionEnv()
+				if err == nil {
+					t.Fatalf("LANGWATCH_SKIP_NLP=%q was accepted; haven would run nlp for someone who believes it is off", value)
+				}
+				if !strings.Contains(err.Error(), "haven up -nlp") {
+					t.Errorf("error %q does not point at the sticky replacement", err)
+				}
+			})
+		}
+	})
+
+	// Blanking a line is how a .env unsets a knob. There is no intent left in it
+	// to refuse, and refusing would leave the developer deleting an empty line to
+	// start a stack.
+	t.Run("given a variable blanked out to nothing", func(t *testing.T) {
+		for _, name := range []string{"WORKERS_IN_PROCESS", "START_WORKERS", "LANGWATCH_SKIP_NLP"} {
+			t.Run("when up runs with "+name+" empty", func(t *testing.T) {
+				onlyRemovedKnobSet(t, name, "")
+				if err := rejectRemovedSelectionEnv(); err != nil {
+					t.Errorf("%s= blocked a stack: %v", name, err)
+				}
+			})
+		}
+	})
+
+	// START_WORKERS=true is what `pnpm dev` itself exports, so a checkout that
+	// carries it must still be able to start a stack.
+	t.Run("given START_WORKERS set to what pnpm dev exports", func(t *testing.T) {
+		t.Run("when up runs", func(t *testing.T) {
+			onlyRemovedKnobSet(t, "START_WORKERS", "true")
+			if err := rejectRemovedSelectionEnv(); err != nil {
+				t.Errorf("START_WORKERS=true blocked a stack: %v", err)
+			}
+		})
+	})
+}
+
+// WORKERS_IN_PROCESS=1 is still how plain `pnpm dev` asks for a single process
+// outside haven, and it is what haven itself passes to the app child. Only the
+// values that used to steer haven's own selection are refused, so a checkout
+// carrying it can still start a stack.
+//
+// @scenario "A variable haven never read as a selection does not block a stack"
+func TestWorkersInProcessOneDoesNotBlockUp(t *testing.T) {
+	t.Run("given WORKERS_IN_PROCESS=1", func(t *testing.T) {
+		t.Run("when up runs", func(t *testing.T) {
+			t.Run("starts normally", func(t *testing.T) {
+				onlyRemovedKnobSet(t, "WORKERS_IN_PROCESS", "1")
+				if err := rejectRemovedSelectionEnv(); err != nil {
+					t.Errorf("WORKERS_IN_PROCESS=1 must not block up: %v", err)
+				}
+			})
+		})
+	})
 }

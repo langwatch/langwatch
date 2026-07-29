@@ -195,3 +195,95 @@ describe("`langwatch help` command", () => {
     expect(process.exitCode).toBe(1);
   });
 });
+
+/**
+ * The package ships TWO bin names for one bundle — `lw` and `langwatch` — and
+ * one daemon serves both (`resolveBuildId` stats the same symlink target either
+ * way). So inside the daemon, `process.argv[1]` is whichever bin happened to
+ * spawn it and is a coin flip for everybody else: an `lw` caller whose daemon
+ * was started by `langwatch` was shown `Usage: langwatch …`, for `--help` and
+ * for every commander error, since the root sets `.showHelpAfterError()`.
+ */
+describe("the name usage and errors are titled with", () => {
+  const savedArgv1 = process.argv[1] ?? "";
+
+  afterEach(() => {
+    process.argv[1] = savedArgv1;
+    vi.restoreAllMocks();
+  });
+
+  /**
+   * What a caller who mistypes actually sees. `helpInformation()` renders the
+   * intentional `--help` page and nothing else, so it cannot speak for the
+   * error path at all — and the error path is the half `.showHelpAfterError()`
+   * added, reached through `_displayError` rather than through `outputHelp`.
+   * Commander writes the whole block to stderr there, so that is where we look.
+   */
+  const commanderErrorText = (
+    args: string[],
+    options: { bin?: string } = {},
+  ): string => {
+    let text = "";
+    const stderrSpy = vi
+      .spyOn(process.stderr, "write")
+      .mockImplementation((chunk) => {
+        text += String(chunk);
+        return true;
+      });
+    const program = buildProgram(options);
+    program.exitOverride();
+    try {
+      program.parse(args, { from: "user" });
+    } catch {
+      // commander throws instead of exiting once exitOverride is installed.
+    }
+    stderrSpy.mockRestore();
+    return text;
+  };
+
+  describe("given the caller's bin travels with the request", () => {
+    it("titles usage with the caller's bin, not the serving process's", () => {
+      expect(
+        buildProgram({ bin: "/usr/local/bin/lw" }).helpInformation(),
+      ).toContain("Usage: lw ");
+      expect(
+        buildProgram({ bin: "/usr/local/bin/langwatch" }).helpInformation(),
+      ).toContain("Usage: langwatch ");
+    });
+
+    it("titles commander's own errors with it too, which is where most callers meet the name", () => {
+      const lw = commanderErrorText(["nosuchcommand"], {
+        bin: "/usr/local/bin/lw",
+      });
+      expect(lw).toContain("unknown command 'nosuchcommand'");
+      expect(lw).toContain("Usage: lw ");
+      expect(lw).not.toContain("Usage: langwatch ");
+
+      const langwatch = commanderErrorText(["nosuchcommand"], {
+        bin: "/usr/local/bin/langwatch",
+      });
+      expect(langwatch).toContain("Usage: langwatch ");
+      expect(langwatch).not.toContain("Usage: lw ");
+    });
+  });
+
+  describe("given no bin travels with it — every in-process invocation", () => {
+    it("falls back to the running process's own argv, as it always did", () => {
+      process.argv[1] = "/usr/local/bin/lw";
+      expect(buildProgram().helpInformation()).toContain("Usage: lw ");
+
+      process.argv[1] = "/usr/local/bin/langwatch";
+      expect(buildProgram().helpInformation()).toContain("Usage: langwatch ");
+    });
+
+    it("falls back to it on the error path as well", () => {
+      process.argv[1] = "/usr/local/bin/lw";
+      expect(commanderErrorText(["--nosuchoption"])).toContain("Usage: lw ");
+
+      process.argv[1] = "/usr/local/bin/langwatch";
+      expect(commanderErrorText(["--nosuchoption"])).toContain(
+        "Usage: langwatch ",
+      );
+    });
+  });
+});

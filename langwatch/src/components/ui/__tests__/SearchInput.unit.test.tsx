@@ -33,7 +33,9 @@ describe("<SearchInput/>", () => {
       await user.type(input, "billing");
 
       expect(onChange).toHaveBeenCalled();
-      const lastCallEvent = onChange.mock.calls.at(-1)?.[0] as React.ChangeEvent<HTMLInputElement>;
+      const lastCallEvent = onChange.mock.calls.at(
+        -1,
+      )?.[0] as React.ChangeEvent<HTMLInputElement>;
       expect(lastCallEvent.target.value).toBe("billing");
     });
   });

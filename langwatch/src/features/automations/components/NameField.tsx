@@ -1,7 +1,11 @@
 import { Field, Input } from "@chakra-ui/react";
 import { useEffect, useRef } from "react";
 import { useAutomationStore } from "../state/automationStore";
-import { useConfigComplete, useDraft, usePresetLabels } from "../state/selectors";
+import {
+  useConfigComplete,
+  useDraft,
+  usePresetLabels,
+} from "../state/selectors";
 
 /** Per-preset placeholder — a concrete example beats an empty field. */
 const NAME_PLACEHOLDER = {

@@ -1,15 +1,16 @@
 import { Box, Field, Input, VStack } from "@chakra-ui/react";
-import React, { useEffect } from "react";
+import type React from "react";
+import { useEffect } from "react";
+import { ManagedModelProviderAlert } from "../../../ee/managed-providers/ManagedModelProviderAlert";
 import type {
   UseModelProviderFormActions,
   UseModelProviderFormState,
 } from "../../hooks/useModelProviderForm";
-import type { MaybeStoredModelProvider } from "../../server/modelProviders/registry";
 import { useRequiredCredentialKeys } from "../../hooks/useRequiredCredentialKeys";
+import type { MaybeStoredModelProvider } from "../../server/modelProviders/registry";
+import { api } from "../../utils/api";
 import { isApiKeyField } from "../../utils/modelProviderHelpers";
 import { SmallLabel } from "../SmallLabel";
-import { ManagedModelProviderAlert } from "../../../ee/managed-providers/ManagedModelProviderAlert";
-import { api } from "../../utils/api";
 
 /**
  * Renders credential input fields (API keys, endpoints, etc.) based on the provider's schema.

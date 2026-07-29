@@ -2,15 +2,18 @@ import { describe, expect, it, vi } from "vitest";
 import { createTenantId } from "../../../../domain/tenantId";
 import type { SimulationRunStateData } from "../../projections/simulationRunState.foldProjection";
 import {
-  SIMULATION_RUN_EVENT_TYPES,
   SIMULATION_EVENT_VERSIONS,
+  SIMULATION_RUN_EVENT_TYPES,
 } from "../../schemas/constants";
 import type {
-  SimulationRunStartedEvent,
   SimulationRunFinishedEvent,
+  SimulationRunStartedEvent,
   SimulationTextMessageEndEvent,
 } from "../../schemas/events";
-import { createSuiteRunSyncReactor, type SuiteRunSyncReactorDeps } from "../suiteRunSync.reactor";
+import {
+  createSuiteRunSyncReactor,
+  type SuiteRunSyncReactorDeps,
+} from "../suiteRunSync.reactor";
 
 const TEST_TENANT_ID = createTenantId("tenant-1");
 
@@ -24,7 +27,9 @@ function createDeps(): SuiteRunSyncReactorDeps & {
   };
 }
 
-function createFoldState(overrides: Partial<SimulationRunStateData> = {}): SimulationRunStateData {
+function createFoldState(
+  overrides: Partial<SimulationRunStateData> = {},
+): SimulationRunStateData {
   return {
     ScenarioRunId: "run-1",
     ScenarioId: "scenario-1",

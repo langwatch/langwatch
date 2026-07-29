@@ -1,8 +1,9 @@
 /**
  * @vitest-environment jsdom
  */
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { renderHook, act, waitFor } from "@testing-library/react";
+
+import { act, renderHook, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // We need to test the real module, not the test-setup mock
 vi.unmock("~/utils/auth-client");
@@ -34,7 +35,12 @@ describe("useSession session caching", () => {
 
   const mockSessionResponse = {
     session: { id: "sess-1", userId: "user-1", token: "tok" },
-    user: { id: "user-1", name: "Test User", email: "test@example.com", image: null },
+    user: {
+      id: "user-1",
+      name: "Test User",
+      email: "test@example.com",
+      image: null,
+    },
   };
 
   it("fetches session only once across multiple hook instances", async () => {
@@ -58,7 +64,8 @@ describe("useSession session caching", () => {
 
     // Only ONE fetch call despite two hooks mounting
     const sessionCalls = mockFetch.mock.calls.filter(
-      (call) => typeof call[0] === "string" && call[0].includes("/api/auth/session")
+      (call) =>
+        typeof call[0] === "string" && call[0].includes("/api/auth/session"),
     );
     expect(sessionCalls).toHaveLength(1);
   });
@@ -93,7 +100,8 @@ describe("useSession session caching", () => {
 
     // No new fetch calls — served from cache
     const sessionCalls = mockFetch.mock.calls.filter(
-      (call) => typeof call[0] === "string" && call[0].includes("/api/auth/session")
+      (call) =>
+        typeof call[0] === "string" && call[0].includes("/api/auth/session"),
     );
     expect(sessionCalls).toHaveLength(0);
   });

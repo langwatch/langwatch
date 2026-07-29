@@ -10,6 +10,7 @@ import {
 import { Eye, Info } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
+import { HandledErrorAlert } from "~/features/errors";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { AggregateTable } from "./AggregateTable";
@@ -282,16 +283,10 @@ export function DejaViewContent() {
             )}
 
             {searchResults.error && (
-              <Box
-                padding={4}
-                borderRadius="md"
-                borderWidth="1px"
-                borderColor="red.200"
-              >
-                <Text textStyle="sm" color="red.500">
-                  {searchResults.error.message}
-                </Text>
-              </Box>
+              <HandledErrorAlert
+                error={searchResults.error}
+                fallbackTitle="Couldn't run this search"
+              />
             )}
 
             {hasSearched &&
@@ -358,9 +353,10 @@ export function DejaViewContent() {
           </Center>
         ) : eventsQuery.error ? (
           <Center flex={1}>
-            <Text textStyle="sm" color="red.500">
-              {eventsQuery.error.message}
-            </Text>
+            <HandledErrorAlert
+              error={eventsQuery.error}
+              fallbackTitle="Couldn't load these events"
+            />
           </Center>
         ) : events.length === 0 ? (
           <Center flex={1}>
