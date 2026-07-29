@@ -1,23 +1,12 @@
-import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { GraphTriggerEvaluationReason } from "~/server/app-layer/automations/graph-trigger-evaluation.service";
 import type { TriggerService } from "~/server/app-layer/automations/trigger.service";
 import type { Event } from "~/server/event-sourcing/domain/types";
+import { isDispatchError } from "~/server/event-sourcing/queues/dispatchError";
 
 const logger = createLogger(
   "langwatch:triggers:graph-trigger-activity-subscriber",
 );
-
-/**
- * A trigger the customer can fix themselves — a threshold pointing at a series
- * they deleted, a filter that no longer resolves. The canonical rationale for
- * keying on `fault` (and the warning that it defaults to `"customer"`, so this
- * is opt-out) lives on `isCustomerFixable` in
- * `evaluation-processing/commands/executeEvaluation.command.ts`.
- */
-function isCustomerFixable(error: unknown): error is HandledError {
-  return HandledError.isHandled(error) && error.fault === "customer";
-}
 
 /** Locked ADR-034 Phase 5 real-time debounce. */
 export const GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS = 5_000;
@@ -53,7 +42,7 @@ export function createGraphTriggerActivityHandler(
     if (triggers.length === 0) return;
 
     let failures = 0;
-    let skipped = 0;
+    let terminal = 0;
     for (const trigger of triggers) {
       try {
         await deps.evaluateGraphTrigger({
@@ -62,23 +51,34 @@ export function createGraphTriggerActivityHandler(
           reason: "real-time",
         });
       } catch (error) {
-        // A misconfigured trigger fails identically on every redelivery, so
-        // counting it as a failure below bought nothing and cost a lot: the
-        // event was retried until the poison guard parked the whole group,
-        // and each attempt re-logged at error for every trigger in the
-        // project. It is the customer's config to fix, not an incident.
-        if (isCustomerFixable(error)) {
-          skipped++;
+        // A trigger the evaluator has already judged terminal — a Slack
+        // connection missing its token, a revoked webhook — fails identically
+        // on every redelivery. Counting it below bought nothing and cost a
+        // lot: the event was retried until the poison guard parked the whole
+        // group, and every attempt re-logged at error for every trigger in the
+        // project.
+        //
+        // `retryable` is the thrower's own explicit decision (ADR-027), and it
+        // is safe by default in the right direction: anything that is not a
+        // DispatchError — an unexpected crash, a DB outage — is retryable by
+        // contract, so it falls through to the error branch below rather than
+        // being quietly demoted. Do NOT widen this to a general fault lookup:
+        // classifications that default to "customer" would silently swallow
+        // our own failures here.
+        if (isDispatchError(error) && !error.retryable) {
+          terminal++;
           logger.info(
             {
-              // `meta` first so the fixed identifiers below always win.
-              ...error.meta,
-              code: error.code,
               projectId,
               triggerId: trigger.id,
+              // The customer-facing sentence when the rejection had one; the
+              // full diagnostic always stays in `error`.
+              ...(error.customerMessage
+                ? { customerMessage: error.customerMessage }
+                : {}),
               error: error.message,
             },
-            "graphTriggerActivity: customer-fixable trigger skipped",
+            "graphTriggerActivity: trigger cannot be delivered until reconfigured",
           );
           continue;
         }
@@ -93,16 +93,16 @@ export function createGraphTriggerActivityHandler(
         );
       }
     }
-    if (skipped > 0) {
+    if (terminal > 0) {
       logger.info(
-        { projectId, skipped, triggers: triggers.length },
-        `graphTriggerActivity: ${skipped}/${triggers.length} triggers skipped as customer-fixable`,
+        { projectId, terminal, triggers: triggers.length },
+        `graphTriggerActivity: ${terminal}/${triggers.length} triggers need reconfiguring`,
       );
     }
     // Throw AFTER the loop so one trigger's failure doesn't starve the
     // others, but the queue still redelivers for the failed ones —
-    // TriggerSent idempotency makes the re-evaluations safe. Customer-fixable
-    // skips are deliberately excluded: redelivering them cannot succeed.
+    // TriggerSent idempotency makes the re-evaluations safe. Terminal
+    // rejections are deliberately excluded: redelivering them cannot succeed.
     if (failures > 0) {
       throw new Error(
         `graphTriggerActivity: ${failures}/${triggers.length} evaluations failed — retry via queue redelivery`,
