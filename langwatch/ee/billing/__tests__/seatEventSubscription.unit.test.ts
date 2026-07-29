@@ -798,11 +798,11 @@ describe("seatEventSubscription", () => {
     });
 
     describe("when the currency lookup fails for a reason we cannot name", () => {
+      const lookupError = new Error("socket hang up");
+
       beforeEach(() => {
         db.subscription.findMany.mockResolvedValue([]);
-        stripe.customers.retrieve.mockRejectedValue(
-          new Error("socket hang up"),
-        );
+        stripe.customers.retrieve.mockRejectedValue(lookupError);
         stripe.checkout.sessions.create.mockResolvedValue({
           url: "https://checkout.stripe.com/session",
         });
@@ -820,7 +820,9 @@ describe("seatEventSubscription", () => {
           })
           .catch((caught: unknown) => caught);
 
-        expect((error as Error).message).toBe("socket hang up");
+        // Identity, not just the message: "returned untouched" is the contract,
+        // and a same-message replacement would satisfy a message check.
+        expect(error).toBe(lookupError);
         expect(error).not.toHaveProperty("isHandled");
       });
 
