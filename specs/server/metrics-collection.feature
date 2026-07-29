@@ -24,16 +24,19 @@ Feature: Metrics collection in a deployed chart
 
   Rule: Both tiers come up in every metrics configuration
 
+    @e2e @unimplemented
     Scenario: Default install, with no metrics key configured
       Given no metrics API key is configured
       Then the app pod becomes ready
       And the workers pod becomes ready
 
+    @e2e @unimplemented
     Scenario: Install with a metrics key configured
       Given a metrics API key is configured
       Then the app pod becomes ready
       And the workers pod becomes ready
 
+    @e2e @unimplemented
     Scenario: Install with the metrics key delivered from a secret store
       Given a metrics API key is delivered to the containers from a secret store
       Then the app pod becomes ready
@@ -41,6 +44,7 @@ Feature: Metrics collection in a deployed chart
 
   Rule: Without a key, metrics collection fails closed and liveness still answers
 
+    @e2e @unimplemented
     Scenario: The worker refuses to serve metrics to anyone
       Given no metrics API key is configured
       When a caller requests the worker metrics endpoint with any credentials
@@ -48,6 +52,7 @@ Feature: Metrics collection in a deployed chart
       And no metric samples are returned
       # Fail-closed: an unset key is a misconfiguration, not an invitation.
 
+    @e2e @unimplemented
     Scenario: Liveness is unaffected by the missing key
       Given no metrics API key is configured
       When the kubelet requests the worker liveness endpoint without credentials
@@ -56,18 +61,21 @@ Feature: Metrics collection in a deployed chart
 
   Rule: With a key, metrics are collectable only by an authenticated caller
 
+    @e2e @unimplemented
     Scenario: An unauthenticated scrape is rejected
       Given a metrics API key is configured
       When a caller requests the worker metrics endpoint without credentials
       Then the request is rejected as unauthorized
       And no metric samples are returned
 
+    @e2e @unimplemented
     Scenario: A scrape presenting the wrong credential is rejected
       Given a metrics API key is configured
       When a caller requests the worker metrics endpoint with an incorrect key
       Then the request is rejected as unauthorized
       And no metric samples are returned
 
+    @e2e @unimplemented
     Scenario: An authenticated scrape collects worker metrics
       Given a metrics API key is configured
       When a caller requests the worker metrics endpoint with the configured key
@@ -75,12 +83,14 @@ Feature: Metrics collection in a deployed chart
       And metric samples are returned
       # The path Prometheus actually uses. Previously unproven in a cluster.
 
+    @e2e @unimplemented
     Scenario: An authenticated scrape collects app metrics
       Given a metrics API key is configured
       When a caller requests the app metrics endpoint with the configured key
       Then the response is successful
       And metric samples are returned
 
+    @e2e @unimplemented
     Scenario: The liveness endpoint stays credential-free even once a key exists
       Given a metrics API key is configured
       When the kubelet requests the worker liveness endpoint without credentials
@@ -89,6 +99,7 @@ Feature: Metrics collection in a deployed chart
 
   Rule: A key delivered from a secret store reaches the process
 
+    @e2e @unimplemented
     Scenario: An authenticated scrape collects metrics when the key came from a secret
       Given a metrics API key is delivered to the containers from a secret store
       When a caller requests the worker metrics endpoint with the configured key
