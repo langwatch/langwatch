@@ -14,7 +14,7 @@ import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
-import { FieldInfoTooltip } from "./FieldInfoTooltip";
+import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import { api } from "~/utils/api";
 
 type BudgetCreateDrawerProps = {

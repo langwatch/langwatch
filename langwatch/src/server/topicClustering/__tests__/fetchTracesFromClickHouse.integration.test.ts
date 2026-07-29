@@ -181,4 +181,45 @@ describe("fetchTracesFromClickHouse integration", () => {
       expect(page2.traces[0]?.trace_id).toBe(`${EMPTY_TENANT}-trace-002000`);
     });
   });
+
+  describe("when a trace is older than the fetch window", () => {
+    // The heavy ComputedInput fetch is bounded to a 49-day hot-tier window so
+    // cursor-paging never reads the payload column back into S3 cold storage.
+    // A trace whose OccurredAt predates the window must not be returned.
+    const WINDOW_TENANT = "topic-fetch-window-test";
+    const DAY_MS = 24 * 60 * 60 * 1000;
+
+    beforeAll(async () => {
+      const now = Date.now();
+      const input = JSON.stringify("hello world");
+      const row = (id: string, occurredAt: number): TraceRow => ({
+        ...traceRow(WINDOW_TENANT, 0, input),
+        TraceId: `${WINDOW_TENANT}-${id}`,
+        OccurredAt: new Date(occurredAt),
+        UpdatedAt: new Date(occurredAt),
+        TopicId: null,
+      });
+      await insertRows(ch, [
+        row("recent", now - 10 * DAY_MS), // inside the 49-day window
+        row("stale", now - 60 * DAY_MS), // older than the window
+      ]);
+    }, 60_000);
+
+    afterAll(async () => {
+      await cleanupTestData(WINDOW_TENANT);
+    });
+
+    it("returns the in-window trace and excludes the older one", async () => {
+      const res = await fetchTracesFromClickHouse(
+        ch,
+        WINDOW_TENANT,
+        false,
+        [],
+        [],
+      );
+      const ids = res.traces.map((t) => t.trace_id);
+      expect(ids).toContain(`${WINDOW_TENANT}-recent`);
+      expect(ids).not.toContain(`${WINDOW_TENANT}-stale`);
+    });
+  });
 });

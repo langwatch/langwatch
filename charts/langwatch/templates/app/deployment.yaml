@@ -144,6 +144,16 @@ spec:
             - name: NEXTAUTH_URL_INTERNAL
               value: "http://localhost:{{ .Values.app.service.port | default 5560 }}"
 
+            # Internal platform-API base URL that in-pod scenario/simulation
+            # runners call back to. Post-#3541 the app boot-validates it as a
+            # required URL. On the app pod the app IS local, so self-reference
+            # over localhost (like NEXTAUTH_URL_INTERNAL) — no Service/DNS hop.
+            # Workers/nlp are separate pods and use the app's service DNS
+            # instead. Override only if in-pod runners must reach the app
+            # through a different URL.
+            - name: LANGWATCH_ENDPOINT
+              value: {{ .Values.app.http.langwatchEndpoint | default (printf "http://localhost:%v" (.Values.app.service.port | default 5560)) | quote }}
+
             # Cron API key
             {{- if .Values.app.cronApiKey.secretKeyRef.name }}
             - name: CRON_API_KEY

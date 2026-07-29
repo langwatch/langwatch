@@ -1,10 +1,10 @@
 import { TupleParam } from "@clickhouse/client";
+import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { prisma as defaultPrisma } from "~/server/db";
 import { ExperimentService } from "~/server/experiments/experiment.service";
-import { createLogger } from "~/utils/logger/server";
 import {
   computeOccurredAtRangeForRuns,
   OCCURRED_AT_BUFFER_MS,

@@ -7,6 +7,7 @@
 import { createHash } from "node:crypto";
 import type { Readable } from "node:stream";
 import { Instance, Ksuid } from "@langwatch/ksuid";
+import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import {
@@ -16,7 +17,6 @@ import {
   getStoredObjectWriteFailureCounter,
   storedObjectReadFailureCounter,
 } from "~/server/metrics";
-import { createLogger } from "~/utils/logger/server";
 import { ObjectNotFoundError } from "./errors";
 import {
   redactStorageUri,
@@ -334,6 +334,32 @@ export class StoredObjectsService {
           throw error;
         }
       },
+    );
+  }
+
+  /**
+   * Returns the storage-accounting byte ledger for a project (ADR-040): the
+   * summed `size_bytes` of the project's live stored objects, optionally scoped
+   * to one `purpose` (e.g. "evaluation_inputs"). This is the durable-object
+   * side of a tenant's storage usage, alongside the ClickHouse row bytes.
+   */
+  async getStorageUsageByProject({
+    projectId,
+    purpose,
+  }: {
+    projectId: string;
+    purpose?: string;
+  }): Promise<{ totalBytes: number; objectCount: number }> {
+    return tracer.withActiveSpan(
+      "StoredObjectsService.getStorageUsageByProject",
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          "tenant.id": projectId,
+          ...(purpose ? { "stored_object.purpose": purpose } : {}),
+        },
+      },
+      async () => this.repository.sumSizeBytesByProject({ projectId, purpose }),
     );
   }
 

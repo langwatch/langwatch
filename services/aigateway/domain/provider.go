@@ -50,6 +50,48 @@ type Credential struct {
 	DeploymentMap map[string]string
 }
 
+// WithDeploymentSelfMap ensures Azure / Bedrock / Vertex credentials carry a
+// deployment entry for bareModel so Bifrost's per-key readers resolve a
+// deployment ("deployment not found for model X" / "deployments not set"
+// otherwise). By default the model id IS the deployment name
+// (azure/gpt-5-mini → deployment "gpt-5-mini"), so a {bareModel: bareModel}
+// self-map suffices; when the provider defines an explicit deployment (the
+// model id need not equal the deployment name), the control plane / gateway
+// forwards it as Extra["deployment"] and that wins. Non-mapped providers
+// (OpenAI, ...) and an empty bareModel are returned unchanged.
+//
+// Every dispatch path shares this so Azure resolves its deployment identically
+// regardless of entry point: dispatcheradapter (Studio / workflows /
+// runSignature) and the gatewayproxy /go/proxy path (scenario User Simulator,
+// playground). The /go/proxy path previously skipped it, so Azure calls that
+// got past the endpoint check then failed deployment resolution (#5760).
+func WithDeploymentSelfMap(cred Credential, bareModel string) Credential {
+	if bareModel == "" {
+		return cred
+	}
+	switch cred.ProviderID {
+	case ProviderAzure, ProviderBedrock, ProviderVertex:
+	default:
+		return cred
+	}
+	if _, present := cred.DeploymentMap[bareModel]; present {
+		return cred
+	}
+	deployment := bareModel
+	if explicit := cred.Extra["deployment"]; explicit != "" {
+		deployment = explicit
+	}
+	// Copy on write: cred arrives by value, but DeploymentMap is a reference, so
+	// writing through it would land in the caller's map.
+	next := make(map[string]string, len(cred.DeploymentMap)+1)
+	for model, target := range cred.DeploymentMap {
+		next[model] = target
+	}
+	next[bareModel] = deployment
+	cred.DeploymentMap = next
+	return cred
+}
+
 // Provider dispatches requests to a specific AI provider.
 type Provider interface {
 	ID() ProviderID

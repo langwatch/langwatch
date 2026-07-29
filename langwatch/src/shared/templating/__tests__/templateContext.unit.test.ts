@@ -13,6 +13,7 @@ const baseArgs = {
 
 describe("buildTemplateContext", () => {
   describe("when given trace matches", () => {
+    /** @scenario "Notification links point at the Trace Explorer trace path" */
     it("builds trace URLs and the project URL from the base host", () => {
       const ctx = buildTemplateContext({
         ...baseArgs,
@@ -20,7 +21,7 @@ describe("buildTemplateContext", () => {
       });
       expect(ctx.project.url).toBe("https://app.langwatch.ai/acme");
       expect(ctx.matches[0]?.trace.url).toBe(
-        "https://app.langwatch.ai/acme/messages/trace_1",
+        "https://app.langwatch.ai/acme/traces/trace_1",
       );
       expect(ctx.matches[0]?.trace.id).toBe("trace_1");
     });

@@ -665,7 +665,9 @@ export const RunDetails = React.memo(
                   <Field.Root>
                     <Switch
                       checked={displayRawParams}
-                      onChange={() => setDisplayRawParams(!displayRawParams)}
+                      onCheckedChange={() =>
+                        setDisplayRawParams(!displayRawParams)
+                      }
                     />
                   </Field.Root>
                 </HStack>

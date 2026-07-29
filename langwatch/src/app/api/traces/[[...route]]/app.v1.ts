@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/observability";
 import { HTTPException } from "hono/http-exception";
 import { describeRoute } from "hono-openapi";
 import { resolver, validator as zValidator } from "hono-openapi/zod";
@@ -29,7 +30,6 @@ import {
   formatTraceSummaryDigest,
   generateAsciiTree,
 } from "~/server/traces/trace-formatting";
-import { createLogger } from "~/utils/logger/server";
 import type { AuthMiddlewareVariables } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
 import { platformUrl } from "../../shared/platform-url";
@@ -209,7 +209,7 @@ export function registerTracesRoutes(
             evaluations: trace.evaluations,
             platformUrl: platformUrl({
               projectSlug: project.slug,
-              path: `/messages/${trace.trace_id}`,
+              path: `/traces/${trace.trace_id}`,
             }),
           };
         }
@@ -217,7 +217,7 @@ export function registerTracesRoutes(
           ...trace,
           platformUrl: platformUrl({
             projectSlug: project.slug,
-            path: `/messages/${trace.trace_id}`,
+            path: `/traces/${trace.trace_id}`,
           }),
         };
       };
@@ -412,7 +412,7 @@ export function registerTracesRoutes(
           evaluations,
           platformUrl: platformUrl({
             projectSlug: project.slug,
-            path: `/messages/${resolvedTraceId}`,
+            path: `/traces/${resolvedTraceId}`,
           }),
         });
       }
@@ -424,7 +424,7 @@ export function registerTracesRoutes(
         ascii_tree: asciiTree,
         platformUrl: platformUrl({
           projectSlug: project.slug,
-          path: `/messages/${resolvedTraceId}`,
+          path: `/traces/${resolvedTraceId}`,
         }),
       });
     },

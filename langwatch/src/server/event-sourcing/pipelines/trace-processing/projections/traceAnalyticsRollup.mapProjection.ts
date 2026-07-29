@@ -33,7 +33,7 @@ export interface TraceAnalyticsRollupRow {
    *  This is a SORT key, not a group-by target — the rollup attributes each
    *  span's cost to that span's own model, whereas legacy and the slim table
    *  attribute a trace's whole cost to every model it used. See
-   *  `routing/route-table.ts` → ROLLUP_GROUP_BY_KEYS. */
+   *  `routing/route-table.ts` → ROLLUP_TRACE_GROUP_BY_KEYS. */
   model: string;
   /** langwatch.span.type ('' when absent). */
   spanType: string;

@@ -14,6 +14,7 @@
  * then this preserves a stable per-project actor for forensic queries.
  */
 
+import { createLogger } from "@langwatch/observability";
 import type { Prisma } from "@prisma/client";
 import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi/zod";
@@ -32,7 +33,6 @@ import {
   VirtualKeyService,
 } from "~/server/gateway/virtualKey.service";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
-import { createLogger } from "~/utils/logger/server";
 import { baseResponses } from "../../shared/base-responses";
 
 const logger = createLogger("langwatch:api:gateway-platform");

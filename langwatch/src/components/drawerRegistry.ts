@@ -50,6 +50,10 @@ const AutomationDrawer = lazyDefault({
   factory: () => import("~/features/automations/AutomationDrawer"),
   key: "AutomationDrawer",
 });
+const ViewAutomationDrawer = lazyDefault({
+  factory: () => import("~/features/automations/ViewAutomationDrawer"),
+  key: "ViewAutomationDrawer",
+});
 const AgentHistoryDrawer = lazyDefault({
   factory: () => import("./agents/AgentHistoryDrawer"),
   key: "AgentHistoryDrawer",
@@ -78,10 +82,6 @@ const WorkflowSelectorDrawerFromUrl = lazyDefault({
   factory: () => import("./agents/drawerFromUrl"),
   key: "WorkflowSelectorDrawerFromUrl",
 });
-const AlertDrawer = lazyDefault({
-  factory: () => import("./analytics/AlertDrawer"),
-  key: "AlertDrawer",
-});
 const DashboardNameDrawer = lazyDefault({
   factory: () => import("./analytics/DashboardNameDrawer"),
   key: "DashboardNameDrawer",
@@ -97,10 +97,6 @@ const UploadCSVDrawer = lazyDefault({
 const FeatureFlagsDrawer = lazyDefault({
   factory: () => import("./drawers/FeatureFlagsDrawer"),
   key: "FeatureFlagsDrawer",
-});
-const SdkRadarDrawer = lazyDefault({
-  factory: () => import("./drawers/SdkRadarDrawer"),
-  key: "SdkRadarDrawer",
 });
 const EditAutomationFilterDrawer = lazyDefault({
   factory: () => import("./EditAutomationFilterDrawer"),
@@ -226,6 +222,7 @@ export const drawers = {
   traceDetails: TraceDetailsDrawer,
   traceV2Details: TraceV2DrawerNoop,
   automation: AutomationDrawer,
+  viewAutomation: ViewAutomationDrawer,
   editModelProvider: EditModelProviderDrawer,
   defaultModelOverride: DefaultModelOverrideDrawer,
   addOrEditAnnotationScore: AddOrEditAnnotationScoreDrawer,
@@ -237,7 +234,6 @@ export const drawers = {
   editAutomationFilter: EditAutomationFilterDrawer,
   seriesFilters: SeriesFiltersDrawer,
   selectDataset: SelectDatasetDrawer,
-  customGraphAlert: AlertDrawer,
   dashboardName: DashboardNameDrawer,
   // Evaluations V3 drawers
   targetTypeSelector: TargetTypeSelectorDrawer,
@@ -272,8 +268,6 @@ export const drawers = {
   // Online Evaluations (Monitors)
   onlineEvaluation: OnlineEvaluationDrawer,
   guardrails: GuardrailsDrawer,
-  // SDK Radar
-  sdkRadar: SdkRadarDrawer,
   // Dev tools
   featureFlags: FeatureFlagsDrawer,
   // Ops

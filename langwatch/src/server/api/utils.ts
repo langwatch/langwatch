@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/observability";
 import {
   OrganizationUserRole,
   type PrismaClient,
@@ -25,7 +26,6 @@ import {
 import { getDataPrivacyPolicyService } from "~/server/data-privacy/dataPrivacyPolicy.service";
 import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
 import { TtlCache } from "~/server/utils/ttlCache";
-import { createLogger } from "~/utils/logger/server";
 import { FREE_VISIBILITY_DAYS } from "../../../ee/licensing/constants";
 import type { CategoryVisibility, Protections } from "../traces/protections";
 import { hasProjectPermission, isDemoProject } from "./rbac";

@@ -11,23 +11,23 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
+import { createLogger } from "@langwatch/observability";
 import { AlertTriangle, ArrowLeft, Check, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import type { UseFormReturn } from "react-hook-form";
 import { useModelProvidersSettings } from "../../hooks/useModelProvidersSettings";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
-import { createLogger } from "../../utils/logger";
 import { toaster } from "../ui/toaster";
 import { ResolvedModelCaption } from "./ResolvedModelCaption";
 import type { ScenarioFormData } from "./ScenarioForm";
 import {
-  generateScenarioWithAI,
   type GeneratedScenario,
+  generateScenarioWithAI,
 } from "./services/scenarioGeneration";
+import { consumeStoredPrompt } from "./services/scenarioPromptStorage";
 import { classifyGenerationError } from "./utils/classifyGenerationError";
 import { getDefaultModelState } from "./utils/defaultModelState";
-import { consumeStoredPrompt } from "./services/scenarioPromptStorage";
 
 const logger = createLogger("langwatch:scenarios:ai-generation");
 

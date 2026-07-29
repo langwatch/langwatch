@@ -23,7 +23,7 @@ vi.mock("~/server/tracer/tracesMapping", () => ({
   tryAndConvertTo: (value: unknown) => value,
 }));
 
-vi.mock("~/utils/logger/server", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
     error: vi.fn(),
     warn: vi.fn(),

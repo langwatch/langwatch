@@ -112,6 +112,20 @@ export class ExperimentRunStateFoldProjection
   readonly version = EXPERIMENT_RUN_PROJECTION_VERSIONS.RUN_STATE;
   readonly store: FoldProjectionStore<ExperimentRunStateData>;
 
+  /**
+   * Order-insensitive fold: every handler is a counter (`CompletedCount++`),
+   * a running sum (`TotalCost`/`TotalDurationMs`/`TotalScoreSum` +=), a
+   * `Math.max` (`Total`), or a keyed map that last-write-wins per key
+   * (`TraceMetrics[traceId]` subtract-old/add-new, `Targets` merged by id) —
+   * so the state converges to the same value whichever order events are seen
+   * in. A run's aggregate is dataset-scale (one targetResult per row + one
+   * evaluatorResult per row×evaluator, thousands of events), so re-folding the
+   * whole history on every out-of-order event is the same O(n²) amplification
+   * that hit the trace folds — pure waste here since the result is identical.
+   * See specs/event-sourcing/hot-trace-fold-amplification.feature.
+   */
+  readonly options = { refoldOnOutOfOrder: false } as const;
+
   protected readonly events = experimentRunEvents;
 
   constructor(deps: { store: FoldProjectionStore<ExperimentRunStateData> }) {

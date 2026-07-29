@@ -13,6 +13,10 @@ import React, { useEffect, useState } from "react";
 import { LuSettings2 } from "react-icons/lu";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import {
+  buildCustomModelDisplayNames,
+  modelDisplayLabel,
+} from "../server/modelProviders/customModelDisplayNames";
+import {
   modelProviderIcons,
   ProviderIconGlyph,
 } from "../server/modelProviders/iconsMap";
@@ -121,12 +125,15 @@ export const useModelSelectionOptions = (
     }
   }
 
+  const displayNames = buildCustomModelDisplayNames(
+    modelProviders.data?.providers ?? [],
+  );
+
   const selectOptions: ModelOption[] = allModels.map((modelValue) => {
     const provider = modelValue.split("/")[0]!;
-    const modelName = modelValue.split("/").slice(1).join("/");
 
     return {
-      label: modelName,
+      label: modelDisplayLabel({ fullModelId: modelValue, displayNames }),
       value: modelValue,
       icon: modelProviderIcons[provider as keyof typeof modelProviderIcons],
       isDisabled: false,

@@ -248,6 +248,86 @@ export class StoredObjectsRepository {
   }
 
   /**
+   * Sums `size_bytes` of the live rows owned by a project, optionally scoped to
+   * one `purpose`, as the storage-accounting byte ledger (ADR-040).
+   *
+   * Dedup uses the IN-tuple `(project_id, id, max(inserted_at))` pattern so
+   * only the latest version of each content-addressed row is counted - never
+   * summing across stale ReplacingMergeTree versions. project_id is the first
+   * predicate for tenant isolation and to keep the scan on the project's
+   * granules.
+   */
+  async sumSizeBytesByProject({
+    projectId,
+    purpose,
+  }: {
+    projectId: string;
+    purpose?: string;
+  }): Promise<{ totalBytes: number; objectCount: number }> {
+    return tracer.withActiveSpan(
+      "StoredObjectsRepository.sumSizeBytesByProject",
+      {
+        kind: SpanKind.CLIENT,
+        attributes: {
+          "db.system": "clickhouse",
+          "db.operation": "SELECT",
+          "tenant.id": projectId,
+          ...(purpose ? { "stored_object.purpose": purpose } : {}),
+        },
+      },
+      async (span) => {
+        const client = await getClickHouseClientForProject(projectId);
+        if (!client) {
+          throw new Error(
+            "ClickHouse is not configured - cannot sum stored object sizes",
+          );
+        }
+
+        const purposePredicate = purpose
+          ? "AND t.purpose = {purpose:String}"
+          : "";
+        const innerPurposePredicate = purpose
+          ? "AND purpose = {purpose:String}"
+          : "";
+
+        const result = await client.query({
+          query: `
+            SELECT
+              sum(t.size_bytes) AS total_bytes,
+              count()           AS object_count
+            FROM ${TABLE_NAME} AS t
+            WHERE t.project_id = {projectId:String}
+              ${purposePredicate}
+              AND (t.project_id, t.id, t.inserted_at) IN (
+                SELECT project_id, id, max(inserted_at)
+                FROM ${TABLE_NAME}
+                WHERE project_id = {projectId:String}
+                  ${innerPurposePredicate}
+                GROUP BY project_id, id
+              )
+          `,
+          query_params: purpose
+            ? { projectId, purpose }
+            : { projectId },
+          format: "JSONEachRow",
+        });
+
+        const rows = await result.json<{
+          total_bytes: string | number | null;
+          object_count: string | number | null;
+        }>();
+        const raw = rows[0];
+        const totalBytes = raw?.total_bytes != null ? Number(raw.total_bytes) : 0;
+        const objectCount =
+          raw?.object_count != null ? Number(raw.object_count) : 0;
+        span.setAttribute("stored_objects.total_bytes", totalBytes);
+        span.setAttribute("stored_objects.object_count", objectCount);
+        return { totalBytes, objectCount };
+      },
+    );
+  }
+
+  /**
    * Deletes every stored_objects row for a project (and optionally a single
    * owner) via ClickHouse ALTER TABLE DELETE.
    *

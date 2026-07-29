@@ -24,7 +24,7 @@ import {
   EligibleModelProvidersPreview,
   EligibleModelProvidersSummary,
 } from "./EligibleModelProvidersPreview";
-import { FieldInfoTooltip } from "./FieldInfoTooltip";
+import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import {
   type VirtualKeyScopeEntry,
   VirtualKeyScopePicker,

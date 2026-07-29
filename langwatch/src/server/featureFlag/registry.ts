@@ -92,6 +92,20 @@ export const FEATURE_FLAGS = [
       "Skips the strict PII redaction pass that calls the external analysis service (Presidio via langevals). The native secrets and essential PII redaction in the ingestion pipeline are unaffected. Emergency operator override to shed analysis-service load.",
     family: "Collector",
   },
+  // Kill switch for the evaluation-inputs offload (ADR-040). The offload is ON
+  // by default: oversized evaluator inputs go to the durable stored-objects
+  // service and the event/row carry a bounded marker instead of the full
+  // payload. Flipping this ON keeps inputs inline (only the unconditional
+  // repository cap bounds the ClickHouse row). Operators flip it from
+  // /ops/feature-flags.
+  {
+    key: "ops_evaluation_payload_offload_disabled",
+    scope: "SYSTEM",
+    defaultValue: false,
+    description:
+      "Disables the oversized evaluator-inputs offload to durable object storage (ADR-040). While on, inputs flow inline and only the unconditional 8 MiB repository cap bounds the ClickHouse row. Emergency operator override for object-storage trouble.",
+    family: "Event sourcing",
+  },
   // Per-span token estimation kill switches. Hardcoded raw keys before;
   // each `record_span` job was a PostHog /flags call for the global key
   // plus another for the project key (~5k calls/day in dogfood at modest
@@ -115,12 +129,6 @@ export const FEATURE_FLAGS = [
   },
 
   // ----- PRODUCT -----
-  {
-    key: "release_ui_sdk_radar_banner_card_enabled",
-    scope: "PRODUCT",
-    defaultValue: false,
-    description: "Shows the SDK radar banner card on the home page.",
-  },
   {
     key: "release_ui_ai_gateway_menu_enabled",
     scope: "PRODUCT",
@@ -173,6 +181,25 @@ export const FEATURE_FLAGS = [
     defaultValue: false,
     description:
       "Tripwire for ADR-034 Phase 3: when ON alongside release_event_sourced_analytics_read, runs the routed and legacy trace_summaries queries in parallel and logs divergence beyond a small tolerance. Returns the routed result either way.",
+  },
+  // ADR-034 Phase 5 — moves custom-graph threshold-alert firing off the K8s
+  // cron onto the event-sourced path (real-time outbox reactor on
+  // trace-processing + 30s heartbeat for no-data / firing-resolve absence
+  // cases). SYSTEM scope: self-hosted (env + /ops/feature-flags store),
+  // never consults PostHog — the rollout is operator-driven per project
+  // rather than %-targeted, and we don't want PostHog outages or quota
+  // to flip trigger delivery. OFF (default) = cron handles the project's
+  // graph triggers as today. ON = cron skips that project's graph
+  // triggers; the event-sourced path takes over. The cron loop and the
+  // new path coexist per-project — graph triggers either fire from one
+  // OR the other for a given project, never both.
+  {
+    key: "release_es_graph_triggers_firing",
+    scope: "SYSTEM",
+    defaultValue: false,
+    description:
+      "Moves custom-graph threshold-alert firing off the K8s cron onto the event-sourced path (ADR-034 Phase 5). Self-hosted flag; toggle globally via RELEASE_ES_GRAPH_TRIGGERS_FIRING=1 or per-project from /ops/feature-flags. On = cron skips this project's graph triggers; real-time outbox reactor + heartbeat fire them. Off = cron handles as today.",
+    family: "Event sourcing",
   },
   {
     key: "release_langy_enabled",

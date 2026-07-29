@@ -14,7 +14,7 @@ import { TRPCError } from "@trpc/server";
 import {
   NotFoundError,
   ValidationError,
-} from "~/server/app-layer/domain-error";
+} from "~/server/app-layer/handled-error";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { encrypt } from "~/utils/encryption";
 import {

@@ -5,7 +5,6 @@ import { LearningResources } from "./LearningResources";
 import { OnboardingProgress } from "./OnboardingProgress";
 import { QuickAccessLinks } from "./QuickAccessLinks";
 import { RecentItemsSection } from "./RecentItemsSection";
-import { SdkRadarCard } from "./SdkRadarCard";
 import { TracesOverview } from "./TracesOverview";
 import { WelcomeHeader } from "./WelcomeHeader";
 
@@ -16,7 +15,6 @@ export function HomePage() {
         <VStack gap={6} width="full" align="start">
           <WelcomeHeader />
           <HomePageBanners />
-          <SdkRadarCard />
           <OnboardingProgress />
           <TracesOverview />
           <RecentItemsSection />

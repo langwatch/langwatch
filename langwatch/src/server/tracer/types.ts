@@ -131,6 +131,45 @@ export const chatRichContentSchema = z.union([
       mimeType: z.string().optional(),
     }),
   }),
+  /**
+   * AI-SDK image part. `image` is a data: URI pre-extraction, a
+   * /api/files/{projectId}/{id} reference after ingest-side extraction, or an
+   * external http(s) URL (passed through, never re-hosted). This is the shape
+   * the typescript scenario SDK ships for image attachments in simulated user
+   * messages (scenario docs: multimodal-images).
+   */
+  z.object({
+    type: z.literal("image"),
+    image: z.string(),
+    mediaType: z.string().optional(),
+  }),
+  /**
+   * AI-SDK file part. Non-audio mediaTypes are externalized to a `binary`
+   * reference at ingest; audio/* mediaTypes route through the `input_audio`
+   * externalization path (see `visitContentPart`).
+   */
+  z.object({
+    type: z.literal("file"),
+    mediaType: z.string(),
+    data: z.string().optional(),
+    url: z.string().optional(),
+    filename: z.string().optional(),
+  }),
+  /**
+   * OpenAI ChatCompletion file part (scenario docs: multimodal-files).
+   * `file_data` is a data: URI or raw base64; `file_id` references a file
+   * hosted on the provider side and carries no bytes, so it passes through
+   * extraction unchanged. Externalized at ingest to a `binary` reference
+   * preserving the filename.
+   */
+  z.object({
+    type: z.literal("file"),
+    file: z.object({
+      file_data: z.string().optional(),
+      file_id: z.string().optional(),
+      filename: z.string().optional(),
+    }),
+  }),
 ]);
 
 export type ChatRichContent = z.infer<typeof chatRichContentSchema>;

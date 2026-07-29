@@ -1,11 +1,11 @@
+import { createLogger } from "@langwatch/observability";
 import { useCallback, useEffect, useRef } from "react";
-import {
-  isCompactStreamingEvent,
-  type CompactStreamingEvent,
-} from "~/utils/streaming-event-codec";
-import { api } from "~/utils/api";
 import { DEFAULT_SET_ID } from "~/server/scenarios/internal-set-id";
-import { createLogger } from "~/utils/logger";
+import { api } from "~/utils/api";
+import {
+  type CompactStreamingEvent,
+  isCompactStreamingEvent,
+} from "~/utils/streaming-event-codec";
 import { usePageVisibility } from "./usePageVisibility";
 import { useSSESubscription } from "./useSSESubscription";
 
@@ -108,7 +108,7 @@ export function useSimulationUpdateListener({
     };
   }, []);
 
-  useSSESubscription<
+  const subscription = useSSESubscription<
     { event: string; timestamp: number },
     { projectId: string }
   >(
@@ -172,4 +172,12 @@ export function useSimulationUpdateListener({
       },
     },
   );
+
+  // Callers use the connection state to disable fallback polling while the
+  // event stream is healthy — SSE is the primary freshness signal, polling
+  // exists only for disconnected sessions.
+  return {
+    connectionState: subscription.connectionState,
+    isConnected: subscription.isConnected,
+  } as const;
 }

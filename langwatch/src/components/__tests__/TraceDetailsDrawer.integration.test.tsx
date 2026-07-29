@@ -42,13 +42,11 @@ vi.mock("~/components/traces/TraceDetails", () => ({
   TraceDetails: () => <div data-testid="trace-details">TraceDetails</div>,
 }));
 
-// NewTracesPromo pulls in tRPC (publicEnv → useOrganizationTeamProject) which
-// requires withTRPC context this test does not provide. Also exports the
-// `isDrawerSwapInProgress` flag-getter that TraceDetailsDrawer reads on
-// every onOpenChange — stub it as always-false so the close flow runs.
-vi.mock("~/components/messages/NewTracesPromo", () => ({
-  NewTracesPromo: () => null,
-  isDrawerSwapInProgress: () => false,
+// LegacyTracesDeprecationBanner pulls in tRPC (publicEnv →
+// useOrganizationTeamProject) which requires withTRPC context this test
+// does not provide.
+vi.mock("~/components/messages/LegacyTracesDeprecationBanner", () => ({
+  LegacyTracesDeprecationBanner: () => null,
 }));
 
 // Capture the onOpenChange handler from Drawer.Root. The real

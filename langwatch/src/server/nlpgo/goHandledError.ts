@@ -1,6 +1,6 @@
 import { APICallError, RetryError } from "ai";
 import { z } from "zod";
-import { DomainError } from "../app-layer/domain-error";
+import { HandledError } from "../app-layer/handled-error";
 
 /**
  * nlpgo's handled-error envelope (services/nlpgo herr package). Every
@@ -22,17 +22,17 @@ const goErrorEnvelopeSchema = z.object({
 
 /**
  * A handled error the Go side (nlpgo / AI Gateway) returned as a typed
- * envelope. `kind` is the most specific discriminant available —
+ * envelope. `code` is the most specific discriminant available —
  * `meta.reason` when present (e.g. "missing_provider"), the envelope
  * `type` otherwise (e.g. "bad_request").
  */
-export class NlpgoHandledError extends DomainError {
+export class NlpgoHandledError extends HandledError {
   constructor(
-    kind: string,
+    code: string,
     message: string,
     options: { httpStatus: number; meta?: Record<string, unknown> },
   ) {
-    super(kind, message, options);
+    super(code, message, options);
     this.name = "NlpgoHandledError";
   }
 }
@@ -47,6 +47,27 @@ export class NlpgoHandledError extends DomainError {
  * Unwraps the AI SDK's RetryError to the last attempt, since
  * generateObject surfaces exhausted retries that way.
  */
+/**
+ * True when `error` is an abort — e.g. an `AbortSignal.timeout` cap firing.
+ * `AbortSignal.timeout().reason` is a `DOMException` (name "TimeoutError"), not
+ * `instanceof Error` in this runtime, so match on the `name` property directly.
+ * Mirrors the abort names in `@ai-sdk/provider-utils`' `isAbortError`
+ * ("AbortError" / "TimeoutError" / Next.js "ResponseAborted") — kept as a local
+ * copy because `ai` doesn't re-export it and provider-utils isn't a direct dep.
+ * No `RetryError` unwrap: the AI SDK re-throws aborts RAW before wrapping, so an
+ * abort is never a `RetryError.lastError` (verified against ai@6.0.217). Lives
+ * here beside `nlpgoHandledErrorFrom` so every `generateObject` caller can share
+ * one abort predicate.
+ */
+export function isAbortLikeError(error: unknown): boolean {
+  const name = (error as { name?: unknown } | null | undefined)?.name;
+  return (
+    name === "AbortError" ||
+    name === "TimeoutError" ||
+    name === "ResponseAborted"
+  );
+}
+
 export function nlpgoHandledErrorFrom(error: unknown): NlpgoHandledError | null {
   const cause = RetryError.isInstance(error) ? error.lastError : error;
   if (!APICallError.isInstance(cause) || !cause.responseBody) {
@@ -67,9 +88,9 @@ export function nlpgoHandledErrorFrom(error: unknown): NlpgoHandledError | null 
 
   const envelope = parsed.data.error;
   const reason = envelope.meta?.reason;
-  const kind = typeof reason === "string" ? reason : envelope.type;
+  const code = typeof reason === "string" ? reason : envelope.type;
 
-  return new NlpgoHandledError(kind, envelope.message ?? envelope.type, {
+  return new NlpgoHandledError(code, envelope.message ?? envelope.type, {
     httpStatus: cause.statusCode ?? 500,
     meta: envelope.meta,
   });

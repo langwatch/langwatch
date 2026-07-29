@@ -10,7 +10,7 @@ import {
 import type { Project } from "@prisma/client";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import type React from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { trackEvent } from "../../utils/tracking";
 import { ICON_SIZE, MENU_ITEM_HEIGHT, SideMenuLink } from "./SideMenuLink";
 
@@ -47,6 +47,15 @@ export const CollapsibleMenuGroup = ({
   const [isExpanded, setIsExpanded] = useState(
     defaultExpanded || isAnyChildActive,
   );
+
+  // Stay open while you're inside the group. The initial `useState` only
+  // captures active-ness on mount; the persistent rail stays mounted across
+  // client navigations, so without this the group would collapse the moment
+  // you clicked into one of its children. Re-open (never force-close) so a
+  // manual collapse elsewhere isn't fought.
+  useEffect(() => {
+    if (isAnyChildActive) setIsExpanded(true);
+  }, [isAnyChildActive]);
 
   const handleToggle = (details: { open: boolean }) => {
     setIsExpanded(details.open);

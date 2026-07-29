@@ -1,4 +1,4 @@
-import { DomainError } from "~/server/app-layer/domain-error";
+import { HandledError } from "~/server/app-layer/handled-error";
 import { LIMIT_TYPE_LABELS } from "./constants";
 import type { LimitType } from "./types";
 
@@ -7,8 +7,8 @@ import type { LimitType } from "./types";
  * This error is framework-agnostic and should be caught and mapped to
  * HTTP/tRPC errors by the router layer.
  */
-export class LimitExceededError extends DomainError {
-  declare readonly kind: "resource_limit_exceeded";
+export class LimitExceededError extends HandledError {
+  declare readonly code: "resource_limit_exceeded";
 
   constructor(
     public readonly limitType: LimitType,

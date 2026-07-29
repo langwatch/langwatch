@@ -10,8 +10,8 @@ import {
  * Single Responsibility: Provides consistent color values for console components (dark mode only)
  */
 export const CONSOLE_COLORS: Record<string, Tokens["colors"]> = {
-  consoleBg: "gray.800",
-  consoleText: "white",
+  consoleBg: "gray.950",
+  consoleText: "gray.200",
   headerColor: "white",
   successColor: "green.300",
   failureColor: "red.400",

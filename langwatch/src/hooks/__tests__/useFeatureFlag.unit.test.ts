@@ -34,7 +34,7 @@ describe("useFeatureFlag()", () => {
 
     it("returns isLoading true", () => {
       const { result } = renderHook(() =>
-        useFeatureFlag("release_ui_sdk_radar_banner_card_enabled"),
+        useFeatureFlag("release_ui_ai_gateway_menu_enabled"),
       );
 
       expect(result.current.isLoading).toBe(true);
@@ -42,7 +42,7 @@ describe("useFeatureFlag()", () => {
 
     it("returns enabled false", () => {
       const { result } = renderHook(() =>
-        useFeatureFlag("release_ui_sdk_radar_banner_card_enabled"),
+        useFeatureFlag("release_ui_ai_gateway_menu_enabled"),
       );
 
       expect(result.current.enabled).toBe(false);
@@ -59,7 +59,7 @@ describe("useFeatureFlag()", () => {
 
     it("returns enabled false", () => {
       const { result } = renderHook(() =>
-        useFeatureFlag("release_ui_sdk_radar_banner_card_enabled"),
+        useFeatureFlag("release_ui_ai_gateway_menu_enabled"),
       );
 
       expect(result.current.enabled).toBe(false);
@@ -67,7 +67,7 @@ describe("useFeatureFlag()", () => {
 
     it("returns isLoading false", () => {
       const { result } = renderHook(() =>
-        useFeatureFlag("release_ui_sdk_radar_banner_card_enabled"),
+        useFeatureFlag("release_ui_ai_gateway_menu_enabled"),
       );
 
       expect(result.current.isLoading).toBe(false);
@@ -84,7 +84,7 @@ describe("useFeatureFlag()", () => {
 
     it("returns enabled true", () => {
       const { result } = renderHook(() =>
-        useFeatureFlag("release_ui_sdk_radar_banner_card_enabled"),
+        useFeatureFlag("release_ui_ai_gateway_menu_enabled"),
       );
 
       expect(result.current.enabled).toBe(true);
@@ -92,7 +92,7 @@ describe("useFeatureFlag()", () => {
 
     it("returns isLoading false", () => {
       const { result } = renderHook(() =>
-        useFeatureFlag("release_ui_sdk_radar_banner_card_enabled"),
+        useFeatureFlag("release_ui_ai_gateway_menu_enabled"),
       );
 
       expect(result.current.isLoading).toBe(false);
@@ -109,7 +109,7 @@ describe("useFeatureFlag()", () => {
 
     it("passes projectId and organizationId to query", () => {
       renderHook(() =>
-        useFeatureFlag("release_ui_sdk_radar_banner_card_enabled", {
+        useFeatureFlag("release_ui_ai_gateway_menu_enabled", {
           projectId: "proj-123",
           organizationId: "org-456",
         }),
@@ -117,7 +117,7 @@ describe("useFeatureFlag()", () => {
 
       expect(mockUseQuery).toHaveBeenCalledWith(
         {
-          flag: "release_ui_sdk_radar_banner_card_enabled",
+          flag: "release_ui_ai_gateway_menu_enabled",
           projectId: "proj-123",
           organizationId: "org-456",
         },
@@ -140,11 +140,11 @@ describe("useFeatureFlag()", () => {
     });
 
     it("passes undefined for optional params", () => {
-      renderHook(() => useFeatureFlag("release_ui_sdk_radar_banner_card_enabled"));
+      renderHook(() => useFeatureFlag("release_ui_ai_gateway_menu_enabled"));
 
       expect(mockUseQuery).toHaveBeenCalledWith(
         {
-          flag: "release_ui_sdk_radar_banner_card_enabled",
+          flag: "release_ui_ai_gateway_menu_enabled",
           projectId: undefined,
           organizationId: undefined,
         },
@@ -168,7 +168,7 @@ describe("useFeatureFlag()", () => {
 
     it("disables the query", () => {
       renderHook(() =>
-        useFeatureFlag("release_ui_sdk_radar_banner_card_enabled", {
+        useFeatureFlag("release_ui_ai_gateway_menu_enabled", {
           projectId: undefined,
           enabled: false,
         }),
@@ -184,7 +184,7 @@ describe("useFeatureFlag()", () => {
 
     it("returns enabled false", () => {
       const { result } = renderHook(() =>
-        useFeatureFlag("release_ui_sdk_radar_banner_card_enabled", {
+        useFeatureFlag("release_ui_ai_gateway_menu_enabled", {
           enabled: false,
         }),
       );
@@ -194,7 +194,7 @@ describe("useFeatureFlag()", () => {
 
     it("returns isLoading false", () => {
       const { result } = renderHook(() =>
-        useFeatureFlag("release_ui_sdk_radar_banner_card_enabled", {
+        useFeatureFlag("release_ui_ai_gateway_menu_enabled", {
           enabled: false,
         }),
       );

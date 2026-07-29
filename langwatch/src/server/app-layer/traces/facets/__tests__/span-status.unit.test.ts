@@ -12,18 +12,27 @@ describe("SPAN_STATUS_FACET", () => {
 
   describe("status code expression", () => {
     it("maps OTel status code 2 to 'error'", () => {
-      expect(SPAN_STATUS_FACET.expression).toContain("StatusCode = 2");
-      expect(SPAN_STATUS_FACET.expression).toContain("'error'");
+      expect(SPAN_STATUS_FACET.expression).toContain("= 2, 'error'");
     });
 
     it("maps OTel status code 1 to 'ok'", () => {
-      expect(SPAN_STATUS_FACET.expression).toContain("StatusCode = 1");
-      expect(SPAN_STATUS_FACET.expression).toContain("'ok'");
+      expect(SPAN_STATUS_FACET.expression).toContain("= 1, 'ok'");
     });
 
-    it("treats null / missing status as 'unset'", () => {
-      // NULL == anything is false in CH; the outer `if(_, _, 'unset')` arm
-      // catches both `0` and `NULL`, which is the desired OTel semantic.
+    it("coalesces a NULL status before comparing it", () => {
+      // `StatusCode` is Nullable(UInt8), and in ClickHouse a comparison
+      // against NULL evaluates to NULL — so `if(StatusCode = 2, ...)` returns
+      // NULL for a NULL-status span rather than falling through to 'unset',
+      // dropping the span out of the filter entirely. Every read of the
+      // column must therefore be NULL-coalesced before it is compared.
+      const bareComparisons =
+        SPAN_STATUS_FACET.expression.match(/(?<!ifNull\()StatusCode\s*=/g) ?? [];
+
+      expect(bareComparisons).toEqual([]);
+      expect(SPAN_STATUS_FACET.expression).toContain("ifNull(StatusCode, 0)");
+    });
+
+    it("treats a coalesced-to-zero status as 'unset'", () => {
       expect(SPAN_STATUS_FACET.expression).toContain("'unset'");
     });
 
@@ -31,7 +40,7 @@ describe("SPAN_STATUS_FACET", () => {
       // Anchors against the literal expression so a future copy/paste edit
       // that flips the code → label mapping fails loudly.
       expect(SPAN_STATUS_FACET.expression).toBe(
-        "if(StatusCode = 2, 'error', if(StatusCode = 1, 'ok', 'unset'))",
+        "if(ifNull(StatusCode, 0) = 2, 'error', if(ifNull(StatusCode, 0) = 1, 'ok', 'unset'))",
       );
     });
   });

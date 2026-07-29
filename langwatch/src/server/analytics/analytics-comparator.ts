@@ -6,12 +6,12 @@
  * during comparison mode.
  */
 
-import { createLogger } from "../../utils/logger/server";
+import { createLogger } from "@langwatch/observability";
 import type {
-  TimeseriesResult,
-  FilterDataResult,
-  TopDocumentsResult,
   FeedbacksResult,
+  FilterDataResult,
+  TimeseriesResult,
+  TopDocumentsResult,
 } from "./types";
 
 /** Tolerance for numeric comparison (5% or at least 1) */

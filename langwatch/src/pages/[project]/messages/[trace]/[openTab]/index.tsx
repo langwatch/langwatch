@@ -2,25 +2,23 @@ import { useRouter } from "~/utils/compat/next-router";
 import { useEffect } from "react";
 
 /**
- * Redirect page for /[project]/messages/[trace]/[openTab]
- * Opens the traceDetails drawer on the messages page with the specified tab.
+ * Redirect page for the legacy /[project]/messages/[trace]/[openTab] deep
+ * link. Old links land here; they now open the Trace Explorer drawer, which
+ * is the default trace experience. The legacy tab has no Trace Explorer
+ * equivalent, so it is dropped.
  */
 export default function TraceDetailsWithTabRedirect() {
   const router = useRouter();
   const projectSlug = router.query.project as string | undefined;
   const traceId = router.query.trace as string | undefined;
-  const openTab = router.query.openTab as string | undefined;
 
   useEffect(() => {
     if (!projectSlug || !traceId || !router.isReady) return;
 
-    const tabParam = openTab
-      ? `&drawer.openTab=${encodeURIComponent(openTab)}`
-      : "";
     void router.replace(
-      `/${projectSlug}/messages?drawer.open=traceDetails&drawer.traceId=${encodeURIComponent(traceId)}${tabParam}`,
+      `/${projectSlug}/traces?drawer.open=traceV2Details&drawer.traceId=${encodeURIComponent(traceId)}`,
     );
-  }, [projectSlug, traceId, openTab, router, router.isReady]);
+  }, [projectSlug, traceId, router, router.isReady]);
 
   return null;
 }

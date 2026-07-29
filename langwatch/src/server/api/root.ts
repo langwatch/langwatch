@@ -64,7 +64,6 @@ import { routingPoliciesRouter } from "./routers/routingPolicies";
 import { savedViewsRouter } from "./routers/savedViews";
 import { scenarioRouter } from "./routers/scenarios";
 import { scimTokenRouter } from "./routers/scimToken";
-import { sdkRadarRouter } from "./routers/sdkRadar";
 import { secretsRouter } from "./routers/secrets";
 import { shareRouter } from "./routers/share";
 import { spansRouter } from "./routers/spans";
@@ -130,7 +129,6 @@ const coreRouters = {
   prompts: promptsRouter,
   promptTags: promptTagsRouter,
   savedViews: savedViewsRouter,
-  sdkRadar: sdkRadarRouter,
   secrets: secretsRouter,
   license: licenseRouter,
   licenseEnforcement: licenseEnforcementRouter,

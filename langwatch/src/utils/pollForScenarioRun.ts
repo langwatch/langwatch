@@ -1,5 +1,5 @@
+import { createLogger } from "@langwatch/observability";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
-import { createLogger } from "./logger";
 
 const logger = createLogger("pollForScenarioRun");
 

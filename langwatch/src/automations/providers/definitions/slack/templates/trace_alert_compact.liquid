@@ -1,29 +1,34 @@
-{%- capture _md_user -%}
-## User
-{{ match.trace.input | truncate: 1500 | replace: "&", "&amp;" | replace: "<", "&lt;" | replace: ">", "&gt;" }}
+{%- capture _header_text -%}
+{% if trigger.alertType == 'INFO' %}ℹ️ {% elsif trigger.alertType == 'CRITICAL' %}🔴 {% elsif trigger.alertType == 'WARNING' %}⚠️ {% else %}🔔 {% endif %}{{ trigger.name }}
 {%- endcapture -%}
-{%- capture _md_assistant -%}
-## Assistant
-{{ match.trace.output | truncate: 1500 | replace: "&", "&amp;" | replace: "<", "&lt;" | replace: ">", "&gt;" }}
-{%- endcapture -%}
-{%- capture _ctx_header -%}
-{%- if match.evaluation %}*{{ match.evaluation.evaluatorName | default: "Evaluation" | replace: "&", "&amp;" | replace: "<", "&lt;" | replace: ">", "&gt;" }}*{% if match.evaluation.score != null %} `{{ match.evaluation.score }}`{% endif %}{% if match.evaluation.label %} · {{ match.evaluation.label | replace: "&", "&amp;" | replace: "<", "&lt;" | replace: ">", "&gt;" }}{% endif %}{%- endif -%}
+{%- capture _ctx_eval -%}
+{%- if match.evaluation %}*{{ match.evaluation.evaluatorName | default: "Evaluation" | mrkdwn_escape }}*{% if match.evaluation.score != null %} `{{ match.evaluation.score }}`{% endif %}{% if match.evaluation.label %} · {{ match.evaluation.label | mrkdwn_escape }}{% endif %}{%- endif -%}
 {%- if match.evaluation and trigger.alertType %} · {% endif -%}
 {%- if trigger.alertType %}_{{ trigger.alertType }}_{%- endif -%}
 {%- endcapture -%}
 {%- capture _footer -%}
-`{{ match.trace.id | truncate: 12 }}`{% if match.trace.metadata.model %} · {{ match.trace.metadata.model | replace: "&", "&amp;" | replace: "<", "&lt;" | replace: ">", "&gt;" }}{% endif %}{% if match.trace.metadata.duration_ms %} · {{ match.trace.metadata.duration_ms }}ms{% endif %}{% if match.trace.metadata.cost %} · ${{ match.trace.metadata.cost }}{% endif %} · <{{ match.trace.url }}|View in LangWatch ↗>
+`{{ match.trace.id | truncate: 12 }}`{% if match.trace.metadata.model %} · {{ match.trace.metadata.model | mrkdwn_escape }}{% endif %}{% if match.trace.metadata.duration_ms %} · {{ match.trace.metadata.duration_ms }}ms{% endif %}{% if match.trace.metadata.cost %} · ${{ match.trace.metadata.cost }}{% endif %} · <{{ match.trace.url }}|View in LangWatch ↗>
+{%- endcapture -%}
+{%- assign _input = match.trace.input | truncate: 1500 -%}
+{%- assign _output = match.trace.output | truncate: 1500 -%}
+{%- capture _rt_body -%}
+{%- if _input != "" -%}
+{ "type": "rich_text_section", "elements": [{ "type": "text", "text": "Input", "style": { "bold": true } }] },
+{ "type": "rich_text_quote", "elements": [{ "type": "text", "text": {{ _input | json }} }] }
+{%- endif -%}
+{%- if _input != "" and _output != "" -%},{%- endif -%}
+{%- if _output != "" -%}
+{ "type": "rich_text_section", "elements": [{ "type": "text", "text": "Output", "style": { "bold": true } }] },
+{ "type": "rich_text_quote", "elements": [{ "type": "text", "text": {{ _output | json }} }] }
+{%- endif -%}
 {%- endcapture -%}
 [
-  { "type": "header", "text": { "type": "plain_text", "text": {{ trigger.name | truncate: 140 | json }}, "emoji": true } }
-  {%- if _ctx_header != "" -%}
-  ,{ "type": "context", "elements": [{ "type": "mrkdwn", "text": {{ _ctx_header | json }} }] }
+  { "type": "header", "text": { "type": "plain_text", "text": {{ _header_text | truncate: 140 | json }}, "emoji": true } }
+  {%- if _ctx_eval != "" -%}
+  ,{ "type": "context", "elements": [{ "type": "mrkdwn", "text": {{ _ctx_eval | json }} }] }
   {%- endif -%}
-  {%- if match.trace.input != "" -%}
-  ,{ "type": "markdown", "text": {{ _md_user | json }} }
-  {%- endif -%}
-  {%- if match.trace.output != "" -%}
-  ,{ "type": "markdown", "text": {{ _md_assistant | json }} }
+  {%- if _rt_body != "" -%}
+  ,{ "type": "rich_text", "elements": [ {{ _rt_body }} ] }
   {%- endif -%}
   ,{ "type": "context", "elements": [{ "type": "mrkdwn", "text": {{ _footer | json }} }] }
 ]

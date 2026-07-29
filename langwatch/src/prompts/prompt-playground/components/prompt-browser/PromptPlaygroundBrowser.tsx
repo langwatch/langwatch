@@ -1,4 +1,4 @@
-import { HStack, Spacer } from "@chakra-ui/react";
+import { HStack } from "@chakra-ui/react";
 import { LuColumns2 } from "react-icons/lu";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Tooltip } from "~/components/ui/tooltip";
@@ -6,7 +6,7 @@ import { useDraggableTabsBrowserStore } from "../../prompt-playground-store/Drag
 import { AddPromptButton } from "../sidebar/AddPromptButton";
 import { ExperimentFromPlaygroundButton } from "./ExperimentFromPlaygroundButton";
 import { PromptBrowserWindowContent } from "./prompt-browser-window/PromptBrowserWindowContent";
-import { PromptBrowserTab } from "./tab/PromptBrowserTab";
+import { PromptTabStrip } from "./PromptTabStrip";
 import { DraggableTabsBrowser } from "./ui/DraggableTabsBrowser";
 import { TabIdProvider } from "./ui/TabContext";
 
@@ -40,34 +40,28 @@ export function PromptPlaygroundBrowser() {
     }),
   );
 
-  /**
-   * handleTabMove
-   * Single Responsibility: Moves a tab to a new position/window when dragged.
-   */
   function handleTabMove(params: {
     tabId: string;
-    from: { groupId: string; index: number };
-    to: { groupId: string; index: number };
+    from: { windowId: string; index: number };
+    to: { windowId: string; index: number };
   }) {
     moveTab({
       tabId: params.tabId,
-      windowId: params.to.groupId,
+      windowId: params.to.windowId,
       index: params.to.index,
     });
   }
 
-  /**
-   * handleTabChange
-   * Single Responsibility: Sets the active tab within a window group.
-   */
-  function handleTabChange(groupId: string, tabId: string) {
-    setActiveTab({ windowId: groupId, tabId });
+  function handleTabChange({
+    windowId,
+    tabId,
+  }: {
+    windowId: string;
+    tabId: string;
+  }) {
+    setActiveTab({ windowId, tabId });
   }
 
-  /**
-   * handleSplit
-   * Single Responsibility: Splits the current tab into a new window pane.
-   */
   function handleSplit(tabId: string) {
     splitTab({ tabId });
   }
@@ -75,12 +69,12 @@ export function PromptPlaygroundBrowser() {
   return (
     <DraggableTabsBrowser.Root onTabMove={handleTabMove}>
       {windows.map((tabbedWindow) => (
-        <DraggableTabsBrowser.Group
+        <DraggableTabsBrowser.Window
           key={tabbedWindow.id}
-          groupId={tabbedWindow.id}
+          windowId={tabbedWindow.id}
           activeTabId={tabbedWindow.activeTabId ?? undefined}
           onTabChange={handleTabChange}
-          onClick={() => setActiveWindow({ windowId: tabbedWindow.id })}
+          onWindowClick={() => setActiveWindow({ windowId: tabbedWindow.id })}
           maxWidth={
             windows.length > 1
               ? `calc((100vw - 340px) / ${windows.length})`
@@ -91,26 +85,17 @@ export function PromptPlaygroundBrowser() {
           <DraggableTabsBrowser.TabBar
             tabIds={tabbedWindow.tabs.map((tab) => tab.id)}
           >
-            <HStack
-              gap={0}
-              overflow="auto"
-              height="full"
-              paddingY={2}
-              paddingX={2}
-            >
-              {tabbedWindow.tabs.map((tab) => (
-                <TabIdProvider key={tab.id} tabId={tab.id}>
-                  <DraggableTabsBrowser.Tab id={tab.id} height="full">
-                    <DraggableTabsBrowser.Trigger value={tab.id}>
-                      <PromptBrowserTab
-                        dimmed={tabbedWindow.id !== activeWindowId}
-                      />
-                    </DraggableTabsBrowser.Trigger>
-                  </DraggableTabsBrowser.Tab>
-                </TabIdProvider>
-              ))}
-            </HStack>
-            <Spacer />
+            {/* The switcher lives inside the strip, not in the toolbar below,
+                because the toolbar only renders for the active pane — and a
+                pane you are not working in still has tabs worth reaching. */}
+            <PromptTabStrip
+              tabs={tabbedWindow.tabs}
+              activeTabId={tabbedWindow.activeTabId ?? undefined}
+              isActiveWindow={tabbedWindow.id === activeWindowId}
+              onSelectTab={(tabId) =>
+                handleTabChange({ windowId: tabbedWindow.id, tabId })
+              }
+            />
             {tabbedWindow.id === activeWindowId && (
               <>
                 <HStack
@@ -167,7 +152,7 @@ export function PromptPlaygroundBrowser() {
               </DraggableTabsBrowser.Content>
             </TabIdProvider>
           ))}
-        </DraggableTabsBrowser.Group>
+        </DraggableTabsBrowser.Window>
       ))}
     </DraggableTabsBrowser.Root>
   );

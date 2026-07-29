@@ -118,7 +118,6 @@ Two **blocks** with a fixed +1000 offset, leaving room for future services witho
 | langevals           | base + 2    | 5562    | services   |
 | ai-gateway (Go)     | base + 3    | 5563    | services   |
 | _reserved_          | base + 4..7 |         | services   |
-| bullboard           | base + 8    | 5568    | services (off by default — `--bullboard`) |
 | _reserved_          | base + 9    |         | services   |
 | postgres            | base + 1000 | 6560    | infra      |
 | redis               | base + 1001 | 6561    | infra      |

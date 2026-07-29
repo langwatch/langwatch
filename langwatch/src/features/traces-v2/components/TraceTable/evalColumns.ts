@@ -80,7 +80,12 @@ export function buildEvalColumnDef({
   field: EvalColumnField;
   evaluatorKey: string;
   label: string;
-}): ColumnDef<TraceListItem, ReturnType<typeof evalFieldValue>> {
+}): ColumnDef<TraceListItem, unknown> {
+  // TanStack's ColumnDef is invariant in TValue (function-typed props like
+  // aggregatedCell), so a concretely-typed def is not assignable to
+  // useTraceLensColumns' defs array (Array<ColumnDef<TraceListItem, unknown>>).
+  // Erase the value type at this boundary once instead of casting at the
+  // push site.
   return evalCol.accessor(
     (row) =>
       evalFieldValue({ ev: latestEvalForKey({ row, evaluatorKey }), field }),
@@ -95,5 +100,5 @@ export function buildEvalColumnDef({
       maxSize: 320,
       enableSorting: false,
     },
-  );
+  ) as ColumnDef<TraceListItem, unknown>;
 }

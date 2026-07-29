@@ -1,6 +1,9 @@
 import type { LogRecordStorageRepository } from "~/server/app-layer/traces/repositories/log-record-storage.repository";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
-import type { AppendStore } from "../../../projections/mapProjection.types";
+import type {
+  AppendStore,
+  BulkAppendContext,
+} from "../../../projections/mapProjection.types";
 import type { ProjectionStoreContext } from "../../../projections/projectionStoreContext";
 import type { NormalizedLogRecord } from "../schemas/logRecords";
 
@@ -18,7 +21,7 @@ export class LogRecordAppendStore implements AppendStore<NormalizedLogRecord> {
 
   async bulkAppend(
     records: NormalizedLogRecord[],
-    context: ProjectionStoreContext,
+    context: BulkAppendContext,
   ): Promise<void> {
     if (records.length === 0) return;
     const retentionDays =

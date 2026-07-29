@@ -1,0 +1,18 @@
+-- IRREVERSIBLE: Drops the ProjectDailySdkUsage table as part of SDK Radar removal.
+-- Data is no longer needed and cannot be meaningfully restored after the feature is retired.
+-- To roll back, uncomment and run manually:
+-- CREATE TABLE "ProjectDailySdkUsage" (
+--     "id" TEXT NOT NULL,
+--     "projectId" TEXT NOT NULL,
+--     "date" TEXT NOT NULL,
+--     "sdkName" TEXT NOT NULL DEFAULT '',
+--     "sdkVersion" TEXT NOT NULL DEFAULT '',
+--     "sdkLanguage" TEXT NOT NULL DEFAULT '',
+--     "count" INTEGER NOT NULL DEFAULT 0,
+--     "lastEventTimestamp" BIGINT,
+--     "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+--     CONSTRAINT "ProjectDailySdkUsage_pkey" PRIMARY KEY ("id")
+-- );
+-- CREATE INDEX "ProjectDailySdkUsage_projectId_date_idx" ON "ProjectDailySdkUsage"("projectId", "date");
+-- CREATE UNIQUE INDEX "ProjectDailySdkUsage_projectId_date_sdkName_sdkVersion_sdkL_key" ON "ProjectDailySdkUsage"("projectId", "date", "sdkName", "sdkVersion", "sdkLanguage");
+DROP TABLE IF EXISTS "ProjectDailySdkUsage";

@@ -1,6 +1,6 @@
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
+import { createLogger } from "@langwatch/observability";
 import { createResilientClickHouseClient } from "~/server/app-layer/clients/clickhouse.resilient";
-import { createLogger } from "~/utils/logger/server";
 import { wrapWithDefaultSettings } from "./safeClickhouseClient";
 
 const logger = createLogger("langwatch:clickhouse:client");

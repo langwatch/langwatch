@@ -1,7 +1,7 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
 import { Hono } from "hono";
-import { handleError } from "../error-handler";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LimitExceededError } from "~/server/license-enforcement/errors";
+import { handleError } from "../error-handler";
 
 vi.mock("~/server/app-layer/app", () => ({
   getApp: vi.fn(),
@@ -14,7 +14,7 @@ vi.mock("~/env.mjs", () => ({
   },
 }));
 
-vi.mock("~/utils/logger/server", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
     info: vi.fn(),
     error: vi.fn(),
@@ -37,8 +37,27 @@ describe("handleError()", () => {
     return app;
   }
 
+  // Mirrors what the tracer middleware does: stash the request's trace/span ids
+  // on the context before the handler runs, so handleError can read them.
+  function createTracedTestApp(
+    errorToThrow: Error,
+    ids: { traceId?: string; spanId?: string },
+  ) {
+    const app = new Hono<{ Variables: { traceId: string; spanId: string } }>();
+    app.onError(handleError);
+    app.use("*", async (c, next) => {
+      if (ids.traceId) c.set("traceId", ids.traceId);
+      if (ids.spanId) c.set("spanId", ids.spanId);
+      await next();
+    });
+    app.get("/", () => {
+      throw errorToThrow;
+    });
+    return app;
+  }
+
   describe("when error is a LimitExceededError", () => {
-    it("returns 403 with DomainError shape", async () => {
+    it("returns 403 with HandledError shape", async () => {
       const error = new LimitExceededError("prompts", 5, 5);
       const app = createTestApp(error);
 
@@ -154,6 +173,84 @@ describe("handleError()", () => {
       } finally {
         process.env.NODE_ENV = originalEnv;
       }
+    });
+  });
+
+  describe("given trace info on error responses", () => {
+    const originalEnv = process.env.NODE_ENV;
+    const originalGrafana = process.env.GRAFANA_BASE_URL;
+
+    afterEach(() => {
+      process.env.NODE_ENV = originalEnv;
+      if (originalGrafana === undefined) delete process.env.GRAFANA_BASE_URL;
+      else process.env.GRAFANA_BASE_URL = originalGrafana;
+    });
+
+    describe("when a Grafana is configured", () => {
+      beforeEach(() => {
+        process.env.GRAFANA_BASE_URL = "http://127.0.0.1:3000";
+      });
+
+      it("attaches the trace/span ids and clickable Grafana links", async () => {
+        const app = createTracedTestApp(new Error("boom"), {
+          traceId: "a".repeat(32),
+          spanId: "b".repeat(16),
+        });
+
+        const res = await app.request("/");
+        const body = await res.json();
+
+        expect(body.trace.traceId).toBe("a".repeat(32));
+        expect(body.trace.spanId).toBe("b".repeat(16));
+        expect(body.trace.traceUrl).toContain("/explore");
+        expect(body.trace.traceUrl).toContain("http://127.0.0.1:3000");
+        expect(body.trace.logsUrl).toContain("/explore");
+      });
+
+      it("omits the all-zero (no active span) trace id", async () => {
+        const app = createTracedTestApp(new Error("boom"), {
+          traceId: "0".repeat(32),
+          spanId: "0".repeat(16),
+        });
+
+        const res = await app.request("/");
+        const body = await res.json();
+
+        expect(body).not.toHaveProperty("trace");
+      });
+
+      it("still attaches the block in production (Grafana is access-controlled)", async () => {
+        process.env.NODE_ENV = "production";
+        const app = createTracedTestApp(new Error("boom"), {
+          traceId: "a".repeat(32),
+          spanId: "b".repeat(16),
+        });
+
+        const res = await app.request("/");
+        const body = await res.json();
+
+        expect(body.trace.traceId).toBe("a".repeat(32));
+        expect(body.trace.traceUrl).toContain("/explore");
+      });
+    });
+
+    describe("when no Grafana is configured", () => {
+      beforeEach(() => {
+        delete process.env.GRAFANA_BASE_URL;
+      });
+
+      it("still surfaces the ids, without links", async () => {
+        const app = createTracedTestApp(new Error("boom"), {
+          traceId: "a".repeat(32),
+          spanId: "b".repeat(16),
+        });
+
+        const res = await app.request("/");
+        const body = await res.json();
+
+        expect(body.trace.traceId).toBe("a".repeat(32));
+        expect(body.trace).not.toHaveProperty("traceUrl");
+      });
     });
   });
 });

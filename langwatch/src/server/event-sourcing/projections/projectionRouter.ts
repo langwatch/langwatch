@@ -1,6 +1,10 @@
+import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-import type { ProcessRole } from "~/server/app-layer/config";
+import {
+  type ProcessRole,
+  roleSatisfiesRunIn,
+} from "~/server/app-layer/config";
 import type { FeatureFlagServiceInterface } from "~/server/featureFlag/types";
 import {
   incrementEsFoldProjectionTotal,
@@ -12,7 +16,6 @@ import {
   observeEsReactorDuration,
   withMetrics,
 } from "~/server/metrics";
-import { createLogger } from "~/utils/logger/server";
 import { toError } from "~/utils/posthogErrorCapture";
 import type { ResolvedRetention } from "../../data-retention/retentionPolicy.schema";
 import type { RetentionPolicyResolver } from "../../data-retention/retentionPolicyResolver";
@@ -41,9 +44,19 @@ import type { ReplayMarkerChecker } from "./replayMarkerCheck";
  * Default cap on how many same-aggregate fold events are coalesced into one
  * load/apply/store cycle. Bounds the per-cycle drain + apply loop (and the
  * re-stage loop on failure) while collapsing a backed-up group from O(n²) to
- * O(n). A fold can opt out by setting options.coalesceMaxBatch = 1.
+ * O(n). A fold can opt out by setting options.coalesceMaxBatch = 1, or raise it
+ * further for folds with small event payloads.
+ *
+ * Set to 500 (was 100): a backed-up group drains 5× fewer dispatch cycles, so a
+ * large backlog (e.g. a hot trace with tens of thousands of staged fold jobs)
+ * clears far faster. The cap still bounds per-cycle memory — at most this many
+ * events + one fold state are held at once, unlike the full-history re-fold
+ * (which the trace/experiment folds now avoid via refoldOnOutOfOrder: false).
+ * Coalescing is a pure left-fold: the final state is identical to applying the
+ * events one at a time (see initializeFoldQueues below), so raising it changes
+ * throughput only, never correctness.
  */
-const DEFAULT_FOLD_COALESCE_MAX_BATCH = 100;
+const DEFAULT_FOLD_COALESCE_MAX_BATCH = 500;
 
 /**
  * The router only ever dispatches reactors on the live event path — the
@@ -1334,8 +1347,10 @@ export class ProjectionRouter<
 
   /** Returns true if the reactor's runIn filter excludes the current processRole. */
   private isReactorExcluded(reactor: ReactorDefinition<EventType>): boolean {
-    if (!reactor.options?.runIn || !this.processRole) return false;
-    return !reactor.options.runIn.includes(this.processRole);
+    return !roleSatisfiesRunIn({
+      runIn: reactor.options?.runIn,
+      processRole: this.processRole,
+    });
   }
 
   private async resolveRetention(

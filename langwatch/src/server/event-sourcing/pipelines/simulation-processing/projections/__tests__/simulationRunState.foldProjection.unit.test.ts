@@ -11,6 +11,7 @@ import type {
     SimulationRunCancelRequestedEvent,
     SimulationRunDeletedEvent,
     SimulationRunFinishedEvent,
+    SimulationRunQueuedEvent,
     SimulationRunStartedEvent,
     SimulationTextMessageEndEvent,
     SimulationTextMessageStartEvent,
@@ -42,6 +43,30 @@ function createRunStartedEvent(
     occurredAt: 1000,
     type: SIMULATION_RUN_EVENT_TYPES.STARTED,
     version: SIMULATION_EVENT_VERSIONS.STARTED,
+    data: {
+      scenarioRunId: "scenario-run-1",
+      scenarioId: "scenario-1",
+      batchRunId: "batch-1",
+      scenarioSetId: "set-1",
+      ...overrides,
+    },
+    ...eventOverrides,
+  };
+}
+
+function createRunQueuedEvent(
+  overrides: Partial<SimulationRunQueuedEvent["data"]> = {},
+  eventOverrides: Partial<SimulationRunQueuedEvent> = {},
+): SimulationRunQueuedEvent {
+  return {
+    id: "event-0",
+    aggregateId: "scenario-run-1",
+    aggregateType: "simulation_run",
+    tenantId: TEST_TENANT_ID,
+    createdAt: 500,
+    occurredAt: 500,
+    type: SIMULATION_RUN_EVENT_TYPES.QUEUED,
+    version: SIMULATION_EVENT_VERSIONS.QUEUED,
     data: {
       scenarioRunId: "scenario-run-1",
       scenarioId: "scenario-1",
@@ -865,6 +890,190 @@ describe("simulationRunStateFoldProjection", () => {
 
       expect(afterSecond.CancellationRequestedAt).toBe(5000);
       expect(afterSecond.Status).toBe("IN_PROGRESS");
+    });
+  });
+});
+
+describe("simulationRunStateFoldProjection finalized-status guard", () => {
+  // Orphaned-run reconciliation writes a terminal `finished` event for a run
+  // whose worker died. If the worker's child process actually outlived its
+  // parent (reparented) and later POSTs a real started/snapshot whose
+  // client-supplied occurredAt is AFTER the reconciliation time, that event
+  // applies in-order (no re-fold, since occurredAt is not strictly less than
+  // LastEventOccurredAt) and would otherwise clobber Status back to a
+  // non-terminal value while FinishedAt stays set — an unrecoverable zombie
+  // the read-time stall path can no longer rescue. Once FinishedAt is set,
+  // Status must stay terminal.
+  describe("given a run that already finished", () => {
+    describe("when a later started event arrives", () => {
+      it("keeps the terminal status instead of resurrecting IN_PROGRESS", () => {
+        const state = foldEvents([
+          createRunFinishedEvent({ status: "ERROR" }, { occurredAt: 3000 }),
+          createRunStartedEvent({}, { occurredAt: 5000 }),
+        ]);
+
+        expect(state.Status).toBe("ERROR");
+        expect(state.FinishedAt).toBe(3000);
+      });
+    });
+
+    describe("when a later message snapshot carrying a status arrives", () => {
+      it("keeps the terminal status", () => {
+        const state = foldEvents([
+          createRunFinishedEvent({ status: "ERROR" }, { occurredAt: 3000 }),
+          createMessageSnapshotEvent(
+            { status: "IN_PROGRESS" },
+            { occurredAt: 5000 },
+          ),
+        ]);
+
+        expect(state.Status).toBe("ERROR");
+        expect(state.FinishedAt).toBe(3000);
+      });
+    });
+
+    // Note: this pins the OUTCOME, not the guard. At this call site the status
+    // candidate is `state.Status === "PENDING" ? "IN_PROGRESS" : state.Status`,
+    // which already preserves a terminal status on its own -- so removing
+    // statusAfter here would not turn this test red. The guard stays as defence
+    // in depth against that candidate expression changing.
+    describe("when a later text_message_start arrives", () => {
+      it("keeps the terminal status", () => {
+        const state = foldEvents([
+          createRunFinishedEvent({ status: "ERROR" }, { occurredAt: 3000 }),
+          createTextMessageStartEvent({}, { occurredAt: 5000 }),
+        ]);
+
+        expect(state.Status).toBe("ERROR");
+        expect(state.FinishedAt).toBe(3000);
+      });
+    });
+
+    // The fourth non-terminal Status writer. A `queued` event is in the fold
+    // set, so one arriving after `finished` resurrected Status=QUEUED while
+    // FinishedAt stayed set -- an unrecoverable run: the orphan reconciler skips
+    // it (FinishedAt IS NULL) and read-time stall detection skips it too.
+    describe("when a later queued event arrives", () => {
+      it("keeps the terminal status instead of resurrecting QUEUED", () => {
+        const state = foldEvents([
+          createRunFinishedEvent({ status: "ERROR" }, { occurredAt: 3000 }),
+          createRunQueuedEvent({}, { occurredAt: 5000 }),
+        ]);
+
+        expect(state.Status).toBe("ERROR");
+        expect(state.FinishedAt).toBe(3000);
+      });
+    });
+
+    // A late child that outlived the parent this run's reconciliation already
+    // failed must not rewrite the terminal record the downstream reactors have
+    // already acted on -- nor split it into an ERROR status carrying the late
+    // child's SUCCESS verdict.
+    describe("when a second finished event arrives", () => {
+      it("keeps the first terminal record and ignores the late one", () => {
+        const state = foldEvents([
+          createRunFinishedEvent({ status: "ERROR" }, { occurredAt: 3000 }),
+          createRunFinishedEvent(
+            {
+              status: "SUCCESS",
+              results: {
+                verdict: "success",
+                reasoning: "late child finished for real",
+                metCriteria: [],
+                unmetCriteria: [],
+              },
+            },
+            { occurredAt: 5000, id: "event-late-finish" },
+          ),
+        ]);
+
+        expect(state.Status).toBe("ERROR");
+        expect(state.Verdict).toBeNull();
+        expect(state.FinishedAt).toBe(3000);
+      });
+    });
+  });
+
+  // The scenario-events ingest route types the finished status as the full
+  // ScenarioRunStatus enum, non-terminal members included. Writing one straight
+  // through would set a non-terminal Status alongside FinishedAt -- a run the
+  // orphan reconciler skips (FinishedAt IS NULL) and read-time stall detection
+  // skips (it only resolves unfinished runs). Nothing could ever recover it.
+  describe("given a finished event carrying a non-terminal status", () => {
+    describe("when it is folded", () => {
+      it("refuses the non-terminal status and finishes the run terminally", () => {
+        const state = foldEvents([
+          createRunStartedEvent({}, { occurredAt: 1000 }),
+          createRunFinishedEvent(
+            { status: "IN_PROGRESS" },
+            { occurredAt: 3000 },
+          ),
+        ]);
+
+        expect(state.Status).not.toBe("IN_PROGRESS");
+        expect(state.Status).toBe("FAILURE");
+        expect(state.FinishedAt).toBe(3000);
+      });
+    });
+
+    describe("when it carries a success verdict", () => {
+      it("derives the terminal status from the verdict", () => {
+        const state = foldEvents([
+          createRunStartedEvent({}, { occurredAt: 1000 }),
+          createRunFinishedEvent(
+            {
+              status: "QUEUED",
+              results: {
+                verdict: "success",
+                reasoning: "ok",
+                metCriteria: [],
+                unmetCriteria: [],
+              },
+            },
+            { occurredAt: 3000 },
+          ),
+        ]);
+
+        expect(state.Status).toBe("SUCCESS");
+        expect(state.FinishedAt).toBe(3000);
+      });
+    });
+
+    // Every non-terminal member of ScenarioRunStatus, not just the two that
+    // happened to be interesting -- the ingest field is an unconstrained string
+    // on the internal event schema, so the whole enum can arrive here.
+    describe.each(["PENDING", "QUEUED", "IN_PROGRESS", "RUNNING"])(
+      "when the non-terminal status is %s",
+      (nonTerminal) => {
+        it("never leaves the run non-terminal once FinishedAt is set", () => {
+          const state = foldEvents([
+            createRunStartedEvent({}, { occurredAt: 1000 }),
+            createRunFinishedEvent(
+              { status: nonTerminal },
+              { occurredAt: 3000 },
+            ),
+          ]);
+
+          expect(state.FinishedAt).toBe(3000);
+          expect(state.Status).not.toBe(nonTerminal);
+          expect(["SUCCESS", "FAILURE", "FAILED", "ERROR", "CANCELLED"]).toContain(
+            state.Status,
+          );
+        });
+      },
+    );
+  });
+
+  describe("given a run that has not finished", () => {
+    describe("when a started event arrives", () => {
+      it("still transitions to IN_PROGRESS (guard does not affect the live path)", () => {
+        const state = foldEvents([
+          createRunStartedEvent({}, { occurredAt: 1000 }),
+        ]);
+
+        expect(state.Status).toBe("IN_PROGRESS");
+        expect(state.FinishedAt).toBeNull();
+      });
     });
   });
 });

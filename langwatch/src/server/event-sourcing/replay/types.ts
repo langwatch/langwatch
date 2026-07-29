@@ -1,6 +1,10 @@
+import type { ClickHouseClient } from "@clickhouse/client";
+import type IORedis from "ioredis";
 import type { FoldProjectionDefinition } from "../projections/foldProjection.types";
 import type { MapProjectionDefinition } from "../projections/mapProjection.types";
 import type { Event } from "../domain/types";
+import type { DiscoveredAggregate } from "./replayEventLoader";
+import type { RetentionPolicyResolver } from "../../data-retention/retentionPolicyResolver";
 
 export interface RegisteredFoldProjection {
   projectionName: string;
@@ -102,8 +106,20 @@ export interface ReplayResult {
 }
 
 export interface DiscoveryResult {
-  aggregates: import("./replayEventLoader").DiscoveredAggregate[];
-  byTenant: Map<string, import("./replayEventLoader").DiscoveredAggregate[]>;
+  aggregates: DiscoveredAggregate[];
+  byTenant: Map<string, DiscoveredAggregate[]>;
   tenantCount: number;
   totalEvents: number;
+}
+
+/**
+ * Shared dependencies the replay path implementations (fold / map / optimized)
+ * receive from `ReplayService`.
+ */
+export interface ReplayContext {
+  redis: IORedis;
+  /** Resolves the ClickHouse client for a tenant (falls back to "default"). */
+  resolveClient: (tenantId?: string) => Promise<ClickHouseClient>;
+  /** Accumulator options carrying the retention resolver (if wired). */
+  accumulatorOpts: { retentionResolver?: RetentionPolicyResolver };
 }

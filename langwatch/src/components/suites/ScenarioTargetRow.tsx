@@ -18,6 +18,7 @@ import { formatRunStatusLabel } from "./format-run-status-label";
 import { formatCost, formatLatency } from "~/components/shared/formatters";
 import { Tooltip } from "~/components/ui/tooltip";
 import { isCancellableStatus } from "./useCancelScenarioRun";
+import { usePrefetchRunState } from "./usePrefetchRunState";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 
 type ScenarioTargetRowProps = {
@@ -143,6 +144,8 @@ export function ScenarioTargetRow({
 
   const hasCancelButton = onCancel && isCancellableStatus(scenarioRun.status);
   const hasMetrics = scenarioRun.durationInMs > 0 || scenarioRun.totalCost != null;
+  const prefetchRunState = usePrefetchRunState();
+  const handlePrefetch = () => prefetchRunState(scenarioRun.scenarioRunId);
 
   return (
     <Box
@@ -163,6 +166,8 @@ export function ScenarioTargetRow({
         borderRadius="lg"
         cursor="pointer"
         onClick={onClick}
+        onMouseEnter={handlePrefetch}
+        onFocus={handlePrefetch}
         tabIndex={0}
         aria-label={`View details for ${displayName}`}
       >

@@ -1,6 +1,6 @@
+import { createLogger } from "@langwatch/observability";
 import { useCallback, useEffect, useState } from "react";
 import { toaster } from "../../components/ui/toaster";
-import { createLogger } from "~/utils/logger";
 import { generateOtelTraceId } from "../../utils/trace";
 import type { StudioClientEvent } from "../types/events";
 import { mergeLocalConfigsIntoDsl } from "../utils/mergeLocalConfigs";

@@ -47,6 +47,34 @@ describe("resolveOpsScope (lw#3584)", () => {
       expect(scope).toEqual({ kind: "platform" });
     });
   });
+
+  describe("when an admin is impersonating a customer user", () => {
+    /** @scenario Admin impersonating a customer keeps ops access */
+    it("carries the impersonator's grant through: returns { kind: 'platform' }", () => {
+      const scope = resolveOpsScope({
+        userId: "customer-1",
+        userEmail: "person@example.com",
+        impersonatorEmail: "admin@langwatch.ai",
+        permission: "ops:view",
+        prisma: {} as unknown,
+      });
+      expect(scope).toEqual({ kind: "platform" });
+    });
+  });
+
+  describe("when the impersonator is not an admin", () => {
+    /** @scenario Non-admin impersonator does not gain ops access */
+    it("returns { kind: 'none' }", () => {
+      const scope = resolveOpsScope({
+        userId: "customer-1",
+        userEmail: "person@example.com",
+        impersonatorEmail: "other-person@example.com",
+        permission: "ops:view",
+        prisma: {} as unknown,
+      });
+      expect(scope).toEqual({ kind: "none" });
+    });
+  });
 });
 
 describe("checkOpsPermission middleware (lw#3584)", () => {
@@ -105,6 +133,35 @@ describe("checkOpsPermission middleware (lw#3584)", () => {
     expect(next).toHaveBeenCalledTimes(1);
     expect((ctx as { opsScope?: unknown }).opsScope).toEqual({
       kind: "none",
+    });
+  });
+
+  /** @scenario Admin impersonating a customer keeps ops access */
+  it("grants access when the session's impersonator is an admin", async () => {
+    const middleware = checkOpsPermission({ permission: "ops:view" });
+    const next = vi.fn().mockResolvedValue("OK");
+    const ctx = {
+      session: {
+        user: {
+          id: "customer-1",
+          email: "person@example.com",
+          impersonator: {
+            id: "admin-1",
+            email: "admin@langwatch.ai",
+          },
+        },
+      },
+      prisma: {} as unknown,
+    } as unknown as Parameters<ReturnType<typeof checkOpsPermission>>[0]["ctx"];
+    const result = await middleware({
+      ctx,
+      input: undefined,
+      next,
+    } as unknown as Parameters<ReturnType<typeof checkOpsPermission>>[0]);
+    expect(result).toBe("OK");
+    expect(next).toHaveBeenCalledTimes(1);
+    expect((ctx as { opsScope?: unknown }).opsScope).toEqual({
+      kind: "platform",
     });
   });
 });

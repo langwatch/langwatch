@@ -1,5 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
+import { createTenantId } from "../../../../domain/tenantId";
+import { FoldProjectionExecutor } from "../../../../projections/foldProjectionExecutor";
 import type { FoldProjectionStore } from "../../../../projections/foldProjection.types";
 import type {
   EvaluationCompletedEvent,
@@ -263,6 +265,39 @@ describe("evaluationRun foldProjection", () => {
         );
 
         expect(afterCompleted.inputs).toEqual(inputs);
+      });
+    });
+  });
+
+  describe("re-fold policy", () => {
+    describe("given a persisted checkpoint later than an incoming event", () => {
+      /** @scenario "Evaluation folds keep re-folding because order is significant" */
+      it("re-folds from the event log because evaluation folds are order-sensitive", async () => {
+        const CHECKPOINT_MS = 9_000;
+        const stored: EvaluationRunData = {
+          ...createInitState(),
+          LastEventOccurredAt: CHECKPOINT_MS,
+        };
+        const store: FoldProjectionStore<EvaluationRunData> = {
+          get: async () => stored,
+          store: async () => {},
+        } as unknown as FoldProjectionStore<EvaluationRunData>;
+
+        // No options.refoldOnOutOfOrder: false here — unlike traceSummary /
+        // traceAnalytics, an evaluation's reported result depends on the
+        // order events are applied in, so an out-of-order event must trigger
+        // a full re-fold rather than being applied on top.
+        const projection = new EvaluationRunFoldProjection({ store });
+        const eventLoader = vi.fn().mockResolvedValue([]);
+        projection.eventLoader = eventLoader;
+
+        await new FoldProjectionExecutor().execute(
+          projection,
+          createStartedEvent({ occurredAt: 1_000 } as Partial<EvaluationStartedEvent>),
+          { aggregateId: "eval-1", tenantId: createTenantId("tenant-1") },
+        );
+
+        expect(eventLoader).toHaveBeenCalled();
       });
     });
   });

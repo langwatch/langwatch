@@ -14,11 +14,11 @@
  * `splitLink`) which procedures ride which transport.
  */
 
-import type { IncomingMessage, Server as HttpServer } from "http";
+import { createLogger } from "@langwatch/observability";
 import { applyWSSHandler } from "@trpc/server/adapters/ws";
+import type { Server as HttpServer, IncomingMessage } from "http";
 import { WebSocketServer } from "ws";
 import { env } from "~/env.mjs";
-import { createLogger } from "~/utils/logger/server";
 import { appRouter } from "../api/root";
 import { createTRPCContext } from "../api/trpc";
 

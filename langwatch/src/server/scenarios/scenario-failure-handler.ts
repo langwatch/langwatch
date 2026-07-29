@@ -9,14 +9,14 @@
  * @see specs/scenarios/scenario-failure-handler.feature
  */
 
+import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
+import { getApp } from "~/server/app-layer/app";
 import {
   ScenarioRunStatus,
   Verdict,
 } from "~/server/scenarios/scenario-event.enums";
-import { getApp } from "~/server/app-layer/app";
-import { createLogger } from "~/utils/logger/server";
 
 const tracer = getLangWatchTracer("langwatch.scenarios.failure-handler");
 const logger = createLogger("langwatch:scenarios:failure-handler");

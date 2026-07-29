@@ -42,11 +42,13 @@ func AuthMiddleware(resolver app.AuthResolver) func(http.Handler) http.Handler {
 
 			ctx := context.WithValue(r.Context(), bundleCtxKey{}, bundle)
 
-			// Enrich context logger with identity fields.
-			ctx = clog.With(ctx,
-				zap.String("project_id", bundle.ProjectID),
-				zap.String("team_id", bundle.TeamID),
-			)
+			// Enrich context logger with identity fields (project + team +
+			// organization/tenant). No user_id — the gateway is API-key auth.
+			ctx = clog.WithIdentity(ctx, clog.Identity{
+				ProjectID:      bundle.ProjectID,
+				TeamID:         bundle.TeamID,
+				OrganizationID: bundle.OrganizationID,
+			})
 
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})

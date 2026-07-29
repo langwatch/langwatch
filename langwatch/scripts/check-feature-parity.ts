@@ -69,6 +69,7 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   "services/nlpgo",
   "services/aigateway",
   "pkg",
+  "tools/thuishaven",
 ];
 
 /**

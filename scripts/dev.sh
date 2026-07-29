@@ -9,7 +9,7 @@
 #   scripts/dev.sh dev-infra      # local redis + workers + app, everything else against shared dev
 #   scripts/dev.sh frontend-only  # no compose, pure pnpm dev against .env URLs
 #   scripts/dev.sh migration      # postgres + clickhouse on host ports for prisma migrate
-#   scripts/dev.sh full-local     # all-local-nlp + workers + bullboard + ai-server
+#   scripts/dev.sh full-local     # all-local-nlp + workers + ai-server
 #   scripts/dev.sh help           # non-interactive preset reference
 #   scripts/dev.sh down           # stop all services
 #   scripts/dev.sh ps | logs | clean | rebuild
@@ -61,7 +61,7 @@ Presets — pass as the first arg or pick interactively:
                   from your host shell. No app, no workers.
 
   full-local      Kitchen-sink local: all-local-nlp + dedicated workers
-                  container + bullboard + ai-server. Slowest boot.
+                  container + ai-server. Slowest boot.
 
 URL-override model: each preset writes `langwatch/.env.dev-up` listing only
 the URLs whose services start locally. compose loads this overlay AFTER
@@ -316,7 +316,6 @@ run_all_local() {
 run_all_local_nlp() {
   ensure_prepared
   export APP_PORT=$(find_free_port 5560)
-  export BULLBOARD_PORT=$(find_free_port 6380)
   . "$(dirname "$0")/lib/sanitize-dev-env.sh"
   sanitize_localhost_dev_env
   write_overrides all-local-nlp
@@ -460,7 +459,6 @@ EOF
 run_full_local() {
   ensure_prepared
   export APP_PORT=$(find_free_port 5560)
-  export BULLBOARD_PORT=$(find_free_port 6380)
   export AI_SERVER_PORT=$(find_free_port 3456)
   . "$(dirname "$0")/lib/sanitize-dev-env.sh"
   sanitize_localhost_dev_env
@@ -496,7 +494,6 @@ run_meta() {
       echo "Rebuilding (removes container node_modules)..."
       $COMPOSE --profile full down
       docker volume rm "${VOLUME_PREFIX:-langwatch}-app-modules" 2>/dev/null || true
-      docker volume rm "${VOLUME_PREFIX:-langwatch}-bullboard-modules" 2>/dev/null || true
       docker volume rm "${VOLUME_PREFIX:-langwatch}-goose-bin" 2>/dev/null || true
       local last_preset=""
       [ -f "$LAST_CHOICE_FILE" ] && last_preset=$(cat "$LAST_CHOICE_FILE")
@@ -557,7 +554,7 @@ Pick a preset:
   4) dev-infra       Local app + Redis + workers, shared dev infra for PG/CH/NLP/S3. Most faithful e2e.
   5) frontend-only   No compose. UI / design / static iteration.
   6) migration       postgres + clickhouse on host ports for prisma migrate (no app, no workers).
-  7) full-local      Kitchen-sink local: all-local-nlp + dedicated workers container + bullboard + ai-server.
+  7) full-local      Kitchen-sink local: all-local-nlp + dedicated workers container + ai-server.
 
   d) down            stop all services
   l) logs            tail compose logs

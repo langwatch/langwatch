@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/observability";
 import { HTTPException } from "hono/http-exception";
 import { describeRoute } from "hono-openapi";
 import { resolver, validator as zValidator } from "hono-openapi/zod";
@@ -25,7 +26,6 @@ import {
 import { TagValidationError } from "~/server/prompt-config/repositories/llm-config-tag.repository";
 import { getLatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
-import { createLogger } from "~/utils/logger/server";
 import {
   type AuthMiddlewareVariables,
   type OrganizationMiddlewareVariables,
@@ -48,7 +48,7 @@ import {
   buildStandardSuccessResponse,
   handlePossibleConflictError,
 } from "./utils";
-import { handleSystemPromptDomainErrors } from "./utils/handle-system-prompt-domain-errors";
+import { handleSystemPromptHandledErrors } from "./utils/handle-system-prompt-handled-errors";
 
 const logger = createLogger("langwatch:api:prompts");
 
@@ -1035,7 +1035,7 @@ export function registerPromptRoutes(
           });
         }
         handlePossibleConflictError(error, data.scope);
-        handleSystemPromptDomainErrors(error);
+        handleSystemPromptHandledErrors(error);
 
         // Re-throw other errors to be handled by the error middleware
         throw error;

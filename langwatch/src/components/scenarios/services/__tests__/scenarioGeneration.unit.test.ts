@@ -88,6 +88,53 @@ describe("generateScenarioWithAI()", () => {
     });
   });
 
+  describe("when the response body is not JSON (HTML error page)", () => {
+    // Regression for langwatch#5758. The generate endpoint answers with JSON on
+    // every outcome, so a NON-JSON body means the response came from a layer in
+    // FRONT of the app — a reverse-proxy / gateway 502·504, an auth-redirect
+    // login page, a timeout error page, or an older self-hosted Next.js build.
+    // Before the fix, `response.json()` threw a raw
+    // `Unexpected token '<', "<!DOCTYPE "... is not valid JSON` that leaked to
+    // the user and masked the real HTTP status. A real Response is used so the
+    // genuine JSON.parse crash is exercised, not a hand-faked reject.
+    const HTML_ERROR_BODY =
+      "<!DOCTYPE html>\n<html><head><title>502 Bad Gateway</title></head>" +
+      "<body><h1>502 Bad Gateway</h1></body></html>";
+
+    beforeEach(() => {
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+        new Response(HTML_ERROR_BODY, {
+          status: 502,
+          statusText: "Bad Gateway",
+          headers: { "content-type": "text/html" },
+        })
+      );
+    });
+
+    it("does not leak a raw JSON.parse error to the caller", async () => {
+      const error = await generateScenarioWithAI(
+        "test prompt",
+        "project-123",
+        null
+      ).catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).message).not.toMatch(
+        /Unexpected token|is not valid JSON|DOCTYPE/i
+      );
+    });
+
+    it("surfaces the HTTP status so the failure is actionable", async () => {
+      const error = await generateScenarioWithAI(
+        "test prompt",
+        "project-123",
+        null
+      ).catch((e: unknown) => e);
+
+      expect((error as Error).message).toContain("502");
+    });
+  });
+
   describe("when API returns an error response", () => {
     it("throws error with message from API", async () => {
       (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
@@ -120,7 +167,7 @@ describe("generateScenarioWithAI()", () => {
           Promise.resolve({
             error: "bad_request",
             domainError: {
-              kind: "missing_provider",
+              code: "missing_provider",
               meta: { reason: "missing_provider" },
               httpStatus: 400,
             },

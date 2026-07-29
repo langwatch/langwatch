@@ -796,7 +796,14 @@ func credentialToBifrostKey(cred domain.Credential, provider bfschemas.ModelProv
 	switch provider {
 	case bfschemas.Azure:
 		k.Value = envVar(cred.APIKey)
-		endpoint := cred.Extra["endpoint"]
+		// Accept both endpoint names: the control-plane/VK path
+		// (config.materialiser.ts / config_wire.go) sends "endpoint", but the
+		// /go/proxy path (gatewayproxy.ParseCredentialFromHeaders) carries the
+		// customer's Azure endpoint under the litellm-era "api_base" name. Reading
+		// only "endpoint" left every Azure scenario/playground call dispatching
+		// with an empty endpoint → Bifrost "endpoint not set" (#5760). Mirrors the
+		// dual-name tolerance credBaseURL already applies to vLLM.
+		endpoint := credExtra(cred, "endpoint", "api_base")
 		cfg := &bfschemas.AzureKeyConfig{
 			Endpoint:    envVar(endpoint),
 			Deployments: cred.DeploymentMap,

@@ -22,6 +22,7 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import type { ComponentProps } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DefaultModelsSection } from "../DefaultModelsSection";
 
@@ -177,13 +178,34 @@ const FAKE_PAYLOAD = {
   ],
 };
 
-function renderSection() {
+function renderSection(
+  props: Partial<ComponentProps<typeof DefaultModelsSection>> = {},
+) {
   return render(
     <ChakraProvider value={defaultSystem}>
-      <DefaultModelsSection />
+      <DefaultModelsSection {...props} />
     </ChakraProvider>,
   );
 }
+
+// Issue #5759: a custom model's configured Display Name must reach the
+// table chip too, not just the drawer's dropdown - pins the
+// DefaultModelsSection -> ModelChip prop-threading hop. Deliberately
+// disjoint from its own raw id (never "gpt-5.1-custom") so a dropped
+// `displayNames={displayNames}` is provable by exact string identity,
+// not a substring match the raw id could still slip through.
+const CUSTOM_MODEL_ID = "gpt-5.1";
+const CUSTOM_DISPLAY_NAME = "Ada Prod Model";
+const CUSTOM_FULL_ID = `custom/${CUSTOM_MODEL_ID}`;
+
+const CUSTOM_MODEL_CONFIG_ROW = {
+  id: "cfg_custom_display_name",
+  config: { DEFAULT: CUSTOM_FULL_ID },
+  createdAt: new Date("2026-05-15T12:00:00Z"),
+  updatedAt: new Date("2026-05-15T12:00:00Z"),
+  authorId: "user-1",
+  scopes: [{ type: "PROJECT", id: "proj-1", name: "Acme App" }],
+};
 
 describe("<DefaultModelsSection />", () => {
   beforeEach(() => {
@@ -267,5 +289,24 @@ describe("<DefaultModelsSection />", () => {
     // Same URL-routed drawer as Edit — without an editingId so the
     // drawer initialises in create mode.
     expect(mockOpenDrawer).toHaveBeenCalledWith("defaultModelOverride", {});
+  });
+
+  describe("given a config whose role model is a renamed custom model", () => {
+    describe("when the section receives the resolved displayNames map", () => {
+      it("renders the table chip with the configured display name, not the raw model id", () => {
+        mockGetDefaultModels.mockReturnValue({
+          data: { ...FAKE_PAYLOAD, configs: [CUSTOM_MODEL_CONFIG_ROW] },
+          isLoading: false,
+        });
+
+        renderSection({
+          displayNames: { [CUSTOM_FULL_ID]: CUSTOM_DISPLAY_NAME },
+        });
+
+        expect(
+          screen.getByTestId(`model-chip-${CUSTOM_FULL_ID}`).textContent,
+        ).toBe(CUSTOM_DISPLAY_NAME);
+      });
+    });
   });
 });

@@ -23,15 +23,21 @@ Feature: BetterAuth config (unmounted)
     Then email-and-password signin is enabled
     And no social providers are configured
 
-  @unimplemented
+  # Bound at builder-function layer: the env-driven provider selection lives in
+  # the exported pure helpers `buildSocialProviders` / `buildGenericOAuthConfigs`
+  # / `isEmailPasswordEnabled` in `better-auth/index.ts`. Tests call these
+  # directly with a synthetic env for each provider, so we exercise auth0/google
+  # selection without re-initializing the module under a different
+  # NEXTAUTH_PROVIDER (which would need vi.resetModules() and hang the shard).
+  @unit
   Scenario: Auth0 enterprise mode
     Given NEXTAUTH_PROVIDER is "auth0"
     And AUTH0_CLIENT_ID, AUTH0_CLIENT_SECRET, AUTH0_ISSUER are set
     When I inspect the BetterAuth instance
     Then the generic-oauth plugin lists an "auth0" provider
-    And email-and-password is still enabled for admin fallback
+    And email-and-password is disabled (SSO-only enforcement — no email/password bypass)
 
-  @unimplemented
+  @unit
   Scenario: Google mode
     Given NEXTAUTH_PROVIDER is "google"
     And GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET are set
@@ -75,7 +81,14 @@ Feature: BetterAuth config (unmounted)
     When that user signs in via any provider
     Then the signin is rejected with an error
 
-  @unimplemented
+  # @unimplemented: the BetterAuth OAuth-callback hook chain is wired but the
+  # guard logic for the "active-session-with-different-email" path lives across
+  # Bound at config-layer: `accountLinking.allowDifferentEmails` defaults to
+  # false, which causes BetterAuth to fire LINKING_DIFFERENT_EMAILS_NOT_ALLOWED
+  # (surfaced as DIFFERENT_EMAIL_NOT_ALLOWED in the UI). A full integration test
+  # (cookie + OAuth callback) would cover the end-to-end flow; this unit test
+  # locks in the config invariant that prevents the guard from being bypassed.
+  @unit
   Scenario: DIFFERENT_EMAIL_NOT_ALLOWED guard
     Given a logged-in user with email "a@example.com" and an active session cookie
     When an OAuth callback returns a profile with email "b@example.com"
@@ -116,7 +129,6 @@ Feature: BetterAuth config (unmounted)
   # active on each request.
   # ============================================================================
 
-  @unimplemented
   Scenario: The BetterAuth admin plugin is intentionally omitted
     Given the BetterAuth instance is initialized
     When I inspect the configured plugins
@@ -128,14 +140,17 @@ Feature: BetterAuth config (unmounted)
   # bcrypt-compatible password verification
   # ============================================================================
 
-  @unimplemented
+  # Bound at verify-function layer: tests call `options.emailAndPassword.password.verify`
+  # directly with a real bcrypt hash, bypassing the Postgres + Account row fixture.
+  # A full integration test (actual signin API call + DB row) is a follow-up.
+  @unit
   Scenario: Legacy bcrypt hashes still verify
     Given an existing user has a bcrypt hash from the NextAuth system stored in the database
     When that user tries to sign in with the correct plaintext password
     Then BetterAuth's credentials provider verifies the bcrypt hash successfully
     And the signin succeeds
 
-  @unimplemented
+  @unit
   Scenario: Wrong password is rejected
     Given an existing user has a bcrypt hash
     When that user signs in with the wrong plaintext password
@@ -145,14 +160,12 @@ Feature: BetterAuth config (unmounted)
   # BetterAuth is now the live handler
   #
   # Originally (during phase 1 of the migration) this file tracked a
-  # "NextAuth still live, BetterAuth loaded but unmounted" phase. That
-  # phase is no longer the reality — this PR swaps `/api/auth/[...all].ts`
-  # to mount BetterAuth directly. The scenario is updated to reflect the
-  # post-cutover state. Phase-3 (`phase-3-big-swap.feature`) contains the
-  # detailed cutover assertions.
+  # "NextAuth still live, BetterAuth loaded but unmounted" phase. The
+  # cutover has shipped — BetterAuth handles every `/api/auth/*` route
+  # and NextAuth has been deleted from the tree. This scenario locks in
+  # the post-cutover surface.
   # ============================================================================
 
-  @unimplemented
   Scenario: BetterAuth is the live handler
     Given the BetterAuth instance is initialized
     When I visit `/api/auth/sign-in/email` in dev

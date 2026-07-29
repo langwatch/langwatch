@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/observability";
 import { Currency, type PrismaClient } from "@prisma/client";
 import type { PostHog } from "posthog-node";
 import type Stripe from "stripe";
@@ -13,7 +14,6 @@ import {
   PLATFORM_DEFAULT_RETENTION_DAYS,
   RETENTION_CATEGORIES,
 } from "../../../src/server/data-retention/retentionPolicy.schema";
-import { createLogger } from "../../../src/utils/logger";
 import { SubscriptionRecordNotFoundError } from "../errors";
 import { fireSubscriptionSyncNurturing } from "../nurturing/hooks/subscriptionSync";
 import { SubscriptionStatus } from "../planTypes";

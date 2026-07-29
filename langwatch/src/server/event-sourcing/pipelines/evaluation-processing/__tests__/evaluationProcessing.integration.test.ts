@@ -1,11 +1,7 @@
+import { createLogger } from "@langwatch/observability";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
 import { EvaluationRunClickHouseRepository } from "~/server/app-layer/evaluations/repositories/evaluation-run.clickhouse.repository";
-import { createLogger } from "~/utils/logger/server";
-import type {
-  CompleteEvaluationCommandData,
-  StartEvaluationCommandData,
-} from "../";
 import type { AggregateType } from "../../../";
 import { createTenantId, definePipeline } from "../../../";
 import {
@@ -21,14 +17,18 @@ import { EventSourcing } from "../../../eventSourcing";
 import type { PipelineWithCommandHandlers } from "../../../pipeline/types";
 import { EventStoreClickHouse } from "../../../stores/eventStoreClickHouse";
 import { EventRepositoryClickHouse } from "../../../stores/repositories/eventRepositoryClickHouse";
+import type {
+  CompleteEvaluationCommandData,
+  StartEvaluationCommandData,
+} from "../";
 import {
-  StartEvaluationCommand,
   CompleteEvaluationCommand,
+  StartEvaluationCommand,
 } from "../commands";
 import type { EvaluationRun } from "../projections";
 import { EvaluationRunFoldProjection } from "../projections";
-import type { EvaluationProcessingEvent } from "../schemas/events";
 import { EvaluationRunStore } from "../projections/evaluationRun.store";
+import type { EvaluationProcessingEvent } from "../schemas/events";
 
 const logger = createLogger(
   "langwatch:event-sourcing:tests:evaluation-processing:integration",
