@@ -153,7 +153,7 @@ const VALUE_ROWS: ReadonlyArray<{
   {
     form: "Free text",
     example: '"refund policy"',
-    notes: "Wrap multi-word phrases in quotes",
+    notes: "Searches input, output, trace and span names",
   },
 ];
 
