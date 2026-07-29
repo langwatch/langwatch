@@ -36,6 +36,7 @@ Feature: One workspace for every JavaScript project in the repo
   # A single install covers everything
   # ===========================================================================
 
+  @unit
   Scenario: A fresh clone needs one install
     Given someone has just cloned the repo
     When they install dependencies once from the repo root
@@ -45,12 +46,14 @@ Feature: One workspace for every JavaScript project in the repo
     # error it eventually produced named a missing binary rather than the
     # missing install.
 
+  @unit
   Scenario: The repo holds one lockfile
     Given the repo
     When someone looks for lockfiles
     Then exactly one lockfile exists, at the repo root
     And no JavaScript project carries a lockfile of its own
 
+  @unit
   Scenario: Projects that used to opt out of the workspace no longer do
     Given the skills compiler and the agentic end-to-end tests
     When their dependencies are installed
@@ -62,6 +65,7 @@ Feature: One workspace for every JavaScript project in the repo
   # The name collision that blocked the merge
   # ===========================================================================
 
+  @unit
   Scenario: The application and the SDK no longer share a package name
     Given the application and the TypeScript SDK
     When their package names are compared
@@ -71,6 +75,7 @@ Feature: One workspace for every JavaScript project in the repo
     # on its own name, which silently resolved to the published SDK instead of
     # to itself.
 
+  @unit
   Scenario: The application still gets the published SDK
     Given the application depends on the TypeScript SDK
     When its dependencies are installed
@@ -82,6 +87,7 @@ Feature: One workspace for every JavaScript project in the repo
   # Shared dependency policy
   # ===========================================================================
 
+  @unit
   Scenario: Security overrides are declared once
     Given a dependency that has to be pinned to a patched version
     When the pin is declared at the repo root
@@ -120,6 +126,7 @@ Feature: One workspace for every JavaScript project in the repo
     # validation library. A blanket pin from one of them would drag the
     # application onto a major it is not built for.
 
+  @unit
   Scenario: A shared internal package is reachable from every project
     Given an internal package that two projects both need
     When either project declares a dependency on it
@@ -139,6 +146,7 @@ Feature: One workspace for every JavaScript project in the repo
     And it installs only the application and what the application needs
     And it does not install the SDK, the skills compiler, or the test suites
 
+  @unit
   Scenario: The published package carries a lockfile
     Given the published package
     When its contents are listed
@@ -157,6 +165,7 @@ Feature: One workspace for every JavaScript project in the repo
     # The frozen-lockfile guarantee is what makes an end user's install
     # reproducible; narrowing the install must not weaken it.
 
+  @unit
   Scenario: The published layout is not a mirror of the repository layout
     Given the published package is assembled
     When its layout is chosen
@@ -165,6 +174,7 @@ Feature: One workspace for every JavaScript project in the repo
     # changed what shipped. Rearranging the workspace broke the published
     # install exactly that way.
 
+  @unit
   Scenario: Every project the lockfile mentions is resolvable
     Given the published package
     When its dependencies are installed
