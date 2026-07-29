@@ -64,7 +64,12 @@ function makeSibling(): DrainedJob {
   return { stagedJobId: "sib-1", jobDataJson: RAW_VALUE, originalScore: 4242 };
 }
 
-describe("GroupQueueProcessor drained-sibling dead-letter durability", () => {
+/**
+ * Shared spy harness. A helper rather than a common parent `describe` so neither
+ * top-level block exceeds the 60-line function budget Biome enforces on new code.
+ * Returns getters because the instances are rebuilt per test.
+ */
+function useSpyProcessor() {
   let conn: IORedis;
   let processor: GroupQueueProcessor<TestPayload>;
   let scripts: {
@@ -100,16 +105,31 @@ describe("GroupQueueProcessor drained-sibling dead-letter durability", () => {
     conn.disconnect();
     vi.restoreAllMocks();
   });
+  return {
+    get processor() {
+      return processor;
+    },
+    get scripts() {
+      return scripts;
+    },
+    get blobLifecycle() {
+      return blobLifecycle;
+    },
+  };
+}
+
+describe("GroupQueueProcessor drained-sibling dead-letter durability — write failures", () => {
+  const h = useSpyProcessor();
 
   describe("given the dead-letter write fails for a value already out of staging", () => {
     describe("when deadLetterDrainedValue runs", () => {
       /** @scenario a drained value whose dead-letter write fails is re-staged not lost */
       it("re-stages the raw value so the drop stays recoverable instead of vanishing", async () => {
-        blobLifecycle.preserveForDlq.mockResolvedValue(undefined);
-        scripts.writeJobToDlq.mockRejectedValue(new Error("redis down"));
-        scripts.stage.mockResolvedValue(undefined);
+        h.blobLifecycle.preserveForDlq.mockResolvedValue(undefined);
+        h.scripts.writeJobToDlq.mockRejectedValue(new Error("redis down"));
+        h.scripts.stage.mockResolvedValue(undefined);
 
-        await (processor as any).deadLetterDrainedValue({
+        await (h.processor as any).deadLetterDrainedValue({
           groupId: GROUP_ID,
           stagedJobId: "sib-1",
           jobDataJson: RAW_VALUE,
@@ -119,8 +139,8 @@ describe("GroupQueueProcessor drained-sibling dead-letter durability", () => {
 
         // Falsifiability: drop the fallback (call preserveForDlq/writeJobToDlq
         // directly, as before the fix) and stage() is never reached here.
-        expect(scripts.stage).toHaveBeenCalledTimes(1);
-        expect(scripts.stage).toHaveBeenCalledWith(
+        expect(h.scripts.stage).toHaveBeenCalledTimes(1);
+        expect(h.scripts.stage).toHaveBeenCalledWith(
           expect.objectContaining({
             stagedJobId: "sib-1",
             groupId: GROUP_ID,
@@ -135,11 +155,11 @@ describe("GroupQueueProcessor drained-sibling dead-letter durability", () => {
   describe("given the dead-letter write succeeds", () => {
     describe("when deadLetterDrainedValue runs", () => {
       it("does not spuriously re-stage a value it just dead-lettered", async () => {
-        blobLifecycle.preserveForDlq.mockResolvedValue(undefined);
-        scripts.writeJobToDlq.mockResolvedValue(undefined);
-        scripts.stage.mockResolvedValue(undefined);
+        h.blobLifecycle.preserveForDlq.mockResolvedValue(undefined);
+        h.scripts.writeJobToDlq.mockResolvedValue(undefined);
+        h.scripts.stage.mockResolvedValue(undefined);
 
-        await (processor as any).deadLetterDrainedValue({
+        await (h.processor as any).deadLetterDrainedValue({
           groupId: GROUP_ID,
           stagedJobId: "sib-1",
           jobDataJson: RAW_VALUE,
@@ -147,8 +167,8 @@ describe("GroupQueueProcessor drained-sibling dead-letter durability", () => {
           originalScore: 4242,
         });
 
-        expect(scripts.writeJobToDlq).toHaveBeenCalledTimes(1);
-        expect(scripts.stage).not.toHaveBeenCalled();
+        expect(h.scripts.writeJobToDlq).toHaveBeenCalledTimes(1);
+        expect(h.scripts.stage).not.toHaveBeenCalled();
       });
     });
   });
@@ -156,14 +176,14 @@ describe("GroupQueueProcessor drained-sibling dead-letter durability", () => {
   describe("given both the dead-letter write and the re-stage fallback fail", () => {
     describe("when deadLetterDrainedValue runs", () => {
       it("does not throw — the value survives in the drop log recordDrop wrote", async () => {
-        blobLifecycle.preserveForDlq.mockResolvedValue(undefined);
-        scripts.writeJobToDlq.mockRejectedValue(new Error("redis down"));
-        scripts.stage.mockRejectedValue(new Error("still down"));
+        h.blobLifecycle.preserveForDlq.mockResolvedValue(undefined);
+        h.scripts.writeJobToDlq.mockRejectedValue(new Error("redis down"));
+        h.scripts.stage.mockRejectedValue(new Error("still down"));
 
         // Must resolve: the caller awaits this inside its batch loop, so a throw
         // here would abort the remaining siblings.
         await expect(
-          (processor as any).deadLetterDrainedValue({
+          (h.processor as any).deadLetterDrainedValue({
             groupId: GROUP_ID,
             stagedJobId: "sib-1",
             jobDataJson: RAW_VALUE,
@@ -174,21 +194,25 @@ describe("GroupQueueProcessor drained-sibling dead-letter durability", () => {
       });
     });
   });
+});
+
+describe("GroupQueueProcessor drained-sibling dead-letter durability — re-stage paths", () => {
+  const h = useSpyProcessor();
 
   describe("given a drained sibling whose re-stage stage() succeeds", () => {
     describe("when the lease re-renew then fails", () => {
       it("does not dead-letter the already-re-staged sibling (RaiMv double-process guard)", async () => {
-        scripts.stage.mockResolvedValue(undefined);
+        h.scripts.stage.mockResolvedValue(undefined);
         // renewLease() is not supposed to throw (it degrades to the TTL
         // backstop); if it ever does, it sits OUTSIDE the dead-letter fallback
         // catch, so it SURFACES rather than being mistaken for a re-stage failure.
-        blobLifecycle.renewLease.mockRejectedValue(new Error("lease hiccup"));
+        h.blobLifecycle.renewLease.mockRejectedValue(new Error("lease hiccup"));
 
         // try/await/catch (not a chained `.catch`) so the rejection is handled
         // synchronously in-band — no unhandled-rejection window to flake on.
         let surfaced = false;
         try {
-          await (processor as any).restageDrainedSiblings(GROUP_ID, [
+          await (h.processor as any).restageDrainedSiblings(GROUP_ID, [
             makeSibling(),
           ]);
         } catch {
@@ -201,8 +225,8 @@ describe("GroupQueueProcessor drained-sibling dead-letter durability", () => {
         // resolves (surfaced stays false). Outside the catch, the throw
         // surfaces and NO dead-letter is written.
         expect(surfaced).toBe(true);
-        expect(scripts.stage).toHaveBeenCalledTimes(1);
-        expect(scripts.writeJobToDlq).not.toHaveBeenCalled();
+        expect(h.scripts.stage).toHaveBeenCalledTimes(1);
+        expect(h.scripts.writeJobToDlq).not.toHaveBeenCalled();
       });
     });
   });
@@ -210,16 +234,16 @@ describe("GroupQueueProcessor drained-sibling dead-letter durability", () => {
   describe("given a drained sibling whose re-stage stage() fails", () => {
     describe("when restageDrainedSiblings runs", () => {
       it("dead-letters the raw value so the discard is recoverable", async () => {
-        scripts.stage.mockRejectedValue(new Error("stage failed"));
-        blobLifecycle.preserveForDlq.mockResolvedValue(undefined);
-        scripts.writeJobToDlq.mockResolvedValue(undefined);
+        h.scripts.stage.mockRejectedValue(new Error("stage failed"));
+        h.blobLifecycle.preserveForDlq.mockResolvedValue(undefined);
+        h.scripts.writeJobToDlq.mockResolvedValue(undefined);
 
-        await (processor as any).restageDrainedSiblings(GROUP_ID, [
+        await (h.processor as any).restageDrainedSiblings(GROUP_ID, [
           makeSibling(),
         ]);
 
-        expect(blobLifecycle.renewLease).not.toHaveBeenCalled();
-        expect(scripts.writeJobToDlq).toHaveBeenCalledWith(
+        expect(h.blobLifecycle.renewLease).not.toHaveBeenCalled();
+        expect(h.scripts.writeJobToDlq).toHaveBeenCalledWith(
           expect.objectContaining({
             stagedJobId: "sib-1",
             reason: "sibling_restage_failed",
@@ -235,15 +259,15 @@ describe("GroupQueueProcessor drained-sibling dead-letter durability", () => {
         // Body genuinely gone → decode throws missing_blob. Unlike a body-present
         // drop, there is nothing to dead-letter; the stale lease must be released
         // here because the success-path release no longer covers dropped siblings.
-        blobLifecycle.decode.mockRejectedValue(
+        h.blobLifecycle.decode.mockRejectedValue(
           new DecodeFailureError({
             message: "tiered blob is missing",
             reason: "missing_blob",
           }),
         );
-        blobLifecycle.releaseLease.mockResolvedValue(undefined);
+        h.blobLifecycle.releaseLease.mockResolvedValue(undefined);
 
-        const result = await (processor as any).parseDrainedPayload({
+        const result = await (h.processor as any).parseDrainedPayload({
           sibling: makeSibling(),
           groupId: GROUP_ID,
         });
@@ -252,12 +276,12 @@ describe("GroupQueueProcessor drained-sibling dead-letter durability", () => {
         // The stale lease is dropped (blob already gone). Falsifiability: remove
         // the missing_blob `else` release and this lease leaks — release is
         // never called.
-        expect(blobLifecycle.releaseLease).toHaveBeenCalledWith(
+        expect(h.blobLifecycle.releaseLease).toHaveBeenCalledWith(
           expect.objectContaining({ values: [RAW_VALUE], groupId: GROUP_ID }),
         );
         // Nothing to preserve: no dead-letter write, no re-stage.
-        expect(blobLifecycle.preserveForDlq).not.toHaveBeenCalled();
-        expect(scripts.writeJobToDlq).not.toHaveBeenCalled();
+        expect(h.blobLifecycle.preserveForDlq).not.toHaveBeenCalled();
+        expect(h.scripts.writeJobToDlq).not.toHaveBeenCalled();
       });
     });
   });

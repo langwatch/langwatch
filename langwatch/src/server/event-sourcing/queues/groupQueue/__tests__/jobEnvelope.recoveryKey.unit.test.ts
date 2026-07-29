@@ -45,13 +45,22 @@ const reactorPayload = (eventId: string) => ({
   foldState: { count: 1 },
 });
 
-describe("jobEnvelope recovery key (#718)", () => {
+/**
+ * Envelope writes are behind a flag; every case here needs them on. Registered
+ * as a helper rather than a shared parent `describe` so neither top-level block
+ * grows past the 60-line function budget Biome enforces on new code.
+ */
+function withEnvelopeWritesEnabled(): void {
   beforeEach(() => {
     vi.stubEnv("GROUP_QUEUE_ENVELOPE_WRITES_ENABLED", "true");
   });
   afterEach(() => {
     vi.unstubAllEnvs();
   });
+}
+
+describe("jobEnvelope recovery key (#718) — reading a key off a gone body", () => {
+  withEnvelopeWritesEnabled();
 
   describe("given a GQ2 offloaded job whose blob is gone", () => {
     describe("when the recovery key is read from the header", () => {
@@ -116,6 +125,10 @@ describe("jobEnvelope recovery key (#718)", () => {
       });
     });
   });
+});
+
+describe("jobEnvelope recovery key (#718) — encoding, dedup and round-trip", () => {
+  withEnvelopeWritesEnabled();
 
   describe("given two GQ2 jobs with identical bodies but different recovery keys", () => {
     describe("when both are encoded", () => {

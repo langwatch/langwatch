@@ -31,8 +31,12 @@ const CLAIM =
 const CAVEAT =
   /\bnot\b|\bnever\b|used to|n['’]t|adr-046|permanent loss|fold\/map|justified|once claimed/i;
 
-/** Lines that ASSERT replay recovers a drop, with no scoping/denying caveat on the same line. */
-export function replayClaimViolations(source: string): string[] {
+/**
+ * Lines that ASSERT replay recovers a drop, with no scoping/denying caveat on the
+ * same line. Deliberately NOT exported — nothing outside this file consumes it, and
+ * a test file that exports is a `noExportsInTest` violation.
+ */
+function replayClaimViolations(source: string): string[] {
   return source
     .split("\n")
     .filter((line) => CLAIM.test(line) && !CAVEAT.test(line))

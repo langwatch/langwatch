@@ -32,6 +32,7 @@ import {
   type ProjectStorageDestination,
   redactStorageUrisInText,
 } from "../../../stored-objects/project-storage-destination";
+import { errText } from "../../parseErrorText";
 import type {
   DeduplicationConfig,
   EventSourcedQueueDefinition,
@@ -1848,7 +1849,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
             groupId,
             stagedJobId,
             reason,
-            error: dlqErr instanceof Error ? dlqErr.message : String(dlqErr),
+            error: errText(dlqErr),
           },
           "Dead-letter write failed for a drained value — re-staged the raw value as a durability fallback",
         );
@@ -1863,11 +1864,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
             groupId,
             stagedJobId,
             reason,
-            dlqError: dlqErr instanceof Error ? dlqErr.message : String(dlqErr),
-            restageError:
-              restageErr instanceof Error
-                ? restageErr.message
-                : String(restageErr),
+            dlqError: errText(dlqErr),
+            restageError: errText(restageErr),
           },
           "Dead-letter write AND re-stage fallback failed for a drained value — raw value lost",
         );
