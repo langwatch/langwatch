@@ -147,9 +147,34 @@ export const experimentResultsCommand = async ({
       evaluations: evaluationsByRow.get(rowKey(entry.index, entry.targetId)) ?? [],
     }));
 
+    // A row's failures are not all reachable through the dataset join.
+    //
+    // `isFailedRow` was handed only the evaluations keyed to that (row,
+    // target), so a row whose ONLY failure was the comparison — every target
+    // produced output, every per-target evaluation passed, and the judge
+    // errored — looked clean and was filtered out. That is the evaluator this
+    // command was just taught to display, so `--filter failed` could hide
+    // exactly the failure a caller came to find.
+    //
+    // Grouped by row index because that is all a row-independent evaluation
+    // has. Every target-row of that index carries it, which is right: the
+    // comparison covers the whole field on that row, so the row failed.
+    const rowIndependentByIndex = new Map<number, ExperimentRunEvaluation[]>();
+    for (const evaluation of rowIndependentEvaluations) {
+      const list = rowIndependentByIndex.get(evaluation.index) ?? [];
+      list.push(evaluation);
+      rowIndependentByIndex.set(evaluation.index, list);
+    }
+
     if (filter === "failed") {
       rows = rows.filter((r) =>
-        isFailedRow({ entry: r.entry, evaluations: r.evaluations }),
+        isFailedRow({
+          entry: r.entry,
+          evaluations: [
+            ...r.evaluations,
+            ...(rowIndependentByIndex.get(r.entry.index) ?? []),
+          ],
+        }),
       );
     }
 

@@ -25,6 +25,13 @@ Feature: CLI evaluation results command
     And the CLI exits with status 0
 
   @integration @unimplemented
+  Scenario: A row whose only failure is the comparison is still a failed row
+    Given every target on a row produced output and passed its own evaluations
+    But the comparison judging that row errored
+    When I run `langwatch experiment results <experiment> --filter failed`
+    Then that row is shown
+    And the comparison's failure is shown with it
+
   Scenario: User filters the table to only failed rows
     Given an experiment whose latest run has both passing and failing rows
     When I run `langwatch experiment results <experiment> --filter failed`

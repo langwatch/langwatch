@@ -409,3 +409,85 @@ describe("experimentResultsCommand()", () => {
     });
   });
 });
+
+/**
+ * A run where the ONLY failure is the comparison itself. Every target
+ * produced output and every per-target evaluation passed; the comparison
+ * errored. `--filter failed` has to be able to show that row.
+ */
+const comparisonFailedResults = {
+  experimentId: "exp_3",
+  runId: "run_3",
+  projectId: "proj_1",
+  progress: 2,
+  total: 2,
+  dataset: [
+    { index: 0, targetId: "target_a", entry: { input: "q1" } },
+    { index: 0, targetId: "target_b", entry: { input: "q1" } },
+  ],
+  evaluations: [
+    { evaluator: "quality", targetId: "target_a", index: 0, status: "processed", score: 0.9, passed: true },
+    { evaluator: "quality", targetId: "target_b", index: 0, status: "processed", score: 0.8, passed: true },
+    // Row-independent, and the only thing that went wrong.
+    { evaluator: "target_comparison", targetId: "target_comparison", index: 0, status: "error", details: "judge timed out" },
+  ],
+  timestamps: { createdAt: 0, updatedAt: 0 },
+};
+
+describe("experimentResultsCommand() — failures the row join cannot see", () => {
+  let mockGetRunResults2: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetRunResults2 = vi.fn().mockResolvedValue(comparisonFailedResults);
+    vi.mocked(ExperimentsApiService).mockImplementation(function () {
+      return {
+        startRun: vi.fn(),
+        getRunStatus: vi.fn(),
+        getRunResults: mockGetRunResults2,
+        listRuns: vi.fn().mockResolvedValue({ runs: [{ runId: "run_3" }] }),
+      } as unknown as ExperimentsApiService;
+    });
+    vi.spyOn(console, "log").mockImplementation(noop);
+    vi.spyOn(console, "error").mockImplementation(noop);
+    mockProcessExit();
+  });
+
+  describe("given only the comparison failed", () => {
+    it("still surfaces the row under --filter failed", async () => {
+      // The failure filter walks the dataset join, and a comparison verdict
+      // has no dataset entry to hang off — so a row that failed ONLY on the
+      // comparison was silently filtered out. That is the evaluator this
+      // command was just taught to display.
+      const result = (await experimentResultsCommand({
+        experimentSlug: "exp",
+        options: { filter: "failed" },
+      })) as { data: { dataset: unknown[]; evaluations: { evaluator: string }[] } };
+
+      expect(result.data.dataset.length).toBeGreaterThan(0);
+      expect(
+        result.data.evaluations.some((e) => e.evaluator === "target_comparison"),
+      ).toBe(true);
+    });
+  });
+
+  describe("given nothing failed at all", () => {
+    it("shows no rows under --filter failed", async () => {
+      mockGetRunResults2.mockResolvedValue({
+        ...comparisonFailedResults,
+        evaluations: comparisonFailedResults.evaluations.map((e) =>
+          e.status === "error"
+            ? { ...e, status: "processed", score: 1, label: "target_a" }
+            : e,
+        ),
+      });
+
+      const result = (await experimentResultsCommand({
+        experimentSlug: "exp",
+        options: { filter: "failed" },
+      })) as { data: { dataset: unknown[] } };
+
+      expect(result.data.dataset.length).toBe(0);
+    });
+  });
+});
