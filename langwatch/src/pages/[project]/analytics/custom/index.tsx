@@ -24,7 +24,6 @@ import {
   Select as MultiSelect,
   type SingleValue,
 } from "chakra-react-select";
-import { useRouter } from "~/utils/compat/next-router";
 import React, {
   type Dispatch,
   type SetStateAction,
@@ -71,11 +70,13 @@ import { Tooltip } from "~/components/ui/tooltip";
 import { useDrawer } from "~/hooks/useDrawer";
 import { type FilterParam, useFilterParams } from "~/hooks/useFilterParams";
 import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
+import { useRouter } from "~/utils/compat/next-router";
 import {
   CustomGraph,
   type CustomGraphInput,
   summaryGraphTypes,
 } from "../../../../components/analytics/CustomGraph";
+import { deriveSeriesIdentifier } from "../../../../components/analytics/seriesIdentifier";
 import { DashboardLayout } from "../../../../components/DashboardLayout";
 import { FilterIconWithBadge } from "../../../../components/filters/FilterIconWithBadge";
 import { FilterSidebar } from "../../../../components/filters/FilterSidebar";
@@ -387,40 +388,64 @@ function AnalyticsCustomGraphContent({
                     fontSize="16px"
                   />
                   <HStack gap={2}>
-                    {form.watch("alert.enabled") ? (
-                      <Tooltip
-                        content="Alert configured"
-                        positioning={{ placement: "top" }}
-                      >
-                        <Box
-                          padding={1}
-                          cursor="pointer"
+                    {/*
+                     * ADR-034 Phase 8: both the bell-icon (edit) and the
+                     * "Add alert" (create) paths open the automations
+                     * drawer pre-filled with this graph + its first series,
+                     * mirroring the dashboard chart card flow from Phase
+                     * 5.2. `deriveSeriesIdentifier` emits the canonical
+                     * "{index}/{key|metric}/{aggregation}" form the
+                     * automations secondary drawer matches against
+                     * (Series.name is a free-form label and would not
+                     * pre-select). Alerts only exist for saved graphs —
+                     * `customId` is unset until the first save, so the
+                     * entry point hides rather than opening a drawer that
+                     * can't reference the graph.
+                     */}
+                    {customId ? (
+                      form.watch("alert.enabled") ? (
+                        <Tooltip
+                          content="Alert configured"
+                          positioning={{ placement: "top" }}
+                        >
+                          <Box
+                            padding={1}
+                            cursor="pointer"
+                            onClick={() =>
+                              openDrawer("automation", {
+                                automationId:
+                                  form.getValues("alert.triggerId"),
+                                prefilledGraphId: customId,
+                                prefilledSeriesName: deriveSeriesIdentifier(
+                                  graph,
+                                  0,
+                                ),
+                              })
+                            }
+                          >
+                            <Bell width={16} />
+                          </Box>
+                        </Tooltip>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          colorPalette="gray"
+                          size="sm"
                           onClick={() =>
-                            openDrawer("customGraphAlert", {
-                              form,
-                              graphId: customId,
+                            openDrawer("automation", {
+                              prefilledGraphId: customId,
+                              prefilledSeriesName: deriveSeriesIdentifier(
+                                graph,
+                                0,
+                              ),
                             })
                           }
                         >
                           <Bell width={16} />
-                        </Box>
-                      </Tooltip>
-                    ) : (
-                      <Button
-                        variant="outline"
-                        colorPalette="gray"
-                        size="sm"
-                        onClick={() =>
-                          openDrawer("customGraphAlert", {
-                            form,
-                            graphId: customId,
-                          })
-                        }
-                      >
-                        <Bell width={16} />
-                        Add alert
-                      </Button>
-                    )}
+                          Add alert
+                        </Button>
+                      )
+                    ) : null}
                     <Menu.Root>
                       <Menu.Trigger asChild>
                         <Button variant="ghost" paddingX={0}>
@@ -656,9 +681,7 @@ function CustomGraphForm({
   const series = useWatch({ control: form.control, name: "series" });
   const { showFilters, setShowFilters } = useFilterToggle();
 
-  const joinedSeriesNames = series
-    .map((s) => s.name)
-    .join(", ");
+  const joinedSeriesNames = series.map((s) => s.name).join(", ");
 
   useEffect(() => {
     if (!form.getFieldState("title")?.isTouched || !title) {
@@ -692,16 +715,9 @@ function CustomGraphForm({
       graphJson.height = 300;
     }
 
-    const formData = form.getValues();
-
-    // Get the series label for the alert name
-    let alertName: string | undefined;
-    if (formData.alert?.enabled && formData.series.length > 0) {
-      const selectedSeries = formData.series[0];
-      alertName =
-        selectedSeries?.name ||
-        `${selectedSeries?.metric} (${selectedSeries?.aggregation})`;
-    }
+    // Alert-writing moved to the automations drawer (ADR-034 Phase 5.2 —
+    // the chart-card `Add alert` bell opens `automation` drawer with
+    // `prefilledGraphId`). This graph mutation is graph-shape only.
 
     addNewGraph.mutate(
       {
@@ -709,9 +725,7 @@ function CustomGraphForm({
         name: graphName ?? "",
         graph: JSON.stringify(graphJson),
         filterParams: filterParams,
-        alert: formData.alert?.enabled ? formData.alert : undefined,
         dashboardId: dashboardId,
-        alertName: alertName,
       },
       {
         onSuccess: () => {
@@ -729,16 +743,10 @@ function CustomGraphForm({
   const updateGraph = () => {
     const graphName = form.getValues("title");
     const graphJson = customGraphFormToCustomGraphInput(form.getValues());
-    const formData = form.getValues();
 
-    // Get the series label for the alert name
-    let alertName: string | undefined;
-    if (formData.alert?.enabled && formData.series.length > 0) {
-      const selectedSeries = formData.series[0];
-      alertName =
-        selectedSeries?.name ||
-        `${selectedSeries?.metric} (${selectedSeries?.aggregation})`;
-    }
+    // Alert-writing moved to the automations drawer (ADR-034 Phase 5.2).
+    // This graph mutation is graph-shape only; edits to the alert go
+    // through the bell icon → automation drawer edit path.
 
     updateGraphById.mutate(
       {
@@ -747,8 +755,6 @@ function CustomGraphForm({
         graphId: customId ?? "",
         graph: JSON.stringify(graphJson),
         filterParams: filterParams,
-        alert: formData.alert?.enabled ? formData.alert : undefined,
-        alertName: alertName,
       },
       {
         onSuccess: () => {
@@ -810,7 +816,10 @@ function CustomGraphForm({
             name="connected"
             defaultValue={false}
             render={({ field: { onChange, value } }) => (
-              <Switch onChange={onChange} checked={value}>
+              <Switch
+                onCheckedChange={({ checked }) => onChange(checked)}
+                checked={value}
+              >
                 Connect dots
               </Switch>
             )}
@@ -935,7 +944,11 @@ function CustomGraphForm({
             name="includePrevious"
             defaultValue={false}
             render={({ field: { onChange, value } }) => (
-              <Switch onChange={onChange} checked={value} colorPalette="orange">
+              <Switch
+                onCheckedChange={({ checked }) => onChange(checked)}
+                checked={value}
+                colorPalette="orange"
+              >
                 Include previous period
               </Switch>
             )}
@@ -965,29 +978,29 @@ function CustomGraphForm({
           Cancel
         </Button>
         {customId ? (
-            <Button
-              colorPalette="orange"
-              onClick={updateGraph}
-              loading={updateGraphById.isLoading}
-              marginX={2}
-              minWidth="fit-content"
-            >
-              Update
-            </Button>
+          <Button
+            colorPalette="orange"
+            onClick={updateGraph}
+            loading={updateGraphById.isLoading}
+            marginX={2}
+            minWidth="fit-content"
+          >
+            Update
+          </Button>
         ) : (
-            <Button
-              colorPalette="orange"
-              loading={addNewGraph.isLoading}
-              onClick={() => {
-                checkAndProceed(() => {
-                  addGraph();
-                });
-              }}
-              marginX={2}
-              minWidth="fit-content"
-            >
-              Save
-            </Button>
+          <Button
+            colorPalette="orange"
+            loading={addNewGraph.isLoading}
+            onClick={() => {
+              checkAndProceed(() => {
+                addGraph();
+              });
+            }}
+            marginX={2}
+            minWidth="fit-content"
+          >
+            Save
+          </Button>
         )}
       </HStack>
     </VStack>
@@ -1009,7 +1022,10 @@ function SeriesFieldItem({
   setExpandedSeries: Dispatch<SetStateAction<string[]>>;
   customId?: string;
 }) {
-  const colorSet = useWatch({ control: form.control, name: `series.${index}.colorSet` });
+  const colorSet = useWatch({
+    control: form.control,
+    name: `series.${index}.colorSet`,
+  });
   const coneColors = rotatingColors[colorSet].map((color, i) => {
     const color_ = getRawColorValue(color.color);
     const len = rotatingColors[colorSet].length;
@@ -1183,16 +1199,31 @@ function SeriesField({
   index: number;
   customId?: string;
 }) {
-  const name = useWatch({ control: form.control, name: `series.${index}.name` });
-  const metric = useWatch({ control: form.control, name: `series.${index}.metric` });
-  const aggregation = useWatch({ control: form.control, name: `series.${index}.aggregation` });
+  const name = useWatch({
+    control: form.control,
+    name: `series.${index}.name`,
+  });
+  const metric = useWatch({
+    control: form.control,
+    name: `series.${index}.metric`,
+  });
+  const aggregation = useWatch({
+    control: form.control,
+    name: `series.${index}.aggregation`,
+  });
   const key = useWatch({ control: form.control, name: `series.${index}.key` });
-  const pipelineField = useWatch({ control: form.control, name: `series.${index}.pipeline.field` });
+  const pipelineField = useWatch({
+    control: form.control,
+    name: `series.${index}.pipeline.field`,
+  });
   const pipelineAggregation = useWatch({
     control: form.control,
     name: `series.${index}.pipeline.aggregation`,
   });
-  const filters = useWatch({ control: form.control, name: `series.${index}.filters` });
+  const filters = useWatch({
+    control: form.control,
+    name: `series.${index}.filters`,
+  });
   const nonEmptyFilters = filterOutEmptyFilters(filters);
 
   const metric_ = metric ? getMetric(metric) : undefined;
@@ -1275,10 +1306,7 @@ function SeriesField({
                   {Object.entries(analyticsMetrics).map(([group, metrics]) => (
                     <optgroup key={group} label={camelCaseToTitleCase(group)}>
                       {Object.entries(metrics).map(([metricKey, m]) => (
-                        <option
-                          key={metricKey}
-                          value={`${group}.${metricKey}`}
-                        >
+                        <option key={metricKey} value={`${group}.${metricKey}`}>
                           {m.label}
                         </option>
                       ))}
@@ -1429,7 +1457,7 @@ function SeriesField({
                     {...field}
                     checked={!!field.value}
                     value="on"
-                    onChange={(e) => field.onChange(e.target.checked)}
+                    onCheckedChange={({ checked }) => field.onChange(checked)}
                   />
                   <Field.Label flexShrink={0}>
                     Show in percentage (%)

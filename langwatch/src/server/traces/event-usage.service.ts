@@ -1,10 +1,10 @@
+import { createLogger } from "@langwatch/observability";
 import { isClickHouseEnabled } from "~/server/clickhouse/clickhouseClient";
 import {
-  queryBillableEventsTotalUniq,
-  queryBillableEventsByProjectApprox,
   getBillingMonth,
+  queryBillableEventsByProjectApprox,
+  queryBillableEventsTotalUniq,
 } from "../../../ee/billing/services/billableEventsQuery";
-import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:traces:eventUsage");
 

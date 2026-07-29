@@ -17,7 +17,7 @@ import { useColorModeValue } from "../ui/color-mode";
 
 // Amber → orange → violet palette so the governance hero visually rhymes with
 // the home announcements (same MeshGradient + glass-card shape as
-// `VoiceAgentsHomeBanner` / `TracesV2HomeBanner`) without reusing their teal.
+// `VoiceAgentsHomeBanner`) without reusing its teal.
 const MESH_COLORS_LIGHT = ["#b45309", "#ea580c", "#7c3aed", "#fff7ed"];
 const MESH_COLORS_DARK = ["#78350f", "#7c2d12", "#4c1d95", "#1a1206"];
 

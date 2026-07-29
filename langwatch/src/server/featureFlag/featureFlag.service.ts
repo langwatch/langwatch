@@ -1,5 +1,5 @@
+import { createLogger } from "@langwatch/observability";
 import { env } from "~/env.mjs";
-import { createLogger } from "~/utils/logger/server";
 import { checkFlagEnvOverride } from "./envOverride";
 import { FeatureFlagServiceMemory } from "./featureFlagService.memory";
 import { FeatureFlagServicePostHog } from "./featureFlagService.posthog";

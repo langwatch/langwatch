@@ -29,8 +29,8 @@ describe("automationStore", () => {
 
     describe("when setSection is called", () => {
       it("updates the open secondary", () => {
-        useAutomationStore.getState().setSection("filters");
-        expect(useAutomationStore.getState().section).toBe("filters");
+        useAutomationStore.getState().setSection("configuration");
+        expect(useAutomationStore.getState().section).toBe("configuration");
       });
     });
 
@@ -62,7 +62,7 @@ describe("automationStore", () => {
 
     describe("when reset is called after edits", () => {
       it("wipes draft + section + history", () => {
-        useAutomationStore.getState().setSection("filters");
+        useAutomationStore.getState().setSection("configuration");
         useAutomationStore.getState().pushTestAttempt({
           at: 1,
           channel: "email",

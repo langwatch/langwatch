@@ -1,7 +1,7 @@
+import { createLogger } from "@langwatch/observability";
 import { EventEmitter } from "events";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
-import { createLogger } from "~/utils/logger/server";
 import { BroadcasterNotActiveError } from "./errors";
 import { TenantRateLimiter } from "./tenant-rate-limiter";
 

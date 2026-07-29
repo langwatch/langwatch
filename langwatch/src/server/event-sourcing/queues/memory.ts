@@ -1,7 +1,7 @@
+import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import type { SemConvAttributes } from "langwatch/observability";
-import { createLogger } from "../../../utils/logger/server";
 import type {
 	DeduplicationConfig,
 	EventSourcedQueueDefinition,

@@ -29,7 +29,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 // outbox-reactor-adapter's registration warning, which fires synchronously
 // while `initializeDefaultApp` wires the pipelines.
 const { warnSpy } = vi.hoisted(() => ({ warnSpy: vi.fn() }));
-vi.mock("~/utils/logger/server", () => {
+vi.mock("@langwatch/observability", () => {
   const make = () => {
     const logger = {
       trace: vi.fn(),
@@ -45,10 +45,10 @@ vi.mock("~/utils/logger/server", () => {
   return { createLogger: make };
 });
 
-import { resetApp } from "~/server/app-layer/app";
 import type { App } from "~/server/app-layer/app";
-import { initializeDefaultApp } from "~/server/app-layer/presets";
+import { resetApp } from "~/server/app-layer/app";
 import type { ProcessRole } from "~/server/app-layer/config";
+import { initializeDefaultApp } from "~/server/app-layer/presets";
 
 const REGISTER_DROP_WARNING = "registered without an outbox runtime";
 
@@ -89,6 +89,24 @@ describe("presets outbox wiring", () => {
       expect(outboxDropWarnings()).toBe(0);
       // When the boot completes (sandbox permitting), assert the invariant
       // directly too.
+      if (app?.eventSourcing) {
+        expect(app.eventSourcing.isOutboxWired).toBe(true);
+      }
+    });
+  });
+
+  describe("when the app is initialized as all (in-process dev mode)", () => {
+    /** @scenario the in-process app wires the outbox exactly like a dedicated worker */
+    it("wires the outbox exactly like a worker (no drop-warnings)", async () => {
+      await resetApp();
+      vi.clearAllMocks();
+
+      const app = bootTolerant("all");
+
+      // The dev single-process role hosts the worker stack in the web process,
+      // so its outbox reactors must register WITH a runtime — same as "worker",
+      // never on the drop path.
+      expect(outboxDropWarnings()).toBe(0);
       if (app?.eventSourcing) {
         expect(app.eventSourcing.isOutboxWired).toBe(true);
       }

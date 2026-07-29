@@ -1,4 +1,4 @@
-import { createLogger } from "~/utils/logger/server";
+import { createLogger } from "@langwatch/observability";
 import type { StorageBillingCheckpointRepository } from "./repositories/storage-billing-checkpoint.repository";
 import type { StorageUsageHourlyRepository } from "./repositories/storage-usage-hourly.repository";
 import { MS_PER_HOUR } from "./sealedHour";

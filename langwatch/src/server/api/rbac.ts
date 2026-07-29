@@ -1547,16 +1547,25 @@ export type OpsScope = { kind: "none" } | { kind: "platform" };
  *
  * Only users listed in ADMIN_EMAILS get the `platform` scope. All ops
  * data is platform-wide so no org-scoped tier exists.
+ *
+ * Impersonation: an impersonation session rewrites `session.user` to the
+ * impersonated (customer) identity, which would hide the ops UI (Deja
+ * View) exactly when an admin impersonates a customer to debug their
+ * account. The impersonator's own grant carries through instead — the
+ * scope is resolved against the real admin's email as well.
  */
 export function resolveOpsScope({
   userEmail,
+  impersonatorEmail,
 }: {
   userId: string;
   userEmail: string | null | undefined;
+  /** Email of the real admin behind an impersonation session, if any. */
+  impersonatorEmail?: string | null;
   permission: Permission;
   prisma: unknown;
 }): OpsScope {
-  if (isAdmin({ email: userEmail })) {
+  if (isAdmin({ email: userEmail }) || isAdmin({ email: impersonatorEmail })) {
     return { kind: "platform" };
   }
 
@@ -1580,6 +1589,7 @@ export const checkOpsPermission =
     const opsScope = await resolveOpsScope({
       userId: user.id,
       userEmail: user.email,
+      impersonatorEmail: user.impersonator?.email,
       permission,
       prisma: ctx.prisma,
     });

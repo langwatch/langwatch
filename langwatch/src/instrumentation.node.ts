@@ -1,3 +1,10 @@
+// Platform self-reference guard — the FIRST import so it runs before any OTel or
+// langwatch module is evaluated (or any import-time side effect can wire an exporter).
+// A platform process holding LANGWATCH_API_KEY would self-reference its own trace
+// ingest; the boot module throws. See langwatchPlatformGuard for the full rationale.
+import "./langwatchPlatformGuard.boot";
+
+import { metrics } from "@opentelemetry/api";
 import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentations-node";
 import {
   CompositePropagator,
@@ -5,14 +12,31 @@ import {
   W3CTraceContextPropagator,
 } from "@opentelemetry/core";
 import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-proto";
+import { OTLPMetricExporter } from "@opentelemetry/exporter-metrics-otlp-proto";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-proto";
+import { HostMetrics } from "@opentelemetry/host-metrics";
 import { awsEksDetector } from "@opentelemetry/resource-detector-aws";
-import { detectResources } from "@opentelemetry/resources";
+import {
+  detectResources,
+  envDetector,
+  resourceFromAttributes,
+} from "@opentelemetry/resources";
 import { BatchLogRecordProcessor } from "@opentelemetry/sdk-logs";
+import {
+  MeterProvider,
+  PeriodicExportingMetricReader,
+} from "@opentelemetry/sdk-metrics";
 import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-node";
 import { setupObservability } from "langwatch/observability/node";
 
-const explicitEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
+const isEnvTrue = (value: string | undefined) => value === "true";
+
+// A trailing slash on the endpoint would produce `//v1/traces`, which some
+// collectors 404 on.
+const explicitEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT?.replace(
+  /\/+$/,
+  "",
+);
 const langwatchTracingEnabled = !!process.env.LANGWATCH_API_KEY;
 
 const spanProcessors = [] as Array<BatchSpanProcessor>;
@@ -30,7 +54,7 @@ if (explicitEndpoint) {
     ),
   );
 
-  if (process.env.PINO_OTEL_ENABLED) {
+  if (isEnvTrue(process.env.PINO_OTEL_ENABLED)) {
     logRecordProcessors.push(
       new BatchLogRecordProcessor(
         new OTLPLogExporter({
@@ -52,8 +76,11 @@ if (
       "service.name": "langwatch-backend",
       "deployment.environment": process.env.ENVIRONMENT,
     },
+    // envDetector merges OTEL_RESOURCE_ATTRIBUTES (e.g. langwatch.worktree=<name>,
+    // set by `make observability-connect`) so telemetry from each worktree is
+    // filterable in Grafana.
     resource: detectResources({
-      detectors: [awsEksDetector],
+      detectors: [awsEksDetector, envDetector],
     }),
     advanced: {},
     spanProcessors: spanProcessors,
@@ -108,4 +135,44 @@ if (
       }),
     ],
   });
+}
+
+// Metrics are a separate global MeterProvider (setupObservability only wires
+// traces + logs). Gated on OTEL_METRICS_ENABLED so it stays off by default and
+// only pushes to a collector that's actually configured. Emits Node/host
+// runtime metrics (CPU, memory, event loop, GC) — enough to correlate with the
+// traces + logs when debugging local dev in Grafana.
+if (explicitEndpoint && isEnvTrue(process.env.OTEL_METRICS_ENABLED)) {
+  const metricAttrs: Record<string, string> = {
+    "service.name": process.env.OTEL_SERVICE_NAME ?? "langwatch-backend",
+  };
+  if (process.env.ENVIRONMENT) {
+    metricAttrs["deployment.environment"] = process.env.ENVIRONMENT;
+  }
+
+  const meterProvider = new MeterProvider({
+    // Merge OTEL_RESOURCE_ATTRIBUTES (e.g. langwatch.worktree) into the metric
+    // resource too, so metrics carry the same worktree label as traces/logs.
+    resource: resourceFromAttributes(metricAttrs).merge(
+      detectResources({ detectors: [envDetector] }),
+    ),
+    readers: [
+      new PeriodicExportingMetricReader({
+        exporter: new OTLPMetricExporter({
+          url: `${explicitEndpoint}/v1/metrics`,
+        }),
+        exportIntervalMillis: 15_000,
+      }),
+    ],
+  });
+  metrics.setGlobalMeterProvider(meterProvider);
+
+  new HostMetrics({ meterProvider, name: "langwatch-backend" }).start();
+
+  // The graceful-shutdown path (start.ts / workers.ts) calls process.exit(0)
+  // without waiting on this provider, so the last periodic export can be
+  // dropped. Race a best-effort flush against that exit.
+  const flushMetricsOnExit = () => void meterProvider.forceFlush().catch(() => {});
+  process.on("SIGTERM", flushMetricsOnExit);
+  process.on("SIGINT", flushMetricsOnExit);
 }

@@ -10,18 +10,17 @@
  */
 
 import { zValidator } from "@hono/zod-validator";
-import type { NextRequest } from "~/types/next-stubs";
+import { createLogger } from "@langwatch/observability";
 import crypto from "crypto";
-
-import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { hasProjectPermission } from "~/server/api/rbac";
+import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { getUserProtectionsForProject } from "~/server/api/utils";
+import { getApp } from "~/server/app-layer/app";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 import { ExportService } from "~/server/export/export.service";
 import { exportRequestSchema } from "~/server/export/types";
-import { getApp } from "~/server/app-layer/app";
-import { createLogger } from "~/utils/logger/server";
+import type { NextRequest } from "~/types/next-stubs";
 
 const logger = createLogger("langwatch:api:export-traces");
 

@@ -12,6 +12,29 @@ type OTel struct {
 	OTLPEndpoint string  `env:"OTLP_ENDPOINT"`
 	OTLPHeaders  string  `env:"OTLP_HEADERS"`
 	SampleRatio  float64 `env:"SAMPLE_RATIO"`
+
+	// DebugCollectorEndpoint is an OPTIONAL second OTLP/HTTP endpoint —
+	// typically a developer's local observability stack (OTel Collector
+	// + Loki/Tempo/Prometheus/Grafana) on http://localhost:4318. When
+	// set, the service ADDITIONALLY ships its own operational telemetry
+	// there: a second span exporter (traces are dual-exported, never
+	// diverted from the primary product pipeline), plus net-new OTLP
+	// logs and OTLP metrics. This is the base URL only — the per-signal
+	// paths (/v1/traces, /v1/logs, /v1/metrics) are appended by
+	// otelsetup. Empty (the default everywhere, prod included) means
+	// none of the debug-collector behavior is installed.
+	DebugCollectorEndpoint string `env:"DEBUG_COLLECTOR_ENDPOINT"`
+	// DebugCollectorHeaders carries optional auth headers for the debug
+	// collector, in the OTEL_EXPORTER_OTLP_HEADERS "k=v,k2=v2" format.
+	DebugCollectorHeaders string `env:"DEBUG_COLLECTOR_HEADERS"`
+}
+
+// DebugCollector returns the debug-collector base endpoint (no signal
+// path) and its parsed headers. An empty endpoint means the debug
+// collector is disabled. Exposed for services (e.g. nlpgo) that build
+// otelsetup.Options directly instead of going through Configure.
+func (o *OTel) DebugCollector() (endpoint string, headers map[string]string) {
+	return o.DebugCollectorEndpoint, parseHeaders(o.DebugCollectorHeaders)
 }
 
 // Configure initializes the OTel provider from the config, parsing headers and
@@ -21,11 +44,14 @@ func (o *OTel) Configure(ctx context.Context, nodeID string) (*otelsetup.Provide
 	if endpoint != "" && !strings.HasSuffix(endpoint, "/v1/traces") {
 		endpoint = strings.TrimRight(endpoint, "/") + "/v1/traces"
 	}
+	debugEndpoint, debugHeaders := o.DebugCollector()
 	return otelsetup.New(ctx, otelsetup.Options{
-		NodeID:       nodeID,
-		OTLPEndpoint: endpoint,
-		OTLPHeaders:  parseHeaders(o.OTLPHeaders),
-		SampleRatio:  o.SampleRatio,
+		NodeID:                 nodeID,
+		OTLPEndpoint:           endpoint,
+		OTLPHeaders:            parseHeaders(o.OTLPHeaders),
+		SampleRatio:            o.SampleRatio,
+		DebugCollectorEndpoint: debugEndpoint,
+		DebugCollectorHeaders:  debugHeaders,
 	})
 }
 

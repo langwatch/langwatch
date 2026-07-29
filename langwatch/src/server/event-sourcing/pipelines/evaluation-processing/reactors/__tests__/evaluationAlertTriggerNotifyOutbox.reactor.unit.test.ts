@@ -1,4 +1,4 @@
-import { TriggerAction } from "@prisma/client";
+import { TriggerAction, TriggerKind } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
@@ -58,6 +58,7 @@ function createTrigger(
     projectId: "tenant-1",
     name: "Quality Alert",
     action: TriggerAction.SEND_EMAIL,
+    triggerKind: TriggerKind.AUTOMATION,
     actionParams: { members: ["user@example.com"] },
     filters: {
       "evaluations.passed": { "evaluator-1": ["true"] },
@@ -66,6 +67,7 @@ function createTrigger(
     message: "",
     customGraphId: null,
     notificationCadence: "immediate",
+    filterQuery: null,
     traceDebounceMs: 25_000,
     templates: {
       slackTemplateType: null,
@@ -141,12 +143,11 @@ describe("evaluationAlertTriggerNotifyOutbox reactor", () => {
         "tenant-1/triggerNotify:trigger-eval-notify",
       );
       expect(request!.enqueueOptions).toEqual({ ttlMs: 25_000 });
-      const payload = request!.payload as unknown as {
-        stage: string;
-        foldSnapshotAtEnqueue: { computedInput: string };
-      };
+      const payload = request!.payload as unknown as { stage: string };
       expect(payload.stage).toBe("settle");
-      expect(payload.foldSnapshotAtEnqueue.computedInput).toBe("the input");
+      // Identity only — the trace's content is re-read at fire time, never
+      // carried on the payload (and so never projected into Postgres).
+      expect(JSON.stringify(payload)).not.toContain("the input");
     });
   });
 

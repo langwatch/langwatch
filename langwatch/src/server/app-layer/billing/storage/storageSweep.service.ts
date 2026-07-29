@@ -1,4 +1,4 @@
-import { createLogger } from "~/utils/logger/server";
+import { createLogger } from "@langwatch/observability";
 import type { StorageSweepCursorRepository } from "./repositories/storage-sweep-cursor.repository";
 import { currentSealedHour, floorToDay } from "./sealedHour";
 

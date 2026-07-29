@@ -1,5 +1,5 @@
+import { createLogger } from "@langwatch/observability";
 import type { PublicShare } from "@prisma/client";
-import { createLogger } from "~/utils/logger/server";
 import type { PinnedTraceService } from "~/server/data-retention/pinning/pinnedTrace.service";
 import type {
   ShareRepository,

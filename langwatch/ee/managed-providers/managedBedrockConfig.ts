@@ -8,9 +8,10 @@
  * The <label> is a human-readable customer name (e.g., "skai"), ignored by code.
  * The <orgId> is the organization ID used for routing.
  */
+
+import { AssumeRoleCommand, STSClient } from "@aws-sdk/client-sts";
+import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
-import { STSClient, AssumeRoleCommand } from "@aws-sdk/client-sts";
-import { createLogger } from "~/utils/logger/server";
 import { prisma } from "~/server/db";
 import type { MaybeStoredModelProvider } from "~/server/modelProviders/registry";
 

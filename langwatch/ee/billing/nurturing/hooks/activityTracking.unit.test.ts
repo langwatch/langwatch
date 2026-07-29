@@ -6,7 +6,7 @@ import {
 } from "./activityTracking";
 
 // Suppress logger output
-vi.mock("../../../../src/utils/logger/server", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
     info: vi.fn(),
     warn: vi.fn(),

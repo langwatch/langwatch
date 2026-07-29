@@ -28,7 +28,7 @@ import {
   firstEligibleDefaultModel,
   type OrgModelProvider,
 } from "./eligibleModelProviders";
-import { FieldInfoTooltip } from "./FieldInfoTooltip";
+import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import {
   VirtualKeyScopePicker,
   type VirtualKeyScopeEntry,

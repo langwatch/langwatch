@@ -1,9 +1,8 @@
 import { createHash } from "node:crypto";
-
+import { createLogger } from "@langwatch/observability";
 import { SpanKind as ApiSpanKind } from "@opentelemetry/api";
 import type { IExportLogsServiceRequest } from "@opentelemetry/otlp-transformer";
 import { getLangWatchTracer } from "langwatch";
-import { createLogger } from "~/utils/logger/server";
 import type { DeepPartial } from "~/utils/types";
 import {
   piiRedactionLevelSchema,

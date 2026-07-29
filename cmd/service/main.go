@@ -29,6 +29,15 @@ var services = map[string]ServiceBoot{
 }
 
 func main() {
+	// A langwatch platform process must never carry the langwatch SDK's own
+	// LANGWATCH_API_KEY. With it set, the platform's OTel/SDK bootstrap exports the
+	// platform's own operational telemetry into its own trace ingest — a
+	// self-referencing feedback loop (every ingested span does more work that emits
+	// more spans). Refuse to boot rather than silently self-reference.
+	if os.Getenv("LANGWATCH_API_KEY") != "" {
+		panic("LANGWATCH_API_KEY must not be set on a langwatch platform process — it makes " +
+			"the platform self-reference its own trace ingest (a feedback loop).")
+	}
 	os.Exit(run(os.Args))
 }
 

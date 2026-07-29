@@ -3,7 +3,7 @@ import { NurturingService } from "./nurturing.service";
 import type { CioBatchCall } from "./types";
 
 // Suppress logger output and captureException in tests
-vi.mock("../../../src/utils/logger/server", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
     info: vi.fn(),
     warn: vi.fn(),

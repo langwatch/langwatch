@@ -1,11 +1,11 @@
+import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
 import type { PrismaClient, Scenario } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
-import { createLogger } from "~/utils/logger/server";
 import { ScenarioNotFoundError } from "./errors";
 import {
-  ScenarioRepository,
   type CreateScenarioInput,
+  ScenarioRepository,
   type UpdateScenarioInput,
 } from "./scenario.repository";
 

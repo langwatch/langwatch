@@ -9,17 +9,21 @@ import type {
   SeriesInputType,
   TimeseriesInputType,
 } from "~/server/analytics/registry";
-import type {
-  TimeseriesBucket,
-  TimeseriesResult,
-} from "~/server/analytics/types";
+import type { TimeseriesResult } from "~/server/analytics/types";
 import { getAnalyticsService } from "~/server/app-layer/analytics";
+import { buildSeriesName } from "~/server/app-layer/analytics/repositories/_timeseries-row-parser";
+import { sumMetricAcrossGroups } from "~/server/app-layer/analytics/series-points";
 import { prisma } from "~/server/db";
 import type { Trace } from "~/server/tracer/types";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { handleSendEmail } from "./actions/sendEmail";
 import { handleSendSlackMessage } from "./actions/sendSlackMessage";
-import type { ActionParams, TriggerData, TriggerResult } from "./types";
+import type {
+  ActionParams,
+  TriggerContext,
+  TriggerData,
+  TriggerResult,
+} from "./types";
 import { addTriggersSent, checkThreshold, updateAlert } from "./utils";
 
 // Graph config stored in database (subset of CustomGraphInput)
@@ -164,12 +168,17 @@ export const processCustomGraphTrigger = async (
     const timeseriesResult =
       await analyticsService.getTimeseries(timeseriesInput);
 
-    // Calculate current value (sum or average of the last period)
-    // Use seriesName as the key to find the value in timeseries results
+    // Calculate current value (sum or average of the last period).
+    // The stored `seriesName` identifies WHICH series to watch; result
+    // buckets are keyed by `buildSeriesName` (`{queryIndex}/{metric}/{agg}
+    // [/{key}]`, terms→cardinality) and we query a single-series input, so
+    // the lookup key must be derived from `seriesInput` at index 0 — the
+    // stored identifier only matches for a first-position, keyless,
+    // non-terms series.
     const currentValue = calculateCurrentValue(
       timeseriesResult,
       series,
-      seriesName,
+      buildSeriesName(seriesInput, 0),
       graphData.groupBy,
     );
 
@@ -215,7 +224,17 @@ export const processCustomGraphTrigger = async (
           },
         ];
 
-        const context = {
+        // The alert's most recent incident row, open or resolved. Its id is the
+        // fire generation the per-recipient idempotency ledger is keyed on — see
+        // `graphAlertFireDigest`. No open row exists on this branch, so this
+        // reads the last RESOLVED one (null on the alert's first-ever fire).
+        const previousFire = await prisma.triggerSent.findFirst({
+          where: { triggerId, projectId, customGraphId },
+          orderBy: { createdAt: "desc" },
+          select: { id: true },
+        });
+
+        const context: TriggerContext = {
           trigger: {
             ...trigger,
             message:
@@ -227,17 +246,39 @@ export const processCustomGraphTrigger = async (
           projects,
           triggerData,
           projectSlug: project.slug,
+          // The measured facts, so the action handlers can render the alert
+          // templates instead of re-parsing the prose strings above.
+          graphAlert: {
+            graph: { id: customGraphId, name: customGraph.name },
+            metric: { label: series.name, seriesName },
+            condition: {
+              operator,
+              threshold,
+              timePeriodMinutes: timePeriod,
+            },
+            currentValue,
+            window: { start: startDate, end: endDate },
+            occurredAt: endDate,
+            previousFireId: previousFire?.id ?? null,
+          },
         };
 
-        // Execute the appropriate action
+        // Execute the appropriate action. `didSend` mirrors the dispatcher's
+        // semantics (see `GraphAlertDispatchResult.didSend`): true when the
+        // fire is consumed — a provider call was made, or an ADR-031 cap
+        // suppressed the delivery — false when dispatch failed or dropped on
+        // config, so the incident is NOT recorded and the next tick retries.
+        let didSend = true;
         if (action === TriggerAction.SEND_EMAIL) {
-          await handleSendEmail(context);
+          ({ didSend } = await handleSendEmail(context));
         } else if (action === TriggerAction.SEND_SLACK_MESSAGE) {
-          await handleSendSlackMessage(context);
+          ({ didSend } = await handleSendSlackMessage(context));
         }
 
-        // Record that this alert was sent (creates new TriggerSent with resolvedAt = null)
-        await addTriggersSent(triggerId, triggerData);
+        if (didSend) {
+          // Record that this alert was sent (creates new TriggerSent with resolvedAt = null)
+          await addTriggersSent(triggerId, triggerData);
+        }
 
         await updateAlert(triggerId, Date.now(), projectId);
 
@@ -268,7 +309,12 @@ export const processCustomGraphTrigger = async (
             id: unresolvedTriggerSent.id,
             projectId: projectId,
           },
-          data: { resolvedAt: new Date() },
+          // Clear openIncidentKey alongside resolvedAt, mirroring the trigger
+          // repository's `markResolvedById`: the identity MUST free up (go
+          // NULL) for the alert to fire again, or the event-sourced path's
+          // next `claimOpenForGraphAlert` INSERT hits the still-held unique
+          // key (P2002) forever.
+          data: { resolvedAt: new Date(), openIncidentKey: null },
         });
       }
 
@@ -297,42 +343,6 @@ export const processCustomGraphTrigger = async (
       message: error instanceof Error ? error.message : "Unknown error",
     };
   }
-};
-
-/**
- * Sum a metric across all groups in a grouped timeseries bucket.
- *
- * Grouped buckets nest values as:
- *   { [groupBy]: { [groupKey]: { [seriesKey]: number } } }
- *
- * Returns undefined when no group contains the metric so the
- * bucket is excluded from aggregation rather than counted as 0.
- */
-export const sumMetricAcrossGroups = (
-  entry: TimeseriesBucket,
-  groupBy: string,
-  seriesKey: string,
-): number | undefined => {
-  const groupData = entry[groupBy];
-  if (
-    typeof groupData !== "object" ||
-    groupData === null ||
-    Array.isArray(groupData)
-  ) {
-    return undefined;
-  }
-
-  const groups = groupData as Record<string, Record<string, number>>;
-  let sum = 0;
-  let found = false;
-  for (const metrics of Object.values(groups)) {
-    const value = metrics[seriesKey];
-    if (typeof value === "number") {
-      found = true;
-      sum += value;
-    }
-  }
-  return found ? sum : undefined;
 };
 
 const calculateCurrentValue = (

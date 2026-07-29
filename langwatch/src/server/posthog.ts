@@ -1,5 +1,5 @@
+import { createLogger } from "@langwatch/observability";
 import { PostHog } from "posthog-node";
-import { createLogger } from "~/utils/logger/server";
 import { env } from "../env.mjs";
 
 const logger = createLogger("langwatch:posthog:client");

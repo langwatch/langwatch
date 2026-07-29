@@ -1,8 +1,7 @@
+import { createLogger } from "@langwatch/observability";
 import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { TriggerService } from "~/server/app-layer/triggers/trigger.service";
-import { classifyTriggerFilters } from "~/server/filters/triggerFilter.matcher";
-import { createLogger } from "~/utils/logger/server";
 import { createTenantId } from "../../../domain/tenantId";
 import type {
   OutboxEnqueueRequest,
@@ -16,7 +15,10 @@ import {
 } from "../../../outbox/payload";
 import type { FoldProjectionStore } from "../../../projections/foldProjection.types";
 import type { ReactorContext } from "../../../reactors/reactor.types";
-import { NOTIFY_TRIGGER_ACTIONS } from "../../shared/triggerActionDispatch";
+import {
+  NOTIFY_TRIGGER_ACTIONS,
+  triggerReadsEvaluations,
+} from "../../shared/triggerActionDispatch";
 import type { EvaluationProcessingEvent } from "../schemas/events";
 import {
   isEvaluationCompletedEvent,
@@ -89,15 +91,14 @@ export function createEvaluationAlertTriggerNotifyOutboxReactor(
         await deps.triggers.getActiveTraceTriggersForProject(tenantId);
       if (triggers.length === 0) return [];
 
-      const candidates = triggers.filter((t) => {
-        const { hasEvaluationFilters } = classifyTriggerFilters(t.filters);
-        return hasEvaluationFilters && NOTIFY_TRIGGER_ACTIONS.has(t.action);
-      });
+      const candidates = triggers.filter(
+        (t) => triggerReadsEvaluations(t) && NOTIFY_TRIGGER_ACTIONS.has(t.action),
+      );
       if (candidates.length === 0) return [];
 
-      // Cross-pipeline read: settle re-reads the fold itself, but we
-      // need foldSnapshotAtEnqueue for the debugging breadcrumb. A
-      // missing fold short-circuits — no payload to enqueue.
+      // Existence guard only: settle re-reads the fold at fire time, so nothing
+      // from the summary is carried on the payload. A trace with no fold has
+      // nothing to match, so there is no payload to enqueue.
       const brandedTenantId = createTenantId(tenantId);
       const traceSummary = await deps.traceSummaryStore.get(traceId, {
         tenantId: brandedTenantId,
@@ -115,6 +116,10 @@ export function createEvaluationAlertTriggerNotifyOutboxReactor(
       for (const trigger of candidates) {
         const payload: SettleStagePayload = {
           stage: "settle",
+          // reactor-001: stamp actionClass so the dispatcher routes without
+          // falling back to reading trigger.action; the trace pair + the
+          // eval persist reactor all set this — this one was missing.
+          actionClass: "notify",
           projectId: tenantId,
           triggerId: trigger.id,
           traceId,
@@ -124,10 +129,6 @@ export function createEvaluationAlertTriggerNotifyOutboxReactor(
             triggerId: trigger.id,
             traceId,
           }),
-          foldSnapshotAtEnqueue: {
-            computedInput: traceSummary.computedInput ?? "",
-            computedOutput: traceSummary.computedOutput ?? "",
-          },
         };
         requests.push({
           dedupKey: payload.auditDedupKey,

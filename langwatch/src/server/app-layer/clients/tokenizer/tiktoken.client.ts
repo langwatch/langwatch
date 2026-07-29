@@ -1,6 +1,6 @@
+import { createLogger } from "@langwatch/observability";
 import fs from "fs/promises";
 import path from "path";
-import { createLogger } from "~/utils/logger/server";
 import type { TokenizerClient } from "./tokenizer.client";
 
 const logger = createLogger("langwatch:tiktoken");

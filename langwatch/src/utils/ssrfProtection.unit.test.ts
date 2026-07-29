@@ -15,15 +15,31 @@ vi.mock("dns/promises", () => ({
   },
 }));
 
+/**
+ * Every Agent construction is recorded so the socket-level bounds
+ * (headersTimeout / bodyTimeout) can be asserted. Subclassing rather than
+ * stubbing keeps `instanceof Agent` true for the dispatcher assertions below.
+ */
+const agentOptions = vi.hoisted(() => [] as Record<string, unknown>[]);
+
 vi.mock("undici", async () => {
-  const actual = await vi.importActual("undici");
+  const actual = await vi.importActual<typeof import("undici")>("undici");
   return {
     ...actual,
     fetch: vi.fn(),
+    Agent: class RecordingAgent extends actual.Agent {
+      constructor(opts?: Record<string, unknown>) {
+        agentOptions.push(opts ?? {});
+        super(opts);
+      }
+    },
   };
 });
 
 const mockedFetch = vi.mocked(undiciFetch);
+
+const fetchOptions = (callIndex: number) =>
+  mockedFetch.mock.calls[callIndex]![1] as Record<string, unknown>;
 
 const mockedDnsResolve = vi.mocked(dns.resolve);
 
@@ -282,6 +298,7 @@ describe("createSSRFSafeFetchConfig()", () => {
 describe("fetchWithResolvedIp()", () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    agentOptions.length = 0;
   });
 
   describe("when result is unresolved (DNS failed but blockLocal is off)", () => {
@@ -345,6 +362,117 @@ describe("fetchWithResolvedIp()", () => {
       const callArgs = mockedFetch.mock.calls[0]!;
       const options = callArgs[1] as Record<string, unknown>;
       expect(options.dispatcher).toBeInstanceOf(Agent);
+    });
+  });
+
+  describe("when the caller passes an AbortSignal", () => {
+    const resolvedResult: SSRFResolvedResult = {
+      type: "resolved",
+      resolvedIp: "93.184.216.34",
+      originalUrl: "https://example.com/api",
+      hostname: "example.com",
+      port: 443,
+      protocol: "https:",
+      path: "/api",
+    };
+
+    it("forwards it to undici, so the caller's deadline actually applies", async () => {
+      mockedFetch.mockResolvedValue({
+        status: 200,
+        headers: new Headers(),
+      } as never);
+      const controller = new AbortController();
+
+      await fetchWithResolvedIp(resolvedResult, {
+        signal: controller.signal,
+      });
+
+      expect(fetchOptions(0).signal).toBe(controller.signal);
+    });
+
+    it("carries the same signal into a redirected hop, so one deadline bounds the whole chain", async () => {
+      stubDnsResolve(["93.184.216.34"]);
+      mockedFetch
+        .mockResolvedValueOnce({
+          status: 302,
+          headers: new Headers({ location: "https://example.com/moved" }),
+        } as never)
+        .mockResolvedValueOnce({
+          status: 200,
+          headers: new Headers(),
+        } as never);
+      const controller = new AbortController();
+
+      await fetchWithResolvedIp(resolvedResult, { signal: controller.signal });
+
+      expect(mockedFetch).toHaveBeenCalledTimes(2);
+      expect(fetchOptions(1).signal).toBe(controller.signal);
+    });
+  });
+
+  describe("when the caller passes socket-level timeout bounds", () => {
+    const resolvedResult: SSRFResolvedResult = {
+      type: "resolved",
+      resolvedIp: "93.184.216.34",
+      originalUrl: "https://example.com/api",
+      hostname: "example.com",
+      port: 443,
+      protocol: "https:",
+      path: "/api",
+    };
+
+    it("sets them on the dispatching Agent as a backstop behind the signal", async () => {
+      mockedFetch.mockResolvedValue({
+        status: 200,
+        headers: new Headers(),
+      } as never);
+
+      await fetchWithResolvedIp(resolvedResult, {
+        headersTimeoutMs: 7_000,
+        bodyTimeoutMs: 8_000,
+      });
+
+      expect(agentOptions).toHaveLength(1);
+      expect(agentOptions[0]).toMatchObject({
+        headersTimeout: 7_000,
+        bodyTimeout: 8_000,
+      });
+    });
+
+    it("keeps undici's own defaults when the caller asks for no bound", async () => {
+      mockedFetch.mockResolvedValue({
+        status: 200,
+        headers: new Headers(),
+      } as never);
+
+      await fetchWithResolvedIp(resolvedResult);
+
+      expect(agentOptions[0]).not.toHaveProperty("headersTimeout");
+      expect(agentOptions[0]).not.toHaveProperty("bodyTimeout");
+    });
+
+    it("re-applies them to the Agent built for a redirected hop", async () => {
+      stubDnsResolve(["93.184.216.34"]);
+      mockedFetch
+        .mockResolvedValueOnce({
+          status: 302,
+          headers: new Headers({ location: "https://example.com/moved" }),
+        } as never)
+        .mockResolvedValueOnce({
+          status: 200,
+          headers: new Headers(),
+        } as never);
+
+      await fetchWithResolvedIp(resolvedResult, {
+        headersTimeoutMs: 7_000,
+        bodyTimeoutMs: 8_000,
+      });
+
+      expect(agentOptions).toHaveLength(2);
+      expect(agentOptions[1]).toMatchObject({
+        headersTimeout: 7_000,
+        bodyTimeout: 8_000,
+      });
     });
   });
 });

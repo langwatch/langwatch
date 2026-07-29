@@ -18,6 +18,7 @@ import {
   StrandsExtractor,
   TraceloopExtractor,
   VercelExtractor,
+  VertexAdkExtractor,
 } from "./extractors";
 import type {
   CanonicalAttributesExtractor,
@@ -36,6 +37,7 @@ export class CanonicalizeSpanAttributesService {
     // Priority is determined by the order of registration.
     new LangWatchExtractor(),
     new GenAIExtractor(),
+    new VertexAdkExtractor(),
     new MastraExtractor(),
     new OpenInferenceExtractor(),
     new TraceloopExtractor(),

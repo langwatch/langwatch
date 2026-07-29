@@ -1,6 +1,6 @@
+import { createLogger } from "@langwatch/observability";
 import { createHmac } from "crypto";
 import { env } from "../../env.mjs";
-import { createLogger } from "../../utils/logger/server";
 
 const logger = createLogger("langwatch:mailer:triggerNoReply");
 

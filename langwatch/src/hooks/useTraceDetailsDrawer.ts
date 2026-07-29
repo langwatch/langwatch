@@ -9,8 +9,9 @@ import { useDrawer } from "./useDrawer";
  * cross-cutting concerns are enforced centrally, so every trace open — through
  * this hook or a direct `openDrawer` call — behaves identically:
  * - EXTERNAL-user restriction, in `CurrentDrawer`.
- * - Traces v2 opt-in routing, in `openDrawer` (a trace open is sent to the new
- *   explorer when this device opted in; see `routeTraceDrawerForV2`).
+ * - Trace Explorer default routing, in `openDrawer` (a trace open is sent to
+ *   the Trace Explorer everywhere except the legacy Traces page; see
+ *   `routeTraceDrawerForV2`).
  */
 export function useTraceDetailsDrawer() {
   const { openDrawer } = useDrawer();

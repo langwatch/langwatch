@@ -194,7 +194,7 @@ describe("translateRouter.translate()", () => {
       expect(error).toMatchObject({ code: "BAD_REQUEST" });
 
       // Serialised wire shape the frontend extractor reads — proves the
-      // typed error reaches domainErrorMiddleware untouched (the claim the
+      // typed error reaches handledErrorMiddleware untouched (the claim the
       // translate.ts comment makes) instead of being mis-tagged as an
       // AI_CALL_FAILED or flattened to a generic 500.
       const wire = errorFormatterForTesting({

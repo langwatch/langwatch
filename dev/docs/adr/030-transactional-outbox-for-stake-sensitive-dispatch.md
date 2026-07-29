@@ -55,7 +55,7 @@ These stay as **two separate tables** with distinct roles:
 
   The `${projectId}/` prefix mirrors the `groupKey` convention (see queue section) and makes tenant scoping structural in the key itself. The `:trace:` / `:graph:` discriminator keeps the two subject types in separate namespaces so a future trigger type cannot collide.
 
-Outbox **queue enqueue** is **gated on `TriggerSent` claim succeeding**: the reactor's match phase first calls `TriggerSent.claimSend`; only on a successful claim does it call `outboxQueue.send(...)`, which then writes the corresponding `ReactorOutbox` audit row via the adapter's `onEnqueue` hook.
+Outbox **queue enqueue** is **not gated on `TriggerSent` claim** — the reactor's match phase calls `outboxQueue.send(...)` unconditionally and the `ReactorOutbox` audit row is written via the adapter's `onEnqueue` hook. The at-most-once `TriggerSent.claimSend` gate has moved to the **cadence dispatcher**, after a successful send, per **ADR-035** (persist-class debounce). This flip means retries after a mid-dispatch crash see `TriggerSent` still unclaimed and re-attempt the send — correct at-most-once semantics require the claim to bind to the successful dispatch, not to enqueue.
 
 ### GroupQueue as the dispatch substrate
 
@@ -130,8 +130,7 @@ src/server/event-sourcing/
 The framework wrapper invoked by `.withOutbox` is responsible for:
 
 1. Wrapping `match` in `_originGuardedReactor` guards.
-2. Gating queue enqueue on `TriggerSent.claimSend` (or equivalent reactor-defined claim).
-3. Calling `outboxDispatchQueue.send(payload, { delay: cadenceWindowMs, deduplication: { makeId: dedupKey } })`.
+2. Calling `outboxDispatchQueue.send(payload, { delay: cadenceWindowMs, deduplication: { makeId: dedupKey } })` **unconditionally** — the at-most-once `TriggerSent` gate lives on the cadence dispatcher (post-dispatch), not here. See **ADR-035** for the flip and why.
 
 The queue's `PgOutboxAuditAdapter` writes the `ReactorOutbox` row via its `onEnqueue` hook. There is **no** separate `createMany skipDuplicates` step in the wrapper — the queue's dedup config is the replay-safety mechanism, and the adapter mirrors the resulting transition to PG.
 
@@ -203,9 +202,13 @@ Adapter writes are still best-effort relative to dispatch: a PG outage logs and 
 - **Mirrors `TriggerSent`.** Both tables have the same per-match grain. Operator queries can join them on `(triggerId, traceId)` or `(triggerId, customGraphId)`.
 - **Cost of more rows is negligible.** Outbox rows live ~minutes (until the worker drains the digest), then transition to `dispatched` and live ~30 days for audit, then prune.
 
-### Why outbox insert is gated on `TriggerSent` claim
+### Why the `TriggerSent` claim moved post-dispatch (ADR-035)
 
-If we insert outbox rows unconditionally, an out-of-order replay could insert a new `queued` outbox row for a `(triggerId, subjectId)` whose digest has already been dispatched. The drainer would happily re-notify. Gating insertion on the `TriggerSent` claim means: if a match has already been claimed by either pipeline, no new outbox row is created. `TriggerSent` is the durable "we've already considered this match" anchor; `ReactorOutbox` is the durable "what's the dispatch's life-cycle state" anchor.
+**Original design (this ADR, pre-ADR-035, 2026-06-19):** gate outbox INSERT on `TriggerSent.claimSend`. Rationale was that an out-of-order replay could insert a new `queued` outbox row for a `(triggerId, subjectId)` whose digest had already been dispatched, and the drainer would happily re-notify.
+
+**Current design (ADR-035):** enqueue unconditionally, claim `TriggerSent` in the cadence dispatcher **after** a successful send. Rationale: mid-dispatch crash + retry semantics require the claim to bind to the successful send, not to enqueue. Under the original design, a worker that crashed between claim and dispatch left `TriggerSent` claimed but no email/Slack ever went out — the retry saw an already-claimed row and silently dropped. ADR-035's post-dispatch claim inverts that: a crashed dispatch leaves `TriggerSent` unclaimed so the retry re-sends; only a successful send marks the row.
+
+`TriggerSent` is now the durable "we've successfully dispatched this match" anchor (was: "we've already considered this match"). `ReactorOutbox` remains the durable "what's the dispatch's life-cycle state" anchor.
 
 ### Why GroupQueue and not BullMQ
 

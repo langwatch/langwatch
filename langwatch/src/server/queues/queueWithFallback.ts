@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
 import {
   Job,
@@ -16,7 +17,6 @@ import {
   runWithContext,
 } from "~/server/context/asyncContext";
 import { connection } from "~/server/redis";
-import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:queueWithFallback");
 

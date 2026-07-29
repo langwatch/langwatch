@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { buildMetricAlias } from "../metric-translator";
+import type {
+  FlattenAnalyticsMetricsEnum,
+  SeriesInputType,
+} from "../../registry";
 import { buildTimeseriesQuery } from "../aggregation-builder";
-import type { FlattenAnalyticsMetricsEnum, SeriesInputType } from "../../registry";
+import { buildMetricAlias } from "../metric-translator";
 
 /**
  * These tests verify that the column aliases generated in SQL match
@@ -18,10 +21,17 @@ describe("result-parsing", () => {
   describe("alias consistency", () => {
     // Test with a single series (index 0)
     it("generates consistent aliases for single metric", () => {
-      const series = { metric: "performance.total_cost" as FlattenAnalyticsMetricsEnum, aggregation: "avg" as const };
+      const series = {
+        metric: "performance.total_cost" as FlattenAnalyticsMetricsEnum,
+        aggregation: "avg" as const,
+      };
 
       // This is the alias used when parsing results (always index 0 for first series)
-      const parsingAlias = buildMetricAlias(0, series.metric, series.aggregation);
+      const parsingAlias = buildMetricAlias(
+        0,
+        series.metric,
+        series.aggregation,
+      );
 
       // Build a query with this metric
       const input = {
@@ -39,17 +49,27 @@ describe("result-parsing", () => {
       expect(parsingAlias).toBe("0__performance_total_cost__avg");
 
       // The SQL should contain the alias (possibly quoted with backticks)
-      const aliasInSql = result.sql.includes(parsingAlias) ||
-                        result.sql.includes(`\`${parsingAlias}\``);
+      const aliasInSql =
+        result.sql.includes(parsingAlias) ||
+        result.sql.includes(`\`${parsingAlias}\``);
       expect(aliasInSql).toBe(true);
     });
 
     // Test with multiple series to verify indices are correct
     it("uses correct indices for multiple metrics", () => {
       const series = [
-        { metric: "metadata.trace_id" as FlattenAnalyticsMetricsEnum, aggregation: "cardinality" as const },
-        { metric: "performance.total_cost" as FlattenAnalyticsMetricsEnum, aggregation: "avg" as const },
-        { metric: "performance.completion_time" as FlattenAnalyticsMetricsEnum, aggregation: "p90" as const },
+        {
+          metric: "metadata.trace_id" as FlattenAnalyticsMetricsEnum,
+          aggregation: "cardinality" as const,
+        },
+        {
+          metric: "performance.total_cost" as FlattenAnalyticsMetricsEnum,
+          aggregation: "avg" as const,
+        },
+        {
+          metric: "performance.completion_time" as FlattenAnalyticsMetricsEnum,
+          aggregation: "p90" as const,
+        },
       ];
 
       const input = {
@@ -71,7 +91,8 @@ describe("result-parsing", () => {
       ];
 
       for (const alias of expectedAliases) {
-        const found = result.sql.includes(alias) || result.sql.includes(`\`${alias}\``);
+        const found =
+          result.sql.includes(alias) || result.sql.includes(`\`${alias}\``);
         expect(found).toBe(true);
       }
     });
@@ -80,14 +101,18 @@ describe("result-parsing", () => {
   describe("UserThreads-like query", () => {
     it("generates correct aliases for all 4 UserThreads metrics", () => {
       const userThreadsSeries: SeriesInputType[] = [
-        { metric: "metadata.thread_id" as FlattenAnalyticsMetricsEnum, aggregation: "cardinality" },
+        {
+          metric: "metadata.thread_id" as FlattenAnalyticsMetricsEnum,
+          aggregation: "cardinality",
+        },
         {
           metric: "metadata.thread_id" as FlattenAnalyticsMetricsEnum,
           aggregation: "cardinality",
           pipeline: { field: "user_id" as const, aggregation: "avg" as const },
         },
         {
-          metric: "threads.average_duration_per_thread" as FlattenAnalyticsMetricsEnum,
+          metric:
+            "threads.average_duration_per_thread" as FlattenAnalyticsMetricsEnum,
           aggregation: "avg",
           pipeline: { field: "user_id" as const, aggregation: "avg" as const },
         },
@@ -132,10 +157,22 @@ describe("result-parsing", () => {
   describe("LLMSummary-like query", () => {
     it("generates correct aliases for all LLMSummary metrics", () => {
       const llmSummarySeries: SeriesInputType[] = [
-        { metric: "performance.total_tokens" as FlattenAnalyticsMetricsEnum, aggregation: "avg" },
-        { metric: "performance.total_cost" as FlattenAnalyticsMetricsEnum, aggregation: "avg" },
-        { metric: "performance.first_token" as FlattenAnalyticsMetricsEnum, aggregation: "p90" },
-        { metric: "performance.completion_time" as FlattenAnalyticsMetricsEnum, aggregation: "p90" },
+        {
+          metric: "performance.total_tokens" as FlattenAnalyticsMetricsEnum,
+          aggregation: "avg",
+        },
+        {
+          metric: "performance.total_cost" as FlattenAnalyticsMetricsEnum,
+          aggregation: "avg",
+        },
+        {
+          metric: "performance.first_token" as FlattenAnalyticsMetricsEnum,
+          aggregation: "p90",
+        },
+        {
+          metric: "performance.completion_time" as FlattenAnalyticsMetricsEnum,
+          aggregation: "p90",
+        },
       ];
 
       const input = {
@@ -193,14 +230,18 @@ describe("result-parsing", () => {
       ];
 
       const series: SeriesInputType[] = [
-        { metric: "metadata.thread_id" as FlattenAnalyticsMetricsEnum, aggregation: "cardinality" },
+        {
+          metric: "metadata.thread_id" as FlattenAnalyticsMetricsEnum,
+          aggregation: "cardinality",
+        },
         {
           metric: "metadata.thread_id" as FlattenAnalyticsMetricsEnum,
           aggregation: "cardinality",
           pipeline: { field: "user_id" as const, aggregation: "avg" as const },
         },
         {
-          metric: "threads.average_duration_per_thread" as FlattenAnalyticsMetricsEnum,
+          metric:
+            "threads.average_duration_per_thread" as FlattenAnalyticsMetricsEnum,
           aggregation: "avg",
           pipeline: { field: "user_id" as const, aggregation: "avg" as const },
         },
@@ -241,12 +282,16 @@ describe("result-parsing", () => {
       // Verify all values were correctly parsed
       expect(results.current!["0__metadata_thread_id__cardinality"]).toBe(150);
       expect(results.current!["1__metadata_thread_id__cardinality"]).toBe(3.5);
-      expect(results.current!["2__threads_average_duration_per_thread__avg"]).toBe(8280000);
+      expect(
+        results.current!["2__threads_average_duration_per_thread__avg"],
+      ).toBe(8280000);
       expect(results.current!["3__metadata_trace_id__cardinality"]).toBe(25.5);
 
       expect(results.previous!["0__metadata_thread_id__cardinality"]).toBe(120);
       expect(results.previous!["1__metadata_thread_id__cardinality"]).toBe(3.2);
-      expect(results.previous!["2__threads_average_duration_per_thread__avg"]).toBe(7200000);
+      expect(
+        results.previous!["2__threads_average_duration_per_thread__avg"],
+      ).toBe(7200000);
       expect(results.previous!["3__metadata_trace_id__cardinality"]).toBe(22.0);
     });
   });
@@ -407,9 +452,13 @@ describe("result-parsing", () => {
       ] as Record<string, Record<string, number>>;
 
       // cat_a gets its value under the series name key
-      expect(currentGroupData["cat_a"]!["0/metadata.trace_id/cardinality"]).toBe(150);
+      expect(
+        currentGroupData["cat_a"]!["0/metadata.trace_id/cardinality"],
+      ).toBe(150);
       // cat_b gets its value under the series name key
-      expect(currentGroupData["cat_b"]!["0/metadata.trace_id/cardinality"]).toBe(160);
+      expect(
+        currentGroupData["cat_b"]!["0/metadata.trace_id/cardinality"],
+      ).toBe(160);
 
       // Verify nested structure exists for previous period
       expect(previousPeriod).toHaveLength(1);
@@ -418,8 +467,12 @@ describe("result-parsing", () => {
         "evaluations.evaluation_label"
       ] as Record<string, Record<string, number>>;
 
-      expect(previousGroupData["cat_a"]!["0/metadata.trace_id/cardinality"]).toBe(100);
-      expect(previousGroupData["cat_b"]!["0/metadata.trace_id/cardinality"]).toBe(110);
+      expect(
+        previousGroupData["cat_a"]!["0/metadata.trace_id/cardinality"],
+      ).toBe(100);
+      expect(
+        previousGroupData["cat_b"]!["0/metadata.trace_id/cardinality"],
+      ).toBe(110);
     });
 
     it("produces flat structure when no groupBy for summary rows", () => {
@@ -486,9 +539,10 @@ describe("result-parsing", () => {
       );
 
       expect(currentPeriod).toHaveLength(1);
-      const groupData = currentPeriod[0]![
-        "metadata.user_id"
-      ] as Record<string, Record<string, number>>;
+      const groupData = currentPeriod[0]!["metadata.user_id"] as Record<
+        string,
+        Record<string, number>
+      >;
 
       // Each group key gets its own metric value under the pipeline series name
       expect(
@@ -534,95 +588,9 @@ describe("result-parsing", () => {
       // Empty string group_key is treated as a valid key (String("") === "")
       expect(groupData[""]!["0/metadata.trace_id/cardinality"]).toBe(42);
       // Non-empty key is also preserved
-      expect(groupData["known_label"]!["0/metadata.trace_id/cardinality"]).toBe(88);
-    });
-  });
-
-  describe("metric key normalization", () => {
-    /**
-     * This test verifies the fix for % change indicators not showing.
-     * When ClickHouse returns NULL for pipeline metrics in the previous period
-     * (e.g., due to empty subquery results), the normalization ensures
-     * all metrics have default values of 0 in both periods.
-     */
-    it("normalizes missing metrics to 0 so frontend can calculate % change", () => {
-      // Simulate ClickHouse response where pipeline metrics return NULL for previous period
-      // (this happens when subquery returns no data for that period)
-      const simulatedChResponseWithNulls = [
-        {
-          period: "current",
-          "0__metadata_thread_id__cardinality": 150, // simple metric - always present
-          "1__metadata_thread_id__cardinality": 3.5, // pipeline metric
-          "2__threads_average_duration_per_thread__avg": 8280000, // pipeline metric
-          "3__metadata_trace_id__cardinality": 25.5, // pipeline metric
-        },
-        {
-          period: "previous",
-          "0__metadata_thread_id__cardinality": 120, // simple metric - always present
-          // Pipeline metrics are NULL - simulated by not including them
-          // (ClickHouse returns null, which skips the key in parsing)
-        },
-      ];
-
-      // Simulate parsing with normalization (as the service does)
-      type Bucket = { date: string; [key: string]: number | string };
-      const currentPeriod: Bucket[] = [];
-      const previousPeriod: Bucket[] = [];
-
-      for (const row of simulatedChResponseWithNulls) {
-        const period = row.period as "current" | "previous";
-        const bucket: Bucket = { date: "full" };
-
-        for (const [key, value] of Object.entries(row)) {
-          if (key === "period") continue;
-          if (value !== undefined && value !== null) {
-            bucket[key] = Number(value);
-          }
-        }
-
-        if (period === "current") {
-          currentPeriod.push(bucket);
-        } else {
-          previousPeriod.push(bucket);
-        }
-      }
-
-      // Before normalization: previousPeriod is missing pipeline metrics
-      expect(previousPeriod[0]!["1__metadata_thread_id__cardinality"]).toBeUndefined();
-      expect(previousPeriod[0]!["2__threads_average_duration_per_thread__avg"]).toBeUndefined();
-      expect(previousPeriod[0]!["3__metadata_trace_id__cardinality"]).toBeUndefined();
-
-      // Apply normalization (same logic as ClickHouseAnalyticsService.normalizeMetricKeys)
-      const allMetricKeys = new Set<string>();
-      for (const bucket of [...previousPeriod, ...currentPeriod]) {
-        for (const key of Object.keys(bucket)) {
-          if (key === "date") continue;
-          allMetricKeys.add(key);
-        }
-      }
-      for (const bucket of [...previousPeriod, ...currentPeriod]) {
-        for (const key of allMetricKeys) {
-          if (bucket[key] === undefined) {
-            bucket[key] = 0;
-          }
-        }
-      }
-
-      // After normalization: all metrics present with 0 defaults
-      expect(previousPeriod[0]!["0__metadata_thread_id__cardinality"]).toBe(120);
-      expect(previousPeriod[0]!["1__metadata_thread_id__cardinality"]).toBe(0);
-      expect(previousPeriod[0]!["2__threads_average_duration_per_thread__avg"]).toBe(0);
-      expect(previousPeriod[0]!["3__metadata_trace_id__cardinality"]).toBe(0);
-
-      // Current period should be unchanged
-      expect(currentPeriod[0]!["0__metadata_thread_id__cardinality"]).toBe(150);
-      expect(currentPeriod[0]!["1__metadata_thread_id__cardinality"]).toBe(3.5);
-      expect(currentPeriod[0]!["2__threads_average_duration_per_thread__avg"]).toBe(8280000);
-      expect(currentPeriod[0]!["3__metadata_trace_id__cardinality"]).toBe(25.5);
-
-      // Now frontend can calculate % change for all metrics
-      // e.g., for metric 1: (3.5 - 0) / 0 = Infinity or displayed as "New"
-      // This is better than not showing any % change indicator
+      expect(groupData["known_label"]!["0/metadata.trace_id/cardinality"]).toBe(
+        88,
+      );
     });
   });
 });

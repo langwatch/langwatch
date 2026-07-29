@@ -1,7 +1,16 @@
-import { describe, expect, it } from "vitest";
+import { hash } from "bcrypt";
+import { describe, expect, it, vi } from "vitest";
+
+// Must be mocked before importing ../index — both create persistent handles
+// (Redis socket, Prisma connection pool) that prevent Vite from closing after
+// tests pass, causing shard 2 to hang until GitHub Actions cancels it.
+// Established pattern: see fallbackName.test.ts line 17-18.
+vi.mock("~/server/db", () => ({ prisma: {} }));
+vi.mock("~/server/redis", () => ({ connection: undefined }));
 
 describe("better-auth config", () => {
   describe("when imported", () => {
+    /** @scenario BetterAuth is the live handler */
     it("exports an auth instance without throwing", async () => {
       const module = await import("../index");
       expect(module.auth).toBeDefined();
@@ -44,6 +53,23 @@ describe("better-auth config", () => {
     });
 
     /** @scenario Credentials-only on-prem mode */
+    /** @scenario The BetterAuth admin plugin is intentionally omitted */
+    // Verifies that impersonation stays in Session.impersonating, not the admin() plugin.
+    it("does not register the BetterAuth admin plugin", async () => {
+      const { auth } = await import("../index");
+      const options = (auth as any).options;
+      const pluginIds = (options?.plugins ?? []).map(
+        (p: { id?: string }) => p?.id,
+      );
+      expect(pluginIds).not.toContain("admin");
+      // Only genericOAuth (or empty) is acceptable — impersonation is handled
+      // via the legacy Session.impersonating JSON column, not via the
+      // admin() plugin.
+      for (const id of pluginIds) {
+        expect(id).toBe("generic-oauth");
+      }
+    });
+
     it("gates emailAndPassword.enabled on NEXTAUTH_PROVIDER=email", async () => {
       // Regression for iter-20 bug 16: BetterAuth's email/password routes
       // (`/sign-up/email`, `/sign-in/email`) were unconditionally enabled,
@@ -55,6 +81,118 @@ describe("better-auth config", () => {
       const { env } = await import("~/env.mjs");
       const expected = env.NEXTAUTH_PROVIDER === "email";
       expect(options?.emailAndPassword?.enabled).toBe(expected);
+    });
+
+    /** @scenario DIFFERENT_EMAIL_NOT_ALLOWED guard */
+    it("does not allow account linking with a different email (DIFFERENT_EMAIL_NOT_ALLOWED guard)", async () => {
+      // BetterAuth's `allowDifferentEmails` defaults to false. Not setting it
+      // means: if an OAuth callback returns a profile whose email differs from
+      // the currently-signed-in user's email, BetterAuth fires
+      // LINKING_DIFFERENT_EMAILS_NOT_ALLOWED (surfaced in /auth/error as
+      // DIFFERENT_EMAIL_NOT_ALLOWED). The config guard is the single line
+      // that enforces this — it must not be changed to `true`.
+      const { auth } = await import("../index");
+      const options = (auth as any).options;
+      expect(
+        options?.account?.accountLinking?.allowDifferentEmails,
+      ).toBeFalsy();
+    });
+
+    /** @scenario Legacy bcrypt hashes still verify */
+    it("verifies a bcrypt hash from the legacy NextAuth system via the credentials verify function", async () => {
+      // `emailAndPassword.password.verify` is wired to `compare(password, storedHash)`
+      // from the bcrypt package. This locks the wiring in: a maintainer removing
+      // or replacing the verify function would need to update this test.
+      const { auth } = await import("../index");
+      const options = (auth as any).options;
+      const verifyFn = options?.emailAndPassword?.password?.verify as
+        | ((args: { password: string; hash: string }) => Promise<boolean>)
+        | undefined;
+      expect(verifyFn).toBeDefined();
+      const legacyHash = await hash("hunter2", 10);
+      expect(await verifyFn!({ password: "hunter2", hash: legacyHash })).toBe(
+        true,
+      );
+    });
+
+    /** @scenario Wrong password is rejected */
+    it("rejects a wrong password via the credentials verify function", async () => {
+      const { auth } = await import("../index");
+      const options = (auth as any).options;
+      const verifyFn = options?.emailAndPassword?.password?.verify as
+        | ((args: { password: string; hash: string }) => Promise<boolean>)
+        | undefined;
+      const legacyHash = await hash("hunter2", 10);
+      expect(
+        await verifyFn!({ password: "wrong-password", hash: legacyHash }),
+      ).toBe(false);
+    });
+  });
+
+  describe("when NEXTAUTH_PROVIDER selects auth0", () => {
+    /** @scenario Auth0 enterprise mode */
+    it("lists an auth0 provider and disables email/password (SSO-only)", async () => {
+      // The env-driven provider selection lives in pure builders so we can
+      // exercise auth0 mode without re-initializing the module under a
+      // different NEXTAUTH_PROVIDER (which would need vi.resetModules()).
+      const { buildGenericOAuthConfigs, isEmailPasswordEnabled } = await import(
+        "../index"
+      );
+      const e = {
+        NEXTAUTH_PROVIDER: "auth0",
+        AUTH0_CLIENT_ID: "auth0-client-id",
+        AUTH0_CLIENT_SECRET: "auth0-client-secret",
+        AUTH0_ISSUER: "tenant.us.auth0.com",
+        OKTA_CLIENT_ID: undefined,
+        OKTA_CLIENT_SECRET: undefined,
+        OKTA_ISSUER: undefined,
+        NEXTAUTH_URL: "http://localhost:3000",
+      };
+      const configs = buildGenericOAuthConfigs(e);
+      const providerIds = configs.map(
+        (c) => (c as { providerId?: string }).providerId,
+      );
+      expect(providerIds).toContain("auth0");
+      // Lock the OAuth `redirect_uri` to the legacy NextAuth callback path.
+      // Auth0 only has this path registered as an allowed callback; sending a
+      // different `redirect_uri` (e.g. BetterAuth's default
+      // `/api/auth/oauth2/callback/auth0`) makes Auth0 reject the
+      // authorization request — a customer-breaking regression.
+      const auth0Config = configs.find(
+        (c) => (c as { providerId?: string }).providerId === "auth0",
+      ) as { redirectURI?: string } | undefined;
+      expect(auth0Config?.redirectURI).toBe(
+        "http://localhost:3000/api/auth/callback/auth0",
+      );
+      // SSO-only enforcement: no email/password bypass of the IdP in auth0 mode.
+      expect(isEmailPasswordEnabled(e)).toBe(false);
+    });
+  });
+
+  describe("when NEXTAUTH_PROVIDER selects google", () => {
+    /** @scenario Google mode */
+    it("includes google in the socialProviders map", async () => {
+      const { buildSocialProviders } = await import("../index");
+      const socialProviders = buildSocialProviders({
+        NEXTAUTH_PROVIDER: "google",
+        GOOGLE_CLIENT_ID: "google-client-id",
+        GOOGLE_CLIENT_SECRET: "google-client-secret",
+        GITHUB_CLIENT_ID: undefined,
+        GITHUB_CLIENT_SECRET: undefined,
+        GITLAB_CLIENT_ID: undefined,
+        GITLAB_CLIENT_SECRET: undefined,
+        AZURE_AD_CLIENT_ID: undefined,
+        AZURE_AD_CLIENT_SECRET: undefined,
+        AZURE_AD_TENANT_ID: undefined,
+      });
+      expect(socialProviders.google).toBeDefined();
+      // Credentials must be threaded through from env, not just present.
+      const google = socialProviders.google as {
+        clientId?: string;
+        clientSecret?: string;
+      };
+      expect(google.clientId).toBe("google-client-id");
+      expect(google.clientSecret).toBe("google-client-secret");
     });
   });
 });

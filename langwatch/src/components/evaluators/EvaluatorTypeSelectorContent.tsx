@@ -32,7 +32,6 @@ const evaluatorCategoryMap: Record<
   "langevals/llm_boolean": "llm_judge",
   "langevals/llm_score": "llm_judge",
   "langevals/llm_category": "llm_judge",
-  "langevals/pairwise_compare": "llm_judge",
 
   // RAG
   "ragas/faithfulness": "rag",
@@ -65,6 +64,18 @@ const evaluatorCategoryMap: Record<
   // Ignored — custom templates, legacy, or internal
   "langevals/basic": "ignored",
   "langevals/similarity": "ignored",
+  // Superseded by select_best_compare ("Comparison"), which handles two
+  // candidates as well as N. Kept resolvable so experiments and monitors
+  // created before the merge keep running; never offered for a new evaluator.
+  "langevals/pairwise_compare": "ignored",
+  // Comparison is configured against the workbench's target columns — its
+  // `variants` are target ids and its `goldenField` a dataset column, both
+  // local to one experiment. Created from this catalog there is nothing to
+  // bind them to, so the drawer renders name + model + prompt and no way to
+  // say WHAT is being compared. It has its own entry point that opens the
+  // full form: the Comparison card in TargetTypeSelectorDrawer. Kept
+  // resolvable here so saved comparisons still load and re-run.
+  "langevals/select_best_compare": "ignored",
   "legacy/ragas_answer_correctness": "ignored",
   "legacy/ragas_answer_relevancy": "ignored",
   "legacy/ragas_context_precision": "ignored",

@@ -76,6 +76,19 @@ const SCAN_ALLOWLIST: ReadonlyArray<RegExp> = [
   // that documents the BinaryPart shape — it is not a GC or retention
   // reference. Audited: no delete/update/truncate on stored_objects.
   /^src\/server\/tracer\/types\.ts$/,
+  // evaluation-inputs-offload.ts stores and resolves oversized evaluator
+  // inputs through StoredObjectsService (ADR-040). Audited: write + read
+  // only; deletion happens solely via the existing project-delete cascade.
+  // Known gap (accepted in ADR-040, follow-up noted there): an offloaded
+  // evaluation-input object outlives its evaluation row's retention TTL - the
+  // row is GC'd on the normal data-retention schedule, but its stored object is
+  // only reclaimed by the project-delete cascade, so it can linger past the
+  // row. This is a deliberate trade-off (no per-object retention job yet), not a
+  // retention/GC/orphan-reaper that this test forbids.
+  /^src\/server\/app-layer\/evaluations\/evaluation-inputs-offload\.ts$/,
+  // clickhouse/metrics.ts lists stored_objects in MONITORED_TABLES for the
+  // ops size gauges. Audited: read-only system.parts aggregation.
+  /^src\/server\/clickhouse\/metrics\.ts$/,
 ];
 
 function isAllowlisted(rel: string): boolean {

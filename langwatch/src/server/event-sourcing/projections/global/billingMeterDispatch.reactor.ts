@@ -1,11 +1,11 @@
-import { createLogger } from "~/utils/logger/server";
+import { createLogger } from "@langwatch/observability";
 import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
 import {
   getBillingMonth,
   getPreviousBillingMonth,
 } from "../../../../../ee/billing/services/billableEventsQuery";
-import type { ReportUsageForMonthCommandData } from "../../pipelines/billing-reporting/schemas/commands";
 import type { Event } from "../../domain/types";
+import type { ReportUsageForMonthCommandData } from "../../pipelines/billing-reporting/schemas/commands";
 import type { ReactorDefinition } from "../../reactors/reactor.types";
 
 const logger = createLogger("langwatch:billing:meterDispatch");

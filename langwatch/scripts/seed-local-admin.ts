@@ -124,9 +124,6 @@ async function main() {
         firstMessage: false,
         integrated: false,
         userLinkTemplate: null,
-        piiRedactionLevel: "ESSENTIAL",
-        capturedInputVisibility: "VISIBLE_TO_ALL",
-        capturedOutputVisibility: "VISIBLE_TO_ALL",
       },
     });
     console.log(`Created project ${project.id} (${project.slug})`);

@@ -809,10 +809,11 @@ export class ModelProviderService {
     // Walk the multi-scope access relation: every MP whose scope set
     // intersects the project's (projectId, teamId, organizationId) is
     // returned. When the same provider string appears multiple times
-    // (e.g. an ORG row and a PROJECT override), narrower-scope wins for
-    // the legacy `Record<provider, …>` shape we still return here —
-    // new consumers that need the full list should call
-    // `listAccessibleForProject` directly on the service.
+    // (e.g. an ORG row and a PROJECT override), an enabled row beats a
+    // disabled one, then narrower-scope wins for the legacy
+    // `Record<provider, …>` shape we still return here — new consumers
+    // that need the full list should call
+    // `listProjectModelProvidersForFrontend` directly on the service.
     const savedProviders =
       await this.repository.findAllAccessibleForProject(projectId);
 
@@ -859,9 +860,10 @@ export class ModelProviderService {
             scopeId: narrowestScope.scopeId,
           };
 
-          // Narrower-scope wins when the same provider string has
-          // multiple accessible rows (preserves iter 107/108 semantics
-          // for the Record<provider, …> consumers).
+          // Collapse rules when the same provider string has multiple
+          // accessible rows: an enabled row beats a disabled one, then
+          // narrower scope wins (preserves iter 107/108 semantics for
+          // the Record<provider, …> consumers).
           const existing = acc[mp.provider];
           if (!existing || this.isNarrower(provider_, existing)) {
             return { ...acc, [mp.provider]: provider_ };
@@ -902,6 +904,15 @@ export class ModelProviderService {
     a: MaybeStoredModelProvider,
     b: MaybeStoredModelProvider,
   ): boolean {
+    // Prefer an enabled row over a disabled one, regardless of scope.
+    // A disabled narrower-scope row must not mask an enabled wider-scope
+    // one — otherwise `hasEnabledProviders` on the frontend gates off
+    // Ask AI even though an enabled row exists at a wider scope (#5575).
+    if (a.enabled !== b.enabled) {
+      return a.enabled;
+    }
+    // Same enabled state: narrower scope wins (preserves iter 107/108
+    // semantics for the Record<provider, …> consumers).
     return this.scopePriority(a.scopeType) > this.scopePriority(b.scopeType);
   }
 

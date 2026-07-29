@@ -20,8 +20,11 @@ export interface TestFireAttempt {
   errorDetail?: string;
 }
 
-/** Which secondary drawer is currently open on top of the main view. */
-export type Section = null | "filters" | "configuration" | "cadence";
+/** Which secondary drawer is currently open on top of the main view.
+ *  Subject, Type, Cadence, and Severity are inlined on the main pane now
+ *  (ADR-043); only Delivery's guided template authoring still opens a
+ *  secondary, keyed `"configuration"`. */
+export type Section = null | "configuration";
 
 export interface AutomationStore {
   /** Pure-state portion. The whole drawer is a view onto this. */

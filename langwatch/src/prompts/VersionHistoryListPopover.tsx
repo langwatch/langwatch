@@ -12,6 +12,7 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
+import { createLogger } from "@langwatch/observability";
 import { useCallback, useEffect } from "react";
 import { LuChevronRight } from "react-icons/lu";
 import { HistoryIcon } from "~/components/icons/History";
@@ -21,7 +22,6 @@ import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { VersionedPrompt } from "~/server/prompt-config";
 import { api } from "~/utils/api";
-import { createLogger } from "~/utils/logger";
 
 const logger = createLogger("VersionHistoryListPopover");
 

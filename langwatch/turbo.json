@@ -28,6 +28,19 @@
       "outputs": [],
       "cache": true
     },
+    "typecheck:tests": {
+      "dependsOn": ["^build"],
+      "inputs": [
+        "src/**",
+        "ee/**",
+        "e2e/**",
+        "scripts/**",
+        "tsconfig.tsgo.json",
+        "tsconfig.tsgo.tests.json"
+      ],
+      "outputs": [],
+      "cache": true
+    },
     "test:unit": {
       "dependsOn": [],
       "inputs": [

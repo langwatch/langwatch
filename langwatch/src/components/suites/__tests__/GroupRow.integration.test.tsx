@@ -14,6 +14,10 @@ import { GroupRow } from "../GroupRow";
 import { makeScenarioRunData, makeSummary } from "./test-helpers";
 import type { RunGroup } from "../run-history-transforms";
 
+vi.mock("../usePrefetchRunState", () => ({
+  usePrefetchRunState: () => vi.fn(),
+}));
+
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );

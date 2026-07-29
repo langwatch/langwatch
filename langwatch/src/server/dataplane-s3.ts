@@ -10,8 +10,9 @@
  * When no private config exists for an organization, callers fall back to the
  * shared S3 env vars (S3_ENDPOINT, S3_BUCKET_NAME, etc.).
  */
+
+import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
-import { createLogger } from "~/utils/logger/server";
 import { prisma } from "./db";
 
 const logger = createLogger("langwatch:dataplane:s3");

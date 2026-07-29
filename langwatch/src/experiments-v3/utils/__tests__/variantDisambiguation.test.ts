@@ -1,43 +1,47 @@
 import { describe, expect, it } from "vitest";
-import { disambiguateVariantNames } from "../variantDisambiguation";
+import { disambiguateNames } from "../variantDisambiguation";
 
-describe("disambiguateVariantNames", () => {
-  describe("given variant names differ", () => {
+describe("disambiguateNames", () => {
+  describe("given every name differs", () => {
     it("returns the names unchanged", () => {
-      const result = disambiguateVariantNames({
-        variantAName: "Variant A",
-        variantBName: "Variant B",
-      });
-
-      expect(result).toEqual({
-        variantAName: "Variant A",
-        variantBName: "Variant B",
-      });
+      expect(disambiguateNames(["Variant A", "Variant B"])).toEqual([
+        "Variant A",
+        "Variant B",
+      ]);
     });
   });
 
-  describe("given variant names are empty", () => {
-    it("returns both empty without appending a suffix", () => {
-      const result = disambiguateVariantNames({
-        variantAName: "",
-        variantBName: "",
-      });
-
-      expect(result).toEqual({ variantAName: "", variantBName: "" });
+  describe("given names are empty", () => {
+    it("returns them empty without appending a suffix", () => {
+      expect(disambiguateNames(["", ""])).toEqual(["", ""]);
     });
   });
 
-  describe("given variant names collide", () => {
+  describe("given two names collide", () => {
     it("falls back to sequential numbering", () => {
-      const result = disambiguateVariantNames({
-        variantAName: "AI search system",
-        variantBName: "AI search system",
-      });
+      expect(
+        disambiguateNames(["AI search system", "AI search system"]),
+      ).toEqual(["AI search system (1)", "AI search system (2)"]);
+    });
+  });
 
-      expect(result).toEqual({
-        variantAName: "AI search system (1)",
-        variantBName: "AI search system (2)",
-      });
+  describe("given three names collide", () => {
+    it("numbers all three in variant order", () => {
+      expect(disambiguateNames(["bot", "bot", "bot"])).toEqual([
+        "bot (1)",
+        "bot (2)",
+        "bot (3)",
+      ]);
+    });
+  });
+
+  describe("given only some names collide", () => {
+    it("numbers the colliding names and leaves the unique one alone", () => {
+      expect(disambiguateNames(["bot", "helper", "bot"])).toEqual([
+        "bot (1)",
+        "helper",
+        "bot (2)",
+      ]);
     });
   });
 });

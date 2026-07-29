@@ -12,11 +12,14 @@ import {
   createGovernanceOcsfEventsSyncReactor,
   type GovernanceOcsfEventsSyncReactorDeps,
 } from "@ee/governance/reactors/governanceOcsfEventsSync.reactor";
+import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
 import type { Cluster, Redis } from "ioredis";
 import { createOrUpdateQueueItems } from "~/server/api/routers/annotation";
 import { createManyDatasetRecords } from "~/server/api/routers/datasetRecord.utils";
 import { getProtectionsForProject } from "~/server/api/utils";
+import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
+import { resolveClaudeTurnLogCap } from "~/server/app-layer/traces/claude-code-log-to-span";
 import { DatasetRepository } from "~/server/datasets/dataset.repository";
 import {
   createDatasetNormalizeHandler,
@@ -24,8 +27,9 @@ import {
 } from "~/server/datasets/dataset-normalize.job";
 import { registerDatasetNormalizeEnqueue } from "~/server/datasets/dataset-normalize.queue";
 import { getDatasetStorage } from "~/server/datasets/dataset-storage";
+import { featureFlagService } from "~/server/featureFlag";
+import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
 import { TraceService } from "~/server/traces/trace.service";
-import { createLogger } from "~/utils/logger/server";
 import { queryBillableEventsTotal } from "../../../ee/billing/services/billableEventsQuery";
 import type { UsageReportingService } from "../../../ee/billing/services/usageReportingService";
 import type { BillingCheckpointService } from "../app-layer/billing/billingCheckpoint.service";
@@ -33,12 +37,17 @@ import type { BroadcastService } from "../app-layer/broadcast/broadcast.service"
 import { getAzureSafetyEnvFromProject } from "../app-layer/evaluations/azure-safety-env.server";
 import type { EvaluationCostRecorder } from "../app-layer/evaluations/evaluation-cost.recorder";
 import type { EvaluationExecutionService } from "../app-layer/evaluations/evaluation-execution.service";
+import { offloadInputsIfOversized } from "../app-layer/evaluations/evaluation-inputs-offload";
 import type { EvaluationRunService } from "../app-layer/evaluations/evaluation-run.service";
+import type { EvaluationAnalyticsRepository } from "../app-layer/evaluations/repositories/evaluation-analytics.repository";
+import type { EvaluationAnalyticsRollupRepository } from "../app-layer/evaluations/repositories/evaluation-analytics-rollup.repository";
 import type { MonitorService } from "../app-layer/monitors/monitor.service";
 import type { OrganizationService } from "../app-layer/organizations/organization.service";
 import type { ProjectService } from "../app-layer/projects/project.service";
 import type { LogRecordStorageRepository } from "../app-layer/traces/repositories/log-record-storage.repository";
 import type { MetricRecordStorageRepository } from "../app-layer/traces/repositories/metric-record-storage.repository";
+import type { TraceAnalyticsRepository } from "../app-layer/traces/repositories/trace-analytics.repository";
+import type { TraceAnalyticsRollupRepository } from "../app-layer/traces/repositories/trace-analytics-rollup.repository";
 import type { TraceSummaryRepository } from "../app-layer/traces/repositories/trace-summary.repository";
 import type { SpanStorageService } from "../app-layer/traces/span-storage.service";
 import { TraceReadDerivationService } from "../app-layer/traces/trace-read-derivation.service";
@@ -58,9 +67,13 @@ import {
 } from "./pipelines/billing-reporting/pipeline";
 import { ExecuteEvaluationCommand } from "./pipelines/evaluation-processing/commands/executeEvaluation.command";
 import { createEvaluationProcessingPipeline } from "./pipelines/evaluation-processing/pipeline";
+import type { EvaluationAnalyticsData } from "./pipelines/evaluation-processing/projections/evaluationAnalytics.foldProjection";
+import { EvaluationAnalyticsStore } from "./pipelines/evaluation-processing/projections/evaluationAnalytics.store";
+import { EvaluationAnalyticsRollupAppendStore } from "./pipelines/evaluation-processing/projections/evaluationAnalyticsRollup.store";
 import { EvaluationRunStore } from "./pipelines/evaluation-processing/projections/evaluationRun.store";
 import { createEvaluationAlertTriggerReactor } from "./pipelines/evaluation-processing/reactors/evaluationAlertTrigger.reactor";
 import { createEvaluationAlertTriggerNotifyOutboxReactor } from "./pipelines/evaluation-processing/reactors/evaluationAlertTriggerNotifyOutbox.reactor";
+import { createEvaluationGraphTriggerEvaluationOutboxReactor } from "./pipelines/evaluation-processing/reactors/graphTriggerEvaluation.outboxReactor";
 import { createExperimentRunProcessingPipeline } from "./pipelines/experiment-run-processing/pipeline";
 import type { ClickHouseExperimentRunResultRecord } from "./pipelines/experiment-run-processing/projections/experimentRunResultStorage.mapProjection";
 import { createExperimentRunItemAppendStore } from "./pipelines/experiment-run-processing/projections/experimentRunResultStorage.store";
@@ -88,17 +101,22 @@ import { createSuiteRunProcessingPipeline } from "./pipelines/suite-run-processi
 import type { SuiteRunStateData } from "./pipelines/suite-run-processing/projections/suiteRunState.foldProjection";
 import type { SuiteRunStateRepository } from "./pipelines/suite-run-processing/repositories/suiteRunState.repository";
 import { SUITE_RUN_PROJECTION_VERSIONS } from "./pipelines/suite-run-processing/schemas/constants";
+import { resolveLogCommandShardCount } from "./pipelines/trace-processing/commands/logCommandGroupKey";
 import { resolveSpanCommandShardCount } from "./pipelines/trace-processing/commands/spanCommandGroupKey";
 import { createTraceProcessingPipeline } from "./pipelines/trace-processing/pipeline";
 import { LogRecordAppendStore } from "./pipelines/trace-processing/projections/logRecordStorage.store";
 import { MetricRecordAppendStore } from "./pipelines/trace-processing/projections/metricRecordStorage.store";
 import type { DerivedTraceEvent } from "./pipelines/trace-processing/projections/services/trace-events.derivation";
 import { SpanAppendStore } from "./pipelines/trace-processing/projections/spanStorage.store";
+import type { TraceAnalyticsData } from "./pipelines/trace-processing/projections/traceAnalytics.foldProjection";
+import { TraceAnalyticsStore } from "./pipelines/trace-processing/projections/traceAnalytics.store";
+import { TraceAnalyticsRollupAppendStore } from "./pipelines/trace-processing/projections/traceAnalyticsRollup.store";
 import { TraceSummaryStore } from "./pipelines/trace-processing/projections/traceSummary.store";
 import { createClaudeCodeSpanSyncReactor } from "./pipelines/trace-processing/reactors/claudeCodeSpanSync.reactor";
 import { createCustomEvaluationSyncReactor } from "./pipelines/trace-processing/reactors/customEvaluationSync.reactor";
 import { createEvaluationTriggerReactor } from "./pipelines/trace-processing/reactors/evaluationTrigger.reactor";
 import { createExperimentMetricsSyncReactor } from "./pipelines/trace-processing/reactors/experimentMetricsSync.reactor";
+import { createGraphTriggerEvaluationOutboxReactor } from "./pipelines/trace-processing/reactors/graphTriggerEvaluation.outboxReactor";
 import {
   createDeferredOriginHandler,
   createOriginGateReactor,
@@ -180,6 +198,14 @@ export interface PipelineRepositories {
   traceSummaryFold: TraceSummaryRepository;
   logRecordStorage: LogRecordStorageRepository;
   metricRecordStorage: MetricRecordStorageRepository;
+  /** ADR-034 Phase 1: per-span rollup repository (app-side, replaces the MV). */
+  traceAnalyticsRollup: TraceAnalyticsRollupRepository;
+  /** ADR-034 Phase 2: slim per-trace analytics repository (dual-tap). */
+  traceAnalytics: TraceAnalyticsRepository;
+  /** ADR-034 Phase 6: per-evaluation rollup repository. */
+  evaluationAnalyticsRollup: EvaluationAnalyticsRollupRepository;
+  /** ADR-034 Phase 6: slim per-evaluation analytics repository. */
+  evaluationAnalytics: EvaluationAnalyticsRepository;
   experimentRunItemStorage: AppendStore<ClickHouseExperimentRunResultRecord>;
 }
 
@@ -211,7 +237,7 @@ export interface PipelineRegistryDeps {
    * so oversized commands (> 256 KB) are fetched from S3 and the spool is
    * best-effort DELETEd after event_log INSERT succeeds.
    */
-  blobStore?: import("~/server/app-layer/traces/blob-store.service").BlobStore;
+  blobStore?: BlobStore;
   governanceKpisSync?: GovernanceKpisSyncReactorDeps;
   governanceOcsfEventsSync?: GovernanceOcsfEventsSyncReactorDeps;
   retentionPolicyResolver?: RetentionPolicyResolver;
@@ -238,10 +264,10 @@ export class PipelineRegistry {
 
   registerAll() {
     // TODO: Customer.io reactors are implemented but not yet registered.
-    // Counting strategy needs to be finalised (extend R5 daily sync pattern
-    // vs per-event ClickHouse queries) before enabling.
-    // See: customerIoDailyUsageSyncReactor, customerIoTraceSyncReactor,
-    //      customerIoEvaluationSyncReactor, customerIoSimulationSyncReactor
+    // Counting strategy needs to be finalised (per-event ClickHouse queries)
+    // before enabling.
+    // See: customerIoTraceSyncReactor, customerIoEvaluationSyncReactor,
+    //      customerIoSimulationSyncReactor
 
     const traceSummaryStore = this.cached<TraceSummaryData>(
       new TraceSummaryStore(this.deps.repositories.traceSummaryFold),
@@ -293,6 +319,49 @@ export class PipelineRegistry {
       evaluationExecution: this.deps.evaluations.execution,
       costRecorder: this.deps.costRecorder,
       azureSafetyEnvResolver: getAzureSafetyEnvFromProject,
+      // ADR-040: offload oversized evaluator inputs to durable object storage
+      // before the event is built. ON by default (this bounds the fat-payload
+      // class behind the 2026-07-10 outage); the SYSTEM flag
+      // ops_evaluation_payload_offload_disabled is the operator kill switch.
+      // A flag-store error keeps the DEFAULT (offload runs): the kill switch
+      // failing to read must not silently drop the protection. Storage errors
+      // are handled INSIDE offloadInputsIfOversized, which degrades to a
+      // bounded preview-only marker so the event stays lean even when S3 is
+      // down. The catch below is the wiring-level fail-open for unexpected
+      // errors only (service construction, serialization); there the inputs
+      // stay inline and the unconditional repository belt-and-braces cap
+      // keeps the ClickHouse row merge-safe.
+      offloadInputs: async ({ projectId, evaluationId, inputs }) => {
+        try {
+          let disabled = false;
+          try {
+            disabled = await featureFlagService.isEnabled(
+              "ops_evaluation_payload_offload_disabled",
+              { distinctId: "evaluation-inputs-offload", defaultValue: false },
+            );
+          } catch {
+            // Unreadable kill switch: stay on the default (offload enabled).
+          }
+          if (disabled) return inputs;
+          const { inputs: maybeOffloaded } = await offloadInputsIfOversized({
+            inputs,
+            projectId,
+            evaluationId,
+            storedObjects: createStoredObjectsService({ projectId }),
+          });
+          return maybeOffloaded;
+        } catch (error) {
+          createLogger("langwatch:evaluations:inputs-offload-fail-open").warn(
+            {
+              projectId,
+              evaluationId,
+              error: error instanceof Error ? error.message : String(error),
+            },
+            "Evaluation inputs offload gate failed; keeping inputs inline (fail-open)",
+          );
+          return inputs;
+        }
+      },
     });
 
     // ADR-035: the persist branch is now an outbox reactor that only
@@ -311,14 +380,38 @@ export class PipelineRegistry {
         traceSummaryStore,
       });
 
+    // ADR-034 Phase 6: real-time graph-trigger reactor on the slim eval fold.
+    // Flag-gated per project via the same `release_es_graph_triggers_firing`
+    // flag the trace pipeline uses — disabled = empty decide; cron handles
+    // the project's graph triggers as today.
+    const graphTriggerEvaluationOutboxReactor =
+      createEvaluationGraphTriggerEvaluationOutboxReactor({
+        triggers: this.deps.triggers,
+      });
+
     return this.deps.eventSourcing.register(
       createEvaluationProcessingPipeline({
         evalRunStore: new EvaluationRunStore(
           this.deps.evaluations.runs.repository,
         ),
+        // Redis cache is the eval slim fold's ONLY warm read path — its
+        // store's get() returns null by design (lossy row, no read-back),
+        // and on a cache miss the fold's refoldOnStoreMiss option rebuilds
+        // state from the event log. Same wiring as trace_analytics.
+        evaluationAnalyticsStore: this.cached<EvaluationAnalyticsData>(
+          new EvaluationAnalyticsStore(
+            this.deps.repositories.evaluationAnalytics,
+          ),
+          "evaluation_analytics",
+        ),
+        evaluationAnalyticsRollupAppendStore:
+          new EvaluationAnalyticsRollupAppendStore(
+            this.deps.repositories.evaluationAnalyticsRollup,
+          ),
         executeEvaluationCommand,
         evaluationAlertTriggerReactor,
         evaluationAlertTriggerNotifyOutboxReactor,
+        graphTriggerEvaluationOutboxReactor,
       }),
     );
   }
@@ -370,6 +463,15 @@ export class PipelineRegistry {
         triggers: this.deps.triggers,
       });
 
+    // ADR-034 Phase 5: real-time path for custom-graph threshold alerts.
+    // Flag-gated per project inside `decide` so a flag-OFF project sees
+    // an empty enqueue list and the cron handles its graph triggers
+    // unchanged.
+    const graphTriggerEvaluationOutboxReactor =
+      createGraphTriggerEvaluationOutboxReactor({
+        triggers: this.deps.triggers,
+      });
+
     const customEvaluationSyncReactor = createCustomEvaluationSyncReactor({
       reportEvaluation: evalCommands.reportEvaluation,
     });
@@ -385,12 +487,26 @@ export class PipelineRegistry {
     });
 
     const claudeCodeSpanSyncReactor = createClaudeCodeSpanSyncReactor({
-      getMarkedClaudeCodeLogs: (tenantId, traceId, occurredAtMs) =>
+      getMarkedClaudeCodeLogs: (tenantId, traceId, occurredAtMs, limit) =>
         this.deps.repositories.logRecordStorage.getMarkedClaudeCodeLogsByTrace(
           tenantId,
           traceId,
           occurredAtMs,
+          limit,
         ),
+      countMarkedClaudeCodeLogs: (tenantId, traceId, occurredAtMs) =>
+        this.deps.repositories.logRecordStorage.countMarkedClaudeCodeLogsByTrace(
+          tenantId,
+          traceId,
+          occurredAtMs,
+        ),
+      // Per-turn conversion cap (env LANGWATCH_CLAUDE_TURN_LOG_CAP, default
+      // CLAUDE_TURN_LOG_CAP). Bounds how many of a pathological turn's marked
+      // logs the span-sync reactor folds in one pass so a runaway turn can't
+      // seize the worker; the root span is marked truncated when the cap bites.
+      turnLogCap: resolveClaudeTurnLogCap(
+        process.env.LANGWATCH_CLAUDE_TURN_LOG_CAP,
+      ),
       recordSpan: recordSpanDispatch.fn,
     });
 
@@ -450,6 +566,18 @@ export class PipelineRegistry {
     const tracePipeline = this.deps.eventSourcing.register(
       createTraceProcessingPipeline({
         spanAppendStore: new SpanAppendStore(this.deps.traces.spans.repository),
+        traceAnalyticsRollupAppendStore: new TraceAnalyticsRollupAppendStore(
+          this.deps.repositories.traceAnalyticsRollup,
+        ),
+        // Redis cache is the slim fold's ONLY warm read path — its store's
+        // get() returns null by design (lossy row, no read-back), and on a
+        // cache miss the fold's refoldOnStoreMiss option rebuilds state from
+        // the event log. Without this wrapper every event would trigger a
+        // full event-log re-fold.
+        traceAnalyticsStore: this.cached<TraceAnalyticsData>(
+          new TraceAnalyticsStore(this.deps.repositories.traceAnalytics),
+          "trace_analytics",
+        ),
         logRecordAppendStore: new LogRecordAppendStore(
           this.deps.repositories.logRecordStorage,
         ),
@@ -461,6 +589,7 @@ export class PipelineRegistry {
         evaluationTriggerReactor,
         alertTriggerReactor,
         alertTriggerNotifyOutboxReactor,
+        graphTriggerEvaluationOutboxReactor,
         customEvaluationSyncReactor,
         traceUpdateBroadcastReactor,
         projectMetadataReactor,
@@ -477,6 +606,14 @@ export class PipelineRegistry {
         // parallel across `traceId:<shard>` GroupQueue groups; fold stays per-trace.
         spanCommandShardCount: resolveSpanCommandShardCount(
           process.env.TRACE_SPAN_PROCESSING_SHARDS,
+        ),
+        // Log-command sharding fan-out, ON by default (4 lanes; env
+        // TRACE_LOG_PROCESSING_SHARDS tunes it, 1 disables). Lets one Claude
+        // Code turn's recordLog commands drain in parallel across
+        // `traceId:<shard>` GroupQueue groups; the fold and the
+        // claude-span-sync reactor stay per-trace.
+        logCommandShardCount: resolveLogCommandShardCount(
+          process.env.TRACE_LOG_PROCESSING_SHARDS,
         ),
         governanceKpisSyncReactor,
         governanceOcsfEventsSyncReactor,
@@ -809,6 +946,7 @@ export type AppCommands = ReturnType<PipelineRegistry["registerAll"]>;
 // ============================================================================
 
 import { getApp } from "../app-layer/app";
+// StaticPipelineDefinition is already imported at the top of the file.
 
 export interface ProjectionMetadata {
   projectionName: string;
@@ -842,24 +980,28 @@ function getDefinitions(): ReadonlyArray<
 export function getProjectionMetadata(): ProjectionMetadata[] {
   return getDefinitions().flatMap((def) => {
     const { name: pipelineName, aggregateType } = def.metadata;
-    const folds = Array.from(def.foldProjections.values()).map(({ definition }) => ({
-      projectionName: definition.name,
-      pipelineName,
-      aggregateType,
-      source: "pipeline" as const,
-      pauseKey: `${pipelineName}/projection/${definition.name}`,
-      kind: "fold" as const,
-    }));
-    const maps = Array.from(def.mapProjections.values()).map(({ definition }) => ({
-      projectionName: definition.name,
-      pipelineName,
-      aggregateType,
-      source: "pipeline" as const,
-      // Maps run as `__jobType=handler` in the GroupQueue, so the pause-set
-      // entry must use the `handler` segment to match the dispatcher's Lua check.
-      pauseKey: `${pipelineName}/handler/${definition.name}`,
-      kind: "map" as const,
-    }));
+    const folds = Array.from(def.foldProjections.values()).map(
+      ({ definition }) => ({
+        projectionName: definition.name,
+        pipelineName,
+        aggregateType,
+        source: "pipeline" as const,
+        pauseKey: `${pipelineName}/projection/${definition.name}`,
+        kind: "fold" as const,
+      }),
+    );
+    const maps = Array.from(def.mapProjections.values()).map(
+      ({ definition }) => ({
+        projectionName: definition.name,
+        pipelineName,
+        aggregateType,
+        source: "pipeline" as const,
+        // Maps run as `__jobType=handler` in the GroupQueue, so the pause-set
+        // entry must use the `handler` segment to match the dispatcher's Lua check.
+        pauseKey: `${pipelineName}/handler/${definition.name}`,
+        kind: "map" as const,
+      }),
+    );
     return [...folds, ...maps];
   });
 }

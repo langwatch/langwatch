@@ -266,7 +266,6 @@ SaaS-only cross-pipeline fold projections live in `projections/global/`:
 | Projection | Purpose |
 |------------|---------|
 | `projectDailyBillableEvents` | Tracks billable event counts per project per day |
-| `projectDailySdkUsage` | Tracks SDK usage per project per day |
 
 ### Entry Points
 

@@ -45,15 +45,14 @@ describe("PgOutboxAuditAdapter", () => {
       traceId,
       reactorName,
       auditDedupKey: dedupKey,
-      foldSnapshotAtEnqueue: { computedInput: "in", computedOutput: "out" },
-    };
+      };
     cadencePayload = {
       stage: "cadence",
       projectId,
       triggerId,
       reactorName,
       auditDedupKey: dedupKey,
-      match: { traceId, input: "in", output: "out" },
+      match: { traceId },
     };
   });
 

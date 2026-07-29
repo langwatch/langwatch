@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { TriggerAction } from "@prisma/client";
+import { TriggerAction, TriggerKind } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { TriggerSummary } from "~/server/app-layer/triggers/repositories/trigger.repository";
@@ -15,6 +15,13 @@ import {
   createAlertTriggerReactor,
 } from "../alertTrigger.reactor";
 
+/**
+ * The trace's prompt and response, as the fold holds them. Distinctive strings
+ * so the "no content on the payload" assertions below cannot pass by accident.
+ */
+const TRACE_INPUT = "What is the patient's diagnosis?";
+const TRACE_OUTPUT = "The patient has a suspected fracture.";
+
 function createFoldState(
   overrides: Partial<TraceSummaryData> = {},
 ): TraceSummaryData {
@@ -23,8 +30,8 @@ function createFoldState(
     spanCount: 1,
     totalDurationMs: 100,
     computedIOSchemaVersion: "1",
-    computedInput: "hello",
-    computedOutput: "world",
+    computedInput: TRACE_INPUT,
+    computedOutput: TRACE_OUTPUT,
     timeToFirstTokenMs: null,
     timeToLastTokenMs: null,
     tokensPerSecond: null,
@@ -87,6 +94,7 @@ function createTrigger(
     projectId: "tenant-1",
     name: "Latency Alert",
     action: TriggerAction.ADD_TO_DATASET,
+    triggerKind: TriggerKind.AUTOMATION,
     actionParams: {
       datasetId: "dataset-1",
       datasetMapping: { mapping: {}, expansions: [] },
@@ -96,6 +104,7 @@ function createTrigger(
     message: "",
     customGraphId: null,
     notificationCadence: "immediate",
+    filterQuery: null,
     traceDebounceMs: 30000,
     templates: {
       slackTemplateType: null,
@@ -151,10 +160,6 @@ describe("alertTrigger reactor (persist outbox)", () => {
           projectId: string;
           triggerId: string;
           traceId: string;
-          foldSnapshotAtEnqueue: {
-            computedInput: string;
-            computedOutput: string;
-          };
         };
         expect(payload.stage).toBe("settle");
         // The marker the cadence handler reads to pick dispatchTriggerAction.
@@ -162,10 +167,28 @@ describe("alertTrigger reactor (persist outbox)", () => {
         expect(payload.projectId).toBe("tenant-1");
         expect(payload.triggerId).toBe("trigger-1");
         expect(payload.traceId).toBe("trace-1");
-        expect(payload.foldSnapshotAtEnqueue).toEqual({
-          computedInput: "hello",
-          computedOutput: "world",
-        });
+      });
+
+      it("carries no trace content on the payload", async () => {
+        const trigger = createTrigger();
+        (
+          deps.triggers.getActiveTraceTriggersForProject as any
+        ).mockResolvedValue([trigger]);
+
+        const reactor = createAlertTriggerReactor(deps);
+        const requests = await reactor.decide(
+          createEvent(),
+          createContext(createFoldState()),
+        );
+
+        // A settle payload carries an IDENTITY, never trace content: settle
+        // re-reads the fold at fire time, so a copy here would be unread
+        // customer text living in Redis and (via the audit projection) at rest
+        // in Postgres, outliving the trace it came from.
+        const serialized = JSON.stringify(requests[0]!.payload);
+        expect(serialized).not.toContain(TRACE_INPUT);
+        expect(serialized).not.toContain(TRACE_OUTPUT);
+        expect(serialized).not.toContain("patient");
       });
     });
 

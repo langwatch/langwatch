@@ -1,13 +1,13 @@
+import { createLogger } from "@langwatch/observability";
 import type { Scenario } from "@prisma/client";
 import { describeRoute } from "hono-openapi";
 import { resolver, validator as zValidator } from "hono-openapi/zod";
 import { z } from "zod";
 import { badRequestSchema } from "~/app/api/shared/schemas";
-import { type SecuredApp, requires } from "~/server/api/security";
+import { requires, type SecuredApp } from "~/server/api/security";
 import { prisma } from "~/server/db";
 import { ScenarioNotFoundError } from "~/server/scenarios/errors";
 import { ScenarioService } from "~/server/scenarios/scenario.service";
-import { createLogger } from "~/utils/logger/server";
 import type { AuthMiddlewareVariables } from "../../middleware";
 import { resourceLimitMiddleware } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
