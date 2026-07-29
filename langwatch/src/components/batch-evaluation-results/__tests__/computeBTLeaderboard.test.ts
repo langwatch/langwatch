@@ -272,7 +272,7 @@ describe("computeBTLeaderboard", () => {
     // This used to assert 2, on the grounds that both rows passed the
     // `winner !== null` filter and the real drop happened later inside
     // buildWinMatrix. But comparisonCount is what the UI narrates as "based
-    // on N comparisons" and what it hands to Langy, so counting a row that
+    // on N comparisons" and what it actually ranked on, so counting a row that
     // contributed no evidence overstated the run to the reader.
     expect(result.comparisonCount).toBe(1);
     expect(result.winMatrix["A"]!["B"]).toBe(1);

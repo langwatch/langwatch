@@ -24,8 +24,6 @@ export type LeaderboardVerdictPanelProps = {
   cheaperAlternative: CheaperAlternative | null;
   variantNames: Record<string, string>;
   targetColors?: Record<string, string>;
-  /** Rendered under the headline — the optional written explanation. */
-  children?: React.ReactNode;
 };
 
 const nameOf = (
@@ -123,7 +121,6 @@ export function LeaderboardVerdictPanel({
   cheaperAlternative,
   variantNames,
   targetColors,
-  children,
 }: LeaderboardVerdictPanelProps) {
   const tied = new Set(verdict.tiedIds);
 
@@ -143,7 +140,6 @@ export function LeaderboardVerdictPanel({
       <Callout tone={headline.tone} heading={headline.heading}>
         {headline.detail}
       </Callout>
-      {children}
       <ScoreBars
         leaderboard={leaderboard}
         variantNames={variantNames}

@@ -436,36 +436,6 @@ Feature: Comparison leaderboard (Bradley-Terry ranking on the results page)
     # estimated from the same thin data. Promising "20 more will settle it"
     # is a promise the run cannot keep.
 
-  # ── The optional written explanation ───────────────────────────────────
-
-  Scenario: The written explanation is opt-in, not automatic
-    When I open the expanded leaderboard
-    Then no model has been called to describe the result
-    And I see a control offering to explain the result in prose
-
-  Scenario: The explanation is a conversation with Langy, not a paragraph in the panel
-    When I ask for the result to be explained
-    Then the question opens in Langy with the computed result already in it
-    And nothing generated is rendered inside the result panel itself
-    # Two reasons. Generated prose sitting inside the panel carries the same
-    # visual authority as the computed verdict beside it, which is how a
-    # fluent wrong answer gets acted on. And a reader who disagrees, or wants
-    # to know what to change, can push back on a conversation but not on a
-    # frozen paragraph.
-
-  Scenario: The question carries the computed conclusion
-    When I ask for the result to be explained
-    Then Langy is given the scores, intervals, costs and checks that were already computed
-    And it is asked to explain that conclusion rather than to rank the variants again
-    # Langy could go and re-derive a ranking from the run. A second ranking
-    # that disagrees with the one on screen is worse than no explanation.
-
-  Scenario: A reader who cannot start a Langy conversation is not offered one
-    Given I do not have permission to start a Langy conversation
-    When I open the expanded leaderboard
-    Then I am not offered the explain control
-    And I still see the full computed result
-
   # ── Axis labels ────────────────────────────────────────────────────────
 
   Scenario: Every chart in the row labels the bars identically

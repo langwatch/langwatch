@@ -28,7 +28,6 @@ import {
 } from "./batch-evaluation-results/computeLeaderboardVerdict";
 import { computeSampleAdequacy } from "./batch-evaluation-results/computeSampleAdequacy";
 import { useVariantMetrics } from "./batch-evaluation-results/useVariantMetrics";
-import { LeaderboardAskLangyButton } from "./batch-evaluation-results/LeaderboardAskLangyButton";
 import { LeaderboardStep } from "./batch-evaluation-results/LeaderboardStep";
 import { LeaderboardTrustPanel } from "./batch-evaluation-results/LeaderboardTrustPanel";
 import { LeaderboardVerdictPanel } from "./batch-evaluation-results/LeaderboardVerdictPanel";
@@ -186,24 +185,7 @@ export function ComparisonLeaderboardDrawer({
                 cheaperAlternative={cheaperAlternative}
                 variantNames={variantNames}
                 targetColors={targetColors}
-              >
-                {/* Hands the finished result to the assistant the platform
-                    already has, rather than rendering generated prose inside
-                    the panel at the same visual authority as the computed
-                    verdict. */}
-                <LeaderboardAskLangyButton
-                  comparisonName={column.name}
-                  leaderboard={leaderboard}
-                  verdict={verdict}
-                  cheaperAlternative={cheaperAlternative}
-                  sampleAdequacy={sampleAdequacy}
-                  verbosity={verbosity}
-                  judgeIndependence={judgeIndependence}
-                  variantMetrics={variantMetrics}
-                  variantNames={variantNames}
-                  warnThreshold={DEFAULT_WARN_THRESHOLD}
-                />
-              </LeaderboardVerdictPanel>
+              />
             </LeaderboardStep>
 
             <LeaderboardStep
