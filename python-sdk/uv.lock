@@ -20,7 +20,7 @@ resolution-markers = [
 ]
 
 [options]
-exclude-newer = "2026-07-17T17:19:05.065156Z"
+exclude-newer = "2026-07-22T00:08:14.728758Z"
 exclude-newer-span = "P7D"
 
 [manifest]
@@ -3322,7 +3322,7 @@ wheels = [
 
 [[package]]
 name = "langwatch"
-version = "0.26.0"
+version = "1.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "attrs" },

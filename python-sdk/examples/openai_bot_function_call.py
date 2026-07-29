@@ -57,12 +57,11 @@ async def main(message: cl.Message):
                 },
             }
         ],
-        tool_choice={
-            "type": "function",
-            "function": {
-                "name": "get_weather",
-            },
-        },
+        # gpt-5-mini refuses a FORCED function tool_choice outright
+        # (400 invalid_prompt, pointing at the reasoning-model prompting
+        # guide). "auto" still calls the tool for a weather question and
+        # keeps the example's function-call round-trip intact.
+        tool_choice="auto",
     )
 
     tool_message = completion.choices[0].message.tool_calls[0]  # type: ignore

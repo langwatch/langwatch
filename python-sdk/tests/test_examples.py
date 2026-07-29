@@ -56,6 +56,12 @@ def build_example_input(example_file: str) -> str:
         return "who is the oldest person?"
     if "rag" in example_file:
         return "what is LangWatch?"
+    if "function_call" in example_file:
+        # This example FORCES the get_weather tool via tool_choice. Asking
+        # it something unrelated makes the forced call incoherent, which
+        # OpenAI's safety layer now rejects outright as invalid_prompt.
+        # Ask the weather bot a weather question.
+        return "what is the weather in Amsterdam?"
     return "what makes a good daily routine?"
 
 
