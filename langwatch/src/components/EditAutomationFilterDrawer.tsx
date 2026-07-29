@@ -1,12 +1,4 @@
-import {
-  Box,
-  Button,
-  Heading,
-  HStack,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
-import dynamic from "~/utils/compat/next-dynamic";
+import { Box, Button, Heading, HStack, Text, VStack } from "@chakra-ui/react";
 import { useCallback, useRef, useState } from "react";
 import { useColorMode } from "~/components/ui/color-mode";
 import { useDrawer } from "~/hooks/useDrawer";
@@ -15,11 +7,12 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
   type FilterField,
   sanitizeTriggerFilters,
-  triggerFiltersPermissiveSchema,
   type TriggerFilters,
   type TriggerFilterValue,
+  triggerFiltersPermissiveSchema,
 } from "~/server/filters/types";
 import { api } from "~/utils/api";
+import dynamic from "~/utils/compat/next-dynamic";
 import { Drawer } from "../components/ui/drawer";
 import { Switch } from "../components/ui/switch";
 import { toaster } from "../components/ui/toaster";
@@ -80,11 +73,16 @@ function parseCodeFilters(value: string): ParsedCodeFilters {
   }
 }
 
-export function EditAutomationFilterDrawer({ automationId }: { automationId?: string }) {
+export function EditAutomationFilterDrawer({
+  automationId,
+}: {
+  automationId?: string;
+}) {
   const { project } = useOrganizationTeamProject();
   const { colorMode } = useColorMode();
 
-  const updateTriggerFilters = api.automation.updateTriggerFilters.useMutation();
+  const updateTriggerFilters =
+    api.automation.updateTriggerFilters.useMutation();
 
   const queryClient = api.useContext();
   const { closeDrawer } = useDrawer();

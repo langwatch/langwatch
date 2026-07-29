@@ -1,5 +1,11 @@
+import {
+  type Group,
+  type GroupMembership,
+  type PrismaClient,
+  type RoleBinding,
+  RoleBindingScopeType,
+} from "@prisma/client";
 import { scopesTouchPersonalTeam } from "~/server/role-bindings/personal-team-scope";
-import { RoleBindingScopeType, type Group, type GroupMembership, type PrismaClient, type RoleBinding } from "@prisma/client";
 import type {
   CreateBindingInput,
   CreateGroupInput,
@@ -141,7 +147,13 @@ export class PrismaGroupRepository implements GroupRepository {
     return this.prisma.group.findUnique({ where: { id } });
   }
 
-  async delete({ id, organizationId }: { id: string; organizationId: string }): Promise<void> {
+  async delete({
+    id,
+    organizationId,
+  }: {
+    id: string;
+    organizationId: string;
+  }): Promise<void> {
     await this.prisma.group.deleteMany({ where: { id, organizationId } });
   }
 

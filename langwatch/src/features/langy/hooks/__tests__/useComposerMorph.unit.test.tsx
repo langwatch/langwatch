@@ -80,8 +80,9 @@ const setPrefersReducedMotion = (reduce: boolean) => {
   })) as unknown as typeof window.matchMedia;
 };
 
-const renderMorph = (heroCardRef: ReturnType<typeof createRef<HTMLDivElement>>) =>
-  renderHook(() => useComposerMorph({ heroCardRef }));
+const renderMorph = (
+  heroCardRef: ReturnType<typeof createRef<HTMLDivElement>>,
+) => renderHook(() => useComposerMorph({ heroCardRef }));
 
 beforeEach(() => {
   vi.useFakeTimers();

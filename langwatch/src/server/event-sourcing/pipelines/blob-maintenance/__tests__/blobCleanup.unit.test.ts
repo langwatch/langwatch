@@ -8,7 +8,9 @@ import {
   runBlobCleanup,
 } from "../process-manager/blobCleanup.process";
 
-const report = (overrides: Partial<BlobSweepReport["totals"]> = {}): BlobSweepReport => ({
+const report = (
+  overrides: Partial<BlobSweepReport["totals"]> = {},
+): BlobSweepReport => ({
   queues: [],
   totals: {
     scanned: 0,
@@ -58,8 +60,14 @@ describe("blobCleanup process", () => {
       // The commit that persists this evolution is what fences racing workers,
       // so a handler that read a clock or did I/O would make two workers diverge.
       it("derives everything from the context clock, never its own", () => {
-        const first = blobCleanupWake({ lastSweepAt: 1 }, wakeContext(500) as never);
-        const second = blobCleanupWake({ lastSweepAt: 1 }, wakeContext(500) as never);
+        const first = blobCleanupWake(
+          { lastSweepAt: 1 },
+          wakeContext(500) as never,
+        );
+        const second = blobCleanupWake(
+          { lastSweepAt: 1 },
+          wakeContext(500) as never,
+        );
 
         expect(first).toEqual(second);
       });
@@ -69,7 +77,9 @@ describe("blobCleanup process", () => {
   describe("given the sweep intent executes", () => {
     describe("when the sweep reclaims blobs", () => {
       it("sweeps and then prunes its own outbox rows", async () => {
-        const sweep = vi.fn().mockResolvedValue(report({ reclaimed: 3, scanned: 9 }));
+        const sweep = vi
+          .fn()
+          .mockResolvedValue(report({ reclaimed: 3, scanned: 9 }));
         const deleteDispatchedBefore = vi.fn().mockResolvedValue(0);
 
         await runBlobCleanup({
@@ -93,7 +103,9 @@ describe("blobCleanup process", () => {
         await expect(
           runBlobCleanup({
             sweep,
-            deleteDispatchedBefore: vi.fn().mockRejectedValue(new Error("db down")),
+            deleteDispatchedBefore: vi
+              .fn()
+              .mockRejectedValue(new Error("db down")),
           })(),
         ).resolves.toBeUndefined();
 

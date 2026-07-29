@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { Command } from "../../../../commands/command";
 import { createTenantId } from "../../../../domain/tenantId";
-import { RecordMetricDataPointCommand } from "../recordMetricDataPointCommand";
+import type { RecordMetricDataPointCommandData } from "../../schemas/commands";
 import {
   METRIC_DATA_POINT_RECEIVED_EVENT_TYPE,
   RECORD_METRIC_DATA_POINT_COMMAND_TYPE,
 } from "../../schemas/constants";
-import type { RecordMetricDataPointCommandData } from "../../schemas/commands";
+import { RecordMetricDataPointCommand } from "../recordMetricDataPointCommand";
 
 describe("RecordMetricDataPointCommand", () => {
   it("uses PointId for the aggregate and a tenant-prefixed idempotency key", async () => {

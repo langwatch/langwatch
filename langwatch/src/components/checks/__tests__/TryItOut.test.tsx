@@ -17,8 +17,8 @@ import { useForm } from "react-hook-form";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Span } from "~/server/tracer/types";
 import type { RouterOutputs } from "~/utils/api";
-import { TryItOut } from "../TryItOut";
 import type { CheckConfigFormData } from "../CheckConfigForm";
+import { TryItOut } from "../TryItOut";
 
 type SampleTraces = RouterOutputs["traces"]["getSampleTraces"];
 
@@ -100,7 +100,11 @@ const ragSpanWithContexts: Span[] = [
     trace_id: "trace-1",
     type: "rag",
     contexts: [
-      { document_id: "doc-1", chunk_id: "chunk-1", content: "Paris is the capital of France." },
+      {
+        document_id: "doc-1",
+        chunk_id: "chunk-1",
+        content: "Paris is the capital of France.",
+      },
     ],
     timestamps: { started_at: 1700000000000, finished_at: 1700000001000 },
   },

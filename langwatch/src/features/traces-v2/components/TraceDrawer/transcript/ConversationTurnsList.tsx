@@ -3,7 +3,6 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { useEffect, useRef, useState } from "react";
 import { LuChevronDown, LuChevronUp } from "react-icons/lu";
 import { ThreadedTurnView } from "./ThreadedTurnView";
-import { TurnView } from "./TurnView";
 import {
   type ChatLayout,
   type ConversationTurn,

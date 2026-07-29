@@ -14,7 +14,7 @@ import { TRPCError } from "@trpc/server";
 import { describe, expect, it } from "vitest";
 
 import { ModelNotConfiguredError } from "../../modelProviders/modelNotConfiguredError";
-import { errorFormatterForTesting } from "../trpc";
+import { errorFormatter } from "../trpc";
 
 describe("tRPC wire mapping for ModelNotConfiguredError", () => {
   /** @scenario A tRPC procedure forwards ModelNotConfiguredError as a typed TRPCError */
@@ -31,7 +31,7 @@ describe("tRPC wire mapping for ModelNotConfiguredError", () => {
       cause,
     });
 
-    const formatted = errorFormatterForTesting({
+    const formatted = errorFormatter({
       shape: {
         message: trpcError.message,
         code: -32600,

@@ -323,9 +323,7 @@ describe("SavedViews Endpoints", () => {
 
       const result = await caller.savedViews.getAll({ projectId });
 
-      const otherUserViews = result.filter(
-        (v) => v.userId === otherUser.id,
-      );
+      const otherUserViews = result.filter((v) => v.userId === otherUser.id);
       expect(otherUserViews).toHaveLength(0);
     });
   });

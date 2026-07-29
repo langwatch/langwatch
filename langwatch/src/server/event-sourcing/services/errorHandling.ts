@@ -1,5 +1,5 @@
-import type { createLogger } from "@langwatch/observability";
 import { HandledError } from "@langwatch/handled-error";
+import type { createLogger } from "@langwatch/observability";
 
 /**
  * Error categories for standardized error handling.
@@ -428,7 +428,19 @@ export function categorizeError(error: unknown): ErrorCategory {
  * - 999: KEEPER_EXCEPTION (ZooKeeper / ClickHouse Keeper coordination error)
  */
 const CLICKHOUSE_TRANSIENT_CODES = new Set([
-  "33", "159", "160", "202", "203", "209", "210", "236", "241", "242", "252", "394", "999",
+  "33",
+  "159",
+  "160",
+  "202",
+  "203",
+  "209",
+  "210",
+  "236",
+  "241",
+  "242",
+  "252",
+  "394",
+  "999",
 ]);
 
 /**

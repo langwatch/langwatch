@@ -201,5 +201,4 @@ describe("EventSourcingPipeline", () => {
       expect(pipeline1.name).not.toBe(pipeline2.name);
     });
   });
-
 });

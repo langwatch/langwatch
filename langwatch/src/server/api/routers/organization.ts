@@ -1,11 +1,9 @@
-import { assertNoPersonalTeamScope } from "~/server/role-bindings/personal-team-scope";
 import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
 import {
   OrganizationUserRole,
   RoleBindingScopeType,
   TeamUserRole,
 } from "@prisma/client";
-import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { fireTeamMemberInvitedNurturing } from "~/../ee/billing/nurturing/hooks/featureAdoption";
@@ -19,6 +17,7 @@ import type { FullyLoadedOrganization } from "~/server/app-layer/organizations/r
 import { PrismaRoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.prisma.repository";
 import { trackServerEvent } from "~/server/posthog";
 import { RoleService } from "~/server/role/role.service";
+import { assertNoPersonalTeamScope } from "~/server/role-bindings/personal-team-scope";
 import { signUpDataSchema } from "~/server/schemas/sign-up-data.schema";
 import { decrypt } from "~/utils/encryption";
 import {
@@ -560,6 +559,16 @@ export const organizationRouter = createTRPCRouter({
       }
 
       const inviteService = InviteService.create(prisma);
+
+      // Before anything is written: inviting someone who is already a member
+      // used to succeed silently, adding a pending invite beside the membership
+      // it duplicated. Checked ahead of the licence limit so an admin who is at
+      // their seat cap is told the real reason rather than being sold an
+      // upgrade for a seat they already own.
+      await inviteService.assertNotAlreadyMembers({
+        emails: input.invites.map((invite) => invite.email),
+        organizationId: input.organizationId,
+      });
 
       // Check license limits using the service
       try {

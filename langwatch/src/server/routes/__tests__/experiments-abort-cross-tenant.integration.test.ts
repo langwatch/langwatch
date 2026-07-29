@@ -67,7 +67,10 @@ describe("POST /api/experiments/abort cross-tenant isolation", () => {
   describe("when the run belongs to a different project than the caller's", () => {
     /** @scenario "A resource id from the body is verified against the authenticated tenant" */
     it("returns 404 and does not signal an abort", async () => {
-      getRunState.mockResolvedValue({ runId: "run_x", projectId: "project_OTHER" });
+      getRunState.mockResolvedValue({
+        runId: "run_x",
+        projectId: "project_OTHER",
+      });
 
       const res = await post({ projectId: "project_MINE", runId: "run_x" });
 
@@ -81,7 +84,10 @@ describe("POST /api/experiments/abort cross-tenant isolation", () => {
     it("returns 404 and does not signal an abort", async () => {
       getRunState.mockResolvedValue(null);
 
-      const res = await post({ projectId: "project_MINE", runId: "run_missing" });
+      const res = await post({
+        projectId: "project_MINE",
+        runId: "run_missing",
+      });
 
       expect(res.status).toBe(404);
       expect(requestAbort).not.toHaveBeenCalled();
@@ -91,7 +97,10 @@ describe("POST /api/experiments/abort cross-tenant isolation", () => {
 
   describe("when the run belongs to the caller's project", () => {
     it("signals the abort", async () => {
-      getRunState.mockResolvedValue({ runId: "run_x", projectId: "project_MINE" });
+      getRunState.mockResolvedValue({
+        runId: "run_x",
+        projectId: "project_MINE",
+      });
 
       const res = await post({ projectId: "project_MINE", runId: "run_x" });
 

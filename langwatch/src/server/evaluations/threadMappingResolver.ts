@@ -18,9 +18,7 @@ import type { Trace } from "~/server/tracer/types";
 /**
  * Check if any mapping in the state has type "thread".
  */
-export function hasThreadMappings(
-  mappingState: MappingState | null,
-): boolean {
+export function hasThreadMappings(mappingState: MappingState | null): boolean {
   // The `?.mapping` check defends against historical malformed rows persisted
   // before write-side coercion existed (#3875). The MappingState type says
   // `.mapping` is required, but legacy `{}` payloads in the DB violate that.
@@ -53,13 +51,9 @@ export async function resolveThreadMappingsIntoData(params: {
   const threadId = trace.metadata?.thread_id;
 
   // Eagerly fetch thread traces once (empty if no thread_id)
-  const threadTraces = threadId
-    ? await getThreadTraces(threadId)
-    : [];
+  const threadTraces = threadId ? await getThreadTraces(threadId) : [];
 
-  for (const [targetField, mappingConfig] of Object.entries(
-    mappings.mapping,
-  )) {
+  for (const [targetField, mappingConfig] of Object.entries(mappings.mapping)) {
     if (!("type" in mappingConfig && mappingConfig.type === "thread")) {
       continue;
     }
@@ -77,14 +71,10 @@ export async function resolveThreadMappingsIntoData(params: {
 
     const traces = threadTraces;
 
-    if (
-      (SERVER_ONLY_THREAD_SOURCES as readonly string[]).includes(source)
-    ) {
+    if ((SERVER_ONLY_THREAD_SOURCES as readonly string[]).includes(source)) {
       if (source === "formatted_traces") {
         data[targetField] = (
-          await Promise.all(
-            traces.map((t) => formatSpansDigest(t.spans ?? [])),
-          )
+          await Promise.all(traces.map((t) => formatSpansDigest(t.spans ?? [])))
         ).join("\n\n---\n\n");
       } else {
         // Unknown server-only source: degrade gracefully instead of crashing the evaluation loop

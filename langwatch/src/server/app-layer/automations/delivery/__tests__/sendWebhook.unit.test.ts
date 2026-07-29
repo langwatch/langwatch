@@ -93,7 +93,9 @@ describe("assertWebhookDelivered", () => {
   });
 
   describe("when the endpoint answers a retryable status", () => {
-    it.each([500, 502, 503, 429, 408])("classifies %s as retryable", (status) => {
+    it.each([
+      500, 502, 503, 429, 408,
+    ])("classifies %s as retryable", (status) => {
       try {
         assertWebhookDelivered({ result: { status, body: "" }, triggerName });
         throw new Error("expected a throw");
@@ -105,18 +107,17 @@ describe("assertWebhookDelivered", () => {
   });
 
   describe("when the endpoint answers a terminal status", () => {
-    it.each([301, 400, 401, 403, 404, 422])(
-      "classifies %s as terminal",
-      (status) => {
-        try {
-          assertWebhookDelivered({ result: { status, body: "" }, triggerName });
-          throw new Error("expected a throw");
-        } catch (err) {
-          expect(err).toBeInstanceOf(DispatchError);
-          expect((err as DispatchError).retryable).toBe(false);
-        }
-      },
-    );
+    it.each([
+      301, 400, 401, 403, 404, 422,
+    ])("classifies %s as terminal", (status) => {
+      try {
+        assertWebhookDelivered({ result: { status, body: "" }, triggerName });
+        throw new Error("expected a throw");
+      } catch (err) {
+        expect(err).toBeInstanceOf(DispatchError);
+        expect((err as DispatchError).retryable).toBe(false);
+      }
+    });
 
     it("carries a capped response snippet in the message", () => {
       try {

@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
 import { SpanStorageClickHouseRepository } from "~/server/app-layer/traces/repositories/span-storage.clickhouse.repository";
-import { TraceSummaryService } from "~/server/app-layer/traces/trace-summary.service";
 import { TraceSummaryClickHouseRepository } from "~/server/app-layer/traces/repositories/trace-summary.clickhouse.repository";
+import { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
+import { TraceSummaryService } from "~/server/app-layer/traces/trace-summary.service";
 import { getTestClickHouseClient } from "../../../__tests__/integration/testContainers";
 import {
   cleanupTestDataForTenant,
@@ -11,12 +11,12 @@ import {
 } from "../../../__tests__/integration/testHelpers";
 import { FoldProjectionExecutor } from "../../../projections/foldProjectionExecutor";
 import { RecordSpanCommand } from "../commands/recordSpanCommand";
-import { RECORD_SPAN_COMMAND_TYPE } from "../schemas/constants";
-import type { SpanReceivedEvent } from "../schemas/events";
 import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
 import { TraceSummaryFoldProjection } from "../projections/traceSummary.foldProjection";
-import type { OtlpSpan } from "../schemas/otlp";
 import { TraceSummaryStore } from "../projections/traceSummary.store";
+import { RECORD_SPAN_COMMAND_TYPE } from "../schemas/constants";
+import type { SpanReceivedEvent } from "../schemas/events";
+import type { OtlpSpan } from "../schemas/otlp";
 
 // Subclass that injects no-op span-enrichment deps so the production
 // `require("~/server/db")` default-dependency path never runs (that require
@@ -45,7 +45,11 @@ function generateId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).substring(7)}`;
 }
 
-function buildRawSpan(traceId: string, spanId: string, startTimeMs: number): OtlpSpan {
+function buildRawSpan(
+  traceId: string,
+  spanId: string,
+  startTimeMs: number,
+): OtlpSpan {
   const startNano = BigInt(startTimeMs) * 1_000_000n;
   const endNano = startNano + BigInt(10) * 1_000_000n;
   return {
@@ -115,7 +119,11 @@ describe.skipIf(!hasTestcontainers)(
             aggregateId: traceId,
             tenantId: tenantIdString,
             data: {
-              span: buildRawSpan(traceId, `${generateId("span")}-${i}`, base + i),
+              span: buildRawSpan(
+                traceId,
+                `${generateId("span")}-${i}`,
+                base + i,
+              ),
               resource: null,
               instrumentationScope: null,
               piiRedactionLevel: "DISABLED",
@@ -127,7 +135,9 @@ describe.skipIf(!hasTestcontainers)(
         expect(events).toHaveLength(SPAN_COUNT);
 
         const executor = new FoldProjectionExecutor();
-        const fold = new TraceSummaryFoldProjection({ store: traceSummaryStore });
+        const fold = new TraceSummaryFoldProjection({
+          store: traceSummaryStore,
+        });
         const context = { aggregateId: traceId, tenantId, key: traceId };
 
         const folded = (await executor.executeBatch(
@@ -144,7 +154,10 @@ describe.skipIf(!hasTestcontainers)(
         let persisted: TraceSummaryData | null = null;
         const deadline = Date.now() + 10000;
         while (Date.now() < deadline) {
-          persisted = (await traceSummaryStore.get(traceId, context)) as TraceSummaryData | null;
+          persisted = (await traceSummaryStore.get(
+            traceId,
+            context,
+          )) as TraceSummaryData | null;
           if (persisted?.spanCount === SPAN_COUNT) break;
           await new Promise((r) => setTimeout(r, 200));
         }

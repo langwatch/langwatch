@@ -1,36 +1,35 @@
-import { nanoid } from "nanoid";
-import { afterEach, describe, expect, it } from "vitest";
-
-import { LangyConversationNotFoundError } from "~/server/app-layer/langy/errors";
-import { LangyMessageService } from "~/server/app-layer/langy/langy-message.service";
-import { prisma } from "~/server/db";
-import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
-import type { Event } from "~/server/event-sourcing/domain/types";
-import { MapProjectionExecutor } from "~/server/event-sourcing/projections/mapProjectionExecutor";
-import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
-import { StateProjectionExecutor } from "~/server/event-sourcing/projections/stateProjectionExecutor";
-import {
-  LangyAgentRespondedEventSchema,
-  LangyAgentTurnAcceptedEventSchema,
-  LangyMessageRecordedEventSchema,
-  LangyConversationMetadataUpdatedEventSchema,
-  LangyConversationStateFoldProjection,
-  LangyConversationTurnFoldProjection,
-  LangyMessageOperationalMapProjection,
-  LangyPlanUpdatedEventSchema,
-  LangyToolCallInitiatedEventSchema,
-  LangyToolCallSucceededEventSchema,
-} from "~/server/event-sourcing/pipelines/langy-conversation-processing";
 import {
   LANGY_CONVERSATION_EVENT_TYPES,
   LANGY_CONVERSATION_EVENT_VERSIONS,
   makeConversationTurnKey,
 } from "@langwatch/langy";
+import { nanoid } from "nanoid";
+import { afterEach, describe, expect, it } from "vitest";
+import { LangyConversationNotFoundError } from "~/server/app-layer/langy/errors";
+import { LangyMessageService } from "~/server/app-layer/langy/langy-message.service";
+import { prisma } from "~/server/db";
+import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
+import type { Event } from "~/server/event-sourcing/domain/types";
+import {
+  LangyAgentRespondedEventSchema,
+  LangyAgentTurnAcceptedEventSchema,
+  LangyConversationMetadataUpdatedEventSchema,
+  LangyConversationStateFoldProjection,
+  LangyConversationTurnFoldProjection,
+  LangyMessageOperationalMapProjection,
+  LangyMessageRecordedEventSchema,
+  LangyPlanUpdatedEventSchema,
+  LangyToolCallInitiatedEventSchema,
+  LangyToolCallSucceededEventSchema,
+} from "~/server/event-sourcing/pipelines/langy-conversation-processing";
+import { MapProjectionExecutor } from "~/server/event-sourcing/projections/mapProjectionExecutor";
+import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
+import { StateProjectionExecutor } from "~/server/event-sourcing/projections/stateProjectionExecutor";
+import { PrismaLangyConversationRepository } from "../langy-conversation.prisma.repository";
 import { PrismaLangyConversationProjectionRepository } from "../langy-conversation-projection.prisma.repository";
 import { PrismaLangyConversationTurnProjectionRepository } from "../langy-conversation-turn-projection.prisma.repository";
-import { PrismaLangyConversationRepository } from "../langy-conversation.prisma.repository";
-import { PrismaLangyMessageProjectionRepository } from "../langy-message-projection.prisma.repository";
 import { PrismaLangyMessageRepository } from "../langy-message.prisma.repository";
+import { PrismaLangyMessageProjectionRepository } from "../langy-message-projection.prisma.repository";
 
 const namespace = `langy-operational-${nanoid(10)}`;
 const projectIds = [`${namespace}-project-a`, `${namespace}-project-b`];

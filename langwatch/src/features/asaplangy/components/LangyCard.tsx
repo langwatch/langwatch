@@ -1,4 +1,4 @@
-import { Box, chakra, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
 import type { ReactNode } from "react";
 import { useReducedMotion } from "~/hooks/useReducedMotion";

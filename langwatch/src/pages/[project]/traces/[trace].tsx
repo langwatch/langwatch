@@ -1,5 +1,5 @@
-import { useRouter } from "~/utils/compat/next-router";
 import { useEffect } from "react";
+import { useRouter } from "~/utils/compat/next-router";
 
 /**
  * Redirect page for /[project]/traces/[trace] — the canonical short link to a

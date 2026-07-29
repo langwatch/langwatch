@@ -1,10 +1,13 @@
 import { NotFoundError } from "@langwatch/handled-error";
 import { Hono } from "hono";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-const logRecords: { level: string; payload: Record<string, unknown>; message: string }[] =
-  [];
+const logRecords: {
+  level: string;
+  payload: Record<string, unknown>;
+  message: string;
+}[] = [];
 
 /**
  * Capture every record the request logger writes, at the logger seam rather
@@ -13,7 +16,8 @@ const logRecords: { level: string; payload: Record<string, unknown>; message: st
  * real.
  */
 vi.mock("@langwatch/observability", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@langwatch/observability")>();
+  const actual =
+    await importOriginal<typeof import("@langwatch/observability")>();
   const record =
     (level: string) => (payload: Record<string, unknown>, message: string) => {
       logRecords.push({ level, payload, message });
@@ -65,7 +69,9 @@ describe("given a request that fails", () => {
 
   describe("when the handler throws a customer-fault HandledError", () => {
     it("writes exactly one record, at warn, with the handled-error metadata", async () => {
-      const app = appThatThrows(new NotFoundError("not_found", "Resource", "abc"));
+      const app = appThatThrows(
+        new NotFoundError("not_found", "Resource", "abc"),
+      );
 
       const res = await app.request("/things");
 
@@ -122,9 +128,9 @@ describe("given a request that succeeds", () => {
 
       expect(res.status).toBe(200);
       expect(errorRecords()).toHaveLength(0);
-      expect(logRecords.filter((r) => r.message === "request handled")).toHaveLength(
-        1,
-      );
+      expect(
+        logRecords.filter((r) => r.message === "request handled"),
+      ).toHaveLength(1);
     });
   });
 });

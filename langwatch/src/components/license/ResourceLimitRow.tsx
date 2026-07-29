@@ -7,7 +7,11 @@ export interface ResourceLimitRowProps {
   max?: number;
 }
 
-export function ResourceLimitRow({ label, current, max }: ResourceLimitRowProps) {
+export function ResourceLimitRow({
+  label,
+  current,
+  max,
+}: ResourceLimitRowProps) {
   return (
     <VStack
       align="start"
@@ -19,14 +23,21 @@ export function ResourceLimitRow({ label, current, max }: ResourceLimitRowProps)
       borderRadius="lg"
       bg="bg.subtle"
     >
-      <Text fontSize="xs" color="fg.muted" fontWeight="medium" textTransform="uppercase" letterSpacing="wide">
+      <Text
+        fontSize="xs"
+        color="fg.muted"
+        fontWeight="medium"
+        textTransform="uppercase"
+        letterSpacing="wide"
+      >
         {label}
       </Text>
       <Text fontSize="xl" fontWeight="semibold" color="fg">
         {current.toLocaleString()}
         {max != null && (
           <Text as="span" fontSize="sm" fontWeight="normal" color="fg.muted">
-            {" "}/ {formatLimitOrUnlimited(max)}
+            {" "}
+            / {formatLimitOrUnlimited(max)}
           </Text>
         )}
       </Text>

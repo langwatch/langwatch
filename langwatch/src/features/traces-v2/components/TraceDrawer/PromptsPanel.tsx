@@ -545,7 +545,7 @@ function SpanRow({
       </Text>
       {span?.model && (
         <Text textStyle="2xs" color="fg.subtle" flexShrink={0}>
-          {(span.model)}
+          {span.model}
         </Text>
       )}
       {span && (

@@ -22,14 +22,13 @@
 import { STARTER_PACK_TILES } from "@ee/governance/services/aiToolEntry.service";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-
-import { prisma } from "~/server/db";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
-import { createTestApp } from "~/server/app-layer/presets";
 import { OrganizationService } from "~/server/app-layer/organizations/organization.service";
 import { PrismaOrganizationRepository } from "~/server/app-layer/organizations/repositories/organization.prisma.repository";
-import type { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
+import { createTestApp } from "~/server/app-layer/presets";
+import { prisma } from "~/server/db";
 import { LicenseEnforcementRepository } from "~/server/license-enforcement/license-enforcement.repository";
+import type { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
 import { createInnerTRPCContext } from "../../../trpc";
 import { onboardingRouter } from "../onboarding.router";
 
@@ -50,7 +49,11 @@ async function seedUser(label: string) {
   return user;
 }
 
-function callerFor(user: { id: string; name: string | null; email: string | null }) {
+function callerFor(user: {
+  id: string;
+  name: string | null;
+  email: string | null;
+}) {
   return onboardingRouter.createCaller(
     createInnerTRPCContext({
       session: {
@@ -187,9 +190,7 @@ describe("onboarding.initializeOrganization personal workspace", () => {
       expect(tiles.map((t) => t.slug)).toEqual(
         STARTER_PACK_TILES.map((t) => t.slug),
       );
-      expect(tiles.every((t) => t.enabled && t.archivedAt === null)).toBe(
-        true,
-      );
+      expect(tiles.every((t) => t.enabled && t.archivedAt === null)).toBe(true);
     });
 
     /** @scenario The personal workspace does not spend the plan's allowance */
@@ -259,9 +260,7 @@ describe("onboarding.initializeOrganization personal workspace", () => {
       expect(tiles.map((t) => t.slug)).toEqual(
         STARTER_PACK_TILES.map((t) => t.slug),
       );
-      expect(tiles.every((t) => t.enabled && t.archivedAt === null)).toBe(
-        true,
-      );
+      expect(tiles.every((t) => t.enabled && t.archivedAt === null)).toBe(true);
     });
   });
 });

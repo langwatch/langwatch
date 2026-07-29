@@ -50,7 +50,7 @@ vi.mock("~/optimization_studio/server/lambda", () => ({
 
 vi.mock("~/utils/posthogErrorCapture", () => ({
   captureException: vi.fn(),
-  toError: vi.fn((e) => e instanceof Error ? e : new Error(String(e))),
+  toError: vi.fn((e) => (e instanceof Error ? e : new Error(String(e)))),
 }));
 
 // Mock the trace id generator so tests can assert call count and deterministic ids.
@@ -59,9 +59,8 @@ const { generateOtelTraceIdMock } = vi.hoisted(() => ({
   generateOtelTraceIdMock: vi.fn<() => string>(),
 }));
 vi.mock("~/utils/trace", async () => {
-  const actual = await vi.importActual<typeof import("~/utils/trace")>(
-    "~/utils/trace",
-  );
+  const actual =
+    await vi.importActual<typeof import("~/utils/trace")>("~/utils/trace");
   return {
     ...actual,
     generateOtelTraceId: generateOtelTraceIdMock,
@@ -74,9 +73,9 @@ import type {
   CopilotRuntimeChatCompletionResponse,
 } from "@copilotkit/runtime";
 import { beforeEach, describe, expect, it } from "vitest";
-import { studioBackendPostEvent } from "../../workflows/post_event/post-event";
 import { addEnvs } from "~/optimization_studio/server/addEnvs";
 import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
+import { studioBackendPostEvent } from "../../workflows/post_event/post-event";
 import { PromptStudioAdapter } from "./service-adapter";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -166,7 +165,9 @@ function buildRequest({
     messages: [],
     actions: [],
     threadId: "thread-test-123",
-    forwardedParameters: { model } as CopilotRuntimeChatCompletionRequest["forwardedParameters"],
+    forwardedParameters: {
+      model,
+    } as CopilotRuntimeChatCompletionRequest["forwardedParameters"],
   } as RequestForProcess;
 }
 
@@ -248,7 +249,10 @@ describe("PromptStudioAdapter", () => {
 
     function lastPostedEvent(): any {
       const mocked = vi.mocked(studioBackendPostEvent);
-      expect(mocked, "studioBackendPostEvent must have been called").toHaveBeenCalled();
+      expect(
+        mocked,
+        "studioBackendPostEvent must have been called",
+      ).toHaveBeenCalled();
       // The component_state_change consumer is async; we only need the
       // envelope shape that was passed in. The `!` propagates the
       // toHaveBeenCalled guarantee past TS's noUncheckedIndexedAccess.
@@ -300,7 +304,8 @@ describe("PromptStudioAdapter", () => {
       );
 
       const envelope = lastPostedEvent();
-      const sent: { role: string; content: string }[] = envelope.payload.inputs.messages;
+      const sent: { role: string; content: string }[] =
+        envelope.payload.inputs.messages;
       // Exactly one user turn — the template's `{{input}}` slot, NOT a
       // duplicated live "test7" turn. Server-side render will resolve
       // the placeholder against inputs.input.
@@ -330,7 +335,8 @@ describe("PromptStudioAdapter", () => {
       );
 
       const envelope = lastPostedEvent();
-      const sent: { role: string; content: string }[] = envelope.payload.inputs.messages;
+      const sent: { role: string; content: string }[] =
+        envelope.payload.inputs.messages;
       // Prior live history (older question + older reply) FIRST, then
       // the template's `{{input}}` slot which renders to the latest
       // "test7" turn at the END. Pre-2026-05-17 the order was inverted
@@ -377,7 +383,8 @@ describe("PromptStudioAdapter", () => {
       );
 
       const envelope = lastPostedEvent();
-      const sent: { role: string; content: string }[] = envelope.payload.inputs.messages;
+      const sent: { role: string; content: string }[] =
+        envelope.payload.inputs.messages;
       // Chronological history (everything BEFORE the latest user turn)
       // + template's `{{input}}` slot at the end, which the downstream
       // render will resolve to "huh?".
@@ -415,7 +422,8 @@ describe("PromptStudioAdapter", () => {
       );
 
       const envelope = lastPostedEvent();
-      const sent: { role: string; content: string }[] = envelope.payload.inputs.messages;
+      const sent: { role: string; content: string }[] =
+        envelope.payload.inputs.messages;
       // ONE user turn — the template's explicit "answer it". The
       // live "how much is 2+3" is absorbed into inputs.input, not
       // appended as a second user turn.
@@ -447,7 +455,8 @@ describe("PromptStudioAdapter", () => {
       );
 
       const envelope = lastPostedEvent();
-      const sent: { role: string; content: string }[] = envelope.payload.inputs.messages;
+      const sent: { role: string; content: string }[] =
+        envelope.payload.inputs.messages;
       expect(sent).toEqual([
         { role: "user", content: "answer it" },
         { role: "user", content: "how much is 2+3" },

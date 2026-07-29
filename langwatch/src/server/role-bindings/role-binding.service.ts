@@ -1,20 +1,20 @@
+import { generate } from "@langwatch/ksuid";
 import {
   OrganizationUserRole,
+  type PrismaClient,
   RoleBindingScopeType,
   TeamUserRole,
-  type PrismaClient,
 } from "@prisma/client";
-import { generate } from "@langwatch/ksuid";
 import { TRPCError } from "@trpc/server";
-import { KSUID_RESOURCES } from "~/utils/constants";
-import { assertNoPersonalTeamScope } from "./personal-team-scope";
-import type { RoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.repository";
 import {
   getOrganizationRolePermissions,
   getTeamRolePermissions,
 } from "~/server/api/rbac";
-import type { RoleService } from "~/server/role/role.service";
+import type { RoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.repository";
 import { assertUsersInOrganization } from "~/server/organizations/assertUsersInOrganization";
+import type { RoleService } from "~/server/role/role.service";
+import { KSUID_RESOURCES } from "~/utils/constants";
+import { assertNoPersonalTeamScope } from "./personal-team-scope";
 
 export class RoleBindingService {
   constructor(
@@ -78,7 +78,13 @@ export class RoleBindingService {
     }
   }
 
-  async listForUser({ organizationId, userId }: { organizationId: string; userId: string }) {
+  async listForUser({
+    organizationId,
+    userId,
+  }: {
+    organizationId: string;
+    userId: string;
+  }) {
     const bindings = await this.prisma.roleBinding.findMany({
       where: { organizationId, userId },
       include: {
@@ -87,19 +93,34 @@ export class RoleBindingService {
       orderBy: { createdAt: "asc" },
     });
 
-    const orgIds = bindings.filter((b) => b.scopeType === RoleBindingScopeType.ORGANIZATION).map((b) => b.scopeId);
-    const teamIds = bindings.filter((b) => b.scopeType === RoleBindingScopeType.TEAM).map((b) => b.scopeId);
-    const projectIds = bindings.filter((b) => b.scopeType === RoleBindingScopeType.PROJECT).map((b) => b.scopeId);
+    const orgIds = bindings
+      .filter((b) => b.scopeType === RoleBindingScopeType.ORGANIZATION)
+      .map((b) => b.scopeId);
+    const teamIds = bindings
+      .filter((b) => b.scopeType === RoleBindingScopeType.TEAM)
+      .map((b) => b.scopeId);
+    const projectIds = bindings
+      .filter((b) => b.scopeType === RoleBindingScopeType.PROJECT)
+      .map((b) => b.scopeId);
 
     const [orgs, teams, projects] = await Promise.all([
       orgIds.length > 0
-        ? this.prisma.organization.findMany({ where: { id: { in: orgIds } }, select: { id: true, name: true } })
+        ? this.prisma.organization.findMany({
+            where: { id: { in: orgIds } },
+            select: { id: true, name: true },
+          })
         : [],
       teamIds.length > 0
-        ? this.prisma.team.findMany({ where: { id: { in: teamIds }, organizationId }, select: { id: true, name: true } })
+        ? this.prisma.team.findMany({
+            where: { id: { in: teamIds }, organizationId },
+            select: { id: true, name: true },
+          })
         : [],
       projectIds.length > 0
-        ? this.prisma.project.findMany({ where: { id: { in: projectIds }, team: { organizationId } }, select: { id: true, name: true } })
+        ? this.prisma.project.findMany({
+            where: { id: { in: projectIds }, team: { organizationId } },
+            select: { id: true, name: true },
+          })
         : [],
     ]);
 
@@ -157,13 +178,22 @@ export class RoleBindingService {
     // data, failed migrations). Bindings are already filtered by organizationId.
     const [orgs, teams, projects] = await Promise.all([
       orgIds.length > 0
-        ? this.prisma.organization.findMany({ where: { id: { in: orgIds } }, select: { id: true, name: true } })
+        ? this.prisma.organization.findMany({
+            where: { id: { in: orgIds } },
+            select: { id: true, name: true },
+          })
         : [],
       teamIds.length > 0
-        ? this.prisma.team.findMany({ where: { id: { in: teamIds }, organizationId }, select: { id: true, name: true } })
+        ? this.prisma.team.findMany({
+            where: { id: { in: teamIds }, organizationId },
+            select: { id: true, name: true },
+          })
         : [],
       projectIds.length > 0
-        ? this.prisma.project.findMany({ where: { id: { in: projectIds }, team: { organizationId } }, select: { id: true, name: true } })
+        ? this.prisma.project.findMany({
+            where: { id: { in: projectIds }, team: { organizationId } },
+            select: { id: true, name: true },
+          })
         : [],
     ]);
 
@@ -417,7 +447,8 @@ export class RoleBindingService {
         userId: userId ?? null,
         groupId: groupId ?? null,
         role,
-        customRoleId: role === TeamUserRole.CUSTOM ? (customRoleId ?? null) : null,
+        customRoleId:
+          role === TeamUserRole.CUSTOM ? (customRoleId ?? null) : null,
         scopeType,
         scopeId,
       },
@@ -450,7 +481,8 @@ export class RoleBindingService {
       where: { id: bindingId },
       data: {
         role,
-        customRoleId: role === TeamUserRole.CUSTOM ? (customRoleId ?? null) : null,
+        customRoleId:
+          role === TeamUserRole.CUSTOM ? (customRoleId ?? null) : null,
       },
     });
   }
@@ -505,7 +537,10 @@ export class RoleBindingService {
       });
     }
     await assertNoPersonalTeamScope(this.prisma, bindingsToCreate);
-    await this.validateCustomRolesAssignable({ organizationId, bindings: bindingsToCreate });
+    await this.validateCustomRolesAssignable({
+      organizationId,
+      bindings: bindingsToCreate,
+    });
 
     return this.prisma.$transaction(async (tx) => {
       if (bindingIdsToDelete.length > 0) {
@@ -580,7 +615,10 @@ export class RoleBindingService {
       });
     }
     await assertNoPersonalTeamScope(this.prisma, bindingsToCreate);
-    await this.validateCustomRolesAssignable({ organizationId, bindings: bindingsToCreate });
+    await this.validateCustomRolesAssignable({
+      organizationId,
+      bindings: bindingsToCreate,
+    });
 
     return this.prisma.$transaction(async (tx) => {
       const group = await tx.group.findFirst({
@@ -645,8 +683,7 @@ export class RoleBindingService {
         if (group.scimSource) {
           throw new TRPCError({
             code: "BAD_REQUEST",
-            message:
-              "Cannot manually remove members from a SCIM-managed group",
+            message: "Cannot manually remove members from a SCIM-managed group",
           });
         }
         await tx.groupMembership.deleteMany({

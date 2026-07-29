@@ -1,12 +1,12 @@
 import type Stripe from "stripe";
 import { describe, expect, it } from "vitest";
+import { PlanTypes } from "../planTypes";
 import {
   calculateQuantityForPrice,
   createItemsToAdd,
   getItemsToUpdate,
   prices,
 } from "../services/subscriptionItemCalculator";
-import { PlanTypes } from "../planTypes";
 
 const createSubscriptionItem = (
   id: string,
@@ -74,7 +74,12 @@ describe("subscriptionItemCalculator", () => {
     });
 
     it("returns empty for FREE downgrade", () => {
-      const items = getItemsToUpdate({ currentItems: [], plan: PlanTypes.FREE, tracesToAdd: 1_000, membersToAdd: 2 });
+      const items = getItemsToUpdate({
+        currentItems: [],
+        plan: PlanTypes.FREE,
+        tracesToAdd: 1_000,
+        membersToAdd: 2,
+      });
 
       expect(items).toEqual([]);
     });
@@ -138,7 +143,11 @@ describe("subscriptionItemCalculator", () => {
   describe("calculateQuantityForPrice()", () => {
     it("calculates quantity for user add-ons", () => {
       expect(
-        calculateQuantityForPrice({ priceId: prices.LAUNCH_USERS, quantity: 4, plan: PlanTypes.LAUNCH }),
+        calculateQuantityForPrice({
+          priceId: prices.LAUNCH_USERS,
+          quantity: 4,
+          plan: PlanTypes.LAUNCH,
+        }),
       ).toBe(7);
       expect(
         calculateQuantityForPrice({
@@ -170,7 +179,13 @@ describe("subscriptionItemCalculator", () => {
     });
 
     it("returns 0 for unknown price ids", () => {
-      expect(calculateQuantityForPrice({ priceId: "unknown", quantity: 10, plan: PlanTypes.PRO })).toBe(0);
+      expect(
+        calculateQuantityForPrice({
+          priceId: "unknown",
+          quantity: 10,
+          plan: PlanTypes.PRO,
+        }),
+      ).toBe(0);
     });
   });
 });

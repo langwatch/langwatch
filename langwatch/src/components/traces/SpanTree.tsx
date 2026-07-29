@@ -1,7 +1,7 @@
 import { Alert, Box, HStack, Text, VStack } from "@chakra-ui/react";
-import { useRouter } from "~/utils/compat/next-router";
 import numeral from "numeral";
 import { useEffect, useMemo } from "react";
+import { useRouter } from "~/utils/compat/next-router";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useSpanTreeLoader } from "../../hooks/useSpanTreeLoader";
 import { useTraceUpdateListener } from "../../hooks/useTraceUpdateListener";
@@ -77,13 +77,17 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level, isNew }) => {
       gap={2}
       marginLeft={level == 0 ? "0" : level == 1 ? "10px" : "26px"}
       position="relative"
-      css={isNew ? {
-        "@keyframes spanFadeIn": {
-          from: { opacity: 0, transform: "translateX(-8px)" },
-          to: { opacity: 1, transform: "translateX(0)" },
-        },
-        animation: "spanFadeIn 0.3s ease-out",
-      } : undefined}
+      css={
+        isNew
+          ? {
+              "@keyframes spanFadeIn": {
+                from: { opacity: 0, transform: "translateX(-8px)" },
+                to: { opacity: 1, transform: "translateX(0)" },
+              },
+              animation: "spanFadeIn 0.3s ease-out",
+            }
+          : undefined
+      }
     >
       <Box
         zIndex={1}
@@ -378,10 +382,7 @@ export function SpanTree(props: SpanTreeProps) {
             paddingX={6}
             flexDirection={{ base: "column", xl: "row" }}
           >
-            <TreeRenderer
-              spans={sortedSpans}
-              newSpanIds={loader.newSpanIds}
-            />
+            <TreeRenderer spans={sortedSpans} newSpanIds={loader.newSpanIds} />
             {project && span && (
               <SpanDetails
                 project={project}

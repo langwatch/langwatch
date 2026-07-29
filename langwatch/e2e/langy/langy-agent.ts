@@ -74,10 +74,7 @@ function getSessionCookie(): Promise<string> {
 }
 
 /** Mirror langyChatTransport.ts's message shape: {role, parts: [{type, text}]}. */
-function toTurnMessage(msg: {
-  role: string;
-  content: unknown;
-}): TurnMessage {
+function toTurnMessage(msg: { role: string; content: unknown }): TurnMessage {
   const role: TurnMessage["role"] =
     msg.role === "assistant" || msg.role === "system" ? msg.role : "user";
   if (typeof msg.content === "string") {
@@ -191,9 +188,7 @@ async function streamTurnText({
     },
   );
   if (!res.ok || !res.body) {
-    throw new Error(
-      `Langy onTurnStream -> ${res.status}: ${await res.text()}`,
-    );
+    throw new Error(`Langy onTurnStream -> ${res.status}: ${await res.text()}`);
   }
 
   const reader = res.body.getReader();

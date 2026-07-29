@@ -38,24 +38,23 @@ local-dev orchestrator) owns its lifecycle. That buys three things a raw
 
 ```bash
 make observability            # start the capped stack on colima (OTLP :4318, Grafana :3000)
-                              #   (equivalently: haven observability up)
+                              #   (equivalently: haven restart obs)
 make observability-connect    # mint a Grafana token + configure gcx
 # any pnpm dev stack you start while it is up exports to it automatically,
 # tagged by worktree — no .env changes needed. Already-running stacks need a
 # restart (pnpm dev) to pick it up.
-make observability-down        # stop it (haven observability down) — discards all telemetry
+LANGWATCH_HAVEN_OBS=0 haven up # keep the next up from starting it; haven down --all stops everything
 ```
 
 Then open Grafana at http://localhost:3000 (anonymous Admin, or admin/admin), or
-ask your agent to query it. `make haven doctor` (or `haven doctor`) reports
+ask your agent to query it. `make haven status` (or `haven status`) reports
 stack health and the image actually running.
 
 ### Tuning the caps
 
 Retention and the resource ceilings live in `haven`'s
 `domain.DefaultObservabilityLimits` (a debugging window, not an archive). The
-stack keeps **no volume**, so `make observability-down` reclaims every byte
-regardless. Override the image or ports with `HAVEN_OBS_IMAGE`,
+stack keeps **no volume**, so stopping it reclaims every byte regardless. Override the image or ports with `HAVEN_OBS_IMAGE`,
 `LW_OBS_GRAFANA_PORT`, `LW_OBS_OTLP_HTTP_PORT`; pick the colima profile with
 `HAVEN_COLIMA_PROFILE`.
 
@@ -115,8 +114,9 @@ Tempo, logs → Loki, metrics → Prometheus) and a pre-provisioned Grafana on
 `:3000`. It's a shared singleton (fixed container name + host ports, no volume),
 so every worktree exports to the same collector — which is what makes the
 `langwatch.worktree` tag useful. It is not part of any `quickstart` preset;
-`make observability` starts just this service and `make observability-down`
-stops just this service (never the rest of the dev stack). Data is
+`make observability` starts just this service. There is no obs-only stop:
+the stack is managed automatically, so `LANGWATCH_HAVEN_OBS=0` keeps the next
+`haven up` from starting it and `haven down --all` stops everything. Data is
 **ephemeral** — no persistent volume — so a down discards everything, keeping the
 footprint tiny and retention naturally low. To persist + hard-cap retention,
 mount trimmed Loki/Tempo/Prometheus configs (otel-lgtm reads them from
@@ -178,8 +178,11 @@ Two ways, both wired by `make observability-connect`:
 ## Turning it off
 
 ```bash
-make observability-down       # stop the stack (discards telemetry)
+LANGWATCH_HAVEN_OBS=0 haven up   # keep the next up from starting it
+haven down --all                 # stop everything haven runs, this included
 ```
+
+Either discards the telemetry collected so far — the stack keeps no volume.
 
 Restore your previous `langwatch/.env` from the `.env.bak.<timestamp>` that
 `observability-connect` wrote, or just clear the OTLP vars.

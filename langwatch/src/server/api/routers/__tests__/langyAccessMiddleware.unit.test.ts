@@ -12,8 +12,8 @@ vi.mock("~/server/organizations/resolveOrganizationId", () => ({
   resolveOrganizationId,
 }));
 
-import { enforceLangyAccess } from "../langyAccessMiddleware";
 import { LangyNotEnabledError } from "~/server/app-layer/langy/errors";
+import { enforceLangyAccess } from "../langyAccessMiddleware";
 
 const user = { id: "user-1", email: "user@example.com", emailVerified: true };
 
@@ -107,7 +107,10 @@ describe("given a project-scoped call and an org-scoped rollout rule", () => {
 
     expect(resolveOrganizationId).toHaveBeenCalledWith("project-1");
     expect(hasLangyAccess).toHaveBeenCalledWith(
-      expect.objectContaining({ projectId: "project-1", organizationId: "org-9" }),
+      expect.objectContaining({
+        projectId: "project-1",
+        organizationId: "org-9",
+      }),
     );
   });
 

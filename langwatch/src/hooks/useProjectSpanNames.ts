@@ -27,7 +27,7 @@ export function useProjectSpanNames({
   const endDate = useMemo(() => Date.now(), []);
   const startDate = useMemo(
     () => endDate - 30 * 24 * 60 * 60 * 1000,
-    [endDate]
+    [endDate],
   );
 
   const fieldNames = api.traces.getFieldNames.useQuery(
@@ -40,7 +40,7 @@ export function useProjectSpanNames({
       enabled: !!projectId && enabled,
       refetchOnWindowFocus: false,
       staleTime: 5 * 60 * 1000, // Cache for 5 minutes
-    }
+    },
   );
 
   const metadataKeys = useMemo(() => {

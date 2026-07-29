@@ -2,23 +2,21 @@ import { generate } from "@langwatch/ksuid";
 import {
   Prisma,
   type PrismaClient,
-  type Project,
   RoleBindingScopeType,
   TeamUserRole,
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
-import { env } from "~/env.mjs";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
+import { provisionLangyVirtualKey } from "~/server/app-layer/langy/langyVirtualKey";
 import {
   personalWorkspaceArchiveViolation,
   personalWorkspaceCreateViolation,
   personalWorkspaceMoveViolation,
 } from "~/server/app-layer/projects/project.service";
 import type { Session } from "~/server/auth";
-import { provisionLangyVirtualKey } from "~/server/app-layer/langy/langyVirtualKey";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { encrypt } from "~/utils/encryption";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
@@ -34,7 +32,6 @@ import {
   checkProjectPermission,
   checkTeamPermission,
   hasProjectPermission,
-  skipPermissionCheck,
   skipPermissionCheckProjectCreation,
 } from "../rbac";
 import { getUserProtectionsForProject } from "../utils";

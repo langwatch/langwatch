@@ -250,9 +250,7 @@ export function TraceSummaryAccordions({
                       <MissingIORow label="Input" mode="input" />
                     )}
                     <SummaryMediaStrip
-                      refsJson={
-                        trace.attributes?.[RESERVED_INPUT_MEDIA_REFS]
-                      }
+                      refsJson={trace.attributes?.[RESERVED_INPUT_MEDIA_REFS]}
                     />
                   </RedactedField>
                   <RedactedField
@@ -271,9 +269,7 @@ export function TraceSummaryAccordions({
                       <MissingIORow label="Output" mode="output" />
                     )}
                     <SummaryMediaStrip
-                      refsJson={
-                        trace.attributes?.[RESERVED_OUTPUT_MEDIA_REFS]
-                      }
+                      refsJson={trace.attributes?.[RESERVED_OUTPUT_MEDIA_REFS]}
                     />
                   </RedactedField>
                 </VStack>

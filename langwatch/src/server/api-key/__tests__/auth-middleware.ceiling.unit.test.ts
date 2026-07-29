@@ -2,12 +2,13 @@ import { Hono } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { resolveApiKeyPermission } from "~/server/rbac/role-binding-resolver";
-import type { ResolvedToken } from "../token-resolver";
 import {
   apiKeyCeilingDenialResponse,
   enforceApiKeyCeiling,
   requireApiKeyPermission,
 } from "../auth-middleware";
+import { ApiKeyPermissionDeniedError } from "../errors";
+import type { ResolvedToken } from "../token-resolver";
 
 /**
  * Enforcement side of the API-key ceiling — the middleware and the guard it
@@ -167,8 +168,9 @@ describe("requireApiKeyPermission()", () => {
         const res = await app.request("/");
 
         expect(res.status).toBe(403);
-        // The full handled-error body (ADR-045): the code is the part a
-        // caller can branch on, so pin that rather than a display string.
+        // The `error` field is the CODE, not the status text: the middleware
+        // answers with the same body `onError` would have built (ADR-045), so
+        // a caller keeps the code, the permission in `meta`, and the tips.
         await expect(res.json()).resolves.toMatchObject({
           error: "api_key_permission_denied",
         });
@@ -215,6 +217,42 @@ describe("apiKeyCeilingDenialResponse()", () => {
       const boom = new Error("connection reset");
 
       expect(() => apiKeyCeilingDenialResponse(boom)).toThrow(boom);
+    });
+  });
+
+  /**
+   * Only the re-throw branch was covered, so the branch that BUILDS a response
+   * drifted for free: it kept answering a hand-built `{ error: "Forbidden" }`
+   * long after `requireApiKeyPermission` moved to the shared handled body, and
+   * the suite stayed green through the whole divergence. This pins the wire
+   * contract the eight ingest routes hand back.
+   */
+  describe("when handed an API key permission denial", () => {
+    it("answers 403 with the handled body a caller can act on", () => {
+      const denial = apiKeyCeilingDenialResponse(
+        new ApiKeyPermissionDeniedError("traces:create", {
+          meta: { apiKeyId: "apikey1", projectId: "proj1" },
+        }),
+      );
+
+      expect(denial.status).toBe(403);
+      const body = denial.body as Record<string, unknown>;
+      expect(body.error).toBe("api_key_permission_denied");
+      // The permission is the whole point of the meta: a CLI reads it to say
+      // WHICH grant is missing, and nothing pinned it until now.
+      expect(body.permission).toBe("traces:create");
+      expect(body.apiKeyId).toBe("apikey1");
+    });
+
+    it("carries the remediation channel the hand-built body dropped", () => {
+      const denial = apiKeyCeilingDenialResponse(
+        new ApiKeyPermissionDeniedError("traces:create"),
+      );
+
+      const body = denial.body as Record<string, unknown>;
+      expect(body.fault).toBe("customer");
+      expect(body).toHaveProperty("message");
+      expect(body.error).not.toBe("Forbidden");
     });
   });
 });

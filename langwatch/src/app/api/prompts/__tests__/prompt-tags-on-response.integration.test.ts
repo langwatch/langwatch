@@ -202,9 +202,7 @@ describe("Prompt tags appear in prompt responses", () => {
     });
 
     it("when fetched with ?tag=staging returns only tags pointing at that (non-latest) version", async () => {
-      const res = await get(
-        `/api/prompts/${promptConfig.id}?tag=staging`,
-      );
+      const res = await get(`/api/prompts/${promptConfig.id}?tag=staging`);
       expect(res.status).toBe(200);
       const body = (await res.json()) as {
         versionId: string;
@@ -215,9 +213,7 @@ describe("Prompt tags appear in prompt responses", () => {
     });
 
     it("when fetched with ?tag=latest resolves to the latest version (round-trip works)", async () => {
-      const res = await get(
-        `/api/prompts/${promptConfig.id}?tag=latest`,
-      );
+      const res = await get(`/api/prompts/${promptConfig.id}?tag=latest`);
       expect(res.status).toBe(200);
       const body = (await res.json()) as {
         versionId: string;

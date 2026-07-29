@@ -36,25 +36,25 @@ describe("tracer.ts", () => {
   });
 
   describe("getLangWatchTracerFromProvider", () => {
-    it("should create a LangWatch tracer from a tracer provider", () => {
+    it("creates a LangWatch tracer from a tracer provider", () => {
       expect(langwatchTracer).toBeDefined();
       expect(typeof langwatchTracer.startSpan).toBe("function");
       expect(typeof langwatchTracer.startActiveSpan).toBe("function");
       expect(typeof langwatchTracer.withActiveSpan).toBe("function");
     });
 
-    it("should call provider.getTracer with correct parameters", () => {
+    it("calls provider.getTracer with correct parameters", () => {
       expect(mockProvider.getTracer).toHaveBeenCalledWith("test-tracer", "1.0.0");
     });
 
-    it("should handle version parameter correctly", () => {
+    it("handles version parameter correctly", () => {
       getLangWatchTracerFromProvider(mockProvider, "no-version");
       expect(mockProvider.getTracer).toHaveBeenCalledWith("no-version", undefined);
     });
   });
 
   describe("getLangWatchTracer", () => {
-    it("should get tracer from global provider", () => {
+    it("gets tracer from global provider", () => {
       // Mock the global tracer provider
       const globalGetTracerSpy = vi.spyOn(otelTrace, 'getTracerProvider').mockReturnValue(mockProvider);
 
@@ -69,7 +69,7 @@ describe("tracer.ts", () => {
   });
 
   describe("startSpan", () => {
-    it("should create a LangWatchSpan", () => {
+    it("creates a LangWatchSpan", () => {
       const span = langwatchTracer.startSpan("test-span");
 
       expect(span).toBeDefined();
@@ -81,7 +81,7 @@ describe("tracer.ts", () => {
       expect(mockTracer.getSpanCount()).toBeGreaterThan(0);
     });
 
-    it("should pass options and context to underlying tracer", () => {
+    it("passes options and context to underlying tracer", () => {
       const options = { kind: SpanKind.CLIENT, attributes: { "test": "value" } };
       const context = {} as any; // Mock context
 
@@ -94,7 +94,7 @@ describe("tracer.ts", () => {
       expect(mockTracer.getSpanCount()).toBeGreaterThan(0);
     });
 
-    it("should return enhanced span with LangWatch methods", () => {
+    it("returns enhanced span with LangWatch methods", () => {
       const span = langwatchTracer.startSpan("test-span");
 
       // Test that we can chain LangWatch-specific methods
@@ -108,7 +108,7 @@ describe("tracer.ts", () => {
   });
 
   describe("startActiveSpan", () => {
-    it("should execute callback with LangWatchSpan", () => {
+    it("executes callback with LangWatchSpan", () => {
       const callback = vi.fn((span: LangWatchSpan) => {
         expect(span).toBeDefined();
         expect(typeof span.setType).toBe("function");
@@ -124,7 +124,7 @@ describe("tracer.ts", () => {
       expect(mockTracer.getSpanCount()).toBeGreaterThan(0);
     });
 
-    it("should handle options parameter", () => {
+    it("handles options parameter", () => {
       const options = { kind: SpanKind.SERVER };
       const callback = vi.fn(() => "result");
 
@@ -137,7 +137,7 @@ describe("tracer.ts", () => {
       expect(mockTracer.getSpanCount()).toBeGreaterThan(0);
     });
 
-    it("should handle options and context parameters", () => {
+    it("handles options and context parameters", () => {
       const options = { kind: SpanKind.SERVER };
       const context = {} as any;
       const callback = vi.fn(() => "result");
@@ -151,7 +151,7 @@ describe("tracer.ts", () => {
       expect(mockTracer.getSpanCount()).toBeGreaterThan(0);
     });
 
-    it("should pass through return value from callback", () => {
+    it("passes through return value from callback", () => {
       const expectedResult = { data: "test", count: 42 };
       const callback = vi.fn(() => expectedResult);
 
@@ -160,7 +160,7 @@ describe("tracer.ts", () => {
       expect(result).toEqual(expectedResult);
     });
 
-    it("should handle async callbacks", async () => {
+    it("handles async callbacks", async () => {
       const callback = vi.fn(async (_span: LangWatchSpan) => {
         await createDelayedPromise("async-result", 10);
         return "async-result";
@@ -172,7 +172,7 @@ describe("tracer.ts", () => {
       expect(result instanceof Promise ? await result : result).toBe("async-result");
     });
 
-    it("should propagate errors from callback", () => {
+    it("propagates errors from callback", () => {
       const error = new Error("Callback error");
       const callback = vi.fn(() => {
         throw error;
@@ -186,7 +186,7 @@ describe("tracer.ts", () => {
 
   describe("withActiveSpan", () => {
     describe("async callback behavior", () => {
-      it("should execute async callback with automatic span management", async () => {
+      it("executes async callback with automatic span management", async () => {
         const callback = vi.fn(async (span: LangWatchSpan) => {
           expect(span).toBeDefined();
           expect(typeof span.setType).toBe("function");
@@ -201,7 +201,7 @@ describe("tracer.ts", () => {
         expect(mockTracer.getSpanCount()).toBeGreaterThan(0);
       });
 
-      it("should automatically end span on async success", async () => {
+      it("automaticallies end span on async success", async () => {
         let spanEnded = false;
         const callback = vi.fn(async (span: LangWatchSpan) => {
           expect(span.isRecording()).toBe(true);
@@ -223,7 +223,7 @@ describe("tracer.ts", () => {
         expect(spanEnded).toBe(true);
       });
 
-      it("should automatically end span on async error", async () => {
+      it("automaticallies end span on async error", async () => {
         let spanEnded = false;
         let statusSet = false;
         let exceptionRecorded = false;
@@ -263,7 +263,7 @@ describe("tracer.ts", () => {
         expect(exceptionRecorded).toBe(true);
       });
 
-      it("should handle async errors without message", async () => {
+      it("handles async errors without message", async () => {
         const error = new Error("String error");
         const callback = vi.fn(async () => {
           throw error;
@@ -273,7 +273,7 @@ describe("tracer.ts", () => {
         expect(callback).toHaveBeenCalled();
       });
 
-      it("should handle async null/undefined errors", async () => {
+      it("handles async null/undefined errors", async () => {
         const callback = vi.fn(async () => {
           throw new Error("Null error");
         });
@@ -282,7 +282,7 @@ describe("tracer.ts", () => {
         expect(callback).toHaveBeenCalled();
       });
 
-      it("should handle delayed async callbacks", async () => {
+      it("handles delayed async callbacks", async () => {
         const callback = vi.fn(async (span: LangWatchSpan) => {
           await new Promise(resolve => setTimeout(resolve, 10));
           span.setType("llm");
@@ -297,7 +297,7 @@ describe("tracer.ts", () => {
     });
 
     describe("sync callback behavior", () => {
-      it("should work with synchronous callbacks", () => {
+      it("works with synchronous callbacks", () => {
         const callback = vi.fn((span: LangWatchSpan) => {
           span.setType("tool");
           return "sync-result";
@@ -310,7 +310,7 @@ describe("tracer.ts", () => {
         expect(mockTracer.getSpanCount()).toBeGreaterThan(0);
       });
 
-      it("should automatically end span on sync success", () => {
+      it("automaticallies end span on sync success", () => {
         let spanEnded = false;
         const callback = vi.fn((span: LangWatchSpan) => {
           expect(span.isRecording()).toBe(true);
@@ -332,7 +332,7 @@ describe("tracer.ts", () => {
         expect(spanEnded).toBe(true);
       });
 
-      it("should automatically end span on sync error", () => {
+      it("automaticallies end span on sync error", () => {
         let spanEnded = false;
         let statusSet = false;
         let exceptionRecorded = false;
@@ -372,7 +372,7 @@ describe("tracer.ts", () => {
         expect(exceptionRecorded).toBe(true);
       });
 
-      it("should handle sync errors without message", () => {
+      it("handles sync errors without message", () => {
         const error = new Error("String sync error");
         const callback = vi.fn(() => {
           throw error;
@@ -382,7 +382,7 @@ describe("tracer.ts", () => {
         expect(callback).toHaveBeenCalled();
       });
 
-      it("should handle sync null/undefined errors", () => {
+      it("handles sync null/undefined errors", () => {
         const callback = vi.fn(() => {
           throw new Error("Null error");
         });
@@ -393,7 +393,7 @@ describe("tracer.ts", () => {
     });
 
     describe("edge cases and promise-like objects", () => {
-      it("should handle promise-like objects (thenables)", async () => {
+      it("handles promise-like objects (thenables)", async () => {
         const thenable = {
           then: vi.fn((onFulfilled: any) => {
             setTimeout(() => onFulfilled("thenable-result"), 5);
@@ -416,7 +416,7 @@ describe("tracer.ts", () => {
         expect(thenable.finally).toHaveBeenCalled();
       });
 
-      it("should handle null/undefined return values", () => {
+      it("handles null/undefined return values", () => {
         const nullCallback = vi.fn(() => null);
         const undefinedCallback = vi.fn(() => undefined);
 
@@ -427,7 +427,7 @@ describe("tracer.ts", () => {
         expect(undefinedResult).toBeUndefined();
       });
 
-      it("should handle objects with then property that is not a function", () => {
+      it("handles objects with then property that is not a function", () => {
         const fakePromise = { then: "not-a-function" };
         const callback = vi.fn(() => fakePromise);
 
@@ -436,7 +436,7 @@ describe("tracer.ts", () => {
         expect(result).toBe(fakePromise);
       });
 
-      it("should handle rejected promises correctly", async () => {
+      it("handles rejected promises correctly", async () => {
         const rejectionError = new Error("Promise rejection");
         const callback = vi.fn(async () => {
           throw rejectionError;
@@ -445,7 +445,7 @@ describe("tracer.ts", () => {
         await expect(langwatchTracer.withActiveSpan("rejection-span", callback)).rejects.toThrow(rejectionError);
       });
 
-      it("should handle promise that resolves to another promise", async () => {
+      it("handles promise that resolves to another promise", async () => {
         const innerPromise = Promise.resolve("inner-value");
         const callback = vi.fn(async () => innerPromise);
 
@@ -456,7 +456,7 @@ describe("tracer.ts", () => {
     });
 
     describe("parameter handling", () => {
-      it("should handle options parameter", async () => {
+      it("handles options parameter", async () => {
         const options = { kind: SpanKind.PRODUCER };
         const callback = vi.fn(() => "result");
 
@@ -467,7 +467,7 @@ describe("tracer.ts", () => {
         expect(mockTracer.getSpanCount()).toBeGreaterThan(0);
       });
 
-      it("should handle options and context parameters", async () => {
+      it("handles options and context parameters", async () => {
         const options = { kind: SpanKind.CONSUMER };
         const context = {} as any;
         const callback = vi.fn(() => "result");
@@ -479,7 +479,7 @@ describe("tracer.ts", () => {
         expect(mockTracer.getSpanCount()).toBeGreaterThan(0);
       });
 
-      it("should ensure span is ended even if recordException fails", async () => {
+      it("ensures span is ended even if recordException fails", async () => {
         const originalError = new Error("Original error");
         const callback = vi.fn(async () => {
           throw originalError;
@@ -494,7 +494,7 @@ describe("tracer.ts", () => {
   });
 
     describe("argument normalization", () => {
-    it("should handle different argument patterns for startActiveSpan", () => {
+    it("handles different argument patterns for startActiveSpan", () => {
       // Test all valid argument combinations
       const callback = vi.fn(() => "result");
       const options = { kind: SpanKind.CLIENT };
@@ -515,7 +515,7 @@ describe("tracer.ts", () => {
       expect(callback).toHaveBeenCalledTimes(3);
     });
 
-    it("should handle different argument patterns for withActiveSpan", async () => {
+    it("handles different argument patterns for withActiveSpan", async () => {
       const callback = vi.fn(() => "result");
       const options = { kind: SpanKind.CLIENT };
       const context = {} as any;
@@ -535,7 +535,7 @@ describe("tracer.ts", () => {
       expect(callback).toHaveBeenCalledTimes(3);
     });
 
-    it("should throw error for invalid arguments", () => {
+    it("throws error for invalid arguments", () => {
       expect(() => {
         (langwatchTracer as any).startActiveSpan("span-name", "not-a-function");
       }).toThrow("Expected a span callback as the last argument");
@@ -547,20 +547,20 @@ describe("tracer.ts", () => {
   });
 
   describe("proxy behavior", () => {
-    it("should have the expected LangWatch methods", () => {
+    it("has the expected LangWatch methods", () => {
       // Test that the proxy provides the LangWatch-specific methods
       expect(typeof langwatchTracer.startSpan).toBe("function");
       expect(typeof langwatchTracer.startActiveSpan).toBe("function");
       expect(typeof langwatchTracer.withActiveSpan).toBe("function");
     });
 
-    it("should proxy through to underlying tracer methods", () => {
+    it("proxies through to underlying tracer methods", () => {
       // Test that standard OTel tracer methods are available
       expect(typeof langwatchTracer.startSpan).toBe("function");
       expect(typeof langwatchTracer.startActiveSpan).toBe("function");
     });
 
-    it("should maintain proxy behavior for standard methods", () => {
+    it("maintains proxy behavior for standard methods", () => {
       // Create a fresh tracer with a custom method for testing
       const customMockTracer = new MockTracer();
       (customMockTracer as any).customMethod = vi.fn();
@@ -579,7 +579,7 @@ describe("tracer.ts", () => {
   });
 
   describe("withActiveSpan error handling improvements", () => {
-    it("should handle complex error scenarios with proper cleanup", async () => {
+    it("handles complex error scenarios with proper cleanup", async () => {
       const mockProvider = new MockTracerProvider();
       const langwatchTracer = getLangWatchTracerFromProvider(mockProvider, "error-tracer", "1.0.0");
       const mockTracer = mockProvider.getTracerByName("error-tracer", "1.0.0")!;
@@ -604,7 +604,7 @@ describe("tracer.ts", () => {
       );
     });
 
-    it("should handle partial failures in batch operations", async () => {
+    it("handles partial failures in batch operations", async () => {
       const mockProvider = new MockTracerProvider();
       const langwatchTracer = getLangWatchTracerFromProvider(mockProvider, "batch-tracer", "1.0.0");
       const mockTracer = mockProvider.getTracerByName("batch-tracer", "1.0.0")!;
@@ -626,7 +626,7 @@ describe("tracer.ts", () => {
   });
 
   describe("performance and concurrency improvements", () => {
-    it("should handle high-frequency span creation without performance degradation", async () => {
+    it("handles high-frequency span creation without performance degradation", async () => {
       const mockProvider = new MockTracerProvider();
       const langwatchTracer = getLangWatchTracerFromProvider(mockProvider, "perf-tracer", "1.0.0");
       const mockTracer = mockProvider.getTracerByName("perf-tracer", "1.0.0")!;
@@ -655,7 +655,7 @@ describe("tracer.ts", () => {
       });
     });
 
-    it("should handle nested spans with proper parent-child relationships", async () => {
+    it("handles nested spans with proper parent-child relationships", async () => {
       const mockProvider = new MockTracerProvider();
       const langwatchTracer = getLangWatchTracerFromProvider(mockProvider, "nested-tracer", "1.0.0");
       const mockTracer = mockProvider.getTracerByName("nested-tracer", "1.0.0")!;
@@ -690,7 +690,7 @@ describe("tracer.ts", () => {
   });
 
   describe("argument validation and edge cases", () => {
-    it("should provide clear error messages for invalid arguments", () => {
+    it("provides clear error messages for invalid arguments", () => {
       const { langwatchTracer } = testScenarios.createTracerTest();
 
       expect(() => {
@@ -706,7 +706,7 @@ describe("tracer.ts", () => {
       }).toThrow(); // Should throw some validation error
     });
 
-    it("should handle edge cases in span context", () => {
+    it("handles edge cases in span context", () => {
       const { langwatchTracer } = testScenarios.createTracerTest();
 
       // Test with undefined/null contexts
@@ -721,7 +721,7 @@ describe("tracer.ts", () => {
   });
 
   describe("memory and resource management", () => {
-    it("should not leak spans in memory", () => {
+    it("does not leak spans in memory", () => {
       const { mockTracer } = testScenarios.createTracerTest();
 
       const initialSpanCount = mockTracer.getSpanCount();
@@ -738,7 +738,7 @@ describe("tracer.ts", () => {
       expect(mockTracer.getSpanCount()).toBe(0);
     });
 
-    it("should handle rapid span creation and cleanup", () => {
+    it("handles rapid span creation and cleanup", () => {
       const { langwatchTracer } = testScenarios.createTracerTest();
 
       // This tests the implementation's ability to handle rapid operations
@@ -766,7 +766,7 @@ describe("tracer.ts", () => {
   });
 
   describe("integration scenarios", () => {
-    it("should support nested spans with proper parent-child relationships", async () => {
+    it("supports nested spans with proper parent-child relationships", async () => {
       const parentCallback = vi.fn(async (parentSpan: LangWatchSpan) => {
         parentSpan.setType("workflow");
 
@@ -784,7 +784,7 @@ describe("tracer.ts", () => {
       expect(parentCallback).toHaveBeenCalled();
     });
 
-    it("should handle mixed manual and automatic span management", async () => {
+    it("handles mixed manual and automatic span management", async () => {
       // Manual span
       const manualSpan = langwatchTracer.startSpan("manual-span");
       manualSpan.setType("tool");
@@ -802,7 +802,7 @@ describe("tracer.ts", () => {
       expect(mockTracer.getSpanCount()).toBeGreaterThan(0);
     });
 
-    it("should handle rapid concurrent span creation", async () => {
+    it("handles rapid concurrent span creation", async () => {
       const promises = Array.from({ length: 10 }, (_, i) =>
         langwatchTracer.withActiveSpan(`concurrent-span-${i}`, async (span) => {
           span.setType("llm");
@@ -819,7 +819,7 @@ describe("tracer.ts", () => {
       });
     });
 
-    it("should handle error propagation in nested spans", async () => {
+    it("handles error propagation in nested spans", async () => {
       const outerError = new Error("Outer error");
 
       await expect(

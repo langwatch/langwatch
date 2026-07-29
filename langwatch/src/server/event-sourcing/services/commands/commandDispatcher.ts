@@ -30,10 +30,6 @@ import { ValidationError } from "../errorHandling";
  * All command payloads must include a tenantId for tenant isolation
  * and occurredAt for global FIFO ordering.
  */
-interface BaseCommandPayload {
-  tenantId: TenantId | string;
-  occurredAt: number;
-}
 
 /**
  * Parameters for the extracted processCommand function.

@@ -11,6 +11,7 @@ import { LuCheck, LuCircleAlert, LuCopy, LuListTree } from "react-icons/lu";
 import { EvaluatorResultChip } from "~/components/shared/EvaluatorResultChip";
 import { formatLatency } from "~/components/shared/formatters";
 import { Tooltip } from "~/components/ui/tooltip";
+import { describeCellFailure } from "~/experiments-v3/utils/cellFailure";
 import { TraceIdPeek } from "~/features/traces-v2/components/TraceIdPeek";
 import { useDrawer } from "~/hooks/useDrawer";
 import { formatTargetOutput } from "~/utils/formatTargetOutput";
@@ -122,10 +123,12 @@ export function BatchTargetCell({
   // This avoids useEffect + scrollHeight measurement which causes flicker during virtualization
   const isLikelyOverflowing = isTextLikelyOverflowing(rawOutput);
 
+  const failure = describeCellFailure(targetOutput);
+
   // Render output content
   const renderOutput = (expanded: boolean) => {
     // Error state
-    if (targetOutput.error) {
+    if (failure) {
       const errorBox = (
         <HStack
           gap={2}
@@ -141,13 +144,25 @@ export function BatchTargetCell({
           <Box flexShrink={0}>
             <LuCircleAlert size={16} />
           </Box>
-          <Text lineClamp={expanded ? undefined : 2}>{targetOutput.error}</Text>
+          <VStack align="start" gap={0.5}>
+            <Text lineClamp={expanded ? undefined : 2}>{failure.title}</Text>
+            {failure.description && (
+              <Text
+                fontSize="12px"
+                color="fg.muted"
+                lineClamp={expanded ? undefined : 2}
+              >
+                {failure.description}
+              </Text>
+            )}
+          </VStack>
         </HStack>
       );
 
       // The cell clamps to two lines, so the full error is hidden. Surface it
       // on hover (and on click via the expanded overlay above) instead of
-      // forcing the user to inspect the DOM.
+      // forcing the user to inspect the DOM. The engine's own words ride along
+      // here, marked as detail — this is the "on request" surface, not copy.
       if (expanded) {
         return errorBox;
       }
@@ -155,14 +170,31 @@ export function BatchTargetCell({
       return (
         <Tooltip
           content={
-            <Text
-              fontSize="13px"
-              whiteSpace="pre-wrap"
-              wordBreak="break-word"
+            <VStack
+              align="start"
+              gap={1}
               data-testid={`error-tooltip-${targetOutput.targetId}`}
             >
-              {targetOutput.error}
-            </Text>
+              <Text
+                fontSize="13px"
+                whiteSpace="pre-wrap"
+                wordBreak="break-word"
+              >
+                {failure.description
+                  ? `${failure.title}. ${failure.description}`
+                  : failure.title}
+              </Text>
+              {failure.raw && (
+                <Text
+                  fontSize="12px"
+                  opacity={0.8}
+                  whiteSpace="pre-wrap"
+                  wordBreak="break-word"
+                >
+                  {failure.raw}
+                </Text>
+              )}
+            </VStack>
           }
           positioning={{ placement: "top" }}
           openDelay={100}
@@ -327,9 +359,7 @@ export function BatchTargetCell({
           </Button>
         </Tooltip>
       )}
-      {targetOutput.traceId && (
-        <TraceIdPeek traceId={targetOutput.traceId} />
-      )}
+      {targetOutput.traceId && <TraceIdPeek traceId={targetOutput.traceId} />}
       {/* Copy button */}
       {rawOutput && (
         <Tooltip

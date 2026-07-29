@@ -96,7 +96,10 @@ async function getTraceCount(
   clickhouse: ClickHouseClient | null,
 ): Promise<number> {
   if (!clickhouse || projects.length === 0) return 0;
-  return getChTraceCount(clickhouse, projects.map((p) => p.id));
+  return getChTraceCount(
+    clickhouse,
+    projects.map((p) => p.id),
+  );
 }
 
 async function getChTraceCount(
@@ -122,7 +125,10 @@ async function getScenariosCount(
   clickhouse: ClickHouseClient | null,
 ): Promise<number> {
   if (!clickhouse || projects.length === 0) return 0;
-  return getChScenariosCount(clickhouse, projects.map((p) => p.id));
+  return getChScenariosCount(
+    clickhouse,
+    projects.map((p) => p.id),
+  );
 }
 
 async function getChScenariosCount(
@@ -149,4 +155,3 @@ async function getChScenariosCount(
   const rows = (await result.json()) as Array<{ Total: string }>;
   return parseInt(rows[0]?.Total ?? "0", 10);
 }
-

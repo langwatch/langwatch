@@ -27,13 +27,15 @@ import type {
   GatewayBudgetWindow,
 } from "@prisma/client";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import {
+  bucketScopeIdFor,
+  PROVIDER_BUCKET_SEPARATOR,
+} from "./budgetResolution.service";
 
 const EVENTS_TABLE = "gateway_budget_ledger_events" as const;
 const TOTALS_TABLE = "gateway_budget_scope_totals" as const;
 
-const logger = createLogger(
-  "langwatch:gateway:budget-clickhouse-repository",
-);
+const logger = createLogger("langwatch:gateway:budget-clickhouse-repository");
 
 export type BudgetDebitRow = {
   tenantId: string;
@@ -43,6 +45,8 @@ export type BudgetDebitRow = {
   window: GatewayBudgetWindow;
   virtualKeyId: string;
   providerCredentialId?: string | null;
+  /** ModelProvider the request was dispatched to, when the gateway said. */
+  providerKey?: string | null;
   gatewayRequestId: string;
   amountUsd: string;
   tokensInput: number;
@@ -62,6 +66,63 @@ export type ScopeSpend = {
   scopeId: string;
   spentUsd: string;
 };
+
+/**
+ * One budget's read target. `scopeId` is the ledger bucket, not the
+ * budget's target: a provider-filtered budget and a per-member GROUP
+ * allowance each accrue under their own key (see `bucketScopeIdFor` /
+ * `groupBucketScopeId`). `match: "prefix"` sums every bucket under the
+ * key, which is how a GROUP budget reports what a whole group has
+ * spent when no single member is in context.
+ */
+export type BudgetSpendTarget = {
+  budgetId: string;
+  scope: GatewayBudgetScopeType;
+  scopeId: string;
+  window: GatewayBudgetWindow;
+  match?: "exact" | "prefix";
+  /**
+   * Only meaningful with `match: "prefix"`. A string anchors the bucket's
+   * provider suffix (`|provider:<key>`) so a provider-filtered group
+   * budget matches its own buckets; null/undefined requires the bucket to
+   * carry NO provider suffix, so an unfiltered group budget does not
+   * absorb a filtered sibling's buckets on the same group.
+   */
+  bucketSuffix?: string | null;
+};
+
+/**
+ * Read targets for a plain list of budgets, with no request context. A
+ * GROUP budget has no single member here, so it sums every member bucket.
+ */
+export function spendTargetsForBudgets(
+  budgets: GatewayBudget[],
+): BudgetSpendTarget[] {
+  return budgets.map((b) =>
+    b.scopeType === "GROUP"
+      ? {
+          budgetId: b.id,
+          scope: b.scopeType,
+          // The member id sits between the group prefix and the provider
+          // suffix, so a provider-filtered group budget cannot be a plain
+          // prefix target: the prefix is the bare group, and the provider
+          // filter anchors the suffix instead.
+          scopeId: `${b.scopeId}:`,
+          window: b.window,
+          match: "prefix" as const,
+          bucketSuffix: b.providerKey
+            ? `${PROVIDER_BUCKET_SEPARATOR}${b.providerKey}`
+            : null,
+        }
+      : {
+          budgetId: b.id,
+          scope: b.scopeType,
+          scopeId: bucketScopeIdFor(b, b.scopeId),
+          window: b.window,
+          match: "exact" as const,
+        },
+  );
+}
 
 /**
  * Read-shape for ledger events. Mirrors the columns previously read off
@@ -144,6 +205,7 @@ export class GatewayBudgetClickHouseRepository {
       Window: windowToClickHouse(r.window),
       VirtualKeyId: r.virtualKeyId,
       ProviderCredentialId: r.providerCredentialId ?? "",
+      ProviderKey: r.providerKey ?? "",
       GatewayRequestId: r.gatewayRequestId,
       AmountUSD: r.amountUsd,
       TokensInput: r.tokensInput,
@@ -181,95 +243,16 @@ export class GatewayBudgetClickHouseRepository {
    */
   async getSpendForBudgets(
     tenantId: string,
-    budgets: GatewayBudget[],
+    budgets: GatewayBudget[] | BudgetSpendTarget[],
+    // The instant the read is anchored to. Injectable so a test that wrote
+    // a debit at a known time can read the same period deterministically
+    // instead of racing the wall clock across a MINUTE or HOUR boundary.
+    now: Date = new Date(),
   ): Promise<ScopeSpend[]> {
-    if (budgets.length === 0) return [];
-
-    const now = new Date();
-    const byWindow = new Map<GatewayBudgetWindow, GatewayBudget[]>();
-    for (const b of budgets) {
-      const list = byWindow.get(b.window) ?? [];
-      list.push(b);
-      byWindow.set(b.window, list);
-    }
-
-    const out: Map<string, ScopeSpend> = new Map();
-
-    for (const [window, budgetsForWindow] of byWindow) {
-      const periodStart = currentPeriodStart(window, now);
-      const scopeTuples = budgetsForWindow.map((b) => ({
-        scope: scopeToClickHouse(b.scopeType),
-        scopeId: b.scopeId,
-        budgetId: b.id,
-      }));
-
-      // Build a parameter-safe IN clause. We query every (Scope, ScopeId)
-      // tuple for this window in one round-trip and stitch results back by
-      // budget id after.
-      const scopeFilter = scopeTuples
-        .map((_, i) => `(Scope = {scope${i}:String} AND ScopeId = {scopeId${i}:String})`)
-        .join(" OR ");
-      const params: Record<string, string | number> = {
-        tenantId,
-        window: windowToClickHouse(window),
-        periodStart: periodStart.getTime(),
-      };
-      for (let i = 0; i < scopeTuples.length; i++) {
-        params[`scope${i}`] = scopeTuples[i]!.scope;
-        params[`scopeId${i}`] = scopeTuples[i]!.scopeId;
-      }
-
-      try {
-        const client = await this.resolveClient(tenantId);
-        const result = await client.query({
-          query: `
-            SELECT
-              Scope,
-              ScopeId,
-              toString(sumMerge(SpendUSD)) AS SpentUSD
-            FROM ${TOTALS_TABLE}
-            WHERE TenantId = {tenantId:String}
-              AND Window = {window:String}
-              AND PeriodStart = fromUnixTimestamp64Milli({periodStart:Int64})
-              AND (${scopeFilter})
-            GROUP BY Scope, ScopeId
-          `,
-          query_params: params,
-          format: "JSONEachRow",
-        });
-        type Row = { Scope: string; ScopeId: string; SpentUSD: string };
-        const rows = (await result.json()) as Row[];
-        const byKey = new Map<string, string>();
-        for (const r of rows) {
-          byKey.set(`${r.Scope}:${r.ScopeId}`, r.SpentUSD);
-        }
-        for (const t of scopeTuples) {
-          const key = `${t.scope}:${t.scopeId}`;
-          out.set(t.budgetId, {
-            budgetId: t.budgetId,
-            scope: budgetsForWindow.find((b) => b.id === t.budgetId)!
-              .scopeType,
-            scopeId: t.scopeId,
-            spentUsd: byKey.get(key) ?? "0",
-          });
-        }
-      } catch (error) {
-        logger.error(
-          { tenantId, window, error },
-          "failed to read gateway budget scope totals",
-        );
-        throw error;
-      }
-    }
-
-    return budgets.map(
-      (b) =>
-        out.get(b.id) ?? {
-          budgetId: b.id,
-          scope: b.scopeType,
-          scopeId: b.scopeId,
-          spentUsd: "0",
-        },
+    return this.getSpendForTargetsAcrossTenants(
+      [tenantId],
+      toSpendTargets(budgets),
+      now,
     );
   }
 
@@ -289,30 +272,57 @@ export class GatewayBudgetClickHouseRepository {
    */
   async getSpendForBudgetsAcrossTenants(
     tenantIds: string[],
-    budgets: GatewayBudget[],
+    budgets: GatewayBudget[] | BudgetSpendTarget[],
+    now: Date = new Date(),
   ): Promise<ScopeSpend[]> {
-    if (budgets.length === 0 || tenantIds.length === 0) return [];
+    return this.getSpendForTargetsAcrossTenants(
+      tenantIds,
+      toSpendTargets(budgets),
+      now,
+    );
+  }
 
-    const now = new Date();
-    const byWindow = new Map<GatewayBudgetWindow, GatewayBudget[]>();
-    for (const b of budgets) {
-      const list = byWindow.get(b.window) ?? [];
-      list.push(b);
-      byWindow.set(b.window, list);
+  /**
+   * The one spend read. Sums the rollup for each target's bucket in its
+   * own current period, across every tenant given.
+   *
+   * A target's `scopeId` is the ledger bucket, so a provider-filtered
+   * budget reads only its provider's spend and a per-member group
+   * allowance reads only that member's, the same keys the fold writes.
+   * `match: "prefix"` is how a group budget totals all its members
+   * when no single member is in context.
+   */
+  async getSpendForTargetsAcrossTenants(
+    tenantIds: string[],
+    targets: BudgetSpendTarget[],
+    now: Date = new Date(),
+  ): Promise<ScopeSpend[]> {
+    if (targets.length === 0 || tenantIds.length === 0) return [];
+
+    const byWindow = new Map<GatewayBudgetWindow, BudgetSpendTarget[]>();
+    for (const t of targets) {
+      const list = byWindow.get(t.window) ?? [];
+      list.push(t);
+      byWindow.set(t.window, list);
     }
 
     const out: Map<string, ScopeSpend> = new Map();
 
-    for (const [window, budgetsForWindow] of byWindow) {
+    for (const [window, targetsForWindow] of byWindow) {
       const periodStart = currentPeriodStart(window, now);
-      const scopeTuples = budgetsForWindow.map((b) => ({
-        scope: scopeToClickHouse(b.scopeType),
-        scopeId: b.scopeId,
-        budgetId: b.id,
-      }));
 
-      const scopeFilter = scopeTuples
-        .map((_, i) => `(Scope = {scope${i}:String} AND ScopeId = {scopeId${i}:String})`)
+      // One round-trip per window: every bucket is asked for at once and
+      // stitched back onto its budget after. Prefix targets are grouped
+      // and summed per target rather than per bucket.
+      const scopeFilter = targetsForWindow
+        .map((t, i) => {
+          if (t.match !== "prefix") {
+            return `(Scope = {scope${i}:String} AND ScopeId = {scopeId${i}:String})`;
+          }
+          return t.bucketSuffix
+            ? `(Scope = {scope${i}:String} AND startsWith(ScopeId, {scopeId${i}:String}) AND endsWith(ScopeId, {suffix${i}:String}))`
+            : `(Scope = {scope${i}:String} AND startsWith(ScopeId, {scopeId${i}:String}) AND position(ScopeId, {sep:String}) = 0)`;
+        })
         .join(" OR ");
       const tenantPlaceholders = tenantIds
         .map((_, i) => `{tenant${i}:String}`)
@@ -324,9 +334,12 @@ export class GatewayBudgetClickHouseRepository {
       for (let i = 0; i < tenantIds.length; i++) {
         params[`tenant${i}`] = tenantIds[i]!;
       }
-      for (let i = 0; i < scopeTuples.length; i++) {
-        params[`scope${i}`] = scopeTuples[i]!.scope;
-        params[`scopeId${i}`] = scopeTuples[i]!.scopeId;
+      params.sep = PROVIDER_BUCKET_SEPARATOR;
+      for (let i = 0; i < targetsForWindow.length; i++) {
+        params[`scope${i}`] = scopeToClickHouse(targetsForWindow[i]!.scope);
+        params[`scopeId${i}`] = targetsForWindow[i]!.scopeId;
+        const suffix = targetsForWindow[i]!.bucketSuffix;
+        if (suffix) params[`suffix${i}`] = suffix;
       }
 
       try {
@@ -352,18 +365,25 @@ export class GatewayBudgetClickHouseRepository {
         });
         type Row = { Scope: string; ScopeId: string; SpentUSD: string };
         const rows = (await result.json()) as Row[];
-        const byKey = new Map<string, string>();
-        for (const r of rows) {
-          byKey.set(`${r.Scope}:${r.ScopeId}`, r.SpentUSD);
-        }
-        for (const t of scopeTuples) {
-          const key = `${t.scope}:${t.scopeId}`;
+        for (const t of targetsForWindow) {
+          const scope = scopeToClickHouse(t.scope);
+          const total = rows
+            .filter(
+              (r) =>
+                r.Scope === scope &&
+                (t.match === "prefix"
+                  ? r.ScopeId.startsWith(t.scopeId) &&
+                    (t.bucketSuffix
+                      ? r.ScopeId.endsWith(t.bucketSuffix)
+                      : !r.ScopeId.includes(PROVIDER_BUCKET_SEPARATOR))
+                  : r.ScopeId === t.scopeId),
+            )
+            .reduce((sum, r) => sum + (Number.parseFloat(r.SpentUSD) || 0), 0);
           out.set(t.budgetId, {
             budgetId: t.budgetId,
-            scope: budgetsForWindow.find((b) => b.id === t.budgetId)!
-              .scopeType,
+            scope: t.scope,
             scopeId: t.scopeId,
-            spentUsd: byKey.get(key) ?? "0",
+            spentUsd: total.toFixed(6),
           });
         }
       } catch (error) {
@@ -375,12 +395,12 @@ export class GatewayBudgetClickHouseRepository {
       }
     }
 
-    return budgets.map(
-      (b) =>
-        out.get(b.id) ?? {
-          budgetId: b.id,
-          scope: b.scopeType,
-          scopeId: b.scopeId,
+    return targets.map(
+      (t) =>
+        out.get(t.budgetId) ?? {
+          budgetId: t.budgetId,
+          scope: t.scope,
+          scopeId: t.scopeId,
           spentUsd: "0",
         },
     );
@@ -510,11 +530,14 @@ function toLedgerEventRow(r: {
     virtualKeyId: r.virtualKeyId,
     amountUsd: r.amountUsd,
     model: r.model,
-    providerSlot: r.providerSlot && r.providerSlot !== "" ? r.providerSlot : null,
+    providerSlot:
+      r.providerSlot && r.providerSlot !== "" ? r.providerSlot : null,
     tokensInput: Number(r.tokensInput),
     tokensOutput: Number(r.tokensOutput),
     durationMs:
-      r.durationMs === null || r.durationMs === undefined || Number(r.durationMs) === 0
+      r.durationMs === null ||
+      r.durationMs === undefined ||
+      Number(r.durationMs) === 0
         ? null
         : Number(r.durationMs),
     status: ledgerStatusFromCH(r.status),
@@ -537,6 +560,20 @@ function ledgerStatusFromCH(raw: string): GatewayBudgetLedgerStatus {
   }
 }
 
+/**
+ * Accept either raw budget rows (list views, which have no request
+ * context) or explicit bucket targets (request paths, which do).
+ */
+function toSpendTargets(
+  input: GatewayBudget[] | BudgetSpendTarget[],
+): BudgetSpendTarget[] {
+  if (input.length === 0) return [];
+  const first = input[0]!;
+  return "budgetId" in first
+    ? (input as BudgetSpendTarget[])
+    : spendTargetsForBudgets(input as GatewayBudget[]);
+}
+
 function scopeToClickHouse(scope: GatewayBudgetScopeType): string {
   switch (scope) {
     case "ORGANIZATION":
@@ -549,6 +586,8 @@ function scopeToClickHouse(scope: GatewayBudgetScopeType): string {
       return "virtual_key";
     case "PRINCIPAL":
       return "principal";
+    case "GROUP":
+      return "group";
   }
 }
 

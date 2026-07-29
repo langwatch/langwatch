@@ -3,11 +3,11 @@ import { createLogger } from "@langwatch/observability";
 import { resolveOffloadedTraces } from "~/server/traces/resolve-offloaded-traces";
 import type { BlobStore } from "./blob-store.service";
 import { TraceNotFoundError } from "./errors";
+import type { SpanStorageRepository } from "./repositories/span-storage.repository";
 import type {
   FindByTraceIdOptions,
   TraceSummaryRepository,
 } from "./repositories/trace-summary.repository";
-import type { SpanStorageRepository } from "./repositories/span-storage.repository";
 import type { TraceIOExtractionService } from "./trace-io-extraction.service";
 import type { TraceSummaryData } from "./types";
 import { teaserOf } from "./visibility-window.service";

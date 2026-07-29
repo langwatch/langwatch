@@ -2,40 +2,6 @@ import { TRPCClientError, type TRPCClientErrorLike } from "@trpc/client";
 import type { AppRouter } from "../server/api/root";
 import type { LimitType } from "../server/license-enforcement";
 
-/**
- * The best display string for any error, in the order the wire can be trusted:
- *
- *   1. `data.error.meta.message` — prose that was deliberately authored to be
- *      shown. This is the only channel that carries a user-facing sentence for
- *      a handled error: `SerializedHandledError` has no `message` field, and a
- *      HandledError's own `message` is server copy that never crosses the
- *      boundary (ADR-045). Go populates it via `herr.FromBody`.
- *   2. `error.message` — for a handled error this is now its code; for a plain
- *      `TRPCError` it is the copy the procedure authored ("Choose a project
- *      first"), which is still exactly what to show.
- *   3. `data.error.code` — last resort, so the user always gets the stable
- *      identifier rather than an empty toast.
- *
- * Prefer a code-keyed explainer (`explainHandledError`, `explainLangyError`)
- * where one exists — this is the generic fallback for the surfaces that don't
- * have bespoke copy yet.
- */
-export function errorDisplayMessage(error: unknown): string {
-  const domain = (error as { data?: { error?: unknown } })?.data?.error as
-    | { code?: unknown; meta?: { message?: unknown } }
-    | undefined;
-
-  const authored = domain?.meta?.message;
-  if (typeof authored === "string" && authored.length > 0) return authored;
-
-  const wire = (error as { message?: unknown })?.message;
-  if (typeof wire === "string" && wire.length > 0) return wire;
-
-  return typeof domain?.code === "string"
-    ? domain.code
-    : "An unknown error occurred";
-}
-
 export const isNotFound = (error: TRPCClientErrorLike<AppRouter> | null) => {
   if (
     error &&
@@ -47,6 +13,14 @@ export const isNotFound = (error: TRPCClientErrorLike<AppRouter> | null) => {
   return false;
 };
 
+/**
+ * Every error any global interceptor in `utils/api.tsx` has already surfaced —
+ * as a modal, or as its own bespoke toast. `isHandledByGlobalHandler` reads
+ * ONLY this set, so a new `markAsHandledBy…` cannot forget to enrol itself in
+ * a hand-maintained OR the way the first version did.
+ */
+const handledGlobally = new WeakSet<Error>();
+
 // Track handled errors without mutating them
 const handledLicenseErrors = new WeakSet<Error>();
 
@@ -56,6 +30,7 @@ const handledLicenseErrors = new WeakSet<Error>();
  */
 export function markAsHandledByLicenseHandler(error: Error): void {
   handledLicenseErrors.add(error);
+  handledGlobally.add(error);
 }
 
 /**
@@ -68,7 +43,7 @@ export function markAsHandledByLicenseHandler(error: Error): void {
  * const mutation = api.prompts.create.useMutation({
  *   onError: (error) => {
  *     if (isHandledByGlobalLicenseHandler(error)) return;
- *     toaster.create({ title: "Error", description: error.message });
+ *     showErrorToast({ error, fallbackTitle: "Couldn't save" });
  *   },
  * });
  * ```
@@ -83,15 +58,12 @@ export interface LimitExceededInfo {
   max: number;
 }
 
-/**
- * Extracts limit exceeded info from a TRPC error.
- * Returns the info if the error is a FORBIDDEN error with limit data, null otherwise.
- */
 // --- Lite member restriction dedup ---
 const handledLiteMemberErrors = new WeakSet<Error>();
 
 export function markAsHandledByLiteMemberHandler(error: Error): void {
   handledLiteMemberErrors.add(error);
+  handledGlobally.add(error);
 }
 
 export function isHandledByLiteMemberHandler(error: unknown): boolean {
@@ -99,26 +71,32 @@ export function isHandledByLiteMemberHandler(error: unknown): boolean {
 }
 
 /**
- * Check if an error was already handled by any global error handler
- * (license limit or lite member restriction).
- * Use this single check in component-level onError callbacks to avoid
- * showing duplicate error messages (toast + modal).
+ * Check if an error was already handled by any global error handler, which
+ * surface it as a modal or a bespoke toast — so reporting it again would
+ * duplicate it.
+ *
+ * Every interceptor in `utils/api.tsx` counts. This used to be a hand-written
+ * OR over the individual sets, and the first version listed only two of them,
+ * so a missing-model failure (which opens its own sticky toast naming the
+ * feature and linking to model settings) also drew a second, vaguer toast next
+ * to it — the exact duplication this guard exists to stop. It now reads the one
+ * `handledGlobally` set that every `markAsHandledBy…` writes to, so adding an
+ * interceptor cannot leave this stale.
+ *
+ * You rarely need to call this: `showErrorToast` and `<HandledErrorAlert>`
+ * already do, which is why the ~137 copies of this guard in `onError`
+ * callbacks are gone. Reach for it directly only when reporting an error some
+ * other way.
  *
  * @example
  * ```tsx
  * const mutation = api.prompts.create.useMutation({
- *   onError: (error) => {
- *     if (isHandledByGlobalHandler(error)) return;
- *     toaster.create({ title: "Error", description: error.message });
- *   },
+ *   onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't save" }),
  * });
  * ```
  */
 export function isHandledByGlobalHandler(error: unknown): boolean {
-  return (
-    isHandledByGlobalLicenseHandler(error) ||
-    isHandledByLiteMemberHandler(error)
-  );
+  return error instanceof Error && handledGlobally.has(error);
 }
 
 // --- Lite member restriction extractor ---
@@ -144,6 +122,10 @@ export function extractLiteMemberRestrictionInfo(
   return { resource: handledError?.meta?.resource };
 }
 
+/**
+ * Extracts limit exceeded info from a TRPC error.
+ * Returns the info if the error is a FORBIDDEN error with limit data, null otherwise.
+ */
 export function extractLimitExceededInfo(
   error: unknown,
 ): LimitExceededInfo | null {
@@ -168,6 +150,7 @@ const handledMissingModelErrors = new WeakSet<Error>();
 
 export function markAsHandledByMissingModelHandler(error: Error): void {
   handledMissingModelErrors.add(error);
+  handledGlobally.add(error);
 }
 
 export function isHandledByMissingModelHandler(error: unknown): boolean {
@@ -231,6 +214,7 @@ const handledProviderDisabledErrors = new WeakSet<Error>();
 
 export function markAsHandledByProviderDisabledHandler(error: Error): void {
   handledProviderDisabledErrors.add(error);
+  handledGlobally.add(error);
 }
 
 export function isHandledByProviderDisabledHandler(error: unknown): boolean {
@@ -336,8 +320,6 @@ export interface AiCallFailedExtracted {
   featureKey: string;
   featureDisplayName: string;
   role: "DEFAULT" | "FAST" | "LANGY" | "EMBEDDINGS";
-  /** Best-effort short message from the provider/SDK. */
-  errorMessage?: string;
 }
 
 export function extractAiCallFailedInfo(
@@ -350,7 +332,6 @@ export function extractAiCallFailedInfo(
         featureKey?: string;
         featureDisplayName?: string;
         role?: string;
-        errorMessage?: string;
       }
     | undefined;
 
@@ -370,6 +351,5 @@ export function extractAiCallFailedInfo(
     featureKey: cause.featureKey,
     featureDisplayName: cause.featureDisplayName ?? cause.featureKey,
     role,
-    errorMessage: cause.errorMessage,
   };
 }

@@ -1,5 +1,5 @@
 import { Box, Button, Heading, HStack, Text, VStack } from "@chakra-ui/react";
-import { FlaskConical, RefreshCw, ArrowRight } from "lucide-react";
+import { ArrowRight, FlaskConical, RefreshCw } from "lucide-react";
 import { Dialog } from "../ui/dialog";
 
 const CAPABILITIES = [
@@ -28,9 +28,9 @@ function ScenarioWelcomeContent({ onProceed }: { onProceed: () => void }) {
           Welcome to Scenarios
         </Heading>
         <Text fontSize="md" color="fg.muted">
-          Scenarios let you test your agent behavior with repeatable,
-          automated checks. Define situations, set expectations, and verify
-          your agent responds correctly every time.
+          Scenarios let you test your agent behavior with repeatable, automated
+          checks. Define situations, set expectations, and verify your agent
+          responds correctly every time.
         </Text>
       </VStack>
 
@@ -103,7 +103,12 @@ export function ScenarioWelcomeModal({
   onProceed: () => void;
 }) {
   return (
-    <Dialog.Root open={open} onOpenChange={(e) => onOpenChange(e.open)} placement="center" size="lg">
+    <Dialog.Root
+      open={open}
+      onOpenChange={(e) => onOpenChange(e.open)}
+      placement="center"
+      size="lg"
+    >
       <Dialog.Content bg="bg" maxWidth="640px">
         <Dialog.CloseTrigger />
         <Dialog.Body py={8} px={8}>

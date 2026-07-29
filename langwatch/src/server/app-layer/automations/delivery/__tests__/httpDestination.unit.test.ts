@@ -20,7 +20,10 @@ function fetchResolves(status: number, text: string) {
 }
 
 /** A body that never ends — the shape a hostile endpoint uses to stream forever. */
-function endlessBody(): { stream: ReadableStream<Uint8Array>; wasCancelled: () => boolean } {
+function endlessBody(): {
+  stream: ReadableStream<Uint8Array>;
+  wasCancelled: () => boolean;
+} {
   let cancelled = false;
   const chunk = new TextEncoder().encode("x".repeat(8 * 1024));
   const stream = new ReadableStream<Uint8Array>({
@@ -48,7 +51,10 @@ describe("sendHttpDestination", () => {
   describe("when the endpoint responds", () => {
     it("returns the status and body", async () => {
       fetchResolves(200, "ok-body");
-      await expect(send()).resolves.toMatchObject({ status: 200, body: "ok-body" });
+      await expect(send()).resolves.toMatchObject({
+        status: 200,
+        body: "ok-body",
+      });
     });
 
     it("caps an oversized response body", async () => {

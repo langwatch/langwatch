@@ -98,7 +98,9 @@ export function collectorHeaders(): Record<string, string> {
   const headers: Record<string, string> = {
     "content-type": "application/json",
   };
-  for (const pair of (process.env.OTEL_EXPORTER_OTLP_HEADERS ?? "").split(",")) {
+  for (const pair of (process.env.OTEL_EXPORTER_OTLP_HEADERS ?? "").split(
+    ",",
+  )) {
     const separator = pair.indexOf("=");
     if (separator <= 0) continue;
     const name = pair.slice(0, separator).trim();
@@ -188,9 +190,7 @@ export function stampIdentity(resourceSpans: OtlpResourceSpans[]): void {
     const resource = (resourceSpan.resource ??= {});
     const attributes = resource.attributes ?? [];
     resource.attributes = [
-      ...attributes.filter(
-        (attribute) => !owned.has(attribute.key ?? ""),
-      ),
+      ...attributes.filter((attribute) => !owned.has(attribute.key ?? "")),
       { key: "service.name", value: { stringValue: RUM_SERVICE_NAME } },
       {
         key: "langwatch.origin",
@@ -228,7 +228,8 @@ export function assertWalkableExport(resourceSpans: unknown[]): void {
       const { attributes } = resource;
       if (attributes !== void 0) {
         if (!Array.isArray(attributes)) throw invalid();
-        if (attributes.some((attribute) => !isObject(attribute))) throw invalid();
+        if (attributes.some((attribute) => !isObject(attribute)))
+          throw invalid();
       }
     }
 

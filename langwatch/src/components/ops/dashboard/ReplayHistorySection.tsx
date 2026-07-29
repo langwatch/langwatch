@@ -1,9 +1,9 @@
 import { Badge, Box, Card, HStack, Text } from "@chakra-ui/react";
 import { ArrowUpRight } from "lucide-react";
-import NextLink from "~/utils/compat/next-link";
 import { formatDuration } from "~/components/ops/shared/formatters";
 import { replayStateColor } from "~/components/ops/shared/ReplayStateBadge";
 import { api } from "~/utils/api";
+import NextLink from "~/utils/compat/next-link";
 
 export function ReplayHistorySection() {
   const historyQuery = api.ops.getReplayHistory.useQuery(undefined, {

@@ -436,7 +436,7 @@ model Project {
   /// lens, used when a trace has no principal user). Accounting-only.
   departmentId String?
 
-  /// Per-project Langy egress allow-list (ADR-043). A nullable JSON array of
+  /// Per-project Langy egress allow-list (ADR-076). A nullable JSON array of
   /// host patterns (`["registry.npmjs.org", "*.internal.acme.com"]`) that the
   /// project's Langy workers may reach outbound. The *presence* of the list is
   /// the enforcement mode: null/absent ⇒ monitor-only (watch, never block);
@@ -2121,6 +2121,31 @@ model ApiKey {
   @@index([lookupId])
   @@index([ingestSourceType])
   @@index([ingestionTemplateId])
+  // DELIBERATELY UNINDEXED: the Langy session-key reaper sweeps on
+  // (name = <reserved> AND revokedAt IS NULL AND expiresAt <= now), which no
+  // index above serves, so the hourly tick is a sequential scan.
+  //
+  // An index for it was written and then withdrawn. Prisma runs migrations
+  // inside a transaction and this repo has no non-transactional setup, so it
+  // could not be built CONCURRENTLY — and a plain CREATE INDEX takes a SHARE
+  // lock that blocks WRITES on this table for the whole build. ApiKey is on
+  // the authorization hot path (`ApiKeyService.markUsed` fires a
+  // fire-and-forget `update({ lastUsedAt })` after every authorized request,
+  // including trace ingest, and `create` runs on every Langy session-key
+  // mint), so that lock is a deploy-time stall on customer traffic. Paying it
+  // to speed up an HOURLY background sweep is the wrong trade, and telling
+  // each operator to pre-build the index by hand is not an upgrade-safe
+  // mitigation.
+  //
+  // When the table grows enough to warrant it, add it OUT OF BAND — online,
+  // outside a migration:
+  //   CREATE INDEX CONCURRENTLY "ApiKey_name_expiresAt_unrevoked_idx"
+  //     ON "ApiKey"("name", "expiresAt") WHERE "revokedAt" IS NULL;
+  // Keep it undeclared here even then: Prisma cannot express the predicate,
+  // and the predicate is the point — session keys are minted per chat turn and
+  // never deleted, so the un-revoked working set stays small while the table
+  // grows without bound. Declaring an `@@index` would make every migrate diff
+  // want to recreate it as a non-partial index.
 }
 
 model BillingMeterCheckpoint {
@@ -2190,12 +2215,19 @@ enum GatewayProviderHealthStatus {
   CIRCUIT_OPEN
 }
 
+// GROUP is a per-member tier: one GROUP budget materialises one
+// enforcement bucket per (budget, member), so "everyone in Engineering
+// gets $50/month" is one row, not one row per person. The bucket rides
+// the PRINCIPAL cascade machinery: the ledger stamps the member's user
+// id and the bucket key is `<groupId>:<userId>`. There is no aggregate
+// flavour: a shared pot across a department is a TEAM/PROJECT budget.
 enum GatewayBudgetScopeType {
   ORGANIZATION
   TEAM
   PROJECT
   VIRTUAL_KEY
   PRINCIPAL
+  GROUP
 }
 
 enum GatewayBudgetWindow {
@@ -2290,6 +2322,12 @@ model VirtualKey {
   principalUserId String?
   principalUser   User?   @relation("PrincipalScopedVirtualKeys", fields: [principalUserId], references: [id], onDelete: SetNull)
 
+  // Where this key's traces and costs land, for keys whose access scopes
+  // do not name a single project (org- and team-owned keys). Deliberately
+  // NOT a VirtualKeyScope row: scope rows grant access and visibility,
+  // and the trace destination must grant neither.
+  traceProjectId String?
+
   // Slim config blob - per-key state only. The "gateway-config bundle"
   // that the gateway reads via /internal/gateway/config/:vk_id is now
   // materialised on-read from the scope graph (eligible ModelProviders
@@ -2328,6 +2366,13 @@ model VirtualKey {
   routingPolicyId String?
   routingPolicy   RoutingPolicy? @relation("VirtualKeyRoutingPolicy", fields: [routingPolicyId], references: [id], onDelete: SetNull)
 
+  // Explicit routing behaviour. Split out of "routingPolicyId is null"
+  // so "no fallback" is representable at all: the old implicit default
+  // was fallback-across-everything-eligible, which quietly re-routes a
+  // request (and its data) to another vendor. POLICY requires
+  // routingPolicyId; NONE / FALLBACK_ALL require it to be null.
+  routingMode VirtualKeyRoutingMode @default(NONE)
+
   @@unique([hashedSecret])
   @@index([organizationId])
   @@index([displayPrefix])
@@ -2336,6 +2381,23 @@ model VirtualKey {
   @@index([revision])
   @@index([routingPolicyId])
   @@index([organizationId, purpose])
+}
+
+// How a key behaves when the provider serving the requested model fails.
+//
+//   NONE          - no failover. The chain is exactly the provider that
+//                   serves the requested model; a provider outage surfaces
+//                   as an error instead of silently re-routing spend and
+//                   data to a different vendor. Default for new keys.
+//   FALLBACK_ALL  - try every eligible provider in priority order. This is
+//                   what a null routingPolicyId used to mean implicitly,
+//                   so existing keys migrate onto it and behave exactly as
+//                   before.
+//   POLICY        - ordering + rules come from the linked RoutingPolicy.
+enum VirtualKeyRoutingMode {
+  NONE
+  FALLBACK_ALL
+  POLICY
 }
 
 // VirtualKeyScope - N-scope access for VirtualKey, mirrors
@@ -2949,6 +3011,15 @@ model GatewayBudget {
   scopeType      GatewayBudgetScopeType
   scopeId        String
 
+  // Provider filter, orthogonal to the target: null = every provider the
+  // key can reach; set = the budget only counts and only constrains spend
+  // dispatched to that provider. This is what makes the targeting matrix
+  // n x n ("$50/month on OpenAI for the platform team") without adding a
+  // scope type per provider. Holds a `ModelProvider.id` (the row id, not
+  // the provider type key): it survives renames and is the same identity
+  // the gateway keys credentials on, so chain filtering is an id compare.
+  providerKey String?
+
   name        String
   description String?
   window      GatewayBudgetWindow
@@ -2971,8 +3042,16 @@ model GatewayBudget {
 
   ledgerEntries GatewayBudgetLedger[]
 
+  // Set when this budget row is the one the virtual-key drawer's budget
+  // field manages (created with the key or through its edit drawer).
+  // Clearing the drawer field archives ONLY this row; budgets created
+  // independently on the Budgets page keep their own lifecycle and their
+  // own delete permission.
+  managedByVirtualKeyId String?
+
   @@index([organizationId])
-  @@index([scopeType, scopeId])
+  @@index([scopeType, scopeId, providerKey])
+  @@index([managedByVirtualKeyId])
   @@index([resetsAt])
 }
 
@@ -2987,6 +3066,12 @@ model GatewayBudgetLedger {
   // at the MP directly. Column kept nullable for ledger rows whose
   // resolving provider has since been deleted (audit-only state).
   modelProviderId String?
+
+  // The provider the request was actually dispatched to, stamped on every
+  // debit so a provider-filtered budget accumulates only its own spend.
+  // Same identity as GatewayBudget.providerKey (a ModelProvider row id).
+  // Null when the dispatching gateway did not report one.
+  providerKey String?
 
   // Idempotency key - ULID produced by the gateway per request. Dedup for 24h.
   gatewayRequestId String
@@ -3130,15 +3215,34 @@ model ProcessManagerInstance {
 
 /// Idempotency marker for a source event consumed by a process definition.
 model ProcessManagerInbox {
-  id            String   @id @default(nanoid())
-  processName   String
-  projectId     String
-  processKey    String
-  tenantId      String
-  sourceEventId String
-  consumedAt    DateTime @db.Timestamptz(3)
+  id             String   @id @default(nanoid())
+  processName    String
+  projectId      String
+  processKey     String
+  tenantId       String
+  /// The raw source event id, kept UNINDEXED for diagnostics. A caller composes
+  /// this and its length is that domain's business, so it must never carry a
+  /// btree constraint — see `sourceEventKey`.
+  sourceEventId  String
+  /// The fixed-width digest of `sourceEventId` the uniqueness is enforced on,
+  /// derived by the store (`stores/inboxKey.ts`). Postgres cannot index a btree
+  /// row past ~2704 bytes; keying on a digest makes the constraint the same
+  /// width no matter what any pipeline concatenates into an idempotency key.
+  ///
+  /// Nullable ONLY for the rolling deploy that introduces it — pods running the
+  /// previous build write rows without it, and a NOT NULL would fail their
+  /// commits outright. The store always supplies it.
+  ///
+  /// The trade, stated plainly: a NULL is not constrained by the unique index
+  /// (btree treats NULLs as distinct), so while an old writer is serving, the
+  /// one case that loses its guard is the same source event reaching two
+  /// different process keys at once — the store's own read-check plus its
+  /// per-processKey advisory lock cover everything else. A follow-up migration
+  /// adds NOT NULL once the fleet has cycled and closes it.
+  sourceEventKey String?
+  consumedAt     DateTime @db.Timestamptz(3)
 
-  @@unique([processName, projectId, sourceEventId])
+  @@unique([processName, projectId, sourceEventKey])
   @@index([processName, projectId, processKey, consumedAt])
 }
 

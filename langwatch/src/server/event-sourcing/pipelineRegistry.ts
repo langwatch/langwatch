@@ -23,9 +23,7 @@ import type {
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
 import type { Cluster, Redis } from "ioredis";
-import { createOrUpdateQueueItems } from "~/server/api/routers/annotation";
-import { createManyDatasetRecords } from "~/server/api/routers/datasetRecord.utils";
-import { getProtectionsForProject } from "~/server/api/utils";
+import { reapExpiredLangySessionApiKeys } from "~/server/app-layer/langy/langyApiKey";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import { DatasetRepository } from "~/server/datasets/dataset.repository";
 import {
@@ -36,7 +34,6 @@ import { registerDatasetNormalizeEnqueue } from "~/server/datasets/dataset-norma
 import { getDatasetStorage } from "~/server/datasets/dataset-storage";
 import { featureFlagService } from "~/server/featureFlag";
 import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
-import { TraceService } from "~/server/traces/trace.service";
 import { queryBillableEventsTotal } from "../../../ee/billing/services/billableEventsQuery";
 import type { UsageReportingService } from "../../../ee/billing/services/usageReportingService";
 import type { TriggerService } from "../app-layer/automations/trigger.service";
@@ -122,13 +119,13 @@ import { EvaluationAnalyticsRollupAppendStore } from "./pipelines/evaluation-pro
 import { EvaluationRunStore } from "./pipelines/evaluation-processing/projections/evaluationRun.store";
 import { createExperimentRunProcessingPipeline } from "./pipelines/experiment-run-processing/pipeline";
 import type { ClickHouseExperimentRunResultRecord } from "./pipelines/experiment-run-processing/projections/experimentRunResultStorage.mapProjection";
-import { createExperimentRunItemAppendStore } from "./pipelines/experiment-run-processing/projections/experimentRunResultStorage.store";
 import type { ExperimentRunStateData } from "./pipelines/experiment-run-processing/projections/experimentRunState.foldProjection";
 import { createExperimentRunStateFoldStore } from "./pipelines/experiment-run-processing/projections/experimentRunState.store";
 import type { ExperimentRunStateRepository } from "./pipelines/experiment-run-processing/repositories/experimentRunState.repository";
 import type { ComputeExperimentRunMetricsCommandData } from "./pipelines/experiment-run-processing/schemas/commands";
 import { createLangyConversationProcessingPipeline } from "./pipelines/langy-conversation-processing/pipeline";
 import type { LangyAnalyticsEventProjectionRecord } from "./pipelines/langy-conversation-processing/projections/langyAnalyticsEvent.mapProjection";
+import { createLangyMaintenancePipeline } from "./pipelines/langy-maintenance/pipeline";
 import { resolveLogCommandShardCount as resolveCanonicalLogCommandShardCount } from "./pipelines/log-processing/canonicalLog";
 import { createLogProcessingPipeline } from "./pipelines/log-processing/pipeline";
 import { CanonicalLogAppendStore } from "./pipelines/log-processing/projections/stores";
@@ -146,7 +143,6 @@ import {
 import { createSimulationProcessingPipeline } from "./pipelines/simulation-processing/pipeline";
 import type { SimulationRunStateData } from "./pipelines/simulation-processing/projections/simulationRunState.foldProjection";
 import { createCancellationBroadcastReactor } from "./pipelines/simulation-processing/reactors/cancellationBroadcast.reactor";
-import type { ScenarioExecutionReactorHandle } from "./pipelines/simulation-processing/reactors/scenarioExecution.reactor";
 import { createScenarioExecutionReactor } from "./pipelines/simulation-processing/reactors/scenarioExecution.reactor";
 import { createSnapshotUpdateBroadcastReactor } from "./pipelines/simulation-processing/reactors/snapshotUpdateBroadcast";
 import { createSuiteRunSyncReactor } from "./pipelines/simulation-processing/reactors/suiteRunSync.reactor";
@@ -167,7 +163,6 @@ import {
   createTraceProcessingPipeline,
   type TraceProcessingPipelineDeps,
 } from "./pipelines/trace-processing/pipeline";
-import type { DerivedTraceEvent } from "./pipelines/trace-processing/projections/services/trace-events.derivation";
 import { SpanAppendStore } from "./pipelines/trace-processing/projections/spanStorage.store";
 import type { TraceAnalyticsData } from "./pipelines/trace-processing/projections/traceAnalytics.foldProjection";
 import { TraceAnalyticsStore } from "./pipelines/trace-processing/projections/traceAnalytics.store";
@@ -195,6 +190,10 @@ import { RedisCachedFoldStore } from "./projections/redisCachedFoldStore";
 import { RepositoryFoldStore } from "./projections/repositoryFoldStore";
 import type { StateProjectionStore } from "./projections/stateProjection.types";
 import { BlobSweeper } from "./queues/groupQueue/blobSweeper";
+import {
+  generateKillSwitchKey,
+  type KillSwitchComponentType,
+} from "./utils/killSwitch";
 
 const logger = createLogger("langwatch:event-sourcing:pipeline-registry");
 
@@ -417,6 +416,20 @@ export class PipelineRegistry {
       }),
     );
 
+    // Langy credential maintenance, on the same footing. The reaper existed and
+    // was routed for cron, but the chart ships no CronJobs — so until now the
+    // backstop for keys orphaned by a SIGKILLed manager had no caller at all.
+    this.deps.eventSourcing.register(
+      createLangyMaintenancePipeline({
+        sessionKeyReap: {
+          reap: () =>
+            reapExpiredLangySessionApiKeys({ prisma: this.deps.prisma }),
+          deleteDispatchedBefore: (params) =>
+            this.deps.repositories.processStore.deleteDispatchedBefore(params),
+        },
+      }),
+    );
+
     const automationCommands = mapCommands(automationPipeline.commands);
     const evalPipeline = this.registerEvaluationPipeline({
       automations: {
@@ -468,6 +481,8 @@ export class PipelineRegistry {
       codingAgentSubscribers: [
         createCodingAgentSpanFactsDispatchSubscriber({
           contributeSpanFacts: codingAgentCommands.contributeSpanFacts,
+          getNormalizedSpanById: (params) =>
+            this.deps.traces.spans.getNormalizedSpanById(params),
         }),
       ],
     });
@@ -838,10 +853,10 @@ export class PipelineRegistry {
         evalRunStore: new EvaluationRunStore(
           this.deps.evaluations.runs.repository,
         ),
-        // Redis cache is the eval slim fold's ONLY warm read path — its
-        // store's get() returns null by design (lossy row, no read-back),
-        // and on a cache miss the fold's refoldOnStoreMiss option rebuilds
-        // state from the event log. Same wiring as trace_analytics.
+        // Redis cache is the eval slim fold's warm read path; a miss now falls
+        // through to the store's own ClickHouse read-back (ADR-066, migration
+        // 00056) rather than re-folding the event log. Same wiring as
+        // trace_analytics.
         evaluationAnalyticsStore: this.cached<EvaluationAnalyticsData>(
           new EvaluationAnalyticsStore(
             this.deps.repositories.evaluationAnalytics,
@@ -966,11 +981,10 @@ export class PipelineRegistry {
         traceAnalyticsRollupAppendStore: new TraceAnalyticsRollupAppendStore(
           this.deps.repositories.traceAnalyticsRollup,
         ),
-        // Redis cache is the slim fold's ONLY warm read path — its store's
-        // get() returns null by design (lossy row, no read-back), and on a
-        // cache miss the fold's refoldOnStoreMiss option rebuilds state from
-        // the event log. Without this wrapper every event would trigger a
-        // full event-log re-fold.
+        // Redis cache is the slim fold's warm read path; a miss now falls
+        // through to the store's own ClickHouse read-back (ADR-066, migration
+        // 00056) rather than re-folding the event log. The wrapper still earns
+        // its keep — it keeps the steady state off ClickHouse entirely.
         traceAnalyticsStore: this.cached<TraceAnalyticsData>(
           new TraceAnalyticsStore(this.deps.repositories.traceAnalytics),
           "trace_analytics",
@@ -1485,7 +1499,7 @@ export function getProcessManagerMetadata(): ProcessManagerMetadata[] {
 export interface KillSwitchDescriptor {
   key: string;
   aggregateType: string;
-  componentType: "projection" | "mapProjection" | "command";
+  componentType: KillSwitchComponentType;
   componentName: string;
   pipelineName: string;
 }
@@ -1518,6 +1532,33 @@ export function getKillSwitchDescriptors(): KillSwitchDescriptor[] {
         aggregateType,
         componentType: "command",
         componentName: cmd.name,
+        pipelineName,
+      });
+    }
+    // Subscribers belong here MORE than the others do, not less: the enqueue
+    // seam decides relevance and DISCARDS what it judges irrelevant, and
+    // subscriber fan-out is never replayed (ADR-069), so a bad filter loses
+    // those events for good. `ops.setFeatureFlag` rejects any key that is
+    // neither a registry entry nor a live descriptor, so a switch missing from
+    // this list is not merely unlisted — it is unsettable, leaving a revert as
+    // the only way to stop the seam it guards.
+    //
+    // A subscriber may override its key via `options.killSwitch.customKey`;
+    // emit the key the router will actually read, or the page would offer one
+    // nothing consults.
+    for (const definition of def.eventSubscribers.values()) {
+      out.push({
+        // Generated, never re-spelled: the comment above is the reason. A
+        // hand-built key that drifts from `generateKillSwitchKey` is not a
+        // cosmetic mismatch — `ops.setFeatureFlag` refuses a key that is
+        // neither a registry entry nor a live descriptor, so the switch
+        // becomes unsettable.
+        key:
+          definition.options?.killSwitch?.customKey ??
+          generateKillSwitchKey(aggregateType, "subscriber", definition.name),
+        aggregateType,
+        componentType: "subscriber",
+        componentName: definition.name,
         pipelineName,
       });
     }

@@ -7,10 +7,9 @@ import {
   Stack,
   Text,
 } from "@chakra-ui/react";
+import type { SlackDeliveryMethod } from "@langwatch/automations/providers/slack";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useState } from "react";
-
-import type { SlackDeliveryMethod } from "@langwatch/automations/providers/slack";
 import {
   type DraftCadence,
   pickDefaultSlackBlockKitTemplateId,
@@ -246,7 +245,12 @@ function Card({
             <Wireframe />
           </Box>
           {locked && lockedNote ? (
-            <Badge size="xs" variant="subtle" colorPalette="gray" alignSelf="start">
+            <Badge
+              size="xs"
+              variant="subtle"
+              colorPalette="gray"
+              alignSelf="start"
+            >
               {lockedNote}
             </Badge>
           ) : (

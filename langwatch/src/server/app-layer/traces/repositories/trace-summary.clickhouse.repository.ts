@@ -42,7 +42,11 @@ export class TraceSummaryClickHouseRepository
 {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
-  async upsert(data: TraceSummaryData, tenantId: string, retentionDays = PLATFORM_DEFAULT_RETENTION_DAYS): Promise<void> {
+  async upsert(
+    data: TraceSummaryData,
+    tenantId: string,
+    retentionDays = PLATFORM_DEFAULT_RETENTION_DAYS,
+  ): Promise<void> {
     EventUtils.validateTenantId(
       { tenantId },
       "TraceSummaryClickHouseRepository.upsert",
@@ -82,7 +86,11 @@ export class TraceSummaryClickHouseRepository
   }
 
   async upsertBatch(
-    entries: Array<{ data: TraceSummaryData; tenantId: string; retentionDays?: number }>,
+    entries: Array<{
+      data: TraceSummaryData;
+      tenantId: string;
+      retentionDays?: number;
+    }>,
   ): Promise<void> {
     if (entries.length === 0) return;
 
@@ -93,21 +101,23 @@ export class TraceSummaryClickHouseRepository
 
     try {
       const client = await this.resolveClient(tenantId);
-      const records = entries.map(({ data, tenantId: tid, retentionDays: rd }) => {
-        const projectionId =
-          IdUtils.generateDeterministicTraceSummaryIdFromData(
+      const records = entries.map(
+        ({ data, tenantId: tid, retentionDays: rd }) => {
+          const projectionId =
+            IdUtils.generateDeterministicTraceSummaryIdFromData(
+              tid,
+              data.traceId,
+              data.occurredAt,
+            );
+          return this.toClickHouseRecord(
+            data,
             tid,
-            data.traceId,
-            data.occurredAt,
+            projectionId,
+            TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
+            rd,
           );
-        return this.toClickHouseRecord(
-          data,
-          tid,
-          projectionId,
-          TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
-          rd,
-        );
-      });
+        },
+      );
 
       await client.insert({
         table: TABLE_NAME,
@@ -226,7 +236,10 @@ export class TraceSummaryClickHouseRepository
           // null from the light scan without ever issuing the heavy read;
           // historical sentinel rows still use the legacy unbounded fallback to
           // preserve correctness.
-          const resolved = await this.resolveOccurredAtMs({ tenantId, traceId });
+          const resolved = await this.resolveOccurredAtMs({
+            tenantId,
+            traceId,
+          });
           if (!resolved.found) return null;
           if (resolved.occurredAtMs === undefined) {
             logger.debug(
@@ -291,7 +304,9 @@ export class TraceSummaryClickHouseRepository
     const rowCountRaw = rows[0]?.rowCount;
     const raw = rows[0]?.occurredAtMs;
     const rowCount =
-      typeof rowCountRaw === "string" ? Number(rowCountRaw) : rowCountRaw ?? NaN;
+      typeof rowCountRaw === "string"
+        ? Number(rowCountRaw)
+        : (rowCountRaw ?? NaN);
     if (!Number.isFinite(rowCount) || rowCount <= 0) {
       return { found: false };
     }

@@ -1,7 +1,7 @@
-import { describe, it, expect } from "vitest";
-import { createDefaultPromptFormValues } from "../useLoadSpanIntoPromptPlayground";
-import { DEFAULT_MODEL } from "~/utils/constants";
+import { describe, expect, it } from "vitest";
 import type { RouterOutputs } from "~/utils/api";
+import { DEFAULT_MODEL } from "~/utils/constants";
+import { createDefaultPromptFormValues } from "../useLoadSpanIntoPromptPlayground";
 
 type SpanData = RouterOutputs["spans"]["getForPromptStudio"];
 

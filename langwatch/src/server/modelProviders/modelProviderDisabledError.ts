@@ -1,11 +1,17 @@
+import { HandledError } from "@langwatch/handled-error";
+
 import type { ModelRole } from "./featureRegistry";
 import type { ResolutionScope } from "./resolveModelForFeature";
 
 /**
- * Stable wire-format cause carried on tRPC/REST responses so the frontend
- * interceptor can match without sniffing message strings. Distinct from
- * MODEL_NOT_CONFIGURED — the cascade DID find a model, it's just unusable
- * right now because the backing provider is disabled.
+ * Legacy wire-format discriminator carried on the tRPC `data.cause` sidecar.
+ *
+ * @deprecated NOT the error's code — the code is `model_provider_disabled`,
+ * which is what `APP_ERROR_CODES` enumerates and what the presentation
+ * registry writes copy for. This constant survives for one consumer:
+ * `src/utils/trpcError.ts::extractProviderDisabledInfo`, fed by the bespoke
+ * `providerDisabledCause` block in `src/server/api/trpc.ts`. New code reads
+ * `error.code`.
  */
 export const MODEL_PROVIDER_DISABLED_CAUSE = "MODEL_PROVIDER_DISABLED" as const;
 
@@ -25,9 +31,14 @@ export interface ResolvedAlternate {
 
 /**
  * Thrown by `getVercelAIModel` when the cascade resolver picked a
- * model whose provider is currently disabled. The frontend
- * `extractProviderDisabledInfo` interceptor matches on
- * `cause === MODEL_PROVIDER_DISABLED` and opens the swap toast.
+ * model whose provider is currently disabled. A `HandledError` carrying the
+ * enumerated `model_provider_disabled` code, so the words a customer reads
+ * come from the code-keyed presentation registry. The frontend
+ * `extractProviderDisabledInfo` interceptor additionally matches on the
+ * legacy `cause === MODEL_PROVIDER_DISABLED` sidecar and opens the swap toast.
+ *
+ * `httpStatus` is 400 (the caller can fix it) and `fault` stays `customer` —
+ * the provider was disabled in their own settings.
  *
  * Carries:
  *   - featureKey / featureDisplayName / role — for messaging + telemetry
@@ -35,8 +46,19 @@ export interface ResolvedAlternate {
  *   - alternate — the next cascade candidate, if any, so the toast can
  *     offer a one-click swap
  *   - projectId — so the action button knows which scope row to clear
+ *
+ * All of it is the customer's own configuration, so all of it is safe on the
+ * client contract; it rides in `meta` as well as on the legacy sidecar so the
+ * bespoke `providerDisabledCause` block in `trpc.ts` can be retired without
+ * the toast losing what it needs.
  */
-export class ModelProviderDisabledError extends Error {
+export class ModelProviderDisabledError extends HandledError {
+  declare readonly code: "model_provider_disabled";
+
+  /**
+   * @deprecated The legacy alias of `code` — see
+   * {@link MODEL_PROVIDER_DISABLED_CAUSE}.
+   */
   public readonly cause = MODEL_PROVIDER_DISABLED_CAUSE;
 
   constructor(
@@ -50,7 +72,21 @@ export class ModelProviderDisabledError extends Error {
     public readonly alternate: ResolvedAlternate | null,
   ) {
     super(
+      "model_provider_disabled",
       `Model "${resolvedModel}" is configured at ${resolvedScope} scope for "${featureKey}", but its provider "${providerKey}" is currently disabled.`,
+      {
+        httpStatus: 400,
+        meta: {
+          featureKey,
+          featureDisplayName,
+          role,
+          projectId,
+          resolvedScope,
+          resolvedModel,
+          providerKey,
+          alternate,
+        },
+      },
     );
     this.name = "ModelProviderDisabledError";
   }

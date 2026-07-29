@@ -36,7 +36,8 @@ export type HasActiveShareForTrace = (params: {
 export class PinnedTraceService {
   constructor(
     private readonly repository: PinnedTraceRepository,
-    private readonly hasActiveShareForTrace: HasActiveShareForTrace = async () => false,
+    private readonly hasActiveShareForTrace: HasActiveShareForTrace = async () =>
+      false,
   ) {}
 
   async pin(params: PinTraceParams): Promise<PinnedTrace> {

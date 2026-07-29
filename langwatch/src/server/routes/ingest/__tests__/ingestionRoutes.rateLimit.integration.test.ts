@@ -63,13 +63,14 @@ afterEach(async () => {
   if (!redisConnection) return;
   let cursor = "0";
   do {
-    const [next, found] = (await (redisConnection as { scan: (...args: unknown[]) => Promise<[string, string[]]> }).scan(
-      cursor,
-      "MATCH",
-      `lwingest:rate:${ns}-*`,
-      "COUNT",
-      100,
-    )) as [string, string[]];
+    const [next, found] = (await (
+      redisConnection as {
+        scan: (...args: unknown[]) => Promise<[string, string[]]>;
+      }
+    ).scan(cursor, "MATCH", `lwingest:rate:${ns}-*`, "COUNT", 100)) as [
+      string,
+      string[],
+    ];
     cursor = next;
     for (const k of found) {
       await redisConnection.del(k);

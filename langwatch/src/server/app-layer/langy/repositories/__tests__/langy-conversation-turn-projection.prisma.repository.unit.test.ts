@@ -1,8 +1,5 @@
-import {
-  type LangyConversationTurnProjection,
-  Prisma,
-} from "@prisma/client";
 import { LANGY_CONVERSATION_TURN_STATUS } from "@langwatch/langy";
+import { type LangyConversationTurnProjection, Prisma } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
 import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
 import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";

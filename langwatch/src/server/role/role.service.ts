@@ -1,4 +1,8 @@
-import { type Prisma, type PrismaClient, RoleBindingScopeType } from "@prisma/client";
+import {
+  type Prisma,
+  type PrismaClient,
+  RoleBindingScopeType,
+} from "@prisma/client";
 import { assertNoPersonalTeamScope } from "~/server/role-bindings/personal-team-scope";
 import {
   RoleDuplicateNameError,
@@ -11,8 +15,8 @@ import {
   UserNotTeamMemberError,
 } from "./errors";
 import {
-  CUSTOM_ROLE_KIND,
   type CreateRoleParams,
+  CUSTOM_ROLE_KIND,
   RoleRepository,
   type UpdateRoleParams,
 } from "./repositories/role.repository";
@@ -28,7 +32,8 @@ export class RoleService {
   }
 
   async getAllRoles(organizationId: string) {
-    const roles = await this.repository.findUserCreatedByOrganization(organizationId);
+    const roles =
+      await this.repository.findUserCreatedByOrganization(organizationId);
     return roles.map((role) => ({
       ...role,
       permissions: role.permissions as string[],
@@ -176,7 +181,11 @@ export class RoleService {
     organizationId: string;
     teamId: string;
   }) {
-    return this.repository.findUserCustomRoleBinding({ userId, organizationId, teamId });
+    return this.repository.findUserCustomRoleBinding({
+      userId,
+      organizationId,
+      teamId,
+    });
   }
 
   async validateRolesAssignable({
@@ -188,7 +197,10 @@ export class RoleService {
   }) {
     if (roleIds.length === 0) return;
 
-    const validRoles = await this.repository.findAssignableByIds(roleIds, organizationId);
+    const validRoles = await this.repository.findAssignableByIds(
+      roleIds,
+      organizationId,
+    );
     const validIds = new Set(validRoles.map((r) => r.id));
     const invalid = roleIds.filter((id) => !validIds.has(id));
 
@@ -205,7 +217,10 @@ export class RoleService {
     organizationId: string;
   }): Promise<string[]> {
     if (roleIds.length === 0) return [];
-    const validRoles = await this.repository.findAssignableByIds(roleIds, organizationId);
+    const validRoles = await this.repository.findAssignableByIds(
+      roleIds,
+      organizationId,
+    );
     return validRoles.map((r) => r.id);
   }
 }

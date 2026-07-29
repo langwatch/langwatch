@@ -4,7 +4,7 @@
 
 **Status:** Accepted (design; implementation starting)
 
-**Builds on:** the existing relay dual-export lane (`services/langyagent/adapters/otelrelay`, `otel/angelinajolie.go` — the content-stripped operational copy), ADR-043/ADR-053 (egress), ADR-055 (canonical OTLP pipelines), `specs/langy/langy-otel-tracing.feature` (amended by this ADR).
+**Builds on:** the existing relay dual-export lane (`services/langyagent/adapters/otelrelay`, `otel/angelinajolie.go` — the content-stripped operational copy), ADR-076/ADR-053 (egress), ADR-055 (canonical OTLP pipelines), `specs/langy/langy-otel-tracing.feature` (amended by this ADR).
 
 ## Context
 

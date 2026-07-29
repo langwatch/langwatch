@@ -16,16 +16,16 @@ vi.mock("langwatch", () => ({
   }),
 }));
 
+import {
+  type NormalizedSpan,
+  NormalizedSpanKind,
+  NormalizedStatusCode,
+} from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import type { BlobStore } from "../blob-store.service";
 import { BlobNotFoundError } from "../blob-store.service";
 import { EVENTREF_ATTR_PREFIX } from "../lean-for-projection";
-import { TraceIOExtractionService } from "../trace-io-extraction.service";
 import type { SpanStorageRepository } from "../repositories/span-storage.repository";
-import {
-  NormalizedSpanKind,
-  NormalizedStatusCode,
-  type NormalizedSpan,
-} from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
+import { TraceIOExtractionService } from "../trace-io-extraction.service";
 import { TraceSummaryService } from "../trace-summary.service";
 
 // ---------------------------------------------------------------------------
@@ -69,12 +69,10 @@ function makeSpan(
 
 function fakeBlobStore(resolvedValues: Record<string, string>): BlobStore {
   return {
-    getFromEventLog: vi.fn(
-      async ({ field }: { field: string }) => {
-        if (field in resolvedValues) return resolvedValues[field]!;
-        throw new BlobNotFoundError("evt-test", field, "proj-1");
-      },
-    ),
+    getFromEventLog: vi.fn(async ({ field }: { field: string }) => {
+      if (field in resolvedValues) return resolvedValues[field]!;
+      throw new BlobNotFoundError("evt-test", field, "proj-1");
+    }),
     putSpool: vi.fn(),
     getSpool: vi.fn(),
     deleteSpool: vi.fn(),

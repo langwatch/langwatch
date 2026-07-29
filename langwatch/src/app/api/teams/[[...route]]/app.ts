@@ -1,22 +1,22 @@
+import { generate } from "@langwatch/ksuid";
 import {
+  type Organization,
   RoleBindingScopeType,
   TeamUserRole,
-  type Organization,
 } from "@prisma/client";
-import { generate } from "@langwatch/ksuid";
 import { describeRoute } from "hono-openapi";
-import { validator as zValidator } from "~/server/api/validation";
 import { z } from "zod";
+import { createOrgApp, requires } from "~/server/api/security";
+import { validator as zValidator } from "~/server/api/validation";
 import {
   PERSONAL_TEAM_MEMBERSHIP_REFUSAL,
   PersonalTeamProtectedError,
   TeamNotFoundError,
   type TeamRestService,
 } from "~/server/app-layer/teams/team.service";
-import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
-import { createOrgApp, requires } from "~/server/api/security";
 import { prisma } from "~/server/db";
 import { KSUID_RESOURCES } from "~/utils/constants";
+import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import type { TeamServiceMiddlewareVariables } from "../../middleware/team-service";
 import { teamServiceMiddleware } from "../../middleware/team-service";
 import {
@@ -70,152 +70,142 @@ const secured = createOrgApp<TeamServiceMiddlewareVariables>({
 
 secured.hono.onError(handleTeamError);
 
-secured
-  .access(requires("team:view"))
-  .get(
-    "/",
-    teamServiceMiddleware,
-    describeRoute({
-      description: "List all non-archived teams for the organization (paginated)",
-    }),
-    zValidator("query", paginationQuerySchema),
-    async (c) => {
-      const organization = c.get("organization") as Organization;
-      const { page, limit } = c.req.valid("query");
-      const service = c.get("teamService") as TeamRestService;
+secured.access(requires("team:view")).get(
+  "/",
+  teamServiceMiddleware,
+  describeRoute({
+    description: "List all non-archived teams for the organization (paginated)",
+  }),
+  zValidator("query", paginationQuerySchema),
+  async (c) => {
+    const organization = c.get("organization") as Organization;
+    const { page, limit } = c.req.valid("query");
+    const service = c.get("teamService") as TeamRestService;
 
-      const result = await service.listByOrganization({
+    const result = await service.listByOrganization({
+      organizationId: organization.id,
+      page,
+      limit,
+    });
+
+    return c.json({
+      data: result.data.map(teamResponse),
+      pagination: result.pagination,
+    });
+  },
+);
+
+secured.access(requires("team:create")).post(
+  "/",
+  teamServiceMiddleware,
+  describeRoute({
+    description: "Create a new team that can group projects and members",
+  }),
+  zValidator("json", createTeamSchema),
+  async (c) => {
+    const organization = c.get("organization") as Organization;
+    const body = c.req.valid("json");
+    const service = c.get("teamService") as TeamRestService;
+
+    const team = await service.create({
+      organizationId: organization.id,
+      name: body.name,
+    });
+
+    return c.json(teamResponse(team), 201);
+  },
+);
+
+secured.access(requires("team:view")).get(
+  "/:id",
+  teamServiceMiddleware,
+  describeRoute({
+    description: "Get a team by its id",
+  }),
+  async (c) => {
+    const { id } = c.req.param();
+    const organization = c.get("organization") as Organization;
+    const service = c.get("teamService") as TeamRestService;
+
+    const team = await service.getById({
+      id,
+      organizationId: organization.id,
+    });
+    if (!team) {
+      throw new NotFoundError("Team not found");
+    }
+
+    return c.json(teamResponse(team));
+  },
+);
+
+secured.access(requires("team:update")).patch(
+  "/:id",
+  teamServiceMiddleware,
+  describeRoute({
+    description: "Update a team by its id",
+  }),
+  zValidator("json", updateTeamSchema),
+  async (c) => {
+    const { id } = c.req.param();
+    const organization = c.get("organization") as Organization;
+    const body = c.req.valid("json");
+    const service = c.get("teamService") as TeamRestService;
+
+    let team;
+    try {
+      team = await service.update({
+        id,
         organizationId: organization.id,
-        page,
-        limit,
+        data: {
+          ...(body.name !== undefined && { name: body.name }),
+        },
       });
+    } catch (error) {
+      if (error instanceof TeamNotFoundError) {
+        throw new NotFoundError("Team not found");
+      }
+      throw error;
+    }
 
-      return c.json({
-        data: result.data.map(teamResponse),
-        pagination: result.pagination,
-      });
-    },
-  );
+    return c.json(teamResponse(team));
+  },
+);
 
-secured
-  .access(requires("team:create"))
-  .post(
-    "/",
-    teamServiceMiddleware,
-    describeRoute({
-      description: "Create a new team that can group projects and members",
-    }),
-    zValidator("json", createTeamSchema),
-    async (c) => {
-      const organization = c.get("organization") as Organization;
-      const body = c.req.valid("json");
-      const service = c.get("teamService") as TeamRestService;
+secured.access(requires("team:delete")).delete(
+  "/:id",
+  teamServiceMiddleware,
+  describeRoute({
+    description: "Archive a team (soft-delete)",
+  }),
+  async (c) => {
+    const { id } = c.req.param();
+    const organization = c.get("organization") as Organization;
+    const service = c.get("teamService") as TeamRestService;
 
-      const team = await service.create({
-        organizationId: organization.id,
-        name: body.name,
-      });
-
-      return c.json(teamResponse(team), 201);
-    },
-  );
-
-secured
-  .access(requires("team:view"))
-  .get(
-    "/:id",
-    teamServiceMiddleware,
-    describeRoute({
-      description: "Get a team by its id",
-    }),
-    async (c) => {
-      const { id } = c.req.param();
-      const organization = c.get("organization") as Organization;
-      const service = c.get("teamService") as TeamRestService;
-
-      const team = await service.getById({
+    let team;
+    try {
+      team = await service.archive({
         id,
         organizationId: organization.id,
       });
-      if (!team) {
+    } catch (error) {
+      if (error instanceof TeamNotFoundError) {
         throw new NotFoundError("Team not found");
       }
-
-      return c.json(teamResponse(team));
-    },
-  );
-
-secured
-  .access(requires("team:update"))
-  .patch(
-    "/:id",
-    teamServiceMiddleware,
-    describeRoute({
-      description: "Update a team by its id",
-    }),
-    zValidator("json", updateTeamSchema),
-    async (c) => {
-      const { id } = c.req.param();
-      const organization = c.get("organization") as Organization;
-      const body = c.req.valid("json");
-      const service = c.get("teamService") as TeamRestService;
-
-      let team;
-      try {
-        team = await service.update({
-          id,
-          organizationId: organization.id,
-          data: {
-            ...(body.name !== undefined && { name: body.name }),
-          },
-        });
-      } catch (error) {
-        if (error instanceof TeamNotFoundError) {
-          throw new NotFoundError("Team not found");
-        }
-        throw error;
+      if (error instanceof PersonalTeamProtectedError) {
+        throw new ForbiddenError(error.message);
       }
+      throw error;
+    }
 
-      return c.json(teamResponse(team));
-    },
-  );
-
-secured
-  .access(requires("team:delete"))
-  .delete(
-    "/:id",
-    teamServiceMiddleware,
-    describeRoute({
-      description: "Archive a team (soft-delete)",
-    }),
-    async (c) => {
-      const { id } = c.req.param();
-      const organization = c.get("organization") as Organization;
-      const service = c.get("teamService") as TeamRestService;
-
-      let team;
-      try {
-        team = await service.archive({
-          id,
-          organizationId: organization.id,
-        });
-      } catch (error) {
-        if (error instanceof TeamNotFoundError) {
-          throw new NotFoundError("Team not found");
-        }
-        if (error instanceof PersonalTeamProtectedError) {
-          throw new ForbiddenError(error.message);
-        }
-        throw error;
-      }
-
-      return c.json({
-        id: team.id,
-        name: team.name,
-        archivedAt: team.archivedAt,
-      });
-    },
-  );
+    return c.json({
+      id: team.id,
+      name: team.name,
+      archivedAt: team.archivedAt,
+    });
+  },
+);
 
 // ── Members ──────────────────────────────────────────────────────────────────
 
@@ -230,7 +220,10 @@ secured
       const organization = c.get("organization") as Organization;
       const service = c.get("teamService") as TeamRestService;
 
-      const team = await service.getById({ id, organizationId: organization.id });
+      const team = await service.getById({
+        id,
+        organizationId: organization.id,
+      });
       if (!team) throw new NotFoundError("Team not found");
 
       const bindings = await prisma.roleBinding.findMany({
@@ -269,7 +262,10 @@ secured
       const body = c.req.valid("json");
       const service = c.get("teamService") as TeamRestService;
 
-      const team = await service.getById({ id, organizationId: organization.id });
+      const team = await service.getById({
+        id,
+        organizationId: organization.id,
+      });
       if (!team) throw new NotFoundError("Team not found");
       // A personal team holds exactly its owner, which is why plan limits
       // exempt it. A second member would contradict that, so the request is
@@ -323,7 +319,10 @@ secured
       const organization = c.get("organization") as Organization;
       const service = c.get("teamService") as TeamRestService;
 
-      const team = await service.getById({ id, organizationId: organization.id });
+      const team = await service.getById({
+        id,
+        organizationId: organization.id,
+      });
       if (!team) throw new NotFoundError("Team not found");
       // The one member of a personal team is its owner, and nothing puts that
       // binding back, so removal is refused rather than leaving the owner
@@ -360,12 +359,25 @@ secured
       const organization = c.get("organization") as Organization;
       const service = c.get("teamService") as TeamRestService;
 
-      const team = await service.getById({ id, organizationId: organization.id });
+      const team = await service.getById({
+        id,
+        organizationId: organization.id,
+      });
       if (!team) throw new NotFoundError("Team not found");
 
       const projects = await prisma.project.findMany({
-        where: { teamId: id, archivedAt: null, kind: { not: "internal_governance" } },
-        select: { id: true, name: true, slug: true, createdAt: true, updatedAt: true },
+        where: {
+          teamId: id,
+          archivedAt: null,
+          kind: { not: "internal_governance" },
+        },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          createdAt: true,
+          updatedAt: true,
+        },
         orderBy: { createdAt: "desc" },
       });
 

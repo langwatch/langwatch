@@ -195,11 +195,8 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
         classified.cta === "configure" ||
         classified.cta === "configure-and-retry";
       toaster.create({
-        title: "Generation failed",
-        description:
-          classified.tier === "unknown"
-            ? classified.rawMessage
-            : classified.copy,
+        title: classified.title,
+        description: classified.copy,
         type: "error",
         duration: TOAST_DURATION_MS,
         action: needsConfiguration

@@ -12,6 +12,8 @@
  * Real logic follows once the service layer for VirtualKey / Budget lands.
  */
 
+// biome-ignore-all lint/suspicious/noEmptyBlockStatements: the empty blocks in this file are deliberate no-ops.
+
 import { createLogger } from "@langwatch/observability";
 import { createHash, createHmac, timingSafeEqual } from "crypto";
 import type { Context, Next } from "hono";
@@ -27,11 +29,11 @@ import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.click
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
 import { ChangeEventRepository } from "~/server/gateway/changeEvent.repository";
 import { GatewayConfigMaterialiser } from "~/server/gateway/config.materialiser";
+import { signGatewayJwt } from "~/server/gateway/gatewayJwt";
 import {
   GatewayGuardrailEvaluationService,
   GUARDRAIL_WIRE_DIRECTIONS,
 } from "~/server/gateway/guardrailEvaluation.service";
-import { signGatewayJwt } from "~/server/gateway/gatewayJwt";
 import { resolveTraceProject } from "~/server/gateway/scopeResolver";
 import {
   hashVirtualKeySecret,

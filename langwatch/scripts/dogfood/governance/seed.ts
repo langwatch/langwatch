@@ -42,6 +42,7 @@ function shortId(): string {
 function parseArgs(argv: string[]): Args {
   const out: Partial<Args> = { sourceType: "otel_generic" };
   let nsRoot = "dogfood";
+  // biome-ignore lint/style/useForOf: flag parser advances the index (argv[++i]) to consume a value; for...of has no index to advance.
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === "--source-type") {

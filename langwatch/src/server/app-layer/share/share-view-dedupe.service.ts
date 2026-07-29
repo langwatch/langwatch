@@ -1,6 +1,6 @@
 import { createLogger } from "@langwatch/observability";
-import type { Cluster } from "ioredis";
 import type IORedis from "ioredis";
+import type { Cluster } from "ioredis";
 
 const logger = createLogger("langwatch:share-view-dedupe");
 

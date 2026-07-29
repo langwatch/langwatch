@@ -1,9 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-import type { Event } from "../../domain/types";
-import { definePipeline } from "../../pipeline/staticBuilder";
 import { DisabledPipeline } from "../../disabledPipeline";
+import type { Event } from "../../domain/types";
 import { EventSourcing } from "../../eventSourcing";
+import { definePipeline } from "../../pipeline/staticBuilder";
 import { createMockEventStore } from "../../services/__tests__/testHelpers";
 import { EventStoreMemory } from "../../stores/eventStoreMemory";
 

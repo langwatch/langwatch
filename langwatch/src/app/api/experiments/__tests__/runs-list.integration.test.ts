@@ -15,8 +15,7 @@ describe.skipIf(process.env.CI)("GET /api/experiments/runs", () => {
   let experiment: Experiment;
   const testSlug = `runs-list-test-${Date.now()}`;
 
-  const getBaseUrl = () =>
-    process.env.TEST_BASE_URL ?? "http://localhost:5560";
+  const getBaseUrl = () => process.env.TEST_BASE_URL ?? "http://localhost:5560";
 
   beforeAll(async () => {
     project = await getTestProject("runs-list-test");
@@ -57,10 +56,9 @@ describe.skipIf(process.env.CI)("GET /api/experiments/runs", () => {
     describe("when experimentSlug is missing", () => {
       /** @scenario "Missing experimentSlug returns 400" */
       it("rejects with 400", async () => {
-        const response = await fetch(
-          `${getBaseUrl()}/api/experiments/runs`,
-          { headers: { "X-Auth-Token": project.apiKey } },
-        );
+        const response = await fetch(`${getBaseUrl()}/api/experiments/runs`, {
+          headers: { "X-Auth-Token": project.apiKey },
+        });
         expect(response.status).toBe(400);
         const body = await response.json();
         expect(body.error).toMatch(/experimentSlug/);

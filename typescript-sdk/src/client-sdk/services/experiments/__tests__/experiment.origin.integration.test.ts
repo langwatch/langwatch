@@ -64,6 +64,7 @@ describe("Experiment origin and span parenting", () => {
   });
 
   describe("when running evaluation.run() without targets", () => {
+    /** @scenario "Run evaluation over dataset with automatic tracing" */
     it("sets langwatch.origin on the evaluation.iteration span", async () => {
       const { provider, exporter } = setupTestTracer();
       tracerProvider = provider;

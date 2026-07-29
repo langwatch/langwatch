@@ -1,10 +1,10 @@
+import type { LangyConversationStateData } from "@langwatch/langy";
 import type { Prisma } from "@prisma/client";
 import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
 import type {
   StateProjectionStore,
   StoredProjection,
 } from "~/server/event-sourcing/projections/stateProjection.types";
-import type { LangyConversationStateData } from "@langwatch/langy";
 
 type Row = Prisma.LangyConversationProjectionGetPayload<object>;
 
@@ -38,7 +38,9 @@ function fromRow(row: Row): StoredProjection<LangyConversationStateData> {
 }
 
 /** Postgres row I/O for the type-aware conversation projection. */
-export class PrismaLangyConversationProjectionRepository implements StateProjectionStore<LangyConversationStateData> {
+export class PrismaLangyConversationProjectionRepository
+  implements StateProjectionStore<LangyConversationStateData>
+{
   constructor(private readonly prisma: ConversationProjectionPrismaClient) {}
 
   async load(

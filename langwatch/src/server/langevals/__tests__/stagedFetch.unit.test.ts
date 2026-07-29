@@ -12,7 +12,7 @@
  * pure-function. The contract under test is the decision logic + the
  * shape of the outbound request, not the AWS SDK plumbing itself.
  */
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const s3SendCalls: any[] = [];
 const presignerCalls: any[] = [];
@@ -64,10 +64,7 @@ vi.mock("../../../env.mjs", () => ({
   },
 }));
 
-import {
-  PayloadTooLargeError,
-  stagedLangevalsFetch,
-} from "../stagedFetch";
+import { PayloadTooLargeError, stagedLangevalsFetch } from "../stagedFetch";
 
 beforeEach(() => {
   s3SendCalls.length = 0;

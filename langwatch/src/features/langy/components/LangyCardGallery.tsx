@@ -22,28 +22,34 @@
  * its connect card instead of an error — which is the behaviour item 19 hangs
  * on, made visible).
  */
-import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  HStack,
+  IconButton,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import type { UIMessage } from "ai";
 import { X } from "lucide-react";
-import { IconButton } from "@chakra-ui/react";
 import { LangyCard } from "~/features/asaplangy";
-import { useLangyStore } from "../stores/langyStore";
 import {
   explainLangyError,
   KNOWN_LANGY_ERROR_KINDS,
 } from "../logic/langyErrorExplainer";
-import { LangyDerivedCardsTestingGround } from "./derived-cards/LangyDerivedCardsTestingGround";
+import { useLangyStore } from "../stores/langyStore";
 import { LangyCapabilityPendingCard } from "./capabilities/LangyCapabilityPendingCard";
 import { LangyCapabilityRenderer } from "./capabilities/LangyCapabilityRenderer";
-import { LangyError } from "./LangyError";
-import { LangyFeedback } from "./LangyFeedback";
+import { LangyDerivedCardsTestingGround } from "./derived-cards/LangyDerivedCardsTestingGround";
 import { LangyGitHubConnectCard } from "./github/LangyGitHubConnectCard";
 import { LangyGitHubPrCard } from "./github/LangyGitHubPrCard";
 import { LangyGitHubProgressCard } from "./github/LangyGitHubProgressCard";
+import { LangyError } from "./LangyError";
+import { LangyFeedback } from "./LangyFeedback";
 import { LangyPlanLimitCard } from "./LangyPlanLimitCard";
 import { LangyRecoveringLine } from "./LangyRecoveringLine";
 import { LangyToolActivity } from "./LangyToolActivity";
-import { ProposalCard, type LangyProposal } from "./MessageContent";
+import { type LangyProposal, ProposalCard } from "./MessageContent";
 import { StreamingStatusLine } from "./StreamingStatusLine";
 
 /** A settled tool call, shaped exactly as the stream delivers one. */
@@ -584,7 +590,12 @@ export function LangyCardGallery() {
             title: "Creating scenario failed",
             message: "Your plan includes 3 scenarios, and all 3 are in use.",
             code: "resource_limit_exceeded",
-            limit: { label: "scenarios", type: "scenarios", current: 3, max: 3 },
+            limit: {
+              label: "scenarios",
+              type: "scenarios",
+              current: 3,
+              max: 3,
+            },
             terminal: true,
           }}
         />

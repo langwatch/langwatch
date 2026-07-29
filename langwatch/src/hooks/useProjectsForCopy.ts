@@ -1,10 +1,10 @@
 import { useMemo } from "react";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useRequiredSession } from "~/hooks/useRequiredSession";
 import {
   hasPermissionWithHierarchy,
   teamRoleHasPermission,
 } from "~/server/api/rbac";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { useRequiredSession } from "~/hooks/useRequiredSession";
 
 export type CopyTargetProject = {
   label: string;
@@ -49,15 +49,9 @@ export function useProjectsForCopy(
           const permissions =
             (teamMember.assignedRole.permissions as string[]) ?? [];
           if (permissions.length > 0) {
-            hasPermission = hasPermissionWithHierarchy(
-              permissions,
-              permission,
-            );
+            hasPermission = hasPermissionWithHierarchy(permissions, permission);
           } else {
-            hasPermission = teamRoleHasPermission(
-              teamMember.role,
-              permission,
-            );
+            hasPermission = teamRoleHasPermission(teamMember.role, permission);
           }
         } else {
           hasPermission = teamRoleHasPermission(teamMember.role, permission);

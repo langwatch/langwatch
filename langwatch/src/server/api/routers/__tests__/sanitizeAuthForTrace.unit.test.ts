@@ -7,8 +7,8 @@
  */
 import { describe, expect, it } from "vitest";
 import {
-  sanitizeHeadersForTrace,
   buildTraceTestContext,
+  sanitizeHeadersForTrace,
 } from "../httpProxyTracing";
 
 describe("sanitizeHeadersForTrace()", () => {

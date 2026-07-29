@@ -17,7 +17,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AutosaveStatus } from "../components/AutosaveStatus";
 import { UndoRedo } from "../components/UndoRedo";
 import {
-  performRedo,
   performUndo,
   useEvaluationsV3Store,
 } from "../hooks/useEvaluationsV3Store";

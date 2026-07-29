@@ -43,7 +43,8 @@ function deriveKey(label: string): string | null {
 function flattenChildrenToString(children: React.ReactNode): string {
   if (typeof children === "string") return children;
   if (typeof children === "number") return String(children);
-  if (Array.isArray(children)) return children.map(flattenChildrenToString).join("");
+  if (Array.isArray(children))
+    return children.map(flattenChildrenToString).join("");
   return "";
 }
 
@@ -89,7 +90,8 @@ export function Kbd({
 
   useEffect(() => {
     if (!targetKey) return;
-    const expected = targetKey.length === 1 ? targetKey.toLowerCase() : targetKey;
+    const expected =
+      targetKey.length === 1 ? targetKey.toLowerCase() : targetKey;
     const handler = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       const got = e.key.length === 1 ? e.key.toLowerCase() : e.key;
@@ -142,7 +144,9 @@ export function Kbd({
       fontSize="2xs"
       fontFamily="mono"
       color={pressed ? "blue.fg" : "fg.muted"}
-      transform={pressed ? "translateY(1px) scale(0.94)" : "translateY(0) scale(1)"}
+      transform={
+        pressed ? "translateY(1px) scale(0.94)" : "translateY(0) scale(1)"
+      }
       boxShadow={pressed ? "none" : "0 1px 0 var(--chakra-colors-border-muted)"}
       transition="transform 0.08s ease, background 0.12s ease, border-color 0.12s ease, color 0.12s ease, box-shadow 0.08s ease"
     >

@@ -18,24 +18,23 @@
  *
  * Spec: specs/ai-gateway/governance/cli-ingest-debug.feature
  */
+
+import { IngestionKeyService } from "@ee/governance/services/ingestionKey.service";
+import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-
+import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { createTestApp } from "~/server/app-layer/presets";
+import { PlanProviderService } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
-import { connection as redisConnection } from "~/server/redis";
 import {
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
+import { connection as redisConnection } from "~/server/redis";
 import { FREE_PLAN } from "../../../../ee/licensing/constants";
 import type { PlanInfo } from "../../../../ee/licensing/planInfo";
-import { PlanProviderService } from "~/server/app-layer/subscription/plan-provider";
-import { globalForApp, resetApp } from "~/server/app-layer/app";
-import { createTestApp } from "~/server/app-layer/presets";
-
 import { app } from "../auth-cli";
-import { IngestionKeyService } from "@ee/governance/services/ingestionKey.service";
-import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
 
 // Phase 4b-6 added a 402 license gate on every /api/auth/cli/governance/*
 // route. This test pins read-and-tenancy behavior, not license behavior, so
@@ -429,8 +428,6 @@ describe("GET /api/auth/cli/governance/*", () => {
     const INGEST_KEY_USER = `usr-cli-ik-${suffix}`;
     const INGEST_KEY_ORG = `org-cli-ik-${suffix}`;
     const INGEST_KEY_TOKEN = `lw_at_${"k".repeat(43)}-${suffix}`;
-    let ingestionKeyLookupId: string | undefined;
-    let revokedKeyLookupId: string | undefined;
 
     beforeAll(async () => {
       await prisma.organization.create({
@@ -448,7 +445,11 @@ describe("GET /api/auth/cli/governance/*", () => {
         },
       });
       await prisma.organizationUser.create({
-        data: { organizationId: INGEST_KEY_ORG, userId: INGEST_KEY_USER, role: "ADMIN" },
+        data: {
+          organizationId: INGEST_KEY_ORG,
+          userId: INGEST_KEY_USER,
+          role: "ADMIN",
+        },
       });
       await prisma.roleBinding.create({
         data: {
@@ -482,13 +483,12 @@ describe("GET /api/auth/cli/governance/*", () => {
 
       // Mint a live key via the service so we can verify it appears in the list
       const service = IngestionKeyService.create(prisma);
-      const result = await service.ensureForPersonalProject({
+      await service.ensureForPersonalProject({
         userId: INGEST_KEY_USER,
         organizationId: INGEST_KEY_ORG,
         sourceType: "codex",
         createdByDeviceLabel: null,
       });
-      ingestionKeyLookupId = result.token.split("_")[0]?.replace("ik-lw-", "");
 
       // Mint a second key then revoke it immediately — it must not appear
       const revokedResult = await service.ensureForPersonalProject({
@@ -497,7 +497,6 @@ describe("GET /api/auth/cli/governance/*", () => {
         sourceType: "claude_code",
         createdByDeviceLabel: null,
       });
-      revokedKeyLookupId = revokedResult.token.split("_")[0]?.replace("ik-lw-", "");
       // Revoke by setting revokedAt directly to avoid needing full admin context
       await prisma.apiKey.updateMany({
         where: {
@@ -602,7 +601,9 @@ describe("GET /api/auth/cli/governance/*", () => {
     ];
 
     describe("when called with a valid Bearer for an org on FREE plan", () => {
-      it.each(endpoints)("returns 402 with payment_required envelope on %s", async (path) => {
+      it.each(
+        endpoints,
+      )("returns 402 with payment_required envelope on %s", async (path) => {
         const res = await callGovernance(path, `Bearer ${TOKEN_C}`);
         expect(res.status).toBe(402);
         const body = (await res.json()) as {

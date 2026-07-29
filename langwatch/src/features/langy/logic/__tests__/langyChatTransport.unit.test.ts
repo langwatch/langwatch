@@ -5,8 +5,9 @@
  * transport boundary — the tRPC client and the onTurnStream subscription are
  * mocked so only the transport's own decisions are under test.
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import type { Unsubscribable } from "@trpc/server/observable";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createLangyChatTransport,
   type LangyChatTransportDeps,
@@ -320,7 +321,10 @@ describe("createLangyChatTransport", () => {
       await transport.sendMessages(options());
       const { onData } = streamHandlers();
 
-      onData({ type: "navigate", href: "/demo/simulations/set_1/batch_1?openRun=run_1" });
+      onData({
+        type: "navigate",
+        href: "/demo/simulations/set_1/batch_1?openRun=run_1",
+      });
 
       expect(onNavigate).toHaveBeenCalledWith({
         type: "navigate",
@@ -337,9 +341,7 @@ describe("createLangyChatTransport", () => {
       await transport.sendMessages(options());
       const { onData } = streamHandlers();
 
-      expect(() =>
-        onData({ type: "navigate", href: "/demo/x" }),
-      ).not.toThrow();
+      expect(() => onData({ type: "navigate", href: "/demo/x" })).not.toThrow();
     });
   });
 

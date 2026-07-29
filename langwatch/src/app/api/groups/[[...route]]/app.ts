@@ -1,22 +1,22 @@
 import {
+  type Organization,
   RoleBindingScopeType,
   TeamUserRole,
-  type Organization,
 } from "@prisma/client";
 import { describeRoute } from "hono-openapi";
-import { validator as zValidator } from "~/server/api/validation";
 import { z } from "zod";
+import { createOrgApp, requires } from "~/server/api/security";
+import { validator as zValidator } from "~/server/api/validation";
 import {
   BindingNotFoundError,
   DuplicateMemberError,
   GroupNotFoundError,
-  GroupRestService,
+  type GroupRestService,
   ScimManagedGroupError,
   ScopeNotInOrganizationError,
   UserNotInOrganizationError,
 } from "~/server/app-layer/groups/group.service";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
-import { createOrgApp, requires } from "~/server/api/security";
 import type { GroupServiceMiddlewareVariables } from "../../middleware/group-service";
 import { groupServiceMiddleware } from "../../middleware/group-service";
 import { BadRequestError, NotFoundError } from "../../shared/errors";

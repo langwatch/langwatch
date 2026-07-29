@@ -80,25 +80,24 @@ export interface GroupRepository {
 
   delete(params: { id: string; organizationId: string }): Promise<void>;
 
-  findMembers(params: {
-    groupId: string;
-  }): Promise<
+  findMembers(params: { groupId: string }): Promise<
     Array<{
       userId: string;
       user: { id: string; name: string | null; email: string | null };
     }>
   >;
 
-  addMember(params: { groupId: string; userId: string }): Promise<GroupMembership>;
+  addMember(params: {
+    groupId: string;
+    userId: string;
+  }): Promise<GroupMembership>;
 
   removeMember(params: { groupId: string; userId: string }): Promise<void>;
 
   findBindings(params: {
     groupId: string;
   }): Promise<
-    Array<
-      RoleBinding & { customRole: { id: string; name: string } | null }
-    >
+    Array<RoleBinding & { customRole: { id: string; name: string } | null }>
   >;
 
   createBinding(data: CreateBindingInput): Promise<RoleBinding>;

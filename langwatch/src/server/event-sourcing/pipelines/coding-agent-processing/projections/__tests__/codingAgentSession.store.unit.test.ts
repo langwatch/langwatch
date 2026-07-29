@@ -2,14 +2,14 @@ import { describe, expect, it } from "vitest";
 import type { CodingAgentSessionRepository } from "~/server/app-layer/coding-agent/repositories/coding-agent-session.repository";
 import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
 import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
+import { createInitCodingAgentSession } from "../../services/coding-agent-session.derivation";
 import {
+  CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST,
   type CodingAgentSessionRow,
   type CodingAgentSessionState,
-  CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST,
   projectCodingAgentSessionToRow,
 } from "../codingAgentSession.foldProjection";
 import { CodingAgentSessionStore } from "../codingAgentSession.store";
-import { createInitCodingAgentSession } from "../../services/coding-agent-session.derivation";
 
 /**
  * The store adapter's half of the durable dedup watermark (ADR-066): it threads
@@ -56,8 +56,10 @@ class FakeRepo implements CodingAgentSessionRepository {
     retentionDays?: number;
     appliedEventIds?: readonly string[];
   }> = [];
-  withApplied: { row: CodingAgentSessionRow; appliedEventIds: string[] } | null =
-    null;
+  withApplied: {
+    row: CodingAgentSessionRow;
+    appliedEventIds: string[];
+  } | null = null;
   lastFindParams:
     | {
         tenantId: string;
@@ -92,7 +94,10 @@ class FakeRepo implements CodingAgentSessionRepository {
     tenantId: string;
     sessionId: string;
     window?: { fromMs: number; toMs: number };
-  }): Promise<{ row: CodingAgentSessionRow; appliedEventIds: string[] } | null> {
+  }): Promise<{
+    row: CodingAgentSessionRow;
+    appliedEventIds: string[];
+  } | null> {
     this.lastFindParams = params;
     return this.withApplied;
   }
@@ -102,7 +107,9 @@ class FakeRepo implements CodingAgentSessionRepository {
   }
 }
 
-const context = (over: Partial<ProjectionStoreContext> = {}): ProjectionStoreContext => ({
+const context = (
+  over: Partial<ProjectionStoreContext> = {},
+): ProjectionStoreContext => ({
   aggregateId: "session-1",
   tenantId,
   ...over,
@@ -171,7 +178,10 @@ describe("CodingAgentSessionStore durable dedup", () => {
       it("maps the row to state and returns the persisted watermark", async () => {
         const repo = new FakeRepo();
         const state = makeState({ modelCalls: 3 });
-        repo.withApplied = { row: makeRow(state), appliedEventIds: ["e1", "e2"] };
+        repo.withApplied = {
+          row: makeRow(state),
+          appliedEventIds: ["e1", "e2"],
+        };
         const store = new CodingAgentSessionStore(repo);
 
         const result = await store.getWithApplied(
@@ -215,6 +225,219 @@ describe("CodingAgentSessionStore durable dedup", () => {
         const result = await store.get("session-1", context());
 
         expect(result?.modelCalls).toBe(7);
+      });
+    });
+  });
+});
+
+/**
+ * The read-back gate (ADR-066). The columns of migrations 00053/00054 are only
+ * trustworthy on a row written after 00053 applied; on an older row each decodes
+ * as a ClickHouse default indistinguishable from a real value, so the store
+ * reports a miss and the fold's `refoldOnStoreMiss` rebuilds it once.
+ *
+ * The version alone cannot tell those apart. 00053 and 00054 shipped WITHOUT
+ * bumping the stamp, so `2026-07-21` covers rows on both sides of the column
+ * change. The gate therefore pairs it with the `LastEventOccurredAt` checkpoint,
+ * which arrived in 00053, defaults to 0, and only ever takes a positive
+ * `occurredAt` — 0 on every pre-00053 row and positive on every later one, by
+ * construction.
+ */
+describe("CodingAgentSessionStore read-back gate", () => {
+  /** A session with every read-back column carrying real, non-default values. */
+  function committedState(): CodingAgentSessionState {
+    return makeState({
+      modelCalls: 3,
+      subAgents: 2,
+      subAgentIds: ["sub-a", "sub-b"],
+      previousCallContextTokens: 12_000,
+      steps: [{ name: "Read", count: 2, failed: false, startedAtMs: 9_000 }],
+      metricSeries: {
+        "loc-added": {
+          metricName: "claude_code.lines_of_code.count",
+          type: "added",
+          decision: null,
+          language: null,
+          value: 42,
+        },
+      },
+      linesAdded: 42,
+    });
+  }
+
+  describe("given a row stamped with the current projection version", () => {
+    describe("when the fold reads it back", () => {
+      /** @scenario a stored state written under the fold's current shape is read straight back */
+      it("returns the decoded state and the durable watermark", async () => {
+        const repo = new FakeRepo();
+        repo.withApplied = {
+          row: makeRow(committedState()),
+          appliedEventIds: ["e1", "e2"],
+        };
+        const store = new CodingAgentSessionStore(repo);
+
+        const { state, appliedEventIds } = await store.getWithApplied(
+          "session-1",
+          context(),
+        );
+
+        expect(state?.subAgentIds).toEqual(["sub-a", "sub-b"]);
+        expect(state?.steps[0]?.startedAtMs).toBe(9_000);
+        expect(Object.keys(state?.metricSeries ?? {})).toEqual(["loc-added"]);
+        expect(appliedEventIds).toEqual(["e1", "e2"]);
+      });
+    });
+  });
+
+  describe("given a row stamped with an older projection version", () => {
+    /**
+     * Such a row predates the read-back columns, so each one carries its column
+     * default: an empty metric-series map makes the next contribution recompute
+     * every metric-fed total from that one series alone, an empty sub-agent id
+     * set resets the count to one, zeroed step start times leave later steps
+     * only their arrival order to be placed by, and a zeroed previous context
+     * size reads as "first call ever" so the next cache rebuild goes uncounted.
+     */
+    const staleRow = (): CodingAgentSessionRow => ({
+      ...makeRow(committedState()),
+      version: "2026-07-21",
+      subAgentIds: [],
+      stepStartedAt: [],
+      previousCallContextTokens: 0,
+      metricSeries: [],
+      lastEventOccurredAt: 0,
+    });
+
+    describe("when the fold reads it back", () => {
+      /** @scenario a stored state written under an older shape is rebuilt rather than trusted */
+      it("reports a store miss so the fold rebuilds instead of trusting it", async () => {
+        const repo = new FakeRepo();
+        repo.withApplied = {
+          row: staleRow(),
+          appliedEventIds: ["e1", "e2"],
+        };
+        const store = new CodingAgentSessionStore(repo);
+
+        const { state, appliedEventIds, miss } = await store.getWithApplied(
+          "session-1",
+          context(),
+        );
+
+        expect(state).toBeNull();
+        // The watermark goes with the state: keeping it would suppress the very
+        // events the re-fold needs to see.
+        expect(appliedEventIds).toEqual([]);
+        // Asserted on the REAL store. The executor skips its unwindowed
+        // re-read on `undecodable`; without this the only test naming the
+        // value fabricated it from a mock, so deleting the discriminator
+        // here left the suite green.
+        expect(miss).toBe("undecodable");
+      });
+
+      it("misses through get() too, so both read paths agree", async () => {
+        const repo = new FakeRepo();
+        repo.withApplied = { row: staleRow(), appliedEventIds: ["e1"] };
+        const store = new CodingAgentSessionStore(repo);
+
+        expect(await store.get("session-1", context())).toBeNull();
+      });
+    });
+  });
+
+  describe("given a rebuilt aggregate's state committed at the current version", () => {
+    describe("when it is read back", () => {
+      /** @scenario rebuilding an aggregate once retires it from rebuilding again */
+      it("returns the committed state rather than reporting a miss", async () => {
+        const repo = new FakeRepo();
+        const store = new CodingAgentSessionStore(repo);
+
+        // Stands in for the re-fold's commit: whatever version the refused
+        // row wore, the rewrite carries the current one. The refold itself
+        // belongs to the executor and is exercised there — what matters here
+        // is that the rewritten row reads back, which is what retires it.
+        await store.store(
+          committedState(),
+          context({ appliedEventIds: ["e1", "e2"] }),
+        );
+        const written = repo.upsertCalls[0]!;
+        repo.withApplied = {
+          row: written.row,
+          appliedEventIds: [...(written.appliedEventIds ?? [])],
+        };
+
+        const { state, appliedEventIds, miss } = await store.getWithApplied(
+          "session-1",
+          context(),
+        );
+
+        // Asserted explicitly, because the executor cannot catch this one:
+        // `loadWithApplied` returns as soon as a state is present, so a
+        // result carrying BOTH a state and a miss is read as a plain success
+        // and the miss is never looked at again. A store that reported one
+        // would go unnoticed everywhere else.
+        expect(miss).toBeUndefined();
+        expect(state?.subAgentIds).toEqual(["sub-a", "sub-b"]);
+        expect(state?.previousCallContextTokens).toBe(12_000);
+        expect(appliedEventIds).toEqual(["e1", "e2"]);
+      });
+    });
+  });
+
+  describe("given a pre-bump row whose read-back columns are populated", () => {
+    /**
+     * The population migrations 00053/00054 created without a stamp bump: rows
+     * written by a build that HAD the read-back columns, still carrying
+     * `2026-07-21` because neither migration touched the version. Rejecting
+     * these on the version alone would refold a large live population from full
+     * `event_log` history for no gain — the exact cost ADR-066 exists to remove,
+     * on the aggregate class behind the 2026-07-23 outage.
+     */
+    const preBumpRow = (): CodingAgentSessionRow => ({
+      ...makeRow(committedState()),
+      version: "2026-07-21",
+      lastEventOccurredAt: 1_900,
+    });
+
+    describe("when the fold reads it back", () => {
+      it("decodes it rather than forcing a full-history refold", async () => {
+        const repo = new FakeRepo();
+        repo.withApplied = {
+          row: preBumpRow(),
+          appliedEventIds: ["e1", "e2"],
+        };
+        const store = new CodingAgentSessionStore(repo);
+
+        const { state, appliedEventIds } = await store.getWithApplied(
+          "session-1",
+          context(),
+        );
+
+        expect(state?.subAgentIds).toEqual(["sub-a", "sub-b"]);
+        expect(state?.steps[0]?.startedAtMs).toBe(9_000);
+        expect(state?.previousCallContextTokens).toBe(12_000);
+        expect(appliedEventIds).toEqual(["e1", "e2"]);
+      });
+    });
+  });
+
+  describe("given a row on neither the current nor the pre-bump stamp", () => {
+    describe("when the fold reads it back", () => {
+      it("misses regardless of its checkpoint", async () => {
+        // A populated checkpoint only rehabilitates the ONE stamp that is known
+        // to straddle the column change. Any other stamp is a shape this build
+        // has never reasoned about, so it refolds.
+        const repo = new FakeRepo();
+        repo.withApplied = {
+          row: {
+            ...makeRow(committedState()),
+            version: "2026-06-01",
+            lastEventOccurredAt: 1_900,
+          },
+          appliedEventIds: ["e1"],
+        };
+        const store = new CodingAgentSessionStore(repo);
+
+        expect(await store.get("session-1", context())).toBeNull();
       });
     });
   });

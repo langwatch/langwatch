@@ -16,8 +16,8 @@ vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({ query: mockQuery, isReady: true, replace: mockReplace }),
 }));
 
-import TraceDetailsRedirect from "../[trace]/index";
 import TraceDetailsWithSpanRedirect from "../[trace]/[openTab]/[span]";
+import TraceDetailsRedirect from "../[trace]/index";
 
 describe("legacy trace deep-link redirects", () => {
   beforeEach(() => {

@@ -8,7 +8,9 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("~/env.mjs", () => ({ env: { BASE_HOST: "https://app.langwatch.ai" } }));
+vi.mock("~/env.mjs", () => ({
+  env: { BASE_HOST: "https://app.langwatch.ai" },
+}));
 
 const { getScenarioRunData, getProjectById } = vi.hoisted(() => ({
   getScenarioRunData: vi.fn(),

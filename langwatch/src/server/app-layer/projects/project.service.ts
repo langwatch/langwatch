@@ -10,10 +10,10 @@ import { slugify } from "~/utils/slugify";
 import type {
   PaginatedResult,
   PresenceConfig,
-  TraceSharingConfig,
   ProjectRepository,
   ProjectWithTeam,
   SearchProjectsResult,
+  TraceSharingConfig,
   UpdateProjectInput,
   UpdateProjectMetadataInput,
 } from "./repositories/project.repository";
@@ -133,7 +133,9 @@ export function personalWorkspaceArchiveViolation(
 export function personalWorkspaceCreateViolation(
   isDestinationTeamPersonal: boolean,
 ): string | null {
-  return isDestinationTeamPersonal ? PERSONAL_TEAM_PROJECT_CREATE_REFUSAL : null;
+  return isDestinationTeamPersonal
+    ? PERSONAL_TEAM_PROJECT_CREATE_REFUSAL
+    : null;
 }
 
 export interface CreateProjectParams {

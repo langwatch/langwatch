@@ -76,9 +76,7 @@ const s3PollingConfigSchema = z.object({
 
 export type S3PollingConfig = z.infer<typeof s3PollingConfigSchema>;
 
-export class S3PollingPullerAdapter
-  implements PullerAdapter<S3PollingConfig>
-{
+export class S3PollingPullerAdapter implements PullerAdapter<S3PollingConfig> {
   readonly id: string = "s3_polling";
 
   validateConfig(config: unknown): S3PollingConfig {
@@ -107,10 +105,7 @@ export class S3PollingPullerAdapter
     let lastSuccessfulKey: string | null = cursor;
 
     for (const key of listed) {
-      if (
-        options.deadlineMs !== undefined &&
-        Date.now() > options.deadlineMs
-      ) {
+      if (options.deadlineMs !== undefined && Date.now() > options.deadlineMs) {
         logger.info(
           { adapter: this.id, key, processed: events.length },
           "deadline reached mid-pull, returning partial results",
@@ -266,9 +261,7 @@ export class S3PollingPullerAdapter
       // The SDK's abortSignal covers the request, not the draining of an
       // already-open body. A slow trickle would otherwise outlive the deadline.
       if (signal?.aborted) {
-        throw new Error(
-          `aborted while reading s3://${config.bucket}/${key}`,
-        );
+        throw new Error(`aborted while reading s3://${config.bucket}/${key}`);
       }
       const buffer = Buffer.from(chunk);
       totalBytes += buffer.length;

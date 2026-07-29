@@ -174,11 +174,7 @@ export function CurrentPlanBlock({
               colorPalette="orange"
               data-testid="contact-sales-button"
             >
-              <Link
-                href={contactSalesUrl}
-                isExternal
-                fontWeight="semibold"
-              >
+              <Link href={contactSalesUrl} isExternal fontWeight="semibold">
                 Contact us to Upgrade
               </Link>
             </Button>

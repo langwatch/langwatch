@@ -66,7 +66,11 @@ export const pilotDefinition: ProcessDefinition<PilotState> = {
               {
                 messageKey: `dispatch:${turnId}:1`,
                 intentType: "worker-dispatch",
-                payload: { turnId, generation: 1, handoffKey: `handoff:${turnId}` },
+                payload: {
+                  turnId,
+                  generation: 1,
+                  handoffKey: `handoff:${turnId}`,
+                },
               },
             ],
           };

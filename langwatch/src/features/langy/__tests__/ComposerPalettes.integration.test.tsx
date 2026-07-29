@@ -33,6 +33,7 @@ vi.mock("~/components/ModelSelector", () => ({
 }));
 
 import { Composer } from "../components/Composer";
+import { LangyComposerPalette } from "../components/LangyComposerPalette";
 import { LangyContextTargetLayer } from "../components/LangyContextTargetLayer";
 import { useLangyContextTarget } from "../hooks/useLangyContextTarget";
 import {
@@ -140,6 +141,57 @@ describe("given the Langy composer", () => {
 
       expect(screen.queryByPlaceholderText(/pick a skill/i)).toBeNull();
       expect(useLangyStore.getState().draft).toBe("http:/");
+    });
+  });
+});
+
+describe("given a palette with no rows to show", () => {
+  /**
+   * An empty list has two causes and they are different questions. On an index
+   * route with no drawer open there is nothing to reference at all, so `#`
+   * opens on an empty list with an EMPTY query — and answering that with
+   * "nothing matches that" replies to a search the reader never ran.
+   */
+  function renderPalette({
+    mode,
+    query,
+  }: {
+    mode: "context" | "skills";
+    query: string;
+  }) {
+    return render(
+      <ChakraProvider value={defaultSystem}>
+        <LangyComposerPalette
+          mode={mode}
+          query={query}
+          chips={[]}
+          onQueryChange={() => {}}
+          onPickChip={() => {}}
+          onClose={() => {}}
+        />
+      </ChakraProvider>,
+    );
+  }
+
+  const emptyText = () =>
+    screen.getByTestId("langy-palette-empty").textContent ?? "";
+
+  describe("when the page had nothing to offer in the first place", () => {
+    it("says so, instead of answering a search nobody ran", () => {
+      renderPalette({ mode: "context", query: "" });
+
+      // Not pinned to the wording: the fact under test is that a palette that
+      // was never filtered does not report a failed filter.
+      expect(emptyText().trim()).not.toBe("");
+      expect(emptyText()).not.toMatch(/match/i);
+    });
+  });
+
+  describe("when rows exist but the query matched none of them", () => {
+    it("says the search found nothing", () => {
+      renderPalette({ mode: "skills", query: "zzzzzz-no-such-skill" });
+
+      expect(emptyText()).toMatch(/match/i);
     });
   });
 });

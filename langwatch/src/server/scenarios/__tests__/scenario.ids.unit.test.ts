@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { generateScenarioRunId, generateBatchRunId } from "../scenario.ids";
+import { describe, expect, it } from "vitest";
+import { generateBatchRunId, generateScenarioRunId } from "../scenario.ids";
 
 describe("generateScenarioRunId()", () => {
   /** @scenario 'Synthetic scenario run ID uses "scenariorun_" prefix with KSUID' */

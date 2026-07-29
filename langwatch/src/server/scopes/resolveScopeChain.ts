@@ -1,4 +1,4 @@
-import { type ScopeAssignment } from "./scope.types";
+import type { ScopeAssignment } from "./scope.types";
 
 /**
  * The `PROJECT -> TEAM -> ORGANIZATION` cascade chain for a single project

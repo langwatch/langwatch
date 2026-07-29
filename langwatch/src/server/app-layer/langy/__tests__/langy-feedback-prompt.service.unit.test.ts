@@ -9,8 +9,8 @@ import { describe, expect, it } from "vitest";
 import {
   FEEDBACK_LONG_CONVERSATION_ANSWERS,
   FEEDBACK_QUIET_PERIOD_MS,
-  LangyFeedbackPromptService,
   type LangyFeedbackPromptRedis,
+  LangyFeedbackPromptService,
 } from "../langy-feedback-prompt.service";
 
 function memoryRedis(): LangyFeedbackPromptRedis & {

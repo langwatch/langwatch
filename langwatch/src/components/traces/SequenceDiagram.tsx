@@ -622,10 +622,7 @@ export function SequenceDiagramContainer(props: SequenceDiagramProps) {
     if (!spans || spans.length === 0) return;
 
     // Count participants with default selection (without "span")
-    const participantCount = countParticipants(
-      spans,
-      defaultSelectedSpanTypes,
-    );
+    const participantCount = countParticipants(spans, defaultSelectedSpanTypes);
 
     // If 2 or fewer participants, automatically include "span" type
     if (participantCount <= 2 && !selectedSpanTypes.includes("span")) {
@@ -670,10 +667,7 @@ export function SequenceDiagramContainer(props: SequenceDiagramProps) {
         </HStack>
       </Select.Root>
 
-      <SequenceDiagram
-        spans={spans}
-        selectedSpanTypes={selectedSpanTypes}
-      />
+      <SequenceDiagram spans={spans} selectedSpanTypes={selectedSpanTypes} />
     </VStack>
   );
 }

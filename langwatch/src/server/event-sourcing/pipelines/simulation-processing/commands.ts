@@ -1,14 +1,14 @@
 import { defineCommand } from "../../commands/defineCommand";
 import {
+  simulationMessageSnapshotEventDataSchema,
+  simulationRunCancelRequestedEventDataSchema,
+  simulationRunDeletedEventDataSchema,
+  simulationRunFinishedEventDataSchema,
   simulationRunQueuedEventDataSchema,
   simulationRunStartedEventDataSchema,
-  simulationMessageSnapshotEventDataSchema,
-  simulationRunFinishedEventDataSchema,
-  simulationTextMessageStartEventDataSchema,
-  simulationTextMessageEndEventDataSchema,
-  simulationRunDeletedEventDataSchema,
-  simulationRunCancelRequestedEventDataSchema,
   simulationSetArchivedEventDataSchema,
+  simulationTextMessageEndEventDataSchema,
+  simulationTextMessageStartEventDataSchema,
 } from "./schemas/events";
 
 /**
@@ -57,7 +57,8 @@ export const MessageSnapshotCommand = defineCommand({
   aggregateType: "simulation_run",
   schema: simulationMessageSnapshotEventDataSchema,
   aggregateId: (d) => d.scenarioRunId,
-  idempotencyKey: (d) => `${d.tenantId}:${d.scenarioRunId}:messageSnapshot:${d.occurredAt}`,
+  idempotencyKey: (d) =>
+    `${d.tenantId}:${d.scenarioRunId}:messageSnapshot:${d.occurredAt}`,
   spanAttributes: (d) => ({
     "payload.scenarioRun.id": d.scenarioRunId,
     "payload.messages.count": d.messages.length,
@@ -72,13 +73,15 @@ export const TextMessageStartCommand = defineCommand({
   aggregateType: "simulation_run",
   schema: simulationTextMessageStartEventDataSchema,
   aggregateId: (d) => d.scenarioRunId,
-  idempotencyKey: (d) => `${d.tenantId}:${d.scenarioRunId}:textMessageStart:${d.messageId}`,
+  idempotencyKey: (d) =>
+    `${d.tenantId}:${d.scenarioRunId}:textMessageStart:${d.messageId}`,
   spanAttributes: (d) => ({
     "payload.scenarioRun.id": d.scenarioRunId,
     "payload.message.id": d.messageId,
     "payload.role": d.role,
   }),
-  makeJobId: (d) => `${d.tenantId}:${d.scenarioRunId}:text-message-start:${d.messageId}`,
+  makeJobId: (d) =>
+    `${d.tenantId}:${d.scenarioRunId}:text-message-start:${d.messageId}`,
 });
 
 export const TextMessageEndCommand = defineCommand({
@@ -88,13 +91,15 @@ export const TextMessageEndCommand = defineCommand({
   aggregateType: "simulation_run",
   schema: simulationTextMessageEndEventDataSchema,
   aggregateId: (d) => d.scenarioRunId,
-  idempotencyKey: (d) => `${d.tenantId}:${d.scenarioRunId}:textMessageEnd:${d.messageId}`,
+  idempotencyKey: (d) =>
+    `${d.tenantId}:${d.scenarioRunId}:textMessageEnd:${d.messageId}`,
   spanAttributes: (d) => ({
     "payload.scenarioRun.id": d.scenarioRunId,
     "payload.message.id": d.messageId,
     "payload.role": d.role,
   }),
-  makeJobId: (d) => `${d.tenantId}:${d.scenarioRunId}:text-message-end:${d.messageId}`,
+  makeJobId: (d) =>
+    `${d.tenantId}:${d.scenarioRunId}:text-message-end:${d.messageId}`,
 });
 
 export const FinishRunCommand = defineCommand({

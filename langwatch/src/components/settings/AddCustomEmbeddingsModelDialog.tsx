@@ -2,6 +2,7 @@ import { Button, HStack, Input, VStack } from "@chakra-ui/react";
 import { useCallback, useRef, useState } from "react";
 import type { CustomModelEntry } from "../../server/modelProviders/customModel.schema";
 import { customModelEntrySchema } from "../../server/modelProviders/customModel.schema";
+import { SmallLabel } from "../SmallLabel";
 import {
   DialogBody,
   DialogCloseTrigger,
@@ -11,7 +12,6 @@ import {
   DialogRoot,
   DialogTitle,
 } from "../ui/dialog";
-import { SmallLabel } from "../SmallLabel";
 
 type AddCustomEmbeddingsModelDialogProps = {
   open: boolean;
@@ -87,9 +87,13 @@ export function AddCustomEmbeddingsModelDialog({
 
   return (
     <DialogRoot open={open} onOpenChange={(e) => !e.open && handleClose()}>
-      <DialogContent {...(dialogBackground ? { background: dialogBackground } : {})}>
+      <DialogContent
+        {...(dialogBackground ? { background: dialogBackground } : {})}
+      >
         <DialogHeader>
-          <DialogTitle>{isEditing ? "Edit Embeddings Model" : "Add Embeddings Model"}</DialogTitle>
+          <DialogTitle>
+            {isEditing ? "Edit Embeddings Model" : "Add Embeddings Model"}
+          </DialogTitle>
         </DialogHeader>
         <DialogCloseTrigger />
         <DialogBody>
@@ -125,11 +129,7 @@ export function AddCustomEmbeddingsModelDialog({
             <Button variant="ghost" size="sm" onClick={handleClose}>
               Cancel
             </Button>
-            <Button
-              colorPalette="orange"
-              size="sm"
-              onClick={handleSubmit}
-            >
+            <Button colorPalette="orange" size="sm" onClick={handleSubmit}>
               {isEditing ? "Save" : "Add model"}
             </Button>
           </HStack>

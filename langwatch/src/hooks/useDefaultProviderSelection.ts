@@ -39,16 +39,20 @@ export function useDefaultProviderSelection({
   enabledProvidersCount: number;
 }): UseDefaultProviderSelectionReturn {
   const [useAsDefaultProvider, setUseAsDefaultProviderState] =
-    useState<boolean>(() => shouldAutoEnableAsDefault({ enabledProvidersCount }));
+    useState<boolean>(() =>
+      shouldAutoEnableAsDefault({ enabledProvidersCount }),
+    );
 
-  const [projectDefaultModel, setProjectDefaultModelState] =
-    useState<string | null>(null);
+  const [projectDefaultModel, setProjectDefaultModelState] = useState<
+    string | null
+  >(null);
 
   const [projectTopicClusteringModel, setProjectTopicClusteringModelState] =
     useState<string | null>(null);
 
-  const [projectEmbeddingsModel, setProjectEmbeddingsModelState] =
-    useState<string | null>(null);
+  const [projectEmbeddingsModel, setProjectEmbeddingsModelState] = useState<
+    string | null
+  >(null);
 
   const setUseAsDefaultProvider = useCallback((use: boolean) => {
     setUseAsDefaultProviderState(use);
@@ -58,12 +62,9 @@ export function useDefaultProviderSelection({
     setProjectDefaultModelState(model);
   }, []);
 
-  const setProjectTopicClusteringModel = useCallback(
-    (model: string | null) => {
-      setProjectTopicClusteringModelState(model);
-    },
-    [],
-  );
+  const setProjectTopicClusteringModel = useCallback((model: string | null) => {
+    setProjectTopicClusteringModelState(model);
+  }, []);
 
   const setProjectEmbeddingsModel = useCallback((model: string | null) => {
     setProjectEmbeddingsModelState(model);

@@ -72,14 +72,22 @@ function retentionDaysFrom(
  * `storeBatch` (N rows with per-row retention). Concrete classes provide
  * the aggregate-specific config via `super(...)`.
  *
- * `get` returns `null` for every aggregate we've shipped so far — the slim
- * rows are lossy by design, so fold state cannot be read back. Fold-state
- * continuity therefore REQUIRES two layers around any store built on this
- * base: a RedisCachedFoldStore wrapper at registration (warm path) and the
- * fold's `refoldOnStoreMiss` option (event-log rebuild on a cache miss).
- * Without both, a miss folds only the delivered batch and partial rows
- * overwrite complete ones. Override `get` in a subclass if a future
- * aggregate genuinely needs a read-back path.
+ * DEPRECATED — do not build on this. It has no remaining consumers: its last
+ * one (`evaluationAnalytics.store.ts`) moved to the ADR-066 read-back shape in
+ * migration 00056, and it is kept only so the removal lands as its own change.
+ *
+ * `get` returns `null` here, which is precisely the pattern ADR-066 exists to
+ * retire: a null read-back forced continuity to come from the fold's
+ * `refoldOnStoreMiss` option, i.e. an unbounded `event_log` re-fold on every
+ * cache miss — the cold-scan behaviour behind the 2026-07-23 TOO_MANY_PARTS
+ * outage. `refoldOnStoreMiss` survives only as a schema-gated transitional net
+ * on the three read-back folds — the two slim analytics ones and
+ * `codingAgentSession` — where it fires once per aggregate still carrying a row
+ * written before its read-back columns existed
+ * (`es_fold_refold_on_miss_total` is what says when that has stopped). A new
+ * store must persist enough typed state to reconstruct its own working state (see
+ * `TraceAnalyticsStore` / `EvaluationAnalyticsStore`) rather than re-enabling
+ * that flag as a steady-state mechanism.
  */
 export abstract class BaseAnalyticsFoldStore<TState, TRow>
   implements FoldProjectionStore<TState>

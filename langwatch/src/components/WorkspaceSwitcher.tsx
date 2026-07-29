@@ -18,10 +18,9 @@ import {
 } from "lucide-react";
 import React, { useState } from "react";
 import { useRouter } from "~/utils/compat/next-router";
-
-import { Menu } from "./ui/menu";
-import { Link } from "./ui/link";
 import { ProjectAvatar } from "./ProjectAvatar";
+import { Link } from "./ui/link";
+import { Menu } from "./ui/menu";
 import { Tooltip } from "./ui/tooltip";
 
 import { useWorkspaceCurrent } from "./useWorkspaceCurrent";
@@ -165,9 +164,7 @@ function entryIsCurrent(
   if (entry.kind === "team") {
     return current.kind === "team" && current.teamId === entry.teamId;
   }
-  return (
-    current.kind === "project" && current.projectId === entry.projectId
-  );
+  return current.kind === "project" && current.projectId === entry.projectId;
 }
 
 function currentLabel(
@@ -238,8 +235,7 @@ export const WorkspaceSwitcher = React.memo(function WorkspaceSwitcher({
   // For project context, render the colored ProjectAvatar in the trigger to
   // preserve parity with the legacy ProjectSelector — projects are visually
   // identified by their team-color bubble across the rest of the app.
-  const triggerProjectName =
-    triggerKind === "project" ? triggerLabel : null;
+  const triggerProjectName = triggerKind === "project" ? triggerLabel : null;
 
   // On org-scoped routes, offer the in-place org switch when the user belongs
   // to more than one org. The active org is the current chip, so it is not a
@@ -302,12 +298,11 @@ export const WorkspaceSwitcher = React.memo(function WorkspaceSwitcher({
     { orgName: string; orgSlug: string; teams: typeof teams }
   >();
   for (const team of visibleTeams) {
-    const bucket =
-      teamsByOrg.get(team.orgId) ?? {
-        orgName: team.orgName,
-        orgSlug: team.orgSlug,
-        teams: [] as typeof teams,
-      };
+    const bucket = teamsByOrg.get(team.orgId) ?? {
+      orgName: team.orgName,
+      orgSlug: team.orgSlug,
+      teams: [] as typeof teams,
+    };
     bucket.teams.push(team);
     teamsByOrg.set(team.orgId, bucket);
   }
@@ -456,69 +451,73 @@ export const WorkspaceSwitcher = React.memo(function WorkspaceSwitcher({
               {orgs.map((org) => {
                 const orgPersonal = personalByOrgId.get(org.orgId);
                 return (
-                <Group
-                  key={org.orgId}
-                  // Show the org name as a header when the user spans multiple
-                  // orgs, or whenever this org has a personal nested under it
-                  // (governance orgs), so the org name is always visible above
-                  // its "My Workspace". A lone non-governance org stays
-                  // header-free — its org context is implicit.
-                  title={
-                    multipleOrgs || personalByOrgId.has(org.orgId)
-                      ? orgHeader(org)
-                      : undefined
-                  }
-                >
-                  {orgPersonal && (
-                    <SwitcherItem
-                      entry={orgPersonal}
-                      active={entryIsCurrent(orgPersonal, current)}
-                      onSelect={() => {
-                        setOpen(false);
-                        void router.push(orgPersonal.href);
-                      }}
-                    />
-                  )}
-                  {org.teams.map((team) => {
-                    const teamProjects = projectsByTeam.get(team.teamId) ?? [];
-                    return (
-                      <Box key={team.teamId}>
-                        <Box position="relative">
-                          <SwitcherItem
-                            entry={team}
-                            active={entryIsCurrent(team, current)}
-                            onSelect={() => {
-                              setOpen(false);
-                              void router.push(team.href);
-                            }}
-                          />
-                          {team.canCreateProject && onCreateProjectForTeam && (
-                            <TeamCreateProjectButton
-                              team={team}
-                              onCreateProjectForTeam={onCreateProjectForTeam}
-                              setOpen={setOpen}
+                  <Group
+                    key={org.orgId}
+                    // Show the org name as a header when the user spans multiple
+                    // orgs, or whenever this org has a personal nested under it
+                    // (governance orgs), so the org name is always visible above
+                    // its "My Workspace". A lone non-governance org stays
+                    // header-free — its org context is implicit.
+                    title={
+                      multipleOrgs || personalByOrgId.has(org.orgId)
+                        ? orgHeader(org)
+                        : undefined
+                    }
+                  >
+                    {orgPersonal && (
+                      <SwitcherItem
+                        entry={orgPersonal}
+                        active={entryIsCurrent(orgPersonal, current)}
+                        onSelect={() => {
+                          setOpen(false);
+                          void router.push(orgPersonal.href);
+                        }}
+                      />
+                    )}
+                    {org.teams.map((team) => {
+                      const teamProjects =
+                        projectsByTeam.get(team.teamId) ?? [];
+                      return (
+                        <Box key={team.teamId}>
+                          <Box position="relative">
+                            <SwitcherItem
+                              entry={team}
+                              active={entryIsCurrent(team, current)}
+                              onSelect={() => {
+                                setOpen(false);
+                                void router.push(team.href);
+                              }}
                             />
+                            {team.canCreateProject &&
+                              onCreateProjectForTeam && (
+                                <TeamCreateProjectButton
+                                  team={team}
+                                  onCreateProjectForTeam={
+                                    onCreateProjectForTeam
+                                  }
+                                  setOpen={setOpen}
+                                />
+                              )}
+                          </Box>
+                          {teamProjects.length > 0 && (
+                            <VStack gap={0} align="stretch" paddingLeft={5}>
+                              {teamProjects.map((project) => (
+                                <SwitcherItem
+                                  key={project.projectId}
+                                  entry={project}
+                                  active={entryIsCurrent(project, current)}
+                                  onSelect={() => {
+                                    setOpen(false);
+                                    void router.push(project.href);
+                                  }}
+                                />
+                              ))}
+                            </VStack>
                           )}
                         </Box>
-                        {teamProjects.length > 0 && (
-                          <VStack gap={0} align="stretch" paddingLeft={5}>
-                            {teamProjects.map((project) => (
-                              <SwitcherItem
-                                key={project.projectId}
-                                entry={project}
-                                active={entryIsCurrent(project, current)}
-                                onSelect={() => {
-                                  setOpen(false);
-                                  void router.push(project.href);
-                                }}
-                              />
-                            ))}
-                          </VStack>
-                        )}
-                      </Box>
-                    );
-                  })}
-                </Group>
+                      );
+                    })}
+                  </Group>
                 );
               })}
 

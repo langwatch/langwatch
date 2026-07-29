@@ -8,15 +8,12 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Info } from "react-feather";
 import { Trash2, UnplugIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Info } from "react-feather";
 
 import { DeleteConfirmationDialog } from "~/components/annotations/DeleteConfirmationDialog";
 import { CopyButton } from "~/components/CopyButton";
-import { Tooltip } from "~/components/ui/tooltip";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { GeneratePromptApiSnippetDialog } from "~/prompts/components/GeneratePromptApiSnippetDialog";
 import {
   DialogBody,
   DialogCloseTrigger,
@@ -28,6 +25,9 @@ import {
 } from "~/components/ui/dialog";
 import { Select } from "~/components/ui/select";
 import { toaster } from "~/components/ui/toaster";
+import { Tooltip } from "~/components/ui/tooltip";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { GeneratePromptApiSnippetDialog } from "~/prompts/components/GeneratePromptApiSnippetDialog";
 import { usePromptTags } from "~/prompts/hooks/usePromptTags";
 import { api } from "~/utils/api";
 
@@ -297,7 +297,11 @@ export function DeployPromptDialog({
                     </Text>
                   </HStack>
                   <HStack gap={2}>
-                    <Text fontSize="sm" color="fg.muted" data-testid="latest-version">
+                    <Text
+                      fontSize="sm"
+                      color="fg.muted"
+                      data-testid="latest-version"
+                    >
                       {latestVersion ? `v${latestVersion.version}` : "--"}
                     </Text>
                     <Tooltip content="Automatically points to the latest version number.">
@@ -311,7 +315,7 @@ export function DeployPromptDialog({
 
               {/* Environment tag rows (built-in + custom, excluding latest) */}
               {nonLatestTags.map((tagDef) => {
-                const isAssigned = !!(tagSelections[tagDef.name]);
+                const isAssigned = !!tagSelections[tagDef.name];
                 return (
                   <Box
                     key={tagDef.name}
@@ -341,23 +345,47 @@ export function DeployPromptDialog({
                           flex="1"
                           minWidth={0}
                           maxWidth="280px"
-                          value={tagSelections[tagDef.name] ? [tagSelections[tagDef.name] ?? ""] : []}
+                          value={
+                            tagSelections[tagDef.name]
+                              ? [tagSelections[tagDef.name] ?? ""]
+                              : []
+                          }
                           onValueChange={(details) => {
-                            setTagVersionId(tagDef.name, details.value[0] ?? "");
+                            setTagVersionId(
+                              tagDef.name,
+                              details.value[0] ?? "",
+                            );
                           }}
                           aria-label={`${tagDef.name.charAt(0).toUpperCase()}${tagDef.name.slice(1)} version`}
                         >
                           <Select.Trigger clearable>
                             <Select.ValueText placeholder="Select version">
                               {(items) => {
-                                const item = items[0] as typeof versionItems[number] | undefined;
+                                const item = items[0] as
+                                  | (typeof versionItems)[number]
+                                  | undefined;
                                 if (!item) return "Select version";
                                 return (
-                                  <HStack gap={1} maxWidth="100%" overflow="hidden">
-                                    <Text as="span" fontFamily="mono" fontSize="sm" fontWeight="semibold" flexShrink={0}>
+                                  <HStack
+                                    gap={1}
+                                    maxWidth="100%"
+                                    overflow="hidden"
+                                  >
+                                    <Text
+                                      as="span"
+                                      fontFamily="mono"
+                                      fontSize="sm"
+                                      fontWeight="semibold"
+                                      flexShrink={0}
+                                    >
                                       v{item.version}
                                     </Text>
-                                    <Text as="span" fontSize="sm" color="fg.muted" truncate>
+                                    <Text
+                                      as="span"
+                                      fontSize="sm"
+                                      color="fg.muted"
+                                      truncate
+                                    >
                                       {item.commitMessage}
                                     </Text>
                                   </HStack>
@@ -368,12 +396,30 @@ export function DeployPromptDialog({
                           <Select.Content>
                             {versionItems.map((v) => (
                               <Select.Item key={v.value} item={v}>
-                                <Tooltip content={v.commitMessage} openDelay={500}>
-                                  <HStack gap={2} maxWidth="100%" overflow="hidden">
-                                    <Text as="span" fontFamily="mono" fontSize="sm" fontWeight="semibold" flexShrink={0}>
+                                <Tooltip
+                                  content={v.commitMessage}
+                                  openDelay={500}
+                                >
+                                  <HStack
+                                    gap={2}
+                                    maxWidth="100%"
+                                    overflow="hidden"
+                                  >
+                                    <Text
+                                      as="span"
+                                      fontFamily="mono"
+                                      fontSize="sm"
+                                      fontWeight="semibold"
+                                      flexShrink={0}
+                                    >
                                       v{v.version}
                                     </Text>
-                                    <Text as="span" fontSize="sm" color="fg.muted" truncate>
+                                    <Text
+                                      as="span"
+                                      fontSize="sm"
+                                      color="fg.muted"
+                                      truncate
+                                    >
                                       {v.commitMessage}
                                     </Text>
                                   </HStack>

@@ -3,12 +3,12 @@ import { PersonalUsageService } from "@ee/governance/services/personalUsage.serv
 import { HTTPException } from "hono/http-exception";
 import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi/zod";
-import { validator as zValidator } from "~/server/api/validation";
 import {
   createProjectApp,
   requires,
   type SecuredApp,
 } from "~/server/api/security";
+import { validator as zValidator } from "~/server/api/validation";
 import { prisma } from "~/server/db";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 

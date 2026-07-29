@@ -14,11 +14,12 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { assignTopicMock, recordTopicsMock, stagedLangevalsFetchMock } = vi.hoisted(() => ({
-  assignTopicMock: vi.fn(),
-  recordTopicsMock: vi.fn(),
-  stagedLangevalsFetchMock: vi.fn(),
-}));
+const { assignTopicMock, recordTopicsMock, stagedLangevalsFetchMock } =
+  vi.hoisted(() => ({
+    assignTopicMock: vi.fn(),
+    recordTopicsMock: vi.fn(),
+    stagedLangevalsFetchMock: vi.fn(),
+  }));
 
 const mockClickHouseQuery = vi.fn();
 
@@ -54,7 +55,9 @@ vi.mock("~/server/embeddings", () => ({
 }));
 
 vi.mock("~/server/modelProviders/resolveModelForFeature", () => ({
-  resolveModelForFeature: vi.fn().mockResolvedValue({ model: "openai/gpt-5-mini" }),
+  resolveModelForFeature: vi
+    .fn()
+    .mockResolvedValue({ model: "openai/gpt-5-mini" }),
 }));
 
 vi.mock("~/server/api/routers/modelProviders.utils", () => ({
@@ -109,7 +112,9 @@ describe("clusterTopicsForProject", () => {
     vi.mocked(prisma.topic.findMany).mockResolvedValue([]);
     vi.mocked(prisma.topic.deleteMany).mockResolvedValue({ count: 0 } as any);
     vi.mocked(prisma.topic.createMany).mockResolvedValue({ count: 0 } as any);
-    vi.mocked(prisma.project.findUnique).mockResolvedValue(makeProject() as any);
+    vi.mocked(prisma.project.findUnique).mockResolvedValue(
+      makeProject() as any,
+    );
     vi.mocked(getClickHouseClientForProject).mockResolvedValue({
       query: mockClickHouseQuery,
     } as any);
@@ -171,7 +176,9 @@ describe("storeResults", () => {
       });
 
       it("returns null so the caller can report a skip", async () => {
-        await expect(storeResults("proj-1", undefined, false)).resolves.toBeNull();
+        await expect(
+          storeResults("proj-1", undefined, false),
+        ).resolves.toBeNull();
       });
     });
   });

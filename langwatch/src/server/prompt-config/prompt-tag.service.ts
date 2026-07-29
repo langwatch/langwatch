@@ -1,10 +1,10 @@
-import type { PromptTag, PrismaClient } from "@prisma/client";
+import type { PrismaClient, PromptTag } from "@prisma/client";
+import { isUniqueConstraintError } from "../utils/prismaErrors";
 import {
   PROTECTED_TAGS,
   PromptTagRepository,
   type ProtectedTag,
 } from "./repositories/prompt-tag.repository";
-import { isUniqueConstraintError } from "../utils/prismaErrors";
 
 const TAG_NAME_REGEX = /^[a-z][a-z0-9_-]*$/;
 const PURELY_NUMERIC_REGEX = /^\d+$/;
@@ -91,7 +91,11 @@ export class PromptTagService {
   /**
    * Returns all custom tag definitions for the given org.
    */
-  async getAll({ organizationId }: { organizationId: string }): Promise<PromptTag[]> {
+  async getAll({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<PromptTag[]> {
     return this.repo.findAll({ organizationId });
   }
 
@@ -212,14 +216,10 @@ export class PromptTagService {
           `A tag with name "${newName}" already exists in this org.`,
         );
       }
-      if (
-        error instanceof Error &&
-        error.message.includes("not found")
-      ) {
+      if (error instanceof Error && error.message.includes("not found")) {
         throw new PromptTagNotFoundError(oldName);
       }
       throw error;
     }
   }
 }
-

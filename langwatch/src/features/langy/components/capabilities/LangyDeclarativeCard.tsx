@@ -17,24 +17,24 @@
  * a real answer and says so in real words.
  */
 import { Box, Grid, Text, VStack } from "@chakra-ui/react";
+import { type CliResultDigest, parseCardResult } from "@langwatch/langy";
 import { extractPlatformUrl } from "~/utils/platformHref";
-import { parseCardResult, type CliResultDigest } from "@langwatch/langy";
-import type { LangyTurnMetric } from "../../hooks/useLangyTurnSignals";
 import {
-  useCapabilityData,
   type CapabilityData,
+  useCapabilityData,
 } from "../../hooks/useCapabilityData";
+import type { LangyTurnMetric } from "../../hooks/useLangyTurnSignals";
 import { StreamingStatCard } from "../StreamingStatCard";
 import {
   buildResourceHref,
   buildSurfaceHref,
+  type CapabilityCardInput,
+  type CapabilityDescriptor,
   extractPrimaryId,
   extractResourceName,
   extractToolText,
   SURFACE_LABEL,
   summaryLines,
-  type CapabilityCardInput,
-  type CapabilityDescriptor,
 } from "./capabilityRegistry";
 import { collectionOf, totalOf } from "./cliResultDocument";
 import {
@@ -84,7 +84,8 @@ function firstString(value: unknown, keys: string[]): string | null {
 
 /** Renderable primitive → display text; null for anything structural. */
 function displayValue(value: unknown): string | null {
-  if (typeof value === "string") return value.trim() ? truncate(value, SNIPPET_MAX) : null;
+  if (typeof value === "string")
+    return value.trim() ? truncate(value, SNIPPET_MAX) : null;
   if (typeof value === "number") return value.toLocaleString();
   if (typeof value === "boolean") return value ? "yes" : "no";
   return null;
@@ -253,7 +254,13 @@ function RowsBody({
   const rows = collectionOf(document);
   if (!rows) {
     // The document is a single resource after all — read it as one.
-    return <FactsBody descriptor={descriptor} document={document} projectSlug={projectSlug} />;
+    return (
+      <FactsBody
+        descriptor={descriptor}
+        document={document}
+        projectSlug={projectSlug}
+      />
+    );
   }
 
   if (rows.length === 0) {
@@ -276,7 +283,8 @@ function RowsBody({
       {shown.map((row, index) => {
         const name = firstString(row, NAME_KEYS);
         const id = firstString(row, ROW_ID_KEYS);
-        const primary = name ?? id ?? `${capitalize(descriptor.noun.singular)} ${index + 1}`;
+        const primary =
+          name ?? id ?? `${capitalize(descriptor.noun.singular)} ${index + 1}`;
         const secondary =
           firstString(row, ["status", "state", "description"]) ??
           (name && id && id !== name ? id : null);
@@ -313,7 +321,13 @@ function FactsBody({
 }) {
   if (Array.isArray(document) || collectionOf(document)) {
     // The document is a collection after all — read it as one.
-    return <RowsBody descriptor={descriptor} document={document} projectSlug={projectSlug} />;
+    return (
+      <RowsBody
+        descriptor={descriptor}
+        document={document}
+        projectSlug={projectSlug}
+      />
+    );
   }
 
   // The card's title already shows the resource's name — don't repeat it.
@@ -352,7 +366,13 @@ function StatsBody({
   const stats = statsOf(document);
   if (stats.length === 0) {
     // Nothing counts as a figure — the resource's fields still tell the story.
-    return <FactsBody descriptor={descriptor} document={document} projectSlug={projectSlug} />;
+    return (
+      <FactsBody
+        descriptor={descriptor}
+        document={document}
+        projectSlug={projectSlug}
+      />
+    );
   }
   return <StreamingStatCard metrics={stats} />;
 }
@@ -384,7 +404,8 @@ function DiffBody({
 
   return (
     <VStack align="stretch" gap={1.5}>
-      {version != null && (typeof version === "string" || typeof version === "number") ? (
+      {version != null &&
+      (typeof version === "string" || typeof version === "number") ? (
         <Text textStyle="2xs" color="fg.muted">
           Version {version}
         </Text>
@@ -392,7 +413,11 @@ function DiffBody({
       {fields.length > 0 ? (
         <VStack align="stretch" gap={0}>
           {fields.map((field) => (
-            <CapabilityRow key={field} primary={labelize(field)} secondary="changed" />
+            <CapabilityRow
+              key={field}
+              primary={labelize(field)}
+              secondary="changed"
+            />
           ))}
         </VStack>
       ) : content ? (
@@ -462,7 +487,7 @@ export function LangyDeclarativeCard({
   // Read against the card that was DECIDED, never a kind re-derived from the
   // command's name here — that is a second decision point, and a promoted
   // result would be read by the schema of the card it did not get. See
-  // ADR-059 §1.
+  // ADR-079 §1.
   const parsed = parseCardResult({ kind: descriptor.render, output });
   const document = parsed.ok ? parsed.card : null;
 
@@ -571,9 +596,7 @@ function HydratedRowsCard({
       icon={descriptor.icon}
     >
       {hydration.isHydrating && hydration.rows.length === 0 ? (
-        <CapabilityRowSkeletons
-          count={Math.min(returned ?? 3, MAX_ROWS)}
-        />
+        <CapabilityRowSkeletons count={Math.min(returned ?? 3, MAX_ROWS)} />
       ) : hydration.rows.length > 0 ? (
         <VStack align="stretch" gap={0}>
           {hydration.rows.map((row) => (
@@ -622,11 +645,29 @@ function WidgetBody({
 }) {
   switch (descriptor.body) {
     case "rows":
-      return <RowsBody descriptor={descriptor} document={document} projectSlug={projectSlug} />;
+      return (
+        <RowsBody
+          descriptor={descriptor}
+          document={document}
+          projectSlug={projectSlug}
+        />
+      );
     case "facts":
-      return <FactsBody descriptor={descriptor} document={document} projectSlug={projectSlug} />;
+      return (
+        <FactsBody
+          descriptor={descriptor}
+          document={document}
+          projectSlug={projectSlug}
+        />
+      );
     case "stats":
-      return <StatsBody descriptor={descriptor} document={document} projectSlug={projectSlug} />;
+      return (
+        <StatsBody
+          descriptor={descriptor}
+          document={document}
+          projectSlug={projectSlug}
+        />
+      );
     case "diff":
       return (
         <DiffBody
@@ -640,7 +681,9 @@ function WidgetBody({
     case "text": {
       const lines = summaryLines(output, 3);
       if (lines.length === 0) {
-        return <UnreadableBody descriptor={descriptor} projectSlug={projectSlug} />;
+        return (
+          <UnreadableBody descriptor={descriptor} projectSlug={projectSlug} />
+        );
       }
       return <SummaryLinesBody lines={lines} />;
     }
@@ -651,14 +694,24 @@ function WidgetBody({
       return isPlottable(document) ? (
         <TimeseriesPlot payload={document} />
       ) : (
-        <StatsBody descriptor={descriptor} document={document} projectSlug={projectSlug} />
+        <StatsBody
+          descriptor={descriptor}
+          document={document}
+          projectSlug={projectSlug}
+        />
       );
     // A widget the catalog grows before this switch does. Falling off the end
     // of the switch returned `undefined` — a card with no body at all, which
     // is how a registered `chart` widget rendered nothing for as long as it
     // existed. Facts read every document, so they are the safe floor.
     default:
-      return <FactsBody descriptor={descriptor} document={document} projectSlug={projectSlug} />;
+      return (
+        <FactsBody
+          descriptor={descriptor}
+          document={document}
+          projectSlug={projectSlug}
+        />
+      );
   }
 }
 
@@ -677,8 +730,7 @@ function TextFallbackBody({
   projectSlug: string | null;
 }) {
   const text = extractToolText(output).trim();
-  const looksLikeBrokenDocument =
-    text.startsWith("{") || text.startsWith("[");
+  const looksLikeBrokenDocument = text.startsWith("{") || text.startsWith("[");
   if (!text || looksLikeBrokenDocument) {
     return <UnreadableBody descriptor={descriptor} projectSlug={projectSlug} />;
   }

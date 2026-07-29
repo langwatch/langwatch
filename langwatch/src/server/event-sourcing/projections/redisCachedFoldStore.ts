@@ -9,11 +9,11 @@ import {
   observeEsFoldCacheGetDuration,
   observeEsFoldCacheStoreDuration,
 } from "~/server/metrics";
-import type { FoldProjectionStore } from "./foldProjection.types";
 import {
   decodeFoldCacheEntry,
   encodeFoldCacheEntry,
 } from "./foldCache/foldCacheEntry";
+import type { FoldProjectionStore } from "./foldProjection.types";
 import type { ProjectionStoreContext } from "./projectionStoreContext";
 
 const logger = createLogger("langwatch:event-sourcing:redis-cached-fold-store");
@@ -110,9 +110,7 @@ function readUpdatedAt<State>(state: State): number {
  * keeps the pre-durable behaviour: eviction or Redis loss drops the set,
  * degrading to a blind re-apply, not to something worse.
  */
-export class RedisCachedFoldStore<State>
-  implements FoldProjectionStore<State>
-{
+export class RedisCachedFoldStore<State> implements FoldProjectionStore<State> {
   private readonly keyPrefix: string;
   private readonly ttlSeconds: number;
   private readonly updatedAtOf: (state: State) => number;
@@ -143,7 +141,19 @@ export class RedisCachedFoldStore<State>
   async getWithApplied(
     aggregateId: string,
     context: ProjectionStoreContext,
-  ): Promise<{ state: State | null; appliedEventIds: string[] }> {
+  ): Promise<{
+    state: State | null;
+    appliedEventIds: string[];
+    /**
+     * Forwarded verbatim from the durable tier. DECLARED, not incidental: every
+     * ADR-066 adopter is wrapped by this store, so the executor's decision to
+     * skip a pointless unwindowed re-read on an `undecodable` row reaches it
+     * only through here. Left undeclared it survived purely because
+     * `readDurable` happens to return the inner object unchanged, and a routine
+     * refactor to `{ state, appliedEventIds }` would have silently disabled it.
+     */
+    miss?: "absent" | "undecodable";
+  }> {
     // The executor's read-window fallback re-reads moments after its windowed
     // attempt already consulted the cache — a second Redis read is a
     // guaranteed miss that would double-count the cache and dedup metrics, so
@@ -198,7 +208,11 @@ export class RedisCachedFoldStore<State>
       incrementEsFoldCacheRedisError(this.keyPrefix, "get");
       incrementEsFoldCacheTotal(this.keyPrefix, "fallback_error");
       logger.warn(
-        { aggregateId, tenantId: String(context.tenantId), error: String(error) },
+        {
+          aggregateId,
+          tenantId: String(context.tenantId),
+          error: String(error),
+        },
         "Fold cache read failed — falling through to the durable store",
       );
       return { hit: false, reason: "read_error" };
@@ -227,7 +241,11 @@ export class RedisCachedFoldStore<State>
       incrementEsFoldCacheRedisError(this.keyPrefix, "get");
       incrementEsFoldCacheTotal(this.keyPrefix, "fallback_error");
       logger.error(
-        { aggregateId, tenantId: String(context.tenantId), error: String(error) },
+        {
+          aggregateId,
+          tenantId: String(context.tenantId),
+          error: String(error),
+        },
         "Fold cache entry was unreadable — falling through to the durable store, dedup unavailable for this read",
       );
       return { hit: false, reason: "unreadable" };
@@ -252,7 +270,11 @@ export class RedisCachedFoldStore<State>
   private async readDurable(
     aggregateId: string,
     context: ProjectionStoreContext,
-  ): Promise<{ state: State | null; appliedEventIds: string[] }> {
+  ): Promise<{
+    state: State | null;
+    appliedEventIds: string[];
+    miss?: "absent" | "undecodable";
+  }> {
     const startedAt = performance.now();
     const result = this.inner.getWithApplied
       ? await this.inner.getWithApplied(aggregateId, context)

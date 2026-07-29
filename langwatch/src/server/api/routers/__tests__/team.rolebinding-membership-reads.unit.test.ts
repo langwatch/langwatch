@@ -1,8 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { PrismaClient } from "@prisma/client";
 import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
-import { teamRouter } from "../team";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createInnerTRPCContext } from "../../trpc";
+import { teamRouter } from "../team";
 
 // Team membership is written ONLY to RoleBinding since migration
 // 20260407120000_migrate_team_users_to_role_bindings — the legacy TeamUser
@@ -172,7 +172,9 @@ describe("team.getTeamsWithMembers", () => {
         buildMockPrisma({ teamBindings: [bindingFor({ userId: MEMBER_ID })] }),
       );
 
-      const teams = await caller.getTeamsWithMembers({ organizationId: ORG_ID });
+      const teams = await caller.getTeamsWithMembers({
+        organizationId: ORG_ID,
+      });
 
       const found = teams.find((t) => t.id === TEAM_ID);
       expect(found).toBeDefined();

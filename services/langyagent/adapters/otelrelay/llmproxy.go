@@ -189,11 +189,17 @@ func (r *Relay) handleLLM(w http.ResponseWriter, req *http.Request) {
 			}
 			e, typed := decodeLLMErrorBody(peeked)
 			if !typed {
+				// The provider's own sentence goes HERE and nowhere else. It is
+				// the most useful thing there is when diagnosing a wedged
+				// conversation, and a log line is read by operators rather than
+				// shipped to a customer — which is the whole distinction, since
+				// the same sentence may be quoting the API key we sent.
 				clog.Get(r.baseCtx).Info("otelrelay llm error body not a typed envelope; captured best-effort",
 					zap.String("conversation", entry.info.ConversationID),
 					zap.Int("status", resp.StatusCode),
 					zap.Int("body_bytes", len(peeked)),
-					zap.String("content_type", resp.Header.Get("Content-Type")))
+					zap.String("content_type", resp.Header.Get("Content-Type")),
+					zap.String("upstream_message", extractUpstreamErrorMessage(peeked)))
 			}
 			if e.Meta == nil {
 				e.Meta = herr.M{}
@@ -260,8 +266,9 @@ func llmTargetURL(gatewayBaseURL, token string, reqURL *url.URL) (*url.URL, erro
 // llmUpstreamErrorCode marks a failed mediated LLM call whose response body was
 // NOT the gateway's typed herr envelope — a provider-native error the gateway
 // forwarded verbatim (an Anthropic "credit balance too low", the codex
-// backend's `{"detail": ...}`). The provider's message rides Meta["message"]
-// so the turn's terminal error frame still names the real failure.
+// backend's `{"detail": ...}`). The provider's own error type rides as a typed
+// reason so the control plane can name the failure; the provider's prose does
+// not travel with it (see decodeLLMErrorBody).
 const llmUpstreamErrorCode = herr.Code("llm_upstream_error")
 
 // rateLimitCutAfter is how many CONSECUTIVE 429s a conversation's mediated LLM
@@ -323,30 +330,64 @@ const maxProviderTypeBytes = 128
 
 // decodeLLMErrorBody turns a failed LLM response body into the herr.E the turn's
 // terminal error frame carries as its cause. Typed gateway envelopes (see
-// isGatewayEnvelope) decode losslessly (typed=true). Anything else, whether
-// provider-native error JSON the gateway forwards byte-for-byte or plain text,
-// is captured best-effort as an `llm_upstream_error` whose Meta["message"]
-// holds the provider's own message (typed=false). Provider error messages are
-// client-facing by design (the same body the SDK shows), so carrying the prose
-// is safe. When a provider-native body names its own error type, that
-// discriminant rides as a typed reason under the `llm_upstream_error`: the
-// control plane classifies known provider discriminants by exact reason code
-// (the codex backend's `usage_limit_reached` becomes the plan-limit card)
-// while the top-level cause still says the failure came from upstream.
+// isGatewayEnvelope) decode losslessly (typed=true) — that message is OUR own,
+// written by the gateway for a cause it named, so it travels as it always has.
+//
+// Anything else, whether provider-native error JSON the gateway forwards
+// byte-for-byte or plain text, becomes an `llm_upstream_error` carrying the
+// provider's DISCRIMINANT and no prose (typed=false).
+//
+// It used to carry the prose too, in Meta["message"], reasoning that provider
+// error messages are client-facing by design because they are the same body the
+// SDK shows. The flaw is who "the client" is: that body is written for whoever
+// holds the API key, and on a mediated call the key holder is LangWatch.
+// OpenAI rejects a bad key with `Incorrect API key provided: sk-proj-…`, so
+// forwarding the sentence hands a customer a platform credential — and because
+// Meta is a client contract, it does that whether or not any UI renders it.
+// Filtering the prose instead was considered and rejected: matching credential
+// shapes only catches the shapes someone enumerated.
+//
+// What remains is strictly better structured. When a provider-native body names
+// its own error type, that discriminant rides as a typed reason under the
+// `llm_upstream_error`, and the control plane classifies the ones it knows by
+// exact reason code (the codex backend's `usage_limit_reached` becomes the
+// plan-limit card) while the top-level cause still says the failure came from
+// upstream. A discriminant is a value from a set the provider enumerates, so it
+// cannot smuggle a key the way free text can.
+//
+// The prose is not lost, only redirected: the caller logs it server-side, where
+// it is an operator's diagnostic rather than a customer's copy.
 func decodeLLMErrorBody(peeked []byte) (e herr.E, typed bool) {
 	var envelope herr.ErrorResponse
 	if json.Unmarshal(peeked, &envelope) == nil && isGatewayEnvelope(envelope.Error) {
 		return herr.FromBody(envelope.Error), true
 	}
-	e = herr.E{Code: llmUpstreamErrorCode, Meta: herr.M{}}
-	if message := extractUpstreamErrorMessage(peeked); message != "" {
-		e.Meta["message"] = message
-	}
+	return decodeProviderErrorBody(peeked), false
+}
+
+// decodeProviderErrorBody captures a body KNOWN to be provider-native, skipping
+// the gateway-envelope test that decodeLLMErrorBody opens with.
+//
+// Callers that already know which side a body came from should use this rather
+// than paying for a shape guess they do not need. An SSE error event inside a
+// 200 stream is the case in point: the gateway reports its own failures as
+// non-200 JSON responses through herr.WriteHTTP, so nothing arriving mid-stream
+// is ever its envelope — and the guess is not free, because a provider dialect
+// CAN satisfy it by coincidence. OpenAI's quota body sets type and code to the
+// same `insufficient_quota` with a message alongside, which is precisely the
+// shape isGatewayEnvelope reads as ours; routing it through here keeps its
+// prose out of the frame on the strength of where it came from rather than
+// what it looks like.
+func decodeProviderErrorBody(peeked []byte) herr.E {
+	e := herr.E{Code: llmUpstreamErrorCode, Meta: herr.M{}}
 	if t := gjson.GetBytes(peeked, "error.type"); t.Type == gjson.String &&
 		t.Str != "" && len(t.Str) <= maxProviderTypeBytes {
+		// herrgen:external — the provider's own discriminant, relayed as a
+		// reason so the client can branch on it. Not ours to enumerate, so
+		// it never belongs in the generated code list.
 		e.Reasons = []error{herr.E{Code: herr.Code(t.Str)}}
 	}
-	return e, false
+	return e
 }
 
 // isGatewayEnvelope reports whether a failed response body is the gateway's
@@ -356,10 +397,13 @@ func decodeLLMErrorBody(peeked []byte) (e herr.E, typed bool) {
 // dialects reuse the field names but not the matched pair: Anthropic sends
 // `type` without `code`, the codex backend sends `type` only or a bare
 // `detail`, and OpenAI's `code` (when present) rarely matches its `type`.
-// A provider body that does emit the full matched shape decodes typed; its
-// message is preserved in Meta["message"] either way (herr.FromBody), so the
-// terminal error frame names the real failure regardless of which side of
-// the gate a body lands on.
+// This gate decides whether prose survives, so it is worth stating plainly: a
+// body that emits the full matched shape decodes typed and keeps its message
+// (herr.FromBody), because that shape is the gateway's own and the message is
+// therefore ours. Everything else keeps only its discriminant. A provider
+// dialect that happens to emit the matched shape is indistinguishable from the
+// gateway by construction — the reason the gate demands all three fields, not
+// one.
 func isGatewayEnvelope(body herr.ErrorBody) bool {
 	return body.Code != "" && body.Type == body.Code && body.Message != ""
 }

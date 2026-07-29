@@ -32,7 +32,7 @@ export function useFilteredProjects(
   query: string,
   organizations: Organization[] | undefined,
   currentProjectSlug: string | undefined,
-  currentUserId: string | undefined
+  currentUserId: string | undefined,
 ): FilteredProject[] {
   return useMemo(() => {
     if (!organizations || !query.trim()) return [];
@@ -49,7 +49,8 @@ export function useFilteredProjects(
     ];
     const isSearchingCategory = projectKeywords.some(
       (kw) =>
-        kw.startsWith(lowerQuery) && lowerQuery.length >= MIN_CATEGORY_MATCH_LENGTH
+        kw.startsWith(lowerQuery) &&
+        lowerQuery.length >= MIN_CATEGORY_MATCH_LENGTH,
     );
 
     const projects: FilteredProject[] = [];

@@ -111,7 +111,11 @@ function channelPage({
 }) {
   return {
     ok: true,
-    channels: ids.map((id) => ({ id, name: id.toLowerCase(), is_private: false })),
+    channels: ids.map((id) => ({
+      id,
+      name: id.toLowerCase(),
+      is_private: false,
+    })),
     response_metadata: nextCursor ? { next_cursor: nextCursor } : {},
   };
 }
@@ -295,7 +299,11 @@ describe("listSlackChannels", () => {
       // the app is missing channels:read entirely.
       respond(200, { ok: false, error: "missing_scope" });
       const result = await listSlackChannels("xoxb-test");
-      expect(result).toEqual({ channels: [], error: "missing_scope", gaps: [] });
+      expect(result).toEqual({
+        channels: [],
+        error: "missing_scope",
+        gaps: [],
+      });
     });
 
     it("falls back to public channels when only groups:read is missing", async () => {
@@ -323,9 +331,7 @@ describe("listSlackChannels", () => {
       expect(result.error).toBeNull();
       expect(result.gaps).toContain("private_channels_hidden");
       expect(result.channels.map((c) => c.id)).toEqual(["C1"]);
-      expect(bodyParams(0).get("types")).toBe(
-        "public_channel,private_channel",
-      );
+      expect(bodyParams(0).get("types")).toBe("public_channel,private_channel");
       expect(bodyParams(1).get("types")).toBe("public_channel");
     });
   });

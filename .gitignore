@@ -149,6 +149,12 @@ server.log
 
 # thuishaven (portless local dev)
 .langwatch-slug
+.haven.json
 /bin/haven
 langwatch/dev.log
 .claude/tmp/
+
+# Biome gate artifacts (.github/workflows/langwatch-app-ci.yml lint job)
+/biome.raw.json
+/biome.rdjson
+/biome.posted.json

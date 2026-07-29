@@ -1,11 +1,9 @@
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
-import type { ProcessManagerApplier } from "~/server/event-sourcing/pipeline/processBuilder";
 import type {
   IntentSpec,
   WakeHandler,
 } from "~/server/event-sourcing/pipeline/processManagerDefinition";
-import type { AutomationEvent } from "~/server/event-sourcing/pipelines/automations/schemas/events";
 
 const logger = createLogger("langwatch:triggers:webhook-delivery-prune");
 
@@ -41,10 +39,7 @@ type PruneIntents = {
 export const webhookDeliveryPruneWake: WakeHandler<
   WebhookDeliveryPruneState,
   PruneIntents
-> = (
-  _state,
-  ctx,
-) => ({
+> = (_state, ctx) => ({
   state: { lastPruneAt: ctx.at },
   intents: [ctx.intents.prune(`prune:${ctx.at}`, { scheduledFor: ctx.at })],
 });

@@ -59,9 +59,9 @@ describe("ApiKeyService system-managed guard", () => {
     it("refuses a revoke as not-found, so a live turn keeps working", async () => {
       const sut = ApiKeyService.create(mockPrisma(LANGY_SESSION_API_KEY_NAME));
 
-      await expect(sut.revoke({ id: KEY_ID, ...caller })).rejects.toBeInstanceOf(
-        ApiKeyNotFoundError,
-      );
+      await expect(
+        sut.revoke({ id: KEY_ID, ...caller }),
+      ).rejects.toBeInstanceOf(ApiKeyNotFoundError);
     });
   });
 

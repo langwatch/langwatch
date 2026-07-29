@@ -1,20 +1,12 @@
-import {
-  Box,
-  Heading,
-  HStack,
-  Spinner,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Heading, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import numeral from "numeral";
-import { useRouter } from "~/utils/compat/next-router";
-
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
+import { Link } from "~/components/ui/link";
 import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
-import { Link } from "~/components/ui/link";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
+import { useRouter } from "~/utils/compat/next-router";
 import { getHexColorForString } from "~/utils/rotatingColors";
 
 type SpendByUser = RouterOutputs["activityMonitor"]["spendByUser"][number];
@@ -51,9 +43,15 @@ function SortChip({
         borderRadius: 9999,
         borderWidth: 1,
         borderStyle: "solid",
-        borderColor: active ? "var(--chakra-colors-orange-500)" : "var(--chakra-colors-border-muted)",
-        backgroundColor: active ? "var(--chakra-colors-orange-50)" : "transparent",
-        color: active ? "var(--chakra-colors-orange-700)" : "var(--chakra-colors-fg-muted)",
+        borderColor: active
+          ? "var(--chakra-colors-orange-500)"
+          : "var(--chakra-colors-border-muted)",
+        backgroundColor: active
+          ? "var(--chakra-colors-orange-50)"
+          : "transparent",
+        color: active
+          ? "var(--chakra-colors-orange-700)"
+          : "var(--chakra-colors-fg-muted)",
         fontSize: 12,
         fontWeight: 500,
         cursor: "pointer",
@@ -132,8 +130,8 @@ function GovernanceUsersListPage() {
             </Text>
             <Heading size="md">All users by {SORT_LABEL[sortBy]}</Heading>
             <Text color="fg.muted" fontSize="sm">
-              Every LangWatch member that reported activity in the last
-              30 days. Click a row to drill into a single user.
+              Every LangWatch member that reported activity in the last 30 days.
+              Click a row to drill into a single user.
             </Text>
           </VStack>
         </HStack>
@@ -233,11 +231,7 @@ function Header() {
 function Row({ user }: { user: SpendByUser }) {
   const dotColor = getHexColorForString(user.actor);
   const arrow =
-    user.trendVsPreviousPct > 0
-      ? "↑"
-      : user.trendVsPreviousPct < 0
-        ? "↓"
-        : "·";
+    user.trendVsPreviousPct > 0 ? "↑" : user.trendVsPreviousPct < 0 ? "↓" : "·";
   const trendColor = !user.hasPriorBaseline
     ? "fg.muted"
     : user.trendVsPreviousPct > 25

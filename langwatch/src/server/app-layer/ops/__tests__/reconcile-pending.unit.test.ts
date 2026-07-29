@@ -19,12 +19,16 @@ function createMockRedis() {
   } as unknown as import("ioredis").default;
 }
 
-function createMockRepo(overrides: Partial<QueueRepository> = {}): QueueRepository {
+function createMockRepo(
+  overrides: Partial<QueueRepository> = {},
+): QueueRepository {
   return {
     discoverQueueNames: vi.fn().mockResolvedValue([]),
     scanQueues: vi.fn().mockResolvedValue([]),
     getGroupJobs: vi.fn().mockResolvedValue({ jobs: [], total: 0 }),
-    getBlockedSummary: vi.fn().mockResolvedValue({ totalBlocked: 0, clusters: [] }),
+    getBlockedSummary: vi
+      .fn()
+      .mockResolvedValue({ totalBlocked: 0, clusters: [] }),
     unblockGroup: vi.fn().mockResolvedValue({ wasBlocked: false }),
     unblockAll: vi.fn().mockResolvedValue({ unblockedCount: 0 }),
     drainGroup: vi.fn().mockResolvedValue({ jobsRemoved: 0 }),
@@ -33,17 +37,29 @@ function createMockRepo(overrides: Partial<QueueRepository> = {}): QueueReposito
     retryBlocked: vi.fn().mockResolvedValue({ wasBlocked: false }),
     listPausedKeys: vi.fn().mockResolvedValue([]),
     moveToDlq: vi.fn().mockResolvedValue({ jobsMoved: 0 }),
-    moveAllBlockedToDlq: vi.fn().mockResolvedValue({ movedCount: 0, jobsMoved: 0 }),
+    moveAllBlockedToDlq: vi
+      .fn()
+      .mockResolvedValue({ movedCount: 0, jobsMoved: 0 }),
     replayFromDlq: vi.fn().mockResolvedValue({ jobsReplayed: 0 }),
-    replayAllFromDlq: vi.fn().mockResolvedValue({ replayedCount: 0, jobsReplayed: 0 }),
-    canaryRedrive: vi.fn().mockResolvedValue({ redrivenCount: 0, groupIds: [] }),
-    canaryUnblock: vi.fn().mockResolvedValue({ unblockedCount: 0, groupIds: [] }),
+    replayAllFromDlq: vi
+      .fn()
+      .mockResolvedValue({ replayedCount: 0, jobsReplayed: 0 }),
+    canaryRedrive: vi
+      .fn()
+      .mockResolvedValue({ redrivenCount: 0, groupIds: [] }),
+    canaryUnblock: vi
+      .fn()
+      .mockResolvedValue({ unblockedCount: 0, groupIds: [] }),
     listDlqGroups: vi.fn().mockResolvedValue([]),
-    drainAllBlockedPreview: vi.fn().mockResolvedValue({ totalAffected: 0, byPipeline: [], byError: [] }),
+    drainAllBlockedPreview: vi
+      .fn()
+      .mockResolvedValue({ totalAffected: 0, byPipeline: [], byError: [] }),
     pauseTenant: vi.fn().mockResolvedValue(undefined),
     unpauseTenant: vi.fn().mockResolvedValue(undefined),
     listPausedTenants: vi.fn().mockResolvedValue([]),
-    drainTenant: vi.fn().mockResolvedValue({ groupsDrained: 0, jobsDrained: 0 }),
+    drainTenant: vi
+      .fn()
+      .mockResolvedValue({ groupsDrained: 0, jobsDrained: 0 }),
     reconcileTotalPending: vi.fn().mockResolvedValue(null),
     ...overrides,
   };
@@ -60,10 +76,21 @@ describe("OpsMetricsCollector", () => {
          */
         it("accumulates absolute drift values so opposing drifts do not cancel", async () => {
           const queueRepo = createMockRepo({
-            discoverQueueNames: vi.fn().mockResolvedValue(["queue-alpha", "queue-beta"]),
-            reconcileTotalPending: vi.fn()
-              .mockResolvedValueOnce({ counter: 130, groundTruth: 100, drift: 30 })
-              .mockResolvedValueOnce({ counter: 40, groundTruth: 50, drift: -10 }),
+            discoverQueueNames: vi
+              .fn()
+              .mockResolvedValue(["queue-alpha", "queue-beta"]),
+            reconcileTotalPending: vi
+              .fn()
+              .mockResolvedValueOnce({
+                counter: 130,
+                groundTruth: 100,
+                drift: 30,
+              })
+              .mockResolvedValueOnce({
+                counter: 40,
+                groundTruth: 50,
+                drift: -10,
+              }),
           });
 
           const collector = new OpsMetricsCollector({
@@ -76,7 +103,9 @@ describe("OpsMetricsCollector", () => {
 
           // Call the private method through the public reconcile path.
           // Access via bracket notation to avoid exposing a test-only public API.
-          await (collector as unknown as { reconcilePending(): Promise<void> }).reconcilePending();
+          await (
+            collector as unknown as { reconcilePending(): Promise<void> }
+          ).reconcilePending();
 
           expect(collector.getDashboardData().pendingDrift).toBe(40);
         });

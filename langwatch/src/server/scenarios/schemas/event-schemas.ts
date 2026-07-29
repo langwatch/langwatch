@@ -9,7 +9,11 @@ import {
 } from "@ag-ui/core";
 import { z } from "zod";
 import { chatMessageSchema } from "~/server/tracer/types";
-import { ScenarioEventType, ScenarioRunStatus, Verdict } from "../scenario-event.enums";
+import {
+  ScenarioEventType,
+  ScenarioRunStatus,
+  Verdict,
+} from "../scenario-event.enums";
 
 /**
  * AG-UI Base Event Schema
@@ -45,7 +49,11 @@ const baseScenarioEventSchema = baseEventSchema.extend({
   batchRunId: batchRunIdSchema,
   scenarioId: scenarioIdSchema,
   scenarioRunId: scenarioRunIdSchema,
-  scenarioSetId: z.string().optional().default("default").transform((v) => v || "default"),
+  scenarioSetId: z
+    .string()
+    .optional()
+    .default("default")
+    .transform((v) => v || "default"),
 });
 
 /**

@@ -1,9 +1,4 @@
-import type {
-  Dataset,
-  DatasetRecord,
-  Prisma,
-  PrismaClient,
-} from "@prisma/client";
+import type { Dataset, Prisma, PrismaClient } from "@prisma/client";
 
 /**
  * Input types derived from Prisma for type safety

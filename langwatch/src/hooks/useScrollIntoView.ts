@@ -5,12 +5,12 @@ import { useEffect } from "react";
  */
 export function useScrollIntoView(
   selectedIndex: number,
-  resultsRef: React.RefObject<HTMLDivElement | null>
+  resultsRef: React.RefObject<HTMLDivElement | null>,
 ) {
   useEffect(() => {
     if (!resultsRef.current) return;
     const selectedElement = resultsRef.current.querySelector(
-      `[data-index="${selectedIndex}"]`
+      `[data-index="${selectedIndex}"]`,
     );
     if (selectedElement) {
       selectedElement.scrollIntoView({ block: "nearest", behavior: "smooth" });

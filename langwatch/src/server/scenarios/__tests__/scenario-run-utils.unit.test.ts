@@ -7,12 +7,14 @@
  * - Edge cases: no queued jobs, no stored data
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { ScenarioRunStatus } from "../../scenarios/scenario-event.enums";
-import { mergeRunData } from "../scenario-run.utils";
 import type { ScenarioRunData } from "../scenario-event.types";
+import { mergeRunData } from "../scenario-run.utils";
 
-function makeRunData(overrides: Partial<ScenarioRunData> = {}): ScenarioRunData {
+function makeRunData(
+  overrides: Partial<ScenarioRunData> = {},
+): ScenarioRunData {
   return {
     scenarioId: "scen_1",
     batchRunId: "batch_1",
@@ -136,7 +138,9 @@ describe("mergeRunData()", () => {
 
     it("does not include the duplicate queued entry", () => {
       const result = mergeRunData({ esRuns, queuedRuns });
-      const queuedResults = result.filter((r) => r.status === ScenarioRunStatus.QUEUED);
+      const queuedResults = result.filter(
+        (r) => r.status === ScenarioRunStatus.QUEUED,
+      );
       expect(queuedResults).toHaveLength(1);
       expect(queuedResults[0]?.scenarioRunId).toBe("scenariorun_bbb");
     });

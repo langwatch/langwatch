@@ -251,7 +251,10 @@ vi.mock("~/utils/api", () => ({
 vi.mock("~/components/PeriodSelector", () => ({
   PeriodSelector: () => null,
   usePeriodSelector: () => ({
-    period: { startDate: new Date(1710500000000), endDate: new Date(1710600000000) },
+    period: {
+      startDate: new Date(1710500000000),
+      endDate: new Date(1710600000000),
+    },
     setPeriod: stableSetFn,
   }),
 }));
@@ -421,7 +424,7 @@ describe("<MessagesTable/> export wiring", () => {
           filters: { "metadata.labels": ["production"] },
           startDate: 1710500000000,
           endDate: 1710600000000,
-        })
+        }),
       );
     });
   });
@@ -458,7 +461,7 @@ describe("<MessagesTable/> export wiring", () => {
       render(<MessagesTable />, { wrapper: Wrapper });
 
       expect(screen.getByTestId("dialog-is-selected").textContent).toBe(
-        "false"
+        "false",
       );
     });
   });
@@ -503,7 +506,7 @@ describe("<MessagesTable/> export wiring", () => {
 
       expect(screen.getByTestId("export-progress")).toBeInTheDocument();
       expect(screen.getByTestId("export-progress").textContent).toContain(
-        "Exported 150 of 500 traces..."
+        "Exported 150 of 500 traces...",
       );
     });
   });
@@ -522,7 +525,7 @@ describe("<MessagesTable/> export wiring", () => {
         name: /^Export$/i,
       });
       const toolbarExport = allExportButtons.find(
-        (btn) => btn.textContent?.trim() === "Export"
+        (btn) => btn.textContent?.trim() === "Export",
       );
 
       expect(toolbarExport).toBeDefined();
@@ -539,7 +542,7 @@ describe("<MessagesTable/> export wiring", () => {
       render(<MessagesTable hideExport />, { wrapper: Wrapper });
 
       expect(
-        screen.queryByRole("button", { name: /Export all/i })
+        screen.queryByRole("button", { name: /Export all/i }),
       ).not.toBeInTheDocument();
     });
   });

@@ -1,8 +1,8 @@
-import {
-  orgRoleOptions,
-  type OrgRoleOption,
-} from "../settings/OrganizationUserRoleField";
 import { OrganizationUserRole } from "@prisma/client";
+import {
+  type OrgRoleOption,
+  orgRoleOptions,
+} from "../settings/OrganizationUserRoleField";
 
 /**
  * Returns the organization role options available to the current user.

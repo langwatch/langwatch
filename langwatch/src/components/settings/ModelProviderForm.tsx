@@ -20,6 +20,7 @@ import { useModelProviderApiKeyValidation } from "../../hooks/useModelProviderAp
 import { useModelProviderForm } from "../../hooks/useModelProviderForm";
 import { useModelProvidersSettings } from "../../hooks/useModelProvidersSettings";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { useRequiredCredentialKeys } from "../../hooks/useRequiredCredentialKeys";
 import {
   type MaybeStoredModelProvider,
   modelProviders as modelProvidersRegistry,
@@ -29,7 +30,6 @@ import {
   hasUserEnteredNewApiKey,
   hasUserModifiedNonApiKeyFields,
 } from "../../utils/modelProviderHelpers";
-import { useRequiredCredentialKeys } from "../../hooks/useRequiredCredentialKeys";
 import { parseZodFieldErrors, type ZodErrorStructure } from "../../utils/zod";
 import { SmallLabel } from "../SmallLabel";
 import { Switch } from "../ui/switch";

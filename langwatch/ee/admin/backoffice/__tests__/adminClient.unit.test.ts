@@ -4,9 +4,13 @@ import {
   describe,
   expect,
   it,
-  vi,
   type Mock,
+  vi,
 } from "vitest";
+// The logic module rather than `~/features/errors`: the barrel pulls in the
+// Chakra toaster, which has no place in a node-environment unit test.
+import { readHandledError } from "~/features/errors/logic/readHandledError";
+
 import { adminClient, impersonateUser } from "../adminClient";
 
 /**
@@ -21,11 +25,12 @@ describe("adminClient", () => {
   let fetchMock: Mock;
 
   beforeEach(() => {
-    fetchMock = vi.fn(async () =>
-      new Response(JSON.stringify({ data: [], total: 0 }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      }),
+    fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ data: [], total: 0 }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
     );
     globalThis.fetch = fetchMock as unknown as typeof fetch;
   });
@@ -60,9 +65,7 @@ describe("adminClient", () => {
 
     it("defaults pagination, sort, and filter when params are partial", async () => {
       await adminClient.getList("organization", {});
-      const body = JSON.parse(
-        fetchMock.mock.calls[0]![1].body as string,
-      );
+      const body = JSON.parse(fetchMock.mock.calls[0]![1].body as string);
       expect(body.params.pagination).toEqual({ page: 1, perPage: 25 });
       expect(body.params.sort).toEqual({ field: "id", order: "ASC" });
       expect(body.params.filter).toEqual({});
@@ -99,14 +102,46 @@ describe("adminClient", () => {
     });
   });
 
-  describe("when the server returns a non-2xx", () => {
-    it("throws an Error that includes status and body for visibility", async () => {
+  describe("when the server returns a handled failure", () => {
+    it("throws it in the shape the error UI reads", async () => {
+      fetchMock.mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            error: "cannot_impersonate_admin",
+            message: "Cannot impersonate another admin",
+            userId: "user_target",
+            fault: "customer",
+            trace: { traceId: "0af7651916cd43dd8448eb211c80319c" },
+          }),
+          { status: 403, headers: { "Content-Type": "application/json" } },
+        ),
+      );
+
+      const error = await adminClient.getList("user", {}).catch((e) => e);
+
+      // The whole point of the shape: the presentation layer can name the
+      // failure and hand the operator an id to quote. A bare
+      // `new Error("...failed (403): {json}")` gives it neither.
+      const handled = readHandledError(error);
+      expect(handled?.code).toBe("cannot_impersonate_admin");
+      expect(handled?.traceId).toBe("0af7651916cd43dd8448eb211c80319c");
+      expect(handled?.meta.userId).toBe("user_target");
+      expect(handled?.httpStatus).toBe(403);
+    });
+  });
+
+  describe("when the server returns a body that isn't JSON", () => {
+    it("still names the call and its status, and stays unhandled", async () => {
       fetchMock.mockResolvedValueOnce(
         new Response("boom", { status: 500, statusText: "Server Error" }),
       );
-      await expect(
-        adminClient.getList("user", {}),
-      ).rejects.toThrow(/user\/getList failed \(500\): boom/);
+
+      const error = await adminClient.getList("user", {}).catch((e) => e);
+
+      expect((error as Error).message).toMatch(/user\/getList failed \(500\)/);
+      // Nothing structured came back, so there is nothing to present — the
+      // generic unknown treatment is the correct outcome here (ADR-045).
+      expect(readHandledError(error)).toBeNull();
     });
   });
 });
@@ -116,8 +151,9 @@ describe("impersonateUser", () => {
   let fetchMock: Mock;
 
   beforeEach(() => {
-    fetchMock = vi.fn(async () =>
-      new Response(JSON.stringify({ message: "ok" }), { status: 200 }),
+    fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ message: "ok" }), { status: 200 }),
     );
     globalThis.fetch = fetchMock as unknown as typeof fetch;
   });

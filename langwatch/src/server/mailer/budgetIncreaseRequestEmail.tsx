@@ -1,4 +1,11 @@
-import { Button, Container, Heading, Html, Img, Section } from "@react-email/components";
+import {
+  Button,
+  Container,
+  Heading,
+  Html,
+  Img,
+  Section,
+} from "@react-email/components";
 import { render } from "@react-email/render";
 import { env } from "../../env.mjs";
 import { sendEmail } from "./emailSender";
@@ -61,8 +68,8 @@ export const sendBudgetIncreaseRequestEmail = async (
           Budget increase request
         </Heading>
         <p style={{ fontSize: "14px", lineHeight: 1.6 }}>
-          <strong>{input.requesterName ?? input.requesterEmail}</strong>{" "}
-          (<a href={`mailto:${input.requesterEmail}`}>{input.requesterEmail}</a>){" "}
+          <strong>{input.requesterName ?? input.requesterEmail}</strong> (
+          <a href={`mailto:${input.requesterEmail}`}>{input.requesterEmail}</a>){" "}
           has requested a budget increase in{" "}
           <strong>{input.organizationName}</strong>.
         </p>

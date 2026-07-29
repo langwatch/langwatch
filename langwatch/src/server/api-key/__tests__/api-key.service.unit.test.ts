@@ -20,7 +20,10 @@ vi.mock("~/server/rbac/role-binding-resolver", () => ({
 
 // Mock the custom role permissions module
 vi.mock("~/server/rbac/custom-role-permissions", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("~/server/rbac/custom-role-permissions")>();
+  const actual =
+    await importOriginal<
+      typeof import("~/server/rbac/custom-role-permissions")
+    >();
   return {
     ...actual,
     parseCustomRolePermissions: vi.fn().mockReturnValue(["project:view"]),
@@ -83,7 +86,9 @@ function createMockPrisma() {
   };
 
   return {
-    $transaction: vi.fn((fn: (tx: typeof mockTx) => Promise<unknown>) => fn(mockTx)),
+    $transaction: vi.fn((fn: (tx: typeof mockTx) => Promise<unknown>) =>
+      fn(mockTx),
+    ),
     organizationUser: {
       findFirst: vi.fn().mockResolvedValue({ userId: "user_1" }),
     },
@@ -231,8 +236,12 @@ describe("ApiKeyService", () => {
   describe("create() ceiling validation ordering", () => {
     describe("when ceiling check rejects permissions", () => {
       it("does not create a CustomRole", async () => {
-        const { checkRoleBindingPermission } = await import("~/server/rbac/role-binding-resolver");
-        (checkRoleBindingPermission as ReturnType<typeof vi.fn>).mockResolvedValue(false);
+        const { checkRoleBindingPermission } = await import(
+          "~/server/rbac/role-binding-resolver"
+        );
+        (
+          checkRoleBindingPermission as ReturnType<typeof vi.fn>
+        ).mockResolvedValue(false);
 
         await expect(
           service.create({
@@ -253,7 +262,9 @@ describe("ApiKeyService", () => {
 
         expect(prisma._mockTx.customRole.create).not.toHaveBeenCalled();
 
-        (checkRoleBindingPermission as ReturnType<typeof vi.fn>).mockResolvedValue(true);
+        (
+          checkRoleBindingPermission as ReturnType<typeof vi.fn>
+        ).mockResolvedValue(true);
       });
     });
   });
@@ -272,7 +283,10 @@ describe("ApiKeyService", () => {
     describe("when owner updates their own key", () => {
       it("updates the key name", async () => {
         prisma.apiKey.findUnique.mockResolvedValue(existingKey);
-        prisma._mockTx.apiKey.update.mockResolvedValue({ ...existingKey, name: "New Name" });
+        prisma._mockTx.apiKey.update.mockResolvedValue({
+          ...existingKey,
+          name: "New Name",
+        });
         prisma._mockTx.apiKey.findUnique.mockResolvedValue({
           ...existingKey,
           name: "New Name",
@@ -310,7 +324,10 @@ describe("ApiKeyService", () => {
     describe("when admin updates another user's key", () => {
       it("succeeds", async () => {
         prisma.apiKey.findUnique.mockResolvedValue(existingKey);
-        prisma._mockTx.apiKey.update.mockResolvedValue({ ...existingKey, name: "Admin Edit" });
+        prisma._mockTx.apiKey.update.mockResolvedValue({
+          ...existingKey,
+          name: "Admin Edit",
+        });
         prisma._mockTx.apiKey.findUnique.mockResolvedValue({
           ...existingKey,
           name: "Admin Edit",
@@ -481,7 +498,13 @@ describe("ApiKeyService", () => {
         const keyWithCustomRole = {
           ...existingKey,
           roleBindings: [
-            { id: "rb_1", customRoleId: "cr_1", role: "CUSTOM", scopeType: "ORGANIZATION", scopeId: "org_1" },
+            {
+              id: "rb_1",
+              customRoleId: "cr_1",
+              role: "CUSTOM",
+              scopeType: "ORGANIZATION",
+              scopeId: "org_1",
+            },
           ],
         };
         prisma.apiKey.findUnique.mockResolvedValue(keyWithCustomRole);
@@ -513,8 +536,20 @@ describe("ApiKeyService", () => {
         const keyWithSharedRole = {
           ...existingKey,
           roleBindings: [
-            { id: "rb_1", customRoleId: "cr_1", role: "CUSTOM", scopeType: "PROJECT", scopeId: "p_1" },
-            { id: "rb_2", customRoleId: "cr_1", role: "CUSTOM", scopeType: "PROJECT", scopeId: "p_2" },
+            {
+              id: "rb_1",
+              customRoleId: "cr_1",
+              role: "CUSTOM",
+              scopeType: "PROJECT",
+              scopeId: "p_1",
+            },
+            {
+              id: "rb_2",
+              customRoleId: "cr_1",
+              role: "CUSTOM",
+              scopeType: "PROJECT",
+              scopeId: "p_2",
+            },
           ],
         };
         prisma.apiKey.findUnique.mockResolvedValue(keyWithSharedRole);
@@ -546,7 +581,13 @@ describe("ApiKeyService", () => {
         const keyWithAdminOnly = {
           ...existingKey,
           roleBindings: [
-            { id: "rb_1", customRoleId: null, role: "ADMIN", scopeType: "ORGANIZATION", scopeId: "org_1" },
+            {
+              id: "rb_1",
+              customRoleId: null,
+              role: "ADMIN",
+              scopeType: "ORGANIZATION",
+              scopeId: "org_1",
+            },
           ],
         };
         prisma.apiKey.findUnique.mockResolvedValue(keyWithAdminOnly);

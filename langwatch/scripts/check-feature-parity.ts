@@ -8,25 +8,53 @@
  * dev/docs/TESTING_PHILOSOPHY.md. Without this check, feature files can drift
  * into documentation that nobody verifies.
  *
- * Polarity: enforce-all by default. Files listed in `LEGACY_UNBOUND` are
- * tolerated during migration — they still parse and are reported in the
- * `legacy` block, but unbound scenarios in those files do NOT fail CI.
- * Shrinking the deny-list toward zero is the work tracked by #3338.
+ * Polarity: enforce-all by default, and fail closed. Two ratcheted deny-lists
+ * carry the migration debt, and both only ever shrink:
+ *
+ *   - `LEGACY_UNBOUND` — files with enforced-but-unbound scenarios.
+ *   - `LEGACY_INERT`   — files that yield NO enforced scenario at all, because
+ *                        nothing in them is tagged. Without this list such a
+ *                        file reports `0/0 scenarios bound · ✓ all bound` and
+ *                        passes, which is an assertion of coverage that does
+ *                        not exist. Any file that becomes inert and is not on
+ *                        the list is a hard failure.
+ *
+ * Shrinking both lists toward zero is the work tracked by #3338.
  *
  * Usage:
  *   pnpm check:feature-parity              # exit 1 if any enforced unbound
  *   pnpm check:feature-parity --json       # machine-readable report
  */
 
-import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
-import { resolve, relative, join, dirname } from "node:path";
+import {
+  existsSync,
+  readdirSync,
+  readFileSync,
+  realpathSync,
+  statSync,
+} from "node:fs";
+import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const REPO_ROOT = resolve(__dirname, "../..");
-const SPECS_ROOT = resolve(REPO_ROOT, "specs");
+
+/**
+ * Every tree that holds `.feature` files.
+ *
+ * `typescript-sdk/specs` is here because leaving it out made the whole tree
+ * INVISIBLE: its scenarios counted for nothing, and — worse — an `@scenario`
+ * annotation in `typescript-sdk/src` (which IS scanned) could never resolve
+ * against them, so binding one was reported as a typo. A spec tree the checker
+ * cannot see is the same "0/0, all bound ✓" trap a `.feature` file with no tags
+ * falls into, one directory up.
+ */
+const SPECS_ROOTS = [
+  resolve(REPO_ROOT, "specs"),
+  resolve(REPO_ROOT, "typescript-sdk/specs"),
+] as const;
 
 /**
  * Test roots scanned for `@scenario` bindings. Every `.test.ts` /
@@ -74,8 +102,14 @@ const DEFAULT_BATS_TEST_ROOTS: string[] = [
 const DEFAULT_GO_TEST_ROOTS: string[] = [
   "services/nlpgo",
   "services/aigateway",
+  // The Langy worker manager. Its specs (egress enforcement, worker isolation,
+  // shutdown handoff) are satisfied by Go tests and by nothing else, so without
+  // this root those scenarios could only ever be @unimplemented or bound to a
+  // TS stub that proves nothing.
+  "services/langyagent",
   "pkg",
   "tools/thuishaven",
+  "tools/herrgen",
 ];
 
 /**
@@ -109,6 +143,16 @@ const DEFAULT_PYTHON_TEST_ROOTS: string[] = [
  *     prevents the list from rotting.
  */
 const LEGACY_UNBOUND: string[] = [
+  // typescript-sdk/specs is absent from THIS list, but do not read that as
+  // "the tree is fully resolved" — it is not. Adding the tree to SPECS_ROOTS
+  // made it discoverable, and every scenario in it that carries a `@unit` /
+  // `@integration` tag is bound. Most of its scenarios carry no tag at all and
+  // so are invisible to this gate: `typescript-sdk/specs/cli/daemon.feature`,
+  // for one, has 35 scenarios of which 2 are enforced and none are
+  // @unimplemented. `LEGACY_INERT` below catches a file where that count falls
+  // to zero; it does NOT catch a partially-tagged file like that one. Tagging
+  // the remainder is still outstanding.
+  //
   // The consolidated Langy/home corpus landed while feature parity was already
   // enforce-all, but its tests predate @scenario bindings. Keep the debt
   // explicit and file-scoped while #3338 drives this list back to empty; new
@@ -129,6 +173,464 @@ const LEGACY_UNBOUND: string[] = [
   "specs/langy/langy-plan-progress.feature",
   "specs/langy/langy-projection-independent-reactions.feature",
   "specs/langy/langy-turn-recovery.feature",
+];
+
+/**
+ * Feature files that contain scenarios but yield ZERO enforced ones, because
+ * nothing in them is tagged `@unit` / `@integration` / `@e2e` / `@regression`.
+ *
+ * This is the gate's oldest blind spot. An untagged file is not "passing" — it
+ * is unmeasured, and it reports itself as `0/0 scenarios bound · ✓ all bound`,
+ * which reads exactly like a fully-covered file. Adding a fresh `.feature` with
+ * twenty untagged scenarios used to be a silent no-op.
+ *
+ * The list turns that silence into a ratchet: the files below are the ones
+ * already in that state when the floor was introduced, and they are tolerated.
+ * Any OTHER file that yields no enforced scenario fails the check.
+ *
+ * A file whose scenarios are all `@unimplemented` also lands here — tags say
+ * "tracked gap", and that is a claim worth making explicitly rather than by
+ * omission.
+ *
+ * Direction: drive this list to empty by tagging the scenarios that describe
+ * behaviour we actually test, marking @unimplemented the ones we do not, and
+ * deleting the ones that no longer describe anything.
+ *
+ * Invariants (enforced below):
+ *   - Every path must resolve to a discovered `.feature` file.
+ *   - Every entry must still be inert. A file that has since gained an
+ *     enforced scenario must be removed — that is the ratchet clicking.
+ */
+const LEGACY_INERT: string[] = [
+  "specs/agents/create-workflow-agent.feature",
+  "specs/agents/workflow-agent-editor.feature",
+  "specs/ai-gateway/advanced-routing.feature",
+  "specs/ai-gateway/azure-endpoint-from-api-base.feature",
+  "specs/ai-gateway/budgets-principal-cascade.feature",
+  "specs/ai-gateway/cache-control-rules.feature",
+  "specs/ai-gateway/caching-passthrough.feature",
+  "specs/ai-gateway/cli-integrations.feature",
+  "specs/ai-gateway/cli-virtualkeys.feature",
+  "specs/ai-gateway/custom-provider-base-url.feature",
+  "specs/ai-gateway/epic.feature",
+  "specs/ai-gateway/governance/activity-monitor.feature",
+  "specs/ai-gateway/governance/admin-oversight.feature",
+  "specs/ai-gateway/governance/admin-routing-policies.feature",
+  "specs/ai-gateway/governance/anomaly-detection.feature",
+  "specs/ai-gateway/governance/anomaly-rules.feature",
+  "specs/ai-gateway/governance/architecture-invariants.feature",
+  "specs/ai-gateway/governance/birds-eye-dashboard-v2.feature",
+  "specs/ai-gateway/governance/budget-exceeded.feature",
+  "specs/ai-gateway/governance/c3-alert-dispatch.feature",
+  "specs/ai-gateway/governance/cli-402-license-gate.feature",
+  "specs/ai-gateway/governance/cli-deep-links.feature",
+  "specs/ai-gateway/governance/cli-ingest-debug.feature",
+  "specs/ai-gateway/governance/cli-login.feature",
+  "specs/ai-gateway/governance/cli-tool-mode-policy.feature",
+  "specs/ai-gateway/governance/compliance-baseline.feature",
+  "specs/ai-gateway/governance/event-log-durability.feature",
+  "specs/ai-gateway/governance/feature-flag-gating.feature",
+  "specs/ai-gateway/governance/folds.feature",
+  "specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature",
+  "specs/ai-gateway/governance/governance-home-routing.feature",
+  "specs/ai-gateway/governance/guardrails-project-scope.feature",
+  "specs/ai-gateway/governance/ingest-api-key-lifecycle.feature",
+  "specs/ai-gateway/governance/ingestion-attribution.feature",
+  "specs/ai-gateway/governance/ingestion-sources.feature",
+  "specs/ai-gateway/governance/me-usage-rest-api.feature",
+  "specs/ai-gateway/governance/my-settings.feature",
+  "specs/ai-gateway/governance/no-spy-mode.feature",
+  "specs/ai-gateway/governance/persona-aware-chrome.feature",
+  "specs/ai-gateway/governance/persona-home-content.feature",
+  "specs/ai-gateway/governance/personal-keys.feature",
+  "specs/ai-gateway/governance/personal-project-ingest-via-template.feature",
+  "specs/ai-gateway/governance/personal-workspace-features.feature",
+  "specs/ai-gateway/governance/receiver-auth-rate-limit.feature",
+  "specs/ai-gateway/governance/receiver-shapes.feature",
+  "specs/ai-gateway/governance/routing-policy-aliases-and-rules.feature",
+  "specs/ai-gateway/governance/routing-policy-scope-cascade.feature",
+  "specs/ai-gateway/governance/self-hosted-setup.feature",
+  "specs/ai-gateway/governance/sessions-and-devices.feature",
+  "specs/ai-gateway/governance/siem-export.feature",
+  "specs/ai-gateway/governance/template-cross-bind-guard.feature",
+  "specs/ai-gateway/governance/template-ottl-authoring.feature",
+  "specs/ai-gateway/governance/template-ottl-principal-guard.feature",
+  "specs/ai-gateway/governance/vk-config-bundle.feature",
+  "specs/ai-gateway/governance/vk-personal-scope.feature",
+  "specs/ai-gateway/governance/vk-scope-inheritance.feature",
+  "specs/ai-gateway/guardrails.feature",
+  "specs/ai-gateway/health-checks.feature",
+  "specs/ai-gateway/license-gate-governance.feature",
+  "specs/ai-gateway/model-disambiguation.feature",
+  "specs/ai-gateway/model-provider-scoping.feature",
+  "specs/ai-gateway/openai-param-compat.feature",
+  "specs/ai-gateway/payload-capture.feature",
+  "specs/ai-gateway/policy-rules.feature",
+  "specs/ai-gateway/prometheus-metrics.feature",
+  "specs/ai-gateway/public-rest-api.feature",
+  "specs/ai-gateway/rate-limits.feature",
+  "specs/ai-gateway/rbac-legacy-admin-fallback.feature",
+  "specs/ai-gateway/self-hosting/gateway-finds-its-control-plane.feature",
+  "specs/ai-gateway/self-hosting/personal-keys-deployment.feature",
+  "specs/ai-gateway/semantic-caching.feature",
+  "specs/ai-gateway/span-shape.feature",
+  "specs/ai-gateway/trace-propagation.feature",
+  "specs/ai-gateway/wrapper-e2e/claude.feature",
+  "specs/ai-gateway/wrapper-e2e/codex.feature",
+  "specs/ai-gateway/wrapper-e2e/cursor.feature",
+  "specs/ai-gateway/wrapper-e2e/gemini.feature",
+  "specs/ai-gateway/wrapper-e2e/opencode.feature",
+  "specs/ai-governance/cli-wrappers/cli-mints-ingest-key.feature",
+  "specs/ai-governance/cli-wrappers/latest-login-wins.feature",
+  "specs/ai-governance/cli-wrappers/logout.feature",
+  "specs/ai-governance/cli-wrappers/request-increase.feature",
+  "specs/ai-governance/cli-wrappers/shell-rc-persistence.feature",
+  "specs/ai-governance/cli-wrappers/wrap-login-routing.feature",
+  "specs/ai-governance/dogfood-seed/scope-runner.feature",
+  "specs/ai-governance/ingestion-sources/claude-code-otlp.feature",
+  "specs/ai-governance/ingestion-sources/native-receiver-lift.feature",
+  "specs/ai-governance/no-spy-mode/no-spy-mode.feature",
+  "specs/ai-governance/personal-portal/coding-assistant-tile.feature",
+  "specs/ai-governance/personal-portal/external-tool-tile.feature",
+  "specs/ai-governance/personal-portal/model-provider-tile.feature",
+  "specs/ai-governance/personal-portal/portal-grid.feature",
+  "specs/ai-governance/personal-portal/tool-catalog-scoping.feature",
+  "specs/ai-governance/personal-portal/tool-catalog-vk-bridge.feature",
+  "specs/ai-governance/puller-framework/copilot-studio-reference.feature",
+  "specs/ai-governance/puller-framework/event-sourced-process-scheduling.feature",
+  "specs/ai-governance/puller-framework/http-custom-byo-admin-ui.feature",
+  "specs/ai-governance/puller-framework/http-polling.feature",
+  "specs/ai-governance/puller-framework/puller-adapter-contract.feature",
+  "specs/ai-governance/puller-framework/s3-polling.feature",
+  "specs/ai-governance/sessions/admin-max-ttl.feature",
+  "specs/ai-governance/sessions/personal-sessions.feature",
+  "specs/ai-governance/sessions/sessions-inventory.feature",
+  "specs/analytics/dashboard-rest-api.feature",
+  "specs/analytics/posthog-cost-control.feature",
+  "specs/audit-log/audit-log.feature",
+  "specs/auth/auth-signin-flows.feature",
+  "specs/auth/dev-port-origin-alignment.feature",
+  "specs/auth/diagnostic-logging-on-auth-failure.feature",
+  "specs/auth/impersonation-banner.feature",
+  "specs/auth/sign-in-failure-messages.feature",
+  "specs/auth/sso-orphan-user-linking.feature",
+  "specs/auth/sso-wrong-provider-recovery.feature",
+  "specs/automations/authoring-drawer.feature",
+  "specs/automations/dispatch-timing.feature",
+  "specs/automations/notification-templates.feature",
+  "specs/automations/process-manager-dispatch.feature",
+  "specs/automations/spam-prevention.feature",
+  "specs/automations/webhook-http-action.feature",
+  "specs/batch-evaluation-results/experiment-cost-folding.feature",
+  "specs/batch-evaluation-results/run-comparison.feature",
+  "specs/batch-evaluation-results/target-metadata-api.feature",
+  "specs/ci/migration-order.feature",
+  "specs/ci/no-committed-screenshots.feature",
+  "specs/ci/no-docker-integration-tests.feature",
+  "specs/ci/path-filters.feature",
+  "specs/ci/pr-impact-map.feature",
+  "specs/claude/drive-pr.feature",
+  "specs/claude/telemetry-turn-bounding.feature",
+  "specs/clickhouse/windowed-read-fallback.feature",
+  "specs/coding-agent/personal-usage.feature",
+  "specs/coding-agent/terminal-view.feature",
+  "specs/components/code-block-editor.feature",
+  "specs/components/hoverable-big-text-overflow.feature",
+  "specs/data-retention/data-size-metering.feature",
+  "specs/data-retention/ingestion-stamping.feature",
+  "specs/data-retention/monitoring.feature",
+  "specs/data-retention/plan-gated-retention-menu.feature",
+  "specs/data-retention/retention-policy-configuration.feature",
+  "specs/data-retention/retroactive-update.feature",
+  "specs/data-retention/trace-pinning.feature",
+  "specs/data-retention/ttl-activation.feature",
+  "specs/data-retention/visibility-window-teaser-redaction.feature",
+  "specs/datasets/add-to-dataset-span-mapping.feature",
+  "specs/dependencies/supply-chain-age-gates.feature",
+  "specs/evaluations/evaluation-payload-offload.feature",
+  "specs/evaluations/experiments-online-evaluations-separation.feature",
+  "specs/evaluators/create-workflow-evaluator.feature",
+  "specs/evaluators/evaluator-cli.feature",
+  "specs/evaluators/evaluator-error-propagation.feature",
+  "specs/evaluators/satisfaction-score-migration.feature",
+  "specs/evaluators/thread-eval-skips-without-thread-id.feature",
+  "specs/evaluators/workflow-evaluator-editor.feature",
+  "specs/event-sourcing/deduplication-strategy.feature",
+  "specs/event-sourcing/dispatch-error-contract.feature",
+  "specs/event-sourcing/fold-projection.feature",
+  "specs/event-sourcing/global-projections.feature",
+  "specs/event-sourcing/map-projection.feature",
+  "specs/event-sourcing/oversized-attribute-value-preview.feature",
+  "specs/event-sourcing/payload-envelope.feature",
+  "specs/event-sourcing/pipeline-model.feature",
+  "specs/event-sourcing/poison-group-park-guard.feature",
+  "specs/event-sourcing/process-roles.feature",
+  "specs/event-sourcing/producer-append-coalescing.feature",
+  "specs/event-sourcing/projection-replay.feature",
+  "specs/event-sourcing/reactors.feature",
+  "specs/event-sourcing/redis-fold-cache.feature",
+  "specs/event-sourcing/work-conserving-fair-dispatch.feature",
+  "specs/experiments-v3/autosave-status.feature",
+  "specs/experiments-v3/dataset-inline-editing.feature",
+  "specs/experiments-v3/evaluation-creation-entrypoints.feature",
+  "specs/experiments-v3/evaluation-execution.feature",
+  "specs/experiments-v3/evaluator-configuration.feature",
+  "specs/experiments-v3/evaluator-mappings.feature",
+  "specs/experiments-v3/execution-controls.feature",
+  "specs/experiments-v3/http-agent-support.feature",
+  "specs/experiments-v3/per-dataset-mappings.feature",
+  "specs/experiments-v3/runner-configuration.feature",
+  "specs/experiments-v3/table-display.feature",
+  "specs/experiments-v3/undo-redo.feature",
+  "specs/experiments/comparison.feature",
+  "specs/features/agent-cli.feature",
+  "specs/features/analytics-cli.feature",
+  "specs/features/annotation-cli.feature",
+  "specs/features/dashboard-cli.feature",
+  "specs/features/dataset-python-sdk.feature",
+  "specs/features/devtools/issue-creation-skill.feature",
+  "specs/features/devtools/orchestrator-bug-fix-workflow.feature",
+  "specs/features/devtools/worktree-creation.feature",
+  "specs/features/evaluation-cli.feature",
+  "specs/features/graph-cli.feature",
+  "specs/features/model-provider-cli.feature",
+  "specs/features/monitor-cli.feature",
+  "specs/features/onboarding/primary-use-setting.feature",
+  "specs/features/prompt-versions-cli.feature",
+  "specs/features/scenario-cli.feature",
+  "specs/features/secret-cli.feature",
+  "specs/features/simulation-runs-cli.feature",
+  "specs/features/suite-cli.feature",
+  "specs/features/suites/collapsible-suite-sidebar.feature",
+  "specs/features/suites/footer-to-header-migration.feature",
+  "specs/features/suites/inline-add-target-and-scenario-buttons.feature",
+  "specs/features/suites/sidebar-summary-status.feature",
+  "specs/features/suites/simulation-run-status-consistency.feature",
+  "specs/features/suites/suite-run-confirmation-modal.feature",
+  "specs/features/suites/suite-sidebar-status-summary.feature",
+  "specs/features/suites/suite-url-nesting.feature",
+  "specs/features/suites/suite-url-routing.feature",
+  "specs/features/suites/trace-role-cost-accumulation.feature",
+  "specs/features/suites/unified-run-view-layout.feature",
+  "specs/features/suites/unified-sidebar-list-items.feature",
+  "specs/features/tag-management.feature",
+  "specs/features/trace-cli.feature",
+  "specs/features/trigger-cli.feature",
+  "specs/features/workflow-cli.feature",
+  "specs/home/onboarding-progress-ui.feature",
+  "specs/home/voice-agents-home-banner.feature",
+  "specs/langy/langy-agent-service-conventions.feature",
+  "specs/langy/langy-baseline.feature",
+  "specs/langy/langy-card-taxonomy.feature",
+  "specs/langy/langy-choice-questions.feature",
+  "specs/langy/langy-command-bar-activation.feature",
+  "specs/langy/langy-composer-feedback-and-cards.feature",
+  "specs/langy/langy-context-awareness.feature",
+  "specs/langy/langy-conversation-title.feature",
+  "specs/langy/langy-deploy-hardening.feature",
+  "specs/langy/langy-derived-cards.feature",
+  "specs/langy/langy-dogfood-scenarios.feature",
+  "specs/langy/langy-empty-state-suggestions.feature",
+  "specs/langy/langy-event-sourced-conversations.feature",
+  "specs/langy/langy-native-skills.feature",
+  "specs/langy/langy-panel-fold-motion.feature",
+  "specs/langy/langy-peek-dock.feature",
+  "specs/langy/langy-selfhost-install.feature",
+  "specs/langy/langy-session-key-lifecycle.feature",
+  "specs/langy/langy-session-key.feature",
+  "specs/langy/langy-shutdown-handoff.feature",
+  "specs/langy/langy-workbench-sidebar.feature",
+  "specs/langy/langy-worker-isolation.feature",
+  "specs/licensing/billing-meter-dispatch.feature",
+  "specs/licensing/dual-pricing-model.feature",
+  "specs/licensing/enforcement-hono-api.feature",
+  "specs/licensing/license-activation-ui.feature",
+  "specs/licensing/license-generation.feature",
+  "specs/licensing/license-lifecycle-e2e.feature",
+  "specs/licensing/license-page-styling.feature",
+  "specs/licensing/license-status-ui.feature",
+  "specs/licensing/notification-coverage-gaps.feature",
+  "specs/licensing/proration-preview.feature",
+  "specs/licensing/resource-limit-notifications.feature",
+  "specs/licensing/subscription-page.feature",
+  "specs/licensing/usage-page-navigation.feature",
+  "specs/mcp-server/analytics-tool.feature",
+  "specs/mcp-server/api-key-tools.feature",
+  "specs/mcp-server/experiment-results-tool.feature",
+  "specs/mcp-server/project-api-key-tools.feature",
+  "specs/mcp-server/project-tools.feature",
+  "specs/mcp-server/prompt-tools.feature",
+  "specs/mcp-server/scenario-tool-formatters.feature",
+  "specs/members/member-role-team-restrictions.feature",
+  "specs/migration/vite-migration.feature",
+  "specs/model-config/anthropic-empty-content.feature",
+  "specs/model-config/litellm-reasoning-params.feature",
+  "specs/model-config/model-parameter-display.feature",
+  "specs/model-config/model-selector-ux.feature",
+  "specs/model-config/unified-reasoning-ui.feature",
+  "specs/model-providers/codex-account-provider.feature",
+  "specs/model-providers/custom-model-max-tokens.feature",
+  "specs/model-providers/default-provider.feature",
+  "specs/model-providers/provider-list.feature",
+  "specs/monitors/evaluation-trigger-skips-derived-and-stale-traces.feature",
+  "specs/monitors/guardrails-api-compatibility.feature",
+  "specs/monitors/monitor-execution-backend.feature",
+  "specs/monitors/monitor-trace-mappings.feature",
+  "specs/monitors/new-evaluation-menu.feature",
+  "specs/monitors/online-evaluation-drawer-flow.feature",
+  "specs/monitors/online-evaluation-drawer.feature",
+  "specs/monitors/pending-mappings-validation.feature",
+  "specs/monitors/replicate-monitor-to-project.feature",
+  "specs/monitors/workflow-evaluator-checktype.feature",
+  "specs/monitors/workflow-evaluator-mappings.feature",
+  "specs/navigation/child-drawer-nesting.feature",
+  "specs/navigation/home-navigation.feature",
+  "specs/navigation/shared-section-navigation-layout.feature",
+  "specs/nlp-go/dataset-block.feature",
+  "specs/nlp-go/http-block.feature",
+  "specs/nlp-go/proxy.feature",
+  "specs/nlp-go/python-removal.feature",
+  "specs/nlp-go/remove-execute-evaluation.feature",
+  "specs/nlp-go/telemetry.feature",
+  "specs/nlp-go/topic-clustering.feature",
+  "specs/nlp-go/tracing-parity.feature",
+  "specs/npx-installer/01-bootstrap.feature",
+  "specs/npx-installer/02-predeps.feature",
+  "specs/npx-installer/03-services.feature",
+  "specs/npx-installer/04-validation.feature",
+  "specs/npx-installer/05-publish.feature",
+  "specs/npx-installer/06-langy.feature",
+  "specs/npx-installer/07-lean-install.feature",
+  "specs/observability/browser-rum-trace-correlation.feature",
+  "specs/observability/process-substrate-alerting.feature",
+  "specs/ops/clickhouse-backup-metrics.feature",
+  "specs/ops/dashboard-latency.feature",
+  "specs/ops/dejaview-impersonation-access.feature",
+  "specs/ops/internal-feature-flags.feature",
+  "specs/ops/local-observability-stack.feature",
+  "specs/ops/production-bundle-integrity.feature",
+  "specs/otlp/canonical-log-ingestion.feature",
+  "specs/otlp/canonical-metric-ingestion.feature",
+  "specs/projects/create-project-drawer.feature",
+  "specs/projects/project-list-refresh.feature",
+  "specs/prompts/custom-prompt-tags.feature",
+  "specs/prompts/liquid-template-support.feature",
+  "specs/prompts/open-existing-prompt-from-trace.feature",
+  "specs/prompts/open-trace-in-playground.feature",
+  "specs/prompts/prompt-selection-drawer.feature",
+  "specs/prompts/structured-outputs-streaming.feature",
+  "specs/prompts/unified-defaults.feature",
+  "specs/python-sdk/async-experiment-parallelism.feature",
+  "specs/python-sdk/experiment-print-summary.feature",
+  "specs/rbac/fetch-org-role-permission-resolution.feature",
+  "specs/scenarios/ai-create-modal.feature",
+  "specs/scenarios/event-driven-execution-prep.feature",
+  "specs/scenarios/internal-scenario-namespace.feature",
+  "specs/scenarios/internal-set-namespace.feature",
+  "specs/scenarios/provider-setup-link-from-warnings.feature",
+  "specs/scenarios/scenario-api.feature",
+  "specs/scenarios/scenario-bulk-actions.feature",
+  "specs/scenarios/scenario-deferred-persistence.feature",
+  "specs/scenarios/scenario-deletion.feature",
+  "specs/scenarios/scenario-drawer-close-on-save.feature",
+  "specs/scenarios/scenario-editor-new-agent-flow.feature",
+  "specs/scenarios/scenario-editor.feature",
+  "specs/scenarios/scenario-execution.feature",
+  "specs/scenarios/scenario-library.feature",
+  "specs/scenarios/stalled-scenario-runs.feature",
+  "specs/secrets/secrets-manager.feature",
+  "specs/security/org-level-tenancy-enforcement.feature",
+  "specs/security/tenant-aware-egress-isolation.feature",
+  "specs/server/metrics-collection.feature",
+  "specs/server/spa-fallback.feature",
+  "specs/server/worker-liveness-probe.feature",
+  "specs/settings/decompose-model-provider-form-hook.feature",
+  "specs/settings/settings-table-responsiveness.feature",
+  "specs/setup/docker-dev-worktree-isolation.feature",
+  "specs/setup/simplified-setup.feature",
+  "specs/skills/agent-insight-skills.feature",
+  "specs/skills/docs-skills-directory.feature",
+  "specs/skills/empty-state-skill-setup.feature",
+  "specs/skills/onboarding-skills-architecture.feature",
+  "specs/skills/platform-integration.feature",
+  "specs/skills/prompt-compiler.feature",
+  "specs/skills/skills-testing.feature",
+  "specs/studio/nlpgo-true-root-span-without-traceparent.feature",
+  "specs/suites/simulations-performance.feature",
+  "specs/suites/voice-agents-callout.feature",
+  "specs/topic-clustering/event-sourced-scheduling.feature",
+  "specs/topic-clustering/run-history.feature",
+  "specs/topic-clustering/topics-source-of-truth.feature",
+  "specs/trace-drawer/attribute-table.feature",
+  "specs/trace-drawer/eval-chips-in-header.feature",
+  "specs/trace-drawer/playground-affordance.feature",
+  "specs/trace-processing/oversized-trace-lighter-processing.feature",
+  "specs/trace-processing/sdk-timing-and-metrics-canonicalisation.feature",
+  "specs/traces-v2/accessibility.feature",
+  "specs/traces-v2/annotations.feature",
+  "specs/traces-v2/attribute-value-readability.feature",
+  "specs/traces-v2/bulk-actions.feature",
+  "specs/traces-v2/column-configuration.feature",
+  "specs/traces-v2/conditional-formatting.feature",
+  "specs/traces-v2/conversation-context-turn-counts.feature",
+  "specs/traces-v2/conversation-message-expand.feature",
+  "specs/traces-v2/conversation-turn-ledger.feature",
+  "specs/traces-v2/data-layer.feature",
+  "specs/traces-v2/editable-trace-name-alignment.feature",
+  "specs/traces-v2/evaluations.feature",
+  "specs/traces-v2/facet-perspectives.feature",
+  "specs/traces-v2/flame-graph.feature",
+  "specs/traces-v2/grouping-engine.feature",
+  "specs/traces-v2/io-pretty-markdown.feature",
+  "specs/traces-v2/lens-preset-groups.feature",
+  "specs/traces-v2/light-mode-contrast.feature",
+  "specs/traces-v2/live-tail.feature",
+  "specs/traces-v2/message-translation.feature",
+  "specs/traces-v2/metadata-facet.feature",
+  "specs/traces-v2/metrics.feature",
+  "specs/traces-v2/model-chip-interactive-card.feature",
+  "specs/traces-v2/multiplayer-presence.feature",
+  "specs/traces-v2/onboarding-empty-state.feature",
+  "specs/traces-v2/origin-badge-filter.feature",
+  "specs/traces-v2/prompt-facets.feature",
+  "specs/traces-v2/prompt-integration.feature",
+  "specs/traces-v2/skill-invocation-highlight.feature",
+  "specs/traces-v2/span-list.feature",
+  "specs/traces-v2/span-reference-jump-to-trace.feature",
+  "specs/traces-v2/span-view.feature",
+  "specs/traces-v2/tour-visibility-and-persistence.feature",
+  "specs/traces-v2/trace-drawer-panes.feature",
+  "specs/traces-v2/trace-drawer-shell.feature",
+  "specs/traces-v2/trace-header-full-content-resolution.feature",
+  "specs/traces-v2/trace-peek.feature",
+  "specs/traces-v2/trace-table.feature",
+  "specs/traces-v2/trace-view.feature",
+  "specs/traces-v2/view-analytics.feature",
+  "specs/traces-v2/view-system.feature",
+  "specs/traces-v2/visualizations.feature",
+  "specs/traces/evaluation-history-grouping.feature",
+  "specs/traces/openinference-token-ingest.feature",
+  "specs/traces/pagination-controls.feature",
+  "specs/traces/rag-contexts-read-deserialization.feature",
+  "specs/traces/rest-collector-span-dedup.feature",
+  "specs/traces/span-attribute-unicode-sanitisation.feature",
+  "specs/traces/trace-export.feature",
+  "specs/traces/trace-io-extraction.feature",
+  "specs/traces/vertex-adk-canonicalisation.feature",
+  "specs/triggers/event-sourced-graph-triggers.feature",
+  "specs/typescript-sdk/cli-docs.feature",
+  "specs/typescript-sdk/cli-error-handling.feature",
+  "specs/typescript-sdk/cli-experiment-results.feature",
+  "specs/typescript-sdk/cli-projects-api-keys.feature",
+  "specs/typescript-sdk/prompt-tags.feature",
+  "specs/variables-ui/prompt-editor-drawer-mappings.feature",
+  "specs/workflows/studio-drawer-migration.feature",
+  "specs/workflows/studio-evaluator-node-drawer.feature",
+  "specs/workflows/studio-evaluator-sidebar.feature",
+  "specs/workflows/studio-llm-node-drawer.feature",
+  "specs/workflows/studio-local-state.feature",
+  "specs/workflows/studio-usage-limits.feature",
+  "specs/workflows/workflow-management.feature",
 ];
 
 const TEST_FILE_RE = /\.test\.tsx?$/;
@@ -166,6 +668,18 @@ interface Report {
   feature: string;
   scenarios: AnnotatedScenario[];
   unbound: Scenario[];
+  /** Every scenario the file declares, tagged or not. */
+  totalScenarios: number;
+  /** Of those, how many are explicitly parked as `@unimplemented`. */
+  unimplementedScenarios: number;
+}
+
+/** A feature file that declares scenarios but no ENFORCED ones. */
+interface InertReport {
+  feature: string;
+  totalScenarios: number;
+  /** Of those, how many are explicitly parked as `@unimplemented`. */
+  unimplemented: number;
 }
 
 interface LegacyReport {
@@ -181,7 +695,7 @@ interface UnknownAnnotation {
   ref: BindingRef;
 }
 
-interface CollectedBinding {
+export interface CollectedBinding {
   title: string;
   ref: BindingRef;
 }
@@ -226,9 +740,14 @@ function parseFeature(absPath: string): Scenario[] {
       continue;
     }
 
-    if (!trimmed.startsWith("Given") && !trimmed.startsWith("When") &&
-        !trimmed.startsWith("Then") && !trimmed.startsWith("And") &&
-        !trimmed.startsWith("But") && !trimmed.startsWith("|")) {
+    if (
+      !trimmed.startsWith("Given") &&
+      !trimmed.startsWith("When") &&
+      !trimmed.startsWith("Then") &&
+      !trimmed.startsWith("And") &&
+      !trimmed.startsWith("But") &&
+      !trimmed.startsWith("|")
+    ) {
       pendingTags = [];
     }
   }
@@ -236,7 +755,10 @@ function parseFeature(absPath: string): Scenario[] {
   return scenarios;
 }
 
-function walkFiles(root: string, predicate: (name: string) => boolean): string[] {
+function walkFiles(
+  root: string,
+  predicate: (name: string) => boolean,
+): string[] {
   const out: string[] = [];
   let entries: string[];
   try {
@@ -262,8 +784,32 @@ function walkFiles(root: string, predicate: (name: string) => boolean): string[]
   return out;
 }
 
-function discoverFeatureFiles(): string[] {
-  const files = walkFiles(SPECS_ROOT, (n) => FEATURE_FILE_RE.test(n));
+/**
+ * A configured root that is missing is a CONFIGURATION failure, not an empty
+ * tree. Skipping it silently is how a renamed or moved spec directory reports
+ * every scenario in it as bound: the files simply stop being discovered, and
+ * the check goes green having measured nothing. Fail closed instead — the tree
+ * is either there or the check refuses to run.
+ */
+export function discoverFeatureFiles(
+  roots: readonly string[] = SPECS_ROOTS,
+): string[] {
+  const files = roots.flatMap((root) => {
+    if (!existsSync(root)) {
+      throw new Error(
+        `Configured specs root does not exist: ${root}. ` +
+          `Fix SPECS_ROOTS in scripts/check-feature-parity.ts, or restore the tree — ` +
+          `a missing root would silently report every scenario under it as bound.`,
+      );
+    }
+    if (!statSync(root).isDirectory()) {
+      throw new Error(
+        `Configured specs root is not a directory: ${root}. ` +
+          `Fix SPECS_ROOTS in scripts/check-feature-parity.ts.`,
+      );
+    }
+    return walkFiles(root, (n) => FEATURE_FILE_RE.test(n));
+  });
   return files.map((f) => relative(REPO_ROOT, f)).sort();
 }
 
@@ -305,7 +851,9 @@ function collectAllBindings(testRoots: string[]): CollectedBinding[] {
   const bindings: CollectedBinding[] = [];
   const files: string[] = [];
   for (const r of testRoots) {
-    files.push(...walkFiles(resolve(REPO_ROOT, r), (n) => TEST_FILE_RE.test(n)));
+    files.push(
+      ...walkFiles(resolve(REPO_ROOT, r), (n) => TEST_FILE_RE.test(n)),
+    );
   }
 
   for (const file of files) {
@@ -365,13 +913,49 @@ function isNextLineBatsTest(lines: string[], startLineIdx: number): boolean {
  *     t.Skip(promptSpansPendingMsg)
  *   }
  *
+ * Table-driven Go tests bind at SUBTEST granularity, which is where the
+ * behaviour actually lives — a top-level `func TestX` that hosts a dozen
+ * `t.Run` cases would otherwise force every scenario in the group onto one
+ * annotation. So a `t.Run("...", func(t *testing.T) {` line is an equally
+ * valid binding site:
+ *
+ *   // @scenario "Every span of a turn names the model the same way"
+ *   t.Run("substitutes the manager-held model id on model-call spans", func(t *testing.T) {
+ *
  * Same ANNOTATION_RE that handles TS — only the proximity check differs:
- * we require the next non-blank, non-comment token to be `func Test...`.
+ * we require the next non-blank, non-comment token to be `func Test...` or
+ * a `t.Run(...)` subtest declaration.
  */
-function isFollowedByGoTestFunc(src: string, start: number): boolean {
-  const len = src.length;
+const GO_TEST_FUNC_RE =
+  /^func\s+Test[A-Za-z0-9_]*\s*\(\s*[A-Za-z_][A-Za-z0-9_]*\s+\*testing\.T\s*\)/;
+
+/** Opening of a subtest call: `t.Run(` / `subT.Run(` / … */
+const GO_SUBTEST_HEAD_RE = /^[A-Za-z_][A-Za-z0-9_]*\.Run\(/;
+
+/** What makes a `.Run(...)` call a SUBTEST: the `func(t *testing.T) {` closure. */
+const GO_SUBTEST_CLOSURE_RE =
+  /^func\s*\(\s*[A-Za-z_][A-Za-z0-9_]*\s+\*testing\.T\s*\)\s*\{/;
+
+/**
+ * Longest prefix of a `.Run(` call the scan will read before giving up. The
+ * first argument plus its comma is a few dozen characters even when the call
+ * is spread over several lines; the cap exists only so a truncated or
+ * malformed file cannot turn the scan into a walk to EOF.
+ */
+const GO_SUBTEST_SCAN_BUDGET = 4096;
+
+/**
+ * Advance past Go whitespace and comments, returning the index of the next
+ * significant character, or `-1` if `limit` is reached first. Linear: every
+ * character is visited at most once, no backtracking.
+ */
+function skipGoSpaceAndComments(
+  src: string,
+  start: number,
+  limit: number,
+): number {
   let i = start;
-  while (i < len) {
+  while (i < limit) {
     const ch = src[i];
     if (ch === " " || ch === "\t" || ch === "\n" || ch === "\r") {
       i++;
@@ -379,28 +963,135 @@ function isFollowedByGoTestFunc(src: string, start: number): boolean {
     }
     if (ch === "/" && src[i + 1] === "*") {
       const close = src.indexOf("*/", i + 2);
-      if (close === -1) return false;
+      if (close === -1 || close + 2 > limit) return -1;
       i = close + 2;
       continue;
     }
     if (ch === "/" && src[i + 1] === "/") {
       const nl = src.indexOf("\n", i);
-      if (nl === -1) return false;
+      if (nl === -1 || nl + 1 > limit) return -1;
       i = nl + 1;
       continue;
     }
-    const rest = src.slice(i);
-    return /^func\s+Test[A-Za-z0-9_]*\s*\(\s*[A-Za-z_][A-Za-z0-9_]*\s+\*testing\.T\s*\)/.test(rest);
+    return i;
   }
-  return false;
+  return -1;
 }
 
-function collectGoBindings(testRoots: string[]): CollectedBinding[] {
+/**
+ * Is `rest` the start of a `t.Run("name", func(t *testing.T) { … }` subtest
+ * declaration?
+ *
+ * The subtest name may be a quoted literal, a raw (backtick) literal, or an
+ * arbitrary expression (`tc.name`, `fmt.Sprintf("%s/%s", a, b)`), and gofmt
+ * does NOT collapse the call onto one line — it preserves whatever the author
+ * wrote, so the very common
+ *
+ *   t.Run(
+ *     "a long subtest name",
+ *     func(t *testing.T) {
+ *
+ * has to bind too. A regex that spans the newline would either backtrack
+ * across the rest of the file on every non-match (`[\s\S]*?`) or, bounded to
+ * one line (`[^\n]*?`), silently reject the form above. So the first argument
+ * is walked forward instead, character by character and once each: string,
+ * raw-string and rune literals are skipped whole so a comma inside them is not
+ * read as the argument separator, bracket depth is tracked for the same reason,
+ * and the walk stops at the first top-level comma. What follows that comma must
+ * be the `*testing.T` closure.
+ */
+function isGoSubtestDeclaration(rest: string): boolean {
+  const head = rest.match(GO_SUBTEST_HEAD_RE);
+  if (!head) return false;
+
+  const headLength = head[0]!.length;
+  const limit = Math.min(rest.length, headLength + GO_SUBTEST_SCAN_BUDGET);
+  let depth = 0;
+  let i = headLength;
+  let commaAt = -1;
+
+  while (i < limit) {
+    const ch = rest[i];
+
+    if (ch === '"' || ch === "'") {
+      // Interpreted string / rune literal: backslash escapes, never spans a line.
+      const quote = ch;
+      i++;
+      let closed = false;
+      while (i < limit) {
+        const c = rest[i];
+        if (c === "\\") {
+          i += 2;
+          continue;
+        }
+        if (c === "\n") return false;
+        i++;
+        if (c === quote) {
+          closed = true;
+          break;
+        }
+      }
+      if (!closed) return false;
+      continue;
+    }
+
+    if (ch === "`") {
+      // Raw string literal: no escapes, may span lines.
+      const close = rest.indexOf("`", i + 1);
+      if (close === -1 || close >= limit) return false;
+      i = close + 1;
+      continue;
+    }
+
+    if (ch === "/" && (rest[i + 1] === "/" || rest[i + 1] === "*")) {
+      const next = skipGoSpaceAndComments(rest, i, limit);
+      if (next === -1) return false;
+      i = next;
+      continue;
+    }
+
+    if (ch === "(" || ch === "[" || ch === "{") {
+      depth++;
+      i++;
+      continue;
+    }
+
+    if (ch === ")" || ch === "]" || ch === "}") {
+      // The call closed before any top-level comma: `t.Run(name)` is not a subtest.
+      if (depth === 0) return false;
+      depth--;
+      i++;
+      continue;
+    }
+
+    if (ch === "," && depth === 0) {
+      commaAt = i;
+      break;
+    }
+
+    i++;
+  }
+
+  if (commaAt === -1) return false;
+
+  const closureAt = skipGoSpaceAndComments(rest, commaAt + 1, limit);
+  if (closureAt === -1) return false;
+  return GO_SUBTEST_CLOSURE_RE.test(rest.slice(closureAt));
+}
+
+function isFollowedByGoTestFunc(src: string, start: number): boolean {
+  const i = skipGoSpaceAndComments(src, start, src.length);
+  if (i === -1) return false;
+  const rest = src.slice(i);
+  return GO_TEST_FUNC_RE.test(rest) || isGoSubtestDeclaration(rest);
+}
+
+export function collectGoBindings(testRoots: string[]): CollectedBinding[] {
   const bindings: CollectedBinding[] = [];
   const files: string[] = [];
   for (const r of testRoots) {
     files.push(
-      ...walkFiles(resolve(REPO_ROOT, r), (n) => GO_TEST_FILE_RE.test(n))
+      ...walkFiles(resolve(REPO_ROOT, r), (n) => GO_TEST_FILE_RE.test(n)),
     );
   }
 
@@ -484,7 +1175,7 @@ function collectPythonBindings(testRoots: string[]): CollectedBinding[] {
   const files: string[] = [];
   for (const r of testRoots) {
     files.push(
-      ...walkFiles(resolve(REPO_ROOT, r), (n) => PYTHON_TEST_FILE_RE.test(n))
+      ...walkFiles(resolve(REPO_ROOT, r), (n) => PYTHON_TEST_FILE_RE.test(n)),
     );
   }
 
@@ -515,8 +1206,9 @@ function collectPythonBindings(testRoots: string[]): CollectedBinding[] {
       if (!title) continue;
       // Use the same proximity check as the block form. Walk from the
       // start of the next line.
-      const lineStartOffset =
-        lines.slice(0, i + 1).reduce((acc, l) => acc + l.length + 1, 0);
+      const lineStartOffset = lines
+        .slice(0, i + 1)
+        .reduce((acc, l) => acc + l.length + 1, 0);
       if (!isFollowedByPythonTestFunc(src, lineStartOffset)) continue;
       bindings.push({
         title,
@@ -532,7 +1224,9 @@ function collectBatsBindings(testRoots: string[]): CollectedBinding[] {
   const bindings: CollectedBinding[] = [];
   const files: string[] = [];
   for (const r of testRoots) {
-    files.push(...walkFiles(resolve(REPO_ROOT, r), (n) => BATS_FILE_RE.test(n)));
+    files.push(
+      ...walkFiles(resolve(REPO_ROOT, r), (n) => BATS_FILE_RE.test(n)),
+    );
   }
 
   for (const file of files) {
@@ -574,7 +1268,7 @@ function buildReport(
   const scenarios = allScenarios.filter(
     (s) =>
       s.tags.some((t) => BOUND_TAGS.has(t)) &&
-      !s.tags.includes(UNIMPLEMENTED_TAG)
+      !s.tags.includes(UNIMPLEMENTED_TAG),
   );
 
   const unbound: Scenario[] = [];
@@ -584,7 +1278,34 @@ function buildReport(
     return { ...s, bindings: binds };
   });
 
-  return { feature: featureRelPath, scenarios: annotated, unbound };
+  return {
+    feature: featureRelPath,
+    scenarios: annotated,
+    unbound,
+    totalScenarios: allScenarios.length,
+    unimplementedScenarios: allScenarios.filter((s) =>
+      s.tags.includes(UNIMPLEMENTED_TAG),
+    ).length,
+  };
+}
+
+/**
+ * The floor under the `0/0 · ✓ all bound` trap: a file that declares scenarios
+ * and enforces none of them. Callers decide whether a given file is tolerated
+ * (`LEGACY_INERT`) or fatal.
+ */
+export function isInert(
+  r: Pick<Report, "scenarios" | "totalScenarios">,
+): boolean {
+  return r.totalScenarios > 0 && r.scenarios.length === 0;
+}
+
+function toInertReport(r: Report): InertReport {
+  return {
+    feature: r.feature,
+    totalScenarios: r.totalScenarios,
+    unimplemented: r.unimplementedScenarios,
+  };
 }
 
 function toLegacyReport(r: Report): LegacyReport {
@@ -601,7 +1322,20 @@ function printEnforcedReport(r: Report): void {
   const total = r.scenarios.length;
   const boundCount = total - r.unbound.length;
   console.log(`\n▸ ${r.feature}`);
+
+  // Never print `0/0 · ✓ all bound` — that is the sentence this check exists to
+  // stop telling. Say what is actually true: nothing here is measured.
+  if (isInert(r)) {
+    console.log(`  ${describeInert(toInertReport(r))}`);
+    return;
+  }
+
   console.log(`  ${boundCount}/${total} scenarios bound`);
+
+  if (total === 0) {
+    console.log(`  · no scenarios declared`);
+    return;
+  }
 
   if (r.unbound.length === 0) {
     console.log(`  ✓ all bound`);
@@ -614,7 +1348,7 @@ function printEnforcedReport(r: Report): void {
     console.log(`    ✗ [${tags}] ${s.title}`);
     console.log(`      ${r.feature}:${s.line}`);
     console.log(
-      `      Add: /** @scenario ${s.title} */ above an it(...) test, or # @scenario "${s.title}" above an @test in a .bats file`
+      `      Add: /** @scenario ${s.title} */ above an it(...) test, or # @scenario "${s.title}" above an @test in a .bats file`,
     );
   }
 }
@@ -626,20 +1360,60 @@ function printLegacySummary(reports: LegacyReport[]): void {
   const totalScenarios = reports.reduce((s, r) => s + r.total, 0);
   console.log(`\nLegacy (tolerated — not failing CI):`);
   console.log(
-    `  ${reports.length} file(s), ${totalBound}/${totalScenarios} bound, ${totalUnbound} unbound`
+    `  ${reports.length} file(s), ${totalBound}/${totalScenarios} bound, ${totalUnbound} unbound`,
   );
   for (const r of reports) {
-    console.log(`  · ${r.feature}  ${r.bound}/${r.total} bound, ${r.unbound} unbound`);
+    console.log(
+      `  · ${r.feature}  ${r.bound}/${r.total} bound, ${r.unbound} unbound`,
+    );
   }
   console.log(
-    `\n  Shrink this list by binding scenarios, flagging @unimplemented, or removing stale scenarios. See dev/docs/TESTING_PHILOSOPHY.md.`
+    `\n  Shrink this list by binding scenarios, flagging @unimplemented, or removing stale scenarios. See dev/docs/TESTING_PHILOSOPHY.md.`,
   );
+}
+
+/** Why a file enforces nothing — untagged, parked, or a mix of the two. */
+function describeInert(r: InertReport): string {
+  const head = `0 of ${r.totalScenarios} scenario(s) enforced`;
+  if (r.unimplemented === 0) {
+    return `${head} — none tagged @unit/@integration/@e2e/@regression`;
+  }
+  if (r.unimplemented === r.totalScenarios) {
+    return `${head} — every scenario is @unimplemented`;
+  }
+  return `${head} — ${r.unimplemented} @unimplemented, the rest untagged`;
+}
+
+function printInertSummary(reports: InertReport[]): void {
+  if (reports.length === 0) return;
+  const invisible = reports.reduce((s, r) => s + r.totalScenarios, 0);
+  const parked = reports.reduce((s, r) => s + r.unimplemented, 0);
+  console.log(`\nInert (no enforced scenarios — tolerated via LEGACY_INERT):`);
+  console.log(
+    `  ${reports.length} file(s) hold ${invisible} scenario(s) this check cannot see` +
+      (parked > 0 ? ` (${parked} of them parked as @unimplemented).` : "."),
+  );
+  console.log(
+    `  Tag them @unit/@integration to measure them, or @unimplemented to declare the gap. See dev/docs/TESTING_PHILOSOPHY.md.`,
+  );
+}
+
+function printNewInert(reports: InertReport[]): void {
+  if (reports.length === 0) return;
+  console.log(`\nFeature files that enforce no scenario at all:`);
+  for (const r of reports) {
+    console.log(`  ✗ ${r.feature}`);
+    console.log(`      ${describeInert(r)}`);
+    console.log(
+      `      Tag the scenarios @unit / @integration / @e2e / @regression and bind them, or add this file to LEGACY_INERT with a reason.`,
+    );
+  }
 }
 
 function printUnknownAnnotations(unknown: UnknownAnnotation[]): void {
   if (unknown.length === 0) return;
   console.log(
-    `\nAnnotations referencing unknown scenarios (typo? renamed scenario? stale binding?):`
+    `\nAnnotations referencing unknown scenarios (typo? renamed scenario? stale binding?):`,
   );
   for (const a of unknown) {
     console.log(`  ✗ @scenario ${a.title}`);
@@ -647,12 +1421,20 @@ function printUnknownAnnotations(unknown: UnknownAnnotation[]): void {
   }
 }
 
-function validateLegacyList(allFeatures: string[]): string[] {
+function validateExemptionList({
+  name,
+  entries,
+  allFeatures,
+}: {
+  name: string;
+  entries: readonly string[];
+  allFeatures: string[];
+}): string[] {
   const errors: string[] = [];
   const seen = new Set<string>();
-  for (const entry of LEGACY_UNBOUND) {
+  for (const entry of entries) {
     if (seen.has(entry)) {
-      errors.push(`LEGACY_UNBOUND contains duplicate entry: ${entry}`);
+      errors.push(`${name} contains duplicate entry: ${entry}`);
       continue;
     }
     seen.add(entry);
@@ -660,11 +1442,11 @@ function validateLegacyList(allFeatures: string[]): string[] {
       const abs = resolve(REPO_ROOT, entry);
       if (!existsSync(abs)) {
         errors.push(
-          `LEGACY_UNBOUND entry does not resolve to an existing .feature file: ${entry}`
+          `${name} entry does not resolve to an existing .feature file: ${entry}`,
         );
       } else {
         errors.push(
-          `LEGACY_UNBOUND entry is not discovered under specs/: ${entry}`
+          `${name} entry is not discovered under the configured spec roots: ${entry}`,
         );
       }
     }
@@ -677,7 +1459,18 @@ function main(): void {
   const asJson = args.includes("--json");
 
   const allFeatures = discoverFeatureFiles();
-  const listErrors = validateLegacyList(allFeatures);
+  const listErrors = [
+    ...validateExemptionList({
+      name: "LEGACY_UNBOUND",
+      entries: LEGACY_UNBOUND,
+      allFeatures,
+    }),
+    ...validateExemptionList({
+      name: "LEGACY_INERT",
+      entries: LEGACY_INERT,
+      allFeatures,
+    }),
+  ];
 
   const bindings = [
     ...collectAllBindings(DEFAULT_TEST_ROOTS),
@@ -715,6 +1508,20 @@ function main(): void {
   // scenario. If a file is fully bound, it must be removed from the list.
   const staleLegacy = legacy.filter((r) => r.unbound === 0);
 
+  // Inert floor. A file that declares scenarios and enforces none of them is a
+  // failure unless it was already in that state when the floor was introduced.
+  const inertSet = new Set(LEGACY_INERT);
+  const inert = enforced.filter(isInert).map(toInertReport);
+  const newInert = inert.filter((r) => !inertSet.has(r.feature));
+  const exemptInert = inert.filter((r) => inertSet.has(r.feature));
+
+  // Ratchet hygiene: an entry that is no longer inert has been fixed, and must
+  // leave the list so it can never silently regress.
+  const inertFeatures = new Set(inert.map((r) => r.feature));
+  const staleInert = LEGACY_INERT.filter(
+    (f) => allFeatures.includes(f) && !inertFeatures.has(f),
+  );
+
   if (asJson) {
     console.log(
       JSON.stringify(
@@ -724,20 +1531,25 @@ function main(): void {
           unknownAnnotations,
           listErrors,
           staleLegacy: staleLegacy.map((r) => r.feature),
+          inert: exemptInert,
+          newInert,
+          staleInert,
         },
         null,
-        2
-      )
+        2,
+      ),
     );
   } else {
     console.log("Feature-file parity check");
     console.log("=========================");
     console.log(
-      `Enforced: ${enforced.length} file(s) · Legacy: ${legacy.length} file(s)`
+      `Enforced: ${enforced.length} file(s) · Legacy: ${legacy.length} file(s) · Inert: ${inert.length} file(s)`,
     );
 
     for (const r of enforced) printEnforcedReport(r);
     printLegacySummary(legacy);
+    printInertSummary(exemptInert);
+    printNewInert(newInert);
     printUnknownAnnotations(unknownAnnotations);
   }
 
@@ -746,7 +1558,9 @@ function main(): void {
     enforcedUnbound > 0 ||
     unknownAnnotations.length > 0 ||
     listErrors.length > 0 ||
-    staleLegacy.length > 0;
+    staleLegacy.length > 0 ||
+    newInert.length > 0 ||
+    staleInert.length > 0;
 
   if (hasFatal) {
     if (!asJson) {
@@ -761,34 +1575,92 @@ function main(): void {
         parts.push(
           `${staleLegacy.length} fully-bound file(s) still in LEGACY_UNBOUND — remove them from the list: ${staleLegacy
             .map((r) => r.feature)
-            .join(", ")}`
+            .join(", ")}`,
         );
       }
-      for (const err of listErrors) console.error(`LEGACY_UNBOUND error: ${err}`);
+      if (newInert.length > 0) {
+        parts.push(
+          `${newInert.length} file(s) enforce no scenario at all (nothing in them is tagged @unit/@integration/@e2e/@regression)`,
+        );
+      }
+      if (staleInert.length > 0) {
+        parts.push(
+          `${staleInert.length} file(s) in LEGACY_INERT now enforce scenarios — remove them from the list: ${staleInert.join(
+            ", ",
+          )}`,
+        );
+      }
+      if (listErrors.length > 0) {
+        parts.push(`${listErrors.length} exemption-list error(s)`);
+      }
+      // The list name is already inside each message.
+      for (const err of listErrors) console.error(`Exemption list: ${err}`);
       console.error(
         `FAIL: ${parts.join(
-          ", "
-        )}. See spec-binding convention in dev/docs/TESTING_PHILOSOPHY.md.`
+          ", ",
+        )}. See spec-binding convention in dev/docs/TESTING_PHILOSOPHY.md.`,
       );
     }
     process.exit(1);
   }
 
   if (!asJson) {
-    const enforcedTotal = enforced.reduce(
-      (s, r) => s + r.scenarios.length,
-      0
-    );
+    const enforcedTotal = enforced.reduce((s, r) => s + r.scenarios.length, 0);
     const legacyUnbound = legacy.reduce((s, r) => s + r.unbound, 0);
     console.log(
-      `\nOK: ${enforcedTotal} enforced scenario(s) bound across ${enforced.length} file(s).`
+      `\nOK: ${enforcedTotal} enforced scenario(s) bound across ${enforced.length} file(s).`,
     );
     if (legacy.length > 0) {
       console.log(
-        `    ${legacyUnbound} unbound scenario(s) tolerated in ${legacy.length} legacy file(s).`
+        `    ${legacyUnbound} unbound scenario(s) tolerated in ${legacy.length} legacy file(s).`,
+      );
+    }
+    if (exemptInert.length > 0) {
+      const invisible = exemptInert.reduce((s, r) => s + r.totalScenarios, 0);
+      console.log(
+        `    ${exemptInert.length} file(s) exempted via LEGACY_INERT enforce nothing at all — ${invisible} scenario(s) are invisible to this check.`,
       );
     }
   }
 }
 
-main();
+/**
+ * Is this module the one node was asked to run?
+ *
+ * A plain string compare of `process.argv[1]` against `import.meta.url` is
+ * fail-OPEN: invoke the check through a symlink — a `node_modules/.bin` shim, a
+ * pnpm store link, a worktree symlinked into place — and the two paths differ,
+ * the guard declines to run `main()`, and the process exits 0 having checked
+ * nothing. A parity gate that silently no-ops is worse than no gate. So both
+ * sides are resolved through `realpathSync` before comparing.
+ *
+ * `realpathSync` throws if the path does not exist (argv[1] can be anything);
+ * falling back to the lexically-resolved path keeps that case a mismatch rather
+ * than a crash.
+ */
+export function isEntryModule({
+  invokedPath,
+  modulePath,
+}: {
+  invokedPath: string | undefined;
+  modulePath: string;
+}): boolean {
+  if (invokedPath === undefined) return false;
+  return realPathOrResolved(invokedPath) === realPathOrResolved(modulePath);
+}
+
+function realPathOrResolved(p: string): string {
+  const abs = resolve(p);
+  try {
+    return realpathSync(abs);
+  } catch {
+    return abs;
+  }
+}
+
+// Run only when invoked as a script (`tsx scripts/check-feature-parity.ts`),
+// so the collectors above can be imported and exercised by unit tests without
+// the whole repo scan — and its `process.exit(1)` — running on import.
+if (isEntryModule({ invokedPath: process.argv[1], modulePath: __filename })) {
+  main();
+}

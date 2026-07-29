@@ -150,6 +150,32 @@ describe("ContributeSpanFactsCommand", () => {
       SESSION,
     );
   });
+
+  describe("given a nested interactive session launched from inside another", () => {
+    describe("when both sessions' spans arrive on the same trace", () => {
+      /** @scenario an interactive child session stands alone */
+      it("routes each to its own aggregate, so the child's work never joins the parent's totals", async () => {
+        const handler = new ContributeSpanFactsCommand();
+        const CHILD = "b7d1f0aa-child-session";
+
+        const [parent] = await handler.handle(
+          makeCommand(CONTRIBUTE_SPAN_FACTS_COMMAND_TYPE, spanFactsData()),
+        );
+        // Same trace, same tool span shape — only the session id differs, which
+        // is the whole of what makes the child a session in its own right.
+        const [child] = await handler.handle(
+          makeCommand(
+            CONTRIBUTE_SPAN_FACTS_COMMAND_TYPE,
+            spanFactsData({ sessionId: CHILD, spanId: "span-2" }),
+          ),
+        );
+
+        expect(parent!.aggregateId).toBe(SESSION);
+        expect(child!.aggregateId).toBe(CHILD);
+        expect(child!.idempotencyKey).not.toBe(parent!.idempotencyKey);
+      });
+    });
+  });
 });
 
 describe("ContributeLogFactsCommand", () => {

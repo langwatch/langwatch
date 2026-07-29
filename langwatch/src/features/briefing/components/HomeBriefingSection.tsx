@@ -1,13 +1,13 @@
 import { Box, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { LangyPanelSurface } from "~/features/asaplangy";
-import { useShowLangy } from "~/features/langy/hooks/useShowLangy";
 import { useCanAskLangy } from "~/features/langy/hooks/useCanAskLangy";
+import { useShowLangy } from "~/features/langy/hooks/useShowLangy";
 import { useLangyStore } from "~/features/langy/stores/langyStore";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { HomeOverviewCard } from "./HomeOverviewCard";
-import { LangyBriefing } from "./LangyBriefing";
 import { useLangyBriefing } from "../hooks/useLangyBriefing";
 import type { BriefingReceipt } from "../types";
+import { HomeOverviewCard } from "./HomeOverviewCard";
+import { LangyBriefing } from "./LangyBriefing";
 
 /**
  * The briefing sheet that leads the home: Langy's read AND the project's

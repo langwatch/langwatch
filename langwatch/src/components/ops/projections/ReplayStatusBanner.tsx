@@ -1,9 +1,9 @@
-import { useRouter } from "~/utils/compat/next-router";
 import { Badge, Button, Card, HStack, Status, Text } from "@chakra-ui/react";
-import { api } from "~/utils/api";
+import { parseActiveProjections } from "~/components/ops/replay-progress/parseActiveProjections";
 import { useOpsPermission } from "~/hooks/useOpsPermission";
 import { useReplayStatus } from "~/hooks/useReplayStatus";
-import { parseActiveProjections } from "~/components/ops/replay-progress/parseActiveProjections";
+import { api } from "~/utils/api";
+import { useRouter } from "~/utils/compat/next-router";
 
 export function ReplayStatusBanner() {
   const router = useRouter();
@@ -15,7 +15,7 @@ export function ReplayStatusBanner() {
 
   const status = statusQuery.data;
   // Only show banner while actively running
-  if (!status || status.state !== "running") return null;
+  if (status?.state !== "running") return null;
 
   const activeProjectionNames = parseActiveProjections(
     status.currentProjection,

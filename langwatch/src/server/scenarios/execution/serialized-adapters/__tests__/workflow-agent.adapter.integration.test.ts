@@ -19,9 +19,9 @@
  *   AC 4: conversation history preserved as distinct turns — no escaped-JSON blob leak
  */
 
-import { AgentRole, type AgentInput } from "@langwatch/scenario";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { type AgentInput, AgentRole } from "@langwatch/scenario";
 import { beforeAll, describe, expect, it } from "vitest";
 import type { WorkflowAgentData } from "../../types";
 import { SerializedWorkflowAgentAdapter } from "../workflow-agent.adapter";
@@ -29,7 +29,10 @@ import { SerializedWorkflowAgentAdapter } from "../workflow-agent.adapter";
 const NLP = process.env.LANGWATCH_NLP_SERVICE ?? "http://localhost:5561";
 const FIXTURES = resolve(__dirname, "fixtures");
 const REPRO_BUG1 = resolve(FIXTURES, "repro-bug1-str-type.json");
-const REPRO_BUG2 = resolve(FIXTURES, "repro-bug2-chat_messages-type-crash.json");
+const REPRO_BUG2 = resolve(
+  FIXTURES,
+  "repro-bug2-chat_messages-type-crash.json",
+);
 
 // --- Helpers ---------------------------------------------------------------------
 
@@ -47,7 +50,9 @@ type SignatureNode = {
 
 async function nlpReachable(): Promise<boolean> {
   try {
-    const r = await fetch(`${NLP}/health`, { signal: AbortSignal.timeout(2000) });
+    const r = await fetch(`${NLP}/health`, {
+      signal: AbortSignal.timeout(2000),
+    });
     return r.ok;
   } catch {
     return false;
@@ -76,7 +81,8 @@ function getSignatureNode(workflow: WorkflowDsl): SignatureNode {
 function patchSignaturePrompt(sig: SignatureNode): void {
   const params = sig.data.parameters ?? [];
   const messagesParam = params.find((p) => p.identifier === "messages");
-  if (!messagesParam) throw new Error("signature is missing the 'messages' parameter");
+  if (!messagesParam)
+    throw new Error("signature is missing the 'messages' parameter");
   messagesParam.value = [
     {
       role: "user",
@@ -98,7 +104,11 @@ function patchSignaturePrompt(sig: SignatureNode): void {
  * Add a `random_static_value` input with a default value, mirroring the Studio
  * "Variables panel → static value" shape from the issue screenshot.
  */
-function addStaticInput(sig: SignatureNode, identifier: string, value: string): void {
+function addStaticInput(
+  sig: SignatureNode,
+  identifier: string,
+  value: string,
+): void {
   const inputs = (sig.data.inputs ??= []);
   if (!inputs.some((f) => f.identifier === identifier)) {
     inputs.push({ identifier, type: "str", value });
@@ -106,11 +116,15 @@ function addStaticInput(sig: SignatureNode, identifier: string, value: string): 
 }
 
 function buildAdapter(workflow: WorkflowDsl): SerializedWorkflowAgentAdapter {
-  const entry = (workflow.nodes as Array<{ id: string; data: { outputs?: Array<{ identifier: string; type: string }> } }>).find(
-    (n) => n.id === "entry",
-  );
+  const entry = (
+    workflow.nodes as Array<{
+      id: string;
+      data: { outputs?: Array<{ identifier: string; type: string }> };
+    }>
+  ).find((n) => n.id === "entry");
   const messagesType =
-    entry?.data.outputs?.find((f) => f.identifier === "messages")?.type ?? "str";
+    entry?.data.outputs?.find((f) => f.identifier === "messages")?.type ??
+    "str";
   const config: WorkflowAgentData = {
     type: "workflow",
     agentId: "e2e-agent",
@@ -191,34 +205,30 @@ describe("SerializedWorkflowAgentAdapter — e2e against live NLP (#3415)", () =
   /** @scenario Pre-existing str-typed workflows still function */
   /** @scenario A 2-turn scenario produces at least 2 distinct provider messages */
   /** @scenario Same template interpolates cleanly across Studio-exposed field types */
-  it(
-    "interpolates template variables and preserves history [AC 1, 4, 6]",
-    async () => {
-      if (!nlpUp) return;
-      const wf = cloneWorkflow(loadRepro(REPRO_BUG1));
-      const sig = getSignatureNode(wf);
-      patchSignaturePrompt(sig);
-      addStaticInput(sig, "random_static_value", "bob is your uncle");
+  it("interpolates template variables and preserves history [AC 1, 4, 6]", async () => {
+    if (!nlpUp) return;
+    const wf = cloneWorkflow(loadRepro(REPRO_BUG1));
+    const sig = getSignatureNode(wf);
+    patchSignaturePrompt(sig);
+    addStaticInput(sig, "random_static_value", "bob is your uncle");
 
-      const output = await buildAdapter(wf).call(makeAgentInput());
+    const output = await buildAdapter(wf).call(makeAgentInput());
 
-      // Hard negative invariants — the actual regression signals proving the fix.
-      expect(output).not.toContain("{{");
-      expect(output).not.toMatch(/\\"role\\":/);
+    // Hard negative invariants — the actual regression signals proving the fix.
+    expect(output).not.toContain("{{");
+    expect(output).not.toMatch(/\\"role\\":/);
 
-      // Soft positive echo checks — LLMs can reformat, match case-insensitively.
-      // Opaque thread_id (t-e2e-3415) is not asserted on the LLM echo; its substitution
-      // is covered at the pytest layer (test_str_inputs_interpolate).
-      expect(output).toMatch(/bob is your uncle/i);
-      expect(output).toMatch(/capital of france/i);
+    // Soft positive echo checks — LLMs can reformat, match case-insensitively.
+    // Opaque thread_id (t-e2e-3415) is not asserted on the LLM echo; its substitution
+    // is covered at the pytest layer (test_str_inputs_interpolate).
+    expect(output).toMatch(/bob is your uncle/i);
+    expect(output).toMatch(/capital of france/i);
 
-      // AC 4 role-preservation: the prior assistant turn's content must be reachable
-      // through the pipeline. The parrot-back prompt serializes `{{messages}}` into the
-      // echoed string, so each history turn's content appears there. Pre-fix bug 1, the
-      // whole history collapsed into a single escaped-JSON user message; post-fix the
-      // assistant's own words round-trip.
-      expect(output).toMatch(/hello there/i);
-    },
-    120_000,
-  );
+    // AC 4 role-preservation: the prior assistant turn's content must be reachable
+    // through the pipeline. The parrot-back prompt serializes `{{messages}}` into the
+    // echoed string, so each history turn's content appears there. Pre-fix bug 1, the
+    // whole history collapsed into a single escaped-JSON user message; post-fix the
+    // assistant's own words round-trip.
+    expect(output).toMatch(/hello there/i);
+  }, 120_000);
 });

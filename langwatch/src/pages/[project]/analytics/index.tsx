@@ -46,10 +46,7 @@ function AnalyticsContent() {
                   "Tracing is not integrated yet, so there's no data to display. Go to the "
                 }
               </Text>
-              <Link
-                textDecoration="underline"
-                href={`/${project.slug}/traces`}
-              >
+              <Link textDecoration="underline" href={`/${project.slug}/traces`}>
                 setup
               </Link>
               <Text as="span"> page to get started.</Text>
@@ -191,42 +188,42 @@ function CustomReportsSection({ slug }: { slug: string }) {
               name: dashboard.name,
             })}
           >
-          <Link
-            href={`/${slug}/analytics/reports?dashboard=${dashboard.id}`}
-            _hover={{ textDecoration: "none" }}
-          >
-            <Card.Root
-              width="full"
-              cursor="pointer"
-              borderColor="border"
-              _hover={{ borderColor: "orange.400", shadow: "sm" }}
-              transition="all 0.15s ease"
+            <Link
+              href={`/${slug}/analytics/reports?dashboard=${dashboard.id}`}
+              _hover={{ textDecoration: "none" }}
             >
-              <Card.Body paddingX={4} paddingY={3}>
-                <Flex gap={3} alignItems="center">
-                  <Box
-                    padding={2}
-                    borderRadius="md"
-                    bg="orange.subtle"
-                    color="orange.fg"
-                  >
-                    <BarChart2 size={16} />
-                  </Box>
-                  <VStack align="start" gap={0} flex={1}>
-                    <Text fontWeight="500" textStyle="sm">
-                      {dashboard.name}
-                    </Text>
-                    <Text textStyle="xs" color="fg.muted">
-                      Custom Dashboard
-                    </Text>
-                  </VStack>
-                  <Box color="fg.subtle" marginLeft="auto">
-                    <ArrowUpRight size={14} />
-                  </Box>
-                </Flex>
-              </Card.Body>
-            </Card.Root>
-          </Link>
+              <Card.Root
+                width="full"
+                cursor="pointer"
+                borderColor="border"
+                _hover={{ borderColor: "orange.400", shadow: "sm" }}
+                transition="all 0.15s ease"
+              >
+                <Card.Body paddingX={4} paddingY={3}>
+                  <Flex gap={3} alignItems="center">
+                    <Box
+                      padding={2}
+                      borderRadius="md"
+                      bg="orange.subtle"
+                      color="orange.fg"
+                    >
+                      <BarChart2 size={16} />
+                    </Box>
+                    <VStack align="start" gap={0} flex={1}>
+                      <Text fontWeight="500" textStyle="sm">
+                        {dashboard.name}
+                      </Text>
+                      <Text textStyle="xs" color="fg.muted">
+                        Custom Dashboard
+                      </Text>
+                    </VStack>
+                    <Box color="fg.subtle" marginLeft="auto">
+                      <ArrowUpRight size={14} />
+                    </Box>
+                  </Flex>
+                </Card.Body>
+              </Card.Root>
+            </Link>
           </LangyContextTarget>
         ))}
       </Grid>

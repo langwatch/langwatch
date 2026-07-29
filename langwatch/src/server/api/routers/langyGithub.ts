@@ -33,9 +33,11 @@ async function ensureOrganizationMember(
   userId: string,
   organizationId: string,
 ): Promise<void> {
-  const isMember = await getApp().langy.githubInstallations.isOrganizationMember(
-    { userId, organizationId },
-  );
+  const isMember =
+    await getApp().langy.githubInstallations.isOrganizationMember({
+      userId,
+      organizationId,
+    });
   if (!isMember) {
     // Generic message — echoing the org id would confirm a valid id to a
     // non-member (light enumeration oracle).
@@ -119,9 +121,7 @@ export const langyGithubRouter = createTRPCRouter({
     }),
 
   disconnect: protectedProcedure
-    .input(
-      z.object({ organizationId: z.string(), installationId: z.string() }),
-    )
+    .input(z.object({ organizationId: z.string(), installationId: z.string() }))
     .use(checkOrganizationPermission("langy:manage"))
     .use(enforceOrganizationMembership)
     .use(enforceLangyAccess)

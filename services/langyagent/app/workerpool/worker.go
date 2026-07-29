@@ -40,7 +40,7 @@ type Worker struct {
 	// authProxy fronts opencode with bearer-token auth. Shutdown on worker exit
 	// so the externally-advertised port frees up.
 	authProxy *opencode.AuthProxy
-	// egress is the per-worker OUTBOUND egress handle (ADR-043) returned by the
+	// egress is the per-worker OUTBOUND egress handle (ADR-076) returned by the
 	// egress guard's PrepareWorker: it carries the loopback forward-proxy port
 	// the worker's HTTPS_PROXY points at (0 when the guard runs no proxy) and a
 	// Close that tears the proxy down. Closed on every teardown path (kill /

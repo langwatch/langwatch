@@ -4,7 +4,7 @@ import { checkFlagEnvOverride } from "./envOverride";
 import { FeatureFlagServiceMemory } from "./featureFlagService.memory";
 import { FeatureFlagServicePostHog } from "./featureFlagService.posthog";
 import {
-  FeatureFlagStorePostgres,
+  type FeatureFlagStorePostgres,
   getFeatureFlagStore,
 } from "./featureFlagStore.postgres";
 import type { FeatureFlagKey } from "./registry";

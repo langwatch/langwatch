@@ -77,7 +77,9 @@ export function ComparisonColumnHeader({
 
   const aggregate = useMemo(
     () =>
-      evaluator ? computeComparisonAggregate(evaluator, results, rowCount) : null,
+      evaluator
+        ? computeComparisonAggregate(evaluator, results, rowCount)
+        : null,
     [evaluator, results, rowCount],
   );
 

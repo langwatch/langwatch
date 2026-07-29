@@ -15,12 +15,13 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { FlaskConical, RefreshCw, TriangleAlert } from "lucide-react";
+import { FlaskConical, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Period } from "~/components/PeriodSelector";
 import { SetupWithAgentButton } from "~/components/SetupWithAgentButton";
 import { ShadowDivider } from "~/components/ui/ShadowDivider";
 import { toaster } from "~/components/ui/toaster";
+import { HandledErrorAlert, showErrorToast } from "~/features/errors";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useSimulationUpdateListener } from "~/hooks/useSimulationUpdateListener";
@@ -181,23 +182,14 @@ export function RunHistoryPanel({
       onCancelJobError: (error) => {
         setCancellingJobId(null);
         void refetch();
-        toaster.create({
-          title: "Failed to cancel job",
-          description: error.message,
-          type: "error",
-        });
+        showErrorToast({ error, fallbackTitle: "Couldn't cancel job" });
       },
       onCancelBatchSuccess: () => {
         void refetch();
         toaster.create({ title: "Jobs cancelled", type: "success" });
       },
-      onCancelBatchError: (error) => {
-        toaster.create({
-          title: "Failed to cancel jobs",
-          description: error.message,
-          type: "error",
-        });
-      },
+      onCancelBatchError: (error) =>
+        showErrorToast({ error, fallbackTitle: "Couldn't cancel jobs" }),
     },
   );
 
@@ -335,16 +327,18 @@ export function RunHistoryPanel({
   // --- Render ---
 
   if (error) {
+    // The alert is this panel's whole error surface: one component that reads
+    // the handled payload, an authored non-5xx message, or the generic unknown
+    // state, and carries the tips, docs link and copyable error id with it.
     return (
       <EmptyState.Root paddingY={12}>
         <EmptyState.Content>
-          <EmptyState.Indicator color="red.fg">
-            <TriangleAlert size={28} />
-          </EmptyState.Indicator>
-          <EmptyState.Title>Couldn&apos;t load runs</EmptyState.Title>
-          <EmptyState.Description maxWidth="360px" textAlign="center">
-            {error.message}
-          </EmptyState.Description>
+          <Box maxWidth="420px" width="100%">
+            <HandledErrorAlert
+              error={error}
+              fallbackTitle="Couldn't load runs"
+            />
+          </Box>
           <Button size="sm" variant="outline" onClick={() => void refetch()}>
             <RefreshCw size={14} /> Try again
           </Button>

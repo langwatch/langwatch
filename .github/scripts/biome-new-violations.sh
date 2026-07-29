@@ -1,0 +1,165 @@
+#!/usr/bin/env bash
+#
+# Fail when a PR ADDS Biome violations, measured against a format-normalized
+# merge base.
+#
+# WHY NOT reviewdog's `filter-mode=added`, which is the obvious answer.
+#
+# It attributes a diagnostic to a PR when the diagnostic's line is one the diff
+# added. Biome anchors `noExcessiveCognitiveComplexity`,
+# `noExcessiveLinesPerFunction` and `useMaxParams` at the function's DECLARATION
+# line, so rewrapping a signature -- something the formatter does on its own,
+# with no author involvement -- re-adds that line and hands the PR the whole
+# function's pre-existing backlog. Measured on the branch that introduced these
+# rules: 61 findings, of which the author had written none. A gate that reports
+# things the author did not do gets switched off, which is the same end state as
+# the green-but-meaningless check this whole ruleset exists to remove.
+#
+# So ask the question that actually matters -- "does this PR leave the tree
+# worse than it found it?" -- by counting violations per (file, rule) on both
+# sides and failing only on an increase.
+#
+# The base is FORMATTED FIRST, with the head's own config. Without that step the
+# comparison is not like-for-like for a rule that counts lines: a 58-line
+# function whose signature the formatter rewraps onto four lines becomes a
+# 61-line function and trips a 60-line limit that nobody's edit went near. On
+# the branch that introduced these rules, normalizing the base collapsed 77
+# apparent regressions to 1 -- and that 1 was real.
+#
+# KNOWN AND ACCEPTED: a moved or renamed file reads as entirely new, because the
+# base has no counts under its new path. Net-zero churn within one file and rule
+# (delete one long function, add another) also passes. reviewdog still annotates
+# every added line in the job above, so those stay visible on the diff; they are
+# not gated, which is the deliberate trade for not gating the false positives.
+#
+# Usage: biome-new-violations.sh <head-rdjson> <base-ref> <path>...
+#   <head-rdjson>  biome --reporter=rdjson output for HEAD, paths relative to
+#                  langwatch/ (i.e. BEFORE any repo-root prefixing)
+#   <base-ref>     e.g. origin/main
+#   <path>...      the same paths the head run was given
+
+set -euo pipefail
+
+if [ "$#" -lt 3 ]; then
+  echo "usage: $0 <head-rdjson> <base-ref> <path>..." >&2
+  exit 2
+fi
+
+HEAD_RDJSON="$1"
+BASE_REF="$2"
+shift 2
+PATHS=("$@")
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+BIOME="$REPO_ROOT/langwatch/node_modules/.bin/biome"
+
+if [ ! -x "$BIOME" ]; then
+  echo "biome not found at $BIOME -- run pnpm install in langwatch/ first" >&2
+  exit 2
+fi
+
+MERGE_BASE="$(git merge-base "$BASE_REF" HEAD)"
+echo "comparing against merge base $MERGE_BASE ($BASE_REF)"
+
+BASE_TREE="$(mktemp -d)"
+cleanup() {
+  git worktree remove --force "$BASE_TREE" >/dev/null 2>&1 || true
+  rm -rf "$BASE_TREE"
+}
+trap cleanup EXIT
+
+# --detach: this is a throwaway checkout, never a branch anyone commits to.
+# --quiet: the per-file checkout progress is thousands of lines of CI log.
+git worktree add --quiet --detach "$BASE_TREE" "$MERGE_BASE"
+
+# The base is linted under the HEAD's rules, not its own. The question is "what
+# did main already have, judged by the rules we are adopting" -- judging it by
+# main's rules would count a newly-enabled rule's entire backlog as this PR's.
+rm -f "$BASE_TREE"/langwatch/biome.json "$BASE_TREE"/langwatch/biome.jsonc
+cp "$REPO_ROOT/langwatch/biome.jsonc" "$BASE_TREE/langwatch/biome.jsonc"
+
+# Both sides must resolve the same dependencies or the type-aware rules
+# (noFloatingPromises, noMisusedPromises) disagree for reasons that have nothing
+# to do with the diff. Symlinking is enough -- biome only reads them.
+ln -sfn "$REPO_ROOT/langwatch/node_modules" "$BASE_TREE/langwatch/node_modules"
+if [ -d "$REPO_ROOT/node_modules" ]; then
+  ln -sfn "$REPO_ROOT/node_modules" "$BASE_TREE/node_modules"
+fi
+
+# Normalize the base's formatting. --linter-enabled=false so this only rewrites
+# layout: it must not fix a lint violation, or the base would look better than
+# it is and the PR would inherit the difference as a regression.
+(cd "$BASE_TREE/langwatch" && "$BIOME" check --write --linter-enabled=false "${PATHS[@]}" >/dev/null 2>&1) || true
+
+BASE_RDJSON="$BASE_TREE/base.rdjson"
+# Biome exits non-zero whenever it reports anything, which is the normal case.
+(cd "$BASE_TREE/langwatch" && "$BIOME" check --reporter=rdjson "${PATHS[@]}" > "$BASE_RDJSON" 2>/dev/null) || true
+
+# An unreadable or empty base would make every head diagnostic look new. That
+# fails loudly rather than quietly, but the message would be nonsense, so say
+# what actually went wrong.
+if ! jq -e '.diagnostics | type == "array"' "$BASE_RDJSON" >/dev/null 2>&1; then
+  echo "::error::could not lint the merge base -- no usable rdjson at $BASE_RDJSON" >&2
+  exit 2
+fi
+
+counts() {
+  jq '[.diagnostics[] | (.location.path + "|" + (.code.value // "?"))]
+      | group_by(.) | map({key: .[0], value: length}) | from_entries' "$1"
+}
+
+BASE_COUNTS="$BASE_TREE/base.counts.json"
+HEAD_COUNTS="$BASE_TREE/head.counts.json"
+counts "$BASE_RDJSON" > "$BASE_COUNTS"
+counts "$HEAD_RDJSON" > "$HEAD_COUNTS"
+
+echo "base diagnostics: $(jq '.diagnostics | length' "$BASE_RDJSON")"
+echo "head diagnostics: $(jq '.diagnostics | length' "$HEAD_RDJSON")"
+
+REGRESSIONS="$BASE_TREE/regressions.json"
+jq -n --slurpfile h "$HEAD_COUNTS" --slurpfile b "$BASE_COUNTS" '
+  ($h[0]) as $H | ($b[0]) as $B |
+  [ $H | to_entries[]
+    | select(.value > ($B[.key] // 0))
+    | { file: (.key | split("|")[0]),
+        rule: (.key | split("|")[1]),
+        base: ($B[.key] // 0),
+        head: .value } ]
+  | sort_by(.file, .rule)
+' > "$REGRESSIONS"
+
+NEW_TOTAL="$(jq '[.[] | .head - .base] | add // 0' "$REGRESSIONS")"
+FIXED_TOTAL="$(jq -n --slurpfile h "$HEAD_COUNTS" --slurpfile b "$BASE_COUNTS" '
+  ($h[0]) as $H | ($b[0]) as $B |
+  [ $B | to_entries[] | select(.value > ($H[.key] // 0)) | .value - ($H[.key] // 0) ] | add // 0
+')"
+
+echo "violations removed by this PR: $FIXED_TOTAL"
+
+if [ "$NEW_TOTAL" -eq 0 ]; then
+  echo "no new Biome violations"
+  exit 0
+fi
+
+echo
+echo "This PR adds $NEW_TOTAL Biome violation(s):"
+echo
+jq -r '.[] | "  \(.file)\n    \(.rule): \(.base) -> \(.head)"' "$REGRESSIONS"
+echo
+echo "Each is a rule the repo already enforces on new code. Either fix it, or"
+echo "-- if the rule is genuinely wrong for this code -- scope an override in"
+echo "langwatch/biome.jsonc with a comment saying why."
+
+# Also surface it on the run summary, so the reason is visible without opening
+# the log.
+if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+  {
+    echo "### Biome: $NEW_TOTAL new violation(s)"
+    echo
+    echo "| File | Rule | Base | Head |"
+    echo "| --- | --- | --- | --- |"
+    jq -r '.[] | "| `\(.file)` | \(.rule) | \(.base) | \(.head) |"' "$REGRESSIONS"
+  } >> "$GITHUB_STEP_SUMMARY"
+fi
+
+exit 1

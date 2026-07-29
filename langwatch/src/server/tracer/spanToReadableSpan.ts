@@ -64,12 +64,20 @@ function flattenParams({
 
     const fullKey = prefix ? `${prefix}.${key}` : key;
 
-    if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    if (
+      typeof value === "string" ||
+      typeof value === "number" ||
+      typeof value === "boolean"
+    ) {
       attrs[fullKey] = value;
     } else if (Array.isArray(value)) {
       attrs[fullKey] = JSON.stringify(value);
     } else if (typeof value === "object") {
-      flattenParams({ params: value as Record<string, unknown>, prefix: fullKey, attrs });
+      flattenParams({
+        params: value as Record<string, unknown>,
+        prefix: fullKey,
+        attrs,
+      });
     }
   }
 }
@@ -84,11 +92,11 @@ function buildAttributes(span: Span): Attributes {
     if (span.input.type === "chat_messages") {
       attrs["gen_ai.input.messages"] = JSON.stringify(span.input.value);
     } else if (span.input.type === "text") {
-      attrs["input"] = span.input.value;
+      attrs.input = span.input.value;
     } else if (span.input.type === "json") {
-      attrs["input"] = JSON.stringify(span.input.value);
+      attrs.input = JSON.stringify(span.input.value);
     } else if (span.input.type === "raw") {
-      attrs["input"] = span.input.value;
+      attrs.input = span.input.value;
     }
   }
 
@@ -97,11 +105,11 @@ function buildAttributes(span: Span): Attributes {
     if (span.output.type === "chat_messages") {
       attrs["gen_ai.output.messages"] = JSON.stringify(span.output.value);
     } else if (span.output.type === "text") {
-      attrs["output"] = span.output.value;
+      attrs.output = span.output.value;
     } else if (span.output.type === "json") {
-      attrs["output"] = JSON.stringify(span.output.value);
+      attrs.output = JSON.stringify(span.output.value);
     } else if (span.output.type === "raw") {
-      attrs["output"] = span.output.value;
+      attrs.output = span.output.value;
     }
   }
 

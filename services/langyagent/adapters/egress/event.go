@@ -11,7 +11,7 @@ import (
 )
 
 // egressDecision is the verb attached to every observed outbound flow. Rung 0
-// (ADR-043) makes every enforcement action ALSO a monitored event, so a
+// (ADR-076) makes every enforcement action ALSO a monitored event, so a
 // deny/throttle is a monitored deny/throttle — the same event with a different
 // verb. The control plane never sees these; they are pod-local telemetry.
 type egressDecision string
@@ -37,7 +37,16 @@ const (
 	egressDeniedCleartext egressDecision = "denied_cleartext"
 	// egressDeniedSNIMismatch: the TLS ClientHello SNI did not match the CONNECT
 	// authority the decision was made against (domain-fronting attempt).
-	egressDeniedSNIMismatch    egressDecision = "denied_sni_mismatch"
+	egressDeniedSNIMismatch egressDecision = "denied_sni_mismatch"
+	// egressDeniedSNIUnreadable: the stream is a TLS handshake but no SNI could
+	// be recovered from it, while an allow-list (or the enforced floor) is in
+	// force. Fragmentation alone does not get you here — the peek reassembles a
+	// ClientHello split across records — so what remains is ClientHello data that
+	// is malformed, incomplete, or unsupported (including a record version no TLS
+	// record uses), or a peer that claims a handshake and then sends nothing.
+	// Under an enforcing policy "cannot read" must fail closed — otherwise the
+	// anti-fronting check is opt-out.
+	egressDeniedSNIUnreadable  egressDecision = "denied_sni_unreadable"
 	egressDeniedPrivateAddress egressDecision = "denied_private_address"
 )
 
@@ -45,7 +54,7 @@ const (
 // destination). Used at the call site to choose 403 vs. tunnel.
 func (d egressDecision) blocked() bool {
 	switch d {
-	case egressDenied, egressDeniedCleartext, egressDeniedSNIMismatch, egressDeniedPrivateAddress:
+	case egressDenied, egressDeniedCleartext, egressDeniedSNIMismatch, egressDeniedSNIUnreadable, egressDeniedPrivateAddress:
 		return true
 	default:
 		return false
@@ -63,7 +72,7 @@ type egressEvent struct {
 	Bytes          int64
 }
 
-// egressMonitor is the rung-0 flag sink (ADR-043). The enforcing adapter calls
+// egressMonitor is the rung-0 flag sink (ADR-076). The enforcing adapter calls
 // record() on every per-CONNECT decision so enforcement and monitoring are the
 // same event. The default is logEgressMonitor (pod log); an operator wiring a
 // richer attributed-telemetry sink injects it at NewEnforcingGuard time.

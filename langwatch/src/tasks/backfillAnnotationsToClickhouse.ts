@@ -63,10 +63,7 @@ export default async function execute() {
       }
     }
 
-    logger.info(
-      { projectId, projectTraces },
-      "Finished backfilling project",
-    );
+    logger.info({ projectId, projectTraces }, "Finished backfilling project");
   }
 
   logger.info(

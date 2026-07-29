@@ -8,6 +8,7 @@ import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
 import { compare, hash } from "bcrypt";
 import { z } from "zod";
+import { NoAdminConfiguredError } from "~/server/app-layer/organizations/errors";
 import {
   Auth0ApiError,
   changeAuth0Password,
@@ -23,10 +24,7 @@ import { sendBudgetIncreaseRequestEmail } from "~/server/mailer/budgetIncreaseRe
 import { resolveOrgAdminEmail } from "~/server/organizations/resolveOrgAdminEmail";
 import { resolveSupportContact } from "~/server/organizations/resolveSupportContact";
 import { rateLimit } from "~/server/rateLimit";
-import {
-  AVATAR_MAX_DATA_URL_LENGTH,
-  AvatarValidationError,
-} from "~/server/user-avatar/avatar";
+import { AvatarRateLimitedError } from "~/server/user-avatar/avatar";
 import { UserAvatarService } from "~/server/user-avatar/avatar.service";
 import { UserService } from "~/server/users/user.service";
 import { getClientIp } from "~/utils/getClientIp";
@@ -500,10 +498,13 @@ export const userRouter = createTRPCRouter({
       z.object({
         organizationId: z.string(),
         // A base64 image data URL (`data:image/...;base64,...`) produced by the
-        // client crop/resize step. Bounded here as first-line defense so an
-        // oversized payload is rejected before UserAvatarService decodes it;
-        // validated + decoded there.
-        imageDataUrl: z.string().min(1).max(AVATAR_MAX_DATA_URL_LENGTH),
+        // client crop/resize step. Deliberately NOT bounded with a `.max()`
+        // here: `parseAvatarDataUrl` rejects at exactly the same ceiling before
+        // it scans or decodes anything, so a `.max()` only wins the race and
+        // turns the specific `avatar_image_too_large` ("Pick one under 8 MB")
+        // into the anonymous `validation_error`. The point of that code is that
+        // both halves of the check answer with it, whichever caught the file.
+        imageDataUrl: z.string().min(1),
       }),
     )
     .use(checkOrganizationPermission("organization:view"))
@@ -516,26 +517,20 @@ export const userRouter = createTRPCRouter({
         max: 10,
       });
       if (!limit.allowed) {
-        throw new TRPCError({
-          code: "TOO_MANY_REQUESTS",
-          message: "Too many avatar updates. Please try again shortly.",
-        });
+        throw new AvatarRateLimitedError();
       }
 
-      try {
-        return await new UserAvatarService(ctx.prisma).setAvatar({
-          userId: ctx.session.user.id,
-          organizationId: input.organizationId,
-          imageDataUrl: input.imageDataUrl,
-          displayName: ctx.session.user.name,
-          displayEmail: ctx.session.user.email,
-        });
-      } catch (err) {
-        if (err instanceof AvatarValidationError) {
-          throw new TRPCError({ code: "BAD_REQUEST", message: err.message });
-        }
-        throw err;
-      }
+      // `AvatarValidationError` is a handled error, so `handledErrorMiddleware`
+      // carries its code and meta to the client on its own. Catching it here to
+      // rewrap it as a BAD_REQUEST would only replace the code with the raw
+      // message — the thing #5984 closed.
+      return await new UserAvatarService(ctx.prisma).setAvatar({
+        userId: ctx.session.user.id,
+        organizationId: input.organizationId,
+        imageDataUrl: input.imageDataUrl,
+        displayName: ctx.session.user.name,
+        displayEmail: ctx.session.user.email,
+      });
     }),
 
   /**
@@ -906,10 +901,11 @@ export const userRouter = createTRPCRouter({
         organizationId: input.organizationId,
       });
       if (!adminEmail) {
-        throw new TRPCError({
-          code: "PRECONDITION_FAILED",
-          message: "no_admin_found",
-        });
+        logger.warn(
+          { organizationId: input.organizationId },
+          "budget increase requested but the organization has no admin",
+        );
+        throw new NoAdminConfiguredError();
       }
       const [organization, requester] = await Promise.all([
         ctx.prisma.organization.findUnique({

@@ -1,14 +1,15 @@
 /**
  * @vitest-environment node
  */
-import { describe, it, expect } from "vitest";
-import type { Node, Edge } from "@xyflow/react";
+
+import type { Edge, Node } from "@xyflow/react";
+import { describe, expect, it } from "vitest";
+import type { Component, Workflow } from "../../types/dsl";
 import {
-  getWorkflowEntryOutputs,
   canAutoMapAllFields,
+  getWorkflowEntryOutputs,
   isOutputConnectedToNonEvaluator,
 } from "../workflowFields";
-import type { Workflow, Component } from "../../types/dsl";
 
 describe("workflowFields", () => {
   describe("isOutputConnectedToNonEvaluator", () => {
@@ -157,9 +158,24 @@ describe("workflowFields", () => {
           },
         ],
         edges: [
-          { id: "e1", source: "entry", target: "sig1", sourceHandle: "outputs.input" },
-          { id: "e2", source: "entry", target: "sig1", sourceHandle: "outputs.output" },
-          { id: "e3", source: "entry", target: "sig1", sourceHandle: "outputs.score" },
+          {
+            id: "e1",
+            source: "entry",
+            target: "sig1",
+            sourceHandle: "outputs.input",
+          },
+          {
+            id: "e2",
+            source: "entry",
+            target: "sig1",
+            sourceHandle: "outputs.output",
+          },
+          {
+            id: "e3",
+            source: "entry",
+            target: "sig1",
+            sourceHandle: "outputs.score",
+          },
         ],
       };
 
@@ -196,7 +212,12 @@ describe("workflowFields", () => {
         ],
         edges: [
           // Only "input" is connected, "unused_field" has no connections
-          { id: "e1", source: "entry", target: "sig1", sourceHandle: "outputs.input" },
+          {
+            id: "e1",
+            source: "entry",
+            target: "sig1",
+            sourceHandle: "outputs.input",
+          },
         ],
       };
 
@@ -314,7 +335,12 @@ describe("workflowFields", () => {
         ],
         edges: [
           // Connect outputs.question to llm_call
-          { id: "e1", source: "entry", target: "llm_call", sourceHandle: "outputs.question" },
+          {
+            id: "e1",
+            source: "entry",
+            target: "llm_call",
+            sourceHandle: "outputs.question",
+          },
         ],
       };
 

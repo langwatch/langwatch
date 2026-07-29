@@ -1,11 +1,11 @@
-import { describe, expect, it } from "vitest";
 import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
+import { describe, expect, it } from "vitest";
+import type { TeamRoleValue } from "../memberRoleConstraints";
 import {
   getAutoCorrectedTeamRoleForOrganizationRole,
   getOrganizationRoleLabel,
   isTeamRoleAllowedForOrganizationRole,
 } from "../memberRoleConstraints";
-import type { TeamRoleValue } from "../memberRoleConstraints";
 
 describe("memberRoleConstraints", () => {
   describe("getOrganizationRoleLabel()", () => {

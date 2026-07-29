@@ -18,7 +18,7 @@
  * Requires the dev server running on $NEXTAUTH_URL (default
  * http://localhost:5571) in email mode.
  */
-import { chromium, type BrowserContext } from "playwright";
+import { type BrowserContext, chromium } from "playwright";
 import { prisma } from "../../src/server/db";
 
 const BASE_URL = process.env.NEXTAUTH_URL ?? "http://localhost:5571";
@@ -41,7 +41,12 @@ const check = (label: string, ok: boolean, extra = "") => {
   }
 };
 
-async function signUp(ctx: BrowserContext, email: string, password: string, name: string) {
+async function signUp(
+  ctx: BrowserContext,
+  email: string,
+  password: string,
+  name: string,
+) {
   const page = await ctx.newPage();
   await page.goto(`${BASE_URL}/auth/signup`, { waitUntil: "networkidle" });
   await page.waitForSelector("form", { timeout: 10000 });
@@ -52,10 +57,9 @@ async function signUp(ctx: BrowserContext, email: string, password: string, name
   await pwFields[1]!.fill(password);
   await page.click('button:has-text("Sign up")');
   try {
-    await page.waitForURL(
-      (url) => !url.toString().includes("/auth/signup"),
-      { timeout: 15000 },
-    );
+    await page.waitForURL((url) => !url.toString().includes("/auth/signup"), {
+      timeout: 15000,
+    });
   } catch (e) {
     const formCount = await page.locator("form").count();
     const inputCount = await page.locator("input").count();
@@ -67,7 +71,9 @@ async function signUp(ctx: BrowserContext, email: string, password: string, name
       );
     }
     console.log(`  !! signUp(${email}) timed out. url=${page.url()}`);
-    console.log(`  !! form=${formCount} input=${inputCount} alerts=${alertCount}`);
+    console.log(
+      `  !! form=${formCount} input=${inputCount} alerts=${alertCount}`,
+    );
     console.log(`  !! alertTexts: ${JSON.stringify(alertTexts)}`);
     // Also check the toast notifications
     const toasts = await page.locator('[data-part="root"]').allTextContents();
@@ -187,10 +193,9 @@ async function main() {
     // The signup link is at the bottom of the signin form.
     const signupLink = await page2.locator('a:has-text("Register")').first();
     await signupLink.click();
-    await page2.waitForURL(
-      (url) => url.toString().includes("/auth/signup"),
-      { timeout: 15000 },
-    );
+    await page2.waitForURL((url) => url.toString().includes("/auth/signup"), {
+      timeout: 15000,
+    });
     await page2.waitForSelector("form", { timeout: 10000 });
     await page2.fill('input[name="name"]', "Invited User");
     await page2.fill('input[type="email"]', INVITED_EMAIL);
@@ -204,10 +209,12 @@ async function main() {
       await page2.waitForURL(
         (url) => {
           const s = url.toString();
-          return s.includes("/invite/accept") ||
+          return (
+            s.includes("/invite/accept") ||
             s.includes("iter44-project") ||
             s.endsWith("/") ||
-            s.endsWith(BASE_URL + "/");
+            s.endsWith(BASE_URL + "/")
+          );
         },
         { timeout: 20000 },
       );
@@ -219,8 +226,13 @@ async function main() {
     // to fire. If we landed elsewhere (e.g. /onboarding/welcome because the
     // callbackUrl wasn't honored), explicitly navigate to the invite URL
     // now that we're signed in.
-    if (!page2.url().includes("/invite/accept") && !page2.url().includes("iter44-project")) {
-      console.log("  → callbackUrl not honored; explicitly navigating to invite URL");
+    if (
+      !page2.url().includes("/invite/accept") &&
+      !page2.url().includes("iter44-project")
+    ) {
+      console.log(
+        "  → callbackUrl not honored; explicitly navigating to invite URL",
+      );
       await page2.goto(inviteUrl, { waitUntil: "networkidle" });
     }
     // The mutation fires inside a useEffect after session loads; give it
@@ -276,7 +288,9 @@ async function main() {
     console.log(`  → wrong-email final url: ${page3.url()}`);
     const page3Body = (await page3.textContent("body")) ?? "";
     const lowered = page3Body.toLowerCase();
-    console.log(`  → body preview: ${page3Body.slice(0, 200).replace(/\s+/g, " ")}`);
+    console.log(
+      `  → body preview: ${page3Body.slice(0, 200).replace(/\s+/g, " ")}`,
+    );
     check(
       "wrong-email user sees an error message (not auto-accepted)",
       lowered.includes("error") ||
@@ -293,10 +307,7 @@ async function main() {
         organizationId: org.id,
       },
     });
-    check(
-      "no OrganizationUser row for wrong-email user",
-      !wrongMembership,
-    );
+    check("no OrganizationUser row for wrong-email user", !wrongMembership);
     await ctx3.close();
 
     // ─────────────────────────────────────────────────────────────
@@ -382,7 +393,9 @@ async function main() {
     console.log(`✅ ALL CHECKS PASSED (${passes}/${passes})`);
     process.exit(0);
   } else {
-    console.log(`❌ ${fails} CHECKS FAILED (${passes}/${passes + fails} passed)`);
+    console.log(
+      `❌ ${fails} CHECKS FAILED (${passes}/${passes + fails} passed)`,
+    );
     process.exit(1);
   }
 }

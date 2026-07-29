@@ -1,20 +1,21 @@
-import { RoleBindingScopeType, TeamUserRole, type PrismaClient } from "@prisma/client";
-import { TRPCError } from "@trpc/server";
-import { z } from "zod";
 import { generate } from "@langwatch/ksuid";
 import {
-  assertEnterprisePlan,
-  ENTERPRISE_FEATURE_ERRORS,
-} from "../enterprise";
-import { checkOrganizationPermission } from "../rbac";
+  type PrismaClient,
+  RoleBindingScopeType,
+  TeamUserRole,
+} from "@prisma/client";
+import { TRPCError } from "@trpc/server";
+import { z } from "zod";
 import { PrismaRoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.prisma.repository";
-import { RoleBindingService } from "~/server/role-bindings/role-binding.service";
-import { assertNoPersonalTeamScope } from "~/server/role-bindings/personal-team-scope";
-import { RoleService } from "~/server/role/role.service";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
-import { slugify } from "~/utils/slugify";
-import { KSUID_RESOURCES } from "~/utils/constants";
 import { assertUsersInOrganization } from "~/server/organizations/assertUsersInOrganization";
+import { RoleService } from "~/server/role/role.service";
+import { assertNoPersonalTeamScope } from "~/server/role-bindings/personal-team-scope";
+import { RoleBindingService } from "~/server/role-bindings/role-binding.service";
+import { KSUID_RESOURCES } from "~/utils/constants";
+import { slugify } from "~/utils/slugify";
+import { assertEnterprisePlan, ENTERPRISE_FEATURE_ERRORS } from "../enterprise";
+import { checkOrganizationPermission } from "../rbac";
+import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 async function findUniqueGroupSlug(
   prisma: Pick<PrismaClient, "group">,
@@ -60,13 +61,22 @@ async function resolveScopeNames(
 
   const [orgs, teams, projects] = await Promise.all([
     orgIds.length > 0
-      ? prisma.organization.findMany({ where: { id: { in: orgIds } }, select: { id: true, name: true } })
+      ? prisma.organization.findMany({
+          where: { id: { in: orgIds } },
+          select: { id: true, name: true },
+        })
       : [],
     teamIds.length > 0
-      ? prisma.team.findMany({ where: { id: { in: teamIds } }, select: { id: true, name: true } })
+      ? prisma.team.findMany({
+          where: { id: { in: teamIds } },
+          select: { id: true, name: true },
+        })
       : [],
     projectIds.length > 0
-      ? prisma.project.findMany({ where: { id: { in: projectIds } }, select: { id: true, name: true } })
+      ? prisma.project.findMany({
+          where: { id: { in: projectIds } },
+          select: { id: true, name: true },
+        })
       : [],
   ]);
 
@@ -169,7 +179,9 @@ export const groupRouter = createTRPCRouter({
               },
             },
             include: {
-              user: { select: { id: true, name: true, email: true, image: true } },
+              user: {
+                select: { id: true, name: true, email: true, image: true },
+              },
             },
           },
         },
@@ -179,7 +191,10 @@ export const groupRouter = createTRPCRouter({
         throw new TRPCError({ code: "NOT_FOUND", message: "Group not found" });
       }
 
-      const scopeNames = await resolveScopeNames(ctx.prisma, group.roleBindings);
+      const scopeNames = await resolveScopeNames(
+        ctx.prisma,
+        group.roleBindings,
+      );
 
       return {
         id: group.id,
@@ -266,10 +281,19 @@ export const groupRouter = createTRPCRouter({
       }
 
       return ctx.prisma.$transaction(async (tx) => {
-        const slug = await findUniqueGroupSlug(tx, input.organizationId, baseSlug);
+        const slug = await findUniqueGroupSlug(
+          tx,
+          input.organizationId,
+          baseSlug,
+        );
 
         const group = await tx.group.create({
-          data: { id: generate(KSUID_RESOURCES.GROUP).toString(), organizationId: input.organizationId, name: input.name, slug },
+          data: {
+            id: generate(KSUID_RESOURCES.GROUP).toString(),
+            organizationId: input.organizationId,
+            name: input.name,
+            slug,
+          },
         });
 
         if (input.bindings?.length) {
@@ -280,7 +304,10 @@ export const groupRouter = createTRPCRouter({
               organizationId: input.organizationId,
               groupId: group.id,
               role: b.role,
-              customRoleId: b.role === TeamUserRole.CUSTOM ? (b.customRoleId ?? null) : null,
+              customRoleId:
+                b.role === TeamUserRole.CUSTOM
+                  ? (b.customRoleId ?? null)
+                  : null,
               scopeType: b.scopeType,
               scopeId: b.scopeId,
             })),
@@ -289,7 +316,10 @@ export const groupRouter = createTRPCRouter({
 
         if (input.memberIds?.length) {
           await tx.groupMembership.createMany({
-            data: input.memberIds.map((userId) => ({ groupId: group.id, userId })),
+            data: input.memberIds.map((userId) => ({
+              groupId: group.id,
+              userId,
+            })),
           });
         }
 
@@ -369,7 +399,10 @@ export const groupRouter = createTRPCRouter({
         where: { id: input.bindingId, organizationId: input.organizationId },
       });
       if (!binding) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Binding not found" });
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Binding not found",
+        });
       }
       await assertNoPersonalTeamScope(ctx.prisma, [binding]);
       await ctx.prisma.roleBinding.delete({ where: { id: input.bindingId } });
@@ -409,7 +442,8 @@ export const groupRouter = createTRPCRouter({
       if (!orgMember) {
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message: "User must belong to the organization before joining a group",
+          message:
+            "User must belong to the organization before joining a group",
         });
       }
 
@@ -432,8 +466,12 @@ export const groupRouter = createTRPCRouter({
         throw new TRPCError({ code: "NOT_FOUND", message: "Group not found" });
       }
 
-      await ctx.prisma.groupMembership.deleteMany({ where: { groupId: input.groupId } });
-      await ctx.prisma.roleBinding.deleteMany({ where: { groupId: input.groupId } });
+      await ctx.prisma.groupMembership.deleteMany({
+        where: { groupId: input.groupId },
+      });
+      await ctx.prisma.roleBinding.deleteMany({
+        where: { groupId: input.groupId },
+      });
       await ctx.prisma.group.delete({ where: { id: input.groupId } });
 
       return { success: true };
@@ -547,7 +585,9 @@ export const groupRouter = createTRPCRouter({
       }
 
       await ctx.prisma.groupMembership.delete({
-        where: { userId_groupId: { userId: input.userId, groupId: input.groupId } },
+        where: {
+          userId_groupId: { userId: input.userId, groupId: input.groupId },
+        },
       });
       return { success: true };
     }),

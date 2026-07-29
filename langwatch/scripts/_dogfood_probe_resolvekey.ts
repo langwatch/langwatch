@@ -12,7 +12,9 @@ import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
 async function main() {
   const presented = process.env.VK_SECRET;
   if (!presented) {
-    console.error("Usage: VK_SECRET=vk-lw-... pnpm tsx scripts/_dogfood_probe_resolvekey.ts");
+    console.error(
+      "Usage: VK_SECRET=vk-lw-... pnpm tsx scripts/_dogfood_probe_resolvekey.ts",
+    );
     process.exit(2);
   }
 

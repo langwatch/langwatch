@@ -117,10 +117,9 @@ describe("Evaluators API", () => {
 
       /** @scenario PUT /api/evaluators/:id updates an evaluator */
       it("updates the evaluator name", async () => {
-        const res = await helpers.api.put(
-          `/api/evaluators/${evaluator.id}`,
-          { name: "Updated Name" },
-        );
+        const res = await helpers.api.put(`/api/evaluators/${evaluator.id}`, {
+          name: "Updated Name",
+        });
 
         expect(res.status).toBe(200);
         const body = await res.json();
@@ -131,15 +130,12 @@ describe("Evaluators API", () => {
       });
 
       it("updates the evaluator config settings", async () => {
-        const res = await helpers.api.put(
-          `/api/evaluators/${evaluator.id}`,
-          {
-            config: {
-              evaluatorType: "langevals/exact_match",
-              settings: { someSetting: "value" },
-            },
+        const res = await helpers.api.put(`/api/evaluators/${evaluator.id}`, {
+          config: {
+            evaluatorType: "langevals/exact_match",
+            settings: { someSetting: "value" },
           },
-        );
+        });
 
         expect(res.status).toBe(200);
         const body = await res.json();
@@ -150,14 +146,11 @@ describe("Evaluators API", () => {
       });
 
       it("rejects changing evaluatorType", async () => {
-        const res = await helpers.api.put(
-          `/api/evaluators/${evaluator.id}`,
-          {
-            config: {
-              evaluatorType: "openai/moderation",
-            },
+        const res = await helpers.api.put(`/api/evaluators/${evaluator.id}`, {
+          config: {
+            evaluatorType: "openai/moderation",
           },
-        );
+        });
 
         expect(res.status).toBe(400);
         const body = await res.json();
@@ -165,15 +158,12 @@ describe("Evaluators API", () => {
       });
 
       it("allows sending the same evaluatorType", async () => {
-        const res = await helpers.api.put(
-          `/api/evaluators/${evaluator.id}`,
-          {
-            config: {
-              evaluatorType: "langevals/exact_match",
-              settings: { newSetting: true },
-            },
+        const res = await helpers.api.put(`/api/evaluators/${evaluator.id}`, {
+          config: {
+            evaluatorType: "langevals/exact_match",
+            settings: { newSetting: true },
           },
-        );
+        });
 
         expect(res.status).toBe(200);
       });
@@ -181,10 +171,9 @@ describe("Evaluators API", () => {
 
     describe("when the evaluator does not exist", () => {
       it("returns 404", async () => {
-        const res = await helpers.api.put(
-          "/api/evaluators/nonexistent-id",
-          { name: "Updated Name" },
-        );
+        const res = await helpers.api.put("/api/evaluators/nonexistent-id", {
+          name: "Updated Name",
+        });
 
         expect(res.status).toBe(404);
       });
@@ -210,9 +199,7 @@ describe("Evaluators API", () => {
 
       /** @scenario DELETE /api/evaluators/:id archives an evaluator */
       it("archives the evaluator and returns success", async () => {
-        const res = await helpers.api.delete(
-          `/api/evaluators/${evaluator.id}`,
-        );
+        const res = await helpers.api.delete(`/api/evaluators/${evaluator.id}`);
 
         expect(res.status).toBe(200);
         const body = await res.json();
@@ -233,9 +220,7 @@ describe("Evaluators API", () => {
       it("returns 404 when trying to get archived evaluator", async () => {
         await helpers.api.delete(`/api/evaluators/${evaluator.id}`);
 
-        const getRes = await helpers.api.get(
-          `/api/evaluators/${evaluator.id}`,
-        );
+        const getRes = await helpers.api.get(`/api/evaluators/${evaluator.id}`);
 
         expect(getRes.status).toBe(404);
       });
@@ -243,9 +228,7 @@ describe("Evaluators API", () => {
 
     describe("when the evaluator does not exist", () => {
       it("returns 404", async () => {
-        const res = await helpers.api.delete(
-          "/api/evaluators/nonexistent-id",
-        );
+        const res = await helpers.api.delete("/api/evaluators/nonexistent-id");
 
         expect(res.status).toBe(404);
       });

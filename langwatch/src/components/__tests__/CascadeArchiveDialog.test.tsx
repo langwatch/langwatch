@@ -160,7 +160,9 @@ describe("CascadeArchiveDialog", () => {
     render(<CascadeArchiveDialog {...defaultProps} />, { wrapper: Wrapper });
 
     await waitFor(() => {
-      const confirmButton = screen.getByTestId("cascade-archive-confirm-button");
+      const confirmButton = screen.getByTestId(
+        "cascade-archive-confirm-button",
+      );
       expect(confirmButton).toBeDisabled();
     });
 
@@ -168,7 +170,9 @@ describe("CascadeArchiveDialog", () => {
     await user.type(input, "delete");
 
     await waitFor(() => {
-      const confirmButton = screen.getByTestId("cascade-archive-confirm-button");
+      const confirmButton = screen.getByTestId(
+        "cascade-archive-confirm-button",
+      );
       expect(confirmButton).not.toBeDisabled();
     });
   });
@@ -177,10 +181,9 @@ describe("CascadeArchiveDialog", () => {
     const user = userEvent.setup();
     const onConfirm = vi.fn();
 
-    render(
-      <CascadeArchiveDialog {...defaultProps} onConfirm={onConfirm} />,
-      { wrapper: Wrapper },
-    );
+    render(<CascadeArchiveDialog {...defaultProps} onConfirm={onConfirm} />, {
+      wrapper: Wrapper,
+    });
 
     const input = screen.getByTestId("cascade-archive-confirm-input");
     await user.type(input, "delete");
@@ -195,10 +198,9 @@ describe("CascadeArchiveDialog", () => {
     const user = userEvent.setup();
     const onConfirm = vi.fn();
 
-    render(
-      <CascadeArchiveDialog {...defaultProps} onConfirm={onConfirm} />,
-      { wrapper: Wrapper },
-    );
+    render(<CascadeArchiveDialog {...defaultProps} onConfirm={onConfirm} />, {
+      wrapper: Wrapper,
+    });
 
     const input = screen.getByTestId("cascade-archive-confirm-input");
     await user.type(input, "delete{Enter}");
@@ -210,10 +212,9 @@ describe("CascadeArchiveDialog", () => {
     const user = userEvent.setup();
     const onConfirm = vi.fn();
 
-    render(
-      <CascadeArchiveDialog {...defaultProps} onConfirm={onConfirm} />,
-      { wrapper: Wrapper },
-    );
+    render(<CascadeArchiveDialog {...defaultProps} onConfirm={onConfirm} />, {
+      wrapper: Wrapper,
+    });
 
     const input = screen.getByTestId("cascade-archive-confirm-input");
     await user.type(input, "wrong{Enter}");
@@ -241,16 +242,17 @@ describe("CascadeArchiveDialog", () => {
     });
 
     await waitFor(() => {
-      const confirmButton = screen.getByTestId("cascade-archive-confirm-button");
+      const confirmButton = screen.getByTestId(
+        "cascade-archive-confirm-button",
+      );
       expect(confirmButton).toBeDisabled();
     });
   });
 
   it("shows loading spinner for related entities when isLoadingRelated is true", async () => {
-    render(
-      <CascadeArchiveDialog {...defaultProps} isLoadingRelated={true} />,
-      { wrapper: Wrapper },
-    );
+    render(<CascadeArchiveDialog {...defaultProps} isLoadingRelated={true} />, {
+      wrapper: Wrapper,
+    });
 
     await waitFor(() => {
       expect(screen.getByText("Loading related items...")).toBeInTheDocument();
@@ -286,10 +288,9 @@ describe("CascadeArchiveDialog", () => {
     const user = userEvent.setup();
     const onConfirm = vi.fn();
 
-    render(
-      <CascadeArchiveDialog {...defaultProps} onConfirm={onConfirm} />,
-      { wrapper: Wrapper },
-    );
+    render(<CascadeArchiveDialog {...defaultProps} onConfirm={onConfirm} />, {
+      wrapper: Wrapper,
+    });
 
     const input = screen.getByTestId("cascade-archive-confirm-input");
     await user.type(input, "DELETE");

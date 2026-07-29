@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { OrganizationRepository } from "~/server/repositories/organization.repository";
 import { TraceUsageService } from "../trace-usage.service";
+import { USAGE_UNKNOWN } from "../usage-count";
 
 const { mockQueryTraceSummariesTotalUniq } = vi.hoisted(() => ({
   mockQueryTraceSummariesTotalUniq: vi.fn(),
@@ -66,17 +67,23 @@ describe("TraceUsageService", () => {
     });
 
     describe("when queryTraceSummariesTotalUniq returns null (ClickHouse unavailable)", () => {
-      it("fails open with 0", async () => {
+      it("reports the count as unknown, never 0", async () => {
+        // Was "fails open with 0". The instinct was right and the mechanism
+        // was not: a fabricated zero cannot be told apart from a real one, so
+        // enforcement, the usage-limit notifier and the usage page each acted
+        // on "this organization sent nothing" during an outage. The permissive
+        // decision now lives in UsageService.checkLimit, where it is logged.
         mockQueryTraceSummariesTotalUniq.mockResolvedValue(null);
 
         const result = await service.getCurrentMonthCount({
           organizationId: "org-ch-null-1",
         });
 
-        expect(result).toBe(0);
+        expect(result).toBe(USAGE_UNKNOWN);
       });
 
-      it("does not cache the failure-derived zero", async () => {
+      /** @scenario An unknown count is never cached */
+      it("does not cache the unknown", async () => {
         mockQueryTraceSummariesTotalUniq.mockResolvedValue(null);
         await service.getCurrentMonthCount({
           organizationId: "org-ch-null-nocache-1",
@@ -126,7 +133,11 @@ describe("TraceUsageService", () => {
     });
 
     describe("when queryTraceSummariesTotalUniq returns null (ClickHouse unavailable)", () => {
-      it("fails open with count 0 for the project", async () => {
+      /** @scenario A partial per-project breakdown is reported as unknown, not as zeros */
+      it("reports the whole set as unknown, not a zeroed project", async () => {
+        // One unreachable project makes the set untrustworthy: a caller
+        // summing it against a cap, or ranking projects in an email, would be
+        // working from a partial total that looks complete.
         mockQueryTraceSummariesTotalUniq.mockResolvedValue(null);
 
         const result = await service.getCountByProjects({
@@ -134,7 +145,7 @@ describe("TraceUsageService", () => {
           projectIds: ["proj-1"],
         });
 
-        expect(result).toEqual([{ projectId: "proj-1", count: 0 }]);
+        expect(result).toBe(USAGE_UNKNOWN);
       });
     });
 

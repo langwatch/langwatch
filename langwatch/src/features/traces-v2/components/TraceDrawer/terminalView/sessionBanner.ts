@@ -16,6 +16,7 @@ import {
 /** Which agent's mark and name the banner draws. */
 export type BannerAgent =
   | "claude_code"
+  | "claude_cowork"
   | "opencode"
   | "codex"
   | "gemini_cli"
@@ -42,6 +43,9 @@ function detectBannerAgent({
   spans: SpanDetail[];
 }): BannerAgent {
   const service = serviceName.toLowerCase();
+  // Before the claude check: Cowork is the Claude runtime under another
+  // service name, so "claude" alone must not claim it.
+  if (service.includes("cowork")) return "claude_cowork";
   if (service.includes("claude")) return "claude_code";
   if (service.includes("opencode")) return "opencode";
   if (service.includes("codex")) return "codex";

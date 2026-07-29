@@ -11,7 +11,7 @@ import {
  */
 describe("reservedColumns utilities", () => {
   describe("isReservedColumnName", () => {
-    it("should identify reserved column names case-insensitively", () => {
+    it("identifies reserved column names case-insensitively", () => {
       expect(isReservedColumnName("id")).toBe(true);
       expect(isReservedColumnName("ID")).toBe(true);
       expect(isReservedColumnName("Id")).toBe(true);
@@ -20,7 +20,7 @@ describe("reservedColumns utilities", () => {
       expect(isReservedColumnName("Selected")).toBe(true);
     });
 
-    it("should not identify non-reserved column names", () => {
+    it("does not identify non-reserved column names", () => {
       expect(isReservedColumnName("name")).toBe(false);
       expect(isReservedColumnName("email")).toBe(false);
       expect(isReservedColumnName("user_id")).toBe(false);
@@ -29,7 +29,7 @@ describe("reservedColumns utilities", () => {
   });
 
   describe("getSafeColumnName", () => {
-    it("should append '_' to reserved names when no collisions", () => {
+    it("appends '_' to reserved names when no collisions", () => {
       const existingNames = new Set<string>();
       expect(getSafeColumnName("id", existingNames)).toBe("id_");
       expect(getSafeColumnName("ID", existingNames)).toBe("ID_");
@@ -37,7 +37,7 @@ describe("reservedColumns utilities", () => {
       expect(getSafeColumnName("SELECTED", existingNames)).toBe("SELECTED_");
     });
 
-    it("should return non-reserved names unchanged when no collisions", () => {
+    it("returns non-reserved names unchanged when no collisions", () => {
       const existingNames = new Set<string>();
       expect(getSafeColumnName("name", existingNames)).toBe("name");
       expect(getSafeColumnName("email", existingNames)).toBe("email");
@@ -45,7 +45,7 @@ describe("reservedColumns utilities", () => {
       expect(getSafeColumnName("", existingNames)).toBe("");
     });
 
-    it("should handle collisions with existing names", () => {
+    it("handles collisions with existing names", () => {
       const existingNames = new Set(["name", "id_", "id_1"]);
 
       // Non-reserved name that collides with existing
@@ -55,7 +55,7 @@ describe("reservedColumns utilities", () => {
       expect(getSafeColumnName("id", existingNames)).toBe("id_2");
     });
 
-    it("should handle multiple collision iterations", () => {
+    it("handles multiple collision iterations", () => {
       const existingNames = new Set([
         "test",
         "test_",
@@ -68,13 +68,13 @@ describe("reservedColumns utilities", () => {
       expect(getSafeColumnName("test", existingNames)).toBe("test_4");
     });
 
-    it("should handle reserved names that collide with existing names", () => {
+    it("handles reserved names that collide with existing names", () => {
       const existingNames = new Set(["selected_", "selected_1"]);
 
       expect(getSafeColumnName("selected", existingNames)).toBe("selected_2");
     });
 
-    it("should return original name if not reserved and no collision", () => {
+    it("returns original name if not reserved and no collision", () => {
       const existingNames = new Set(["other_name"]);
 
       expect(getSafeColumnName("unique_name", existingNames)).toBe(
@@ -84,12 +84,12 @@ describe("reservedColumns utilities", () => {
   });
 
   describe("RESERVED_COLUMN_NAMES", () => {
-    it("should contain expected reserved column names", () => {
+    it("contains expected reserved column names", () => {
       expect(RESERVED_COLUMN_NAMES).toContain("id");
       expect(RESERVED_COLUMN_NAMES).toContain("selected");
     });
 
-    it("should be a readonly array", () => {
+    it("is a readonly array", () => {
       // This test ensures the type is properly set as readonly
       const names: readonly string[] = RESERVED_COLUMN_NAMES;
       expect(Array.isArray(names)).toBe(true);

@@ -1,11 +1,11 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { LambdaClient } from "@aws-sdk/client-lambda";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  getProjectLambdaArn,
-  createLambdaClient,
   clearLambdaArnCache,
+  createLambdaClient,
+  getProjectLambdaArn,
   LAMBDA_ARN_CACHE_TTL_MS,
 } from "../index";
-import { LambdaClient } from "@aws-sdk/client-lambda";
 
 const setConfig = (imageUri: string) => {
   process.env.LANGWATCH_NLP_LAMBDA_CONFIG = JSON.stringify({
@@ -91,11 +91,17 @@ describe("getProjectLambdaArn", () => {
         // First resolution: Configuration present, image_uri matches, poll Active.
         .mockResolvedValueOnce({
           Configuration: mockLambdaConfig,
-          Code: { ImageUri: "123456789012.dkr.ecr.us-east-1.amazonaws.com/test:latest" },
+          Code: {
+            ImageUri:
+              "123456789012.dkr.ecr.us-east-1.amazonaws.com/test:latest",
+          },
         })
         .mockResolvedValueOnce({
           Configuration: mockLambdaConfig,
-          Code: { ImageUri: "123456789012.dkr.ecr.us-east-1.amazonaws.com/test:latest" },
+          Code: {
+            ImageUri:
+              "123456789012.dkr.ecr.us-east-1.amazonaws.com/test:latest",
+          },
         })
         .mockResolvedValueOnce({ Configuration: mockLambdaConfig });
 
@@ -125,7 +131,10 @@ describe("getProjectLambdaArn", () => {
         )
         .mockResolvedValue({
           Configuration: mockLambdaConfig,
-          Code: { ImageUri: "123456789012.dkr.ecr.us-east-1.amazonaws.com/test:latest" },
+          Code: {
+            ImageUri:
+              "123456789012.dkr.ecr.us-east-1.amazonaws.com/test:latest",
+          },
         });
 
       const calls = Array.from({ length: 100 }, () =>
@@ -135,7 +144,9 @@ describe("getProjectLambdaArn", () => {
       await new Promise((r) => setImmediate(r));
       resolveCheck({
         Configuration: mockLambdaConfig,
-        Code: { ImageUri: "123456789012.dkr.ecr.us-east-1.amazonaws.com/test:latest" },
+        Code: {
+          ImageUri: "123456789012.dkr.ecr.us-east-1.amazonaws.com/test:latest",
+        },
       });
 
       const arns = await Promise.all(calls);
@@ -152,18 +163,26 @@ describe("getProjectLambdaArn", () => {
         // First resolution: GetFunction fails (treated as not-found by the
         // .catch handler in resolveProjectLambdaArn), then CreateFunction
         // fails with a non-recoverable error so the whole call rejects.
-        .mockRejectedValueOnce(Object.assign(new Error("Rate exceeded"), {
-          name: "TooManyRequestsException",
-        }))
+        .mockRejectedValueOnce(
+          Object.assign(new Error("Rate exceeded"), {
+            name: "TooManyRequestsException",
+          }),
+        )
         .mockRejectedValueOnce(new Error("hard create failure"))
         // Second resolution: clean success path.
         .mockResolvedValueOnce({
           Configuration: mockLambdaConfig,
-          Code: { ImageUri: "123456789012.dkr.ecr.us-east-1.amazonaws.com/test:latest" },
+          Code: {
+            ImageUri:
+              "123456789012.dkr.ecr.us-east-1.amazonaws.com/test:latest",
+          },
         })
         .mockResolvedValueOnce({
           Configuration: mockLambdaConfig,
-          Code: { ImageUri: "123456789012.dkr.ecr.us-east-1.amazonaws.com/test:latest" },
+          Code: {
+            ImageUri:
+              "123456789012.dkr.ecr.us-east-1.amazonaws.com/test:latest",
+          },
         })
         .mockResolvedValueOnce({ Configuration: mockLambdaConfig });
 
@@ -214,8 +233,14 @@ describe("getProjectLambdaArn", () => {
       const arnA = "arn:aws:lambda:us-east-1:123:function:A";
       const arnB = "arn:aws:lambda:us-east-1:123:function:B";
       const cfg = (arn: string) => ({
-        Configuration: { FunctionArn: arn, State: "Active", LastUpdateStatus: "Successful" },
-        Code: { ImageUri: "123456789012.dkr.ecr.us-east-1.amazonaws.com/test:latest" },
+        Configuration: {
+          FunctionArn: arn,
+          State: "Active",
+          LastUpdateStatus: "Successful",
+        },
+        Code: {
+          ImageUri: "123456789012.dkr.ecr.us-east-1.amazonaws.com/test:latest",
+        },
       });
 
       vi.spyOn(LambdaClient.prototype as any, "send")
