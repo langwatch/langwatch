@@ -121,6 +121,9 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   // so these are guarded from day one rather than deferred.
   StorageBoundaryEvent: {},
   StorageBillableGauge: {},
+  // Audit posture row (ADR-039 phase 3): written on alarm, read per-org by
+  // the audit tier computation — every access carries organizationId.
+  StorageAuditState: {},
 };
 
 /**

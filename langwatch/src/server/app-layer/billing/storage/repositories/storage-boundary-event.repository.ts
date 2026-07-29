@@ -80,6 +80,15 @@ export interface StorageBoundaryEventRepository {
     projectId: string;
     partitionKey: string;
   }): Promise<NonExitGroupSum[]>;
+  /**
+   * Event log + gauge row read in ONE transaction snapshot — the fold
+   * audit's read. Two independent reads can be torn by a concurrent append
+   * (event visible, increment not, or vice versa) into a phantom alarm.
+   */
+  snapshotFoldState(params: { organizationId: string }): Promise<{
+    events: StoredBoundaryEvent[];
+    gaugeBytes: bigint;
+  }>;
   /** Events effective strictly after `after` — the steady-state sampling fast path's guard. */
   countEventsAfter(params: {
     organizationId: string;
