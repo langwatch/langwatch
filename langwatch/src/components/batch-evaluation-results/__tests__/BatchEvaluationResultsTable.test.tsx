@@ -9,7 +9,7 @@ import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { BatchEvaluationResultsTable } from "../BatchEvaluationResultsTable";
-import type { BatchEvaluationData } from "../types";
+import type { BatchEvaluationData, ComparisonRunData } from "../types";
 
 // Mock the drawer hook
 vi.mock("~/hooks/useDrawer", () => ({
@@ -432,7 +432,7 @@ describe("BatchEvaluationResultsTable", () => {
     });
   });
 
-  describe("View Lens (section visibility)", () => {
+  describe("when changing visible result sections", () => {
     /** @scenario Hide evaluation scores to focus on outputs */
     it("hides evaluator chips but keeps outputs when showEvaluations is false", () => {
       const data = createTestData();
@@ -446,9 +446,8 @@ describe("BatchEvaluationResultsTable", () => {
         { wrapper: Wrapper },
       );
 
-      // Output stays (rendered as JSON containing the "response" field)
+      // The output is rendered as JSON, so it is matched via its "response" field.
       expect(screen.getByText(/response/)).toBeInTheDocument();
-      // Evaluator score chip is gone
       expect(screen.queryByText("Exact Match")).not.toBeInTheDocument();
     });
 
@@ -465,9 +464,7 @@ describe("BatchEvaluationResultsTable", () => {
         { wrapper: Wrapper },
       );
 
-      // Evaluator score chip stays
       expect(screen.getByText("Exact Match")).toBeInTheDocument();
-      // Output is gone
       expect(screen.queryByText(/response/)).not.toBeInTheDocument();
     });
 
@@ -485,9 +482,76 @@ describe("BatchEvaluationResultsTable", () => {
         { wrapper: Wrapper },
       );
 
-      // Target header is gone, but dataset content remains
       expect(screen.queryByText("GPT-4o")).not.toBeInTheDocument();
       expect(screen.getByText("What is 2+2?")).toBeInTheDocument();
+    });
+
+    describe("when comparing runs side by side", () => {
+      const createComparisonRuns = (): ComparisonRunData[] => [
+        {
+          runId: "run-a",
+          runName: "Run A",
+          color: "#3182ce",
+          data: createTestData({ runId: "run-a" }),
+          isLoading: false,
+        },
+        {
+          runId: "run-b",
+          runName: "Run B",
+          color: "#dd6b20",
+          data: createTestData({ runId: "run-b" }),
+          isLoading: false,
+        },
+      ];
+
+      /** @scenario Hide evaluation scores to focus on outputs */
+      it("hides evaluator chips but keeps outputs when showEvaluations is false", () => {
+        render(
+          <BatchEvaluationResultsTable
+            data={null}
+            comparisonData={createComparisonRuns()}
+            showEvaluations={false}
+            disableVirtualization
+          />,
+          { wrapper: Wrapper },
+        );
+
+        expect(screen.getAllByText(/response/).length).toBeGreaterThan(0);
+        expect(screen.queryAllByText("Exact Match")).toHaveLength(0);
+      });
+
+      /** @scenario Hide outputs to focus on evaluation scores */
+      it("hides outputs but keeps evaluator chips when showOutputs is false", () => {
+        render(
+          <BatchEvaluationResultsTable
+            data={null}
+            comparisonData={createComparisonRuns()}
+            showOutputs={false}
+            disableVirtualization
+          />,
+          { wrapper: Wrapper },
+        );
+
+        expect(screen.getAllByText("Exact Match").length).toBeGreaterThan(0);
+        expect(screen.queryAllByText(/response/)).toHaveLength(0);
+      });
+
+      /** @scenario Hide the target column when no target sections are shown */
+      it("removes the target column when both sections are off", () => {
+        render(
+          <BatchEvaluationResultsTable
+            data={null}
+            comparisonData={createComparisonRuns()}
+            showOutputs={false}
+            showEvaluations={false}
+            disableVirtualization
+          />,
+          { wrapper: Wrapper },
+        );
+
+        expect(screen.queryByText("GPT-4o")).not.toBeInTheDocument();
+        expect(screen.getAllByText("What is 2+2?").length).toBeGreaterThan(0);
+      });
     });
   });
 });

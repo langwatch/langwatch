@@ -132,6 +132,22 @@ export type ViewLensButtonProps = {
   onChange: (sections: ViewSections) => void;
 };
 
+const SectionToggle = ({
+  label,
+  checked,
+  onToggle,
+}: {
+  label: string;
+  checked: boolean;
+  onToggle: () => void;
+}) => (
+  <HStack paddingY={1}>
+    <Checkbox checked={checked} onCheckedChange={onToggle}>
+      <Text fontSize="sm">{label}</Text>
+    </Checkbox>
+  </HStack>
+);
+
 export const ViewLensButton = ({ sections, onChange }: ViewLensButtonProps) => {
   const activePreset = VIEW_PRESETS.find(
     (preset) =>
@@ -170,26 +186,20 @@ export const ViewLensButton = ({ sections, onChange }: ViewLensButtonProps) => {
             <Text fontSize="xs" color="fg.muted" fontWeight="medium">
               Sections
             </Text>
-            <HStack paddingY={1}>
-              <Checkbox
-                checked={sections.outputs}
-                onCheckedChange={() =>
-                  onChange({ ...sections, outputs: !sections.outputs })
-                }
-              >
-                <Text fontSize="sm">Outputs</Text>
-              </Checkbox>
-            </HStack>
-            <HStack paddingY={1}>
-              <Checkbox
-                checked={sections.evaluations}
-                onCheckedChange={() =>
-                  onChange({ ...sections, evaluations: !sections.evaluations })
-                }
-              >
-                <Text fontSize="sm">Evaluations</Text>
-              </Checkbox>
-            </HStack>
+            <SectionToggle
+              label="Outputs"
+              checked={sections.outputs}
+              onToggle={() =>
+                onChange({ ...sections, outputs: !sections.outputs })
+              }
+            />
+            <SectionToggle
+              label="Evaluations"
+              checked={sections.evaluations}
+              onToggle={() =>
+                onChange({ ...sections, evaluations: !sections.evaluations })
+              }
+            />
           </VStack>
         </PopoverBody>
       </PopoverContent>
