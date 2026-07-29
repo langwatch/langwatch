@@ -247,6 +247,28 @@ export class UsageReportFailedError extends HandledError {
 }
 
 /**
+ * The invoice history could not be read.
+ *
+ * Reading invoices is a display concern — nothing is being bought — so this
+ * says the list is temporarily missing rather than implying anything is wrong
+ * with the account. It exists because the raw provider error used to escape
+ * this path unwrapped, which is what rendered "An unknown error occurred"
+ * where a customer expected their invoices.
+ */
+export class InvoicesUnavailableError extends HandledError {
+  declare readonly code: "billing_invoices_unavailable";
+
+  constructor(options: { reasons?: readonly Error[] } = {}) {
+    super(
+      "billing_invoices_unavailable",
+      "The invoice history could not be read",
+      { httpStatus: 503, fault: "provider", ...options },
+    );
+    this.name = "InvoicesUnavailableError";
+  }
+}
+
+/**
  * The account is billed in a currency we sell no prices in.
  *
  * A billing account is locked to one currency once it has been invoiced, and

@@ -709,6 +709,33 @@ describe("EESubscriptionService", () => {
       });
     });
 
+    describe("when the payment provider fails to return invoices", () => {
+      it("fails with a named handled error instead of an unknown one", async () => {
+        organizationRepository.getStripeCustomerId.mockResolvedValue("cus_123");
+        stripe.invoices.list.mockRejectedValue(
+          new Error("No such customer: 'cus_123'"),
+        );
+
+        await expect(
+          service.listInvoices({ organizationId: "org_with_stripe" }),
+        ).rejects.toMatchObject({ code: "billing_invoices_unavailable" });
+      });
+
+      it("keeps the provider error as a reason", async () => {
+        const providerError = new Error("No such customer: 'cus_123'");
+        organizationRepository.getStripeCustomerId.mockResolvedValue("cus_123");
+        stripe.invoices.list.mockRejectedValue(providerError);
+
+        const error = await service
+          .listInvoices({ organizationId: "org_with_stripe" })
+          .catch((caught: unknown) => caught);
+
+        expect((error as { reasons: readonly Error[] }).reasons).toEqual([
+          providerError,
+        ]);
+      });
+    });
+
     describe("when organization has a stripeCustomerId", () => {
       it("returns mapped invoices excluding drafts", async () => {
         organizationRepository.getStripeCustomerId.mockResolvedValue("cus_123");

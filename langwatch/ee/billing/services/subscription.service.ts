@@ -14,8 +14,10 @@ import type {
   SubscriptionService,
 } from "../../../src/server/app-layer/subscription/subscription.service";
 import { traced } from "../../../src/server/app-layer/tracing";
+import { toError } from "../../../src/utils/posthogErrorCapture";
 import {
   InvalidPlanError,
+  InvoicesUnavailableError,
   OrganizationNotFoundError,
   SeatBillingUnavailableError,
   SubscriptionCreationFailedError,
@@ -401,10 +403,17 @@ export class EESubscriptionService implements SubscriptionService {
       return [];
     }
 
-    const invoices = await this.stripe.invoices.list({
-      customer: stripeCustomerId,
-      limit: RECENT_INVOICES_LIMIT,
-    });
+    // Without this the raw provider error escapes unwrapped and the client
+    // renders "An unknown error occurred" in place of the invoice list.
+    let invoices: Stripe.ApiList<Stripe.Invoice>;
+    try {
+      invoices = await this.stripe.invoices.list({
+        customer: stripeCustomerId,
+        limit: RECENT_INVOICES_LIMIT,
+      });
+    } catch (error) {
+      throw new InvoicesUnavailableError({ reasons: [toError(error)] });
+    }
 
     return invoices.data
       .filter((inv) => inv.status !== "draft")
