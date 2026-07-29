@@ -475,8 +475,7 @@ jobs:
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          cache-dependency-path: "langwatch/pnpm-lock.yaml"
-          install-dir: langwatch
+          install: "@langwatch/web..."
 
       # THE GATE. Everything below this step is annotation, not enforcement.
       #
