@@ -13,6 +13,14 @@
  */
 
 import { createLogger } from "@langwatch/observability";
+import { getSharedClickHouseClient } from "../clickhouse/clickhouseClient";
+import { reconcileOrphanedRunsOnBoot } from "./orphaned-run-reconciliation.clickhouse";
+import {
+  findQueuedRunCandidates,
+  LOOKBACK_MS,
+  ORPHAN_QUEUED_THRESHOLD_MS,
+  reconcileOrphanedQueuedRuns,
+} from "./scenario-orphan-reconciler";
 import { type ChildProcess, spawn } from "child_process";
 import path from "path";
 import { env } from "~/env.mjs";
@@ -666,16 +674,61 @@ export async function startScenarioProcessor(
     "Scenario processor started (event-driven)",
   );
 
-  // Stuck-run recovery is NOT here any more. Two cross-tenant ClickHouse
-  // sweeps used to run at this point — one for runs orphaned at QUEUED, one
-  // for runs orphaned at IN_PROGRESS — and because they ran only at boot, the
-  // recovery bound was the deploy cadence: a run abandoned an hour after the
-  // last restart waited for the next one.
+  // Ongoing stuck-run recovery is NOT here any more. Two cross-tenant
+  // ClickHouse sweeps used to run at this point — one for runs orphaned at
+  // QUEUED, one for runs orphaned at IN_PROGRESS — and because they ran only
+  // at boot, the recovery bound was the deploy cadence: a run abandoned an
+  // hour after the last restart waited for the next one.
   //
-  // The `scenarioExecution` process manager on the simulation pipeline now
-  // holds that guarantee continuously. Every progress event re-arms its
-  // durable deadline; when one fires, it writes the terminal state itself.
-  // See ADR-073.
+  // The `scenarioExecution` process manager on the simulation pipeline holds
+  // that guarantee continuously now. Every progress event re-arms its durable
+  // deadline; when one fires, it writes the terminal state itself. See ADR-073.
+  //
+  // ── CUTOVER AID — DELETE ONE RELEASE AFTER ADR-073 SHIPS ──────────────────
+  //
+  // The sweeps still run, once per boot, for exactly one population: runs that
+  // were already stuck when this version deployed. The process manager arms
+  // deadlines from live events only — it does not replay history and does not
+  // seed `ProcessManagerInstance` rows for runs that went quiet before it
+  // existed. Those rows have no heartbeat, no `nextWakeAt`, and nothing else
+  // that would ever terminalise them: `STALLED` is a stored status, not a
+  // read-time derivation, so they would sit non-terminal in the UI forever —
+  // the precise failure the sweeps were written for (#3195).
+  //
+  // So they are kept as a drain, not as the mechanism. Once a release has
+  // passed with the process manager live, no run predating it can still be
+  // open, this block and the three modules it calls are dead, and they go.
+  const sharedClickHouseClient = getSharedClickHouseClient();
+  if (sharedClickHouseClient) {
+    const reconcilerNow = Date.now();
+    void reconcileOrphanedQueuedRuns({
+      findCandidates: () =>
+        findQueuedRunCandidates({
+          client: sharedClickHouseClient,
+          lookbackMs: LOOKBACK_MS,
+          now: reconcilerNow,
+          orphanThresholdMs: ORPHAN_QUEUED_THRESHOLD_MS,
+        }),
+      emitFailure: (candidate) =>
+        deps.failureEmitter.ensureFailureEventsEmitted({
+          projectId: candidate.projectId,
+          scenarioId: candidate.scenarioId,
+          setId: candidate.setId,
+          batchRunId: candidate.batchRunId,
+          scenarioRunId: candidate.scenarioRunId,
+          error:
+            "Reconciled: orphaned QUEUED run with no live worker (worker restart/crash)",
+        }),
+      now: reconcilerNow,
+      thresholdMs: ORPHAN_QUEUED_THRESHOLD_MS,
+    }).catch((err) => logger.warn({ err }, "orphan reconciler failed"));
+  }
+
+  void reconcileOrphanedRunsOnBoot({
+    failureEmitter: deps.failureEmitter,
+  }).catch((err: unknown) =>
+    logger.error({ err }, "Orphaned-run reconciliation failed on boot"),
+  );
 
   return {
     close: async () => {
