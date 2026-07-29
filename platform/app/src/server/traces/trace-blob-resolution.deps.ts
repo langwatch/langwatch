@@ -1,5 +1,6 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { createLogger } from "@langwatch/observability";
+import { env } from "~/env.mjs";
 import type { SpoolStorage } from "~/server/app-layer/traces/blob-store.service";
 import { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
@@ -22,6 +23,11 @@ import type { BlobResolutionDeps } from "./trace.service";
 const defaultSpoolStorage: SpoolStorage = {
   objectStoreFor: (projectId: string) => createStorageRegistry({ projectId }),
   resolveDestination: resolveProjectStorageDestination,
+  // The env read lives here, at the composition root, so `BlobStore` stays
+  // env-free and testable. Default false: the spool stays off on Azure until an
+  // operator states the lifecycle rule exists, because nothing else bounds an
+  // orphan left by a crash between the write and its delete.
+  azureRetentionConfirmed: env.AZURE_BLOB_SPOOL_RETENTION_CONFIRMED ?? false,
 };
 
 /**

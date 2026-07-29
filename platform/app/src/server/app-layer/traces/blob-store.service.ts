@@ -45,6 +45,12 @@ export interface SpoolStorage {
   /** Per-project so BYOC tenants resolve their own bucket and credentials. */
   objectStoreFor(projectId: string): SpoolObjectStore;
   resolveDestination(projectId: string): Promise<ProjectStorageDestination>;
+  /**
+   * The operator's assertion that the Azure container has the orphan-reaping
+   * lifecycle rule. Injected rather than read from env here so this class keeps
+   * its no-env-coupling property; the composition root owns the env read.
+   */
+  azureRetentionConfirmed: boolean;
 }
 
 /**
@@ -392,6 +398,32 @@ export class BlobStore {
           "bucket/container lifecycle rule, which a filesystem cannot express, so a crash between " +
           "the write and its delete would leave the object forever. Ingestion continues with the " +
           "full payload inline. Configure S3 or Azure Blob storage to get oversize protection.",
+      );
+    }
+
+    // Same rule, applied consistently. Azure CAN express the lifecycle policy
+    // the orphan bound depends on — but nothing here can confirm it exists.
+    // The policy is a MANAGEMENT-plane resource
+    // (Microsoft.Storage/storageAccounts/managementPolicies); this deployment
+    // holds a data-plane key only, so reading it back would mean asking every
+    // operator for ARM credentials and a subscription id the feature otherwise
+    // has no use for. Refusing to check is not the same as refusing to care:
+    // the operator asserts it at deploy time, in the same config that turns the
+    // spool on, and the default is off. An Azure install that enables the flag
+    // without provisioning retention therefore degrades to inline payloads
+    // rather than accumulating customer trace data nothing will ever reap.
+    if (
+      destination.kind === "azure" &&
+      !this.spoolStorage.azureRetentionConfirmed
+    ) {
+      throw new SpoolDestinationUnsupportedError(
+        "The trace spool is disabled on Azure Blob until orphan retention is provisioned. A crash " +
+          "between the spool write and its delete leaves the object behind, and only a lifecycle " +
+          "rule reaps it. Create a lifecycle management policy on this container that deletes " +
+          "blobs under the `trace-blobs/spool/` prefix after 3 days, then set " +
+          "AZURE_BLOB_SPOOL_RETENTION_CONFIRMED=true (chart: " +
+          "`app.dataplane.providers.azureBlob.spoolRetentionConfirmed`). Ingestion continues with " +
+          "the full payload inline until then.",
       );
     }
 

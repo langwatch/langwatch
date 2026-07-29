@@ -64,6 +64,7 @@ function azureSpoolStorage(): SpoolStorage {
   return {
     objectStoreFor: () => driver(),
     resolveDestination: async () => AZURE_DESTINATION,
+    azureRetentionConfirmed: true,
   };
 }
 
@@ -203,6 +204,7 @@ describeRealAzure("trace spool against real Azure Blob Storage", () => {
             kind: "file",
             root: "/var/lib/langwatch/objects",
           }),
+          azureRetentionConfirmed: true,
         },
       });
 

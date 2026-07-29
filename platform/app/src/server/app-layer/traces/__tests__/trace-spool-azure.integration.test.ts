@@ -61,6 +61,9 @@ function azureSpoolStorage(): SpoolStorage {
   return {
     objectStoreFor: () => driver,
     resolveDestination: async () => destination,
+    // This suite proves the write path, so it runs as a deployment that has
+    // provisioned the orphan-reaping lifecycle rule.
+    azureRetentionConfirmed: true,
   };
 }
 

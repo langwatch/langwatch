@@ -340,6 +340,8 @@ app:
           value: ""
           ## @param app.dataplane.providers.azureBlob.container.secretKeyRef [object] Secret ref for the Azure Blob container name.
           secretKeyRef: { name: "", key: "" }
+        ## @param app.dataplane.providers.azureBlob.spoolRetentionConfirmed [boolean] Confirms the container has a lifecycle rule deleting `trace-blobs/spool/` blobs after 3 days. The ADR-022 trace spool refuses to write to Azure until this is true, because a crash between the spool write and its delete is bounded only by that rule and the app cannot verify a management-plane policy with a data-plane key. Leave false unless you have created the policy.
+        spoolRetentionConfirmed: false
         # Optional. Override the blob endpoint for sovereign clouds
         # (*.usgovcloudapi.net, *.chinacloudapi.cn), private endpoints, or an
         # emulator. Defaults to https://{accountName}.blob.core.windows.net.
