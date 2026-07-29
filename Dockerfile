@@ -67,11 +67,6 @@ RUN cd langwatch && NODE_OPTIONS=--max-old-space-size=4096 pnpm run build
 # workspace it reasons about every project instead of the one subtree we
 # installed.
 #
-# It really does remove, not merely skip. Verified on a scratch workspace: a
-# member's devDependency is deleted from its node_modules while its runtime
-# dependency and the app's link to it survive — which is what makes copying
-# the whole packages/ tree below safe rather than a way to ship vitest.
-#
 # CI=true is load-bearing. --prod purges the modules directory, and pnpm
 # refuses to do that without a TTY unless told it is non-interactive
 # (ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY). The root .npmrc also carries
@@ -79,6 +74,22 @@ RUN cd langwatch && NODE_OPTIONS=--max-old-space-size=4096 pnpm run build
 # losing this silently would leave a dev-dependency-laden production image,
 # and losing it loudly fails the build here where the cause is obvious.
 RUN CI=true pnpm install --frozen-lockfile --prod --filter "@langwatch/web..."
+
+# ...and then actually reclaim the disk. The step above rewrites each member's
+# node_modules — the devDependency symlinks go — but it does NOT touch the
+# virtual store, and the store is what the runtime stage copies wholesale as
+# /app/node_modules. Measured on a scratch workspace: after
+# `pnpm install --prod`, `node_modules/.pnpm/<devdep>@<ver>` is still present;
+# after `pnpm prune --prod` it is gone. Without this line vite, vitest,
+# playwright, biome and esbuild all ship in the production image, merely
+# unreferenced — roughly the gigabyte this step is supposed to remove.
+#
+# `prune` takes no --filter, which is why the install above is filtered and
+# this is not. That is fine here: the members outside the app's closure have
+# no node_modules in this image at all, so there is nothing for prune to get
+# wrong. It must run BEFORE `prisma generate`, because prune drops the
+# generated client (it is not a declared dependency).
+RUN CI=true pnpm prune --prod
 # Regenerate Prisma client after pruning (prisma is a prod dep, but generate needs re-run)
 RUN cd langwatch && pnpm prisma generate
 
