@@ -165,16 +165,16 @@ describe("CopilotExtractor", () => {
       // appliedRules pins the delegation: without GenAIExtractor in the
       // chain these attrs would still merge via remaining(), so the
       // value assertions alone would be unfalsifiable.
-      expect(
-        result.appliedRules.some((r) => r.startsWith("genai:")),
-      ).toBe(true);
+      expect(result.appliedRules.some((r) => r.startsWith("genai:"))).toBe(
+        true,
+      );
       expect(result.attributes["gen_ai.request.model"]).toBe("gpt-5");
       expect(result.attributes["gen_ai.usage.input_tokens"]).toBe(1200);
       expect(result.attributes["gen_ai.usage.output_tokens"]).toBe(350);
       // Extras — Copilot's work.
-      expect(
-        result.appliedRules.some((r) => r.startsWith("copilot:")),
-      ).toBe(true);
+      expect(result.appliedRules.some((r) => r.startsWith("copilot:"))).toBe(
+        true,
+      );
       expect(result.attributes["metadata.copilot_premium_requests"]).toBe("1");
       expect(result.attributes["langwatch.user.id"]).toBe("hash");
     });

@@ -34,10 +34,7 @@
 import { ATTR_KEYS } from "./_constants";
 import { inferSpanTypeIfAbsent } from "./_extraction";
 import { isNonEmptyString } from "./_guards";
-import type {
-  CanonicalAttributesExtractor,
-  ExtractorContext,
-} from "./_types";
+import type { CanonicalAttributesExtractor, ExtractorContext } from "./_types";
 
 const COPILOT_ATTR_PREFIX = "github.copilot.";
 
