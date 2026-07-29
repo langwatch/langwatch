@@ -10,6 +10,9 @@ import WeightBalancedSequencer from "./vitest.sequencer";
 
 config();
 
+// One switch for the CI-vs-laptop trade-offs below.
+const isCI = !!process.env.CI;
+
 export default defineConfig({
   test: {
     // Global setup runs once before all tests - starts shared containers
@@ -52,6 +55,14 @@ export default defineConfig({
     // to deserialize constructor options"). The wedge in forks is
     // handled by a hard-floor process.exit timer in globalSetup.ts.
     pool: "forks",
+    // Unlike the unit config, this one does NOT switch pools in CI. The note
+    // above is the reason: threads panic inside @prisma/client's query engine,
+    // and that is true wherever it runs. Only the worker count differs.
+    //
+    // Every core in CI, one locally. Local integration runs are serial anyway
+    // (fileParallelism is off), so extra workers would buy nothing while the
+    // containers and the rest of the machine compete for the same memory.
+    maxWorkers: isCI ? "100%" : 1,
     // Same weight-balanced split as the unit config: equal file counts are not
     // equal work, and a matrix is only as fast as its slowest leg.
     sequence: { sequencer: WeightBalancedSequencer },
