@@ -12,7 +12,7 @@
  *
  * See specs/server/worker-liveness-probe.feature.
  */
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { Counter, register } from "prom-client";
 
@@ -64,10 +64,21 @@ function fakeExchange(url: string) {
   return { req, res, captured };
 }
 
+/**
+ * Name of the fixture metric the "serves the registry" test registers. Removed
+ * in afterEach rather than at the end of the test body, so a failing assertion
+ * cannot leave it behind in the process-wide prom-client registry.
+ */
+const PROBE_METRIC = "worker_metrics_handler_probe_total";
+
 /** Drains the handler's floating `register.metrics()` promise chain. */
 const flush = () => new Promise((resolve) => setImmediate(resolve));
 
 describe("createWorkerMetricsHandler", () => {
+  afterEach(() => {
+    register.removeSingleMetric(PROBE_METRIC);
+  });
+
   describe("given the liveness path", () => {
     describe("when the metrics gate would throw (production, no API key)", () => {
       /** @scenario Default install — no metrics API key in production */
@@ -105,7 +116,7 @@ describe("createWorkerMetricsHandler", () => {
 
     describe("when the probe reads the response body", () => {
       /** @scenario The liveness endpoint leaks no telemetry */
-      it("returns no metric samples", async () => {
+      it("answers ok as plain text, with no metric samples", async () => {
         const { req, res, captured } = fakeExchange(WORKER_LIVENESS_PATH);
 
         createWorkerMetricsHandler(() => true)(req, res);
@@ -151,7 +162,7 @@ describe("createWorkerMetricsHandler", () => {
         // one the registry renders "" and any "did it serve?" assertion passes
         // on the empty string.
         const probe = new Counter({
-          name: "worker_metrics_handler_probe_total",
+          name: PROBE_METRIC,
           help: "Fixture counter proving the registry is rendered.",
           registers: [register],
         });
@@ -162,15 +173,15 @@ describe("createWorkerMetricsHandler", () => {
         createWorkerMetricsHandler(() => true)(req, res);
         await flush();
 
-        // Neither auth branch fired: success takes the implicit-200 path and
-        // writes no explicit status.
-        expect(captured.status).toBeUndefined();
+        // Neither auth branch fired. Assert the outcome a scraper observes, not
+        // which Node code path produced it: the success path currently writes no
+        // explicit status and relies on the implicit 200, but an explicit
+        // writeHead(200) is equally correct and must not turn this red.
+        expect(captured.status ?? 200).toBe(200);
         // Prometheus needs this exact content type to parse the response; the
         // handler sets it via setHeader, so the fake must capture it.
         expect(captured.headers["content-type"]).toBe(register.contentType);
-        expect(captured.body).toContain("worker_metrics_handler_probe_total");
-
-        register.removeSingleMetric("worker_metrics_handler_probe_total");
+        expect(captured.body).toContain(PROBE_METRIC);
       });
     });
   });
