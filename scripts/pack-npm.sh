@@ -54,6 +54,20 @@ mkdir -p "$APP"
 # where it is visible next to the copy that applies it.
 EXCLUDES=(
   --exclude=node_modules
+  # No ignore files in the staged tree. npm/pnpm pack honours a .gitignore
+  # inside an included directory, and langwatch/.gitignore lists `/dist` and
+  # `*.generated.ts` — both REQUIRED at runtime (the prebuilt vite client, and
+  # the generated types the app imports). Carrying it into staging silently
+  # strips them, the app tree arrives without dist/client, and first boot
+  # falls back to a full on-runner `vite build`.
+  #
+  # This is exactly what the deleted langwatch/.npmignore existed to prevent:
+  # an .npmignore overrides the sibling .gitignore, which is why the old file
+  # had to restate the broad excludes explicitly. Staging replaces that
+  # mechanism — the copy below IS the allowlist, so no ignore file should get
+  # a second say over it.
+  --exclude=.gitignore
+  --exclude=.npmignore
   --exclude=.git
   --exclude=__tests__
   --exclude=__pycache__
@@ -134,3 +148,38 @@ echo "→ staged $(du -sh "$STAGE" | cut -f1) at $STAGE"
 echo "→ running: pnpm pack $*"
 cd "$STAGE"
 pnpm pack "$@"
+
+# Assert the tarball still carries what the staging tree put in it.
+#
+# Packing applies its own filtering on top of the staged allowlist, so a file
+# can be staged correctly and still not ship — which is how the prebuilt vite
+# client went missing once already (a .gitignore inside langwatch/ listing
+# `/dist`). The failure surfaces ~25 minutes later as an end-user boot that
+# silently rebuilds and times out, so check it here where the cause is
+# obvious. Only asserted when the source actually had a build to ship: a
+# dev-checkout pack with no dist/ is legitimate.
+# `|| true` on both: under `set -e` + `pipefail` a glob that matches nothing
+# makes ls fail, which would abort the script here — silently, since packing
+# has already succeeded by this point.
+dest="$STAGE"
+prev=""
+for arg in "$@"; do
+  [ "$prev" = "--pack-destination" ] && dest="$arg"
+  prev="$arg"
+done
+tarball="$(ls -t "$dest"/*.tgz 2>/dev/null | head -n1 || true)"
+[ -n "$tarball" ] || tarball="$(ls -t "$STAGE"/*.tgz 2>/dev/null | head -n1 || true)"
+
+if [ -z "$tarball" ]; then
+  echo "✗ pack produced no tarball in $dest" >&2
+  exit 1
+fi
+
+if [ -f "$ROOT/langwatch/dist/client/index.html" ]; then
+  if ! tar -tzf "$tarball" | grep -qx "package/app/langwatch/dist/client/index.html"; then
+    echo "✗ the repo has a built langwatch/dist/client but the tarball does not ship it." >&2
+    echo "  Something filtered it out after staging — check for an ignore file in the staged tree." >&2
+    exit 1
+  fi
+  echo "→ verified: tarball ships the prebuilt langwatch/dist/client"
+fi
