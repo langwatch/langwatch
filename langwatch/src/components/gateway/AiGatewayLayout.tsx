@@ -4,6 +4,7 @@ import {
   Gauge,
   KeyRound,
   LineChart,
+  ReceiptText,
   Route,
   Shield,
   Zap,
@@ -71,6 +72,12 @@ export default function AiGatewayLayout({
           href: "/settings/gateway/usage",
           includePath: "/settings/gateway/usage",
           icon: <LineChart size={14} />,
+        },
+        {
+          label: "Billing Events",
+          href: "/settings/gateway/billing-events",
+          includePath: "/settings/gateway/billing-events",
+          icon: <ReceiptText size={14} />,
         },
         {
           label: "Routing Policies",

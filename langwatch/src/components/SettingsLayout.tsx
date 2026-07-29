@@ -131,6 +131,9 @@ export default function SettingsLayout({
           {!isLiteMember && (
             <MenuLink href="/settings/api-keys">API Keys</MenuLink>
           )}
+          {showEnterpriseNav && !isLiteMember && (
+            <MenuLink href="/settings/webhooks">Webhooks</MenuLink>
+          )}
 
           <NavSection
             label="Models"
