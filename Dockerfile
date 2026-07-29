@@ -61,10 +61,23 @@ RUN CI=true pnpm install --frozen-lockfile --filter "@langwatch/web..."
 COPY langwatch ./langwatch
 RUN cd langwatch && NODE_OPTIONS=--max-old-space-size=4096 pnpm run build
 
-# Remove dev dependencies — not needed at runtime. A filtered re-install with
+# Remove dev dependencies — not needed at runtime, and on the order of a
+# gigabyte of vite, vitest, playwright and biome. A filtered re-install with
 # --prod rather than `pnpm prune --prod`: prune takes no --filter, so in a
 # workspace it reasons about every project instead of the one subtree we
-# installed. Both converge on the same prod-only tree.
+# installed.
+#
+# It really does remove, not merely skip. Verified on a scratch workspace: a
+# member's devDependency is deleted from its node_modules while its runtime
+# dependency and the app's link to it survive — which is what makes copying
+# the whole packages/ tree below safe rather than a way to ship vitest.
+#
+# CI=true is load-bearing. --prod purges the modules directory, and pnpm
+# refuses to do that without a TTY unless told it is non-interactive
+# (ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY). The root .npmrc also carries
+# confirm-modules-purge=false, so either alone suffices; both are kept because
+# losing this silently would leave a dev-dependency-laden production image,
+# and losing it loudly fails the build here where the cause is obvious.
 RUN CI=true pnpm install --frozen-lockfile --prod --filter "@langwatch/web..."
 # Regenerate Prisma client after pruning (prisma is a prod dep, but generate needs re-run)
 RUN cd langwatch && pnpm prisma generate
