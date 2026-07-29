@@ -86,6 +86,11 @@ interface ClickHouseTraceAnalyticsWriteRecord {
   // ── Durable dedup watermark (ADR-066, migration 00056) ─────────────────
   AppliedEventIds: string[];
 
+  /** The persistable-signal verdict (migration 00064) — see TraceAnalyticsRow. */
+  HasSignal: boolean;
+  /** Per-write random identity, the LWW tiebreak's deterministic last key. */
+  WriterNonce: string;
+
   _retention_days: number;
 }
 
@@ -148,8 +153,24 @@ function toClickHouseRecord(
 
     AppliedEventIds: [...appliedEventIds],
 
+    HasSignal: row.hasSignal,
+    // A fresh nonce PER WRITE, not per row object: two writers racing the same
+    // committed version produce rows the progress ranking cannot always split,
+    // and this key makes `queryLatestVersion`'s LIMIT 1 deterministic across
+    // reads (migration 00064). Which one wins is arbitrary — no key can know
+    // which fold got further — but it is the SAME arbitrary winner every time,
+    // which is what the applied-event-id dedup needs.
+    WriterNonce: newWriterNonce(),
+
     _retention_days: retentionDays,
   };
+}
+
+/** 16 hex chars of randomness — collision-free in practice for a tiebreak key. */
+function newWriterNonce(): string {
+  return Array.from({ length: 16 }, () =>
+    Math.floor(Math.random() * 16).toString(16),
+  ).join("");
 }
 
 export class TraceAnalyticsClickHouseRepository
@@ -378,15 +399,17 @@ export class TraceAnalyticsClickHouseRepository
    *      it are the progress ranking. Reading the array length costs only its
    *      offsets column, and every other key is a scalar already in the row.
    *
-   * This ordering is BEST-EFFORT, not total. All four keys can be equal on two
-   * concurrent versions — same latest event, same span count, same saturated
-   * watermark length, and (precisely because the anchor is now frozen) the same
-   * OccurredAt — in which case `LIMIT 1` still picks arbitrarily and the loser's
-   * contributions and applied-id watermark are dropped. Closing that needs a
-   * unique persisted version/writer identity on the row, which this table does
-   * not have; the ranking narrows the window rather than eliminating it. The
-   * residual case requires two writers to resume from the same committed version
-   * AND land on the same `updatedAt` millisecond AND make identical progress.
+   * The four progress keys are BEST-EFFORT, not total: two concurrent versions
+   * can be equal on every one — same latest event, same span count, same
+   * saturated watermark length, and (precisely because the anchor is now
+   * frozen) the same OccurredAt. `WriterNonce DESC` (migration 00064) closes
+   * what that used to leave open: a bare `LIMIT 1` picked ARBITRARILY, so two
+   * reads could crown different winners and the fold would resume from one
+   * version while the applied-id watermark it trusted came from the other. The
+   * nonce cannot know which fold got further — no persisted key can — but it
+   * makes the pick DETERMINISTIC: the same winner every read, which is what
+   * the dedup machinery actually needs. Rows written before the nonce existed
+   * carry '' and rank below any nonce-carrying version.
    */
   private async queryLatestVersion({
     tenantId,
@@ -422,7 +445,8 @@ export class TraceAnalyticsClickHouseRepository
           LastEventOccurredAt DESC,
           SpanCount DESC,
           length(AppliedEventIds) DESC,
-          OccurredAt ASC
+          OccurredAt ASC,
+          WriterNonce DESC
         LIMIT 1
       `,
       query_params: {
@@ -498,6 +522,13 @@ function fromRecord(record: Record<string, unknown>): TraceAnalyticsRow {
         : Boolean(record.HasAnnotation),
 
     attributes: asStringMap(record.Attributes),
+
+    // Absent on a pre-00064 record → true: every row an old build wrote had,
+    // by construction, passed the persistable-signal gate.
+    hasSignal:
+      record.HasSignal === null || record.HasSignal === undefined
+        ? true
+        : Boolean(record.HasSignal),
 
     spanCount: asNumber(record.SpanCount),
     annotationIds: asStringArray(record.AnnotationIds),

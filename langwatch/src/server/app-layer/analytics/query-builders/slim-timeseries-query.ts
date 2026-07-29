@@ -205,12 +205,22 @@ function slimAggExpression(agg: AggregationTypes, column: string): string {
  * `ReplacingMergeTree(UpdatedAt)`. Same pattern as the legacy
  * `dedupedTraceSummaries` helper, parameterised for the slim table + its
  * OccurredAt partition column.
+ *
+ * `AND HasSignal` (migration 00064): the store now writes dimension-only
+ * states — a topic, an annotation, a rename, with no span or log record —
+ * as rows flagged `HasSignal = 0`, where it used to not write them at all.
+ * This filter is what keeps such rows out of the product's numbers: a row on
+ * this table is otherwise counted as A TRACE by every aggregate below. Outer
+ * SELECT only — `HasSignal` is monotonic non-decreasing across a trace's
+ * versions (spans only accumulate), so the latest version's flag speaks for
+ * the trace and the max(UpdatedAt) grouping needs no second filter.
  */
 function dedupedSlim(alias: string, dateClause: string): string {
   return `(
     SELECT *
     FROM ${SLIM_TABLE}
     WHERE TenantId = {tenantId:String}
+      AND HasSignal
       ${dateClause}
       AND (TenantId, TraceId, UpdatedAt) IN (
         SELECT TenantId, TraceId, max(UpdatedAt)

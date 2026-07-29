@@ -27,7 +27,7 @@ const DECODABLE_PROJECTION_VERSIONS: ReadonlySet<string> = new Set([
 /**
  * FoldProjectionStore adapter for the slim trace_analytics fold (ADR-034
  * Phase 2, read-back per ADR-066). Mirrors the trace-summary store's shape —
- * skip empty traces, fall back to the aggregateId when the state has no
+ * fall back to the aggregateId when the state has no
  * traceId, stamp the per-tenant retention onto the record — and projects the
  * in-memory `TraceAnalyticsData` accumulator into the slim row at write time.
  *
@@ -93,7 +93,14 @@ export class TraceAnalyticsStore
     retentionDays: number;
     appliedEventIds: string[];
   } | null {
-    if (!hasPersistableSignal(state)) return null;
+    // ALWAYS writes — including dimension-only states, which used to be gated
+    // out here. The gate's verdict now rides on the row as `HasSignal`
+    // (stamped inside `projectAnalyticsStateToRow`, column added in migration
+    // 00064): analytics readers filter on it, so the product still never
+    // counts a phantom trace, while the fold read-back always finds its row —
+    // which is what lets the executor trust an absent read
+    // (`trustAbsentMiss`) instead of paying an unwindowed fallback scan plus
+    // an `event_log` re-fold on every genuinely-new aggregate.
     const stateWithId: TraceAnalyticsData = state.traceId
       ? state
       : { ...state, traceId: String(context.aggregateId) };
@@ -204,34 +211,3 @@ export class TraceAnalyticsStore
   }
 }
 
-/**
- * Same persistable-signal predicate the trace-summary store uses. Spans-only
- * gating is too strict for log-only emitters (Claude Code Path B, Codex Path B);
- * the trace-summary fold counts log records via
- * langwatch.reserved.log_record_count and we mirror its acceptance.
- *
- * `occurredAt > 0` is the second door onto the same signal: only a folded span
- * ever sets it (never a phantom init state), so it admits a state whose real
- * timing survived even if the span counter did not.
- *
- * A state carrying ONLY dimension signal (topic / annotation / name, no span or
- * log record) still writes nothing — and that is now SAFE rather than lossy: no
- * row means `get()` misses, and the fold's `refoldOnStoreMiss` rebuilds the
- * dimension from `event_log`. Before the version gate restored that net, such a
- * state lived in Redis alone and its signal was lost for good on eviction.
- *
- * `storageAnchorMs` is deliberately NOT a third door, even though ADR-071 step 3
- * gives every contribution a real anchor and so removes the only technical
- * reason such a row could not be written. What decides it is not the anchor: a
- * row on this table is a TRACE for every analytics read — it is counted,
- * grouped and averaged over — so admitting a trace whose sole signal is an
- * annotation or a classification would change what the product means by "a
- * trace", not just what the fold persists. That is a product call, and it is not
- * this change's to make.
- */
-function hasPersistableSignal(state: TraceAnalyticsData): boolean {
-  if (state.spanCount > 0) return true;
-  if (state.occurredAt > 0) return true;
-  const raw = state.attributes?.["langwatch.reserved.log_record_count"];
-  return typeof raw === "string" && Number(raw) > 0;
-}

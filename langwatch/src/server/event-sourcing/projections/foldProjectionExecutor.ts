@@ -1,5 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import {
+  incrementEsFoldAbsentMissTrustedTotal,
   incrementEsFoldDuplicateEventsSkipped,
   incrementEsFoldReadWindowFallbackTotal,
   incrementEsFoldRefoldOnMissTotal,
@@ -165,15 +166,20 @@ export class FoldProjectionExecutor {
    * `init()` permanently overwrites the complete row. The retry is the
    * declared-window contract's correctness net; the windowed read is only the
    * partition-pruning fast path.
+   *
+   * A fold that declared `trustAbsentMiss` has replaced that net with a
+   * stronger claim — its store always writes a row and its window provably
+   * covers every live one — so for it an absent windowed read IS the answer
+   * and the retry is skipped (see the option's docstring for the measured
+   * basis and the `HasSignal` prerequisite). An `undecodable` miss is outside
+   * the claim and keeps its own no-retry reasoning below.
    */
-  private async loadWithApplied<State>({
-    projectionName,
-    store,
+  private async loadWithApplied<State, E extends Event>({
+    projection,
     key,
     context,
   }: {
-    projectionName: string;
-    store: FoldProjectionStore<State>;
+    projection: FoldProjectionDefinition<State, E>;
     key: string;
     context: ProjectionStoreContext;
   }): Promise<{
@@ -181,6 +187,8 @@ export class FoldProjectionExecutor {
     appliedEventIds: string[];
     miss?: "absent" | "undecodable";
   }> {
+    const projectionName = projection.name;
+    const store = projection.store;
     const read = async (
       readContext: ProjectionStoreContext,
     ): Promise<{
@@ -191,9 +199,14 @@ export class FoldProjectionExecutor {
       if (store.getWithApplied) {
         return await store.getWithApplied(key, readContext);
       }
+      // A get()-only store has no way to say "found but refused", so its null
+      // is always an absent miss; stamping it keeps the miss kind uniform for
+      // the refold gate and `trustAbsentMiss` downstream.
+      const state = await store.get(key, readContext);
       return {
-        state: await store.get(key, readContext),
+        state,
         appliedEventIds: [],
+        ...(state === null ? { miss: "absent" as const } : {}),
       };
     };
 
@@ -207,6 +220,10 @@ export class FoldProjectionExecutor {
     // meaning "the window missed a live aggregate" rather than absorbing a
     // schema condition that has nothing to do with the window.
     if (windowed.miss === "undecodable") {
+      return windowed;
+    }
+    if (this.trustsAbsentMiss(projection)) {
+      incrementEsFoldAbsentMissTrustedTotal(projectionName, "fallback_read");
       return windowed;
     }
 
@@ -343,14 +360,28 @@ export class FoldProjectionExecutor {
       appliedEventIds,
       miss,
     } = await this.loadWithApplied({
-      projectionName: projection.name,
-      store: projection.store,
+      projection,
       key,
       context: loadContext,
     });
     if (loaded === null) this.assertUndecodableIsRecoverable(projection, miss);
 
-    if (loaded === null && this.shouldRefoldOnMiss(projection)) {
+    // A trusted absent miss folds from init() WITHOUT replaying event_log:
+    // the store always writes a row (HasSignal, migration 00064), so no row
+    // means nothing was ever committed and there is no history worth reading
+    // — the measured steady state was 93% of these re-folds returning exactly
+    // the delivered batch. `undecodable` deliberately does not take this
+    // shortcut: there a complete row EXISTS and the re-fold is what makes
+    // refusing it safe.
+    const absentTrusted =
+      loaded === null &&
+      miss === "absent" &&
+      this.trustsAbsentMiss(projection);
+    if (absentTrusted && this.shouldRefoldOnMiss(projection)) {
+      incrementEsFoldAbsentMissTrustedTotal(projection.name, "refold");
+    }
+
+    if (loaded === null && !absentTrusted && this.shouldRefoldOnMiss(projection)) {
       const refolded = await this.refoldUpToDelivered(
         projection,
         [event],
@@ -509,14 +540,22 @@ export class FoldProjectionExecutor {
       appliedEventIds,
       miss,
     } = await this.loadWithApplied({
-      projectionName: projection.name,
-      store: projection.store,
+      projection,
       key,
       context: loadContext,
     });
     if (loaded === null) this.assertUndecodableIsRecoverable(projection, miss);
 
-    if (loaded === null && this.shouldRefoldOnMiss(projection)) {
+    // Same trusted-absent shortcut as the single-event path above.
+    const absentTrusted =
+      loaded === null &&
+      miss === "absent" &&
+      this.trustsAbsentMiss(projection);
+    if (absentTrusted && this.shouldRefoldOnMiss(projection)) {
+      incrementEsFoldAbsentMissTrustedTotal(projection.name, "refold");
+    }
+
+    if (loaded === null && !absentTrusted && this.shouldRefoldOnMiss(projection)) {
       const refolded = await this.refoldUpToDelivered(
         projection,
         ordered,
@@ -641,6 +680,23 @@ export class FoldProjectionExecutor {
       projection.options?.refoldOnStoreMiss === true &&
       projection.eventLoaderUpTo !== undefined
     );
+  }
+
+  /**
+   * Whether this fold declared an absent store read authoritative — see
+   * `FoldProjectionOptions.trustAbsentMiss` for the two-part claim that
+   * declaration makes. `ES_FOLD_TRUST_ABSENT_MISS=0` is the operational
+   * kill-switch: it restores the unwindowed fallback read and the store-miss
+   * re-fold for every fold at once, without a code change, read per call so
+   * flipping it needs no restart of anything that re-reads env (and a plain
+   * string compare costs nothing at these rates).
+   */
+  private trustsAbsentMiss<State, E extends Event>(
+    projection: FoldProjectionDefinition<State, E>,
+  ): boolean {
+    if (projection.options?.trustAbsentMiss !== true) return false;
+    const env = process.env.ES_FOLD_TRUST_ABSENT_MISS;
+    return env !== "0" && env !== "false";
   }
 
   /**
