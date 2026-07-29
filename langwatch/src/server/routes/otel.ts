@@ -14,6 +14,7 @@ import {
   stampIngestKeyProvenanceOnTraceRequest,
 } from "@ee/governance/services/ingestKeyProvenance.utils";
 import { createLogger } from "@langwatch/observability";
+import { recordOnActiveSpan } from "@langwatch/observability/tracing";
 import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
 import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root";
@@ -139,6 +140,17 @@ async function authenticate(
     });
   } catch (error) {
     const denial = apiKeyCeilingDenialResponse(error);
+    // A denial here means the customer's spans were REJECTED, so "whose key,
+    // against which project" is the whole question — and the log envelope
+    // holding it is dropped in production. On the span it can be filtered,
+    // which is the difference between knowing ingestion is being refused and
+    // knowing whose.
+    recordOnActiveSpan({
+      "auth.denied_permission": "traces:create",
+      "langwatch.project.id": resolved.project.id,
+      "auth.token_type": classifyTokenType(credentials.token),
+      "http.response.status_code": denial.status,
+    });
     logger.warn(
       {
         ...diag,

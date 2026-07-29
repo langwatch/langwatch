@@ -1,6 +1,6 @@
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
-import { trace } from "@opentelemetry/api";
+import { recordOnActiveSpan } from "@langwatch/observability/tracing";
 import type { Organization, PrismaClient, Project } from "@prisma/client";
 import type { MiddlewareHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
@@ -155,6 +155,11 @@ export function createUnifiedAuthMiddleware({
 
     if (!resolved) {
       const tokenType = getTokenType(credentials.token);
+      recordAuthDiagnosticsOnSpan(diag);
+      recordOnActiveSpan({
+        "auth.failure_reason": "invalid_credentials",
+        "auth.token_type": tokenType,
+      });
       logger.warn(
         {
           ...diag,
@@ -332,19 +337,17 @@ export type AuthDiagnostics = {
  * path, tracing disabled in a test) means nothing is recorded, never a throw.
  */
 export function recordAuthDiagnosticsOnSpan(diag: AuthDiagnostics): void {
-  const span = trace.getActiveSpan();
-  if (!span) return;
-
-  span.setAttribute("auth.failed", true);
-  span.setAttribute("auth.has_empty_token", diag.hasEmptyAuthToken);
-  span.setAttribute("http.route", diag.path);
-  span.setAttribute("http.request.method", diag.method);
-  if (diag.userAgent) span.setAttribute("user_agent.original", diag.userAgent);
-  // The caller's address as the edge saw it. Not a secret, and the only thing
-  // that separates one misconfigured deployment from a hundred callers.
-  if (diag.forwardedFor) {
-    span.setAttribute("client.address", diag.forwardedFor);
-  }
+  recordOnActiveSpan({
+    "auth.failed": true,
+    "auth.has_empty_token": diag.hasEmptyAuthToken,
+    "http.route": diag.path,
+    "http.request.method": diag.method,
+    "user_agent.original": diag.userAgent,
+    // The caller's address as the edge saw it. Not a secret, and the only
+    // thing that separates one misconfigured deployment from a hundred
+    // callers.
+    "client.address": diag.forwardedFor,
+  });
 }
 
 export function collectAuthDiagnostics(c: {
@@ -402,6 +405,18 @@ export async function enforceApiKeyCeiling({
   });
 
   if (!allowed) {
+    // The key and the permission are the whole diagnosis — a denial means the
+    // caller's request was refused, and which key against which project says
+    // whether that is one misconfigured integration or a permission regression
+    // hitting everyone. Logged fields do not survive the prod pipeline; span
+    // attributes do.
+    recordOnActiveSpan({
+      "auth.ceiling_denied": true,
+      "auth.denied_permission": permission,
+      "auth.api_key_id": resolved.apiKeyId,
+      "langwatch.project.id": resolved.project.id,
+      "user.id": resolved.userId,
+    });
     permissionLogger.warn(
       {
         apiKeyId: resolved.apiKeyId,

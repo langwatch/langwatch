@@ -1,3 +1,4 @@
+import { recordOnActiveSpan } from "@langwatch/observability/tracing";
 import {
   getProjectModelProviders,
   prepareEnvKeys,
@@ -90,11 +91,34 @@ export async function setupModelEnv(
   const provider = model.split("/")[0]!;
   const modelProvider = modelProviders[provider];
 
+  // `meta` and the span both carry the identifiers, and neither is redundant.
+  // The message is what survives the prod log pipeline, which drops structured
+  // fields — but it is also customer-facing, so it names the provider and the
+  // model and stops there. `meta` rides with the error for callers that render
+  // remediation, and the span is where the project id can be filtered on: with
+  // only the sentence, a burst of these is countable but not attributable, and
+  // "one project misconfigured a provider" and "a provider broke for everyone"
+  // are the same line.
+  const configFailure = (reason: "not_configured" | "not_enabled") => {
+    recordOnActiveSpan({
+      "evaluation.model_provider": provider,
+      "evaluation.model": model,
+      "evaluation.provider_failure": reason,
+      "langwatch.project.id": projectId,
+    });
+    return new EvaluatorConfigError(
+      reason === "not_configured"
+        ? `Provider ${provider} is not configured (required by model ${model})`
+        : `Provider ${provider} is not enabled (required by model ${model})`,
+      { meta: { provider, model, projectId, embeddings } },
+    );
+  };
+
   if (!modelProvider) {
-    throw new EvaluatorConfigError(`Provider ${provider} is not configured`);
+    throw configFailure("not_configured");
   }
   if (!modelProvider.enabled) {
-    throw new EvaluatorConfigError(`Provider ${provider} is not enabled`);
+    throw configFailure("not_enabled");
   }
 
   const modelName = model.split("/").slice(1).join("/");

@@ -1,5 +1,6 @@
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
+import { recordOnActiveSpan } from "@langwatch/observability/tracing";
 import { extractErrorMessage } from "../../../../../utils/captureError";
 import {
   AZURE_SAFETY_NOT_CONFIGURED_MESSAGE,
@@ -183,6 +184,16 @@ export class ExecuteEvaluationCommand
       monitorId: data.evaluatorId,
     });
     if (!monitor) {
+      // Recorded on the span as well as logged: this fires once per delivered
+      // event for as long as the condition holds, so what matters is not the
+      // count but WHICH monitor and whose — and the log envelope carrying that
+      // is dropped before the line is stored.
+      recordOnActiveSpan({
+        "evaluation.skipped": true,
+        "evaluation.skip_reason": "monitor_not_found",
+        "langwatch.project.id": tenantId,
+        "evaluation.evaluator_id": data.evaluatorId,
+      });
       logger.warn(
         { tenantId: tenantId, evaluatorId: data.evaluatorId },
         "Monitor not found — skipping evaluation",
@@ -202,6 +213,19 @@ export class ExecuteEvaluationCommand
         this.deps.azureSafetyEnvResolver ?? getAzureSafetyEnvFromProject;
       const azureEnv = await azureEnvResolver(tenantId);
       if (!azureEnv) {
+        // The single highest-volume skip in production, and until now an
+        // anonymous one: it fires per delivered event for every project with
+        // an Azure evaluator and no configured provider, and the identifiers
+        // that would say which projects those are never survived the log
+        // pipeline. The condition is static, so the useful question is "how
+        // many distinct projects", which only attributes answer.
+        recordOnActiveSpan({
+          "evaluation.skipped": true,
+          "evaluation.skip_reason": "azure_safety_not_configured",
+          "langwatch.project.id": tenantId,
+          "evaluation.evaluator_id": data.evaluatorId,
+          "evaluation.evaluator_type": monitor.checkType,
+        });
         logger.warn(
           {
             tenantId,

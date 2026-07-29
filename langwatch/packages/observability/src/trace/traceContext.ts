@@ -50,3 +50,37 @@ export function getActiveTraceId(): string | undefined {
 
   return traceId;
 }
+
+/**
+ * Copies diagnostic context onto the active span, so it survives to somewhere
+ * it can be searched.
+ *
+ * Passing the same fields to the logger is not equivalent, and this exists
+ * because of the difference. Production ships stdout through a collector that
+ * keeps a record's MESSAGE and drops its structured fields, so a
+ * `logger.warn({ projectId, evaluatorType }, "...")` arrives as the bare
+ * sentence: you can count the failures but you cannot say whose they are, or
+ * group them, or tell one cause from another. Span attributes are not on that
+ * path. The log line already carries the trace id, so recording the same
+ * context here is what turns a countable line into an attributable one.
+ *
+ * Use it at the sites where the answer to "who/which/why" lives, and pass the
+ * identifiers rather than a rendered sentence — an attribute is worth having
+ * because it can be filtered on.
+ *
+ * Best-effort by construction. No active span (a code path outside a trace,
+ * tracing disabled in a test) records nothing and never throws, and null or
+ * undefined values are skipped so optional context can be passed inline
+ * without the caller building the object conditionally.
+ */
+export function recordOnActiveSpan(
+  attributes: Record<string, string | number | boolean | null | undefined>,
+): void {
+  const span = trace.getActiveSpan();
+  if (!span) return;
+
+  for (const [key, value] of Object.entries(attributes)) {
+    if (value === null || value === undefined) continue;
+    span.setAttribute(key, value);
+  }
+}
