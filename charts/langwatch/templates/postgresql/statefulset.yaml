@@ -40,8 +40,7 @@ spec:
       # layers on top rather than replacing, so a partial override cannot
       # strip runAsNonRoot or the seccomp profile.
       securityContext:
-        {{- $base := dict "runAsUser" 999 "runAsGroup" 999 "fsGroup" 999 "runAsNonRoot" true "seccompProfile" (dict "type" "RuntimeDefault") }}
-        {{- toYaml (mustMergeOverwrite $base (.Values.postgresql.podSecurityContext | default dict)) | nindent 8 }}
+        {{- include "langwatch.podSecurityContext" (dict "ctx" . "component" .Values.postgresql "base" (dict "runAsUser" 999 "runAsGroup" 999 "fsGroup" 999 "runAsNonRoot" true "seccompProfile" (dict "type" "RuntimeDefault"))) | nindent 8 }}
       terminationGracePeriodSeconds: 30
       containers:
         - name: postgresql
@@ -99,10 +98,15 @@ spec:
             - name: tmp
               mountPath: /tmp
       volumes:
+        # Bounded like every other scratch volume: an unbounded emptyDir is
+        # backed by node ephemeral storage, so a looping pod evicts neighbours
+        # instead of itself.
         - name: run
-          emptyDir: {}
+          emptyDir:
+            sizeLimit: {{ .Values.postgresql.scratchSizeLimit }}
         - name: tmp
-          emptyDir: {}
+          emptyDir:
+            sizeLimit: {{ .Values.postgresql.scratchSizeLimit }}
   volumeClaimTemplates:
     - metadata:
         name: data

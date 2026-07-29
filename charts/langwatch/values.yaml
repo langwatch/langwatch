@@ -1358,6 +1358,8 @@ postgresql:
   tolerations: []
   ## @param postgresql.affinity [object] Affinity rules. Falls back to global.scheduling.affinity.
   affinity: {}
+  ## @param postgresql.scratchSizeLimit [string, default: 1Gi] Size cap for the writable scratch emptyDirs (socket dir, /tmp) the container needs under a read-only root filesystem. Bounded so a looping pod is evicted on its own quota rather than filling the node.
+  scratchSizeLimit: 1Gi
   # Whether to manage PostgreSQL via this chart or use external instance
   ## @param postgresql.chartManaged [default: true] Manage PostgreSQL via this chart.
   chartManaged: true
@@ -1571,6 +1573,8 @@ redis:
   tolerations: []
   ## @param redis.affinity [object] Affinity rules. Falls back to global.scheduling.affinity.
   affinity: {}
+  ## @param redis.scratchSizeLimit [string, default: 1Gi] Size cap for the writable scratch emptyDirs (socket dir, /tmp) the container needs under a read-only root filesystem. Bounded so a looping pod is evicted on its own quota rather than filling the node.
+  scratchSizeLimit: 1Gi
   # Whether to manage Redis via this chart or use external instance
   ## @param redis.chartManaged [default: true] Manage Redis via this chart.
   chartManaged: true

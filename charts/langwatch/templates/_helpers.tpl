@@ -961,8 +961,13 @@ podAffinity:
 */}}
 {{- define "langwatch.podSecurityContext" -}}
 {{- $global := .ctx.Values.global.podSecurityContext | default dict -}}
+{{- /* Components whose image pins its own uid pass "base" instead of the
+       global default — the bundled datastores cannot run as uid 1000. The
+       override still layers on top, so a partial override cannot strip the
+       uid, runAsNonRoot or the seccomp profile. */ -}}
+{{- $defaults := .base | default $global -}}
 {{- $override := .component.podSecurityContext | default dict -}}
-{{- toYaml (mustMergeOverwrite (deepCopy $global) $override) -}}
+{{- toYaml (mustMergeOverwrite (deepCopy $defaults) $override) -}}
 {{- end -}}
 
 {{- define "langwatch.containerSecurityContext" -}}

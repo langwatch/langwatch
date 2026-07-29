@@ -176,7 +176,10 @@ spec:
 
       volumes:
         - name: keeper-config
-          emptyDir: {}
+          # Holds rendered config only (ch-config writes here); bounded like
+          # every other scratch volume, so nothing is node-backed without a limit.
+          emptyDir:
+            sizeLimit: 64Mi
         - name: keeper-logs
           emptyDir:
             sizeLimit: {{ .Values.scratch.logsSizeLimit }}
