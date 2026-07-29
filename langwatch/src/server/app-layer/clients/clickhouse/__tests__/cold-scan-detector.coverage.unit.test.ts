@@ -36,15 +36,17 @@ const NOT_ON_A_READ_PATH = new Set<string>([
 ]);
 
 /**
- * A migration's Up section, comments removed.
+ * A migration's Up section, with `--` line comments removed.
  *
  * Order matters: split on the Down marker BEFORE stripping comments. The
  * marker is itself a comment line (`-- +goose Down`) in every migration, so
  * stripping first would delete it and leave `split` matching nothing — the
  * "Up section" would silently be the whole file, Down included.
  *
- * Comments go second because a commented-out CREATE is not a live table, and
- * counting it would demand coverage for something that does not exist.
+ * `--` comments go second because a commented-out CREATE is not a live table,
+ * and counting it would demand coverage for something that does not exist.
+ * Block comments are not stripped: no migration uses them, and every
+ * commented-out CREATE in the tree is a `--` line.
  */
 function upSectionOf(raw: string): string {
   const up = raw.split(/^\s*--\s*\+goose Down/m)[0] ?? raw;
@@ -52,6 +54,31 @@ function upSectionOf(raw: string): string {
     .split("\n")
     .filter((line) => !line.trim().startsWith("--"))
     .join("\n");
+}
+
+/**
+ * The single CREATE statement starting at `from`, ending at whichever comes
+ * first: its terminating `;` or the next `CREATE TABLE`.
+ *
+ * A fixed-width window instead of a real boundary is what makes this test lie:
+ * an unpartitioned table followed closely enough by a partitioned one would
+ * pick up the neighbour's `PARTITION BY` and be recorded as partitioned. Every
+ * assertion below would then pass against an entry describing a table that
+ * cannot prune — the exact silent gap this file exists to close.
+ */
+function statementAt(up: string, from: number): string {
+  const rest = up.slice(from);
+  const semicolon = rest.indexOf(";");
+  // Searched from index 1 so the match that opened this statement is skipped.
+  const nextCreate = rest.slice(1).search(/CREATE\s+TABLE/i);
+
+  return rest.slice(
+    0,
+    Math.min(
+      semicolon === -1 ? rest.length : semicolon,
+      nextCreate === -1 ? rest.length : nextCreate + 1,
+    ),
+  );
 }
 
 /** Tables one Up section creates with a PARTITION BY, mapped to it. */
@@ -63,8 +90,9 @@ function partitionedTablesIn(up: string): Map<string, string> {
   while ((match = createRe.exec(up)) !== null) {
     const table = match[1];
     if (!table) continue;
-    const tail = up.slice(match.index, match.index + 6000);
-    const partitionBy = /PARTITION BY\s+([^\n]+)/i.exec(tail);
+    const partitionBy = /PARTITION BY\s+([^\n]+)/i.exec(
+      statementAt(up, match.index),
+    );
     if (partitionBy?.[1]) found.set(table, partitionBy[1].trim());
   }
 
@@ -120,7 +148,7 @@ function pruneColumnMismatches(
 
 describe("cold-scan detector coverage", () => {
   describe("given a table is partitioned by a time expression", () => {
-    /** @scenario Every partitioned table is known to the cold-scan detector */
+    /** @scenario The detector knows every table the schema partitions by time */
     it("is listed in TIME_PARTITIONED_TABLES so its unpruned reads get flagged", () => {
       const partitioned = partitionedTablesFromMigrations();
       // Guard against a vacuous pass: if the migration directory ever moved,
@@ -139,7 +167,7 @@ describe("cold-scan detector coverage", () => {
       expect(uncovered).toEqual([]);
     });
 
-    /** @scenario The declared prune column actually appears in the PARTITION BY */
+    /** @scenario The predicate the detector asks for is one that can prune */
     it("declares a prune column the PARTITION BY expression really uses", () => {
       const wrong = pruneColumnMismatches(partitionedTablesFromMigrations());
 
@@ -152,7 +180,7 @@ describe("cold-scan detector coverage", () => {
      * A stale entry makes the detector demand a time predicate on a table that
      * cannot prune by one — noise that trains people to ignore the warning.
      */
-    /** @scenario The map carries no table that is not partitioned */
+    /** @scenario The detector never demands a predicate that cannot prune */
     it("is a table that really is partitioned", () => {
       const partitioned = partitionedTablesFromMigrations();
 

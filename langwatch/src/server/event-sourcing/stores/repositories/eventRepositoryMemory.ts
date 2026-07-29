@@ -39,14 +39,22 @@ export class EventRepositoryMemory implements EventRepository {
     return filtered.map((record) => ({ ...record }));
   }
 
-  async getEventRecordsUpTo(
-    tenantId: string,
-    aggregateType: string,
-    aggregateId: string,
-    upToTimestamp: number,
-    upToEventId: string,
-    occurredAtFromMs?: number,
-  ): Promise<EventRecord[]> {
+  async getEventRecordsUpTo(request: {
+    tenantId: string;
+    aggregateType: string;
+    aggregateId: string;
+    upToTimestamp: number;
+    upToEventId: string;
+    occurredAtFromMs?: number;
+  }): Promise<EventRecord[]> {
+    const {
+      tenantId,
+      aggregateType,
+      aggregateId,
+      upToTimestamp,
+      upToEventId,
+      occurredAtFromMs,
+    } = request;
     const key = `${tenantId}:${aggregateType}:${String(aggregateId)}`;
     const records = this.eventsByKey.get(key) ?? [];
 
@@ -56,8 +64,6 @@ export class EventRepositoryMemory implements EventRepository {
     const hasLowerBound =
       typeof occurredAtFromMs === "number" && occurredAtFromMs > 0;
 
-    // Filter events up to and including the specified event
-    // Events where: timestamp < upToTimestamp OR (timestamp = upToTimestamp AND eventId <= upToEventId)
     const filteredRecords = records.filter((record) => {
       // Records with an unknown occurred time are always kept, exactly as the
       // SQL does, so the bound can never drop one. Null and 0 are both

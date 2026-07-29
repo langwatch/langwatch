@@ -170,14 +170,22 @@ export class EventRepositoryClickHouse implements EventRepository {
     }
   }
 
-  async getEventRecordsUpTo(
-    tenantId: string,
-    aggregateType: string,
-    aggregateId: string,
-    upToTimestamp: number,
-    upToEventId: string,
-    occurredAtFromMs?: number,
-  ): Promise<EventRecord[]> {
+  async getEventRecordsUpTo(request: {
+    tenantId: string;
+    aggregateType: string;
+    aggregateId: string;
+    upToTimestamp: number;
+    upToEventId: string;
+    occurredAtFromMs?: number;
+  }): Promise<EventRecord[]> {
+    const {
+      tenantId,
+      aggregateType,
+      aggregateId,
+      upToTimestamp,
+      upToEventId,
+      occurredAtFromMs,
+    } = request;
     try {
       const client = await this.getClient(tenantId);
       // Same partition-pruning bound as `getEventRecords`, and for the same

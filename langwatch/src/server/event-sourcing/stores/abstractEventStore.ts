@@ -286,20 +286,23 @@ export abstract class AbstractEventStore<EventType extends Event = Event>
       },
       async () => {
         try {
-          const records = await this.repository.getEventRecordsUpTo(
-            context.tenantId,
+          const records = await this.repository.getEventRecordsUpTo({
+            tenantId: context.tenantId,
             aggregateType,
             aggregateId,
-            upToEvent.createdAt,
-            upToEvent.id,
+            upToTimestamp: upToEvent.createdAt,
+            upToEventId: upToEvent.id,
             // Anchor on the triggering event's own occurred time. For a
             // time-local aggregate every sibling event falls inside the
             // aggregate's lifetime — seconds to hours — so a 45-day window
             // around the anchor cannot exclude one. `rehydrationLowerBoundMs`
             // returns undefined for long-lived types and for a missing anchor,
             // leaving those reads unbounded exactly as before.
-            rehydrationLowerBoundMs(aggregateType, upToEvent.occurredAt),
-          );
+            occurredAtFromMs: rehydrationLowerBoundMs(
+              aggregateType,
+              upToEvent.occurredAt,
+            ),
+          });
 
           const events = records.map((record) =>
             recordToEvent<EventType>(record, aggregateId),

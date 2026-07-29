@@ -57,14 +57,14 @@ export interface EventRepository {
    * above is on EventTimestamp, which is NOT the partition key, so without this
    * the read walks every weekly partition ever written.
    */
-  getEventRecordsUpTo(
-    tenantId: string,
-    aggregateType: string,
-    aggregateId: string,
-    upToTimestamp: number,
-    upToEventId: string,
-    occurredAtFromMs?: number,
-  ): Promise<EventRecord[]>;
+  getEventRecordsUpTo(request: {
+    tenantId: string;
+    aggregateType: string;
+    aggregateId: string;
+    upToTimestamp: number;
+    upToEventId: string;
+    occurredAtFromMs?: number;
+  }): Promise<EventRecord[]>;
 
   /**
    * Cursor-paginated variant of `getEventRecordsUpTo`: returns at most `limit`
