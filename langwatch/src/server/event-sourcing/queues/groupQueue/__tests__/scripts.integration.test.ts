@@ -93,7 +93,7 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
-  await redis.flushall();
+  await redis.flushdb();
   scripts = new GroupStagingScripts(redis, QUEUE_NAME);
 });
 

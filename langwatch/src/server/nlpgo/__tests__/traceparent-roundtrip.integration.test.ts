@@ -357,10 +357,10 @@ describe.skipIf(!shouldRun)(
       const redis = getTestRedisConnection();
       if (redis) {
         try {
-          await redis.flushall();
+          await redis.flushdb();
         } catch {
           await sleep(2_000);
-          await redis.flushall();
+          await redis.flushdb();
         }
       }
 

@@ -6,6 +6,8 @@ import { config } from "dotenv";
 import { join } from "path";
 import { configDefaults, defineConfig } from "vitest/config";
 
+import WeightBalancedSequencer from "./vitest.sequencer";
+
 config();
 
 export default defineConfig({
@@ -23,17 +25,26 @@ export default defineConfig({
       "./test-setup.ts",
     ],
     include: ["**/*.integration.{test,spec}.?(c|m)[jt]s?(x)"],
-    exclude: [
-      ...configDefaults.exclude,
-      ".next/**/*",
-      ".next-saas/**/*",
-    ],
+    exclude: [...configDefaults.exclude, ".next/**/*", ".next-saas/**/*"],
     testTimeout: 60_000, // 60 seconds for testcontainers startup and processing
     hookTimeout: 60_000, // 60 seconds for beforeAll/afterAll hooks
     teardownTimeout: 30_000, // 30 seconds for cleanup
     // Run test files sequentially to avoid BullMQ/Redis resource contention
-    // when multiple pipelines are created and destroyed in parallel
-    fileParallelism: false,
+    // when multiple pipelines are created and destroyed in parallel.
+    //
+    // That contention is Redis-specific: BullMQ keys a queue by name alone, so
+    // two files building the same pipeline share it. The ClickHouse and
+    // Postgres fixtures do not have the same problem -- of the 111 integration
+    // files that touch ClickHouse there are five hardcoded tenant ids between
+    // them, and one appears in more than one file.
+    //
+    // So parallelism is opt-in rather than impossible: set both
+    // VITEST_INTEGRATION_PARALLEL and VITEST_ISOLATE_WORKER_REDIS (see
+    // setupEnv.ts, which then gives each worker its own Redis database) and
+    // the files can run concurrently. CI sets both. It stays OFF by default
+    // because a local run is on a machine also doing other things, and the
+    // serial path is the one that has always been safe there.
+    fileParallelism: process.env.VITEST_INTEGRATION_PARALLEL === "1",
     // Use forked child processes. We briefly tried pool: "threads" to
     // sidestep the post-test shard 4 wedge, but threads exposes a panic
     // in @prisma/client/query-engine-node-api when the client gets
@@ -41,6 +52,9 @@ export default defineConfig({
     // to deserialize constructor options"). The wedge in forks is
     // handled by a hard-floor process.exit timer in globalSetup.ts.
     pool: "forks",
+    // Same weight-balanced split as the unit config: equal file counts are not
+    // equal work, and a matrix is only as fast as its slowest leg.
+    sequence: { sequencer: WeightBalancedSequencer },
     // NOTE: BUILD_TIME is NOT set for integration tests because we need real Redis/ClickHouse connections.
     // The setup.ts file handles setting the correct URLs from globalSetup.
   },

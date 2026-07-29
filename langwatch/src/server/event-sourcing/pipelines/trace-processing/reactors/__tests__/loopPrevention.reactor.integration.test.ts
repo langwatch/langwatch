@@ -318,7 +318,7 @@ describe.skipIf(!hasTestcontainers)(
     beforeAll(async () => {
       const redisConnection = getTestRedisConnection();
       if (redisConnection) {
-        await redisConnection.flushall();
+        await redisConnection.flushdb();
       }
     });
 

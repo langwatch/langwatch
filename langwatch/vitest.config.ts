@@ -2,6 +2,8 @@ import { config } from "dotenv";
 import { join } from "path";
 import { configDefaults, defineConfig } from "vitest/config";
 
+import WeightBalancedSequencer from "./vitest.sequencer";
+
 config();
 
 export default defineConfig({
@@ -33,6 +35,11 @@ export default defineConfig({
     // context grows unbounded. See dev/docs/best_practices/vitest-performance.md.
     pool: "vmForks",
     maxWorkers: "50%", // Low default for local dev; CI overrides with VITEST_MAX_WORKERS
+    // Shard by weight, not by file count. Vitest's default splits the file
+    // list into equal-sized pieces, which paced the matrix at its slowest leg:
+    // four shards of 402/402/402/401 files ran 2.7, 4.8, 3.3 and 2.9 minutes.
+    // See vitest.sequencer.ts for what it weighs and why.
+    sequence: { sequencer: WeightBalancedSequencer },
     vmMemoryLimit: "512MB", // Recycle a worker once its reused VM context hits this
     // isolate:false reuses one VM context across the files in a worker instead
     // of building a fresh module registry per file. Safe here because the suite

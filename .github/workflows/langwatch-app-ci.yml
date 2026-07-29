@@ -39,14 +39,25 @@ jobs:
       heavy: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
       # One shard each on a draft, because the draft run is affected-tests-only
       # and a subset does not need splitting.
+      #
+      # Integration drops from six shards to three. Sharding was standing in
+      # for parallelism while every file ran serially; now that a shard runs
+      # its files across four workers, splitting the suite six ways buys
+      # queueing rather than speed. Three shards run the same 726 files with
+      # half the concurrent runners.
       unit-shards: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && '[1,2,3,4]' || '[1]' }}
-      integration-shards: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && '[1,2,3,4,5,6]' || '[1]' }}
+      integration-shards: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && '[1,2,3]' || '[1]' }}
       # Coverage instrumentation costs ~45% of the run (measured: a unit subset
       # goes 3.7s -> 6.6s with --coverage). Nothing gates on it — there is no
-      # codecov.yml, no codecov status check on PRs, and both uploads are
-      # fail_ci_if_error: false. So it runs where the trend line is actually
-      # read (main, merge queue) and not on every PR push.
-      coverage: ${{ github.event_name != 'pull_request' }}
+      # codecov.yml, no codecov status check, and both uploads are
+      # fail_ci_if_error: false — so it is a trend line, not a gate.
+      #
+      # A trend line does not need recomputing on every merge to main. It now
+      # runs on the weekly schedule and on demand, which keeps the graph while
+      # taking the instrumentation off the path between a merge and a green
+      # main. The provider is already the fast one (vitest 4 defaults to v8,
+      # not istanbul), so frequency was the only lever left.
+      coverage: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
       - uses: ./.github/actions/detect-changes
@@ -221,14 +232,30 @@ jobs:
       matrix:
         shard: ${{ fromJSON(needs.changes.outputs.integration-shards) }}
     env:
-      # Several integration suites (groupQueue, scripts, loopPrevention,
-      # traceparent) call redis.flushall() directly in afterEach against the
-      # shared Redis — the shared cleanup helper is tenant-scoped to avoid this
-      # race, but these suites aren't. vitest.integration.config.ts sets
-      # fileParallelism: false but does NOT cap the worker pool, so on CI
-      # multiple workers raced on those FLUSHALLs and wiped each other's
-      # in-flight queue state. Force a single worker to serialize them.
-      VITEST_MAX_WORKERS: "1"
+      # The integration suite used to run strictly one file at a time, which
+      # made it by far the most expensive thing in this workflow: six shards
+      # at ~6 minutes each, ~36 runner-minutes, every one of them serial.
+      #
+      # The reason was real but narrower than the setting. Five suites
+      # (groupQueue x2, scripts, loopPrevention, traceparent) called
+      # redis.flushall() in afterEach against the shared Redis, so any
+      # concurrency wiped another worker's in-flight queue state; and BullMQ
+      # keys a queue by name alone, so two workers building the same pipeline
+      # share it. Both are Redis problems. The ClickHouse and Postgres
+      # fixtures were already written against per-suite tenant ids.
+      #
+      # So: those five now call flushdb(), each worker gets its own Redis
+      # logical database (VITEST_ISOLATE_WORKER_REDIS, see setupEnv.ts), and a
+      # flushdb can no longer reach past the worker that issued it. With the
+      # contention gone the files can run concurrently.
+      #
+      # Both flags are CI-only. A local `pnpm test:integration` still runs
+      # serially on one Redis database, because a laptop is doing other things
+      # at the same time and the serial path is the one that has always been
+      # safe there.
+      VITEST_INTEGRATION_PARALLEL: "1"
+      VITEST_ISOLATE_WORKER_REDIS: "1"
+      VITEST_MAX_WORKERS: "4" # physical core count on GitHub-hosted ubuntu runners
       # Required environment variables for integration tests
       DATABASE_URL: "postgresql://langwatch_ci:ci_password@localhost:5432/langwatch_test"
       BASE_HOST: "localhost:3000"
@@ -318,7 +345,7 @@ jobs:
           done
           exit 1
 
-      - name: Run integration tests (shard ${{ matrix.shard }}/6)
+      - name: Run integration tests (shard ${{ matrix.shard }}/3)
         id: integration-tests
         working-directory: langwatch
         # Integration files run sequentially in a single long-lived fork worker
@@ -347,7 +374,7 @@ jobs:
               --outputFile=test-results.json
           else
             # shellcheck disable=SC2086
-            pnpm test:integration --shard=${{ matrix.shard }}/6 $COV \
+            pnpm test:integration --shard=${{ matrix.shard }}/3 $COV \
               --reporter=default --reporter=json --reporter=./src/test-utils/shardFailureReporter.ts \
               --outputFile=test-results.json
           fi

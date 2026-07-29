@@ -66,7 +66,7 @@ describe.skipIf(!hasTestcontainers)(
 
     afterEach(async () => {
       await Promise.all(queues.map((q) => q.close().catch(() => {})));
-      await redis.flushall();
+      await redis.flushdb();
     });
 
     afterAll(async () => {
