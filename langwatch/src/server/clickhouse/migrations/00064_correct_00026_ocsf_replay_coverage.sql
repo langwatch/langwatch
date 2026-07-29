@@ -10,11 +10,15 @@
 -- without data loss". BOTH ARE FALSE, and acting on the rebuild claim
 -- PERMANENTLY DESTROYS SOC2 / ISO27001 audit evidence:
 --
---   1. The table is REACTOR-populated (governanceOcsfEventsSync, registered via
+--   1. As of this migration the table is REACTOR-populated
+--      (governanceOcsfEventsSync, registered via
 --      builder.withReactor("traceSummary", …)), NOT a fold projection. Event
 --      replay rebuilds fold/map projections and NEVER invokes reactors
 --      (projections/projectionRouter.ts; ADR-081), so a rebuild from event_log
---      produces ZERO OCSF rows for event-sourced audit events.
+--      produces ZERO OCSF rows for event-sourced audit events. Should that
+--      writer later be converted to a replay-covered projection, reason 2 below
+--      still makes a rebuild lossy — this instruction does not expire with
+--      reason 1.
 --   2. Two of its three writers never touch event_log at all —
 --      adminWorkspaceViewAudit.service.ts (admin drill-in audit) and
 --      pullerWorker.ts (external governance pull). Those rows have NO event_log
