@@ -14,15 +14,15 @@
  * No "should" in it() names (project convention).
  */
 
-import { describe, it, expect, vi } from "vitest";
-import { createTenantId, type Command } from "../../../../";
+import { describe, expect, it, vi } from "vitest";
+import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
+import { type Command, createTenantId } from "../../../../";
 import type { RecordSpanCommandData } from "../../schemas/commands";
 import { RECORD_SPAN_COMMAND_TYPE } from "../../schemas/constants";
 import {
   RecordSpanCommand,
   type RecordSpanCommandDependencies,
 } from "../recordSpanCommand";
-import { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 
 // ---------------------------------------------------------------------------
 // Helpers
