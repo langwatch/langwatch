@@ -41,7 +41,37 @@
 	},
 	"files": {
 		"ignoreUnknown": false,
-		"includes": ["**", "!src/server/modelProviders/llmModels.json"]
+		"includes": [
+			"**",
+			"!src/server/modelProviders/llmModels.json",
+			// `!!` is a HARD ignore: it applies even to files Biome pulls in
+			// through the type graph rather than from the scan list. Needed
+			// because this file is never scanned directly — it arrives as a
+			// dependency of anything that imports the SDK.
+			//
+			// The published `langwatch` package inlines the whole REST API
+			// schema into one .d.ts: `interface operations` alone is 11,998
+			// lines, `interface paths` another 2,058, 525KB in total. Biome
+			// gives up at 200,000 types and raises an INTERNAL diagnostic,
+			// which it then repeats for every importing file.
+			//
+			// NOTE WHAT THIS DOES AND DOES NOT BUY. Biome was already unable
+			// to analyse those types — it aborted on them. So the type-aware
+			// rules (noFloatingPromises, noMisusedPromises) were ALREADY blind
+			// wherever the SDK's types reach, and still are. This only stops
+			// the crash being reported, it does not restore the coverage.
+			//
+			// The actual fix belongs in typescript-sdk/: its public types are
+			// written as indexed lookups into the generated schema, e.g.
+			// `paths["/api/evaluators"]["get"]["responses"]["200"]...`, and a
+			// dts bundler cannot tree-shake an indexed access — it has to
+			// inline the entire `paths` tree to keep the lookup resolvable.
+			// Emitting the resolved shapes as named types instead would let it
+			// ship only what is used. That is a change to a published package,
+			// so it lands on an SDK release and a version bump here, not in
+			// this config.
+			"!!**/node_modules/langwatch/dist/*.d.ts"
+		]
 	},
 	"formatter": {
 		"enabled": true,
