@@ -48,8 +48,135 @@ export type SpendEventRow = {
   occurredAt: Date;
 };
 
+function mapSpendEventRow(r: Record<string, unknown>): SpendEventRow {
+  return {
+    tenantId: String(r.TenantId),
+    gatewayRequestId: String(r.GatewayRequestId),
+    organizationId: String(r.OrganizationId),
+    teamId: String(r.TeamId),
+    virtualKeyId: String(r.VirtualKeyId),
+    principalUserId: String(r.PrincipalUserId),
+    endUserId: String(r.EndUserId),
+    traceId: String(r.TraceId),
+    model: String(r.Model),
+    providerKey: String(r.ProviderKey),
+    tokensInput: Number(r.TokensInput),
+    tokensOutput: Number(r.TokensOutput),
+    tokensCacheRead: Number(r.TokensCacheRead),
+    tokensCacheWrite: Number(r.TokensCacheWrite),
+    tokensReasoning: Number(r.TokensReasoning),
+    costUsd: String(r.CostUSD),
+    status: r.Status === "error" ? "error" : "success",
+    errorClass: String(r.ErrorClass),
+    httpStatus: Number(r.HttpStatus),
+    labels: Array.isArray(r.Labels) ? r.Labels.map(String) : [],
+    metadata: String(r.Metadata ?? ""),
+    durationMs: Number(r.DurationMS),
+    occurredAt: new Date(Number(r.OccurredAtMs)),
+  };
+}
+
+export interface SpendEventsPageCursor {
+  occurredAtMs: number;
+  gatewayRequestId: string;
+}
+
+export interface SpendEventsPageFilters {
+  virtualKeyId?: string;
+  endUserId?: string;
+  model?: string;
+  status?: "success" | "error";
+}
+
 export class GatewaySpendEventsRepository {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
+
+  /**
+   * Newest-first page read for the ledger UI. Keyset pagination on
+   * (OccurredAt, GatewayRequestId) DESC so a page boundary never skips or
+   * repeats rows while inserts land; FINAL for the same no-transient-
+   * duplicates reason as readSpendEvents.
+   */
+  async readSpendEventsPage({
+    tenantId,
+    fromMs,
+    toMs,
+    filters = {},
+    cursor,
+    limit = 50,
+  }: {
+    tenantId: string;
+    fromMs: number;
+    toMs: number;
+    filters?: SpendEventsPageFilters;
+    cursor?: SpendEventsPageCursor;
+    limit?: number;
+  }): Promise<{
+    rows: SpendEventRow[];
+    nextCursor: SpendEventsPageCursor | null;
+  }> {
+    const client = await this.resolveClient(tenantId);
+    const conditions: string[] = [
+      "TenantId = {tenantId:String}",
+      "OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})",
+      "OccurredAt < fromUnixTimestamp64Milli({toMs:Int64})",
+    ];
+    const params: Record<string, unknown> = { tenantId, fromMs, toMs, limit };
+    if (filters.virtualKeyId) {
+      conditions.push("VirtualKeyId = {virtualKeyId:String}");
+      params.virtualKeyId = filters.virtualKeyId;
+    }
+    if (filters.endUserId) {
+      conditions.push("EndUserId = {endUserId:String}");
+      params.endUserId = filters.endUserId;
+    }
+    if (filters.model) {
+      conditions.push("Model = {model:String}");
+      params.model = filters.model;
+    }
+    if (filters.status) {
+      conditions.push("Status = {status:String}");
+      params.status = filters.status;
+    }
+    if (cursor) {
+      conditions.push(
+        "(OccurredAt, GatewayRequestId) < (fromUnixTimestamp64Milli({cursorOccurredAtMs:Int64}), {cursorRequestId:String})",
+      );
+      params.cursorOccurredAtMs = cursor.occurredAtMs;
+      params.cursorRequestId = cursor.gatewayRequestId;
+    }
+
+    const result = await client.query({
+      query: `
+        SELECT
+          TenantId, GatewayRequestId, OrganizationId, TeamId, VirtualKeyId,
+          PrincipalUserId, EndUserId, TraceId, Model, ProviderKey,
+          TokensInput, TokensOutput, TokensCacheRead, TokensCacheWrite,
+          TokensReasoning, toString(CostUSD) AS CostUSD, Status, ErrorClass,
+          HttpStatus, Labels, Metadata, DurationMS,
+          toUnixTimestamp64Milli(OccurredAt) AS OccurredAtMs
+        FROM ${TABLE} FINAL
+        WHERE ${conditions.join(" AND ")}
+        ORDER BY OccurredAt DESC, GatewayRequestId DESC
+        LIMIT {limit:UInt32}
+      `,
+      query_params: params,
+      format: "JSONEachRow",
+    });
+    const raw = (await result.json()) as Array<Record<string, unknown>>;
+    const rows = raw.map(mapSpendEventRow);
+    const last = rows[rows.length - 1];
+    return {
+      rows,
+      nextCursor:
+        rows.length === limit && last
+          ? {
+              occurredAtMs: last.occurredAt.getTime(),
+              gatewayRequestId: last.gatewayRequestId,
+            }
+          : null,
+    };
+  }
 
   /**
    * Insert rows, skipping any gateway_request_id the table already has.

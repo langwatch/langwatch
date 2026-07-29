@@ -35,6 +35,8 @@ import { gatewayBudgetsRouter } from "./routers/gatewayBudgets";
 import { gatewayCacheRulesRouter } from "./routers/gatewayCacheRules";
 import { gatewayGuardrailsRouter } from "./routers/gatewayGuardrails";
 import { gatewayUsageRouter } from "./routers/gatewayUsage";
+import { gatewaySpendEventsRouter } from "./routers/gatewaySpendEvents";
+import { webhookEndpointsRouter } from "./routers/webhookEndpoints";
 import { graphsRouter } from "./routers/graphs";
 import { groupRouter } from "./routers/group";
 import { homeRouter } from "./routers/home";
@@ -164,6 +166,8 @@ const coreRouters = {
   gatewayCacheRules: gatewayCacheRulesRouter,
   gatewayGuardrails: gatewayGuardrailsRouter,
   gatewayUsage: gatewayUsageRouter,
+  gatewaySpendEvents: gatewaySpendEventsRouter,
+  webhookEndpoints: webhookEndpointsRouter,
   langyGithub: langyGithubRouter,
   langyEgress: langyEgressRouter,
   langy: langyRouter,
