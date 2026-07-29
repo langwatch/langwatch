@@ -3,7 +3,7 @@
  * @integration
  *
  * Verifies the bloom_filter skip-index on simulation_runs.ScenarioRunId
- * (migration 00058):
+ * (migration 00063):
  *  - the migration attaches idx_scenario_run_id to the table, and
  *  - the (TenantId, ScenarioRunId) point-lookup shapes still return the right
  *    rows.
@@ -112,7 +112,7 @@ afterAll(async () => {
   await stopTestContainers();
 });
 
-describe("simulation_runs ScenarioRunId skip-index (migration 00058)", () => {
+describe("simulation_runs ScenarioRunId skip-index (migration 00063)", () => {
   it("attaches a bloom_filter index on ScenarioRunId", async () => {
     const ddl = await (
       await ch.query({
