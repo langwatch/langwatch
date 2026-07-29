@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, renderHook } from "@testing-library/react";
+import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useLangyOrbProximity } from "../useLangyOrbProximity";
 
@@ -53,6 +53,10 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  // Unmount, don't just wipe the DOM: clearing `body` orphans the React root,
+  // leaving this test's effect alive with its window listeners bound and its
+  // rAF loop still writing into a detached orb for the rest of the file.
+  cleanup();
   vi.useRealTimers();
   document.body.innerHTML = "";
 });

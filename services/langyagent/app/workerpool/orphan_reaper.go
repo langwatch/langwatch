@@ -55,7 +55,7 @@ import (
 // degraded diagnostic on a path nothing branches on. Worth fixing one day;
 // not worth a process-ownership redesign inside a retrospective bug-fix.
 //
-// Fire-and-forget: it spawns a goroutine that stops when ctx is cancelled, so
+// Fire-and-forget: it spawns a goroutine that stops when ctx is canceled, so
 // it plugs straight into a pkg/lifecycle Worker. The goroutine is launched via
 // clog.Go so a panic can never crash the manager, and each SIGCHLD-drain is
 // additionally guarded so a panic in one drain can't silently end zombie-reaping

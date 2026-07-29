@@ -308,20 +308,26 @@ describe("daemon over a unix socket", () => {
         const loserStaging = stagingSocketPath(socketPath, 2);
         const loser = await bindSocket(loserStaging);
 
-        expect(() => publishSocket(loserStaging, socketPath)).toThrow(
-          DaemonAlreadyRunningError,
-        );
+        // In a `finally`: these are raw servers the suite-level teardown knows
+        // nothing about, so a failing assertion would otherwise leave two
+        // listening handles behind and turn a clean failure into a worker that
+        // never settles.
+        try {
+          expect(() => publishSocket(loserStaging, socketPath)).toThrow(
+            DaemonAlreadyRunningError,
+          );
 
-        // The winner is untouched and still answering — a rename here would
-        // have left it alive on an inode no client can dial.
-        expect(fs.statSync(socketPath).ino).toBe(published.ino);
-        expect(await dial(socketPath)).toBe(true);
-        // And the loser still holds only its own private name, which libuv
-        // takes with the handle when `listen()` closes it.
-        expect(fs.existsSync(loserStaging)).toBe(true);
-
-        await new Promise<void>((resolve) => winner.close(() => resolve()));
-        await new Promise<void>((resolve) => loser.close(() => resolve()));
+          // The winner is untouched and still answering — a rename here would
+          // have left it alive on an inode no client can dial.
+          expect(fs.statSync(socketPath).ino).toBe(published.ino);
+          expect(await dial(socketPath)).toBe(true);
+          // And the loser still holds only its own private name, which libuv
+          // takes with the handle when `listen()` closes it.
+          expect(fs.existsSync(loserStaging)).toBe(true);
+        } finally {
+          await new Promise<void>((resolve) => winner.close(() => resolve()));
+          await new Promise<void>((resolve) => loser.close(() => resolve()));
+        }
       });
     });
 

@@ -231,30 +231,16 @@ Feature: Langy dual-stream — a raw token fast-path beside the durable event-so
   # turn then ran to completion, emitted nothing, and never reached a terminal
   # state — a silent hang with no error surfaced to the user.
   #
-  # The three scenarios below are one user-visible contract reached three ways:
-  # the credential store failing, no credentials ever recorded, and a read that
-  # comes back blank. None of that is distinguishable from the user's seat, so
-  # the steps state only the shared precondition and the unit tests pin which
-  # cause produced it.
+  # One user-visible contract reached three ways: the credential store failing,
+  # no credentials ever recorded, and a read that comes back blank. None of that
+  # is distinguishable from the user's seat, so it is one scenario here and the
+  # unit tests bound to it pin which cause produced it.
   @unit
-  Scenario: A turn that cannot be signed is refused instead of hanging
+  Scenario: Langy reports the agent unavailable instead of hanging the turn
     Given Langy cannot access the conversation credentials
     When the user sends a message
     Then the turn fails straight away with an agent-unavailable error
     And no answer ever starts streaming
-
-  @unit
-  Scenario: A conversation whose credentials are missing cannot start a turn
-    Given Langy cannot access the conversation credentials
-    When the user sends a message
-    Then the turn fails straight away with an agent-unavailable error
-    And no answer ever starts streaming
-
-  @unit
-  Scenario: A conversation whose credentials read back blank cannot start a turn
-    Given Langy cannot access the conversation credentials
-    When the user sends a message
-    Then the turn fails straight away with an agent-unavailable error
     And the user is never left watching a turn that produces nothing
 
   # The durable token buffer used to hold tokens until ~64 words accumulated,

@@ -77,8 +77,9 @@ func Serve(ctx context.Context, application *app.App, deps *Deps, cfg Config) er
 		// override) would demote the manager off init with no other observable
 		// signal. Boot logs then say plainly whether it armed.
 		lifecycle.Worker("orphan-reaper", func(ctx context.Context) {
+			armed := workerpool.StartOrphanReaper(ctx)
 			deps.Logger.Info("orphan_reaper_started",
-				zap.Bool("armed", workerpool.StartOrphanReaper(ctx)),
+				zap.Bool("armed", armed),
 				zap.Int("pid", os.Getpid()),
 			)
 		}, func() {}),

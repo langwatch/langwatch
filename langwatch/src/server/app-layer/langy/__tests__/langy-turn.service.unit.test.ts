@@ -717,7 +717,7 @@ describe("when a follow-up turn depends on what an earlier turn created", () => 
  * signed with "" emits nothing and never terminates — a silent hang.
  */
 describe("when the conversation's runToken cannot be resolved", () => {
-  /** @scenario A turn that cannot be signed is refused instead of hanging */
+  /** @scenario Langy reports the agent unavailable instead of hanging the turn */
   it("refuses the turn when the runToken read fails", async () => {
     const { deps, mocks } = makeDeps();
     mocks.getRunToken.mockRejectedValue(new Error("postgres unavailable"));
@@ -729,7 +729,7 @@ describe("when the conversation's runToken cannot be resolved", () => {
     expect(mocks.dispatch).not.toHaveBeenCalled();
   });
 
-  /** @scenario A conversation whose credentials are missing cannot start a turn */
+  /** @scenario Langy reports the agent unavailable instead of hanging the turn */
   it("refuses the turn when the conversation carries no runToken", async () => {
     const { deps, mocks } = makeDeps();
     mocks.getRunToken.mockResolvedValue(null);
@@ -741,7 +741,7 @@ describe("when the conversation's runToken cannot be resolved", () => {
     expect(mocks.dispatch).not.toHaveBeenCalled();
   });
 
-  /** @scenario A conversation whose credentials read back blank cannot start a turn */
+  /** @scenario Langy reports the agent unavailable instead of hanging the turn */
   it("never dispatches a turn with a falsy runToken", async () => {
     const { deps, mocks } = makeDeps();
     mocks.getRunToken.mockResolvedValue("");
@@ -1040,7 +1040,8 @@ describe("LangyTurnService.stopTurn", () => {
  */
 /** The `system` string the worker was dispatched with. */
 const systemOf = (dispatch: ReturnType<typeof vi.fn>): string =>
-  (dispatch.mock.calls[0]?.[0] as { system?: string } | undefined)?.system ?? "";
+  (dispatch.mock.calls[0]?.[0] as { system?: string } | undefined)?.system ??
+  "";
 
 describe("when the project holding Langy's versioned prompts is configured", () => {
   const PROJECT_ENV = "LANGY_PROMPT_PROJECT_ID";
@@ -1069,7 +1070,10 @@ describe("when the project holding Langy's versioned prompts is configured", () 
     await LangyTurnService.create(deps).startConversationTurn(input());
 
     expect(getPromptByIdOrHandle).toHaveBeenCalledWith(
-      expect.objectContaining({ projectId: "project-system", tag: "production" }),
+      expect.objectContaining({
+        projectId: "project-system",
+        tag: "production",
+      }),
     );
     expect(systemOf(mocks.dispatch)).toContain("REGISTRY OVERRIDE TEXT");
   });

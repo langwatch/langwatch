@@ -1430,7 +1430,9 @@ function validateExemptionList({
           `${name} entry does not resolve to an existing .feature file: ${entry}`
         );
       } else {
-        errors.push(`${name} entry is not discovered under specs/: ${entry}`);
+        errors.push(
+          `${name} entry is not discovered under the configured spec roots: ${entry}`
+        );
       }
     }
   }

@@ -444,7 +444,11 @@ export function createDaemonServer(options: DaemonServerOptions): DaemonServer {
     try {
       unlinkIfSameFile(options.socketPath, publishedSocket);
     } catch {
-      // Already gone — someone cleaned up a stale file, or we never published.
+      // Not "already gone" and not "we never published" — both of those return
+      // false rather than throwing. What lands here is the residual class: a
+      // filesystem refusal (EACCES, EPERM, a directory removed under us).
+      // Shutdown proceeds regardless; a socket we could not unlink is a corpse
+      // the next client's liveness probe cleans up.
     }
     server.close();
 

@@ -35,10 +35,20 @@ type OrgScopedModelConfig = {
    * FK, a globally-unique secret) simply ignore the argument.
    */
   extraBound?: (args: {
-    clause: any;
+    clause: unknown;
     action: Prisma.MiddlewareParams["action"];
   }) => boolean;
 };
+
+/**
+ * Read one top-level key off a WHERE clause of unknown shape. The clause comes
+ * off `Prisma.MiddlewareParams["args"]`, so it is genuinely untyped input and
+ * every bound below has to narrow before it reads.
+ */
+const clauseField = (clause: unknown, key: string): unknown =>
+  clause && typeof clause === "object"
+    ? (clause as Record<string, unknown>)[key]
+    : undefined;
 
 /**
  * A reserved, system-managed API-key name. Only the platform can create or
@@ -162,7 +172,8 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   OrganizationInvite: {
     // inviteCode is a globally-unique acceptance token; the invite row it
     // names belongs to exactly one organization.
-    extraBound: ({ clause }) => typeof clause?.inviteCode === "string",
+    extraBound: ({ clause }) =>
+      typeof clauseField(clause, "inviteCode") === "string",
   },
   // Org-scoped RBAC + config models, audited to already carry a bounded
   // predicate (organizationId, a row id, a compound org key, a parent FK, or
@@ -174,8 +185,8 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
     // its inline (scopeType, scopeId) target (a team / project id unique
     // across the platform), all of which bound to a single organization.
     extraBound: ({ clause }) =>
-      typeof clause?.apiKeyId === "string" ||
-      typeof clause?.groupId === "string" ||
+      typeof clauseField(clause, "apiKeyId") === "string" ||
+      typeof clauseField(clause, "groupId") === "string" ||
       hasInlineScope(clause),
   },
   ApiKey: {
@@ -200,7 +211,7 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
     // have authorised. A new platform maintenance query does not inherit the
     // hatch; it is a deliberate widening here, with its own shape and action.
     extraBound: ({ clause, action }) =>
-      typeof clause?.lookupId === "string" ||
+      typeof clauseField(clause, "lookupId") === "string" ||
       (action === "updateMany" && isSystemManagedKeySweep(clause)),
   },
   RoutingPolicy: {},
@@ -211,7 +222,8 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   // (webhook + mint paths). Issue #4747; spec
   // specs/langy/langy-github-install.feature.
   LangyGithubInstallation: {
-    extraBound: ({ clause }) => typeof clause?.installationId === "string",
+    extraBound: ({ clause }) =>
+      typeof clauseField(clause, "installationId") === "string",
   },
 };
 
