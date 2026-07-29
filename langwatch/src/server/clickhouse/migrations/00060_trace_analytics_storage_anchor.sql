@@ -90,6 +90,12 @@ ALTER TABLE ${CLICKHOUSE_DATABASE}.trace_analytics
 -- +goose ENVSUB OFF
 
 -- +goose Down
+-- IRREVERSIBLE: dropping EarliestSpanStartMs discards persisted span-timing
+-- state that cannot be recovered from the remaining columns. Since the anchor
+-- split, OccurredAt carries the frozen storage anchor rather than min(span
+-- start), so the baseline is not re-derivable from the row — only by replaying
+-- the trace's whole history out of event_log, for every affected trace.
+--
 -- Down migrations are commented out to prevent accidental data loss. Dropping
 -- this column strands the span timing baseline on every row written since, and
 -- the fold — which reads it back rather than re-deriving it — restarts each

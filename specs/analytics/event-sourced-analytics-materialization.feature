@@ -49,18 +49,18 @@ Feature: Event-sourced analytics materialization
       Then the row is anchored at the first span's start
 
     @unit
-    Scenario: A trace already stored keeps its anchor when the platform is upgraded
-      Given a trace whose row was stored before the anchor was held separately
-      When that row is read back after the upgrade
-      Then it is still anchored where it was already stored
-      And its measured start is still the earliest span the trace ever reported
+    Scenario: A trace recorded before the upgrade keeps its place in the timeline
+      Given a trace that was recorded before storage time was held separately
+      When it is read back after the upgrade
+      Then it still appears at the same point in analytics as it did before
+      And its duration is still measured from the earliest span it reported
 
     @unit
-    Scenario: A trace anchored in the far future is refused that time
-      Given a trace whose reported start time is years ahead of now
-      When its slim row is written
-      Then the row is not filed under that time
-      And it is kept for its full retention period rather than outliving it
+    Scenario: A trace that reports a start time years ahead is not filed under it
+      Given a trace whose reported start time is years in the future
+      When it is recorded
+      Then it does not appear years ahead in analytics
+      And it is discarded on the normal retention schedule rather than outliving it
 
     @unit
     Scenario: A late earlier-starting span moves the trace's timing, not its anchor

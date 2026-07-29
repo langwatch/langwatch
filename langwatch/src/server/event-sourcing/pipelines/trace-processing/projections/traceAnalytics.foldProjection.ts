@@ -582,8 +582,9 @@ export function projectAnalyticsStateToRow({
     // `state.createdAt` would put the row straight back in 196952, which is the
     // one outcome this whole change exists to prevent.
     //
-    // ADR-071:163 names `CreatedAt` as a trap for exactly this use, and it is
-    // right: it is fold time, so a rebuild re-stamps it. That is accepted here
+    // ADR-071 ("One trap for whoever implements it") names `CreatedAt` as a trap
+    // for exactly this use, and it is right: it is fold time, so a rebuild
+    // re-stamps it. That is accepted here
     // and no worse than the alternative, because it applies ONLY to a state that
     // has no business time at all, and because the read-back promotes whatever
     // landed in the column to the frozen anchor — so it stops drifting after the

@@ -328,7 +328,10 @@ export class TraceAnalyticsClickHouseRepository
    * freeze — and a trace whose anchor a post-miss rebuild re-stamped — still
    * carry more than one OccurredAt, so superseded versions persist until TTL.
    * The inner dedup subquery reads only sort-key columns — no heavy Attributes
-   * map — so it stays a cheap keyed seek.
+   * map. It is NOT a keyed seek: `TraceId` is third in the sort key and the
+   * inner scope carries no `OccurredAt` predicate (deliberately — see below), so
+   * it is a tenant-wide scan over the trace's versions. What keeps it cheap is
+   * the narrow column set, not the key prefix.
    *
    * `window` bounds OccurredAt on the OUTER read only, keeping it a
    * partition-pruned point read. The inner dedup is deliberately UNWINDOWED so
@@ -361,14 +364,23 @@ export class TraceAnalyticsClickHouseRepository
    *      that saw the same latest event time, more spans folded = more complete.
    *   3. `length(AppliedEventIds) DESC` — more deliveries absorbed. Last of the
    *      three because the watermark is a bounded ring, so it saturates.
-   *   4. `OccurredAt ASC` — a deterministic last-resort tie-break whose only
-   *      job is to make the ordering total. It is NOT a progress signal: since
-   *      ADR-071 step 3 OccurredAt is the frozen storage anchor, equal across a
-   *      trace's versions except where a post-miss rebuild re-derived it from
-   *      replayed history — which can land either side of the original — so no
-   *      direction of it says which version folded further. The three keys
-   *      above it are the progress ranking. Reading the array length costs only
-   *      its offsets column, and every other key is a scalar already in the row.
+   *   4. `OccurredAt ASC` — a last-resort tie-break, and NOT a progress signal:
+   *      since ADR-071 step 3 OccurredAt is the frozen storage anchor, equal
+   *      across a trace's versions except where a rebuild from an absent row
+   *      re-derived it — which can land either side of the original — so no
+   *      direction of it says which version folded further. The three keys above
+   *      it are the progress ranking. Reading the array length costs only its
+   *      offsets column, and every other key is a scalar already in the row.
+   *
+   * This ordering is BEST-EFFORT, not total. All four keys can be equal on two
+   * concurrent versions — same latest event, same span count, same saturated
+   * watermark length, and (precisely because the anchor is now frozen) the same
+   * OccurredAt — in which case `LIMIT 1` still picks arbitrarily and the loser's
+   * contributions and applied-id watermark are dropped. Closing that needs a
+   * unique persisted version/writer identity on the row, which this table does
+   * not have; the ranking narrows the window rather than eliminating it. The
+   * residual case requires two writers to resume from the same committed version
+   * AND land on the same `updatedAt` millisecond AND make identical progress.
    */
   private async queryLatestVersion({
     tenantId,

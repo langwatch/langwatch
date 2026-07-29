@@ -373,7 +373,7 @@ describe("traceAnalytics storage anchor", () => {
     const now = BASE_MS;
     const farFuture = BASE_MS + 400 * 24 * 60 * 60 * 1000;
 
-    /** @scenario "A trace anchored in the far future is refused that time" */
+    /** @scenario "A trace that reports a start time years ahead is not filed under it" */
     it("refuses it rather than freezing the row into a partition years away", () => {
       const state = anchorStorageTime({
         state: projection.init(),

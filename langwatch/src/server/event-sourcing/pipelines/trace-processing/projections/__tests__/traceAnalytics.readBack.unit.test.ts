@@ -170,8 +170,13 @@ describe("traceAnalytics read-back (fromRow)", () => {
       expect(decoded.annotationIds).toEqual([]);
       expect(decoded.spanCount).toBe(0);
       expect(decoded.LastEventOccurredAt).toBe(0);
-      // 0 reads back as "no span has seeded the timing baseline" — which is
-      // precisely why the store refuses such a row rather than folding onto it.
+      // 0 reads back as "no span has seeded the timing baseline". On a row this
+      // old that default is indistinguishable from the truth, and nothing else
+      // on the row carries the baseline — which is why the VERSION gate refuses
+      // the stamp outright. Note this is a property of the STAMP, not of the
+      // zero: the pre-split stamp decodes a baseline of 0 quite happily, because
+      // there OccurredAt still carries the real value (see the pre-split
+      // describe below).
       expect(decoded.occurredAt).toBe(0);
     });
   });
@@ -244,7 +249,7 @@ describe("TraceAnalyticsStore read-back version gate", () => {
       expect(appliedEventIds).toEqual(["evt-1", "evt-2"]);
     });
 
-    /** @scenario "A trace already stored keeps its anchor when the platform is upgraded" */
+    /** @scenario "A trace recorded before the upgrade keeps its place in the timeline" */
     it("takes the timing baseline from the anchor's column, because there they are the same value", () => {
       const state = traceAnalyticsStateFromRow(preSplitRow());
 
@@ -253,7 +258,7 @@ describe("TraceAnalyticsStore read-back version gate", () => {
       expect(state.occurredAt).toBe(BASE_MS + 250);
     });
 
-    /** @scenario "A trace already stored keeps its anchor when the platform is upgraded" */
+    /** @scenario "A trace recorded before the upgrade keeps its place in the timeline" */
     it("keeps the anchor exactly where the row was already stored", () => {
       // The point of decoding rather than refolding: re-projecting the decoded
       // state must reproduce the same partition column, so the row is rewritten
