@@ -72,7 +72,7 @@ Routing pattern:
   - `<alias>` (e.g. `gpt-4o`, `claude`) — resolved via VK config `model_aliases`. **Aliases always win** if defined; they are the VK owner's explicit redirect.
   - `<provider>/<model>` explicit form (e.g. `openai/gpt-5-mini`, `bedrock/anthropic.claude-haiku-4-5-20251001`, `azure/my-deployment`) — bypasses aliases and addresses the provider directly. Still subject to `models_allowed` allowlist.
 - If the alias/explicit form doesn't resolve to a provider in the VK's `providers` list, returns `model_not_allowed` error.
-- `GET /v1/models` returns the **effective** model list: the union of aliases + explicitly-allowed models for this VK, filtered by `models_allowed` if set.
+- `GET /v1/models` returns the **effective** model list: the union of aliases + explicitly-allowed models for this VK, filtered by `models_allowed` if set. Without an allowlist, the list is discovered from the chain's catalogs: base-URL endpoints and hosted providers are asked for their models, deployment-mapped providers (Azure / Bedrock / Vertex) list their mapped ids. Providers that dispatch can route to but that contributed nothing are named in the `X-Langwatch-Models-Discovery-Incomplete` response header as `provider:reason` tokens (`not-enumerable`, `probe-failed`), so an empty or partial list is diagnosable rather than silent.
 
 ---
 

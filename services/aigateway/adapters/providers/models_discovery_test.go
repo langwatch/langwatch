@@ -14,10 +14,14 @@ import (
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
+// noHostedCatalogs disables the hosted-provider catalog table so a unit
+// test never dials a real provider API. Tests covering hosted discovery
+// override the table with local servers instead.
+var noHostedCatalogs = map[domain.ProviderID]catalogProbe{}
+
 // @scenario "GET /v1/models discovers models from self-hosted endpoints"
 // Credentials with a base URL are asked for their OpenAI-shape /v1/models
-// list (vLLM, LiteLLM, and Anthropic-compatible servers all serve it);
-// credentials without one are skipped — there is no catalog to query.
+// list (vLLM, LiteLLM, and Anthropic-compatible servers all serve it).
 // Spec: specs/ai-gateway/provider-routing.feature
 func TestListModels_QueriesBaseURLCredentials(t *testing.T) {
 	var captured struct {
@@ -32,11 +36,14 @@ func TestListModels_QueriesBaseURLCredentials(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	router := &BifrostRouter{}
-	models, err := router.ListModels(context.Background(), []domain.Credential{
+	router := &BifrostRouter{hostedCatalogs: noHostedCatalogs}
+	models, gaps, err := router.ListModels(context.Background(), []domain.Credential{
 		// Conventional "/v1" suffix must not produce ".../v1/v1/models".
 		{ID: "mp-1", ProviderID: domain.ProviderAnthropic, APIKey: "sk-local", Extra: map[string]string{"base_url": srv.URL + "/v1"}},
-		{ID: "mp-2", ProviderID: domain.ProviderOpenAI, APIKey: "sk-hosted"}, // no base URL — skipped
+		// No base URL and (here) no hosted catalog: nothing can list this
+		// credential's models, which must surface as a gap rather than a
+		// silent omission.
+		{ID: "mp-2", ProviderID: domain.ProviderOpenAI, APIKey: "sk-hosted"},
 	})
 	if err != nil {
 		t.Fatalf("ListModels returned error: %v", err)
@@ -58,6 +65,223 @@ func TestListModels_QueriesBaseURLCredentials(t *testing.T) {
 	if len(ids) != 2 || ids[0] != "qwen3-14b" || ids[1] != "bge-m3" {
 		t.Fatalf("models = %v, want [qwen3-14b bge-m3]", ids)
 	}
+	if len(gaps) != 1 || gaps[0].ProviderID != domain.ProviderOpenAI || gaps[0].Reason != domain.ModelDiscoveryNotEnumerable {
+		t.Fatalf("gaps = %v, want the unlistable openai credential reported as not-enumerable", gaps)
+	}
+}
+
+// @scenario "GET /v1/models lists hosted provider catalogs for API-key credentials"
+// REPRO of the production symptom: a virtual key whose chain is plain
+// API-key credentials (openai + anthropic, no base_url) dispatched fine
+// but listed zero models, because discovery only probed base-URL
+// credentials. Hosted credentials must be asked at their provider's
+// public catalog endpoint, with the provider's required headers
+// (api.anthropic.com rejects the probe without anthropic-version).
+// Spec: specs/ai-gateway/provider-routing.feature
+func TestListModels_QueriesHostedProviderCatalogs(t *testing.T) {
+	var openaiAuth string
+	openaiSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		openaiAuth = r.Header.Get("Authorization")
+		_, _ = w.Write([]byte(`{"object":"list","data":[{"id":"gpt-5-nano"}]}`))
+	}))
+	defer openaiSrv.Close()
+	var anthropicVersion string
+	anthropicSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		anthropicVersion = r.Header.Get("anthropic-version")
+		if anthropicVersion == "" {
+			// Mirrors api.anthropic.com: the header is mandatory.
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		_, _ = w.Write([]byte(`{"data":[{"id":"claude-haiku-4-5"}]}`))
+	}))
+	defer anthropicSrv.Close()
+
+	router := &BifrostRouter{hostedCatalogs: map[domain.ProviderID]catalogProbe{
+		domain.ProviderOpenAI:    {modelsURL: openaiSrv.URL + "/v1/models"},
+		domain.ProviderAnthropic: {modelsURL: anthropicSrv.URL + "/v1/models?limit=1000", headers: map[string]string{"anthropic-version": anthropicModelsAPIVersion}},
+	}}
+	models, gaps, err := router.ListModels(context.Background(), []domain.Credential{
+		{ID: "mp-openai", ProviderID: domain.ProviderOpenAI, APIKey: "sk-oa"},
+		{ID: "mp-anthropic", ProviderID: domain.ProviderAnthropic, APIKey: "sk-ant"},
+	})
+	if err != nil {
+		t.Fatalf("ListModels returned error: %v", err)
+	}
+	if len(gaps) != 0 {
+		t.Fatalf("gaps = %v, want none when every hosted catalog answered", gaps)
+	}
+	if openaiAuth != "Bearer sk-oa" {
+		t.Fatalf("openai probe Authorization = %q, want the credential's key", openaiAuth)
+	}
+	if anthropicVersion != anthropicModelsAPIVersion {
+		t.Fatalf("anthropic probe anthropic-version = %q, want %q", anthropicVersion, anthropicModelsAPIVersion)
+	}
+	byID := map[string]domain.ProviderID{}
+	for _, m := range models {
+		byID[m.ID] = m.ProviderID
+	}
+	if byID["gpt-5-nano"] != domain.ProviderOpenAI || byID["claude-haiku-4-5"] != domain.ProviderAnthropic {
+		t.Fatalf("models = %v, want both hosted providers' catalogs listed with correct attribution", models)
+	}
+}
+
+// @scenario "a failed catalog probe surfaces as a gap, not a silent empty list"
+// One dead catalog endpoint must not blank the response NOR vanish
+// silently: the provider is reported as probe-failed so an empty or
+// partial list is diagnosable from the response.
+// Spec: specs/ai-gateway/provider-routing.feature
+func TestListModels_HostedProbeFailureSurfacesAsGap(t *testing.T) {
+	dead := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer dead.Close()
+
+	router := &BifrostRouter{hostedCatalogs: map[domain.ProviderID]catalogProbe{
+		domain.ProviderOpenAI: {modelsURL: dead.URL + "/v1/models"},
+	}}
+	models, gaps, err := router.ListModels(context.Background(), []domain.Credential{
+		{ID: "mp-openai", ProviderID: domain.ProviderOpenAI, APIKey: "sk-oa"},
+	})
+	if err != nil {
+		t.Fatalf("ListModels returned error: %v", err)
+	}
+	if len(models) != 0 {
+		t.Fatalf("models = %v, want none from a failing catalog", models)
+	}
+	if len(gaps) != 1 || gaps[0].ProviderID != domain.ProviderOpenAI || gaps[0].Reason != domain.ModelDiscoveryProbeFailed {
+		t.Fatalf("gaps = %v, want the failed openai probe reported as probe-failed", gaps)
+	}
+}
+
+// @scenario "GET /v1/models lists deployment-mapped models without probing"
+// Azure / Bedrock / Vertex route on deployment maps: the map's keys are
+// the model ids dispatch accepts, so they belong in the catalog without
+// any network call, and a mapped credential is fully enumerated (no gap).
+// Spec: specs/ai-gateway/provider-routing.feature
+func TestListModels_DeploymentMapContributesWithoutProbe(t *testing.T) {
+	router := &BifrostRouter{hostedCatalogs: noHostedCatalogs}
+	models, gaps, err := router.ListModels(context.Background(), []domain.Credential{
+		{ID: "mp-bedrock", ProviderID: domain.ProviderBedrock, DeploymentMap: map[string]string{
+			"claude-haiku-4-5": "eu.anthropic.claude-haiku-4-5-20251001-v1:0",
+			"claude-sonnet-4":  "eu.anthropic.claude-sonnet-4-20250514-v1:0",
+		}},
+	})
+	if err != nil {
+		t.Fatalf("ListModels returned error: %v", err)
+	}
+	if len(gaps) != 0 {
+		t.Fatalf("gaps = %v, want none for a deployment-mapped credential", gaps)
+	}
+	if len(models) != 2 || models[0].ID != "claude-haiku-4-5" || models[1].ID != "claude-sonnet-4" {
+		t.Fatalf("models = %v, want the deployment map's model ids in stable order", models)
+	}
+	for _, m := range models {
+		if m.ProviderID != domain.ProviderBedrock {
+			t.Fatalf("model %q attributed to %q, want bedrock", m.ID, m.ProviderID)
+		}
+	}
+}
+
+// @scenario "GET /v1/models says so when a provider's catalog cannot be enumerated"
+// A bedrock credential with no deployment map is dispatchable but
+// unlistable (enumerating Bedrock needs signed SDK calls). The response
+// must say so instead of silently returning empty.
+// Spec: specs/ai-gateway/provider-routing.feature
+func TestListModels_UnenumerableProviderReportsGap(t *testing.T) {
+	router := &BifrostRouter{hostedCatalogs: noHostedCatalogs}
+	models, gaps, err := router.ListModels(context.Background(), []domain.Credential{
+		{ID: "mp-bedrock", ProviderID: domain.ProviderBedrock},
+	})
+	if err != nil {
+		t.Fatalf("ListModels returned error: %v", err)
+	}
+	if len(models) != 0 {
+		t.Fatalf("models = %v, want none", models)
+	}
+	if len(gaps) != 1 || gaps[0].ProviderID != domain.ProviderBedrock || gaps[0].Reason != domain.ModelDiscoveryNotEnumerable {
+		t.Fatalf("gaps = %v, want bedrock reported as not-enumerable", gaps)
+	}
+}
+
+// Gemini's OpenAI-compat catalog decorates ids as "models/gemini-…";
+// dispatch accepts the bare name, so the probe's configured prefix strip
+// must normalize them or every listed gemini model would 404 on dispatch.
+func TestListModels_StripsConfiguredIDPrefix(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"data":[{"id":"models/gemini-2.5-flash"}]}`))
+	}))
+	defer srv.Close()
+
+	router := &BifrostRouter{hostedCatalogs: map[domain.ProviderID]catalogProbe{
+		domain.ProviderGemini: {modelsURL: srv.URL + "/models", stripIDPrefix: "models/"},
+	}}
+	models, _, err := router.ListModels(context.Background(), []domain.Credential{
+		{ID: "mp-gemini", ProviderID: domain.ProviderGemini, APIKey: "sk-g"},
+	})
+	if err != nil {
+		t.Fatalf("ListModels returned error: %v", err)
+	}
+	if len(models) != 1 || models[0].ID != "gemini-2.5-flash" {
+		t.Fatalf("models = %v, want the catalog's models/ prefix stripped to the dispatchable id", models)
+	}
+}
+
+// The production hosted-catalog table is data the whole fix hangs on;
+// pin the parts that were verified against the live providers so a
+// refactor cannot silently drop them.
+func TestHostedModelCatalogsShape(t *testing.T) {
+	for _, p := range []domain.ProviderID{
+		domain.ProviderOpenAI, domain.ProviderAnthropic, domain.ProviderGemini,
+		domain.ProviderGroq, domain.ProviderXAI, domain.ProviderCerebras, domain.ProviderDeepSeek,
+	} {
+		if _, ok := hostedModelCatalogs[p]; !ok {
+			t.Errorf("hostedModelCatalogs missing %q: its hosted credentials would silently list nothing", p)
+		}
+	}
+	if v := hostedModelCatalogs[domain.ProviderAnthropic].headers["anthropic-version"]; v == "" {
+		t.Error("anthropic catalog probe must send anthropic-version: api.anthropic.com rejects the request without it")
+	}
+	if hostedModelCatalogs[domain.ProviderGemini].stripIDPrefix != "models/" {
+		t.Error("gemini catalog probe must strip the models/ prefix: dispatch accepts the bare model name")
+	}
+	for p, probe := range hostedModelCatalogs {
+		if !strings.HasPrefix(probe.modelsURL, "https://") {
+			t.Errorf("%s catalog URL %q must be https", p, probe.modelsURL)
+		}
+	}
+	// Deployment-routed and non-enumerable providers stay out of the
+	// table on purpose; their coverage is the deployment map and the
+	// not-enumerable gap.
+	for _, p := range []domain.ProviderID{domain.ProviderAzure, domain.ProviderBedrock, domain.ProviderVertex, domain.ProviderCustom} {
+		if _, ok := hostedModelCatalogs[p]; ok {
+			t.Errorf("hostedModelCatalogs must not carry %q: it has no API-key OpenAI-shape catalog", p)
+		}
+	}
+}
+
+// A deployment-map edit changes what the catalog lists, so it must not be
+// served the previous map's entry for a full TTL.
+func TestListModels_CacheKeyCoversDeploymentMap(t *testing.T) {
+	router := &BifrostRouter{hostedCatalogs: noHostedCatalogs}
+	first, _, err := router.ListModels(context.Background(), []domain.Credential{
+		{ID: "mp-azure", ProviderID: domain.ProviderAzure, DeploymentMap: map[string]string{"gpt-5-mini": "prod-mini"}},
+	})
+	if err != nil {
+		t.Fatalf("ListModels returned error: %v", err)
+	}
+	second, _, err := router.ListModels(context.Background(), []domain.Credential{
+		{ID: "mp-azure", ProviderID: domain.ProviderAzure, DeploymentMap: map[string]string{"gpt-5-large": "prod-large"}},
+	})
+	if err != nil {
+		t.Fatalf("ListModels returned error: %v", err)
+	}
+	if len(first) != 1 || first[0].ID != "gpt-5-mini" {
+		t.Fatalf("first = %v, want the first map's model", first)
+	}
+	if len(second) != 1 || second[0].ID != "gpt-5-large" {
+		t.Fatalf("second = %v, want the edited map's model, not a stale cache entry", second)
+	}
 }
 
 // A server that fails to answer is skipped without failing the request —
@@ -74,7 +298,7 @@ func TestListModels_SkipsFailingEndpoint(t *testing.T) {
 	defer alive.Close()
 
 	router := &BifrostRouter{}
-	models, err := router.ListModels(context.Background(), []domain.Credential{
+	models, _, err := router.ListModels(context.Background(), []domain.Credential{
 		{ID: "mp-dead", ProviderID: domain.ProviderCustom, Extra: map[string]string{"base_url": dead.URL}},
 		{ID: "mp-alive", ProviderID: domain.ProviderCustom, Extra: map[string]string{"base_url": alive.URL}},
 	})
@@ -102,7 +326,7 @@ func TestListModels_NoAuthHeaderWhenKeyEmptyAndDedupes(t *testing.T) {
 	defer srv2.Close()
 
 	router := &BifrostRouter{}
-	models, err := router.ListModels(context.Background(), []domain.Credential{
+	models, _, err := router.ListModels(context.Background(), []domain.Credential{
 		{ID: "mp-1", ProviderID: domain.ProviderCustom, Extra: map[string]string{"base_url": srv1.URL}},
 		{ID: "mp-2", ProviderID: domain.ProviderCustom, Extra: map[string]string{"api_base": srv2.URL}},
 	})
@@ -134,7 +358,7 @@ func TestListModels_QueriesEndpointsConcurrently(t *testing.T) {
 
 	router := &BifrostRouter{}
 	start := time.Now()
-	_, err := router.ListModels(context.Background(), []domain.Credential{
+	_, _, err := router.ListModels(context.Background(), []domain.Credential{
 		{ID: "mp-1", ProviderID: domain.ProviderCustom, Extra: map[string]string{"base_url": s1.URL}},
 		{ID: "mp-2", ProviderID: domain.ProviderCustom, Extra: map[string]string{"base_url": s2.URL}},
 		{ID: "mp-3", ProviderID: domain.ProviderCustom, Extra: map[string]string{"base_url": s3.URL}},
@@ -162,7 +386,7 @@ func TestListModels_SendsXAPIKeyForAnthropicStyleServers(t *testing.T) {
 	defer srv.Close()
 
 	router := &BifrostRouter{}
-	models, err := router.ListModels(context.Background(), []domain.Credential{
+	models, _, err := router.ListModels(context.Background(), []domain.Credential{
 		{ID: "mp-1", ProviderID: domain.ProviderAnthropic, APIKey: "sk-local", Extra: map[string]string{"base_url": srv.URL}},
 	})
 	if err != nil {
@@ -206,7 +430,7 @@ func TestListModels_BoundsFanOutConcurrency(t *testing.T) {
 	}
 
 	router := &BifrostRouter{}
-	_, err := router.ListModels(context.Background(), creds)
+	_, _, err := router.ListModels(context.Background(), creds)
 	if err != nil {
 		t.Fatalf("ListModels returned error: %v", err)
 	}
@@ -235,7 +459,7 @@ func TestListModels_RejectsOversizedResponse(t *testing.T) {
 	defer srv.Close()
 
 	router := &BifrostRouter{}
-	models, err := router.ListModels(context.Background(), []domain.Credential{
+	models, _, err := router.ListModels(context.Background(), []domain.Credential{
 		{ID: "mp-huge", ProviderID: domain.ProviderCustom, Extra: map[string]string{"base_url": srv.URL}},
 	})
 	if err != nil {
@@ -267,7 +491,7 @@ func TestListModels_DoesNotFollowRedirects(t *testing.T) {
 	defer entry.Close()
 
 	router := &BifrostRouter{}
-	models, err := router.ListModels(context.Background(), []domain.Credential{
+	models, _, err := router.ListModels(context.Background(), []domain.Credential{
 		{ID: "mp-redirect", ProviderID: domain.ProviderCustom, APIKey: "sk-secret", Extra: map[string]string{"base_url": entry.URL}},
 	})
 	if err != nil {
@@ -310,7 +534,7 @@ func TestListModels_RejectsRebindingToLocalAddress(t *testing.T) {
 	}
 
 	router := &BifrostRouter{endpointPolicy: policy}
-	models, err := router.ListModels(context.Background(), []domain.Credential{
+	models, _, err := router.ListModels(context.Background(), []domain.Credential{
 		{ID: "mp-rebind", ProviderID: domain.ProviderCustom, Extra: map[string]string{"base_url": "http://localhost:" + port}},
 	})
 	if err != nil {
@@ -344,7 +568,7 @@ func TestListModels_CachesDiscoveryBetweenCalls(t *testing.T) {
 	}
 	router := &BifrostRouter{}
 	for i := 0; i < 5; i++ {
-		models, err := router.ListModels(context.Background(), creds)
+		models, _, err := router.ListModels(context.Background(), creds)
 		if err != nil {
 			t.Fatalf("ListModels returned error: %v", err)
 		}
@@ -376,7 +600,7 @@ func TestListModels_CacheKeyedByCredentialChain(t *testing.T) {
 
 	router := &BifrostRouter{}
 	for _, key := range []string{"sk-old", "sk-rotated"} {
-		if _, err := router.ListModels(context.Background(), []domain.Credential{
+		if _, _, err := router.ListModels(context.Background(), []domain.Credential{
 			{ID: "mp-1", ProviderID: domain.ProviderCustom, APIKey: key, Extra: map[string]string{"base_url": srv.URL}},
 		}); err != nil {
 			t.Fatalf("ListModels returned error: %v", err)
@@ -414,7 +638,7 @@ func TestListModels_CollapsesConcurrentDiscovery(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			models, err := router.ListModels(context.Background(), creds)
+			models, _, err := router.ListModels(context.Background(), creds)
 			if err != nil {
 				t.Errorf("ListModels returned error: %v", err)
 				return
@@ -450,7 +674,7 @@ func TestListModels_ProbeSurvivesCallerCancellation(t *testing.T) {
 	}()
 
 	router := &BifrostRouter{}
-	models, err := router.ListModels(ctx, []domain.Credential{
+	models, _, err := router.ListModels(ctx, []domain.Credential{
 		{ID: "mp-1", ProviderID: domain.ProviderCustom, Extra: map[string]string{"base_url": srv.URL}},
 	})
 	if err != nil {
@@ -467,11 +691,11 @@ func TestModelsDiscoveryCache_ExpiresEmptyResultsQuickly(t *testing.T) {
 	cache := &modelsDiscoveryCache{}
 
 	before := time.Now()
-	if _, err := cache.get(context.Background(), "empty", func() []domain.Model { return nil }); err != nil {
+	if _, err := cache.get(context.Background(), "empty", func() discoveredCatalog { return discoveredCatalog{} }); err != nil {
 		t.Fatalf("get returned error: %v", err)
 	}
-	if _, err := cache.get(context.Background(), "full", func() []domain.Model {
-		return []domain.Model{{ID: "qwen3-14b"}}
+	if _, err := cache.get(context.Background(), "full", func() discoveredCatalog {
+		return discoveredCatalog{models: []domain.Model{{ID: "qwen3-14b"}}}
 	}); err != nil {
 		t.Fatalf("get returned error: %v", err)
 	}
@@ -501,20 +725,20 @@ func TestModelsDiscoveryCache_RecoversFromPanickingFetch(t *testing.T) {
 				t.Error("panic did not propagate to the caller")
 			}
 		}()
-		_, _ = cache.get(context.Background(), "key", func() []domain.Model {
+		_, _ = cache.get(context.Background(), "key", func() discoveredCatalog {
 			panic("discovery blew up")
 		})
 	}()
 
 	done := make(chan []domain.Model, 1)
 	go func() {
-		models, err := cache.get(context.Background(), "key", func() []domain.Model {
-			return []domain.Model{{ID: "qwen3-14b"}}
+		catalog, err := cache.get(context.Background(), "key", func() discoveredCatalog {
+			return discoveredCatalog{models: []domain.Model{{ID: "qwen3-14b"}}}
 		})
 		if err != nil {
 			t.Errorf("second call returned error: %v", err)
 		}
-		done <- models
+		done <- catalog.models
 	}()
 
 	select {
@@ -541,7 +765,7 @@ func TestListModels_HonorsCustomerEndpointPolicy(t *testing.T) {
 	router := &BifrostRouter{
 		endpointPolicy: newCustomerEndpointPolicy(true, false, nil),
 	}
-	models, err := router.ListModels(context.Background(), []domain.Credential{
+	models, _, err := router.ListModels(context.Background(), []domain.Credential{
 		{ID: "mp-local", ProviderID: domain.ProviderCustom, APIKey: "sk-secret", Extra: map[string]string{"base_url": srv.URL}},
 	})
 	if err != nil {

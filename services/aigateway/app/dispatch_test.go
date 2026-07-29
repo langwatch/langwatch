@@ -20,7 +20,7 @@ import (
 type mockProvider struct {
 	dispatchFn func(ctx context.Context, req *domain.Request, cred domain.Credential) (*domain.Response, error)
 	streamFn   func(ctx context.Context, req *domain.Request, cred domain.Credential) (domain.StreamIterator, error)
-	listFn     func(ctx context.Context, creds []domain.Credential) ([]domain.Model, error)
+	listFn     func(ctx context.Context, creds []domain.Credential) ([]domain.Model, []domain.ModelDiscoveryGap, error)
 }
 
 func (m *mockProvider) Dispatch(ctx context.Context, req *domain.Request, cred domain.Credential) (*domain.Response, error) {
@@ -31,11 +31,11 @@ func (m *mockProvider) DispatchStream(ctx context.Context, req *domain.Request, 
 	return m.streamFn(ctx, req, cred)
 }
 
-func (m *mockProvider) ListModels(ctx context.Context, creds []domain.Credential) ([]domain.Model, error) {
+func (m *mockProvider) ListModels(ctx context.Context, creds []domain.Credential) ([]domain.Model, []domain.ModelDiscoveryGap, error) {
 	if m.listFn != nil {
 		return m.listFn(ctx, creds)
 	}
-	return nil, nil
+	return nil, nil, nil
 }
 
 type mockRateLimiter struct {

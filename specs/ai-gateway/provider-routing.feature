@@ -121,6 +121,48 @@ Feature: Model → provider routing via VK config
       When I GET /v1/models
       Then "gpt-4o" is absent from the response
 
+  Rule: Discovery and dispatch agree on what the key can do
+
+    Any provider the materialised chain can dispatch to contributes its
+    models to GET /v1/models, or the response says why it cannot. A key
+    that completes fine against two providers while listing zero models is
+    a displayed guarantee contradicting reality: the production canary key
+    (openai + anthropic + bedrock, plain API keys) answered {"data": []}
+    while both chat lanes returned 200, because discovery only probed
+    base-URL credentials and silently skipped every hosted one.
+
+    @unit
+    Scenario: GET /v1/models lists hosted provider catalogs for API-key credentials
+      Given the VK's chain holds openai and anthropic credentials with API keys and no base_url
+      And no models_allowed is configured
+      When I GET /v1/models
+      Then the gateway asks each provider's public models endpoint with that credential's key
+      And the anthropic probe carries the required anthropic-version header
+      And models from both providers appear in the response with correct attribution
+
+    @unit
+    Scenario: GET /v1/models lists deployment-mapped models without probing
+      Given a bedrock credential whose deployment map holds "claude-haiku-4-5"
+      When I GET /v1/models
+      Then "claude-haiku-4-5" is listed without any outbound call
+      # The map's keys are the ids dispatch routes onto the provider's
+      # deployments, so they are the catalog for deployment-routed
+      # providers (Azure, Bedrock, Vertex).
+
+    @unit
+    Scenario: GET /v1/models says so when a provider's catalog cannot be enumerated
+      Given the VK's chain holds a bedrock credential with no deployment map
+      When I GET /v1/models
+      Then the response carries header X-Langwatch-Models-Discovery-Incomplete containing "bedrock:not-enumerable"
+      And the body stays exactly the OpenAI list shape
+
+    @unit
+    Scenario: a failed catalog probe surfaces as a gap, not a silent empty list
+      Given an openai credential whose catalog endpoint answers 500
+      When I GET /v1/models
+      Then the response carries header X-Langwatch-Models-Discovery-Incomplete containing "openai:probe-failed"
+      And other providers' models still appear
+
   Rule: Model discovery cannot be turned into a probe of the gateway's network
 
     Discovery is the one place the gateway itself fetches a

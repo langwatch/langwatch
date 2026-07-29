@@ -32,14 +32,14 @@ func TestListModels_AliasesPlusAllowlist(t *testing.T) {
 	application := New(
 		WithLogger(zap.NewNop()),
 		WithProviders(&mockProvider{
-			listFn: func(_ context.Context, _ []domain.Credential) ([]domain.Model, error) {
+			listFn: func(_ context.Context, _ []domain.Credential) ([]domain.Model, []domain.ModelDiscoveryGap, error) {
 				providerCalled = true
-				return []domain.Model{{ID: "should-not-appear"}}, nil
+				return []domain.Model{{ID: "should-not-appear"}}, nil, nil
 			},
 		}),
 	)
 
-	models, err := application.ListModels(context.Background(), &domain.Bundle{
+	models, _, err := application.ListModels(context.Background(), &domain.Bundle{
 		Config: domain.BundleConfig{
 			ModelAliases: map[string]domain.ModelAlias{
 				"chat": {ProviderID: domain.ProviderOpenAI, Model: "gpt-5-mini"},
@@ -64,16 +64,16 @@ func TestListModels_ExpandsWildcardAllowlistEntries(t *testing.T) {
 	application := New(
 		WithLogger(zap.NewNop()),
 		WithProviders(&mockProvider{
-			listFn: func(_ context.Context, _ []domain.Credential) ([]domain.Model, error) {
+			listFn: func(_ context.Context, _ []domain.Credential) ([]domain.Model, []domain.ModelDiscoveryGap, error) {
 				return []domain.Model{
 					{ID: "claude-haiku-4-5-20251001", ProviderID: domain.ProviderAnthropic},
 					{ID: "claude-opus-4-20250514", ProviderID: domain.ProviderAnthropic},
-				}, nil
+				}, nil, nil
 			},
 		}),
 	)
 
-	models, err := application.ListModels(context.Background(), &domain.Bundle{
+	models, _, err := application.ListModels(context.Background(), &domain.Bundle{
 		Config: domain.BundleConfig{
 			AllowedModels: []string{"gpt-5-mini", "claude-haiku-*"},
 		},
@@ -94,16 +94,16 @@ func TestListModels_DiscoversFromProviderWhenNoAllowlist(t *testing.T) {
 	application := New(
 		WithLogger(zap.NewNop()),
 		WithProviders(&mockProvider{
-			listFn: func(_ context.Context, got []domain.Credential) ([]domain.Model, error) {
+			listFn: func(_ context.Context, got []domain.Credential) ([]domain.Model, []domain.ModelDiscoveryGap, error) {
 				assert.Equal(t, creds, got, "discovery must receive the bundle's credential chain")
 				return []domain.Model{
 					{ID: "qwen3-14b", Name: "qwen3-14b", ProviderID: domain.ProviderAnthropic},
-				}, nil
+				}, nil, nil
 			},
 		}),
 	)
 
-	models, err := application.ListModels(context.Background(), &domain.Bundle{
+	models, _, err := application.ListModels(context.Background(), &domain.Bundle{
 		Credentials: creds,
 		Config: domain.BundleConfig{
 			ModelAliases: map[string]domain.ModelAlias{
@@ -121,7 +121,7 @@ func TestListModels_DiscoversFromProviderWhenNoAllowlist(t *testing.T) {
 func TestListModels_FiltersDeniedModels(t *testing.T) {
 	application := New(WithLogger(zap.NewNop()), WithProviders(&mockProvider{}))
 
-	models, err := application.ListModels(context.Background(), &domain.Bundle{
+	models, _, err := application.ListModels(context.Background(), &domain.Bundle{
 		Config: domain.BundleConfig{
 			AllowedModels: []string{"gpt-5-mini", "gpt-4o"},
 			PolicyRules: []domain.PolicyRule{
@@ -144,7 +144,7 @@ func TestListModels_AllowlistProviderAttribution(t *testing.T) {
 	application := New(WithLogger(zap.NewNop()), WithProviders(&mockProvider{}))
 
 	t.Run("single credential provider is attributed", func(t *testing.T) {
-		models, err := application.ListModels(context.Background(), &domain.Bundle{
+		models, _, err := application.ListModels(context.Background(), &domain.Bundle{
 			Credentials: []domain.Credential{{ID: "cred-1", ProviderID: domain.ProviderOpenAI}},
 			Config:      domain.BundleConfig{AllowedModels: []string{"gpt-5-mini"}},
 		})
@@ -154,7 +154,7 @@ func TestListModels_AllowlistProviderAttribution(t *testing.T) {
 	})
 
 	t.Run("ambiguous multi-provider chain reports no provider", func(t *testing.T) {
-		models, err := application.ListModels(context.Background(), &domain.Bundle{
+		models, _, err := application.ListModels(context.Background(), &domain.Bundle{
 			Credentials: []domain.Credential{
 				{ID: "cred-1", ProviderID: domain.ProviderOpenAI},
 				{ID: "cred-2", ProviderID: domain.ProviderAnthropic},
@@ -173,13 +173,13 @@ func TestListModels_DedupesAndSorts(t *testing.T) {
 	application := New(
 		WithLogger(zap.NewNop()),
 		WithProviders(&mockProvider{
-			listFn: func(_ context.Context, _ []domain.Credential) ([]domain.Model, error) {
-				return []domain.Model{{ID: "b-model"}, {ID: "a-model"}, {ID: "b-model"}}, nil
+			listFn: func(_ context.Context, _ []domain.Credential) ([]domain.Model, []domain.ModelDiscoveryGap, error) {
+				return []domain.Model{{ID: "b-model"}, {ID: "a-model"}, {ID: "b-model"}}, nil, nil
 			},
 		}),
 	)
 
-	models, err := application.ListModels(context.Background(), &domain.Bundle{
+	models, _, err := application.ListModels(context.Background(), &domain.Bundle{
 		Config: domain.BundleConfig{
 			ModelAliases: map[string]domain.ModelAlias{
 				"a-model": {ProviderID: domain.ProviderOpenAI, Model: "whatever"},
@@ -199,13 +199,13 @@ func TestListModels_FiltersModelsOutsideAllowRules(t *testing.T) {
 	application := New(
 		WithLogger(zap.NewNop()),
 		WithProviders(&mockProvider{
-			listFn: func(_ context.Context, _ []domain.Credential) ([]domain.Model, error) {
-				return []domain.Model{{ID: "qwen3-14b"}, {ID: "gpt-4o"}}, nil
+			listFn: func(_ context.Context, _ []domain.Credential) ([]domain.Model, []domain.ModelDiscoveryGap, error) {
+				return []domain.Model{{ID: "qwen3-14b"}, {ID: "gpt-4o"}}, nil, nil
 			},
 		}),
 	)
 
-	models, err := application.ListModels(context.Background(), &domain.Bundle{
+	models, _, err := application.ListModels(context.Background(), &domain.Bundle{
 		Config: domain.BundleConfig{
 			PolicyRules: []domain.PolicyRule{
 				{Pattern: "^qwen.*$", Type: domain.PolicyAllow, Target: domain.PolicyTargetModel},
@@ -229,7 +229,7 @@ func TestListModels_InvalidPolicyPatternLogsWarning(t *testing.T) {
 		WithProviders(&mockProvider{}),
 	)
 
-	models, err := application.ListModels(context.Background(), &domain.Bundle{
+	models, _, err := application.ListModels(context.Background(), &domain.Bundle{
 		Config: domain.BundleConfig{
 			AllowedModels: []string{"gpt-5-mini"},
 			PolicyRules: []domain.PolicyRule{
@@ -244,4 +244,50 @@ func TestListModels_InvalidPolicyPatternLogsWarning(t *testing.T) {
 	entries := logs.FilterMessage("model policy rule has invalid pattern, skipping for listing").All()
 	require.Len(t, entries, 1, "the skipped pattern must be logged, not silently dropped")
 	assert.Equal(t, zapcore.WarnLevel, entries[0].Level)
+}
+
+// @scenario "GET /v1/models says so when a provider's catalog cannot be enumerated"
+// @scenario "a failed catalog probe surfaces as a gap, not a silent empty list"
+// Discovery gaps travel from the provider router to the caller untouched:
+// they are how the HTTP surface tells a client that a provider the key
+// can dispatch to contributed nothing to the list.
+// Spec: specs/ai-gateway/provider-routing.feature
+func TestListModels_ForwardsDiscoveryGaps(t *testing.T) {
+	wantGaps := []domain.ModelDiscoveryGap{
+		{ProviderID: domain.ProviderBedrock, Reason: domain.ModelDiscoveryNotEnumerable},
+		{ProviderID: domain.ProviderOpenAI, Reason: domain.ModelDiscoveryProbeFailed},
+	}
+	application := New(
+		WithLogger(zap.NewNop()),
+		WithProviders(&mockProvider{
+			listFn: func(_ context.Context, _ []domain.Credential) ([]domain.Model, []domain.ModelDiscoveryGap, error) {
+				return []domain.Model{{ID: "claude-haiku-4-5", ProviderID: domain.ProviderAnthropic}}, wantGaps, nil
+			},
+		}),
+	)
+
+	models, gaps, err := application.ListModels(context.Background(), &domain.Bundle{})
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []string{"claude-haiku-4-5"}, modelIDs(models))
+	assert.Equal(t, wantGaps, gaps, "discovery gaps must reach the caller unchanged")
+}
+
+// A literal allowlist is authoritative and discovery never runs, so there
+// is no gap to report: the list is exactly what the operator configured.
+func TestListModels_LiteralAllowlistReportsNoGaps(t *testing.T) {
+	application := New(
+		WithLogger(zap.NewNop()),
+		WithProviders(&mockProvider{
+			listFn: func(_ context.Context, _ []domain.Credential) ([]domain.Model, []domain.ModelDiscoveryGap, error) {
+				return nil, []domain.ModelDiscoveryGap{{ProviderID: domain.ProviderBedrock, Reason: domain.ModelDiscoveryNotEnumerable}}, nil
+			},
+		}),
+	)
+
+	_, gaps, err := application.ListModels(context.Background(), &domain.Bundle{
+		Credentials: []domain.Credential{{ID: "mp-bedrock", ProviderID: domain.ProviderBedrock}},
+		Config:      domain.BundleConfig{AllowedModels: []string{"claude-haiku-4-5"}},
+	})
+	require.NoError(t, err)
+	assert.Empty(t, gaps, "no discovery ran, so no gap applies")
 }
