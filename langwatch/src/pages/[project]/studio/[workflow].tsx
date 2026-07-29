@@ -1,7 +1,10 @@
-import { Alert, Box } from "@chakra-ui/react";
+import { Button } from "@chakra-ui/react";
+import { SearchX } from "lucide-react";
 import { useEffect } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
-import { HandledErrorAlert } from "~/features/errors";
+import { Link } from "~/components/ui/link";
+import { HandledErrorState } from "~/features/errors";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import OptimizationStudio from "../../../optimization_studio/components/OptimizationStudio";
 import { useLoadWorkflow } from "../../../optimization_studio/hooks/useLoadWorkflow";
 import {
@@ -13,6 +16,7 @@ import { api } from "../../../utils/api";
 
 export default function Studio() {
   const { workflow } = useLoadWorkflow();
+  const { project } = useOrganizationTeamProject();
 
   const {
     reset,
@@ -75,31 +79,36 @@ export default function Studio() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [!!workflow.data]);
 
-  // A workflow that isn't there is a thing we can name, and the person looking
-  // at it needs a way out. This used to be a bare full-screen "404 / An error
-  // occurred" with no navigation and no explanation, while the query underneath
-  // it held a perfectly good `workflow_not_found`. Rendered inside
-  // `DashboardLayout` for the same reason the experiments page does it: the
-  // sidebar is the way back.
-  if (workflow.isError || (workflow.isFetched && !workflow.data)) {
+  // A missing workflow is a thing we can name, and the person looking at it
+  // needs a way out — this was a bare full-screen "404 / An error occurred"
+  // with no navigation, while the query underneath held `workflow_not_found`.
+  // Inside `DashboardLayout` for the same reason the experiments page does it:
+  // the sidebar is the way back.
+  //
+  // On `isError` alone. The old condition also fired on "fetched but no data",
+  // which only meant anything while a missing workflow came back as an empty
+  // success; `getById` raises now. What that arm can still catch is a moment
+  // mid-refetch where `data` is briefly undefined — flashing a dead end over a
+  // studio someone is working in, which is worse than what it guarded.
+  if (workflow.isError) {
     return (
       <DashboardLayout>
-        <Box padding={6}>
-          {workflow.error ? (
-            <HandledErrorAlert
-              error={workflow.error}
-              fallbackTitle="Couldn't open this workflow"
-            />
-          ) : (
-            <Alert.Root status="warning">
-              <Alert.Indicator />
-              <Alert.Title>Workflow not found</Alert.Title>
-              <Alert.Description>
-                It may have been deleted, or you may not have access to it.
-              </Alert.Description>
-            </Alert.Root>
+        {/*
+          `fullHeight` off: `DashboardLayout` already owns the viewport, so a
+          second 100vh would push the state below the fold.
+        */}
+        <HandledErrorState
+          error={workflow.error}
+          fallbackTitle="Couldn't open this workflow"
+          icon={<SearchX size={44} strokeWidth={1.5} />}
+          fullHeight={false}
+        >
+          {project && (
+            <Link href={`/${project.slug}/workflows`}>
+              <Button colorPalette="orange">Back to workflows</Button>
+            </Link>
           )}
-        </Box>
+        </HandledErrorState>
       </DashboardLayout>
     );
   }

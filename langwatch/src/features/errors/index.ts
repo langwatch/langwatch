@@ -13,6 +13,8 @@
 export { FormServerError } from "./components/FormServerError";
 export type { HandledErrorAlertProps } from "./components/HandledErrorAlert";
 export { HandledErrorAlert } from "./components/HandledErrorAlert";
+export type { HandledErrorStateProps } from "./components/HandledErrorState";
+export { HandledErrorState } from "./components/HandledErrorState";
 export {
   applyHandledErrorToForm,
   FORM_SERVER_ERROR,

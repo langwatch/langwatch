@@ -56,7 +56,6 @@ const OrganizationScreen: React.FC = () => {
           value={organizationName}
           onChange={(e) => setOrganizationName(e.target.value)}
         />
-        <Field.ErrorText />
       </Field.Root>
 
       <Field.Root colorPalette="orange">

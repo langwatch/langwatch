@@ -22,6 +22,16 @@ const { workflowRef } = vi.hoisted(() => ({
   workflowRef: { current: {} as Record<string, unknown> },
 }));
 
+vi.mock("~/hooks/useOrganizationTeamProject", () => ({
+  useOrganizationTeamProject: () => ({ project: { slug: "ux-review" } }),
+}));
+
+vi.mock("~/components/ui/link", () => ({
+  Link: ({ href, children }: { href: string; children: React.ReactNode }) => (
+    <a href={href}>{children}</a>
+  ),
+}));
+
 vi.mock("~/components/DashboardLayout", () => ({
   DashboardLayout: ({ children }: { children: ReactNode }) => (
     <div data-testid="dashboard-layout">{children}</div>
@@ -90,6 +100,10 @@ describe("Studio page", () => {
       expect(screen.getByText("Workflow not found")).toBeTruthy();
       expect(screen.getByTestId("dashboard-layout")).toBeTruthy();
       expect(screen.queryByTestId("studio-canvas")).toBeNull();
+      // A dead end needs a way out of it, not just a sentence about it.
+      expect(
+        screen.getByRole("link", { name: /back to workflows/i }),
+      ).toBeTruthy();
     });
   });
 

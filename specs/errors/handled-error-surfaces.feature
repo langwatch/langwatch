@@ -70,20 +70,19 @@ Feature: Knowable failures reach the customer as themselves
     And a dropped database connection is still treated as an outage
 
   # ---------------------------------------------------------------------------
-  # The error id is an escalation handle, not decoration
+  # The error id
   #
-  # Offering "Copy error ID" on a failure the customer can resolve alone
-  # invites a support ticket for something self-service, and on the anonymous
-  # share page it hands a stranger an internal identifier for an entirely
-  # expected outcome.
+  # Offered on every failure, without exception. It was briefly withheld from
+  # errors judged self-serviceable, which turned its presence into a signal —
+  # so its absence became something the reader had to interpret — and failed
+  # exactly the person looking at a screen we had classified wrongly.
   # ---------------------------------------------------------------------------
 
   @unit
-  Scenario: A named customer-fault failure offers no error id
-    Given a handled error with copy written for its code
-    And the failure is the customer's to resolve
+  Scenario: The error id is offered on every failure
+    Given a handled error the reader could resolve alone
     When the surface resolves what to render
-    Then no error id is offered
+    Then the error id is still offered
 
   @unit
   Scenario: A platform fault keeps its error id

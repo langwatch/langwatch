@@ -50,12 +50,13 @@ describe("showErrorToast", () => {
       );
     });
 
-    it("surfaces the docs link for the footer to render", () => {
+    it("surfaces the docs link and trace id for the footer to render", () => {
       showErrorToast({
         error: handledError({
           code: "trace_not_found",
           httpStatus: 404,
           docsUrl: "https://docs.langwatch.ai/platform/data-retention",
+          traceId: "4bf92f",
         }),
       });
 
@@ -63,46 +64,10 @@ describe("showErrorToast", () => {
         expect.objectContaining({
           meta: expect.objectContaining({
             docsUrl: "https://docs.langwatch.ai/platform/data-retention",
+            traceId: "4bf92f",
           }),
         }),
       );
-    });
-
-    /**
-     * The id rides along only where it is any use — a failure the reader
-     * cannot resolve alone. The rule itself lives in `resolveErrorCopy` and is
-     * covered exhaustively by `resolveErrorCopy.traceId.unit.test.ts`; this
-     * pair only checks that the toast passes on whatever that decided, since
-     * `trace_not_found` used to arrive here with an id attached.
-     */
-    it("surfaces the trace id when the failure is ours", () => {
-      showErrorToast({
-        error: handledError({
-          code: "workflow_execution_failed",
-          httpStatus: 500,
-          fault: "platform",
-          traceId: "4bf92f",
-        }),
-      });
-
-      expect(create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          meta: expect.objectContaining({ traceId: "4bf92f" }),
-        }),
-      );
-    });
-
-    it("withholds the trace id when the reader can fix it themselves", () => {
-      showErrorToast({
-        error: handledError({
-          code: "trace_not_found",
-          httpStatus: 404,
-          fault: "customer",
-          traceId: "4bf92f",
-        }),
-      });
-
-      expect(create.mock.calls[0]![0].meta.traceId).toBeUndefined();
     });
 
     /**

@@ -5,6 +5,7 @@ import type React from "react";
 import { useEffect, useState } from "react";
 import { AnalyticsBoundary } from "react-contextual-analytics";
 import { LoadingScreen } from "~/components/LoadingScreen";
+import { showErrorToast } from "~/features/errors";
 import { toaster } from "~/components/ui/toaster";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
 import { api } from "~/utils/api";
@@ -133,12 +134,16 @@ export const WelcomeScreen: React.FC = () => {
 
           window.location.href = `/onboarding/product?${params.toString()}`;
         },
-        onError: () => {
-          toaster.create({
-            title: "Failed to proceed with onboarding",
-            description: "Please try again or contact support",
-            type: "error",
-            meta: { closable: true },
+        // Through the registry, not a hardcoded sentence. This threw the
+        // error away and told everyone to "try again or contact support" —
+        // advice that cannot resolve a plan limit, an address already in use,
+        // or a name that fails validation, which are the failures this call
+        // actually has. Signing up is the worst possible place to be told
+        // nothing.
+        onError: (error) => {
+          showErrorToast({
+            error,
+            fallbackTitle: "Couldn't finish setting up your organization",
           });
         },
       },
