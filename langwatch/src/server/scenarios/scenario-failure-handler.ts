@@ -13,10 +13,11 @@ import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import { getApp } from "~/server/app-layer/app";
+import { Verdict } from "~/server/scenarios/scenario-event.enums";
 import {
-  ScenarioRunStatus,
-  Verdict,
-} from "~/server/scenarios/scenario-event.enums";
+  type ScenarioFailureOutcome,
+  statusForFailureOutcome,
+} from "~/server/scenarios/scenario-failure-outcome";
 import {
   classifyScenarioInfraError,
   encodeScenarioError,
@@ -38,12 +39,35 @@ export interface FailureEventParams {
   name?: string;
   /** Scenario description/situation for display in UI */
   description?: string;
-  /** When true, writes CANCELLED status instead of ERROR */
-  cancelled?: boolean;
+  /**
+   * How the run ended. Decides the terminal status written: ERROR by default,
+   * CANCELLED when a user asked it to stop, STALLED when nothing reported on
+   * it for longer than it was allowed to stay quiet.
+   *
+   * One modelled field rather than a flag per outcome — see
+   * `scenario-failure-outcome.ts`.
+   */
+  outcome?: ScenarioFailureOutcome;
 }
 
-function buildFailureResults(params: { cancelled: boolean; error?: string }) {
-  if (params.cancelled) {
+/**
+ * The child's own exit code, when the raw failure string is the parent's
+ * "Child process exited with code N: …" wrapper.
+ *
+ * Worth pulling out on its own because it is the one piece of that string that
+ * is ours, bounded, and diagnostic — everything after the colon is the child's
+ * unsanitised stderr, which must not be logged at info.
+ */
+function exitCodeFrom(error: string | undefined): number | undefined {
+  const match = /^Child process exited with code (\d+)/i.exec(error ?? "");
+  return match ? Number(match[1]) : undefined;
+}
+
+function buildFailureResults(params: {
+  outcome: ScenarioFailureOutcome;
+  error?: string;
+}) {
+  if (params.outcome === "cancelled") {
     return {
       verdict: Verdict.INCONCLUSIVE,
       reasoning: "Cancelled by user",
@@ -71,8 +95,10 @@ function buildFailureResults(params: { cancelled: boolean; error?: string }) {
 /**
  * Handles emission of failure events when scenario jobs fail.
  *
- * Dispatches startRun + finishRun commands via event-sourcing so ClickHouse
- * gets the terminal status and the UI updates via SSE.
+ * Dispatches the finishRun command — and only finishRun — via event-sourcing,
+ * so ClickHouse gets the terminal status and the UI updates via SSE. The
+ * scenarioRunId is pre-assigned by whoever queued the run, so there is no
+ * startRun to synthesise here.
  */
 export class ScenarioFailureHandler {
   static create(): ScenarioFailureHandler {
@@ -82,8 +108,9 @@ export class ScenarioFailureHandler {
   /**
    * Ensures failure events are emitted for a failed scenario job.
    *
-   * Dispatches startRun (if needed) and finishRun with ERROR/CANCELLED status
-   * via event-sourcing. The finishRun command is idempotent.
+   * Dispatches finishRun with the terminal status `statusForFailureOutcome`
+   * picks for the outcome — ERROR, CANCELLED or STALLED. The finishRun command
+   * is idempotent.
    */
   async ensureFailureEventsEmitted(params: FailureEventParams): Promise<void> {
     return tracer.withActiveSpan(
@@ -98,8 +125,9 @@ export class ScenarioFailureHandler {
         },
       },
       async (span) => {
-        const { projectId, scenarioId, setId, batchRunId, error, name, description, cancelled } = params;
-        const status = cancelled ? ScenarioRunStatus.CANCELLED : ScenarioRunStatus.ERROR;
+        const { projectId, scenarioId, setId, batchRunId, error, name, description } = params;
+        const outcome = params.outcome ?? "error";
+        const status = statusForFailureOutcome(outcome);
         const scenarioRunId = params.scenarioRunId;
 
         if (!scenarioRunId) {
@@ -107,22 +135,42 @@ export class ScenarioFailureHandler {
           return;
         }
 
+        // A classified reason and the child's exit code, never a positional
+        // slice of the raw failure string: that string is usually
+        // "Child process exited with code N: <stderr>", and the stderr half is
+        // the runner's own output about the customer's conversation. The first
+        // 100 characters of it are still content. The raw window stays at
+        // debug for a local reproduction.
+        const classified = classifyScenarioInfraError(error);
         logger.info(
-          { projectId, scenarioId, setId, batchRunId, scenarioRunId, status, error: error?.substring(0, 100) },
+          {
+            projectId,
+            scenarioId,
+            setId,
+            batchRunId,
+            scenarioRunId,
+            status,
+            errorCode: classified.code,
+            exitCode: exitCodeFrom(error),
+          },
           "Emitting failure events via event-sourcing",
+        );
+        logger.debug(
+          { scenarioRunId, error: error?.substring(0, 100) },
+          "Scenario failure, raw error window",
         );
 
         const timestamp = Date.now();
         span.setAttribute("scenario.run.id", scenarioRunId);
 
-        // Dispatch finishRun with ERROR/CANCELLED status
+        // Dispatch finishRun with the outcome's terminal status
         try {
           await getApp().simulations.finishRun({
             tenantId: projectId,
             scenarioRunId,
             occurredAt: timestamp,
             status,
-            results: buildFailureResults({ cancelled: cancelled ?? false, error }),
+            results: buildFailureResults({ outcome, error }),
           });
           span.setAttribute("result.emitted_run_finished", true);
         } catch (err) {

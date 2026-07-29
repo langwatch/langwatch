@@ -98,24 +98,12 @@ export interface CommandHandler<
 }
 
 /**
- * Validates a command using the CommandSchema.
- * Useful for validating commands from external sources (e.g., API requests).
- *
- * @param command - The command to validate
- * @returns The validated command
- * @throws {z.ZodError} If the command is invalid
- */
-export function validateCommand(
-  command: unknown,
-): z.infer<typeof CommandSchema> {
-  return CommandSchema.parse(command);
-}
-
-/**
  * Creates a command with type-safe payload and metadata.
  *
  * This function does not perform runtime validation because it receives already-validated types
- * (TenantId, CommandType) as parameters. For validating commands from external sources, use validateCommand().
+ * (TenantId, CommandType) as parameters. Commands arriving from an external
+ * source are validated by the command's own Zod schema at its handler seam
+ * (`defineCommandSchema`), not here.
  *
  * @param tenantId - Tenant identifier for multi-tenant isolation
  * @param aggregateId - The aggregate this command targets

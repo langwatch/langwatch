@@ -5,11 +5,12 @@
  * trace isolation. Each scenario runs in its own process with separate
  * LANGWATCH_API_KEY and LANGWATCH_ENDPOINT env vars.
  *
- * Execution is triggered by the scenarioExecution reactor (event-driven via
- * GroupQueue), NOT by BullMQ. The execution pool manages concurrency.
+ * Execution is triggered by the `scenarioExecution` process manager's leased
+ * outbox (ADR-073 step 2), which holds the run's lease for the whole child
+ * process and therefore bounds concurrency itself.
  *
  * @see specs/scenarios/simulation-runner.feature
- * @see specs/scenarios/event-driven-execution-prep.feature
+ * @see specs/scenarios/scenario-execution-process-manager.feature
  */
 
 import { createLogger } from "@langwatch/observability";
@@ -58,12 +59,13 @@ import type {
   ChildProcessJobData,
   ScenarioExecutionResult,
 } from "./execution/types";
-import { CHILD_PROCESS, SCENARIO_WORKER } from "./scenario.constants";
+import { CHILD_PROCESS } from "./scenario.constants";
 import { ScenarioService } from "./scenario.service";
 import {
   type FailureEventParams,
   ScenarioFailureHandler,
 } from "./scenario-failure-handler";
+import { classifyScenarioInfraError } from "./scenario-infra-error";
 
 // ============================================================================
 // Dependency Interfaces (Dependency Inversion Principle)
@@ -140,60 +142,6 @@ export async function handleFailedJobResult(
 }
 
 /**
- * Emit a terminal failure for every run still in flight, then drain the pool.
- *
- * Called on processor shutdown — including the worker's max-runtime restart,
- * which awaits `close()` before it rejects/restarts. Without this, in-flight
- * runs (running children killed by drain, and buffered pending jobs silently
- * dropped) would never get a terminal event and would orphan at QUEUED, with
- * the suites page polling them forever.
- *
- * Each emission is isolated by a per-job try/catch so one failure can't block
- * draining the rest. Double-emitting for
- * a running child whose own close handler also emits is safe — finishRun is
- * idempotent.
- */
-export async function drainInFlightRuns(
-  pool: ScenarioExecutionPool,
-  deps: ProcessorDependencies,
-): Promise<void> {
-  const inFlight = pool.inFlightJobs;
-  if (inFlight.length > 0) {
-    logger.info(
-      { count: inFlight.length },
-      "Draining: emitting terminal failure for in-flight scenario runs before shutdown",
-    );
-    await Promise.all(
-      inFlight.map(async (jobData) => {
-        try {
-          if (pool.wasCancelled(jobData.scenarioRunId)) {
-            await handleCancelledJobResult(
-              jobData,
-              "Cancelled before execution started",
-              deps,
-            );
-          } else {
-            await handleFailedJobResult(
-              jobData,
-              "Worker restarting — scenario run terminated before completion",
-              deps,
-            );
-          }
-        } catch (err) {
-          logger.warn(
-            { err, scenarioRunId: jobData.scenarioRunId },
-            "Failed to emit terminal failure for in-flight run during drain",
-          );
-        }
-      }),
-    );
-  }
-
-  // Kills running children and clears the pending buffer.
-  pool.drain();
-}
-
-/**
  * Handle a cancelled job result by emitting cancellation events.
  */
 export async function handleCancelledJobResult(
@@ -215,7 +163,7 @@ export async function handleCancelledJobResult(
     error: error ?? "Cancelled by user",
     name: scenario?.name,
     description: scenario?.situation,
-    cancelled: true,
+    outcome: "cancelled",
   });
 }
 
@@ -331,8 +279,10 @@ export function parseChildProcessResult(
 /**
  * Execute a scenario run by spawning an isolated child process.
  *
- * Called by the ScenarioExecutionPool when a slot is available.
- * The pool manages concurrency and tracks running children.
+ * Called by the `scenarioExecution` process outbox while it holds the run's
+ * lease, so this resolves only when the child is done. Concurrency is the
+ * dispatcher's; the pool only tracks the running children so cancellation can
+ * find them.
  */
 export async function executeScenarioRun(
   jobData: ExecutionJobData,
@@ -347,6 +297,19 @@ export async function executeScenarioRun(
 
   await runWithContext(requestContext, async () => {
     const startTime = Date.now();
+
+    // A cancel that landed before this dispatch was leased. Checked here
+    // rather than in the pool, which no longer decides when a job starts.
+    if (pool.wasCancelled(jobData.scenarioRunId)) {
+      jobLogger.info("Scenario cancelled before execution started");
+      await handleCancelledJobResult(
+        jobData,
+        "Cancelled before execution started",
+        deps,
+      );
+      return;
+    }
+
     getJobProcessingCounter("scenario", "processing").inc();
     jobLogger.info("Processing scenario job");
 
@@ -416,14 +379,23 @@ export async function executeScenarioRun(
       await handleCancelledJobResult(jobData, result.error, deps);
     } else {
       getJobProcessingCounter("scenario", "failed").inc();
+      // The classified code, not the raw failure text. `result.error` is
+      // whatever the runner or its stderr produced, which is the simulated
+      // conversation and the judge's verdict about it — customer content that
+      // must not land in the platform's own log retention. The code is enough
+      // to tell an operator why the run died; the raw text stays at debug.
       jobLogger.warn(
         {
           success: false,
-          error: result.error,
+          errorCode: classifyScenarioInfraError(result.error).code,
           totalDurationMs,
           childDurationMs,
         },
         "Scenario job completed with failure",
+      );
+      jobLogger.debug(
+        { error: result.error },
+        "Scenario job failure, raw runner error",
       );
       await handleFailedJobResult(jobData, result.error, deps);
     }
@@ -451,7 +423,7 @@ async function spawnScenarioChildProcess(
     });
 
     const log = (
-      level: "info" | "warn" | "error",
+      level: "debug" | "info" | "warn" | "error",
       message: string,
       extra?: Record<string, unknown>,
     ) => {
@@ -528,20 +500,32 @@ async function spawnScenarioChildProcess(
       });
     }, CHILD_PROCESS.TIMEOUT_MS);
 
+    // The child's output is CUSTOMER CONTENT, not our diagnostics. Its own
+    // pino logger writes to stdout — including the judge's `reasoning`, which
+    // is verdict text about the simulated conversation — and its structured
+    // result line carries the same. Re-emitting those lines at `info`/`warn`
+    // copied every one of them verbatim into the platform's log retention.
+    //
+    // So the raw stream is forwarded at `debug` and nowhere else, and the
+    // result line is read from the accumulated `stdout` at close (see
+    // `parseChildProcessResult`) rather than by re-emitting lines as they
+    // arrive. Everything an operator needs at `info` — spawn, pid, exit code,
+    // classified failure reason — is logged by this file in its own words.
     child.stdout?.on("data", (data: Buffer) => {
       const chunk = data.toString();
       stdout += chunk;
       const lines = chunk.trim().split("\n");
       for (const line of lines) {
-        if (line) log("info", line);
+        if (line) log("debug", line);
       }
     });
 
     child.stderr?.on("data", (data: Buffer) => {
-      stderr += data.toString();
-      const lines = data.toString().trim().split("\n");
+      const chunk = data.toString();
+      stderr += chunk;
+      const lines = chunk.trim().split("\n");
       for (const line of lines) {
-        if (line) log("warn", line);
+        if (line) log("debug", line);
       }
     });
 
@@ -571,10 +555,15 @@ async function spawnScenarioChildProcess(
           childResult?.error && childResult.error.trim().length > 0
             ? childResult.error
             : `Child process exited with code ${code}: ${stderr}`;
+        // Exit code + classified reason is what an operator needs, and neither
+        // quotes the child. The raw stderr is an unbounded, unsanitised stream
+        // (it can carry the conversation the run was about), so it stays at
+        // debug.
         log("error", `Child process exited with code ${code}`, {
           exitCode: code,
-          stderr,
+          errorCode: classifyScenarioInfraError(error).code,
         });
+        log("debug", "Child process stderr", { exitCode: code, stderr });
         resolve({
           success: false,
           error,
@@ -618,9 +607,9 @@ async function spawnScenarioChildProcess(
 /**
  * Start the scenario processor.
  *
- * Sets up the cancel subscription (Redis pub/sub) and wires the execution
- * pool's spawn function. The actual job processing is triggered by the
- * scenarioExecution reactor via the GroupQueue.
+ * Sets up the cancel subscription (Redis pub/sub). Job execution itself is
+ * driven by the `scenarioExecution` process outbox, which calls
+ * {@link executeScenarioRun} while holding the run's lease.
  *
  * @returns A shutdown handle, or undefined if Redis is not available.
  */
@@ -633,26 +622,7 @@ export async function startScenarioProcessor(
     return undefined;
   }
 
-  // Wire the spawn function into the pool
-  pool.setSpawnFunction(async (jobData) => {
-    await executeScenarioRun(jobData, pool, deps);
-  });
-
-  // Wire the callback for when the pool skips a cancelled job —
-  // dispatch finished(CANCELLED) so the run reaches terminal state
-  pool.setOnSkipCancelled((jobData) => {
-    logger.info(
-      { scenarioRunId: jobData.scenarioRunId },
-      "Dispatching finished(CANCELLED) for skipped cancelled job",
-    );
-    void handleCancelledJobResult(
-      jobData,
-      "Cancelled before execution started",
-      deps,
-    );
-  });
-
-  // Subscribe to cancellation signals from the event-sourcing reactor
+  // Subscribe to cancellation signals from the event-sourcing pipeline
   const subscriber = connection.duplicate();
   const unsubscribe = await subscribeToCancellations({
     subscriber,
@@ -669,16 +639,15 @@ export async function startScenarioProcessor(
     },
   });
 
-  logger.info(
-    { concurrency: SCENARIO_WORKER.CONCURRENCY },
-    "Scenario processor started (event-driven)",
-  );
+  logger.info("Scenario processor started (event-driven)");
 
   // Ongoing stuck-run recovery is NOT here any more. Two cross-tenant
   // ClickHouse sweeps used to run at this point — one for runs orphaned at
   // QUEUED, one for runs orphaned at IN_PROGRESS — and because they ran only
   // at boot, the recovery bound was the deploy cadence: a run abandoned an
-  // hour after the last restart waited for the next one.
+  // hour after the last restart waited for the next one. A third mechanism, a
+  // graceful drain that emitted a terminal failure per in-flight run, has gone
+  // with them.
   //
   // The `scenarioExecution` process manager on the simulation pipeline holds
   // that guarantee continuously now. Every progress event re-arms its durable
@@ -732,11 +701,10 @@ export async function startScenarioProcessor(
 
   return {
     close: async () => {
-      // Emit a terminal failure for every in-flight run, then drain. This is
-      // what makes the worker's max-runtime restart (which awaits close()
-      // before it rejects/restarts) safe: in-flight runs reach a terminal
-      // state instead of orphaning at QUEUED.
-      await drainInFlightRuns(pool, deps);
+      // Release the OS resources this worker holds. The runs whose children
+      // are killed here keep their armed deadlines, so each still reaches a
+      // terminal state without a shutdown path racing the exit to write it.
+      pool.drain();
       await unsubscribe().catch((err: unknown) =>
         logger.warn({ err }, "Error closing cancellation subscriber"),
       );

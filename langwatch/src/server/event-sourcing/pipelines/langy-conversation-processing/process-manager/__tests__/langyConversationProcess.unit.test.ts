@@ -7,12 +7,10 @@ import {
 } from "~/server/event-sourcing/process-manager";
 import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
 
-import { buildProcessManager } from "~/server/event-sourcing/pipeline/processBuilder";
 import { buildProcessDefinition } from "~/server/event-sourcing/process-manager/processRuntime";
 import type { ProcessDefinition } from "~/server/event-sourcing/process-manager";
 
-import { langyConversationProcess } from "../langyConversationProcess";
-import { createStubLangyEffectPorts } from "../langyEffectPorts";
+import { buildLangyProcessManager } from "./helpers/langyProcessHarness";
 import {
   LANGY_CONVERSATION_PROCESS_NAME,
   LANGY_PROCESS_INTENT_TYPES,
@@ -40,18 +38,15 @@ import {
 } from "./helpers/langyEventFixtures";
 
 /**
- * The EXACT definition the runtime mounts — built through the pipeline's own
- * `langyConversationProcess` applier and the runtime's
+ * The EXACT definition the runtime mounts — built by building the pipeline
+ * itself and taking the process manager it mounts, through the runtime's
  * `buildProcessDefinition`, so these tests cover the generated evolve
  * (intent-key prefixing, undeclared-event guard, schema-validated intent
- * payloads) rather than a re-implementation. The effect ports are stubs:
- * evolve never dispatches.
+ * payloads) rather than a re-implementation. Evolve never dispatches, so the
+ * effects behind it are inert here.
  */
-const langyConversationProcessDefinition = buildProcessDefinition(
-  buildProcessManager<LangyConversationProcessingEvent>({
-    name: LANGY_CONVERSATION_PROCESS_NAME,
-    applier: langyConversationProcess(createStubLangyEffectPorts().ports),
-  }).config,
+const langyConversationPMDefinition = buildProcessDefinition(
+  buildLangyProcessManager({ projectId: PROJECT_ID }).definition.config,
 ) as ProcessDefinition<LangyConversationProcessState>;
 
 
@@ -68,7 +63,7 @@ describe("LangyConversationProcess", () => {
   beforeEach(() => {
     store = new InMemoryProcessStore();
     service = new ProcessManagerService({
-      definition: langyConversationProcessDefinition,
+      definition: langyConversationPMDefinition,
       store,
     });
   });

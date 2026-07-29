@@ -9,7 +9,15 @@ import {
 } from "../schemas/constants";
 import type { TraceProcessingEvent } from "../schemas/events";
 
-const OLD_TRACE_THRESHOLD_MS = 60 * 60 * 1000;
+/**
+ * How stale an *event* may be before the guards reject it — replay and resync
+ * paths re-emit events with historical `occurredAt`, and re-running side
+ * effects for them is never wanted. Exported and single-sourced here (like
+ * `passesTraceOriginGuards` below) so the subscriber variant in
+ * `_originGuardedSubscriber.ts`, which rejects on the same threshold
+ * pre-enqueue via `when`, cannot drift from the handler-side check.
+ */
+export const OLD_TRACE_THRESHOLD_MS = 60 * 60 * 1000;
 
 /**
  * Never re-run an on-message reactor for a trace whose first span is older
@@ -81,6 +89,24 @@ export function passesTraceOriginGuards(
   if (!attrs["langwatch.origin"]) return false;
 
   return true;
+}
+
+/**
+ * Whether this trace counts as a project actually being used.
+ *
+ * Sample traces (seeded from the empty-state "Seed sample traces" path; every
+ * span carries `langwatch.origin = "sample"`) are not real ingest. Treating
+ * them as such would prematurely dismiss the empty-state onboarding card while
+ * the user has not connected their own app yet, and would schedule daily topic
+ * clustering for every project that clicked "seed sample traces" once.
+ *
+ * Pure and fold-state-only, so it is safe both pre-enqueue (`shouldReact`) and
+ * inside a handler. Single-sourced here — like `passesTraceOriginGuards` above
+ * — so the projectMetadata reactor and the two subscribers that ask the same
+ * question cannot drift apart, and so a fix can never miss a stale duplicate.
+ */
+export function isRealIngest(foldState: TraceSummaryData): boolean {
+  return foldState.attributes?.["langwatch.origin"] !== "sample";
 }
 
 /**

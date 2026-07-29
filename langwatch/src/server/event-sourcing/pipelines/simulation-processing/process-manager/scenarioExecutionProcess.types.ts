@@ -1,23 +1,28 @@
 import { z } from "zod";
 
-import { CHILD_PROCESS } from "~/server/scenarios/scenario.constants";
+import { scenarioFailureOutcomeSchema } from "~/server/scenarios/scenario-failure-outcome";
+import {
+  CHILD_PROCESS,
+  SCENARIO_WORKER,
+} from "~/server/scenarios/scenario.constants";
 
 /** Process name, as mounted on the simulation pipeline. */
 export const SCENARIO_EXECUTION_PROCESS_NAME = "scenarioExecution";
 
 export const SCENARIO_EXECUTION_INTENT_TYPES = {
+  EXECUTE_RUN: "executeRun",
   FAIL_RUN: "failRun",
 } as const;
 
 /**
  * How long a run may go quiet before it is declared dead.
  *
- * 2× the child-process timeout, the same bound the legacy stall derivation and
- * both boot sweeps used — the sweeps still run, but only as a cutover drain for
- * runs stuck before this process existed. A child that hits its own 15-minute
- * cap still has a full cap's worth of margin to report the failure itself, so
- * this deadline only fires when nothing is left to report it — which is exactly
- * the case it exists for.
+ * 2× the child-process timeout, the same bound the deleted read-time `STALLED`
+ * derivation and both boot sweeps used — the sweeps still run, but only as a
+ * cutover drain for runs stuck before this process existed. A child that hits
+ * its own 15-minute cap still has a full cap's worth of margin to report the
+ * failure itself, so this deadline only fires when nothing is left to report
+ * it — which is exactly the case it exists for.
  */
 export const SCENARIO_PROGRESS_DEADLINE_MS = CHILD_PROCESS.TIMEOUT_MS * 2;
 
@@ -78,17 +83,50 @@ export function dispatchDeadlineMsFor(batchTotal: number): number {
 export const SCENARIO_CANCEL_DEADLINE_MS = 60_000;
 
 /**
- * Retries for the terminal-write intent. `finishRun` is idempotent, so a
- * retried write is harmless — and losing it would leave the run in exactly
- * the non-terminal state this process exists to prevent.
+ * Delivery attempts, shared by both intents because the dispatcher is
+ * configured per process rather than per intent type.
  *
- * This is not the scenario's own no-retry contract: nothing is re-executed
- * here, only the record of its death is written.
+ * Set for `failRun`, which is idempotent (`finishRun` collapses a repeat) and
+ * whose loss would leave the run in exactly the non-terminal state this
+ * process exists to prevent. `executeRun` must NOT inherit "try again" from
+ * this number — a scenario costs money per run — so its at-most-once contract
+ * is enforced inside its own handler, by reading back whether the run has
+ * already left the queue. See `scenarioExecutionIntentHandlers.ts`.
  */
 export const SCENARIO_EXECUTION_MAX_ATTEMPTS = 3;
 
-/** A terminal write is one command dispatch; it does not need a long lease. */
-export const SCENARIO_EXECUTION_LEASE_DURATION_MS = 60_000;
+/**
+ * How long a leased dispatch stays invisible to other loops.
+ *
+ * `OutboxDispatcherService` leases once and never renews, and the `executeRun`
+ * handler holds its lease for the entire child process. The lease therefore
+ * has to outlast the child's own cap, or a second worker re-leases a message
+ * whose run is still alive and spawns it twice. The margin covers prefetch,
+ * spawn and the terminal write on either side of the child.
+ */
+export const SCENARIO_EXECUTION_LEASE_MARGIN_MS = 5 * 60 * 1000;
+export const SCENARIO_EXECUTION_LEASE_DURATION_MS =
+  CHILD_PROCESS.TIMEOUT_MS + SCENARIO_EXECUTION_LEASE_MARGIN_MS;
+
+/**
+ * In-flight dispatches per worker. This is what the pool's `_pending` array
+ * used to bound: pending work is now a Postgres row and the dispatcher is the
+ * only thing deciding how many children a worker holds at once.
+ *
+ * `batchSize` matches, because dispatches here take minutes — leasing more
+ * than can be in flight would hide the surplus behind a 20-minute lease.
+ */
+export const SCENARIO_EXECUTION_CONCURRENCY = SCENARIO_WORKER.CONCURRENCY;
+
+/** The reference the child process is spawned against. */
+export const scenarioExecutionTargetSchema = z.object({
+  type: z.enum(["prompt", "http", "code", "workflow"]),
+  referenceId: z.string(),
+});
+
+export type ScenarioExecutionTarget = z.infer<
+  typeof scenarioExecutionTargetSchema
+>;
 
 export interface ScenarioExecutionState {
   /** Empty until the first event carrying identities is folded. */
@@ -96,6 +134,12 @@ export interface ScenarioExecutionState {
   scenarioId: string;
   batchRunId: string;
   setId: string;
+  /**
+   * What to execute, carried by the `queued` event. Null for a run whose
+   * `queued` event predates the field, which is a run nothing can dispatch —
+   * the deadline finalises it rather than the outbox.
+   */
+  target: ScenarioExecutionTarget | null;
   /**
    * A cancel was asked for. Decides which terminal status a fired deadline
    * writes — a run the user cancelled is CANCELLED even if no worker was left
@@ -111,6 +155,7 @@ export const INITIAL_SCENARIO_EXECUTION_STATE: ScenarioExecutionState = {
   scenarioId: "",
   batchRunId: "",
   setId: "",
+  target: null,
   cancelRequested: false,
   settled: false,
 };
@@ -118,7 +163,8 @@ export const INITIAL_SCENARIO_EXECUTION_STATE: ScenarioExecutionState = {
 /**
  * The content boundary. Simulation events carry conversation messages, so the
  * default `event.data` payload would persist customer content into process
- * state and outbox rows. This process needs identities and nothing else.
+ * state and outbox rows. This process needs identities, and the target
+ * reference it has to dispatch against, and nothing else.
  */
 export const scenarioExecutionEventViewSchema = z.object({
   scenarioRunId: z.string().nullable(),
@@ -131,10 +177,35 @@ export const scenarioExecutionEventViewSchema = z.object({
    * rather than defaulted to 1.
    */
   batchTotal: z.number().int().nonnegative().nullable().optional(),
+  /**
+   * Nullish rather than nullable: step 1's narrowed view had no `target` at
+   * all, so an inbox row written before this change omits the key entirely.
+   * A required field here would throw on every one of those and wedge the
+   * process for exactly the runs that were in flight across the deploy.
+   */
+  target: scenarioExecutionTargetSchema.nullish().transform((t) => t ?? null),
 });
 
 export type ScenarioExecutionEventView = z.infer<
   typeof scenarioExecutionEventViewSchema
+>;
+
+/**
+ * Dispatch: run this scenario. The handler holds its outbox lease for the
+ * whole child process, which is why the lease above is sized from the child's
+ * timeout rather than from a write.
+ */
+export const scenarioExecutionExecuteRunIntentSchema = z.object({
+  projectId: z.string(),
+  scenarioRunId: z.string(),
+  scenarioId: z.string(),
+  batchRunId: z.string(),
+  setId: z.string(),
+  target: scenarioExecutionTargetSchema,
+});
+
+export type ScenarioExecutionExecuteRunIntent = z.infer<
+  typeof scenarioExecutionExecuteRunIntentSchema
 >;
 
 export const scenarioExecutionFailRunIntentSchema = z.object({
@@ -143,8 +214,8 @@ export const scenarioExecutionFailRunIntentSchema = z.object({
   scenarioId: z.string(),
   batchRunId: z.string(),
   setId: z.string(),
-  /** Write CANCELLED rather than ERROR. */
-  cancelled: z.boolean(),
+  /** Which terminal status to write. One modelled outcome, not two booleans. */
+  outcome: scenarioFailureOutcomeSchema,
   /** Human-readable cause, recorded on the terminal event. */
   reason: z.string(),
 });
@@ -152,3 +223,19 @@ export const scenarioExecutionFailRunIntentSchema = z.object({
 export type ScenarioExecutionFailRunIntent = z.infer<
   typeof scenarioExecutionFailRunIntentSchema
 >;
+
+/**
+ * The outbox message key for a run's dispatch.
+ *
+ * Derived from the run, never minted (ADR-076). The outbox skips a duplicate
+ * key on insert, so a `queued` event that is folded twice enqueues one
+ * dispatch — the idempotency is the key, not a claim table.
+ */
+export function executeRunMessageKey(scenarioRunId: string): string {
+  return `execute:${scenarioRunId}`;
+}
+
+/** The outbox message key for a run's terminal write. Derived for the same reason. */
+export function failRunMessageKey(scenarioRunId: string): string {
+  return `fail:${scenarioRunId}`;
+}

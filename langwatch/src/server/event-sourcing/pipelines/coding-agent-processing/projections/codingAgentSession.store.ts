@@ -111,7 +111,7 @@ export class CodingAgentSessionStore
   /**
    * Read the session's last committed state back together with the
    * applied-event-id watermark persisted next to it (ADR-066) — the
-   * CH-fallthrough side of the read path: `RedisCachedFoldStore` serves the warm
+   * CH-fallthrough side of the read path: `CachedFoldStore` serves the warm
    * cache and only calls this on a miss. The row round-trips the full working
    * state — counters, ordered steps (with their start times), the sub-agent
    * dedup set, the previous-call context size, and the converged metric units —

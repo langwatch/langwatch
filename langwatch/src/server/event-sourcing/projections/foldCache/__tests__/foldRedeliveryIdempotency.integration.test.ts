@@ -48,7 +48,8 @@ import { createMockFoldProjectionDefinition } from "../../../services/__tests__/
 import { FoldProjectionExecutor } from "../../foldProjectionExecutor";
 import type { FoldProjectionStore } from "../../foldProjection.types";
 import type { ProjectionStoreContext } from "../../projectionStoreContext";
-import { RedisCachedFoldStore } from "../../redisCachedFoldStore";
+import { CachedFoldStore } from "../../cachedFoldStore";
+import { RedisFoldCacheClient } from "../foldCacheClient";
 
 const hasTestcontainers = !!(
   process.env.TEST_CLICKHOUSE_URL ||
@@ -195,9 +196,11 @@ describe.skipIf(!hasTestcontainers)("fold redelivery idempotency", () => {
     durableFactory?: DurableStoreFactory;
   }) {
     const durable = durableFactory();
-    const cached = new RedisCachedFoldStore<CounterState>(durable.store, redis, {
-      keyPrefix,
-    });
+    const cached = new CachedFoldStore<CounterState>(
+      durable.store,
+      new RedisFoldCacheClient(redis),
+      { keyPrefix },
+    );
 
     const fold = createMockFoldProjectionDefinition("counter", {
       store: cached,

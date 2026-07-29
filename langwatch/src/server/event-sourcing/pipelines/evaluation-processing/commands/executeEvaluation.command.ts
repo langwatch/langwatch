@@ -327,6 +327,13 @@ export class ExecuteEvaluationCommand implements CommandHandler<
       if (result.status === "processed" && result.cost) {
         costId = await this.deps.costRecorder.recordCost({
           projectId: tenantId,
+          // The natural key that makes the write idempotent. This handler runs
+          // under at-least-once delivery, and a failure below this point
+          // re-runs it from the top; `evaluationId` is fixed in the command
+          // payload, so the retry lands on the same Cost row instead of
+          // billing twice. A genuine re-evaluation gets a fresh evaluationId
+          // from evaluationTrigger.reactor.ts and still bills.
+          evaluationId: data.evaluationId,
           isGuardrail: !!data.isGuardrail,
           evaluatorName: data.evaluatorName ?? data.evaluatorType,
           evaluatorId: data.evaluatorId,

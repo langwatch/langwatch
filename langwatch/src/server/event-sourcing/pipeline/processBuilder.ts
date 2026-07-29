@@ -13,12 +13,8 @@ import {
 } from "./processManagerDefinition";
 
 type EventTypeOf<E extends Event> = E["type"] & string;
-type EventData<E extends Event, Type extends string> = Extract<
-  E,
-  { type: Type }
-> extends Event<infer Data>
-  ? Data
-  : never;
+type EventData<E extends Event, Type extends string> =
+  Extract<E, { type: Type }> extends Event<infer Data> ? Data : never;
 
 type OutboxOptions = NonNullable<
   ProcessManagerConfig<any, Record<string, IntentSpec<any>>>["outbox"]
@@ -34,7 +30,9 @@ export interface ProcessManagerStateStage<E extends Event, State> {
     schema: Schema,
     run: IntentSpec<Schema>["run"],
   ): ProcessManagerIntentStage<E, State, Record<Name, IntentSpec<Schema>>>;
-  schedule(options: { everyMs: number }): ProcessManagerScheduledStage<E, State>;
+  schedule(options: {
+    everyMs: number;
+  }): ProcessManagerScheduledStage<E, State>;
 }
 
 export interface ProcessManagerScheduledStage<E extends Event, State>
@@ -74,6 +72,10 @@ export interface ProcessManagerIntentStage<
     eventType: Type,
     handle: EventHandler<State, EventData<E, Type>, Intents>,
   ): ProcessManagerHandledStage<E, State, Intents>;
+  /** @see ProcessManagerHandledStage.ignores */
+  ignores<Type extends EventTypeOf<E>>(
+    ...eventTypes: Type[]
+  ): ProcessManagerHandledStage<E, State, Intents>;
   onWake(
     handle: WakeHandler<State, Intents>,
   ): ProcessManagerHandledStage<E, State, Intents>;
@@ -95,6 +97,19 @@ export interface ProcessManagerHandledStage<
     eventType: Type,
     handle: EventHandler<State, EventData<E, Type>, Intents>,
   ): ProcessManagerHandledStage<E, State, Intents>;
+  /**
+   * Subscribe to these events and decide nothing.
+   *
+   * Declared rather than omitted: the runtime derives its subscription from
+   * the declared handlers AND throws on an undeclared event, so leaving one
+   * out both stops delivery and turns any other delivery path into a hard
+   * failure. This is the `default:` arm of a hand-rolled evolve, made explicit
+   * — and it keeps a long list of "nothing to do here" events from burying the
+   * decisions that matter in the pipeline's own topology.
+   */
+  ignores<Type extends EventTypeOf<E>>(
+    ...eventTypes: Type[]
+  ): ProcessManagerHandledStage<E, State, Intents>;
   onWake(
     handle: WakeHandler<State, Intents>,
   ): ProcessManagerHandledStage<E, State, Intents>;
@@ -115,11 +130,9 @@ class ProcessManagerBuilder<E extends Event> {
   private stateValue: unknown;
   private hasState = false;
   private readonly intents: Record<string, IntentSpec<any>> = {};
-  private readonly handlers: Record<
-    string,
-    EventHandler<any, any, any>
-  > = {};
+  private readonly handlers: Record<string, EventHandler<any, any, any>> = {};
   private wakeHandler: WakeHandler<any, any> | undefined;
+  private readonly ignoredEventTypes: string[] = [];
   private outboxOptions: OutboxOptions | undefined;
   private scheduleOptions: { everyMs: number } | undefined;
   private payloadMapper:
@@ -146,10 +159,7 @@ class ProcessManagerBuilder<E extends Event> {
     return this;
   }
 
-  on(
-    eventType: string,
-    handle: EventHandler<any, any, any>,
-  ): this {
+  on(eventType: string, handle: EventHandler<any, any, any>): this {
     if (this.handlers[eventType]) {
       throw new ConfigurationError(
         "ProcessManagerBuilder",
@@ -161,12 +171,65 @@ class ProcessManagerBuilder<E extends Event> {
     return this;
   }
 
+  /**
+   * Route these event types into the process's inbox and decide nothing from
+   * them — the instance still records that it saw them, which is what keeps a
+   * later replay deterministic.
+   *
+   * **This CLEARS any armed deadline.** `nextWakeAt` is authoritative and the
+   * runtime resolves an omitted one to `null`, so "no decision" and "cancel the
+   * wake" are the same value. That is safe only for a process that never arms
+   * one. Using this on a process with a deadline silently disarms it on the
+   * next ignored event, and nothing fails — so the builder refuses that
+   * combination rather than trusting the caller to notice. The same applies to
+   * a deadline armed by `.schedule()`, which is refused for the same reason.
+   */
+  ignores(...eventTypes: string[]): this {
+    if (this.scheduleOptions) {
+      throw new ConfigurationError(
+        "ProcessManagerBuilder",
+        `Process manager "${this.name}" cannot use both .schedule() and .ignores(): ` +
+          `an ignored event clears the wake the schedule armed. Handle those ` +
+          `event types explicitly and return the wake you want to keep.`,
+        { name: this.name, eventTypes },
+      );
+    }
+    if (this.wakeHandler) {
+      throw new ConfigurationError(
+        "ProcessManagerBuilder",
+        `Process manager "${this.name}" cannot use .ignores() after .onWake(): ` +
+          `an ignored event clears the armed deadline. Handle those event ` +
+          `types explicitly and return the wake you want to keep.`,
+        { name: this.name, eventTypes },
+      );
+    }
+    this.ignoredEventTypes.push(...eventTypes);
+    for (const eventType of eventTypes) {
+      this.on(eventType, (state) => ({ state, nextWakeAt: null }));
+    }
+    return this;
+  }
+
   onWake(handle: WakeHandler<any, any>): this {
     if (this.wakeHandler) {
       throw new ConfigurationError(
         "ProcessManagerBuilder",
         `Process manager "${this.name}" already has a wake handler`,
         { name: this.name },
+      );
+    }
+    // `.ignores()` clears the deadline, because an omitted `nextWakeAt`
+    // resolves to null and null is authoritative. A process that both ignores
+    // events and arms a wake would disarm itself on the next ignored event,
+    // with nothing failing and no test catching it. Refuse the combination
+    // instead of documenting it.
+    if (this.ignoredEventTypes.length > 0) {
+      throw new ConfigurationError(
+        "ProcessManagerBuilder",
+        `Process manager "${this.name}" cannot use both .ignores() and .onWake(): ` +
+          `an ignored event clears the armed deadline. Handle those event ` +
+          `types explicitly and return the wake you want to keep.`,
+        { name: this.name, ignoredEventTypes: this.ignoredEventTypes },
       );
     }
     this.wakeHandler = handle;
@@ -196,7 +259,24 @@ class ProcessManagerBuilder<E extends Event> {
     return this;
   }
 
+  /**
+   * Arm a recurring wake. The runtime re-arms it from the present on every
+   * wake, so a schedule is a standing deadline rather than a one-shot.
+   *
+   * Refused alongside `.ignores()` for the reason that method documents: an
+   * ignored event resolves `nextWakeAt` to null, and null is authoritative, so
+   * the first ignored event would disarm the schedule with nothing failing.
+   */
   schedule(options: { everyMs: number }): this {
+    if (this.ignoredEventTypes.length > 0) {
+      throw new ConfigurationError(
+        "ProcessManagerBuilder",
+        `Process manager "${this.name}" cannot use both .ignores() and .schedule(): ` +
+          `an ignored event clears the wake the schedule armed. Handle those ` +
+          `event types explicitly and return the wake you want to keep.`,
+        { name: this.name, ignoredEventTypes: this.ignoredEventTypes },
+      );
+    }
     if (!Number.isFinite(options.everyMs) || options.everyMs <= 0) {
       throw new ConfigurationError(
         "ProcessManagerBuilder",

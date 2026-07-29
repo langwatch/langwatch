@@ -44,13 +44,6 @@ export type CommandsUnionToRegistry<C extends RegisteredCommand> = {
     : never]: K extends { payload: infer P } ? P : never;
 };
 
-// Convenience: command name union from a StaticPipelineDefinition
-export type CommandNamesFromPipeline<
-  P extends StaticPipelineDefinition<any, any, any>,
-> = keyof CommandsUnionToRegistry<
-  P extends StaticPipelineDefinition<any, any, infer C> ? C : never
->;
-
 /**
  * Builder for creating static pipeline definitions without runtime dependencies.
  * Use `definePipeline()` to start building a pipeline.

@@ -40,20 +40,23 @@ self-idempotent) and a **process manager** (transactional inbox, durable state,
 deadlines, leased outbox). The third is the **reactor**: a side-effect handler
 tied to a fold projection, dispatched after the fold applies and stores.
 
-The reactor's defining property is stated in the router itself:
+The reactor's defining property used to be stated in the router itself, as a
+constant every dispatch site passed:
 
 ```ts
-// projectionRouter.ts
+// projectionRouter.ts — deleted, see "What is deleted" below
 // The router only ever dispatches reactors on the live event path — the
 // replay service rebuilds fold projections and never invokes reactors, so
 // no reactor context here can be a replay.
 const LIVE_DISPATCH_IS_REPLAY = false;
 ```
 
-`ReactorContext.isReplay` exists but is wired to that constant on every call
-site. A reactor sees live events only. Anything a reactor writes is therefore
-**outside the event-sourced guarantee**: replay cannot rebuild it, and any
-divergence between the event log and what the reactor produced is permanent.
+`ReactorContext.isReplay` existed but was wired to that constant on every call
+site and read by no handler — write-only plumbing, since removed. The property
+it described still holds: a reactor sees live events only. Anything a reactor
+writes is therefore **outside the event-sourced guarantee**: replay cannot
+rebuild it, and any divergence between the event log and what the reactor
+produced is permanent.
 
 ADR-072 removed two aggregates that had exactly this bug. `suite_runs` was
 maintained by `suiteRunSync.reactor.ts` with non-idempotent `+ 1` counters on
@@ -115,13 +118,36 @@ and
 
 ## Decision
 
-**The reactor is retired as a concept.** Post-event work is expressed as an
-event subscriber or a process manager, and nothing else. `ReactorDefinition`,
+**The reactor is retired as a concept.** Post-event work is expressed as a
+subscriber or a process manager, and nothing else. `ReactorDefinition`,
 `ReactorContext`, `ReactorOptions`, `withReactor` and the router's reactor
 dispatch path are deleted once the last call site moves.
 
-The choice between the two is decided by one question — *if this work is lost,
-does anything need to be able to tell?*
+**There are two kinds of subscriber, and the distinction is load-bearing.**
+An earlier draft of this ADR described a subscriber as event-only, with no fold
+state — that is true of one of them and not the other, and the omission
+actively misled the first two conversions, which each invented a way to fetch
+committed state that the framework already provides:
+
+- **`withEventSubscriber(name, def)`** takes an `EventSubscriberDefinition`.
+  It sees the event and nothing else (`EventSubscriberContext` is `tenantId` +
+  `aggregateId`), and is dispatched from the routing seam independent of any
+  projection.
+- **`withSubscriber(name, { fold: "...", handler })`** takes a `SubscriberSpec`
+  and stages the handler *after that projection commits the event*, with the
+  committed state in `ctx.state: TriggerContext<FoldState>`. Its own docblock
+  calls it "the best-effort reaction primitive (ADR-052)". This is the direct
+  replacement for a reactor: same after-the-fold ordering, same fold state, and
+  it is what the automations migration already used.
+
+**Pick the fold-bound form whenever the handler reads `context.foldState`
+today.** It preserves both the state and the ordering, which the event-only
+form silently drops — a reactor fires after its projection commits, an event
+subscriber fires on delivery. Reach for `withEventSubscriber` only where the
+handler genuinely needs nothing but the event.
+
+Given that, the choice is decided by one question — *if this work is lost, does
+anything need to be able to tell?*
 
 | If the work… | Substrate | Guarantee |
 | --- | --- | --- |
@@ -131,23 +157,72 @@ does anything need to be able to tell?*
 | dispatches work that costs money or must happen | **process manager** | leased outbox, retried up to the process's own `maxAttempts` |
 | happens *later* rather than *now* | **process manager** | `nextWakeAt`, a durable deadline |
 
-A projection is not a third substrate — it is the existing fold/map projection
+A projection is not a further substrate — it is the existing fold/map projection
 machinery, which replay already rebuilds. The point of the row is that derived
 state must go through it rather than through a handler beside it.
 
-### The seventeen call sites
+### The eighteen call sites
 
-**Class A — transient fan-out → subscriber (3).** `cancellationBroadcast`,
-`spanStorageBroadcast`, `traceUpdateBroadcast`. These push to websocket/SSE
-clients. Making them durable would be *wrong*: an outbox redelivering a push to
-a browser that closed an hour ago is not a fix, it is a leak. They become
-subscribers with at-most-once semantics stated in the spec rather than implied
-by a `ttl`.
+Counted by live `.withReactor(...)` registration, which is the only honest way
+to count them: an earlier draft of this ADR said seventeen, because it searched
+for `*.reactor.ts` and `snapshotUpdateBroadcast.ts` does not carry the suffix.
+There are **19 registrations, 18 of them real** — see `retentionOrphanSweep`
+under "What is deleted".
+
+**Class A — transient fan-out → subscriber (4).** `cancellationBroadcast`,
+`spanStorageBroadcast`, `traceUpdateBroadcast`, `snapshotUpdateBroadcast`.
+These push to websocket/SSE clients. Making them durable would be *wrong*: an
+outbox redelivering a push to a browser that closed an hour ago is not a fix,
+it is a leak. They become subscribers with at-most-once semantics stated in the
+spec rather than implied by a `ttl`.
+
+Class A looked mechanical and is not, for a reason that generalises across
+every class: **most of these handlers read `context.foldState`.**
+`cancellationBroadcast` labels its message with `BatchRunId`, which the
+`cancel_requested` event does not carry — it only ever enters the fold from
+`queued`/`started`. `snapshotUpdateBroadcast` has the same dependency four times
+over (`ScenarioRunId`, `BatchRunId`, `ScenarioSetId`, `Status`).
+
+**The answer is the fold-bound subscriber**, `withSubscriber({ fold, handler })`,
+which hands the committed state to the handler in `ctx.state` and preserves the
+after-the-fold ordering. No injected store, no read-back port, no new event
+field. Two independent conversion attempts each reached for a workaround here
+before the ADR named the right seam; that was the ADR's fault, not theirs.
+
+Where a field turns out to have no reader at all, delete it instead of carrying
+it across — `CancellationMessage.batchRunId` and `.projectId` have no consumer
+(`scenario.processor.ts` reads only `scenarioRunId`). A field nobody reads is
+not a migration problem, it is dead weight the conversion happens to expose.
+
+**Ordering is the other reason to prefer the fold-bound form.** A reactor fires
+after its parent projection applies *and stores*; `withEventSubscriber` is
+dispatched from the routing seam, independent of any projection. Converting to
+the event-only form silently changes `spanStorageBroadcast` from "the span is in
+ClickHouse" to "something happened on this trace". That happens to be tolerable
+where the client refetches rather than trusting the push — but it is a semantic
+change to check per site, never to assume, and `withSubscriber({ fold })` avoids
+the question entirely.
 
 **Class B — external CRM sync → subscriber (3).** `customerIoEvaluationSync`,
 `customerIoSimulationSync`, `customerIoTraceSync`, all on
 `CIO_REACTOR_DEBOUNCE_TTL_MS`. Marketing nurture counts, lossy by contract.
-Subscribers, keeping the debounce as a deduplication strategy.
+Subscribers, keeping the debounce as a deduplication strategy — and the two
+that read fold state (`customerIoTraceSync` needs the trace's accumulated sdk
+attributes and its business `occurredAt`; `customerIoEvaluationSync` needs
+`evaluatorType`, which only the `reported` event carries) take the fold-bound
+form.
+
+**None of the three is registered.** `createCustomerIo*Reactor` has no call
+site outside its own file and its own unit test, and `pipelineRegistry.ts`
+carries a TODO saying the counting strategy has to be settled before enabling
+them. The `evaluationCountFn` / `simulationCountFn` they depend on do not exist
+anywhere in the repo. So Class B is not live code with a migration problem — it
+is **three unwired reactors and a missing feature**. Converting them is cheap
+and keeps the retirement total, but it does not remove anything from production,
+and the honest sequencing choice is either to finish the counting work or to
+delete all three. That decision belongs to whoever owns nurture, not to this
+ADR; what this ADR insists on is that they must not be left as a fourth kind of
+post-event handler.
 
 **Class C — derived durable state → projection (3).** `gatewayBudgetSync`,
 `governanceKpisSync`, `governanceOcsfEventsSync`. All three write derived rows
@@ -157,6 +232,34 @@ splits: the debit rows are the projection, and the best-effort
 `virtualKey.lastUsedAt` touch is a subscriber, because it is a side effect on
 Prisma rather than derived state.
 
+Two questions that come up during the conversion, both already answered by the
+repo — settled here so they are not reopened:
+
+**OCSF rows are keyed per span, not per trace.** Migration 00026's header is
+explicit: *"Each governance span/log emits ONE OCSF row keyed by (TenantId,
+EventId). EventId is the span_id (hex) for span-shaped traces and the log
+record id for flat-event traces."* `folds.feature` says the same. The reactor
+keyed on `traceId` and justified it in a docblock as "too noisy for SIEM
+consumers" — that was a unilateral deviation from its own table's documented
+contract, and it is also what made the stream un-rebuildable, since a trace is
+not one immutable event. Restoring span grain is a bug fix, not a product
+decision. SIEM volume is bounded by the export's cursor pagination and `limit`,
+not by row grain, so the objection the docblock raised was already handled a
+layer up.
+
+**Log-record governance ingest has never worked, and this ADR does not fix it.**
+Migration 00026 and `folds.feature` both provide for it, and the receiver does
+stamp the origin attributes — but the trace pipeline only sees log attributes
+through `liftCanonicalAttributesFromLogRecord`, whose extractor registry is a
+set of *vendor* adapters (ClaudeCode, Codex, GenAI, SpringAI). `langwatch.origin.*`
+is not a vendor attribute needing extraction; it is already canonical and
+simply needs passing through. So webhook-ingested governance data produces no
+KPI or OCSF rows and never has, under the reactor or after conversion. Scope
+the projections to `span_received` to match real coverage. The gap is a genuine
+defect on a compliance surface and deserves its own fix — but it is orthogonal
+to which substrate writes the rows, and folding it in here would grow a
+substrate change into an ingest change.
+
 **Class D — work dispatch → process manager outbox (6).** `scenarioExecution`
 (this is ADR-073 step 2), `evaluationTrigger`, `customEvaluationSync`,
 `billingMeterDispatch`, `traceMetricsSync`, `simulationMetricsSync`. Each
@@ -164,10 +267,38 @@ dispatches work that must happen. `evaluationTrigger`'s per-monitor
 `delay: monitor.threadIdleTimeout * 1000` and `simulationMetricsSync`'s
 `delay: 60_000` become deadlines rather than queue delays.
 
-**Class E — deferred re-check → process manager wake (2).** `originGate`
-(`DEFERRED_CHECK_DELAY_MS`, 5 minutes) and `projectMetadata` (which also owns
-the ADR-051 topic-clustering bootstrap). Both are already process managers
-written by hand.
+**Class E — deferred re-check → process manager wake (1).** `originGate`
+(`DEFERRED_CHECK_DELAY_MS`, 5 minutes) is a process manager written by hand:
+its whole job happens *later*, so there is a deadline worth making durable.
+
+**`projectMetadata` was in this class and does not belong here.** It has no
+`delay` at all — its options are `makeJobId` + `ttl: 60_000`, which is a dedup
+window, not a deferral. It runs immediately on the first event of each window,
+so a process manager would buy a durable deadline it does not have, at the cost
+of an instance row and an inbox transition per *trace* to do work that is
+per *project*. The classification confused "debounced" with "deferred". Two
+independent conversion attempts both refused the assignment before this was
+corrected.
+
+It is also two concerns fused, and the fusion was a live defect: the ADR-051
+clustering bootstrap sat inside the metadata write's `try`, after a Prisma read,
+so a database blip skipped the clustering re-assertion and reported it as
+"Failed to update project metadata" — the clustering outage was invisible and
+mislabelled. They split:
+
+- the metadata write (`firstMessage` / `integrated` / `language`) reads three
+  keys off `foldState.attributes`, so it is a **fold-bound subscriber**. Not a
+  projection, for the same reason `virtualKey.lastUsedAt` is not: it is a side
+  effect on a Prisma row with its own lifecycle, not derived state.
+- the clustering bootstrap is a **liveness poke** and becomes its own
+  subscriber, failing forward on a read error rather than skipping. Making it a
+  process manager would be a process manager whose only job is to ensure another
+  process manager exists — the durable deadline already exists one pipeline
+  over, on the right key and cadence.
+
+Longer term it should not ride the ingest path at all: a `.schedule()` sweep
+inside the topic-clustering pipeline removes the coupling entirely. That is a
+behaviour change and belongs in its own decision.
 
 ### Migration order
 
@@ -190,11 +321,25 @@ requires a big-bang cutover, and no step depends on a later one.
 ### What is deleted
 
 `ReactorDefinition`, `ReactorContext`, `ReactorOptions`, `withReactor`, the
-router's reactor dispatch path, `LIVE_DISPATCH_IS_REPLAY` and the vestigial
-`isReplay` plumbing, and `specs/event-sourcing/reactors.feature` (superseded by
-`post-event-work.feature`). ADR-026 is superseded: `shouldReact`'s successor is
-`EnqueueDispatchOptions.filter` on the subscriber contract (ADR-069 phase 1),
-plus the process manager's trigger predicate.
+router's reactor dispatch path, and `specs/event-sourcing/reactors.feature`
+(superseded by `post-event-work.feature`).
+
+**Already deleted:** `LIVE_DISPATCH_IS_REPLAY` and the vestigial `isReplay`
+plumbing are gone. They came out ahead of the rest because they were
+write-only — the field was declared once, written as the constant at the three
+router dispatch sites, and read by no handler anywhere — so removing them did
+not require a single reactor call site to move. The invariant they documented
+(replay never reaches a reactor) is unchanged and is recorded in this ADR
+instead; it is the whole reason Class C exists. ADR-026 is superseded: `shouldReact`'s successor is
+`EnqueueDispatchOptions.filter` on the event-only subscriber contract (ADR-069
+phase 1) or the fold-bound subscriber's trigger predicate, plus the process
+manager's.
+
+**`retentionOrphanSweep` goes with them, and is not migrated.** It is declared
+as an optional dep in `trace-processing/pipeline.ts` and registered when
+supplied — but nothing in `langwatch/src` or `langwatch/ee` ever supplies it. It
+is dead wiring, which is why the registration count is 19 while the live call
+sites are 18. Delete the dep and its `if` block rather than finding it a class.
 
 ### The one migration hazard: `shouldReact` fails open, `filter` does not
 
@@ -255,14 +400,88 @@ enqueue filter narrows on `eventTypes` alone.
   rebuilt on replay, so a replay over a governance window will re-derive the
   OCSF and KPI streams. Each repository must therefore be idempotent on its own
   natural event key **before** conversion — this is a precondition, not a
-  consequence. The keys already exist and differ per stream, so no new one is
-  invented here: the budget ledger collapses on
-  `(TenantId, BudgetId, GatewayRequestId)` via `ReplacingMergeTree`
-  (`specs/ai-gateway/budgets.feature`), and OCSF rows carry the span id or
-  log-record id as `event_id` (`folds.feature`). `governance_kpis` is the one
-  that needs work: it is an incrementing aggregate per
-  `(org, source, hour_bucket)`, so re-deriving it means recomputing the bucket
-  rather than re-applying a delta.
+  consequence. OCSF rows carry the span id or log-record id as `event_id`
+  (`folds.feature`).
+
+- **`governance_kpis` is not an incrementing aggregate, and "recompute the
+  bucket" would have been the wrong fix.** An earlier draft of this ADR said it
+  was, and told implementers to recompute. Migration 00031 says otherwise:
+  `ReplacingMergeTree(LastEventOccurredAt)` keyed
+  `(TenantId, SourceId, HourBucket, TraceId)` — already one row per trace,
+  summed at read time. Recomputing the bucket would have reintroduced the
+  load-mutate-store race across traces sharing an hour that 00031's header
+  explicitly rejected.
+
+  The actual defect is narrower and worse: the version column is
+  `LastEventOccurredAt`, which is the trace's *earliest* span start. It is
+  **constant across firings**, so competing rows for one key tie and the
+  survivor is arbitrary; and it can **decrease** when a span with an earlier
+  start lands late, so a more complete row can lose to a less complete one.
+  Rebuild-to-correct-drift could not have worked even in principle, because a
+  replay writing final totals ties with what is already there. The fix is to
+  move the key to event grain — one row per span, carrying that span's own
+  cost — so re-derivation is a set-union of rows the set already contains.
+
+- **This one was not merely un-rebuildable, it is wrong live, and it reaches a
+  customer-facing alert.** `spendSpikeAnomalyEvaluator.service.ts` reads
+  `sumIf(SpendUsd, …)` from `governance_kpis` with no `FINAL`, no `argMax` and
+  no IN-tuple dedup, against a `ReplacingMergeTree` whose duplicate-keyed rows
+  are exactly what the arbitrary-survivor tie produces. So the spend-spike rule
+  over-counts every unmerged partial today. Event-grain keying removes the
+  duplicate keys that cause it, but **the missing read-side dedup is a separate
+  defect and should be fixed on its own** — it decides whether a customer gets
+  paged.
+
+- **Do not delete the budget ledger's insert probe.** An earlier draft of this
+  ADR said the ledger "collapses on `(TenantId, BudgetId, GatewayRequestId)`
+  via `ReplacingMergeTree`", implying the table engine makes replay safe. It
+  does not, and acting on that sentence would inflate every budget. The engine
+  is right for the ledger table (`00017_create_gateway_budget_ledger.sql`), but
+  budgets are **enforced on `gateway_budget_scope_totals`** — an
+  `AggregatingMergeTree` fed by a materialised view that `sumState`s at INSERT
+  time. A materialised view fires per insert, so a duplicate ledger insert adds
+  a second contribution to the sum, and collapsing the ledger row afterwards
+  does not retract it. The inflation is immediate and permanent.
+
+  What actually keeps spend honest is application code: `insertDebit` probes
+  `SELECT 1 … WHERE TenantId AND GatewayRequestId LIMIT 1` before inserting, and
+  skips on a hit. Any Class C conversion must preserve that probe, and it is the
+  kind of code someone deletes as redundant precisely *because* the table says
+  `ReplacingMergeTree`.
+
+  The probe is also weaker than it looks: it keys on `gateway_request_id` alone,
+  not `(budget, request)`. A request whose debit landed for two of three budgets
+  finds a row, skips, and keeps the gap forever — so replay repairs a *wholly*
+  missing debit and not a partial one. `budgets.feature`'s "any debit missing
+  from the ledger is reported" is therefore not satisfied by conversion alone.
+  Widening the probe is a one-line `WHERE` change and should ship with it.
+
+- **The enqueue seam exists on one of three registration paths, and that blocks
+  Classes C and E.** ADR-069 phase 1 put `EnqueueDispatchOptions` (filter +
+  claim-check staging) on `EventSubscriberDefinition` only. The other two paths
+  a retired reactor can land on have nothing:
+
+  - `MapProjectionDefinition` has no equivalent, so a Class C conversion mints a
+    job for every `span_received` — on the busiest path in the product — even
+    when the derivation returns `null` for all but gateway spans. The subscriber
+    half of the same conversion gets a filter and costs nothing; the projection
+    half cannot.
+  - `ProcessRuntime.registerPipeline` builds a process manager's subscriber as
+    `{ name, eventTypes, handle }` with **no `options` object at all** — no
+    dedup, no delay, no filter. So Class E is the largest row-count change in
+    the whole retirement, not the mechanical tail it looks like. `originGate`
+    today is `ttl: 15_000` + `delay: 5_000`, i.e. one job per trace per 15
+    seconds. As a trace-keyed process manager it becomes a queue job, an inbox
+    row and an optimistic-concurrency update on one instance row **per span** —
+    a 10k-span trace goes from a handful of jobs to 10k durable Postgres
+    transitions, serialised on a single key, with revision conflicts throwing
+    back to the queue under contention. That is the amplification
+    `specs/event-sourcing/hot-trace-fold-amplification.feature` exists for.
+
+  Extending the seam to both paths is a router change touching all 15
+  map-projection registrations and every process manager, which is why it is
+  called out here rather than folded into a class. **It should land before the
+  remaining Class C and Class E conversions, not after them.**
 
 ## References
 

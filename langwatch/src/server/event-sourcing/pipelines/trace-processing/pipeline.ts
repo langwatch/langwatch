@@ -4,7 +4,10 @@ import { GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS } from "~/server/event-sourcing/pip
 import { definePipeline } from "../../";
 import type { TriggerContext } from "../../pipeline/processManagerDefinition";
 import type { FoldProjectionStore } from "../../projections/foldProjection.types";
-import type { AppendStore } from "../../projections/mapProjection.types";
+import type {
+  AppendStore,
+  MapProjectionDefinition,
+} from "../../projections/mapProjection.types";
 import type { ReactorDefinition } from "../../reactors/reactor.types";
 import type { EventSubscriberDefinition } from "../../subscribers/eventSubscriber.types";
 import {
@@ -83,14 +86,16 @@ export interface TraceProcessingPipelineDeps {
     ) => Promise<void>;
   };
   spanStorageBroadcastReactor: ReactorDefinition<TraceProcessingEvent>;
-  customerIoTraceSyncReactor?: ReactorDefinition<
-    TraceProcessingEvent,
-    TraceSummaryData
+  /**
+   * ADR-075 Class C: gateway spend is derived state, so it is a projection and
+   * a replay rebuilds it. Absent when ClickHouse is disabled.
+   */
+  gatewayBudgetDebitsProjection?: MapProjectionDefinition<
+    unknown,
+    TraceProcessingEvent
   >;
-  gatewayBudgetSyncReactor?: ReactorDefinition<
-    TraceProcessingEvent,
-    TraceSummaryData
-  >;
+  /** The best-effort `VirtualKey.lastUsedAt` touch the debit write split from. */
+  virtualKeyLastUsedSubscriber?: EventSubscriberDefinition<TraceProcessingEvent>;
   /**
    * ADR-022: BlobStore injected so RecordSpanCommand can reconstitute oversized
    * commands (fetch from S3 spool) and best-effort delete the spool after
@@ -105,17 +110,13 @@ export interface TraceProcessingPipelineDeps {
    * spanCommandGroupKey.ts.
    */
   spanCommandShardCount?: number;
-  governanceKpisSyncReactor?: ReactorDefinition<
-    TraceProcessingEvent,
-    TraceSummaryData
+  governanceKpisProjection?: MapProjectionDefinition<
+    unknown,
+    TraceProcessingEvent
   >;
-  retentionOrphanSweepReactor?: ReactorDefinition<
-    TraceProcessingEvent,
-    TraceSummaryData
-  >;
-  governanceOcsfEventsSyncReactor?: ReactorDefinition<
-    TraceProcessingEvent,
-    TraceSummaryData
+  governanceOcsfEventsProjection?: MapProjectionDefinition<
+    unknown,
+    TraceProcessingEvent
   >;
   /** Cross-pipeline dispatchers (e.g. coding-agent span-facts, ADR-056). */
   subscribers?: EventSubscriberDefinition<TraceProcessingEvent>[];
@@ -206,43 +207,31 @@ export function createTraceProcessingPipeline(
       deps.spanStorageBroadcastReactor,
     );
 
-  if (deps.customerIoTraceSyncReactor) {
-    builder = builder.withReactor(
-      "traceSummary",
-      "customerIoTraceSync",
-      deps.customerIoTraceSyncReactor,
+  if (deps.gatewayBudgetDebitsProjection) {
+    builder = builder.withMapProjection(
+      "gatewayBudgetDebits",
+      deps.gatewayBudgetDebitsProjection,
     );
   }
 
-  if (deps.gatewayBudgetSyncReactor) {
-    builder = builder.withReactor(
-      "traceSummary",
-      "gatewayBudgetSync",
-      deps.gatewayBudgetSyncReactor,
+  if (deps.virtualKeyLastUsedSubscriber) {
+    builder = builder.withEventSubscriber(
+      "virtualKeyLastUsed",
+      deps.virtualKeyLastUsedSubscriber,
     );
   }
 
-  if (deps.governanceKpisSyncReactor) {
-    builder = builder.withReactor(
-      "traceSummary",
-      "governanceKpisSync",
-      deps.governanceKpisSyncReactor,
+  if (deps.governanceKpisProjection) {
+    builder = builder.withMapProjection(
+      "governanceKpis",
+      deps.governanceKpisProjection,
     );
   }
 
-  if (deps.governanceOcsfEventsSyncReactor) {
-    builder = builder.withReactor(
-      "traceSummary",
-      "governanceOcsfEventsSync",
-      deps.governanceOcsfEventsSyncReactor,
-    );
-  }
-
-  if (deps.retentionOrphanSweepReactor) {
-    builder = builder.withReactor(
-      "traceSummary",
-      "retentionOrphanSweep",
-      deps.retentionOrphanSweepReactor,
+  if (deps.governanceOcsfEventsProjection) {
+    builder = builder.withMapProjection(
+      "governanceOcsfEvents",
+      deps.governanceOcsfEventsProjection,
     );
   }
 

@@ -1,0 +1,75 @@
+-- Cost.idempotencyKey — stop at-least-once retries double-billing.
+--
+-- WHY
+-- ---
+-- `ExecuteEvaluationCommand` calls `PrismaEvaluationCostRecorder.recordCost`
+-- part-way through its handler, and the handler runs on the GroupQueue's
+-- at-least-once delivery. A failure AFTER the cost row is written but BEFORE
+-- the handler completes re-runs the whole handler, and `prisma.cost.create`
+-- with a freshly generated id happily wrote a SECOND row for the same
+-- evaluation. Those rows are money: `license-enforcement.repository.ts`
+-- aggregates them for limit enforcement and `api/routers/costs.ts` reports
+-- them, so the duplicate over-counts a customer's spend against their plan.
+--
+-- WHY A NEW COLUMN RATHER THAN A UNIQUE OVER THE BUSINESS COLUMNS
+-- ---------------------------------------------------------------
+-- The obvious candidate key —
+--   (projectId, referenceType, referenceId, extraInfo->>'trace_id', costType)
+-- — is not a key. Three of the four writers legitimately emit many rows under
+-- one such tuple:
+--
+--   * app-layer/topic-clustering/clustering.ts writes one CLUSTERING / PROJECT
+--     row per clustering run, all with referenceId = projectId and no trace_id.
+--     Every scheduled run would collide with the previous one.
+--   * routes/evaluations-legacy.ts (batch) writes one BATCH_EVALUATION / BATCH
+--     row per datapoint, all against the same experiment id and with no
+--     trace_id at all.
+--   * routes/evaluations-legacy.ts (single) can be called repeatedly for the
+--     same (evaluator, trace) — a re-run there is a real, separately billable
+--     execution, not a retry.
+--
+-- On top of that, the table already contains the duplicates this defect has
+-- been producing, so a unique index over those columns could not even be
+-- built without first deleting rows we cannot safely classify.
+--
+-- A nullable `idempotencyKey` sidesteps both problems. Postgres treats NULLs
+-- as distinct in a unique index (the default, and this index deliberately does
+-- NOT use NULLS NOT DISTINCT), so:
+--
+--   * every existing row gets NULL and none of them can conflict — the index
+--     builds against today's data with no cleanup step;
+--   * the three writers above keep writing NULL and are entirely unaffected;
+--   * only writers that explicitly claim an identity are constrained.
+--
+-- The evaluation recorder claims `evaluation:<evaluationId>`. That is the right
+-- grain: `evaluationTrigger.reactor.ts` mints a fresh KSUID evaluationId per
+-- dispatch, so a genuine re-evaluation bills again, while a redelivery of the
+-- SAME enqueued command carries the same payload and therefore the same key.
+--
+-- HISTORICAL DUPLICATES
+-- ---------------------
+-- Not touched. They stay NULL-keyed and keep summing as they do today. We
+-- cannot tell a retry duplicate from a legitimate second evaluation after the
+-- fact — both are two rows with different ids, the same evaluator and the same
+-- trace — so deleting them here would be guesswork against billing data. This
+-- migration stops the bleeding; any reconciliation of past over-counts is an
+-- operator decision made against the event log, not a schema change.
+--
+-- ROLLOUT
+-- -------
+-- `ADD COLUMN` of a nullable column with no default is metadata-only on
+-- PostgreSQL 11+ and does not rewrite the table. `CREATE UNIQUE INDEX` (not
+-- CONCURRENTLY — Prisma runs each migration in a transaction) takes a SHARE
+-- lock on "Cost" for the duration of the build, blocking writes to it. Cost is
+-- append-only and written from evaluation/clustering paths, so the effect of a
+-- block is delayed cost recording rather than failed user requests, but on a
+-- large Cost table this is still the part of the migration to schedule
+-- deliberately. An operator who needs zero write-blocking can build
+-- `Cost_projectId_idempotencyKey_key` by hand with CREATE UNIQUE INDEX
+-- CONCURRENTLY before deploying — the IF NOT EXISTS below then no-ops.
+
+-- AlterTable
+ALTER TABLE "Cost" ADD COLUMN "idempotencyKey" TEXT;
+
+-- CreateIndex
+CREATE UNIQUE INDEX IF NOT EXISTS "Cost_projectId_idempotencyKey_key" ON "Cost"("projectId", "idempotencyKey");

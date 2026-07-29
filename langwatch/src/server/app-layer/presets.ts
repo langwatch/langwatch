@@ -32,6 +32,7 @@ import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/p
 import { getFeatureFlagStore } from "~/server/featureFlag/featureFlagStore.postgres";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import { GatewayBudgetRepository } from "~/server/gateway/budget.repository";
+import { ChangeEventRepository } from "~/server/gateway/changeEvent.repository";
 import { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
 import { getEdgeSpoolFailOpenCounter } from "~/server/metrics";
 import {
@@ -76,14 +77,21 @@ import {
   type AppCommands,
   PipelineRegistry,
 } from "../event-sourcing/pipelineRegistry";
-import { buildAutomationDispatchPorts } from "../event-sourcing/pipelines/automations/automationDispatch.wiring";
+import { buildAutomationDispatchPorts } from "../event-sourcing/pipelines/automations/automationDispatch.adapter";
+import { AnnotationService } from "../annotations/annotation.service";
+import { createAutomationDispatchCollaborators } from "./automations/automation-dispatch.composition";
+import {
+  type FoldCacheClient,
+  InMemoryFoldCacheClient,
+  RedisFoldCacheClient,
+} from "../event-sourcing/projections/foldCache/foldCacheClient";
 import { createExperimentRunItemAppendStore } from "../event-sourcing/pipelines/experiment-run-processing/projections/experimentRunResultStorage.store";
 import {
   ExperimentRunStateRepositoryClickHouse,
   ExperimentRunStateRepositoryMemory,
 } from "../event-sourcing/pipelines/experiment-run-processing/repositories";
 import { LangyAnalyticsEventAppendStore } from "../event-sourcing/pipelines/langy-conversation-processing/projections/langyAnalyticsEvent.store";
-import type { ScenarioExecutionReactorHandle } from "../event-sourcing/pipelines/simulation-processing/reactors/scenarioExecution.reactor";
+import type { ScenarioExecutionDispatcherHandle } from "../scenarios/execution/execution-dispatcher";
 import {
   SimulationRunStateRepositoryClickHouse,
   SimulationRunStateRepositoryMemory,
@@ -275,10 +283,11 @@ import { traced } from "./tracing";
 import { UsageService } from "./usage/usage.service";
 
 /**
- * Late-bound handle for the scenario execution reactor.
+ * Late-bound handle the worker binds its scenario execution pool into, and
+ * that the `scenarioExecution` process outbox dispatches through (ADR-073).
  * Stored on globalForApp to survive hot-reload in dev (same as the App instance).
  */
-export function getScenarioExecutionHandle(): ScenarioExecutionReactorHandle | null {
+export function getScenarioExecutionHandle(): ScenarioExecutionDispatcherHandle | null {
   return (globalForApp as any).__scenarioExecutionHandle ?? null;
 }
 
@@ -328,6 +337,26 @@ export function initializeDefaultApp(options?: {
         clusterEndpoints: config.redisClusterEndpoints,
         db: config.redisDbIndex,
       });
+
+  // ADR-077 §3: which tier backs the fold cache is decided HERE and nowhere
+  // else. Every fold store downstream is composed over this one client, so the
+  // two sites that used to disagree about whether trace_summaries is cached
+  // cannot, and no pipeline or adapter can re-open the question.
+  //
+  // `RedisFoldCacheClient` takes `Redis | Cluster` and does not discriminate:
+  // the fold cache issues only single-key reads and writes, which a Cluster
+  // client routes to the owning slot. Topology therefore does not decide
+  // whether folds are cached, and that is deliberate — ADR-066 §5 makes this
+  // cache the read-your-write consistency layer rather than an accelerator, so
+  // the fold writers must keep it in every Redis topology.
+  //
+  // Without Redis there is no fleet to share a tier with — the event-sourcing
+  // queues are Redis — so the in-process map IS the shared tier, and it keeps
+  // read-your-write instead of reading through to a ClickHouse replica that may
+  // not have caught up.
+  const foldCacheClient: FoldCacheClient = redis
+    ? new RedisFoldCacheClient(redis)
+    : new InMemoryFoldCacheClient();
 
   const broadcast = new BroadcastService(redis);
   const projects = traced(
@@ -573,6 +602,7 @@ export function initializeDefaultApp(options?: {
     new PrismaScheduledJobRepository(prisma),
     redis,
   );
+  const annotations = AnnotationService.create({ prisma });
   const emailSuppressions = new EmailSuppressionService(
     new PrismaEmailSuppressionRepository(prisma),
     new PrismaEmailSuppressionNameLookupRepository(prisma),
@@ -740,6 +770,10 @@ export function initializeDefaultApp(options?: {
         budgetCHRepository: new GatewayBudgetClickHouseRepository(
           resolveClickHouseClient,
         ),
+        // The debit store emits BUDGET_UPDATED so the Go gateway evicts its
+        // cached bundles. The reactor built this inline; passing the repository
+        // keeps the store's dependencies visible and testable.
+        changeEvents: new ChangeEventRepository(prisma),
       }
     : undefined;
 
@@ -774,16 +808,19 @@ export function initializeDefaultApp(options?: {
   // registry composes (triggerSettlement + graphAlertSweep). Built on every
   // role — registration is passive shape; the outbox/wake worker loops
   // start only where roleRunsWorkers() is true.
-  const automationPorts = buildAutomationDispatchPorts({
-    prisma,
-    redis: redis ?? null,
-    triggers,
-    emailSuppressions,
-    projects,
-    evaluations: { runs: evaluations.runs },
-    traces: { spans: spanStorage },
-    traceSummaryRepository: repositories.traceSummaryFold,
-  });
+  const automationPorts = buildAutomationDispatchPorts(
+    createAutomationDispatchCollaborators({
+      prisma,
+      foldCacheClient,
+      triggers,
+      annotations,
+      emailSuppressions,
+      projects,
+      evaluationRuns: evaluations.runs,
+      spanStorage,
+      traceSummaryRepository: repositories.traceSummaryFold,
+    }),
+  );
 
   // ADR-044 Phase 1: the generic calendar scheduler. No cron infra. A
   // worker-only in-process loop that sleeps until the soonest due
@@ -934,6 +971,7 @@ export function initializeDefaultApp(options?: {
     eventSourcing: es,
     repositories,
     redis: redis!,
+    foldCacheClient,
     broadcast,
     langy: {
       buffer: langyTokenBuffer,
@@ -1254,6 +1292,7 @@ export function initializeDefaultApp(options?: {
     traces,
     evaluations,
     experiments,
+    annotations,
     triggers,
     triggerTemplates,
     emailSuppressions,
@@ -1436,6 +1475,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     },
     dspySteps: { steps: new DspyStepService(new NullDspyStepRepository()) },
     experiments: ExperimentService.create(testPrisma),
+    annotations: AnnotationService.create({ prisma: testPrisma }),
     triggers: new TriggerService(new NullTriggerRepository()),
     emailSuppressions: new EmailSuppressionService(
       new NullEmailSuppressionRepository(),
@@ -1646,14 +1686,10 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         recordTriggerMatch: noop,
       } as AppCommands["automations"],
       scenarioExecutionHandle: {
-        reactor: {
-          name: "scenarioExecution",
-          options: { runIn: ["worker"] },
-          handle: async () => {
-            /* noop */
-          },
-        },
         setPool: () => {
+          /* noop */
+        },
+        execute: async () => {
           /* noop */
         },
       },

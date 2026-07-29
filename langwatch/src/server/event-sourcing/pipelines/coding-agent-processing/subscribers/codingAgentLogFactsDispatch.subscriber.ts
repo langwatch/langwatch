@@ -36,7 +36,10 @@ export function createCodingAgentLogFactsDispatchSubscriber(deps: {
     },
     handle: async (event) => {
       const record = event.data;
-      const attributes = parseFlatAttributes(record.attributesFlatJson);
+      const attributes = parseFlatAttributes({
+        json: record.attributesFlatJson,
+        recordId: record.recordId,
+      });
       if (attributes === null) return;
       // The canonical preparation extracts `eventName` into its own column
       // and some agents only spell it there.
@@ -56,9 +59,10 @@ export function createCodingAgentLogFactsDispatchSubscriber(deps: {
       });
       if (facts === null) return;
 
-      const resourceAttributes = parseFlatAttributes(
-        record.resourceAttributesFlatJson,
-      );
+      const resourceAttributes = parseFlatAttributes({
+        json: record.resourceAttributesFlatJson,
+        recordId: record.recordId,
+      });
       const rawServiceName = resourceAttributes?.["service.name"];
       const serviceName =
         typeof rawServiceName === "string" && rawServiceName.length > 0
@@ -113,7 +117,13 @@ export function createCodingAgentLogFactsDispatchSubscriber(deps: {
 }
 
 /** The canonical row stores attributes flattened as JSON — parse or skip. */
-function parseFlatAttributes(json: string): Record<string, unknown> | null {
+function parseFlatAttributes({
+  json,
+  recordId,
+}: {
+  json: string;
+  recordId: string;
+}): Record<string, unknown> | null {
   if (!json) return null;
   try {
     const parsed: unknown = JSON.parse(json);
@@ -129,7 +139,19 @@ function parseFlatAttributes(json: string): Record<string, unknown> | null {
     // A canonical row's JSON is written by our own preparation, so this
     // should be unreachable — but a dispatcher must never poison the queue
     // over one record.
-    logger.warn({ error }, "unparseable canonical log attributes; skipping");
+    //
+    // The error's NAME and the record id, never the error itself: V8 builds
+    // `SyntaxError.message` by quoting ~10 characters of the input it choked
+    // on, so serialising the error copies a slice of the customer's log
+    // attributes into ours. The record id is a better pointer anyway — the
+    // canonical row is still there to read.
+    logger.warn(
+      {
+        errorName: error instanceof Error ? error.name : typeof error,
+        recordId,
+      },
+      "unparseable canonical log attributes; skipping",
+    );
     return null;
   }
 }

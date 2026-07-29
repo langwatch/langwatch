@@ -29,20 +29,24 @@ type Intents = Parameters<typeof scenarioExecutionWake>[1]["intents"];
 function makeCtx(
   overrides: { at?: number; now?: number } = {},
 ): ProcessHandlerContext<any> {
+  const factory = (intentType: string) => (key: string, payload: unknown) => ({
+    messageKey: key,
+    intentType,
+    payload,
+  });
   return {
     at: overrides.at ?? NOW,
     now: overrides.now ?? NOW,
     key: RUN_ID,
     projectId: "project-1",
     intents: {
-      failRun: (key: string, payload: unknown) => ({
-        messageKey: key,
-        intentType: "failRun",
-        payload,
-      }),
+      executeRun: factory("executeRun"),
+      failRun: factory("failRun"),
     } as unknown as Intents,
   };
 }
+
+const TARGET = { type: "http", referenceId: "agent-1" } as const;
 
 /** The identities every simulation event carries, as the payload view sees them. */
 const IDENTITIES = {
@@ -50,7 +54,11 @@ const IDENTITIES = {
   scenarioId: "scenario-1",
   batchRunId: "batch-1",
   scenarioSetId: "set-1",
+  target: null,
 };
+
+/** What a `queued` event carries: identities plus what to execute. */
+const QUEUED_PAYLOAD = { ...IDENTITIES, target: TARGET };
 
 /** A committed `queued` event, as the pipeline hands it to the payload view. */
 function queuedEvent(data: Record<string, unknown>): SimulationProcessingEvent {
@@ -84,7 +92,7 @@ describe("scenarioExecution process", () => {
     it("arms a dispatch deadline", () => {
       const result = handleQueued(
         INITIAL_SCENARIO_EXECUTION_STATE,
-        IDENTITIES,
+        QUEUED_PAYLOAD,
         makeCtx(),
       );
 
@@ -94,7 +102,7 @@ describe("scenarioExecution process", () => {
     it("records the identities a terminal write will need", () => {
       const result = handleQueued(
         INITIAL_SCENARIO_EXECUTION_STATE,
-        IDENTITIES,
+        QUEUED_PAYLOAD,
         makeCtx(),
       );
 
@@ -104,6 +112,82 @@ describe("scenarioExecution process", () => {
         batchRunId: "batch-1",
         setId: "set-1",
       });
+    });
+
+    /**
+     * The heart of step 2. The predecessor called `pool.submit()` from a
+     * reactor, fire-and-forget into an in-RAM overflow array; here the
+     * dispatch is committed with the inbox row, so a worker that dies between
+     * consuming the event and starting the child no longer loses the run.
+     */
+    it("enqueues the dispatch alongside the deadline", () => {
+      const result = handleQueued(
+        INITIAL_SCENARIO_EXECUTION_STATE,
+        QUEUED_PAYLOAD,
+        makeCtx(),
+      );
+
+      expect(result.intents).toHaveLength(1);
+      expect(result.intents?.[0]?.intentType).toBe("executeRun");
+      expect(result.intents?.[0]?.payload).toMatchObject({
+        projectId: "project-1",
+        scenarioRunId: RUN_ID,
+        scenarioId: "scenario-1",
+        batchRunId: "batch-1",
+        setId: "set-1",
+        target: TARGET,
+      });
+    });
+
+    it("addresses the dispatch by a key derived from the run", () => {
+      const first = handleQueued(
+        INITIAL_SCENARIO_EXECUTION_STATE,
+        QUEUED_PAYLOAD,
+        makeCtx(),
+      );
+      const redelivered = handleQueued(
+        INITIAL_SCENARIO_EXECUTION_STATE,
+        QUEUED_PAYLOAD,
+        makeCtx({ at: NOW + 5_000, now: NOW + 5_000 }),
+      );
+
+      // The outbox skips a duplicate message key on insert, so deriving the
+      // key from the run — rather than minting one per attempt — is what
+      // makes a redelivered `queued` enqueue one execution, not two.
+      expect(first.intents?.[0]?.messageKey).toBe(
+        redelivered.intents?.[0]?.messageKey,
+      );
+      expect(first.intents?.[0]?.messageKey).toContain(RUN_ID);
+    });
+  });
+
+  describe("given a queued run carries no target", () => {
+    it("arms the deadline but enqueues nothing", () => {
+      const result = handleQueued(
+        INITIAL_SCENARIO_EXECUTION_STATE,
+        IDENTITIES,
+        makeCtx(),
+      );
+
+      // Nothing can be executed, so there is nothing for the outbox to retry.
+      // The armed deadline is what ends the run instead.
+      expect(result.intents ?? []).toEqual([]);
+      expect(result.nextWakeAt).toBe(NOW + SCENARIO_DISPATCH_DEADLINE_MS);
+    });
+  });
+
+  describe("given a queued event arrives after the run already ended", () => {
+    it("does not enqueue a dispatch for it", () => {
+      const settled = handleSettled(known(), IDENTITIES, makeCtx());
+
+      const late = handleQueued(
+        settled.state,
+        QUEUED_PAYLOAD,
+        makeCtx({ at: NOW + 1_000, now: NOW + 1_000 }),
+      );
+
+      expect(late.intents ?? []).toEqual([]);
+      expect(late.nextWakeAt).toBeNull();
     });
   });
 
@@ -245,7 +329,9 @@ describe("scenarioExecution process", () => {
 
       const woken = scenarioExecutionWake(armed.state, makeCtx());
 
-      expect(woken.intents?.[0]?.payload).toMatchObject({ cancelled: true });
+      expect(woken.intents?.[0]?.payload).toMatchObject({
+        outcome: "cancelled",
+      });
     });
 
     /**
@@ -278,7 +364,9 @@ describe("scenarioExecution process", () => {
 
       const woken = scenarioExecutionWake(later.state, makeCtx());
 
-      expect(woken.intents?.[0]?.payload).toMatchObject({ cancelled: true });
+      expect(woken.intents?.[0]?.payload).toMatchObject({
+        outcome: "cancelled",
+      });
     });
   });
 
@@ -329,7 +417,52 @@ describe("scenarioExecution process", () => {
         scenarioId: "scenario-1",
         batchRunId: "batch-1",
         setId: "set-1",
-        cancelled: false,
+      });
+    });
+
+    /**
+     * Step 1 wrote ERROR here, because a stored STALLED would have disagreed
+     * with the read-time derivation that was still live. That derivation is
+     * gone, so the stall is now written once instead of being recomputed —
+     * and therefore possibly answered differently — on every read.
+     */
+    it("records the stall as a stored fact", () => {
+      const woken = scenarioExecutionWake(known(), makeCtx());
+
+      expect(woken.intents?.[0]?.payload).toMatchObject({
+        outcome: "stalled",
+      });
+    });
+
+    it("says what the reason was, not just that it failed", () => {
+      const woken = scenarioExecutionWake(known(), makeCtx());
+
+      expect(woken.intents?.[0]?.payload).toMatchObject({
+        reason: expect.stringContaining("no longer alive"),
+      });
+    });
+
+    /**
+     * The run whose dispatch never happened: `queued` armed the deadline and
+     * enqueued an execution that nothing ever leased, so no `started` and no
+     * progress event ever folded. The wake still ends it.
+     */
+    it("ends a run that never got past queued", () => {
+      const queued = handleQueued(
+        INITIAL_SCENARIO_EXECUTION_STATE,
+        QUEUED_PAYLOAD,
+        makeCtx(),
+      );
+
+      const woken = scenarioExecutionWake(
+        queued.state,
+        makeCtx({ at: NOW + SCENARIO_DISPATCH_DEADLINE_MS }),
+      );
+
+      expect(woken.intents).toHaveLength(1);
+      expect(woken.intents?.[0]?.payload).toMatchObject({
+        scenarioRunId: RUN_ID,
+        outcome: "stalled",
       });
     });
 

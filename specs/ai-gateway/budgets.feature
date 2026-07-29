@@ -198,19 +198,28 @@ Feature: AI Gateway — Budgets
   # The scenarios above cover spend being counted ONCE (idempotency by
   # gateway_request_id). These cover it being counted AT ALL.
   #
-  # Debits are written today by `gatewayBudgetSync`, a reactor, and the
-  # projection router never dispatches a reactor on the replay path
-  # (`LIVE_DISPATCH_IS_REPLAY = false`). So a debit lost to a failed handler is
-  # lost permanently: the spend happened, the gateway trace records it, and the
-  # budget never learns. The same handler emits the BUDGET_UPDATED change the
-  # gateway consumes to evict cached bundles, so losing it also leaves the
-  # gateway authorising against stale spend.
+  # Debits used to be written by `gatewayBudgetSync`, a reactor, and the
+  # projection router never dispatches a reactor on the replay path — the
+  # replay service rebuilds projections and never invokes a reactor at all. So
+  # a debit lost to a failed handler was lost permanently: the spend happened,
+  # the gateway trace recorded it, and the budget never learned. The same
+  # handler emitted the BUDGET_UPDATED change the gateway consumes to evict
+  # cached bundles, so losing it also left the gateway authorising against
+  # stale spend. Both failures moved measured spend DOWN, the dangerous
+  # direction for a control whose job is to stop spending.
   #
-  # Both failures move measured spend DOWN, which is the dangerous direction
-  # for a control whose job is to stop spending. ADR-075 (Class C) converts the
-  # write to a projection so a rebuild recovers it. @unimplemented until then.
+  # ADR-075 (Class C) has since converted the write to a map projection over
+  # gateway spans. A failed write now propagates instead of being swallowed, so
+  # the job retries; and because the debit is derived rather than emitted, a
+  # replay of the window re-derives whatever the retries never landed, and
+  # announces only what it actually repaired.
+  #
+  # What still does not exist is the reconciliation REPORT — recomputing a
+  # period's spend from its traces and naming the debits that are missing — and
+  # the restart path where the gateway is left holding a cached view no
+  # surviving process will correct. Those two stay @unimplemented.
 
-  @integration @unimplemented
+  @integration
   Scenario: Spend recorded during a failure still counts against the budget
     Given a gateway request that consumed budget
     When the work recording that debit fails

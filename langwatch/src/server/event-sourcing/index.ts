@@ -32,6 +32,12 @@ export { defineCommandSchema } from "./commands/commandSchema";
 export type { CommandSchema } from "./commands/commandSchema";
 export { defineCommand } from "./commands/defineCommand";
 export type { DefinedCommandClass } from "./commands/defineCommand";
+export { createCommandBus } from "./commands/commandBus";
+export type {
+  AnyCommandClass,
+  CommandBus,
+  CommandBusRuntime,
+} from "./commands/commandBus";
 export { withCommandEnvelope, stripEnvelope } from "./commands/commandEnvelope";
 export type { CommandEnvelope } from "./commands/commandEnvelope";
 
