@@ -205,8 +205,27 @@ const scopeWireSchema = z.object({
   scope_id: z.string().min(1),
 });
 
+/**
+ * A positive USD amount on the wire: a number, or a decimal string (the
+ * form that survives JSON round-trips without float drift). The string
+ * branch is validated here so a malformed value answers 400 instead of
+ * exploding into a Prisma Decimal parse further down.
+ */
+const usdAmountSchema = z
+  .number()
+  .positive()
+  .or(
+    z
+      .string()
+      .trim()
+      .regex(/^\d+(\.\d+)?$/, "must be a decimal number of dollars")
+      .refine((v) => Number.parseFloat(v) > 0, {
+        message: "must be greater than zero",
+      }),
+  );
+
 const budgetWireSchema = z.object({
-  limit_usd: z.union([z.string(), z.number()]),
+  limit_usd: usdAmountSchema,
   window: z.enum(["DAY", "WEEK", "MONTH"]),
   on_breach: z.enum(["BLOCK", "WARN"]).optional(),
   name: z.string().min(1).max(128).optional(),
@@ -275,7 +294,7 @@ const updateCacheRuleSchema = z.object({
 const updateBudgetSchema = z.object({
   name: z.string().min(1).max(128).optional(),
   description: z.string().nullable().optional(),
-  limit_usd: z.number().positive().or(z.string()).optional(),
+  limit_usd: usdAmountSchema.optional(),
   on_breach: z.enum(["BLOCK", "WARN"]).optional(),
   timezone: z.string().nullable().optional(),
 });
@@ -303,7 +322,7 @@ const createBudgetSchema = z.object({
   name: z.string().min(1).max(128),
   description: z.string().optional(),
   window: z.enum(["MINUTE", "HOUR", "DAY", "WEEK", "MONTH", "TOTAL"]),
-  limit_usd: z.number().positive().or(z.string()),
+  limit_usd: usdAmountSchema,
   on_breach: z.enum(["BLOCK", "WARN"]).optional(),
   timezone: z.string().nullable().optional(),
   /**
@@ -364,11 +383,13 @@ function membershipForApiCaller(project: Project): MembershipSet {
 }
 
 /**
- * Load a key for a by-id route, applying the same visibility rule as the
- * list: a key the caller can't see is indistinguishable from one that
- * doesn't exist. Shared by reads AND mutations so an unauthorized-but-
- * invisible key can never answer 403 where the GET answers 404 (an
- * existence oracle).
+ * Load a key for a by-id READ with the list's visibility rule: a key the
+ * caller can't see is indistinguishable from one that doesn't exist.
+ * Mutations deliberately do NOT use this — their contract is
+ * permission-based (the op-perm on any existing scope, same as tRPC), so
+ * a credential holding a scope role binding can operate on a key its
+ * membership set does not surface, and an unauthorized caller inside the
+ * tenant gets FORBIDDEN, as virtual-key-access-boundaries.feature pins.
  */
 async function requireVisibleVk(
   service: VirtualKeyService,
@@ -651,25 +672,12 @@ secured.access(apiKeyPermission("virtualKeys:view")).get(
     const id = c.req.param("id");
     const service = VirtualKeyService.create(prisma);
     const organizationId = await orgIdForProject(project.id);
-    const vk = await service.getById(id, organizationId);
-    // A key the caller can't see is indistinguishable from one that
-    // doesn't exist — same 404, no existence leak.
-    if (
-      !vk ||
-      !isVisibleToMembership(membershipForApiCaller(project), vk.scopes)
-    ) {
-      return c.json(
-        {
-          error: {
-            type: "not_found",
-            code: "virtual_key_not_found",
-            message: "virtual key not found",
-          },
-        },
-        404,
-      );
+    try {
+      const vk = await requireVisibleVk(service, id, organizationId, project);
+      return c.json({ virtual_key: toVkDto(vk) });
+    } catch (error) {
+      return trpcErrorResponse(c, error);
     }
-    return c.json({ virtual_key: toVkDto(vk) });
   },
 );
 
@@ -737,21 +745,11 @@ secured.access(apiKeyPermission("gatewayUsage:view")).get(
 
     const organizationId = await orgIdForProject(project.id);
     const service = VirtualKeyService.create(prisma);
-    const vk = await service.getById(id, organizationId);
-    if (
-      !vk ||
-      !isVisibleToMembership(membershipForApiCaller(project), vk.scopes)
-    ) {
-      return c.json(
-        {
-          error: {
-            type: "not_found",
-            code: "virtual_key_not_found",
-            message: "virtual key not found",
-          },
-        },
-        404,
-      );
+    let vk;
+    try {
+      vk = await requireVisibleVk(service, id, organizationId, project);
+    } catch (error) {
+      return trpcErrorResponse(c, error);
     }
 
     // Same failure the tRPC spend column raises (spend_source_unavailable):
@@ -828,7 +826,13 @@ secured.access(apiKeyPermission("virtualKeys:update")).patch(
     const { actor, actorUserId } = actorForRequest(c);
     const service = VirtualKeyService.create(prisma);
     try {
-      const existing = await requireVisibleVk(service, id, organizationId, project);
+      const existing = await service.getById(id, organizationId);
+      if (!existing) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "virtual_key_not_found: virtual key not found",
+        });
+      }
       // Mutating an existing key needs virtualKeys:update on one of the
       // scopes it already lives in; re-scoping additionally needs manage
       // on every NEW scope — the same two gates as the tRPC update.
@@ -931,7 +935,13 @@ secured.access(apiKeyPermission("virtualKeys:rotate")).post(
     const { actor, actorUserId } = actorForRequest(c);
     const service = VirtualKeyService.create(prisma);
     try {
-      const existing = await requireVisibleVk(service, id, organizationId, project);
+      const existing = await service.getById(id, organizationId);
+      if (!existing) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "virtual_key_not_found: virtual key not found",
+        });
+      }
       await assertActorCanOperateOnAnyScope(
         { prisma, actor },
         existing.scopes,
@@ -975,7 +985,13 @@ secured.access(apiKeyPermission("virtualKeys:delete")).post(
     const { actor, actorUserId } = actorForRequest(c);
     const service = VirtualKeyService.create(prisma);
     try {
-      const existing = await requireVisibleVk(service, id, organizationId, project);
+      const existing = await service.getById(id, organizationId);
+      if (!existing) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "virtual_key_not_found: virtual key not found",
+        });
+      }
       await assertActorCanOperateOnAnyScope(
         { prisma, actor },
         existing.scopes,

@@ -704,7 +704,7 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       });
       expect(status).toBe(400);
       expect(body.error.code).toBe("validation_error");
-      expect(body.error.message).toContain("limitUsd");
+      expect(body.error.message).toContain("limit_usd");
     });
   });
 

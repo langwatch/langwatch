@@ -154,7 +154,7 @@ Feature: Public REST API — /api/gateway/v1/*
     # uses, so a cap tRPC would refuse cannot arrive via REST.
     When I create a key with `budget: { "limit_usd": "10abs", "window": "MONTH" }`
     Then the response status is 400
-    And the message names `limitUsd`
+    And the message names `limit_usd`
 
   # ============================================================================
   # Virtual keys: lifecycle + visibility + audit

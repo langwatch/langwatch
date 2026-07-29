@@ -58,10 +58,13 @@ function sessionActor(session: Session): VirtualKeyActor {
 }
 
 /**
- * Load a key for a by-id procedure with the same visibility rule as
- * `get`: a key outside the caller's membership set is indistinguishable
- * from one that doesn't exist. Mutations share this so an invisible key
- * can never answer FORBIDDEN where the read answers NOT_FOUND.
+ * Load a key for a by-id READ with the list's visibility rule: a key
+ * outside the caller's membership set is indistinguishable from one that
+ * doesn't exist. Mutations deliberately do NOT use this — their contract
+ * is permission-based (the op-perm on any existing scope), so a holder
+ * of a scope role binding can operate without being a member
+ * (vk-scope-rbac.feature), and an unauthorized caller gets FORBIDDEN,
+ * as virtual-key-access-boundaries.feature pins.
  */
 async function requireVisibleVk(
   ctx: { prisma: PrismaClient; session: Session },
@@ -119,21 +122,9 @@ export const virtualKeysRouter = createTRPCRouter({
     .input(idInput)
     .use(authorizeInResolver)
     .query(async ({ ctx, input }) => {
-      const service = VirtualKeyService.create(ctx.prisma);
-      const vk = await service.getById(input.id, input.organizationId);
       // A key the caller can't see is indistinguishable from one that
       // doesn't exist — same NOT_FOUND, no existence leak.
-      if (!vk) {
-        throw new TRPCError({ code: "NOT_FOUND" });
-      }
-      const membership = await loadMembershipSet(
-        ctx.prisma,
-        input.organizationId,
-        ctx.session.user.id,
-      );
-      if (!isVisibleToMembership(membership, vk.scopes)) {
-        throw new TRPCError({ code: "NOT_FOUND" });
-      }
+      const vk = await requireVisibleVk(ctx, input.organizationId, input.id);
       return toVirtualKeyCamelDto(vk);
     }),
 
@@ -217,40 +208,20 @@ export const virtualKeysRouter = createTRPCRouter({
       // anyone who can see an org-wide key read a sibling team's budget
       // names and spend by injecting that team's scope into the input.
       if (input.virtualKeyId) {
-        const vk = await ctx.prisma.virtualKey.findFirst({
-          where: {
-            id: input.virtualKeyId,
-            organizationId: input.organizationId,
-          },
-          select: {
-            id: true,
-            traceProjectId: true,
-            principalUserId: true,
-            scopes: { select: { scopeType: true, scopeId: true } },
-          },
-        });
-        if (!vk) {
-          throw new TRPCError({ code: "NOT_FOUND" });
-        }
-        const membership = await loadMembershipSet(
-          ctx.prisma,
+        const vk = await requireVisibleVk(
+          ctx,
           input.organizationId,
-          ctx.session.user.id,
+          input.virtualKeyId,
         );
-        if (
-          !isVisibleToMembership(
-            membership,
-            vk.scopes as { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }[],
-          )
-        ) {
-          throw new TRPCError({ code: "NOT_FOUND" });
-        }
         return resolveApplicableBudgetsForDraftKey(
           ctx.prisma,
           {
             organizationId: input.organizationId,
             virtualKeyId: vk.id,
-            scopes: vk.scopes as { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }[],
+            scopes: vk.scopes.map((scope) => ({
+              scopeType: scope.scopeType,
+              scopeId: scope.scopeId,
+            })),
             traceProjectId: vk.traceProjectId,
             principalUserId: vk.principalUserId,
           },
@@ -405,11 +376,10 @@ export const virtualKeysRouter = createTRPCRouter({
     .use(authorizeInResolver)
     .mutation(async ({ ctx, input }) => {
       const service = VirtualKeyService.create(ctx.prisma);
-      const existing = await requireVisibleVk(
-        ctx,
-        input.organizationId,
-        input.id,
-      );
+      const existing = await service.getById(input.id, input.organizationId);
+      if (!existing) {
+        throw new TRPCError({ code: "NOT_FOUND" });
+      }
       // Mutating an existing key needs virtualKeys:update on one of the
       // scopes it already lives in.
       await assertActorCanOperateOnAnyScope(
@@ -492,11 +462,10 @@ export const virtualKeysRouter = createTRPCRouter({
     .use(authorizeInResolver)
     .mutation(async ({ ctx, input }) => {
       const service = VirtualKeyService.create(ctx.prisma);
-      const existing = await requireVisibleVk(
-        ctx,
-        input.organizationId,
-        input.id,
-      );
+      const existing = await service.getById(input.id, input.organizationId);
+      if (!existing) {
+        throw new TRPCError({ code: "NOT_FOUND" });
+      }
       await assertActorCanOperateOnAnyScope(
         { prisma: ctx.prisma, actor: sessionActor(ctx.session) },
         existing.scopes,
@@ -515,11 +484,10 @@ export const virtualKeysRouter = createTRPCRouter({
     .use(authorizeInResolver)
     .mutation(async ({ ctx, input }) => {
       const service = VirtualKeyService.create(ctx.prisma);
-      const existing = await requireVisibleVk(
-        ctx,
-        input.organizationId,
-        input.id,
-      );
+      const existing = await service.getById(input.id, input.organizationId);
+      if (!existing) {
+        throw new TRPCError({ code: "NOT_FOUND" });
+      }
       await assertActorCanOperateOnAnyScope(
         { prisma: ctx.prisma, actor: sessionActor(ctx.session) },
         existing.scopes,
