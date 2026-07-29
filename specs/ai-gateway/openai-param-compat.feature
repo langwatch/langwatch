@@ -172,6 +172,63 @@ Feature: AI Gateway — OpenAI client-param compatibility translation
       # Mirrors the strictness of max_completion_tokens, which is typed as
       # an integer and already rejects malformed values at parse time.
 
+  Rule: Every parameter has an explicit disposition per translated lane
+
+    # The parameter policy table (adapters/providers/param_policy.go) is
+    # the single source of truth: every OpenAI chat-completions parameter
+    # is mapped, dropped with a signal, or refused, per lane. Raw-forward
+    # lanes bypass it entirely. The docs page
+    # docs/ai-gateway/parameter-mapping.mdx renders the table and a parity
+    # test keeps the two in sync.
+
+    @unit
+    Scenario: tier-3 params are dropped with a signal by default
+      When a client sends a tuning param the lane cannot map (seed, logit_bias, user, ...) with drop_tuning_params unset
+      Then the request proceeds without the param
+      And the response carries extra_fields.params_dropped naming it
+      And the X-LangWatch-Params-Dropped response header carries the same list
+      And the gateway span records langwatch.gateway.params_dropped
+
+    @unit
+    Scenario: drop_tuning_params false refuses any unmappable param
+      When a client sends seed toward anthropic with drop_tuning_params false
+      Then the gateway responds 400 unsupported_parameter
+      And the message names the param, the lane, and how to proceed
+
+    @unit
+    Scenario: contract params always refuse, drop_tuning_params cannot drop them
+      When a client sends response_format json_object toward anthropic or bedrock, or logprobs toward anthropic or bedrock, or legacy functions, or tool_choice allowed_tools, or reasoning_effort toward a Bedrock family with no reasoning mapping
+      Then the gateway responds 400 unsupported_parameter regardless of drop_tuning_params
+      And the message explains the functional dependency
+
+    @unit
+    Scenario: a named tool_choice must reference a tool in the request
+      When tool_choice names a function absent from tools on a translated lane
+      Then the gateway refuses with the missing name instead of letting the provider fail downstream
+
+    @unit
+    Scenario: top_p with temperature is dropped visibly on Anthropic models
+      When a client sends both temperature and top_p toward an Anthropic model on the anthropic or bedrock lane
+      Then top_p is dropped with a signal and temperature wins
+      And strict mode refuses the combination instead
+      # Verified live: Anthropic models hard-400 the pair ("temperature and
+      # top_p cannot both be specified"), so a faithful both-params mapping
+      # does not exist; the previous behavior was the same drop, silent.
+
+    @unit
+    Scenario: a thinking-exhausted cap yields finish_reason length, not an empty 200
+      Given a gemini request whose thinking consumes the whole completion cap
+      When the provider answers with no content parts
+      Then the response carries one choice with finish_reason "length" and empty content
+      And usage stays intact
+      # Previously: HTTP 200 with choices null, usage billed, no signal.
+
+    @unit
+    Scenario: the managed Bedrock endpoint maps reasoning and json_schema like public bedrock
+      When a request with reasoning_effort or response_format json_schema dispatches over the Bedrock VPCE path
+      Then additionalModelRequestFields carries the same thinking and output_config shapes bifrost's bedrock translator emits
+      And no output cap the caller never sent is force-set
+
     @live
     Scenario Outline: client cap verifiably bounds output on every translated lane
       When a client POSTs /v1/chat/completions toward <provider> with <cap_field> 16 asking for a long answer, <mode>

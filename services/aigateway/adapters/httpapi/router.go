@@ -918,6 +918,9 @@ func setMetaHeaders(w http.ResponseWriter, meta app.DispatchMeta) {
 	if meta.CacheMode != "" {
 		h.Set("X-LangWatch-Cache-Mode", meta.CacheMode)
 	}
+	if len(meta.ParamsDropped) > 0 {
+		h.Set("X-LangWatch-Params-Dropped", strings.Join(meta.ParamsDropped, ","))
+	}
 	if meta.CustomerTraceparent != "" {
 		h.Set("Traceparent", meta.CustomerTraceparent)
 	}
@@ -1101,6 +1104,7 @@ func registerErrorStatuses() {
 	herr.RegisterStatus(domain.ErrProviderError, http.StatusBadGateway)
 	herr.RegisterStatus(domain.ErrProviderTimeout, http.StatusGatewayTimeout)
 	herr.RegisterStatus(domain.ErrBadRequest, http.StatusBadRequest)
+	herr.RegisterStatus(domain.ErrUnsupportedParameter, http.StatusBadRequest)
 	herr.RegisterStatus(domain.ErrPayloadTooLarge, http.StatusRequestEntityTooLarge)
 	herr.RegisterStatus(domain.ErrChainExhausted, http.StatusBadGateway)
 	herr.RegisterStatus(domain.ErrNotFound, http.StatusNotFound)
