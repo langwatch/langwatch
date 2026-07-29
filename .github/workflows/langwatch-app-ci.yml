@@ -40,13 +40,18 @@ jobs:
       # One shard each on a draft, because the draft run is affected-tests-only
       # and a subset does not need splitting.
       #
-      # Integration drops from six shards to three. Sharding was standing in
-      # for parallelism while every file ran serially; now that a shard runs
-      # its files across four workers, splitting the suite six ways buys
-      # queueing rather than speed. Three shards run the same 726 files with
-      # half the concurrent runners.
+      # Integration drops from six shards to four. Sharding was standing in for
+      # parallelism while every file ran serially; now that a shard runs its
+      # files across two workers, a sixth shard buys queueing rather than
+      # speed.
+      #
+      # Four rather than three, measured: three shards at four workers each ran
+      # 7.3/9.1/10.0 min against six serial shards at ~6 min, so runner-minutes
+      # fell 35 -> 26 but wall-clock rose. Four shards at two workers splits the
+      # difference — the same suite, two fewer runners, and no shard longer
+      # than the six-way serial split used to be.
       unit-shards: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && '[1,2,3,4]' || '[1]' }}
-      integration-shards: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && '[1,2,3]' || '[1]' }}
+      integration-shards: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && '[1,2,3,4]' || '[1]' }}
       # Coverage instrumentation costs ~45% of the run (measured: a unit subset
       # goes 3.7s -> 6.6s with --coverage). Nothing gates on it — there is no
       # codecov.yml, no codecov status check, and both uploads are
@@ -255,7 +260,13 @@ jobs:
       # safe there.
       VITEST_INTEGRATION_PARALLEL: "1"
       VITEST_ISOLATE_WORKER_REDIS: "1"
-      VITEST_MAX_WORKERS: "4" # physical core count on GitHub-hosted ubuntu runners
+      # TWO workers, not four. The runner has 4 vCPUs and is also hosting
+      # ClickHouse, Postgres and Redis as service containers; handing all four
+      # to vitest starved the datastores and three suites failed on vi.waitFor
+      # timeouts rather than on anything they assert. Leaving half the box to
+      # the things the tests are waiting on is what makes the parallelism
+      # usable.
+      VITEST_MAX_WORKERS: "2"
       # Required environment variables for integration tests
       DATABASE_URL: "postgresql://langwatch_ci:ci_password@localhost:5432/langwatch_test"
       BASE_HOST: "localhost:3000"
@@ -314,6 +325,24 @@ jobs:
         working-directory: langwatch
         run: pnpm start:prepare:files
 
+      # traceparent-roundtrip.integration.test.ts runs the REAL nlpgo service,
+      # so it compiles it: `go build ./cmd/service` into langwatch/.vitest-tmp/.
+      # That build is the single most expensive thing in the whole integration
+      # suite — 140.9s for a file containing one test, measured on shard 2,
+      # where the entire shard's tests came to 10.6 minutes. One Go compile was
+      # over a fifth of it.
+      #
+      # The test already skips the build when the cached binary is newer than
+      # every .go file under services/nlpgo, so it only needs the artifact to
+      # survive between runs. Keyed on the Go sources and go.sum, so a real
+      # change to the service still rebuilds; the OS is in the key because the
+      # cached artifact is a native binary.
+      - name: Cache the compiled nlpgo test binary
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: langwatch/.vitest-tmp
+          key: ${{ runner.os }}-nlpgo-testbin-${{ hashFiles('services/nlpgo/**/*.go', 'go.sum') }}
+
       - name: Setup database
         working-directory: langwatch
         run: pnpm prisma:migrate
@@ -345,7 +374,7 @@ jobs:
           done
           exit 1
 
-      - name: Run integration tests (shard ${{ matrix.shard }}/3)
+      - name: Run integration tests (shard ${{ matrix.shard }}/4)
         id: integration-tests
         working-directory: langwatch
         # Integration files run sequentially in a single long-lived fork worker
@@ -374,7 +403,7 @@ jobs:
               --outputFile=test-results.json
           else
             # shellcheck disable=SC2086
-            pnpm test:integration --shard=${{ matrix.shard }}/3 $COV \
+            pnpm test:integration --shard=${{ matrix.shard }}/4 $COV \
               --reporter=default --reporter=json --reporter=./src/test-utils/shardFailureReporter.ts \
               --outputFile=test-results.json
           fi
@@ -514,13 +543,52 @@ jobs:
             biome.raw.json > biome.rdjson
           echo "diagnostics: $(jq '.diagnostics | length' biome.rdjson)"
 
+          # ANNOTATE, then GATE — two passes, because one cannot do both here.
+          #
+          # A single `github-pr-review` pass died on `422 Body is too long
+          # (maximum is 65536 characters)`. GitHub caps a review body, and this
+          # branch reformats the repository, so `filter-mode=added` considers
+          # nearly every line added and the review grew past the limit. Capping
+          # the diagnostics fed to a single pass would have capped the GATE
+          # too: whether the step fails would then depend on whether a real
+          # finding made the cut, which is the kind of quiet pass this whole
+          # branch exists to remove.
+          #
+          # So the posting pass is capped and cannot fail, and the deciding
+          # pass sees everything and posts nothing.
+          POSTED=200
+          jq --argjson n "$POSTED" \
+            '.diagnostics |= (sort_by(.location.path, .location.range.start.line) | .[:$n])' \
+            biome.rdjson > biome.posted.json
+          total=$(jq '.diagnostics | length' biome.rdjson)
+          if [ "$total" -gt "$POSTED" ]; then
+            echo "::notice::annotating the first $POSTED of $total diagnostics; the gate below still reads all $total"
+          fi
+
           reviewdog -f=rdjson -name=Biome \
             -reporter=github-pr-review \
             -filter-mode=added \
             -level=warning \
+            -fail-level=none \
+            < biome.posted.json || true
+
+          # The gate. `local` prints to the log and never calls the API, so no
+          # size limit applies and every diagnostic is considered.
+          #
+          # -diff is passed EXPLICITLY. The local reporter has no PR to infer a
+          # diff from, and with nothing to compare against `filter-mode=added`
+          # matches nothing and exits 0 — a gate that passes because it looked
+          # at an empty diff. Naming the range makes that impossible to happen
+          # silently: if the ref is missing the fetch fails and so does the job.
+          BASE="${{ github.base_ref }}"
+          git fetch --no-tags origin "+refs/heads/$BASE:refs/remotes/origin/$BASE"
+          reviewdog -f=rdjson -name=Biome \
+            -reporter=local \
+            -diff="git diff origin/$BASE...HEAD" \
+            -filter-mode=added \
+            -level=warning \
             -fail-level=warning \
             < biome.rdjson
-          biome_flags: "./src ./ee ./scripts ./e2e ./prisma ./vite ./packages"
 
       - name: Notify Slack on failure
         if: failure() && github.ref == 'refs/heads/main'

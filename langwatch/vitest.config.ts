@@ -42,13 +42,17 @@ export default defineConfig({
     // LOCAL takes the memory side. A laptop runs several worktrees and
     // everything else at once, and 2.5GB of test process is felt immediately.
     //
-    // CI takes the speed side: the runner has 16GB, does nothing else, and is
-    // destroyed at the end of the job, so the leak never outlives anything
-    // that would care. vmMemoryLimit still bounds it — a worker is recycled
-    // once its context passes the limit — which is what makes threads safe
-    // here rather than merely faster. If a unit shard ever OOMs, put this back
-    // to vmForks first.
-    pool: isCI ? "vmThreads" : "vmForks",
+    // CI was briefly switched to vmThreads for that ~15%, and it broke two
+    // suites: the ClickHouse DateTime64 decode tests set `process.env.TZ` to
+    // a non-UTC zone and assert the decode still lands on UTC. A thread does
+    // not get its own process, so the TZ change no longer takes hold per
+    // worker and the assertion collapses to "expected +0 not to be +0".
+    //
+    // Forks everywhere, then. The memory argument was always the stronger one;
+    // this just means the speed argument was never available to trade against
+    // it. Anything that reads process-global state — TZ, cwd, process.env —
+    // needs a process, and this suite has such tests.
+    pool: "vmForks",
     // Half the cores locally so a run leaves the machine usable; all of them
     // in CI. The workflow also sets VITEST_MAX_WORKERS, which vitest applies
     // over whatever is resolved here.
