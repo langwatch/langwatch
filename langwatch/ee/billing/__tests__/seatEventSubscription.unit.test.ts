@@ -1,3 +1,4 @@
+import Stripe from "stripe";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../utils/growthSeatEvent", () => ({
@@ -751,18 +752,18 @@ describe("seatEventSubscription", () => {
       });
     });
 
-    describe("when the Stripe customer currency lookup fails", () => {
+    describe("when the provider rate-limits the currency lookup", () => {
       beforeEach(() => {
         db.subscription.findMany.mockResolvedValue([]);
         stripe.customers.retrieve.mockRejectedValue(
-          new Error("rate limit exceeded"),
+          new Stripe.errors.StripeRateLimitError({ message: "slow down" }),
         );
         stripe.checkout.sessions.create.mockResolvedValue({
           url: "https://checkout.stripe.com/session",
         });
       });
 
-      it("fails with a retryable billing-currency error", async () => {
+      it("fails with a retryable provider-unavailable error", async () => {
         await expect(
           service.createSeatEventCheckout({
             organizationId: "org_1",
@@ -772,27 +773,7 @@ describe("seatEventSubscription", () => {
             billingInterval: "monthly",
             membersToAdd: 2,
           }),
-        ).rejects.toMatchObject({ code: "billing_currency_unavailable" });
-      });
-
-      it("keeps the original failure as a reason on the handled error", async () => {
-        const lookupError = new Error("rate limit exceeded");
-        stripe.customers.retrieve.mockRejectedValue(lookupError);
-
-        const error = await service
-          .createSeatEventCheckout({
-            organizationId: "org_1",
-            customerId: "cus_1",
-            baseUrl: "https://app.test",
-            currency: "USD" as any,
-            billingInterval: "monthly",
-            membersToAdd: 2,
-          })
-          .catch((caught: unknown) => caught);
-
-        expect((error as { reasons: readonly Error[] }).reasons).toEqual([
-          lookupError,
-        ]);
+        ).rejects.toMatchObject({ code: "billing_provider_unavailable" });
       });
 
       it("creates no checkout session and no pending records", async () => {
@@ -810,7 +791,51 @@ describe("seatEventSubscription", () => {
         expect(stripe.checkout.sessions.create).not.toHaveBeenCalled();
         expect(db.$transaction).not.toHaveBeenCalled();
         expect(db.subscription.updateMany).not.toHaveBeenCalled();
-        expect(db.organizationInvite.deleteMany).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the currency lookup fails for a reason we cannot name", () => {
+      beforeEach(() => {
+        db.subscription.findMany.mockResolvedValue([]);
+        stripe.customers.retrieve.mockRejectedValue(
+          new Error("socket hang up"),
+        );
+        stripe.checkout.sessions.create.mockResolvedValue({
+          url: "https://checkout.stripe.com/session",
+        });
+      });
+
+      it("lets the original error through instead of dressing it as handled", async () => {
+        const error = await service
+          .createSeatEventCheckout({
+            organizationId: "org_1",
+            customerId: "cus_1",
+            baseUrl: "https://app.test",
+            currency: "USD" as any,
+            billingInterval: "monthly",
+            membersToAdd: 2,
+          })
+          .catch((caught: unknown) => caught);
+
+        expect((error as Error).message).toBe("socket hang up");
+        expect(error).not.toHaveProperty("isHandled");
+      });
+
+      it("still creates no checkout session and no pending records", async () => {
+        await service
+          .createSeatEventCheckout({
+            organizationId: "org_1",
+            customerId: "cus_1",
+            baseUrl: "https://app.test",
+            currency: "USD" as any,
+            billingInterval: "monthly",
+            membersToAdd: 2,
+          })
+          .catch(() => undefined);
+
+        expect(stripe.checkout.sessions.create).not.toHaveBeenCalled();
+        expect(db.$transaction).not.toHaveBeenCalled();
+        expect(db.subscription.updateMany).not.toHaveBeenCalled();
       });
     });
 

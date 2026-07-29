@@ -295,21 +295,23 @@ export class BillingCustomerDeletedError extends HandledError {
 }
 
 /**
- * We could not establish which currency the account is billed in.
+ * The payment provider told us to wait, or we could not reach it.
  *
- * A failed lookup is not evidence that the account is unfixed, so guessing
- * would risk a rejected checkout *after* the pending subscription and its
- * invites exist. Retrying is the correct response, and nothing was charged.
+ * Deliberately narrow: raised only for the two shapes that mean "nothing
+ * happened, try again" — rate limiting and connection failure. Every other
+ * provider failure stays unhandled and degrades to unknown at the boundary,
+ * because naming a cause we do not understand would promise the caller an
+ * action they do not have. The classification lives in `translateStripeError`.
  */
-export class BillingCurrencyUnavailableError extends HandledError {
-  declare readonly code: "billing_currency_unavailable";
+export class BillingProviderUnavailableError extends HandledError {
+  declare readonly code: "billing_provider_unavailable";
 
   constructor(options: { reasons?: readonly Error[] } = {}) {
     super(
-      "billing_currency_unavailable",
-      "We couldn't confirm this account's billing currency",
+      "billing_provider_unavailable",
+      "The payment provider could not be reached",
       { httpStatus: 503, fault: "provider", ...options },
     );
-    this.name = "BillingCurrencyUnavailableError";
+    this.name = "BillingProviderUnavailableError";
   }
 }
