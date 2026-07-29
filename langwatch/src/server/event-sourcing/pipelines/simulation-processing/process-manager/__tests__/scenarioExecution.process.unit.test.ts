@@ -364,7 +364,9 @@ describe("scenarioExecution process", () => {
 
       const woken = scenarioExecutionWake(later.state, makeCtx());
 
-      expect(woken.intents?.[0]?.payload).toMatchObject({ cancelled: true });
+      expect(woken.intents?.[0]?.payload).toMatchObject({
+        outcome: "cancelled",
+      });
     });
   });
 
