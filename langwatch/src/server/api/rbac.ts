@@ -108,6 +108,12 @@ export const Resources = {
   // org tier would let a project-scoped role exfiltrate org-wide data.
   // Enterprise-gated at the plan layer on top of the permission.
   WEBHOOK_ENDPOINTS: "webhookEndpoints",
+  // The billing reconciliation surface (spend-events pull + per-end-user
+  // rollups). Org-tier and separate from webhookEndpoints: reading the
+  // metered ledger is a strictly weaker capability than managing outbound
+  // delivery, and billing consumers get keys that can ONLY read. Same
+  // enterprise plan gate as the webhook platform.
+  BILLING: "billing",
   // The Langy in-product assistant. Its own resource rather than riding on
   // `evaluations:view`, because starting a turn is not a read: it provisions
   // credentials, spawns an OpenCode worker and spends the project's model
@@ -155,6 +161,7 @@ const ORG_EXCLUSIVE_RESOURCES: ReadonlySet<Resource> = new Set<Resource>([
   Resources.ACTIVITY_MONITOR,
   Resources.AI_TOOLS,
   Resources.WEBHOOK_ENDPOINTS,
+  Resources.BILLING,
 ]);
 
 /** True when the permission targets an organization-tier-only resource. */
@@ -469,6 +476,10 @@ const ORGANIZATION_ROLE_PERMISSIONS: Record<
     // webhookEndpoints:view for read-only delivery-log access.
     "webhookEndpoints:view",
     "webhookEndpoints:manage",
+    // Billing reconciliation reads (spend events, end-user rollups) and
+    // replay. Manage covers replay because it re-drives outbound traffic.
+    "billing:view",
+    "billing:manage",
   ],
   // MEMBER + EXTERNAL get aiTools:view so the /me portal renders for
   // every org member. Catalog management stays admin-only.

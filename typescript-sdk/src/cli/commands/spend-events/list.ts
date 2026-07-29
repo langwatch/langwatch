@@ -1,0 +1,79 @@
+import chalk from "chalk";
+import { createSpinner } from "../../utils/spinner";
+import { SpendEventsApiService } from "@/client-sdk/services/spend-events/spend-events-api.service";
+import { checkOrgApiKey } from "../../utils/apiKey";
+import { formatTable } from "../../utils/formatting";
+import { failSpinner } from "../../utils/spinnerError";
+import type { CommandResult } from "../../utils/output";
+
+import { parseInstantOrNull } from "../../utils/instant";
+
+const parseInstant = (value: string, flag: string): number => {
+  const parsed = parseInstantOrNull(value);
+  if (parsed !== null) return parsed;
+  console.error(`Invalid ${flag}: pass an ISO-8601 instant or epoch milliseconds.`);
+  process.exit(1);
+};
+
+export const listSpendEventsCommand = async (options: {
+  from?: string;
+  to?: string;
+  cursor?: string;
+  limit?: string;
+  virtualKey?: string;
+  endUser?: string;
+  project?: string;
+  model?: string;
+  status?: "success" | "error";
+}): Promise<CommandResult | void> => {
+  const apiKey = checkOrgApiKey();
+  const service = new SpendEventsApiService({ apiKey });
+  const spinner = createSpinner("Fetching spend events...").start();
+  try {
+    const page = await service.list({
+      from: options.from !== undefined ? parseInstant(options.from, "--from") : undefined,
+      to: options.to !== undefined ? parseInstant(options.to, "--to") : undefined,
+      cursor: options.cursor,
+      limit: options.limit !== undefined ? Number(options.limit) : undefined,
+      virtualKeyId: options.virtualKey,
+      endUserId: options.endUser,
+      projectId: options.project,
+      model: options.model,
+      status: options.status,
+    });
+    spinner.succeed(`${page.data.length} event${page.data.length !== 1 ? "s" : ""}${page.next_cursor ? " (more available)" : ""}`);
+    return {
+      data: page,
+      table: () => {
+        if (page.data.length === 0) {
+          console.log();
+          console.log(chalk.gray("No spend events in range."));
+          return;
+        }
+        console.log();
+        formatTable({
+          data: page.data.map((e) => ({
+            "Request id": e.data.event_id,
+            "Occurred at": new Date(e.data.occurred_at).toLocaleString(),
+            Model: e.data.model,
+            "End user": e.data.end_user_id ?? chalk.gray("-"),
+            "In/Out": `${e.data.usage.input_tokens}/${e.data.usage.output_tokens}`,
+            "Cache r/w": `${e.data.usage.cache_read_input_tokens}/${e.data.usage.cache_creation_input_tokens}`,
+            "Cost USD": e.data.cost.total_usd,
+            Status: e.data.status === "success" ? chalk.green("success") : chalk.red(e.data.error?.class ?? "error"),
+          })),
+          headers: ["Request id", "Occurred at", "Model", "End user", "In/Out", "Cache r/w", "Cost USD", "Status"],
+          colorMap: { "Request id": chalk.gray, Model: chalk.cyan },
+        });
+        if (page.next_cursor) {
+          console.log();
+          console.log(chalk.gray(`Next page: --cursor '${page.next_cursor}'`));
+        }
+        console.log();
+      },
+    };
+  } catch (error) {
+    failSpinner({ spinner, error, action: "fetch spend events" });
+    process.exit(1);
+  }
+};

@@ -1773,6 +1773,212 @@ export function buildProgram(): Command {
     },
   );
 
+  // Add webhooks command group (org-anchored webhook platform)
+  const webhooksCmd = program
+    .command("webhooks")
+    .description("Manage outbound webhook endpoints (org API key; enterprise)");
+
+  emitsResult(
+    webhooksCmd
+      .command("list")
+      .description("List the organization's webhook endpoints")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async () => {
+      const { listWebhooksCommand: impl } = await import("./commands/webhooks/list.js");
+      return impl();
+    },
+  );
+
+  emitsResult(
+    webhooksCmd
+      .command("get <id>")
+      .description("Get one webhook endpoint")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (id: string) => {
+      const { getWebhookCommand: impl } = await import("./commands/webhooks/get.js");
+      return impl(id);
+    },
+  );
+
+  emitsResult(
+    webhooksCmd
+      .command("create")
+      .description("Create an endpoint; prints the signing secret ONCE")
+      .requiredOption("--url <url>", "HTTPS receiver URL")
+      .requiredOption("--events <types>", "Comma-separated event types (see: langwatch webhooks event-types)")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (options: { url: string; events: string }) => {
+      const { createWebhookCommand: impl } = await import("./commands/webhooks/create.js");
+      return impl(options);
+    },
+  );
+
+  emitsResult(
+    webhooksCmd
+      .command("update <id>")
+      .description("Update an endpoint's URL or event subscriptions")
+      .option("--url <url>", "New HTTPS receiver URL")
+      .option("--events <types>", "New comma-separated event types (replaces the set)")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (id: string, options: { url?: string; events?: string }) => {
+      const { updateWebhookCommand: impl } = await import("./commands/webhooks/update.js");
+      return impl(id, options);
+    },
+  );
+
+  emitsResult(
+    webhooksCmd
+      .command("enable <id>")
+      .description("Re-enable a disabled endpoint")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (id: string) => {
+      const { enableWebhookCommand: impl } = await import("./commands/webhooks/update.js");
+      return impl(id);
+    },
+  );
+
+  emitsResult(
+    webhooksCmd
+      .command("disable <id>")
+      .description("Disable an endpoint (queued deliveries drain without sending)")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (id: string) => {
+      const { disableWebhookCommand: impl } = await import("./commands/webhooks/update.js");
+      return impl(id);
+    },
+  );
+
+  emitsResult(
+    webhooksCmd
+      .command("delete <id>")
+      .description("Archive an endpoint")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (id: string) => {
+      const { deleteWebhookCommand: impl } = await import("./commands/webhooks/delete.js");
+      return impl(id);
+    },
+  );
+
+  emitsResult(
+    webhooksCmd
+      .command("roll-secret <id>")
+      .description("Roll the signing secret; prints the new one ONCE")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (id: string) => {
+      const { rollWebhookSecretCommand: impl } = await import("./commands/webhooks/roll-secret.js");
+      return impl(id);
+    },
+  );
+
+  emitsResult(
+    webhooksCmd
+      .command("test <id>")
+      .description("Send a signed test event and report the receiver's answer")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (id: string) => {
+      const { testWebhookCommand: impl } = await import("./commands/webhooks/test.js");
+      return impl(id);
+    },
+  );
+
+  emitsResult(
+    webhooksCmd
+      .command("deliveries <id>")
+      .description("The endpoint's delivery log with receiver status codes")
+      .option("--limit <n>", "Max attempts to return (default 50)")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (id: string, options: { limit?: string }) => {
+      const { webhookDeliveriesCommand: impl } = await import("./commands/webhooks/deliveries.js");
+      return impl(id, options);
+    },
+  );
+
+  emitsResult(
+    webhooksCmd
+      .command("health <id>")
+      .description("Delivery health: status, failure streak, last success")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (id: string) => {
+      const { webhookHealthCommand: impl } = await import("./commands/webhooks/health.js");
+      return impl(id);
+    },
+  );
+
+  emitsResult(
+    webhooksCmd
+      .command("event-types")
+      .description("The subscribable event catalog, grouped by family")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async () => {
+      const { webhookEventTypesCommand: impl } = await import("./commands/webhooks/events.js");
+      return impl();
+    },
+  );
+
+  emitsResult(
+    webhooksCmd
+      .command("events")
+      .description("The org's emitted-events log (Stripe /v1/events parity)")
+      .option("--type <type>", "Filter by event type")
+      .option("--from <instant>", "ISO-8601 or epoch ms lower bound")
+      .option("--to <instant>", "ISO-8601 or epoch ms upper bound")
+      .option("--cursor <cursor>", "Page cursor from the previous call")
+      .option("--limit <n>", "Events per page (default 50)")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: { type?: string; from?: string; to?: string; cursor?: string; limit?: string }) => {
+      const { webhookEventsCommand: impl } = await import("./commands/webhooks/events.js");
+      return impl(options);
+    },
+  );
+
+  // Add spend-events command group (billing reconciliation pull)
+  const spendEventsCmd = program
+    .command("spend-events")
+    .description("Pull the per-request spend record (org API key; enterprise)");
+
+  emitsResult(
+    spendEventsCmd
+      .command("list")
+      .description("Cursor-paged spend events with filters")
+      .option("--from <instant>", "ISO-8601 or epoch ms lower bound (occurred-at)")
+      .option("--to <instant>", "ISO-8601 or epoch ms upper bound (occurred-at)")
+      .option("--cursor <cursor>", "Page cursor from the previous call")
+      .option("--limit <n>", "Events per page (default 50, max 200)")
+      .option("--virtual-key <id>", "Filter by virtual key")
+      .option("--end-user <id>", "Filter by external end-user id")
+      .option("--project <id>", "Filter by project")
+      .option("--model <model>", "Filter by model")
+      .option("--status <status>", "Filter by status: success|error")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: {
+      from?: string;
+      to?: string;
+      cursor?: string;
+      limit?: string;
+      virtualKey?: string;
+      endUser?: string;
+      project?: string;
+      model?: string;
+      status?: "success" | "error";
+    }) => {
+      const { listSpendEventsCommand: impl } = await import("./commands/spend-events/list.js");
+      return impl(options);
+    },
+  );
+
+  emitsResult(
+    spendEventsCmd
+      .command("by-user <endUserId>")
+      .description("Windowed spend rollup for one external end user")
+      .option("--window <window>", "day|week|month (default month)")
+      .option("--virtual-key <id>", "Narrow to one virtual key")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (endUserId: string, options: { window?: "day" | "week" | "month"; virtualKey?: string }) => {
+      const { spendByUserCommand: impl } = await import("./commands/spend-events/by-user.js");
+      return impl(endUserId, options);
+    },
+  );
+
   // Add annotation command group
   const annotationCmd = program
     .command("annotation")
