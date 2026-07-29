@@ -6,6 +6,19 @@ Feature: One workspace for every JavaScript project in the repo
 
   See dev/docs/adr/076-single-pnpm-workspace.md.
 
+  # These scenarios describe how the repository installs, resolves and packages
+  # itself, so most of them bind to packages/server/test/workspace-invariants.test.ts,
+  # which asserts the shape directly against the repo — one lockfile, one
+  # workspace definition, no member holding overrides pnpm would ignore, the
+  # app and the SDK on different names.
+  #
+  # The ones tagged @unimplemented are the ones a test cannot reach: they are
+  # enforced by the build instead — `pnpm install --frozen-lockfile` across the
+  # workspace, the assertions in scripts/pack-npm.sh (the tarball must carry
+  # the lockfile, the prebuilt client, and every tracked source file), and the
+  # npx-server-smoke job, which installs and boots the published artifact on
+  # three platforms.
+
   # Context. The repo grew six independent pnpm install roots — the repo root,
   # the application, the TypeScript SDK, the MCP server, the skills compiler,
   # and the agentic end-to-end tests. Each carried its own lockfile, so a
@@ -75,6 +88,7 @@ Feature: One workspace for every JavaScript project in the repo
     Then every project in the repo resolves to the patched version
     And no project can silently keep an unpatched copy
 
+  @unimplemented
   Scenario: Merging the override lists loses no existing pin
     Given the override lists the separate roots used to carry
     When they are combined into the single root list
@@ -85,6 +99,7 @@ Feature: One workspace for every JavaScript project in the repo
     # package was required at a higher floor by one project than by the other
     # two, and the lower floor had been silently accepted everywhere else.
 
+  @unimplemented
   Scenario: No project keeps a dependency rule that no longer applies
     Given a project that used to be its own install root
     When it becomes a member of the single workspace
@@ -94,6 +109,7 @@ Feature: One workspace for every JavaScript project in the repo
     # Two projects each carried a second list in a place that was only ever
     # read while they were roots.
 
+  @unimplemented
   Scenario: A pin that suits one project is not forced onto the others
     Given a project that pinned an exact version of a package it depends on
       directly
@@ -115,6 +131,7 @@ Feature: One workspace for every JavaScript project in the repo
   # The published installer keeps working
   # ===========================================================================
 
+  @unimplemented
   Scenario: The published package still installs on an end user's machine
     Given someone runs the published LangWatch server package
     When it prepares the application on first start
@@ -132,6 +149,7 @@ Feature: One workspace for every JavaScript project in the repo
     # this by accident, because the lockfile happened to live beside the
     # application rather than at the top.
 
+  @unimplemented
   Scenario: The install still refuses to drift from the lockfile
     Given the published package
     When it installs the application's dependencies
@@ -158,12 +176,14 @@ Feature: One workspace for every JavaScript project in the repo
   # Building
   # ===========================================================================
 
+  @unimplemented
   Scenario: Building a project builds what it depends on first
     Given a project that depends on another project in the repo
     When it is built
     Then its dependencies are built first, in order
     And nothing has to be built by hand beforehand
 
+  @unimplemented
   Scenario: The MCP server is built once
     Given continuous integration builds the application
     When the MCP server is needed
