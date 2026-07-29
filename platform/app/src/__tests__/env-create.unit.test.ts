@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createEnv } from "@t3-oss/env-core";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   assertGatewaySecretsAllOrNone,
@@ -205,15 +205,12 @@ describe("rumSampleRatioSchema", () => {
       ["a ratio above one", "2"],
       ["a negative ratio", "-1"],
       ["blank, which is how an unset .env line reads", ""],
-    ])(
-      "records everything rather than refusing to boot on %s",
-      (_case, value) => {
-        const parsed = rumSampleRatioSchema.safeParse(value);
+    ])("records everything rather than refusing to boot on %s", (_case, value) => {
+      const parsed = rumSampleRatioSchema.safeParse(value);
 
-        expect(parsed.success).toBe(true);
-        expect(parsed.success && parsed.data).toBe(1);
-      },
-    );
+      expect(parsed.success).toBe(true);
+      expect(parsed.success && parsed.data).toBe(1);
+    });
   });
 
   describe("given a share that reads as a ratio", () => {
@@ -333,9 +330,7 @@ describe("azureBlobAuthModeSchema", () => {
       // The declaration and the runtime wiring, not how many times the name
       // appears — a comment mentioning it twice would satisfy a count, which
       // is the assertion the sibling test above deliberately avoids.
-      expect(source).toMatch(
-        /AZURE_BLOB_AUTH_MODE:\s*azureBlobAuthModeSchema/,
-      );
+      expect(source).toMatch(/AZURE_BLOB_AUTH_MODE:\s*azureBlobAuthModeSchema/);
       expect(source).toMatch(
         /AZURE_BLOB_AUTH_MODE:\s*process\.env\.AZURE_BLOB_AUTH_MODE/,
       );

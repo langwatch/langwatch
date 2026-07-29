@@ -40,7 +40,8 @@ function setTokenModeEnv(mode: string) {
 const injectedWorkloadIdentityVars = {
   AZURE_CLIENT_ID: "client-id",
   AZURE_TENANT_ID: "tenant-id",
-  AZURE_FEDERATED_TOKEN_FILE: "/var/run/secrets/azure/tokens/azure-identity-token",
+  AZURE_FEDERATED_TOKEN_FILE:
+    "/var/run/secrets/azure/tokens/azure-identity-token",
 };
 
 beforeEach(() => {
@@ -156,7 +157,9 @@ describe("resolveAzureCredentials", () => {
       expect(() => resolveAzureCredentials()).toThrow(
         AzureBackendMisconfiguredError,
       );
-      expect(() => resolveAzureCredentials()).toThrow(/STORED_OBJECTS_BACKEND=azure/);
+      expect(() => resolveAzureCredentials()).toThrow(
+        /STORED_OBJECTS_BACKEND=azure/,
+      );
     });
   });
 
@@ -226,26 +229,30 @@ describe("resolveAzureCredentials", () => {
     /** @scenario "A sovereign-cloud endpoint without a matching authority is refused" */
     it("fails, explaining a sovereign endpoint requires a matching authority host", () => {
       setTokenModeEnv("managedIdentity");
-      mockEnv.AZURE_BLOB_ENDPOINT = "https://lwacct.blob.core.usgovcloudapi.net";
+      mockEnv.AZURE_BLOB_ENDPOINT =
+        "https://lwacct.blob.core.usgovcloudapi.net";
       // AZURE_BLOB_AUTHORITY_HOST intentionally left unset.
 
       expect(() => resolveAzureCredentials()).toThrow(
         AzureBackendMisconfiguredError,
       );
-      expect(() => resolveAzureCredentials()).toThrow(/AZURE_BLOB_AUTHORITY_HOST/);
+      expect(() => resolveAzureCredentials()).toThrow(
+        /AZURE_BLOB_AUTHORITY_HOST/,
+      );
     });
 
     it("does not silently fall back to the public-cloud authority", () => {
       setTokenModeEnv("managedIdentity");
-      mockEnv.AZURE_BLOB_ENDPOINT = "https://lwacct.blob.core.usgovcloudapi.net";
+      mockEnv.AZURE_BLOB_ENDPOINT =
+        "https://lwacct.blob.core.usgovcloudapi.net";
       mockEnv.AZURE_BLOB_AUTHORITY_HOST = "https://login.microsoftonline.us";
 
       const credentials = resolveAzureCredentials();
 
       expect(credentials.mode).toBe("managedIdentity");
-      expect(
-        (credentials as { authorityHost?: string }).authorityHost,
-      ).toBe("https://login.microsoftonline.us");
+      expect((credentials as { authorityHost?: string }).authorityHost).toBe(
+        "https://login.microsoftonline.us",
+      );
     });
   });
 });

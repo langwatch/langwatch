@@ -24,12 +24,11 @@ import type { AzureCredentials } from "./azure-credentials";
 import {
   getAzureBlobToken,
   invalidateAzureBlobToken,
-  type TokenModeCredentials,
 } from "./azure-token-provider";
 import { ObjectNotFoundError } from "./errors";
 import {
-  redactStorageUri,
   redactStorageErrorText,
+  redactStorageUri,
 } from "./project-storage-destination";
 import type { StorageDriver } from "./storage-driver";
 import { getUriScheme } from "./uri";
