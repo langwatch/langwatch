@@ -152,6 +152,39 @@ describe("scenarioExecution process", () => {
 
       expect(woken.intents?.[0]?.payload).toMatchObject({ cancelled: true });
     });
+
+    /**
+     * A child routinely finishes streaming its current message before it
+     * honours SIGTERM, so progress events after a cancel are the normal case,
+     * not an edge one. They run through the progress handlers, which ask for
+     * the 30-minute window — taking it would push the cancelled run's deadline
+     * back out by half an hour and strand it exactly as long as never having
+     * cancelled.
+     */
+    it.each([
+      ["a snapshot", handleMessageSnapshot],
+      ["a start", handleStarted],
+    ])("keeps the cancel grace when %s lands afterwards", (_label, handle) => {
+      const cancelled = handleCancelRequested(known(), IDENTITIES, makeCtx());
+
+      const later = handle(cancelled.state, IDENTITIES, makeCtx());
+
+      expect(later.nextWakeAt).toBe(NOW + SCENARIO_CANCEL_DEADLINE_MS);
+      expect(later.nextWakeAt).not.toBe(NOW + SCENARIO_PROGRESS_DEADLINE_MS);
+    });
+
+    it("still finalises as cancelled after that progress event", () => {
+      const cancelled = handleCancelRequested(known(), IDENTITIES, makeCtx());
+      const later = handleMessageSnapshot(
+        cancelled.state,
+        IDENTITIES,
+        makeCtx(),
+      );
+
+      const woken = scenarioExecutionWake(later.state, makeCtx());
+
+      expect(woken.intents?.[0]?.payload).toMatchObject({ cancelled: true });
+    });
   });
 
   describe("given a run reached a terminal state on its own", () => {

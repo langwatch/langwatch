@@ -32,7 +32,7 @@ describe("generateBatchRunId()", () => {
 describe("deriveScenarioRunId()", () => {
   const base = {
     projectId: "proj_1",
-    idempotencyKey: "key-a",
+    batchRunId: "scenariobatch_a",
     scenarioId: "scenario_1",
     targetReferenceId: "target_1",
     repeat: 0,
@@ -51,7 +51,7 @@ describe("deriveScenarioRunId()", () => {
 
   describe("when one field of the submit differs", () => {
     it.each([
-      ["idempotency key", { idempotencyKey: "key-b" }],
+      ["batch", { batchRunId: "scenariobatch_b" }],
       ["scenario", { scenarioId: "scenario_2" }],
       ["target", { targetReferenceId: "target_2" }],
       ["repeat index", { repeat: 1 }],
@@ -98,6 +98,9 @@ describe("deriveBatchRunId()", () => {
     projectId: "proj_1",
     suiteId: "suite_1",
     idempotencyKey: "key-a",
+    scenarioIds: ["scenario_1", "scenario_2"],
+    targetReferenceIds: ["target_1"],
+    repeatCount: 1,
   };
 
   it("returns the same batch for the same submit", () => {
@@ -118,5 +121,57 @@ describe("deriveBatchRunId()", () => {
     expect(deriveBatchRunId({ ...base, suiteId: "suite_2" })).not.toBe(
       deriveBatchRunId(base),
     );
+  });
+
+  it("does not care what order the active set arrives in", () => {
+    // The caller builds these from a query; the set is the identity, not the
+    // ordering it happened to come back in.
+    expect(
+      deriveBatchRunId({ ...base, scenarioIds: ["scenario_2", "scenario_1"] }),
+    ).toBe(deriveBatchRunId(base));
+  });
+
+  /**
+   * The batch carries its own denominator — every child stamps `BatchTotal`.
+   * Reusing one key across a changed set would keep the batch id while the
+   * total moved, so members common to both submits would hold the old total
+   * and members new to the second would hold the new one: one batch, two
+   * denominators, progress that never completes.
+   */
+  describe("when the same key is submitted against a changed active set", () => {
+    it.each([
+      ["a scenario is dropped", { scenarioIds: ["scenario_1"] }],
+      ["a target is added", { targetReferenceIds: ["target_1", "target_2"] }],
+      ["the repeat count changes", { repeatCount: 2 }],
+    ] as const)("gives a different batch when %s", (_label, patch) => {
+      expect(deriveBatchRunId({ ...base, ...patch })).not.toBe(
+        deriveBatchRunId(base),
+      );
+    });
+
+    it("gives that batch different run ids too", () => {
+      // Otherwise the same run id lands in two batches with different totals —
+      // the same defect one level down.
+      const first = deriveBatchRunId(base);
+      const second = deriveBatchRunId({ ...base, scenarioIds: ["scenario_1"] });
+
+      expect(
+        deriveScenarioRunId({
+          projectId: "proj_1",
+          batchRunId: first,
+          scenarioId: "scenario_1",
+          targetReferenceId: "target_1",
+          repeat: 0,
+        }),
+      ).not.toBe(
+        deriveScenarioRunId({
+          projectId: "proj_1",
+          batchRunId: second,
+          scenarioId: "scenario_1",
+          targetReferenceId: "target_1",
+          repeat: 0,
+        }),
+      );
+    });
   });
 });

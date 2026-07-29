@@ -8,7 +8,6 @@ import type {
 
 import type { SimulationProcessingEvent } from "../schemas/events";
 import {
-  INITIAL_SCENARIO_EXECUTION_STATE,
   SCENARIO_CANCEL_DEADLINE_MS,
   SCENARIO_DISPATCH_DEADLINE_MS,
   SCENARIO_PROGRESS_DEADLINE_MS,
@@ -110,7 +109,21 @@ function armed(
   windowMs: number,
 ): ProcessEvolution<ScenarioExecutionState> {
   if (state.settled) return { state, nextWakeAt: null };
-  return { state, nextWakeAt: schedulingRef(ctx) + windowMs };
+  // Once a cancel is asked for, the cancel window governs every later arming.
+  // A child commonly finishes streaming its current message before it honours
+  // SIGTERM, so `cancel_requested` is routinely followed by progress events —
+  // and those run through `refreshDeadline`, which asks for the 30-minute
+  // progress window. Taking it would push a cancelled run's deadline back out
+  // by half an hour, which is the opposite of what cancelling asked for.
+  //
+  // The window still slides forward from the last sign of life rather than
+  // being pinned to the cancel instant: while progress keeps arriving a worker
+  // demonstrably still holds the child, and that is the case the short window
+  // was never aimed at. It fires 60s after the run actually goes quiet.
+  const effectiveMs = state.cancelRequested
+    ? Math.min(windowMs, SCENARIO_CANCEL_DEADLINE_MS)
+    : windowMs;
+  return { state, nextWakeAt: schedulingRef(ctx) + effectiveMs };
 }
 
 const refreshDeadline: EventHandler<
@@ -197,5 +210,3 @@ export const scenarioExecutionWake: WakeHandler<
     ],
   };
 };
-
-export { INITIAL_SCENARIO_EXECUTION_STATE };

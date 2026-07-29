@@ -1,6 +1,6 @@
 # ADR-075: Post-event work is subscribers and process managers
 
-- Status: proposed
+- Status: Proposed
 - Date: 2026-07-28
 - Supersedes: ADR-026 (reactor `shouldReact` predicate)
 - Completes: ADR-052's deferred scope — *"`withReactor` remains available for
@@ -128,7 +128,7 @@ does anything need to be able to tell?*
 | pushes a notification to whoever is connected right now | **subscriber** | at-most-once, explicitly. A lost push is invisible by the next refetch |
 | calls a third party where loss is acceptable by contract | **subscriber** | debounced, at-least-once, no durable trace |
 | produces state someone later reads as fact | **projection** | rebuilt by replay from the event log |
-| dispatches work that costs money or must happen | **process manager** | leased outbox, retried until it succeeds |
+| dispatches work that costs money or must happen | **process manager** | leased outbox, retried up to the process's own `maxAttempts` |
 | happens *later* rather than *now* | **process manager** | `nextWakeAt`, a durable deadline |
 
 A projection is not a third substrate — it is the existing fold/map projection
@@ -232,8 +232,13 @@ enqueue filter narrows on `eventTypes` alone.
   mode stops being reachable rather than being fixed one site at a time.
 - The compliance claim in `event-log-durability.feature` becomes true for the
   governance streams that currently contradict it.
-- Budget debits and billing dispatch get the outbox's retry, so spend is not
-  lost to a handler that happened to throw.
+- Spend stops being lost to a handler that happened to throw — but by two
+  different routes, and the difference matters. Budget debits are Class C: they
+  become a projection, so a lost debit is recovered by rebuilding the window
+  from the event log, not by an outbox retry. Billing *dispatch* is Class D and
+  is what gains the outbox. Reading the debit guarantee as "retry" would be
+  reading the wrong mechanism, and would go looking for outbox rows that a
+  projection never writes.
 - One dedup story and one deferral story instead of `ttl`/`delay` beside inbox
   and `nextWakeAt`.
 - Two substrates to learn, and to instrument, rather than three.

@@ -11,7 +11,6 @@ import {
   handleStarted,
   handleTextMessageEnd,
   handleTextMessageStart,
-  INITIAL_SCENARIO_EXECUTION_STATE,
   scenarioExecutionWake,
 } from "./process-manager/scenarioExecution.process";
 import {
@@ -19,6 +18,7 @@ import {
   type ScenarioExecutionDispatchDeps,
 } from "./process-manager/scenarioExecutionIntentHandlers";
 import {
+  INITIAL_SCENARIO_EXECUTION_STATE,
   SCENARIO_EXECUTION_INTENT_TYPES,
   SCENARIO_EXECUTION_LEASE_DURATION_MS,
   SCENARIO_EXECUTION_MAX_ATTEMPTS,

@@ -106,11 +106,21 @@ export class ExperimentRunStateFoldProjection
   readonly store: FoldProjectionStore<ExperimentRunStateData>;
 
   /**
-   * Order-insensitive fold: every handler is a counter (`CompletedCount++`),
-   * a running sum (`TotalDurationMs`/`TotalScoreSum` +=), a `Math.max`
-   * (`Total`), or a keyed map that last-write-wins per key (`Targets` merged
-   * by id) — so the state converges to the same value whichever order events
-   * are seen in. A run's aggregate is dataset-scale (one targetResult per row
+   * Order-insensitive fold, by two different arguments.
+   *
+   * The per-item handlers are commutative outright: a counter
+   * (`CompletedCount++`), a running sum (`TotalDurationMs`/`TotalScoreSum`
+   * +=), a `Math.max` (`Total`), or a keyed map that last-write-wins per key
+   * (`Targets` merged by id).
+   *
+   * The lifecycle timestamps are NOT commutative — `StartedAt` is
+   * first-write-wins and `FinishedAt`/`StoppedAt` overwrite whatever was
+   * there. They converge anyway because each is written by an event that
+   * occurs at most once per run (`started`, `completed`), so there is never a
+   * second write to order against. That is a property of the event stream, not
+   * of the merge: give either lifecycle event a repeat and this stops holding.
+   *
+   * A run's aggregate is dataset-scale (one targetResult per row
    * + one evaluatorResult per row×evaluator, thousands of events), so
    * re-folding the whole history on every out-of-order event is the same O(n²)
    * amplification that hit the trace folds — pure waste here since the result
