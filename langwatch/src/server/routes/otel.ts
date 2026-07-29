@@ -25,9 +25,11 @@ import {
   enforceApiKeyCeiling,
   extractCredentials,
 } from "~/server/api-key/auth-middleware";
+import { INGEST_KEY_PREFIX } from "~/server/api-key/api-key-token.utils";
 import { TokenResolver } from "~/server/api-key/token-resolver";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
+import { recordExpiredIngestKeyAttempt } from "~/server/routes/ingest/expiredIngestKeyNotice";
 import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
 import {
   parseOtlpLogs,
@@ -65,13 +67,15 @@ type RouteContext = {
 /**
  * Classifies a token by prefix without exposing the value. Mirrors the
  * `tokenType` field emitted by the unified auth middleware so on-call can
- * filter CloudWatch by SDK shape. Ingestion keys are ordinary `sk-lw-`
- * API keys, so they classify as `legacy` here — the ingest discriminator
- * lives on the resolved ApiKey row, not the token prefix.
+ * filter CloudWatch by SDK shape. `ingest` is the `ik-lw-` shape minted
+ * by `langwatch login --device` for a coding agent's OTLP exporter.
  */
-export function classifyTokenType(token: string): "pat" | "legacy" | "unknown" {
+export function classifyTokenType(
+  token: string,
+): "pat" | "legacy" | "ingest" | "unknown" {
   if (token.startsWith("pat-lw-")) return "pat";
   if (token.startsWith("sk-lw-")) return "legacy";
+  if (token.startsWith(INGEST_KEY_PREFIX)) return "ingest";
   return "unknown";
 }
 
@@ -123,6 +127,9 @@ async function authenticate(
       },
       "Authentication failed: invalid credentials",
     );
+    // A coding agent exporting OTLP on its own has no wrapper to tell it
+    // the key stopped working, so leave a mark the dashboard can show.
+    await recordExpiredIngestKeyAttempt(credentials.token);
     const message = "Invalid auth token.";
     return { error: message, status: 401 as const, body: { message } };
   }

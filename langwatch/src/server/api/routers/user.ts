@@ -35,6 +35,20 @@ import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 
 const logger = createLogger("langwatch:user-router");
 
+/**
+ * The notice stays up while the most recent rejection is newer than the
+ * most recent dismissal, so a fresh rejection after a dismissal brings it
+ * back rather than staying hidden forever.
+ */
+export function shouldShowExpiredIngestKeyNotice(user: {
+  expiredIngestKeyAt: Date | null;
+  expiredIngestKeyDismissedAt: Date | null;
+}): boolean {
+  if (!user.expiredIngestKeyAt) return false;
+  if (!user.expiredIngestKeyDismissedAt) return true;
+  return user.expiredIngestKeyAt > user.expiredIngestKeyDismissedAt;
+}
+
 export const userRouter = createTRPCRouter({
   getTraceExplorerTourPreference: protectedProcedure
     .input(z.object({}))
@@ -66,6 +80,42 @@ export const userRouter = createTRPCRouter({
         dismissed: true as const,
         dismissedAt: user.tracesExplorerTourDismissedAt,
       };
+    }),
+  /**
+   * Whether OTLP ingest has turned away one of this user's coding agents
+   * since the last time they dismissed the notice. See
+   * `~/server/routes/ingest/expiredIngestKeyNotice` for the write side.
+   */
+  expiredIngestKeyNotice: protectedProcedure
+    .input(z.object({}))
+    .use(skipPermissionCheck)
+    .query(async ({ ctx }) => {
+      const userId = ctx.session.user.impersonator?.id ?? ctx.session.user.id;
+      const user = await ctx.prisma.user.findUniqueOrThrow({
+        where: { id: userId },
+        select: {
+          expiredIngestKeyAt: true,
+          expiredIngestKeyDismissedAt: true,
+        },
+      });
+
+      return {
+        show: shouldShowExpiredIngestKeyNotice(user),
+        lastAttemptAt: user.expiredIngestKeyAt,
+      };
+    }),
+  dismissExpiredIngestKeyNotice: protectedProcedure
+    .input(z.object({}))
+    .use(skipPermissionCheck)
+    .mutation(async ({ ctx }) => {
+      const userId = ctx.session.user.impersonator?.id ?? ctx.session.user.id;
+      await ctx.prisma.user.update({
+        where: { id: userId },
+        data: { expiredIngestKeyDismissedAt: new Date() },
+        select: { id: true },
+      });
+
+      return { show: false as const };
     }),
   /**
    * Whether the current user is a platform admin (email listed in ADMIN_EMAILS).

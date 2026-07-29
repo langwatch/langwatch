@@ -80,6 +80,15 @@ model User {
   // dismissal applies across projects, browsers, and devices.
   // Spec: specs/traces-v2/tour-visibility-and-persistence.feature
   tracesExplorerTourDismissedAt DateTime?
+  // Last time OTLP ingest turned away a coding agent because the ingestion
+  // key minted by `langwatch login --device` was no longer valid. Agents
+  // that send OTLP without a CLI wrapper have nowhere to show that, so the
+  // dashboard shows it for them. Cleared implicitly by dismissing: the
+  // notice is visible while `expiredIngestKeyAt` is newer than
+  // `expiredIngestKeyDismissedAt`.
+  // Spec: specs/ai-governance/cli-onboarding/expired-ingest-key-notice.feature
+  expiredIngestKeyAt            DateTime?
+  expiredIngestKeyDismissedAt   DateTime?
   Annotation               Annotation[]
   shareLinks               ShareLink[]
   Workflow                 Workflow[]

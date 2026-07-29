@@ -67,6 +67,7 @@ import {
 } from "../utils/routes";
 import { trackEvent } from "../utils/tracking";
 import { AnnouncementBanner } from "./AnnouncementBanner";
+import { ExpiredIngestKeyNotice } from "./me/ExpiredIngestKeyNotice";
 import { CurrentDrawer } from "./CurrentDrawer";
 import { AdminViewingAsBanner } from "./governance/AdminViewingAsBanner";
 import { FullLogo } from "./icons/FullLogo";
@@ -1061,6 +1062,8 @@ export const DashboardLayout = ({
                 )}
 
               <AnnouncementBanner />
+
+              <ExpiredIngestKeyNotice />
 
               {adminViewingAs && (
                 <AdminViewingAsBanner workspaceLabel={adminViewingAs.label} />
