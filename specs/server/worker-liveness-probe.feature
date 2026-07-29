@@ -37,6 +37,7 @@ Feature: Worker liveness probe endpoint
 
   Rule: /healthz answers unauthenticated, in every auth configuration
 
+    @unit
     Scenario: Default install — no metrics API key in production
       Given the worker is running in production mode
       And no metrics API key is configured
@@ -44,29 +45,34 @@ Feature: Worker liveness probe endpoint
       Then the response status is 200
       # The case that would otherwise crash-loop every default install.
 
+    @unit
     Scenario: Key configured, probe still sends nothing
       Given a metrics API key is configured
       When the kubelet requests "/healthz" without an Authorization header
       Then the response status is 200
       # Covers secretKeyRef delivery: the probe never needs the key at all.
 
+    @unit
     Scenario: The liveness endpoint leaks no telemetry
       When the kubelet requests "/healthz"
       Then the response body does not contain any metric samples
 
   Rule: /metrics keeps its bearer gate unchanged
 
+    @unit
     Scenario: Metrics still require the bearer when a key is set
       Given a metrics API key is configured
       When a caller requests "/metrics" without an Authorization header
       Then the response status is 401
 
+    @unit
     Scenario: Metrics still fail closed in production without a key
       Given the worker is running in production mode
       And no metrics API key is configured
       When a caller requests "/metrics" with any credentials
       Then the response status is 500
 
+    @unit
     Scenario: Metrics are served to a correctly authenticated caller
       Given a metrics API key is configured
       When a caller requests "/metrics" with the matching bearer token
@@ -75,12 +81,14 @@ Feature: Worker liveness probe endpoint
 
   Rule: Unknown paths stay 404
 
+    @unit
     Scenario: An unrelated path is not served
       When a caller requests "/not-a-real-path"
       Then the response status is 404
 
   Rule: The chart probes the liveness endpoint, not the metrics endpoint
 
+    @e2e @unimplemented
     Scenario: Worker probes target /healthz with no credentials
       Given the Helm chart renders the workers Deployment
       Then the startup probe performs an HTTP GET on "/healthz"
