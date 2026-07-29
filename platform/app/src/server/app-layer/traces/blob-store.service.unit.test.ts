@@ -20,8 +20,8 @@ import { StreamTooLargeError } from "~/utils/streamToBuffer";
 import {
   BlobStore,
   MAX_SPOOL_BYTES,
-  SPOOL_REF_V2,
   type S3ClientResolver,
+  SPOOL_REF_V2,
   type SpoolStorage,
 } from "./blob-store.service";
 
@@ -153,23 +153,23 @@ describe("BlobStore — spool operations (ADR-022)", () => {
             expectedUri:
               "file:///var/lib/langwatch/objects/trace-blobs/spool/orgA/trace-1/span-1",
           },
-        ])(
-          "writes to the $name destination the deployment resolved",
-          async ({ destination, expectedUri }) => {
-            const objectStore = fakeObjectStore();
-            const store = new BlobStore({
-              resolveS3Client: forbiddenS3Resolver,
-              spoolStorage: spoolStorageFor(objectStore, destination),
-            });
+        ])("writes to the $name destination the deployment resolved", async ({
+          destination,
+          expectedUri,
+        }) => {
+          const objectStore = fakeObjectStore();
+          const store = new BlobStore({
+            resolveS3Client: forbiddenS3Resolver,
+            spoolStorage: spoolStorageFor(objectStore, destination),
+          });
 
-            await store.putSpool({
-              ...spoolCoords,
-              body: Buffer.from("span payload data", "utf-8"),
-            });
+          await store.putSpool({
+            ...spoolCoords,
+            body: Buffer.from("span payload data", "utf-8"),
+          });
 
-            expect(objectStore.putUris).toEqual([expectedUri]);
-          },
-        );
+          expect(objectStore.putUris).toEqual([expectedUri]);
+        });
       });
     });
 

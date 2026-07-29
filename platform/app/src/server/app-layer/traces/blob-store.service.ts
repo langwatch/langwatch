@@ -1,12 +1,11 @@
+import type { Readable } from "node:stream";
 import {
   DeleteObjectCommand,
   GetObjectCommand,
-  PutObjectCommand,
   type S3Client,
 } from "@aws-sdk/client-s3";
 import { Ksuid } from "@langwatch/ksuid";
 import type { Logger } from "@langwatch/observability";
-import type { Readable } from "node:stream";
 import { z } from "zod";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { ProjectStorageDestination } from "~/server/stored-objects/project-storage-destination";
