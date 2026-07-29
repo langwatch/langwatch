@@ -107,6 +107,23 @@ Feature: Gateway service — public HTTP surface and operational basics
       Then it boots normally
       And a warning is logged
 
+  Rule: Auth-cache stale-while-error knobs are configurable in plain seconds
+
+    # SoftBump/HardGrace/ConfigTTL were time.Duration fields parsed from
+    # strings like "5m"/"6h" — per review feedback on #5977, converted to
+    # plain int64 seconds (LW_GATEWAY_AUTH_CACHE_*_SECONDS) to match this
+    # service's existing GracefulSeconds/DrainDelaySeconds convention rather
+    # than fixing the string-parsing path in place.
+    # Bindings: services/aigateway/config_test.go
+
+    @integration @regression
+    Scenario: AuthCache seconds-suffixed env vars reach AuthCacheConfig
+      Given LW_GATEWAY_AUTH_CACHE_SOFT_BUMP_SECONDS=300, _HARD_GRACE_SECONDS=21600, _CONFIG_TTL_SECONDS=90
+      When the gateway loads its configuration
+      Then AuthCache.SoftBumpSeconds is 300
+      And AuthCache.HardGraceSeconds is 21600
+      And AuthCache.ConfigTTLSeconds is 90
+
   Rule: Graceful shutdown window is actually configurable, and checked against the heartbeat interval
 
     # Found during review of #4806's heartbeat fix: charts/gateway/values.yaml

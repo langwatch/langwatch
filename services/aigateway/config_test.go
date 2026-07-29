@@ -3,7 +3,6 @@ package aigateway
 import (
 	"context"
 	"testing"
-	"time"
 )
 
 // LoadConfig with only the two required secrets set should yield in-process defaults.
@@ -183,31 +182,27 @@ func TestLoadConfig_RefusesConflictingOTelEndpointNames(t *testing.T) {
 	}
 }
 
-// @scenario "the documented AuthCache duration format actually parses now"
-func TestLoadConfig_AuthCacheDurationsParseDocumentedFormat(t *testing.T) {
+// @scenario "AuthCache seconds-suffixed env vars reach AuthCacheConfig"
+func TestLoadConfig_AuthCacheSecondsFields(t *testing.T) {
 	clearGatewayEnv(t)
 	t.Setenv("LW_GATEWAY_INTERNAL_SECRET", "internal-1")
 	t.Setenv("LW_GATEWAY_JWT_SECRET", "jwt-1")
-	// Exactly the format .env.example documents (and, before this fix,
-	// the format that silently could never have worked — every
-	// time.Duration field went through the same raw-nanosecond int64
-	// path regardless of which struct it lived on).
-	t.Setenv("LW_GATEWAY_AUTH_CACHE_SOFT_BUMP", "5m")
-	t.Setenv("LW_GATEWAY_AUTH_CACHE_HARD_GRACE", "6h")
-	t.Setenv("LW_GATEWAY_AUTH_CACHE_CONFIG_TTL", "90s")
+	t.Setenv("LW_GATEWAY_AUTH_CACHE_SOFT_BUMP_SECONDS", "300")
+	t.Setenv("LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS", "21600")
+	t.Setenv("LW_GATEWAY_AUTH_CACHE_CONFIG_TTL_SECONDS", "90")
 
 	cfg, err := LoadConfig(context.Background())
 	if err != nil {
 		t.Fatalf("LoadConfig: %v", err)
 	}
-	if cfg.AuthCache.SoftBump != 5*time.Minute {
-		t.Errorf("AuthCache.SoftBump = %v, want 5m", cfg.AuthCache.SoftBump)
+	if cfg.AuthCache.SoftBumpSeconds != 300 {
+		t.Errorf("AuthCache.SoftBumpSeconds = %d, want 300", cfg.AuthCache.SoftBumpSeconds)
 	}
-	if cfg.AuthCache.HardGrace != 6*time.Hour {
-		t.Errorf("AuthCache.HardGrace = %v, want 6h", cfg.AuthCache.HardGrace)
+	if cfg.AuthCache.HardGraceSeconds != 21600 {
+		t.Errorf("AuthCache.HardGraceSeconds = %d, want 21600", cfg.AuthCache.HardGraceSeconds)
 	}
-	if cfg.AuthCache.ConfigTTL != 90*time.Second {
-		t.Errorf("AuthCache.ConfigTTL = %v, want 90s", cfg.AuthCache.ConfigTTL)
+	if cfg.AuthCache.ConfigTTLSeconds != 90 {
+		t.Errorf("AuthCache.ConfigTTLSeconds = %d, want 90", cfg.AuthCache.ConfigTTLSeconds)
 	}
 }
 
@@ -242,9 +237,9 @@ func clearGatewayEnv(t *testing.T) {
 		"LW_GATEWAY_INTERNAL_SECRET",
 		"LW_GATEWAY_JWT_SECRET",
 		"LW_GATEWAY_JWT_SECRET_PREVIOUS",
-		"LW_GATEWAY_AUTH_CACHE_SOFT_BUMP",
-		"LW_GATEWAY_AUTH_CACHE_HARD_GRACE",
-		"LW_GATEWAY_AUTH_CACHE_CONFIG_TTL",
+		"LW_GATEWAY_AUTH_CACHE_SOFT_BUMP_SECONDS",
+		"LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS",
+		"LW_GATEWAY_AUTH_CACHE_CONFIG_TTL_SECONDS",
 		"CUSTOMER_TRACE_BRIDGE_BASE_URL",
 		"OTEL_OTLP_ENDPOINT",
 		"OTEL_OTLP_HEADERS",

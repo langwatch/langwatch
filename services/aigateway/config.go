@@ -60,13 +60,13 @@ type ControlPlaneConfig struct {
 // known-bad credentials. Setting HardGrace=0 disables stale-while-error
 // entirely (legacy behavior).
 type AuthCacheConfig struct {
-	SoftBump  time.Duration `env:"SOFT_BUMP"`
-	HardGrace time.Duration `env:"HARD_GRACE"`
-	// ConfigTTL bounds how stale a cached virtual key's config
+	SoftBumpSeconds  int64 `env:"SOFT_BUMP_SECONDS"`
+	HardGraceSeconds int64 `env:"HARD_GRACE_SECONDS"`
+	// ConfigTTLSeconds bounds how stale a cached virtual key's config
 	// (credentials, base URLs, routing chain) can get before a background
 	// re-fetch, covering config mutations that don't emit change-feed
 	// events. Default 60s; negative disables.
-	ConfigTTL time.Duration `env:"CONFIG_TTL"`
+	ConfigTTLSeconds int64 `env:"CONFIG_TTL_SECONDS"`
 }
 
 // CircuitConfig tunes the per-credential circuit breaker that preempts

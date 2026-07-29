@@ -5,10 +5,19 @@ Feature: Config duration fields parse the format they're documented in
   check it fell into the generic integer branch and parsed via
   strconv.ParseInt — meaning a documented value like "5m" failed to parse,
   and the only value that actually worked was an opaque, undocumented
-  nanosecond count. AuthCacheConfig.SoftBump/HardGrace/ConfigTTL
-  (services/aigateway/config.go) are the fields this affects today;
-  .env.example documented SOFT_BUMP=5m/HARD_GRACE=6h, a format that could
-  never have actually parsed before this fix.
+  nanosecond count.
+
+  AuthCacheConfig.SoftBump/HardGrace/ConfigTTL (services/aigateway/config.go)
+  were the fields this affected in practice, but per reviewer feedback
+  (github.com/langwatch/langwatch/pull/5977#discussion — a defined-int64
+  time.Duration field with string parsing reads as non-standard next to this
+  same PR's plain-int Server.GracefulSeconds/DrainDelaySeconds) they were
+  converted to plain int64 seconds instead of fixed in place — see
+  gateway-service.feature's AuthCache scenario. This Hydrate-level fix
+  remains: it is now preventative for the next time.Duration-tagged field
+  added anywhere pkg/config.Hydrate is used (aigateway, nlpgo, langyagent all
+  share it), demonstrated below with synthetic struct fields rather than a
+  currently-affected real one.
 
   # Bindings: pkg/config/config_test.go, services/aigateway/config_test.go
 
@@ -37,11 +46,3 @@ Feature: Config duration fields parse the format they're documented in
     Given a struct field of type int64 (not time.Duration) tagged env:"COUNT"
     When COUNT=300000000000 is hydrated onto it
     Then the field equals the integer 300000000000
-
-  @integration @regression
-  Scenario: the documented AuthCache duration format actually parses now
-    Given LW_GATEWAY_AUTH_CACHE_SOFT_BUMP=5m, _HARD_GRACE=6h, _CONFIG_TTL=90s
-    When the gateway loads its configuration
-    Then AuthCache.SoftBump is 5 minutes
-    And AuthCache.HardGrace is 6 hours
-    And AuthCache.ConfigTTL is 90 seconds
