@@ -11,9 +11,27 @@
  *
  * These tests are about the answer for things the policy has NEVER heard of.
  */
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 
 import { classifyForLangy } from "../langyPermissionPolicy";
+
+// The cross-products live at module scope rather than as loops inside the
+// `it`. Nested `describe`s already put a test body four levels deep, so a
+// loop-in-a-loop there reads as tangled to any complexity measure — and a
+// table plus `it.each` names the failing grain in the test report instead of
+// burying it in one opaque assertion.
+const DESTRUCTIVE_GRAINS = ["manage", "delete", "share"].flatMap((action) =>
+  ["prompts", "datasets", "traces"].map((family) => `${family}:${action}`),
+);
+
+const DELEGABLE_READS = [
+  "experiments:view",
+  "prompts:view",
+  "prompts:create",
+  "evaluations:create",
+  "traces:view",
+  "project:view",
+];
 
 describe("classifyForLangy", () => {
   describe("given a resource family the policy has never heard of", () => {
@@ -60,38 +78,33 @@ describe("classifyForLangy", () => {
 
   describe("given the destructive actions", () => {
     describe("when they are classified", () => {
-      it("refuses every one, on every family, with the reason stated", () => {
-        for (const action of ["manage", "delete", "share"]) {
-          for (const family of ["prompts", "datasets", "traces"]) {
-            const verdict = classifyForLangy(`${family}:${action}`);
-            expect(
-              verdict.disposition,
-              `${family}:${action} must never be delegable`,
-            ).toBe("excluded");
-            if (verdict.disposition !== "excluded") continue;
-            expect(verdict.reason.length).toBeGreaterThan(0);
-          }
-        }
+      it.each(
+        DESTRUCTIVE_GRAINS,
+      )("refuses %s, with the reason stated", (permission) => {
+        const verdict = classifyForLangy(permission);
+
+        expect(
+          verdict.disposition,
+          `${permission} must never be delegable`,
+        ).toBe("excluded");
+        // Narrows for the assertion below without a branch — a branch here
+        // would silently pass on the `granted` verdict this test exists to
+        // catch.
+        assert(verdict.disposition === "excluded");
+        expect(verdict.reason.length).toBeGreaterThan(0);
       });
     });
   });
 
   describe("given the reads Langy is meant to have", () => {
     describe("when they are classified", () => {
-      it("grants them, so the policy is not vacuously strict", () => {
-        for (const permission of [
-          "experiments:view",
-          "prompts:view",
-          "prompts:create",
-          "evaluations:create",
-          "traces:view",
-          "project:view",
-        ]) {
-          expect(
-            classifyForLangy(permission).disposition,
-            `${permission} should be delegable`,
-          ).toBe("granted");
-        }
+      it.each(
+        DELEGABLE_READS,
+      )("grants %s, so the policy is not vacuously strict", (permission) => {
+        expect(
+          classifyForLangy(permission).disposition,
+          `${permission} should be delegable`,
+        ).toBe("granted");
       });
     });
   });

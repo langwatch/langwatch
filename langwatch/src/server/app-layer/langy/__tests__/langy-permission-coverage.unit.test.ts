@@ -33,25 +33,44 @@ import {
   permissionsDemandedByRoutes,
 } from "./helpers/routePermissions";
 
+/**
+ * Permissions a route demands, the policy says Langy may hold, and the mint
+ * nonetheless does not ask for — each rendered with the routes that demand it,
+ * so a failure names the route rather than just the grain.
+ */
+function grantedByPolicyButNotByTheMint(): string[] {
+  const granted = new Set<string>(LANGY_CANDIDATE_PERMISSIONS);
+
+  return [...permissionsDemandedByRoutes()]
+    .filter(([permission]) => !granted.has(permission))
+    .filter(
+      ([permission]) => classifyForLangy(permission).disposition === "granted",
+    )
+    .map(
+      ([permission, routes]) =>
+        `${permission} — demanded by ${routes.join(", ")}`,
+    );
+}
+
+/** Permissions the mint asks for that the policy says Langy must never hold. */
+function askedForButExcludedByPolicy(): string[] {
+  return LANGY_CANDIDATE_PERMISSIONS.flatMap((permission) => {
+    const verdict = classifyForLangy(permission);
+    return verdict.disposition === "excluded"
+      ? [`${permission} — ${verdict.reason}`]
+      : [];
+  });
+}
+
 describe("Langy permission coverage", () => {
   describe("given every permission the mounted API routes demand", () => {
     describe("when the policy says Langy should be able to hold it", () => {
       it("is granted by the candidate list, so no Langy tool is refused a permission it should have", async () => {
-        const demanded = permissionsDemandedByRoutes();
-        const granted = new Set<string>(LANGY_CANDIDATE_PERMISSIONS);
-
-        const missing: string[] = [];
-        for (const [permission, routes] of demanded) {
-          if (classifyForLangy(permission).disposition !== "granted") continue;
-          if (granted.has(permission)) continue;
-          missing.push(`${permission} — demanded by ${routes.join(", ")}`);
-        }
-
         // Named so the failure reads as an instruction, not a puzzle: add the
         // line to LANGY_CANDIDATE_PERMISSIONS, or record why not in
         // langyPermissionPolicy.ts.
         expect(
-          missing,
+          grantedByPolicyButNotByTheMint(),
           "Routes demand these permissions and the Langy policy says Langy " +
             "should hold them, but LANGY_CANDIDATE_PERMISSIONS omits them. " +
             "Add each to the list, or exclude the family/action in " +
@@ -62,16 +81,8 @@ describe("Langy permission coverage", () => {
 
     describe("when the policy says Langy must never hold it", () => {
       it("is absent from the candidate list, so widening the list cannot quietly cross a line the policy drew", async () => {
-        const wrongly: string[] = [];
-        for (const permission of LANGY_CANDIDATE_PERMISSIONS) {
-          const verdict = classifyForLangy(permission);
-          if (verdict.disposition === "excluded") {
-            wrongly.push(`${permission} — ${verdict.reason}`);
-          }
-        }
-
         expect(
-          wrongly,
+          askedForButExcludedByPolicy(),
           "LANGY_CANDIDATE_PERMISSIONS grants permissions the Langy policy " +
             "excludes. Either the grant is wrong, or the policy in " +
             "langyPermissionPolicy.ts no longer reflects the intended line",
