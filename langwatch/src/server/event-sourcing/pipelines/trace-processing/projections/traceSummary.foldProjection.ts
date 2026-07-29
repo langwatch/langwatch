@@ -1,3 +1,4 @@
+import { DEFAULT_PARTITION_WINDOW_MS } from "~/server/app-layer/clients/clickhouse/windowed-read";
 import { CanonicalizeSpanAttributesService } from "~/server/app-layer/traces/canonicalisation";
 import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
 import {
@@ -12,7 +13,6 @@ import {
 } from "~/server/event-sourcing/projections/abstractFoldProjection";
 import type { FoldProjectionStore } from "~/server/event-sourcing/projections/foldProjection.types";
 import { SYNTHETIC_SPAN_NAMES } from "~/server/tracer/constants";
-import { DEFAULT_PARTITION_WINDOW_MS } from "~/server/app-layer/clients/clickhouse/windowed-read";
 import {
   METRIC_EXEMPLAR_CORRELATION_COUNT_ATTRIBUTE,
   TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
@@ -42,10 +42,6 @@ import {
   traceNameChangedEventSchema,
 } from "../schemas/events";
 import type { NormalizedSpan } from "../schemas/spans";
-import {
-  appendGatewaySpan,
-  buildGatewaySpanEntry,
-} from "./services/gateway-spans.service";
 import {
   extractIOFromLogRecord,
   liftCanonicalAttributesFromLogRecord,
@@ -206,26 +202,6 @@ export function applySpanToSummary({
 
   const newModels = spanCostService.extractModelsFromSpan(span);
   const models = mergeModelsMostRecentFirst(state.models, newModels);
-
-  // Gateway spans get a per-REQUEST bookkeeping entry (reserved attribute,
-  // survives the trace_summaries round-trip) so billing and budget debits
-  // can stay one-record-per-request even when a client folds N gateway
-  // calls under one traceparent. Numbers mirror exactly what the totals
-  // above accumulated for this span, skip flag included.
-  const spanMetrics = spanCostService.isTokenAccumulationSkipped(span)
-    ? { promptTokens: 0, completionTokens: 0, cost: 0, estimated: false }
-    : spanCostService.extractTokenMetrics(span);
-  const gatewayEntry = buildGatewaySpanEntry({
-    span,
-    promptTokens: spanMetrics.promptTokens,
-    completionTokens: spanMetrics.completionTokens,
-    costUsd: spanMetrics.cost,
-    cacheReadTokens: cacheTokens.cacheReadTokens,
-    cacheCreationTokens: cacheTokens.cacheCreationTokens,
-    reasoningTokens: cacheTokens.reasoningTokens,
-    model: newModels[0] ?? "unknown",
-  });
-  if (gatewayEntry) appendGatewaySpan(attributes, gatewayEntry);
 
   // Precedence rules for traceName / rootSpanType / rootSpanStartTimeMs
   // live in TraceNameResolutionService — see that file for the full set.

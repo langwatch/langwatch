@@ -39,6 +39,13 @@ import {
   VirtualKeyCryptoError,
 } from "~/server/gateway/virtualKey.crypto";
 import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
+import { getApp } from "~/server/app-layer/app";
+import {
+  admitSpendCommandDataSchema,
+  confirmSpendCommandDataSchema,
+  failSpendCommandDataSchema,
+} from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/commands";
+import { GATEWAY_SPEND_PIPELINE_NAME } from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/constants";
 import { CodexGatewayRefreshService } from "~/server/modelProviders/codexAccount.service";
 import { ModelProviderRepository } from "~/server/modelProviders/modelProvider.repository";
 
@@ -794,6 +801,155 @@ secured.access(gatewayPolicy()).post("/guardrail/check", async (c) => {
  * Query: ?cursor=<opaque>&limit=1000
  * Response: { jwts: [...], next_cursor: null | string, current_revision }
  */
+
+// ── spend command ingest (spend-command spine) ──────────────────────────
+
+const spendCommandWireSchema = z.object({
+  command: z.enum(["admitSpend", "confirmSpend", "failSpend"]),
+  /** The spine-spec event payload; project_id on the wire maps to the
+   *  internal tenantId. Validated per command type below. */
+  payload: z.record(z.string(), z.unknown()),
+  pod_id: z.string().max(128).default(""),
+  pod_seq: z.number().int().min(0).default(0),
+});
+
+const spendCommandBatchSchema = z.object({
+  records: z.array(spendCommandWireSchema).min(1).max(500),
+});
+
+/**
+ * Async spend-command ingest. The gateway's drainer posts spooled batches
+ * here at-least-once; every command carries a per-(request, step)
+ * idempotency key at the event store, so redelivery is a no-op and the
+ * drainer can retry the whole batch safely.
+ *
+ * Per-record acceptance: one malformed record must not wedge the spool
+ * (the drainer would retry a permanently rejected batch forever), so bad
+ * records are reported back by index and the rest append. The gateway
+ * counts rejects; a nonzero rate is a contract bug, never data loss the
+ * gap detector cannot see.
+ */
+secured.access(gatewayPolicy()).post("/spend-commands", async (c) => {
+  const parsed = spendCommandBatchSchema.safeParse(
+    await c.req.json().catch(() => null),
+  );
+  if (!parsed.success) {
+    return c.json(
+      {
+        error: {
+          type: "bad_request",
+          code: "invalid_batch",
+          message: "records[] of {command, payload, pod_id, pod_seq} required",
+        },
+      },
+      400,
+    );
+  }
+
+  const es = getApp().eventSourcing;
+  const pipeline = (() => {
+    try {
+      return es?.getPipeline(GATEWAY_SPEND_PIPELINE_NAME);
+    } catch {
+      return undefined;
+    }
+  })();
+  if (!pipeline) {
+    return c.json(
+      {
+        error: {
+          type: "unavailable",
+          code: "spend_pipeline_disabled",
+          message:
+            "gateway spend pipeline is not registered (ClickHouse disabled)",
+        },
+      },
+      503,
+    );
+  }
+
+  const rejected: Array<{ index: number; code: string }> = [];
+  const perCommand: Record<
+    "admitSpend" | "confirmSpend" | "failSpend",
+    Array<Record<string, unknown>>
+  > = { admitSpend: [], confirmSpend: [], failSpend: [] };
+
+  parsed.data.records.forEach((record, index) => {
+    const wire = record.payload;
+    const projectId = wire.project_id;
+    if (typeof projectId !== "string" || projectId.length === 0) {
+      rejected.push({ index, code: "missing_project_id" });
+      return;
+    }
+    const { project_id: _projectId, ...rest } = wire;
+    const mapped: Record<string, unknown> =
+      record.command === "admitSpend"
+        ? {
+            ...rest,
+            tenantId: projectId,
+            pod_id: record.pod_id,
+            pod_seq: record.pod_seq,
+          }
+        : { ...rest, tenantId: projectId };
+    const schema =
+      record.command === "admitSpend"
+        ? admitSpendCommandDataSchema
+        : record.command === "confirmSpend"
+          ? confirmSpendCommandDataSchema
+          : failSpendCommandDataSchema;
+    const validated = schema.safeParse(mapped);
+    if (!validated.success) {
+      rejected.push({ index, code: "invalid_payload" });
+      logger.warn(
+        {
+          command: record.command,
+          index,
+          issues: validated.error.issues.slice(0, 3),
+        },
+        "spend command record rejected",
+      );
+      return;
+    }
+    perCommand[record.command].push(validated.data);
+  });
+
+  for (const name of ["admitSpend", "confirmSpend", "failSpend"] as const) {
+    const batch = perCommand[name];
+    if (batch.length === 0) continue;
+    const sender = (
+      pipeline.commands as Record<
+        string,
+        { sendBatch?: (p: unknown[]) => Promise<unknown>; send: (p: unknown) => Promise<unknown> }
+      >
+    )[name];
+    if (!sender) {
+      return c.json(
+        {
+          error: {
+            type: "unavailable",
+            code: "spend_command_missing",
+            message: `command ${name} is not registered`,
+          },
+        },
+        503,
+      );
+    }
+    if (sender.sendBatch) {
+      await sender.sendBatch(batch);
+    } else {
+      for (const payloadItem of batch) {
+        await sender.send(payloadItem);
+      }
+    }
+  }
+
+  return c.json({
+    accepted:
+      parsed.data.records.length - rejected.length,
+    rejected,
+  });
+});
+
 secured.access(gatewayPolicy()).get("/bootstrap", (c) => notImplemented(c));
 
 export const app = secured.hono;

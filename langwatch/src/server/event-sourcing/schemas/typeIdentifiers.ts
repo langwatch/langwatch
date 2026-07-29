@@ -6,6 +6,10 @@
 
 import { BILLING_REPORTING_COMMAND_TYPES } from "../pipelines/billing-reporting/schemas/constants";
 import {
+  GATEWAY_SPEND_PROCESSING_COMMAND_TYPES,
+  GATEWAY_SPEND_PROCESSING_EVENT_TYPES,
+} from "../pipelines/gateway-spend-processing/schemas/constants";
+import {
   CODING_AGENT_PROCESSING_COMMAND_TYPES,
   CODING_AGENT_PROCESSING_EVENT_TYPES,
 } from "../pipelines/coding-agent-processing/schemas/constants";
@@ -83,6 +87,7 @@ export const EVENT_TYPE_IDENTIFIERS = [
   ...LANGY_CONVERSATION_PROCESSING_EVENT_TYPES,
   ...TOPIC_CLUSTERING_PROCESSING_EVENT_TYPES,
   ...ENTERPRISE_EVENT_TYPE_IDENTIFIERS,
+  ...GATEWAY_SPEND_PROCESSING_EVENT_TYPES,
   ...TEST_EVENT_TYPES,
 ] as const;
 
@@ -103,6 +108,7 @@ export const COMMAND_TYPE_IDENTIFIERS = [
   ...TOPIC_CLUSTERING_PROCESSING_COMMAND_TYPES,
   ...ENTERPRISE_COMMAND_TYPE_IDENTIFIERS,
   ...BILLING_REPORTING_COMMAND_TYPES,
+  ...GATEWAY_SPEND_PROCESSING_COMMAND_TYPES,
 ] as const;
 
 /**
@@ -131,6 +137,7 @@ export const AGGREGATE_TYPE_IDENTIFIERS = [
   "topic_clustering",
   ...ENTERPRISE_AGGREGATE_TYPE_IDENTIFIERS,
   "billing_report",
+  "gateway_request",
   "global",
   TEST_AGGREGATE_TYPE,
 ] as const;

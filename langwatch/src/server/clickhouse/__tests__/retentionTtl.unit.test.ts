@@ -124,7 +124,7 @@ describe("RETENTION_MANAGED_TABLES", () => {
   });
 });
 
-describe("gateway_spend_events retention exemption", () => {
+describe("gateway_spend retention exemption", () => {
   // Billing records must never be governed by tenant retention: policies are
   // customer-shrinkable to weeks and retroactively rewrite _retention_days
   // across every mapped table. The spend table follows the usage-estimate
@@ -135,9 +135,9 @@ describe("gateway_spend_events retention exemption", () => {
   // hard-deleting invoiceable rows.
   /** @scenario Billing records are exempt from tenant retention and keep a fixed thirteen month window */
   it("is absent from tenant retention and from the TTL reconciler config", () => {
-    expect(RETENTION_MANAGED_TABLES).not.toContain("gateway_spend_events");
+    expect(RETENTION_MANAGED_TABLES).not.toContain("gateway_spend");
     expect(
-      TABLE_TTL_CONFIG.find((c) => c.table === "gateway_spend_events"),
+      TABLE_TTL_CONFIG.find((c) => c.table === "gateway_spend"),
     ).toBeUndefined();
   });
 
@@ -147,7 +147,7 @@ describe("gateway_spend_events retention exemption", () => {
     const migration = readFileSync(
       join(
         process.cwd(),
-        "src/server/clickhouse/migrations/00060_create_gateway_spend_events.sql",
+        "src/server/clickhouse/migrations/00062_create_gateway_spend.sql",
       ),
       "utf8",
     );

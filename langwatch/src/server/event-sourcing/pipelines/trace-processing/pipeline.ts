@@ -98,10 +98,6 @@ export interface TraceProcessingPipelineDeps {
     TraceProcessingEvent,
     TraceSummaryData
   >;
-  billingExportReactor?: ReactorDefinition<
-    TraceProcessingEvent,
-    TraceSummaryData
-  >;
   /**
    * The webhook platform's delivery process manager (scheduled singleton
    * scan over the spend-event log plus ladder-retried batch sends). Mounted
@@ -242,14 +238,6 @@ export function createTraceProcessingPipeline(
       "traceSummary",
       "gatewayBudgetSync",
       deps.gatewayBudgetSyncReactor,
-    );
-  }
-
-  if (deps.billingExportReactor) {
-    builder = builder.withReactor(
-      "traceSummary",
-      "billingExport",
-      deps.billingExportReactor,
     );
   }
 

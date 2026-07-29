@@ -7,10 +7,6 @@ import {
   type GatewayBudgetSyncReactorDeps,
 } from "@ee/governance/reactors/gatewayBudgetSync.reactor";
 import {
-  type BillingExportReactorDeps,
-  createBillingExportReactor,
-} from "@ee/billing/reactors/billingExport.reactor";
-import {
   createWebhookDeliveryProcessManager,
   type WebhookDeliveryProcessDeps,
 } from "@ee/webhooks/process-manager/webhookDelivery.process";
@@ -114,6 +110,10 @@ import {
 } from "./pipelines/billing-reporting/pipeline";
 import { createBlobMaintenancePipeline } from "./pipelines/blob-maintenance/pipeline";
 import { createCodingAgentProcessingPipeline } from "./pipelines/coding-agent-processing/pipeline";
+import { createGatewaySpendProcessingPipeline } from "./pipelines/gateway-spend-processing/pipeline";
+import type { GatewaySpendState } from "./pipelines/gateway-spend-processing/projections/gatewaySpend.foldProjection";
+import { GatewaySpendStore } from "./pipelines/gateway-spend-processing/projections/gatewaySpend.store";
+import type { GatewaySpendEventsRepository } from "~/server/gateway/spendEvents.clickhouse.repository";
 import type { CodingAgentSessionState } from "./pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
 import { CodingAgentSessionStore } from "./pipelines/coding-agent-processing/projections/codingAgentSession.store";
 import {
@@ -341,7 +341,7 @@ export interface PipelineRegistryDeps {
   billingCheckpoints: BillingCheckpointService;
   usageReportingService?: UsageReportingService;
   gatewayBudgetSync?: GatewayBudgetSyncReactorDeps;
-  billingExport?: BillingExportReactorDeps;
+  gatewaySpend?: { repository: GatewaySpendEventsRepository };
   webhookDelivery?: WebhookDeliveryProcessDeps;
   /**
    * ADR-022: BlobStore for RecordSpanCommand spool reconstitution.
@@ -448,6 +448,9 @@ export class PipelineRegistry {
     // coding-agent dispatch subscribers close over this pipeline's
     // contribution commands.
     const codingAgentPipeline = this.registerCodingAgentPipeline();
+    if (this.deps.gatewaySpend) {
+      this.registerGatewaySpendPipeline(this.deps.gatewaySpend);
+    }
     const codingAgentCommands = mapCommands(codingAgentPipeline.commands);
     const metricPipeline = this.registerMetricPipeline({
       subscribers: [
@@ -748,6 +751,24 @@ export class PipelineRegistry {
    * pipelines and close over this pipeline's commands, so this registers
    * first.
    */
+  /**
+   * The spend-command spine: gateway requests as aggregates, spend records
+   * as a fold projection over gateway_spend, rating in the pipeline. Only
+   * registered when ClickHouse is on (the spend table has no PG fallback).
+   */
+  private registerGatewaySpendPipeline(deps: {
+    repository: GatewaySpendEventsRepository;
+  }) {
+    return this.deps.eventSourcing.register(
+      createGatewaySpendProcessingPipeline({
+        gatewaySpendStore: this.cached<GatewaySpendState>(
+          new GatewaySpendStore(deps.repository),
+          "gateway_spend",
+        ),
+      }),
+    );
+  }
+
   private registerCodingAgentPipeline() {
     return this.deps.eventSourcing.register(
       createCodingAgentProcessingPipeline({
@@ -966,10 +987,6 @@ export class PipelineRegistry {
       ? createGatewayBudgetSyncReactor(this.deps.gatewayBudgetSync)
       : undefined;
 
-    const billingExportReactor = this.deps.billingExport
-      ? createBillingExportReactor(this.deps.billingExport)
-      : undefined;
-
     const webhookDeliveryProcessManager = this.deps.webhookDelivery
       ? createWebhookDeliveryProcessManager(this.deps.webhookDelivery)
       : undefined;
@@ -1009,7 +1026,6 @@ export class PipelineRegistry {
         experimentMetricsSyncReactor,
         spanStorageBroadcastReactor,
         gatewayBudgetSyncReactor,
-        billingExportReactor,
         webhookDeliveryProcessManager,
         // ADR-022: Wire BlobStore so RecordSpanCommand can reconstitute
         // oversized commands and best-effort delete the transient S3 spool.
