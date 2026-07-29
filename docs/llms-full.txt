@@ -53778,7 +53778,7 @@ When using the Helm chart, configuration is set in `values.yaml` rather than env
 | `app.dataplane.providers.azureBlob.authorityHost.value` | `AZURE_BLOB_AUTHORITY_HOST` — required alongside a sovereign endpoint in a token-based mode |
 | `app.dataplane.providers.azureBlob.tokenAudience.value` | `AZURE_BLOB_TOKEN_AUDIENCE` — sovereign storage audience override |
 | `app.dataplane.legacyS3ReadBucket` | `S3_BUCKET_NAME` — set during an S3→Azure migration so pre-migration objects stay readable; leave empty on a greenfield Azure install |
-| `app.dataplane.legacyAzureRead` | Keeps the `AZURE_BLOB_*` settings emitted after moving writes back to S3, so objects already written to Azure stay readable. The write toggle is not emitted, so new writes go to S3 |
+| `app.dataplane.legacyAzureRead` | Keeps the `AZURE_BLOB_*` settings emitted after moving writes back to S3, so **stored objects** already written to Azure stay readable (they carry an `azure-blob://` URI, so a read re-derives its own provider). The write toggle is not emitted, so new writes go to S3. **Does not cover dataset chunks** — those are addressed by index with no provider on the row, so they follow the current toggle and become unreachable after the switch. Do not set this on an install that already has datasets (see issue #6323) |
 | `postgresql.external.connectionString.value` | `DATABASE_URL` |
 | `redis.external.connectionString.value` | `REDIS_URL` |
 | `workers.enabled` | Inverse of `START_WORKERS` |
