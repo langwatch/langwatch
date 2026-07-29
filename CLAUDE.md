@@ -248,6 +248,7 @@ specs/               # BDD feature specs
 | Installing from inside `langwatch/`, `typescript-sdk/`, `mcp-server/` or `skills/` | One `pnpm install` at the **repo root** covers every JavaScript project — the repo is a single pnpm workspace with one lockfile (ADR-076). Installing from a subdirectory resolves the whole workspace anyway, because pnpm walks up to the root. To install just one project, filter from the root: `pnpm install --filter "@langwatch/web..."` (the trailing `...` includes its workspace dependencies) |
 | Adding a security `override` to a single project's `package.json` | pnpm honours `overrides` only at the workspace root, so put it in the root `pnpm-workspace.yaml`. A `pnpm` block in a member package.json is silently ignored — it looks active and does nothing. This is why the pins used to drift when the repo had six install roots |
 | Referring to the app as the `langwatch` package | The app is `@langwatch/web` (in `langwatch/`). `langwatch` is the published TypeScript SDK, in `typescript-sdk/`. They collided until ADR-076; `pnpm --filter langwatch` now unambiguously means the SDK |
+| `cd langwatch` before every command | The repo root proxies the common ones, so `pnpm dev`, `pnpm test:unit`, `pnpm typecheck`, `pnpm lint`, `pnpm prisma:migrate` and friends work from wherever you are. `cd` only when you want a script the root does not proxy — `pnpm --filter @langwatch/web <script>` reaches any of them |
 
 ## TypeScript
 

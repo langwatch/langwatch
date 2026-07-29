@@ -260,7 +260,7 @@ func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) err
 	// are suppressed for an untrusted one — `haven pr` sanitises the fork install
 	// it runs itself, and reaches this path immediately afterwards, so the two
 	// have to agree or the guard is void.
-	if err := o.ensureDeps(ctx, p.LwDir, !p.UntrustedCheckout); err != nil {
+	if err := o.ensureDeps(ctx, p.WorktreeDir, !p.UntrustedCheckout); err != nil {
 		return err
 	}
 	// DOTENV_CONFIG_QUIET drops dotenv v17's promo line for any one-shot script
