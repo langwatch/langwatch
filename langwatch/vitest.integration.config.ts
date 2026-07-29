@@ -44,9 +44,18 @@ export default defineConfig({
     // So parallelism is opt-in rather than impossible: set both
     // VITEST_INTEGRATION_PARALLEL and VITEST_ISOLATE_WORKER_REDIS (see
     // setupEnv.ts, which then gives each worker its own Redis database) and
-    // the files can run concurrently. CI sets both. It stays OFF by default
-    // because a local run is on a machine also doing other things, and the
-    // serial path is the one that has always been safe there.
+    // the files can run concurrently.
+    //
+    // NOTHING SETS THE FIRST ONE TODAY, including CI. It was set for the
+    // integration job and withdrawn: groupQueue.decodeDrop and scripts began
+    // failing non-deterministically with state vanishing underneath them
+    // rather than with a wrong assertion, which is what a flushdb crossing a
+    // worker boundary looks like. The per-worker database is not obviously
+    // airtight either — setupEnv runs once at config load in the main
+    // process, where VITEST_POOL_ID is absent and the id falls back to 1, and
+    // again per worker as a setup file. Nothing asserts that two concurrent
+    // workers cannot see each other's keys; write that test before setting
+    // this again. CI parallelises across shards instead.
     fileParallelism: process.env.VITEST_INTEGRATION_PARALLEL === "1",
     // Use forked child processes. We briefly tried pool: "threads" to
     // sidestep the post-test shard 4 wedge, but threads exposes a panic

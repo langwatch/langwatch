@@ -40,18 +40,23 @@ jobs:
       # One shard each on a draft, because the draft run is affected-tests-only
       # and a subset does not need splitting.
       #
-      # Integration drops from six shards to four. Sharding was standing in for
-      # parallelism while every file ran serially; now that a shard runs its
-      # files across two workers, a sixth shard buys queueing rather than
-      # speed.
+      # Integration is back to six shards, each running its files serially.
       #
-      # Four rather than three, measured: three shards at four workers each ran
-      # 7.3/9.1/10.0 min against six serial shards at ~6 min, so runner-minutes
-      # fell 35 -> 26 but wall-clock rose. Four shards at two workers splits the
-      # difference — the same suite, two fewer runners, and no shard longer
-      # than the six-way serial split used to be.
+      # The four-shard split traded wall-clock for runner-minutes (35 -> 26) on
+      # the strength of running two files at once inside a shard. It did not
+      # hold. Measured here: shards ran 7.4-9.2 min against the ~6 min the
+      # six-way serial split used to take, so the claim that no shard got
+      # longer was wrong -- and two groupQueue suites started failing
+      # non-deterministically, both with Redis state disappearing underneath
+      # them (a staged job never dispatched; `j1` gone from a group set).
+      #
+      # The two kinds of parallelism are not interchangeable. A shard is its
+      # own runner with its own Redis service container, so shards cannot
+      # reach each other. Files inside a shard share one Redis server and are
+      # kept apart only by logical-database juggling, which is exactly what
+      # stopped holding. Buy the parallelism where it is free.
       unit-shards: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && '[1,2,3,4]' || '[1]' }}
-      integration-shards: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && '[1,2,3,4]' || '[1]' }}
+      integration-shards: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && '[1,2,3,4,5,6]' || '[1]' }}
       # Coverage instrumentation costs ~45% of the run (measured: a unit subset
       # goes 3.7s -> 6.6s with --coverage). Nothing gates on it — there is no
       # codecov.yml, no codecov status check, and both uploads are
@@ -237,35 +242,36 @@ jobs:
       matrix:
         shard: ${{ fromJSON(needs.changes.outputs.integration-shards) }}
     env:
-      # The integration suite used to run strictly one file at a time, which
-      # made it by far the most expensive thing in this workflow: six shards
-      # at ~6 minutes each, ~36 runner-minutes, every one of them serial.
+      # VITEST_INTEGRATION_PARALLEL is deliberately NOT set, so a shard runs
+      # its files one at a time.
       #
-      # The reason was real but narrower than the setting. Five suites
-      # (groupQueue x2, scripts, loopPrevention, traceparent) called
-      # redis.flushall() in afterEach against the shared Redis, so any
-      # concurrency wiped another worker's in-flight queue state; and BullMQ
-      # keys a queue by name alone, so two workers building the same pipeline
-      # share it. Both are Redis problems. The ClickHouse and Postgres
-      # fixtures were already written against per-suite tenant ids.
+      # It was set here on the theory that the only obstacle to concurrent
+      # files was five suites calling redis.flushall() in afterEach, and that
+      # switching them to flushdb() plus a per-worker Redis logical database
+      # closed the gap. It did not: with it on, groupQueue.decodeDrop and
+      # scripts began failing non-deterministically, and both failures are
+      # state vanishing rather than a wrong assertion — a staged job that is
+      # never dispatched, and a group set that has lost `j1`. That is the
+      # shape a flushdb crossing a worker boundary makes.
       #
-      # So: those five now call flushdb(), each worker gets its own Redis
-      # logical database (VITEST_ISOLATE_WORKER_REDIS, see setupEnv.ts), and a
-      # flushdb can no longer reach past the worker that issued it. With the
-      # contention gone the files can run concurrently.
+      # The isolation is also subtler than it reads: setupEnv runs as a
+      # config-time import in the main process, where VITEST_POOL_ID does not
+      # exist and the worker id falls back to 1, and again per worker as a
+      # setup file. Nothing in the suite asserts that two concurrent workers
+      # cannot see each other's keys. Turn this back on behind a test that
+      # does.
       #
-      # Both flags are CI-only. A local `pnpm test:integration` still runs
-      # serially on one Redis database, because a laptop is doing other things
-      # at the same time and the serial path is the one that has always been
-      # safe there.
-      VITEST_INTEGRATION_PARALLEL: "1"
+      # The parallelism instead comes from six shards, each its own runner
+      # with its own Redis service container, where isolation is a property of
+      # the topology rather than of a database index.
+      #
+      # The two below stay set. The Redis isolation is free when files are
+      # serial and means the wiring is already in place if the flag above
+      # returns; the worker cap keeps vitest from taking all four vCPUs on a
+      # runner that is also hosting ClickHouse, Postgres and Redis — handing
+      # it the whole box starved the datastores and three suites failed on
+      # vi.waitFor timeouts rather than on anything they assert.
       VITEST_ISOLATE_WORKER_REDIS: "1"
-      # TWO workers, not four. The runner has 4 vCPUs and is also hosting
-      # ClickHouse, Postgres and Redis as service containers; handing all four
-      # to vitest starved the datastores and three suites failed on vi.waitFor
-      # timeouts rather than on anything they assert. Leaving half the box to
-      # the things the tests are waiting on is what makes the parallelism
-      # usable.
       VITEST_MAX_WORKERS: "2"
       # Required environment variables for integration tests
       DATABASE_URL: "postgresql://langwatch_ci:ci_password@localhost:5432/langwatch_test"
