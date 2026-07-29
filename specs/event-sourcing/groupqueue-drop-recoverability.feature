@@ -212,12 +212,24 @@ Feature: GroupQueue drop recoverability — preserve, name, keep the blob
   # ================= #720 — blob lifetime =================
 
   @integration
-  # AC-720.1 — GQ2 holder TTL refreshed to at least the 7-day dead-letter window
-  # (default 5 days). Falsifiability: disabling preserveForDlq drops it back to ~5d.
+  # AC-720.1 — GQ2 holder TTL refreshed to at least the 7-day dead-letter window.
+  # Falsifiability: disabling preserveForDlq drops it back to the routine backstop.
   Scenario: a dead-lettered GQ2 job's blob holder outlives the dead-letter window
     Given a body-present GQ2 job with an acquired blob holder
     When the job is dead-lettered
     Then the blob holder's remaining lifetime is at least the dead-letter window
+
+  @integration
+  # AC-720.2 — a dead-letter hold must survive the ORDINARY path, not just the drop
+  # path. Blobs are content-addressed, so a sibling job with an identical body shares
+  # the lease set; plain EXPIRE is last-writer-wins, so that sibling's routine renew
+  # pulled the 7-day hold back to the 4-day backstop and the sweep then reclaimed the
+  # bytes ~3 days before the dead-letter entry expired. Falsifiability: reverting the
+  # arming expiries to plain EXPIRE reddens this at 345600s (exactly 4 days).
+  Scenario: an ordinary sibling renew cannot shorten a dead-letter hold
+    Given a dead-lettered blob that a sibling job still holds an ordinary lease on
+    When the sibling renews its ordinary lease
+    Then the quarantine window is left intact rather than pulled back to the routine backstop
 
   @integration @unimplemented
   # AC-720.1b — UNBOUND: the GQ1 blob-TTL extend is the same preserveForDlq code path
@@ -255,4 +267,4 @@ Feature: GroupQueue drop recoverability — preserve, name, keep the blob
 #       gaps, same class 5821 deferred; the no-slot sites are WIRED + typecheck-clean).
 # #720: AC-720.1 bound (GQ2 holder, falsifiability-proven). AC-720.1b (@unimplemented, GQ1-forcing harness).
 # #721: AC-721.6 bound (both guard directions). AC-721.1-.5 are documentation ACs (ADR-046 + site corrections
-#       + migration 00042), verified by diff/review, not scenario-mapped.
+#       + migration 00062), verified by diff/review, not scenario-mapped.
