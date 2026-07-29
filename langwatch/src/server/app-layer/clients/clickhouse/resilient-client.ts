@@ -1,5 +1,7 @@
+import { randomUUID } from "node:crypto";
 import type { ClickHouseClient } from "@clickhouse/client";
 import { createLogger } from "@langwatch/observability";
+import { SpanStatusCode, trace } from "@opentelemetry/api";
 import {
   incrementClickHouseQueryCount,
   observeClickHouseQueryDuration,
@@ -266,6 +268,94 @@ function logSuccess({
   }
 }
 
+const tracer = trace.getTracer("langwatch:clickhouse");
+
+/**
+ * The id under which ClickHouse will record this operation in its own
+ * `system.query_log`.
+ *
+ * Chosen HERE rather than left to the driver, which is the whole point: the
+ * driver generates a UUID it never tells anyone, so the server's record of a
+ * query — its text, how long it ran, how much it read, how much memory it took,
+ * why it failed — exists but cannot be tied back to the request that issued it.
+ * An id we mint is one we can put on the span, which makes that record findable
+ * afterwards:
+ *
+ *   SELECT * FROM system.query_log WHERE query_id = '<db.clickhouse.query_id>'
+ *
+ * The trace id is used as the prefix when there is one, so a single trace's
+ * queries are also findable as a group (`query_id LIKE '<traceId>-%'`) without
+ * needing to know each one individually. A caller that set its own `query_id`
+ * keeps it.
+ */
+function resolveQueryId(params: unknown): string {
+  if (params && typeof params === "object") {
+    const existing = (params as Record<string, unknown>).query_id;
+    if (typeof existing === "string" && existing.length > 0) return existing;
+  }
+
+  const traceId = trace.getActiveSpan()?.spanContext().traceId;
+  const unique = randomUUID();
+  return traceId ? `${traceId}-${unique}` : unique;
+}
+
+/**
+ * Runs a ClickHouse operation inside a span describing what it ran.
+ *
+ * The description has to live on the span because it does not survive anywhere
+ * else: the prod log pipeline keeps a record's message and drops its structured
+ * fields, so the statement, table and query id attached to the failure log are
+ * gone by the time anyone reads it, and the driver's own wording ("Query: HTTP
+ * request error.") names neither the query nor the table. Span attributes do
+ * survive, which makes "which query failed?" answerable at all.
+ *
+ * Never allowed to change the outcome: the operation's result and its error
+ * both pass through untouched, and the span is only ever an observer of them.
+ */
+async function withClickHouseSpan<T>({
+  operation,
+  table,
+  queryId,
+  statement,
+  run,
+}: {
+  operation: "query" | "insert";
+  table: string;
+  queryId: string;
+  statement?: string;
+  run: () => Promise<T>;
+}): Promise<T> {
+  return await tracer.startActiveSpan(
+    `clickhouse ${operation} ${table}`,
+    {
+      attributes: {
+        "db.system": "clickhouse",
+        "db.operation": operation,
+        "db.sql.table": table,
+        "db.clickhouse.query_id": queryId,
+        ...(statement ? { "db.statement": statement } : {}),
+      },
+    },
+    async (span) => {
+      try {
+        const result = await run();
+        return result;
+      } catch (error) {
+        span.recordException(
+          error instanceof Error ? error : new Error(String(error)),
+        );
+        span.setStatus({
+          code: SpanStatusCode.ERROR,
+          message: error instanceof Error ? error.message : String(error),
+        });
+        throw error;
+      } finally {
+        span.end();
+      }
+    },
+  );
+}
+
 /**
  * Wraps a ClickHouseClient with structured logging and insert retry.
  */
@@ -285,20 +375,41 @@ export function createResilientClickHouseClient({
   wrapper.query = async (params) => {
     const queryType = extractQueryType(params);
     const table = extractTableName(params);
+    const queryId = resolveQueryId(params);
+    // Stamped onto the params so ClickHouse records the operation in its own
+    // `system.query_log` under an id we chose — see `resolveQueryId`. Set once,
+    // outside the retry loop, so every attempt shares it.
+    const tracedParams = {
+      ...(params as Record<string, unknown>),
+      query_id: queryId,
+    };
     const start = performance.now();
     try {
-      const result = await withTransientRetry(
-        () => client.query(params as Parameters<typeof client.query>[0]),
-        { operation: "query", maxRetries, baseDelayMs, maxDelayMs },
-      );
+      const result = await withClickHouseSpan({
+        operation: "query",
+        table,
+        queryId,
+        statement: extractQueryPreview(params),
+        run: () =>
+          withTransientRetry(
+            () =>
+              client.query(tracedParams as Parameters<typeof client.query>[0]),
+            { operation: "query", maxRetries, baseDelayMs, maxDelayMs },
+          ),
+      });
       const durationMs = performance.now() - start;
-      logSuccess({ operation: "query", durationMs, params });
+      logSuccess({ operation: "query", durationMs, params: tracedParams });
       observeClickHouseQueryDuration(queryType, table, durationMs / 1000);
       incrementClickHouseQueryCount(queryType, "success");
       return result;
     } catch (error) {
       const durationMs = performance.now() - start;
-      logFailure({ operation: "query", error, durationMs, params });
+      logFailure({
+        operation: "query",
+        error,
+        durationMs,
+        params: tracedParams,
+      });
       observeClickHouseQueryDuration(queryType, table, durationMs / 1000);
       incrementClickHouseQueryCount(queryType, "error");
       // Retries are exhausted at this point: translate known ClickHouse
@@ -314,22 +425,38 @@ export function createResilientClickHouseClient({
     const insertTable =
       ((params as unknown as Record<string, unknown>).table as string) ??
       "unknown";
+    const queryId = resolveQueryId(params);
+    const tracedParams = {
+      ...(params as unknown as Record<string, unknown>),
+      query_id: queryId,
+    } as typeof params;
     const start = performance.now();
     try {
-      const result = await withTransientRetry(() => client.insert(params), {
+      const result = await withClickHouseSpan({
         operation: "insert",
-        maxRetries,
-        baseDelayMs,
-        maxDelayMs,
+        table: insertTable,
+        queryId,
+        run: () =>
+          withTransientRetry(() => client.insert(tracedParams), {
+            operation: "insert",
+            maxRetries,
+            baseDelayMs,
+            maxDelayMs,
+          }),
       });
       const durationMs = performance.now() - start;
-      logSuccess({ operation: "insert", durationMs, params });
+      logSuccess({ operation: "insert", durationMs, params: tracedParams });
       observeClickHouseQueryDuration("INSERT", insertTable, durationMs / 1000);
       incrementClickHouseQueryCount("INSERT", "success");
       return result;
     } catch (error) {
       const durationMs = performance.now() - start;
-      logFailure({ operation: "insert", error, durationMs, params });
+      logFailure({
+        operation: "insert",
+        error,
+        durationMs,
+        params: tracedParams,
+      });
       observeClickHouseQueryDuration("INSERT", insertTable, durationMs / 1000);
       incrementClickHouseQueryCount("INSERT", "error");
       throw error;

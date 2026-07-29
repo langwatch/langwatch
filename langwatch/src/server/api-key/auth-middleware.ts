@@ -1,5 +1,6 @@
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
+import { trace } from "@opentelemetry/api";
 import type { Organization, PrismaClient, Project } from "@prisma/client";
 import type { MiddlewareHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
@@ -111,6 +112,7 @@ export function createUnifiedAuthMiddleware({
     const diag = collectAuthDiagnostics(c);
 
     if (!credentials) {
+      recordAuthDiagnosticsOnSpan(diag);
       logger.warn(
         diag,
         diag.hasEmptyAuthToken
@@ -225,6 +227,7 @@ export function createOrgAuthMiddleware({
     const diag = collectAuthDiagnostics(c);
 
     if (!credentials) {
+      recordAuthDiagnosticsOnSpan(diag);
       orgLogger.warn(diag, "Org auth failed: no credentials");
       return c.json(
         {
@@ -314,6 +317,35 @@ export type AuthDiagnostics = {
   forwardedFor: string | null;
   hasEmptyAuthToken: boolean;
 };
+
+/**
+ * Copies the auth diagnostics onto the active span.
+ *
+ * They are already logged, and that is not enough: the prod log pipeline keeps
+ * a record's message and drops its structured fields, so `userAgent`,
+ * `forwardedFor` and `path` — the three that say WHOSE integration is failing —
+ * never reach the log store. Span attributes do survive, and the log line
+ * already carries the trace id, so putting them here is what makes a flood of
+ * auth failures attributable to a caller instead of just countable.
+ *
+ * Best-effort by construction: no active span (a request outside a traced
+ * path, tracing disabled in a test) means nothing is recorded, never a throw.
+ */
+export function recordAuthDiagnosticsOnSpan(diag: AuthDiagnostics): void {
+  const span = trace.getActiveSpan();
+  if (!span) return;
+
+  span.setAttribute("auth.failed", true);
+  span.setAttribute("auth.has_empty_token", diag.hasEmptyAuthToken);
+  span.setAttribute("http.route", diag.path);
+  span.setAttribute("http.request.method", diag.method);
+  if (diag.userAgent) span.setAttribute("user_agent.original", diag.userAgent);
+  // The caller's address as the edge saw it. Not a secret, and the only thing
+  // that separates one misconfigured deployment from a hundred callers.
+  if (diag.forwardedFor) {
+    span.setAttribute("client.address", diag.forwardedFor);
+  }
+}
 
 export function collectAuthDiagnostics(c: {
   req: {

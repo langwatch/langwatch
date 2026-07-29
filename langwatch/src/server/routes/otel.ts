@@ -24,6 +24,7 @@ import {
   collectAuthDiagnostics,
   enforceApiKeyCeiling,
   extractCredentials,
+  recordAuthDiagnosticsOnSpan,
 } from "~/server/api-key/auth-middleware";
 import { TokenResolver } from "~/server/api-key/token-resolver";
 import { getApp } from "~/server/app-layer/app";
@@ -90,6 +91,7 @@ async function authenticate(
   const credentials = extractCredentials((name) => c.req.header(name));
 
   if (!credentials) {
+    recordAuthDiagnosticsOnSpan(diag);
     logger.warn(
       diag,
       diag.hasEmptyAuthToken

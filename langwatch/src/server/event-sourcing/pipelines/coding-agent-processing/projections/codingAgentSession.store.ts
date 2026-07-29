@@ -3,6 +3,10 @@ import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retenti
 import type { FoldProjectionStore } from "../../../projections/foldProjection.types";
 import type { ProjectionStoreContext } from "../../../projections/projectionStoreContext";
 import {
+  readBackOrUnreadable,
+  UNREADABLE_ROW,
+} from "../../../projections/unreadableRow";
+import {
   CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST,
   CODING_AGENT_SESSION_PROJECTION_VERSION_PRE_STAMP,
   type CodingAgentSessionRow,
@@ -178,11 +182,20 @@ export class CodingAgentSessionStore
     appliedEventIds: string[];
     miss?: "absent" | "undecodable";
   }> {
-    const found = await this.repo.findBySessionIdWithApplied({
-      tenantId: String(context.tenantId),
-      sessionId: aggregateId,
-      window: context.readWindow,
-    });
+    // A row that exists but cannot be decoded gets the same answer as a refused
+    // stamp — see {@link readBackOrUnreadable}. This table carries four
+    // ALTER-added Array columns (00053/00054), so it is exposed to the same
+    // defect 00057 fixes.
+    const found = await readBackOrUnreadable(() =>
+      this.repo.findBySessionIdWithApplied({
+        tenantId: String(context.tenantId),
+        sessionId: aggregateId,
+        window: context.readWindow,
+      }),
+    );
+    if (found === UNREADABLE_ROW) {
+      return { state: null, appliedEventIds: [], miss: "undecodable" };
+    }
     if (!found) return { state: null, appliedEventIds: [], miss: "absent" };
     // Stale schema snapshot: the read-back columns did not exist when this row
     // was written, so decoding it would fabricate state. Answer as for "no row"

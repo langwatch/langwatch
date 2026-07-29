@@ -470,6 +470,66 @@ export const CLICKHOUSE_TRANSIENT_MESSAGE_FRAGMENTS = [
 ] as const;
 
 /**
+ * The wording ClickHouse uses when an allocation request cannot be served, and
+ * the clause that says the request came from decoding a column rather than from
+ * the query's own working set. Both are required — see
+ * {@link isUnreadableColumnError}.
+ */
+const UNREADABLE_COLUMN_MESSAGE =
+  "Amount of memory requested to allocate is more than allowed";
+const READING_COLUMN_CLAUSE = "while reading column";
+
+/**
+ * Whether a row exists but cannot be decoded by this build — PERMANENT for that
+ * row, however healthy the cluster is, and so neither transient nor a
+ * data-integrity fault the queue should give up on.
+ *
+ * The occurrence this exists for: an `ADD COLUMN` of an `Array` type without a
+ * `DEFAULT` leaves the column unmaterialised in every part written before the
+ * ALTER, so reading it decodes a size header that was never written and
+ * ClickHouse tries to allocate whatever the garbage says. Migrations 00014 and
+ * 00057 fix the schema; this predicate exists because the READ has to survive
+ * the parts already on disk while it does.
+ *
+ * ClickHouse raises code 173 (CANNOT_ALLOCATE_MEMORY) both for this and for an
+ * allocation that genuinely cannot be served, so the `while reading column`
+ * clause is required as well as the code. Deliberately NOT 241
+ * (MEMORY_LIMIT_EXCEEDED), which is a real budget overrun on a decodable query
+ * and is worth retrying — it stays in
+ * {@link CLICKHOUSE_TRANSIENT_MESSAGE_FRAGMENTS}.
+ *
+ * The caller that matters is a fold read-back: it turns this into a store miss
+ * so the fold rebuilds the aggregate from `event_log` and writes the row back
+ * readable. Retrying instead re-runs a read that can never succeed, and the
+ * aggregate's group stops making progress.
+ *
+ * Unwraps `reasons` on the same single shallow pass as
+ * {@link classifyClickHouseError}, because the resilient client may have
+ * wrapped the driver error before this is asked.
+ */
+export function isUnreadableColumnError(error: unknown): boolean {
+  const candidates =
+    HandledError.isHandled(error) && (error.reasons ?? []).length > 0
+      ? error.reasons
+      : [error];
+
+  return candidates.some((candidate) => {
+    if (!(candidate instanceof Error)) return false;
+
+    const code = String((candidate as { code?: unknown }).code ?? "");
+    const type = (candidate as { type?: string }).type;
+    const message = candidate.message;
+
+    const isAllocationFailure =
+      code === "173" ||
+      type === "CANNOT_ALLOCATE_MEMORY" ||
+      message.includes(UNREADABLE_COLUMN_MESSAGE);
+
+    return isAllocationFailure && message.includes(READING_COLUMN_CLAUSE);
+  });
+}
+
+/**
  * Classifies a ClickHouse error as RECOVERABLE (transient) or CRITICAL.
  *
  * Transient errors (overload, timeouts, connection issues, ZK / cluster

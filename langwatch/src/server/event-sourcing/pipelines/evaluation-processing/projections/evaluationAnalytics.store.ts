@@ -3,6 +3,10 @@ import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retenti
 import type { FoldProjectionStore } from "../../../projections/foldProjection.types";
 import type { ProjectionStoreContext } from "../../../projections/projectionStoreContext";
 import {
+  readBackOrUnreadable,
+  UNREADABLE_ROW,
+} from "../../../projections/unreadableRow";
+import {
   EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST,
   type EvaluationAnalyticsData,
   evaluationAnalyticsStateFromRow,
@@ -133,11 +137,18 @@ export class EvaluationAnalyticsStore
     appliedEventIds: string[];
     miss?: "absent" | "undecodable";
   }> {
-    const found = await this.repo.findByEvaluationIdWithApplied({
-      tenantId: String(context.tenantId),
-      evaluationId: aggregateId,
-      window: context.readWindow,
-    });
+    // A row that exists but cannot be decoded gets the same answer as a refused
+    // stamp — see {@link readBackOrUnreadable}.
+    const found = await readBackOrUnreadable(() =>
+      this.repo.findByEvaluationIdWithApplied({
+        tenantId: String(context.tenantId),
+        evaluationId: aggregateId,
+        window: context.readWindow,
+      }),
+    );
+    if (found === UNREADABLE_ROW) {
+      return { state: null, appliedEventIds: [], miss: "undecodable" };
+    }
     if (!found) return { state: null, appliedEventIds: [], miss: "absent" };
     // Stale schema snapshot: the read-back columns did not exist when this row
     // was written, so decoding it would fabricate state. Answer as for "no row"

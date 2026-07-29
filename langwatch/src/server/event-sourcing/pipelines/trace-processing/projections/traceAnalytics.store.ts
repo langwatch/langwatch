@@ -3,6 +3,10 @@ import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retenti
 import type { FoldProjectionStore } from "../../../projections/foldProjection.types";
 import type { ProjectionStoreContext } from "../../../projections/projectionStoreContext";
 import {
+  readBackOrUnreadable,
+  UNREADABLE_ROW,
+} from "../../../projections/unreadableRow";
+import {
   projectAnalyticsStateToRow,
   TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
   TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT,
@@ -173,11 +177,19 @@ export class TraceAnalyticsStore
     appliedEventIds: string[];
     miss?: "absent" | "undecodable";
   }> {
-    const found = await this.repo.findByTraceIdWithApplied({
-      tenantId: String(context.tenantId),
-      traceId: aggregateId,
-      window: context.readWindow,
-    });
+    // A row that exists but cannot be decoded gets the same answer as a refused
+    // stamp, and for the same reason: it was FOUND, so an unwindowed re-read
+    // only finds it again. The re-fold rewrites it readable.
+    const found = await readBackOrUnreadable(() =>
+      this.repo.findByTraceIdWithApplied({
+        tenantId: String(context.tenantId),
+        traceId: aggregateId,
+        window: context.readWindow,
+      }),
+    );
+    if (found === UNREADABLE_ROW) {
+      return { state: null, appliedEventIds: [], miss: "undecodable" };
+    }
     if (!found) return { state: null, appliedEventIds: [], miss: "absent" };
     // Stale schema snapshot: the read-back columns did not exist when this row
     // was written, so decoding it would fabricate state. Answer as for "no row"
