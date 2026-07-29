@@ -253,7 +253,7 @@ Feature: Public REST API — /api/gateway/v1/*
     When I create a budget with `provider_key` naming my org's model provider
     Then the response status is 201 and the DTO echoes `provider_key`
     When a foreign tenant names the same provider id
-    Then the response status is 400 with error.code "provider_not_in_organization"
+    Then the response status is 400 with error "gateway_scope_org_mismatch" naming the model provider
 
   @integration @rest @budgets @clickhouse
   Scenario: REST budget spend is the live ClickHouse ledger, not the stale PG column

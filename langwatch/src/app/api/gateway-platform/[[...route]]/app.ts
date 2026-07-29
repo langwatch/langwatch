@@ -20,11 +20,7 @@
  */
 
 import { createLogger } from "@langwatch/observability";
-import type {
-  GatewayBudget,
-  GatewayCacheRule,
-  Project,
-} from "@prisma/client";
+import type { GatewayBudget, GatewayCacheRule, Project } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
@@ -66,8 +62,8 @@ import { toVirtualKeySnakeDto } from "~/server/gateway/virtualKey.dto";
 import {
   type CreateVirtualKeyInput,
   type VirtualKeyBudgetInput,
-  virtualKeyBudgetInputSchema,
   VirtualKeyService,
+  virtualKeyBudgetInputSchema,
 } from "~/server/gateway/virtualKey.service";
 import { startOfCurrentMonthUTC } from "~/server/gateway/virtualKeySpend.clickhouse.repository";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
@@ -398,7 +394,10 @@ async function requireVisibleVk(
   project: Project,
 ) {
   const vk = await service.getById(id, organizationId);
-  if (!vk || !isVisibleToMembership(membershipForApiCaller(project), vk.scopes)) {
+  if (
+    !vk ||
+    !isVisibleToMembership(membershipForApiCaller(project), vk.scopes)
+  ) {
     throw new TRPCError({
       code: "NOT_FOUND",
       message: "virtual_key_not_found: virtual key not found",

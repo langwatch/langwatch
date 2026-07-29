@@ -52,13 +52,9 @@ export const gatewayUsageRouter = createTRPCRouter({
         chRepo: chRepoOrUndefined(),
         spendRepo: spendRepoOrUndefined(),
       });
-      return service.summaryForVirtualKey(
-        input.projectId,
-        input.virtualKeyId,
-        {
-          fromDate: new Date(input.fromDate),
-          toDate: new Date(input.toDate),
-        },
-      );
+      return service.summaryForVirtualKey(input.projectId, input.virtualKeyId, {
+        fromDate: new Date(input.fromDate),
+        toDate: new Date(input.toDate),
+      });
     }),
 });

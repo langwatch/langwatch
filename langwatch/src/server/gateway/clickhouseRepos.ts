@@ -19,7 +19,9 @@ import { GatewayVirtualKeySpendRepository } from "./virtualKeySpend.clickhouse.r
 async function resolveClient(projectId: string) {
   const client = await getClickHouseClientForProject(projectId);
   if (!client) {
-    throw new Error(`ClickHouse enabled but no client for project ${projectId}`);
+    throw new Error(
+      `ClickHouse enabled but no client for project ${projectId}`,
+    );
   }
   return client;
 }

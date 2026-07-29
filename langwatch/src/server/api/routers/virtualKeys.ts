@@ -27,20 +27,6 @@ import {
 } from "~/server/gateway/clickhouseRepos";
 import { GatewayUsageService } from "~/server/gateway/usage.service";
 import {
-  VirtualKeyService,
-  virtualKeyBudgetInputSchema,
-} from "~/server/gateway/virtualKey.service";
-import { startOfCurrentMonthUTC } from "~/server/gateway/virtualKeySpend.clickhouse.repository";
-import {
-  parseVirtualKeyConfig,
-  virtualKeyConfigSchema,
-} from "~/server/gateway/virtualKey.config";
-import { toVirtualKeyCamelDto } from "~/server/gateway/virtualKey.dto";
-import { scopeAssignmentSchema } from "~/server/scopes/scope.types";
-
-import { authorizeInResolver } from "../rbac";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
-import {
   assertActorCanManageAllScopes,
   assertActorCanOperateOnAnyScope,
   assertGuardrailAttachmentsAllowed,
@@ -51,6 +37,19 @@ import {
   resolveVkProjectId,
   type VirtualKeyActor,
 } from "~/server/gateway/virtualKey.authz";
+import {
+  parseVirtualKeyConfig,
+  virtualKeyConfigSchema,
+} from "~/server/gateway/virtualKey.config";
+import { toVirtualKeyCamelDto } from "~/server/gateway/virtualKey.dto";
+import {
+  VirtualKeyService,
+  virtualKeyBudgetInputSchema,
+} from "~/server/gateway/virtualKey.service";
+import { startOfCurrentMonthUTC } from "~/server/gateway/virtualKeySpend.clickhouse.repository";
+import { scopeAssignmentSchema } from "~/server/scopes/scope.types";
+import { authorizeInResolver } from "../rbac";
+import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 /** The session expressed in the shared actor vocabulary. */
 function sessionActor(session: Session): VirtualKeyActor {
@@ -266,8 +265,7 @@ export const virtualKeysRouter = createTRPCRouter({
         if (!membership) {
           throw new TRPCError({
             code: "BAD_REQUEST",
-            message:
-              "principalUserId is not a member of this organization.",
+            message: "principalUserId is not a member of this organization.",
           });
         }
       }

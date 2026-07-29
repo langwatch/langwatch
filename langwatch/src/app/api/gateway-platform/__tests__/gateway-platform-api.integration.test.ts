@@ -23,6 +23,7 @@
  * Spec: specs/ai-gateway/public-rest-api.feature
  */
 import type { ClickHouseClient } from "@clickhouse/client";
+import { generate } from "@langwatch/ksuid";
 import {
   OrganizationUserRole,
   RoleBindingScopeType,
@@ -30,8 +31,6 @@ import {
 } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-
-import { generate } from "@langwatch/ksuid";
 
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { prisma } from "~/server/db";
@@ -207,7 +206,11 @@ async function seedTenant(args: {
   orgSlug: string;
 }): Promise<void> {
   await prisma.organization.create({
-    data: { id: args.orgId, name: `GW REST ${args.orgSlug}`, slug: args.orgSlug },
+    data: {
+      id: args.orgId,
+      name: `GW REST ${args.orgSlug}`,
+      slug: args.orgSlug,
+    },
   });
   await prisma.team.create({
     data: {
@@ -394,10 +397,7 @@ describe("gateway platform REST API (real PG + real CH)", () => {
         slug: `gwrest-grp-${suffix}`,
         organizationId: ORG_ID,
         members: {
-          create: [
-            { userId: ADMIN_USER_ID },
-            { userId: MEMBER_USER_ID },
-          ],
+          create: [{ userId: ADMIN_USER_ID }, { userId: MEMBER_USER_ID }],
         },
       },
     });
@@ -772,7 +772,10 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       });
       const res = await patch(
         `/api/gateway/v1/virtual-keys/${created.body.virtual_key.id}`,
-        { name: `updated-${suffix}`, budget: { limit_usd: "3", window: "DAY" } },
+        {
+          name: `updated-${suffix}`,
+          budget: { limit_usd: "3", window: "DAY" },
+        },
         legacyAuth(),
       );
       expect(res.status).toBe(200);
@@ -839,7 +842,11 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       expect((await second.json()).virtual_key.status).toBe("revoked");
 
       const budgets = await prisma.gatewayBudget.findMany({
-        where: { organizationId: ORG_ID, scopeType: "VIRTUAL_KEY", scopeId: id },
+        where: {
+          organizationId: ORG_ID,
+          scopeType: "VIRTUAL_KEY",
+          scopeId: id,
+        },
       });
       expect(budgets.length).toBeGreaterThan(0);
       expect(budgets.every((b) => b.archivedAt !== null)).toBe(true);
@@ -1052,10 +1059,13 @@ describe("gateway platform REST API (real PG + real CH)", () => {
         },
         legacyAuth(FOREIGN_LEGACY_KEY),
       );
+      // A cross-org provider id is refused by the shared service's
+      // org-integrity assert, which answers in the handled-error envelope:
+      // a flat `error` code plus the meta naming which scope was foreign.
       expect(foreign.status).toBe(400);
-      expect((await foreign.json()).error.code).toBe(
-        "provider_not_in_organization",
-      );
+      const foreignBody = await foreign.json();
+      expect(foreignBody.error).toBe("gateway_scope_org_mismatch");
+      expect(foreignBody.scopeKind).toBe("model provider");
     });
 
     /** @scenario REST budget spend is the live ClickHouse ledger, not the stale PG column */
