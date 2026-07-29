@@ -44,10 +44,11 @@ export interface StorageReportingDeps {
    * - "sent": delivered.
    * - "duplicate": Stripe already has this identifier
    *   (resource_already_exists) — success, the idempotency key did its job.
-   * - "permanent-reject": Stripe will never accept this event (invalid
-   *   request other than duplicate, auth) — retrying forever would wedge
-   *   the org's queue behind a poison row.
-   * Throws ONLY on genuinely transient failures (network, 5xx, rate limit).
+   * Throws on EVERYTHING else. Auth and config-class invalid-request errors
+   * (bad key, disabled account, missing/misnamed meter) are system outages,
+   * not row-specific — the reporter must leave the hour unreported for retry
+   * and let the breaker alarm, never settle it (that would drop real
+   * revenue). Transient failures (network, 5xx, rate limit) also throw.
    */
   sendMeterEvent: (params: {
     stripeCustomerId: string;
@@ -56,11 +57,11 @@ export interface StorageReportingDeps {
     identifier: string;
     /** Unix seconds. */
     timestamp: number;
-  }) => Promise<{ outcome: "sent" | "duplicate" | "permanent-reject" }>;
-  /** Alert sink: backdate skips, permanent rejects, and breaker trips. */
+  }) => Promise<{ outcome: "sent" | "duplicate" }>;
+  /** Alert sink: backdate skips and breaker trips. */
   onReportingAlert: (params: {
     organizationId: string;
-    kind: "backdate-ceiling" | "permanent-reject" | "circuit-breaker";
+    kind: "backdate-ceiling" | "circuit-breaker";
     detail: Record<string, string>;
   }) => void;
 }
@@ -149,7 +150,11 @@ export class StorageReportingService {
 
       const billingMonth = row.sealedHour.toISOString().slice(0, 7);
       try {
-        const { outcome } = await this.deps.sendMeterEvent({
+        // "sent" or "duplicate" — both mean Stripe has this hour. Anything
+        // else throws below (auth/config/transient) and the hour stays
+        // unreported for retry; the breaker alarms so real revenue is never
+        // silently settled away.
+        await this.deps.sendMeterEvent({
           stripeCustomerId: org.stripeCustomerId,
           organizationId,
           value: row.megabytes,
@@ -159,28 +164,6 @@ export class StorageReportingService {
           }),
           timestamp: Math.floor(row.sealedHour.getTime() / 1000),
         });
-        if (outcome === "permanent-reject") {
-          // Stripe will NEVER accept this event: settle it (a poison row
-          // must not block every newer hour forever) and alert — this is
-          // usage that needs the meterEventAdjustments runbook.
-          logger.error(
-            {
-              organizationId,
-              sealedHour: row.sealedHour,
-              megabytes: row.megabytes,
-            },
-            "ALARM: Stripe permanently rejected a storage meter event — " +
-              "settled WITHOUT reporting; recover via meterEventAdjustments",
-          );
-          this.deps.onReportingAlert({
-            organizationId,
-            kind: "permanent-reject",
-            detail: {
-              sealedHour: row.sealedHour.toISOString(),
-              megabytes: String(row.megabytes),
-            },
-          });
-        }
         await this.deps.usageHourly.markReported({
           organizationId,
           sealedHour: row.sealedHour,

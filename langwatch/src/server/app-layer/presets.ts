@@ -41,7 +41,6 @@ import { createSeatEventSubscriptionFns } from "../../../ee/billing/services/sea
 import { EESubscriptionService } from "../../../ee/billing/services/subscription.service";
 import * as subscriptionItemCalculator from "../../../ee/billing/services/subscriptionItemCalculator";
 import {
-  isStripeAuthenticationError,
   isStripeInvalidRequestError,
   StripeUsageReportingService,
 } from "../../../ee/billing/services/usageReportingService";
@@ -807,16 +806,15 @@ export function initializeDefaultApp(options?: {
             ) {
               return { outcome: "duplicate" as const };
             }
-            // Any other invalid-request / auth error is PERMANENT: Stripe
-            // will never accept this event, so retrying would wedge the
-            // org's oldest-first queue behind a poison row forever.
-            if (
-              isStripeInvalidRequestError(error) ||
-              isStripeAuthenticationError(error)
-            ) {
-              return { outcome: "permanent-reject" as const };
-            }
-            throw error; // transient: network / 5xx / rate limit
+            // EVERYTHING else throws → the reporter leaves the hour
+            // unreported and the circuit breaker alarms. Auth errors and
+            // config-class invalid-request (bad key, disabled account,
+            // missing/misnamed meter, wrong catalog) are SYSTEM outages, not
+            // row-specific: settling them would mark real billable hours
+            // reported and silently drop the revenue. A genuinely poison row
+            // is rare; a persistent breaker alarm brings a human who can
+            // settle it manually — noisy-but-recoverable beats silent loss.
+            throw error;
           }
         },
         onReportingAlert: ({ organizationId, kind, detail }) => {

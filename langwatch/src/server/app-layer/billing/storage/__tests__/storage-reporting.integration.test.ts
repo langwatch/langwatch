@@ -20,17 +20,17 @@ function makeReporter({
   billingEnabled = true,
   failSends = 0,
   alreadyExists = false,
-  permanentReject = false,
+  authOrConfigError = false,
 }: {
   billingEnabled?: boolean;
   failSends?: number;
   alreadyExists?: boolean;
-  permanentReject?: boolean;
+  /** Simulate a system-wide Stripe failure (bad key / missing meter): every send throws. */
+  authOrConfigError?: boolean;
 } = {}) {
   const sent: { identifier: string; value: number; timestamp: number }[] = [];
   const alerts: { kind: string }[] = [];
   let remainingFailures = failSends;
-  let rejectNext = permanentReject;
   const service = new StorageReportingService({
     usageHourly,
     checkpoints,
@@ -40,13 +40,14 @@ function makeReporter({
       subscriptions: [{ id: "sub_test" }],
     }),
     sendMeterEvent: vi.fn(async ({ identifier, value, timestamp }) => {
+      if (authOrConfigError) {
+        // The presets sender re-throws auth / config-class invalid-request
+        // (missing meter, disabled account, bad key) rather than settling.
+        throw new Error("StripeAuthenticationError: Invalid API Key");
+      }
       if (remainingFailures > 0) {
         remainingFailures -= 1;
         throw new Error("stripe transient error");
-      }
-      if (rejectNext) {
-        rejectNext = false;
-        return { outcome: "permanent-reject" as const };
       }
       // Stripe-side dedup: a resend with a known identifier records nothing
       // new — like the real client mapping resource_already_exists.
@@ -200,24 +201,39 @@ describe("StorageReportingService", () => {
     });
   });
 
-  describe("when Stripe permanently rejects the oldest hour", () => {
-    it("settles the poison row with an alert and reports the next hour", async () => {
-      const organizationId = await orgWithHours("poison", [
+  describe("when Stripe fails system-wide (bad key / missing meter)", () => {
+    it("leaves every hour unreported and never settles real revenue away", async () => {
+      const organizationId = await orgWithHours("authfail", [
         { hoursAgo: 3, megabytes: 100 },
         { hoursAgo: 2, megabytes: 200 },
       ]);
-      const { service, sent, alerts } = makeReporter({ permanentReject: true });
+      const { service, sent } = makeReporter({ authOrConfigError: true });
 
       await service.reportForOrg({ organizationId, at });
 
-      // The rejected hour is settled (never retried, never wedging the
-      // queue) and the newer hour reported normally in the same run.
-      expect(alerts).toEqual([{ kind: "permanent-reject" }]);
-      expect(sent.map((s) => s.value)).toEqual([200]);
+      // Nothing sent, and crucially NOTHING settled: a config/auth outage
+      // must not mark real billable hours reported (that would drop the
+      // revenue silently). The rows stay open for retry after the fix.
+      expect(sent).toEqual([]);
       const unreported = await prisma.storageUsageHourly.findMany({
         where: { organizationId, reportedAt: null },
       });
-      expect(unreported).toEqual([]);
+      expect(unreported).toHaveLength(2);
+    });
+
+    it("trips the circuit-breaker alarm after repeated failures", async () => {
+      const organizationId = await orgWithHours("authfail_breaker", [
+        { hoursAgo: 2, megabytes: 100 },
+      ]);
+      const { service, alerts } = makeReporter({ authOrConfigError: true });
+
+      // Each run fails on the oldest hour and records a failure; after
+      // MAX_CONSECUTIVE_REPORT_FAILURES runs the breaker alarms.
+      for (let i = 0; i < 5; i++) {
+        await service.reportForOrg({ organizationId, at });
+      }
+
+      expect(alerts.some((a) => a.kind === "circuit-breaker")).toBe(true);
     });
   });
 
