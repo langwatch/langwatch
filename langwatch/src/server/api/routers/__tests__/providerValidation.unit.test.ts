@@ -2,12 +2,27 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MASKED_KEY_PLACEHOLDER } from "../../../../utils/constants";
 import {
   ProviderUnreachableError,
+  type ValidationResult,
   validateProviderApiKey,
 } from "../providerValidation";
 
 // Mock fetch globally
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
+
+/**
+ * The code a refusal carries, or `undefined` when the key was accepted.
+ *
+ * Asserted on instead of prose throughout: the code is the contract, while the
+ * sentence a customer reads is the registry's and is free to be reworded
+ * without any of these tests being about it.
+ */
+const codeOf = (result: ValidationResult): string | undefined =>
+  result.valid ? undefined : result.domainError.code;
+
+/** Everything a refusal puts on the wire, for the tests that assert absence. */
+const wireOf = (result: ValidationResult): string =>
+  result.valid ? "" : JSON.stringify(result.domainError);
 
 describe("validateProviderApiKey", () => {
   beforeEach(() => {
@@ -109,8 +124,8 @@ describe("validateProviderApiKey", () => {
       });
 
       expect(result.valid).toBe(false);
-      expect(result.error).toContain("Invalid API key");
-      expect(result.error).not.toContain("network");
+      expect(codeOf(result)).toBe("provider_key_invalid");
+      expect(codeOf(result)).not.toBe("provider_unreachable");
     });
 
     it("raises an unreachable-provider error only when the fetch itself fails", async () => {
@@ -173,7 +188,7 @@ describe("validateProviderApiKey", () => {
       });
 
       expect(result.valid).toBe(false);
-      expect(result.error).toContain("Invalid API key");
+      expect(codeOf(result)).toBe("provider_key_invalid");
     });
 
     it("returns error for 403 forbidden", async () => {
@@ -187,7 +202,7 @@ describe("validateProviderApiKey", () => {
       });
 
       expect(result.valid).toBe(false);
-      expect(result.error).toContain("Invalid API key");
+      expect(codeOf(result)).toBe("provider_key_invalid");
     });
 
     it("returns error for other HTTP errors", async () => {
@@ -201,7 +216,7 @@ describe("validateProviderApiKey", () => {
       });
 
       expect(result.valid).toBe(false);
-      expect(result.error).toContain("API validation failed (500)");
+      expect(codeOf(result)).toBe("provider_refused");
     });
 
     it("raises an unreachable-provider error on network failure", async () => {
@@ -282,7 +297,7 @@ describe("validateProviderApiKey", () => {
       });
 
       expect(result.valid).toBe(false);
-      expect(result.error).toContain("Invalid API key");
+      expect(codeOf(result)).toBe("provider_key_invalid");
     });
 
     it("uses custom base URL when provided", async () => {
@@ -334,7 +349,7 @@ describe("validateProviderApiKey", () => {
       });
 
       expect(result.valid).toBe(false);
-      expect(result.error).toContain("Invalid API key");
+      expect(codeOf(result)).toBe("provider_key_invalid");
     });
   });
 
@@ -394,14 +409,12 @@ describe("validateProviderApiKey", () => {
         });
 
         expect(result.valid).toBe(false);
-        expect(result.error).toContain("Generative Language API");
-        expect(result.error).toContain("enable");
+        expect(codeOf(result)).toBe("provider_service_disabled");
         // With the Generative Language API disabled on the project, this key
         // cannot answer here until it is enabled — and the alternative is a
         // separate Vertex AI provider, which takes a service account rather
         // than this key.
-        expect(result.error).toContain("Vertex AI");
-        expect(result.error).not.toContain("Invalid API key");
+        expect(codeOf(result)).not.toBe("provider_key_invalid");
       });
     });
 
@@ -422,9 +435,8 @@ describe("validateProviderApiKey", () => {
         });
 
         expect(result.valid).toBe(false);
-        expect(result.error).toContain("restriction");
-        expect(result.error).toContain("Vertex AI");
-        expect(result.error).not.toContain("Invalid API key");
+        expect(codeOf(result)).toBe("provider_key_restricted");
+        expect(codeOf(result)).not.toBe("provider_key_invalid");
       });
     });
 
@@ -443,8 +455,8 @@ describe("validateProviderApiKey", () => {
         });
 
         expect(result.valid).toBe(false);
-        expect(result.error).toContain("restriction");
-        expect(result.error).not.toContain("Invalid API key");
+        expect(codeOf(result)).toBe("provider_key_restricted");
+        expect(codeOf(result)).not.toBe("provider_key_invalid");
       });
     });
 
@@ -503,11 +515,9 @@ describe("validateProviderApiKey", () => {
         });
 
         expect(result.valid).toBe(false);
-        expect(result.error).toContain("restriction");
-        expect(result.error).toContain("Vertex AI");
-        expect(result.error).not.toContain("Invalid API key");
+        expect(codeOf(result)).toBe("provider_key_restricted");
+        expect(codeOf(result)).not.toBe("provider_key_invalid");
         // "forbidden" is what a details[]-blind parser would surface.
-        expect(result.error).not.toContain("forbidden");
       });
     });
 
@@ -528,13 +538,21 @@ describe("validateProviderApiKey", () => {
         });
 
         expect(result.valid).toBe(false);
-        expect(result.error).toContain("Invalid API key");
+        expect(codeOf(result)).toBe("provider_key_invalid");
       });
     });
 
     describe("given a non-Gemini provider explains the refusal", () => {
-      /** @scenario "A refusal carries the provider's own explanation" */
-      it("surfaces the OpenAI message", async () => {
+      /**
+       * The provider's sentence is read — it still decides how a refusal
+       * ranks — but it is logged and dropped, never carried. A
+       * rejected-credential body is exactly where the credential turns up:
+       * OpenAI writes the key it rejected into this field. `llm_upstream_error`
+       * once relayed it and was reversed for that reason; see the note on
+       * `ALLOWED_PER_CODE` in `features/errors/.../presentation.unit.test.ts`.
+       */
+      /** @scenario "A refusal is explained in our own words, not the provider's" */
+      it("does not put OpenAI's sentence on the wire", async () => {
         respondWith(401, {
           error: {
             message: "Incorrect API key provided. You can find your API key at",
@@ -546,11 +564,12 @@ describe("validateProviderApiKey", () => {
           OPENAI_API_KEY: "sk-wrong",
         });
 
-        expect(result.valid).toBe(false);
-        expect(result.error).toContain("Incorrect API key provided");
+        expect(codeOf(result)).toBe("provider_key_invalid");
+        expect(wireOf(result)).not.toContain("Incorrect API key provided");
       });
 
-      it("surfaces the Anthropic message", async () => {
+      /** @scenario "A refusal is explained in our own words, not the provider's" */
+      it("does not put Anthropic's sentence on the wire", async () => {
         respondWith(401, {
           type: "error",
           error: { type: "authentication_error", message: "invalid x-api-key" },
@@ -560,14 +579,15 @@ describe("validateProviderApiKey", () => {
           ANTHROPIC_API_KEY: "sk-ant-wrong",
         });
 
-        expect(result.valid).toBe(false);
-        expect(result.error).toContain("invalid x-api-key");
+        expect(codeOf(result)).toBe("provider_key_invalid");
+        expect(wireOf(result)).not.toContain("invalid x-api-key");
       });
 
-      it("surfaces the ElevenLabs message", async () => {
-        // Deliberately unlike INVALID_KEY_MESSAGE: a message that merely
-        // repeats our own fallback wording would pass even if the detail
-        // were never read, which is the one branch this covers.
+      /** @scenario "A refusal is explained in our own words, not the provider's" */
+      it("does not put the ElevenLabs sentence on the wire", async () => {
+        // `detail` rather than `error`: ElevenLabs nests its message
+        // differently, and this is the branch that proves the reader handles
+        // that shape without the sentence then escaping.
         respondWith(401, {
           detail: {
             status: "invalid_api_key",
@@ -580,12 +600,12 @@ describe("validateProviderApiKey", () => {
           ELEVENLABS_API_KEY: "sk_wrong",
         });
 
-        expect(result.valid).toBe(false);
-        expect(result.error).toContain("not associated with a workspace");
+        expect(codeOf(result)).toBe("provider_key_invalid");
+        expect(wireOf(result)).not.toContain("not associated with a workspace");
       });
 
       /** @scenario A provider server error is not reported as a bad key */
-      it("keeps the status code when the provider is failing", async () => {
+      it("blames the provider, not the key, when the provider is failing", async () => {
         respondWith(500, { error: { message: "upstream is on fire" } });
 
         const result = await validateProviderApiKey("openai", {
@@ -593,14 +613,17 @@ describe("validateProviderApiKey", () => {
         });
 
         expect(result.valid).toBe(false);
-        expect(result.error).toContain("API validation failed (500)");
-        expect(result.error).toContain("upstream is on fire");
-        expect(result.error).not.toContain("Invalid API key");
+        expect(codeOf(result)).toBe("provider_refused");
+        expect(codeOf(result)).not.toBe("provider_key_invalid");
+        // The status is a fact from a known set, so it travels; the
+        // provider's prose beside it does not.
+        expect(wireOf(result)).toContain("500");
+        expect(wireOf(result)).not.toContain("upstream is on fire");
       });
     });
 
     describe("given the refusal has no readable explanation", () => {
-      /** @scenario "A refusal with no readable explanation falls back to the generic message" */
+      /** @scenario "A refusal with no readable explanation says the same thing" */
       it("falls back to the invalid key message when the body is not JSON", async () => {
         mockFetch.mockResolvedValueOnce({
           ok: false,
@@ -613,7 +636,7 @@ describe("validateProviderApiKey", () => {
         });
 
         expect(result.valid).toBe(false);
-        expect(result.error).toContain("Invalid API key");
+        expect(codeOf(result)).toBe("provider_key_invalid");
       });
 
       it("falls back when the body cannot be read at all", async () => {
@@ -630,13 +653,13 @@ describe("validateProviderApiKey", () => {
         });
 
         expect(result.valid).toBe(false);
-        expect(result.error).toContain("Invalid API key");
+        expect(codeOf(result)).toBe("provider_key_invalid");
       });
     });
 
     describe("given the provider echoes the submitted key back", () => {
       /** @scenario "A refusal never repeats the submitted API key" */
-      it("hides the key from the message shown to the customer", async () => {
+      it("hides the key from everything the customer's browser receives", async () => {
         const apiKey = "AIzaSySuperSecretKeyValue123456789";
         respondWith(400, {
           error: { message: `API key not valid: ${apiKey} was rejected` },
@@ -647,7 +670,9 @@ describe("validateProviderApiKey", () => {
         });
 
         expect(result.valid).toBe(false);
-        expect(result.error).not.toContain(apiKey);
+        // The whole serialized payload, not one field: the key must not be in
+        // `meta`, in `tips`, or in a `reasons` entry either.
+        expect(wireOf(result)).not.toContain(apiKey);
       });
     });
   });
@@ -794,9 +819,10 @@ describe("validateProviderApiKey", () => {
         GEMINI_API_KEY: "AIzaSyPlainlyInvalid",
       });
 
-      expect(result.error).toBe(
-        "Invalid API key. Please check your API key and try again.",
-      );
+      expect(codeOf(result)).toBe("provider_key_invalid");
+      // The vaguer surface answered first and said nothing mappable; the
+      // canonical `API_KEY_INVALID` still decides the verdict.
+      expect(wireOf(result)).not.toContain("Please pass a valid API key");
     });
 
     /**
@@ -836,8 +862,8 @@ describe("validateProviderApiKey", () => {
       });
 
       expect(result.valid).toBe(false);
-      expect(result.error).toContain("Generative Language API");
-      expect(result.error).not.toContain("Invalid API key");
+      expect(codeOf(result)).toBe("provider_service_disabled");
+      expect(codeOf(result)).not.toBe("provider_key_invalid");
     });
 
     /** @scenario A provider with one documented auth shape is probed once */
@@ -879,8 +905,8 @@ describe("validateProviderApiKey", () => {
       });
 
       expect(result.valid).toBe(false);
-      expect(result.error).not.toContain(encoded);
-      expect(result.error).not.toContain(apiKey);
+      expect(wireOf(result)).not.toContain(encoded);
+      expect(wireOf(result)).not.toContain(apiKey);
     });
   });
 

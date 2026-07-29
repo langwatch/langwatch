@@ -1,4 +1,8 @@
-import { HandledError } from "@langwatch/handled-error";
+import {
+  HandledError,
+  type SerializedHandledError,
+} from "@langwatch/handled-error";
+import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
 import {
   providerApiRoots,
@@ -8,8 +12,22 @@ import { MASKED_KEY_PLACEHOLDER } from "../../../utils/constants";
 import { ModelProviderRepository } from "../../modelProviders/modelProvider.repository";
 import { modelProviders } from "../../modelProviders/registry";
 
-/** Validation result returned by all validation functions */
-export type ValidationResult = { valid: boolean; error?: string };
+/**
+ * The answer to "does this credential work".
+ *
+ * A refusal travels as a serialized `HandledError`, not as a sentence. It is
+ * still a RETURN value rather than a throw — asking a provider and being told
+ * no is a successful question, and ADR-045 reserves throwing for the absence
+ * of an answer — but the words the customer reads come from the code-keyed
+ * registry in `features/errors`, the same as every other failure in the app.
+ *
+ * The shape follows `target_result.domainError`: a handled error carried on a
+ * payload rather than off a transport envelope, read back with
+ * `explainSerializedError`.
+ */
+export type ValidationResult =
+  | { valid: true }
+  | { valid: false; domainError: SerializedHandledError };
 
 /**
  * Authentication strategy for API key validation.
@@ -59,53 +77,118 @@ function buildModelsEndpointUrl(
   return normalized.endsWith("/models") ? normalized : `${normalized}/models`;
 }
 
-const INVALID_KEY_MESSAGE =
-  "Invalid API key. Please check your API key and try again.";
-
-/** Longest upstream explanation we pass through to the customer. */
-const MAX_UPSTREAM_DETAIL_LENGTH = 300;
-
-const GEMINI_RESTRICTION_MESSAGE =
-  "This key's restrictions block this request. Allow it in the Google Cloud console, then try again.";
+const logger = createLogger("langwatch:api:providerValidation");
 
 /**
- * Google answers a refused key with a machine-readable `reason`, and only
- * `API_KEY_INVALID` actually means the key is wrong. The rest are project or
- * key-restriction problems that generating a new key will never fix, so they
- * get an explanation the customer can act on instead.
+ * Every way a credential check can fail, as a coded handled error.
  *
- * This provider is Google AI Studio, at generativelanguage.googleapis.com. A
- * key minted in the Google Cloud console (Agent Platform, Vertex) reaches that
- * host without the API enabled for it, so the refusals below are where a
- * Google Cloud customer lands — and they need the Vertex AI provider, which
- * takes a service account rather than a key. Saying so here is the only place
- * they find out.
+ * None of these carry the provider's own sentence, in any field. A handled
+ * error's `message` is NOT private — the REST boundary sends
+ * `{ error: code, message }` verbatim (`app/api/middleware/error-handler.ts`)
+ * — so "server-side only" is not a property `message` has, and an upstream
+ * refusal is precisely the text that quotes the request back: an OpenAI 401
+ * body reads `Incorrect API key provided: sk-proj-…`, and for Gemini the
+ * request carries the key in its query string.
  *
- * @see https://cloud.google.com/apis/design/errors
+ * Relaying it through `meta.message` is not the way round this either. That
+ * channel exists and is allowlisted per code, but a model provider's rejection
+ * was tried there as `llm_upstream_error` and removed for this exact reason —
+ * see the note on `ALLOWED_PER_CODE` in
+ * `features/errors/logic/__tests__/presentation.unit.test.ts`.
+ *
+ * So the provider's words go to `logger` beside the throw, where the doc says
+ * they belong, and the customer reads this code's entry in
+ * `features/errors/logic/presentation.ts`.
  */
-const GEMINI_REASON_MESSAGES: Record<string, string> = {
-  API_KEY_INVALID: INVALID_KEY_MESSAGE,
-  SERVICE_DISABLED:
-    "This key's Google Cloud project does not have the Generative Language API enabled. Enable it in the Google Cloud console, or configure a separate Vertex AI provider with service-account credentials.",
-  API_KEY_SERVICE_BLOCKED:
-    "This key's API restrictions exclude the Generative Language API. Allow it in the Google Cloud console, or configure a separate Vertex AI provider with service-account credentials.",
-  API_KEY_HTTP_REFERRER_BLOCKED: GEMINI_RESTRICTION_MESSAGE,
-  API_KEY_IP_ADDRESS_BLOCKED: GEMINI_RESTRICTION_MESSAGE,
-  API_KEY_ANDROID_APP_BLOCKED: GEMINI_RESTRICTION_MESSAGE,
-  API_KEY_IOS_APP_BLOCKED: GEMINI_RESTRICTION_MESSAGE,
-};
 
-const UNREACHABLE_MESSAGE =
-  "Could not reach the provider to check this API key.";
+/** The provider positively identified the credential itself as wrong. */
+export class ProviderKeyInvalidError extends HandledError {
+  constructor({ provider }: { provider: string }) {
+    super("provider_key_invalid", `${provider} rejected the API key`, {
+      fault: "customer",
+      httpStatus: 400,
+      meta: { provider },
+    });
+  }
+}
+
+/** The credential is fine; the API it needs is switched off for its project. */
+export class ProviderServiceDisabledError extends HandledError {
+  constructor({ provider }: { provider: string }) {
+    super(
+      "provider_service_disabled",
+      `${provider} reports the required API is not enabled`,
+      {
+        fault: "customer",
+        httpStatus: 403,
+        meta: { provider },
+        tips: [
+          "Enable the Generative Language API in the Google Cloud console.",
+          "Or configure a Vertex AI provider, which uses service-account credentials.",
+        ],
+      },
+    );
+  }
+}
+
+/**
+ * The credential exists but its own restrictions refuse this call.
+ *
+ * `reason` is a discriminant from a set Google enumerates, not free text, so
+ * it is safe to carry and to branch copy on.
+ */
+export class ProviderKeyRestrictedError extends HandledError {
+  constructor({ provider, reason }: { provider: string; reason: string }) {
+    super(
+      "provider_key_restricted",
+      `${provider} refused the API key (${reason})`,
+      {
+        fault: "customer",
+        httpStatus: 403,
+        meta: { provider, reason },
+        tips: ["Adjust the key's restrictions in the Google Cloud console."],
+      },
+    );
+  }
+}
+
+/**
+ * The provider answered, refused, and did not say anything we can map.
+ *
+ * `fault: "provider"` because a 429 or a 503 is theirs, not the customer's,
+ * and the status is the one fact worth carrying — a number from a known set
+ * rather than a sentence.
+ */
+export class ProviderRefusedError extends HandledError {
+  constructor({ provider, status }: { provider: string; status: number }) {
+    super(
+      "provider_refused",
+      `${provider} refused the credential check with ${status}`,
+      {
+        fault: "provider",
+        httpStatus: 502,
+        meta: { provider, status },
+      },
+    );
+  }
+}
+
+/** There was no credential to check — nothing stored, nothing in the env. */
+export class ProviderKeyMissingError extends HandledError {
+  constructor({ provider }: { provider: string }) {
+    super("provider_key_missing", `No API key stored for ${provider}`, {
+      fault: "customer",
+      httpStatus: 400,
+      meta: { provider },
+    });
+  }
+}
 
 /**
  * The probe never reached the provider, so nothing was learned about the key.
  *
- * This is a genuine failure rather than a validation result: a refused key is
- * an answer, an unreachable provider is the absence of one. Raising it as a
- * handled error puts it on the same channel as every other failure — a stable
- * `code`, a `fault` that says whose problem it is, and tips — instead of a
- * bare sentence assembled at the call site.
+ * The one failure here that is thrown rather than returned: a refused key is
+ * an answer, an unreachable provider is the absence of one.
  */
 export class ProviderUnreachableError extends HandledError {
   constructor({
@@ -122,21 +205,70 @@ export class ProviderUnreachableError extends HandledError {
         ]
       : ["Check your network connection."];
 
-    super("provider_unreachable", UNREACHABLE_MESSAGE, {
-      fault: "provider",
-      httpStatus: 502,
-      // A handled error's own message never crosses the tRPC boundary — the
-      // formatter replaces it with the code (ADR-045) — so the words a
-      // customer reads come from this code's entry in the client presentation
-      // registry, not from here. `hasConfigurableEndpoint` is in `meta`
-      // because that entry branches on it: only some providers have a base URL
-      // there is any point telling someone to check. `tips` stays structured
-      // for the API, CLI and MCP consumers that read it as data.
-      meta: { provider, hasConfigurableEndpoint },
-      tips,
-    });
+    super(
+      "provider_unreachable",
+      `Could not reach ${provider} to check the API key`,
+      {
+        fault: "provider",
+        httpStatus: 502,
+        // `hasConfigurableEndpoint` is in `meta` because the registry entry
+        // branches on it: only some providers have a base URL there is any
+        // point telling someone to check.
+        meta: { provider, hasConfigurableEndpoint },
+        tips,
+      },
+    );
   }
 }
+
+/** Longest upstream explanation we keep for the server-side log line. */
+const MAX_UPSTREAM_DETAIL_LENGTH = 300;
+
+/**
+ * Google answers a refused key with a machine-readable `reason`, and only
+ * `API_KEY_INVALID` actually means the key is wrong. The rest are project or
+ * key-restriction problems that generating a new key will never fix.
+ *
+ * This provider is Google AI Studio, at generativelanguage.googleapis.com. A
+ * key minted in the Google Cloud console (Agent Platform, Vertex) reaches that
+ * host without the API enabled for it, so these refusals are where a Google
+ * Cloud customer lands — and they need the Vertex AI provider, which takes a
+ * service account rather than a key.
+ *
+ * @see https://cloud.google.com/apis/design/errors
+ */
+const GEMINI_REASON_ERRORS: Record<
+  string,
+  (args: { provider: string }) => HandledError
+> = {
+  API_KEY_INVALID: (args) => new ProviderKeyInvalidError(args),
+  SERVICE_DISABLED: (args) => new ProviderServiceDisabledError(args),
+  API_KEY_SERVICE_BLOCKED: (args) =>
+    new ProviderKeyRestrictedError({
+      ...args,
+      reason: "API_KEY_SERVICE_BLOCKED",
+    }),
+  API_KEY_HTTP_REFERRER_BLOCKED: (args) =>
+    new ProviderKeyRestrictedError({
+      ...args,
+      reason: "API_KEY_HTTP_REFERRER_BLOCKED",
+    }),
+  API_KEY_IP_ADDRESS_BLOCKED: (args) =>
+    new ProviderKeyRestrictedError({
+      ...args,
+      reason: "API_KEY_IP_ADDRESS_BLOCKED",
+    }),
+  API_KEY_ANDROID_APP_BLOCKED: (args) =>
+    new ProviderKeyRestrictedError({
+      ...args,
+      reason: "API_KEY_ANDROID_APP_BLOCKED",
+    }),
+  API_KEY_IOS_APP_BLOCKED: (args) =>
+    new ProviderKeyRestrictedError({
+      ...args,
+      reason: "API_KEY_IOS_APP_BLOCKED",
+    }),
+};
 
 /** The refusal as the provider described it, once we can read it. */
 type UpstreamRefusal = { message?: string; reason?: string };
@@ -253,28 +385,36 @@ function geminiReasonRefusal({
 }): RankedFailure | undefined {
   if (provider !== "gemini" || !reason) return undefined;
 
-  const known = GEMINI_REASON_MESSAGES[reason];
-  if (!known) return undefined;
+  const build = GEMINI_REASON_ERRORS[reason];
+  if (!build) return undefined;
 
-  return {
-    valid: false,
-    error: known,
-    // Only a reason naming something else is worth outranking the
-    // provider's own verdict that the key itself is wrong.
-    rank:
-      known === INVALID_KEY_MESSAGE
-        ? FAILURE_RANK.definitive
-        : FAILURE_RANK.actionable,
-  };
+  const error = build({ provider });
+
+  return refusal(
+    error,
+    // Only a reason naming something else is worth outranking the provider's
+    // own verdict that the key itself is wrong.
+    error.code === "provider_key_invalid"
+      ? FAILURE_RANK.definitive
+      : FAILURE_RANK.actionable,
+  );
+}
+
+/** A refusal, ranked by how much it tells the customer. */
+function refusal(error: HandledError, rank: number): RankedFailure {
+  return { valid: false, domainError: error.serialize(), rank };
 }
 
 /**
- * Turns an HTTP failure into a message the customer can act on, preferring
- * the provider's own explanation over our guess about what went wrong.
+ * Turns an HTTP failure into the coded error that best describes it.
+ *
+ * The provider's own sentence is read, logged, and then dropped. It still
+ * decides how a refusal RANKS — a shape that explained itself is a better
+ * answer than one that did not — but it never travels, on any field.
  *
  * @param response - The fetch Response object
  * @param context - Which provider was probed, and with which key
- * @returns ValidationResult with error message
+ * @returns The refusal, ranked
  */
 async function handleHttpError({
   response,
@@ -286,6 +426,19 @@ async function handleHttpError({
   const { message, reason } = await readUpstreamRefusal(
     response,
     context.apiKey,
+  );
+
+  // The one place the provider's own words are kept. Redacted at the point of
+  // reading, because this is a log and the key is what it would otherwise
+  // quote back; the customer never sees this line either way.
+  logger.info(
+    {
+      provider: context.provider,
+      status: response.status,
+      reason,
+      upstreamMessage: message,
+    },
+    "provider refused a credential check",
   );
 
   const fromReason = geminiReasonRefusal({
@@ -301,22 +454,19 @@ async function handleHttpError({
     (context.provider === "gemini" && response.status === 400);
 
   if (isAuthFailure) {
-    return {
-      valid: false,
-      error: message
-        ? `${INVALID_KEY_MESSAGE} ${message}`
-        : INVALID_KEY_MESSAGE,
-      rank: message ? FAILURE_RANK.explained : FAILURE_RANK.generic,
-    };
+    return refusal(
+      new ProviderKeyInvalidError({ provider: context.provider }),
+      message ? FAILURE_RANK.explained : FAILURE_RANK.generic,
+    );
   }
 
-  return {
-    valid: false,
-    error: message
-      ? `API validation failed (${response.status}). ${message}`
-      : `API validation failed (${response.status}). Please check your credentials.`,
-    rank: FAILURE_RANK.explained,
-  };
+  return refusal(
+    new ProviderRefusedError({
+      provider: context.provider,
+      status: response.status,
+    }),
+    FAILURE_RANK.explained,
+  );
 }
 
 /**
@@ -456,18 +606,81 @@ const FAILURE_RANK = {
   unreachable: 4,
 } as const;
 
-type RankedFailure = ValidationResult & { rank: number };
+type RankedFailure = {
+  valid: false;
+  domainError: SerializedHandledError;
+  rank: number;
+};
 
-/** Picks the refusal worth showing, keeping the first of equally useful ones. */
-function mostInformativeFailure(failures: RankedFailure[]): RankedFailure {
-  return failures.reduce<RankedFailure>(
-    (chosen, failure) => (failure.rank < chosen.rank ? failure : chosen),
-    failures[0] ?? {
-      valid: false,
-      error: INVALID_KEY_MESSAGE,
-      rank: FAILURE_RANK.generic,
-    },
+/**
+ * Picks the refusal worth showing, keeping the first of equally useful ones.
+ *
+ * Undefined for an empty list rather than a manufactured verdict. Nothing was
+ * asked, so there is nothing to report about the key — the caller turns that
+ * into `ProviderUnreachableError`. An earlier version defaulted to "invalid
+ * API key" here, which is the one answer that is certainly wrong when no
+ * request was made, and the exact misdiagnosis this module exists to remove.
+ */
+function mostInformativeFailure(
+  failures: RankedFailure[],
+): RankedFailure | undefined {
+  return failures.reduce<RankedFailure | undefined>(
+    (chosen, failure) =>
+      !chosen || failure.rank < chosen.rank ? failure : chosen,
+    undefined,
   );
+}
+
+/** The request never landed, so this says nothing about the key itself. */
+function unreachableFailure(context: ProbeContext): RankedFailure {
+  return refusal(
+    new ProviderUnreachableError({
+      provider: context.provider,
+      hasConfigurableEndpoint: context.hasConfigurableEndpoint,
+    }),
+    FAILURE_RANK.unreachable,
+  );
+}
+
+/**
+ * One auth shape, asked once: accepted, refused, or never answered.
+ *
+ * Only the request is guarded. Reading the refusal happens outside the
+ * `catch`, because the two failures mean opposite things: a throw from
+ * `fetch` is the request not landing, while a throw from `handleHttpError` is
+ * a bug in our own parsing of a response we did get. Catching both told the
+ * customer to check their network connection for a host that had answered
+ * perfectly well, and hid the defect completely.
+ */
+async function probeOnce({
+  candidate,
+  context,
+  deadline,
+}: {
+  candidate: ProbeRequest;
+  context: ProbeContext;
+  deadline: AbortSignal;
+}): Promise<
+  | { accepted: true; failure?: undefined }
+  | { accepted: false; failure: RankedFailure }
+> {
+  let response: Response;
+  try {
+    response = await fetch(candidate.url, {
+      method: "GET",
+      headers: candidate.headers,
+      signal: deadline,
+    });
+  } catch {
+    return { accepted: false, failure: unreachableFailure(context) };
+  }
+
+  if (response.ok) return { accepted: true };
+
+  return {
+    accepted: false,
+    failure: await handleHttpError({ response, context }),
+  };
 }
 
 /**
@@ -494,64 +707,42 @@ async function runProbeChain({
   // remaining shapes do not get.
   const deadline = AbortSignal.timeout(PROBE_BUDGET_MS);
 
-  /** The request never landed, so this says nothing about the key itself. */
-  const unreachable = (): RankedFailure => ({
-    valid: false,
-    error: UNREACHABLE_MESSAGE,
-    rank: FAILURE_RANK.unreachable,
-  });
-
   for (const candidate of candidates) {
     if (deadline.aborted) {
-      failures.push(unreachable());
+      failures.push(unreachableFailure(context));
       break;
     }
 
-    // Only the request itself is guarded. Reading the refusal happens below,
-    // outside the `catch`, because the two failures mean opposite things: a
-    // throw here is the request not landing, while a throw from
-    // `handleHttpError` is a bug in our own parsing of a response we did get.
-    // Catching both told the customer to check their network connection for a
-    // host that had answered perfectly well, and hid the defect completely.
-    let response: Response;
-    try {
-      response = await fetch(candidate.url, {
-        method: "GET",
-        headers: candidate.headers,
-        signal: deadline,
-      });
-    } catch {
-      failures.push(unreachable());
-      continue;
-    }
+    const outcome = await probeOnce({ candidate, context, deadline });
 
-    if (response.ok) {
+    if (outcome.accepted) {
       return { valid: true };
     }
 
-    const failure = await handleHttpError({ response, context });
-    failures.push(failure);
+    failures.push(outcome.failure);
 
     // The provider has positively identified the key as wrong. Asking the
     // remaining shapes cannot change that answer, and each one is another
     // outbound request on this request thread.
-    if (failure.rank === FAILURE_RANK.definitive) {
+    if (outcome.failure.rank === FAILURE_RANK.definitive) {
       break;
     }
   }
 
-  const { rank, ...result } = mostInformativeFailure(failures);
+  const chosen = mostInformativeFailure(failures);
 
-  // Nothing answered, so there is no verdict on the key to report — only a
-  // failure to have asked.
-  if (rank === FAILURE_RANK.unreachable) {
+  // Nothing answered — or nothing was even asked — so there is no verdict on
+  // the key to report, only a failure to have asked. Thrown rather than
+  // returned: every other outcome here is an answer, and this is the absence
+  // of one.
+  if (!chosen || chosen.rank === FAILURE_RANK.unreachable) {
     throw new ProviderUnreachableError({
       provider: context.provider,
       hasConfigurableEndpoint: context.hasConfigurableEndpoint,
     });
   }
 
-  return result;
+  return { valid: false, domainError: chosen.domainError };
 }
 
 /**
@@ -600,7 +791,7 @@ export async function validateKeyWithCustomUrl(
   if (!apiKey) {
     return {
       valid: false,
-      error: `No API key found for ${provider}. Please enter an API key.`,
+      domainError: new ProviderKeyMissingError({ provider }).serialize(),
     };
   }
 

@@ -419,6 +419,46 @@ const presentations = {
     describe: () =>
       "It may have been removed, or it isn't available here. Reload to see the current list.",
   },
+  provider_key_invalid: {
+    // The provider positively identified the credential as wrong, which is the
+    // one refusal a new key actually fixes. Deliberately says nothing about
+    // WHY beyond that — the provider's own sentence quotes the request back,
+    // and for Gemini the request carries the key in its query string.
+    title: "That API key was refused",
+    describe: () =>
+      "The provider didn't recognise it. Check you copied the whole key, and that it belongs to the right account.",
+  },
+  provider_key_missing: {
+    title: "No API key to check",
+    describe: () =>
+      "Nothing is stored for this provider yet. Enter a key, then try again.",
+  },
+  provider_key_restricted: {
+    // fault: customer, and fixable — but never by minting a new key, which is
+    // what "invalid" would send them off to do. The reason is a discriminant
+    // from a set Google enumerates, so branching copy on it is safe.
+    title: "This key's restrictions block the request",
+    describe: (error) =>
+      error.meta.reason === "API_KEY_SERVICE_BLOCKED"
+        ? "Its API restrictions exclude the Generative Language API. Allow that API in the Google Cloud console, or set up a Vertex AI provider instead."
+        : "Its application restrictions don't allow a call from our servers. Adjust them in the Google Cloud console, then try again.",
+  },
+  provider_refused: {
+    // fault: provider. It answered and said no, but not in terms we can map —
+    // a 429 or a 503 is theirs to fix, so the copy must not send the customer
+    // hunting through their own key settings.
+    title: "The provider refused the check",
+    describe: () =>
+      "It answered, but wouldn't confirm the key. This is usually temporary — try again in a moment.",
+  },
+  provider_service_disabled: {
+    // The single most useful thing this whole flow says: the key is fine, the
+    // API is switched off for its project. Reported as "invalid API key"
+    // before, which sent Google Cloud customers to mint key after key.
+    title: "That API isn't enabled for this key",
+    describe: () =>
+      "The key works, but its Google Cloud project doesn't have the Generative Language API turned on. Enable it in the console, or set up a Vertex AI provider, which uses service-account credentials.",
+  },
   provider_unreachable: {
     // fault: provider. Nothing answered the credential check, so this says
     // nothing about whether the key is good — the copy must not read as a

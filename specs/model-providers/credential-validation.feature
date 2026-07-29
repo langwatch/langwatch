@@ -244,23 +244,28 @@ Feature: Credential Validation
     When I call validateProviderApiKey for it
     Then I am told the API key is invalid
 
-  @unit
-  Scenario: A refusal carries the provider's own explanation
-    Given a provider rejects the key with an explanation in the response body
-    When I call validateProviderApiKey for it
-    Then the explanation is included in the error I see
+  # A provider's own sentence is never shown. It is the text that quotes the
+  # request back, and a rejected-credential body is where the credential
+  # itself turns up. We say what happened in our own words instead.
 
   @unit
-  Scenario: A refusal with no readable explanation falls back to the generic message
+  Scenario: A refusal is explained in our own words, not the provider's
+    Given a provider rejects the key with an explanation in the response body
+    When I call validateProviderApiKey for it
+    Then I am told the key was refused
+    And the provider's own sentence is not part of what I am told
+
+  @unit
+  Scenario: A refusal with no readable explanation says the same thing
     Given a provider rejects the key with a body that cannot be read or parsed
     When I call validateProviderApiKey for it
-    Then I am told the API key is invalid
+    Then I am told the key was refused
 
   @unit
   Scenario: A refusal never repeats the submitted API key
     Given a provider echoes the submitted API key back in its explanation
     When I call validateProviderApiKey for it
-    Then the key is hidden from the error I see
+    Then the key appears nowhere in what I am told
 
   # tRPC sends queries as GET with their input in the URL, and the input here
   # is the customer's API key. Mutations are audit-logged with their input, so

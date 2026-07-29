@@ -1,6 +1,21 @@
+import type { SerializedHandledError } from "@langwatch/handled-error";
 import { useCallback, useState } from "react";
-import { describeError } from "../features/errors";
+import { describeError, explainSerializedError } from "../features/errors";
 import { api } from "../utils/api";
+
+/**
+ * The refusal, in the words the registry chose for its code.
+ *
+ * A refused credential arrives as a serialized handled error on the result
+ * rather than as a thrown one, so it is read with `explainSerializedError`
+ * instead of `describeError`. Both end at the same registry; only the
+ * transport differs.
+ */
+const describeRefusal = (domainError: SerializedHandledError): string => {
+  const { title, description } = explainSerializedError(domainError);
+
+  return description ? `${title}. ${description}` : title;
+};
 
 /**
  * Hook for validating model provider API keys.
@@ -56,7 +71,7 @@ export function useModelProviderApiKeyValidation(
       });
 
       if (!result.valid) {
-        setValidationError(result.error);
+        setValidationError(describeRefusal(result.domainError));
         return false;
       }
 
@@ -100,7 +115,7 @@ export function useModelProviderApiKeyValidation(
         );
 
         if (!result.valid) {
-          setValidationError(result.error);
+          setValidationError(describeRefusal(result.domainError));
           return false;
         }
 

@@ -39,7 +39,10 @@ vi.mock("../../utils/api", () => ({
 }));
 
 import { TRPCClientError } from "@trpc/client";
-import { ProviderUnreachableError } from "../../server/api/routers/providerValidation";
+import {
+  ProviderKeyRestrictedError,
+  ProviderUnreachableError,
+} from "../../server/api/routers/providerValidation";
 import { errorFormatter } from "../../server/api/trpc";
 import { useModelProviderApiKeyValidation } from "../useModelProviderApiKeyValidation";
 
@@ -98,10 +101,18 @@ describe("useModelProviderApiKeyValidation", () => {
         expect(mockQueryFetch).not.toHaveBeenCalled();
       });
 
+      // A refusal arrives as a serialized handled error on the result, not as
+      // a sentence and not as a throw, so the drawer's words come from the
+      // code's registry entry. Built from the real error class rather than
+      // hand-written, so a code with no entry fails here too.
+      /** @scenario "A refusal is explained in our own words, not the provider's" */
       it("reports the provider's refusal to the caller", async () => {
         mockMutateAsync.mockResolvedValue({
           valid: false,
-          error: "This key's API restrictions exclude something.",
+          domainError: new ProviderKeyRestrictedError({
+            provider: "gemini",
+            reason: "API_KEY_SERVICE_BLOCKED",
+          }).serialize(),
         });
         const { result } = renderValidation();
 
@@ -112,7 +123,13 @@ describe("useModelProviderApiKeyValidation", () => {
 
         expect(valid).toBe(false);
         expect(result.current.validationError).toBe(
-          "This key's API restrictions exclude something.",
+          "This key's restrictions block the request. " +
+            "Its API restrictions exclude the Generative Language API. " +
+            "Allow that API in the Google Cloud console, or set up a " +
+            "Vertex AI provider instead.",
+        );
+        expect(result.current.validationError).not.toContain(
+          "provider_key_restricted",
         );
       });
 

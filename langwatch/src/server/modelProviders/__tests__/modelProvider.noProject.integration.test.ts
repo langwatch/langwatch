@@ -697,7 +697,7 @@ describe("ModelProviderService on an organization with no project (real DB)", ()
           },
           scopes: [{ scopeType: "ORGANIZATION", scopeId: orgId }],
         }),
-      ).rejects.toThrow(/Could not reach the provider/);
+      ).rejects.toThrow(/Could not reach custom/);
 
       expect(fetchCalls.length).toBeGreaterThan(0);
     });
