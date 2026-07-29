@@ -7,7 +7,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { CircleAlert, Equal, Play, Trophy } from "lucide-react";
+import { CircleAlert, Equal, Play, Settings2, Trophy } from "lucide-react";
 import type { MouseEvent, ReactNode } from "react";
 import { Markdown } from "~/components/Markdown";
 import { parseEvaluationResult } from "~/utils/evaluationResults";
@@ -15,10 +15,7 @@ import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import { scrollToTargetColumn } from "../hooks/useOpenTargetEditor";
 import { useTargetName } from "../hooks/useTargetName";
 import type { TargetConfig } from "../types";
-import {
-  explainEvaluatorDomainError,
-  MISSING_MODEL_API_KEY_EXPLANATION,
-} from "../utils/explainEvaluatorDomainError";
+import { explainEvaluatorFailure } from "../utils/explainEvaluatorFailure";
 import {
   labelNamesVariant,
   resolveVerdictLabel,
@@ -63,74 +60,68 @@ function stripBiasPreamble(details: string | undefined): string | undefined {
   return details.replace(/^Call \d+ \([^)]*\):\s*/i, "").trim();
 }
 
-function friendlyError(details: string | undefined): {
-  headline: string;
-  hint?: string;
-  raw?: string;
-} {
-  const raw = details?.trim();
-  if (!raw) return { headline: "Comparison failed" };
-
-  const lower = raw.toLowerCase();
-  if (
-    lower.includes("authenticationerror") ||
-    lower.includes("api key") ||
-    lower.includes("api_key")
-  ) {
-    return { ...MISSING_MODEL_API_KEY_EXPLANATION, raw };
-  }
-  if (
-    lower.includes("rate limit") ||
-    lower.includes("ratelimit") ||
-    lower.includes("429")
-  ) {
-    return {
-      headline: "Judge model rate-limited",
-      hint: "Slow the run down (lower concurrency) or try a different model.",
-      raw,
-    };
-  }
-  if (
-    lower.includes("model not found") ||
-    lower.includes("invalid model") ||
-    lower.includes("does not exist")
-  ) {
-    return {
-      headline: "Judge model not available",
-      hint: "Pick a different model in the evaluator config.",
-      raw,
-    };
-  }
-  if (lower.includes("timeout") || lower.includes("timed out")) {
-    return {
-      headline: "Judge call timed out",
-      hint: "Re-run, or try a faster model.",
-      raw,
-    };
-  }
-  if (
-    lower.includes("waiting on") ||
-    lower.includes("no output for this row") ||
-    lower.includes("missingvariantoutput")
-  ) {
-    const dashIdx = raw.indexOf("—");
-    if (dashIdx > 0) {
-      return {
-        headline: raw.slice(0, dashIdx).trim(),
-        hint: raw.slice(dashIdx + 1).trim(),
-      };
-    }
-    return { headline: raw };
-  }
-  if (lower.includes("missing candidate output")) {
-    return {
-      headline: "One of the candidates is blank",
-      hint: "Its prompt returned an empty string — re-run that prompt or check what it's returning.",
-      raw,
-    };
-  }
-  const lines = raw.split(/\r?\n/);
-  return { headline: lines[0]!, raw: lines.length > 1 ? raw : undefined };
+/**
+ * Shows what came back from the evaluator, as evidence rather than as copy.
+ *
+ * Three things make it safe to show at all. It is ATTRIBUTED — the label says
+ * whose words these are, so a gateway's "Missing Authentication Token" cannot
+ * be mistaken for LangWatch telling the user their token is missing, which is
+ * exactly how it read before. It is QUARANTINED — monospace, muted, its own
+ * bordered block, deliberately not rendered through `Markdown` like the rest of
+ * the cell, so nothing in the response can style itself into looking like our
+ * interface. And it is SECONDARY — our headline and hint say what to do; this
+ * is for whoever is debugging the endpoint they built.
+ *
+ * Shown inline rather than only behind a click: the response is often the only
+ * thing that identifies the failure, and a person staring at a column of
+ * identical cells should not have to click each one to find out they are all
+ * the same. Clamped to three lines, with the whole thing in the popover.
+ */
+function UpstreamResponse({ raw }: { raw: string }) {
+  return (
+    <VStack align="stretch" gap={0.5} marginTop={0.5}>
+      <Text fontSize="10px" color="fg.subtle" textTransform="uppercase">
+        The evaluator returned
+      </Text>
+      <Popover.Root>
+        <Popover.Trigger asChild>
+          <Box
+            as="button"
+            textAlign="left"
+            bg="bg.subtle"
+            borderWidth="1px"
+            borderColor="border.subtle"
+            borderRadius="sm"
+            px={1.5}
+            py={1}
+            fontFamily="mono"
+            fontSize="11px"
+            color="fg.muted"
+            lineClamp={3}
+            whiteSpace="pre-wrap"
+            wordBreak="break-word"
+            data-testid="comparison-error-upstream"
+          >
+            {raw}
+          </Box>
+        </Popover.Trigger>
+        <Popover.Positioner>
+          <Popover.Content maxWidth="460px">
+            <Popover.Arrow />
+            <Popover.Body
+              fontSize="12px"
+              fontFamily="mono"
+              whiteSpace="pre-wrap"
+              wordBreak="break-word"
+              data-testid="comparison-error-details"
+            >
+              {raw}
+            </Popover.Body>
+          </Popover.Content>
+        </Popover.Positioner>
+      </Popover.Root>
+    </VStack>
+  );
 }
 
 /**
@@ -266,25 +257,31 @@ export function ComparisonCell({
   }
 
   if (parsed.status === "error") {
-    const domainExplanation = parsed.domainError
-      ? explainEvaluatorDomainError(parsed.domainError)
-      : null;
-    const { headline, hint, raw } = domainExplanation
-      ? {
-          ...domainExplanation,
-          raw: parsed.details?.trim(),
-        }
-      : friendlyError(parsed.details);
+    const { headline, hint, tone, raw } = explainEvaluatorFailure({
+      error: parsed.domainError,
+      details: parsed.details,
+    });
+    // A configuration problem is not an alarm. It is still recorded and counted
+    // exactly as before — only the paint changes, so a grid the user has to go
+    // and configure stops reading as a grid that broke.
+    const isConfiguration = tone === "configuration";
     return withRunAction(
       <Box
         p={2}
-        bg="red.subtle"
-        color="red.fg"
+        bg={isConfiguration ? "bg.muted" : "red.subtle"}
+        color={isConfiguration ? "fg" : "red.fg"}
         borderRadius="md"
+        borderWidth={isConfiguration ? "1px" : undefined}
+        borderColor={isConfiguration ? "border" : undefined}
         fontSize="13px"
       >
         <HStack gap={1.5} align="start">
-          <Icon as={CircleAlert} boxSize="14px" marginTop="2px" />
+          <Icon
+            as={isConfiguration ? Settings2 : CircleAlert}
+            boxSize="14px"
+            marginTop="2px"
+            color={isConfiguration ? "fg.muted" : undefined}
+          />
           <VStack align="stretch" gap={0.5}>
             <Text fontWeight="medium">{headline}</Text>
             {hint ? (
@@ -292,33 +289,7 @@ export function ComparisonCell({
                 {hint}
               </Text>
             ) : null}
-            {raw ? (
-              <Popover.Root>
-                <Popover.Trigger asChild>
-                  <Box
-                    as="button"
-                    textAlign="left"
-                    color="fg.muted"
-                    textDecoration="underline"
-                    fontSize="11px"
-                  >
-                    show details
-                  </Box>
-                </Popover.Trigger>
-                <Popover.Positioner>
-                  <Popover.Content maxWidth="460px">
-                    <Popover.Arrow />
-                    <Popover.Body
-                      fontSize="12px"
-                      whiteSpace="pre-wrap"
-                      data-testid="comparison-error-details"
-                    >
-                      {raw}
-                    </Popover.Body>
-                  </Popover.Content>
-                </Popover.Positioner>
-              </Popover.Root>
-            ) : null}
+            {raw ? <UpstreamResponse raw={raw} /> : null}
           </VStack>
         </HStack>
       </Box>,

@@ -8,7 +8,11 @@ import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { TargetConfig } from "../../types";
-import { MISSING_MODEL_API_KEY_EXPLANATION } from "../../utils/explainEvaluatorDomainError";
+import {
+  MISSING_MODEL_API_KEY,
+  REFUSED_BY_ENDPOINT,
+  UNRECOGNISED_FAILURE,
+} from "../../utils/explainEvaluatorFailure";
 import { ComparisonCell } from "../ComparisonCell";
 
 // useTargetName reaches through to tRPC; mock it to resolve each target to a
@@ -117,64 +121,104 @@ describe("ComparisonCell", () => {
           />,
         );
 
+        // The response names no credential — it is AWS API Gateway's wording,
+        // about neither LangWatch nor the model provider — so the cell must NOT
+        // send the reader to the model-key settings page.
         expect(
-          screen.getByText(/missing or invalid model api key/i),
+          screen.getByText(REFUSED_BY_ENDPOINT.headline),
         ).toBeInTheDocument();
-        expect(screen.getByText(/settings.*ai gateway/i)).toBeInTheDocument();
-        // The raw provider payload belongs behind "show details", not in the
-        // headline — locate the popover body by testid rather than Chakra's
-        // private class, which is free to change on a version bump.
-        expect(screen.getByText("show details")).toBeInTheDocument();
         expect(
-          within(screen.getByTestId("comparison-error-details")).getByText(
+          screen.queryByText(MISSING_MODEL_API_KEY.headline),
+        ).not.toBeInTheDocument();
+        // The upstream's own words are shown as attributed evidence, never as
+        // the headline — locate by testid rather than Chakra's private class.
+        expect(screen.getByText(/the evaluator returned/i)).toBeInTheDocument();
+        expect(
+          within(screen.getByTestId("comparison-error-upstream")).getByText(
             /^403/,
+          ),
+        ).toBeInTheDocument();
+      });
+
+      /** @scenario The Comparison cell never renders an upstream sentence as its own headline */
+      it("keeps a raw HTTP body out of the headline when nothing is recognised", () => {
+        wrap(
+          <ComparisonCell
+            result={{
+              status: "error",
+              details: '500 {\n  "message": "Internal server error"\n}',
+            }}
+            variantTargets={variantTargets}
+          />,
+        );
+
+        // The old fallback used the first line, rendering `500 {` as our copy.
+        // Our sentence is the headline; theirs appears only inside the
+        // attributed block (twice — the inline clamp and the popover body).
+        expect(
+          screen.getByText(UNRECOGNISED_FAILURE.headline),
+        ).toBeInTheDocument();
+        expect(
+          within(screen.getByTestId("comparison-error-upstream")).getByText(
+            /^500/,
           ),
         ).toBeInTheDocument();
       });
     });
 
-    // The auth message has two doors into the cell: a structured 401/403 domain
-    // error, and the legacy raw-string heuristic that still serves results
-    // stored before evaluators carried domain errors. Rendering both and
-    // comparing pins them to a single source of truth — a second hard-coded
-    // copy of the strings drifts the first time either one is reworded.
-    describe("when the same auth failure arrives structurally and as raw text", () => {
-      const readAuthCopy = (result: unknown) => {
+    // A refusal reaches the cell two ways: structurally, as a 401/403 handled
+    // error, and as a raw string on results stored before evaluators carried
+    // one. Both must route through the SAME decision, so the copy cannot drift
+    // — what differs is only whether the response named a credential.
+    describe("when the same refusal arrives structurally and as raw text", () => {
+      const readCopy = (result: unknown) => {
         const { unmount } = wrap(
           <ComparisonCell result={result} variantTargets={variantTargets} />,
         );
-        const copy = {
-          headline: screen.getByText(MISSING_MODEL_API_KEY_EXPLANATION.headline)
-            .textContent,
-          hint: screen.getByText(MISSING_MODEL_API_KEY_EXPLANATION.hint)
-            .textContent,
-        };
+        const headline = screen.getByText(
+          new RegExp(
+            `${MISSING_MODEL_API_KEY.headline}|${REFUSED_BY_ENDPOINT.headline}`,
+            "i",
+          ),
+        ).textContent;
         unmount();
-        return copy;
+        return headline;
       };
 
-      it("renders one canonical copy for both", () => {
-        const structural = readAuthCopy({
+      it("says the same thing for the same response, whichever door it came through", () => {
+        const structural = readCopy({
           status: "error",
-          details: '403 {\n  "message": "Missing Authentication Token"\n}',
+          details: "AuthenticationError: bad api key",
           domainError: {
             kind: "evaluator_execution_error",
-            meta: { httpStatus: 403 },
-            telemetry: {},
+            code: "evaluator_execution_error",
+            meta: { httpStatus: 403, reason: "auth_failed" },
+            fault: "customer",
             httpStatus: 502,
             reasons: [],
           },
         });
-        const legacy = readAuthCopy({
+        const legacy = readCopy({
           status: "error",
           details: "AuthenticationError: bad api key",
         });
 
         expect(legacy).toEqual(structural);
-        expect(structural).toEqual({
-          headline: MISSING_MODEL_API_KEY_EXPLANATION.headline,
-          hint: MISSING_MODEL_API_KEY_EXPLANATION.hint,
+        expect(structural).toEqual(MISSING_MODEL_API_KEY.headline);
+      });
+
+      it("names the model key only when the response names one", () => {
+        const named = readCopy({
+          status: "error",
+          details: "AuthenticationError: bad api key",
         });
+        const unnamed = readCopy({
+          status: "error",
+          details: '403 {\n  "message": "Missing Authentication Token"\n}',
+        });
+
+        expect(named).toEqual(MISSING_MODEL_API_KEY.headline);
+        expect(unnamed).toEqual(REFUSED_BY_ENDPOINT.headline);
       });
     });
   });
