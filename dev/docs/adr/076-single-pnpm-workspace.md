@@ -207,9 +207,9 @@ one command and a security pin that reaches every project.
   (`packages/server`, `typescript-sdk`, `agentic-e2e-tests`) — a few kilobytes —
   and by the root lockfile. In exchange it stops carrying a second lockfile that
   could drift from the one the repo develops against.
-- `npx @langwatch/server` installs from the tarball root rather than from
-  `langwatch/`. `specs/npx-installer/` scenarios that describe the install
-  location change with it.
+- `npx @langwatch/server` installs from `app/` inside the tarball — the staged
+  workspace root — rather than from `langwatch/`. `specs/npx-installer/`
+  scenarios that describe the install location change with it.
 
 ## References
 
