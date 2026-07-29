@@ -80,7 +80,20 @@ EXCLUDES=(
   --exclude=test-results
   --exclude=playwright-report
   --exclude=blob-report
-  --exclude=reports
+  # NOT `--exclude=reports`. rsync matches a bare name at ANY depth, and the
+  # app has two real source directories called that —
+  # langwatch/src/server/app-layer/reports (imported by presets.ts) and
+  # langwatch/src/components/analytics/reports. Excluding the name dropped
+  # both, and the published server died at first boot with
+  #   Cannot find module './reports/report-chart.service'
+  # inside the ClickHouse migration, ~20 minutes in. The pattern was carried
+  # over from langwatch/.npmignore, where it was meant for the GDPR report
+  # output directory at langwatch/reports — a runtime artifact that a clean
+  # checkout does not even have.
+  #
+  # Every remaining bare name here was checked against the shipped trees for
+  # the same collision: `test`/`tests` match only genuine test directories,
+  # and `notebooks`/`coverage` match nothing in source.
   --exclude=Dockerfile*
   --exclude=.dockerignore
   --exclude=.github
@@ -192,4 +205,33 @@ if [ -f "$ROOT/langwatch/dist/client/index.html" ]; then
   fi
   rm -f "$listing"
   echo "→ verified: tarball ships the prebuilt langwatch/dist/client"
+fi
+
+# Assert no application source went missing.
+#
+# Two separate exclusion bugs in this script have already shipped a tarball
+# that looked fine and died at first boot ~20 minutes in: a .gitignore in the
+# staged tree stripping dist/, and an rsync `--exclude=reports` matching the
+# name at any depth and taking src/server/app-layer/reports with it. Both were
+# invisible until the smoke job ran the whole stack. Comparing what git tracks
+# against what the tarball carries costs a second and catches the entire class.
+#
+# Only when packing from a git checkout — a published tree has no index.
+if git -C "$ROOT" rev-parse --git-dir >/dev/null 2>&1; then
+  in_tar="$(mktemp)"
+  tracked="$(mktemp)"
+  tar -tzf "$tarball" | sed 's|^package/app/||' | sort > "$in_tar"
+  # Runtime source only: tests and their fixtures are excluded on purpose.
+  git -C "$ROOT" ls-files langwatch/src langwatch/ee \
+    | grep -vE '__tests__|\.test\.|\.spec\.' | sort > "$tracked"
+  missing="$(comm -23 "$tracked" "$in_tar")"
+  rm -f "$in_tar" "$tracked"
+  if [ -n "$missing" ]; then
+    echo "✗ the tarball is missing application source the repo tracks:" >&2
+    printf '%s\n' "$missing" | head -20 >&2
+    echo "  An exclude pattern in this script is too broad — a bare name in" >&2
+    echo "  EXCLUDES matches at every depth, not just where it was meant." >&2
+    exit 1
+  fi
+  echo "→ verified: tarball ships every tracked langwatch/src and langwatch/ee file"
 fi
