@@ -85,3 +85,72 @@ Feature: Billing spend events, one unconditional record per gateway request
       Given a tenant retention policy of thirty five days
       Then gateway spend events are not governed by it
       And the table's own retention is a fixed thirteen month delete
+
+  Rule: The caller declares who spent it
+
+    @unit
+    Scenario: A header-declared end user wins over the body user param
+      Given a request carrying both an x-langwatch-end-user-id header and a body user param
+      When the gateway stamps the customer span
+      Then the span's end user id is the header value
+
+    @unit
+    Scenario: The OpenAI user body param attributes the request when no header is sent
+      Given a chat request whose body carries a user param and no attribution header
+      When the gateway stamps the customer span
+      Then the span's end user id is the body user param
+
+    @unit
+    Scenario: Request shapes without a user param stamp nothing without a header
+      Given an Anthropic-wire request with no attribution header
+      When the gateway stamps the customer span
+      Then no end user id is inferred from its body
+
+    @unit
+    Scenario: A request with no end user carries no attribution attribute
+      When a request arrives with no attribution header and no user param
+      Then the customer span carries no end user id attribute
+
+    @unit
+    Scenario: The body user param is sanitized like the headers
+      Given a user param carrying control characters and padding
+      When the gateway stamps the customer span
+      Then the stamped id is trimmed, control-stripped and capped
+
+    @unit
+    Scenario: Attribution headers are consumed by the gateway, never forwarded
+      Given a request carrying attribution and metadata headers
+      When the gateway forwards the request upstream
+      Then none of those headers survive on the forwarded request
+      And the body user param passes through unchanged
+
+    @unit
+    Scenario: The end user id and metadata echo ride the entry into billing
+      Given a request attributed to an end user with a metadata echo
+      When it folds into a spend record
+      Then the record carries the end user id and the echo verbatim
+
+    @unit
+    Scenario: Entries stored before the metadata field existed still parse
+      Given a fold entry persisted before the metadata echo shipped
+      When the entry list is parsed
+      Then the entry parses with an empty echo
+
+  Rule: The metadata echo is a join key, not a payload channel
+
+    @unit
+    Scenario: The metadata echo is stamped verbatim on the customer span
+      Given a request with a valid x-langwatch-metadata JSON object
+      When the gateway stamps the customer span
+      Then the reserved metadata attribute carries the object verbatim
+
+    @unit
+    Scenario: No metadata header means no reserved metadata attribute
+      When a request arrives without a metadata header
+      Then the customer span carries no reserved metadata attribute
+
+    @unit
+    Scenario: An invalid metadata echo is dropped without failing the request
+      Given a metadata header that is oversized or not a JSON object
+      When the gateway processes the request
+      Then the echo is dropped and the request succeeds

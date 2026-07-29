@@ -46,6 +46,7 @@ function entry(
     errorClass: "",
     httpStatus: 0,
     endUserId: "",
+    metadata: "",
     occurredAtMs: 1_700_000_000_000,
     durationMs: 250,
     ...overrides,
@@ -237,6 +238,32 @@ describe("billingExport reactor", () => {
       });
       // Request time, never ingest time.
       expect(rows[0].occurredAt.getTime()).toBe(1_700_000_000_000);
+    });
+
+    /** @scenario The end user id and metadata echo ride the entry into billing */
+    it("carries the entry's end user id and metadata echo into the row", async () => {
+      const { deps, insertSpendEvents } = mockDeps();
+      const reactor = createBillingExportReactor(deps);
+
+      await reactor.handle(
+        event,
+        ctx(
+          createFoldState(
+            gatewayAttrs([
+              entry("req-1", {
+                endUserId: "acme-user-42",
+                metadata: '{"org_id":"acme-9"}',
+              }),
+            ]),
+          ),
+        ),
+      );
+
+      const rows = insertSpendEvents.mock.calls[0]![0];
+      expect(rows[0]).toMatchObject({
+        endUserId: "acme-user-42",
+        metadata: '{"org_id":"acme-9"}',
+      });
     });
   });
 

@@ -125,6 +125,51 @@ describe("trace summary gateway span bookkeeping", () => {
     });
 
     /** @scenario Spend records anchor to request time, not ingest time */
+    /** @scenario The end user id and metadata echo ride the entry into billing */
+    it("carries the end user id and the caller metadata echo when stamped", () => {
+      let state = createInitState();
+      state = applySpanToSummary({
+        state,
+        span: gatewaySpan("req-attr", {
+          "langwatch.end_user_id": "acme-user-42",
+          "langwatch.reserved.request_metadata": '{"org_id":"acme-9"}',
+        }),
+      });
+
+      const [entry] = parseGatewaySpans(state.attributes);
+      expect(entry?.endUserId).toBe("acme-user-42");
+      expect(entry?.metadata).toBe('{"org_id":"acme-9"}');
+    });
+
+    /** @scenario Entries stored before the metadata field existed still parse */
+    it("parses entries persisted without the metadata field", () => {
+      const legacy: Omit<GatewaySpanEntry, "metadata"> = {
+        requestId: "req-legacy",
+        virtualKeyId: "vk-1",
+        model: "openai/gpt-5-mini",
+        modelProviderId: "",
+        inputTokens: 10,
+        outputTokens: 2,
+        cacheReadTokens: 0,
+        cacheWriteTokens: 0,
+        reasoningTokens: 0,
+        costUsd: 0.01,
+        status: "success",
+        errorClass: "",
+        httpStatus: 200,
+        endUserId: "",
+        occurredAtMs: 1700000000000,
+        durationMs: 40,
+      };
+      const attrs: Record<string, string> = {
+        "langwatch.reserved.gateway_spans": JSON.stringify([legacy]),
+      };
+
+      const entries = parseGatewaySpans(attrs);
+      expect(entries).toHaveLength(1);
+      expect(entries[0]?.metadata).toBe("");
+    });
+
     it("anchors occurred-at to the span's own start time", () => {
       const span = gatewaySpan("req-1");
       const state = applySpanToSummary({ state: createInitState(), span });
@@ -182,6 +227,7 @@ function entryFixture(requestId: string): GatewaySpanEntry {
     virtualKeyId: "vk-1",
     model: "m",
     modelProviderId: "",
+    metadata: "",
     inputTokens: 1,
     outputTokens: 1,
     cacheReadTokens: 0,

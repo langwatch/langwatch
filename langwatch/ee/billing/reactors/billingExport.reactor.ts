@@ -157,7 +157,7 @@ export function createBillingExportReactor(
             errorClass: entry.errorClass,
             httpStatus: entry.httpStatus,
             labels,
-            metadata: "",
+            metadata: entry.metadata ?? "",
             durationMs: entry.durationMs,
             occurredAt: new Date(entry.occurredAtMs),
           };
@@ -187,6 +187,7 @@ export function createBillingExportReactor(
                   errorClass: "",
                   httpStatus: 0,
                   endUserId: "",
+                  metadata: "",
                   occurredAtMs: foldState.occurredAt,
                   durationMs: Math.round(foldState.totalDurationMs ?? 0),
                 }),

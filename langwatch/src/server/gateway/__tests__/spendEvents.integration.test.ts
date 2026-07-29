@@ -200,6 +200,29 @@ describe("gateway spend events table", () => {
         labels: ["customer:acme-172"],
       });
     });
+
+    /** @scenario The end user id and metadata echo ride the entry into billing */
+    it("stores the end user id and the caller metadata echo verbatim", async () => {
+      const requestId = `req-${nanoid()}`;
+      const echo = '{"org_id":"acme-9","team_id":"t-4"}';
+      await repo.insertSpendEvents([
+        spendRow(requestId, {
+          endUserId: "acme-user-42",
+          metadata: echo,
+        }),
+      ]);
+
+      const rows = await repo.readSpendEvents({
+        tenantId,
+        fromMs: baseTime - 1000,
+        toMs: baseTime + 1000,
+      });
+      const mine = rows.find((r) => r.gatewayRequestId === requestId);
+      expect(mine).toMatchObject({
+        endUserId: "acme-user-42",
+        metadata: echo,
+      });
+    });
   });
 });
 

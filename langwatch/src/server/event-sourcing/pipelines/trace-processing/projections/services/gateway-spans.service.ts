@@ -47,6 +47,12 @@ export const gatewaySpanEntrySchema = z.object({
   httpStatus: z.number(),
   /** External end-user id once the gateway captures it; empty until then. */
   endUserId: z.string(),
+  /**
+   * Caller metadata echo (x-langwatch-metadata, raw JSON object string).
+   * Optional with a default so entries stored before the field existed
+   * still parse; the spend event row carries it verbatim.
+   */
+  metadata: z.string().optional().default(""),
   /** Request time (span start), unix ms. Period placement anchors here. */
   occurredAtMs: z.number(),
   durationMs: z.number(),
@@ -145,6 +151,7 @@ export function buildGatewaySpanEntry({
   const isError = span.statusCode === NormalizedStatusCode.ERROR;
   const modelProviderId = attrs["langwatch.model_provider_id"];
   const endUserId = attrs["langwatch.end_user_id"];
+  const requestMetadata = attrs["langwatch.reserved.request_metadata"];
 
   return {
     requestId,
@@ -163,6 +170,7 @@ export function buildGatewaySpanEntry({
       typeof errorClassRaw === "string" && isError ? errorClassRaw : "",
     httpStatus: coerceInt(attrs["http.response.status_code"]),
     endUserId: typeof endUserId === "string" ? endUserId : "",
+    metadata: typeof requestMetadata === "string" ? requestMetadata : "",
     occurredAtMs: span.startTimeUnixMs,
     durationMs: Math.max(0, span.endTimeUnixMs - span.startTimeUnixMs),
   };
