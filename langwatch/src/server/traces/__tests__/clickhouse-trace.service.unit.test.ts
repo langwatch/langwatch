@@ -530,6 +530,94 @@ describe("ClickHouseTraceService", () => {
           "%100\\% success\\_rate%",
         );
       });
+
+      // Issue #6356: a tool or agent identifier usually lives on the span
+      // name, not in the captured I/O, so free text has to reach the trace
+      // name and the span names as well.
+      it.each([
+        ["count", 0],
+        ["data", 1],
+      ])("searches the trace name in the %s query", async (_label, callIdx) => {
+        setupMocksForQueryTest();
+
+        const service = new ClickHouseTraceService({
+          project: { findUnique: mockPrismaFindUnique },
+        } as never);
+
+        await service.getAllTracesForProject(
+          { ...baseInput, query: "codex" } as GetAllTracesForProjectInput,
+          protections,
+        );
+
+        const call = mockClickHouseQuery.mock.calls[callIdx as number]!;
+        expect(call[0].query).toContain(
+          "lower(ifNull(ts.TraceName, '')) LIKE {searchQuery:String}",
+        );
+      });
+
+      it.each([
+        ["count", 0],
+        ["data", 1],
+      ])("searches span names in the %s query", async (_label, callIdx) => {
+        setupMocksForQueryTest();
+
+        const service = new ClickHouseTraceService({
+          project: { findUnique: mockPrismaFindUnique },
+        } as never);
+
+        await service.getAllTracesForProject(
+          { ...baseInput, query: "codex" } as GetAllTracesForProjectInput,
+          protections,
+        );
+
+        const sql = mockClickHouseQuery.mock.calls[callIdx as number]![0].query;
+        expect(sql).toContain("FROM stored_spans sp");
+        expect(sql).toContain("lower(sp.SpanName) LIKE {searchQuery:String}");
+        // Correlated on the outer row and bounded, so it prunes partitions
+        // instead of cold-scanning every weekly partition.
+        expect(sql).toContain("sp.TraceId = ts.TraceId");
+        expect(sql).toContain(
+          "sp.StartTime >= fromUnixTimestamp64Milli({startDate:UInt64})",
+        );
+      });
+
+      it("ORs the name branches with the IO branches rather than replacing them", async () => {
+        setupMocksForQueryTest();
+
+        const service = new ClickHouseTraceService({
+          project: { findUnique: mockPrismaFindUnique },
+        } as never);
+
+        await service.getAllTracesForProject(
+          { ...baseInput, query: "codex" } as GetAllTracesForProjectInput,
+          protections,
+        );
+
+        const sql = mockClickHouseQuery.mock.calls[0]![0].query;
+        expect(sql).toContain("lower(ifNull(ts.ComputedInput, ''))");
+        expect(sql).toContain("lower(ifNull(ts.ComputedOutput, ''))");
+        expect(sql).toContain("lower(ifNull(ts.TraceName, ''))");
+        expect(sql).toContain("lower(sp.SpanName)");
+      });
+
+      // The 3-char floor exists because the ngrambf_v1 skip indexes are
+      // n=3; adding name branches must not start issuing queries below it.
+      it("still no-ops below the three-character floor", async () => {
+        setupMocksForQueryTest();
+
+        const service = new ClickHouseTraceService({
+          project: { findUnique: mockPrismaFindUnique },
+        } as never);
+
+        await service.getAllTracesForProject(
+          { ...baseInput, query: "co" } as GetAllTracesForProjectInput,
+          protections,
+        );
+
+        const call = mockClickHouseQuery.mock.calls[0]!;
+        expect(call[0].query_params.searchQuery).toBeUndefined();
+        expect(call[0].query).not.toContain("lower(sp.SpanName)");
+      });
     });
 
     describe("when user cannot see input or output", () => {
