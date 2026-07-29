@@ -19,8 +19,8 @@
  */
 
 import {
-  mkdtempSync,
   mkdirSync,
+  mkdtempSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -63,8 +63,8 @@ describe("collectGoBindings", () => {
               '\tt.Run("stays on one line", func(t *testing.T) {',
               "\t})",
               "}",
-            ].join("\n")
-          )
+            ].join("\n"),
+          ),
         ).toEqual(["One-line subtest"]);
       });
     });
@@ -84,8 +84,8 @@ describe("collectGoBindings", () => {
               "\t\t},",
               "\t)",
               "}",
-            ].join("\n")
-          )
+            ].join("\n"),
+          ),
         ).toEqual(["Multiline subtest"]);
       });
     });
@@ -102,8 +102,8 @@ describe("collectGoBindings", () => {
               '\tt.Run(fmt.Sprintf("%s,%s", tc.a, tc.b), func(t *testing.T) {',
               "\t})",
               "}",
-            ].join("\n")
-          )
+            ].join("\n"),
+          ),
         ).toEqual(["Nested comma subtest"]);
       });
     });
@@ -118,8 +118,8 @@ describe("collectGoBindings", () => {
               '/** @scenario "Top-level test func" */',
               "func TestThing(t *testing.T) {",
               "}",
-            ].join("\n")
-          )
+            ].join("\n"),
+          ),
         ).toEqual(["Top-level test func"]);
       });
     });
@@ -135,8 +135,8 @@ describe("collectGoBindings", () => {
               '\t// @scenario "Not a subtest"',
               "\tserver.Run(ctx)",
               "}",
-            ].join("\n")
-          )
+            ].join("\n"),
+          ),
         ).toEqual([]);
       });
     });
@@ -154,9 +154,9 @@ describe("isEntryModule", () => {
 
         // The lexical compare this replaced returned false here, so `main()`
         // never ran and the whole check exited 0 having measured nothing.
-        expect(
-          isEntryModule({ invokedPath: link, modulePath: real })
-        ).toBe(true);
+        expect(isEntryModule({ invokedPath: link, modulePath: real })).toBe(
+          true,
+        );
       });
     });
   });
@@ -167,9 +167,9 @@ describe("isEntryModule", () => {
         const real = join(root, "check.ts");
         writeFileSync(real, "// script", "utf8");
 
-        expect(
-          isEntryModule({ invokedPath: real, modulePath: real })
-        ).toBe(true);
+        expect(isEntryModule({ invokedPath: real, modulePath: real })).toBe(
+          true,
+        );
       });
     });
   });
@@ -182,9 +182,9 @@ describe("isEntryModule", () => {
         writeFileSync(real, "// script", "utf8");
         writeFileSync(other, "// other", "utf8");
 
-        expect(
-          isEntryModule({ invokedPath: other, modulePath: real })
-        ).toBe(false);
+        expect(isEntryModule({ invokedPath: other, modulePath: real })).toBe(
+          false,
+        );
       });
     });
   });
@@ -199,7 +199,7 @@ describe("isEntryModule", () => {
           isEntryModule({
             invokedPath: join(root, "vanished.ts"),
             modulePath: real,
-          })
+          }),
         ).toBe(false);
       });
     });
@@ -212,7 +212,7 @@ describe("isEntryModule", () => {
           isEntryModule({
             invokedPath: undefined,
             modulePath: join(root, "check.ts"),
-          })
+          }),
         ).toBe(false);
       });
     });
@@ -227,7 +227,7 @@ describe("discoverFeatureFiles", () => {
         // scenario under it as bound: the files stop being discovered and the
         // check goes green.
         expect(() => discoverFeatureFiles([join(root, "gone")])).toThrow(
-          /does not exist/
+          /does not exist/,
         );
       });
     });
@@ -240,7 +240,7 @@ describe("discoverFeatureFiles", () => {
         writeFileSync(notADir, "", "utf8");
 
         expect(() => discoverFeatureFiles([notADir])).toThrow(
-          /is not a directory/
+          /is not a directory/,
         );
       });
     });
@@ -275,11 +275,9 @@ describe("isInert", () => {
       it("does not report the file as inert", () => {
         expect(
           isInert({
-            scenarios: [
-              { title: "t", tags: ["@unit"], line: 1, bindings: [] },
-            ],
+            scenarios: [{ title: "t", tags: ["@unit"], line: 1, bindings: [] }],
             totalScenarios: 20,
-          })
+          }),
         ).toBe(false);
       });
     });

@@ -4,7 +4,6 @@ import { on } from "node:events";
 import { ValidationError } from "@langwatch/handled-error";
 import { LANGY_CONVERSATION_STATUS } from "@langwatch/langy";
 import { createLogger } from "@langwatch/observability";
-import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
