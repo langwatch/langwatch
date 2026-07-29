@@ -335,10 +335,15 @@ export class EnvelopeBlobLifecycle {
     const { lease, blobId } = readEnvelopeRetirement(value);
     try {
       if (lease) {
-        // Tenant guard (ADR-030 §5), matching decode/release/transfer: derive the
-        // ref's tenant from untrusted envelope data, so a forged or mis-routed ref
-        // must not extend another tenant's blob lifetime.
-        if (lease.ref.projectId !== this.projectIdFor(groupId)) {
+        // Tenant guard (ADR-030 §5), matching decode(): derive the ref's tenant
+        // from untrusted envelope data, so a forged or mis-routed ref must not
+        // extend another tenant's blob lifetime. The `!expected` arm is not
+        // belt-and-braces — an UNTENANTED groupId makes projectIdFor return
+        // undefined, and without it a forged ref whose projectId is also missing
+        // passes on an `undefined === undefined` match. decode() refuses that case
+        // explicitly; this must too, or the guard is weaker than the one it cites.
+        const expected = this.projectIdFor(groupId);
+        if (!expected || lease.ref.projectId !== expected) {
           logger.warn(
             { groupId, refProjectId: lease.ref.projectId },
             "Skipping blob TTL preserve-for-DLQ for a tenant-mismatched ref",

@@ -145,6 +145,49 @@ describe("BlobLeases", () => {
     });
   });
 
+  describe("given a dead-lettered blob a sibling job still holds", () => {
+    describe("when the sibling renews its ordinary lease", () => {
+      /** @scenario an ordinary sibling renew cannot shorten a dead-letter hold */
+      it("leaves the quarantine window intact instead of pulling it back to the routine backstop", async () => {
+        await redis.set(BLOB_KEY, "one shared body");
+        // A sibling job holds an ordinary lease on the SAME content hash — the
+        // normal case, since identical bodies collapse to one stored blob.
+        await leases.take({
+          projectId: PROJECT,
+          hash: HASH,
+          holderId: "sibling",
+          tier: "redis",
+        });
+
+        const QUARANTINE = 7 * 24 * 60 * 60;
+        await leases.holdForDlq({
+          projectId: PROJECT,
+          hash: HASH,
+          tier: "redis",
+          ttlSeconds: QUARANTINE,
+        });
+
+        // The sibling keeps working and renews. Before the max-expire fix this
+        // plain EXPIRE'd the shared keys back down to the routine constants, so
+        // the lease-set key — and with it the `gq:dlq` member — died about three
+        // days before the dead-letter entry it was protecting.
+        await leases.renew({
+          projectId: PROJECT,
+          hash: HASH,
+          holderId: "sibling",
+          tier: "redis",
+        });
+
+        const leaseSetTtl = await redis.ttl(LEASE_KEY);
+        const blobTtl = await redis.ttl(BLOB_KEY);
+        expect(leaseSetTtl).toBeGreaterThan(6 * 24 * 60 * 60);
+        expect(blobTtl).toBeGreaterThan(6 * 24 * 60 * 60);
+        // …and the dead-letter's own hold is still recorded.
+        expect(await redis.zscore(LEASE_KEY, "gq:dlq")).not.toBeNull();
+      });
+    });
+  });
+
   describe("given one live lease and two expired sibling leases", () => {
     describe("when the live holder renews", () => {
       it("prunes the crashed holders and keeps the blob untouched", async () => {

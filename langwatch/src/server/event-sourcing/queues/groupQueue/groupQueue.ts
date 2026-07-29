@@ -1794,8 +1794,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
    * value would simply vanish. So on failure we re-stage the RAW value: it
    * re-enters the live group (recoverable, and a later drain retries the DLQ
    * write) rather than being lost. If the re-stage ALSO fails (Redis genuinely
-   * unreachable), the value still survives in the structured drop log `recordDrop`
-   * already wrote — the documented last resort — so we surface that loudly.
+   * unreachable), the value is genuinely lost — `recordDrop` deliberately omits
+   * the body, so nothing reconstructs it — and we surface that loudly.
    */
   private async deadLetterDrainedValue({
     groupId,

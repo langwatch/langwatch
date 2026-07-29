@@ -970,7 +970,17 @@ describe.skipIf(!hasTestcontainers)(
           // a magic 6-day threshold (RaiMk): preserveForDlq extends the holder just
           // BEFORE the DLQ write, so the holder's remaining TTL tracks the entry's
           // within write latency (5s slack) — it does not expire before it.
-          const holderPttl = await redis.pttl(holderKeys[0]!);
+          // Assert on the LEASE SET, not the legacy holder mirror. Both the
+          // release-time grace helper and the maintenance sweep gate blob
+          // survival on ZCARD of `blobleases:*` and never consult
+          // `blobholders:*`; today one atomic script EXPIREs both with the same
+          // ttl, so the mirror happens to agree — but a test pinned to the
+          // decorative key stays green if that ever decouples, while #720
+          // silently regresses.
+          const leaseKeys = await redis.keys(`${name}:gq:blobleases:*`);
+          expect(leaseKeys).toHaveLength(1);
+          expect(await redis.zscore(leaseKeys[0]!, "gq:dlq")).not.toBeNull();
+          const holderPttl = await redis.pttl(leaseKeys[0]!);
           const dlqDataPttl = await redis.pttl(
             `${name}:gq:dlq:${groupId}:data`,
           );

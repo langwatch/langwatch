@@ -6,6 +6,7 @@ import {
   BLOB_LEASE_TTL_SECONDS,
   LEGACY_HOLDER_LEASE_GUARD,
 } from "./blobConstants";
+import { GQ_BLOB_EXPIRE_AT_LEAST_LUA } from "./blobExpireLua";
 import { GQ_BLOB_GRACE_LUA } from "./blobGraceLua";
 import { CachedLuaScript } from "./cachedLuaScript";
 
@@ -427,6 +428,7 @@ end
 // GQ1 values ("GQ1|", header.r = blob id) are private — their blob is
 // UNLINKed directly. Legacy bare-JSON / inline values carry no blob at all.
 const BLOB_LEASE_HELPER_LUA =
+  GQ_BLOB_EXPIRE_AT_LEAST_LUA +
   GQ_BLOB_GRACE_LUA +
   `
 local function gqTenantOf(groupId)
@@ -471,16 +473,16 @@ local function gqTakeLease(keyPrefix, lease, nowMs)
   local leaseKey = keyPrefix .. "blobleases:" .. lease.projectId .. "/" .. lease.hash
   redis.call("ZREMRANGEBYSCORE", leaseKey, "-inf", nowMs)
   redis.call("ZADD", leaseKey, nowMs + (${BLOB_LEASE_TTL_SECONDS} * 1000), lease.holderId)
-  redis.call("EXPIRE", leaseKey, ${BLOB_LEASE_SET_TTL_SECONDS})
+  gqExpireAtLeast(leaseKey, ${BLOB_LEASE_SET_TTL_SECONDS})
 
   -- Rolling-deploy compatibility: previous-release code still SREMs this set
   -- and UNLINKs on empty. The guard makes "last holder" unobservable while new
   -- leases exist; the mirrored token lets an old pod process the value safely.
   local legacyKey = keyPrefix .. "blobholders:" .. lease.projectId .. "/" .. lease.hash
   redis.call("SADD", legacyKey, "${LEGACY_HOLDER_LEASE_GUARD}", lease.holderId)
-  redis.call("EXPIRE", legacyKey, ${BLOB_LEASE_SET_TTL_SECONDS})
+  gqExpireAtLeast(legacyKey, ${BLOB_LEASE_SET_TTL_SECONDS})
   if lease.tier == "redis" then
-    redis.call("EXPIRE", keyPrefix .. "blob:" .. lease.projectId .. "/" .. lease.hash, ${BLOB_BACKSTOP_TTL_SECONDS})
+    gqExpireAtLeast(keyPrefix .. "blob:" .. lease.projectId .. "/" .. lease.hash, ${BLOB_BACKSTOP_TTL_SECONDS})
   end
 end
 

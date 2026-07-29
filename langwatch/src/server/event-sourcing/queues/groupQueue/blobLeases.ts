@@ -8,6 +8,7 @@ import {
   BLOB_LEASE_TTL_SECONDS,
   LEGACY_HOLDER_LEASE_GUARD,
 } from "./blobConstants";
+import { GQ_BLOB_EXPIRE_AT_LEAST_LUA } from "./blobExpireLua";
 import { GQ_BLOB_GRACE_LUA } from "./blobGraceLua";
 import { blobHolderSetKey, blobLeaseSetKey, redisBlobKey } from "./blobKeys";
 import { CachedLuaScript } from "./cachedLuaScript";
@@ -18,15 +19,15 @@ local now = redis.call("TIME")
 local nowMs = (tonumber(now[1]) * 1000) + math.floor(tonumber(now[2]) / 1000)
 `;
 
-const TAKE_LUA = `${REDIS_NOW_MS_LUA}
+const TAKE_LUA = `${GQ_BLOB_EXPIRE_AT_LEAST_LUA}${REDIS_NOW_MS_LUA}
 local ttlSeconds = tonumber(ARGV[2])
 local deadlineMs = nowMs + (ttlSeconds * 1000)
 redis.call("ZREMRANGEBYSCORE", KEYS[1], "-inf", nowMs)
 redis.call("ZADD", KEYS[1], deadlineMs, ARGV[1])
-redis.call("EXPIRE", KEYS[1], ${BLOB_LEASE_SET_TTL_SECONDS})
+gqExpireAtLeast(KEYS[1], ${BLOB_LEASE_SET_TTL_SECONDS})
 redis.call("SADD", KEYS[2], "${LEGACY_HOLDER_LEASE_GUARD}", ARGV[1])
-redis.call("EXPIRE", KEYS[2], ${BLOB_LEASE_SET_TTL_SECONDS})
-if #KEYS == 3 then redis.call("EXPIRE", KEYS[3], ${BLOB_BACKSTOP_TTL_SECONDS}) end
+gqExpireAtLeast(KEYS[2], ${BLOB_LEASE_SET_TTL_SECONDS})
+if #KEYS == 3 then gqExpireAtLeast(KEYS[3], ${BLOB_BACKSTOP_TTL_SECONDS}) end
 return deadlineMs
 `;
 
@@ -48,19 +49,19 @@ return graced
 // blob went onto the grace window, else 0. A same-blob transfer (a retry whose
 // re-encode kept the hash) leaves KEYS[1] == KEYS[2], so the replacement lease
 // is already in that set when the helper runs and the grace window is withheld.
-const TRANSFER_LUA = `${GQ_BLOB_GRACE_LUA}${REDIS_NOW_MS_LUA}
+const TRANSFER_LUA = `${GQ_BLOB_EXPIRE_AT_LEAST_LUA}${GQ_BLOB_GRACE_LUA}${REDIS_NOW_MS_LUA}
 local ttlSeconds = tonumber(ARGV[3])
 local deadlineMs = nowMs + (ttlSeconds * 1000)
 redis.call("ZREMRANGEBYSCORE", KEYS[1], "-inf", nowMs)
 if KEYS[1] ~= KEYS[2] then redis.call("ZREMRANGEBYSCORE", KEYS[2], "-inf", nowMs) end
 redis.call("ZADD", KEYS[1], deadlineMs, ARGV[1])
-redis.call("EXPIRE", KEYS[1], ${BLOB_LEASE_SET_TTL_SECONDS})
+gqExpireAtLeast(KEYS[1], ${BLOB_LEASE_SET_TTL_SECONDS})
 if KEYS[1] ~= KEYS[2] or ARGV[1] ~= ARGV[2] then
   redis.call("ZREM", KEYS[2], ARGV[2])
 end
 if redis.call("ZCARD", KEYS[2]) == 0 then redis.call("DEL", KEYS[2]) end
 redis.call("SADD", KEYS[3], "${LEGACY_HOLDER_LEASE_GUARD}", ARGV[1])
-redis.call("EXPIRE", KEYS[3], ${BLOB_LEASE_SET_TTL_SECONDS})
+gqExpireAtLeast(KEYS[3], ${BLOB_LEASE_SET_TTL_SECONDS})
 if KEYS[3] ~= KEYS[4] or ARGV[1] ~= ARGV[2] then
   redis.call("SREM", KEYS[4], ARGV[2])
 end
@@ -86,14 +87,14 @@ const DLQ_LEASE_HOLDER_ID = "gq:dlq";
  * hardcodes the routine constants there, which is exactly what would let the
  * dead-letter outlive its own blob.
  */
-const HOLD_FOR_DLQ_LUA = `${REDIS_NOW_MS_LUA}
+const HOLD_FOR_DLQ_LUA = `${GQ_BLOB_EXPIRE_AT_LEAST_LUA}${REDIS_NOW_MS_LUA}
 local ttlSeconds = tonumber(ARGV[2])
 redis.call("ZREMRANGEBYSCORE", KEYS[1], "-inf", nowMs)
 redis.call("ZADD", KEYS[1], nowMs + (ttlSeconds * 1000), ARGV[1])
-redis.call("EXPIRE", KEYS[1], ttlSeconds)
+gqExpireAtLeast(KEYS[1], ttlSeconds)
 redis.call("SADD", KEYS[2], "${LEGACY_HOLDER_LEASE_GUARD}", ARGV[1])
-redis.call("EXPIRE", KEYS[2], ttlSeconds)
-if #KEYS == 3 then redis.call("EXPIRE", KEYS[3], ttlSeconds) end
+gqExpireAtLeast(KEYS[2], ttlSeconds)
+if #KEYS == 3 then gqExpireAtLeast(KEYS[3], ttlSeconds) end
 return 1
 `;
 
