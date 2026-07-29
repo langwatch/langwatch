@@ -5,7 +5,6 @@ const createMockStripe = () => ({
   customers: {
     create: vi.fn(),
     del: vi.fn(),
-    retrieve: vi.fn(),
   },
 });
 
@@ -173,81 +172,6 @@ describe("customerService", () => {
             organizationId: "org_123",
           }),
         ).rejects.toMatchObject({ code: "subscription_sync_failed" });
-      });
-    });
-  });
-
-  describe("getFixedBillingCurrency()", () => {
-    describe("when organization has no Stripe customer", () => {
-      it("returns null", async () => {
-        db.organization.findUnique.mockResolvedValue({
-          id: "org_123",
-          stripeCustomerId: null,
-        });
-
-        const result = await service.getFixedBillingCurrency({
-          organizationId: "org_123",
-        });
-
-        expect(result).toBeNull();
-        expect(stripe.customers.retrieve).not.toHaveBeenCalled();
-      });
-    });
-
-    describe("when the Stripe customer has a fixed currency", () => {
-      it("returns the currency uppercased", async () => {
-        db.organization.findUnique.mockResolvedValue({
-          id: "org_123",
-          stripeCustomerId: "cus_123",
-        });
-        stripe.customers.retrieve.mockResolvedValue({
-          id: "cus_123",
-          currency: "eur",
-        });
-
-        const result = await service.getFixedBillingCurrency({
-          organizationId: "org_123",
-        });
-
-        expect(result).toBe("EUR");
-      });
-    });
-
-    describe("when the Stripe customer has no currency yet", () => {
-      it("returns null", async () => {
-        db.organization.findUnique.mockResolvedValue({
-          id: "org_123",
-          stripeCustomerId: "cus_123",
-        });
-        stripe.customers.retrieve.mockResolvedValue({
-          id: "cus_123",
-          currency: null,
-        });
-
-        const result = await service.getFixedBillingCurrency({
-          organizationId: "org_123",
-        });
-
-        expect(result).toBeNull();
-      });
-    });
-
-    describe("when the Stripe customer is fixed to an unsupported currency", () => {
-      it("returns null", async () => {
-        db.organization.findUnique.mockResolvedValue({
-          id: "org_123",
-          stripeCustomerId: "cus_123",
-        });
-        stripe.customers.retrieve.mockResolvedValue({
-          id: "cus_123",
-          currency: "gbp",
-        });
-
-        const result = await service.getFixedBillingCurrency({
-          organizationId: "org_123",
-        });
-
-        expect(result).toBeNull();
       });
     });
   });

@@ -179,11 +179,6 @@ export const mockGetLastSubscription = vi.fn(() => ({
   isLoading: false,
 }));
 
-export const mockGetBillingCurrency = vi.fn(() => ({
-  data: { fixedCurrency: null as "EUR" | "USD" | null },
-  isLoading: false,
-}));
-
 export const mockOpenSeats = vi.fn();
 
 // ---------------------------------------------------------------------------
@@ -221,10 +216,6 @@ export function resetMocks() {
   });
   mockGetLastSubscription.mockReturnValue({
     data: null,
-    isLoading: false,
-  });
-  mockGetBillingCurrency.mockReturnValue({
-    data: { fixedCurrency: null },
     isLoading: false,
   });
 }
