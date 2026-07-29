@@ -42,6 +42,13 @@ Feature: A scenario run always reaches a terminal state
     Then it is not declared dead before the dispatch window elapses
 
   @unit
+  Scenario: A run waiting behind a big batch is not mistaken for a dead one
+    Given the run was queued as one of many in the same batch
+    When it waits its turn behind the others
+    Then it is given more time to be picked up than a run queued on its own
+    And it is not declared dead for waiting
+
+  @unit
   Scenario: A backlog does not kill a healthy run
     Given progress reports are being delivered later than they occurred
     When a report arrives describing a moment already past

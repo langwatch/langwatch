@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import type { ProcessHandlerContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 
+import type { SimulationProcessingEvent } from "../../schemas/events";
 import {
+  buildProcessEventView,
   handleCancelRequested,
   handleMessageSnapshot,
   handleQueued,
@@ -11,6 +13,7 @@ import {
   scenarioExecutionWake,
 } from "../scenarioExecution.process";
 import {
+  dispatchDeadlineMsFor,
   INITIAL_SCENARIO_EXECUTION_STATE,
   SCENARIO_CANCEL_DEADLINE_MS,
   SCENARIO_DISPATCH_DEADLINE_MS,
@@ -48,6 +51,19 @@ const IDENTITIES = {
   batchRunId: "batch-1",
   scenarioSetId: "set-1",
 };
+
+/** A committed `queued` event, as the pipeline hands it to the payload view. */
+function queuedEvent(data: Record<string, unknown>): SimulationProcessingEvent {
+  return {
+    data: {
+      scenarioRunId: RUN_ID,
+      scenarioId: "scenario-1",
+      batchRunId: "batch-1",
+      scenarioSetId: "set-1",
+      ...data,
+    },
+  } as unknown as SimulationProcessingEvent;
+}
 
 function known(
   overrides: Partial<ScenarioExecutionState> = {},
@@ -87,6 +103,85 @@ describe("scenarioExecution process", () => {
         scenarioId: "scenario-1",
         batchRunId: "batch-1",
         setId: "set-1",
+      });
+    });
+  });
+
+  /**
+   * The tail of a large batch waits behind every sibling ahead of it, and that
+   * wait is healthy. A fixed queued window would terminalise it before it ever
+   * ran, which is the one case where this process manager can be actively
+   * wrong rather than merely late.
+   */
+  describe("given the run queued as part of a large batch", () => {
+    describe("when the dispatch deadline is armed", () => {
+      /** @scenario "A run waiting behind a big batch is not mistaken for a dead one" */
+      it("gives it more room than a run that queued alone", () => {
+        const alone = handleQueued(
+          INITIAL_SCENARIO_EXECUTION_STATE,
+          { ...IDENTITIES, batchTotal: 1 },
+          makeCtx(),
+        );
+        const inBatch = handleQueued(
+          INITIAL_SCENARIO_EXECUTION_STATE,
+          { ...IDENTITIES, batchTotal: 500 },
+          makeCtx(),
+        );
+
+        expect(inBatch.nextWakeAt!).toBeGreaterThan(alone.nextWakeAt!);
+      });
+
+      it("falls back to the floor when the batch never said how big it is", () => {
+        const result = handleQueued(
+          INITIAL_SCENARIO_EXECUTION_STATE,
+          IDENTITIES,
+          makeCtx(),
+        );
+
+        expect(result.nextWakeAt).toBe(NOW + SCENARIO_DISPATCH_DEADLINE_MS);
+      });
+
+      it("caps the allowance so a bad denominator cannot arm a deadline years out", () => {
+        expect(dispatchDeadlineMsFor(Number.MAX_SAFE_INTEGER)).toBe(
+          dispatchDeadlineMsFor(10_000_000),
+        );
+      });
+    });
+  });
+
+  /**
+   * The handler only ever sees the narrowed view, so a denominator the view
+   * drops is a denominator the deadline cannot use — silently, and looking
+   * exactly like a batch that never carried one. These go through
+   * `buildProcessEventView` for that reason rather than handing the handler a
+   * payload it would never receive in production.
+   */
+  describe("given a queued event carrying the batch denominator", () => {
+    describe("when it is narrowed for the process manager", () => {
+      it("carries the denominator through to the deadline", () => {
+        const view = buildProcessEventView(queuedEvent({ batchTotal: 500 }));
+
+        expect(
+          handleQueued(INITIAL_SCENARIO_EXECUTION_STATE, view, makeCtx())
+            .nextWakeAt,
+        ).toBe(NOW + dispatchDeadlineMsFor(500));
+      });
+
+      it("leaves conversation content on the far side of the narrowing", () => {
+        const view = buildProcessEventView(
+          queuedEvent({ batchTotal: 2, messages: [{ content: "secret" }] }),
+        );
+
+        expect(view).not.toHaveProperty("messages");
+      });
+
+      it("degrades a malformed denominator to an unknown batch size", () => {
+        const view = buildProcessEventView(queuedEvent({ batchTotal: -3 }));
+
+        expect(
+          handleQueued(INITIAL_SCENARIO_EXECUTION_STATE, view, makeCtx())
+            .nextWakeAt,
+        ).toBe(NOW + SCENARIO_DISPATCH_DEADLINE_MS);
       });
     });
   });
