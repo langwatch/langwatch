@@ -7,7 +7,11 @@
  *
  * Requires: PostgreSQL database (Prisma)
  */
-import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
+import {
+  OrganizationUserRole,
+  RoleBindingScopeType,
+  TeamUserRole,
+} from "@prisma/client";
 import { nanoid } from "nanoid";
 import {
   afterAll,
@@ -20,11 +24,14 @@ import {
   vi,
 } from "vitest";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { OrganizationService } from "~/server/app-layer/organizations/organization.service";
+import { PrismaOrganizationRepository } from "~/server/app-layer/organizations/repositories/organization.prisma.repository";
 import { createTestApp } from "~/server/app-layer/presets";
 import {
   type PlanProvider,
   PlanProviderService,
 } from "~/server/app-layer/subscription/plan-provider";
+import { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
 import { prisma } from "../../../db";
 import { LICENSE_LIMIT_ERRORS } from "../../../license-enforcement/license-limit-guard";
 import { appRouter } from "../../root";
@@ -88,12 +95,19 @@ describe("organization member role plan limit enforcement", () => {
       },
     });
 
-    // Without this the caller is refused before any plan-limit logic runs, so
+    // Without these the caller is refused before any plan-limit logic runs, so
     // the suite would assert nothing about plan limits — see the helper.
+    //
+    // The TEAM-scoped binding matters for a second reason: the repository's
+    // "don't strand a team without an admin" guard counts TEAM-scoped ADMIN
+    // *bindings*, not the `TeamUser` row above. With none, demoting anyone on
+    // the team is refused with "No admin found for this team" before the plan
+    // logic is reached.
     await grantOrganizationAdmin({
       prisma,
       organizationId: organization.id,
       userId: adminUser.id,
+      teamId: team.id,
     });
 
     // Create a custom role with non-view permissions (makes EXTERNAL user a FullMember)
@@ -139,6 +153,16 @@ describe("organization member role plan limit enforcement", () => {
       planProvider: PlanProviderService.create({
         getActivePlan: mockGetActivePlan as PlanProvider["getActivePlan"],
       }),
+      // A REAL organization service, against the test database. `createTestApp`
+      // defaults to a NullOrganizationRepository, which resolves without
+      // writing — so an allow-path test could only assert "the call didn't
+      // throw", and a mutation that silently no-ops the override would pass.
+      // The plan gate is what these tests are about, but proving the write
+      // landed is what distinguishes "allowed" from "quietly dropped".
+      organizations: new OrganizationService(
+        new PrismaOrganizationRepository(prisma),
+        new PromptTagRepository(prisma),
+      ),
     });
 
     // Guarantee target user starts as MEMBER with built-in MEMBER team role
@@ -255,15 +279,11 @@ describe("organization member role plan limit enforcement", () => {
 
         const caller = createCaller();
 
-        // Resolving IS the assertion: the sibling test above proves the same
-        // call is rejected with MEMBER_LITE_LIMIT when the override is off,
-        // so the pair isolates the override as the only difference.
-        //
-        // Deliberately not asserting the persisted row. `createTestApp` wires
-        // `organizations` to a NullOrganizationRepository, so the write this
-        // procedure delegates is a no-op here by design — the row would still
-        // read MEMBER however well the limit gate behaved. Persistence is the
-        // repository's own contract and is tested there.
+        // Two assertions, and the second is the one that matters. The sibling
+        // above proves this call is rejected when the override is off, so
+        // resolving isolates the override — but resolving alone cannot tell
+        // "the override let the write through" apart from "the write silently
+        // did nothing". Reading the row back distinguishes them.
         await expect(
           caller.organization.updateMemberRole({
             userId: targetUserId,
@@ -271,6 +291,13 @@ describe("organization member role plan limit enforcement", () => {
             role: OrganizationUserRole.EXTERNAL,
           }),
         ).resolves.toEqual({ success: true });
+
+        const updated = await prisma.organizationUser.findUnique({
+          where: {
+            userId_organizationId: { userId: targetUserId, organizationId },
+          },
+        });
+        expect(updated?.role).toBe(OrganizationUserRole.EXTERNAL);
       });
     });
   });
@@ -339,9 +366,8 @@ describe("organization member role plan limit enforcement", () => {
 
         const caller = createCaller();
 
-        // As above: resolving is the assertion, paired against the sibling
-        // rejection. The persisted row is not checked because this app's
-        // organization repository is a deliberate no-op.
+        // As above: resolving isolates the override, the read-back proves the
+        // write actually landed rather than being quietly dropped.
         await expect(
           caller.organization.updateTeamMemberRole({
             teamId,
@@ -349,6 +375,23 @@ describe("organization member role plan limit enforcement", () => {
             role: TeamUserRole.VIEWER,
           }),
         ).resolves.toEqual({ success: true });
+
+        // Read the BINDING, not the `TeamUser` row. `updateTeamMemberRole`
+        // replaces the TEAM-scoped RoleBinding and leaves the legacy row
+        // untouched — asserting on `TeamUser.role` here would fail against
+        // correct behaviour, which is what the original assertion did.
+        const binding = await prisma.roleBinding.findFirst({
+          where: {
+            organizationId,
+            userId: targetUserId,
+            scopeType: RoleBindingScopeType.TEAM,
+            scopeId: teamId,
+          },
+        });
+        expect(binding?.role).toBe(TeamUserRole.VIEWER);
+        // The custom role is cleared, not carried over — the point of the
+        // full-to-lite change under test.
+        expect(binding?.customRoleId).toBeNull();
       });
     });
   });
