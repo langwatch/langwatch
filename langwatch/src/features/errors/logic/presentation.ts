@@ -565,8 +565,7 @@ const presentations = {
     // Account state, not an outage, and not fixable from the UI: the account is
     // locked to a currency we don't price plans in, so retrying never helps.
     title: "This plan isn't available in your billing currency",
-    describe: () =>
-      "Contact support and we'll get you onto the right plan.",
+    describe: () => "Contact support and we'll get you onto the right plan.",
   },
   billing_currency_unavailable: {
     // fault: provider. We couldn't confirm the billing currency, so we stopped

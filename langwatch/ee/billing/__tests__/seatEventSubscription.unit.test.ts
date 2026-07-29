@@ -883,7 +883,6 @@ describe("seatEventSubscription", () => {
         );
       });
     });
-
   });
 
   // ── seatEventBillingPortalUrl ─────────────────────────────────────────────
