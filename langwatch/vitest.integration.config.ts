@@ -66,12 +66,18 @@ export default defineConfig({
     pool: "forks",
     // Unlike the unit config, this one does NOT switch pools in CI. The note
     // above is the reason: threads panic inside @prisma/client's query engine,
-    // and that is true wherever it runs. Only the worker count differs.
+    // and that is true wherever it runs.
     //
-    // Every core in CI, one locally. Local integration runs are serial anyway
-    // (fileParallelism is off), so extra workers would buy nothing while the
-    // containers and the rest of the machine compete for the same memory.
-    maxWorkers: isCI ? "100%" : 1,
+    // This only takes effect when fileParallelism is on. Vitest documents that
+    // `fileParallelism: false` overrides maxWorkers to 1, so with the flag off
+    // — which is the current state everywhere — the value here is inert, and
+    // an earlier `isCI ? "100%" : 1` read as if CI were running four workers
+    // when it was running one. Keep it honest: ask for two, and let vitest
+    // clamp it to one while files are serial. Two rather than every core
+    // because the runner has 4 vCPUs and is also hosting ClickHouse, Postgres
+    // and Redis; handing vitest the whole box starved the datastores and
+    // suites failed on vi.waitFor timeouts rather than on their assertions.
+    maxWorkers: isCI ? 2 : 1,
     // Same weight-balanced split as the unit config: equal file counts are not
     // equal work, and a matrix is only as fast as its slowest leg.
     sequence: { sequencer: WeightBalancedSequencer },

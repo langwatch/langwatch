@@ -93,9 +93,22 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
-  await redis.flushdb();
+  // Scoped to this suite's hash-tagged namespace, never flushdb(): flushdb
+  // empties the whole logical database, so it does not just reset this
+  // suite — it deletes the in-flight keys of any suite sharing the database,
+  // which is every other integration file once they run concurrently. The
+  // symptom is not a failure here but a failure over there, in a suite that
+  // never called it. Same rule as the rest of groupQueue/__tests__ (see the
+  // README's namespace note).
+  await deleteSuiteKeys();
   scripts = new GroupStagingScripts(redis, QUEUE_NAME);
 });
+
+/** Remove every key this suite owns, leaving other suites' databases alone. */
+async function deleteSuiteKeys(): Promise<void> {
+  const keys = await redis.keys(`${QUEUE_NAME}*`);
+  if (keys.length > 0) await redis.del(...keys);
+}
 
 afterAll(async () => {
   await stopTestContainers();

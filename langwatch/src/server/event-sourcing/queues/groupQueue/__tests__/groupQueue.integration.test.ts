@@ -49,7 +49,7 @@ function createQueueDefinition(
   },
 ): EventSourcedQueueDefinition<TestPayload> {
   return {
-    name: `{test/gq/${crypto.randomUUID().slice(0, 8)}}`,
+    name: `{test/gqmain/${crypto.randomUUID().slice(0, 8)}}`,
     groupKey: (p) => p.groupId,
     ...overrides,
   };
@@ -73,7 +73,12 @@ describe.skipIf(!hasTestcontainers)(
     afterEach(async () => {
       // Close all queues created during the test
       await Promise.all(queues.map((q) => q.close().catch(() => {})));
-      await redis.flushdb();
+      // Scoped to this suite's own namespace, never flushdb(). flushdb empties
+      // the whole logical database, so it does not just reset this suite — it
+      // deletes whatever another suite has in flight in the same database.
+      // The failure then lands over there, in a file that never called it.
+      const keys = await redis.keys("{test/gqmain/*");
+      if (keys.length > 0) await redis.del(...keys);
     });
 
     afterAll(async () => {
@@ -224,7 +229,7 @@ describe.skipIf(!hasTestcontainers)(
         it("stores the body under a blob key, delivers it intact, and deletes the blob on completion", async () => {
           vi.stubEnv("GROUP_QUEUE_ENVELOPE_WRITES_ENABLED", "true");
           try {
-            const queueName = `{test/gq/blob-${crypto.randomUUID().slice(0, 8)}}`;
+            const queueName = `{test/gqmain/blob-${crypto.randomUUID().slice(0, 8)}}`;
             const blobKeysDuringProcessing: string[] = [];
             const processed = vi.fn(async (_payload: TestPayload) => {
               blobKeysDuringProcessing.push(
@@ -268,7 +273,7 @@ describe.skipIf(!hasTestcontainers)(
         it("sets a TTL safety net on the blob key", async () => {
           vi.stubEnv("GROUP_QUEUE_ENVELOPE_WRITES_ENABLED", "true");
           try {
-            const queueName = `{test/gq/blob-${crypto.randomUUID().slice(0, 8)}}`;
+            const queueName = `{test/gqmain/blob-${crypto.randomUUID().slice(0, 8)}}`;
             let release: () => void;
             const gate = new Promise<void>((resolve) => {
               release = resolve;
@@ -317,7 +322,7 @@ describe.skipIf(!hasTestcontainers)(
         it("reclaims the displaced old blob on replace so it cannot leak", async () => {
           vi.stubEnv("GROUP_QUEUE_ENVELOPE_WRITES_ENABLED", "true");
           try {
-            const queueName = `{test/gq/blob-dedup-${crypto.randomUUID().slice(0, 8)}}`;
+            const queueName = `{test/gqmain/blob-dedup-${crypto.randomUUID().slice(0, 8)}}`;
             const queue = createQueue(vi.fn().mockResolvedValue(undefined), {
               name: queueName,
               delay: 60_000,
@@ -354,7 +359,7 @@ describe.skipIf(!hasTestcontainers)(
         it("reclaims the discarded new blob when the existing payload is kept (replace:false)", async () => {
           vi.stubEnv("GROUP_QUEUE_ENVELOPE_WRITES_ENABLED", "true");
           try {
-            const queueName = `{test/gq/blob-keep-${crypto.randomUUID().slice(0, 8)}}`;
+            const queueName = `{test/gqmain/blob-keep-${crypto.randomUUID().slice(0, 8)}}`;
             const queue = createQueue(vi.fn().mockResolvedValue(undefined), {
               name: queueName,
               delay: 60_000,
@@ -903,7 +908,7 @@ describe.skipIf(!hasTestcontainers)(
         it("never mixes __jobName within a batch and restages foreign siblings", async () => {
           const batches: TestPayload[][] = [];
           const singles: TestPayload[] = [];
-          const queueName = `{test/gq/mixed-${crypto.randomUUID().slice(0, 8)}}`;
+          const queueName = `{test/gqmain/mixed-${crypto.randomUUID().slice(0, 8)}}`;
           const queue = createQueue(
             async (p) => {
               singles.push(p);

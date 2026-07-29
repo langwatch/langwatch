@@ -43,7 +43,7 @@ function createQueueDefinition(
   },
 ): EventSourcedQueueDefinition<TestPayload> {
   return {
-    name: `{test/gq/${crypto.randomUUID().slice(0, 8)}}`,
+    name: `{test/gqpoison/${crypto.randomUUID().slice(0, 8)}}`,
     groupKey: (p) => p.groupId,
     ...overrides,
   };
@@ -66,7 +66,12 @@ describe.skipIf(!hasTestcontainers)(
 
     afterEach(async () => {
       await Promise.all(queues.map((q) => q.close().catch(() => {})));
-      await redis.flushdb();
+      // Scoped to this suite's own namespace, never flushdb(). flushdb empties
+      // the whole logical database, so it does not just reset this suite — it
+      // deletes whatever another suite has in flight in the same database.
+      // The failure then lands over there, in a file that never called it.
+      const keys = await redis.keys("{test/gqpoison/*");
+      if (keys.length > 0) await redis.del(...keys);
     });
 
     afterAll(async () => {

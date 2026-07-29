@@ -78,6 +78,7 @@ import { TraceSummaryStore } from "~/server/event-sourcing/pipelines/trace-proce
 import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
 import { EventStoreClickHouse } from "~/server/event-sourcing/stores/eventStoreClickHouse";
 import { EventRepositoryClickHouse } from "~/server/event-sourcing/stores/repositories/eventRepositoryClickHouse";
+import { makeQueueName } from "~/server/queues/makeQueueName";
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const otlpRoot = require("@opentelemetry/otlp-transformer/build/src/generated/root");
@@ -349,18 +350,29 @@ describe.skipIf(!shouldRun)(
       otlpDeliveries.length = 0;
       nlpgoStderrBuf = "";
 
-      // Flush Redis once so reactor-job orphans from prior runs don't
-      // log "Unknown job in global queue" noise (matches the
+      // Clear reactor-job orphans from prior runs once, so they don't log
+      // "Unknown job in global queue" noise (matches the
       // loopPrevention.reactor.integration.test.ts pattern). Wrap in
       // a one-retry helper so a transient ETIMEDOUT on a saturated CI
       // runner doesn't kill the whole suite before the test even runs.
+      //
+      // Scoped to the global queue's own keys, NOT flushdb(): flushdb empties
+      // the whole logical database, so it deleted the in-flight state of
+      // every other suite sharing it — the failure then surfaces in a file
+      // that never called flushdb.
       const redis = getTestRedisConnection();
       if (redis) {
+        const clearGlobalQueue = async () => {
+          const stale = await redis.keys(
+            `${makeQueueName("event-sourcing/jobs")}*`,
+          );
+          if (stale.length > 0) await redis.del(...stale);
+        };
         try {
-          await redis.flushdb();
+          await clearGlobalQueue();
         } catch {
           await sleep(2_000);
-          await redis.flushdb();
+          await clearGlobalQueue();
         }
       }
 

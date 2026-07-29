@@ -49,6 +49,7 @@ import { TraceSummaryClickHouseRepository } from "~/server/app-layer/traces/repo
 import { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
 import { TraceSummaryService } from "~/server/app-layer/traces/trace-summary.service";
 import { evaluatorLoopBlockedCounter } from "~/server/metrics";
+import { makeQueueName } from "~/server/queues/makeQueueName";
 import type { AggregateType } from "../../../..";
 import { definePipeline } from "../../../..";
 import {
@@ -313,12 +314,22 @@ describe.skipIf(!hasTestcontainers)(
 
     // Stale Redis jobs from prior test-file runs (different pipeline
     // names) cause "Unknown job in global queue" rejections that
-    // block this run's reactors from picking up work. Flush once
+    // block this run's reactors from picking up work. Clear those once
     // before any test in this suite executes.
+    //
+    // Scoped to the global queue's own keys, NOT flushdb(). flushdb empties
+    // the whole logical database, and this runs in beforeAll — so it deleted
+    // the in-flight state of every other suite sharing the database at the
+    // moment this file started. The groupQueue suites were the visible
+    // casualties: a staged job that never dispatches, a blocked set that
+    // never fills, always in a file that never called flushdb itself.
     beforeAll(async () => {
       const redisConnection = getTestRedisConnection();
       if (redisConnection) {
-        await redisConnection.flushdb();
+        const stale = await redisConnection.keys(
+          `${makeQueueName("event-sourcing/jobs")}*`,
+        );
+        if (stale.length > 0) await redisConnection.del(...stale);
       }
     });
 
