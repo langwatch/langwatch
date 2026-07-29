@@ -485,6 +485,7 @@ func buildWorkerEnv(conversationID, workerHome string, creds domain.Credentials,
 		// below) and the LLM virtual key (above).
 		"LANGWATCH_API_KEY="+creds.LangwatchAPIKey,
 		"LANGWATCH_ENDPOINT="+creds.LangwatchEndpoint,
+		"LANGY_IS_SUPER_ADMIN="+strconv.FormatBool(creds.IsSuperAdmin),
 		// Requires opencode's HTTP control server to authenticate with HTTP
 		// Basic (user "opencode", this password) instead of serving every
 		// request unauthenticated. This is the sibling-isolation guarantee

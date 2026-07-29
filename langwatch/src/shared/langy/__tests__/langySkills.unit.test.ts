@@ -59,6 +59,7 @@ describe("given the Langy skill catalogue", () => {
       expect(offered.length).toBeGreaterThan(1);
       expect(offered).toContain("github");
       expect(offered).toContain("tracing");
+      expect(offered).toContain("self-improve-langwatch");
     });
   });
 

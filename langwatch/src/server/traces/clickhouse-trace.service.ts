@@ -1699,29 +1699,26 @@ export class ClickHouseTraceService {
             ? " AND ts.TraceId IN ({traceIds:Array(String)})"
             : "";
 
-        // Text search on computed I/O — lower(ifNull(...)) matches the ngrambf_v1 indexed expression
+        // Text search includes span names so operational traces remain discoverable
+        // even when their captured input and output do not mention the operation.
         const effectiveQuery = query && query.length >= 3 ? query : undefined;
 
-        // If the user can't see input/output, searching their content is not allowed
-        if (
-          effectiveQuery &&
-          protections.canSeeCapturedInput === false &&
-          protections.canSeeCapturedOutput === false
-        ) {
-          return { traces: [], totalHits: 0, lastTrace: null };
-        }
-
-        const searchableColumns = [
+        const searchableConditions = [
           ...(protections.canSeeCapturedInput !== false
-            ? ["lower(ifNull(ts.ComputedInput, ''))"]
+            ? ["lower(ifNull(ts.ComputedInput, '')) LIKE {searchQuery:String}"]
             : []),
           ...(protections.canSeeCapturedOutput !== false
-            ? ["lower(ifNull(ts.ComputedOutput, ''))"]
+            ? ["lower(ifNull(ts.ComputedOutput, '')) LIKE {searchQuery:String}"]
             : []),
+          "ts.TraceId IN (SELECT TraceId FROM stored_spans WHERE TenantId = {tenantId:String} AND lower(SpanName) LIKE {searchQuery:String})",
         ];
 
+        const spanNameMatch = effectiveQuery
+          ? "ts.TraceId IN (SELECT TraceId FROM stored_spans WHERE TenantId = {tenantId:String} AND lower(SpanName) LIKE {searchQuery:String})"
+          : "0";
+
         const searchFilter = effectiveQuery
-          ? ` AND (${searchableColumns.map((col) => `${col} LIKE {searchQuery:String}`).join(" OR ")})`
+          ? ` AND (${searchableConditions.join(" OR ")})`
           : "";
 
         // Date axis.
@@ -1804,7 +1801,7 @@ export class ClickHouseTraceService {
             `;
         const idQuery = isUpdatedAxis
           ? `
-              SELECT ts.TraceId
+                SELECT ts.TraceId, max(${spanNameMatch}) AS _span_name_match
               FROM trace_summaries ts
               WHERE ts.TenantId = {tenantId:String}
                 ${latestVersionOnly}
@@ -1814,13 +1811,14 @@ export class ClickHouseTraceService {
                 ${searchFilter}
                 ${updatedCursor}
               GROUP BY ts.TraceId
-              ORDER BY max(toUnixTimestamp64Milli(ts.UpdatedAt)) ${orderDirection}, ts.TraceId ${orderDirection}
+                ORDER BY _span_name_match DESC, max(toUnixTimestamp64Milli(ts.UpdatedAt)) ${orderDirection}, ts.TraceId ${orderDirection}
               LIMIT {pageSize:UInt32}
             `
           : `
               SELECT s.TraceId
               FROM (
                 SELECT ts.TraceId AS TraceId,
+                       max(${spanNameMatch}) AS _span_name_match,
                        argMax(ts.OccurredAt, ts.UpdatedAt) AS _oa
                 FROM trace_summaries ts
                 WHERE ts.TenantId = {tenantId:String}
@@ -1831,7 +1829,7 @@ export class ClickHouseTraceService {
                   ${occurredCursor}
                 GROUP BY ts.TraceId
               ) s
-              ORDER BY s._oa ${orderDirection}, s.TraceId ${orderDirection}
+               ORDER BY s._span_name_match DESC, s._oa ${orderDirection}, s.TraceId ${orderDirection}
               LIMIT {pageSize:UInt32}
             `;
         const [countResult, idsResult] = await Promise.all([

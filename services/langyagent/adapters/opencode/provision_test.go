@@ -175,6 +175,7 @@ func TestBuildWorkerEnv_InjectsCredentials(t *testing.T) {
 		"OPENAI_API_KEY":     "vk-secret",
 		"LANGWATCH_API_KEY":  "lw-key",
 		"LANGWATCH_ENDPOINT": "https://app.langwatch.ai",
+		"LANGY_IS_SUPER_ADMIN": "false",
 	}
 	for k, v := range wants {
 		if got := valueOfEnv(env, k); got != v {

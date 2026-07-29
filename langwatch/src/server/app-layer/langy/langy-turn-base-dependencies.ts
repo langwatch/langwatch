@@ -1,4 +1,5 @@
 import { createLogger } from "@langwatch/observability";
+import { isAdmin } from "@ee/admin/isAdmin";
 import { getLangWatchTracer } from "langwatch";
 import type { Session } from "~/server/auth";
 
@@ -95,6 +96,7 @@ export async function resolveLangyTurnBaseDependencies(args: {
   }
 
   const credentials = credentialsResult.value;
+  credentials.isSuperAdmin = isAdmin({ email: session.user.email });
   if (egressResult.value) {
     credentials.egressAllowlist = egressResult.value;
   }

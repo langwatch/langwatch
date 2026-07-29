@@ -68,3 +68,10 @@ Feature: Langy loads its skills from the canonical skill directory
     When a Langy conversation starts
     Then that skill is available to the assistant
     And it is offered the same way as the canonical skills
+
+  @unit
+  Scenario: Platform admins can use the LangWatch self-improvement skill
+    Given I am listed in the platform administrator allow-list
+    When I report a verified Langy product issue
+    Then Langy receives the platform-admin capability for that turn
+    And it can use the self-improvement skill to prepare a reviewable fix

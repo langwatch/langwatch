@@ -471,6 +471,9 @@ describe("ClickHouseTraceService", () => {
         expect(countCall[0].query).toContain(
           "lower(ifNull(ts.ComputedOutput, '')) LIKE {searchQuery:String}",
         );
+        expect(countCall[0].query).toContain(
+          "FROM stored_spans WHERE TenantId = {tenantId:String} AND lower(SpanName) LIKE {searchQuery:String}",
+        );
       });
 
       it("includes LIKE clause in data query", async () => {

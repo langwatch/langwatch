@@ -13,6 +13,8 @@ import (
 // pure value object: the workerpool adapter injects it into the subprocess
 // env, and the httpapi adapter decodes it off the wire.
 type Credentials struct {
+	// IsSuperAdmin is server-derived from the platform ADMIN_EMAILS allow-list.
+	IsSuperAdmin bool `json:"isSuperAdmin,omitempty"`
 	// ProjectID and ActorUserID bind an in-memory worker to the principal that
 	// activated it. They are transport metadata, never forwarded as credentials.
 	ProjectID   string `json:"-"`

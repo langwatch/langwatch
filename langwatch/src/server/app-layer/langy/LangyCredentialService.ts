@@ -186,6 +186,8 @@ export function resolveActingGithubLogin(session: Session): string {
 }
 
 export type LangyCredentials = {
+  /** Server-derived platform-admin capability for Langy-only staff workflows. */
+  isSuperAdmin?: boolean;
   /**
    * Ephemeral per-WORKER sk-lw-* key scoped to the requesting user's own
    * permissions (ADR-047). Used by the MCP server in the worker to call the LW

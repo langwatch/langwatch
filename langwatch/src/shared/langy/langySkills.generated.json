@@ -105,6 +105,13 @@
 		"userPrompt": "Add scenario tests for my agent"
 	},
 	{
+		"id": "self-improve-langwatch",
+		"label": "Self Improve LangWatch",
+		"description": "Lets platform super admins turn verified Langy and LangWatch product issues into reviewable fixes.",
+		"category": "skill",
+		"userPrompt": "Report a Langy or LangWatch product issue for improvement"
+	},
+	{
 		"id": "setup-lw",
 		"label": "Setup lw",
 		"description": "Set up and troubleshoot the LangWatch CLI — login (cloud and self-hosted), endpoint configuration, project selection, and connection problems. Use when the CLI isn't authenticated, can't reach LangWatch, or talks to the wrong project.",
