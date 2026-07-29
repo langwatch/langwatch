@@ -475,10 +475,7 @@ export class AiToolEntryService {
     userId: string;
   }): Promise<
     Partial<
-      Record<
-        PlatformToolSlug,
-        { allowVk: boolean; allowOtelDirect: boolean }
-      >
+      Record<PlatformToolSlug, { allowVk: boolean; allowOtelDirect: boolean }>
     >
   > {
     const tiles = await this.resolveVisibleTilesForUser({
@@ -494,10 +491,7 @@ export class AiToolEntryService {
     );
 
     const overrides: Partial<
-      Record<
-        PlatformToolSlug,
-        { allowVk: boolean; allowOtelDirect: boolean }
-      >
+      Record<PlatformToolSlug, { allowVk: boolean; allowOtelDirect: boolean }>
     > = {};
 
     for (const tile of sorted) {
