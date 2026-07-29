@@ -9,47 +9,47 @@ Feature: Storage billing hourly reporting to Stripe
   Background:
     Given the organization has storage billing enabled
 
-  @integration @unimplemented
+  @integration
   Scenario: Each organization hour is reported exactly once
     Given an hourly row that was already reported
     When the reporter runs again over the same hour
     Then no Stripe meter event is sent for it
 
-  @integration @unimplemented
+  @integration
   Scenario: Zero-usage hours are settled without a Stripe call
     Given an hourly row of 0 megabytes
     When the reporter processes it
     Then the row is marked reported
     And no Stripe meter event is sent
 
-  @integration @unimplemented
+  @integration
   Scenario: A resent meter event is deduplicated by Stripe
     Given a meter event that was sent but whose confirmation was lost
     When the reporter retries the same organization hour
     Then the resent event carries the same deterministic identifier
     And Stripe records the usage once
 
-  @integration @unimplemented
+  @integration
   Scenario: A Stripe failure leaves the hour unreported for retry
     Given Stripe rejects a meter event with a transient error
     When the reporter processes the hour
     Then the row is not marked reported
     And the next run retries it
 
-  @integration @unimplemented
+  @integration
   Scenario: Hours older than the Stripe backdate ceiling are settled without reporting
     Given an unreported hourly row older than 35 days
     When the reporter processes it
     Then the row is marked as too old to report
     And an alert records the skipped usage
 
-  @integration @unimplemented
+  @integration
   Scenario: Organizations without the billing gate are never reported
     Given an organization with hourly rows but storage billing disabled
     When the reporter runs
     Then no Stripe meter events are sent for that organization
 
-  @unit @unimplemented
+  @unit
   Scenario: A full month of steady storage invoices at 3 EUR per GiB
     Given an organization holding a steady 8 GiB billable for a 30-day month
     When all hourly reports for the month are summed by the Stripe meter

@@ -1,8 +1,8 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
 import type { PrismaClient } from "@prisma/client";
-import { PrismaSubscriptionRepository } from "../services/subscription.repository";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NUMERIC_OVERRIDE_FIELDS } from "../planProvider";
 import { SubscriptionStatus } from "../planTypes";
+import { PrismaSubscriptionRepository } from "../services/subscription.repository";
 
 describe("PrismaSubscriptionRepository", () => {
   let prisma: { subscription: { update: ReturnType<typeof vi.fn> } };

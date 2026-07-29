@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../utils/growthSeatEvent", () => ({
-  createCheckoutLineItems: vi.fn().mockReturnValue([
-    { price: "price_seat_usd_monthly", quantity: 3 },
-    { price: "price_events_usd_monthly" },
-  ]),
+  createCheckoutLineItems: vi
+    .fn()
+    .mockReturnValue([
+      { price: "price_seat_usd_monthly", quantity: 3 },
+      { price: "price_events_usd_monthly" },
+    ]),
   GROWTH_SEAT_PLAN_TYPES: [
     "GROWTH_SEAT_EUR_MONTHLY",
     "GROWTH_SEAT_EUR_ANNUAL",
@@ -12,17 +14,15 @@ vi.mock("../utils/growthSeatEvent", () => ({
     "GROWTH_SEAT_USD_ANNUAL",
   ],
   isGrowthSeatPrice: vi.fn((id: string) => id.startsWith("price_seat_")),
-  resolveGrowthSeatPlanType: vi
-    .fn()
-    .mockReturnValue("GROWTH_SEAT_USD_MONTHLY"),
+  resolveGrowthSeatPlanType: vi.fn().mockReturnValue("GROWTH_SEAT_USD_MONTHLY"),
 }));
 
-import { createSeatEventSubscriptionFns } from "../services/seatEventSubscription";
-import { SubscriptionStatus } from "../planTypes";
 import {
   NoActiveSubscriptionError,
   SubscriptionItemNotFoundError,
 } from "../errors";
+import { SubscriptionStatus } from "../planTypes";
+import { createSeatEventSubscriptionFns } from "../services/seatEventSubscription";
 
 // ── Mock factories ──────────────────────────────────────────────────────────
 
@@ -356,9 +356,7 @@ describe("seatEventSubscription", () => {
           status: "active",
           canceled_at: null,
           items: {
-            data: [
-              { id: "si_seat", price: { id: "price_seat_usd_monthly" } },
-            ],
+            data: [{ id: "si_seat", price: { id: "price_seat_usd_monthly" } }],
           },
         });
 
@@ -410,9 +408,7 @@ describe("seatEventSubscription", () => {
           status: "active",
           canceled_at: 1700000000,
           items: {
-            data: [
-              { id: "si_seat", price: { id: "price_seat_usd_monthly" } },
-            ],
+            data: [{ id: "si_seat", price: { id: "price_seat_usd_monthly" } }],
           },
         });
 
@@ -684,8 +680,8 @@ describe("seatEventSubscription", () => {
         });
 
         const callArgs = stripe.checkout.sessions.create.mock.calls[0]![0];
-        const anchor =
-          callArgs.subscription_data.billing_cycle_anchor as number;
+        const anchor = callArgs.subscription_data
+          .billing_cycle_anchor as number;
 
         // Anchor should be a Unix timestamp for the 1st of next month
         const anchorDate = new Date(anchor * 1000);

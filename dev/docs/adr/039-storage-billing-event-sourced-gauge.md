@@ -265,6 +265,7 @@ model StorageSweepCursor {
 | Sweep batch sizes / dedup TTLs (tunables within the Decision-5 invariants) | Implementation phase | No |
 | Late-arrival drift tolerance before alarming (reconciliation threshold) | First shadow-mode rollout | No |
 | Platform-outage > 840h: Stripe `meterEventAdjustments` runbook (carried from the predecessor) | Ops, at wire-up phase | No |
+| Subscription-end flush: a cancelling org's final unreported hours sit behind the billable gate and are silently unbilled (phase-4 review finding) — needs a drain on subscription end or an accepted write-off | Billing rollout | No |
 | Category enumeration for the boundary calendar (11 tables → category map reuse from `retentionPolicy.schema`) | Implementation phase | No |
 
 ## Revisions
