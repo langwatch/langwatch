@@ -22,6 +22,8 @@
  */
 import { z } from "zod";
 
+import { unsupportedValue } from "./unsupportedValue";
+
 /**
  * Rule types with a wired detector / evaluator. Only these run on the
  * anomaly reactor today; others save in "preview" mode (admin can
@@ -71,10 +73,10 @@ export type SpendSpikeThresholdConfigParsed = z.infer<
 >;
 
 /**
- * Validate a `thresholdConfig` payload against the schema for the
- * named `ruleType`. Throws ZodError on shape failure; throws a generic
- * Error on unknown ruleType (callers should translate that to
- * BAD_REQUEST at the router layer).
+ * Validate a `thresholdConfig` payload against the schema for the named
+ * `ruleType`. Throws ZodError on shape failure (the router turns it into a
+ * `ValidationError` naming which config it belongs to); throws
+ * `ValidationError` directly on an unknown ruleType.
  */
 export function validateThresholdConfig({
   ruleType,
@@ -83,12 +85,17 @@ export function validateThresholdConfig({
   ruleType: string;
   config: unknown;
 }): SpendSpikeThresholdConfigParsed | null {
-  // Reject genuinely unknown types — saves the admin from a typo
-  // landing as a forever-dead rule.
+  // Reject genuinely unknown types — saves the admin from a typo landing as
+  // a forever-dead rule. Handled, not a plain Error, for the reasons in
+  // `unsupportedValue`: the cause is exactly known and picking a listed type
+  // is the whole fix. The complaint reaches the admin through the
+  // `validation_error` registry copy, which renders `meta.formErrors`.
   if (!ALLOWED_RULE_TYPES.includes(ruleType as AllowedRuleType)) {
-    throw new Error(
-      `Unsupported ruleType "${ruleType}". Allowed: ${ALLOWED_RULE_TYPES.join(", ")}.`,
-    );
+    throw unsupportedValue({
+      field: "ruleType",
+      value: ruleType,
+      allowed: ALLOWED_RULE_TYPES,
+    });
   }
   // Allowed but not yet detected — preview mode. Admin can save the
   // rule, the UI's ThresholdPreview surfaces "Won't fire" honestly,

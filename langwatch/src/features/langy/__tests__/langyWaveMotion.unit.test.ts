@@ -16,11 +16,11 @@ import {
   isErrorTransition,
   isSuccessTransition,
   isWakeTransition,
+  type LangyWaveActivity,
+  type LangyWaveMotion,
   restingWaveMotion,
   stepWaveMotion,
   WAVE_MOTION_TARGETS,
-  type LangyWaveActivity,
-  type LangyWaveMotion,
 } from "../logic/langyWaveMotion";
 
 const assistant = (parts: unknown[]) => ({

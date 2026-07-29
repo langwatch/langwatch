@@ -14,7 +14,7 @@
  * Packages under `langwatch/packages/*` are exempt: they ride along with
  * `COPY --from=builder /app/langwatch ./langwatch`.
  */
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -75,10 +75,12 @@ describe("Dockerfile runtime stage", () => {
       // Guards the guard: if this list ever empties, the assertions below
       // would vacuously pass and stop protecting anything.
       expect(requiredDirs).toContain("handled-error");
-      expect(requiredDirs).toContain("cli-cards");
+      expect(requiredDirs).toContain("langy");
     });
 
-    it.each(requiredDirs)("copies packages/%s into the runtime image", (dir) => {
+    it.each(
+      requiredDirs,
+    )("copies packages/%s into the runtime image", (dir) => {
       expect(
         stage.includes(`/app/packages/${dir}`),
         `The runtime stage must COPY /app/packages/${dir} — langwatch/node_modules/@langwatch/* symlinks into it, so omitting it makes the app fail at boot with "Cannot find module".`,

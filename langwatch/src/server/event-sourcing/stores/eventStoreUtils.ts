@@ -1,13 +1,13 @@
 import type { AggregateType } from "../domain/aggregateType";
 import { createTenantId } from "../domain/tenantId";
 import type { Event } from "../domain/types";
-import type { EventStoreReadContext } from "./eventStore.types";
 import {
-	ErrorCategory,
-	SecurityError,
-	StoreError,
-	ValidationError,
+  ErrorCategory,
+  SecurityError,
+  StoreError,
+  ValidationError,
 } from "../services/errorHandling";
+import type { EventStoreReadContext } from "./eventStore.types";
 import type { EventRecord } from "./repositories/eventRepository.types";
 
 /**

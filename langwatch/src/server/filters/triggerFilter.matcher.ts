@@ -2,11 +2,11 @@ import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
 import type {
-  PreconditionTraceData,
   PreconditionFieldMatcher,
+  PreconditionTraceData,
 } from "./precondition-matchers";
 import { PRECONDITION_FIELD_MATCHERS } from "./precondition-matchers";
-import type { FilterField, TriggerFilterValue, TriggerFilters } from "./types";
+import type { FilterField, TriggerFilters, TriggerFilterValue } from "./types";
 
 const EVALUATION_FIELDS: ReadonlySet<string> = new Set([
   "evaluations.evaluator_id",

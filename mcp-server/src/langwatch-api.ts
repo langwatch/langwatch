@@ -1,4 +1,7 @@
-import type { HandledErrorFault } from "@langwatch/handled-error";
+import type {
+  HandledErrorFault,
+  SerializedReason,
+} from "@langwatch/handled-error";
 import { getConfig, requireApiKey } from "./config.js";
 import type { EvaluationSummary } from "./utils/format-evaluations.js";
 
@@ -107,6 +110,13 @@ export class LangWatchApiError extends Error {
   readonly tips?: string[];
   readonly docsUrl?: string;
   readonly fault?: HandledErrorFault;
+  /**
+   * The per-field failures behind this error, verbatim from the envelope.
+   * A validation failure carries the offending field and the values it would
+   * have accepted here — the difference between an agent correcting its own
+   * request and an agent guessing again.
+   */
+  readonly reasons?: SerializedReason[];
 
   constructor(
     message: string,
@@ -117,6 +127,7 @@ export class LangWatchApiError extends Error {
       tips?: string[];
       docsUrl?: string;
       fault?: HandledErrorFault;
+      reasons?: SerializedReason[];
     } = {},
   ) {
     super(message);
@@ -125,6 +136,7 @@ export class LangWatchApiError extends Error {
     this.tips = options.tips;
     this.docsUrl = options.docsUrl;
     this.fault = options.fault;
+    this.reasons = options.reasons;
   }
 }
 
@@ -135,6 +147,7 @@ interface ParsedErrorBody {
   tips?: string[];
   docsUrl?: string;
   fault?: HandledErrorFault;
+  reasons?: SerializedReason[];
 }
 
 const VALID_FAULTS: readonly HandledErrorFault[] = ["customer", "platform", "provider"];
@@ -173,10 +186,41 @@ function parseErrorBody(responseBody: string): ParsedErrorBody {
     const fault = VALID_FAULTS.includes(body.fault as HandledErrorFault)
       ? (body.fault as HandledErrorFault)
       : undefined;
-    return { code, message, tips, docsUrl, fault };
+    const reasons =
+      Array.isArray(body.reasons) &&
+      body.reasons.every((r) => !!r && typeof r === "object")
+        ? (body.reasons as SerializedReason[])
+        : undefined;
+    return { code, message, tips, docsUrl, fault, reasons };
   } catch {
     return {};
   }
+}
+
+/**
+ * The human line for one per-field failure: the field, what it would have
+ * accepted, and what it got. Returns null when a reason names no field, so a
+ * generic nested error adds no noise to the message.
+ *
+ * This exists because the MCP transport's only channel to the caller is the
+ * error MESSAGE — an agent never sees the `reasons` array itself, so a
+ * rejection whose remedy lives only there is unfollowable.
+ */
+function describeReason(reason: SerializedReason): string | null {
+  const meta = reason.meta;
+  if (!meta || typeof meta !== "object") return null;
+
+  const field = typeof meta.field === "string" ? meta.field : null;
+  if (!field) return null;
+
+  const parts = [`- ${field}`];
+  if (meta.received !== undefined) {
+    parts.push(`received ${JSON.stringify(meta.received)}`);
+  }
+  if (Array.isArray(meta.expected) && meta.expected.length > 0) {
+    parts.push(`expected one of: ${meta.expected.join(", ")}`);
+  }
+  return parts.join(" — ");
 }
 
 /**
@@ -218,6 +262,12 @@ export async function makeRequest(
     const lines = [
       `LangWatch API error ${response.status}: ${parsed.message ?? responseBody}`,
     ];
+    const reasonLines = (parsed.reasons ?? [])
+      .map(describeReason)
+      .filter((line): line is string => line !== null);
+    if (reasonLines.length > 0) {
+      lines.push("Rejected fields:", ...reasonLines);
+    }
     if (parsed.tips && parsed.tips.length > 0) {
       lines.push("Tips:", ...parsed.tips.map((tip) => `- ${tip}`));
     }
@@ -233,6 +283,7 @@ export async function makeRequest(
         tips: parsed.tips,
         docsUrl: parsed.docsUrl,
         fault: parsed.fault,
+        reasons: parsed.reasons,
       },
     );
   }

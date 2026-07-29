@@ -25,7 +25,9 @@ Add variables via double brackets like this: {{input}}
  */
 export function useCreateDraftPrompt() {
   const { project } = useOrganizationTeamProject();
-  const { modelMetadata } = useModelProvidersSettings({ projectId: project?.id });
+  const { modelMetadata } = useModelProvidersSettings({
+    projectId: project?.id,
+  });
   const { addTab } = useDraggableTabsBrowserStore(({ addTab }) => ({ addTab }));
 
   // Cascade-resolved model for "new prompt" surfaces. Returns null when

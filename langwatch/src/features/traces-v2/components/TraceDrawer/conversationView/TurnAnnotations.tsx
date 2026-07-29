@@ -1,12 +1,4 @@
-import {
-  Avatar,
-  Box,
-  Button,
-  HStack,
-  Icon,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import {
   Database,
   Edit3,
@@ -17,6 +9,7 @@ import {
 import { forwardRef, useState } from "react";
 import { PersonalFeatureGateDialog } from "~/components/me/PersonalFeatureGateDialog";
 import { usePersonalFeatureGate } from "~/components/me/usePersonalFeatureGate";
+import { UserAvatar } from "~/components/UserAvatar";
 import { Popover } from "~/components/ui/popover";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useDrawer } from "~/hooks/useDrawer";
@@ -319,13 +312,13 @@ export function TurnAnnotationBadges({
                   _hover={canEdit ? { bg: "bg.muted" } : undefined}
                 >
                   <HStack gap={2} align="start">
-                    <Avatar.Root
+                    <UserAvatar
                       size="xs"
                       background="gray.solid"
                       color="white"
-                    >
-                      <Avatar.Fallback name={a.user?.name ?? a.email ?? "?"} />
-                    </Avatar.Root>
+                      name={a.user?.name ?? a.email ?? "?"}
+                      image={a.user?.image}
+                    />
                     <VStack align="start" gap={0} flex={1} minWidth={0}>
                       <HStack gap={1.5} width="full">
                         <Text textStyle="2xs" fontWeight="600">

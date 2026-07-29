@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { filterOutEmptyFilters } from "../utils";
 import type { FilterParam } from "~/hooks/useFilterParams";
 import type { FilterField } from "~/server/filters/types";
+import { filterOutEmptyFilters } from "../utils";
 
 describe("filterOutEmptyFilters()", () => {
   describe("when filters is undefined", () => {

@@ -3,20 +3,20 @@ import {
   Badge,
   Button,
   Card,
-  HStack,
   Heading,
+  HStack,
   Skeleton,
   Table,
   Text,
   VStack,
 } from "@chakra-ui/react";
 import { useState } from "react";
+import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import type { ClusteringErrorCode } from "~/server/app-layer/topic-clustering/clustering-error";
 import type {
   TopicClusteringRunMode,
   TopicClusteringSkipReason,
 } from "~/server/event-sourcing/pipelines/topic-clustering-processing/schemas/constants";
-import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { api } from "~/utils/api";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
@@ -274,7 +274,10 @@ function ClusteringStatusCard({
                 {/* The mode is only trustworthy on a completed run: a failure
                     leaves the previous run's mode in place. */}
                 {(() => {
-                  const modeCopy = copyFor(RUN_MODE_COPY, status.data.lastRunMode);
+                  const modeCopy = copyFor(
+                    RUN_MODE_COPY,
+                    status.data.lastRunMode,
+                  );
                   return modeCopy ? `${modeCopy}. ` : null;
                 })()}
                 Organized {status.data.lastRunTracesProcessed} traces into{" "}
@@ -285,8 +288,10 @@ function ClusteringStatusCard({
             {status.data.lastRunOutcome === "skipped" &&
               status.data.lastRunSkippedReason && (
                 <Text fontSize="sm" color="fg.muted">
-                  {copyFor(SKIP_REASON_COPY, status.data.lastRunSkippedReason) ??
-                    "Skipped"}
+                  {copyFor(
+                    SKIP_REASON_COPY,
+                    status.data.lastRunSkippedReason,
+                  ) ?? "Skipped"}
                   .
                 </Text>
               )}
@@ -310,8 +315,8 @@ function ClusteringStatusCard({
                   </Alert.Root>
                 ) : (
                   <Text fontSize="sm" color="red.fg">
-                    The last run failed on our side. It will retry
-                    automatically at the next scheduled run.
+                    The last run failed on our side. It will retry automatically
+                    at the next scheduled run.
                   </Text>
                 );
               })()}

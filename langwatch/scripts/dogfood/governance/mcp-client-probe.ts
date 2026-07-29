@@ -23,22 +23,32 @@ const API_KEY = process.env.LANGWATCH_API_KEY;
 const GOVERNANCE_TOOL_PREFIX = "governance_";
 
 if (!API_KEY) {
-  console.error("LANGWATCH_API_KEY env var required (project apiKey, e.g. pkey_*)");
+  console.error(
+    "LANGWATCH_API_KEY env var required (project apiKey, e.g. pkey_*)",
+  );
   process.exit(2);
 }
 
 void (async () => {
-  const transport = new StreamableHTTPClientTransport(new URL(`${BASE_URL}/mcp`), {
-    requestInit: { headers: { Authorization: `Bearer ${API_KEY}` } },
-  });
+  const transport = new StreamableHTTPClientTransport(
+    new URL(`${BASE_URL}/mcp`),
+    {
+      requestInit: { headers: { Authorization: `Bearer ${API_KEY}` } },
+    },
+  );
 
-  const client = new Client({ name: "governance-dogfood-probe", version: "0.0.0" });
+  const client = new Client({
+    name: "governance-dogfood-probe",
+    version: "0.0.0",
+  });
   console.error(`[probe] connecting to ${BASE_URL}/mcp …`);
   await client.connect(transport);
   console.error("[probe] connected");
 
   const { tools } = await client.listTools();
-  const governanceTools = tools.filter((t) => t.name.startsWith(GOVERNANCE_TOOL_PREFIX));
+  const governanceTools = tools.filter((t) =>
+    t.name.startsWith(GOVERNANCE_TOOL_PREFIX),
+  );
   console.error(
     `[probe] tools registered: ${tools.length} total / ${governanceTools.length} governance`,
   );
@@ -57,7 +67,9 @@ void (async () => {
     "governance_ingestion_keys_list",
     "governance_ingestion_keys_mint",
   ];
-  const missing = expected.filter((n) => !governanceTools.some((t) => t.name === n));
+  const missing = expected.filter(
+    (n) => !governanceTools.some((t) => t.name === n),
+  );
   if (missing.length > 0) {
     console.error(`[probe] MISSING tools: ${missing.join(", ")}`);
     process.exit(1);
@@ -73,16 +85,20 @@ void (async () => {
     name: "governance_ingestion_templates_list",
     arguments: {},
   });
-  const listText = ((listResult.content ?? []) as Array<{
-    type: string;
-    text?: string;
-  }>)
-    .map((c) => (c.type === "text" ? c.text ?? "" : ""))
+  const listText = (
+    (listResult.content ?? []) as Array<{
+      type: string;
+      text?: string;
+    }>
+  )
+    .map((c) => (c.type === "text" ? (c.text ?? "") : ""))
     .join("\n");
   console.log(listText.slice(0, 800));
 
   // Write tool without OAuth: should return AUTH_REQUIRED (fail-closed).
-  console.error("\n[probe] calling governance_ingestion_templates_create (expect AUTH_REQUIRED) …");
+  console.error(
+    "\n[probe] calling governance_ingestion_templates_create (expect AUTH_REQUIRED) …",
+  );
   const createResult = await client.callTool({
     name: "governance_ingestion_templates_create",
     arguments: {
@@ -91,11 +107,13 @@ void (async () => {
       ottl_rules: "",
     },
   });
-  const createText = ((createResult.content ?? []) as Array<{
-    type: string;
-    text?: string;
-  }>)
-    .map((c) => (c.type === "text" ? c.text ?? "" : ""))
+  const createText = (
+    (createResult.content ?? []) as Array<{
+      type: string;
+      text?: string;
+    }>
+  )
+    .map((c) => (c.type === "text" ? (c.text ?? "") : ""))
     .join("\n");
   console.log(createText.slice(0, 400));
   if (!createText.startsWith("AUTH_REQUIRED")) {
@@ -105,5 +123,7 @@ void (async () => {
   console.error("[probe] AUTH_REQUIRED returned as designed ✓");
 
   await client.close();
-  console.error("\n[probe] done — read tools live, write tools fail-closed without OAuth");
+  console.error(
+    "\n[probe] done — read tools live, write tools fail-closed without OAuth",
+  );
 })();

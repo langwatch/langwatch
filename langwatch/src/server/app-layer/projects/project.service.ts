@@ -13,6 +13,7 @@ import type {
   ProjectRepository,
   ProjectWithTeam,
   SearchProjectsResult,
+  TraceSharingConfig,
   UpdateProjectInput,
   UpdateProjectMetadataInput,
 } from "./repositories/project.repository";
@@ -227,6 +228,12 @@ export class ProjectService {
 
   async getPresenceConfig(projectId: string): Promise<PresenceConfig | null> {
     return this.repo.getPresenceConfig(projectId);
+  }
+
+  async getTraceSharingConfig(
+    projectId: string,
+  ): Promise<TraceSharingConfig | null> {
+    return this.repo.getTraceSharingConfig(projectId);
   }
 
   /**

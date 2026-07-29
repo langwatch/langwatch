@@ -57,6 +57,13 @@ export interface LangySkill {
    * something the agent cannot do.
    */
   summary: string;
+  /**
+   * The question this skill answers, in the user's own voice — the skill's own
+   * `userPrompt` front-matter where it declares one. Picking the skill in the
+   * `/` palette drops this into the composer, so the palette hands over a real
+   * message rather than a token nobody knows how to finish.
+   */
+  prompt?: string;
   /** Matched against the `/` palette's query. */
   searchText: string;
 }
@@ -83,6 +90,7 @@ const AGENT_SKILLS: LangySkill[] = (GENERATED_SKILLS as GeneratedSkill[]).map(
         ? ("recipe" as const)
         : ("agent-skill" as const),
     summary: skill.description,
+    prompt: skill.userPrompt,
     searchText:
       `${skill.label} ${skill.id} ${skill.description} ${skill.userPrompt ?? ""}`.toLowerCase(),
   }),
@@ -171,11 +179,4 @@ export const LANGY_SKILLS: LangySkill[] = [
 
 export function findSkill(id: string): LangySkill | undefined {
   return LANGY_SKILLS.find((skill) => skill.id === id);
-}
-
-/** Substring match over name, id, description and the CLI commands themselves. */
-export function searchSkills(query: string): LangySkill[] {
-  const q = query.trim().toLowerCase();
-  if (!q) return LANGY_SKILLS;
-  return LANGY_SKILLS.filter((skill) => skill.searchText.includes(q));
 }

@@ -43,11 +43,12 @@ vi.mock("@langwatch/observability", () => ({
 
 vi.mock("~/utils/posthogErrorCapture", () => ({
   captureException: vi.fn(),
-  toError: vi.fn((e) => e instanceof Error ? e : new Error(String(e))),
+  toError: vi.fn((e) => (e instanceof Error ? e : new Error(String(e)))),
 }));
 
 const FIXED_OCCURRED_AT_MS = 1_700_000_000_000; // 2023-11-14T22:13:20Z
-const EXPECTED_HOUR_BUCKET_MS = 1_700_000_000_000 - (1_700_000_000_000 % 3_600_000);
+const EXPECTED_HOUR_BUCKET_MS =
+  1_700_000_000_000 - (1_700_000_000_000 % 3_600_000);
 
 function createFoldState(
   attributes: Record<string, string> = {},

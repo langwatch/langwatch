@@ -138,10 +138,7 @@ export interface EventSourcedQueueDefinition<
    * Used by fold projections to collapse a backed-up group's events into one
    * load/apply/store cycle. The first payload is always the dispatched job.
    */
-  processBatch?: (
-    payloads: Payload[],
-    delivery?: JobDelivery,
-  ) => Promise<void>;
+  processBatch?: (payloads: Payload[], delivery?: JobDelivery) => Promise<void>;
 
   /**
    * Optional per-payload resolver for the maximum number of same-group jobs to
@@ -150,6 +147,17 @@ export interface EventSourcedQueueDefinition<
    * default, which leaves the per-job path byte-for-byte unchanged.
    */
   coalesceMaxBatch?: (payload: Payload) => number | undefined;
+
+  /**
+   * Optional per-payload resolver for the maximum total byte size of a coalesced
+   * batch (ADR-066 pillar 2). The drain stops before taking a same-group job
+   * that would push the batch past this budget, so a coalesced append stays
+   * inside the downstream flush budget; a job too large to fit is left for its
+   * own later dispatch. Returns undefined to fall back to the GroupQueue default
+   * ({@link DEFAULT_COALESCE_MAX_BYTES}). Only consulted when `coalesceMaxBatch`
+   * enables coalescing.
+   */
+  coalesceMaxBytes?: (payload: Payload) => number | undefined;
 
   /**
    * Optional options for the queue processor.

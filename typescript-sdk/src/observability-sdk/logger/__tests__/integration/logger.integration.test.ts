@@ -72,7 +72,7 @@ describe("Logger Integration Tests", () => {
   });
 
   describe("log record creation and data flow", () => {
-    it("should create log records with proper LangWatch attributes through real OpenTelemetry", async () => {
+    it("creates log records with proper LangWatch attributes through real OpenTelemetry", async () => {
       const logger = getLangWatchLogger("integration-test-logger-1");
 
       // Create log record with LangWatch enhancements
@@ -110,7 +110,7 @@ describe("Logger Integration Tests", () => {
       expect(exportedLogRecord.attributes?.["security.level"]).toBe("high");
     });
 
-    it("should handle different severity levels correctly", async () => {
+    it("handles different severity levels correctly", async () => {
       const logger = getLangWatchLogger("severity-test-logger-2");
 
       const logRecords: LangWatchLogRecord[] = [
@@ -161,7 +161,7 @@ describe("Logger Integration Tests", () => {
       });
     });
 
-    it("should handle log records without attributes", async () => {
+    it("handles log records without attributes", async () => {
       const logger = getLangWatchLogger("no-attributes-test-logger-3");
 
       const logRecord: LangWatchLogRecord = {
@@ -190,7 +190,7 @@ describe("Logger Integration Tests", () => {
   });
 
   describe("data capture integration", () => {
-    it("should preserve log record body when output capture is enabled by default", async () => {
+    it("preserves log record body when output capture is enabled by default", async () => {
       const logger = getLangWatchLogger("data-capture-test-logger-4");
 
       const logRecord: LangWatchLogRecord = {
@@ -215,7 +215,7 @@ describe("Logger Integration Tests", () => {
       expect(exportedLogRecord.body).toBe("Test log message with body");
     });
 
-    it("should preserve log record body when data capture is set to 'all'", async () => {
+    it("preserves log record body when data capture is set to 'all'", async () => {
       // Setup with explicit 'all' data capture
       await observabilityHandle.shutdown();
 
@@ -255,7 +255,7 @@ describe("Logger Integration Tests", () => {
       expect(exportedLogRecord.body).toBe("Test log message with body");
     });
 
-    it("should preserve log record body when data capture is set to 'output'", async () => {
+    it("preserves log record body when data capture is set to 'output'", async () => {
       // Setup with 'output' data capture
       await observabilityHandle.shutdown();
 
@@ -295,7 +295,7 @@ describe("Logger Integration Tests", () => {
       expect(exportedLogRecord.body).toBe("Test log message with body");
     });
 
-    it("should remove log record body when data capture is set to 'input'", async () => {
+    it("removes log record body when data capture is set to 'input'", async () => {
       // Setup with 'input' data capture
       await observabilityHandle.shutdown();
 
@@ -335,7 +335,7 @@ describe("Logger Integration Tests", () => {
       expect(exportedLogRecord.body).toBeUndefined();
     });
 
-    it("should remove log record body when data capture is set to 'none'", async () => {
+    it("removes log record body when data capture is set to 'none'", async () => {
       // Setup with 'none' data capture
       await observabilityHandle.shutdown();
 
@@ -375,7 +375,7 @@ describe("Logger Integration Tests", () => {
       expect(exportedLogRecord.body).toBeUndefined();
     });
 
-    it("should preserve other log record properties when output capture is disabled", async () => {
+    it("preserves other log record properties when output capture is disabled", async () => {
       observabilityHandle = setupObservability({
         serviceName: "logger-integration-test",
         logRecordProcessors: [logRecordProcessor],
@@ -418,7 +418,7 @@ describe("Logger Integration Tests", () => {
       // Note: timestamp is not available on ReadableLogRecord, so we don't assert it
     });
 
-    it("should handle log records without body when output capture is disabled", async () => {
+    it("handles log records without body when output capture is disabled", async () => {
 
 
       observabilityHandle = setupObservability({
@@ -459,7 +459,7 @@ describe("Logger Integration Tests", () => {
   });
 
   describe("logger naming and versioning", () => {
-    it("should handle different logger names correctly", async () => {
+    it("handles different logger names correctly", async () => {
       const loggers = [
         getLangWatchLogger("app-logger-11"),
         getLangWatchLogger("database-logger-12"),
@@ -488,7 +488,7 @@ describe("Logger Integration Tests", () => {
       });
     });
 
-    it("should handle different versions correctly", async () => {
+    it("handles different versions correctly", async () => {
       const loggers = [
         getLangWatchLogger("version-test-logger-14", "1.0.0"),
         getLangWatchLogger("version-test-logger-15", "2.0.0"),
@@ -519,7 +519,7 @@ describe("Logger Integration Tests", () => {
   });
 
   describe("GenAI-specific logging", () => {
-    it("should handle GenAI-specific attributes correctly", async () => {
+    it("handles GenAI-specific attributes correctly", async () => {
       const logger = getLangWatchLogger("genai-test-logger-17");
 
       const logRecord: LangWatchLogRecord = {
@@ -555,7 +555,7 @@ describe("Logger Integration Tests", () => {
       expect(exportedLogRecord.attributes?.["langwatch.service"]).toBe("genai-service");
     });
 
-    it("should handle GenAI error scenarios", async () => {
+    it("handles GenAI error scenarios", async () => {
       const logger = getLangWatchLogger("genai-error-test-logger-18");
 
       const errorLogRecord: LangWatchLogRecord = {
@@ -593,7 +593,7 @@ describe("Logger Integration Tests", () => {
   });
 
   describe("performance and concurrency", () => {
-    it("should handle concurrent log record creation efficiently", async () => {
+    it("handles concurrent log record creation efficiently", async () => {
       const logger = getLangWatchLogger("concurrent-test-logger-19");
 
       const concurrentOperations = await Promise.all(
@@ -628,7 +628,7 @@ describe("Logger Integration Tests", () => {
       });
     });
 
-    it("should handle rapid log record creation/deletion cycles", async () => {
+    it("handles rapid log record creation/deletion cycles", async () => {
       const logger = getLangWatchLogger("rapid-cycle-test-logger-20");
       const cycles = 50;
 
@@ -662,7 +662,7 @@ describe("Logger Integration Tests", () => {
       });
     });
 
-    it("should handle large data volumes efficiently", async () => {
+    it("handles large data volumes efficiently", async () => {
       const logger = getLangWatchLogger("large-data-test-logger-21");
 
       // Create moderately large log data
@@ -702,7 +702,7 @@ describe("Logger Integration Tests", () => {
   });
 
   describe("attribute and metadata validation", () => {
-    it("should validate and sanitize attribute values", async () => {
+    it("validates and sanitize attribute values", async () => {
       const logger = getLangWatchLogger("attribute-validation-test-logger-22");
 
       const validationLogRecord: LangWatchLogRecord = {
@@ -740,7 +740,7 @@ describe("Logger Integration Tests", () => {
       // We don't assert their presence/absence as it depends on OpenTelemetry implementation
     });
 
-    it("should handle complex attribute type coercion", async () => {
+    it("handles complex attribute type coercion", async () => {
       const logger = getLangWatchLogger("attribute-coercion-test-logger-23");
 
       const coercionLogRecord: LangWatchLogRecord = {
@@ -777,7 +777,7 @@ describe("Logger Integration Tests", () => {
   });
 
   describe("error boundary and recovery", () => {
-    it("should handle log record operation failures gracefully", async () => {
+    it("handles log record operation failures gracefully", async () => {
       const logger = getLangWatchLogger("log-failure-test-logger-24");
 
       // Test log record that encounters issues during creation
@@ -808,7 +808,7 @@ describe("Logger Integration Tests", () => {
       expect(exportedLogRecord.attributes?.["valid.attr"]).toBe("valid value");
     });
 
-    it("should handle provider shutdown during log operations", async () => {
+    it("handles provider shutdown during log operations", async () => {
       const logger = getLangWatchLogger("shutdown-test-logger-25");
 
       // Emit log record
@@ -840,7 +840,7 @@ describe("Logger Integration Tests", () => {
   });
 
   describe("current logger provider integration", () => {
-    it("should use the currently configured logger provider", () => {
+    it("uses the currently configured logger provider", () => {
       // Get loggers using current provider
       const logger1 = getLangWatchLogger("current-test-26");
       const logger2 = getLangWatchLogger("current-test-27");
@@ -867,7 +867,7 @@ describe("Logger Integration Tests", () => {
   });
 
   describe("custom logger provider integration", () => {
-    it("should work with custom logger providers", async () => {
+    it("works with custom logger providers", async () => {
       // Create a custom logger provider for testing
       const { logs } = await import("@opentelemetry/api-logs");
       const customProvider = logs.getLoggerProvider();

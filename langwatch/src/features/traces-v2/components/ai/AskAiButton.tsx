@@ -43,8 +43,14 @@ interface AskAiButtonProps {
   tooltip?: string;
   /** aria-label override. */
   ariaLabel?: string;
-  /** Show "Ask AI" text alongside the icon. Defaults to true. */
+  /** Show the label text alongside the icon. Defaults to true. */
   showLabel?: boolean;
+  /**
+   * Button label. Defaults to "Ask AI"; the search bar passes "Ask Langy"
+   * when Langy owns the affordance and the click opens the panel instead of
+   * the inline composer.
+   */
+  label?: string;
   /**
    * When true, the click handler is replaced with a primer popover that
    * explains the user needs to configure a model provider first. Used
@@ -65,10 +71,10 @@ interface AskAiButtonProps {
 }
 
 /**
- * The brand "Ask AI" affordance — gradient-filled button with the
- * `Sparkles` icon and (optionally) the "Ask AI" label. Used in the
- * search bar to enter AI mode and in the lens-creation popover to
- * switch to the AI input. Same visuals everywhere so the AI surface
+ * The brand ask affordance — gradient-filled button with the `Sparkles` icon
+ * and (optionally) a label, "Ask AI" by default. The search bar uses it to
+ * enter the inline AI composer, or — relabelled "Ask Langy" — to hand the
+ * search off to the Langy panel. Same visuals either way so the AI surface
  * reads as one consistent feature.
  */
 const AskAiButtonImpl: React.FC<AskAiButtonProps> = ({
@@ -76,6 +82,7 @@ const AskAiButtonImpl: React.FC<AskAiButtonProps> = ({
   tooltip = "Tell us what you want, and let AI make it happen",
   ariaLabel = "Enter AI mode",
   showLabel = true,
+  label = "Ask AI",
   needsProviderPrimer = false,
   disabledReason,
 }) => {
@@ -142,7 +149,7 @@ const AskAiButtonImpl: React.FC<AskAiButtonProps> = ({
       </Box>
       <HStack gap={1} position="relative" zIndex={1}>
         <Sparkles size={11} />
-        {showLabel && <Text textStyle="xs">Ask AI</Text>}
+        {showLabel && <Text textStyle="xs">{label}</Text>}
       </HStack>
     </Button>
   );

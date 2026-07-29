@@ -8,9 +8,9 @@
  */
 import { describe, expect, it } from "vitest";
 import {
-  getInvoiceStatusColor,
-  formatInvoiceDate,
   formatInvoiceAmount,
+  formatInvoiceDate,
+  getInvoiceStatusColor,
 } from "../invoice-utils";
 
 describe("getInvoiceStatusColor", () => {

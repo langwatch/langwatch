@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-  PlanProviderService,
-  type PlanProvider,
-  type PlanProviderUser,
-} from "../plan-provider";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import type { PlanInfo } from "../../../../../ee/licensing/planInfo";
+import {
+  type PlanProvider,
+  PlanProviderService,
+  type PlanProviderUser,
+} from "../plan-provider";
 
 const STUB_PLAN: PlanInfo = {
   ...FREE_PLAN,
@@ -85,7 +85,7 @@ describe("PlanProviderService", () => {
       const service = PlanProviderService.create(source);
 
       await expect(
-        service.getActivePlan({ organizationId: "org_1" })
+        service.getActivePlan({ organizationId: "org_1" }),
       ).rejects.toBe(error);
     });
   });

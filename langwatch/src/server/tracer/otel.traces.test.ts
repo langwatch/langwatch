@@ -2710,7 +2710,10 @@ describe("opentelemetry traces receiver", () => {
                         // OpenClaw JSON.stringify's the system instructions;
                         // Anthropic system can be an array of content blocks
                         stringValue: JSON.stringify([
-                          { type: "text", text: "You are a helpful assistant." },
+                          {
+                            type: "text",
+                            text: "You are a helpful assistant.",
+                          },
                         ]),
                       },
                     },
@@ -2865,9 +2868,7 @@ describe("opentelemetry traces receiver", () => {
     // Cleaned from params
     expect((span.params as any)?.gen_ai?.input?.messages).toBeUndefined();
     expect((span.params as any)?.gen_ai?.output?.messages).toBeUndefined();
-    expect(
-      (span.params as any)?.gen_ai?.system_instructions,
-    ).toBeUndefined();
+    expect((span.params as any)?.gen_ai?.system_instructions).toBeUndefined();
   });
 
   it("receives GenAI trace with 'parts' pattern (Vercel AI SDK / pi-ai style)", async () => {
@@ -2900,7 +2901,10 @@ describe("opentelemetry traces receiver", () => {
                       key: "gen_ai.system_instructions",
                       value: {
                         stringValue: JSON.stringify([
-                          { type: "text", content: "You are Snaps the lobster." },
+                          {
+                            type: "text",
+                            content: "You are Snaps the lobster.",
+                          },
                         ]),
                       },
                     },
@@ -2911,7 +2915,10 @@ describe("opentelemetry traces receiver", () => {
                           {
                             role: "user",
                             parts: [
-                              { type: "text", content: "[Sun 2026-02-08 20:58 UTC] hi" },
+                              {
+                                type: "text",
+                                content: "[Sun 2026-02-08 20:58 UTC] hi",
+                              },
                             ],
                           },
                         ]),
@@ -2924,7 +2931,10 @@ describe("opentelemetry traces receiver", () => {
                           {
                             role: "assistant",
                             parts: [
-                              { type: "text", content: "Hey Rogerio! What's up?" },
+                              {
+                                type: "text",
+                                content: "Hey Rogerio! What's up?",
+                              },
                             ],
                           },
                         ]),

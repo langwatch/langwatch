@@ -4,6 +4,8 @@
 
 **Status:** Accepted
 
+**Related to:** [ADR-066](./066-projection-clickhouse-cached-store.md) — the replay protocol defined here is unchanged, but it is now **off the projection hot path**. Projections read back their own committed state and never refold from `event_log` on delivery, so this protocol runs only for projection-version migration and disaster recovery.
+
 ## Context
 
 LangWatch uses event sourcing with fold projections that materialize state into ClickHouse (ReplacingMergeTree tables). Over time, projection logic evolves — bug fixes, new fields, schema changes — and historical data must be reprocessed ("replayed") to bring projection state up to date.
@@ -184,7 +186,7 @@ so a re-run still skips completed aggregates (resume). Cleanup is best-effort
 
 - Related ADRs:
   - [ADR-007: Event Sourcing Architecture](./007-event-sourcing-architecture.md) — the event-sourcing foundation this replay tooling operates on
-  - [ADR-021: Lean Fold Cache](./021-lean-fold-cache.md) — fold cache whose rebuilds are coordinated through this replay protocol
+  - [ADR-066: Projection state storage](./066-projection-clickhouse-cached-store.md) — the read-back fold store whose version-migration rebuilds are coordinated through this replay protocol (supersedes ADR-021's fold cache)
   - [ADR-022: event_log as single source of truth](./022-event-log-source-of-truth.md) — the event log replays read from
   - [ADR-024: Cold-path tiered storage](./024-cold-path-tiered-storage.md) — the S3 cold storage that the amendment's partition pruning avoids scanning
   - [ADR-034: Event-Sourced Analytics Materialization](./034-event-sourced-analytics-materialization.md) — analytics projections rebuilt via this replay mechanism

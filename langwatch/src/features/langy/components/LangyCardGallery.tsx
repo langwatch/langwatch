@@ -22,26 +22,34 @@
  * its connect card instead of an error — which is the behaviour item 19 hangs
  * on, made visible).
  */
-import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  HStack,
+  IconButton,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import type { UIMessage } from "ai";
 import { X } from "lucide-react";
-import { IconButton } from "@chakra-ui/react";
 import { LangyCard } from "~/features/asaplangy";
-import { useLangyStore } from "../stores/langyStore";
 import {
   explainLangyError,
   KNOWN_LANGY_ERROR_KINDS,
 } from "../logic/langyErrorExplainer";
+import { useLangyStore } from "../stores/langyStore";
 import { LangyCapabilityPendingCard } from "./capabilities/LangyCapabilityPendingCard";
 import { LangyCapabilityRenderer } from "./capabilities/LangyCapabilityRenderer";
-import { LangyError } from "./LangyError";
-import { LangyFeedback } from "./LangyFeedback";
+import { LangyDerivedCardsTestingGround } from "./derived-cards/LangyDerivedCardsTestingGround";
 import { LangyGitHubConnectCard } from "./github/LangyGitHubConnectCard";
 import { LangyGitHubPrCard } from "./github/LangyGitHubPrCard";
 import { LangyGitHubProgressCard } from "./github/LangyGitHubProgressCard";
+import { LangyError } from "./LangyError";
+import { LangyFeedback } from "./LangyFeedback";
+import { LangyPlanLimitCard } from "./LangyPlanLimitCard";
 import { LangyRecoveringLine } from "./LangyRecoveringLine";
 import { LangyToolActivity } from "./LangyToolActivity";
-import { ProposalCard, type LangyProposal } from "./MessageContent";
+import { type LangyProposal, ProposalCard } from "./MessageContent";
 import { StreamingStatusLine } from "./StreamingStatusLine";
 
 /** A settled tool call, shaped exactly as the stream delivers one. */
@@ -106,6 +114,10 @@ function toolMessage(
       input: part.input,
       output: part.output,
     })),
+    // Fixture boundary: a runtime-assembled tool part can't satisfy the SDK's
+    // per-state discriminated union (each `state` literal demands different
+    // required fields). The gallery's whole point is feeding the REAL cards
+    // real-shaped data, and the cards narrow these parts structurally.
   } as unknown as UIMessage;
 }
 
@@ -270,6 +282,13 @@ export function LangyCardGallery() {
             },
           ])}
         />
+      </Section>
+
+      {/* ADR-060: the model-emitted block channel — every derived kind, the
+          failed disclosure, and every choices state, all interactive. The
+          streaming playground feeds the REAL preview reducer chunk by chunk. */}
+      <Section title="Model-emitted blocks — derived cards and choices (ADR-060)">
+        <LangyDerivedCardsTestingGround />
       </Section>
 
       <Section title="Capabilities — reads">
@@ -558,6 +577,27 @@ export function LangyCardGallery() {
           conversationId="gallery"
           messageId="gallery-feedback"
           origin="preview"
+        />
+      </Section>
+
+      {/* A refusal the reader can DO something about — not a broken step, so
+          not a red card. Fixture only; the real one reads its numbers off the
+          failure's own meta, and the CTA only appears for whoever can change
+          the plan. */}
+      <Section title="Plan limits">
+        <LangyPlanLimitCard
+          presentation={{
+            title: "Creating scenario failed",
+            message: "Your plan includes 3 scenarios, and all 3 are in use.",
+            code: "resource_limit_exceeded",
+            limit: {
+              label: "scenarios",
+              type: "scenarios",
+              current: 3,
+              max: 3,
+            },
+            terminal: true,
+          }}
         />
       </Section>
 

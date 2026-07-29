@@ -9,8 +9,8 @@
  *   - An "Invite was already accepted" error must redirect home via a hard
  *     navigation (never during render) so the React "update during render"
  *     warning cannot fire from a downstream consumer.
- *   - A generic error must surface via `status: "error"` + `errorMessage` and
- *     must NOT trigger any navigation.
+ *   - A generic error must surface via `status: "error"` + the error itself
+ *     (never a string lifted off it) and must NOT trigger any navigation.
  */
 import "@testing-library/jest-dom/vitest";
 
@@ -34,10 +34,7 @@ const {
     captureExceptionSpy: vi.fn(),
     mockState: {
       handlers: {} as {
-        onSuccess?: (
-          data: unknown,
-          variables: { inviteCode: string },
-        ) => void;
+        onSuccess?: (data: unknown, variables: { inviteCode: string }) => void;
         onError?: (
           error: { message: string },
           variables: { inviteCode: string },
@@ -79,7 +76,7 @@ vi.mock("~/utils/hardRedirect", () => ({
 
 vi.mock("~/utils/posthogErrorCapture", () => ({
   captureException: captureExceptionSpy,
-  toError: vi.fn((e) => e instanceof Error ? e : new Error(String(e))),
+  toError: vi.fn((e) => (e instanceof Error ? e : new Error(String(e)))),
 }));
 
 import {
@@ -219,7 +216,7 @@ describe("useAcceptInviteOnce()", () => {
 
   describe("given the server returns a generic error", () => {
     describe("when onError fires", () => {
-      it("surfaces status='error' with the message, captures to PostHog, and does NOT navigate", () => {
+      it("surfaces status='error' with the error itself, captures to PostHog, and does NOT navigate", () => {
         const { result, rerender } = renderHook(() =>
           useAcceptInviteOnce({
             inviteCode: "invite-abc",
@@ -247,7 +244,9 @@ describe("useAcceptInviteOnce()", () => {
           }),
         );
         expect(result.current.status).toBe("error");
-        expect(result.current.errorMessage).toBe("The invite has expired");
+        expect(result.current.error).toMatchObject({
+          message: "The invite has expired",
+        });
       });
     });
   });
@@ -258,7 +257,7 @@ describe("useAcceptInviteOnce()", () => {
     // must not be lost with the unmounted instance — otherwise the page
     // dead-ends on the loading screen with the error only in the console.
     describe("when the mutation had already failed before the remount", () => {
-      it("reports status='error' with the message on the remounted instance instead of dead-ending on 'loading'", () => {
+      it("reports status='error' with the error on the remounted instance instead of dead-ending on 'loading'", () => {
         const first = renderHook(() =>
           useAcceptInviteOnce({
             inviteCode: "invite-abc",
@@ -287,9 +286,9 @@ describe("useAcceptInviteOnce()", () => {
 
         expect(mutateSpy).toHaveBeenCalledTimes(1);
         expect(second.result.current.status).toBe("error");
-        expect(second.result.current.errorMessage).toBe(
-          "The invite has expired",
-        );
+        expect(second.result.current.error).toMatchObject({
+          message: "The invite has expired",
+        });
       });
     });
 
@@ -326,9 +325,9 @@ describe("useAcceptInviteOnce()", () => {
         });
 
         expect(second.result.current.status).toBe("error");
-        expect(second.result.current.errorMessage).toBe(
-          "The invite has expired",
-        );
+        expect(second.result.current.error).toMatchObject({
+          message: "The invite has expired",
+        });
       });
     });
   });

@@ -5,8 +5,9 @@
  * Verifies that onOpenChange calls goBack() to handle both nested
  * and root drawer scenarios correctly (Issue #2278).
  */
-import { describe, expect, it, vi, beforeEach } from "vitest";
+
 import { render } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock useDrawer hook
 const mockGoBack = vi.fn();
@@ -53,9 +54,7 @@ vi.mock("~/components/messages/LegacyTracesDeprecationBanner", () => ({
 // handler destructures `{ open }` from its single argument (Chakra
 // passes a details object on close), so type the captured signature
 // accordingly.
-let capturedOnOpenChange:
-  | ((details: { open: boolean }) => void)
-  | undefined;
+let capturedOnOpenChange: ((details: { open: boolean }) => void) | undefined;
 vi.mock("~/components/ui/drawer", () => ({
   Drawer: {
     Root: ({

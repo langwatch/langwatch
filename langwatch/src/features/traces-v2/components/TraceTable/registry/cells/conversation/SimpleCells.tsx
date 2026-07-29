@@ -1,6 +1,5 @@
 import { HStack, Text } from "@chakra-ui/react";
 import type { TraceStatus } from "../../../../../types/trace";
-import { abbreviateModel } from "../../../../../utils/formatters";
 import type { ConversationGroup } from "../../../conversationGroups";
 import { MonoCell } from "../../../MonoCell";
 import { StatusDot, StatusIndicator } from "../../../StatusRow";
@@ -29,12 +28,12 @@ export const ModelCell: CellDef<ConversationGroup> = {
   label: "Model",
   render: ({ row }) => (
     <MonoCell truncate whiteSpace={undefined}>
-      {row.primaryModel ? abbreviateModel(row.primaryModel) : dash}
+      {row.primaryModel ? row.primaryModel : dash}
     </MonoCell>
   ),
   renderComfortable: ({ row }) => (
     <Text textStyle="xs" color="fg.muted" truncate>
-      {row.primaryModel ? abbreviateModel(row.primaryModel) : dash}
+      {row.primaryModel ? row.primaryModel : dash}
     </Text>
   ),
 };

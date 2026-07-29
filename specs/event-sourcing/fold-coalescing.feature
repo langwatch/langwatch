@@ -103,6 +103,12 @@ Feature: Group-coalesced fold projections
     When trace data is derived again after the fold advances with newer spans
     Then the stored spans are read again rather than serving the earlier result
 
+  # The drain that coalesces a backed-up group is bounded by BOTH a count and a
+  # byte budget — one shared mechanism in the GroupQueue (ADR-066, pillar 2).
+  # Folds here are bounded by count (their events are small and uniform); the
+  # byte bound matters for producer-side command coalescing, whose behaviour
+  # (stop at the byte budget, a single oversized item on its own) is specced in
+  # producer-append-coalescing.feature rather than duplicated here.
   @integration @coalescing @queue
   Scenario: A backed-up group is folded in a single batch call
     Given a group with ten queued events

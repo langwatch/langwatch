@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { test } from "@playwright/test";
 
 test.use({
   storageState: "./e2e/auth.json",

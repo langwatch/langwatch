@@ -1,0 +1,12 @@
+# langy-disabled.yaml: run LangWatch without the Langy assistant.
+#
+# Langy ships enabled by default. This overlay removes the agent pod and every
+# reference to it; nothing else in the install changes.
+#
+# Usage:
+#   helm install lw . \
+#     -f examples/overlays/langy-disabled.yaml \
+#     --set autogen.enabled=true
+
+langyagent:
+  chartManaged: false

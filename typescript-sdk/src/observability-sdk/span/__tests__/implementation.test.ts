@@ -31,7 +31,7 @@ describe("LangWatchSpan Implementation", () => {
   });
 
   describe("setInput method overloads", () => {
-    it("should handle explicit text type", () => {
+    it("handles explicit text type", () => {
       const result = langwatchSpan.setInput("text", "Hello world");
 
       expect(result).toBe(langwatchSpan);
@@ -41,7 +41,7 @@ describe("LangWatchSpan Implementation", () => {
       );
     });
 
-    it("should handle explicit raw type", () => {
+    it("handles explicit raw type", () => {
       const obj = { key: "value" };
       const result = langwatchSpan.setInput("raw", obj);
 
@@ -52,7 +52,7 @@ describe("LangWatchSpan Implementation", () => {
       );
     });
 
-    it("should handle explicit chat_messages type", () => {
+    it("handles explicit chat_messages type", () => {
       const messages: ChatMessage[] = [
         { role: "user", content: "Hello" },
         { role: "assistant", content: "Hi!" }
@@ -66,7 +66,7 @@ describe("LangWatchSpan Implementation", () => {
       );
     });
 
-    it("should handle explicit list type", () => {
+    it("handles explicit list type", () => {
       const list: SpanInputOutput[] = [
         { type: "text", value: "Item 1" },
         { type: "text", value: "Item 2" }
@@ -80,7 +80,7 @@ describe("LangWatchSpan Implementation", () => {
       );
     });
 
-    it("should handle explicit json type", () => {
+    it("handles explicit json type", () => {
       const data = { key: "value", number: 42 };
       const result = langwatchSpan.setInput("json", data);
 
@@ -91,7 +91,7 @@ describe("LangWatchSpan Implementation", () => {
       );
     });
 
-    it("should handle auto-detection (single parameter)", () => {
+    it("handles auto-detection (single parameter)", () => {
       const result = langwatchSpan.setInput("Hello world");
 
       expect(result).toBe(langwatchSpan);
@@ -101,7 +101,7 @@ describe("LangWatchSpan Implementation", () => {
       );
     });
 
-    it("should handle auto-detection for objects", () => {
+    it("handles auto-detection for objects", () => {
       const obj = { key: "value" };
       const result = langwatchSpan.setInput(obj);
 
@@ -112,7 +112,7 @@ describe("LangWatchSpan Implementation", () => {
       );
     });
 
-    it("should handle auto-detection for arrays", () => {
+    it("handles auto-detection for arrays", () => {
       const arr = ["item1", "item2"];
       const result = langwatchSpan.setInput(arr);
 
@@ -125,7 +125,7 @@ describe("LangWatchSpan Implementation", () => {
   });
 
   describe("setOutput method overloads", () => {
-    it("should handle explicit text type", () => {
+    it("handles explicit text type", () => {
       const result = langwatchSpan.setOutput("text", "Response");
 
       expect(result).toBe(langwatchSpan);
@@ -135,7 +135,7 @@ describe("LangWatchSpan Implementation", () => {
       );
     });
 
-    it("should handle explicit raw type", () => {
+    it("handles explicit raw type", () => {
       const obj = { response: "data" };
       const result = langwatchSpan.setOutput("raw", obj);
 
@@ -146,7 +146,7 @@ describe("LangWatchSpan Implementation", () => {
       );
     });
 
-    it("should handle explicit chat_messages type", () => {
+    it("handles explicit chat_messages type", () => {
       const messages: ChatMessage[] = [
         { role: "assistant", content: "Response" }
       ];
@@ -159,7 +159,7 @@ describe("LangWatchSpan Implementation", () => {
       );
     });
 
-    it("should handle explicit list type", () => {
+    it("handles explicit list type", () => {
       const list: SpanInputOutput[] = [
         { type: "text", value: "Response 1" },
         { type: "text", value: "Response 2" }
@@ -173,7 +173,7 @@ describe("LangWatchSpan Implementation", () => {
       );
     });
 
-    it("should handle explicit json type", () => {
+    it("handles explicit json type", () => {
       const data = { response: "success", data: { id: 123 } };
       const result = langwatchSpan.setOutput("json", data);
 
@@ -184,7 +184,7 @@ describe("LangWatchSpan Implementation", () => {
       );
     });
 
-    it("should handle auto-detection (single parameter)", () => {
+    it("handles auto-detection (single parameter)", () => {
       const result = langwatchSpan.setOutput("Response");
 
       expect(result).toBe(langwatchSpan);
@@ -194,7 +194,7 @@ describe("LangWatchSpan Implementation", () => {
       );
     });
 
-    it("should handle auto-detection for objects", () => {
+    it("handles auto-detection for objects", () => {
       const obj = { response: "data" };
       const result = langwatchSpan.setOutput(obj);
 
@@ -205,7 +205,7 @@ describe("LangWatchSpan Implementation", () => {
       );
     });
 
-    it("should handle auto-detection for arrays", () => {
+    it("handles auto-detection for arrays", () => {
       const arr = ["response1", "response2"];
       const result = langwatchSpan.setOutput(arr);
 
@@ -218,7 +218,7 @@ describe("LangWatchSpan Implementation", () => {
   });
 
   describe("type preference behavior", () => {
-    it("should prefer explicit types over auto-detection for setInput", () => {
+    it("prefers explicit types over auto-detection for setInput", () => {
       // Object that would auto-detect as "json", but explicit "text" should be preferred
       const obj = { key: "value" };
       (langwatchSpan.setInput as any)("text", obj);
@@ -237,21 +237,21 @@ describe("LangWatchSpan Implementation", () => {
   });
 
   describe("error handling", () => {
-    it("should handle invalid input gracefully", () => {
+    it("handles invalid input gracefully", () => {
       const result = (langwatchSpan.setInput as any)("invalid_type", "test");
 
       expect(result).toBe(langwatchSpan);
       expect(mockSpan.setAttribute).toHaveBeenCalled();
     });
 
-    it("should handle invalid output gracefully", () => {
+    it("handles invalid output gracefully", () => {
       const result = (langwatchSpan.setOutput as any)("invalid_type", "test");
 
       expect(result).toBe(langwatchSpan);
       expect(mockSpan.setAttribute).toHaveBeenCalled();
     });
 
-    it("should handle non-serializable objects", () => {
+    it("handles non-serializable objects", () => {
       const objWithFunction = {
         data: "test",
         method: () => "hello"

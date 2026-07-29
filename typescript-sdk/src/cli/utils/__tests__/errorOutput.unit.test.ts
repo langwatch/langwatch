@@ -3,7 +3,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import chalk from "chalk";
-import { readCliErrorDocument } from "@langwatch/cli-cards/handled-error";
+import { readCliErrorDocument } from "@langwatch/langy/cards/handled-error";
 
 import { LangWatchHandledError } from "@/internal/api/errors";
 import {

@@ -1,5 +1,5 @@
-import { TtlCache } from "~/server/utils/ttlCache";
 import { prisma } from "~/server/db";
+import { TtlCache } from "~/server/utils/ttlCache";
 
 const TEN_MINUTES_MS = 10 * 60 * 1000;
 
@@ -32,4 +32,3 @@ export async function resolveOrganizationId(
 
   return organizationId ?? undefined;
 }
-

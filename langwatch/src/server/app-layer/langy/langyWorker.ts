@@ -10,9 +10,10 @@
  * if cold" (the pre-optimisation cost, never a broken turn); a failed warm means
  * a cold start (the status quo). Neither can start or duplicate a turn.
  */
+
+import { createLogger } from "@langwatch/observability";
 import { context, propagation, trace } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-import { createLogger } from "@langwatch/observability";
 import { getLangyDispatchCounter } from "~/server/metrics";
 
 const logger = createLogger("langwatch:langy:worker");
@@ -55,6 +56,12 @@ export type LangyDispatchOutcome =
  * make it a pessimisation. On timeout we fail open and mint, exactly as before.
  */
 const AGENT_PROBE_TIMEOUT_MS = 1_000;
+/**
+ * Cancel is best-effort and off the turn's critical path — a tight budget so a
+ * Stop click never hangs on a wedged manager. The durable stopped terminal is
+ * already recorded by the time this fires; this only chases the token burn.
+ */
+const AGENT_CANCEL_TIMEOUT_MS = 3_000;
 
 export interface LangyWorkerPort {
   /**
@@ -74,6 +81,10 @@ export interface LangyWorkerPort {
      * scoped to different repos. */
     githubRepoScopeKey?: string;
     egressAllowlist?: string[];
+    /** ADR-061 mirror tier — rides the probe (like the egress list) so a tier
+     * change is a probe MISS and the worker re-warms rather than mirroring under
+     * the tier it booted with. */
+    mirrorTier?: string;
   }): Promise<boolean>;
 
   /**
@@ -106,10 +117,28 @@ export interface LangyWorkerPort {
     runToken: string;
     prompt: string;
     system: string;
+    /** Conversation-so-far seed the manager folds into a fresh session's
+     * first message only; a warm session ignores it. */
+    historySeed?: string;
     credentials: unknown;
     modelOverride?: string;
     resumeToken?: string;
   }): Promise<LangyDispatchOutcome>;
+
+  /**
+   * Ask the manager to abandon an in-flight turn (`POST /worker/cancel`) so the
+   * model stops generating — the token-burn half of a user Stop (ADR-078).
+   * FIRE-AND-FORGET and FAILS OPEN: the durable stopped terminal the control
+   * plane already recorded is what makes the stop truthful, so a cancel that
+   * never reaches a wedged worker costs wasted tokens, never a wrong turn state.
+   * The manager keys the worker by `conversationId` and verifies `turnId` still
+   * matches the live turn, so a stale cancel cannot touch a newer turn.
+   */
+  cancel(args: {
+    conversationId: string;
+    turnId: string;
+    projectId: string;
+  }): Promise<void>;
 }
 
 /**
@@ -130,6 +159,7 @@ export function createLangyWorkerPort(config: {
       hasGithubAuth,
       githubRepoScopeKey,
       egressAllowlist,
+      mirrorTier,
     }) {
       try {
         // traceparent rides along (no span of its own — the probe is a single
@@ -154,15 +184,14 @@ export function createLangyWorkerPort(config: {
             hasGithubAuth,
             ...(githubRepoScopeKey ? { githubRepoScopeKey } : {}),
             ...(egressAllowlist?.length ? { egressAllowlist } : {}),
+            ...(mirrorTier ? { mirrorTier } : {}),
           }),
           signal: AbortSignal.timeout(AGENT_PROBE_TIMEOUT_MS),
         });
         if (!response.ok) return false;
         const body = (await response.json()) as { alive?: unknown };
         const alive = body.alive === true;
-        trace
-          .getActiveSpan()
-          ?.setAttribute("langy.probe.hit", alive);
+        trace.getActiveSpan()?.setAttribute("langy.probe.hit", alive);
         return alive;
       } catch (error) {
         logger.debug(
@@ -234,6 +263,7 @@ export function createLangyWorkerPort(config: {
       runToken,
       prompt,
       system,
+      historySeed,
       credentials,
       modelOverride,
       resumeToken,
@@ -271,6 +301,10 @@ export function createLangyWorkerPort(config: {
                 runToken,
                 prompt,
                 system,
+                // The seed a fresh session's first message is folded from; a
+                // warm session ignores it (the manager decides, it owns the
+                // session-freshness ground truth).
+                ...(historySeed ? { historySeed } : {}),
                 credentials,
                 ...(modelOverride ? { modelOverride } : {}),
                 // ADR-048: resume from a prior turn's checkpoint if one is pending.
@@ -298,7 +332,9 @@ export function createLangyWorkerPort(config: {
                       : "unavailable";
             span.setAttribute("langy.dispatch.outcome", outcome);
             getLangyDispatchCounter(
-              outcome === "credentialsRequired" ? "credentials_required" : outcome,
+              outcome === "credentialsRequired"
+                ? "credentials_required"
+                : outcome,
             ).inc();
             return outcome;
           } catch (error) {
@@ -309,6 +345,44 @@ export function createLangyWorkerPort(config: {
             span.setAttribute("langy.dispatch.outcome", "error");
             getLangyDispatchCounter("error").inc();
             return "unavailable";
+          }
+        },
+      );
+    },
+
+    async cancel({ conversationId, turnId, projectId }) {
+      await tracer.withActiveSpan(
+        "langy.chat.cancel_turn",
+        {
+          attributes: {
+            "tenant.id": projectId,
+            "langy.conversation.id": conversationId,
+            "langy.turn.id": turnId,
+          },
+        },
+        async () => {
+          try {
+            const headers: Record<string, string> = {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${internalSecret}`,
+            };
+            propagation.inject(context.active(), headers);
+
+            const response = await fetch(`${agentUrl}/worker/cancel`, {
+              method: "POST",
+              headers,
+              body: JSON.stringify({ conversationId, turnId, projectId }),
+              signal: AbortSignal.timeout(AGENT_CANCEL_TIMEOUT_MS),
+            });
+            void response.body?.cancel();
+          } catch (error) {
+            // The stop is already truthful (durable stopped terminal + stream
+            // end); a cancel that cannot reach the worker only leaves it burning
+            // tokens until it finishes on its own. Debug, never surface.
+            logger.debug(
+              { error, conversationId, turnId },
+              "langy worker cancel failed — the turn is already stopped on record",
+            );
           }
         },
       );

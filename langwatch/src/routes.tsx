@@ -292,6 +292,14 @@ const routes: RouteObject[] = [
         ...page(() => import("./pages/me/configure")),
       },
       {
+        path: "/me/devices",
+        ...page(() => import("./pages/me/devices")),
+      },
+      {
+        // Pre-rename path for the devices inventory, kept resolving so old
+        // links do not dead-end. A page that renders <Navigate>, not a
+        // `loader` redirect: loaders do not run on a cold load of the SPA,
+        // which is exactly how a stale link arrives.
         path: "/me/sessions",
         ...page(() => import("./pages/me/sessions")),
       },
@@ -576,6 +584,7 @@ const routes: RouteObject[] = [
   { path: "/ops/queues", ...page(() => import("./pages/ops/queues")) },
   { path: "/ops/dejaview", ...page(() => import("./pages/ops/dejaview")) },
   { path: "/ops/scheduler", ...page(() => import("./pages/ops/scheduler")) },
+  { path: "/ops/blobs", ...page(() => import("./pages/ops/blobs")) },
   {
     path: "/ops/feature-flags",
     ...page(() => import("./pages/ops/feature-flags")),
@@ -592,6 +601,10 @@ const routes: RouteObject[] = [
   {
     path: "/ops/backoffice",
     ...page(() => import("./pages/ops/backoffice")),
+  },
+  {
+    path: "/ops/backoffice/bug-reports",
+    ...page(() => import("./pages/ops/backoffice/bug-reports")),
   },
   {
     path: "/ops/backoffice/users",

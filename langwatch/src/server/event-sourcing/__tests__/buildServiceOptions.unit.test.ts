@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { AbstractFoldProjection, type FoldEventHandlers } from "../projections/abstractFoldProjection";
-import { AbstractMapProjection, type MapEventHandlers } from "../projections/abstractMapProjection";
+import {
+  AbstractFoldProjection,
+  type FoldEventHandlers,
+} from "../projections/abstractFoldProjection";
+import {
+  AbstractMapProjection,
+  type MapEventHandlers,
+} from "../projections/abstractMapProjection";
 import type { FoldProjectionStore } from "../projections/foldProjection.types";
 import type { AppendStore } from "../projections/mapProjection.types";
 

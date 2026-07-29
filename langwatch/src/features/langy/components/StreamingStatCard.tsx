@@ -38,9 +38,10 @@ export function StreamingStatCard({ metrics }: { metrics: LangyTurnMetric[] }) {
             <NumberTicker
               value={metric.value}
               format={
-                metric.suffix
+                metric.format ??
+                (metric.suffix
                   ? (n) => `${n.toLocaleString()}${metric.suffix}`
-                  : undefined
+                  : undefined)
               }
             />
           </Box>

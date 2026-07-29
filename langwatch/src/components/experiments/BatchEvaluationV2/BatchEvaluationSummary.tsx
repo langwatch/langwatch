@@ -153,9 +153,7 @@ export function BatchEvaluationV2EvaluationSummary({
                 <Text>
                   Evaluation mean duration:{" "}
                   {run.summary.evaluationsAverageDuration
-                    ? formatMilliseconds(
-                        run.summary.evaluationsAverageDuration,
-                      )
+                    ? formatMilliseconds(run.summary.evaluationsAverageDuration)
                     : "-"}
                 </Text>
               </VStack>

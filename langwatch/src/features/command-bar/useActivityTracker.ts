@@ -1,8 +1,8 @@
-import { useEffect, useCallback, useRef } from "react";
-import { useRouter } from "~/utils/compat/next-router";
+import { useCallback, useEffect, useRef } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { useRecentItems } from "./useRecentItems";
+import { useRouter } from "~/utils/compat/next-router";
 import type { RecentItemType } from "./types";
+import { useRecentItems } from "./useRecentItems";
 
 /**
  * Entity type detection from URL patterns.
@@ -44,7 +44,9 @@ function parseEntityUrl(path: string, projectSlug: string): EntityMatch | null {
   }
 
   // Span page: /[project]/messages/[traceId]/[tab]/[spanId]
-  const spanMatch = relativePath.match(/^\/messages\/([^/]+)\/([^/]+)\/([^/]+)$/);
+  const spanMatch = relativePath.match(
+    /^\/messages\/([^/]+)\/([^/]+)\/([^/]+)$/,
+  );
   if (spanMatch) {
     return {
       type: "span",
@@ -88,7 +90,7 @@ function parseEntityUrl(path: string, projectSlug: string): EntityMatch | null {
 
   // Simulation run: /[project]/simulations/[scenarioSetId]/[batchRunId]/[scenarioRunId]
   const simRunMatch = relativePath.match(
-    /^\/simulations\/([^/]+)\/([^/]+)\/([^/]+)$/
+    /^\/simulations\/([^/]+)\/([^/]+)\/([^/]+)$/,
   );
   if (simRunMatch) {
     return {
@@ -107,7 +109,7 @@ function parseEntityUrl(path: string, projectSlug: string): EntityMatch | null {
  */
 function parseDrawerEntity(
   fullUrl: string,
-  projectSlug: string
+  projectSlug: string,
 ): EntityMatch | null {
   try {
     const url = new URL(fullUrl, "http://localhost");
@@ -131,8 +133,10 @@ function parseDrawerEntity(
       }
     }
 
-    // Evaluator viewer drawer
-    if (drawerOpen === "evaluatorViewer") {
+    // Evaluator editor drawer — the id that actually exists in drawerRegistry.
+    // (`evaluatorViewer` was a phantom id: no drawer answered to it, so links
+    // carrying it opened nothing and this branch never matched a real visit.)
+    if (drawerOpen === "evaluatorEditor") {
       const evaluatorId = url.searchParams.get("drawer.evaluatorId");
       if (evaluatorId) {
         return {
@@ -204,9 +208,10 @@ export function useActivityTracker() {
       let label = entityMatch.id;
       if (entityMatch.type === "trace") {
         // Truncate trace IDs for display
-        label = entityMatch.id.length > 20
-          ? `${entityMatch.id.slice(0, 20)}...`
-          : entityMatch.id;
+        label =
+          entityMatch.id.length > 20
+            ? `${entityMatch.id.slice(0, 20)}...`
+            : entityMatch.id;
       }
 
       addRecentItem({
@@ -219,7 +224,7 @@ export function useActivityTracker() {
         projectSlug: project.slug,
       });
     },
-    [project?.slug, addRecentItem]
+    [project?.slug, addRecentItem],
   );
 
   useEffect(() => {

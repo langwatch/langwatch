@@ -11,7 +11,9 @@ export const startSuiteRunCommandDataSchema = z.object({
   idempotencyKey: z.string(),
   occurredAt: z.number(),
 });
-export type StartSuiteRunCommandData = z.infer<typeof startSuiteRunCommandDataSchema>;
+export type StartSuiteRunCommandData = z.infer<
+  typeof startSuiteRunCommandDataSchema
+>;
 
 export const recordSuiteRunItemStartedCommandDataSchema = z.object({
   tenantId: z.string(),
@@ -20,7 +22,9 @@ export const recordSuiteRunItemStartedCommandDataSchema = z.object({
   scenarioId: z.string(),
   occurredAt: z.number(),
 });
-export type RecordSuiteRunItemStartedCommandData = z.infer<typeof recordSuiteRunItemStartedCommandDataSchema>;
+export type RecordSuiteRunItemStartedCommandData = z.infer<
+  typeof recordSuiteRunItemStartedCommandDataSchema
+>;
 
 export const completeSuiteRunItemCommandDataSchema = z.object({
   tenantId: z.string(),
@@ -34,4 +38,6 @@ export const completeSuiteRunItemCommandDataSchema = z.object({
   error: z.string().optional(),
   occurredAt: z.number(),
 });
-export type CompleteSuiteRunItemCommandData = z.infer<typeof completeSuiteRunItemCommandDataSchema>;
+export type CompleteSuiteRunItemCommandData = z.infer<
+  typeof completeSuiteRunItemCommandDataSchema
+>;

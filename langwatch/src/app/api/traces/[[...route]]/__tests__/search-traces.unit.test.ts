@@ -41,7 +41,7 @@ vi.mock("@langwatch/observability", () => ({
 }));
 
 // Partially mock the projection module: keep the real request schema + error
-// class (so validation and the 400 path are exercised for real) and stub only
+// class (so validation and the 422 path are exercised for real) and stub only
 // `compileProjection` so these surface tests stay independent of the compiler
 // implementation (owned separately). Each test drives the stub's behavior.
 const mockCompileProjection = vi.fn();
@@ -507,24 +507,32 @@ describe("POST /search", () => {
       });
     });
 
-    /** @scenario "Unknown select path returns 400" */
-    it("responds 400", async () => {
+    /** @scenario "Unknown select path returns 422" */
+    it("responds 422", async () => {
       const res = await searchRequest({
         startDate: 1000,
         endDate: 5000,
         select: ["nonexistent_field"],
       });
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(422);
     });
 
-    it("names the invalid path in the error message", async () => {
+    it("names the invalid path in a reason rather than in the message", async () => {
+      // The path used to be concatenated into the sentence. It is structure now:
+      // an unknown select path is a field violation like any other, so a caller
+      // reads it where it reads every other one — `reasons[].meta` — instead of
+      // parsing English. See specs/features/domain-error-contract.feature.
       const res = await searchRequest({
         startDate: 1000,
         endDate: 5000,
         select: ["nonexistent_field"],
       });
       const body = await res.json();
-      expect(body.message).toContain("nonexistent_field");
+      expect(body.error).toBe("validation_error");
+      expect(body.reasons).toHaveLength(1);
+      expect(body.reasons[0].code).toBe("schema_failure");
+      expect(body.reasons[0].meta.field).toBe("select");
+      expect(body.reasons[0].meta.received).toBe("nonexistent_field");
     });
 
     it("does not query the trace service", async () => {
@@ -538,46 +546,46 @@ describe("POST /search", () => {
   });
 
   describe("when the projection request fails schema validation", () => {
-    /** @scenario "Unknown from entity returns 400" */
-    it("rejects an unsupported from entity with 400", async () => {
+    /** @scenario "Unknown from entity returns 422" */
+    it("rejects an unsupported from entity with 422", async () => {
       const res = await searchRequest({
         startDate: 1000,
         endDate: 5000,
         from: "sessions",
         select: ["trace_id"],
       });
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(422);
       expect(mockCompileProjection).not.toHaveBeenCalled();
     });
 
-    /** @scenario "Empty select array returns 400" */
-    it("rejects an empty select array with 400", async () => {
+    /** @scenario "Empty select array returns 422" */
+    it("rejects an empty select array with 422", async () => {
       const res = await searchRequest({
         startDate: 1000,
         endDate: 5000,
         select: [],
       });
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(422);
       expect(mockCompileProjection).not.toHaveBeenCalled();
     });
 
-    it("rejects a select with more than 200 paths with 400", async () => {
+    it("rejects a select with more than 200 paths with 422", async () => {
       const res = await searchRequest({
         startDate: 1000,
         endDate: 5000,
         select: Array.from({ length: 201 }, (_, i) => `metadata.key_${i}`),
       });
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(422);
       expect(mockCompileProjection).not.toHaveBeenCalled();
     });
 
-    it("rejects a select path longer than 256 characters with 400", async () => {
+    it("rejects a select path longer than 256 characters with 422", async () => {
       const res = await searchRequest({
         startDate: 1000,
         endDate: 5000,
         select: [`metadata.${"x".repeat(300)}`],
       });
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(422);
       expect(mockCompileProjection).not.toHaveBeenCalled();
     });
   });
@@ -599,14 +607,14 @@ describe("POST /search", () => {
       expect(options.dateField).toBe("occurred");
     });
 
-    /** @scenario "Invalid dateField value returns 400" */
-    it("rejects an unsupported date axis with 400", async () => {
+    /** @scenario "Invalid dateField value returns 422" */
+    it("rejects an unsupported date axis with 422", async () => {
       const res = await searchRequest({
         startDate: 1000,
         endDate: 5000,
         dateField: "created",
       });
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(422);
     });
   });
 });

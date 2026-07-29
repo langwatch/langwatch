@@ -1,9 +1,9 @@
-import type { DiscoveryResult, ReplayContext } from "./types";
 import type { DiscoveredAggregate } from "./replayEventLoader";
 import {
-  discoverAffectedAggregates,
   countEventsForAggregates,
+  discoverAffectedAggregates,
 } from "./replayEventLoader";
+import type { DiscoveryResult, ReplayContext } from "./types";
 
 /**
  * Discovers the aggregates (and total event count) a projection's replay must

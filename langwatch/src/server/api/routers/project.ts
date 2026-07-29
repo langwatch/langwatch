@@ -2,22 +2,16 @@ import { generate } from "@langwatch/ksuid";
 import {
   Prisma,
   type PrismaClient,
-  type Project,
   RoleBindingScopeType,
   TeamUserRole,
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
-import { env } from "~/env.mjs";
-import {
-  createTRPCRouter,
-  protectedProcedure,
-  publicProcedure,
-} from "~/server/api/trpc";
+import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
-import type { Session } from "~/server/auth";
 import { provisionLangyVirtualKey } from "~/server/app-layer/langy/langyVirtualKey";
+import type { Session } from "~/server/auth";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { encrypt } from "~/utils/encryption";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
@@ -33,53 +27,11 @@ import {
   checkProjectPermission,
   checkTeamPermission,
   hasProjectPermission,
-  skipPermissionCheck,
   skipPermissionCheckProjectCreation,
 } from "../rbac";
 import { getUserProtectionsForProject } from "../utils";
 
 export const projectRouter = createTRPCRouter({
-  publicGetById: publicProcedure
-    .input(z.object({ id: z.string(), shareId: z.string() }))
-    .use(skipPermissionCheck)
-    .query(async ({ input, ctx }) => {
-      const prisma = ctx.prisma;
-
-      const publicShare = await prisma.publicShare.findUnique({
-        where: { id: input.shareId, projectId: input.id },
-      });
-
-      if (!publicShare) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Public share not found",
-        });
-      }
-
-      const project = await prisma.project.findUnique({
-        where: { id: input.id },
-      });
-
-      if (!project) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Project not found",
-        });
-      }
-
-      return {
-        id: project.id,
-        name: project.name,
-        slug: project.slug,
-        language: project.language,
-        framework: project.framework,
-        firstMessage: true,
-        apiKey: "",
-        teamId: "",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      } as Project;
-    }),
   create: protectedProcedure
     .input(
       z.object({
@@ -239,9 +191,14 @@ export const projectRouter = createTRPCRouter({
 
       return { success: true, projectSlug: project.slug };
     }),
+  /**
+   * The base key is a project-level write credential, so reading it is gated
+   * with `project:update` to match the access it grants. Rotation stays at
+   * `project:manage`.
+   */
   getProjectAPIKey: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("project:view"))
+    .use(checkProjectPermission("project:update"))
     .query(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
 

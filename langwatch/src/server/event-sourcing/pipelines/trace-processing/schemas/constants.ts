@@ -5,6 +5,28 @@ export const SPAN_RECEIVED_EVENT_VERSIONS = [
   SPAN_RECEIVED_EVENT_VERSION_LATEST,
 ] as const;
 
+/**
+ * The claim-check twin of `span_received` (ADR-069): staged onto a
+ * subscriber's queue in place of the full event, carrying only the span's
+ * identity — the payload stays in its canonical store and the handler reads
+ * it back from there. It is never appended to the event log, which is why it
+ * is deliberately absent from TRACE_PROCESSING_EVENT_TYPES: it exists only
+ * between the routing seam and the subscriber that opted into it.
+ *
+ * The versions array is load-bearing: a consumer parses a reference by
+ * version, and a version it does not know fails loudly into the queue's
+ * retry rather than half-parsing. Bump the date and append here whenever the
+ * reference's shape — or the contract of the store it resolves through —
+ * changes incompatibly.
+ */
+export const SPAN_REFERENCED_EVENT_TYPE =
+  "lw.obs.trace.span_referenced" as const;
+export const SPAN_REFERENCED_EVENT_VERSION_LATEST = "2026-07-24" as const;
+
+export const SPAN_REFERENCED_EVENT_VERSIONS = [
+  SPAN_REFERENCED_EVENT_VERSION_LATEST,
+] as const;
+
 export const TOPIC_ASSIGNED_EVENT_TYPE = "lw.obs.trace.topic_assigned" as const;
 export const TOPIC_ASSIGNED_EVENT_VERSION_LATEST = "2025-02-01" as const;
 
@@ -12,6 +34,12 @@ export const TOPIC_ASSIGNED_EVENT_VERSIONS = [
   TOPIC_ASSIGNED_EVENT_VERSION_LATEST,
 ] as const;
 
+/**
+ * Trace-fold contribution event for a received log record. No live minter
+ * since the `recordLog` command was retired (canonical `log_records` is now the
+ * only log write path) — kept so historical `event_log` replays of the trace
+ * folds still reproduce pre-cutover log contributions.
+ */
 export const LOG_RECORD_RECEIVED_EVENT_TYPE =
   "lw.obs.trace.log_record_received" as const;
 export const LOG_RECORD_RECEIVED_EVENT_VERSION_LATEST = "2026-03-08" as const;
@@ -96,9 +124,22 @@ export const TRACE_PROCESSING_EVENT_TYPES = [
 export type TraceProcessingEventType =
   (typeof TRACE_PROCESSING_EVENT_TYPES)[number];
 
+/**
+ * Staging-only event types (ADR-069): valid Event brands that travel between
+ * the routing seam and a subscriber's queue but are NEVER appended to the
+ * event log — which is why they stay out of TRACE_PROCESSING_EVENT_TYPES. They
+ * are registered as type identifiers (see typeIdentifiers.ts) solely so a
+ * `stage` hook can return them as well-typed Events.
+ */
+export const TRACE_PROCESSING_STAGING_EVENT_TYPES = [
+  SPAN_REFERENCED_EVENT_TYPE,
+] as const;
+
+export type TraceProcessingStagingEventType =
+  (typeof TRACE_PROCESSING_STAGING_EVENT_TYPES)[number];
+
 export const RECORD_SPAN_COMMAND_TYPE = "lw.obs.trace.record_span" as const;
 export const ASSIGN_TOPIC_COMMAND_TYPE = "lw.obs.trace.assign_topic" as const;
-export const RECORD_LOG_COMMAND_TYPE = "lw.obs.trace.record_log" as const;
 export const RECORD_LOG_CONTRIBUTION_COMMAND_TYPE =
   "lw.obs.trace.record_log_contribution" as const;
 export const RECORD_METRIC_CORRELATION_COMMAND_TYPE =
@@ -117,7 +158,6 @@ export const CHANGE_TRACE_NAME_COMMAND_TYPE =
 export const TRACE_PROCESSING_COMMAND_TYPES = [
   RECORD_SPAN_COMMAND_TYPE,
   ASSIGN_TOPIC_COMMAND_TYPE,
-  RECORD_LOG_COMMAND_TYPE,
   RECORD_LOG_CONTRIBUTION_COMMAND_TYPE,
   RECORD_METRIC_CORRELATION_COMMAND_TYPE,
   RESOLVE_ORIGIN_COMMAND_TYPE,

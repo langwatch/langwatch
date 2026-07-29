@@ -2,12 +2,13 @@ import { findHiddenGovernanceProject } from "@ee/governance/services/governanceP
 import { PersonalUsageService } from "@ee/governance/services/personalUsage.service";
 import { HTTPException } from "hono/http-exception";
 import { describeRoute } from "hono-openapi";
-import { resolver, validator as zValidator } from "hono-openapi/zod";
+import { resolver } from "hono-openapi/zod";
 import {
   createProjectApp,
   requires,
   type SecuredApp,
 } from "~/server/api/security";
+import { validator as zValidator } from "~/server/api/validation";
 import { prisma } from "~/server/db";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 

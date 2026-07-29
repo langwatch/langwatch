@@ -44,7 +44,12 @@ export type CreateLlmConfigParams = Omit<
  */
 export interface LlmConfigWithLatestVersion extends LlmPromptConfig {
   latestVersion: LatestConfigVersionSchema & {
-    author?: { name: string } | null;
+    author?: {
+      id: string;
+      name: string | null;
+      email?: string | null;
+      image?: string | null;
+    } | null;
     runtimeParameters: Record<string, unknown>;
   };
   _count?: {
@@ -123,8 +128,9 @@ export class LlmConfigRepository {
             ...config,
             latestVersion: {
               ...parseLlmConfigVersion(rawVersion),
-              runtimeParameters:
-                parseRuntimeParameters(rawVersion.runtimeParameters),
+              runtimeParameters: parseRuntimeParameters(
+                rawVersion.runtimeParameters,
+              ),
             },
           };
         } catch (error) {
@@ -283,8 +289,9 @@ export class LlmConfigRepository {
         ...config,
         latestVersion: {
           ...parseLlmConfigVersion(rawVersion),
-          runtimeParameters:
-            parseRuntimeParameters(rawVersion.runtimeParameters),
+          runtimeParameters: parseRuntimeParameters(
+            rawVersion.runtimeParameters,
+          ),
         },
       };
     } catch (error) {
@@ -563,8 +570,9 @@ export class LlmConfigRepository {
         ...updatedConfig,
         latestVersion: {
           ...parseLlmConfigVersion(newVersion),
-          runtimeParameters:
-            parseRuntimeParameters(newVersion.runtimeParameters),
+          runtimeParameters: parseRuntimeParameters(
+            newVersion.runtimeParameters,
+          ),
         },
       };
     });
@@ -883,10 +891,15 @@ export class LlmConfigRepository {
     });
     return configs.map((c) => ({
       id: c.id,
-      name:
-        c.handle
-          ? this.removeHandlePrefixes(c.handle, input.projectId, input.organizationId) ?? c.name ?? c.id
-          : c.name ?? c.id,
+      name: c.handle
+        ? (this.removeHandlePrefixes(
+            c.handle,
+            input.projectId,
+            input.organizationId,
+          ) ??
+          c.name ??
+          c.id)
+        : (c.name ?? c.id),
     }));
   }
 

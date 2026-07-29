@@ -6,7 +6,10 @@ import {
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { env } from "~/env.mjs";
-import { LiteMemberRestrictedError } from "~/server/app-layer/permissions/errors";
+import {
+  LiteMemberRestrictedError,
+  ProjectPermissionDeniedError,
+} from "~/server/app-layer/permissions/errors";
 import type { Session } from "~/server/auth";
 import { isAdmin } from "../../../ee/admin/isAdmin";
 
@@ -666,9 +669,21 @@ export const checkProjectPermission =
           ),
         });
       }
+      // `cause` carries the handled error, exactly as the EXTERNAL branch
+      // above does. Without it this denial crossed the boundary as bare prose,
+      // so the client had no code to key copy off and rendered the generic
+      // "unknown" state for a refusal we can name — and one the customer can
+      // act on by asking an admin for the permission named in `meta`.
+      //
+      // The wire code that results is FORBIDDEN, not the UNAUTHORIZED spelled
+      // below: `handledErrorMiddleware` re-derives it from the handled cause's
+      // `httpStatus` (403). That is the right answer — the caller IS
+      // authenticated, they just lack the permission — and it now matches what
+      // the REST surface has always returned for the same refusal.
       throw new TRPCError({
         code: "UNAUTHORIZED",
         message: "You do not have permission to access this project resource",
+        cause: new ProjectPermissionDeniedError(permission),
       });
     }
 
@@ -1277,7 +1292,9 @@ async function loadScopeResolution(
               {
                 userId,
                 user: {
-                  orgMemberships: { some: { organizationId: args.organizationId } },
+                  orgMemberships: {
+                    some: { organizationId: args.organizationId },
+                  },
                 },
               },
               ...(groupIds.length > 0 ? [{ groupId: { in: groupIds } }] : []),
@@ -1729,68 +1746,6 @@ export const authorizeInResolver = ({
   ctx.permissionChecked = true;
   return next();
 };
-
-// ============================================================================
-// PUBLIC SHARE HANDLING
-// ============================================================================
-
-type PublicResourceTypes = "TRACE" | "THREAD";
-
-export const checkPermissionOrPubliclyShared =
-  <
-    Key extends keyof InputType,
-    InputType extends { [key in Key]: string } & { projectId: string },
-  >(
-    permissionCheck: PermissionMiddleware<InputType>,
-    {
-      resourceType,
-      resourceParam,
-    }: {
-      resourceType: PublicResourceTypes | ((input: any) => PublicResourceTypes);
-      resourceParam: Key;
-    },
-  ) =>
-  async ({ ctx, input, next }: PermissionMiddlewareParams<InputType>) => {
-    let allowed = false;
-    try {
-      await permissionCheck({
-        ctx,
-        input,
-        next: async () => true as any,
-      });
-      allowed = true;
-    } catch (e) {
-      if (e instanceof TRPCError && e.code === "UNAUTHORIZED") {
-        allowed = false;
-      } else {
-        throw e;
-      }
-    }
-
-    if (!allowed) {
-      const sharedResource = await ctx.prisma.publicShare.findFirst({
-        where: {
-          projectId: input.projectId,
-          resourceType:
-            typeof resourceType === "function"
-              ? resourceType(input)
-              : resourceType,
-          resourceId: input[resourceParam],
-        },
-      });
-      if (!sharedResource) {
-        throw new TRPCError({
-          code: "UNAUTHORIZED",
-          message:
-            "You do not have permission and this resource is not publicly shared",
-        });
-      }
-      ctx.publiclyShared = true;
-    }
-
-    ctx.permissionChecked = true;
-    return next();
-  };
 
 // ============================================================================
 // OPS PERMISSION

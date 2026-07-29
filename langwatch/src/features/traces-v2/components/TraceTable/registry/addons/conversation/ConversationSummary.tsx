@@ -2,7 +2,6 @@ import { Circle, HStack, Icon, Text } from "@chakra-ui/react";
 import { AlertTriangle, GitBranch, Zap } from "lucide-react";
 import type React from "react";
 import {
-  abbreviateModel,
   formatCost,
   formatTokens,
   formatWallClock,
@@ -32,7 +31,9 @@ export const ConversationSummaryLine: React.FC<SummaryProps> = ({ group }) => {
       {group.primaryModel && (
         <>
           <Separator />
-          <Text>{abbreviateModel(group.primaryModel)}</Text>
+          <Text truncate maxW="16rem" title={group.primaryModel}>
+            {group.primaryModel}
+          </Text>
         </>
       )}
       {group.totalCost > 0 && (
@@ -77,7 +78,9 @@ export const ConversationSummaryDetail: React.FC<SummaryProps> = ({
       {group.primaryModel && (
         <>
           <Separator />
-          <Text>{abbreviateModel(group.primaryModel)}</Text>
+          <Text truncate maxW="16rem" title={group.primaryModel}>
+            {group.primaryModel}
+          </Text>
         </>
       )}
       {group.totalSpans > 0 && (

@@ -117,9 +117,9 @@ importers:
       '@langchain/openai':
         specifier: '>=0.6.0 <1.0.0'
         version: 0.6.17(@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.219.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.8.0(@opentelemetry/api@1.9.1))(openai@5.12.2(zod@4.4.3)))
-      '@langwatch/cli-cards':
+      '@langwatch/langy':
         specifier: workspace:*
-        version: link:../packages/cli-cards
+        version: link:../packages/langy
       '@opentelemetry/api':
         specifier: ^1.9.0
         version: 1.9.1
@@ -202,11 +202,14 @@ importers:
         specifier: ^2.8.1
         version: 2.9.0
 
-  ../packages/cli-cards:
+  ../packages/langy:
     devDependencies:
       typescript:
         specifier: ^5.9.2
         version: 5.9.3
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.5.2)(@vitest/coverage-v8@4.1.9)(msw@2.14.6(@types/node@24.5.2)(typescript@5.9.3))(vite@7.3.5(@types/node@24.5.2)(yaml@2.9.0))
       zod:
         specifier: ^4.0.14
         version: 4.4.3

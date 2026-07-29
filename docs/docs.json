@@ -622,6 +622,7 @@
               "ai-gateway/api/chat-completions",
               "ai-gateway/api/messages",
               "ai-gateway/api/embeddings",
+              "ai-gateway/api/audio",
               "ai-gateway/api/models",
               "ai-gateway/api/errors",
               "ai-gateway/api/management"
@@ -743,6 +744,53 @@
         ]
       },
       {
+        "anchor": "Langy",
+        "icon": "robot",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "langy/overview",
+              "langy/getting-started",
+              "langy/how-langy-works"
+            ]
+          },
+          {
+            "group": "Using Langy",
+            "pages": [
+              "langy/chat",
+              "langy/scenario-tests-and-evals",
+              "langy/pull-requests",
+              "langy/insights"
+            ]
+          },
+          {
+            "group": "Models & Cost",
+            "pages": [
+              "langy/models",
+              "langy/codex",
+              "langy/token-usage-and-cost"
+            ]
+          },
+          {
+            "group": "Security & Control",
+            "pages": [
+              "langy/security/sandbox",
+              "langy/security/data-flow-and-privacy",
+              "langy/security/github-access"
+            ]
+          },
+          {
+            "group": "Reference",
+            "pages": [
+              "langy/reference/supported-models",
+              "langy/reference/limits",
+              "langy/reference/troubleshooting"
+            ]
+          }
+        ]
+      },
+      {
         "anchor": "Self Hosting",
         "icon": "server",
         "groups": [
@@ -763,6 +811,16 @@
               "self-hosting/configuration/sso",
               "self-hosting/configuration/observability",
               "self-hosting/configuration/third-party-integrations"
+            ]
+          },
+          {
+            "group": "Langy",
+            "pages": [
+              "self-hosting/langy/overview",
+              "self-hosting/langy/setup",
+              "self-hosting/langy/github-app",
+              "self-hosting/langy/environment-variables",
+              "self-hosting/langy/networking-and-egress"
             ]
           },
           {
@@ -1235,7 +1293,18 @@
       "x-twitter": "https://x.com/langwatchai",
       "linkedin": "https://www.linkedin.com/company/langwatch/",
       "youtube": "https://www.youtube.com/@LangWatch"
-    }
+    },
+    "links": [
+      {
+        "header": "For agents",
+        "items": [
+          {
+            "label": "For agents: report an issue using npx langwatch report",
+            "href": "https://langwatch.ai/docs/support"
+          }
+        ]
+      }
+    ]
   },
   "integrations": {
     "gtm": {
@@ -1244,7 +1313,7 @@
   },
   "redirects": [
     {
-      "source": "/ci/cache/busted/1784639105",
+      "source": "/ci/cache/busted/1785303164",
       "destination": "/"
     },
     {

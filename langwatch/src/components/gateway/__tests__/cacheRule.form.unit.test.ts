@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  type CacheRuleFormState,
   emptyFormState,
   fromWire,
   toWire,
   validateForm,
-  type CacheRuleFormState,
 } from "../cacheRule.form";
 
 function buildState(
@@ -28,10 +28,11 @@ describe("cacheRule.form", () => {
     describe("when name is empty", () => {
       it("rejects", () => {
         expect(
-          validateForm(
-            buildState({ matchVkId: "vk_01", name: "   " }),
-          ),
-        ).toMatch(/Name is required/);
+          validateForm(buildState({ matchVkId: "vk_01", name: "   " })),
+        ).toMatchObject({
+          field: "name",
+          message: expect.stringContaining("Name is required"),
+        });
       });
     });
 
@@ -45,7 +46,12 @@ describe("cacheRule.form", () => {
               matchVkId: "vk_01",
             }),
           ),
-        ).toMatch(/Priority must be between 0 and 1000/);
+        ).toMatchObject({
+          field: "priority",
+          message: expect.stringContaining(
+            "Priority must be between 0 and 1000",
+          ),
+        });
       });
 
       it("rejects priority above 1000", () => {
@@ -57,7 +63,12 @@ describe("cacheRule.form", () => {
               matchVkId: "vk_01",
             }),
           ),
-        ).toMatch(/Priority must be between 0 and 1000/);
+        ).toMatchObject({
+          field: "priority",
+          message: expect.stringContaining(
+            "Priority must be between 0 and 1000",
+          ),
+        });
       });
     });
 
@@ -72,7 +83,10 @@ describe("cacheRule.form", () => {
               actionTtlSeconds: "-5",
             }),
           ),
-        ).toMatch(/TTL must be a number/);
+        ).toMatchObject({
+          field: "actionTtlSeconds",
+          message: expect.stringContaining("TTL must be a number"),
+        });
       });
 
       it("rejects TTL above 86400", () => {
@@ -85,7 +99,10 @@ describe("cacheRule.form", () => {
               actionTtlSeconds: "100000",
             }),
           ),
-        ).toMatch(/TTL must be a number/);
+        ).toMatchObject({
+          field: "actionTtlSeconds",
+          message: expect.stringContaining("TTL must be a number"),
+        });
       });
 
       it("rejects non-numeric TTL", () => {
@@ -98,7 +115,10 @@ describe("cacheRule.form", () => {
               actionTtlSeconds: "forever",
             }),
           ),
-        ).toMatch(/TTL must be a number/);
+        ).toMatchObject({
+          field: "actionTtlSeconds",
+          message: expect.stringContaining("TTL must be a number"),
+        });
       });
 
       it("accepts TTL at lower bound 0", () => {
@@ -153,7 +173,12 @@ describe("cacheRule.form", () => {
               matchMetadataValue: "",
             }),
           ),
-        ).toMatch(/Request metadata needs both a key and a value/);
+        ).toMatchObject({
+          field: null,
+          message: expect.stringContaining(
+            "Request metadata needs both a key and a value",
+          ),
+        });
       });
 
       it("rejects value without key", () => {
@@ -165,15 +190,21 @@ describe("cacheRule.form", () => {
               matchMetadataValue: "enterprise",
             }),
           ),
-        ).toMatch(/Request metadata needs both a key and a value/);
+        ).toMatchObject({
+          field: null,
+          message: expect.stringContaining(
+            "Request metadata needs both a key and a value",
+          ),
+        });
       });
     });
 
     describe("when no matcher is specified", () => {
       it("rejects (match-every-request not supported in v1)", () => {
-        expect(validateForm(buildState({ name: "x" }))).toMatch(
-          /At least one matcher is required/,
-        );
+        expect(validateForm(buildState({ name: "x" }))).toMatchObject({
+          field: null,
+          message: expect.stringContaining("At least one matcher is required"),
+        });
       });
     });
 
@@ -186,9 +217,7 @@ describe("cacheRule.form", () => {
 
       it("accepts vk_prefix alone", () => {
         expect(
-          validateForm(
-            buildState({ name: "x", matchVkPrefix: "vk-lw-" }),
-          ),
+          validateForm(buildState({ name: "x", matchVkPrefix: "vk-lw-" })),
         ).toBeNull();
       });
 
@@ -202,9 +231,7 @@ describe("cacheRule.form", () => {
 
       it("accepts principal_id alone", () => {
         expect(
-          validateForm(
-            buildState({ name: "x", matchPrincipalId: "user_01" }),
-          ),
+          validateForm(buildState({ name: "x", matchPrincipalId: "user_01" })),
         ).toBeNull();
       });
 
@@ -251,7 +278,9 @@ describe("cacheRule.form", () => {
       expect(wire.name).toBe("trimmed");
       expect(wire.description).toBeNull();
       expect(wire.priority).toBe(250);
-      expect(wire.matchers).toEqual({ vk_tags: ["tier=enterprise", "team=ml"] });
+      expect(wire.matchers).toEqual({
+        vk_tags: ["tier=enterprise", "team=ml"],
+      });
       expect(wire.action).toEqual({ mode: "force" });
     });
 

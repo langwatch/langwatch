@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { useLangyStore } from "../stores/langyStore";
 
 /**
@@ -10,7 +10,7 @@ import { useLangyStore } from "../stores/langyStore";
  */
 describe("askLangy — command-bar → panel handoff", () => {
   beforeEach(() => {
-    useLangyStore.getState().resetForProject();
+    useLangyStore.getState().resetForProject("project-test");
   });
 
   describe("given a question typed in the command bar", () => {

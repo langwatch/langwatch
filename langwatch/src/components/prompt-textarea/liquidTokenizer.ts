@@ -4,9 +4,9 @@
  * server and frontend code can import the same extraction logic.
  */
 export {
-  tokenizeLiquidTemplate,
   extractLiquidVariables,
   type LiquidToken,
   type LiquidTokenType,
   type LiquidVariableExtractionResult,
+  tokenizeLiquidTemplate,
 } from "~/utils/liquid/liquidTokenizer";

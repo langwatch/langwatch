@@ -25,6 +25,7 @@ function conversationRow(
     title: null,
     isShared: false,
     status: "idle",
+    currentTurnId: null,
     lastError: null,
     messageCount: 0,
     lastActivityAtMs: 1,

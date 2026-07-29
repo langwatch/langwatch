@@ -83,6 +83,9 @@ export default function OpsSchedulerPage() {
                   <Table.ColumnHeader>Schedule</Table.ColumnHeader>
                   <Table.ColumnHeader>Next run</Table.ColumnHeader>
                   <Table.ColumnHeader>Last fired</Table.ColumnHeader>
+                  <Table.ColumnHeader>In progress</Table.ColumnHeader>
+                  <Table.ColumnHeader>Retries</Table.ColumnHeader>
+                  <Table.ColumnHeader>Last error</Table.ColumnHeader>
                   <Table.ColumnHeader>Status</Table.ColumnHeader>
                 </Table.Row>
               </Table.Header>
@@ -114,6 +117,44 @@ export default function OpsSchedulerPage() {
                     </Table.Cell>
                     <Table.Cell>{formatWhen(job.nextRunAt)}</Table.Cell>
                     <Table.Cell>{formatWhen(job.lastSlot)}</Table.Cell>
+                    <Table.Cell>
+                      {job.currentSlot ? (
+                        // A claimed slot with prior attempts is a retry in
+                        // backoff, not a long-running execution — say which.
+                        job.attempts > 0 ? (
+                          <Badge colorPalette="orange" variant="subtle">
+                            Retrying
+                          </Badge>
+                        ) : (
+                          <Badge colorPalette="blue" variant="subtle">
+                            Running
+                          </Badge>
+                        )
+                      ) : (
+                        <Text textStyle="xs" color="fg.muted">
+                          —
+                        </Text>
+                      )}
+                    </Table.Cell>
+                    <Table.Cell>
+                      {job.attempts > 0 ? (
+                        <Badge
+                          colorPalette={job.attempts >= 3 ? "red" : "orange"}
+                          variant="subtle"
+                        >
+                          {job.attempts}
+                        </Badge>
+                      ) : (
+                        <Text textStyle="xs" color="fg.muted">
+                          —
+                        </Text>
+                      )}
+                    </Table.Cell>
+                    <Table.Cell maxWidth="280px">
+                      <Text textStyle="xs" color="fg.muted" truncate>
+                        {job.lastError ?? "—"}
+                      </Text>
+                    </Table.Cell>
                     <Table.Cell>
                       {job.active ? (
                         <Badge colorPalette="green" variant="subtle">

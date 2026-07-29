@@ -1,8 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  INTERRUPTED_THRESHOLD_MS,
-  isRunFinished,
-} from "../isRunFinished";
+import { INTERRUPTED_THRESHOLD_MS, isRunFinished } from "../isRunFinished";
 
 describe("isRunFinished", () => {
   beforeEach(() => {

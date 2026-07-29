@@ -237,6 +237,7 @@ export function useModelProviderForm(
     (): FormSnapshot => ({
       provider,
       projectId,
+      organizationId,
       isUsingEnvVars,
       customKeys: credentialKeysHook.customKeys,
       initialKeys: credentialKeysHook.originalStoredKeysRef.current,
@@ -257,6 +258,7 @@ export function useModelProviderForm(
     [
       provider,
       projectId,
+      organizationId,
       isUsingEnvVars,
       credentialKeysHook.customKeys,
       credentialKeysHook.originalStoredKeysRef,

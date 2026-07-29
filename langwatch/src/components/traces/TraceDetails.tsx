@@ -7,15 +7,14 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import type { PublicShare } from "@prisma/client";
-import { useRouter } from "~/utils/compat/next-router";
 import qs from "qs";
 import { useCallback, useEffect, useState } from "react";
 import { Maximize2, Minimize2 } from "react-feather";
 import { useDrawer } from "~/hooks/useDrawer";
+import { useRouter } from "~/utils/compat/next-router";
 import { useAnnotationCommentStore } from "../../hooks/useAnnotationCommentStore";
-import { useLiteMemberGuard } from "../../hooks/useLiteMemberGuard";
 import { useDejaViewLink } from "../../hooks/useDejaViewLink";
+import { useLiteMemberGuard } from "../../hooks/useLiteMemberGuard";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
 import { api } from "../../utils/api";
@@ -33,16 +32,14 @@ import {
   Guardrails,
 } from "./Evaluations";
 import { Events } from "./Events";
-import { SequenceDiagramContainer } from "./SequenceDiagram";
 import { PinButton } from "./PinButton";
-import { ShareButton } from "./ShareButton";
+import { SequenceDiagramContainer } from "./SequenceDiagram";
 import { SpanTree } from "./SpanTree";
 import { TraceSummary } from "./Summary";
 
 export function TraceDetails(props: {
   traceId: string;
   selectedTab?: string;
-  publicShare?: PublicShare;
   traceView?: "span" | "full";
   showMessages?: boolean;
   onToggleView?: () => void;
@@ -106,7 +103,11 @@ export function TraceDetails(props: {
     } else {
       setEvaluationsCheckInterval(undefined);
     }
-  }, [evaluations.data, evaluationsPollingStart, trace.data?.timestamps.inserted_at]);
+  }, [
+    evaluations.data,
+    evaluationsPollingStart,
+    trace.data?.timestamps.inserted_at,
+  ]);
 
   const anyGuardrails = !!evaluations.data?.some((x) => x.is_guardrail);
 
@@ -130,19 +131,19 @@ export function TraceDetails(props: {
       setTimeout(() => {
         void router.replace(
           "?" +
-          qs.stringify(
-            {
-              ...Object.fromEntries(
-                Object.entries(router.query).filter(
-                  ([key]) => !key.startsWith("drawer.selectedTab"),
+            qs.stringify(
+              {
+                ...Object.fromEntries(
+                  Object.entries(router.query).filter(
+                    ([key]) => !key.startsWith("drawer.selectedTab"),
+                  ),
                 ),
-              ),
-              drawer: {
-                selectedTab: tab,
+                drawer: {
+                  selectedTab: tab,
+                },
               },
-            },
-            { allowDots: true },
-          ),
+              { allowDots: true },
+            ),
         );
       }, 100);
     },
@@ -221,6 +222,14 @@ export function TraceDetails(props: {
         colorPalette="blue"
         display="flex"
         flexDirection="column"
+        // lazyMount only (no unmountOnExit): the Thread (messages) tab
+        // renders Conversation -> TraceMessages -> Annotations ->
+        // AnnotationComment, which holds an in-progress annotation
+        // comment via react-hook-form local state. Unmounting that tab
+        // while the user is mid-comment (e.g. after clicking "Annotate"
+        // and switching to another tab) would destroy the draft, so we
+        // only skip mounting tabs that were never opened.
+        lazyMount
       >
         <VStack
           width="full"
@@ -312,9 +321,6 @@ export function TraceDetails(props: {
               )}
               {project && (
                 <PinButton projectId={project.id} traceId={props.traceId} />
-              )}
-              {project && (
-                <ShareButton project={project} traceId={props.traceId} />
               )}
               {dejaView.href && (
                 <Link href={dejaView.href}>

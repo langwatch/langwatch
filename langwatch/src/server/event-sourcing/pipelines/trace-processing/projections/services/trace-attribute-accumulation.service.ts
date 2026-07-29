@@ -1,5 +1,9 @@
 import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import {
+  RESERVED_INPUT_MEDIA_REFS,
+  RESERVED_OUTPUT_MEDIA_REFS,
+} from "~/shared/traces/media-refs";
 import type { NormalizedSpan } from "../../schemas/spans";
 import type { TraceOriginService } from "./trace-origin.service";
 import { parseJsonStringArray, stringAttr } from "./trace-summary.utils";
@@ -35,6 +39,11 @@ export const SPAN_ATTR_MAPPINGS = [
   // gateway_budget_ledger_events stays empty.
   ["langwatch.virtual_key_id", "langwatch.virtual_key_id"],
   ["langwatch.gateway_request_id", "langwatch.gateway_request_id"],
+  // The provider the request was actually dispatched to (a ModelProvider
+  // row id). Provider-filtered budgets ("$50/month, OpenAI only") can only
+  // accrue their own spend if the fold knows which vendor served the call;
+  // without this key they never accrue at all.
+  ["langwatch.model_provider_id", "langwatch.model_provider_id"],
   // Governance ingest markers — stamped on every span by the
   // /api/ingest/otel/:sourceId receiver (langwatch/src/server/routes/ingest/ingestionRoutes.ts).
   // Hoisted into trace_summaries so the ActivityMonitorService dashboard
@@ -242,12 +251,17 @@ export class TraceAttributeAccumulationService {
     outputSource,
     inputIsFallback,
     outputIsFallback,
+    inputMediaRefs,
+    outputMediaRefs,
   }: {
     state: TraceSummaryData;
     span: NormalizedSpan;
     outputSource: string;
     inputIsFallback: boolean;
     outputIsFallback: boolean;
+    /** Compact JSON media refs following the winning IO, or null to clear. */
+    inputMediaRefs: string | null;
+    outputMediaRefs: string | null;
   }): Record<string, string> {
     const spanAttrs = this.extractAttributes(span);
     const merged = { ...spanAttrs, ...state.attributes };
@@ -327,6 +341,20 @@ export class TraceAttributeAccumulationService {
       merged["langwatch.reserved.output_is_fallback"] = "true";
     } else {
       delete merged["langwatch.reserved.output_is_fallback"];
+    }
+
+    // Media refs ride the summary so the trace list and drawer summary can
+    // render thumbnails/players without reloading span payloads. They follow
+    // the same winner as ComputedInput/Output (see TraceIOAccumulationService).
+    if (inputMediaRefs) {
+      merged[RESERVED_INPUT_MEDIA_REFS] = inputMediaRefs;
+    } else {
+      delete merged[RESERVED_INPUT_MEDIA_REFS];
+    }
+    if (outputMediaRefs) {
+      merged[RESERVED_OUTPUT_MEDIA_REFS] = outputMediaRefs;
+    } else {
+      delete merged[RESERVED_OUTPUT_MEDIA_REFS];
     }
 
     // PII redaction status tracking - accumulate span IDs by severity

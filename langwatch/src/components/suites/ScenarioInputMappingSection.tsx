@@ -12,20 +12,16 @@
  * Display format is inverted: scenario_field → agent_input.
  */
 
-import {
-  Box,
-  Link,
-  Separator,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+// biome-ignore-all lint/suspicious/noEmptyBlockStatements: the empty blocks in this file are deliberate no-ops.
+
+import { Box, Link, Separator, Text, VStack } from "@chakra-ui/react";
 import { useMemo } from "react";
-import { VariablesSection } from "~/components/variables/VariablesSection";
 import type {
   AvailableSource,
   FieldMapping,
 } from "~/components/variables/VariableMappingInput";
 import type { Variable } from "~/components/variables/VariablesSection";
+import { VariablesSection } from "~/components/variables/VariablesSection";
 
 /** The three scenario fields shown as input mapping rows. */
 const SCENARIO_FIELDS: Variable[] = [
@@ -173,7 +169,8 @@ export function ScenarioInputMappingSection({
   const hasOutputs = (outputs ?? []).length > 0;
   const autoOutputLabel = outputs?.[0]?.identifier ?? "output";
   // undefined = not yet set (auto-populate), "" = explicitly cleared, string = user selection
-  const selectedOutput = outputField === undefined ? autoOutputLabel : outputField;
+  const selectedOutput =
+    outputField === undefined ? autoOutputLabel : outputField;
   const hasOutputMapping = selectedOutput !== "" && hasOutputs;
 
   const outputDisplayMappings = useMemo<Record<string, FieldMapping>>(
@@ -197,8 +194,8 @@ export function ScenarioInputMappingSection({
 
   // Validation: at least one of input or messages must be mapped
   const missingInputIds = useMemo(() => {
-    const hasInput = !!displayMappings["input"];
-    const hasMessages = !!displayMappings["messages"];
+    const hasInput = !!displayMappings.input;
+    const hasMessages = !!displayMappings.messages;
     if (hasInput || hasMessages) return new Set<string>();
     return new Set(["input", "messages"]);
   }, [displayMappings]);
@@ -249,9 +246,9 @@ export function ScenarioInputMappingSection({
           Scenario Mappings
         </Text>
         <Text fontSize="xs" color="fg.muted">
-          Configure how this agent connects to the scenario framework.
-          When run as a scenario target, these mappings control which data
-          flows in and out.{" "}
+          Configure how this agent connects to the scenario framework. When run
+          as a scenario target, these mappings control which data flows in and
+          out.{" "}
           <Link
             href="https://docs.langwatch.ai/features/scenarios"
             target="_blank"
@@ -288,7 +285,12 @@ export function ScenarioInputMappingSection({
           <VStack align="stretch" gap={1} marginTop={2}>
             {valueMappings.map(([identifier, mapping]) => (
               <Box key={identifier}>
-                <Text as="span" fontSize="xs" color="fg.muted" fontFamily="mono">
+                <Text
+                  as="span"
+                  fontSize="xs"
+                  color="fg.muted"
+                  fontFamily="mono"
+                >
                   {identifier}
                 </Text>
                 <Text as="span" fontSize="xs" color="fg.muted">

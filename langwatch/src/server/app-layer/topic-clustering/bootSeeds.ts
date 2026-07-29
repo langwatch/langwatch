@@ -4,12 +4,12 @@ import type { Cluster, Redis } from "ioredis";
 
 import { TOPIC_CLUSTERING_PROCESS_NAME } from "~/server/event-sourcing/pipelines/topic-clustering-processing/process-manager/topicClusteringProcess.types";
 import {
-  seedClusteringSchedules,
   type BackfillDeps,
+  seedClusteringSchedules,
 } from "./seedClusteringSchedules";
 import {
-  seedTopicModelHistory,
   type RecordTopicsSeedCommand,
+  seedTopicModelHistory,
 } from "./seedTopicModel";
 
 export interface TopicClusteringBootSeedCommands {

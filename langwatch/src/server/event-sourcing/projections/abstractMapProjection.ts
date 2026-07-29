@@ -1,13 +1,13 @@
 import type { z } from "zod";
 import type { AnyEventSchema } from "./abstractFoldProjection";
-import type { AppendStore, MapProjectionOptions } from "./mapProjection.types";
 import {
-  type EventTypeOf,
-  type StripPrefix,
   type DotSnakeToPascal,
-  type UnionToIntersection,
+  type EventTypeOf,
   eventTypeToMapHandlerName,
+  type StripPrefix,
+  type UnionToIntersection,
 } from "./eventTypeTransforms";
+import type { AppendStore, MapProjectionOptions } from "./mapProjection.types";
 
 // ---------------------------------------------------------------------------
 // Map handler name derivation
@@ -52,23 +52,23 @@ export type MapEventHandlers<
  *
  * **Usage:**
  * ```typescript
- * const logEvents = [logRecordReceivedEventSchema] as const;
+ * const events = [canonicalLogRecordReceivedEventSchema] as const;
  *
- * class LogRecordStorageMapProjection
- *   extends AbstractMapProjection<NormalizedLogRecord, typeof logEvents>
- *   implements MapEventHandlers<typeof logEvents, NormalizedLogRecord>
+ * class CanonicalLogStorageMapProjection
+ *   extends AbstractMapProjection<CanonicalLogRecord, typeof events>
+ *   implements MapEventHandlers<typeof events, CanonicalLogRecord>
  * {
- *   readonly name = "logRecordStorage";
- *   readonly store: AppendStore<NormalizedLogRecord>;
- *   protected readonly events = logEvents;
+ *   readonly name = "canonicalLogStorage";
+ *   readonly store: AppendStore<CanonicalLogRecord>;
+ *   protected readonly events = events;
  *
- *   constructor(deps: { store: AppendStore<NormalizedLogRecord> }) {
+ *   constructor(deps: { store: AppendStore<CanonicalLogRecord> }) {
  *     super();
  *     this.store = deps.store;
  *   }
  *
- *   mapObsTraceLogRecordReceived(event: LogRecordReceivedEvent): NormalizedLogRecord {
- *     return { ... };
+ *   mapLogRecordReceived(event: CanonicalLogRecordReceivedEvent): CanonicalLogRecord {
+ *     return event.data;
  *   }
  * }
  * ```
@@ -113,9 +113,9 @@ export abstract class AbstractMapProjection<
     const handlerName = this.dispatchMap[event.type];
     if (!handlerName) return null;
 
-    const handler = this[handlerName as keyof this] as (
-      e: { type: string },
-    ) => Record | null;
+    const handler = this[handlerName as keyof this] as (e: {
+      type: string;
+    }) => Record | null;
     return handler.call(this, event);
   }
 }

@@ -1,3 +1,4 @@
+import type { SerializedHandledError } from "@langwatch/handled-error";
 import { z } from "zod";
 import type {
   AutosaveState,
@@ -13,7 +14,6 @@ import {
 } from "~/optimization_studio/types/dsl";
 import type { DatasetColumnType } from "~/server/datasets/types";
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators";
-import type { LlmConfigInputType, LlmConfigOutputType } from "~/types";
 
 // ============================================================================
 // Zod Schemas (source of truth - types are inferred from these)
@@ -475,6 +475,21 @@ export const targetRowMetadataSchema = z.object({
   cost: z.number().optional(),
   duration: z.number().optional(),
   traceId: z.string().optional(),
+  /**
+   * The failure's stable code, when this row failed.
+   *
+   * Stored beside the raw error string rather than instead of it, and never
+   * as rendered copy: the cell derives what the customer reads from the code
+   * at render time, so the words stay re-derivable after they are rewritten
+   * (ADR-045). Shape owned by `@langwatch/handled-error`; validated here only
+   * as "an object", because a persisted payload from an older or newer client
+   * must survive the round trip rather than be silently stripped.
+   */
+  domainError: z
+    .custom<SerializedHandledError>(
+      (value) => typeof value === "object" && value !== null,
+    )
+    .optional(),
 });
 
 /**
@@ -784,6 +799,8 @@ export type TableRowData = {
       output: unknown;
       evaluators: Record<string, unknown>;
       error?: string | null;
+      /** The failure's code — what the cell renders its copy from. */
+      domainError?: SerializedHandledError;
       isLoading?: boolean;
     }
   >;

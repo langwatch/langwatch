@@ -39,7 +39,12 @@ export const listEvaluatorsCommand = async (): Promise<CommandResult | void> => 
         console.log(chalk.gray("No evaluators found in this project."));
         console.log(chalk.gray("Create your first evaluator with:"));
         console.log(
-          chalk.cyan('  langwatch evaluator create "My Evaluator" --type langevals/llm_judge'),
+          chalk.cyan('  langwatch evaluator create "My Evaluator" --type langevals/llm_boolean'),
+        );
+        console.log(
+          chalk.gray(
+            `Run ${chalk.cyan("langwatch evaluator types")} to list every valid type`,
+          ),
         );
         return;
       }

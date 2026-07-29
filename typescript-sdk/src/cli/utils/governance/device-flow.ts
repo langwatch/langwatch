@@ -136,7 +136,7 @@ export async function startDeviceCode(
 /**
  * Device fingerprint stamped onto the CLI session at /exchange time.
  * The control plane persists it on the access + refresh token records
- * so /me/sessions can render "Mac (rchaves.local)" instead of
+ * so /me/devices can render "Mac (rchaves.local)" instead of
  * "Unknown device" — multi-device users need this to revoke
  * individual sessions without nuking every device they're logged in
  * on (Ariana QA finding). See

@@ -63,6 +63,19 @@ Feature: Langy panel layout modes
     Then page content reclaims the full viewport width
     And the content card extends back to the viewport edge without right rounding
 
+  # The morph idiom is not only panel-to-panel. The home page's lit block is
+  # an ORIGIN for it: its composer is the same object as the panel's, so
+  # sending from home seats that object into whichever layout is in use rather
+  # than opening the panel beside a box that just vanished. The travel itself
+  # is specified in specs/home/langy-home-morph.feature.
+
+  Scenario: The home page's composer is an origin for the panel's morph
+    Given the Langy home renders and the panel is closed
+    When I send a question from the home page's composer
+    Then the panel opens in whichever layout I use
+    And the composer seats itself on that panel's floor as one continuous object
+    And the panel is not remounted, so nothing in flight is torn down
+
   # Opening a drawer does something DIFFERENT per layout, so docked and
   # floating stay visibly distinct.
 
@@ -83,6 +96,13 @@ Feature: Langy panel layout modes
     And the drawer's entrance is held back briefly so the panel clears out first
     And the panel keeps its own Close, the two cards being far apart
 
+  @unit
+  Scenario: The floating panel returns to the right only after the drawer has left
+    Given the floating panel is dodging an open drawer on the left
+    When the drawer closes
+    Then the drawer leaves the right edge first while the panel holds its corner
+    And the panel glides back to the right only after a beat
+
   Scenario: Closing the drawer sends the docked companion back to its dock
     Given the Langy panel is riding beside an open drawer
     When the drawer closes
@@ -101,6 +121,17 @@ Feature: Langy panel layout modes
     And the drawer's own close is the only X on screen
     So closing the drawer, not Langy, is the obvious action
 
-  Scenario: The closed-panel launcher dodges the drawer
-    Given the Langy panel is closed and a right-anchored drawer is open
-    Then the launcher orb sits in the bottom-LEFT corner, clear of the drawer and the table pager
+  # The closed state is a PEEK of the panel itself, not a separate launcher —
+  # see specs/langy/langy-peek-dock.feature for its states and geometry.
+  Scenario: The minimised peek dodges the drawer
+    Given the Langy panel is minimised in floating mode and a right-anchored drawer is open
+    Then the peek sliver rests along the bottom-LEFT edge, clear of the drawer and the table pager
+
+  # The conversation column dissolves into the panel edges with a soft mask so
+  # scrolled-off content never hard-clips against the header or composer seams.
+  Scenario: The conversation fades at the top only once messages are scrolled off above
+    Given the Langy panel is open on a conversation taller than its viewport
+    When the conversation sits at the very top
+    Then the first message is fully opaque with no fade above it
+    When part of the conversation is scrolled off above
+    Then the column dissolves under the header with a soft fade

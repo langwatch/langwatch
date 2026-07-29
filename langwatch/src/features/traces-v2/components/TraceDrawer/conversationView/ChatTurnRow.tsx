@@ -16,11 +16,11 @@ import { TRANSLATE_TEXT_MAX_CHARS } from "~/utils/constants";
 import { useTextTranslation } from "../../../hooks/useTextTranslation";
 import type { TraceListItem } from "../../../types/trace";
 import {
-  abbreviateModel,
   formatCost,
   formatDuration,
   formatRelativeTimeAgo,
 } from "../../../utils/formatters";
+import { isTerminalOrigin } from "../../../utils/terminalOrigin";
 import {
   Bubble,
   type BubbleSide,
@@ -32,6 +32,7 @@ import { getRolePalette, ReasoningBlock } from "../transcript";
 import { useConversationExpand } from "./expandContext";
 import { MessageExpandToggle } from "./MessageExpandToggle";
 import { TurnActionRow, TurnAnnotationBadges } from "./TurnAnnotations";
+import { TurnSteps } from "./TurnSteps";
 import type { TurnLayout } from "./types";
 import { formatGap } from "./utils";
 
@@ -117,12 +118,10 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
     assistantVisuals.displayRole === "user" ? "left" : "right";
   const UserIcon = userVisuals.Icon;
   const AssistantIcon = assistantVisuals.Icon;
-  // Model abbreviation belongs with the agent's response — i.e. whichever
-  // bubble carries `assistantText`. The fallback comes from the helper so
-  // it reads "Assistant" normally and "Agent" in scenario mode.
-  const assistantLabel = turn.models[0]
-    ? abbreviateModel(turn.models[0])
-    : assistantVisuals.bubbleLabel;
+  // The raw model id labels the agent's response — i.e. whichever bubble
+  // carries `assistantText`. The fallback comes from the helper so it
+  // reads "Assistant" normally and "Agent" in scenario mode.
+  const assistantLabel = turn.models[0] || assistantVisuals.bubbleLabel;
 
   return (
     <VStack align="stretch" gap={layout === "thread" ? 1 : 2}>
@@ -176,6 +175,26 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
           visibleTo={turn.inputVisibleTo}
         />
       ) : null}
+
+      {/*
+        The loop that ran between the prompt and the reply. A coding-agent turn
+        can call the model five times and run a dozen tools, and the two bubbles
+        either side of this show none of it — so the steps sit where they
+        happened. Collapsed by default; the spans are only fetched on open.
+      */}
+      {isTerminalOrigin({
+        serviceName: turn.serviceName,
+        origin: turn.origin,
+      }) &&
+        // TurnSteps parses Claude Code's span names only — for any other
+        // agent the strip would announce steps and then find none.
+        (turn.serviceName ?? "").toLowerCase().includes("claude") && (
+          <TurnSteps
+            traceId={turn.traceId}
+            occurredAtMs={turn.timestamp}
+            spanCount={turn.spanCount}
+          />
+        )}
 
       {assistantText ? (
         <TurnMessage

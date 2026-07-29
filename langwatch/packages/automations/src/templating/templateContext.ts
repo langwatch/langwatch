@@ -398,10 +398,18 @@ export function buildExampleGraphAlertTemplateContext({
 }: {
   baseHost: string;
   project: { id?: string; name: string; slug: string };
-  trigger?: { id?: string; name?: string; alertType?: "INFO" | "WARNING" | "CRITICAL" | null };
+  trigger?: {
+    id?: string;
+    name?: string;
+    alertType?: "INFO" | "WARNING" | "CRITICAL" | null;
+  };
   graph?: { id?: string; name?: string };
   metricLabel?: string;
-  condition?: { operator?: string; threshold?: number; timePeriodMinutes?: number };
+  condition?: {
+    operator?: string;
+    threshold?: number;
+    timePeriodMinutes?: number;
+  };
 }): GraphAlertTemplateContext {
   const occurredAt = new Date();
   const exampleHistory = [4, 5, 4, 6, 7, 9, 12].map((value, i) => ({
@@ -500,7 +508,6 @@ export function buildTemplateContext({
     matches: mapped,
   };
 }
-
 
 /** What a report sends. Mirrors the `ReportSource` discriminator so a template
  *  can branch on it without the dispatcher pre-rendering the decision. */

@@ -7,7 +7,7 @@
  *
  * @see specs/analytics/posthog-cost-control.feature
  */
-import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Force memory-only mode (no Redis) so tests are deterministic.
 vi.mock("../../redis", () => ({

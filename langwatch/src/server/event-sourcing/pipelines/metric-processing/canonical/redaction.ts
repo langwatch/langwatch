@@ -57,8 +57,16 @@ export async function redactTypedAttributes(args: {
     prefix: "resource",
     out: refs,
   });
-  collectStringRefs({ value: args.scopeAttributes, prefix: "scope", out: refs });
-  collectStringRefs({ value: args.pointAttributes, prefix: "point", out: refs });
+  collectStringRefs({
+    value: args.scopeAttributes,
+    prefix: "scope",
+    out: refs,
+  });
+  collectStringRefs({
+    value: args.pointAttributes,
+    prefix: "point",
+    out: refs,
+  });
   collectStringRefs({
     value: args.exemplarAttributes,
     prefix: "exemplar",

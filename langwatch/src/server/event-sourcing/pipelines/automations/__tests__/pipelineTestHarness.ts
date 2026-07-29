@@ -1,7 +1,7 @@
 import type { ProcessManagerDefinition } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import {
-  createAutomationsPipeline,
   type AutomationsPipelineDeps,
+  createAutomationsPipeline,
 } from "../pipeline";
 
 /** Pull one process-manager definition out of the real automations pipeline
@@ -16,11 +16,6 @@ export function automationProcessDefinition({
   deps?: Partial<AutomationsPipelineDeps>;
 }): ProcessManagerDefinition {
   const pipeline = createAutomationsPipeline({
-    automationAuditStore: {
-      append: async () => {
-        // inert stub — projection storage is not under test here
-      },
-    } as unknown as AutomationsPipelineDeps["automationAuditStore"],
     dispatch: {} as AutomationsPipelineDeps["dispatch"],
     sweep: {
       decideSweepCandidates: async () => [],

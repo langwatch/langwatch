@@ -1,5 +1,5 @@
-import type { AlertType, TriggerAction } from "../enums";
 import type { ZodTypeAny } from "zod";
+import type { AlertType, TriggerAction } from "../enums";
 
 /**
  * Cross-side vocabulary for the automation provider system. A provider is

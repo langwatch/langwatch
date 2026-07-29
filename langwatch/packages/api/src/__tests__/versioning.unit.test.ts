@@ -1,10 +1,10 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import type { EndpointRegistration } from "../types.js";
 import { isDateVersion } from "../types.js";
 import {
-  resolveVersions,
   resolveRequestVersion,
+  resolveVersions,
   type VersionDefinition,
 } from "../versioning.js";
 

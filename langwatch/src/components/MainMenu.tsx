@@ -4,6 +4,7 @@ import {
   Activity,
   Anvil,
   CalendarClock,
+  Database,
   Film,
   Flag,
   History,
@@ -11,6 +12,7 @@ import {
 } from "lucide-react";
 import React, { useState } from "react";
 import { useRouter } from "~/utils/compat/next-router";
+import { useFeatureFlag } from "../hooks/useFeatureFlag";
 import { useOpsPermission } from "../hooks/useOpsPermission";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { usePublicEnv } from "../hooks/usePublicEnv";
@@ -24,6 +26,7 @@ import {
   isExperimentsActivePath,
   isOnlineEvaluationsActivePath,
 } from "./sidebar/navigationActiveState";
+import { projectScopedDestination } from "./sidebar/projectScopedNav";
 import { SidebarSection } from "./sidebar/SidebarSection";
 import { SideMenuLink } from "./sidebar/SideMenuLink";
 import { SupportMenu } from "./sidebar/SupportMenu";
@@ -172,12 +175,11 @@ export const MainMenu = React.memo(function MainMenu({
                   {
                     icon: featureIcons.scenarios.icon,
                     label: projectRoutes.scenarios.title,
-                    href: project
-                      ? projectRoutes.scenarios.path.replace(
-                          "[project]",
-                          project.slug,
-                        )
-                      : "/auth/signin",
+                    ...projectScopedDestination({
+                      path: projectRoutes.scenarios.path,
+                      label: projectRoutes.scenarios.title,
+                      project,
+                    }),
                     isActive: router.pathname.includes(
                       "/simulations/scenarios",
                     ),
@@ -185,12 +187,11 @@ export const MainMenu = React.memo(function MainMenu({
                   {
                     icon: featureIcons.simulation_runs.icon,
                     label: projectRoutes.simulation_runs.title,
-                    href: project
-                      ? projectRoutes.simulation_runs.path.replace(
-                          "[project]",
-                          project.slug,
-                        )
-                      : "/auth/signin",
+                    ...projectScopedDestination({
+                      path: projectRoutes.simulation_runs.path,
+                      label: projectRoutes.simulation_runs.title,
+                      project,
+                    }),
                     isActive:
                       router.pathname.includes("/simulations") &&
                       !router.pathname.includes("/simulations/scenarios"),
@@ -312,7 +313,14 @@ const OpsSection = ({ showExpanded }: { showExpanded: boolean }) => {
   const router = useRouter();
   const { hasAccess } = useOpsPermission();
   const publicEnv = usePublicEnv();
-  const alwaysShow = publicEnv.data?.SHOW_OPS_IN_MAIN_SIDEBAR ?? false;
+  // Fleet-wide allowlist (env) OR a per-browser pin from the hidden Feature
+  // Flags drawer. The pin is only queried for users who already have ops
+  // access — it is a visibility convenience, never a way to widen access.
+  const envAlwaysShow = publicEnv.data?.SHOW_OPS_IN_MAIN_SIDEBAR ?? false;
+  const { enabled: opsMenuPinned } = useFeatureFlag("ops_ui_ops_menu_pinned", {
+    enabled: hasAccess,
+  });
+  const alwaysShow = envAlwaysShow || opsMenuPinned;
   const isOnOpsRoute = router.pathname.startsWith("/ops");
   const shouldShow = hasAccess && (alwaysShow || isOnOpsRoute);
 
@@ -399,6 +407,13 @@ const OpsSection = ({ showExpanded }: { showExpanded: boolean }) => {
         showLabel={showExpanded}
       />
       <SideMenuLink
+        icon={Database}
+        label="Payload store"
+        href="/ops/blobs"
+        isActive={router.pathname.startsWith("/ops/blobs")}
+        showLabel={showExpanded}
+      />
+      <SideMenuLink
         icon={Flag}
         label="Feature Flags"
         href="/ops/feature-flags"
@@ -453,15 +468,14 @@ const PageMenuLink = ({
       : "?view=list"
     : "";
 
+  const destination = projectScopedDestination({ path, label, project });
+
   return (
     <SideMenuLink
       icon={icon}
       label={label}
-      href={
-        project
-          ? path.replace("[project]", project.slug) + viewModeQuery
-          : "/auth/signin"
-      }
+      href={destination.href && destination.href + viewModeQuery}
+      unavailableReason={destination.unavailableReason}
       isActive={isActive}
       badgeNumber={badgeNumber}
       showLabel={showLabel}

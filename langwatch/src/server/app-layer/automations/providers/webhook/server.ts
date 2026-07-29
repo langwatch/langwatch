@@ -1,8 +1,8 @@
-import { TriggerAction } from "@prisma/client";
 import {
   WEBHOOK_HEADER_VALUE_KEPT,
   type WebhookActionParams,
 } from "@langwatch/automations/providers/webhook";
+import { TriggerAction } from "@prisma/client";
 import { decrypt, encrypt } from "~/utils/encryption";
 import { InvalidActionParamsError } from "../../errors";
 import type { PersistActionParamsArgs, ServerDef } from "../types";

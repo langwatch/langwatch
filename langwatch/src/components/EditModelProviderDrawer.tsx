@@ -60,8 +60,14 @@ export const EditModelProviderDrawer = (
   // rendering the form off the (collapsed-record-only) blank fallback
   // and then resetting once the flat list arrives would wipe whatever
   // the user had already typed.
+  //
+  // The collapsed record is a per-project read, so it never arrives when
+  // there is no project. Waiting on it there is waiting on a query that
+  // was never issued, which is a spinner that never stops; the org-wide
+  // flat list below is what the form actually resolves rows from.
+  const isCollapsedRecordPending = !!projectId && (isLoading || !providers);
   const isFormDataLoading =
-    isLoading || !providers || (isEditingSpecificRow && isAllProvidersLoading);
+    isCollapsedRecordPending || (isEditingSpecificRow && isAllProvidersLoading);
 
   return (
     <Drawer.Root

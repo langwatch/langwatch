@@ -32,7 +32,7 @@ export function QuarantineFillAlert({
     },
   );
 
-  if (!data || !data.exceeded) return null;
+  if (!data?.exceeded) return null;
 
   return (
     <Alert.Root status="warning" variant="surface">
@@ -45,10 +45,10 @@ export function QuarantineFillAlert({
         <Alert.Description>
           <VStack align="start" gap={2}>
             <Text fontSize="sm">
-              Unrecognized traffic is being routed to the org-wide
-              quarantine project (admin-only). End users do not see this
-              data. Configure the credential on the source listed below
-              to send traces to the right scope.
+              Unrecognized traffic is being routed to the org-wide quarantine
+              project (admin-only). End users do not see this data. Configure
+              the credential on the source listed below to send traces to the
+              right scope.
             </Text>
             {data.perSource.length > 0 && (
               <Box>

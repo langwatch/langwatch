@@ -1,5 +1,5 @@
-import { Prisma, type PrismaClient } from "@prisma/client";
 import { HandledError, NotFoundError } from "@langwatch/handled-error";
+import { Prisma, type PrismaClient } from "@prisma/client";
 import { isAdmin } from "./isAdmin";
 
 /** Impersonation window handed to the UI once a start call succeeds. */
@@ -31,11 +31,10 @@ export class CannotImpersonateDeactivatedUserError extends HandledError {
  */
 export class CannotImpersonateAdminError extends HandledError {
   constructor(userId: string) {
-    super(
-      "cannot_impersonate_admin",
-      "Cannot impersonate another admin",
-      { httpStatus: 403, meta: { userId } },
-    );
+    super("cannot_impersonate_admin", "Cannot impersonate another admin", {
+      httpStatus: 403,
+      meta: { userId },
+    });
     this.name = "CannotImpersonateAdminError";
   }
 }
@@ -93,7 +92,10 @@ export class ImpersonationService {
     private readonly auditLog: AuditLogFn,
   ) {}
 
-  static create(prisma: PrismaClient, auditLog: AuditLogFn): ImpersonationService {
+  static create(
+    prisma: PrismaClient,
+    auditLog: AuditLogFn,
+  ): ImpersonationService {
     return new ImpersonationService(prisma, auditLog);
   }
 

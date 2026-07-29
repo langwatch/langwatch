@@ -1,6 +1,6 @@
 import type { Project } from "@prisma/client";
-import { HTTPException } from "hono/http-exception";
 import type { MiddlewareHandler } from "hono";
+import { HTTPException } from "hono/http-exception";
 import { getServerAuthSession } from "~/server/auth";
 import { authMiddleware } from "./auth";
 
@@ -45,49 +45,50 @@ export type DualAuthVariables = {
  * for exactly that scenario: it converts a silent degradation into a hard
  * 500 that surfaces in dev and test rather than rotting undetected in prod.
  */
-export const dualAuth: MiddlewareHandler<{ Variables: DualAuthVariables }> =
-  async (c, next) => {
-    // Skip the API-key path entirely when the caller didn't send credentials —
-    // authMiddleware ALWAYS rejects a credential-less request with a 401 JSON
-    // response (not a thrown HTTPException), and an unconditional invocation
-    // would leave c.res populated with a 401 body that no downstream cares
-    // about. Detect both Authorization header forms (Basic / Bearer) and the
-    // legacy X-Auth-Token header.
-    const hasApiKeyCredentials =
-      c.req.header("authorization") != null ||
-      c.req.header("x-auth-token") != null;
+export const dualAuth: MiddlewareHandler<{
+  Variables: DualAuthVariables;
+}> = async (c, next) => {
+  // Skip the API-key path entirely when the caller didn't send credentials —
+  // authMiddleware ALWAYS rejects a credential-less request with a 401 JSON
+  // response (not a thrown HTTPException), and an unconditional invocation
+  // would leave c.res populated with a 401 body that no downstream cares
+  // about. Detect both Authorization header forms (Basic / Bearer) and the
+  // legacy X-Auth-Token header.
+  const hasApiKeyCredentials =
+    c.req.header("authorization") != null ||
+    c.req.header("x-auth-token") != null;
 
-    if (hasApiKeyCredentials) {
-      try {
-        await authMiddleware(c, async () => {
-          /* no-op: just want the side effect of populating c.var.project */
-        });
-        const project = c.get("project");
-        if (project) {
-          c.set("apiKeyProjectId", project.id);
-          return await next();
-        }
-        // authMiddleware returned without throwing AND without populating
-        // c.var.project — it produced a 401 JSON response via c.json() (its
-        // failure shape for malformed/expired credentials). Fall through to
-        // session auth: the caller may also have a valid session cookie.
-      } catch (err) {
-        if (err instanceof HTTPException) {
-          const status = err.status as number;
-          // 401 / 403 — fall through to session auth. Anything else is a real
-          // server-side failure; let it bubble up to onError as a 5xx.
-          if (status !== 401 && status !== 403) throw err;
-        } else {
-          // Non-HTTPException: don't swallow.
-          throw err;
-        }
+  if (hasApiKeyCredentials) {
+    try {
+      await authMiddleware(c, async () => {
+        /* no-op: just want the side effect of populating c.var.project */
+      });
+      const project = c.get("project");
+      if (project) {
+        c.set("apiKeyProjectId", project.id);
+        return await next();
+      }
+      // authMiddleware returned without throwing AND without populating
+      // c.var.project — it produced a 401 JSON response via c.json() (its
+      // failure shape for malformed/expired credentials). Fall through to
+      // session auth: the caller may also have a valid session cookie.
+    } catch (err) {
+      if (err instanceof HTTPException) {
+        const status = err.status as number;
+        // 401 / 403 — fall through to session auth. Anything else is a real
+        // server-side failure; let it bubble up to onError as a 5xx.
+        if (status !== 401 && status !== 403) throw err;
+      } else {
+        // Non-HTTPException: don't swallow.
+        throw err;
       }
     }
+  }
 
-    const session = await getServerAuthSession({ req: c.req.raw });
-    if (!session?.user?.id) {
-      throw new HTTPException(401, { message: "unauthenticated" });
-    }
-    c.set("userId", session.user.id);
-    return next();
-  };
+  const session = await getServerAuthSession({ req: c.req.raw });
+  if (!session?.user?.id) {
+    throw new HTTPException(401, { message: "unauthenticated" });
+  }
+  c.set("userId", session.user.id);
+  return next();
+};

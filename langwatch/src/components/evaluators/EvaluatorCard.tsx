@@ -1,8 +1,19 @@
 import { Box, Card, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import type { Evaluator } from "@prisma/client";
-import { ArrowUp, CheckSquare, Clock, Code, Copy, MoreVertical, RefreshCw, Workflow } from "lucide-react";
+import {
+  ArrowUp,
+  CheckSquare,
+  Clock,
+  Code,
+  Copy,
+  MoreVertical,
+  RefreshCw,
+  Workflow,
+} from "lucide-react";
 import { useState } from "react";
 import { LuPencil, LuTrash2 } from "react-icons/lu";
+import { LangyContextTarget } from "~/features/langy/components/LangyContextTarget";
+import { evaluationContextChip } from "~/features/langy/logic/langyContextChips";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { OverflownTextWithTooltip } from "../OverflownText";
 import { Menu } from "../ui/menu";
@@ -55,7 +66,9 @@ export function EvaluatorCard({
   const config = evaluator.config as { evaluatorType?: string } | null;
   const evaluatorType = config?.evaluatorType;
 
-  const isCopiedEvaluator = !!(evaluator as { copiedFromEvaluatorId?: string | null }).copiedFromEvaluatorId;
+  const isCopiedEvaluator = !!(
+    evaluator as { copiedFromEvaluatorId?: string | null }
+  ).copiedFromEvaluatorId;
   const hasCopies = (evaluator._count?.copiedEvaluators ?? 0) > 0;
 
   const handleUseFromApi = () => {
@@ -68,54 +81,65 @@ export function EvaluatorCard({
 
   return (
     <>
-      <Card.Root
-        variant="elevated"
-        onClick={onClick}
-        cursor="pointer"
-        height="142px"
-        transition="all 0.2s ease-in-out"
-        data-testid={`evaluator-card-${evaluator.id}`}
+      {/* Armed, the card can be handed to Langy. The chip id is keyed on the
+          evaluator id — the same key the evaluator drawer and the
+          `/evaluators/<id>` route derive — so opening the one you just pointed
+          at yields one chip, not two. */}
+      <LangyContextTarget
+        target={evaluationContextChip({
+          evaluationId: evaluator.id,
+          name: evaluator.name,
+          noun: "evaluator",
+        })}
       >
-        <Card.Body padding={4}>
-          <VStack align="start" gap={2} height="full">
-            {/* Top row: Icon and menu */}
-            <HStack width="full">
-              <Box bg="green.subtle" padding={1} borderRadius="md">
-                <Icon size={18} color="var(--chakra-colors-green-fg)" />
-              </Box>
-              <Spacer />
-              <Menu.Root>
-                <Menu.Trigger
-                  className="js-inner-menu"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <MoreVertical size={16} />
-                </Menu.Trigger>
-                <Menu.Content className="js-inner-menu">
-                  {onEdit && (
+        <Card.Root
+          variant="elevated"
+          onClick={onClick}
+          cursor="pointer"
+          height="142px"
+          transition="all 0.2s ease-in-out"
+          data-testid={`evaluator-card-${evaluator.id}`}
+        >
+          <Card.Body padding={4}>
+            <VStack align="start" gap={2} height="full">
+              {/* Top row: Icon and menu */}
+              <HStack width="full">
+                <Box bg="green.subtle" padding={1} borderRadius="md">
+                  <Icon size={18} color="var(--chakra-colors-green-fg)" />
+                </Box>
+                <Spacer />
+                <Menu.Root>
+                  <Menu.Trigger
+                    className="js-inner-menu"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <MoreVertical size={16} />
+                  </Menu.Trigger>
+                  <Menu.Content className="js-inner-menu">
+                    {onEdit && (
+                      <Menu.Item
+                        value="edit"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onEdit();
+                        }}
+                      >
+                        <LuPencil size={14} />
+                        Edit
+                      </Menu.Item>
+                    )}
                     <Menu.Item
-                      value="edit"
+                      value="use-from-api"
                       onClick={(e) => {
                         e.stopPropagation();
-                        onEdit();
+                        handleUseFromApi();
                       }}
+                      data-testid={`evaluator-use-api-${evaluator.id}`}
                     >
-                      <LuPencil size={14} />
-                      Edit
+                      <Code size={14} />
+                      Use via API
                     </Menu.Item>
-                  )}
-                  <Menu.Item
-                    value="use-from-api"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleUseFromApi();
-                    }}
-                    data-testid={`evaluator-use-api-${evaluator.id}`}
-                  >
-                    <Code size={14} />
-                    Use via API
-                  </Menu.Item>
-                  {isCopiedEvaluator && onSyncFromSource && (
+                    {isCopiedEvaluator && onSyncFromSource && (
                       <Menu.Item
                         value="sync"
                         onClick={(e) => {
@@ -125,8 +149,8 @@ export function EvaluatorCard({
                       >
                         <RefreshCw size={16} /> Update from source
                       </Menu.Item>
-                  )}
-                  {hasCopies && onPushToCopies && (
+                    )}
+                    {hasCopies && onPushToCopies && (
                       <Menu.Item
                         value="push"
                         onClick={(e) => {
@@ -136,8 +160,8 @@ export function EvaluatorCard({
                       >
                         <ArrowUp size={16} /> Push to replicas
                       </Menu.Item>
-                  )}
-                  {onReplicate && (
+                    )}
+                    {onReplicate && (
                       <Menu.Item
                         value="replicate"
                         onClick={(e) => {
@@ -147,59 +171,65 @@ export function EvaluatorCard({
                       >
                         <Copy size={16} /> Replicate to another project
                       </Menu.Item>
-                  )}
-                  {onViewHistory && (
-                    <Menu.Item
-                      value="history"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onViewHistory();
-                      }}
-                    >
-                      <Clock size={14} />
-                      View history
-                    </Menu.Item>
-                  )}
-                  {onDelete && (
-                    <Menu.Item
-                      value="delete"
-                      color="red.500"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onDelete();
-                      }}
-                    >
-                      <LuTrash2 size={14} />
-                      Delete
-                    </Menu.Item>
-                  )}
-                </Menu.Content>
-              </Menu.Root>
-            </HStack>
+                    )}
+                    {onViewHistory && (
+                      <Menu.Item
+                        value="history"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onViewHistory();
+                        }}
+                      >
+                        <Clock size={14} />
+                        View history
+                      </Menu.Item>
+                    )}
+                    {onDelete && (
+                      <Menu.Item
+                        value="delete"
+                        color="red.500"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDelete();
+                        }}
+                      >
+                        <LuTrash2 size={14} />
+                        Delete
+                      </Menu.Item>
+                    )}
+                  </Menu.Content>
+                </Menu.Root>
+              </HStack>
 
-            <Spacer />
+              <Spacer />
 
-            {/* Name */}
-            <OverflownTextWithTooltip
-              color="fg"
-              fontSize="sm"
-              fontWeight={500}
-              lineClamp={2}
-              width="full"
-              wordBreak="break-word"
-            >
-              {evaluator.name}
-            </OverflownTextWithTooltip>
+              {/* Name */}
+              <OverflownTextWithTooltip
+                color="fg"
+                fontSize="sm"
+                fontWeight={500}
+                lineClamp={2}
+                width="full"
+                wordBreak="break-word"
+              >
+                {evaluator.name}
+              </OverflownTextWithTooltip>
 
-            {/* Metadata */}
-            <Text color="fg.subtle" fontSize="12px" lineClamp={1} width="full">
-              {typeLabel}
-              {evaluatorType && ` • ${evaluatorType}`} •{" "}
-              {formatTimeAgo(new Date(evaluator.updatedAt).getTime())}
-            </Text>
-          </VStack>
-        </Card.Body>
-      </Card.Root>
+              {/* Metadata */}
+              <Text
+                color="fg.subtle"
+                fontSize="12px"
+                lineClamp={1}
+                width="full"
+              >
+                {typeLabel}
+                {evaluatorType && ` • ${evaluatorType}`} •{" "}
+                {formatTimeAgo(new Date(evaluator.updatedAt).getTime())}
+              </Text>
+            </VStack>
+          </Card.Body>
+        </Card.Root>
+      </LangyContextTarget>
 
       {/* API Usage Dialog - rendered outside Card to prevent click propagation */}
       <EvaluatorApiUsageDialog

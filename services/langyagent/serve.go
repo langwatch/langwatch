@@ -4,6 +4,7 @@ import (
 	"context"
 	"net"
 	"net/http"
+	"os"
 	"time"
 
 	"go.uber.org/zap"
@@ -69,8 +70,18 @@ func Serve(ctx context.Context, application *app.App, deps *Deps, cfg Config) er
 		// The PID-1 orphan reaper: opencode's children (gh/git/npm) reparent to
 		// the manager on worker kill; only PID 1 may reap them. Fire-and-forget,
 		// stops when the group context cancels.
+		//
+		// The armed flag is recorded rather than discarded: the reaper is gated on
+		// being PID 1, that requirement lives in the Dockerfile as a comment only,
+		// and an entrypoint change (tini, docker --init, a chart `command:`
+		// override) would demote the manager off init with no other observable
+		// signal. Boot logs then say plainly whether it armed.
 		lifecycle.Worker("orphan-reaper", func(ctx context.Context) {
-			workerpool.StartOrphanReaper(ctx)
+			armed := workerpool.StartOrphanReaper(ctx)
+			deps.Logger.Info("orphan_reaper_started",
+				zap.Bool("armed", armed),
+				zap.Int("pid", os.Getpid()),
+			)
 		}, func() {}),
 		// The worker pool: Start begins the idle-reaper sweep; Stop tears down
 		// every worker (process-group kill) and cancels the pool context that
@@ -81,7 +92,7 @@ func Serve(ctx context.Context, application *app.App, deps *Deps, cfg Config) er
 			application.Pool().Shutdown()
 		}),
 		lifecycle.ListenServer("http", srv),
-		// otel-early-flush (PR3, ADR-044): on SIGTERM, force-flush buffered
+		// otel-early-flush (PR3, ADR-048): on SIGTERM, force-flush buffered
 		// telemetry BEFORE the worker drain so a grace period later cut short by
 		// SIGKILL still ships what we already have. Registered BEFORE the handoff
 		// Closer below so it stops AFTER it (reverse-order). ForceFlushGlobal

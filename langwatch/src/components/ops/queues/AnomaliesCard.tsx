@@ -138,4 +138,3 @@ function formatAge(triggeredAt: number): string {
   const h = Math.floor(m / 60);
   return `${h}h ${m % 60}m ago`;
 }
-

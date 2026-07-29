@@ -82,7 +82,7 @@ writes. The exception is only possible because these columns are declared
 **Why map projections and not folds.** A fold earns its cost when an aggregate
 has a lifetime: state that later events amend. An observation has no lifetime.
 Modelling points and records as folds would mean per-series state that lives
-forever in a store and refolds from the event log on a cache miss, to derive
+forever in a store, read back on every cache miss (ADR-066), to derive
 something the raw table already answers. The rollup projection is the case worth
 naming, because it does read-modify-write and so looks like a fold. Making it
 recompute from the raw rows is what keeps it idempotent under replay, and it
@@ -106,11 +106,18 @@ bytes rather than physical row size is what keeps the log cutover from acting as
 an unannounced price rise, since the canonical row denormalises the same content
 into several columns plus a compressed payload.
 
-**Why the legacy log write path stays registered.** The `recordLog` command and
-its projection are dead in this build, but a pre-canonical instance can still
-send `recordLog` during a rolling deploy. Leaving both wired means those records
-land in `stored_log_records` as before, rather than appending an event no
-projection consumes and reaching neither table.
+**Why the legacy log write path is retired.** Canonical `log_records` is now the
+only log write path: the `recordLog` command, its `logRecordStorage` projection,
+and the append store have been removed. `stored_log_records` stays read-only under
+its existing TTL, holding pre-cutover history that a dual read merges with
+canonical (canonical wins). Retiring the write acceptance is safe because
+canonical logging rolled out fully releases ago, so nothing still emits
+`recordLog`; during the retirement deploy a stale pre-cutover `recordLog` job is
+simply never claimed by a new worker, and old instances drain their own in-flight
+jobs before they stop. _(Retired rationale, kept as history: the command and
+projection were previously left wired so a pre-canonical instance mid
+rolling-deploy still landed its records in `stored_log_records`, rather than
+appending an event no projection consumed and reaching neither table.)_
 
 **What we accepted.** Canonical storage is larger than the lossy rows it
 replaces, and each point is written to both the raw table and the usage ledger.
@@ -163,9 +170,14 @@ combined with the project's value, so an indefinite project retention cannot
 keep a fold intermediate forever.
 
 The legacy `stored_log_records` and `stored_metric_records` tables are retained,
-unmodified, and drain under their existing TTLs. They can be dropped together
-with the `recordLog` command and its projection once no pre-canonical instance
-can be running.
+unmodified, and drain under their existing TTLs. The log write chain has since
+been retired: the `recordLog` command, its `logRecordStorage` projection, and the
+append store are gone, so canonical `log_records` is the only log write path and
+`stored_log_records` is now read-only (a dual read merges it with canonical for
+pre-cutover history, canonical winning). `stored_log_records` can be dropped once
+that history has drained; `stored_metric_records`, whose legacy write path this
+ADR left in place, drops with its own record command and projection when no
+pre-canonical instance can be running.
 
 ## References
 

@@ -49,9 +49,9 @@ vi.mock("../hooks/useEvaluatorName", () => ({
   useCodeEvaluatorIds: () => new Set(),
 }));
 
-import { COMPARISON_EVALUATOR_TYPE } from "../types";
 import { EvaluationsV3Table } from "../components/EvaluationsV3Table";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
+import { COMPARISON_EVALUATOR_TYPE } from "../types";
 
 // Track drawer state — deep-linked into the evaluatorEditor drawer for an
 // EXISTING evaluator, the way a page reload would restore the URL.

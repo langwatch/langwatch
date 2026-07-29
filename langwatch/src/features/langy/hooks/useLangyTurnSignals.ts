@@ -1,7 +1,4 @@
-import {
-  type LangyProgressSample,
-  useLangyStore,
-} from "../stores/langyStore";
+import { type LangyProgressSample, useLangyStore } from "../stores/langyStore";
 
 export interface LangyTurnMetric {
   /** Value to roll to; the statcard rolls it up from 0 on first paint. */
@@ -10,6 +7,12 @@ export interface LangyTurnMetric {
   label: string;
   /** Optional unit appended after the number, e.g. "%". */
   suffix?: string;
+  /**
+   * Full formatter, when a suffix cannot express the value — currency needs a
+   * PREFIX, and a cost rendered as a bare `0.433` says nothing about what it
+   * is. Wins over `suffix` when both are set.
+   */
+  format?: (value: number) => string;
 }
 
 export interface LangyTurnSignals {

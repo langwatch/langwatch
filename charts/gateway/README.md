@@ -68,7 +68,7 @@ self-hosting. The values you most often override:
 | Path                          | Purpose                                                              |
 |-------------------------------|----------------------------------------------------------------------|
 | `image.tag`                   | Image tag override (defaults to `Chart.AppVersion`)                  |
-| `controlPlane.baseUrl`        | URL of your LangWatch app — e.g. `http://langwatch-app:5560`         |
+| `controlPlane.baseUrl`        | URL of your LangWatch app. Empty resolves to `<release>-app:5560`     |
 | `secrets.existingSecretName`  | Name of the Secret created above (default `gateway-runtime-secrets`) |
 | `ingress.host`                | Customer-facing hostname for the gateway                             |
 | `ingress.tls.secretName`      | TLS Secret managed by cert-manager (or BYO)                          |
@@ -97,6 +97,18 @@ listener (port `5563`, named `http`):
 
 Response shape and tuning are documented in
 [Health Checks](https://docs.langwatch.ai/ai-gateway/self-hosting/health-checks).
+
+## Status-page endpoint
+
+`GET /health` (also `HEAD`) is the public status-page surface, exposed
+through the ingress as an Exact path when `ingress.healthPath.enabled`
+(default `true`); point an uptime monitor at `https://<ingress.host>/health`.
+It reports the gateway process plus the control-plane connectivity
+verdict that a background probe refreshes every 15 s over the signed
+internal channel: HTTP 200 healthy, 503 once the control plane has been
+unreachable for over 60 s. It never contacts a model provider, so an
+OpenAI or Anthropic outage cannot turn it red, and a poll never fans
+out anywhere. Distinct from the k8s probes above, which stay in-cluster.
 
 ## Streaming / SSE
 

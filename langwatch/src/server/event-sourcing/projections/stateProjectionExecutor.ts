@@ -1,4 +1,5 @@
 import type { Event } from "../domain/types";
+import { compareOrdinal } from "../utils/compareOrdinal";
 import type { ProjectionStoreContext } from "./projectionStoreContext";
 import type {
   ProjectionCursor,
@@ -22,7 +23,7 @@ export function compareCursors(
   if (left.acceptedAt !== right.acceptedAt) {
     return left.acceptedAt - right.acceptedAt;
   }
-  return left.eventId.localeCompare(right.eventId);
+  return compareOrdinal(left.eventId, right.eventId);
 }
 
 export function orderEvents<E extends Event>(events: readonly E[]): E[] {

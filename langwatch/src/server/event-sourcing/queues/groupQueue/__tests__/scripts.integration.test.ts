@@ -16,6 +16,10 @@ import {
   stopTestContainers,
 } from "../../../__tests__/integration/testContainers";
 import { createTenantId } from "../../../domain/tenantId";
+import {
+  BLOB_BACKSTOP_TTL_SECONDS,
+  BLOB_RELEASE_GRACE_TTL_SECONDS,
+} from "../blobConstants";
 import { BlobLeases } from "../blobLeases";
 import { encodeJobEnvelope } from "../jobEnvelope";
 import {
@@ -89,9 +93,22 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
-  await redis.flushall();
+  // Scoped to this suite's hash-tagged namespace, never flushdb(): flushdb
+  // empties the whole logical database, so it does not just reset this
+  // suite — it deletes the in-flight keys of any suite sharing the database,
+  // which is every other integration file once they run concurrently. The
+  // symptom is not a failure here but a failure over there, in a suite that
+  // never called it. Same rule as the rest of groupQueue/__tests__ (see the
+  // README's namespace note).
+  await deleteSuiteKeys();
   scripts = new GroupStagingScripts(redis, QUEUE_NAME);
 });
+
+/** Remove every key this suite owns, leaving other suites' databases alone. */
+async function deleteSuiteKeys(): Promise<void> {
+  const keys = await redis.keys(`${QUEUE_NAME}*`);
+  if (keys.length > 0) await redis.del(...keys);
+}
 
 afterAll(async () => {
   await stopTestContainers();
@@ -707,6 +724,7 @@ describe("GroupStagingScripts", () => {
         projectId: string;
         hash: string;
         holderId: string;
+        tier: "redis" | "s3";
       }) =>
         new BlobLeases({ redis, queueName: QUEUE_NAME }).release(
           args as Parameters<BlobLeases["release"]>[0],
@@ -843,12 +861,13 @@ describe("GroupStagingScripts", () => {
             projectId: TENANT,
             hash: SHARED,
             holderId: "t-a",
+            tier: "redis",
           });
 
           // B is still staged and still leases the blob — the bytes must live.
-          expect(await redis.zrange(leaseKey({ hash: SHARED }), 0, -1)).toEqual([
-            "t-b",
-          ]);
+          expect(await redis.zrange(leaseKey({ hash: SHARED }), 0, -1)).toEqual(
+            ["t-b"],
+          );
           expect(await redis.exists(blobKey({ hash: SHARED }))).toBe(1);
           expect(await redis.get(blobKey({ hash: SHARED }))).toBe(
             "gzipped-bytes",
@@ -856,9 +875,14 @@ describe("GroupStagingScripts", () => {
         });
 
         /** @scenario "A sibling completing never strips a co-staged job's blob" */
-        it("keeps the blob even when the last lease is released, leaving reclaim to the backstop", async () => {
+        it("keeps the blob even when the last lease is released, moving it onto the grace window", async () => {
           const SHARED = "h-last";
-          await redis.set(blobKey({ hash: SHARED }), "gzipped-bytes");
+          await redis.set(
+            blobKey({ hash: SHARED }),
+            "gzipped-bytes",
+            "EX",
+            BLOB_BACKSTOP_TTL_SECONDS,
+          );
           await scripts.stage(
             makeJob({
               stagedJobId: "j-only",
@@ -871,14 +895,19 @@ describe("GroupStagingScripts", () => {
             projectId: TENANT,
             hash: SHARED,
             holderId: "t-only",
+            tier: "redis",
           });
 
           // Emptying the lease set drops the set, never the payload: a
-          // concurrent producer may already have re-staged this content.
+          // concurrent producer may already have re-staged this content. The
+          // deadline shortens so an unread blob doesn't hold Redis for days.
           expect(await redis.zrange(leaseKey({ hash: SHARED }), 0, -1)).toEqual(
             [],
           );
           expect(await redis.exists(blobKey({ hash: SHARED }))).toBe(1);
+          expect(
+            await redis.ttl(blobKey({ hash: SHARED })),
+          ).toBeLessThanOrEqual(BLOB_RELEASE_GRACE_TTL_SECONDS);
         });
       });
 
@@ -952,6 +981,94 @@ describe("GroupStagingScripts", () => {
             await redis.zrange(leaseKey({ hash: "h-shared" }), 0, -1),
           ).toEqual(["t-other"]);
           expect(await redis.exists(blobKey({ hash: "h-shared" }))).toBe(1);
+        });
+
+        // Track 5 of specs/event-sourcing/payload-store-content-addressed.feature.
+        // The squash release must grant the same grace window the standalone
+        // release eval does, or a displaced blob still occupies Redis for the
+        // full backstop.
+        describe("dedup squash grace window", () => {
+          /** @scenario "A dedup squash that retires the last lease puts the displaced blob on the grace window" */
+          it("shortens a displaced blob's expiry when nothing leases it", async () => {
+            const oldValue = gq2Value({ hash: "h-grace", token: "t1" });
+            await scripts.stage(
+              makeJob({
+                stagedJobId: "j1",
+                groupId: GROUP,
+                dedupId: "hold-grace",
+                dedupTtlMs: 60000,
+                jobDataJson: oldValue,
+              }),
+            );
+            await redis.set(
+              blobKey({ hash: "h-grace" }),
+              "gzipped-bytes",
+              "EX",
+              BLOB_BACKSTOP_TTL_SECONDS,
+            );
+            await redis.set(
+              blobKey({ hash: "h-grace-new" }),
+              "gzipped-bytes",
+              "EX",
+              BLOB_BACKSTOP_TTL_SECONDS,
+            );
+
+            await scripts.stage(
+              makeJob({
+                stagedJobId: "j2",
+                groupId: GROUP,
+                dedupId: "hold-grace",
+                dedupTtlMs: 60000,
+                jobDataJson: gq2Value({ hash: "h-grace-new", token: "t2" }),
+              }),
+            );
+
+            expect(await redis.exists(blobKey({ hash: "h-grace" }))).toBe(1);
+            expect(
+              await redis.ttl(blobKey({ hash: "h-grace" })),
+            ).toBeLessThanOrEqual(BLOB_RELEASE_GRACE_TTL_SECONDS);
+            expect(
+              await redis.ttl(blobKey({ hash: "h-grace-new" })),
+            ).toBeGreaterThan(BLOB_RELEASE_GRACE_TTL_SECONDS);
+          });
+
+          it("withholds the grace window from a blob another stage still leases", async () => {
+            const shared = gq2Value({ hash: "h-grace-shared", token: "t1" });
+            await scripts.stage(
+              makeJob({
+                stagedJobId: "j1",
+                groupId: GROUP,
+                dedupId: "hold-grace-shared",
+                dedupTtlMs: 60000,
+                jobDataJson: shared,
+              }),
+            );
+            await redis.set(
+              blobKey({ hash: "h-grace-shared" }),
+              "gzipped-bytes",
+              "EX",
+              BLOB_BACKSTOP_TTL_SECONDS,
+            );
+            await redis.zadd(
+              leaseKey({ hash: "h-grace-shared" }),
+              Date.now() + 60_000,
+              "t-other",
+            );
+
+            await scripts.stage(
+              makeJob({
+                stagedJobId: "j2",
+                groupId: GROUP,
+                dedupId: "hold-grace-shared",
+                dedupTtlMs: 60000,
+                jobDataJson: gq2Value({ hash: "h2", token: "t2" }),
+              }),
+            );
+
+            expect(
+              await redis.ttl(blobKey({ hash: "h-grace-shared" })),
+            ).toBeGreaterThan(BLOB_RELEASE_GRACE_TTL_SECONDS);
+          });
         });
 
         it("does not report an s3-tier displaced blob for eager deletion", async () => {
@@ -2013,6 +2130,67 @@ describe("GroupStagingScripts", () => {
       });
     });
 
+    describe("when a retry re-stages a job", () => {
+      // The group's retry chain and the re-stage are ONE script (ADR-080).
+      // Since the staged id stopped carrying a `/r/<n>` marker, that chain is
+      // the only attempt carrier a re-staged SIBLING has — it comes back with
+      // its original envelope and no `__attempt`. A chain write that failed
+      // while the re-stage succeeded would hand the next sibling-led claim a
+      // fresh budget: an unbounded ladder, and a fold that re-applies events it
+      // had already recorded as applied.
+      const attemptKey = () => `${keyPrefix()}group:group-a:attempt`;
+
+      /** @scenario A sibling-led claim after a retry still sees the attempt the ladder reached */
+      it("records the attempt the ladder reached in the same step", async () => {
+        await scripts.stage(
+          makeJob({ stagedJobId: "j1", dispatchAfterMs: 100 }),
+        );
+        await scripts.dispatch({ nowMs: 200, activeTtlSec: 300 });
+
+        await scripts.retryRestage({
+          groupId: "group-a",
+          stagedJobId: "j1",
+          newStagedJobId: "j1",
+          dispatchAfterMs: 5_000,
+          jobDataJson: JSON.stringify({ v: 1 }),
+          backoffMs: 3_000,
+          attempt: 4,
+          attemptTtlSec: 1800,
+        });
+
+        // A sibling leading the next claim carries no attempt of its own, so
+        // this key is the only thing standing between it and a fresh budget.
+        expect(await redis.get(attemptKey())).toBe("4");
+        expect(await redis.ttl(attemptKey())).toBeGreaterThan(0);
+      });
+
+      /** @scenario A retry that cannot record its attempt does not re-stage the job */
+      it("advances neither the chain nor the staging set when it does not own the slot", async () => {
+        await scripts.stage(
+          makeJob({ stagedJobId: "j1", dispatchAfterMs: 100 }),
+        );
+        await scripts.dispatch({ nowMs: 200, activeTtlSec: 300 });
+
+        // Another worker owns the slot now: the guard fails and the script
+        // writes nothing. Pre-ADR-080 the attempt was written by the CALLER
+        // before this call, so it advanced even when the re-stage did not —
+        // shortening the next job's budget for a job that was never staged.
+        const restaged = await scripts.retryRestage({
+          groupId: "group-a",
+          stagedJobId: "someone-elses-job",
+          newStagedJobId: "someone-elses-job",
+          dispatchAfterMs: 5_000,
+          jobDataJson: JSON.stringify({ v: 1 }),
+          backoffMs: 3_000,
+          attempt: 9,
+          attemptTtlSec: 1800,
+        });
+
+        expect(restaged).toBe(false);
+        expect(await redis.get(attemptKey())).toBeNull();
+      });
+    });
+
     describe("when a stale heartbeat fires after retryRestage", () => {
       // The worker's heartbeat interval stays armed for a few awaits after
       // retryRestage returns (blob-hold transfer, audit write). Before the
@@ -2034,6 +2212,8 @@ describe("GroupStagingScripts", () => {
           dispatchAfterMs: 5_000,
           jobDataJson: JSON.stringify({ attempt: 2 }),
           backoffMs: 3_000,
+          attempt: 1,
+          attemptTtlSec: 1800,
         });
         expect(restaged).toBe(true);
 
@@ -3282,12 +3462,20 @@ describe("GroupStagingScripts", () => {
       /** @scenario Counter is conserved when the same staged-job id is re-sent */
       it("counts the job once in total-pending", async () => {
         await scripts.stage(
-          makeJob({ stagedJobId: "j-dup", groupId: "g-dup", dispatchAfterMs: 100 }),
+          makeJob({
+            stagedJobId: "j-dup",
+            groupId: "g-dup",
+            dispatchAfterMs: 100,
+          }),
         );
         // Re-delivery of the same event id: the ZADD updates the member in
         // place, so the counter must not INCR a second time.
         await scripts.stage(
-          makeJob({ stagedJobId: "j-dup", groupId: "g-dup", dispatchAfterMs: 150 }),
+          makeJob({
+            stagedJobId: "j-dup",
+            groupId: "g-dup",
+            dispatchAfterMs: 150,
+          }),
         );
 
         expect(await redis.zcard(`${keyPrefix()}group:g-dup:jobs`)).toBe(1);
@@ -3306,7 +3494,9 @@ describe("GroupStagingScripts", () => {
         ]);
 
         expect(newStagedCount).toBe(1);
-        expect(await redis.zcard(`${keyPrefix()}group:g-dup-batch:jobs`)).toBe(1);
+        expect(await redis.zcard(`${keyPrefix()}group:g-dup-batch:jobs`)).toBe(
+          1,
+        );
         expect(await inspectTotalPending()).toBe(1);
       });
     });
@@ -3334,6 +3524,8 @@ describe("GroupStagingScripts", () => {
           dispatchAfterMs: 300,
           jobDataJson: JSON.stringify({ attempt: 2 }),
           backoffMs: 1000,
+          attempt: 1,
+          attemptTtlSec: 1800,
         });
         expect(restaged).toBe(true);
 
@@ -3420,6 +3612,8 @@ describe("GroupStagingScripts", () => {
           dispatchAfterMs: 300,
           jobDataJson: JSON.stringify({ attempt: 2 }),
           backoffMs: 500,
+          attempt: 1,
+          attemptTtlSec: 1800,
         });
         await redis.del(`${keyPrefix()}group:g-multi:active`);
 
@@ -3433,6 +3627,8 @@ describe("GroupStagingScripts", () => {
           dispatchAfterMs: 500,
           jobDataJson: JSON.stringify({ attempt: 3 }),
           backoffMs: 1000,
+          attempt: 1,
+          attemptTtlSec: 1800,
         });
         await redis.del(`${keyPrefix()}group:g-multi:active`);
 
@@ -3446,6 +3642,8 @@ describe("GroupStagingScripts", () => {
           dispatchAfterMs: 700,
           jobDataJson: JSON.stringify({ attempt: 4 }),
           backoffMs: 2000,
+          attempt: 1,
+          attemptTtlSec: 1800,
         });
         await redis.del(`${keyPrefix()}group:g-multi:active`);
 
@@ -3487,6 +3685,8 @@ describe("GroupStagingScripts", () => {
           dispatchAfterMs: 300,
           jobDataJson: JSON.stringify({ attempt: 2 }),
           backoffMs: 500,
+          attempt: 1,
+          attemptTtlSec: 1800,
         });
         expect(await inspectTotalPending()).toBe(1);
 
@@ -3581,6 +3781,8 @@ describe("GroupStagingScripts", () => {
           dispatchAfterMs: 300,
           jobDataJson: JSON.stringify({ attempt: 2 }),
           backoffMs: 500,
+          attempt: 1,
+          attemptTtlSec: 1800,
         });
 
         // retryRestage ZADD'd a new job AND INCR'd the counter.
@@ -4112,6 +4314,8 @@ describe("GroupStagingScripts", () => {
         dispatchAfterMs: 9999,
         jobDataJson: JSON.stringify({ hello: "world" }),
         backoffMs: 30_000,
+        attempt: 1,
+        attemptTtlSec: 1800,
       });
 
       // retryRestage sets the slot expiry to Date.now() + retryTtlSec*1000,
@@ -4905,6 +5109,100 @@ describe("GroupStagingScripts.drainGroupReady", () => {
       ).toEqual([]);
     });
   });
+
+  // ADR-066 pillar 2: the drain is bounded by bytes as well as count. Each
+  // stored value here is exactly 100 bytes so the budget arithmetic is exact.
+  describe("when a byte budget is set", () => {
+    const sizedJson = (n: number) => `{"p":"${"x".repeat(n - 8)}"}`;
+
+    async function stageThreeSizedJobs() {
+      await scripts.stage(
+        makeJob({
+          stagedJobId: "j1",
+          dispatchAfterMs: 100,
+          jobDataJson: sizedJson(100),
+        }),
+      );
+      await scripts.stage(
+        makeJob({
+          stagedJobId: "j2",
+          dispatchAfterMs: 200,
+          jobDataJson: sizedJson(100),
+        }),
+      );
+      await scripts.stage(
+        makeJob({
+          stagedJobId: "j3",
+          dispatchAfterMs: 300,
+          jobDataJson: sizedJson(100),
+        }),
+      );
+    }
+
+    /** @scenario 'a batch is bounded by size as well as count' */
+    it("stops before a job that would overflow the budget, leaving it staged", async () => {
+      await stageThreeSizedJobs();
+
+      // 0 + 100 + 100 = 200 ≤ 250 ✓, next 100 → 300 > 250 ✗: j3 stays.
+      const drained = await scripts.drainGroupReady({
+        groupId: "group-a",
+        nowMs: 10_000,
+        maxJobs: 10,
+        maxBytes: 250,
+        initialBytes: 0,
+      });
+
+      expect(drained.map((d) => d.stagedJobId)).toEqual(["j1", "j2"]);
+      expect(await inspectGroupJobs("group-a")).toEqual(["j3", "300"]);
+      expect(await inspectTotalPending()).toBe("1");
+    });
+
+    it("counts initialBytes (the dispatched job's own size) toward the budget", async () => {
+      await stageThreeSizedJobs();
+
+      // initialBytes already fills the budget, so the first candidate overflows.
+      const drained = await scripts.drainGroupReady({
+        groupId: "group-a",
+        nowMs: 10_000,
+        maxJobs: 10,
+        maxBytes: 250,
+        initialBytes: 250,
+      });
+
+      expect(drained).toEqual([]);
+      expect(await inspectTotalPending()).toBe("3");
+    });
+
+    /** @scenario 'a single oversized item is appended on its own' */
+    it("drains no siblings when the dispatched job alone exceeds the budget", async () => {
+      await stageThreeSizedJobs();
+
+      const drained = await scripts.drainGroupReady({
+        groupId: "group-a",
+        nowMs: 10_000,
+        maxJobs: 10,
+        maxBytes: 50,
+        initialBytes: 100,
+      });
+
+      expect(drained).toEqual([]);
+      expect(await inspectTotalPending()).toBe("3");
+    });
+
+    it("applies only the count bound when maxBytes is zero", async () => {
+      await stageThreeSizedJobs();
+
+      const drained = await scripts.drainGroupReady({
+        groupId: "group-a",
+        nowMs: 10_000,
+        maxJobs: 10,
+        maxBytes: 0,
+        initialBytes: 999_999,
+      });
+
+      expect(drained.map((d) => d.stagedJobId)).toEqual(["j1", "j2", "j3"]);
+    });
+  });
 });
 
 describe("group-key TTL safety net", () => {
@@ -4985,6 +5283,8 @@ describe("group-key TTL safety net", () => {
         dispatchAfterMs: Date.now() + 5000,
         jobDataJson: JSON.stringify({ retry: true }),
         backoffMs: 5000,
+        attempt: 1,
+        attemptTtlSec: 1800,
       });
 
       expectFreshTtl(await jobsTtl("group-a"));

@@ -20,6 +20,7 @@ import type { EventStoreReadContext } from "../../stores/eventStore.types";
 import {
   type CommandHandlerOptions,
   processCommand,
+  processCommandBatch,
 } from "../commands/commandDispatcher";
 import { ConfigurationError, ValidationError } from "../errorHandling";
 
@@ -48,6 +49,11 @@ export interface JobRegistryEntry {
    * (including the dispatched job). Defaults to 1 (no coalescing).
    */
   coalesceMaxBatch?: number;
+  /**
+   * Optional byte cap for a coalesced batch (ADR-066 pillar 2). Resolved by the
+   * global queue per job; undefined falls back to the GroupQueue default.
+   */
+  coalesceMaxBytes?: number;
 }
 
 interface QueuedEventConsumerDefinition<E extends Event> {
@@ -603,27 +609,61 @@ export class QueueManager<EventType extends Event = Event> {
           return `${this.aggregateType}:${String(key)}`;
         },
       });
+      const coalesceMaxBatch = cmdEntry.options.coalesceMaxBatch;
+
+      // ADR-066 pillar 2 visibility: a serialized producer that does NOT
+      // coalesce can still flood the event log one tiny insert per item under
+      // high fan-in. Record the gap at registration so it can be found and
+      // closed, instead of surfacing only as ClickHouse small-parts pressure.
+      if (
+        cmdEntry.options.serializeByAggregate &&
+        !(coalesceMaxBatch && coalesceMaxBatch > 1)
+      ) {
+        this.logger.info(
+          { pipeline: this.pipelineName, command: cmdName },
+          "serialized command producer registered without append coalescing",
+        );
+      }
+
+      // Shared across the single and batched processors — same command, same
+      // store, same kill switch; only the payload arity differs.
+      const commandProcessParams = {
+        commandType: cmdEntry.commandType,
+        commandSchema: cmdEntry.schema,
+        handler: cmdEntry.handler,
+        getAggregateId: cmdEntry.getAggregateId,
+        storeEventsFn: storeEvents,
+        aggregateType: this.aggregateType,
+        commandName: cmdEntry.commandName,
+        pipelineName: this.pipelineName,
+        featureFlagService: this.featureFlagService,
+        killSwitchOptions: cmdEntry.killSwitchOptions,
+        logger,
+      };
+
       const jobEntry: JobRegistryEntry = {
         groupKeyFn: commandGroupKeyFn,
         scoreFn: cmdEntry.options.serializeByAggregate
           ? () => Date.now()
           : (payload: any) => payload.occurredAt as number,
         process: async (payload: any) => {
-          await processCommand({
-            payload,
-            commandType: cmdEntry.commandType,
-            commandSchema: cmdEntry.schema,
-            handler: cmdEntry.handler,
-            getAggregateId: cmdEntry.getAggregateId,
-            storeEventsFn: storeEvents,
-            aggregateType: this.aggregateType,
-            commandName: cmdEntry.commandName,
-            pipelineName: this.pipelineName,
-            featureFlagService: this.featureFlagService,
-            killSwitchOptions: cmdEntry.killSwitchOptions,
-            logger,
-          });
+          await processCommand({ ...commandProcessParams, payload });
         },
+        // ADR-066 pillar 2: when the command opts into coalescing, fold a hot
+        // aggregate's queued same-command jobs into one multi-row insert. The
+        // GroupQueue only drains same-`__jobName` siblings, so every payload
+        // here is this command type. Left undefined otherwise (per-job path).
+        processBatch:
+          coalesceMaxBatch && coalesceMaxBatch > 1
+            ? async (payloads: any[]) => {
+                await processCommandBatch({
+                  ...commandProcessParams,
+                  payloads,
+                });
+              }
+            : undefined,
+        coalesceMaxBatch,
+        coalesceMaxBytes: cmdEntry.options.coalesceMaxBytes,
         delay: cmdEntry.options.delay,
         deduplication: rawDedup,
         spanAttributes: cmdEntry.spanAttributes,

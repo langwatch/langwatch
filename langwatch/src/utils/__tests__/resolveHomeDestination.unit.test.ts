@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  resolveHomeDestination,
   type HomeDestinationInput,
+  resolveHomeDestination,
 } from "../resolveHomeDestination";
 
 const base: HomeDestinationInput = {

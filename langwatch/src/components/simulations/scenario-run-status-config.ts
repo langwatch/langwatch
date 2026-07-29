@@ -2,8 +2,8 @@ import {
   AlertTriangle,
   Check,
   Clock,
-  XCircle,
   type LucideIcon,
+  XCircle,
 } from "lucide-react";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 

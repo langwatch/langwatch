@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import type { Cluster, Redis as IORedis } from "ioredis";
+import type { ChainableCommander, Cluster, Redis as IORedis } from "ioredis";
 
 /**
  * EVALSHA wrapper for a Lua script whose source is sent once, not per call.
@@ -33,13 +33,66 @@ export class CachedLuaScript {
     numKeys: number,
     ...keysAndArgs: Array<string | number>
   ): Promise<unknown> {
+    return await this.runCancellable(redis, null, numKeys, ...keysAndArgs);
+  }
+
+  /**
+   * {@link run}, but the caller can withdraw the command in the window the
+   * NOSCRIPT fallback opens.
+   *
+   * The fallback is issued AFTER an await, so unlike the initial EVALSHA it is
+   * not ordered ahead of whatever the caller sent next — on a cold script cache
+   * a command the caller has since superseded can land behind the write that
+   * superseded it. The queue's heartbeat is exactly that case: it must not
+   * extend a group's hold once the job's outcome is decided, and ordering alone
+   * only guarantees that for the EVALSHA (see `groupQueue.ts`'s
+   * `stopHeartbeat`). `isCancelled` closes the remaining window.
+   *
+   * Returns null when withdrawn, which every caller treats as "no refresh
+   * happened" — the same outcome as a heartbeat that never fired.
+   */
+  async runCancellable(
+    redis: IORedis | Cluster,
+    isCancelled: (() => boolean) | null,
+    numKeys: number,
+    ...keysAndArgs: Array<string | number>
+  ): Promise<unknown> {
     try {
       return await redis.evalsha(this.sha, numKeys, ...keysAndArgs);
     } catch (err) {
-      if (err instanceof Error && err.message.startsWith("NOSCRIPT")) {
+      if (isNoScript(err)) {
+        if (isCancelled?.()) return null;
         return await redis.eval(this.source, numKeys, ...keysAndArgs);
       }
       throw err;
     }
   }
+
+  /**
+   * Queues one invocation onto a pipeline, so N runs cost one round trip
+   * instead of N.
+   *
+   * There is no NOSCRIPT fallback inside a pipeline — a queued command cannot
+   * retry itself — so the caller has to recognise that error on the result and
+   * re-run it through {@link run}, which loads the source and warms the cache
+   * for every later call. {@link isNoScriptResult} is that check.
+   */
+  queue(
+    pipeline: ChainableCommander,
+    numKeys: number,
+    ...keysAndArgs: Array<string | number>
+  ): void {
+    pipeline.evalsha(this.sha, numKeys, ...keysAndArgs);
+  }
+}
+
+function isNoScript(err: unknown): boolean {
+  return err instanceof Error && err.message.startsWith("NOSCRIPT");
+}
+
+/** True when a pipelined result failed only because the node had no cached copy. */
+export function isNoScriptResult(
+  result: [Error | null, unknown] | undefined,
+): boolean {
+  return isNoScript(result?.[0]);
 }

@@ -1,5 +1,4 @@
 import {
-  Avatar,
   Box,
   Button,
   Card,
@@ -15,10 +14,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type { AnnotationScoreDataType } from "@prisma/client";
-import Link from "~/utils/compat/next-link";
-import { useSession } from "~/utils/auth-client";
 import { useEffect, useState } from "react";
-
 import { ChevronDown, MoreVertical, Trash2 } from "react-feather";
 import {
   type UseFormSetValue,
@@ -28,8 +24,11 @@ import {
 import { useAnnotationCommentStore } from "~/hooks/useAnnotationCommentStore";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { useSession } from "~/utils/auth-client";
+import Link from "~/utils/compat/next-link";
 import { RandomColorAvatar } from "../RandomColorAvatar";
 import { ScoreReasonModal } from "../ScoreReasonModal";
+import { UserAvatar } from "../UserAvatar";
 import { Checkbox, CheckboxGroup } from "../ui/checkbox";
 import { Menu } from "../ui/menu";
 import { Popover } from "../ui/popover";
@@ -254,6 +253,7 @@ export function AnnotationComment({ key = "" }: { key: string }) {
                   <RandomColorAvatar
                     size="sm"
                     name={session.data?.user.name ?? ""}
+                    image={session.data?.user.image}
                   />
                 </Skeleton>
                 <Skeleton height="20px" width="120px" />
@@ -274,9 +274,11 @@ export function AnnotationComment({ key = "" }: { key: string }) {
             <form onSubmit={handleSubmit(onSubmit)}>
               <VStack align="start" gap={3}>
                 <HStack width="full">
-                  <Avatar.Root size="sm">
-                    <Avatar.Fallback name={session.data?.user.name ?? ""} />
-                  </Avatar.Root>
+                  <UserAvatar
+                    size="sm"
+                    name={session.data?.user.name ?? ""}
+                    image={session.data?.user.image}
+                  />
                   <Text>{session.data?.user.name}</Text>
                   <Spacer />
 

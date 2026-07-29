@@ -9,8 +9,9 @@
  *
  * @see https://github.com/langwatch/langwatch/issues/2297
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+
 import { renderHook } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockPush = vi.fn();
 const mockReplace = vi.fn();
@@ -49,7 +50,7 @@ describe("useSimulationRouter", () => {
         result.current.goToSimulationSet("test-set-123");
 
         expect(mockPush).toHaveBeenCalledWith(
-          "/my-project/simulations/test-set-123"
+          "/my-project/simulations/test-set-123",
         );
         expect(mockPush).toHaveBeenCalledTimes(1);
       });

@@ -1,4 +1,4 @@
-import { Avatar, Box, type AvatarRootProps } from "@chakra-ui/react";
+import { Avatar, type AvatarRootProps, Box } from "@chakra-ui/react";
 import { useState } from "react";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { PresenceSession } from "~/server/app-layer/presence/types";
@@ -55,7 +55,10 @@ export function PresenceAvatar({
   if (!showTooltip) return avatar;
 
   return (
-    <Tooltip content={describePresence(session, displayName)} positioning={{ placement: "top" }}>
+    <Tooltip
+      content={describePresence(session, displayName)}
+      positioning={{ placement: "top" }}
+    >
       <Box display="inline-flex">{avatar}</Box>
     </Tooltip>
   );

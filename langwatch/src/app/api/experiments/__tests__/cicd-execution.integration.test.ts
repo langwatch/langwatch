@@ -507,11 +507,15 @@ describe.skipIf(process.env.CI)("CI/CD Evaluation Execution API", () => {
         total: 10,
       });
 
-      await runStateManager.failRun(runId, "Test error message");
+      await runStateManager.failRun(runId, {
+        code: "experiment_not_found",
+        traceId: "4bf92f3577b34da6a3ce929d0e0e4736",
+      });
 
       const state = await runStateManager.getRunState(runId);
       expect(state?.status).toBe("failed");
-      expect(state?.error).toBe("Test error message");
+      expect(state?.error).toBe("experiment_not_found");
+      expect(state?.traceId).toBe("4bf92f3577b34da6a3ce929d0e0e4736");
 
       // Clean up
       await runStateManager.deleteRun(runId);

@@ -1,23 +1,15 @@
-import {
-  Heading,
-  HStack,
-  Spacer,
-  Tabs,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Heading, HStack, Spacer, Tabs, Text, VStack } from "@chakra-ui/react";
 import { useState } from "react";
 
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
 import { LoadingScreen } from "~/components/LoadingScreen";
-import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
+import type { AiToolEntry } from "~/components/me/tiles/types";
 import { AiToolEntryDrawer } from "~/components/settings/governance/AiToolEntryDrawer";
 import { IngestionTemplatesEditor } from "~/components/settings/governance/IngestionTemplatesEditor";
 import { ToolCatalogEditor } from "~/components/settings/governance/ToolCatalogEditor";
+import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-
-import type { AiToolEntry } from "~/components/me/tiles/types";
 
 /**
  * Admin AI Tool Catalog editor - Phase 7 B6+B9 wired surface.
@@ -62,7 +54,17 @@ function ToolCatalogPage() {
           <Spacer />
         </HStack>
 
-        <Tabs.Root variant="line" defaultValue="tool-tiles">
+        <Tabs.Root
+          variant="line"
+          defaultValue="tool-tiles"
+          // lazyMount only (no unmountOnExit): the Ingestion Templates tab
+          // renders drawers (EditOttlDrawer, CreateTemplateDrawer) with
+          // their own local form state (OTTL statements, new-template
+          // fields). Unmounting that tab while a drawer is open would
+          // destroy in-progress edits, so we avoid unmountOnExit for the
+          // whole Root and only skip mounting tabs that were never opened.
+          lazyMount
+        >
           <Tabs.List>
             <Tabs.Trigger
               value="tool-tiles"
@@ -82,12 +84,8 @@ function ToolCatalogPage() {
           <Tabs.Content value="tool-tiles" paddingTop={4}>
             <ToolCatalogEditor
               organizationId={organization.id}
-              onAddTile={(type) =>
-                setDrawerState({ mode: "create", type })
-              }
-              onEditTile={(entry) =>
-                setDrawerState({ mode: "edit", entry })
-              }
+              onAddTile={(type) => setDrawerState({ mode: "create", type })}
+              onEditTile={(entry) => setDrawerState({ mode: "edit", entry })}
             />
           </Tabs.Content>
           <Tabs.Content value="ingestion-templates" paddingTop={4}>

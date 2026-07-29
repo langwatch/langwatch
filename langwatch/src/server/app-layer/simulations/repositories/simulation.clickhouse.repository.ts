@@ -17,6 +17,10 @@ import {
   mapClickHouseRowToScenarioRunData,
   mapStatus,
 } from "~/server/simulations/simulation-run.mappers";
+import {
+  queryWindowed,
+  type WindowFragment,
+} from "../../clients/clickhouse/windowed-read";
 import type { SimulationRepository } from "./simulation.repository";
 
 const TABLE_NAME = "simulation_runs" as const;
@@ -99,7 +103,8 @@ function buildDateFilter({
 }
 
 /**
- * Builds a StartedAt partition-pruning window from a page of batch aggregates.
+ * Extracts a StartedAt partition-pruning window from a page of batch aggregates,
+ * as a [min, max] range hint for {@link queryWindowed}.
  *
  * getBatchHistoryForScenarioSet fetches the batch page (step 1) and then reads
  * the heavy Messages preview columns for those batches (step 2). simulation_runs
@@ -110,19 +115,22 @@ function buildDateFilter({
  * page run's latest StartedAt lies inside [min, max]. Bounding step 2 to that
  * window prunes the heavy read to the page's few weeks without dropping rows.
  *
- * The predicate must be applied on the OUTER query only, not inside the
+ * The window must be applied on the OUTER query only, not inside the
  * max(UpdatedAt) dedup subquery: StartedAt is not strictly immutable across a
  * run's ReplacingMergeTree versions (a snapshot arriving before the run-started
  * event seeds a provisional StartedAt that the started event later overwrites),
  * so filtering versions by StartedAt before picking the latest could resolve the
  * wrong version. Filtering the already-deduped outer rows is always correct.
  *
- * Returns an empty clause when no valid bound exists (e.g. empty page), so the
- * read falls back to its prior unbounded behavior rather than dropping rows.
+ * Returns `null` when no valid bound exists (an empty page, or rows whose
+ * StartedAt is still provisional/zero). {@link queryWindowed} meters a null hint
+ * as an `unwindowed` read: the step-2 read then runs unbounded — the same
+ * behaviour as before — but the widening is now counted rather than silent
+ * (ADR-067).
  */
-export function buildStartedAtWindowForPage(
+export function startedAtBoundsForPage(
   rows: { MinStartedAt: string; MaxStartedAt: string }[],
-): { whereClause: string; params: Record<string, string> } {
+): { minMs: number; maxMs: number } | null {
   let minMs = Number.POSITIVE_INFINITY;
   let maxMs = 0;
   for (const row of rows) {
@@ -132,13 +140,36 @@ export function buildStartedAtWindowForPage(
     if (Number.isFinite(hi) && hi > 0) maxMs = Math.max(maxMs, hi);
   }
   if (!Number.isFinite(minMs) || maxMs <= 0 || minMs > maxMs) {
+    return null;
+  }
+  return { minMs, maxMs };
+}
+
+/**
+ * Renders the StartedAt predicate the step-2 read has always emitted, from a
+ * {@link queryWindowed} fragment (or the empty clause for an unbounded `null`
+ * fragment). Deliberately hand-written as `toUInt64({...:String})` rather than
+ * `window.sqlFor` so the migration onto queryWindowed changes only *what is
+ * metered* — the emitted SQL and params stay byte-identical. A windowed
+ * fragment's `[fromMs, toMs]` reproduces the page's exact integer `[min, max]`
+ * (a midpoint hint ± a half-range window), so `String(fromMs)`/`String(toMs)`
+ * equal the bounds' own decimal strings.
+ */
+export function buildStartedAtWindowClause(window: WindowFragment | null): {
+  whereClause: string;
+  params: Record<string, string>;
+} {
+  if (!window) {
     return { whereClause: "", params: {} };
   }
   return {
     whereClause:
       "AND StartedAt >= fromUnixTimestamp64Milli(toUInt64({minStartedAtMs:String})) " +
       "AND StartedAt <= fromUnixTimestamp64Milli(toUInt64({maxStartedAtMs:String}))",
-    params: { minStartedAtMs: String(minMs), maxStartedAtMs: String(maxMs) },
+    params: {
+      minStartedAtMs: String(window.fromMs),
+      maxStartedAtMs: String(window.toMs),
+    },
   };
 }
 
@@ -200,6 +231,20 @@ interface CursorPayload {
   batchRunId: string;
 }
 
+/** Slim per-run row shape for the batch-history preview (step-2 heavy read). */
+interface PreviewItemRow {
+  ScenarioRunId: string;
+  BatchRunId: string;
+  Name: string | null;
+  Description: string | null;
+  Status: string;
+  DurationMs: string | null;
+  UpdatedAt: string;
+  FinishedAt: string | null;
+  MessagePreviewRoles: string[];
+  MessagePreviewContents: string[];
+}
+
 export class SimulationClickHouseRepository implements SimulationRepository {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
@@ -214,24 +259,12 @@ export class SimulationClickHouseRepository implements SimulationRepository {
   private async queryRows<T>(
     query: string,
     params: { tenantId: string } & Record<string, string | string[]>,
-    options?: {
-      expectedMaxDurationMs?: number;
-      expectedMaxReadBytes?: number;
-    },
   ): Promise<T[]> {
     const client = await this.getClient(params.tenantId);
     const result = await client.query({
       query,
       query_params: params,
       format: "JSONEachRow",
-      clickhouse_settings: {
-        ...(options?.expectedMaxDurationMs !== undefined && {
-          langwatch_expected_max_duration_ms: options.expectedMaxDurationMs,
-        }),
-        ...(options?.expectedMaxReadBytes !== undefined && {
-          langwatch_expected_max_read_bytes: options.expectedMaxReadBytes,
-        }),
-      },
     });
     return result.json<T>();
   }
@@ -440,23 +473,40 @@ export class SimulationClickHouseRepository implements SimulationRepository {
 
     // Bound the heavy step-2 read to the StartedAt window of the batches on this
     // page (aggregated in step 1) so it prunes partitions instead of scanning
-    // every weekly partition including cold storage.
-    const startedAtWindow = buildStartedAtWindowForPage(pageRows);
+    // every weekly partition including cold storage — routed through
+    // queryWindowed so the outcome lands on clickhouse_windowed_read_total{table}
+    // exactly once per call (ADR-067):
+    //
+    //   - Page has a StartedAt range: the read runs windowed and is metered
+    //     `hit` — the cheap, pruned path.
+    //   - Page has no usable StartedAt (empty / provisional): the hint is null,
+    //     so the read runs unbounded and is metered `unwindowed`. This is the
+    //     widening the old empty-clause helper did *silently*; it is now counted.
+    //
+    // The page carries a [min, max] RANGE, not a point, so it maps as a midpoint
+    // hint with a half-range window — the emitted fragment covers exactly
+    // [min, max]. fallback "none": step 1 already bounded these batches to
+    // [min, max], so a run's latest StartedAt always lies inside the window; an
+    // empty windowed read is a genuine empty page and is never widened (widening
+    // here would issue a second unbounded scan the old code never did, changing
+    // the SQL that runs — precisely what byte-identical adoption forbids).
+    const startedAtBounds = startedAtBoundsForPage(pageRows);
 
     // Step 2: fetch slim item rows (preview columns only)
-    const itemRows = await this.queryRows<{
-      ScenarioRunId: string;
-      BatchRunId: string;
-      Name: string | null;
-      Description: string | null;
-      Status: string;
-      DurationMs: string | null;
-      UpdatedAt: string;
-      FinishedAt: string | null;
-      MessagePreviewRoles: string[];
-      MessagePreviewContents: string[];
-    }>(
-      `SELECT ${PREVIEW_COLUMNS}
+    const itemRows = await queryWindowed<PreviewItemRow[]>({
+      table: TABLE_NAME,
+      hintMs: startedAtBounds
+        ? (startedAtBounds.minMs + startedAtBounds.maxMs) / 2
+        : null,
+      windowMs: startedAtBounds
+        ? (startedAtBounds.maxMs - startedAtBounds.minMs) / 2
+        : undefined,
+      fallback: "none",
+      isEmpty: (rows) => rows.length === 0,
+      run: (window) => {
+        const startedAtWindow = buildStartedAtWindowClause(window);
+        return this.queryRows<PreviewItemRow>(
+          `SELECT ${PREVIEW_COLUMNS}
        FROM ${TABLE_NAME}
        WHERE TenantId = {tenantId:String}
          AND ScenarioSetId IN ({scenarioSetIds:Array(String)})
@@ -465,13 +515,15 @@ export class SimulationClickHouseRepository implements SimulationRepository {
          ${startedAtWindow.whereClause}
          ${simulationRunDedupPredicate("TenantId = {tenantId:String} AND ScenarioSetId IN ({scenarioSetIds:Array(String)}) AND BatchRunId IN ({batchRunIds:Array(String)})")}
        ORDER BY CreatedAt ASC`,
-      {
-        tenantId: projectId,
-        scenarioSetIds: expandSetIdFilter(scenarioSetId),
-        batchRunIds,
-        ...startedAtWindow.params,
+          {
+            tenantId: projectId,
+            scenarioSetIds: expandSetIdFilter(scenarioSetId),
+            batchRunIds,
+            ...startedAtWindow.params,
+          },
+        );
       },
-    );
+    });
 
     // Group items by batchRunId
     const itemsByBatch = new Map<string, typeof itemRows>();
@@ -913,7 +965,6 @@ export class SimulationClickHouseRepository implements SimulationRepository {
           : {}),
         ...dateFilter.params,
       },
-      { expectedMaxDurationMs: 1000, expectedMaxReadBytes: 1_000_000 },
     );
 
     return Number(rows[0]?.LastUpdatedAt ?? "0");
@@ -1166,7 +1217,6 @@ export class SimulationClickHouseRepository implements SimulationRepository {
           ? { scenarioSetIds: expandSetIdFilter(scenarioSetId) }
           : {}),
       },
-      { expectedMaxDurationMs: 5000, expectedMaxReadBytes: 5_000_000 },
     );
 
     const now = Date.now();

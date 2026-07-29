@@ -26,6 +26,8 @@ Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. L
 
 If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
 
+If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team. No login needed, secrets and personal data are redacted locally, and it directly shapes what gets fixed. `npx langwatch report --help` explains the options.
+
 **Projects and API keys: target a real project, not a personal one.**
 
 LangWatch has two kinds of project:
@@ -38,7 +40,7 @@ And two ways to authenticate:
 - **A project API key in `.env`** (`LANGWATCH_API_KEY`): the credential everything in these skills uses. It is scoped to one real project. This is the default; prefer it unless the user explicitly asks for something else.
 - **`langwatch login --device` (AI-tools / SSO)**: a personal device session for wrapping coding assistants (`langwatch claude`, `langwatch codex`, …). It is NOT for evaluations, prompts, datasets, scenarios or SDK instrumentation, and it points at a personal workspace. Do not run it to set up the work in these skills.
 
-So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. If it is missing, ask the user for it (they can mint a key for a specific project at https://app.langwatch.ai/authorize). Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, they are self-hosted, use that endpoint instead of app.langwatch.ai.
+So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env` — most environments already have this provisioned. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, they are self-hosted, use that endpoint instead of app.langwatch.ai.
 
 ## Step 2: Baseline the Vital Signs
 
@@ -64,14 +66,18 @@ langwatch analytics query --metric p95-latency --group-by metadata.model --forma
 
 Widen with `--start-date` (ISO) to 30 days when trends look suspicious: a gradual drift only shows on longer windows. Run `langwatch analytics query --help` for every preset and flag.
 
+An empty metric is a coverage note, never the end of the road. An empty `eval-pass-rate` means there were no evaluator runs in the selected window; it says nothing about the traffic itself, which `trace-count`, `total-cost`, and the latency metrics still describe. For an open "what has my agent been up to?", answer from whichever sources HAVE data, production traces first, then simulation runs: share a few concrete observations (volume, the kinds of requests coming in, errors, cost or latency movements, one or two example traces), then end with one short line inviting the user to name what to dig into more deeply ("Say which of these to dig into and I'll go deeper."). Never end the conversation on "no evaluation data" alone when the project has traces.
+
 ## Step 3: Export the Evidence and Mine It
 
 Aggregates say WHAT changed; only the traces say WHY. Export a large sample and analyze it locally:
 
 ```bash
-langwatch trace export --format jsonl --limit 1000 -o traces.jsonl
-langwatch trace export --format jsonl --limit 1000 --start-date <30d-ago> --end-date <14d-ago> -o traces-before.jsonl
+langwatch trace export --format jsonl --limit 1000 --origin application -o traces.jsonl
+langwatch trace export --format jsonl --limit 1000 --origin application --start-date <30d-ago> --end-date <14d-ago> -o traces-before.jsonl
 ```
+
+`--origin application` scopes the sample to real production traffic (it includes traces with no recorded origin). Evaluation, simulation, playground, gateway, and langy traces would pollute the picture of what the agent does for users; include those origins (comma-separated) only when they are the subject of the question.
 
 Write small local scripts (python3 or jq) over the JSONL to compute, at minimum:
 
@@ -83,7 +89,7 @@ Write small local scripts (python3 or jq) over the JSONL to compute, at minimum:
 6. **Outliers**: the single weirdest traces by duration, cost, span count, and output size. Read them individually.
 
 ```bash
-langwatch trace search -q "<keyword from a pattern>" --limit 10 --format json   # Chase a specific pattern
+langwatch trace search -q "<keyword from a pattern>" --origin application --limit 10 --format json   # Chase a specific pattern
 langwatch trace get <traceId>                                                   # Read a representative trace in full
 langwatch trace get <traceId> -f json                                           # Every span, token count, and timing
 ```
@@ -105,12 +111,7 @@ Open the report path for the user and also summarize the top findings directly i
 
 ## Step 5: Hand Off to Improvement
 
-Diagnosis without treatment is just bad news. Close by proposing the next step:
-
-- If the `agent-improve` skill is installed, offer to run `/agent-improve` on the findings right away: it turns each finding into tested hypotheses, scenario tests, evaluators, and PR-ready changes.
-- If it is not installed, tell the user to install it: `npx skills add langwatch/skills/agent-improve`
-
-Pass along the report: agent-improve uses these findings and trace examples as its evidence base.
+Diagnosis without treatment is just bad news. If the `agent-improve` skill is installed, run it on the findings right away: it turns each finding into tested hypotheses, scenario tests, evaluators, and PR-ready changes. Pass along the report — agent-improve uses these findings and trace examples as its evidence base.
 
 ## Common Mistakes
 
@@ -119,4 +120,6 @@ Pass along the report: agent-improve uses these findings and trace examples as i
 - Do NOT rely on aggregates alone; always read at least a handful of full traces per finding, the surprise is always in the details
 - Do NOT analyze only the happy window; without a before/after comparison you cannot see behavior change
 - Do NOT dump raw JSON at the user; the deliverable is the diagnosis and the report, written in plain language with numbers
-- If the CLI returns an error, surface the exact message in your reply rather than paraphrasing; the user often needs the raw error to debug API key, project, or date-range issues
+- Do NOT stop at an empty evaluation metric; when evaluations have no data, the answer comes from the traces (and simulation runs), with a closing invitation to dig deeper
+- Do NOT mix origins blindly; questions about production behavior are answered from `--origin application` traffic
+- If the CLI returns an error, report the user-facing consequence (what couldn't be determined and why in plain terms), not the raw error text — an activity card already shows the underlying failure

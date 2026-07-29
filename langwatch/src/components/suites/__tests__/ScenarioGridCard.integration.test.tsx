@@ -49,7 +49,10 @@ describe("<ScenarioGridCard/>", () => {
     it("falls back to scenarioId as title", () => {
       render(
         <ScenarioGridCard
-          scenarioRun={makeScenarioRunData({ name: null, scenarioId: "scen_abc" })}
+          scenarioRun={makeScenarioRunData({
+            name: null,
+            scenarioId: "scen_abc",
+          })}
           targetName={null}
           onClick={vi.fn()}
         />,

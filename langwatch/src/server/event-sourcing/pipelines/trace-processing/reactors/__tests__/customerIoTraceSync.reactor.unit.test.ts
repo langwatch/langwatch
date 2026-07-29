@@ -21,7 +21,7 @@ vi.mock("@langwatch/observability", () => ({
 
 vi.mock("~/utils/posthogErrorCapture", () => ({
   captureException: vi.fn(),
-  toError: vi.fn((e) => e instanceof Error ? e : new Error(String(e))),
+  toError: vi.fn((e) => (e instanceof Error ? e : new Error(String(e)))),
 }));
 
 function createFoldState(

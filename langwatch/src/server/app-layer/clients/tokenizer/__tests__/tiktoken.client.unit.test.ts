@@ -111,12 +111,14 @@ describe("TiktokenClient", () => {
       // impl: no fetch, dummy ranks. Fresh client per test so the internal
       // cache never leaks across cases.
       loadMock.mockClear();
-      loadMock.mockImplementation(async (registry: Record<string, unknown>) => ({
-        explicit_n_vocab: undefined,
-        pat_str: registry.pat_str,
-        special_tokens: registry.special_tokens,
-        bpe_ranks: "",
-      }));
+      loadMock.mockImplementation(
+        async (registry: Record<string, unknown>) => ({
+          explicit_n_vocab: undefined,
+          pat_str: registry.pat_str,
+          special_tokens: registry.special_tokens,
+          bpe_ranks: "",
+        }),
+      );
       client = new TiktokenClient();
     });
 

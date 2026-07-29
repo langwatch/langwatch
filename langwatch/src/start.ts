@@ -1,5 +1,11 @@
 import promBundle from "express-prom-bundle";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+  writeSync,
+} from "fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "http";
 import { createSecureServer } from "http2";
 import path from "path";
@@ -41,24 +47,21 @@ async function loadDevHttpsCredentials(
   // `days` option in favour of explicit not-before/not-after dates.
   const notAfterDate = new Date();
   notAfterDate.setDate(notAfterDate.getDate() + 825);
-  const pems = await generate(
-    [{ name: "commonName", value: "localhost" }],
-    {
-      notAfterDate,
-      keySize: 2048,
-      extensions: [
-        {
-          name: "subjectAltName",
-          altNames: [
-            { type: 2, value: "localhost" },
-            { type: 2, value: "*.localhost" },
-            { type: 7, ip: "127.0.0.1" },
-            { type: 7, ip: "::1" },
-          ],
-        },
-      ],
-    },
-  );
+  const pems = await generate([{ name: "commonName", value: "localhost" }], {
+    notAfterDate,
+    keySize: 2048,
+    extensions: [
+      {
+        name: "subjectAltName",
+        altNames: [
+          { type: 2, value: "localhost" },
+          { type: 2, value: "*.localhost" },
+          { type: 7, ip: "127.0.0.1" },
+          { type: 7, ip: "::1" },
+        ],
+      },
+    ],
+  });
 
   mkdirSync(cacheDir, { recursive: true });
   writeFileSync(certPath, pems.cert);
@@ -66,8 +69,8 @@ async function loadDevHttpsCredentials(
   return { cert: Buffer.from(pems.cert), key: Buffer.from(pems.private) };
 }
 
-import { createLogger } from "@langwatch/observability";
 import { getRequestListener } from "@hono/node-server";
+import { createLogger } from "@langwatch/observability";
 // Hono — unified API router
 import type { Hono } from "hono";
 import { register } from "prom-client";
@@ -78,7 +81,6 @@ import {
   initializeInProcessApp,
   initializeWebApp,
 } from "./server/app-layer/presets";
-import { buildStorageConnectSrc } from "./server/buildStorageConnectSrc";
 import {
   getWorkerMetricsPort,
   isMetricsAuthorized,
@@ -86,6 +88,7 @@ import {
 } from "./server/metrics";
 import { shutdownPostHog } from "./server/posthog";
 import { verifyRedisReady } from "./server/redis";
+import { buildSecurityHeaders } from "./server/securityHeaders";
 import { serveStaticOrFallback } from "./server/static-handler";
 import { setupTRPCWebSocket } from "./server/websockets/trpc-ws";
 import { startWorkers, type WorkerHandle } from "./server/workers/startWorkers";
@@ -194,41 +197,7 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
   // In production, resolve the built client assets directory
   const clientDistDir = dev ? null : path.join(dir, "dist/client");
 
-  // Security headers (migrated from next.config.mjs)
-  const cspHeader = [
-    "default-src 'self'",
-    "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://*.posthog.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://*.googletagmanager.com https://*.pendo.io https://client.crisp.chat https://static.hsappstatic.net https://*.google-analytics.com https://www.google.com https://*.reo.dev",
-    "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://*.pendo.io https://client.crisp.chat https://*.google.com https://*.reo.dev https://fonts.googleapis.com https://unpkg.com",
-    "img-src 'self' blob: data: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://image.crisp.chat https://*.googletagmanager.com https://*.pendo.io https://*.google-analytics.com https://www.google.com https://*.reo.dev",
-    "font-src 'self' data: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://client.crisp.chat https://www.google.com https://*.reo.dev https://fonts.gstatic.com",
-    "object-src 'none'",
-    "base-uri 'self'",
-    "form-action 'self'",
-    "frame-ancestors 'none'",
-    ...(!dev ? ["upgrade-insecure-requests"] : []),
-    "worker-src 'self' blob:",
-    // ADR-032: allow the browser's presigned PUT to object storage (derived
-    // from the same env the S3 client uses) — without it the CSP blocks the
-    // upload before it leaves the page and the drawer silently falls back.
-    `connect-src 'self' ${buildStorageConnectSrc({
-      S3_ENDPOINT: process.env.S3_ENDPOINT,
-      S3_REGION: process.env.S3_REGION,
-      S3_BUCKET_NAME: process.env.S3_BUCKET_NAME,
-      AWS_REGION: process.env.AWS_REGION,
-      AZURE_BLOB_ENDPOINT: process.env.AZURE_BLOB_ENDPOINT,
-    }).join(
-      " ",
-    )} https://*.posthog.com https://*.pendo.io wss://*.pendo.io wss://client.relay.crisp.chat https://client.crisp.chat https://*.googletagmanager.com https://analytics.google.com https://stats.g.doubleclick.net https://*.google-analytics.com https://www.google.com https://*.reo.dev`,
-    "frame-src 'self' https://*.posthog.com https://*.pendo.io https://www.youtube.com https://get.langwatch.ai https://*.googletagmanager.com https://www.google.com https://*.reo.dev",
-  ].join("; ");
-
-  const securityHeaders: Record<string, string> = {
-    "Referrer-Policy": "no-referrer",
-    "X-Content-Type-Options": "nosniff",
-    // CSP only in production — dev needs inline scripts for Vite HMR
-    ...(!dev ? { "Content-Security-Policy": cspHeader } : {}),
-    ...(!dev ? { "Strict-Transport-Security": "max-age=31536000; includeSubDomains" } : {}),
-  };
+  const securityHeaders = buildSecurityHeaders({ dev });
 
   // Optional HTTPS + HTTP/2 path for local dev. Set
   // `LANGWATCH_DEV_HTTP2=1` and a self-signed cert is auto-generated on
@@ -247,7 +216,10 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
     try {
       // Collapse runs of slashes so paths like `//authorize` resolve to `/authorize`
       // instead of failing the absolute-path guard on the SPA fallback below.
-      const pathname = ((req.url ?? "/").split("?")[0] ?? "/").replace(/\/{2,}/g, "/");
+      const pathname = ((req.url ?? "/").split("?")[0] ?? "/").replace(
+        /\/{2,}/g,
+        "/",
+      );
 
       // Apply security headers to all responses
       for (const [key, value] of Object.entries(securityHeaders)) {
@@ -311,13 +283,18 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
       res.statusCode = 404;
       res.end("Not Found");
     } catch (err) {
-      logger.error({ url: req.url, error: err }, "error occurred handling request");
+      logger.error(
+        { url: req.url, error: err },
+        "error occurred handling request",
+      );
       res.statusCode = 500;
       res.end("internal server error");
     }
   };
 
-  let server: ReturnType<typeof createServer> | ReturnType<typeof createSecureServer>;
+  let server:
+    | ReturnType<typeof createServer>
+    | ReturnType<typeof createSecureServer>;
   if (useHttp2) {
     const { cert, key } = await loadDevHttpsCredentials(dir);
     // Node's http2 compat-API hands us the same IncomingMessage /
@@ -337,9 +314,20 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
   // Bind the tRPC router to a WebSocket transport on the same HTTP server.
   // Lets high-frequency procedures (presence cursor today) escape the
   // browser's 6-connection HTTP cap by riding a single long-lived socket.
-  const wsHandle = setupTRPCWebSocket(server as ReturnType<typeof createServer>);
+  const wsHandle = setupTRPCWebSocket(
+    server as ReturnType<typeof createServer>,
+  );
 
   server.once("error", (err) => {
+    // Write synchronously to stderr BEFORE the structured log: pino's
+    // transports are async worker threads that never flush past the
+    // process.exit(1) below, so without this a bind failure (e.g.
+    // EADDRINUSE when two dev processes race for the same port) is an
+    // exit(1) with zero output anywhere — stdout, Loki, or otherwise.
+    writeSync(
+      2,
+      `[langwatch:start] server error, exiting: ${err.stack ?? String(err)}\n`,
+    );
     logger.error({ error: err }, "error occurred on server");
     process.exit(1);
   });
@@ -365,7 +353,9 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
         hostname,
         port,
         fullUrl: `${useHttp2 ? "https" : "http"}://${hostname === "0.0.0.0" ? "localhost" : hostname}:${port}`,
-        mode: dev ? `development (API only — Vite on :${basePort})` : "production",
+        mode: dev
+          ? `development (API only — Vite on :${basePort})`
+          : "production",
       },
       "langwatch listening",
     );
@@ -424,7 +414,7 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
   process.on("unhandledRejection", (reason, promise) => {
     logger.fatal(
       { reason: reason instanceof Error ? reason : { value: reason }, promise },
-      "unhandled rejection detected"
+      "unhandled rejection detected",
     );
   });
 
@@ -475,13 +465,24 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
  *     no body and are left alone (a 304 revision-poll or 204 long-poll no-diff
  *     must stay empty).
  *
+ * Forwards every argument `getRequestListener` passes to `honoApp.fetch` —
+ * notably the second (`{ incoming, outgoing }`, Hono's `env`) — rather than
+ * declaring only `request`. Node's calling convention silently drops extra
+ * arguments a function doesn't declare, so a one-parameter wrapper here means
+ * `c.env` is `undefined` in every route handler despite `getRequestListener`
+ * always supplying it; that in turn makes `@hono/node-server/conninfo`'s
+ * `getConnInfo(c)` throw for every request in production (it reads
+ * `c.env.incoming.socket`). No existing handler reads `c.env` today, so this
+ * is additive — it only starts mattering for code that begins relying on it
+ * (see `~/utils/getClientIp.ts`'s `getConnInfo` fallback).
+ *
  * Exported for the langwatch#5219 + streaming-bridge regression tests.
  */
 export function honoFetchForNode(
   honoApp: Pick<Hono, "fetch">,
-): (request: Request) => Promise<Response> {
-  return async (request) => {
-    const response = await honoApp.fetch(request);
+): (...args: Parameters<Hono["fetch"]>) => Promise<Response> {
+  return async (request, ...rest) => {
+    const response = await honoApp.fetch(request, ...rest);
 
     if (response.status === 404) {
       const text = await response.clone().text();

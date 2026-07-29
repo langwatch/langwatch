@@ -43,9 +43,7 @@ describe("dynamic attribute prefix translation", () => {
 
   describe("span.attribute.<key>", () => {
     it("answers via a partition-pruned subquery on stored_spans", () => {
-      const result = translate(
-        "span.attribute.gen_ai.request.model:gpt-4o",
-      );
+      const result = translate("span.attribute.gen_ai.request.model:gpt-4o");
       expect(result).not.toBeNull();
       expect(result!.sql).toContain("FROM stored_spans");
       expect(result!.sql).toContain("SpanAttributes[{");
@@ -98,14 +96,16 @@ describe("dynamic attribute prefix translation", () => {
 
   describe("key validation", () => {
     it("rejects keys with disallowed characters", () => {
-      expect(() => translate('span.attribute.foo bar:value')).toThrow();
+      expect(() => translate("span.attribute.foo bar:value")).toThrow();
       expect(() => translate('trace.attribute.foo"bar:value')).toThrow();
       expect(() => translate("event.attribute.foo[bar]:value")).toThrow();
     });
 
     it("rejects keys longer than the allowed cap", () => {
       const longKey = "a.".repeat(200);
-      expect(() => translate(`trace.attribute.${longKey}:v`)).toThrow(/too long/i);
+      expect(() => translate(`trace.attribute.${longKey}:v`)).toThrow(
+        /too long/i,
+      );
     });
 
     it("accepts the dotted / hyphenated / colon-bearing keys we see in real data", () => {

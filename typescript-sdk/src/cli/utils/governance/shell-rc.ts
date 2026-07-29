@@ -32,19 +32,19 @@ import * as readline from "node:readline";
 import chalk from "chalk";
 
 import {
-  codexOtelBlockHasAuthHeader,
-  codexTraceEndpoint,
-  defaultCodexConfigPath,
-  displayCodexConfigPath,
-  writeCodexOtelBlock,
+	codexOtelBlockHasAuthHeader,
+	codexTraceEndpoint,
+	defaultCodexConfigPath,
+	displayCodexConfigPath,
+	writeCodexOtelBlock,
 } from "../codex-config-toml";
 import {
-  appEnvHasAllVars,
-  appSettingsTargetFor,
-  installAppEnv,
+	appEnvHasAllVars,
+	appSettingsTargetFor,
+	installAppEnv,
 } from "./app-settings";
 import { type GovernanceConfig, saveConfig } from "./config";
-import { envForTool, type ToolEnv } from "./wrapper";
+import { envForTool, type ToolEnv } from "./tool-env";
 
 /** Wrapped tools included in the union'd export block. */
 const TOOLS = ["claude", "codex", "cursor", "gemini", "opencode"] as const;
@@ -63,10 +63,10 @@ export const GATEWAY_RC_MARKERS = { begin: BLOCK_BEGIN, end: BLOCK_END };
  * pair so multiple wrappers coexist in one rc file.
  */
 export function toolMarkers(tool: string): { begin: string; end: string } {
-  return {
-    begin: `# >>> langwatch ${tool} begin >>>`,
-    end: `# <<< langwatch ${tool} end <<<`,
-  };
+	return {
+		begin: `# >>> langwatch ${tool} begin >>>`,
+		end: `# <<< langwatch ${tool} end <<<`,
+	};
 }
 
 export type DetectedShell = "zsh" | "bash" | "fish";
@@ -78,26 +78,32 @@ export type DetectedShell = "zsh" | "bash" | "fish";
  * - the persist flow skips entirely in that case.
  */
 export function detectShell(): DetectedShell | null {
-  const raw = (process.env.SHELL ?? "").toLowerCase();
-  if (raw.includes("fish")) return "fish";
-  if (raw.includes("zsh")) return "zsh";
-  if (raw.includes("bash")) return "bash";
-  if (process.platform === "darwin") return "zsh";
-  if (process.platform === "linux") return "bash";
-  return null;
+	const raw = (process.env.SHELL ?? "").toLowerCase();
+	if (raw.includes("fish")) return "fish";
+	if (raw.includes("zsh")) return "zsh";
+	if (raw.includes("bash")) return "bash";
+	if (process.platform === "darwin") return "zsh";
+	if (process.platform === "linux") return "bash";
+	return null;
+}
+
+/** Render an absolute path with the home dir collapsed to `~`. */
+export function tildify(p: string): string {
+	const home = os.homedir();
+	return p.startsWith(home) ? `~${p.slice(home.length)}` : p;
 }
 
 /** Returns the absolute path of the shell rc file. */
 export function rcPath(shell: DetectedShell): string {
-  const home = os.homedir();
-  switch (shell) {
-    case "zsh":
-      return path.join(home, ".zshrc");
-    case "bash":
-      return path.join(home, ".bashrc");
-    case "fish":
-      return path.join(home, ".config", "fish", "config.fish");
-  }
+	const home = os.homedir();
+	switch (shell) {
+		case "zsh":
+			return path.join(home, ".zshrc");
+		case "bash":
+			return path.join(home, ".bashrc");
+		case "fish":
+			return path.join(home, ".config", "fish", "config.fish");
+	}
 }
 
 /**
@@ -105,9 +111,7 @@ export function rcPath(shell: DetectedShell): string {
  * exported. If true the persist prompt stays quiet (per 1.3).
  */
 export function isShellAlreadyConfigured(): boolean {
-  return (
-    !!process.env.ANTHROPIC_BASE_URL && !!process.env.ANTHROPIC_AUTH_TOKEN
-  );
+	return !!process.env.ANTHROPIC_BASE_URL && !!process.env.ANTHROPIC_AUTH_TOKEN;
 }
 
 /**
@@ -124,25 +128,25 @@ export function isShellAlreadyConfigured(): boolean {
  * for the presence of a well-formed block.
  */
 export function rcHasLangwatchBlock({
-  shell,
-  requiredKeys,
-  markers = { begin: BLOCK_BEGIN, end: BLOCK_END },
+	shell,
+	requiredKeys,
+	markers = { begin: BLOCK_BEGIN, end: BLOCK_END },
 }: {
-  shell: DetectedShell;
-  requiredKeys?: string[];
-  markers?: { begin: string; end: string };
+	shell: DetectedShell;
+	requiredKeys?: string[];
+	markers?: { begin: string; end: string };
 }): boolean {
-  try {
-    const content = fs.readFileSync(rcPath(shell), "utf8");
-    const begin = content.indexOf(markers.begin);
-    const end = content.indexOf(markers.end);
-    if (begin === -1 || end === -1 || end < begin) return false;
-    if (!requiredKeys || requiredKeys.length === 0) return true;
-    const block = content.slice(begin, end);
-    return requiredKeys.every((k) => block.includes(k));
-  } catch {
-    return false;
-  }
+	try {
+		const content = fs.readFileSync(rcPath(shell), "utf8");
+		const begin = content.indexOf(markers.begin);
+		const end = content.indexOf(markers.end);
+		if (begin === -1 || end === -1 || end < begin) return false;
+		if (!requiredKeys || requiredKeys.length === 0) return true;
+		const block = content.slice(begin, end);
+		return requiredKeys.every((k) => block.includes(k));
+	} catch {
+		return false;
+	}
 }
 
 /**
@@ -152,29 +156,29 @@ export function rcHasLangwatchBlock({
  * OPENAI_* + ANTHROPIC_*.
  */
 export function buildExportBlock(
-  cfg: GovernanceConfig,
-  shell: DetectedShell,
+	cfg: GovernanceConfig,
+	shell: DetectedShell,
 ): string {
-  const seen = new Set<string>();
-  const entries: Array<[string, string]> = [];
-  for (const tool of TOOLS) {
-    const env: ToolEnv = envForTool(cfg, tool);
-    for (const [k, v] of Object.entries(env.vars)) {
-      if (seen.has(k)) continue;
-      seen.add(k);
-      entries.push([k, v]);
-    }
-  }
-  const fmt =
-    shell === "fish"
-      ? ([k, v]: [string, string]) => `set -gx ${k} ${quote(v)}`
-      : ([k, v]: [string, string]) => `export ${k}=${quote(v)}`;
-  return entries.map(fmt).join("\n");
+	const seen = new Set<string>();
+	const entries: Array<[string, string]> = [];
+	for (const tool of TOOLS) {
+		const env: ToolEnv = envForTool(cfg, tool);
+		for (const [k, v] of Object.entries(env.vars)) {
+			if (seen.has(k)) continue;
+			seen.add(k);
+			entries.push([k, v]);
+		}
+	}
+	const fmt =
+		shell === "fish"
+			? ([k, v]: [string, string]) => `set -gx ${k} ${quote(v)}`
+			: ([k, v]: [string, string]) => `export ${k}=${quote(v)}`;
+	return entries.map(fmt).join("\n");
 }
 
 function quote(s: string): string {
-  if (!/[ \t\n'"$\\]/.test(s)) return s;
-  return "'" + s.replace(/'/g, "'\\''") + "'";
+	if (!/[ \t\n'"$\\]/.test(s)) return s;
+	return "'" + s.replace(/'/g, "'\\''") + "'";
 }
 
 /**
@@ -189,26 +193,21 @@ function quote(s: string): string {
  * for `persistBlockToRc` to bracket with the tool's markers.
  */
 export function buildScopedToolFunction(
-  tool: string,
-  vars: Record<string, string>,
-  shell: DetectedShell,
+	tool: string,
+	vars: Record<string, string>,
+	shell: DetectedShell,
 ): string {
-  const entries = Object.entries(vars);
-  if (shell === "fish") {
-    const sets = entries
-      .map(([k, v]) => `    set -lx ${k} ${quote(v)}`)
-      .join("\n");
-    return [
-      `function ${tool}`,
-      sets,
-      `    command ${tool} $argv`,
-      "end",
-    ].join("\n");
-  }
-  const assigns = entries
-    .map(([k, v]) => `    ${k}=${quote(v)} \\`)
-    .join("\n");
-  return [`${tool}() {`, assigns, `    command ${tool} "$@"`, "}"].join("\n");
+	const entries = Object.entries(vars);
+	if (shell === "fish") {
+		const sets = entries
+			.map(([k, v]) => `    set -lx ${k} ${quote(v)}`)
+			.join("\n");
+		return [`function ${tool}`, sets, `    command ${tool} $argv`, "end"].join(
+			"\n",
+		);
+	}
+	const assigns = entries.map(([k, v]) => `    ${k}=${quote(v)} \\`).join("\n");
+	return [`${tool}() {`, assigns, `    command ${tool} "$@"`, "}"].join("\n");
 }
 
 /**
@@ -220,42 +219,42 @@ export function buildScopedToolFunction(
  * Returns the path that was written for the caller to surface.
  */
 export function persistBlockToRc(
-  shell: DetectedShell,
-  block: string,
-  markers: { begin: string; end: string } = {
-    begin: BLOCK_BEGIN,
-    end: BLOCK_END,
-  },
+	shell: DetectedShell,
+	block: string,
+	markers: { begin: string; end: string } = {
+		begin: BLOCK_BEGIN,
+		end: BLOCK_END,
+	},
 ): string {
-  const file = rcPath(shell);
-  const dir = path.dirname(file);
-  fs.mkdirSync(dir, { recursive: true });
-  const wrapped = `${markers.begin}\n${block}\n${markers.end}\n`;
+	const file = rcPath(shell);
+	const dir = path.dirname(file);
+	fs.mkdirSync(dir, { recursive: true });
+	const wrapped = `${markers.begin}\n${block}\n${markers.end}\n`;
 
-  let existing = "";
-  try {
-    existing = fs.readFileSync(file, "utf8");
-  } catch {
-    // ENOENT - fresh file
-  }
+	let existing = "";
+	try {
+		existing = fs.readFileSync(file, "utf8");
+	} catch {
+		// ENOENT - fresh file
+	}
 
-  const marker = new RegExp(
-    `${escapeRegex(markers.begin)}[\\s\\S]*?${escapeRegex(markers.end)}\\n?`,
-    "m",
-  );
-  let next: string;
-  if (marker.test(existing)) {
-    next = existing.replace(marker, wrapped);
-  } else {
-    const needsNewline = existing.length > 0 && !existing.endsWith("\n");
-    next = existing + (needsNewline ? "\n" : "") + "\n" + wrapped;
-  }
-  fs.writeFileSync(file, next);
-  return file;
+	const marker = new RegExp(
+		`${escapeRegex(markers.begin)}[\\s\\S]*?${escapeRegex(markers.end)}\\n?`,
+		"m",
+	);
+	let next: string;
+	if (marker.test(existing)) {
+		next = existing.replace(marker, wrapped);
+	} else {
+		const needsNewline = existing.length > 0 && !existing.endsWith("\n");
+		next = existing + (needsNewline ? "\n" : "") + "\n" + wrapped;
+	}
+	fs.writeFileSync(file, next);
+	return file;
 }
 
 function escapeRegex(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+	return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 /**
@@ -266,26 +265,26 @@ function escapeRegex(s: string): string {
  * was removed (idempotent — false when the file or the block was absent).
  */
 export function removeBlockFromRc(
-  shell: DetectedShell,
-  markers: { begin: string; end: string } = {
-    begin: BLOCK_BEGIN,
-    end: BLOCK_END,
-  },
+	shell: DetectedShell,
+	markers: { begin: string; end: string } = {
+		begin: BLOCK_BEGIN,
+		end: BLOCK_END,
+	},
 ): boolean {
-  const file = rcPath(shell);
-  let content: string;
-  try {
-    content = fs.readFileSync(file, "utf8");
-  } catch {
-    return false; // ENOENT
-  }
-  const re = new RegExp(
-    `\\n?${escapeRegex(markers.begin)}[\\s\\S]*?${escapeRegex(markers.end)}\\n?`,
-    "m",
-  );
-  if (!re.test(content)) return false;
-  fs.writeFileSync(file, content.replace(re, ""));
-  return true;
+	const file = rcPath(shell);
+	let content: string;
+	try {
+		content = fs.readFileSync(file, "utf8");
+	} catch {
+		return false; // ENOENT
+	}
+	const re = new RegExp(
+		`\\n?${escapeRegex(markers.begin)}[\\s\\S]*?${escapeRegex(markers.end)}\\n?`,
+		"m",
+	);
+	if (!re.test(content)) return false;
+	fs.writeFileSync(file, content.replace(re, ""));
+	return true;
 }
 
 /**
@@ -298,27 +297,27 @@ export function removeBlockFromRc(
 export type PersistChoice = "yes" | "no" | "never" | "skip";
 
 export async function askPersistChoice(
-  rcPathHint: string,
-  tool: string,
+	rcPathHint: string,
+	tool: string,
 ): Promise<PersistChoice> {
-  if (!process.stdin.isTTY) return "skip";
+	if (!process.stdin.isTTY) return "skip";
 
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
-  const ans = await new Promise<string>((resolve) => {
-    rl.question(
-      `Install env vars to ${rcPathHint} so that next time the plain \`${tool}\` command keeps capturing telemetry data? [Y/n/never] `,
-      (a) => resolve(a),
-    );
-  });
-  rl.close();
+	const rl = readline.createInterface({
+		input: process.stdin,
+		output: process.stdout,
+	});
+	const ans = await new Promise<string>((resolve) => {
+		rl.question(
+			`Install env vars to ${rcPathHint} so that next time the plain \`${tool}\` command keeps capturing telemetry data? [Y/n/never] `,
+			(a) => resolve(a),
+		);
+	});
+	rl.close();
 
-  const norm = ans.trim().toLowerCase();
-  if (norm === "" || norm === "y" || norm === "yes") return "yes";
-  if (norm === "never") return "never";
-  return "no";
+	const norm = ans.trim().toLowerCase();
+	if (norm === "" || norm === "y" || norm === "yes") return "yes";
+	if (norm === "never") return "never";
+	return "no";
 }
 
 /**
@@ -344,149 +343,151 @@ export async function askPersistChoice(
  * already carries the current export set.
  */
 export async function maybeOfferIngestionShellRcPersist({
-  cfg,
-  tool,
-  vars,
+	cfg,
+	tool,
+	vars,
 }: {
-  cfg: GovernanceConfig;
-  tool: string;
-  vars: Record<string, string>;
+	cfg: GovernanceConfig;
+	tool: string;
+	vars: Record<string, string>;
 }): Promise<void> {
-  if (cfg.shell_rc_preference === "skip") return;
-  // Already wired up - the OTLP exporter env is present in this shell.
-  if (process.env.OTEL_EXPORTER_OTLP_ENDPOINT) return;
-  if (Object.keys(vars).length === 0) return;
+	if (cfg.shell_rc_preference === "skip") return;
+	// Already wired up - the OTLP exporter env is present in this shell.
+	if (process.env.OTEL_EXPORTER_OTLP_ENDPOINT) return;
+	if (Object.keys(vars).length === 0) return;
 
-  const appTarget = appSettingsTargetFor(tool);
-  if (appTarget) {
-    if (appEnvHasAllVars(appTarget, vars)) return;
-    console.log();
-    const choice = await askPersistChoice(appTarget.displayPath, tool);
-    if (choice === "skip" || choice === "no") return;
-    if (choice === "never") {
-      recordNeverChoice(cfg);
-      return;
-    }
-    try {
-      installAppEnv(appTarget, vars);
-      console.log(
-        chalk.green(
-          `  ✓ Installed langwatch telemetry exports to ${appTarget.displayPath}`,
-        ),
-      );
-    } catch (err) {
-      console.log(
-        chalk.yellow(
-          `  ! Couldn't write to ${appTarget.displayPath}: ${(err as Error).message}`,
-        ),
-      );
-    }
-    return;
-  }
+	const appTarget = appSettingsTargetFor(tool);
+	if (appTarget) {
+		if (appEnvHasAllVars(appTarget, vars)) return;
+		console.log();
+		const choice = await askPersistChoice(appTarget.displayPath, tool);
+		if (choice === "skip" || choice === "no") return;
+		if (choice === "never") {
+			recordNeverChoice(cfg);
+			return;
+		}
+		try {
+			installAppEnv(appTarget, vars);
+			console.log(
+				chalk.green(
+					`  ✓ Installed langwatch telemetry exports to ${appTarget.displayPath}`,
+				),
+			);
+		} catch (err) {
+			console.log(
+				chalk.yellow(
+					`  ! Couldn't write to ${appTarget.displayPath}: ${(err as Error).message}`,
+				),
+			);
+		}
+		return;
+	}
 
-  // codex has a native app-scoped target too: its [otel] block in
-  // ~/.codex/config.toml takes an inline Authorization header, so the
-  // ingest token scopes to codex runs instead of leaking into every
-  // shell child via the profile rc. The wrapper already wrote the
-  // endpoint-only block during setup; persisting adds the header so a
-  // plain `codex` captures.
-  if (tool === "codex") {
-    const configPath = defaultCodexConfigPath();
-    // Already persisted on a prior run — stay quiet.
-    if (codexOtelBlockHasAuthHeader(configPath)) return;
+	// codex has a native app-scoped target too: its [otel] block in
+	// ~/.codex/config.toml takes an inline Authorization header, so the
+	// ingest token scopes to codex runs instead of leaking into every
+	// shell child via the profile rc. The wrapper already wrote the
+	// endpoint-only block during setup; persisting adds the header so a
+	// plain `codex` captures.
+	if (tool === "codex") {
+		const configPath = defaultCodexConfigPath();
+		// Already persisted on a prior run — stay quiet.
+		if (codexOtelBlockHasAuthHeader(configPath)) return;
 
-    const endpointBase = vars.OTEL_EXPORTER_OTLP_ENDPOINT;
-    const token = bearerFromHeaders(vars.OTEL_EXPORTER_OTLP_HEADERS);
-    if (!endpointBase || !token) return;
+		const endpointBase = vars.OTEL_EXPORTER_OTLP_ENDPOINT;
+		const token = bearerFromHeaders(vars.OTEL_EXPORTER_OTLP_HEADERS);
+		if (!endpointBase || !token) return;
 
-    console.log();
-    const choice = await askPersistChoice(displayCodexConfigPath(), tool);
-    if (choice === "skip" || choice === "no") return;
-    if (choice === "never") {
-      recordNeverChoice(cfg);
-      return;
-    }
-    try {
-      writeCodexOtelBlock(
-        {
-          endpoint: codexTraceEndpoint(endpointBase),
-          ingestionToken: token,
-          environment: cfg.organization?.slug ?? "langwatch",
-        },
-        { persistAuthHeader: true },
-      );
-      console.log(
-        chalk.green(
-          `  ✓ Installed langwatch telemetry exports to ${displayCodexConfigPath()}`,
-        ),
-      );
-    } catch (err) {
-      console.log(
-        chalk.yellow(
-          `  ! Couldn't write to ${displayCodexConfigPath()}: ${(err as Error).message}`,
-        ),
-      );
-    }
-    return;
-  }
+		console.log();
+		const choice = await askPersistChoice(displayCodexConfigPath(), tool);
+		if (choice === "skip" || choice === "no") return;
+		if (choice === "never") {
+			recordNeverChoice(cfg);
+			return;
+		}
+		try {
+			writeCodexOtelBlock(
+				{
+					endpoint: codexTraceEndpoint(endpointBase),
+					ingestionToken: token,
+					environment: cfg.organization?.slug ?? "langwatch",
+				},
+				{ persistAuthHeader: true },
+			);
+			console.log(
+				chalk.green(
+					`  ✓ Installed langwatch telemetry exports to ${displayCodexConfigPath()}`,
+				),
+			);
+		} catch (err) {
+			console.log(
+				chalk.yellow(
+					`  ! Couldn't write to ${displayCodexConfigPath()}: ${(err as Error).message}`,
+				),
+			);
+		}
+		return;
+	}
 
-  const shell = detectShell();
-  if (!shell) return;
+	const shell = detectShell();
+	if (!shell) return;
 
-  // Every remaining tool (gemini, opencode, …) has no config-file env target
-  // and rides on generic OTEL_* names, so a global `export` would leak into
-  // every shell child. Install a scoped wrapper function that sets the
-  // telemetry env only for `<tool>` runs, under the tool's own marker pair so
-  // multiple wrappers coexist. (cursor never reaches here — it's gateway-only
-  // via allow_otel_direct=false, so Path B ingestion never resolves for it.)
-  const markers = toolMarkers(tool);
-  // Already installed for this endpoint, even if this shell hasn't sourced the
-  // rc yet (so the OTEL env isn't in process.env). Keyed on the endpoint so a
-  // stale wrapper for a different endpoint doesn't suppress installing this one.
-  if (
-    rcHasLangwatchBlock({
-      shell,
-      requiredKeys: [vars.OTEL_EXPORTER_OTLP_ENDPOINT].filter(
-        Boolean,
-      ) as string[],
-      markers,
-    })
-  ) {
-    return;
-  }
-  const target = rcPath(shell);
-  console.log();
-  const choice = await askPersistChoice(target, tool);
-  if (choice === "skip" || choice === "no") return;
-  if (choice === "never") {
-    recordNeverChoice(cfg);
-    return;
-  }
-  try {
-    const wrote = persistBlockToRc(
-      shell,
-      buildScopedToolFunction(tool, vars, shell),
-      markers,
-    );
-    console.log(
-      chalk.green(
-        `  ✓ Installed a scoped \`${tool}\` telemetry wrapper in ${wrote}`,
-      ),
-    );
-  } catch (err) {
-    console.log(
-      chalk.yellow(`  ! Couldn't write to ${target}: ${(err as Error).message}`),
-    );
-  }
+	// Every remaining tool (gemini, opencode, …) has no config-file env target
+	// and rides on generic OTEL_* names, so a global `export` would leak into
+	// every shell child. Install a scoped wrapper function that sets the
+	// telemetry env only for `<tool>` runs, under the tool's own marker pair so
+	// multiple wrappers coexist. (cursor never reaches here — it's gateway-only
+	// via allow_otel_direct=false, so Path B ingestion never resolves for it.)
+	const markers = toolMarkers(tool);
+	// Already installed for this endpoint, even if this shell hasn't sourced the
+	// rc yet (so the OTEL env isn't in process.env). Keyed on the endpoint so a
+	// stale wrapper for a different endpoint doesn't suppress installing this one.
+	if (
+		rcHasLangwatchBlock({
+			shell,
+			requiredKeys: [vars.OTEL_EXPORTER_OTLP_ENDPOINT].filter(
+				Boolean,
+			) as string[],
+			markers,
+		})
+	) {
+		return;
+	}
+	const target = rcPath(shell);
+	console.log();
+	const choice = await askPersistChoice(target, tool);
+	if (choice === "skip" || choice === "no") return;
+	if (choice === "never") {
+		recordNeverChoice(cfg);
+		return;
+	}
+	try {
+		const wrote = persistBlockToRc(
+			shell,
+			buildScopedToolFunction(tool, vars, shell),
+			markers,
+		);
+		console.log(
+			chalk.green(
+				`  ✓ Installed a scoped \`${tool}\` telemetry wrapper in ${wrote}`,
+			),
+		);
+	} catch (err) {
+		console.log(
+			chalk.yellow(
+				`  ! Couldn't write to ${target}: ${(err as Error).message}`,
+			),
+		);
+	}
 }
 
 function recordNeverChoice(cfg: GovernanceConfig): void {
-  cfg.shell_rc_preference = "skip";
-  try {
-    saveConfig(cfg);
-  } catch {
-    // best effort — a config write failure just means the next run re-asks.
-  }
+	cfg.shell_rc_preference = "skip";
+	try {
+		saveConfig(cfg);
+	} catch {
+		// best effort — a config write failure just means the next run re-asks.
+	}
 }
 
 /**
@@ -495,7 +496,7 @@ function recordNeverChoice(cfg: GovernanceConfig): void {
  * header is absent or malformed.
  */
 function bearerFromHeaders(headers: string | undefined): string | null {
-  if (!headers) return null;
-  const m = /Bearer\s+(\S+)/.exec(headers);
-  return m ? m[1]! : null;
+	if (!headers) return null;
+	const m = /Bearer\s+(\S+)/.exec(headers);
+	return m ? m[1]! : null;
 }

@@ -106,21 +106,21 @@ images:
   ## @param images.app.pullPolicy [string] App image pull policy.
   app:
     repository: langwatch/langwatch
-    tag: 3.5.0 # x-release-please-version
+    tag: 3.7.0 # x-release-please-version
     pullPolicy: IfNotPresent
   ## @param images.langwatch_nlp.repository [string] NLP image repository (Go nlpgo binary, published as langwatch_nlp).
   ## @param images.langwatch_nlp.tag [string] NLP image tag.
   ## @param images.langwatch_nlp.pullPolicy [string] NLP image pull policy.
   langwatch_nlp:
     repository: langwatch/langwatch_nlp
-    tag: 3.5.0 # x-release-please-version
+    tag: 3.7.0 # x-release-please-version
     pullPolicy: IfNotPresent
   ## @param images.langevals.repository [string] Langevals image repository.
   ## @param images.langevals.tag [string] Langevals image tag.
   ## @param images.langevals.pullPolicy [string] Langevals image pull policy.
   langevals:
     repository: langwatch/langevals
-    tag: 3.5.0 # x-release-please-version
+    tag: 3.7.0 # x-release-please-version
     pullPolicy: IfNotPresent
 
 # =============================================================================
@@ -269,12 +269,14 @@ app:
   # Controls how LangWatch stores and manages training datasets
   ## @extra app.dataplane Object storage configuration for datasets.
   ## @param app.dataplane.enabled [default: false] Enable dataset object storage.
-  ## @param app.dataplane.provider [string, default: awsS3] Object storage provider.
-  ## @param app.dataplane.bucket [string, default: langwatch-dataset] Bucket name for datasets.
+  ## @param app.dataplane.provider [string, default: awsS3] Object storage provider. Options: awsS3, azureBlob.
+  ## @param app.dataplane.bucket [string, default: langwatch-dataset] Bucket name for datasets (awsS3 provider).
   dataplane:
     enabled: false
-    # Storage provider to use. Options: awsS3 (default)
-    # When set to 'awsS3', enables AWS S3 native integration
+    # Storage provider to use. Options: awsS3 (default), azureBlob.
+    # When set to 'awsS3', enables AWS S3 native integration.
+    # When set to 'azureBlob', enables Azure Blob Storage (STORED_OBJECTS_BACKEND=azure,
+    # AC37 / issue #4133) — SharedKey auth only, mirrors the awsS3 shape.
     provider: awsS3
     bucket: "langwatch-dataset" # Bucket name for dataset storage
 
@@ -303,6 +305,43 @@ app:
           value: ""
           ## @param app.dataplane.providers.awsS3.keySalt.secretKeyRef [object] Secret ref for optional key salt.
           secretKeyRef: { name: "", key: "" }
+
+      # Azure Blob Storage configuration for dataset + stored-objects storage
+      # (AC37, issue #4133). SharedKey auth only — workload identity is a later
+      # issue (#6087), per-project Azure BYOC is #6088.
+      ## @extra app.dataplane.providers.azureBlob Azure Blob provider configuration.
+      ## @param app.dataplane.providers.azureBlob.accountName.value [string] Azure Storage account name (not recommended in production — use accountName.secretKeyRef).
+      ## @param app.dataplane.providers.azureBlob.accountKey.value [string] Azure Storage account key (not recommended in production — use accountKey.secretKeyRef).
+      ## @param app.dataplane.providers.azureBlob.container.value [string] Azure Blob container name (not recommended in production — use container.secretKeyRef).
+      azureBlob:
+        accountName:
+          value: ""
+          ## @param app.dataplane.providers.azureBlob.accountName.secretKeyRef [object] Secret ref for the Azure Storage account name.
+          secretKeyRef: { name: "", key: "" }
+        accountKey:
+          value: ""
+          ## @param app.dataplane.providers.azureBlob.accountKey.secretKeyRef [object] Secret ref for the Azure Storage account key.
+          secretKeyRef: { name: "", key: "" }
+        container:
+          value: ""
+          ## @param app.dataplane.providers.azureBlob.container.secretKeyRef [object] Secret ref for the Azure Blob container name.
+          secretKeyRef: { name: "", key: "" }
+        # Optional. Override the blob endpoint for sovereign clouds
+        # (*.usgovcloudapi.net, *.chinacloudapi.cn), private endpoints, or an
+        # emulator. Defaults to https://{accountName}.blob.core.windows.net.
+        ## @param app.dataplane.providers.azureBlob.endpoint.value [string] Custom Azure Blob endpoint base URL.
+        endpoint:
+          value: ""
+          ## @param app.dataplane.providers.azureBlob.endpoint.secretKeyRef [object] Secret ref for a custom Azure Blob endpoint.
+          secretKeyRef: { name: "", key: "" }
+
+      # Migration aid: when provider is azureBlob, the chart still emits the
+      # S3 read config below if it is populated, so legacy s3:// objects
+      # (stored-objects, trace spool, staged payloads) written before the
+      # switch stay readable. New writes go to Azure. Leave empty on a
+      # greenfield Azure install.
+      ## @param app.dataplane.legacyS3ReadBucket [string] Existing S3 bucket to keep reading during an S3->Azure migration.
+    legacyS3ReadBucket: ""
 
   # Stored Objects - externalized byte content (audio, image, PDF, document).
   # By default, uses a local-filesystem PVC so the chart works plug-and-play
@@ -569,6 +608,16 @@ app:
     strategy: {}
     ## @param app.deployment.revisionHistoryLimit [default: 10] Number of old replicasets to retain.
     revisionHistoryLimit: 10
+  # Release flags this install forces ON, comma-separated, regardless of the
+  # flag store. Reach for it to switch on a feature that ships dark by default;
+  # the flag keys are listed in the app's /ops/feature-flags screen. Forcing a
+  # flag on here also means it cannot be turned off from that screen — the env
+  # var wins — so prefer the store for anything you want to toggle later.
+  # The Langy assistant appends its own key here when the agent is deployed;
+  # see the langyagent section at the bottom of this file.
+  ## @param app.featureFlagForceEnable [string, default: ""] Comma-separated feature flag keys to force on for this install.
+  featureFlagForceEnable: ""
+
   # Additional Kubernetes resources
   # Extra environment variables
   # See: https://kubespec.dev/v1/Pod#spec.containers.env
@@ -1580,6 +1629,9 @@ gateway:
   ## @param gateway.publicUrl [string, default: ""] Externally-reachable URL of the AI Gateway (e.g. https://gateway.your-corp.com). The control plane hands this to CLI users (langwatch claude/codex/cursor) at login. REQUIRED for self-hosted CLI/agentic use: without it the CLI falls back to http://localhost:5563, which a developer laptop cannot reach against a remote cluster. Leave empty to auto-derive from gateway.ingress.host when you set your own host. Set LANGWATCH_GATEWAY_URL on the client to override per-user.
   publicUrl: ""
 
+  ## @param gateway.internalUrl [string, default: ""] URL the control plane itself uses to reach the gateway, from inside the cluster. Distinct from publicUrl, which is for browsers and laptops: an install with no gateway ingress still needs this, and Langy refuses every turn without it. Empty derives the Service this chart renders, so set it only for a gateway that lives outside this release or behind a mesh address.
+  internalUrl: ""
+
   # The gateway needs its OWN externally-reachable endpoint, separate from
   # the main app — point a second ingress / load balancer at gateway.ingress
   # below (the LLM clients hit the gateway, the browser hits the app). The
@@ -1590,9 +1642,9 @@ gateway:
   # PDB, SecurityContext) live in charts/gateway/values.yaml. Common
   # umbrella-level overrides below; everything else inherits.
 
-  ## @param gateway.controlPlane.baseUrl [string, default: http://langwatch-app:5560] URL the gateway uses to reach langwatch-app. Defaults assume release name `langwatch`.
+  ## @param gateway.controlPlane.baseUrl [string, default: ""] URL the gateway uses to reach the app. Empty resolves to this install's own app Service, `<release>-app:5560`. Set it for a control plane outside this install, or an app served on another port.
   controlPlane:
-    baseUrl: http://langwatch-app:5560
+    baseUrl: ""
 
   ## @param gateway.secrets.existingSecretName [string, default: langwatch-app-secrets] Name of the Secret the gateway pod mounts for LW_GATEWAY_INTERNAL_SECRET + LW_GATEWAY_JWT_SECRET. this release collapsed gateway-auth into the umbrella's app Secret so both langwatch-app and the gateway pod mount the SAME Secret. Default matches the autogen app-secret name when release name is `langwatch`. If you override the release name OR set `autogen.secretNames.app` / `secrets.existingSecret`, set this to the same Secret name so the gateway subchart bridges to it.
   secrets:
@@ -1628,29 +1680,80 @@ gateway:
 ## assistant. Internal-only (no ingress); the control plane reaches it over
 ## cluster DNS. The subchart defaults (image, probes, NetworkPolicy,
 ## SecurityContext, single-replica) live in charts/langyagent/values.yaml.
-## `langyagent.chartManaged: false` (the default) disables the agent and the
-## app's wiring to it; flip to true once the prerequisite secret + opt-in
-## steps are done (see docs/langy-github-app.md).
 ##
-## WHY default off: the agent + app Deployments both reference a `secretKeyRef`
-## to `langwatch-langyagent-auth` (created out-of-band — terraform / external-
-## secrets / a manual `kubectl create secret`). The umbrella chart does NOT
-## materialise that secret, so an upgrade with chartManaged=true on top of a
-## values file that hasn't been prepared yields `CreateContainerConfigError`
-## on the main app pod — turning an optional, dark-by-flag feature into a
-## blocker for every operator's next upgrade. Default-off keeps existing
-## installs unaffected; operators flip the switch when they're ready.
+## Langy ships ENABLED: a plain `helm install` deploys the agent, wires the app
+## and workers to it, and opens the assistant to the install's users. The shared
+## LANGY_INTERNAL_SECRET lands in the app Secret alongside the gateway's pair.
+## There is no out-of-band `kubectl create secret` step and no internal screen to
+## visit. What Langy still needs from you is a model to talk to: configure a model
+## provider for the project as you would for any other LangWatch feature.
+##
+## ISOLATION. The agent runs shell written by a language model, and the workers
+## hold the requesting user's credentials, so the controls that bound that are
+## on by DEFAULT and cost nothing: each conversation's worker runs under its own
+## UID with its own credentials, workers cannot read each other's, the per-worker
+## opencode password separates them, and the NetworkPolicy denies egress to the
+## internet unless you turn it on.
+##
+## Those are the controls that stop the attack that actually happens: a worker
+## reached by prompt injection through ingested data, using its own legitimate
+## access to exfiltrate. They work identically on every cluster.
+##
+## A sandboxed RuntimeClass (gvisor, Kata) is the rung ABOVE that: it protects
+## the node kernel from a worker that escapes its container, which needs a kernel
+## exploit on top of the injection. It is worth having, and it is deliberately
+## NOT the default here, because it behaves differently on every cluster (node
+## image, containerd version, runsc build) and a default we cannot test on your
+## nodes fails in ways that look like Langy being broken. Harden into it once,
+## on purpose, per the guide:
+##
+##   https://docs.langwatch.ai/self-hosting/langy/setup#hardening-a-sandboxed-runtime
+##
+##   langyagent:
+##     runtimeClassName: "gvisor"          # or your Kata class on AKS
+##     acceptUnsandboxedRuntime: false
+##
+## The install notes tell you which posture you got, and point at the guide when
+## your cluster already offers a sandboxed class you are not using.
+##
+## To not run Langy at all: langyagent.chartManaged: false removes the pod and
+## every reference to it.
 ## NOTE: hyphenated key — reference as (index .Values "langyagent") in templates.
 langyagent:
-  ## @param langyagent.chartManaged [default: false] Lift the Langy agent pod as part of this chart. Default off so existing upgrades aren't broken by the absent shared Secret; opt in once the LANGY_INTERNAL_SECRET secret is created out-of-band.
-  chartManaged: false
+  ## @param langyagent.chartManaged [default: true] Deploy the Langy agent pod as part of this chart, wire the app and workers to it, and open the assistant to this install. Set false to run without the assistant; the pod and every reference to it are removed on the next upgrade.
+  chartManaged: true
 
-  ## @param langyagent.controlPlane.agentUrl [string, default: http://<release>-langyagent:80] URL the app uses to reach the agent Service. Leave empty to auto-derive from the release name.
+  ## @param langyagent.runtimeClassName [string, default: ""] RuntimeClass for the agent pod. Empty runs on the node's normal runtime, which works on any cluster. Set it to a sandboxed class to harden ("gvisor", or your Kata class on AKS) and drop acceptUnsandboxedRuntime to false alongside it. See the hardening guide linked above.
+  runtimeClassName: ""
+
+  ## @param langyagent.acceptUnsandboxedRuntime [default: true] Accept running the agent without a pod-to-host sandbox. Default true so the chart installs and works on any cluster. Setting it false without also setting runtimeClassName is refused at render time, so a cluster that has hardened cannot silently lose its sandbox.
+  acceptUnsandboxedRuntime: true
+
+  ## @param langyagent.enableForAllUsers [default: true] Make Langy available to everyone in this install as soon as the agent is deployed. Set false to keep the rollout flag authoritative and open Langy to chosen projects/orgs from /ops/feature-flags instead — the staged path the hosted product uses.
+  enableForAllUsers: true
+
+  ## @param langyagent.controlPlane.agentUrl [string, default: http://<release>-langyagent:80] URL the app and workers use to reach the agent Service. Leave empty to auto-derive from the release name.
   controlPlane:
     agentUrl: ""
 
-  ## @param langyagent.secrets.existingSecretName [string, default: langwatch-langyagent-auth] Secret carrying LANGY_INTERNAL_SECRET, shared between the app and the agent pod. Created out-of-band (terraform / external-secrets); the umbrella chart does NOT materialise it.
-  ## @param langyagent.secrets.internalSecretKey [string, default: LANGY_INTERNAL_SECRET] Key inside the existing Secret that holds the shared internal secret.
+  ## @param langyagent.secrets.existingSecretName [string, default: the app Secret] Secret carrying LANGY_INTERNAL_SECRET, shared by the app, the workers, and the agent pod. Defaults to this chart's own app Secret, which materialises the key for you (generated when autogen.enabled, supplied by you otherwise — add LANGY_INTERNAL_SECRET to your existing Secret in that case). Point it elsewhere only if the value is managed by external-secrets or terraform.
+  ## @param langyagent.secrets.internalSecretKey [string, default: LANGY_INTERNAL_SECRET] Key inside that Secret holding the shared value.
   secrets:
-    existingSecretName: langwatch-langyagent-auth
+    existingSecretName: langwatch-app-secrets
     internalSecretKey: LANGY_INTERNAL_SECRET
+
+  # Watch Langy work with LangWatch itself. Point the mirror at one of your own
+  # projects and every Langy turn lands there as a trace: the model calls it
+  # made, the tools it ran, what each cost. Two steps, because only you can say
+  # which project: create an API key in that project, put it in a Secret, and
+  # name the Secret here. The endpoint resolves to this install automatically.
+  #
+  #   read -rsp "Mirror project API key: " KEY
+  #   kubectl -n <namespace> create secret generic langwatch-langyagent-mirror \
+  #     --from-env-file=/dev/stdin <<< "LANGY_MIRROR_TRACE_KEY=$KEY"; unset KEY
+  #
+  ## @param langyagent.mirror.existingSecretName [string, default: ""] Secret holding the mirror project's API key. Empty leaves the mirror off.
+  ## @param langyagent.mirror.traceEndpoint [string, default: ""] LangWatch base URL to mirror into. Empty means this install's own app Service; set it to mirror into a different deployment.
+  mirror:
+    existingSecretName: ""
+    traceEndpoint: ""

@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   findPromptReferenceInAncestors,
   flattenParamsToPromptAttributes,
@@ -272,7 +272,12 @@ describe("findPromptReferenceInAncestors()", () => {
       // returns null so the panel falls back to the prompt's declared
       // inputs without injected noise.
       const spans = [
-        { spanId: "parent-span", parentSpanId: null, startTime: 100, attributes: {} },
+        {
+          spanId: "parent-span",
+          parentSpanId: null,
+          startTime: 100,
+          attributes: {},
+        },
         {
           spanId: "get-span",
           parentSpanId: "parent-span",
@@ -281,11 +286,19 @@ describe("findPromptReferenceInAncestors()", () => {
             "langwatch.prompt.id": "support-router:6",
             "langwatch.prompt.variables": JSON.stringify({
               type: "json",
-              value: { prompt_id: "prompt_gg9YhtFllFNrMixRXXslv", tag: "production" },
+              value: {
+                prompt_id: "prompt_gg9YhtFllFNrMixRXXslv",
+                tag: "production",
+              },
             }),
           },
         },
-        { spanId: "llm-span", parentSpanId: "parent-span", startTime: 200, attributes: {} },
+        {
+          spanId: "llm-span",
+          parentSpanId: "parent-span",
+          startTime: 200,
+          attributes: {},
+        },
       ];
 
       const result = findPromptReferenceInAncestors({
@@ -306,7 +319,12 @@ describe("findPromptReferenceInAncestors()", () => {
       // engine injects). The Variables panel must show only the
       // user-declared template vars.
       const spans = [
-        { spanId: "parent-span", parentSpanId: null, startTime: 100, attributes: {} },
+        {
+          spanId: "parent-span",
+          parentSpanId: null,
+          startTime: 100,
+          attributes: {},
+        },
         {
           spanId: "compile-span",
           parentSpanId: "parent-span",
@@ -326,7 +344,12 @@ describe("findPromptReferenceInAncestors()", () => {
             }),
           },
         },
-        { spanId: "llm-span", parentSpanId: "parent-span", startTime: 200, attributes: {} },
+        {
+          spanId: "llm-span",
+          parentSpanId: "parent-span",
+          startTime: 200,
+          attributes: {},
+        },
       ];
 
       const result = findPromptReferenceInAncestors({

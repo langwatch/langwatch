@@ -1,10 +1,10 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
 
-import {
-  type LangyGithubInstallationRow,
-  type LangyGithubInstallationsRepository,
-  type LangyGithubRepositoryRef,
-  type UpsertLangyGithubInstallationInput,
+import type {
+  LangyGithubInstallationRow,
+  LangyGithubInstallationsRepository,
+  LangyGithubRepositoryRef,
+  UpsertLangyGithubInstallationInput,
 } from "./langy-github-installations.repository";
 
 function parseRepositories(
@@ -111,6 +111,40 @@ export class PrismaLangyGithubInstallationsRepository
         repositories,
       },
     });
+  }
+
+  async insertOrGetExisting(
+    input: UpsertLangyGithubInstallationInput,
+  ): Promise<{ wasInserted: boolean; row: LangyGithubInstallationRow }> {
+    try {
+      const created = await this.prisma.langyGithubInstallation.create({
+        data: {
+          installationId: input.installationId,
+          organizationId: input.organizationId,
+          accountLogin: input.accountLogin,
+          accountType: input.accountType,
+          accountId: input.accountId,
+          repositorySelection: input.repositorySelection,
+          repositories: reposToJson(input.repositories),
+          suspendedAt: null,
+        },
+      });
+      return { wasInserted: true, row: toRow(created) };
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        // Another request already committed this installationId first — the
+        // unique index is the atomicity guarantee, not a check we ran
+        // ourselves, so this read always sees the winner's committed row.
+        const existing = await this.prisma.langyGithubInstallation.findUnique({
+          where: { installationId: input.installationId },
+        });
+        if (existing) return { wasInserted: false, row: toRow(existing) };
+      }
+      throw error;
+    }
   }
 
   async setRepositories({

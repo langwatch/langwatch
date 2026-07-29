@@ -1,9 +1,6 @@
 import { createProjectApp } from "~/server/api/security";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
-import {
-  type EvaluatorAppVariables,
-  registerEvaluatorRoutes,
-} from "./app.v1";
+import { type EvaluatorAppVariables, registerEvaluatorRoutes } from "./app.v1";
 
 patchZodOpenapi();
 

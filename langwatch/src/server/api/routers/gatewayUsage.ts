@@ -11,21 +11,29 @@ import {
 } from "~/server/clickhouse/clickhouseClient";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import { GatewayUsageService } from "~/server/gateway/usage.service";
+import { GatewayVirtualKeySpendRepository } from "~/server/gateway/virtualKeySpend.clickhouse.repository";
 
 import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
-function chRepoOrUndefined() {
+async function resolveClient(projectId: string) {
+  const client = await getClickHouseClientForProject(projectId);
+  if (!client) {
+    throw new Error(
+      `ClickHouse enabled but no client for project ${projectId}`,
+    );
+  }
+  return client;
+}
+
+export function chRepoOrUndefined() {
   if (!isClickHouseEnabled()) return undefined;
-  return new GatewayBudgetClickHouseRepository(async (projectId) => {
-    const client = await getClickHouseClientForProject(projectId);
-    if (!client) {
-      throw new Error(
-        `ClickHouse enabled but no client for project ${projectId}`,
-      );
-    }
-    return client;
-  });
+  return new GatewayBudgetClickHouseRepository(resolveClient);
+}
+
+export function spendRepoOrUndefined() {
+  if (!isClickHouseEnabled()) return undefined;
+  return new GatewayVirtualKeySpendRepository(resolveClient);
 }
 
 export const gatewayUsageRouter = createTRPCRouter({
@@ -39,7 +47,11 @@ export const gatewayUsageRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("gatewayUsage:view"))
     .query(async ({ ctx, input }) => {
-      const service = GatewayUsageService.create(ctx.prisma, chRepoOrUndefined());
+      const service = GatewayUsageService.create({
+        prisma: ctx.prisma,
+        chRepo: chRepoOrUndefined(),
+        spendRepo: spendRepoOrUndefined(),
+      });
       return service.summary(input.projectId, {
         fromDate: new Date(input.fromDate),
         toDate: new Date(input.toDate),
@@ -57,14 +69,14 @@ export const gatewayUsageRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("virtualKeys:view"))
     .query(async ({ ctx, input }) => {
-      const service = GatewayUsageService.create(ctx.prisma, chRepoOrUndefined());
-      return service.summaryForVirtualKey(
-        input.projectId,
-        input.virtualKeyId,
-        {
-          fromDate: new Date(input.fromDate),
-          toDate: new Date(input.toDate),
-        },
-      );
+      const service = GatewayUsageService.create({
+        prisma: ctx.prisma,
+        chRepo: chRepoOrUndefined(),
+        spendRepo: spendRepoOrUndefined(),
+      });
+      return service.summaryForVirtualKey(input.projectId, input.virtualKeyId, {
+        fromDate: new Date(input.fromDate),
+        toDate: new Date(input.toDate),
+      });
     }),
 });

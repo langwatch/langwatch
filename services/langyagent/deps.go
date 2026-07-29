@@ -55,10 +55,15 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 	// The relay also keeps LangWatch's own content-stripped copy of worker
 	// telemetry, shipped to the same collector the manager's spans go to. With
 	// no collector configured the second export is simply not installed.
+	// The same bounded second lane also carries the mirror (ADR-061): a tiered
+	// copy of each worker batch into the operator-designated mirror project.
+	// Unset mirror config (the default) leaves that destination dormant.
 	internalEndpoint, internalHeaders := cfg.OTel.PrimaryOTLP()
 	relay, err := otelrelay.New(ctx, otelrelay.Options{
 		InternalOTLPEndpoint: internalEndpoint,
 		InternalOTLPHeaders:  internalHeaders,
+		MirrorEndpoint:       cfg.MirrorTraceEndpoint,
+		MirrorKey:            cfg.MirrorTraceKey,
 	})
 	if err != nil {
 		return ctx, nil, fmt.Errorf("otelrelay init: %w", err)

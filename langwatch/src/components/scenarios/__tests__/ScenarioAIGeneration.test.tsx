@@ -1,9 +1,10 @@
 /**
  * @vitest-environment jsdom
  */
+
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { ScenarioAIGeneration } from "../ScenarioAIGeneration";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -85,7 +86,7 @@ describe("<ScenarioAIGeneration/>", () => {
   it("shows prompt view by default", () => {
     render(<ScenarioAIGeneration form={null} />, { wrapper: Wrapper });
 
-    expect(screen.getByText("Draft with Langy")).toBeInTheDocument();
+    expect(screen.getByText("Draft with AI")).toBeInTheDocument();
     expect(
       screen.getByText("Start from an idea, not a form."),
     ).toBeInTheDocument();

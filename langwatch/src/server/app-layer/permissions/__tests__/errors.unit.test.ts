@@ -1,6 +1,6 @@
+import { HandledError } from "@langwatch/handled-error";
 import { describe, expect, it } from "vitest";
 import { LiteMemberRestrictedError } from "../errors";
-import { HandledError } from "@langwatch/handled-error";
 
 describe("LiteMemberRestrictedError", () => {
   describe("when constructed with a resource", () => {

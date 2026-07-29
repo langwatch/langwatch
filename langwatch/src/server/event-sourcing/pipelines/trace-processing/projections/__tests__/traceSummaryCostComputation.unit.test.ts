@@ -1,7 +1,10 @@
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import { applySpanToSummary } from "../traceSummary.foldProjection";
-import { createInitState, createTestSpan } from "./fixtures/trace-summary-test.fixtures";
+import {
+  createInitState,
+  createTestSpan,
+} from "./fixtures/trace-summary-test.fixtures";
 
 describe("applySpanToSummary cost computation", () => {
   let extractSpy: ReturnType<typeof vi.spyOn>;
@@ -30,7 +33,10 @@ describe("applySpanToSummary cost computation", () => {
         },
       });
 
-      const result = applySpanToSummary({ state: createInitState(), span: span });
+      const result = applySpanToSummary({
+        state: createInitState(),
+        span: span,
+      });
 
       // 100 * 0.000005 + 50 * 0.000015 = 0.0005 + 0.00075 = 0.00125
       expect(result.totalCost).toBeCloseTo(0.00125, 6);
@@ -47,7 +53,10 @@ describe("applySpanToSummary cost computation", () => {
         },
       });
 
-      const result = applySpanToSummary({ state: createInitState(), span: span });
+      const result = applySpanToSummary({
+        state: createInitState(),
+        span: span,
+      });
 
       // gpt-4o is in the static registry, so cost should be computed
       // The exact value depends on the JSON file, but it should be > 0
@@ -66,7 +75,10 @@ describe("applySpanToSummary cost computation", () => {
         },
       });
 
-      const result = applySpanToSummary({ state: createInitState(), span: span });
+      const result = applySpanToSummary({
+        state: createInitState(),
+        span: span,
+      });
 
       expect(result.totalCost).toBeNull();
     });
@@ -80,7 +92,10 @@ describe("applySpanToSummary cost computation", () => {
         },
       });
 
-      const result = applySpanToSummary({ state: createInitState(), span: span });
+      const result = applySpanToSummary({
+        state: createInitState(),
+        span: span,
+      });
 
       expect(result.totalCost).toBeNull();
     });
@@ -96,7 +111,10 @@ describe("applySpanToSummary cost computation", () => {
         },
       });
 
-      const result = applySpanToSummary({ state: createInitState(), span: span });
+      const result = applySpanToSummary({
+        state: createInitState(),
+        span: span,
+      });
 
       expect(result.totalCost).toBeCloseTo(0.005, 6);
     });
@@ -111,7 +129,10 @@ describe("applySpanToSummary cost computation", () => {
         },
       });
 
-      const result = applySpanToSummary({ state: createInitState(), span: span });
+      const result = applySpanToSummary({
+        state: createInitState(),
+        span: span,
+      });
 
       expect(result.totalCost).toBeNull();
     });
@@ -129,7 +150,10 @@ describe("applySpanToSummary cost computation", () => {
         },
       });
 
-      const result = applySpanToSummary({ state: createInitState(), span: span });
+      const result = applySpanToSummary({
+        state: createInitState(),
+        span: span,
+      });
 
       expect(result.totalCost).toBeCloseTo(0.0042, 6);
     });
@@ -145,7 +169,10 @@ describe("applySpanToSummary cost computation", () => {
         },
       });
 
-      const result = applySpanToSummary({ state: createInitState(), span: span });
+      const result = applySpanToSummary({
+        state: createInitState(),
+        span: span,
+      });
 
       expect(result.totalCost).toBeNull();
     });
@@ -158,7 +185,10 @@ describe("applySpanToSummary cost computation", () => {
         },
       });
 
-      const result = applySpanToSummary({ state: createInitState(), span: span });
+      const result = applySpanToSummary({
+        state: createInitState(),
+        span: span,
+      });
 
       expect(result.totalCost).toBeNull();
     });
@@ -174,7 +204,10 @@ describe("applySpanToSummary cost computation", () => {
         },
       });
 
-      const result = applySpanToSummary({ state: createInitState(), span: span });
+      const result = applySpanToSummary({
+        state: createInitState(),
+        span: span,
+      });
 
       expect(result.totalPromptTokenCount).toBe(100);
       expect(result.totalCompletionTokenCount).toBe(50);
@@ -194,7 +227,10 @@ describe("applySpanToSummary cost computation", () => {
         },
       });
 
-      const result = applySpanToSummary({ state: createInitState(), span: span });
+      const result = applySpanToSummary({
+        state: createInitState(),
+        span: span,
+      });
 
       // 100 * 0.00001 + 50 * 0 = 0.001
       expect(result.totalCost).toBeCloseTo(0.001, 6);
@@ -226,7 +262,10 @@ describe("applySpanToSummary guardrail blocking detection", () => {
         },
       });
 
-      const result = applySpanToSummary({ state: createInitState(), span: span });
+      const result = applySpanToSummary({
+        state: createInitState(),
+        span: span,
+      });
 
       expect(result.blockedByGuardrail).toBe(true);
     });
@@ -241,7 +280,10 @@ describe("applySpanToSummary guardrail blocking detection", () => {
         },
       });
 
-      const result = applySpanToSummary({ state: createInitState(), span: span });
+      const result = applySpanToSummary({
+        state: createInitState(),
+        span: span,
+      });
 
       expect(result.blockedByGuardrail).toBe(false);
     });
@@ -255,7 +297,10 @@ describe("applySpanToSummary guardrail blocking detection", () => {
         },
       });
 
-      const result = applySpanToSummary({ state: createInitState(), span: span });
+      const result = applySpanToSummary({
+        state: createInitState(),
+        span: span,
+      });
 
       expect(result.blockedByGuardrail).toBe(false);
     });
@@ -318,7 +363,11 @@ describe("applySpanToSummary token timing from OTel instrumentation events (@reg
         endTimeUnixMs: 3000,
         durationMs: 2000,
         events: [
-          { name: "First Token Stream Event", timeUnixMs: 1200, attributes: {} },
+          {
+            name: "First Token Stream Event",
+            timeUnixMs: 1200,
+            attributes: {},
+          },
         ],
       });
 
@@ -366,9 +415,7 @@ describe("applySpanToSummary token timing from OTel instrumentation events (@reg
         startTimeUnixMs: 1000,
         endTimeUnixMs: 4000,
         durationMs: 3000,
-        events: [
-          { name: "first_token", timeUnixMs: 1300, attributes: {} },
-        ],
+        events: [{ name: "first_token", timeUnixMs: 1300, attributes: {} }],
         spanAttributes: {
           "gen_ai.server.time_to_first_token": 500,
         },

@@ -36,15 +36,36 @@ describe("safeRedirectTarget", () => {
     });
 
     it("allows nested paths with query and hash", () => {
-      expect(
-        safeRedirectTarget("/dashboard?org=acme#section", ORIGIN),
-      ).toBe("/dashboard?org=acme#section");
+      expect(safeRedirectTarget("/dashboard?org=acme#section", ORIGIN)).toBe(
+        "/dashboard?org=acme#section",
+      );
     });
   });
 
   describe("when the callbackUrl is a protocol-relative URL (//evil.com)", () => {
     it("blocks the redirect and falls back to /", () => {
       expect(safeRedirectTarget("//evil.com/steal", ORIGIN)).toBe("/");
+    });
+  });
+
+  describe("when the callbackUrl uses backslashes in place of slashes (@regression)", () => {
+    // The WHATWG URL parser treats `\` as `/` for special schemes, so a
+    // leading `/\`, `\/`, or `\\` is authority-introducing exactly like
+    // `//` — a naive `startsWith("//")` check misses it entirely.
+    it("blocks /\\evil.com", () => {
+      expect(safeRedirectTarget("/\\evil.com/steal", ORIGIN)).toBe("/");
+    });
+
+    it("blocks \\/evil.com", () => {
+      expect(safeRedirectTarget("\\/evil.com/steal", ORIGIN)).toBe("/");
+    });
+
+    it("blocks \\\\evil.com", () => {
+      expect(safeRedirectTarget("\\\\evil.com/steal", ORIGIN)).toBe("/");
+    });
+
+    it("allows a single backslash inside an otherwise same-origin path", () => {
+      expect(safeRedirectTarget("\\settings", ORIGIN)).toBe("/settings");
     });
   });
 
@@ -58,9 +79,9 @@ describe("safeRedirectTarget", () => {
     });
 
     it("blocks a subdomain of the same root domain", () => {
-      expect(
-        safeRedirectTarget("https://evil.app.example.com/", ORIGIN),
-      ).toBe("/");
+      expect(safeRedirectTarget("https://evil.app.example.com/", ORIGIN)).toBe(
+        "/",
+      );
     });
   });
 
@@ -104,10 +125,7 @@ describe("safeRedirectTarget", () => {
 
     it("blocks data: URLs", () => {
       expect(
-        safeRedirectTarget(
-          "data:text/html,<script>alert(1)</script>",
-          ORIGIN,
-        ),
+        safeRedirectTarget("data:text/html,<script>alert(1)</script>", ORIGIN),
       ).toBe("/");
     });
 

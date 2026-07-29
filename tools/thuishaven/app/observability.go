@@ -9,74 +9,22 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
-// RunObservability dispatches the `haven observability <sub>` group: manual
-// control over the shared LGTM stack every worktree exports to.
-func (o *Orchestrator) RunObservability(ctx context.Context, args []string) error {
-	sub := "status"
-	if len(args) > 0 {
-		sub = args[0]
+// ObservabilityLogs streams the shared LGTM container's docker logs — the
+// `haven logs obs` target, so the observability stack is a log target like
+// any service.
+func (o *Orchestrator) ObservabilityLogs(ctx context.Context, follow bool) error {
+	if o.container == nil {
+		return fmt.Errorf("no container runtime configured")
 	}
-	switch sub {
-	case "status":
-		return o.observabilityStatus(ctx)
-	case "up":
-		return o.observabilityUp(ctx)
-	case "down":
-		return o.observabilityDown(ctx)
-	default:
-		return fmt.Errorf("unknown `haven observability` subcommand %q (want status|up|down)", sub)
-	}
-}
-
-// observabilityUp starts the stack and routes its hostname. Stacks that are
-// already running keep exporting wherever they were pointed when they booted —
-// the overlay is written at `up` — so say so rather than let someone wonder why
-// Grafana is empty.
-func (o *Orchestrator) observabilityUp(ctx context.Context) error {
-	endpoints, err := o.obs.Ensure(ctx)
+	dockerHost, err := o.container.Ensure(ctx)
 	if err != nil {
 		return err
 	}
-	o.routeObservability()
-
-	fmt.Printf("observability stack up\n")
-	fmt.Printf("  grafana   : %s  (anonymous Admin, or admin/admin)\n", endpoints.GrafanaURL())
-	fmt.Printf("  otlp      : %s\n", endpoints.OTLPHTTPURL())
-	if url := o.sharedURL(domain.ObservabilityService); url != "" {
-		fmt.Printf("  hostname  : %s\n", url)
+	shell := "docker logs --tail 200 " + domain.ObservabilityContainer
+	if follow {
+		shell = "docker logs --tail 200 -f " + domain.ObservabilityContainer
 	}
-	if n := len(o.store.Stacks()); n > 0 {
-		fmt.Printf("\n%d stack(s) are already running and were wired before this existed.\n", n)
-		fmt.Printf("Restart them (`haven restart`) to export into it.\n")
-	}
-	fmt.Printf("\nNext: make observability-connect   # mint a Grafana token + configure gcx\n")
-	return nil
-}
-
-// observabilityDown removes the stack. Its telemetry goes with it — there is no
-// volume, by design.
-func (o *Orchestrator) observabilityDown(ctx context.Context) error {
-	if err := o.obs.Stop(ctx); err != nil {
-		return err
-	}
-	o.proxy.Remove(domain.ObservabilityService, "")
-	fmt.Println("observability stack down (collected telemetry discarded)")
-	return nil
-}
-
-func (o *Orchestrator) observabilityStatus(ctx context.Context) error {
-	ok, detail := o.obs.Health(ctx)
-	state := "down"
-	if ok {
-		state = "up"
-	}
-	fmt.Printf("observability: %s (%s)\n", state, detail)
-	if ok {
-		if url := o.sharedURL(domain.ObservabilityService); url != "" {
-			fmt.Printf("  hostname : %s\n", url)
-		}
-	}
-	return nil
+	return o.sup.RunOnce(ctx, "obs", o.cfg.RepoRoot, shell, []string{"DOCKER_HOST=" + dockerHost})
 }
 
 // linkObservability records the collector's port on the stack — which is what

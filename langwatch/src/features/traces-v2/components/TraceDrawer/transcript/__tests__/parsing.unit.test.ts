@@ -225,13 +225,50 @@ describe("parseContentBlocks", () => {
   });
 
   describe("given a non-audio file content part", () => {
-    it("falls through to a raw block, unchanged", () => {
+    it("renders it as an attachment media block instead of raw JSON", () => {
       const blocks = parseContentBlocks([
         { type: "file", mediaType: "application/pdf", data: "QUJD" },
       ]);
 
       expect(blocks).toHaveLength(1);
-      expect(blocks[0]).toMatchObject({ kind: "raw" });
+      expect(blocks[0]).toMatchObject({
+        kind: "media",
+        part: { type: "binary", mimeType: "application/pdf" },
+      });
+    });
+  });
+
+  describe("given image and externalized binary content parts", () => {
+    it("maps an externalized image_url reference to an image media block", () => {
+      const blocks = parseContentBlocks([
+        { type: "image_url", image_url: { url: "/api/files/p1/i1" } },
+      ]);
+
+      expect(blocks).toHaveLength(1);
+      expect(blocks[0]).toMatchObject({
+        kind: "media",
+        part: {
+          type: "image",
+          source: { type: "url", value: "/api/files/p1/i1" },
+        },
+      });
+    });
+
+    it("maps an externalized binary PDF reference to an attachment media block", () => {
+      const blocks = parseContentBlocks([
+        {
+          type: "binary",
+          mimeType: "application/pdf",
+          url: "/api/files/p1/f1",
+          filename: "report.pdf",
+        },
+      ]);
+
+      expect(blocks).toHaveLength(1);
+      expect(blocks[0]).toMatchObject({
+        kind: "media",
+        part: { type: "binary", filename: "report.pdf" },
+      });
     });
   });
 });

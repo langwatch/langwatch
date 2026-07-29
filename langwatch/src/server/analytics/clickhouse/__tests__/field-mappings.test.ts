@@ -1,32 +1,32 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildJoinClause,
   fieldMappings,
-  getFieldMapping,
-  getTableForField,
   getColumnExpression,
-  requiresJoin,
+  getFieldMapping,
   getFieldsRequiringTable,
   getTableAlias,
-  buildJoinClause,
+  getTableForField,
   qualifiedColumn,
+  requiresJoin,
   tableAliases,
 } from "../field-mappings";
 
 describe("field-mappings", () => {
   describe("fieldMappings", () => {
     it("has mappings for trace identity fields", () => {
-      expect(fieldMappings["trace_id"]).toBeDefined();
-      expect(fieldMappings["trace_id"]?.table).toBe("trace_summaries");
-      expect(fieldMappings["trace_id"]?.column).toBe("TraceId");
+      expect(fieldMappings.trace_id).toBeDefined();
+      expect(fieldMappings.trace_id?.table).toBe("trace_summaries");
+      expect(fieldMappings.trace_id?.column).toBe("TraceId");
 
-      expect(fieldMappings["project_id"]).toBeDefined();
-      expect(fieldMappings["project_id"]?.column).toBe("TenantId");
+      expect(fieldMappings.project_id).toBeDefined();
+      expect(fieldMappings.project_id?.column).toBe("TenantId");
     });
 
     it("has mappings for metadata fields", () => {
       expect(fieldMappings["metadata.user_id"]).toBeDefined();
       expect(fieldMappings["metadata.user_id"]?.column).toBe(
-        "Attributes['langwatch.user_id']"
+        "Attributes['langwatch.user_id']",
       );
       expect(fieldMappings["metadata.user_id"]?.mapValueType).toBe("string");
 
@@ -37,7 +37,7 @@ describe("field-mappings", () => {
     it("has mappings for performance metrics", () => {
       expect(fieldMappings["metrics.total_time_ms"]).toBeDefined();
       expect(fieldMappings["metrics.total_time_ms"]?.column).toBe(
-        "TotalDurationMs"
+        "TotalDurationMs",
       );
 
       expect(fieldMappings["metrics.total_cost"]).toBeDefined();
@@ -52,17 +52,17 @@ describe("field-mappings", () => {
       expect(fieldMappings["spans.model"]).toBeDefined();
       expect(fieldMappings["spans.model"]?.table).toBe("stored_spans");
       expect(fieldMappings["spans.model"]?.column).toBe(
-        "SpanAttributes['gen_ai.request.model']"
+        "SpanAttributes['gen_ai.request.model']",
       );
     });
 
     it("has mappings for evaluation fields with evaluation_runs table", () => {
       expect(fieldMappings["evaluations.evaluator_id"]).toBeDefined();
       expect(fieldMappings["evaluations.evaluator_id"]?.table).toBe(
-        "evaluation_runs"
+        "evaluation_runs",
       );
       expect(fieldMappings["evaluations.evaluator_id"]?.column).toBe(
-        "EvaluatorId"
+        "EvaluatorId",
       );
 
       expect(fieldMappings["evaluations.score"]).toBeDefined();
@@ -103,7 +103,7 @@ describe("field-mappings", () => {
 
     it("returns evaluation_runs for evaluation fields", () => {
       expect(getTableForField("evaluations.evaluator_id")).toBe(
-        "evaluation_runs"
+        "evaluation_runs",
       );
       expect(getTableForField("evaluations.score")).toBe("evaluation_runs");
     });
@@ -121,7 +121,7 @@ describe("field-mappings", () => {
 
     it("returns map access expression for metadata fields", () => {
       expect(getColumnExpression("metadata.user_id")).toBe(
-        "Attributes['langwatch.user_id']"
+        "Attributes['langwatch.user_id']",
       );
     });
 
@@ -235,7 +235,9 @@ describe("field-mappings", () => {
     it("prefixes simple columns with table alias", () => {
       expect(qualifiedColumn("trace_id")).toBe("ts.TraceId");
       expect(qualifiedColumn("spans.span_id")).toBe("ss.SpanId");
-      expect(qualifiedColumn("evaluations.evaluator_id")).toBe("es.EvaluatorId");
+      expect(qualifiedColumn("evaluations.evaluator_id")).toBe(
+        "es.EvaluatorId",
+      );
     });
 
     it("handles map access columns correctly", () => {

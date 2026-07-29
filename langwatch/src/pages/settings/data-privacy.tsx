@@ -78,6 +78,7 @@ import { Select } from "~/components/ui/select";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import { showErrorToast } from "~/features/errors";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useUrlScopeFilter } from "~/hooks/useUrlScopeFilter";
@@ -262,11 +263,7 @@ export function DataPrivacyPage({ projectId }: { projectId: string }) {
       void invalidate();
       toaster.create({ title: "Privacy rule removed", type: "success" });
     } catch (error) {
-      toaster.create({
-        title: "Failed to remove rule",
-        description: (error as Error).message,
-        type: "error",
-      });
+      showErrorToast({ error, fallbackTitle: "Couldn't remove this rule" });
     }
   };
 

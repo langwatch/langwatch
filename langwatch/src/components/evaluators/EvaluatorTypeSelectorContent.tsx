@@ -1,12 +1,11 @@
 import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { LuExternalLink } from "react-icons/lu";
-import { useRouter } from "~/utils/compat/next-router";
-
 import { Tooltip } from "~/components/ui/tooltip";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { AVAILABLE_EVALUATORS } from "~/server/evaluations/evaluators";
 import { api } from "~/utils/api";
+import { useRouter } from "~/utils/compat/next-router";
 import type { EvaluatorCategoryId } from "./EvaluatorCategorySelectorDrawer";
 
 /**
@@ -181,11 +180,15 @@ export function EvaluatorTypeSelectorContent({
           const evaluator = AVAILABLE_EVALUATORS[evaluatorType];
           if (!evaluator) return null;
 
-          const availableEntry =
-            availableEvaluatorsQuery.data?.[evaluatorType];
+          const availableEntry = availableEvaluatorsQuery.data?.[evaluatorType];
           const missingEnvVars = availableEntry?.missingEnvVars ?? [];
           const isAzureEvaluator = evaluatorType.startsWith("azure/");
-          const isDisabled = isAzureEvaluator && missingEnvVars.length > 0;
+          // Not installed on this server is a different state from installed
+          // but unconfigured: there is no settings screen that fixes it, so it
+          // gets the explanation instead of a call to action.
+          const unavailable = availableEntry?.unavailable;
+          const isDisabled =
+            !!unavailable || (isAzureEvaluator && missingEnvVars.length > 0);
 
           return (
             <EvaluatorCard
@@ -195,12 +198,14 @@ export function EvaluatorTypeSelectorContent({
               description={evaluator.description}
               disabled={isDisabled}
               disabledTooltip={
-                isDisabled
-                  ? "Configure Azure Safety provider in Settings → Model Providers"
-                  : undefined
+                unavailable
+                  ? `${unavailable.reason} ${unavailable.howToEnable}`
+                  : isDisabled
+                    ? "Configure Azure Safety provider in Settings → Model Providers"
+                    : undefined
               }
               disabledCta={
-                isDisabled
+                isDisabled && !unavailable
                   ? {
                       label: "Configure Azure Safety",
                       onClick: handleConfigureAzureSafety,

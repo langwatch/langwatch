@@ -5,8 +5,10 @@ import { Anthropic } from "../../components/icons/Anthropic";
 import { AWS } from "../../components/icons/AWS";
 import { Azure } from "../../components/icons/Azure";
 import { Cerebras } from "../../components/icons/Cerebras";
+import { Codex } from "../../components/icons/Codex";
 import { Custom } from "../../components/icons/Custom";
 import { DeepSeek } from "../../components/icons/DeepSeek";
+import { ElevenLabs } from "../../components/icons/ElevenLabs";
 import { Gemini } from "../../components/icons/Gemini";
 import { GoogleCloud } from "../../components/icons/GoogleCloud";
 import { Groq } from "../../components/icons/Groq";
@@ -20,8 +22,10 @@ export const modelProviderIcons: Record<
   React.ReactNode
 > = {
   openai: <OpenAI />,
+  openai_codex: <Codex />,
   azure: <Azure />,
   anthropic: <Anthropic />,
+  elevenlabs: <ElevenLabs />,
   groq: <Groq />,
   vertex_ai: <GoogleCloud />,
   gemini: <Gemini />,

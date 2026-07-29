@@ -74,10 +74,11 @@ kubectl -n langwatch logs -l app.kubernetes.io/name=langwatch-gateway --tail 50
 ```
 
 If the gateway can't reach the control plane, it logs
-`auth_upstream_unavailable` and returns 503 for every VK call. The
-fix is almost always `gateway.controlPlane.baseUrl`, defaults to
-`http://langwatch-app:5560` on the assumption your release name is
-`langwatch`. Adjust on a different release name or split-domain.
+`auth_upstream_unavailable` and returns 503 for every VK call. Left
+unset, `gateway.controlPlane.baseUrl` resolves to this install's own
+app Service, `<release>-app:5560`, so a release name of your choosing
+needs no adjustment. Set it for a split-domain deployment, or when the
+control plane lives outside this install.
 
 ## 5. Expose the gateway and set its public URL
 

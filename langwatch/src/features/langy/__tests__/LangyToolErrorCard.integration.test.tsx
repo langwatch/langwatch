@@ -156,17 +156,157 @@ describe("Langy tool failure card", () => {
     expect(toActivityGroups(value)).toHaveLength(0);
   });
 
-  it("does not expose an unstructured tool error to a normal user", () => {
-    const value = message(
-      "Prisma LangyConversationProjection findUnique SQL host=db.internal",
-    );
+  // A failure with no document still has TEXT, and the text is the only thing
+  // left that knows anything. It used to be swallowed in favour of "This step
+  // couldn't be completed", which told the reader nothing and told support less.
+  it("shows an unstructured tool error rather than swallowing it", () => {
+    const value = message("psql: connection to server failed: no such host");
 
     const [failure] = toFailedToolCalls(value);
     expect(failure?.presentation.message).toBe(
       "This step couldn't be completed.",
     );
-    expect(JSON.stringify(failure?.presentation)).not.toContain("Prisma");
-    expect(JSON.stringify(failure?.presentation)).not.toContain("db.internal");
+    expect(failure?.presentation.detail).toContain("connection to server");
+    // It claims no code it was never given.
+    expect(failure?.presentation.code).toBeUndefined();
+  });
+
+  it("renders a failure's code so it can be quoted", () => {
+    const value = message(structuredFailureNewCli());
+
+    render(
+      <ChakraProvider value={defaultSystem}>
+        <LangyToolActivity message={value} />
+      </ChakraProvider>,
+    );
+
+    expect(screen.getByRole("alert").textContent).toContain("network_error");
+    expect(
+      screen.getByRole("button", { name: /copy the error details/i }),
+    ).toBeTruthy();
+  });
+
+  // The red card used to render ABOVE the receipt for the steps that ran BEFORE
+  // it, because the transcript was grouped by kind rather than sequenced.
+  it("places a failure after the steps that preceded it", () => {
+    const value = {
+      id: "assistant-ordered",
+      role: "assistant",
+      parts: [
+        {
+          type: "tool-bash",
+          toolCallId: "call-read",
+          state: "output-available",
+          input: { command: "cat notes.md" },
+          output: "ok",
+        },
+        {
+          type: "tool-bash",
+          toolCallId: "call-edit",
+          state: "output-available",
+          input: { command: "sed -i s/a/b/ notes.md" },
+          output: "ok",
+        },
+        {
+          type: "tool-bash",
+          toolCallId: "call-failed",
+          state: "output-error",
+          input: { command: "langwatch scenario create Demo --format json" },
+          errorText: structuredFailureNewCli(),
+        },
+      ],
+    } as UIMessage;
+
+    render(
+      <ChakraProvider value={defaultSystem}>
+        <LangyToolActivity message={value} />
+      </ChakraProvider>,
+    );
+
+    const transcript = screen.getByLabelText("Langy activity");
+    const alert = screen.getByRole("alert");
+    const rows = [...transcript.children];
+    expect(rows.length).toBeGreaterThan(1);
+    expect(rows.findIndex((row) => row.contains(alert))).toBe(rows.length - 1);
+  });
+
+  it("keeps a failure first when nothing ran before it", () => {
+    render(
+      <ChakraProvider value={defaultSystem}>
+        <LangyToolActivity message={message(structuredFailureNewCli())} />
+      </ChakraProvider>,
+    );
+
+    const transcript = screen.getByLabelText("Langy activity");
+    const alert = screen.getByRole("alert");
+    expect([...transcript.children][0]?.contains(alert)).toBe(true);
+  });
+
+  it("names the transcript to assistive tech as a running log", () => {
+    // `getByLabelText` resolves `aria-label` on ANY element, so it passed
+    // happily while the label sat on a plain div — where `aria-label` is
+    // prohibited (implicit role `generic`) and is therefore dropped. Screen
+    // readers got neither the region's name nor its updates, so the running
+    // indicator and the red failure card below were both silent. Asking BY ROLE
+    // is the only query that can tell the difference.
+    render(
+      <ChakraProvider value={defaultSystem}>
+        <LangyToolActivity message={message(structuredFailureNewCli())} />
+      </ChakraProvider>,
+    );
+
+    expect(screen.getByRole("log", { name: "Langy activity" })).toBeTruthy();
+  });
+
+  // A step that WORKED must never be reported as broken. The failure markers
+  // used to be matched anywhere in the payload, so a successful `bash` whose
+  // stdout merely quoted one — a grep for the phrase, a tailed log, a test
+  // summary — drew a red card AND vanished from the completed receipt.
+  describe("given a command that succeeded while printing a failure phrase", () => {
+    const grepForThePhrase = {
+      id: "assistant-grep",
+      role: "assistant",
+      parts: [
+        {
+          type: "tool-bash",
+          toolCallId: "call-grep",
+          state: "output-available",
+          input: { command: 'grep -rn "failed to" src/' },
+          output:
+            'src/server/queue.ts:44:    throw new Error("failed to connect");',
+        },
+      ],
+    } as UIMessage;
+
+    // The classification itself belongs to the readers, and is pinned there
+    // (langyActivityReaders.unit.test.ts, "given a command that SUCCEEDED but
+    // printed a failure phrase"). What this file owns is what the reader SEES.
+    it("renders no error card for it", () => {
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <LangyToolActivity message={grepForThePhrase} />
+        </ChakraProvider>,
+      );
+
+      expect(screen.queryByRole("alert")).toBeNull();
+    });
+
+    it("keeps the step in the completed receipt", () => {
+      // The other half of the same defect, and the half an absence assertion
+      // cannot see: a misclassified call did not merely gain a red card, it
+      // also DROPPED OUT of the receipt. Pinning only "no alert" would pass for
+      // a reader that rendered nothing at all, so the step has to be visibly
+      // accounted for as one that ran and finished.
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <LangyToolActivity message={grepForThePhrase} />
+        </ChakraProvider>,
+      );
+
+      expect(
+        screen.getByRole("button", { name: /1 action completed/i }),
+      ).toBeTruthy();
+    });
   });
 
   it("collapses a mis-associated trace-search payload into a receipt", () => {

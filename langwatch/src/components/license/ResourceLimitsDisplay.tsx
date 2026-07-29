@@ -1,7 +1,7 @@
 import { SimpleGrid } from "@chakra-ui/react";
-import { ResourceLimitRow } from "./ResourceLimitRow";
-import type { PlanInfo } from "../../../ee/licensing/planInfo";
 import { LIMIT_TYPE_DISPLAY_LABELS } from "~/server/license-enforcement/constants";
+import type { PlanInfo } from "../../../ee/licensing/planInfo";
+import { ResourceLimitRow } from "./ResourceLimitRow";
 
 /** Resource keys that can be displayed in the limits component */
 export type ResourceKey =
@@ -17,7 +17,7 @@ export type ResourceKey =
   | "experiments"
   | "messagesPerMonth"
   | "eventsPerMonth"
-  | "tracesPerMonth"
+  | "tracesPerMonth";
 /**
  * Display labels for each resource type.
  * Uses LIMIT_TYPE_DISPLAY_LABELS for core limit types, with additional
@@ -104,20 +104,47 @@ interface UsageData {
  * Used when displaying limits for organizations with a valid license.
  */
 export function mapLicenseStatusToLimits(
-  licenseData: LicenseStatusWithPlan
+  licenseData: LicenseStatusWithPlan,
 ): ResourceLimits {
   return {
-    members: { current: licenseData.currentMembers, max: licenseData.maxMembers },
-    membersLite: { current: licenseData.currentMembersLite, max: licenseData.maxMembersLite },
+    members: {
+      current: licenseData.currentMembers,
+      max: licenseData.maxMembers,
+    },
+    membersLite: {
+      current: licenseData.currentMembersLite,
+      max: licenseData.maxMembersLite,
+    },
     teams: { current: licenseData.currentTeams, max: licenseData.maxTeams },
-    projects: { current: licenseData.currentProjects, max: licenseData.maxProjects },
-    prompts: { current: licenseData.currentPrompts, max: licenseData.maxPrompts },
-    workflows: { current: licenseData.currentWorkflows, max: licenseData.maxWorkflows },
-    scenarios: { current: licenseData.currentScenarios, max: licenseData.maxScenarios },
-    evaluators: { current: licenseData.currentEvaluators, max: licenseData.maxEvaluators },
+    projects: {
+      current: licenseData.currentProjects,
+      max: licenseData.maxProjects,
+    },
+    prompts: {
+      current: licenseData.currentPrompts,
+      max: licenseData.maxPrompts,
+    },
+    workflows: {
+      current: licenseData.currentWorkflows,
+      max: licenseData.maxWorkflows,
+    },
+    scenarios: {
+      current: licenseData.currentScenarios,
+      max: licenseData.maxScenarios,
+    },
+    evaluators: {
+      current: licenseData.currentEvaluators,
+      max: licenseData.maxEvaluators,
+    },
     agents: { current: licenseData.currentAgents, max: licenseData.maxAgents },
-    experiments: { current: licenseData.currentExperiments, max: licenseData.maxExperiments },
-    messagesPerMonth: { current: licenseData.currentMessagesPerMonth, max: licenseData.maxMessagesPerMonth },
+    experiments: {
+      current: licenseData.currentExperiments,
+      max: licenseData.maxExperiments,
+    },
+    messagesPerMonth: {
+      current: licenseData.currentMessagesPerMonth,
+      max: licenseData.maxMessagesPerMonth,
+    },
   };
 }
 
@@ -127,7 +154,7 @@ export function mapLicenseStatusToLimits(
  */
 export function mapUsageToLimits(
   usage: UsageData,
-  plan: PlanInfo
+  plan: PlanInfo,
 ): ResourceLimits {
   return {
     members: { current: usage.membersCount, max: plan.maxMembers },
@@ -140,7 +167,10 @@ export function mapUsageToLimits(
     evaluators: { current: usage.evaluatorsCount, max: plan.maxEvaluators },
     agents: { current: usage.agentsCount, max: plan.maxAgents },
     experiments: { current: usage.experimentsCount, max: plan.maxExperiments },
-    messagesPerMonth: { current: usage.currentMonthMessagesCount ?? 0, max: plan.maxMessagesPerMonth },
+    messagesPerMonth: {
+      current: usage.currentMonthMessagesCount ?? 0,
+      max: plan.maxMessagesPerMonth,
+    },
   };
 }
 
@@ -158,7 +188,12 @@ export interface ResourceLimitsDisplayProps {
  * Displays resource limits in a consistent format.
  * Used by both licensed plan and free tier sections on the usage page.
  */
-export function ResourceLimitsDisplay({ limits, showLimits = false, messagesLabel, showLiteMembers = false }: ResourceLimitsDisplayProps) {
+export function ResourceLimitsDisplay({
+  limits,
+  showLimits = false,
+  messagesLabel,
+  showLiteMembers = false,
+}: ResourceLimitsDisplayProps) {
   const visibleKeys = showLiteMembers
     ? RESOURCE_ORDER
     : RESOURCE_ORDER.filter((key) => key !== "membersLite");
@@ -167,7 +202,10 @@ export function ResourceLimitsDisplay({ limits, showLimits = false, messagesLabe
     <SimpleGrid columns={{ base: 1, md: 3 }} gap={3} width="full">
       {visibleKeys.map((key) => {
         const hideMax = !showLimits;
-        const label = key === "messagesPerMonth" && messagesLabel ? messagesLabel : RESOURCE_LABELS[key];
+        const label =
+          key === "messagesPerMonth" && messagesLabel
+            ? messagesLabel
+            : RESOURCE_LABELS[key];
         return (
           <ResourceLimitRow
             key={key}

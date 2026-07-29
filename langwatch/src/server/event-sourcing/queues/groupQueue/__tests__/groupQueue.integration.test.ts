@@ -1,3 +1,5 @@
+import type { Redis } from "ioredis";
+import { register } from "prom-client";
 import {
   afterAll,
   afterEach,
@@ -8,14 +10,24 @@ import {
   it,
   vi,
 } from "vitest";
-import type { Redis } from "ioredis";
 import {
+  getTestRedisConnection,
   startTestContainers,
   stopTestContainers,
-  getTestRedisConnection,
 } from "../../../__tests__/integration/testContainers";
-import { GroupQueueProcessor } from "../groupQueue";
 import type { EventSourcedQueueDefinition } from "../../queue.types";
+import { GroupQueueProcessor } from "../groupQueue";
+
+async function foreignSiblingsRestagedCount(
+  queueName: string,
+): Promise<number> {
+  const metric = await register
+    .getSingleMetric("gq_foreign_siblings_restaged_total")
+    ?.get();
+  return (
+    metric?.values.find((v) => v.labels.queue_name === queueName)?.value ?? 0
+  );
+}
 
 // Skip when running without testcontainers (unit-only test runs)
 const hasTestcontainers = !!(
@@ -37,7 +49,7 @@ function createQueueDefinition(
   },
 ): EventSourcedQueueDefinition<TestPayload> {
   return {
-    name: `{test/gq/${crypto.randomUUID().slice(0, 8)}}`,
+    name: `{test/gqmain/${crypto.randomUUID().slice(0, 8)}}`,
     groupKey: (p) => p.groupId,
     ...overrides,
   };
@@ -60,10 +72,13 @@ describe.skipIf(!hasTestcontainers)(
 
     afterEach(async () => {
       // Close all queues created during the test
-      await Promise.all(
-        queues.map((q) => q.close().catch(() => {})),
-      );
-      await redis.flushall();
+      await Promise.all(queues.map((q) => q.close().catch(() => {})));
+      // Scoped to this suite's own namespace, never flushdb(). flushdb empties
+      // the whole logical database, so it does not just reset this suite — it
+      // deletes whatever another suite has in flight in the same database.
+      // The failure then lands over there, in a file that never called it.
+      const keys = await redis.keys("{test/gqmain/*");
+      if (keys.length > 0) await redis.del(...keys);
     });
 
     afterAll(async () => {
@@ -214,7 +229,7 @@ describe.skipIf(!hasTestcontainers)(
         it("stores the body under a blob key, delivers it intact, and deletes the blob on completion", async () => {
           vi.stubEnv("GROUP_QUEUE_ENVELOPE_WRITES_ENABLED", "true");
           try {
-            const queueName = `{test/gq/blob-${crypto.randomUUID().slice(0, 8)}}`;
+            const queueName = `{test/gqmain/blob-${crypto.randomUUID().slice(0, 8)}}`;
             const blobKeysDuringProcessing: string[] = [];
             const processed = vi.fn(async (_payload: TestPayload) => {
               blobKeysDuringProcessing.push(
@@ -258,7 +273,7 @@ describe.skipIf(!hasTestcontainers)(
         it("sets a TTL safety net on the blob key", async () => {
           vi.stubEnv("GROUP_QUEUE_ENVELOPE_WRITES_ENABLED", "true");
           try {
-            const queueName = `{test/gq/blob-${crypto.randomUUID().slice(0, 8)}}`;
+            const queueName = `{test/gqmain/blob-${crypto.randomUUID().slice(0, 8)}}`;
             let release: () => void;
             const gate = new Promise<void>((resolve) => {
               release = resolve;
@@ -307,7 +322,7 @@ describe.skipIf(!hasTestcontainers)(
         it("reclaims the displaced old blob on replace so it cannot leak", async () => {
           vi.stubEnv("GROUP_QUEUE_ENVELOPE_WRITES_ENABLED", "true");
           try {
-            const queueName = `{test/gq/blob-dedup-${crypto.randomUUID().slice(0, 8)}}`;
+            const queueName = `{test/gqmain/blob-dedup-${crypto.randomUUID().slice(0, 8)}}`;
             const queue = createQueue(vi.fn().mockResolvedValue(undefined), {
               name: queueName,
               delay: 60_000,
@@ -333,9 +348,9 @@ describe.skipIf(!hasTestcontainers)(
               { timeout: 5000, interval: 50 },
             );
             // Staging holds exactly the one squashed job, referencing the new blob.
-            expect(
-              await redis.hlen(`${queueName}:gq:group:group-a:data`),
-            ).toBe(1);
+            expect(await redis.hlen(`${queueName}:gq:group:group-a:data`)).toBe(
+              1,
+            );
           } finally {
             vi.unstubAllEnvs();
           }
@@ -344,7 +359,7 @@ describe.skipIf(!hasTestcontainers)(
         it("reclaims the discarded new blob when the existing payload is kept (replace:false)", async () => {
           vi.stubEnv("GROUP_QUEUE_ENVELOPE_WRITES_ENABLED", "true");
           try {
-            const queueName = `{test/gq/blob-keep-${crypto.randomUUID().slice(0, 8)}}`;
+            const queueName = `{test/gqmain/blob-keep-${crypto.randomUUID().slice(0, 8)}}`;
             const queue = createQueue(vi.fn().mockResolvedValue(undefined), {
               name: queueName,
               delay: 60_000,
@@ -373,9 +388,9 @@ describe.skipIf(!hasTestcontainers)(
               },
               { timeout: 5000, interval: 50 },
             );
-            expect(
-              await redis.hlen(`${queueName}:gq:group:group-a:data`),
-            ).toBe(1);
+            expect(await redis.hlen(`${queueName}:gq:group:group-a:data`)).toBe(
+              1,
+            );
           } finally {
             vi.unstubAllEnvs();
           }
@@ -616,7 +631,8 @@ describe.skipIf(!hasTestcontainers)(
 
           await vi.waitFor(
             () => {
-              const total = batches.reduce((n, b) => n + b.length, 0) + singles.length;
+              const total =
+                batches.reduce((n, b) => n + b.length, 0) + singles.length;
               expect(total).toBe(10);
             },
             { timeout: 30000, interval: 50 },
@@ -643,7 +659,11 @@ describe.skipIf(!hasTestcontainers)(
 
           // Send shuffled; the queue must still fold them in score order.
           await queue.sendBatch(
-            [4, 2, 0, 3, 1].map((n) => ({ id: `j${n}`, groupId: "group-a", value: String(n) })),
+            [4, 2, 0, 3, 1].map((n) => ({
+              id: `j${n}`,
+              groupId: "group-a",
+              value: String(n),
+            })),
           );
 
           await vi.waitFor(
@@ -674,12 +694,17 @@ describe.skipIf(!hasTestcontainers)(
           await queue.waitUntilReady();
 
           await queue.sendBatch(
-            Array.from({ length: 9 }, (_, i) => ({ id: `j${i}`, groupId: "group-a", value: String(i) })),
+            Array.from({ length: 9 }, (_, i) => ({
+              id: `j${i}`,
+              groupId: "group-a",
+              value: String(i),
+            })),
           );
 
           await vi.waitFor(
             () => {
-              const total = batches.reduce((n, b) => n + b.length, 0) + singles.length;
+              const total =
+                batches.reduce((n, b) => n + b.length, 0) + singles.length;
               expect(total).toBe(9);
             },
             { timeout: 30000, interval: 50 },
@@ -713,7 +738,11 @@ describe.skipIf(!hasTestcontainers)(
           await queue.waitUntilReady();
 
           await queue.sendBatch(
-            Array.from({ length: 5 }, (_, i) => ({ id: `j${i}`, groupId: "group-a", value: String(i) })),
+            Array.from({ length: 5 }, (_, i) => ({
+              id: `j${i}`,
+              groupId: "group-a",
+              value: String(i),
+            })),
           );
 
           await vi.waitFor(
@@ -750,7 +779,11 @@ describe.skipIf(!hasTestcontainers)(
           await queue.waitUntilReady();
 
           await queue.sendBatch(
-            Array.from({ length: 4 }, (_, i) => ({ id: `j${i}`, groupId: "group-a", value: String(i) })),
+            Array.from({ length: 4 }, (_, i) => ({
+              id: `j${i}`,
+              groupId: "group-a",
+              value: String(i),
+            })),
           );
 
           // Despite the first batch throwing, every event is eventually
@@ -764,6 +797,183 @@ describe.skipIf(!hasTestcontainers)(
               expect(new Set(succeeded.map((p) => p.id)).size).toBe(4);
             },
             { timeout: 45000, interval: 100 },
+          );
+        });
+      });
+
+      // ADR-066 pillar 2: the drain is bounded by bytes as well as count. These
+      // exercise the byte budget end-to-end through the GroupQueueProcessor. Byte
+      // math is asserted at the Lua level in scripts.integration.test.ts; here we
+      // only need the observable: a burst that the count bound alone would fold
+      // whole is split by the byte bound, and nothing is lost.
+      describe("when a byte budget bounds the batch", () => {
+        /** @scenario 'a batch is bounded by size as well as count' */
+        it("splits a burst at the byte budget and loses nothing", async () => {
+          const batches: TestPayload[][] = [];
+          const singles: TestPayload[] = [];
+          const bulk = "x".repeat(500);
+          const queue = createQueue(
+            async (p) => {
+              singles.push(p);
+            },
+            {
+              processBatch: async (ps) => {
+                batches.push(ps as TestPayload[]);
+              },
+              coalesceMaxBatch: () => 50,
+              coalesceMaxBytes: () => 1500,
+              score: (p) => Number((p.id as string).slice(1)),
+            },
+          );
+          await queue.waitUntilReady();
+
+          await queue.sendBatch(
+            Array.from({ length: 6 }, (_, i) => ({
+              id: `j${i}`,
+              groupId: "group-a",
+              value: bulk,
+            })),
+          );
+
+          await vi.waitFor(
+            () => {
+              const total =
+                batches.reduce((n, b) => n + b.length, 0) + singles.length;
+              expect(total).toBe(6);
+            },
+            { timeout: 30000, interval: 50 },
+          );
+
+          // The byte bound bit: the whole burst never collapsed into one batch,
+          // even though the count bound alone (50) would have folded all six.
+          const maxBatch =
+            batches.length > 0 ? Math.max(...batches.map((b) => b.length)) : 0;
+          expect(maxBatch).toBeLessThan(6);
+          // ...but a coalesced batch DID form — without this floor the assertion
+          // above passes vacuously when nothing coalesces (maxBatch 0), leaving
+          // the byte-split path untested. A batch of ≥2 proves siblings folded
+          // up to the byte budget rather than each dispatching alone.
+          expect(maxBatch).toBeGreaterThanOrEqual(2);
+          // Every event processed exactly once — the remainder became later batches.
+          const allIds = [...batches.flat(), ...singles].map((p) => p.id);
+          expect(new Set(allIds).size).toBe(6);
+        });
+
+        /** @scenario 'a single oversized item is appended on its own' */
+        it("processes an oversized job on its own, coalescing nothing", async () => {
+          const batches: TestPayload[][] = [];
+          const singles: TestPayload[] = [];
+          const bulk = "x".repeat(500);
+          const queue = createQueue(
+            async (p) => {
+              singles.push(p);
+            },
+            {
+              processBatch: async (ps) => {
+                batches.push(ps as TestPayload[]);
+              },
+              coalesceMaxBatch: () => 50,
+              // Smaller than any single job's stored size, so every dispatch's
+              // own initialBytes already exceeds the budget.
+              coalesceMaxBytes: () => 50,
+              score: (p) => Number((p.id as string).slice(1)),
+            },
+          );
+          await queue.waitUntilReady();
+
+          await queue.sendBatch(
+            Array.from({ length: 4 }, (_, i) => ({
+              id: `j${i}`,
+              groupId: "group-a",
+              value: bulk,
+            })),
+          );
+
+          await vi.waitFor(
+            () => {
+              expect(singles.length).toBe(4);
+            },
+            { timeout: 30000, interval: 50 },
+          );
+          // No siblings are ever folded, so the batch handler is never called.
+          expect(batches.length).toBe(0);
+        });
+      });
+
+      // ADR-066 pillar 2: serialized commands share a group across command types,
+      // so a drained sibling can belong to a DIFFERENT __jobName. A coalesced
+      // batch must never mix job names; foreign siblings are restaged, not folded.
+      describe("when a group mixes __jobName (serialized commands)", () => {
+        /** @scenario 'coalescing preserves every item' */
+        it("never mixes __jobName within a batch and restages foreign siblings", async () => {
+          const batches: TestPayload[][] = [];
+          const singles: TestPayload[] = [];
+          const queueName = `{test/gqmain/mixed-${crypto.randomUUID().slice(0, 8)}}`;
+          const queue = createQueue(
+            async (p) => {
+              singles.push(p);
+            },
+            {
+              name: queueName,
+              processBatch: async (ps) => {
+                batches.push(ps as TestPayload[]);
+              },
+              coalesceMaxBatch: () => 50,
+              score: (p) => Number((p.id as string).slice(1)),
+            },
+          );
+          await queue.waitUntilReady();
+
+          const foreignRestagedBefore =
+            await foreignSiblingsRestagedCount(queueName);
+
+          await queue.sendBatch([
+            { id: "j0", groupId: "group-a", value: "a", __jobName: "cmdA" },
+            { id: "j1", groupId: "group-a", value: "b", __jobName: "cmdB" },
+            { id: "j2", groupId: "group-a", value: "a", __jobName: "cmdA" },
+          ] as unknown as TestPayload[]);
+
+          await vi.waitFor(
+            () => {
+              const total =
+                batches.reduce((n, b) => n + b.length, 0) + singles.length;
+              expect(total).toBe(3);
+            },
+            { timeout: 30000, interval: 50 },
+          );
+
+          // A coalesced cmdA batch actually formed (j0 + j2 folded). Without this
+          // the no-mix loop below is vacuously true on an empty `batches`, so the
+          // "never mixes __jobName" invariant would never be exercised.
+          const coalesced = batches.filter((b) => b.length >= 2);
+          expect(coalesced.length).toBeGreaterThan(0);
+
+          // The invariant: no coalesced batch ever contains two distinct job names.
+          for (const batch of batches) {
+            const names = new Set(
+              batch.map((p) => (p as Record<string, unknown>).__jobName),
+            );
+            expect(names.size).toBe(1);
+          }
+
+          // The foreign sibling (cmdB) was drained out of the cmdA group and
+          // processed via its own dispatch — proving restageDrainedSiblings ran
+          // rather than the cmdB job being folded or dropped.
+          const cmdBProcessed = [...batches.flat(), ...singles].some(
+            (p) => (p as Record<string, unknown>).__jobName === "cmdB",
+          );
+          expect(cmdBProcessed).toBe(true);
+
+          // Every job processed exactly once — the foreign sibling was restaged,
+          // not lost.
+          const allIds = [...batches.flat(), ...singles].map((p) => p.id);
+          expect(new Set(allIds).size).toBe(3);
+
+          // The mixed-command restage is counted distinctly from the
+          // batch-failure restage paths (ADR-066 pillar 2): exactly the one
+          // foreign cmdB sibling was recorded against this queue.
+          expect(await foreignSiblingsRestagedCount(queueName)).toBe(
+            foreignRestagedBefore + 1,
           );
         });
       });

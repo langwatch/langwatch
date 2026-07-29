@@ -71,6 +71,14 @@ export interface SpanSummaryRow {
   durationMs: number;
   statusCode: number | null;
   spanType: string | null;
+  /** Tool display name (`gen_ai.tool.name` ?? `tool_name`), tool spans only. */
+  toolName: string | null;
+  /** Claude model-call join key (`request_id`), llm_request spans only. */
+  requestId: string | null;
+  /** Claude prompt-pairing scope (`query_source`). */
+  querySource: string | null;
+  /** Tool-call join key (`tool_use_id` ?? `gen_ai.tool.call.id`). */
+  toolUseId: string | null;
   model: string | null;
   /**
    * USD cost: `gen_ai.usage.cost` when the SDK reported one, otherwise
@@ -143,6 +151,22 @@ export interface OccurredAtHint {
 }
 
 /**
+ * Params for the claim-check resolution read (ADR-069). The partition hint is
+ * REQUIRED here, unlike the optional {@link OccurredAtHint} every other read
+ * takes: this one runs `fallback: "none"`, and a windowed read with no hint has
+ * no narrow window to accept — it runs the unbounded scan the read exists to
+ * avoid. Making the hint part of the contract keeps that promise true for the
+ * next adopter instead of relying on every caller remembering to pass one.
+ */
+export interface NormalizedSpanByIdParams {
+  tenantId: string;
+  traceId: string;
+  spanId: string;
+  /** Centre of the partition window: the SPAN'S OWN start, epoch ms. */
+  occurredAtMs: number;
+}
+
+/**
  * Per-model usage rollup over a recent window, feeds the model cost rule
  * preview ("which models would this regex match, and how much traffic do
  * they carry").
@@ -204,6 +228,14 @@ export interface SpanStorageRepository {
       spanId: string;
     } & OccurredAtHint,
   ): Promise<Span | null>;
+  /**
+   * Claim-check resolution read (ADR-069): one canonical span by identity,
+   * windowed by the reference's partition hint with no unbounded fallback —
+   * a miss stays cheap because the caller retries via the queue.
+   */
+  findNormalizedSpanById(
+    params: NormalizedSpanByIdParams,
+  ): Promise<NormalizedSpan | null>;
   /**
    * Trace-level events ({spanId, timestamp, name, attributes}) for the
    * trace-detail read, derived from the spans' OTel events. Events-only
@@ -326,6 +358,12 @@ export class NullSpanStorageRepository implements SpanStorageRepository {
     } & OccurredAtHint,
   ): Promise<NormalizedSpan[]> {
     return [];
+  }
+
+  async findNormalizedSpanById(
+    _params: NormalizedSpanByIdParams,
+  ): Promise<NormalizedSpan | null> {
+    return null;
   }
 
   async getSpanByIds(

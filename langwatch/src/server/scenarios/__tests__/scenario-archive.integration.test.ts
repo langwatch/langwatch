@@ -17,9 +17,9 @@
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { getTestUser } from "../../../utils/testUtils";
 import { prisma } from "../../db";
-import { ScenarioService } from "../scenario.service";
-import { ScenarioRepository } from "../scenario.repository";
 import { LicenseEnforcementRepository } from "../../license-enforcement/license-enforcement.repository";
+import { ScenarioRepository } from "../scenario.repository";
+import { ScenarioService } from "../scenario.service";
 
 describe("ScenarioService", () => {
   const projectId = "test-project-id";
@@ -254,7 +254,9 @@ describe("ScenarioService", () => {
         await service.archive({ id: toArchive.id, projectId });
 
         // Count should only include active scenarios
-        const count = await licenseRepo.getActiveScenarioCount(organization!.id);
+        const count = await licenseRepo.getActiveScenarioCount(
+          organization!.id,
+        );
         expect(count).toBe(2);
       });
     });

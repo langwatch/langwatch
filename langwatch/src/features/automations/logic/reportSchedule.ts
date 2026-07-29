@@ -128,7 +128,9 @@ export function ordinal(n: number): string {
 const pad = (n: number) => String(n).padStart(2, "0");
 
 /** `HH:MM` for a time input, from the parts' hour + minute. */
-export function timeOfDay(parts: Pick<ScheduleParts, "hour" | "minute">): string {
+export function timeOfDay(
+  parts: Pick<ScheduleParts, "hour" | "minute">,
+): string {
   return `${pad(parts.hour)}:${pad(parts.minute)}`;
 }
 

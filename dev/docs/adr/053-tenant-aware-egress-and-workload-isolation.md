@@ -749,8 +749,8 @@ Costs and constraints:
 
 ## References
 
-- Related ADRs: ADR-033, ADR-040, ADR-043, ADR-052
-- On acceptance, this ADR supersedes ADR-033 and ADR-043 where they retain
+- Related ADRs: ADR-033, ADR-040, ADR-076, ADR-052
+- On acceptance, this ADR supersedes ADR-033 and ADR-076 where they retain
   multiple untrusted workers or a cooperative proxy inside one Langy pod.
 - Behavioural specification:
   specs/security/tenant-aware-egress-isolation.feature

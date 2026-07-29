@@ -40,10 +40,18 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({ project: projectRef.current }),
 }));
 
+// The minimised affordance is flag-gated (LangySidecar reads
+// release_ui_langy_peek_dock_enabled). This suite is about the inline model
+// setup, not the closed state, so pin the flag off (the classic launcher) —
+// the same render path this suite had before the flag landed.
+vi.mock("~/hooks/useFeatureFlag", () => ({
+  useFeatureFlag: () => ({ enabled: false, isLoading: false }),
+}));
+
 // The panel reads `currentDrawer` to decide whether it is riding beside a
 // drawer as the floating companion. Defaults to no drawer (the dock/floating
-// cases); the companion-header test flips it. `openDrawer` is here because
-// LangyFoundryMenu in the header also reads useDrawer.
+// cases); the companion-header test flips it. The rest of the hook's surface is
+// stubbed so any consumer that reaches for it gets a complete shape.
 const currentDrawerRef = { current: undefined as string | undefined };
 vi.mock("~/hooks/useDrawer", () => ({
   useDrawer: () => ({
@@ -123,10 +131,18 @@ vi.mock(
 // Drives langyNeedsModel. `model: null` (or absent) => setup; a string => the
 // panel resolves a model and skips the prompt. A refetch spy lets the "save
 // unblocks" test flip the state without remounting (no page reload).
-const resolvedDefaultRef = {
+const resolvedDefaultRef: {
   current: {
-    data: undefined as { model: string | null } | undefined,
+    data: { model: string | null } | undefined;
+    isLoading: boolean;
+    /** Optional so the cases that only care about data/loading stay terse. */
+    isError?: boolean;
+  };
+} = {
+  current: {
+    data: undefined,
     isLoading: false,
+    isError: false,
   },
 };
 const refetchResolvedDefault = vi.fn(() => {
@@ -135,6 +151,7 @@ const refetchResolvedDefault = vi.fn(() => {
   resolvedDefaultRef.current = {
     data: { model: "gpt-5-mini" },
     isLoading: false,
+    isError: false,
   };
   return Promise.resolve({ data: resolvedDefaultRef.current.data });
 });
@@ -188,16 +205,14 @@ vi.mock("~/utils/api", () => ({
       onConversationUpdate: {
         useSubscription: () => undefined,
       },
+      stopTurn: {
+        useMutation: () => ({ mutateAsync: () => Promise.resolve() }),
+      },
       deleteConversation: {
         useMutation: () => ({ mutateAsync: () => Promise.resolve() }),
       },
       renameConversation: {
         useMutation: () => ({ mutateAsync: () => Promise.resolve() }),
-      },
-      forkConversation: {
-        useMutation: () => ({
-          mutateAsync: () => Promise.resolve({ id: "forked-conversation" }),
-        }),
       },
       list: {
         useInfiniteQuery: () => ({
@@ -220,6 +235,15 @@ vi.mock("~/utils/api", () => ({
         useQuery: () => ({
           data: resolvedDefaultRef.current.data,
           isLoading: resolvedDefaultRef.current.isLoading,
+          // The panel gates on isSuccess, not on !isLoading: an ERRORED query
+          // also reports isLoading false with data undefined, and reading that
+          // as "no model configured" replaced the whole conversation with the
+          // provider-onboarding grid. Mirror react-query's own relationship
+          // between the three so this mock cannot drift from that contract.
+          isSuccess:
+            !resolvedDefaultRef.current.isLoading &&
+            !(resolvedDefaultRef.current.isError ?? false),
+          isError: resolvedDefaultRef.current.isError ?? false,
           refetch: refetchResolvedDefault,
         }),
       },
@@ -232,6 +256,22 @@ vi.mock("~/utils/api", () => ({
     virtualKeys: {
       list: {
         useQuery: () => ({ data: undefined, isLoading: false }),
+      },
+    },
+    // The empty state's asks are picked from the project's reach (see
+    // useProjectReach); a fully-reached project keeps the classic four rows,
+    // which is what the "normal empty state" assertions below look for.
+    integrationsChecks: {
+      getCheckStatus: {
+        useQuery: () => ({
+          data: {
+            firstMessage: true,
+            onlineEvaluations: 1,
+            simulations: 1,
+            datasets: 1,
+          },
+          isLoading: false,
+        }),
       },
     },
     ops: {
@@ -267,7 +307,11 @@ function renderPanel() {
 
 beforeEach(() => {
   projectRef.current = { id: "project-demo", slug: "demo" };
-  resolvedDefaultRef.current = { data: undefined, isLoading: false };
+  resolvedDefaultRef.current = {
+    data: undefined,
+    isLoading: false,
+    isError: false,
+  };
   refetchResolvedDefault.mockClear();
   lastOnComplete.current = null;
   currentDrawerRef.current = undefined;
@@ -308,9 +352,7 @@ describe("Feature: Langy prompts for a model when the project has none configure
 
         // It replaces — not supplements — the normal empty state.
         expect(
-          screen.queryByText(
-            "Ask in plain language, or start with one of these.",
-          ),
+          screen.queryByText("Just type away, or start with one of these."),
         ).not.toBeInTheDocument();
       });
     });
@@ -359,9 +401,45 @@ describe("Feature: Langy prompts for a model when the project has none configure
         });
         expect(
           await screen.findByText(
-            "Ask in plain language, or start with one of these.",
+            "Just type away, or start with one of these.",
           ),
         ).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("given the project's model resolver fails to answer", () => {
+    describe("when the user opens the Langy panel", () => {
+      /** @scenario "A failed model lookup does not masquerade as a missing model" */
+      it("does not show the setup prompt for what is really a failed lookup", async () => {
+        // react-query reports an errored query as isLoading false with data
+        // undefined - indistinguishable from "no model" unless success is
+        // checked explicitly.
+        resolvedDefaultRef.current = {
+          data: undefined,
+          isLoading: false,
+          isError: true,
+        };
+
+        renderPanel();
+
+        // A POSITIVE anchor first. On its own, "the setup screen is absent"
+        // also holds for a panel that rendered nothing at all, so the
+        // regression could come back behind a blank surface and still pass.
+        // The panel's ordinary empty state is what a failed lookup must fall
+        // back to, so pin that it is really there.
+        expect(
+          await screen.findByText(
+            "Just type away, or start with one of these.",
+          ),
+        ).toBeInTheDocument();
+
+        await waitFor(() => {
+          expect(screen.queryByTestId("model-provider-screen")).toBeNull();
+        });
+        expect(
+          screen.queryByText("Langy needs a model to get started"),
+        ).not.toBeInTheDocument();
       });
     });
   });
@@ -381,7 +459,7 @@ describe("Feature: Langy prompts for a model when the project has none configure
         // The panel shows its normal empty state.
         expect(
           await screen.findByText(
-            "Ask in plain language, or start with one of these.",
+            "Just type away, or start with one of these.",
           ),
         ).toBeInTheDocument();
 
@@ -400,7 +478,7 @@ describe("Feature: Langy prompts for a model when the project has none configure
 describe("Feature: Langy panel layout modes", () => {
   describe("given the Langy panel is docked or floating on its own", () => {
     describe("when the header renders", () => {
-      it("offers its own Close control", async () => {
+      it("offers its own Minimise control", async () => {
         resolvedDefaultRef.current = {
           data: { model: "gpt-5-mini" },
           isLoading: false,
@@ -408,7 +486,7 @@ describe("Feature: Langy panel layout modes", () => {
         renderPanel();
 
         expect(
-          await screen.findByRole("button", { name: "Close Langy" }),
+          await screen.findByRole("button", { name: "Minimise Langy" }),
         ).toBeInTheDocument();
       });
     });
@@ -417,7 +495,7 @@ describe("Feature: Langy panel layout modes", () => {
   describe("given the Langy panel is riding beside an open drawer", () => {
     describe("when the header renders", () => {
       /** @scenario The docked companion offers a single close affordance */
-      it("hides its own Close so the drawer owns the only X", async () => {
+      it("hides its own Minimise so the drawer owns the only dismissal", async () => {
         currentDrawerRef.current = "traceV2Details";
         resolvedDefaultRef.current = {
           data: { model: "gpt-5-mini" },
@@ -429,10 +507,11 @@ describe("Feature: Langy panel layout modes", () => {
         expect(
           await screen.findByRole("button", { name: "New chat" }),
         ).toBeInTheDocument();
-        // ...but the companion header carries no Close: two X's beside the
-        // drawer's own read as "close the drawer" and kept dismissing Langy.
+        // ...but the companion header carries no Minimise: a second dismissal
+        // beside the drawer's own X read as "close the drawer" and kept
+        // dismissing Langy instead.
         expect(
-          screen.queryByRole("button", { name: "Close Langy" }),
+          screen.queryByRole("button", { name: "Minimise Langy" }),
         ).not.toBeInTheDocument();
       });
     });

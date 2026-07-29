@@ -1,5 +1,5 @@
-import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { createProjectApp } from "~/server/api/security";
+import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { registerModelDefaultsRoutes } from "./app.v1";
 
 patchZodOpenapi();

@@ -49,11 +49,14 @@ describe("shouldShowGenericTranslateError()", () => {
 
   describe("when the AI-call-failed handler already surfaces the failure", () => {
     it("returns false so the toast is not duplicated", () => {
+      // No `errorMessage`: the extracted shape stopped carrying the provider's
+      // own sentence when this branch stopped relaying a third party's prose to
+      // the customer. The handler is identified by `featureKey` and `role`; the
+      // words come from the registry.
       vi.mocked(extractAiCallFailedInfo).mockReturnValue({
         featureKey: "translate.text",
         featureDisplayName: "Inline translation",
         role: "FAST",
-        errorMessage: "Invalid API key",
       });
 
       expect(shouldShowGenericTranslateError({})).toBe(false);

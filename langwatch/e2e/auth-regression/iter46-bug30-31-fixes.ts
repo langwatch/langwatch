@@ -16,8 +16,9 @@
  *           rejects POST/PUT/DELETE/PATCH requests whose Origin
  *           (or Referer fallback) doesn't match NEXTAUTH_URL.
  */
-import { _resetMemoryRateLimitStore } from "../../src/server/rateLimit";
+
 import { prisma } from "../../src/server/db";
+import { _resetMemoryRateLimitStore } from "../../src/server/rateLimit";
 
 const BASE_URL = process.env.NEXTAUTH_URL ?? "http://localhost:5571";
 const TS = Date.now();

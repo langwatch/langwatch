@@ -2,7 +2,6 @@ import {
   Badge,
   Box,
   Button,
-  Drawer,
   HStack,
   Input,
   Spacer,
@@ -12,13 +11,13 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
+import { OttlEditor } from "@ee/governance/dashboard/components/OttlEditor";
 import { Eye, Pencil, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
-
-import { OttlEditor } from "@ee/governance/dashboard/components/OttlEditor";
-
+import { Drawer } from "~/components/ui/drawer";
 import { Link } from "~/components/ui/link";
 import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
 
 /**
@@ -71,13 +70,8 @@ export function IngestionTemplatesEditor({
         });
       }
     },
-    onError: (err) => {
-      toaster.create({
-        title: "Clone failed",
-        description: err.message,
-        type: "error",
-      });
-    },
+    onError: (err) =>
+      showErrorToast({ error: err, fallbackTitle: "Couldn't clone template" }),
   });
 
   const archiveMutation = api.ingestionTemplates.archive.useMutation({
@@ -85,13 +79,11 @@ export function IngestionTemplatesEditor({
       void utils.ingestionTemplates.adminList.invalidate();
       toaster.create({ title: "Template archived", type: "success" });
     },
-    onError: (err) => {
-      toaster.create({
-        title: "Archive failed",
-        description: err.message,
-        type: "error",
-      });
-    },
+    onError: (err) =>
+      showErrorToast({
+        error: err,
+        fallbackTitle: "Couldn't archive template",
+      }),
   });
 
   if (listQuery.isLoading) {
@@ -341,48 +333,45 @@ function ViewOttlDrawer({
       }}
       size="lg"
     >
-      <Drawer.Backdrop />
-      <Drawer.Positioner>
-        <Drawer.Content>
-          <Drawer.Header>
-            <Drawer.Title>
-              OTTL — {state?.kind === "view" ? state.slug : ""}
-            </Drawer.Title>
-            <Drawer.CloseTrigger />
-          </Drawer.Header>
-          <Drawer.Body>
-            <VStack align="stretch" gap={3}>
-              <Text fontSize="xs" color="fg.muted">
-                Platform-authored OTTL. Read-only — clone the row from the
-                catalog table to customise it for this org.
+      <Drawer.Content>
+        <Drawer.Header>
+          <Drawer.Title>
+            OTTL — {state?.kind === "view" ? state.slug : ""}
+          </Drawer.Title>
+          <Drawer.CloseTrigger />
+        </Drawer.Header>
+        <Drawer.Body>
+          <VStack align="stretch" gap={3}>
+            <Text fontSize="xs" color="fg.muted">
+              Platform-authored OTTL. Read-only — clone the row from the catalog
+              table to customise it for this org.
+            </Text>
+            {detailQuery.isLoading ? (
+              <Spinner size="sm" />
+            ) : detailQuery.data ? (
+              <Box
+                as="pre"
+                fontSize="xs"
+                fontFamily="mono"
+                whiteSpace="pre-wrap"
+                backgroundColor="bg.subtle"
+                padding={3}
+                borderRadius="sm"
+                borderWidth="1px"
+                borderColor="border.muted"
+                maxHeight="400px"
+                overflow="auto"
+              >
+                {detailQuery.data.ottlRules || "(no OTTL rules)"}
+              </Box>
+            ) : (
+              <Text fontSize="sm" color="fg.muted">
+                Template not found.
               </Text>
-              {detailQuery.isLoading ? (
-                <Spinner size="sm" />
-              ) : detailQuery.data ? (
-                <Box
-                  as="pre"
-                  fontSize="xs"
-                  fontFamily="mono"
-                  whiteSpace="pre-wrap"
-                  backgroundColor="bg.subtle"
-                  padding={3}
-                  borderRadius="sm"
-                  borderWidth="1px"
-                  borderColor="border.muted"
-                  maxHeight="400px"
-                  overflow="auto"
-                >
-                  {detailQuery.data.ottlRules || "(no OTTL rules)"}
-                </Box>
-              ) : (
-                <Text fontSize="sm" color="fg.muted">
-                  Template not found.
-                </Text>
-              )}
-            </VStack>
-          </Drawer.Body>
-        </Drawer.Content>
-      </Drawer.Positioner>
+            )}
+          </VStack>
+        </Drawer.Body>
+      </Drawer.Content>
     </Drawer.Root>
   );
 }
@@ -426,13 +415,8 @@ function EditOttlDrawer({
       toaster.create({ title: "OTTL saved", type: "success" });
       onClose();
     },
-    onError: (err) => {
-      toaster.create({
-        title: "Save failed",
-        description: err.message,
-        type: "error",
-      });
-    },
+    onError: (err) =>
+      showErrorToast({ error: err, fallbackTitle: "Couldn't save OTTL rules" }),
   });
 
   const handleSave = () => {
@@ -456,52 +440,49 @@ function EditOttlDrawer({
       }}
       size="lg"
     >
-      <Drawer.Backdrop />
-      <Drawer.Positioner>
-        <Drawer.Content>
-          <Drawer.Header>
-            <Drawer.Title>
-              Edit OTTL — {state?.kind === "edit" ? state.slug : ""}
-            </Drawer.Title>
-            <Drawer.CloseTrigger />
-          </Drawer.Header>
-          <Drawer.Body>
-            <VStack align="stretch" gap={3}>
-              <Text fontSize="xs" color="fg.muted">
-                Each line is one OTTL statement. Validation runs against the
-                gateway parser as you type. The receiver applies these AFTER
-                stamping the binding's authoritative principal + provenance
-                keys, so OTTL cannot forge attribution.
-              </Text>
-              {detailQuery.isLoading ? (
-                <Spinner size="sm" />
-              ) : (
-                state?.kind === "edit" && (
-                  <OttlEditor
-                    organizationId={organizationId}
-                    sourceType={state.sourceType}
-                    statements={statements}
-                    onChange={setStatements}
-                    enabled={true}
-                  />
-                )
-              )}
-            </VStack>
-          </Drawer.Body>
-          <Drawer.Footer>
-            <Button variant="ghost" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button
-              colorPalette="orange"
-              loading={updateMutation.isPending}
-              onClick={handleSave}
-            >
-              Save OTTL
-            </Button>
-          </Drawer.Footer>
-        </Drawer.Content>
-      </Drawer.Positioner>
+      <Drawer.Content>
+        <Drawer.Header>
+          <Drawer.Title>
+            Edit OTTL — {state?.kind === "edit" ? state.slug : ""}
+          </Drawer.Title>
+          <Drawer.CloseTrigger />
+        </Drawer.Header>
+        <Drawer.Body>
+          <VStack align="stretch" gap={3}>
+            <Text fontSize="xs" color="fg.muted">
+              Each line is one OTTL statement. Validation runs against the
+              gateway parser as you type. The receiver applies these AFTER
+              stamping the binding's authoritative principal + provenance keys,
+              so OTTL cannot forge attribution.
+            </Text>
+            {detailQuery.isLoading ? (
+              <Spinner size="sm" />
+            ) : (
+              state?.kind === "edit" && (
+                <OttlEditor
+                  organizationId={organizationId}
+                  sourceType={state.sourceType}
+                  statements={statements}
+                  onChange={setStatements}
+                  enabled={true}
+                />
+              )
+            )}
+          </VStack>
+        </Drawer.Body>
+        <Drawer.Footer>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            colorPalette="orange"
+            loading={updateMutation.isPending}
+            onClick={handleSave}
+          >
+            Save OTTL
+          </Button>
+        </Drawer.Footer>
+      </Drawer.Content>
     </Drawer.Root>
   );
 }
@@ -544,13 +525,8 @@ function CreateTemplateDrawer({
         onClose();
       }
     },
-    onError: (err) => {
-      toaster.create({
-        title: "Create failed",
-        description: err.message,
-        type: "error",
-      });
-    },
+    onError: (err) =>
+      showErrorToast({ error: err, fallbackTitle: "Couldn't create template" }),
   });
 
   const canSubmit =
@@ -564,88 +540,85 @@ function CreateTemplateDrawer({
       }}
       size="md"
     >
-      <Drawer.Backdrop />
-      <Drawer.Positioner>
-        <Drawer.Content>
-          <Drawer.Header>
-            <Drawer.Title>New ingestion template</Drawer.Title>
-            <Drawer.CloseTrigger />
-          </Drawer.Header>
-          <Drawer.Body>
-            <VStack align="stretch" gap={3}>
-              <VStack align="stretch" gap={1}>
-                <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-                  Display name
-                </Text>
-                <Input
-                  size="sm"
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  placeholder="e.g. Internal Codex Wrapper"
-                />
-              </VStack>
-              <VStack align="stretch" gap={1}>
-                <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-                  Source type
-                </Text>
-                <Input
-                  size="sm"
-                  value={sourceType}
-                  onChange={(e) =>
-                    setSourceType(
-                      e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "_"),
-                    )
-                  }
-                  fontFamily="mono"
-                  placeholder="e.g. codex_internal"
-                />
-                <Text fontSize="xs" color="fg.muted">
-                  Lowercase letters / digits / underscores only. Drives the
-                  /me Trace Ingest tile slug + the langwatch.source provenance
-                  attribute on emitted spans.
-                </Text>
-              </VStack>
-              <VStack align="stretch" gap={1}>
-                <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-                  Description (optional)
-                </Text>
-                <Textarea
-                  size="sm"
-                  rows={3}
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="What does this template do? Shown to end users on the install tile."
-                />
-              </VStack>
+      <Drawer.Content>
+        <Drawer.Header>
+          <Drawer.Title>New ingestion template</Drawer.Title>
+          <Drawer.CloseTrigger />
+        </Drawer.Header>
+        <Drawer.Body>
+          <VStack align="stretch" gap={3}>
+            <VStack align="stretch" gap={1}>
+              <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+                Display name
+              </Text>
+              <Input
+                size="sm"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                placeholder="e.g. Internal Codex Wrapper"
+              />
+            </VStack>
+            <VStack align="stretch" gap={1}>
+              <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+                Source type
+              </Text>
+              <Input
+                size="sm"
+                value={sourceType}
+                onChange={(e) =>
+                  setSourceType(
+                    e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "_"),
+                  )
+                }
+                fontFamily="mono"
+                placeholder="e.g. codex_internal"
+              />
               <Text fontSize="xs" color="fg.muted">
-                After creation, you'll edit the OTTL rules in the next step.
-                The template starts with empty rules — admin authoring
-                continues there.
+                Lowercase letters / digits / underscores only. Drives the /me
+                Trace Ingest tile slug + the langwatch.source provenance
+                attribute on emitted spans.
               </Text>
             </VStack>
-          </Drawer.Body>
-          <Drawer.Footer>
-            <Button variant="ghost" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button
-              colorPalette="orange"
-              disabled={!canSubmit}
-              loading={createMutation.isPending}
-              onClick={() =>
-                createMutation.mutate({
-                  organizationId,
-                  sourceType,
-                  displayName: displayName.trim(),
-                  description: description.trim() || undefined,
-                })
-              }
-            >
-              Create + edit OTTL
-            </Button>
-          </Drawer.Footer>
-        </Drawer.Content>
-      </Drawer.Positioner>
+            <VStack align="stretch" gap={1}>
+              <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+                Description (optional)
+              </Text>
+              <Textarea
+                size="sm"
+                rows={3}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="What does this template do? Shown to end users on the install tile."
+              />
+            </VStack>
+            <Text fontSize="xs" color="fg.muted">
+              After creation, you'll edit the OTTL rules in the next step. The
+              template starts with empty rules — admin authoring continues
+              there.
+            </Text>
+          </VStack>
+        </Drawer.Body>
+        <Drawer.Footer>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            colorPalette="orange"
+            disabled={!canSubmit}
+            loading={createMutation.isPending}
+            onClick={() =>
+              createMutation.mutate({
+                organizationId,
+                sourceType,
+                displayName: displayName.trim(),
+                description: description.trim() || undefined,
+              })
+            }
+          >
+            Create + edit OTTL
+          </Button>
+        </Drawer.Footer>
+      </Drawer.Content>
     </Drawer.Root>
   );
 }

@@ -8,6 +8,7 @@ import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
 import { compare, hash } from "bcrypt";
 import { z } from "zod";
+import { NoAdminConfiguredError } from "~/server/app-layer/organizations/errors";
 import {
   Auth0ApiError,
   changeAuth0Password,
@@ -23,6 +24,8 @@ import { sendBudgetIncreaseRequestEmail } from "~/server/mailer/budgetIncreaseRe
 import { resolveOrgAdminEmail } from "~/server/organizations/resolveOrgAdminEmail";
 import { resolveSupportContact } from "~/server/organizations/resolveSupportContact";
 import { rateLimit } from "~/server/rateLimit";
+import { AvatarRateLimitedError } from "~/server/user-avatar/avatar";
+import { UserAvatarService } from "~/server/user-avatar/avatar.service";
 import { UserService } from "~/server/users/user.service";
 import { getClientIp } from "~/utils/getClientIp";
 import { isAdmin as checkIsAdmin } from "../../../../ee/admin/isAdmin";
@@ -482,6 +485,71 @@ export const userRouter = createTRPCRouter({
     }),
 
   /**
+   * Uploads and sets the caller's own avatar photo. The image is stored in the
+   * S3-backed object store (owned by the user, under their personal workspace)
+   * and its serve URL is written to `User.image`, the field every avatar
+   * surface resolves through. `organizationId` scopes the personal-workspace
+   * resolution and is membership-checked below.
+   *
+   * Spec: specs/settings/user-avatar.feature
+   */
+  setAvatar: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string(),
+        // A base64 image data URL (`data:image/...;base64,...`) produced by the
+        // client crop/resize step. Deliberately NOT bounded with a `.max()`
+        // here: `parseAvatarDataUrl` rejects at exactly the same ceiling before
+        // it scans or decodes anything, so a `.max()` only wins the race and
+        // turns the specific `avatar_image_too_large` ("Pick one under 8 MB")
+        // into the anonymous `validation_error`. The point of that code is that
+        // both halves of the check answer with it, whichever caught the file.
+        imageDataUrl: z.string().min(1),
+      }),
+    )
+    .use(checkOrganizationPermission("organization:view"))
+    .mutation(async ({ ctx, input }) => {
+      // Throttle uploads per user — each writes bytes to object storage and
+      // updates the row; mirrors the changePassword budget shape.
+      const limit = await rateLimit({
+        key: `user.setAvatar:${ctx.session.user.id}`,
+        windowSeconds: 60,
+        max: 10,
+      });
+      if (!limit.allowed) {
+        throw new AvatarRateLimitedError();
+      }
+
+      // `AvatarValidationError` is a handled error, so `handledErrorMiddleware`
+      // carries its code and meta to the client on its own. Catching it here to
+      // rewrap it as a BAD_REQUEST would only replace the code with the raw
+      // message — the thing #5984 closed.
+      return await new UserAvatarService(ctx.prisma).setAvatar({
+        userId: ctx.session.user.id,
+        organizationId: input.organizationId,
+        imageDataUrl: input.imageDataUrl,
+        displayName: ctx.session.user.name,
+        displayEmail: ctx.session.user.email,
+      });
+    }),
+
+  /**
+   * Clears the caller's uploaded avatar so surfaces fall back to their SSO
+   * photo (if any) and then their initials.
+   *
+   * Spec: specs/settings/user-avatar.feature
+   */
+  removeAvatar: protectedProcedure
+    .input(z.object({}))
+    .use(skipPermissionCheck)
+    .mutation(async ({ ctx }) => {
+      await new UserAvatarService(ctx.prisma).removeAvatar({
+        userId: ctx.session.user.id,
+      });
+      return { success: true };
+    }),
+
+  /**
    * Personal context for a user inside an organization. Backs the /me
    * dashboard's `usePersonalContext` hook (see
    * src/components/me/usePersonalContext.ts for the consumed shape).
@@ -833,10 +901,11 @@ export const userRouter = createTRPCRouter({
         organizationId: input.organizationId,
       });
       if (!adminEmail) {
-        throw new TRPCError({
-          code: "PRECONDITION_FAILED",
-          message: "no_admin_found",
-        });
+        logger.warn(
+          { organizationId: input.organizationId },
+          "budget increase requested but the organization has no admin",
+        );
+        throw new NoAdminConfiguredError();
       }
       const [organization, requester] = await Promise.all([
         ctx.prisma.organization.findUnique({

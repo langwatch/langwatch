@@ -5,9 +5,7 @@ type AgentEditorDrawerName =
   | "agentHttpEditor"
   | "agentWorkflowEditor";
 
-export function getAgentEditorDrawer(
-  type: AgentType,
-): AgentEditorDrawerName {
+export function getAgentEditorDrawer(type: AgentType): AgentEditorDrawerName {
   switch (type) {
     case "code":
       return "agentCodeEditor";

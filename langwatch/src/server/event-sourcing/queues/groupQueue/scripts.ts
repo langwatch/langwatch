@@ -1,13 +1,13 @@
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
-
-import { CachedLuaScript } from "./cachedLuaScript";
 import {
   BLOB_BACKSTOP_TTL_SECONDS,
   BLOB_LEASE_SET_TTL_SECONDS,
   BLOB_LEASE_TTL_SECONDS,
   LEGACY_HOLDER_LEASE_GUARD,
 } from "./blobConstants";
+import { GQ_BLOB_GRACE_LUA } from "./blobGraceLua";
+import { CachedLuaScript } from "./cachedLuaScript";
 
 // Lua scripts inlined as string constants.
 // This avoids loader incompatibilities across turbopack, webpack, vitest, and tsx.
@@ -418,13 +418,17 @@ end
 // its lease in the same eval as the staged value becomes visible. A squash
 // transfers the displaced lease atomically with that replacement. Releases
 // never delete content-addressed blobs: Redis TTL and the durable-store
-// lifecycle sweep are the only reclaim paths.
+// lifecycle sweep are the only reclaim paths. Retiring the LAST lease does
+// shorten the Redis-tier blob's expiry to the release grace window, which any
+// later take re-arms — see `blobGraceLua.ts`.
 //
 // Envelope lease parse mirrors the TS readEnvelopeLease: "GQ2|<len>|<headerJson>"
 // with header.ref = {tier, projectId, hash} and header.h = the lease holder id.
 // GQ1 values ("GQ1|", header.r = blob id) are private — their blob is
 // UNLINKed directly. Legacy bare-JSON / inline values carry no blob at all.
-const BLOB_LEASE_HELPER_LUA = `
+const BLOB_LEASE_HELPER_LUA =
+  GQ_BLOB_GRACE_LUA +
+  `
 local function gqTenantOf(groupId)
   local slashPos = string.find(groupId, "/", 1, true)
   if slashPos and slashPos > 1 then return string.sub(groupId, 1, slashPos - 1) end
@@ -503,9 +507,16 @@ local function gqSquashTransferLeases(keyPrefix, tenant, newValue, oldValue)
   local oldLeaseKey = keyPrefix .. "blobleases:" .. oldLease.projectId .. "/" .. oldLease.hash
   redis.call("ZREM", oldLeaseKey, oldLease.holderId)
   redis.call("ZREMRANGEBYSCORE", oldLeaseKey, "-inf", nowMs)
-  if redis.call("ZCARD", oldLeaseKey) == 0 then redis.call("DEL", oldLeaseKey) end
   local oldLegacyKey = keyPrefix .. "blobholders:" .. oldLease.projectId .. "/" .. oldLease.hash
   redis.call("SREM", oldLegacyKey, oldLease.holderId)
+  -- Same grace window the standalone release eval applies: a displaced blob
+  -- nothing leases any more must not sit on the full backstop.
+  local oldBlobKey = ""
+  if oldLease.tier == "redis" then
+    oldBlobKey = keyPrefix .. "blob:" .. oldLease.projectId .. "/" .. oldLease.hash
+  end
+  gqGraceExpireIfUnleased(oldLeaseKey, oldLegacyKey, oldBlobKey)
+  if redis.call("ZCARD", oldLeaseKey) == 0 then redis.call("DEL", oldLeaseKey) end
   return 0
 end
 
@@ -1066,6 +1077,17 @@ return results
  * so no other worker can concurrently dequeue from this group. Used to coalesce
  * a backed-up group's queued events into a single fold load/apply/store cycle.
  *
+ * Two bounds, whichever binds first (ADR-066 pillar 2):
+ *   - count: at most maxJobs candidates are considered.
+ *   - bytes: the drain stops BEFORE taking a job that would push
+ *     initialBytes + (sum of taken jobs' stored sizes) past maxBytes, so a
+ *     coalesced batch stays inside the downstream append/flush budget. A job
+ *     too large to fit is LEFT in staging (it becomes its own later dispatch),
+ *     never dropped. maxBytes <= 0 disables the byte bound (count bound only,
+ *     the pre-ADR-066 behaviour). Sizes are the stored envelope's `#value`,
+ *     which is the append-shaped quantity — for the small inline appends this
+ *     targets it equals the payload size.
+ *
  * Mirrors the per-job bookkeeping DISPATCH does for the jobs it removes:
  * ZREM from the jobs zset, HDEL the job data, and DECR total-pending. It does
  * NOT mark anything active and does NOT re-score ready — the caller's active
@@ -1076,23 +1098,42 @@ local jobsKey         = KEYS[1]
 local dataKey         = KEYS[2]
 local totalPendingKey = KEYS[3]
 
-local nowMs   = tonumber(ARGV[1])
-local maxJobs = tonumber(ARGV[2])
+local nowMs        = tonumber(ARGV[1])
+local maxJobs      = tonumber(ARGV[2])
+local maxBytes     = tonumber(ARGV[3]) or 0
+local initialBytes = tonumber(ARGV[4]) or 0
 
 local results = {}
 if maxJobs <= 0 then
   return results
 end
 
+-- Peek candidates in score order. HGET happens before the byte check so a job
+-- that would overflow the budget can be measured and then left in staging
+-- (we break rather than remove it), preserving score-ordered FIFO for the
+-- next dispatch.
 local entries = redis.call("ZRANGEBYSCORE", jobsKey, "-inf", nowMs, "WITHSCORES", "LIMIT", 0, maxJobs)
+local accumulated = initialBytes
 local i = 1
 while i < #entries do
   local stagedJobId   = entries[i]
   local originalScore = entries[i + 1]
   i = i + 2
 
-  redis.call("ZREM", jobsKey, stagedJobId)
   local jobDataJson = redis.call("HGET", dataKey, stagedJobId)
+  local size = 0
+  if jobDataJson then
+    size = #jobDataJson
+  end
+
+  -- Byte bound: stop before the first job that would overflow the budget.
+  -- Ordering keeps the batch FIFO, so everything from here on stays staged.
+  if maxBytes > 0 and (accumulated + size) > maxBytes then
+    break
+  end
+  accumulated = accumulated + size
+
+  redis.call("ZREM", jobsKey, stagedJobId)
   redis.call("HDEL", dataKey, stagedJobId)
   redis.call("DECR", totalPendingKey)
 
@@ -1279,7 +1320,8 @@ local activeKey    = keyPrefix .. "group:" .. groupId .. ":active"
 -- 1. Block the group — prevents dispatcher from re-dispatching
 redis.call("SADD", blockedKey, groupId)
 
--- 2. Re-stage the failed job with a new ID
+-- 2. Re-stage the failed job under the id it was dispatched under (ADR-080).
+--    Its member was ZREMed at claim time, so this insert lands on an absent one.
 local inserted = redis.call("ZADD", groupJobsKey, score, newStagedJobId)
 redis.call("HSET", groupDataKey, newStagedJobId, jobDataJson)
 local stagedLease = gqParseLease(jobDataJson)
@@ -1337,6 +1379,15 @@ const RETRY_RESTAGE_LUA =
   `
 local activeKey       = KEYS[1]
 local totalPendingKey = KEYS[2]
+-- The group's retry chain. Written HERE rather than by the caller beforehand:
+-- with the staged job id no longer carrying a /r/<n> marker (ADR-080), this
+-- counter is the only attempt carrier a re-staged SIBLING has — a sibling is
+-- re-queued with its original envelope and no attempt of its own. A separate
+-- SET that failed while this script went on to succeed would hand the next
+-- sibling-led claim a fresh budget, restarting a bounded ladder and letting a
+-- fold re-apply what the chain had already applied. One script means both land
+-- or neither does.
+local attemptKey      = KEYS[3]
 
 local keyPrefix             = ARGV[1]
 local groupId               = ARGV[2]
@@ -1350,11 +1401,19 @@ local retryTtlSec           = tonumber(ARGV[7])
 -- in-flight retry's slot doesn't lapse out of the live count.
 local tenantCountKeyPrefix  = ARGV[8]
 local nowMs                 = tonumber(ARGV[9])
+local attempt               = ARGV[10]
+local attemptTtlSec         = tonumber(ARGV[11])
 
 -- 1. Validate active key matches
 local currentActive = redis.call("GET", activeKey)
 if currentActive ~= stagedJobId then
   return 0
+end
+
+-- 1b. Record the attempt on the group's retry chain. After the guard, so a
+--     worker that has lost the slot cannot advance a chain it no longer owns.
+if attempt ~= "" then
+  redis.call("SET", attemptKey, attempt, "EX", attemptTtlSec)
 end
 
 -- 2. Re-stage job with future score (backoff delay)
@@ -1378,15 +1437,22 @@ refreshGroupKeyTtl(groupJobsKey, groupDataKey, nowMs)
 local readyKey = keyPrefix .. "ready"
 addToReadyOrParked(readyKey, groupId, dispatchAfterMs, false)
 
--- 4. Rotate the active key to the NEW staged-job id with a TTL matching the
---    backoff period. While the key exists the group is locked (preserves FIFO
+-- 4. Set the active key to the staged-job id with a TTL matching the backoff
+--    period. While the key exists the group is locked (preserves FIFO
 --    ordering); when it expires the dispatcher picks up the retry on its next
---    poll. Rotating the VALUE (not just EXPIRE-ing the old one) invalidates
---    the retired job id: the worker's activeKey heartbeat interval is still
---    armed for a few awaits after this eval returns (blob transfer, audit
---    write), and a late REFRESH matching the old id would reset this TTL to
---    the full activeTtlSec and push the ready score out with it — delaying
---    the retry by up to activeTtlSec instead of the backoff.
+--    poll.
+--
+--    THIS TTL IS WHAT MAKES THE BACKOFF REAL, and nothing here defends it.
+--    A REFRESH from the worker's heartbeat would reset it to the full
+--    activeTtlSec and push the ready score out with it, delaying the retry by
+--    up to activeTtlSec instead of the backoff. This used to be prevented
+--    here: the re-stage rotated the active key to a NEW id, so a late beat
+--    naming the retired id no longer matched. Since ADR-080 the id is reused,
+--    so newStagedJobId equals stagedJobId and this write invalidates nothing.
+--    The ONLY protection is that the caller stops the heartbeat before issuing
+--    this script (stopHeartbeat() in groupQueue.ts, ordered ahead of
+--    retryRestage on the same connection). Do not move that call later on the
+--    assumption that this line still guards it.
 redis.call("SET", activeKey, newStagedJobId, "EX", retryTtlSec)
 
 -- 5. Bump this slot's expiry score in lockstep with the activeKey TTL so the
@@ -1878,7 +1944,11 @@ export class GroupStagingScripts {
     nowMs: number;
     activeTtlSec: number;
   }): Promise<DispatchResult | null> {
-    const results = await this.dispatchBatch({ nowMs, activeTtlSec, maxJobs: 1 });
+    const results = await this.dispatchBatch({
+      nowMs,
+      activeTtlSec,
+      maxJobs: 1,
+    });
     return results[0] ?? null;
   }
 
@@ -2035,15 +2105,26 @@ export class GroupStagingScripts {
    * Drain up to maxJobs additional DUE jobs from a group's pending queue without
    * altering the group's active/ready state. Only safe while the caller holds
    * the group's active slot. Returns the drained jobs (may be empty).
+   *
+   * `maxBytes` caps the coalesced batch by the summed stored size of the jobs
+   * taken, counting `initialBytes` (the dispatched job's own stored size) toward
+   * the budget; the drain stops before a job that would overflow it, leaving that
+   * job in staging for its own later dispatch (ADR-066 pillar 2). `maxBytes <= 0`
+   * (the default) disables the byte bound, so callers that only want the count
+   * bound are unchanged.
    */
   async drainGroupReady({
     groupId,
     nowMs,
     maxJobs,
+    maxBytes = 0,
+    initialBytes = 0,
   }: {
     groupId: string;
     nowMs: number;
     maxJobs: number;
+    maxBytes?: number;
+    initialBytes?: number;
   }): Promise<DrainedJob[]> {
     if (maxJobs <= 0) return [];
 
@@ -2059,6 +2140,8 @@ export class GroupStagingScripts {
       totalPendingKey,
       String(nowMs),
       String(maxJobs),
+      String(maxBytes),
+      String(initialBytes),
     );
 
     if (!result || !Array.isArray(result) || result.length < 3) {
@@ -2086,16 +2169,26 @@ export class GroupStagingScripts {
     groupId,
     stagedJobId,
     activeTtlSec,
+    isCancelled,
   }: {
     groupId: string;
     stagedJobId: string;
     activeTtlSec: number;
+    /**
+     * Withdraws the refresh if the caller stops wanting it while the call is in
+     * flight. Only the NOSCRIPT fallback can be withdrawn — see
+     * {@link CachedLuaScript.runCancellable} — which is exactly the window
+     * where a refresh could otherwise land behind a re-stage and undo its
+     * backoff.
+     */
+    isCancelled?: () => boolean;
   }): Promise<boolean> {
     const activeKey = `${this.keyPrefix}group:${groupId}:active`;
     const readyKey = `${this.keyPrefix}ready`;
 
-    const result = await refreshScript.run(
+    const result = await refreshScript.runCancellable(
       this.redis,
+      isCancelled ?? null,
       2,
       activeKey,
       readyKey,
@@ -2169,6 +2262,8 @@ export class GroupStagingScripts {
     dispatchAfterMs,
     jobDataJson,
     backoffMs,
+    attempt,
+    attemptTtlSec,
   }: {
     groupId: string;
     stagedJobId: string;
@@ -2176,17 +2271,22 @@ export class GroupStagingScripts {
     dispatchAfterMs: number;
     jobDataJson: string;
     backoffMs: number;
+    /** Recorded on the group's retry chain in the same atomic step. */
+    attempt: number;
+    attemptTtlSec: number;
   }): Promise<boolean> {
     const activeKey = `${this.keyPrefix}group:${groupId}:active`;
     const totalPendingKey = `${this.keyPrefix}stats:total-pending`;
+    const attemptKey = `${this.keyPrefix}group:${groupId}:attempt`;
     // TTL = backoff + 2s buffer so the key expires just after the job becomes eligible
     const retryTtlSec = Math.ceil(backoffMs / 1000) + 2;
 
     const result = await retryRestageScript.run(
       this.redis,
-      2,
+      3,
       activeKey,
       totalPendingKey,
+      attemptKey,
       this.keyPrefix,
       groupId,
       stagedJobId,
@@ -2196,6 +2296,8 @@ export class GroupStagingScripts {
       String(retryTtlSec),
       `${this.keyPrefix}tenant_active_z:`,
       String(Date.now()),
+      String(attempt),
+      String(attemptTtlSec),
     );
 
     return result === 1;

@@ -1,6 +1,6 @@
 import { useMemo } from "react";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useDrawerStore } from "~/features/traces-v2/stores/drawerStore";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { PresenceLocation } from "~/server/app-layer/presence/types";
 import {
   selectMostVisibleSection,
@@ -31,8 +31,8 @@ export function useTracesV2Presence(): void {
 
   const location = useMemo<PresenceLocation>(() => {
     const route: PresenceLocation["route"] = {
-      traceId: isOpen ? traceId ?? null : null,
-      spanId: isOpen ? selectedSpanId ?? null : null,
+      traceId: isOpen ? (traceId ?? null) : null,
+      spanId: isOpen ? (selectedSpanId ?? null) : null,
     };
     if (!isOpen) {
       return { lens: "traces", route };
@@ -45,9 +45,8 @@ export function useTracesV2Presence(): void {
     // mode (which is a UI affordance, not a separate location). `tab`
     // is dropped now that SpanTabBar carries only span-scope tabs; the
     // selected span is already captured via `route.spanId`.
-    const wireMode: "trace" | "conversation" = viewMode === "conversation"
-      ? "conversation"
-      : "trace";
+    const wireMode: "trace" | "conversation" =
+      viewMode === "conversation" ? "conversation" : "trace";
     const view: NonNullable<PresenceLocation["view"]> = {
       mode: wireMode,
       panel: vizTab,

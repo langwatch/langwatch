@@ -19,7 +19,6 @@ import {
   type ProjectMetadataReactorDeps,
 } from "../projectMetadata.reactor";
 
-
 function createFoldState(
   overrides: Partial<TraceSummaryData> = {},
 ): TraceSummaryData {
@@ -342,8 +341,6 @@ describe("createProjectMetadataReactor()", () => {
       // Must not throw
       await expect(reactor.handle(event, context)).resolves.toBeUndefined();
     });
-
-
   });
 
   describe("given a project receiving its first real trace", () => {

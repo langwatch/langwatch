@@ -158,6 +158,41 @@ Feature: AI Gateway — Virtual Keys
     And the description does NOT frame caching as Anthropic-specific
 
   # ============================================================================
+  # Tags field — typing a tag here is the moment a person decides what will be
+  # visible on every trace the key produces, so the field has to say so. The
+  # explanation lives behind the label's information icon, the way every other
+  # field in the drawer explains itself, and the field itself stays quiet
+  # unless what is typed would not survive the save.
+  # ============================================================================
+
+  @integration
+  Scenario: The Tags field explains itself behind the label's information icon
+    When I open the "New virtual key" drawer
+    Then no explanation sits under the Tags field
+    When I open the information icon next to the "Tags" label
+    Then it says tags group this key's traffic by team, app, or environment
+    And it says every trace the key sends carries its tags as labels that
+      anyone with access to the project can see and filter on
+    And it says a cache rule listing tags applies to any key carrying all of them
+    And it says how many tags are kept, how long each may be, and that
+      blanks and repeats are dropped
+    And it links to the cache-rules documentation
+
+  @integration
+  Scenario: A tag list that will not survive the save says so before saving
+    When I open the "New virtual key" drawer
+    And I type more tags than the key keeps
+    Then the field warns that only the first tags will be saved
+    When I type a tag longer than a tag may be
+    Then the field warns that over-long tags will be shortened
+
+  @integration
+  Scenario: A tag list within the limits gets no warning
+    When I open the "New virtual key" drawer
+    And I type a handful of ordinary tags
+    Then the field shows no warning under it
+
+  # ============================================================================
   # Cache control (Lane B iter 35) — provider-agnostic framing in the edit
   # drawer. Modes: respect (passthrough, default), force (always cache on
   # providers that support it, no-op where unsupported), disable (strip

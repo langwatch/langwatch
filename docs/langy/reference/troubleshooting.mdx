@@ -1,0 +1,55 @@
+---
+title: Langy Troubleshooting
+description: Common Langy problems and the exact check for each, from Langy not appearing in your org to a PR it cannot open, no configured model, and a stopped turn.
+sidebarTitle: Troubleshooting
+keywords: langy troubleshooting, langy not working, langy not available, langy cannot open pr
+---
+
+Each problem below lists the check that resolves it. Start with the one that matches the symptom.
+
+<AccordionGroup>
+  <Accordion title="Langy is not available in my org">
+    - **Cloud:** Langy is available. Open the panel to get started.
+    - **Self-hosted:** the agent pod deploys by default. Confirm it was not disabled (`langyagent.chartManaged=false`) and the pod is running. A running pod is not the whole story: with `enableForAllUsers: false` the install keeps the rollout flag authoritative, so Langy stays dark until you target the projects or organizations you want. See [Self-hosting overview](/self-hosting/langy/overview) and [Setup](/self-hosting/langy/setup#staged-rollout).
+  </Accordion>
+
+  <Accordion title="Langy can't open a PR">
+    Two common causes.
+
+    - **The GitHub App is not installed.** Langy opens pull requests only on repositories where its GitHub App is installed. When it reaches for `git` or `gh` and no install exists, it stops the turn and shows an Install card in chat. Use that card to install the app, then re-run the turn. See [GitHub access](/langy/security/github-access).
+    - **Outbound HTTPS is off (self-hosted).** A hardened install with `networkPolicy.allowExternalHttps` set to `false` blocks `github.com`, `api.github.com`, and `codeload.github.com`. Allow those FQDNs (or turn `allowExternalHttps` on) so the worker can push and open the PR. See [Networking and egress](/self-hosting/langy/networking-and-egress).
+    - Also check you are under the daily PR cap. Langy opens at most 20 pull requests per project per day. See [Limits](/langy/reference/limits).
+  </Accordion>
+
+  <Accordion title="Langy has no model">
+    Langy runs on the providers your project has enabled, and there is no default key. Configure a provider (paste an API key) or sign in with your OpenAI account for Codex. Until a model is available for the Langy role, Langy cannot run a turn. See [Supported models](/langy/reference/supported-models) and [Codex](/langy/codex).
+  </Accordion>
+
+  <Accordion title="A turn was stopped">
+    You can stop a running turn for real, and you can continue or resume afterward. A stop is an intentional outcome, not a failure: Langy keeps the partial answer streamed so far, and nothing you did is wrong. Continue the conversation, or ask again. A refresh mid-turn rejoins the running turn rather than losing it.
+  </Accordion>
+
+  <Accordion title="Langy's worker stopped mid-reply">
+    If a worker process dies mid-reply, Langy surfaces a "worker stopped" card. Your message is safe. Send it again; a fresh worker spawns for the next turn.
+  </Accordion>
+</AccordionGroup>
+
+## Audit-log events to check
+
+When Langy touches GitHub, it writes audit-log events. Use these to confirm what happened and when.
+
+| Event | Meaning |
+|---|---|
+| `langy.github.install` | The Langy GitHub App was installed and bound to your org. |
+| `langy.github.disconnect` | The Langy GitHub App was disconnected. |
+
+<Info>
+**Also check:** [GitHub access](/langy/security/github-access), [Limits](/langy/reference/limits), [Supported models](/langy/reference/supported-models).
+</Info>
+
+## Reference
+
+- [Self-hosting overview](/self-hosting/langy/overview)
+- [GitHub access](/langy/security/github-access)
+- [Supported models](/langy/reference/supported-models)
+- [Limits](/langy/reference/limits)

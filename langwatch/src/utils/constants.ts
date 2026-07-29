@@ -58,9 +58,13 @@ export const KSUID_RESOURCES = {
   GROUP: "group",
   ROLE_BINDING: "rolebinding",
   API_KEY_ROLE: "apikeyrole",
+  BUG_REPORT: "bugreport",
   LANGY_CONVERSATION: "langyconv",
   LANGY_MESSAGE: "langymsg",
   TOPIC_CLUSTERING_RUN: "topicrun",
   TOPIC_CLUSTERING_RUN_HISTORY: "topicrunhist",
   TOPIC_MODEL_PROJECTION: "topicmodel",
+  PROCESS_MANAGER_INSTANCE: "pminstance",
+  PROCESS_MANAGER_INBOX: "pminbox",
+  PROCESS_MANAGER_OUTBOX: "pmoutbox",
 } as const;

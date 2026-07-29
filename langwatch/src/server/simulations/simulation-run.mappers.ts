@@ -1,6 +1,6 @@
 import { ScenarioRunStatus, Verdict } from "../scenarios/scenario-event.enums";
-import { resolveRunStatus } from "../scenarios/stall-detection";
 import type { ScenarioRunData } from "../scenarios/scenario-event.types";
+import { resolveRunStatus } from "../scenarios/stall-detection";
 
 type ScenarioMessages = ScenarioRunData["messages"];
 
@@ -92,7 +92,8 @@ export function mapClickHouseRowToScenarioRunData(
   const startedAt = row.StartedAt != null ? Number(row.StartedAt) : null;
   const createdAt = Number(row.CreatedAt);
   const finishedAt = row.FinishedAt != null ? Number(row.FinishedAt) : null;
-  const durationMs = row.DurationMs != null ? parseInt(row.DurationMs, 10) : null;
+  const durationMs =
+    row.DurationMs != null ? parseInt(row.DurationMs, 10) : null;
   // Use StartedAt for duration calculation (CreatedAt is CH insertion time, which can be after FinishedAt)
   const startTimestamp = startedAt ?? createdAt;
 
@@ -114,7 +115,13 @@ export function mapClickHouseRowToScenarioRunData(
   const messages = roles.map((role, i) => {
     const restStr = row["Messages.Rest"]?.[i];
     const restFields = restStr
-      ? (() => { try { return JSON.parse(restStr) as Record<string, unknown>; } catch { return {}; } })()
+      ? (() => {
+          try {
+            return JSON.parse(restStr) as Record<string, unknown>;
+          } catch {
+            return {};
+          }
+        })()
       : {};
     const { content: restContent, ...restWithoutContent } = restFields;
     const content = Array.isArray(restContent)
@@ -147,10 +154,14 @@ export function mapClickHouseRowToScenarioRunData(
     ? (() => {
         try {
           const parsed: unknown = JSON.parse(row.Metadata);
-          return parsed != null && typeof parsed === "object" && !Array.isArray(parsed)
+          return parsed != null &&
+            typeof parsed === "object" &&
+            !Array.isArray(parsed)
             ? (parsed as Record<string, unknown>)
             : null;
-        } catch { return null; }
+        } catch {
+          return null;
+        }
       })()
     : null;
 
@@ -158,6 +169,10 @@ export function mapClickHouseRowToScenarioRunData(
     scenarioId: row.ScenarioId,
     batchRunId: row.BatchRunId,
     scenarioRunId: row.ScenarioRunId,
+    // The scenario set this run belongs to — used to group runs by suite
+    // (run-history-transforms) and to filter ClickHouse reads by set. It no
+    // longer shapes the run's platformUrl (the drawer link is run-id only).
+    scenarioSetId: row.ScenarioSetId,
     name: row.Name,
     description: row.Description,
     metadata,
@@ -167,9 +182,18 @@ export function mapClickHouseRowToScenarioRunData(
     timestamp: startedAt ?? createdAt,
     updatedAt,
     durationInMs:
-      durationMs ?? (finishedAt != null ? finishedAt - startTimestamp : updatedAt - startTimestamp),
+      durationMs ??
+      (finishedAt != null
+        ? finishedAt - startTimestamp
+        : updatedAt - startTimestamp),
     totalCost: row.TotalCost ?? undefined,
-    roleCosts: row.RoleCosts && Object.keys(row.RoleCosts).length > 0 ? row.RoleCosts : undefined,
-    roleLatencies: row.RoleLatencies && Object.keys(row.RoleLatencies).length > 0 ? row.RoleLatencies : undefined,
+    roleCosts:
+      row.RoleCosts && Object.keys(row.RoleCosts).length > 0
+        ? row.RoleCosts
+        : undefined,
+    roleLatencies:
+      row.RoleLatencies && Object.keys(row.RoleLatencies).length > 0
+        ? row.RoleLatencies
+        : undefined,
   };
 }

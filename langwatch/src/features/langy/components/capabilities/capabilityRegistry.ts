@@ -32,19 +32,19 @@
  * resources it lists, and anything it has never heard of — a command the
  * backend shipped before this UI did — degrades to a humanised card on the
  * neutral `platform` surface with no deep link. WHICH card / verb tone comes
- * from the shared `@langwatch/cli-cards` contract, so the panel and the CLI
+ * from the shared `@langwatch/langy` contract, so the panel and the CLI
  * share one grammar. Only a name that is not a CLI call at all (a raw `bash`)
  * falls through to the raw view. The older MCP transport (`platform_*` /
  * `search_traces`) has been retired.
  */
 
 import {
-  type CardKind,
   CLI_COLLECTION_VERBS,
   type CliResultDigest,
   cardKindFor,
   cliVerbTone,
-} from "@langwatch/cli-cards";
+  type MeasuredCardKind,
+} from "@langwatch/langy";
 import {
   type CliCommand,
   featureForCliCommand,
@@ -64,11 +64,14 @@ export type CapabilityTone = "read" | "created" | "updated" | "removed";
 export interface CapabilityDescriptor {
   /**
    * Which bespoke renderer draws the card. The vocabulary is the shared CLI
-   * contract's `CardKind` (`@langwatch/cli-cards`) — one name per card, resolved
-   * once by `cardKindFor` and rendered by {@link LangyCapabilityRenderer}. A
-   * `traces` kind is a trace SEARCH (the sample card), `trace` a single get.
+   * contract's `MeasuredCardKind` (`@langwatch/langy`), rendered by
+   * {@link LangyCapabilityRenderer}. A `traces` kind is a trace SEARCH (the
+   * sample card), `trace` a single get.
+   *
+   * `cardKindFor` seeds this from the command's name; when the call carries a
+   * result envelope, the card stamped there wins (see {@link withDecidedCard}).
    */
-  render: CardKind;
+  render: MeasuredCardKind;
   tone: CapabilityTone;
   surface: CapabilitySurface;
   /** Mono overline label, e.g. "Traces", "New evaluator", "Delete dashboard". */
@@ -111,6 +114,7 @@ export const SURFACE_LABEL: Record<CapabilitySurface, string> = {
   prompts: "Prompts",
   dashboards: "Dashboards",
   simulations: "Simulations",
+  scenarios: "Scenarios",
   agents: "Agents",
   automations: "Automations",
   workflows: "Workflows",
@@ -145,15 +149,36 @@ const SURFACE_ROUTE_CONFIG: Record<CapabilitySurface, SurfaceRouteConfig> = {
   },
   evaluators: {
     path: "evaluators",
+    // `evaluatorEditor` is the drawer that actually exists (drawerRegistry.ts);
+    // an earlier cut deep-linked `evaluatorViewer`, which no drawer answers to,
+    // so "open the evaluator" landed on the list with nothing open.
     resourceHref: (base, resourceId) =>
-      `${base}?drawer.open=evaluatorViewer&drawer.evaluatorId=${encodeURIComponent(
+      `${base}?drawer.open=evaluatorEditor&drawer.evaluatorId=${encodeURIComponent(
         resourceId,
       )}`,
   },
   datasets: { path: "datasets", resourceHref: nestedResourceHref },
   prompts: { path: "prompts" },
-  dashboards: { path: "analytics/custom" },
+  // The dashboard VIEWER, and the specific dashboard when we know which one.
+  // This pointed at "analytics/custom" — the empty graph builder — so every
+  // "Open in Dashboards" landed on a blank form with no dashboard in it. The
+  // REST layer already builds the correct form (`/analytics/reports?dashboard=`).
+  dashboards: {
+    path: "analytics/reports",
+    resourceHref: (base, resourceId) => `${base}?dashboard=${resourceId}`,
+  },
   simulations: { path: "simulations" },
+  // A scenario lives in the scenario LIBRARY, and its own page is that library
+  // with the scenario open — the same URL the scenarios API hands out as
+  // `platformUrl`. The Simulations index is the run history, where a scenario
+  // that was just written does not appear at all.
+  scenarios: {
+    path: "simulations/scenarios",
+    resourceHref: (base, resourceId) =>
+      `${base}?drawer.open=scenarioEditor&drawer.scenarioId=${encodeURIComponent(
+        resourceId,
+      )}`,
+  },
   agents: { path: "agents" },
   automations: { path: "automations" },
   workflows: { path: "workflows" },
@@ -226,7 +251,7 @@ export function buildResourceHref({
  * not its verb — so its `past` is empty.
  *
  * The verb's TONE (read / create / update / remove) is the shared contract's to
- * decide (`cliVerbTone` in `@langwatch/cli-cards`); it classifies verbs for the
+ * decide (`cliVerbTone` in `@langwatch/langy`); it classifies verbs for the
  * whole card catalogue and stays the single source of that truth, so it is
  * deliberately not duplicated here.
  */
@@ -297,7 +322,7 @@ function capitalize(text: string): string {
 export interface CliCapability {
   command: CliCommand;
   surface: CapabilitySurface;
-  render: CardKind;
+  render: MeasuredCardKind;
   tone: CapabilityTone;
   /** Which body widget `LangyDeclarativeCard` draws the result with. */
   body: CapabilityBodyWidget;
@@ -315,7 +340,7 @@ export interface CliCapability {
  * card a home instead of the neutral `platform` one.
  *
  * WHICH card, and the verb's tone, are NOT here: those are CLI grammar, resolved
- * once in `@langwatch/cli-cards` (`cardKindFor`, `cliVerbTone`) and shared with
+ * once in `@langwatch/langy` (`cardKindFor`, `cliVerbTone`) and shared with
  * the CLI itself. This module owns only the view binding layered on top of them,
  * so the panel and the CLI can never disagree about what a command produced.
  */
@@ -325,7 +350,7 @@ export const SURFACE_BY_FEATURE: Record<string, CapabilitySurface> = {
   "observability.annotations": "annotations",
   "evaluations.experiments": "experiments",
   "evaluations.online-evaluation": "evaluations",
-  "agent-simulations.scenarios": "simulations",
+  "agent-simulations.scenarios": "scenarios",
   "agent-simulations.runs": "simulations",
   "agent-simulations.suites": "simulations",
   "prompt-management.prompts": "prompts",
@@ -350,7 +375,7 @@ function derivedBodyWidget({
   render,
   verb,
 }: {
-  render: CardKind;
+  render: MeasuredCardKind;
   verb: string;
 }): CapabilityBodyWidget {
   switch (render) {
@@ -362,7 +387,16 @@ function derivedBodyWidget({
       return "facts";
     case "metrics":
     case "evalRun":
+    case "spend":
       return "stats";
+    // The plot IS the body — there is no stats/rows/facts widget that says
+    // anything a chart does not say better.
+    case "timeseries":
+      return "chart";
+    case "evaluatorConfig":
+      return "facts";
+    case "dashboard":
+      return "rows";
     case "promptDiff":
       return "diff";
     case "resourceCreated":
@@ -382,7 +416,7 @@ function bodyWidgetFor({
   tone,
 }: {
   entry: CapabilityCatalogEntry | undefined;
-  render: CardKind;
+  render: MeasuredCardKind;
   verb: string;
   tone: CapabilityTone;
 }): CapabilityBodyWidget {
@@ -443,6 +477,45 @@ export function resolveCliCapability(rawName: string): CliCapability | null {
     tone,
     body,
     noun: humanizeResource(command.resource),
+  };
+}
+
+/**
+ * Re-seat a descriptor on the card the RESULT was stamped with.
+ *
+ * `cardKindFor` answers from the command's NAME, which is a PRIOR. The card on
+ * the envelope is the DECISION — made once at the command boundary, where the
+ * payload was in hand, and carried from there to the event log, the live edge
+ * and this panel (ADR-079 §1/§3). When the two differ it is because the payload
+ * earned a richer card than its name could give it, which is the only thing
+ * promotion ever produces. So the decision wins, and the body widget is
+ * re-derived for the card that is actually being drawn.
+ *
+ * Without this the panel re-decided from the name and discarded anything that
+ * disagreed — so a promotion, whose defining property is that it disagrees,
+ * could only ever make a card vanish.
+ */
+export function withDecidedCard({
+  descriptor,
+  card,
+}: {
+  descriptor: CapabilityDescriptor;
+  card: MeasuredCardKind;
+}): CapabilityDescriptor {
+  if (card === descriptor.render) return descriptor;
+
+  const entry = (CAPABILITY_CATALOG as Record<string, CapabilityCatalogEntry>)[
+    descriptor.command.resource
+  ];
+  return {
+    ...descriptor,
+    render: card,
+    body: bodyWidgetFor({
+      entry,
+      render: card,
+      verb: descriptor.command.verb,
+      tone: descriptor.tone,
+    }),
   };
 }
 

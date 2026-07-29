@@ -88,7 +88,7 @@ describe.skipIf(!RUN_EXTERNAL)("LangChain Multi-Agent Integration Tests", () => 
     spanExporter.reset();
   });
 
-  it("should trace multi-agent collaboration workflow", async () => {
+  it("traces multi-agent collaboration workflow", async () => {
     const tracer = getLangWatchTracer("multi-agent-test");
 
     await tracer.withActiveSpan(
@@ -169,7 +169,7 @@ describe.skipIf(!RUN_EXTERNAL)("LangChain Multi-Agent Integration Tests", () => 
     });
   }, 30000);
 
-  it("should handle nested agent execution with tool chains", async () => {
+  it("handles nested agent execution with tool chains", async () => {
     const tracer = getLangWatchTracer("nested-agent-test");
 
     await tracer.withActiveSpan(
@@ -275,7 +275,7 @@ describe.skipIf(!RUN_EXTERNAL)("LangChain Multi-Agent Integration Tests", () => 
     });
   }, 30000);
 
-  it("should trace conversational agent memory and context", async () => {
+  it("traces conversational agent memory and context", async () => {
     const tracer = getLangWatchTracer("conversational-agent-test");
 
     await tracer.withActiveSpan(
@@ -378,7 +378,7 @@ describe.skipIf(!RUN_EXTERNAL)("LangChain Multi-Agent Integration Tests", () => 
     });
   }, 30000);
 
-  it("should handle agent error recovery and fallback chains", async () => {
+  it("handles agent error recovery and fallback chains", async () => {
     const tracer = getLangWatchTracer("error-recovery-test");
 
     await tracer.withActiveSpan(
@@ -475,7 +475,7 @@ describe.skipIf(!RUN_EXTERNAL)("LangChain Multi-Agent Integration Tests", () => 
     });
   }, 30000);
 
-  it("should trace parallel agent execution", async () => {
+  it("traces parallel agent execution", async () => {
     const tracer = getLangWatchTracer("parallel-agent-test");
 
     await tracer.withActiveSpan(
@@ -569,7 +569,7 @@ describe.skipIf(!RUN_EXTERNAL)("LangChain Multi-Agent Integration Tests", () => 
     });
   }, 30000);
 
-  it("should verify comprehensive span data capture integrity", async () => {
+  it("verifies comprehensive span data capture integrity", async () => {
     const tracer = getLangWatchTracer("data-integrity-test");
 
     await tracer.withActiveSpan(

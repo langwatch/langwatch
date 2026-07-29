@@ -44,12 +44,12 @@
  *   - organization.prisma.repository.governance-filter.integration.test.ts
  *     (Alexis 94426716e — Layer-1 filter)
  */
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { nanoid } from "nanoid";
 
-import { prisma } from "~/server/db";
 import { IngestionSourceService } from "@ee/governance/services/activity-monitor/ingestionSource.service";
 import { PROJECT_KIND } from "@ee/governance/services/governanceProject.service";
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { prisma } from "~/server/db";
 
 import { app as ingestApp } from "../ingestionRoutes";
 
@@ -131,7 +131,9 @@ async function deleteSeededOrg(seed: SeededOrg | null): Promise<void> {
   await prisma.organization
     .delete({ where: { id: seed.organizationId } })
     .catch(() => undefined);
-  await prisma.user.delete({ where: { id: seed.userId } }).catch(() => undefined);
+  await prisma.user
+    .delete({ where: { id: seed.userId } })
+    .catch(() => undefined);
 }
 
 function buildOtlpJsonBody(
@@ -203,7 +205,8 @@ function buildOtlpLogsJsonBody(): ArrayBuffer {
       },
     ],
   };
-  return new TextEncoder().encode(JSON.stringify(payload)).buffer as ArrayBuffer;
+  return new TextEncoder().encode(JSON.stringify(payload))
+    .buffer as ArrayBuffer;
 }
 
 const handleTraceSpy = vi.fn(
@@ -247,9 +250,13 @@ describe("/api/ingest/* — end-to-end HTTP receiver contract", () => {
 
   beforeAll(async () => {
     otelSeed = await seedOrgWithIngestionSource({ sourceType: "otel_generic" });
-    coworkSeed = await seedOrgWithIngestionSource({ sourceType: "claude_cowork" });
+    coworkSeed = await seedOrgWithIngestionSource({
+      sourceType: "claude_cowork",
+    });
     workatoSeed = await seedOrgWithIngestionSource({ sourceType: "workato" });
-    crossOrgSeed = await seedOrgWithIngestionSource({ sourceType: "otel_generic" });
+    crossOrgSeed = await seedOrgWithIngestionSource({
+      sourceType: "otel_generic",
+    });
   });
 
   afterAll(async () => {
@@ -378,10 +385,9 @@ describe("/api/ingest/* — end-to-end HTTP receiver contract", () => {
         const [tenantId, parsedRequest] = handleTraceSpy.mock.calls[0]!;
         expect(tenantId).toBe(govProject.id);
 
-        const allSpans = (
-          (parsedRequest as any).resourceSpans ?? []
-        ).flatMap((rs: any) =>
-          (rs.scopeSpans ?? []).flatMap((ss: any) => ss.spans ?? []),
+        const allSpans = ((parsedRequest as any).resourceSpans ?? []).flatMap(
+          (rs: any) =>
+            (rs.scopeSpans ?? []).flatMap((ss: any) => ss.spans ?? []),
         );
         expect(allSpans).toHaveLength(spanCount);
 
@@ -390,13 +396,19 @@ describe("/api/ingest/* — end-to-end HTTP receiver contract", () => {
         );
         expect(stampedAttrs).toContain("langwatch.origin.kind");
         expect(stampedAttrs).toContain("langwatch.ingestion_source.id");
-        expect(stampedAttrs).toContain("langwatch.ingestion_source.organization_id");
-        expect(stampedAttrs).toContain("langwatch.ingestion_source.source_type");
+        expect(stampedAttrs).toContain(
+          "langwatch.ingestion_source.organization_id",
+        );
+        expect(stampedAttrs).toContain(
+          "langwatch.ingestion_source.source_type",
+        );
 
         const sourceIdAttr = (allSpans[0]?.attributes ?? []).find(
           (a: any) => a.key === "langwatch.ingestion_source.id",
         );
-        expect(sourceIdAttr?.value?.stringValue).toBe(otelSeed!.ingestionSourceId);
+        expect(sourceIdAttr?.value?.stringValue).toBe(
+          otelSeed!.ingestionSourceId,
+        );
 
         const orgIdAttr = (allSpans[0]?.attributes ?? []).find(
           (a: any) => a.key === "langwatch.ingestion_source.organization_id",
@@ -425,10 +437,9 @@ describe("/api/ingest/* — end-to-end HTTP receiver contract", () => {
         );
         expect(res.status).toBe(202);
         const [, parsedRequest] = handleTraceSpy.mock.calls[0]!;
-        const allSpans = (
-          (parsedRequest as any).resourceSpans ?? []
-        ).flatMap((rs: any) =>
-          (rs.scopeSpans ?? []).flatMap((ss: any) => ss.spans ?? []),
+        const allSpans = ((parsedRequest as any).resourceSpans ?? []).flatMap(
+          (rs: any) =>
+            (rs.scopeSpans ?? []).flatMap((ss: any) => ss.spans ?? []),
         );
         const userEmailAttr = (allSpans[0]?.attributes ?? []).find(
           (a: any) => a.key === "user.email",
@@ -571,7 +582,9 @@ describe("/api/ingest/* — end-to-end HTTP receiver contract", () => {
         const { logRequest } = handleLogSpy.mock.calls[0]![0] as {
           logRequest: {
             resourceLogs?: {
-              scopeLogs?: { logRecords?: { attributes?: { key: string }[] }[] }[];
+              scopeLogs?: {
+                logRecords?: { attributes?: { key: string }[] }[];
+              }[];
             }[];
           };
         };
@@ -696,7 +709,9 @@ describe("/api/ingest/* — end-to-end HTTP receiver contract", () => {
         const attrKeys = (record.attributes ?? []).map((a: any) => a.key);
         expect(attrKeys).toContain("langwatch.origin.kind");
         expect(attrKeys).toContain("langwatch.ingestion_source.id");
-        expect(attrKeys).toContain("langwatch.ingestion_source.organization_id");
+        expect(attrKeys).toContain(
+          "langwatch.ingestion_source.organization_id",
+        );
         expect(attrKeys).toContain("langwatch.ingestion_source.source_type");
 
         const sourceTypeAttr = (record.attributes ?? []).find(

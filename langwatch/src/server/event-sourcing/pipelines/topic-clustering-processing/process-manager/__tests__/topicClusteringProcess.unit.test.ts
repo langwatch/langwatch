@@ -1,18 +1,18 @@
 import { describe, expect, it } from "vitest";
 
 import { buildProcessManager } from "~/server/event-sourcing/pipeline/processBuilder";
-import { buildProcessDefinition } from "~/server/event-sourcing/process-manager/processRuntime";
-import type { ProcessDefinition } from "~/server/event-sourcing/process-manager";
-import type { TopicClusteringProcessingEvent } from "~/server/event-sourcing/pipelines/topic-clustering-processing/schemas/events";
 import { topicClusteringPM } from "~/server/event-sourcing/pipelines/topic-clustering-processing/pipeline";
+import type { TopicClusteringProcessingEvent } from "~/server/event-sourcing/pipelines/topic-clustering-processing/schemas/events";
+import type { ProcessDefinition } from "~/server/event-sourcing/process-manager";
+import { buildProcessDefinition } from "~/server/event-sourcing/process-manager/processRuntime";
 
 import {
   buildProcessEventView,
   nextDailySlot,
   TOPIC_CLUSTERING_STALE_RUN_MS,
 } from "../topicClustering.process";
-import { TOPIC_CLUSTERING_PROCESS_NAME } from "../topicClusteringProcess.types";
 import type { TopicClusteringProcessState } from "../topicClusteringProcess.types";
+import { TOPIC_CLUSTERING_PROCESS_NAME } from "../topicClusteringProcess.types";
 
 const PROJECT_ID = "project-1";
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -316,10 +316,7 @@ describe("topicClustering process (runtime-built definition)", () => {
 
   describe("when a wake fires for a never-bootstrapped process", () => {
     it("decides nothing and clears its own wake", () => {
-      const evolution = evolveWake(
-        initialState,
-        5_000,
-      );
+      const evolution = evolveWake(initialState, 5_000);
 
       expect(evolution.intents).toEqual([]);
       expect(evolution.nextWakeAt).toBeNull();
@@ -342,7 +339,11 @@ describe("topicClustering process (runtime-built definition)", () => {
         {
           messageKey: runKey(`manual-${occurredAt}`, 1),
           intentType: "run",
-          payload: { runId: `manual-${occurredAt}`, page: 1, searchAfter: null },
+          payload: {
+            runId: `manual-${occurredAt}`,
+            page: 1,
+            searchAfter: null,
+          },
         },
       ]);
       expect(evolution.nextWakeAt).toBe(nextDailySlot(PROJECT_ID, occurredAt));
@@ -377,7 +378,11 @@ describe("topicClustering process (runtime-built definition)", () => {
       const evolution = evolveEvent(
         {
           ...bootstrappedState(),
-          currentRun: { runId: "20260717", page: 1, updatedAtMs: occurredAt - 1 },
+          currentRun: {
+            runId: "20260717",
+            page: 1,
+            updatedAtMs: occurredAt - 1,
+          },
         },
         makeEvent({
           type: "lw.obs.topic_clustering.run_completed",
@@ -415,7 +420,11 @@ describe("topicClustering process (runtime-built definition)", () => {
       const evolution = evolveEvent(
         {
           ...bootstrappedState(),
-          currentRun: { runId: "20260717", page: 2, updatedAtMs: occurredAt - 1 },
+          currentRun: {
+            runId: "20260717",
+            page: 2,
+            updatedAtMs: occurredAt - 1,
+          },
         },
         makeEvent({
           type: "lw.obs.topic_clustering.run_completed",
@@ -500,7 +509,11 @@ describe("topicClustering process (runtime-built definition)", () => {
       const evolution = evolveEvent(
         {
           ...bootstrappedState(),
-          currentRun: { runId: "20260717", page: 2, updatedAtMs: occurredAt - 1 },
+          currentRun: {
+            runId: "20260717",
+            page: 2,
+            updatedAtMs: occurredAt - 1,
+          },
         },
         makeEvent({
           type: "lw.obs.topic_clustering.run_failed",
@@ -565,7 +578,12 @@ describe("topicClustering process (runtime-built definition)", () => {
       const startedAtMs = Date.UTC(2026, 6, 17, 2, 0);
       const state: TopicClusteringProcessState = {
         ...bootstrappedState(),
-        currentRun: { runId: "20260717", page: 4, updatedAtMs: startedAtMs, startedAtMs },
+        currentRun: {
+          runId: "20260717",
+          page: 4,
+          updatedAtMs: startedAtMs,
+          startedAtMs,
+        },
       };
 
       const evolution = evolveWake(state, startedAtMs + 60_000);

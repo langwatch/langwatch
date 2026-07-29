@@ -1,3 +1,12 @@
+import {
+  LANGY_CONVERSATION_TURN_STATUS,
+  type LangyConversationTurnData,
+  type LangyConversationTurnStatus,
+  langyMessagePartSchema,
+  langyPlanItemSchema,
+  langyTurnToolCallSchema,
+  parseConversationTurnKey,
+} from "@langwatch/langy";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
@@ -5,36 +14,35 @@ import type {
   StateProjectionStore,
   StoredProjection,
 } from "~/server/event-sourcing/projections/stateProjection.types";
-import {
-  parseConversationTurnKey,
-  type LangyConversationTurnData,
-} from "~/server/event-sourcing/pipelines/langy-conversation-processing/projections/langyConversationTurn.foldProjection";
-import { LANGY_TURN_TOOL_CALL_STATUS } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/constants";
-import { langyPlanItemSchema } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
-import {
-  langyJsonValueSchema,
-  langyMessagePartSchema,
-} from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/shared";
 
+/**
+ * The status values this column accepts, derived from the ONE definition rather
+ * than restated here.
+ *
+ * `status` is TEXT in the database — see the schema comment — so this parse is
+ * what the Postgres enum used to do. It is deliberately at the write boundary
+ * and not in the fold: the fold is already typed, and a guard that only repeats
+ * a type it trusts catches nothing. What this catches is the case the type
+ * cannot see — a projection replayed from an event written by a newer version
+ * of the fold, carrying a status this deployment has never heard of. Failing
+ * the write is right there: a silently stored unknown status would be read back
+ * as one, and every consumer would have to guess.
+ */
+const turnStatusSchema = z.enum(
+  // Cast to the UNION, not to `[string, ...string[]]`: the latter is enough for
+  // `z.enum` to validate but makes `parse` return a plain string, which is
+  // exactly the narrowing the read path needs back.
+  Object.values(LANGY_CONVERSATION_TURN_STATUS) as [
+    LangyConversationTurnStatus,
+    ...LangyConversationTurnStatus[],
+  ],
+);
+
+// Composed only through instanceof-safe combinators (z.array) — the record
+// intersection itself lives in the package, next to the type it validates.
 const messagePartsSchema = z.array(langyMessagePartSchema);
 const planSchema = z.array(langyPlanItemSchema);
-const toolCallsSchema = z.array(
-  z.record(z.string(), langyJsonValueSchema).and(
-    z.object({
-      toolCallId: z.string(),
-      toolName: z.string(),
-      command: z.string().optional(),
-      input: langyJsonValueSchema.optional(),
-      status: z.union([
-        z.literal(LANGY_TURN_TOOL_CALL_STATUS.INITIATED),
-        z.literal(LANGY_TURN_TOOL_CALL_STATUS.SUCCEEDED),
-        z.literal(LANGY_TURN_TOOL_CALL_STATUS.FAILED),
-      ]),
-      durationMs: z.number().optional(),
-      errorText: z.string().optional(),
-    }),
-  ),
-);
+const toolCallsSchema = z.array(langyTurnToolCallSchema);
 
 type Row = Prisma.LangyConversationTurnProjectionGetPayload<object>;
 
@@ -66,6 +74,12 @@ function fromRow(row: Row): StoredProjection<LangyConversationTurnData> {
   return {
     state: {
       ...state,
+      // The column is TEXT now, so the row hands back a plain string and the
+      // domain type wants the union. Parsing on the way OUT as well as in is
+      // the point of choosing text: this is the boundary that decides what a
+      // stored status means, and it refuses one this build cannot interpret
+      // rather than passing it on as if it understood it.
+      Status: turnStatusSchema.parse(state.Status),
       QuestionParts: messagePartsSchema.parse(QuestionParts),
       AnswerParts: messagePartsSchema.parse(AnswerParts),
       ToolCalls: toolCallsSchema.parse(ToolCalls),
@@ -81,7 +95,9 @@ function fromRow(row: Row): StoredProjection<LangyConversationTurnData> {
 }
 
 /** Postgres row I/O for the type-aware turn projection. */
-export class PrismaLangyConversationTurnProjectionRepository implements StateProjectionStore<LangyConversationTurnData> {
+export class PrismaLangyConversationTurnProjectionRepository
+  implements StateProjectionStore<LangyConversationTurnData>
+{
   constructor(
     private readonly prisma: ConversationTurnProjectionPrismaClient,
   ) {}
@@ -124,6 +140,10 @@ export class PrismaLangyConversationTurnProjectionRepository implements StatePro
       Plan,
       ...state
     } = projection.state;
+    // Parsed, not asserted: `state` comes off a replayed projection, so this is
+    // the boundary where an unrecognised status must stop rather than land in a
+    // column that will happily hold it.
+    turnStatusSchema.parse(state.Status);
     const data = {
       ...state,
       ConversationId,

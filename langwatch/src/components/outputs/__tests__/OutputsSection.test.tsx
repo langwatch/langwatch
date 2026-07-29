@@ -22,7 +22,6 @@ import {
   LLM_OUTPUT_TYPES,
   type Output,
   OutputsSection,
-  type OutputType,
 } from "../OutputsSection";
 
 const renderComponent = (

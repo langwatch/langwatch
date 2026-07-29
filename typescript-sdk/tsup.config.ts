@@ -3,8 +3,11 @@ import packageJson from "./package.json";
 
 // The card/domain-error contract is a source-only workspace package and a
 // devDependency, so it must be inlined rather than left as an import the
-// published `langwatch` tarball could never resolve.
-const noExternal = ["@langwatch/cli-cards"];
+// published `langwatch` tarball could never resolve. The pattern covers every
+// subpath the CLI takes (`/cards`, `/cards/handled-error`), not just the one
+// spelled here — a plain string would match a single specifier and silently
+// leave the others external.
+const noExternal = [/^@langwatch\/langy(\/|$)/];
 
 // `__CLI_VERSION__` is a bare identifier in src/cli/program.ts.
 const define = {

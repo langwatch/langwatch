@@ -1,6 +1,7 @@
 import {
   Badge,
   Box,
+  Button,
   Card,
   Heading,
   HStack,
@@ -9,9 +10,9 @@ import {
   Spinner,
   Table,
   Text,
-  Button,
   VStack,
 } from "@chakra-ui/react";
+import { RoleBindingScopeType } from "@prisma/client";
 import { Users } from "lucide-react";
 import { useState } from "react";
 import { RandomColorAvatar } from "~/components/RandomColorAvatar";
@@ -20,9 +21,8 @@ import { ContactSalesBlock } from "../../components/subscription/ContactSalesBlo
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
 import { useActivePlan } from "../../hooks/useActivePlan";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { api } from "../../utils/api";
 import type { RouterOutputs } from "../../utils/api";
-import { RoleBindingScopeType } from "@prisma/client";
+import { api } from "../../utils/api";
 
 type Binding = RouterOutputs["roleBinding"]["listForOrg"][number];
 type ScopeFilter = "ALL" | RoleBindingScopeType;
@@ -55,6 +55,7 @@ type Principal = {
   userId: string | null;
   userName: string | null;
   userEmail: string | null;
+  userImage: string | null;
   groupId: string | null;
   groupName: string | null;
   groupScimSource: string | null;
@@ -72,6 +73,7 @@ function groupByPrincipal(bindings: Binding[]): Principal[] {
         userId: b.userId,
         userName: b.userName,
         userEmail: b.userEmail,
+        userImage: b.userImage,
         groupId: b.groupId,
         groupName: b.groupName,
         groupScimSource: b.groupScimSource,
@@ -97,13 +99,18 @@ function PrincipalCell({ principal }: { principal: Principal }) {
         <RandomColorAvatar
           id={principal.userId}
           name={principal.userName ?? principal.userEmail ?? "?"}
+          image={principal.userImage}
           size="xs"
         />
         <VStack gap={0} align="start">
           {principal.userName && (
-            <Text fontWeight="medium" fontSize="sm">{principal.userName}</Text>
+            <Text fontWeight="medium" fontSize="sm">
+              {principal.userName}
+            </Text>
           )}
-          <Text fontSize="xs" color="fg.muted">{principal.userEmail ?? ""}</Text>
+          <Text fontSize="xs" color="fg.muted">
+            {principal.userEmail ?? ""}
+          </Text>
         </VStack>
       </HStack>
     );
@@ -147,9 +154,12 @@ function BindingsCell({ bindings }: { bindings: Binding[] }) {
           <Badge colorPalette={roleBadgeColor(b.role)} size="sm">
             {b.customRoleName ?? b.role}
           </Badge>
-          <Text fontSize="xs" color="fg.muted">on</Text>
+          <Text fontSize="xs" color="fg.muted">
+            on
+          </Text>
           <Badge colorPalette={scopePillColor(b.scopeType)} size="sm">
-            {scopeLabel(b.scopeType)} · {b.scopeName ?? b.scopeId.slice(0, 8) + "…"}
+            {scopeLabel(b.scopeType)} ·{" "}
+            {b.scopeName ?? b.scopeId.slice(0, 8) + "…"}
           </Badge>
         </HStack>
       ))}
@@ -166,7 +176,13 @@ const FILTERS: { label: string; value: ScopeFilter }[] = [
   { label: "Project", value: RoleBindingScopeType.PROJECT },
 ];
 
-function FilterBar({ active, onChange }: { active: ScopeFilter; onChange: (f: ScopeFilter) => void }) {
+function FilterBar({
+  active,
+  onChange,
+}: {
+  active: ScopeFilter;
+  onChange: (f: ScopeFilter) => void;
+}) {
   return (
     <HStack gap={1}>
       {FILTERS.map((f) => (
@@ -191,20 +207,25 @@ function AccessAuditPage() {
   const { isEnterprise, isLoading: isPlanLoading } = useActivePlan();
   const [scopeFilter, setScopeFilter] = useState<ScopeFilter>("ALL");
 
-  const { data: bindings, isLoading } =
-    api.roleBinding.listForOrg.useQuery(
-      { organizationId: organization?.id ?? "" },
-      { enabled: !!organization?.id && isEnterprise },
-    );
+  const { data: bindings, isLoading } = api.roleBinding.listForOrg.useQuery(
+    { organizationId: organization?.id ?? "" },
+    { enabled: !!organization?.id && isEnterprise },
+  );
 
   if (isPlanLoading || !organization) {
-    return <SettingsLayout><Spinner /></SettingsLayout>;
+    return (
+      <SettingsLayout>
+        <Spinner />
+      </SettingsLayout>
+    );
   }
 
   if (!isEnterprise) {
     return (
       <SettingsLayout>
-        <Box width="full"><ContactSalesBlock /></Box>
+        <Box width="full">
+          <ContactSalesBlock />
+        </Box>
       </SettingsLayout>
     );
   }
@@ -233,7 +254,8 @@ function AccessAuditPage() {
           <Spacer />
           {bindings && (
             <Text fontSize="sm" color="fg.muted">
-              {principals.length} {principals.length === 1 ? "principal" : "principals"}
+              {principals.length}{" "}
+              {principals.length === 1 ? "principal" : "principals"}
             </Text>
           )}
         </HStack>
@@ -241,7 +263,9 @@ function AccessAuditPage() {
         <Card.Root width="full" overflow="hidden">
           <Card.Body paddingY={0} paddingX={0} overflowX="auto">
             {isLoading ? (
-              <Box padding={8} display="flex" justifyContent="center"><Spinner /></Box>
+              <Box padding={8} display="flex" justifyContent="center">
+                <Spinner />
+              </Box>
             ) : principals.length === 0 ? (
               <Box padding={8} textAlign="center">
                 <Text color="fg.muted">No role bindings found.</Text>
@@ -251,7 +275,9 @@ function AccessAuditPage() {
                 <Table.Header>
                   <Table.Row>
                     <Table.ColumnHeader width="240px">Who</Table.ColumnHeader>
-                    <Table.ColumnHeader textAlign="right">Access</Table.ColumnHeader>
+                    <Table.ColumnHeader textAlign="right">
+                      Access
+                    </Table.ColumnHeader>
                   </Table.Row>
                 </Table.Header>
                 <Table.Body>
@@ -270,12 +296,10 @@ function AccessAuditPage() {
             )}
           </Card.Body>
         </Card.Root>
-
       </VStack>
     </SettingsLayout>
   );
 }
-
 
 export default withPermissionGuard("organization:manage", {
   layoutComponent: SettingsLayout,

@@ -41,7 +41,9 @@ describe("retry chain invariants", () => {
         ),
       );
 
-      expect(GROUP_ATTEMPT_TTL_SECONDS * 1000).toBeGreaterThan(longestScheduled);
+      expect(GROUP_ATTEMPT_TTL_SECONDS * 1000).toBeGreaterThan(
+        longestScheduled,
+      );
     });
   });
 

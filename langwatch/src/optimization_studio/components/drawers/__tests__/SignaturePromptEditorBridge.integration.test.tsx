@@ -3,7 +3,6 @@
  */
 import { render } from "@testing-library/react";
 import type { Node } from "@xyflow/react";
-import React from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { LocalPromptConfig } from "~/experiments-v3/types";
 import type { Component, Signature } from "../../../types/dsl";

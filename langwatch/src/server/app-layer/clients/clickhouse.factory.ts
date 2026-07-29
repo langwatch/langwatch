@@ -1,5 +1,6 @@
-import { type ClickHouseClient, createClient } from "@clickhouse/client";
+import { createClient } from "@clickhouse/client";
 import { ClickHouseLogger } from "~/server/clickhouse/clickhouseLogger";
+import type { ResilientClickHouseClient } from "./clickhouse/resilient-client";
 import { createResilientClickHouseClient } from "./clickhouse.resilient";
 
 export interface ClickHouseFactoryOptions {
@@ -9,7 +10,7 @@ export interface ClickHouseFactoryOptions {
 
 export function createClickHouseClientFromConfig(
   opts: ClickHouseFactoryOptions,
-): ClickHouseClient | null {
+): ResilientClickHouseClient | null {
   if (!opts.enabled || !opts.url) return null;
 
   let url: URL | string = opts.url;

@@ -11,14 +11,16 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type { Annotation } from "@prisma/client";
-import { useRouter } from "~/utils/compat/next-router";
 import { useMemo, useState } from "react";
 import { ChevronDown, Edit, MessageCircle, MoreVertical } from "react-feather";
+import { LangyContextTarget } from "~/features/langy/components/LangyContextTarget";
+import { traceContextChip } from "~/features/langy/logic/langyContextChips";
 import { TraceIdPeek } from "~/features/traces-v2/components/TraceIdPeek";
 import { useAnnotationQueues } from "~/hooks/useAnnotationQueues";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { Trace } from "~/server/tracer/types";
+import { useRouter } from "~/utils/compat/next-router";
 import { Link } from "../../components/ui/link";
 import { Menu } from "../../components/ui/menu";
 import { Radio, RadioGroup } from "../../components/ui/radio";
@@ -54,6 +56,7 @@ export type AnnotationWithUser = Annotation & {
   user?: {
     name: string | null;
     id: string;
+    image?: string | null;
   };
 };
 
@@ -67,7 +70,11 @@ type GroupedAnnotation = {
 export type UnifiedQueueItem = {
   id: string;
   doneAt: Date | null;
-  createdByUser: { name: string | null; id: string } | null;
+  createdByUser: {
+    name: string | null;
+    id: string;
+    image?: string | null;
+  } | null;
   createdAt: Date;
   traceId: string;
   trace?: Trace;
@@ -123,6 +130,7 @@ export const AnnotationsTable = ({
         ? {
             name: item.createdByUser.name,
             id: item.createdByUser.id,
+            image: item.createdByUser.image ?? null,
           }
         : null,
       createdAt: item.createdAt ? new Date(item.createdAt) : new Date(),
@@ -428,173 +436,184 @@ export const AnnotationsTable = ({
                     ) : allQueueItems.length > 0 ? (
                       allQueueItems.map((item: UnifiedQueueItem) => {
                         return (
-                          <Table.Row
-                            cursor="pointer"
+                          // Armed, the row can be handed to Langy. The resource
+                          // a queue item IS about is its trace, and that is the
+                          // chip id the trace drawer this row opens derives —
+                          // so pointing at the row and opening it is one chip.
+                          <LangyContextTarget
                             key={item.id}
-                            onClick={() =>
-                              handleTraceClick(
-                                item.traceId,
-                                item.id,
-                                item.doneAt,
-                              )
-                            }
-                            backgroundColor={item.doneAt ? "bg.subtle" : "bg.panel"}
-                            padding={2}
+                            target={traceContextChip(item.traceId)}
                           >
-                            <Table.Cell>
-                              <Tooltip
-                                content={
-                                  <VStack align="start" gap={0}>
-                                    {item.createdByUser && (
-                                      <Text marginBottom={2}>
-                                        Created by {item.createdByUser.name}
-                                      </Text>
-                                    )}
-                                    <Text>Comments by:</Text>
+                            <Table.Row
+                              cursor="pointer"
+                              onClick={() =>
+                                handleTraceClick(
+                                  item.traceId,
+                                  item.id,
+                                  item.doneAt,
+                                )
+                              }
+                              backgroundColor={
+                                item.doneAt ? "bg.subtle" : "bg.panel"
+                              }
+                              padding={2}
+                            >
+                              <Table.Cell>
+                                <Tooltip
+                                  content={
+                                    <VStack align="start" gap={0}>
+                                      {item.createdByUser && (
+                                        <Text marginBottom={2}>
+                                          Created by {item.createdByUser.name}
+                                        </Text>
+                                      )}
+                                      <Text>Comments by:</Text>
 
-                                    {item.annotations
-                                      .map(
-                                        (a: AnnotationWithUser) => a.user?.name,
-                                      )
-                                      .filter(
-                                        (name): name is string =>
-                                          name !== null && name !== undefined,
-                                      )
-                                      .filter(
-                                        (name, index, self) =>
-                                          self.indexOf(name) === index,
-                                      )
-                                      .map((name) => (
-                                        <Text key={name}>{name}</Text>
-                                      ))}
+                                      {item.annotations
+                                        .map(
+                                          (a: AnnotationWithUser) =>
+                                            a.user?.name,
+                                        )
+                                        .filter(
+                                          (name): name is string =>
+                                            name !== null && name !== undefined,
+                                        )
+                                        .filter(
+                                          (name, index, self) =>
+                                            self.indexOf(name) === index,
+                                        )
+                                        .map((name) => (
+                                          <Text key={name}>{name}</Text>
+                                        ))}
+                                    </VStack>
+                                  }
+                                >
+                                  <HStack>
+                                    <UserAvatarGroup
+                                      createdByUser={item.createdByUser}
+                                      annotations={item.annotations}
+                                    />
+                                  </HStack>
+                                </Tooltip>
+                              </Table.Cell>
+                              {!isDone && (
+                                <Table.Cell minWidth={150}>
+                                  <Text>
+                                    {item.createdAt
+                                      ? `${item.createdAt.getDate()}/${item.createdAt.toLocaleDateString(
+                                          "en-US",
+                                          {
+                                            month: "short",
+                                          },
+                                        )}`
+                                      : "-"}
+                                  </Text>
+                                </Table.Cell>
+                              )}
+
+                              <Table.Cell minWidth={350}>
+                                <RedactedField field="input">
+                                  <Tooltip
+                                    content={
+                                      item.trace?.input?.value ?? "<empty>"
+                                    }
+                                  >
+                                    <Text
+                                      lineClamp={2}
+                                      maxWidth="350px"
+                                      textOverflow="ellipsis"
+                                      wordBreak="break-word"
+                                    >
+                                      {item.trace?.input?.value ?? "<empty>"}
+                                    </Text>
+                                  </Tooltip>
+                                </RedactedField>
+                              </Table.Cell>
+                              <Table.Cell minWidth={350}>
+                                <RedactedField field="output">
+                                  <Tooltip
+                                    content={
+                                      item.trace?.output?.value ?? "<empty>"
+                                    }
+                                  >
+                                    <Text
+                                      lineClamp={2}
+                                      maxWidth="350px"
+                                      textOverflow="ellipsis"
+                                      wordBreak="break-word"
+                                    >
+                                      {item.trace?.output?.value ?? "<empty>"}
+                                    </Text>
+                                  </Tooltip>
+                                </RedactedField>
+                              </Table.Cell>
+                              {hasExpectedOutput() && (
+                                <Table.Cell minWidth={350}>
+                                  <VStack align="start" gap={2} divideY="1px">
+                                    {item.annotations.map(
+                                      (annotation: AnnotationWithUser) =>
+                                        annotation.expectedOutput ? (
+                                          <Text
+                                            key={annotation.id}
+                                            width="full"
+                                            textAlign="left"
+                                            whiteSpace="pre-wrap"
+                                            wordBreak="break-word"
+                                            minWidth={400}
+                                            paddingY={2}
+                                          >
+                                            {annotation.expectedOutput}
+                                          </Text>
+                                        ) : null,
+                                    )}
                                   </VStack>
-                                }
-                              >
-                                <HStack>
-                                  <UserAvatarGroup
-                                    createdByUser={item.createdByUser}
-                                    annotations={item.annotations}
+                                </Table.Cell>
+                              )}
+                              {hasComments() && (
+                                <Table.Cell minWidth={350}>
+                                  <VStack align="start" gap={2} divideY="1px">
+                                    {item.annotations.map(
+                                      (annotation: AnnotationWithUser) =>
+                                        annotation.comment ? (
+                                          <Text
+                                            key={annotation.id}
+                                            width="full"
+                                            textAlign="left"
+                                            whiteSpace="pre-wrap"
+                                            wordBreak="break-word"
+                                            minWidth={400}
+                                            paddingY={2}
+                                          >
+                                            {annotation.comment}
+                                          </Text>
+                                        ) : null,
+                                    )}
+                                  </VStack>
+                                </Table.Cell>
+                              )}
+                              {scoreOptions.data &&
+                                scoreOptions.data.length > 0 &&
+                                annotationScoreValues(
+                                  item.annotations,
+                                  scoreOptionsIDArray,
+                                )}
+                              <Table.Cell>
+                                <HStack gap={1}>
+                                  <Text>
+                                    {new Date(
+                                      item.trace?.timestamps.started_at ?? "",
+                                    ).toLocaleDateString()}
+                                  </Text>
+                                  <TraceIdPeek
+                                    traceId={item.traceId}
+                                    occurredAtMs={toOccurredAtMsHint(
+                                      item.trace?.timestamps.started_at,
+                                    )}
                                   />
                                 </HStack>
-                              </Tooltip>
-                            </Table.Cell>
-                            {!isDone && (
-                              <Table.Cell minWidth={150}>
-                                <Text>
-                                  {item.createdAt
-                                    ? `${item.createdAt.getDate()}/${item.createdAt.toLocaleDateString(
-                                        "en-US",
-                                        {
-                                          month: "short",
-                                        },
-                                      )}`
-                                    : "-"}
-                                </Text>
                               </Table.Cell>
-                            )}
-
-                            <Table.Cell minWidth={350}>
-                              <RedactedField field="input">
-                                <Tooltip
-                                  content={
-                                    item.trace?.input?.value ?? "<empty>"
-                                  }
-                                >
-                                  <Text
-                                    lineClamp={2}
-                                    maxWidth="350px"
-                                    textOverflow="ellipsis"
-                                    wordBreak="break-word"
-                                  >
-                                    {item.trace?.input?.value ?? "<empty>"}
-                                  </Text>
-                                </Tooltip>
-                              </RedactedField>
-                            </Table.Cell>
-                            <Table.Cell minWidth={350}>
-                              <RedactedField field="output">
-                                <Tooltip
-                                  content={
-                                    item.trace?.output?.value ?? "<empty>"
-                                  }
-                                >
-                                  <Text
-                                    lineClamp={2}
-                                    maxWidth="350px"
-                                    textOverflow="ellipsis"
-                                    wordBreak="break-word"
-                                  >
-                                    {item.trace?.output?.value ?? "<empty>"}
-                                  </Text>
-                                </Tooltip>
-                              </RedactedField>
-                            </Table.Cell>
-                            {hasExpectedOutput() && (
-                              <Table.Cell minWidth={350}>
-                                <VStack align="start" gap={2} divideY="1px">
-                                  {item.annotations.map(
-                                    (annotation: AnnotationWithUser) =>
-                                      annotation.expectedOutput ? (
-                                        <Text
-                                          key={annotation.id}
-                                          width="full"
-                                          textAlign="left"
-                                          whiteSpace="pre-wrap"
-                                          wordBreak="break-word"
-                                          minWidth={400}
-                                          paddingY={2}
-                                        >
-                                          {annotation.expectedOutput}
-                                        </Text>
-                                      ) : null,
-                                  )}
-                                </VStack>
-                              </Table.Cell>
-                            )}
-                            {hasComments() && (
-                              <Table.Cell minWidth={350}>
-                                <VStack align="start" gap={2} divideY="1px">
-                                  {item.annotations.map(
-                                    (annotation: AnnotationWithUser) =>
-                                      annotation.comment ? (
-                                        <Text
-                                          key={annotation.id}
-                                          width="full"
-                                          textAlign="left"
-                                          whiteSpace="pre-wrap"
-                                          wordBreak="break-word"
-                                          minWidth={400}
-                                          paddingY={2}
-                                        >
-                                          {annotation.comment}
-                                        </Text>
-                                      ) : null,
-                                  )}
-                                </VStack>
-                              </Table.Cell>
-                            )}
-                            {scoreOptions.data &&
-                              scoreOptions.data.length > 0 &&
-                              annotationScoreValues(
-                                item.annotations,
-                                scoreOptionsIDArray,
-                              )}
-                            <Table.Cell>
-                              <HStack gap={1}>
-                                <Text>
-                                  {new Date(
-                                    item.trace?.timestamps.started_at ?? "",
-                                  ).toLocaleDateString()}
-                                </Text>
-                                <TraceIdPeek
-                                  traceId={item.traceId}
-                                  occurredAtMs={toOccurredAtMsHint(
-                                    item.trace?.timestamps.started_at,
-                                  )}
-                                />
-                              </HStack>
-                            </Table.Cell>
-                          </Table.Row>
+                            </Table.Row>
+                          </LangyContextTarget>
                         );
                       })
                     ) : (

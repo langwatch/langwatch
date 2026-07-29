@@ -1,17 +1,15 @@
-import { describe, expect, it } from "vitest";
-import { createTenantId } from "../../../../domain/tenantId";
-import type { StateProjectionStore } from "../../../../projections/stateProjection.types";
 import {
   LANGY_CONVERSATION_EVENT_TYPES,
   LANGY_CONVERSATION_EVENT_VERSIONS,
   LANGY_CONVERSATION_STATUS,
   LANGY_TITLE_SOURCE,
-} from "../../schemas/constants";
-import type { LangyConversationProcessingEvent } from "../../schemas/events";
-import {
-  LangyConversationStateFoldProjection,
   type LangyConversationStateData,
-} from "../langyConversationState.foldProjection";
+} from "@langwatch/langy";
+import { describe, expect, it } from "vitest";
+import { createTenantId } from "../../../../domain/tenantId";
+import type { StateProjectionStore } from "../../../../projections/stateProjection.types";
+import type { LangyConversationProcessingEvent } from "../../schemas/events";
+import { LangyConversationStateFoldProjection } from "../langyConversationState.foldProjection";
 
 const noopStore: StateProjectionStore<LangyConversationStateData> = {
   store: async () => {},
@@ -206,6 +204,37 @@ describe("LangyConversationStateFoldProjection", () => {
       });
     });
 
+    describe("when the user stops the turn mid-answer", () => {
+      /** @scenario A stop is recorded as a distinct outcome, not a failure */
+      /** @scenario After stopping, I can just keep chatting */
+      it("keeps the partial answer and returns the conversation to idle, continuable — not failed", () => {
+        const state = fold.apply(
+          started,
+          event(
+            "AGENT_RESPONDED",
+            LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_RESPONDED,
+            {
+              turnId: "turn-1",
+              messageId: "a1",
+              role: "assistant",
+              parts: [{ type: "text", text: "half an answer" }],
+              outcome: "stopped",
+            },
+            2000,
+          ),
+        );
+
+        // The conversation spine reads a stop as a non-failed terminal: the
+        // partial counts as a message, the turn clears, and it lands IDLE so the
+        // next message just works — the stopped-ness lives on the turn doc, not
+        // here (ADR-078).
+        expect(state.MessageCount).toBe(2);
+        expect(state.Status).toBe(LANGY_CONVERSATION_STATUS.IDLE);
+        expect(state.CurrentTurnId).toBeNull();
+        expect(state.LastError).toBeNull();
+      });
+    });
+
     describe("when a failure event arrives for the turn in flight", () => {
       it("fails the conversation and records the error", () => {
         const state = fold.apply(
@@ -307,12 +336,7 @@ describe("LangyConversationStateFoldProjection", () => {
   describe("given an archived conversation", () => {
     const archived = fold.apply(
       fold.apply(fold.init(), messageSent({}, 1000)),
-      event(
-        "ARCHIVED",
-        LANGY_CONVERSATION_EVENT_VERSIONS.ARCHIVED,
-        {},
-        3000,
-      ),
+      event("ARCHIVED", LANGY_CONVERSATION_EVENT_VERSIONS.ARCHIVED, {}, 3000),
     );
 
     it("flips status to archived and stamps ArchivedAt", () => {
@@ -360,7 +384,12 @@ describe("LangyConversationStateFoldProjection", () => {
       event(
         "TITLE_GENERATED",
         LANGY_CONVERSATION_EVENT_VERSIONS.TITLE_GENERATED,
-        { title: "Generated Title", source: "auto", model: "openai/gpt-5-mini", ...data },
+        {
+          title: "Generated Title",
+          source: "auto",
+          model: "openai/gpt-5-mini",
+          ...data,
+        },
         occurredAt,
       );
 

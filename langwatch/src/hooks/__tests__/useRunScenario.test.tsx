@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  */
 import { renderHook, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useRunScenario } from "../useRunScenario";
 
 // Mock tRPC api
@@ -62,7 +62,10 @@ describe("useRunScenario()", () => {
       setId: "set-123",
       batchRunId: "batch-123",
     });
-    mockPollForScenarioRun.mockResolvedValue({ success: true, scenarioRunId: "run-123" });
+    mockPollForScenarioRun.mockResolvedValue({
+      success: true,
+      scenarioRunId: "run-123",
+    });
     // Reset to having providers by default
     mockHasEnabledProviders = true;
   });
@@ -73,7 +76,7 @@ describe("useRunScenario()", () => {
         useRunScenario({
           projectId: "project-123",
           projectSlug: "my-project",
-        })
+        }),
       );
 
       await result.current.runScenario({
@@ -95,7 +98,7 @@ describe("useRunScenario()", () => {
         useRunScenario({
           projectId: "project-123",
           projectSlug: "my-project",
-        })
+        }),
       );
 
       await result.current.runScenario({
@@ -108,21 +111,19 @@ describe("useRunScenario()", () => {
           expect.objectContaining({
             title: "No model provider configured",
             type: "error",
-          })
+          }),
         );
       });
     });
 
     it("exposes the settings link via the toaster action slot", async () => {
-      const openSpy = vi
-        .spyOn(window, "open")
-        .mockImplementation(() => null);
+      const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
 
       const { result } = renderHook(() =>
         useRunScenario({
           projectId: "project-123",
           projectSlug: "my-project",
-        })
+        }),
       );
 
       await result.current.runScenario({
@@ -137,7 +138,7 @@ describe("useRunScenario()", () => {
             action: expect.objectContaining({
               label: "Configure model providers",
             }),
-          })
+          }),
         );
       });
 
@@ -164,7 +165,7 @@ describe("useRunScenario()", () => {
         useRunScenario({
           projectId: "project-123",
           projectSlug: "my-project",
-        })
+        }),
       );
 
       await result.current.runScenario({
@@ -184,7 +185,7 @@ describe("useRunScenario()", () => {
           projectId: "project-123",
           projectSlug: "my-project",
           onRunComplete,
-        })
+        }),
       );
 
       await result.current.runScenario({
@@ -206,7 +207,7 @@ describe("useRunScenario()", () => {
         useRunScenario({
           projectId: "project-123",
           projectSlug: "my-project",
-        })
+        }),
       );
 
       await result.current.runScenario({
@@ -236,7 +237,7 @@ describe("useRunScenario()", () => {
           projectId: "project-123",
           projectSlug: "my-project",
           onRunFailed,
-        })
+        }),
       );
 
       await result.current.runScenario({
@@ -249,7 +250,7 @@ describe("useRunScenario()", () => {
           expect.objectContaining({
             title: "Scenario run failed",
             type: "error",
-          })
+          }),
         );
       });
 

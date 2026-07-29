@@ -68,14 +68,49 @@ Feature: Staged automation authoring drawer
       Then the recipient is accepted
       And it is shown with an "External" warning badge
 
-    Scenario: A Slack notification configures a webhook and a message template
+    Scenario: A Slack notification configures a destination and a message template
       Given the user is configuring a Slack notification
-      Then the user sets the webhook and the message template
+      Then the user sets the channel and the message template
 
     Scenario: A dataset action configures the destination only
       Given the user is configuring an add-to-dataset action
       Then the user selects the target dataset
       And no template section is shown
+
+  Rule: The Slack channel list never claims to be complete when it isn't
+
+    The picker is populated from what the bot token can see, and there are
+    several ways that view comes back partial: a scope the app was never
+    granted, and a workspace with more channels than the picker can list. A
+    partial list that looks complete is worse than no list — the author scrolls
+    past the channel they wanted, concludes the integration is broken, and has
+    nothing to act on. Whenever the list is short of the workspace, the author
+    is told so and given the way through.
+
+    Scenario: The workspace has more channels than the picker can list
+      Given the user is configuring a Slack notification
+      And the workspace has more channels than the picker can list
+      Then the channels that were retrieved are offered
+      And the author is told the list is incomplete
+      And the author is told they can enter the channel directly instead
+
+    Scenario: The app cannot see private channels
+      Given the user is configuring a Slack notification
+      And the Slack app cannot see the workspace's private channels
+      Then the public channels are still offered
+      And the author is told private channels are missing and which permission adds them
+
+    Scenario: The whole workspace fits in the list
+      Given the user is configuring a Slack notification
+      And the workspace has few enough channels for the picker to list them all
+      Then every channel is offered
+      And no incompleteness notice is shown
+
+    Scenario: A channel the list never returned can still be used
+      Given the user is configuring a Slack notification
+      And the channel they want is absent from the list
+      When the author enters the channel themselves
+      Then it is accepted as the destination
 
   Rule: Cadence and debounce apply per trigger
 

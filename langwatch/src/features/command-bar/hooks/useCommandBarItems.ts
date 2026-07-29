@@ -1,16 +1,16 @@
+import { BookOpen, Search, Sparkles } from "lucide-react";
 import { useMemo } from "react";
-import { Search, BookOpen, Sparkles } from "lucide-react";
-import type { ListItem } from "../getIconInfo";
-import type { Command, RecentItem, SearchResult } from "../types";
-import type { FilteredCommands } from "./useFilteredCommands";
-import type { FilteredProject } from "./useFilteredProjects";
 import { topLevelNavigationCommands } from "../command-registry";
 import {
   MIN_SEARCH_QUERY_LENGTH,
   RECENT_ITEMS_DISPLAY_LIMIT,
 } from "../constants";
-import type { GroupedRecentItems } from "../useRecentItems";
 import { findEasterEgg } from "../easterEggs";
+import type { ListItem } from "../getIconInfo";
+import type { Command, RecentItem, SearchResult } from "../types";
+import type { GroupedRecentItems } from "../useRecentItems";
+import type { FilteredCommands } from "./useFilteredCommands";
+import type { FilteredProject } from "./useFilteredProjects";
 
 /**
  * Hook that builds the flat list of all items for keyboard navigation and display.
@@ -37,8 +37,11 @@ export function useCommandBarItems(
   // The "Ask Langy" activation — the command bar's door into Langy. Synthesized
   // (not a static registry command) so it can carry the live query and only
   // appears where Langy can actually open: a real project, and the user in the
-  // rollout (langyEnabled mirrors useShowLangy). Selecting it flips the bar into
-  // AI mode rather than navigating — see CommandBar.handleSelect.
+  // rollout (langyEnabled mirrors useShowLangy). With a typed question,
+  // selecting it hands the question straight to the panel in one Enter; on an
+  // empty bar it flips the field into Langy's composer instead — see
+  // CommandPalette.handleSelect. The hint tells each apart, so the row promises
+  // exactly what selecting it does.
   const askLangyItem = useMemo<ListItem | null>(() => {
     if (!langyEnabled || !projectSlug) return null;
     const trimmed = query.trim();
@@ -49,7 +52,7 @@ export function useCommandBarItems(
         label: trimmed ? `Ask Langy: "${trimmed}"` : "Ask Langy",
         description: trimmed
           ? "Hand this question to Langy"
-          : "Ask about your project in plain language",
+          : "Ask about the project in plain language",
         icon: Sparkles,
         category: "actions",
         keywords: ["langy", "ask", "ai", "assistant", "chat", "help"],
@@ -171,19 +174,25 @@ export function useCommandBarItems(
       for (const proj of filteredProjects) {
         items.push({ type: "project", data: proj });
       }
-      // Add "Search in traces" at the end
+      // Ask Langy sits under the real MATCHES and above the FALLBACKS.
+      //
+      // It used to trail everything, which sounds like the same rule but is
+      // not: "Search for X in traces" and "in docs" are offered for literally
+      // any string, so they are not matches at all — they are the two things
+      // we can always say. Ranking them above Langy meant typing a plain
+      // question and pressing Enter ran a substring search for that question,
+      // which is never what someone typing a question meant.
+      //
+      // Below genuine matches, though. A typed page name, a pasted id or a
+      // project still owns index 0, so Enter navigates the way it always did.
+      if (askLangyItem) {
+        items.push(askLangyItem);
+      }
       if (searchInTracesItem) {
         items.push(searchInTracesItem);
       }
-      // Add "Search in docs" after "Search in traces"
       if (searchInDocsItem) {
         items.push(searchInDocsItem);
-      }
-      // Ask Langy TRAILS while typing — a "or just ask" fallback under the
-      // matches, so a typed page name + Enter still navigates (index 0 stays the
-      // best match), the way Search-in-traces / Search-in-docs already do.
-      if (askLangyItem) {
-        items.push(askLangyItem);
       }
     }
 

@@ -138,7 +138,7 @@ Each matcher is optional; all non-null matchers must match for the rule to apply
 
 - **First-match wins**, sorted by `priority` descending.
 - Rules evaluated once per request, AT auth-resolve time (bundled with VK config), so zero additional upstream latency.
-- Rule hits exposed in observability via `langwatch.cache.rule_id` span attribute + `gateway_cache_rule_hits_total{rule_id, mode, provider}` counter.
+- Rule hits exposed in observability via `langwatch.cache.rule_id` span attribute + `gateway_cache_rule_hits_total{rule_id, mode_applied}` counter.
 
 ### Concrete example: "force 5-min cache on all prod internal-api calls"
 

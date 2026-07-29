@@ -12,7 +12,7 @@
  * wrong". The assertions below are that contract.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { readCliErrorDocument } from "@langwatch/cli-cards/handled-error";
+import { readCliErrorDocument } from "@langwatch/langy/cards/handled-error";
 import type * as TracesApiModule from "@/client-sdk/services/traces/traces-api.service";
 
 vi.mock(

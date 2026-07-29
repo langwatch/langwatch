@@ -25,6 +25,11 @@ type probeRequest struct {
 	// worker re-warms rather than being reused with a differently-scoped token.
 	GithubRepoScopeKey string   `json:"githubRepoScopeKey,omitempty"`
 	EgressAllowlist    []string `json:"egressAllowlist,omitempty"`
+	// MirrorTier is the resolved ADR-061 mirror fidelity for this turn's org. It
+	// rides the probe (like the egress allow-list) so a tier change is a probe
+	// MISS and the worker re-warms rather than being reused under the tier it
+	// booted with — the relay's mirror decision is bound at spawn.
+	MirrorTier string `json:"mirrorTier,omitempty"`
 }
 
 type probeResponse struct {

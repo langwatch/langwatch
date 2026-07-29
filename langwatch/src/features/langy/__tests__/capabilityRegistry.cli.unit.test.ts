@@ -1,11 +1,14 @@
+import { CLI_SUBRESOURCE_VERBS } from "@langwatch/langy";
 import { describe, expect, it } from "vitest";
 import { FEATURES } from "~/shared/langy/featureMap";
+import { extractPlatformUrl } from "~/utils/platformHref";
 import { CAPABILITY_CATALOG } from "../components/capabilities/capabilityCatalog";
 import {
   buildResourceHref,
   buildSurfaceHref,
   resolveCapability,
   SURFACE_BY_FEATURE,
+  withDecidedCard,
 } from "../components/capabilities/capabilityRegistry";
 
 describe("resolveCapability, given a LangWatch CLI tool call", () => {
@@ -94,6 +97,25 @@ describe("resolveCapability, given a LangWatch CLI tool call", () => {
         overline: "Push prompt",
         body: "diff",
       });
+    });
+  });
+
+  // The catalog listing is what an agent reads to pick a valid evaluator type.
+  // Its rows are TYPES, not the project's saved evaluators — read as the
+  // latter, a full catalog draws as "none of these exist here", which is the
+  // empty-state card the command was added to stop.
+  describe("when the CLI listed the evaluator type catalog", () => {
+    it("renders the catalog as a collection, worded in the plural", () => {
+      expect(resolveCapability("langwatch.evaluator.types")).toMatchObject({
+        render: "resourceRead",
+        tone: "read",
+        body: "rows",
+        overline: "Evaluators",
+      });
+    });
+
+    it("keeps the rows out of saved-evaluator lookup", () => {
+      expect(CLI_SUBRESOURCE_VERBS.has("types")).toBe(true);
     });
   });
 
@@ -216,7 +238,29 @@ describe("buildResourceHref, given a row-level deep link", () => {
           resourceId: "evaluator_1",
         }),
       ).toBe(
-        "/acme/evaluators?drawer.open=evaluatorViewer&drawer.evaluatorId=evaluator_1",
+        "/acme/evaluators?drawer.open=evaluatorEditor&drawer.evaluatorId=evaluator_1",
+      );
+    });
+  });
+
+  // A scenario is not a simulation RUN. The Simulations index is the run
+  // history, where a scenario that was just written does not appear at all.
+  describe("when the resource is a scenario", () => {
+    it("points the surface link at the scenario library", () => {
+      expect(
+        buildSurfaceHref({ surface: "scenarios", projectSlug: "acme" }),
+      ).toBe("/acme/simulations/scenarios");
+    });
+
+    it("opens the scenario in the library", () => {
+      expect(
+        buildResourceHref({
+          surface: "scenarios",
+          projectSlug: "acme",
+          resourceId: "scenario_1",
+        }),
+      ).toBe(
+        "/acme/simulations/scenarios?drawer.open=scenarioEditor&drawer.scenarioId=scenario_1",
       );
     });
   });
@@ -230,6 +274,43 @@ describe("buildResourceHref, given a row-level deep link", () => {
           resourceId: "prompt_1",
         }),
       ).toBeNull();
+    });
+  });
+});
+
+describe("extractPlatformUrl, given a settled tool call's result payload", () => {
+  describe("when the payload carries the platform's own link", () => {
+    it("reads it off the payload", () => {
+      expect(
+        extractPlatformUrl({
+          scenarioRunId: "run_1",
+          platformUrl:
+            "https://app.langwatch.ai/acme/simulations/set_1/batch_1?openRun=run_1",
+        }),
+      ).toBe(
+        "https://app.langwatch.ai/acme/simulations/set_1/batch_1?openRun=run_1",
+      );
+    });
+  });
+
+  describe("when the payload carries no platform link", () => {
+    it("returns null", () => {
+      expect(extractPlatformUrl({ scenarioRunId: "run_1" })).toBeNull();
+    });
+  });
+
+  describe("when the output is not an object", () => {
+    it("returns null instead of throwing", () => {
+      expect(extractPlatformUrl(null)).toBeNull();
+      expect(extractPlatformUrl("Found 0 traces")).toBeNull();
+      expect(extractPlatformUrl(undefined)).toBeNull();
+    });
+  });
+
+  describe("when the platformUrl field is present but blank", () => {
+    it("returns null rather than an empty link", () => {
+      expect(extractPlatformUrl({ platformUrl: "" })).toBeNull();
+      expect(extractPlatformUrl({ platformUrl: "   " })).toBeNull();
     });
   });
 });
@@ -285,6 +366,56 @@ describe("the card binding, given the catalog and feature map are the sources of
       }
 
       expect(disagreements).toEqual([]);
+    });
+  });
+});
+
+/**
+ * The command's name is the PRIOR; the card stamped on the result envelope at
+ * the command boundary is the DECISION (ADR-079 §1/§3). `withDecidedCard` is
+ * where the panel stops arguing with it.
+ */
+describe("withDecidedCard, given a result whose card was decided by its shape", () => {
+  const analyticsQuery = () => {
+    const descriptor = resolveCapability("langwatch.analytics.query");
+    if (!descriptor) throw new Error("analytics query resolves to no card");
+    return descriptor;
+  };
+
+  describe("when the decided card is richer than the name's", () => {
+    it("draws the decided card", () => {
+      expect(
+        withDecidedCard({ descriptor: analyticsQuery(), card: "timeseries" })
+          .render,
+      ).toBe("timeseries");
+    });
+
+    it("re-derives the body widget for the card being drawn", () => {
+      // A trend's body is its plot. Carrying the metrics card's figures over
+      // would draw the promoted card with the widget of the card it replaced.
+      expect(
+        withDecidedCard({ descriptor: analyticsQuery(), card: "timeseries" })
+          .body,
+      ).toBe("chart");
+    });
+
+    it("keeps the wording and surface the command earned", () => {
+      const promoted = withDecidedCard({
+        descriptor: analyticsQuery(),
+        card: "timeseries",
+      });
+      expect(promoted).toMatchObject({
+        surface: analyticsQuery().surface,
+        overline: analyticsQuery().overline,
+        command: analyticsQuery().command,
+      });
+    });
+  });
+
+  describe("when the decided card is the one the name already gave", () => {
+    it("leaves the descriptor exactly as it was", () => {
+      const descriptor = analyticsQuery();
+      expect(withDecidedCard({ descriptor, card: "metrics" })).toBe(descriptor);
     });
   });
 });

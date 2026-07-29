@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-20
 
-**Status:** Proposed
+**Status:** Accepted (WP4 lease lifecycle shipped in #5947; retention amendment below in #6028)
 
 > **Lifecycle amendment (2026-07-18):** WP4 replaced the holder-set eager-reclaim design below with per-holder renewable leases and lazy reclaim. The content-addressed tiers, tenant namespacing, and GQ2 envelope remain unchanged. See the current [GroupQueue architecture](../../../langwatch/src/server/event-sourcing/queues/groupQueue/ARCHITECTURE.md#per-holder-renewable-leases); the holder-set sections in this ADR are retained as the historical decision being superseded.
 >
@@ -15,6 +15,14 @@
 > - **Post-deployment state comparison.** No Terraform-managed resource changes, so desired and live state are compared by confirming the plan is empty for the queue's Redis and the workers deployment, and that the live workers pod spec matches the rendered chart output — the same `helm template` versus `kubectl get -o yaml` diff used for any no-values-change release. Any drift here means something *other* than this change moved.
 >
 > **Open item, not resolved by WP4.** Lazy reclaim removes the eager delete without adding a durable-tier sweeper: S3-tier queue payloads are not deleted by this codebase. Redis-tier blobs remain bounded by the 4-day backstop. Before the S3 tier carries meaningful volume this needs either a bucket lifecycle rule on the `<projectId>/` prefix or a queue-specific GC, tracked separately.
+>
+> **Retention amendment (2026-07-22): release grace window.** The "expected to trend up" note above was right that memory would rise and wrong that it would settle. With the 4-day backstop as the *only* Redis-tier reclaim path, nothing drains retained blobs before they age out, so the "steady state" it points at is just the full four days of retention — a ceiling that was never sized against the instance it has to fit in. Observed in production the day after the WP4 rollout: Redis memory left a flat two-day baseline within minutes of the deploy and climbed linearly from there, with no reclaim offsetting it.
+>
+> Retiring a blob's LAST lease now shortens its expiry to `BLOB_RELEASE_GRACE_TTL_SECONDS` (1 hour) instead of leaving the full backstop. This is deliberately not a return to eager reclaim: the bytes are not deleted, and any subsequent take re-arms the 4-day backstop. The race WP4 closed was a release *destroying* bytes a concurrent producer had already written and was about to stage; shortening a deadline cannot destroy them, and the producer's stage restores the backstop. The gap being covered is one Redis round trip, so an hour over-covers it by orders of magnitude. Withheld — full backstop retained — whenever any lease is live, or the rolling-deploy holder set carries a member beyond the migration sentinel (a pod from a pre-lease release, whose holder this blob's lease set cannot see).
+>
+> `gq_blob_release_grace_total` counts blobs entering the window. It exists because the failure mode this amendment fixes was *silence*: nothing reported that reclaim had stopped, and the only evidence was memory the rollout notes had already told operators to expect. Read it beside `gq_jobs_completed_total` — a rate near zero while jobs complete means reclaim is not happening again. `gq_jobs_dropped_total{reason="missing_blob"}` stays the rollback signal. Scope is terminal retirement only; the dedup-squash release applies the same window but is not counted, because that would mean widening the stage scripts' return contract on the hot path. Treat the count as a floor and don't derive a reclaim ratio from it.
+>
+> Note for anyone reading a prod graph after deploying this: it bounds *future* accumulation only. Blobs released before the fix keep the backstop their last take gave them and still age out on their own 4-day schedule.
 
 **Extends / supersedes in part:** [ADR-026](./026-groupqueue-payload-envelope.md) (GroupQueue payload envelope). The versioned-envelope + header-only routing decision stands. This ADR supersedes ADR-026's §"Blob lifecycle" — random blob ids, best-effort delete, and the 7-day pure-backstop TTL — for offloaded bodies.
 

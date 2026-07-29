@@ -2,21 +2,21 @@ import type { AggregateType } from "../../";
 import { createTenantId, definePipeline } from "../../";
 import { EventSourcing } from "../../eventSourcing";
 import type {
-	PipelineWithCommandHandlers,
-	RegisteredPipeline,
+  PipelineWithCommandHandlers,
+  RegisteredPipeline,
 } from "../../pipeline/types";
 import { EventStoreClickHouse } from "../../stores/eventStoreClickHouse";
 import { EventRepositoryClickHouse } from "../../stores/repositories/eventRepositoryClickHouse";
 import {
-	cleanupTestData,
-	getTestClickHouseClient,
-	getTestRedisConnection,
+  cleanupTestData,
+  getTestClickHouseClient,
+  getTestRedisConnection,
 } from "./testContainers";
 import type { TestProjection } from "./testPipelines";
 import {
-	TestCommandHandler,
-	testFoldProjection,
-	testMapProjection,
+  TestCommandHandler,
+  testFoldProjection,
+  testMapProjection,
 } from "./testPipelines";
 
 /**
@@ -39,9 +39,7 @@ export async function closePipelineGracefully(pipeline: {
 /**
  * Generates a unique aggregate ID to avoid collisions in parallel tests.
  */
-export function generateTestAggregateId(
-  prefix: string = "test-aggregate",
-): string {
+export function generateTestAggregateId(prefix = "test-aggregate"): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
@@ -125,7 +123,15 @@ export function createTestPipeline(): PipelineWithCommandHandlers<
  * Replaces checkpoint-based waiting — the fold state IS the checkpoint.
  */
 export async function waitForProjection(
-  pipeline: { service: { getProjectionByName: (name: string, aggregateId: string, context: any) => Promise<any> } },
+  pipeline: {
+    service: {
+      getProjectionByName: (
+        name: string,
+        aggregateId: string,
+        context: any,
+      ) => Promise<any>;
+    };
+  },
   projectionName: string,
   aggregateId: string,
   tenantId: ReturnType<typeof createTenantId>,
@@ -175,8 +181,8 @@ export async function waitForProjection(
 
     throw new Error(
       `Timeout waiting for projection "${projectionName}". ` +
-      `Expected eventCount >= ${expectedEventCount}, ` +
-      `got ${projection?.data.eventCount ?? "null"}`,
+        `Expected eventCount >= ${expectedEventCount}, ` +
+        `got ${projection?.data.eventCount ?? "null"}`,
     );
   } catch (error) {
     if (error instanceof Error && error.message.startsWith("Timeout waiting")) {
@@ -184,7 +190,7 @@ export async function waitForProjection(
     }
     throw new Error(
       `Timeout waiting for projection "${projectionName}". ` +
-      `Expected eventCount >= ${expectedEventCount}, got error: ${error}`,
+        `Expected eventCount >= ${expectedEventCount}, got error: ${error}`,
     );
   }
 }

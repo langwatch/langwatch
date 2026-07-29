@@ -1,3 +1,5 @@
+// biome-ignore-all lint/suspicious/noEmptyBlockStatements: Null* repositories implement the interface as intentional no-ops.
+
 import type {
   CustomRole,
   Organization,
@@ -175,6 +177,9 @@ export interface UpdateOrganizationInput {
   s3SecretAccessKey?: string | null;
   s3Bucket?: string | null;
   presenceEnabled?: boolean;
+  /** Org-level trace-sharing kill switch (ADR-057). Off disables sharing for
+   *  every project in the org. */
+  traceSharingEnabled?: boolean;
   supportContact?: string | null;
   /** ADR-038 "Primary use" setting; null clears back to legacy behavior. */
   primaryIntent?: OrganizationIntent | null;
@@ -257,9 +262,7 @@ export interface OrganizationRepository {
 
   // --- New methods for router delegation ---
 
-  createAndAssign(
-    input: CreateAndAssignInput,
-  ): Promise<CreateAndAssignResult>;
+  createAndAssign(input: CreateAndAssignInput): Promise<CreateAndAssignResult>;
 
   getAllForUser(params: {
     userId: string;

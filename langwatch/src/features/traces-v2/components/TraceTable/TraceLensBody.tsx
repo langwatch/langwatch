@@ -9,6 +9,7 @@ import {
 } from "@tanstack/react-table";
 import type React from "react";
 import { useCallback, useMemo } from "react";
+import { traceContextChip } from "~/features/langy/logic/langyContextChips";
 import { useEvaluatorOptions } from "../../hooks/useEvaluatorOptions";
 import {
   getColumnSizingKey,
@@ -86,7 +87,6 @@ export const TraceLensBody: React.FC<TraceLensBodyProps> = ({
   const sortFromStore = useViewStore((s) => s.sort);
   const setSortInStore = useViewStore((s) => s.setSort);
   const setVisibleColumns = useViewStore((s) => s.setVisibleColumns);
-  const resetPagination = useFilterStore((s) => s.resetPagination);
 
   const sizingKey = getColumnSizingKey(lens.id, "trace");
   const persistedSizing = useColumnSizingStore(
@@ -116,6 +116,9 @@ export const TraceLensBody: React.FC<TraceLensBodyProps> = ({
     [sortFromStore],
   );
 
+  // Dropping the keyset cursors is `setSort`'s own job — a cursor is only
+  // valid for the column that minted it, and that invariant has to hold for
+  // every path into a new sort, not just this header click.
   const handleSortingChange = useCallback(
     (updater: Updater<SortingState>) => {
       const next = typeof updater === "function" ? updater(sorting) : updater;
@@ -125,9 +128,8 @@ export const TraceLensBody: React.FC<TraceLensBodyProps> = ({
         columnId: first.id,
         direction: first.desc ? "desc" : "asc",
       });
-      resetPagination();
     },
-    [sorting, setSortInStore, resetPagination],
+    [sorting, setSortInStore],
   );
 
   // Surface `columnOrder` as explicit Tanstack state. Without it,
@@ -239,12 +241,26 @@ export const TraceLensBody: React.FC<TraceLensBodyProps> = ({
                 isFirstOfErrorRun={
                   !isLoading && isFirstOfErrorRun[virtualItem.index]
                 }
-                // Trace rows no longer offer themselves to Langy on hover (the
-                // per-row "Absorb context" affordance read as noise on a dense
-                // table). Adding traces to context is now an explicit,
-                // multi-select action: check the rows, then "Add to context"
-                // in the selection bar (see BulkActionBar).
-                langyTarget={null}
+                // A trace row IS a trace, so it offers itself to Langy like any
+                // other addressable resource on the page.
+                //
+                // This was null, from when the affordance was held open on
+                // hover and read as noise on a dense table. The arming gate
+                // (`#`, or a held Shift — see useLangyContextArming) settled
+                // that: disarmed, a registered row carries no class, no state
+                // attribute, no handlers and no drag, so the table is exactly
+                // the table. The multi-select route through the selection bar
+                // stays — it is the better way to take twenty — but pointing at
+                // ONE trace should not require checking a box first, and every
+                // other resource on the page already works that way.
+                langyTarget={
+                  isLoading
+                    ? null
+                    : traceContextChip(
+                        row.original.traceId,
+                        row.original.name ?? null,
+                      )
+                }
               />
             );
           })}

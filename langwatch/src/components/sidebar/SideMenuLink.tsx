@@ -5,6 +5,7 @@ import { trackEvent } from "../../utils/tracking";
 import { BetaPill } from "../ui/BetaPill";
 import { LegacyPill } from "../ui/LegacyPill";
 import { Link } from "../ui/link";
+import { Tooltip } from "../ui/tooltip";
 
 export const MENU_ITEM_HEIGHT = "32px";
 export const ICON_SIZE = 16;
@@ -142,9 +143,15 @@ export const SideMenuItem = ({
 
 // Link variant for navigation items
 export type SideMenuLinkProps = SideMenuItemProps & {
-  href: string;
+  href?: string;
   project?: Project;
   onClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void;
+  /**
+   * Why this destination cannot be opened yet. Set it and the item renders
+   * dimmed and inert with the reason in a tooltip, instead of offering a link
+   * that goes somewhere the label never promised.
+   */
+  unavailableReason?: string;
 };
 
 export const SideMenuLink = ({
@@ -160,7 +167,39 @@ export const SideMenuLink = ({
   betaLabel,
   legacy,
   legacyLabel,
+  unavailableReason,
 }: SideMenuLinkProps) => {
+  if (unavailableReason) {
+    return (
+      <Tooltip
+        content={unavailableReason}
+        positioning={{ placement: "right" }}
+        showArrow
+      >
+        <Box
+          width="full"
+          role="link"
+          aria-disabled="true"
+          aria-label={label}
+          tabIndex={0}
+          opacity={0.4}
+          cursor="not-allowed"
+        >
+          <SideMenuItem
+            icon={icon}
+            label={label}
+            badgeNumber={badgeNumber}
+            showLabel={showLabel}
+            beta={beta}
+            betaLabel={betaLabel}
+            legacy={legacy}
+            legacyLabel={legacyLabel}
+          />
+        </Box>
+      </Tooltip>
+    );
+  }
+
   return (
     <Link
       variant="plain"

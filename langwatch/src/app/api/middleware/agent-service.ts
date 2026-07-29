@@ -1,7 +1,6 @@
 import type { MiddlewareHandler } from "hono";
-
-import { prisma } from "~/server/db";
 import { AgentService } from "~/server/agents/agent.service";
+import { prisma } from "~/server/db";
 
 export type AgentServiceMiddlewareVariables = {
   agentService: AgentService;

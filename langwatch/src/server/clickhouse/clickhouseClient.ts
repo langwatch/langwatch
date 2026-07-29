@@ -2,8 +2,8 @@ import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import { createLogger } from "@langwatch/observability";
 import { createResilientClickHouseClient } from "~/server/app-layer/clients/clickhouse.resilient";
 import { prisma } from "../db";
-import { _getSharedClickHouseClient } from "./client";
 import { ClickHouseLogger } from "./clickhouseLogger";
+import { _getSharedClickHouseClient } from "./client";
 import { wrapWithDefaultSettings } from "./safeClickhouseClient";
 
 const logger = createLogger("langwatch:clickhouse:routing");
@@ -13,7 +13,9 @@ const logger = createLogger("langwatch:clickhouse:routing");
  * tenant (projectId). Repositories use this instead of holding a fixed client,
  * enabling per-tenant routing to private ClickHouse instances.
  */
-export type ClickHouseClientResolver = (tenantId: string) => Promise<ClickHouseClient>;
+export type ClickHouseClientResolver = (
+  tenantId: string,
+) => Promise<ClickHouseClient>;
 
 /**
  * Env var format: CLICKHOUSE_URL__<label>__<orgId>=<connectionUrl>
@@ -30,15 +32,24 @@ const PRIVATE_CH_ENV_PREFIX = "CLICKHOUSE_URL__";
  * Map of orgId → connectionUrl, parsed from env vars at module load.
  * Zero runtime overhead — no DB queries, no decryption.
  */
-const privateClickHouseUrls = parsePrivateEnvVars(PRIVATE_CH_ENV_PREFIX, "ClickHouse");
+const privateClickHouseUrls = parsePrivateEnvVars(
+  PRIVATE_CH_ENV_PREFIX,
+  "ClickHouse",
+);
 
-function parsePrivateEnvVars(prefix: string, label: string): Map<string, string> {
+function parsePrivateEnvVars(
+  prefix: string,
+  label: string,
+): Map<string, string> {
   const map = new Map<string, string>();
   for (const [key, value] of Object.entries(process.env)) {
     if (!key.startsWith(prefix)) continue;
 
     if (!value || value.trim() === "") {
-      logger.warn({ envVar: key }, `Skipping private ${label} env var: empty value`);
+      logger.warn(
+        { envVar: key },
+        `Skipping private ${label} env var: empty value`,
+      );
       continue;
     }
 
@@ -57,7 +68,10 @@ function parsePrivateEnvVars(prefix: string, label: string): Map<string, string>
     }
 
     map.set(orgId, value);
-    logger.info({ orgId, envVar: key }, `Loaded private ${label} URL from env var`);
+    logger.info(
+      { orgId, envVar: key },
+      `Loaded private ${label} URL from env var`,
+    );
   }
   if (map.size > 0) {
     logger.info({ count: map.size }, `Private ${label} instances configured`);
@@ -114,7 +128,7 @@ export async function getClickHouseClientForOrganization(
     if (!shared) {
       throw new Error(
         "ClickHouse is not configured. Set the CLICKHOUSE_URL environment variable. " +
-        "See dev/docs/adr/004-docker-dev-environment.md for setup instructions.",
+          "See dev/docs/adr/004-docker-dev-environment.md for setup instructions.",
       );
     }
     return shared;
@@ -127,11 +141,16 @@ export async function getClickHouseClientForOrganization(
  * Returns all ClickHouse instances: the shared one plus any private ones from env vars.
  * Useful for migrations, schema checks, or broadcasting DDL to all instances.
  */
-export async function getAllClickHouseInstances(): Promise<Array<{
-  target: "shared" | string;
-  client: ClickHouseClient;
-}>> {
-  const instances: Array<{ target: "shared" | string; client: ClickHouseClient }> = [];
+export async function getAllClickHouseInstances(): Promise<
+  Array<{
+    target: "shared" | string;
+    client: ClickHouseClient;
+  }>
+> {
+  const instances: Array<{
+    target: "shared" | string;
+    client: ClickHouseClient;
+  }> = [];
 
   const shared = _getSharedClickHouseClient();
   if (shared) {
@@ -162,12 +181,13 @@ export async function getAllClickHouseInstances(): Promise<Array<{
  * (shared or private). Use for feature-gating (e.g., deciding Real vs Null repository).
  */
 export function isClickHouseEnabled(): boolean {
-  return _getSharedClickHouseClient() !== null || privateClickHouseUrls.size > 0;
+  return (
+    _getSharedClickHouseClient() !== null || privateClickHouseUrls.size > 0
+  );
 }
 
 /** Re-export for infrastructure-only use (metrics collection, not tenant data). */
 export { _getSharedClickHouseClient as getSharedClickHouseClient } from "./client";
-
 
 /**
  * Returns a cached ClickHouse client for the given org and URL,

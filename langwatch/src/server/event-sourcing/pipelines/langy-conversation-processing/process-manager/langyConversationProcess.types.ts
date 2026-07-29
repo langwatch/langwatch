@@ -1,6 +1,5 @@
+import type { LangyTitleSource } from "@langwatch/langy";
 import { z } from "zod";
-
-import type { LangyTitleSource } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/constants";
 
 /**
  * Langy conversation process manager (ADR-049 §4) — typed contracts for the
@@ -77,7 +76,7 @@ export type LangyGenerateTitleIntent = z.infer<
  */
 export const langyProcessEventViewSchema = z.object({
   turnId: z.string().nullable(),
-  outcome: z.enum(["completed", "failed"]).nullable(),
+  outcome: z.enum(["completed", "failed", "stopped"]).nullable(),
   /** metadata_updated only: the user set a title (rename is sticky). */
   titleTouched: z.boolean(),
 });

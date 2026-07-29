@@ -1,5 +1,11 @@
 import { Box, HStack, Icon, Text, VStack } from "@chakra-ui/react";
-import { ArrowRight, Code, MessageSquare, Monitor, Terminal } from "lucide-react";
+import {
+  ArrowRight,
+  Code,
+  MessageSquare,
+  Monitor,
+  Terminal,
+} from "lucide-react";
 import { motion } from "motion/react";
 import type React from "react";
 import { api } from "~/utils/api";
@@ -36,7 +42,8 @@ const productOptions: ProductOption[] = [
   {
     key: "via-claude-desktop",
     title: "Via MCP",
-    description: "Connect any MCP client. Claude Desktop, ChatGPT, Cursor, Windsurf, and more",
+    description:
+      "Connect any MCP client. Claude Desktop, ChatGPT, Cursor, Windsurf, and more",
     icon: MessageSquare,
     gradient:
       "linear-gradient(135deg, rgba(128,90,213,0.05) 0%, transparent 50%)",
@@ -58,7 +65,8 @@ interface ProductSelectionScreenProps {
 export const ProductSelectionScreen: React.FC<ProductSelectionScreenProps> = ({
   onSelectProduct,
 }) => {
-  const setIntegrationMethod = api.onboarding.setIntegrationMethod.useMutation();
+  const setIntegrationMethod =
+    api.onboarding.setIntegrationMethod.useMutation();
 
   return (
     <VStack gap={3} align="stretch" w="full" maxW="520px" mx="auto">

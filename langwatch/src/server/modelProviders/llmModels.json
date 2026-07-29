@@ -1,7 +1,427 @@
 {
-  "updatedAt": "2026-07-16T10:14:55.159Z",
-  "modelCount": 346,
+  "updatedAt": "2026-07-27T03:08:01.673Z",
+  "modelCount": 361,
   "models": {
+    "anthropic/claude-opus-5-fast": {
+      "id": "anthropic/claude-opus-5-fast",
+      "name": "Claude Opus 5 (Fast)",
+      "provider": "anthropic",
+      "pricing": {
+        "inputCostPerToken": 0.00001,
+        "outputCostPerToken": 0.00005,
+        "inputCacheReadPerToken": 0.000001,
+        "inputCacheWritePerToken": 0.0000125,
+        "webSearchCostPerQuery": 0.01
+      },
+      "contextLength": 1000000,
+      "maxCompletionTokens": 128000,
+      "supportedParameters": [
+        "include_reasoning",
+        "max_tokens",
+        "reasoning",
+        "reasoning_effort",
+        "response_format",
+        "stop",
+        "structured_outputs",
+        "tool_choice",
+        "tools",
+        "verbosity"
+      ],
+      "defaultParameters": {
+        "temperature": null,
+        "topP": null,
+        "frequencyPenalty": null
+      },
+      "modality": "text+image+file->text",
+      "mode": "chat",
+      "description": "Fast-mode variant of [Opus 5](/anthropic/claude-opus-5) - identical capabilities with higher output speed at 2x pricing relative to regular Opus 5. Learn more in Anthropic's docs: https://platform.claude.com/docs/en/build-with-claude/fast-mode",
+      "supportsImageInput": true,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": false
+    },
+    "anthropic/claude-opus-5": {
+      "id": "anthropic/claude-opus-5",
+      "name": "Claude Opus 5",
+      "provider": "anthropic",
+      "pricing": {
+        "inputCostPerToken": 0.000005,
+        "outputCostPerToken": 0.000025,
+        "inputCacheReadPerToken": 5e-7,
+        "inputCacheWritePerToken": 0.00000625,
+        "webSearchCostPerQuery": 0.01
+      },
+      "contextLength": 1000000,
+      "maxCompletionTokens": 128000,
+      "supportedParameters": [
+        "include_reasoning",
+        "max_completion_tokens",
+        "max_tokens",
+        "reasoning",
+        "reasoning_effort",
+        "response_format",
+        "stop",
+        "structured_outputs",
+        "temperature",
+        "tool_choice",
+        "tools",
+        "verbosity"
+      ],
+      "defaultParameters": {
+        "temperature": null,
+        "topP": null,
+        "frequencyPenalty": null
+      },
+      "modality": "text+image+file->text",
+      "mode": "chat",
+      "description": "Claude Opus 5 is Anthropic’s flagship model for demanding reasoning, coding, and long-horizon agentic work. It is particularly strong at end-to-end software tasks, code review and bug finding, visual analysis...",
+      "supportsImageInput": true,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": false
+    },
+    "poolside/laguna-s-2.1": {
+      "id": "poolside/laguna-s-2.1",
+      "name": "Poolside: Laguna S 2.1",
+      "provider": "poolside",
+      "pricing": {
+        "inputCostPerToken": 1e-7,
+        "outputCostPerToken": 2e-7,
+        "inputCacheReadPerToken": 1e-8
+      },
+      "contextLength": 1048576,
+      "maxCompletionTokens": 131072,
+      "supportedParameters": [
+        "include_reasoning",
+        "max_tokens",
+        "reasoning",
+        "stop",
+        "temperature",
+        "tool_choice",
+        "tools"
+      ],
+      "defaultParameters": {
+        "temperature": 0.7,
+        "topP": 0.9,
+        "frequencyPenalty": null
+      },
+      "modality": "text->text",
+      "mode": "chat",
+      "description": "Laguna S 2.1 is the latest coding agent model from [Poolside](<https://poolside.ai/>). Laguna S 2.1 is a 118B total parameter model with 8B active parameters, scoring 70.2% on Terminal-Bench 2.1 and...",
+      "supportsImageInput": false,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": false
+    },
+    "gemini/gemini-3.6-flash": {
+      "id": "gemini/gemini-3.6-flash",
+      "name": "Google: Gemini 3.6 Flash",
+      "provider": "gemini",
+      "pricing": {
+        "inputCostPerToken": 0.0000015,
+        "outputCostPerToken": 0.0000075,
+        "inputCacheReadPerToken": 1.5e-7,
+        "inputCacheWritePerToken": 8.333333333333334e-8,
+        "imageCostPerToken": 0.0000015,
+        "audioCostPerToken": 0.0000015,
+        "internalReasoningCostPerToken": 0.0000075,
+        "webSearchCostPerQuery": 0.014
+      },
+      "contextLength": 1048576,
+      "maxCompletionTokens": 65536,
+      "supportedParameters": [
+        "include_reasoning",
+        "max_tokens",
+        "reasoning",
+        "reasoning_effort",
+        "response_format",
+        "seed",
+        "stop",
+        "structured_outputs",
+        "temperature",
+        "tool_choice",
+        "tools",
+        "top_p"
+      ],
+      "defaultParameters": {
+        "temperature": null,
+        "topP": null,
+        "frequencyPenalty": null
+      },
+      "modality": "text+image+file+audio+video->text",
+      "mode": "chat",
+      "description": "Gemini 3.6 Flash is a high-efficiency model from Google for coding, agentic workflows, and web and app development. It is designed to produce polished outputs with fewer unnecessary edits and...",
+      "supportsImageInput": true,
+      "supportsAudioInput": true,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": false,
+      "reasoningConfig": {
+        "supported": true,
+        "parameterName": "thinkingLevel",
+        "allowedValues": [
+          "low",
+          "high"
+        ],
+        "defaultValue": "low",
+        "canDisable": false
+      }
+    },
+    "gemini/gemini-3.5-flash-lite": {
+      "id": "gemini/gemini-3.5-flash-lite",
+      "name": "Google: Gemini 3.5 Flash Lite",
+      "provider": "gemini",
+      "pricing": {
+        "inputCostPerToken": 3e-7,
+        "outputCostPerToken": 0.0000025,
+        "inputCacheReadPerToken": 3e-8,
+        "inputCacheWritePerToken": 8.333333333333334e-8,
+        "imageCostPerToken": 3e-7,
+        "audioCostPerToken": 3e-7,
+        "internalReasoningCostPerToken": 0.0000025,
+        "webSearchCostPerQuery": 0.014
+      },
+      "contextLength": 1048576,
+      "maxCompletionTokens": 65536,
+      "supportedParameters": [
+        "include_reasoning",
+        "max_tokens",
+        "reasoning",
+        "reasoning_effort",
+        "response_format",
+        "seed",
+        "stop",
+        "structured_outputs",
+        "temperature",
+        "tool_choice",
+        "tools",
+        "top_p"
+      ],
+      "defaultParameters": {
+        "temperature": null,
+        "topP": null,
+        "frequencyPenalty": null
+      },
+      "modality": "text+image+file+audio+video->text",
+      "mode": "chat",
+      "description": "Gemini 3.5 Flash Lite is a high-efficiency model from Google with upgraded agentic capabilities. It is suited for subagents that execute focused tasks within complex, multi-agent workflows.",
+      "supportsImageInput": true,
+      "supportsAudioInput": true,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": false,
+      "reasoningConfig": {
+        "supported": true,
+        "parameterName": "thinkingLevel",
+        "allowedValues": [
+          "low",
+          "high"
+        ],
+        "defaultValue": "low",
+        "canDisable": false
+      }
+    },
+    "meituan/longcat-2.0": {
+      "id": "meituan/longcat-2.0",
+      "name": "Meituan: LongCat 2.0",
+      "provider": "meituan",
+      "pricing": {
+        "inputCostPerToken": 3e-7,
+        "outputCostPerToken": 0.0000012,
+        "inputCacheReadPerToken": 6e-9
+      },
+      "contextLength": 1048756,
+      "maxCompletionTokens": 262144,
+      "supportedParameters": [
+        "frequency_penalty",
+        "include_reasoning",
+        "logit_bias",
+        "max_tokens",
+        "min_p",
+        "presence_penalty",
+        "reasoning",
+        "repetition_penalty",
+        "seed",
+        "stop",
+        "temperature",
+        "tool_choice",
+        "tools",
+        "top_k",
+        "top_p"
+      ],
+      "defaultParameters": {},
+      "modality": "text->text",
+      "mode": "chat",
+      "description": "LongCat 2.0 is a sparse mixture-of-experts language model from Meituan, with 48B active parameters out of 1.6T total. It is suited for coding, repository-level changes, long-horizon problem solving, and agentic...",
+      "supportsImageInput": false,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": false
+    },
+    "thinkingmachines/inkling": {
+      "id": "thinkingmachines/inkling",
+      "name": "Thinking Machines: Inkling",
+      "provider": "thinkingmachines",
+      "pricing": {
+        "inputCostPerToken": 0.000001,
+        "outputCostPerToken": 0.00000405,
+        "inputCacheReadPerToken": 1.7e-7
+      },
+      "contextLength": 1048576,
+      "maxCompletionTokens": null,
+      "supportedParameters": [
+        "frequency_penalty",
+        "include_reasoning",
+        "logit_bias",
+        "max_tokens",
+        "min_p",
+        "presence_penalty",
+        "reasoning",
+        "reasoning_effort",
+        "repetition_penalty",
+        "seed",
+        "stop",
+        "temperature",
+        "tool_choice",
+        "tools",
+        "top_k",
+        "top_p"
+      ],
+      "defaultParameters": {
+        "temperature": null,
+        "topP": null,
+        "frequencyPenalty": null
+      },
+      "modality": "text+image+audio->text",
+      "mode": "chat",
+      "description": "Inkling is an open-weight multimodal mixture-of-experts model from Thinking Machines Lab, with 41B active parameters out of 975B total. It is designed for general-purpose reasoning, coding, agentic and tool-use systems,...",
+      "supportsImageInput": true,
+      "supportsAudioInput": true,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": false
+    },
+    "openrouter/auto-beta": {
+      "id": "openrouter/auto-beta",
+      "name": "Auto Router (Beta)",
+      "provider": "openrouter",
+      "pricing": {
+        "inputCostPerToken": -1,
+        "outputCostPerToken": -1
+      },
+      "contextLength": 2000000,
+      "maxCompletionTokens": null,
+      "supportedParameters": [
+        "frequency_penalty",
+        "include_reasoning",
+        "logit_bias",
+        "logprobs",
+        "max_tokens",
+        "min_p",
+        "prediction",
+        "presence_penalty",
+        "reasoning",
+        "reasoning_effort",
+        "repetition_penalty",
+        "response_format",
+        "seed",
+        "stop",
+        "structured_outputs",
+        "temperature",
+        "tool_choice",
+        "tools",
+        "top_a",
+        "top_k",
+        "top_logprobs",
+        "top_p",
+        "web_search_options"
+      ],
+      "defaultParameters": {
+        "temperature": null,
+        "topP": null,
+        "frequencyPenalty": null
+      },
+      "modality": "text+image+file+audio+video->text+image",
+      "mode": "chat",
+      "description": "Auto Router (Beta) is a task-aware router from OpenRouter. It classifies each request, then routes it the [most popular model](/rankings#task-spend) for that task based on aggregate spend, filtered by your...",
+      "supportsImageInput": true,
+      "supportsAudioInput": true,
+      "supportsImageOutput": true,
+      "supportsAudioOutput": false
+    },
+    "moonshotai/kimi-k3": {
+      "id": "moonshotai/kimi-k3",
+      "name": "MoonshotAI: Kimi K3",
+      "provider": "moonshotai",
+      "pricing": {
+        "inputCostPerToken": 0.000003,
+        "outputCostPerToken": 0.000015,
+        "inputCacheReadPerToken": 3e-7
+      },
+      "contextLength": 1048576,
+      "maxCompletionTokens": null,
+      "supportedParameters": [
+        "frequency_penalty",
+        "include_reasoning",
+        "max_tokens",
+        "presence_penalty",
+        "reasoning",
+        "reasoning_effort",
+        "response_format",
+        "stop",
+        "structured_outputs",
+        "tool_choice",
+        "tools"
+      ],
+      "defaultParameters": {
+        "temperature": null,
+        "topP": null,
+        "frequencyPenalty": null
+      },
+      "modality": "text+image->text",
+      "mode": "chat",
+      "description": "Kimi K3 is a 2.8T parameter open-weight multimodal reasoning model from Moonshot AI. It is suited for complex coding, knowledge work, and long-horizon agentic workflows, and is particularly strong at...",
+      "supportsImageInput": true,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": false
+    },
+    "meta/muse-spark-1.1": {
+      "id": "meta/muse-spark-1.1",
+      "name": "Meta: Muse Spark 1.1",
+      "provider": "meta",
+      "pricing": {
+        "inputCostPerToken": 0.00000125,
+        "outputCostPerToken": 0.00000425,
+        "inputCacheReadPerToken": 1.5e-7,
+        "webSearchCostPerQuery": 0.0025
+      },
+      "contextLength": 1048576,
+      "maxCompletionTokens": null,
+      "supportedParameters": [
+        "include_reasoning",
+        "max_tokens",
+        "reasoning",
+        "reasoning_effort",
+        "repetition_penalty",
+        "response_format",
+        "structured_outputs",
+        "temperature",
+        "tool_choice",
+        "tools",
+        "top_k",
+        "top_p"
+      ],
+      "defaultParameters": {
+        "temperature": null,
+        "topP": null,
+        "frequencyPenalty": null
+      },
+      "modality": "text+image+file+audio+video->text",
+      "mode": "chat",
+      "description": "Muse Spark 1.1 is a multimodal reasoning model from Meta, built for agentic tasks. It accepts text, images, video, audio, and PDF documents and returns text, with a 1M-token context...",
+      "supportsImageInput": true,
+      "supportsAudioInput": true,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": false
+    },
     "kwaipilot/kat-coder-air-v2.5": {
       "id": "kwaipilot/kat-coder-air-v2.5",
       "name": "Kwaipilot: KAT-Coder-Air V2.5",
@@ -313,7 +733,7 @@
       "pricing": {
         "inputCostPerToken": 0.000002,
         "outputCostPerToken": 0.000006,
-        "inputCacheReadPerToken": 5e-7,
+        "inputCacheReadPerToken": 3e-7,
         "webSearchCostPerQuery": 0.005
       },
       "contextLength": 500000,
@@ -356,7 +776,7 @@
       "pricing": {
         "inputCostPerToken": 0.000002,
         "outputCostPerToken": 0.000006,
-        "inputCacheReadPerToken": 5e-7,
+        "inputCacheReadPerToken": 3e-7,
         "webSearchCostPerQuery": 0.005
       },
       "contextLength": 500000,
@@ -457,16 +877,17 @@
       "name": "Tencent: Hy3",
       "provider": "tencent",
       "pricing": {
-        "inputCostPerToken": 2e-7,
-        "outputCostPerToken": 8e-7,
-        "inputCacheReadPerToken": 5e-8
+        "inputCostPerToken": 1.32e-7,
+        "outputCostPerToken": 5.28e-7,
+        "inputCacheReadPerToken": 3.3e-8
       },
       "contextLength": 262144,
-      "maxCompletionTokens": 131072,
+      "maxCompletionTokens": 128000,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
         "logit_bias",
+        "max_completion_tokens",
         "max_tokens",
         "min_p",
         "presence_penalty",
@@ -578,7 +999,7 @@
         "webSearchCostPerQuery": 0.014
       },
       "contextLength": 65536,
-      "maxCompletionTokens": 65536,
+      "maxCompletionTokens": 66000,
       "supportedParameters": [
         "include_reasoning",
         "max_tokens",
@@ -737,7 +1158,7 @@
         "internalReasoningCostPerToken": 0.000012,
         "webSearchCostPerQuery": 0.014
       },
-      "contextLength": 65536,
+      "contextLength": 131072,
       "maxCompletionTokens": 32768,
       "supportedParameters": [
         "include_reasoning",
@@ -776,9 +1197,9 @@
       "name": "Z.ai: GLM 5.2",
       "provider": "z-ai",
       "pricing": {
-        "inputCostPerToken": 9.576e-7,
-        "outputCostPerToken": 0.0000030096,
-        "inputCacheReadPerToken": 1.7784e-7
+        "inputCostPerToken": 6.692e-7,
+        "outputCostPerToken": 0.0000021032,
+        "inputCacheReadPerToken": 1.2428e-7
       },
       "contextLength": 1048576,
       "maxCompletionTokens": 131072,
@@ -847,9 +1268,9 @@
       "name": "MoonshotAI: Kimi K2.7 Code",
       "provider": "moonshotai",
       "pricing": {
-        "inputCostPerToken": 7.19e-7,
-        "outputCostPerToken": 0.00000349,
-        "inputCacheReadPerToken": 1.49e-7
+        "inputCostPerToken": 7.3e-7,
+        "outputCostPerToken": 0.0000035,
+        "inputCacheReadPerToken": 1.5e-7
       },
       "contextLength": 262144,
       "maxCompletionTokens": 262144,
@@ -1012,7 +1433,7 @@
         "outputCostPerToken": 0.0000036,
         "inputCacheReadPerToken": 2e-7
       },
-      "contextLength": 1000000,
+      "contextLength": 512288,
       "maxCompletionTokens": null,
       "supportedParameters": [
         "frequency_penalty",
@@ -1137,7 +1558,7 @@
         "outputCostPerToken": 0.00000115,
         "inputCacheReadPerToken": 4e-8
       },
-      "contextLength": 256000,
+      "contextLength": 262144,
       "maxCompletionTokens": 256000,
       "supportedParameters": [
         "frequency_penalty",
@@ -1899,33 +2320,24 @@
       "name": "MoonshotAI Kimi Latest",
       "provider": "~moonshotai",
       "pricing": {
-        "inputCostPerToken": 6.6e-7,
-        "outputCostPerToken": 0.00000341,
-        "inputCacheReadPerToken": 1.5e-7
+        "inputCostPerToken": 0.000003,
+        "outputCostPerToken": 0.000015,
+        "inputCacheReadPerToken": 3e-7
       },
-      "contextLength": 262144,
-      "maxCompletionTokens": 262144,
+      "contextLength": 1048576,
+      "maxCompletionTokens": null,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
-        "logit_bias",
-        "logprobs",
         "max_tokens",
-        "min_p",
-        "parallel_tool_calls",
         "presence_penalty",
         "reasoning",
-        "repetition_penalty",
+        "reasoning_effort",
         "response_format",
-        "seed",
         "stop",
         "structured_outputs",
-        "temperature",
         "tool_choice",
-        "tools",
-        "top_k",
-        "top_logprobs",
-        "top_p"
+        "tools"
       ],
       "defaultParameters": {
         "temperature": null,
@@ -1946,12 +2358,12 @@
       "provider": "~google",
       "pricing": {
         "inputCostPerToken": 0.0000015,
-        "outputCostPerToken": 0.000009,
+        "outputCostPerToken": 0.0000075,
         "inputCacheReadPerToken": 1.5e-7,
         "inputCacheWritePerToken": 8.333333333333334e-8,
         "imageCostPerToken": 0.0000015,
-        "audioCostPerToken": 0.000003,
-        "internalReasoningCostPerToken": 0.000009,
+        "audioCostPerToken": 0.0000015,
+        "internalReasoningCostPerToken": 0.0000075,
         "webSearchCostPerQuery": 0.014
       },
       "contextLength": 1048576,
@@ -2213,8 +2625,9 @@
       "name": "Qwen: Qwen3.6 27B",
       "provider": "qwen",
       "pricing": {
-        "inputCostPerToken": 4.5e-7,
-        "outputCostPerToken": 0.0000027
+        "inputCostPerToken": 3e-7,
+        "outputCostPerToken": 0.000002,
+        "inputCacheReadPerToken": 1.5e-7
       },
       "contextLength": 262144,
       "maxCompletionTokens": 65536,
@@ -2375,12 +2788,12 @@
       "name": "DeepSeek: DeepSeek V4 Flash",
       "provider": "deepseek",
       "pricing": {
-        "inputCostPerToken": 9.8e-8,
-        "outputCostPerToken": 1.96e-7,
-        "inputCacheReadPerToken": 2e-8
+        "inputCostPerToken": 1.4e-7,
+        "outputCostPerToken": 2.8e-7,
+        "inputCacheReadPerToken": 2.8e-8
       },
       "contextLength": 1048576,
-      "maxCompletionTokens": null,
+      "maxCompletionTokens": 393216,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -2469,18 +2882,14 @@
       "contextLength": 262144,
       "maxCompletionTokens": null,
       "supportedParameters": [
-        "frequency_penalty",
         "include_reasoning",
         "max_tokens",
-        "presence_penalty",
         "reasoning",
         "reasoning_effort",
         "seed",
-        "stop",
         "temperature",
         "tool_choice",
         "tools",
-        "top_k",
         "top_p"
       ],
       "defaultParameters": {
@@ -2505,7 +2914,7 @@
         "outputCostPerToken": 8.7e-7,
         "inputCacheReadPerToken": 3.6e-9
       },
-      "contextLength": 1048576,
+      "contextLength": 1050000,
       "maxCompletionTokens": 131072,
       "supportedParameters": [
         "frequency_penalty",
@@ -2550,7 +2959,7 @@
         "outputCostPerToken": 2.8e-7,
         "inputCacheReadPerToken": 2.8e-9
       },
-      "contextLength": 1048576,
+      "contextLength": 1050000,
       "maxCompletionTokens": 131072,
       "supportedParameters": [
         "frequency_penalty",
@@ -2737,12 +3146,12 @@
       "name": "MoonshotAI: Kimi K2.6",
       "provider": "moonshotai",
       "pricing": {
-        "inputCostPerToken": 9.5e-7,
-        "outputCostPerToken": 0.000004,
-        "inputCacheReadPerToken": 1.6e-7
+        "inputCostPerToken": 6.46e-7,
+        "outputCostPerToken": 0.00000272,
+        "inputCacheReadPerToken": 1.088e-7
       },
       "contextLength": 262144,
-      "maxCompletionTokens": null,
+      "maxCompletionTokens": 262144,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -2837,7 +3246,7 @@
         "outputCostPerToken": 0.000003036,
         "inputCacheReadPerToken": 1.794e-7
       },
-      "contextLength": 202752,
+      "contextLength": 204800,
       "maxCompletionTokens": 128000,
       "supportedParameters": [
         "frequency_penalty",
@@ -2878,11 +3287,12 @@
       "name": "Google: Gemma 4 26B A4B ",
       "provider": "gemini",
       "pricing": {
-        "inputCostPerToken": 1e-7,
-        "outputCostPerToken": 3e-7
+        "inputCostPerToken": 1.2e-7,
+        "outputCostPerToken": 3.5e-7,
+        "inputCacheReadPerToken": 5e-8
       },
       "contextLength": 262144,
-      "maxCompletionTokens": 256000,
+      "maxCompletionTokens": 262144,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -2921,9 +3331,8 @@
       "name": "Google: Gemma 4 31B",
       "provider": "gemini",
       "pricing": {
-        "inputCostPerToken": 2.2e-7,
-        "outputCostPerToken": 5.5e-7,
-        "inputCacheReadPerToken": 1.2e-7
+        "inputCostPerToken": 1.4e-7,
+        "outputCostPerToken": 4e-7
       },
       "contextLength": 262144,
       "maxCompletionTokens": 262144,
@@ -2944,6 +3353,7 @@
         "temperature",
         "tool_choice",
         "tools",
+        "top_a",
         "top_k",
         "top_logprobs",
         "top_p"
@@ -3040,20 +3450,30 @@
       "name": "Arcee AI: Trinity Large Thinking",
       "provider": "arcee-ai",
       "pricing": {
-        "inputCostPerToken": 2.5e-7,
-        "outputCostPerToken": 8e-7,
+        "inputCostPerToken": 2.2e-7,
+        "outputCostPerToken": 8.5e-7,
         "inputCacheReadPerToken": 6e-8
       },
       "contextLength": 262144,
-      "maxCompletionTokens": 80000,
+      "maxCompletionTokens": 262144,
       "supportedParameters": [
+        "frequency_penalty",
         "include_reasoning",
+        "logit_bias",
+        "logprobs",
         "max_tokens",
+        "presence_penalty",
         "reasoning",
+        "repetition_penalty",
+        "response_format",
+        "seed",
+        "stop",
+        "structured_outputs",
         "temperature",
         "tool_choice",
         "tools",
         "top_k",
+        "top_logprobs",
         "top_p"
       ],
       "defaultParameters": {
@@ -3215,7 +3635,7 @@
         "outputCostPerToken": 0.0000012,
         "inputCacheReadPerToken": 6e-8
       },
-      "contextLength": 256000,
+      "contextLength": 262144,
       "maxCompletionTokens": 80000,
       "supportedParameters": [
         "frequency_penalty",
@@ -3292,9 +3712,9 @@
       "name": "MiniMax: MiniMax M2.7",
       "provider": "minimax",
       "pricing": {
-        "inputCostPerToken": 3e-7,
-        "outputCostPerToken": 0.0000012,
-        "inputCacheReadPerToken": 6e-8
+        "inputCostPerToken": 2.5e-7,
+        "outputCostPerToken": 0.000001,
+        "inputCacheReadPerToken": 5e-8
       },
       "contextLength": 204800,
       "maxCompletionTokens": 131072,
@@ -3487,12 +3907,11 @@
       "name": "NVIDIA: Nemotron 3 Super",
       "provider": "nvidia",
       "pricing": {
-        "inputCostPerToken": 2.1e-7,
-        "outputCostPerToken": 4.55e-7,
-        "inputCacheReadPerToken": 6e-8
+        "inputCostPerToken": 8.5e-8,
+        "outputCostPerToken": 4e-7
       },
       "contextLength": 1000000,
-      "maxCompletionTokens": null,
+      "maxCompletionTokens": 16384,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -3865,7 +4284,7 @@
         "webSearchCostPerQuery": 0.014
       },
       "contextLength": 131072,
-      "maxCompletionTokens": 32768,
+      "maxCompletionTokens": 65536,
       "supportedParameters": [
         "include_reasoning",
         "max_tokens",
@@ -4082,7 +4501,7 @@
         "internalReasoningCostPerToken": 0.000012,
         "webSearchCostPerQuery": 0.014
       },
-      "contextLength": 1048756,
+      "contextLength": 1048576,
       "maxCompletionTokens": 65536,
       "supportedParameters": [
         "include_reasoning",
@@ -4342,9 +4761,8 @@
       "name": "Qwen: Qwen3.5 397B A17B",
       "provider": "qwen",
       "pricing": {
-        "inputCostPerToken": 4.5e-7,
-        "outputCostPerToken": 0.000003,
-        "inputCacheReadPerToken": 2.25e-7
+        "inputCostPerToken": 3.9e-7,
+        "outputCostPerToken": 0.00000234
       },
       "contextLength": 262144,
       "maxCompletionTokens": 65536,
@@ -4434,11 +4852,11 @@
       "provider": "z-ai",
       "pricing": {
         "inputCostPerToken": 9.5e-7,
-        "outputCostPerToken": 0.00000315,
-        "inputCacheReadPerToken": 1.9e-7
+        "outputCostPerToken": 0.00000255,
+        "inputCacheReadPerToken": 2e-7
       },
-      "contextLength": 202752,
-      "maxCompletionTokens": 202752,
+      "contextLength": 204800,
+      "maxCompletionTokens": 131072,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -5117,7 +5535,7 @@
         "outputCostPerToken": 0.00000175,
         "inputCacheReadPerToken": 8e-8
       },
-      "contextLength": 202752,
+      "contextLength": 204800,
       "maxCompletionTokens": 131072,
       "supportedParameters": [
         "frequency_penalty",
@@ -5622,10 +6040,8 @@
       "maxCompletionTokens": null,
       "supportedParameters": [
         "frequency_penalty",
-        "logprobs",
         "max_tokens",
         "presence_penalty",
-        "repetition_penalty",
         "response_format",
         "seed",
         "stop",
@@ -5633,7 +6049,6 @@
         "temperature",
         "tool_choice",
         "tools",
-        "top_logprobs",
         "top_p"
       ],
       "defaultParameters": {
@@ -5702,10 +6117,8 @@
       "maxCompletionTokens": null,
       "supportedParameters": [
         "frequency_penalty",
-        "logprobs",
         "max_tokens",
         "presence_penalty",
-        "repetition_penalty",
         "response_format",
         "seed",
         "stop",
@@ -5713,7 +6126,6 @@
         "temperature",
         "tool_choice",
         "tools",
-        "top_logprobs",
         "top_p"
       ],
       "defaultParameters": {
@@ -6093,7 +6505,7 @@
       "pricing": {
         "inputCostPerToken": 0.00000125,
         "outputCostPerToken": 0.00001,
-        "inputCacheReadPerToken": 1.25e-7,
+        "inputCacheReadPerToken": 1.3e-7,
         "webSearchCostPerQuery": 0.01
       },
       "contextLength": 400000,
@@ -6142,11 +6554,11 @@
       "pricing": {
         "inputCostPerToken": 2.5e-7,
         "outputCostPerToken": 0.000002,
-        "inputCacheReadPerToken": 2.5e-8,
+        "inputCacheReadPerToken": 3e-8,
         "webSearchCostPerQuery": 0.01
       },
       "contextLength": 400000,
-      "maxCompletionTokens": 100000,
+      "maxCompletionTokens": 128000,
       "supportedParameters": [
         "include_reasoning",
         "max_completion_tokens",
@@ -6190,10 +6602,11 @@
       "provider": "moonshotai",
       "pricing": {
         "inputCostPerToken": 6e-7,
-        "outputCostPerToken": 0.0000025
+        "outputCostPerToken": 0.0000025,
+        "inputCacheReadPerToken": 1.5e-7
       },
       "contextLength": 262144,
-      "maxCompletionTokens": 262144,
+      "maxCompletionTokens": 100352,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -6419,7 +6832,7 @@
         "inputCostPerToken": 1.04e-7,
         "outputCostPerToken": 4.16e-7
       },
-      "contextLength": 262144,
+      "contextLength": 131072,
       "maxCompletionTokens": 32768,
       "supportedParameters": [
         "logprobs",
@@ -6587,7 +7000,7 @@
         "inputCostPerToken": 1.17e-7,
         "outputCostPerToken": 0.000001365
       },
-      "contextLength": 256000,
+      "contextLength": 131072,
       "maxCompletionTokens": 32768,
       "supportedParameters": [
         "include_reasoning",
@@ -6624,7 +7037,7 @@
         "inputCostPerToken": 1.17e-7,
         "outputCostPerToken": 4.55e-7
       },
-      "contextLength": 256000,
+      "contextLength": 262144,
       "maxCompletionTokens": 32768,
       "supportedParameters": [
         "frequency_penalty",
@@ -6807,47 +7220,6 @@
       "supportsImageOutput": false,
       "supportsAudioOutput": false
     },
-    "nvidia/llama-3.3-nemotron-super-49b-v1.5": {
-      "id": "nvidia/llama-3.3-nemotron-super-49b-v1.5",
-      "name": "NVIDIA: Llama 3.3 Nemotron Super 49B V1.5",
-      "provider": "nvidia",
-      "pricing": {
-        "inputCostPerToken": 4e-7,
-        "outputCostPerToken": 4e-7
-      },
-      "contextLength": 131072,
-      "maxCompletionTokens": 16384,
-      "supportedParameters": [
-        "frequency_penalty",
-        "include_reasoning",
-        "logit_bias",
-        "max_tokens",
-        "min_p",
-        "presence_penalty",
-        "reasoning",
-        "repetition_penalty",
-        "response_format",
-        "seed",
-        "stop",
-        "temperature",
-        "tool_choice",
-        "tools",
-        "top_k",
-        "top_p"
-      ],
-      "defaultParameters": {
-        "temperature": 0.6,
-        "topP": 0.95,
-        "frequencyPenalty": null
-      },
-      "modality": "text->text",
-      "mode": "chat",
-      "description": "Llama-3.3-Nemotron-Super-49B-v1.5 is a 49B-parameter, English-centric reasoning/chat model derived from Meta’s Llama-3.3-70B-Instruct with a 128K context. It’s post-trained for agentic workflows (RAG, tool calling) via SFT across math, code, science, and...",
-      "supportsImageInput": false,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
     "gemini/gemini-2.5-flash-image": {
       "id": "gemini/gemini-2.5-flash-image",
       "name": "Google: Nano Banana (Gemini 2.5 Flash Image)",
@@ -6906,7 +7278,7 @@
         "inputCostPerToken": 1.3e-7,
         "outputCostPerToken": 0.00000156
       },
-      "contextLength": 131072,
+      "contextLength": 262144,
       "maxCompletionTokens": 32768,
       "supportedParameters": [
         "frequency_penalty",
@@ -6943,11 +7315,11 @@
       "name": "Qwen: Qwen3 VL 30B A3B Instruct",
       "provider": "qwen",
       "pricing": {
-        "inputCostPerToken": 1.3e-7,
-        "outputCostPerToken": 5.2e-7
+        "inputCostPerToken": 1.5e-7,
+        "outputCostPerToken": 6e-7
       },
       "contextLength": 262144,
-      "maxCompletionTokens": 32768,
+      "maxCompletionTokens": 16384,
       "supportedParameters": [
         "frequency_penalty",
         "logit_bias",
@@ -7033,7 +7405,7 @@
         "outputCostPerToken": 0.000002,
         "inputCacheReadPerToken": 1e-7
       },
-      "contextLength": 202752,
+      "contextLength": 204800,
       "maxCompletionTokens": 131072,
       "supportedParameters": [
         "frequency_penalty",
@@ -7270,7 +7642,7 @@
         "outputCostPerToken": 0.0000019,
         "inputCacheReadPerToken": 1e-7
       },
-      "contextLength": 131072,
+      "contextLength": 262144,
       "maxCompletionTokens": 32768,
       "supportedParameters": [
         "frequency_penalty",
@@ -7435,7 +7807,7 @@
         "outputCostPerToken": 0.000001,
         "inputCacheReadPerToken": 1.35e-7
       },
-      "contextLength": 131072,
+      "contextLength": 163840,
       "maxCompletionTokens": 32768,
       "supportedParameters": [
         "frequency_penalty",
@@ -7519,6 +7891,7 @@
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
+        "logit_bias",
         "logprobs",
         "max_tokens",
         "presence_penalty",
@@ -7665,7 +8038,7 @@
         "inputCostPerToken": 1.3e-7,
         "outputCostPerToken": 0.00000156
       },
-      "contextLength": 131072,
+      "contextLength": 81920,
       "maxCompletionTokens": 32768,
       "supportedParameters": [
         "include_reasoning",
@@ -8128,8 +8501,7 @@
       "provider": "openai",
       "pricing": {
         "inputCostPerToken": 3e-8,
-        "outputCostPerToken": 1.3e-7,
-        "inputCacheReadPerToken": 3e-8
+        "outputCostPerToken": 1.4e-7
       },
       "contextLength": 131072,
       "maxCompletionTokens": 131072,
@@ -8263,7 +8635,7 @@
         "inputCostPerToken": 7e-8,
         "outputCostPerToken": 2.7e-7
       },
-      "contextLength": 160000,
+      "contextLength": 262144,
       "maxCompletionTokens": 32768,
       "supportedParameters": [
         "frequency_penalty",
@@ -8296,11 +8668,11 @@
       "name": "Qwen: Qwen3 30B A3B Instruct 2507",
       "provider": "qwen",
       "pricing": {
-        "inputCostPerToken": 1e-7,
-        "outputCostPerToken": 3e-7
+        "inputCostPerToken": 4.815e-8,
+        "outputCostPerToken": 1.9305e-7
       },
       "contextLength": 262144,
-      "maxCompletionTokens": null,
+      "maxCompletionTokens": 32000,
       "supportedParameters": [
         "frequency_penalty",
         "logit_bias",
@@ -8408,11 +8780,11 @@
       "name": "Qwen: Qwen3 235B A22B Thinking 2507",
       "provider": "qwen",
       "pricing": {
-        "inputCostPerToken": 1.495e-7,
-        "outputCostPerToken": 0.000001495
+        "inputCostPerToken": 3e-7,
+        "outputCostPerToken": 0.000003
       },
       "contextLength": 262144,
-      "maxCompletionTokens": null,
+      "maxCompletionTokens": 32768,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -8455,7 +8827,7 @@
         "outputCostPerToken": 0.000001,
         "inputCacheReadPerToken": 1e-7
       },
-      "contextLength": 1048576,
+      "contextLength": 262144,
       "maxCompletionTokens": 65536,
       "supportedParameters": [
         "frequency_penalty",
@@ -8770,7 +9142,7 @@
         "inputCostPerToken": 4.2e-7,
         "outputCostPerToken": 0.00000125
       },
-      "contextLength": 131072,
+      "contextLength": 123000,
       "maxCompletionTokens": 16000,
       "supportedParameters": [
         "frequency_penalty",
@@ -8803,12 +9175,11 @@
         "outputCostPerToken": 3e-7,
         "inputCacheReadPerToken": 1e-8
       },
-      "contextLength": 131072,
+      "contextLength": 256000,
       "maxCompletionTokens": null,
       "supportedParameters": [
         "frequency_penalty",
         "logit_bias",
-        "logprobs",
         "max_tokens",
         "min_p",
         "presence_penalty",
@@ -8821,7 +9192,6 @@
         "tool_choice",
         "tools",
         "top_k",
-        "top_logprobs",
         "top_p"
       ],
       "defaultParameters": {
@@ -9372,7 +9742,7 @@
         "inputCostPerToken": 1.8e-7,
         "outputCostPerToken": 1.8e-7
       },
-      "contextLength": 163840,
+      "contextLength": 1048576,
       "maxCompletionTokens": 16384,
       "supportedParameters": [
         "frequency_penalty",
@@ -9481,11 +9851,11 @@
       "name": "Qwen: Qwen3 14B",
       "provider": "qwen",
       "pricing": {
-        "inputCostPerToken": 1e-7,
-        "outputCostPerToken": 2.4e-7
+        "inputCostPerToken": 2.275e-7,
+        "outputCostPerToken": 9.1e-7
       },
-      "contextLength": 131702,
-      "maxCompletionTokens": 40960,
+      "contextLength": 131072,
+      "maxCompletionTokens": 8192,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -9838,7 +10208,7 @@
         "inputCostPerToken": 1e-7,
         "outputCostPerToken": 3e-7
       },
-      "contextLength": 10000000,
+      "contextLength": 1310720,
       "maxCompletionTokens": 16384,
       "supportedParameters": [
         "frequency_penalty",
@@ -10178,7 +10548,7 @@
         "outputCostPerToken": 4.5e-7,
         "inputCacheReadPerToken": 4e-8
       },
-      "contextLength": 131072,
+      "contextLength": 262144,
       "maxCompletionTokens": 131072,
       "supportedParameters": [
         "frequency_penalty",
@@ -10455,7 +10825,7 @@
         "outputCostPerToken": 0.000001,
         "inputCacheReadPerToken": 4e-7
       },
-      "contextLength": 131072,
+      "contextLength": 128000,
       "maxCompletionTokens": 128000,
       "supportedParameters": [
         "frequency_penalty",
@@ -10637,7 +11007,7 @@
         "inputCostPerToken": 8e-7,
         "outputCostPerToken": 8e-7
       },
-      "contextLength": 128000,
+      "contextLength": 8192,
       "maxCompletionTokens": 8192,
       "supportedParameters": [
         "frequency_penalty",
@@ -10794,7 +11164,7 @@
         "inputCostPerToken": 2.002e-7,
         "outputCostPerToken": 8.001e-7
       },
-      "contextLength": 131072,
+      "contextLength": 163840,
       "maxCompletionTokens": 16000,
       "supportedParameters": [
         "frequency_penalty",
@@ -11132,7 +11502,7 @@
         "inputCostPerToken": 6.6e-7,
         "outputCostPerToken": 0.000001
       },
-      "contextLength": 128000,
+      "contextLength": 32768,
       "maxCompletionTokens": 32768,
       "supportedParameters": [
         "frequency_penalty",
@@ -11199,7 +11569,7 @@
         "inputCostPerToken": 0.000003,
         "outputCostPerToken": 0.000005
       },
-      "contextLength": 32768,
+      "contextLength": 16384,
       "maxCompletionTokens": 2048,
       "supportedParameters": [
         "frequency_penalty",
@@ -11236,7 +11606,7 @@
         "inputCostPerToken": 4e-8,
         "outputCostPerToken": 1e-7
       },
-      "contextLength": 131072,
+      "contextLength": 32768,
       "maxCompletionTokens": 32768,
       "supportedParameters": [
         "frequency_penalty",
@@ -11265,56 +11635,6 @@
       "modality": "text->text",
       "mode": "chat",
       "description": "Qwen2.5 7B is the latest series of Qwen large language models. Qwen2.5 brings the following improvements upon Qwen2: - Significantly more knowledge and has greatly improved capabilities in coding and...",
-      "supportsImageInput": false,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
-    "inflection/inflection-3-pi": {
-      "id": "inflection/inflection-3-pi",
-      "name": "Inflection: Inflection 3 Pi",
-      "provider": "inflection",
-      "pricing": {
-        "inputCostPerToken": 0.0000025,
-        "outputCostPerToken": 0.00001
-      },
-      "contextLength": 8000,
-      "maxCompletionTokens": 1024,
-      "supportedParameters": [
-        "max_tokens",
-        "stop",
-        "temperature",
-        "top_p"
-      ],
-      "defaultParameters": {},
-      "modality": "text->text",
-      "mode": "chat",
-      "description": "Inflection 3 Pi powers Inflection's [Pi](https://pi.ai) chatbot, including backstory, emotional intelligence, productivity, and safety. It has access to recent news, and excels in scenarios like customer support and roleplay. Pi...",
-      "supportsImageInput": false,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
-    "inflection/inflection-3-productivity": {
-      "id": "inflection/inflection-3-productivity",
-      "name": "Inflection: Inflection 3 Productivity",
-      "provider": "inflection",
-      "pricing": {
-        "inputCostPerToken": 0.0000025,
-        "outputCostPerToken": 0.00001
-      },
-      "contextLength": 8000,
-      "maxCompletionTokens": 1024,
-      "supportedParameters": [
-        "max_tokens",
-        "stop",
-        "temperature",
-        "top_p"
-      ],
-      "defaultParameters": {},
-      "modality": "text->text",
-      "mode": "chat",
-      "description": "Inflection 3 Productivity is optimized for following instructions. It is better for tasks requiring JSON output or precise adherence to provided guidelines. It has access to recent news. For emotional...",
       "supportsImageInput": false,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
@@ -11355,39 +11675,6 @@
       "supportsImageOutput": false,
       "supportsAudioOutput": false
     },
-    "meta-llama/llama-3.2-11b-vision-instruct": {
-      "id": "meta-llama/llama-3.2-11b-vision-instruct",
-      "name": "Meta: Llama 3.2 11B Vision Instruct",
-      "provider": "meta-llama",
-      "pricing": {
-        "inputCostPerToken": 3.45e-7,
-        "outputCostPerToken": 3.45e-7
-      },
-      "contextLength": 131072,
-      "maxCompletionTokens": 16384,
-      "supportedParameters": [
-        "frequency_penalty",
-        "logit_bias",
-        "max_tokens",
-        "min_p",
-        "presence_penalty",
-        "repetition_penalty",
-        "response_format",
-        "seed",
-        "stop",
-        "temperature",
-        "top_k",
-        "top_p"
-      ],
-      "defaultParameters": {},
-      "modality": "text+image->text",
-      "mode": "chat",
-      "description": "Llama 3.2 11B Vision is a multimodal model with 11 billion parameters, designed to handle tasks combining visual and textual data. It excels in tasks such as image captioning and...",
-      "supportsImageInput": true,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
     "meta-llama/llama-3.2-1b-instruct": {
       "id": "meta-llama/llama-3.2-1b-instruct",
       "name": "Meta: Llama 3.2 1B Instruct",
@@ -11396,7 +11683,7 @@
         "inputCostPerToken": 2.7e-8,
         "outputCostPerToken": 2.01e-7
       },
-      "contextLength": 131072,
+      "contextLength": 60000,
       "maxCompletionTokens": 60000,
       "supportedParameters": [
         "frequency_penalty",
@@ -11463,7 +11750,7 @@
         "inputCostPerToken": 3.6e-7,
         "outputCostPerToken": 4e-7
       },
-      "contextLength": 131072,
+      "contextLength": 32768,
       "maxCompletionTokens": 16384,
       "supportedParameters": [
         "frequency_penalty",
@@ -11816,8 +12103,8 @@
       "name": "Mistral: Mistral Nemo",
       "provider": "mistralai",
       "pricing": {
-        "inputCostPerToken": 2e-8,
-        "outputCostPerToken": 4e-8
+        "inputCostPerToken": 1.9e-8,
+        "outputCostPerToken": 3e-8
       },
       "contextLength": 131072,
       "maxCompletionTokens": 16384,
@@ -12079,7 +12366,7 @@
         "inputCostPerToken": 6.2e-7,
         "outputCostPerToken": 6.2e-7
       },
-      "contextLength": 65536,
+      "contextLength": 65535,
       "maxCompletionTokens": 8000,
       "supportedParameters": [
         "frequency_penalty",
@@ -12288,7 +12575,6 @@
         "include_reasoning",
         "logit_bias",
         "logprobs",
-        "max_completion_tokens",
         "max_tokens",
         "min_p",
         "prediction",
@@ -12396,8 +12682,8 @@
       "name": "Mancer: Weaver (alpha)",
       "provider": "mancer",
       "pricing": {
-        "inputCostPerToken": 7.5e-7,
-        "outputCostPerToken": 0.000001
+        "inputCostPerToken": 5e-7,
+        "outputCostPerToken": 7.5e-7
       },
       "contextLength": 8000,
       "maxCompletionTokens": 2000,
@@ -12437,7 +12723,7 @@
         "outputCostPerToken": 6.5e-7
       },
       "contextLength": 6144,
-      "maxCompletionTokens": 4096,
+      "maxCompletionTokens": 2048,
       "supportedParameters": [
         "frequency_penalty",
         "logit_bias",
@@ -12473,7 +12759,7 @@
         "inputCostPerToken": 6e-8,
         "outputCostPerToken": 6e-8
       },
-      "contextLength": 4096,
+      "contextLength": 8192,
       "maxCompletionTokens": 4096,
       "supportedParameters": [
         "frequency_penalty",
@@ -13074,6 +13360,195 @@
       "description": "The Qwen3 Embedding model series is the latest proprietary model of the Qwen family, specifically designed for text embedding and ranking tasks. This series inherits the exceptional multilingual capabilities, long-text...",
       "supportsImageInput": false,
       "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": false
+    },
+    "elevenlabs/eleven_v3": {
+      "id": "elevenlabs/eleven_v3",
+      "name": "eleven_v3",
+      "provider": "elevenlabs",
+      "pricing": {
+        "inputCostPerToken": 0,
+        "outputCostPerToken": 0,
+        "inputCostPerCharacter": 0.00018
+      },
+      "contextLength": 0,
+      "maxCompletionTokens": null,
+      "supportedParameters": [],
+      "defaultParameters": null,
+      "modality": "text->audio",
+      "mode": "audio",
+      "description": "Speech synthesis, priced per input character. Synced from litellm's price registry.",
+      "supportsImageInput": false,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": true
+    },
+    "elevenlabs/scribe_v1": {
+      "id": "elevenlabs/scribe_v1",
+      "name": "scribe_v1",
+      "provider": "elevenlabs",
+      "pricing": {
+        "inputCostPerToken": 0,
+        "outputCostPerToken": 0,
+        "inputCostPerSecond": 0.0000611
+      },
+      "contextLength": 0,
+      "maxCompletionTokens": null,
+      "supportedParameters": [],
+      "defaultParameters": null,
+      "modality": "audio->text",
+      "mode": "audio",
+      "description": "Speech-to-text, priced per second of audio. Synced from litellm's price registry.",
+      "supportsImageInput": false,
+      "supportsAudioInput": true,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": false
+    },
+    "elevenlabs/scribe_v1_experimental": {
+      "id": "elevenlabs/scribe_v1_experimental",
+      "name": "scribe_v1_experimental",
+      "provider": "elevenlabs",
+      "pricing": {
+        "inputCostPerToken": 0,
+        "outputCostPerToken": 0,
+        "inputCostPerSecond": 0.0000611
+      },
+      "contextLength": 0,
+      "maxCompletionTokens": null,
+      "supportedParameters": [],
+      "defaultParameters": null,
+      "modality": "audio->text",
+      "mode": "audio",
+      "description": "Speech-to-text, priced per second of audio. Synced from litellm's price registry.",
+      "supportsImageInput": false,
+      "supportsAudioInput": true,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": false
+    },
+    "openai/gpt-realtime-whisper": {
+      "id": "openai/gpt-realtime-whisper",
+      "name": "gpt-realtime-whisper",
+      "provider": "openai",
+      "pricing": {
+        "inputCostPerToken": 0,
+        "outputCostPerToken": 0,
+        "inputCostPerSecond": 0.0002833333333333333
+      },
+      "contextLength": 0,
+      "maxCompletionTokens": null,
+      "supportedParameters": [],
+      "defaultParameters": null,
+      "modality": "audio->text",
+      "mode": "audio",
+      "description": "Speech-to-text, priced per second of audio. Synced from litellm's price registry.",
+      "supportsImageInput": false,
+      "supportsAudioInput": true,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": false
+    },
+    "openai/tts-1": {
+      "id": "openai/tts-1",
+      "name": "tts-1",
+      "provider": "openai",
+      "pricing": {
+        "inputCostPerToken": 0,
+        "outputCostPerToken": 0,
+        "inputCostPerCharacter": 0.000015
+      },
+      "contextLength": 0,
+      "maxCompletionTokens": null,
+      "supportedParameters": [],
+      "defaultParameters": null,
+      "modality": "text->audio",
+      "mode": "audio",
+      "description": "Speech synthesis, priced per input character. Synced from litellm's price registry.",
+      "supportsImageInput": false,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": true
+    },
+    "openai/tts-1-1106": {
+      "id": "openai/tts-1-1106",
+      "name": "tts-1-1106",
+      "provider": "openai",
+      "pricing": {
+        "inputCostPerToken": 0,
+        "outputCostPerToken": 0,
+        "inputCostPerCharacter": 0.000015
+      },
+      "contextLength": 0,
+      "maxCompletionTokens": null,
+      "supportedParameters": [],
+      "defaultParameters": null,
+      "modality": "text->audio",
+      "mode": "audio",
+      "description": "Speech synthesis, priced per input character. Synced from litellm's price registry.",
+      "supportsImageInput": false,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": true
+    },
+    "openai/tts-1-hd": {
+      "id": "openai/tts-1-hd",
+      "name": "tts-1-hd",
+      "provider": "openai",
+      "pricing": {
+        "inputCostPerToken": 0,
+        "outputCostPerToken": 0,
+        "inputCostPerCharacter": 0.00003
+      },
+      "contextLength": 0,
+      "maxCompletionTokens": null,
+      "supportedParameters": [],
+      "defaultParameters": null,
+      "modality": "text->audio",
+      "mode": "audio",
+      "description": "Speech synthesis, priced per input character. Synced from litellm's price registry.",
+      "supportsImageInput": false,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": true
+    },
+    "openai/tts-1-hd-1106": {
+      "id": "openai/tts-1-hd-1106",
+      "name": "tts-1-hd-1106",
+      "provider": "openai",
+      "pricing": {
+        "inputCostPerToken": 0,
+        "outputCostPerToken": 0,
+        "inputCostPerCharacter": 0.00003
+      },
+      "contextLength": 0,
+      "maxCompletionTokens": null,
+      "supportedParameters": [],
+      "defaultParameters": null,
+      "modality": "text->audio",
+      "mode": "audio",
+      "description": "Speech synthesis, priced per input character. Synced from litellm's price registry.",
+      "supportsImageInput": false,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": true
+    },
+    "openai/whisper-1": {
+      "id": "openai/whisper-1",
+      "name": "whisper-1",
+      "provider": "openai",
+      "pricing": {
+        "inputCostPerToken": 0,
+        "outputCostPerToken": 0,
+        "inputCostPerSecond": 0.0001
+      },
+      "contextLength": 0,
+      "maxCompletionTokens": null,
+      "supportedParameters": [],
+      "defaultParameters": null,
+      "modality": "audio->text",
+      "mode": "audio",
+      "description": "Speech-to-text, priced per second of audio. Synced from litellm's price registry.",
+      "supportsImageInput": false,
+      "supportsAudioInput": true,
       "supportsImageOutput": false,
       "supportsAudioOutput": false
     }

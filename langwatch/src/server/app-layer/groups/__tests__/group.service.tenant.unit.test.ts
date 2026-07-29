@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import type { GroupRepository } from "../repositories/group.repository";
 import { GroupRestService, UserNotInOrganizationError } from "../group.service";
+import type { GroupRepository } from "../repositories/group.repository";
 
 describe("GroupRestService.create", () => {
   describe("when a requested member is not in the organization", () => {

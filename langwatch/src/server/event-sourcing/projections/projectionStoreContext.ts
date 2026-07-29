@@ -2,6 +2,27 @@ import type { ResolvedRetention } from "../../data-retention/retentionPolicy.sch
 import type { TenantId } from "../domain/tenantId";
 
 /**
+ * A closed time range (ms since epoch) bounding a store's backing-table read
+ * so a time-partitioned table can prune partitions instead of scanning them
+ * all (including the cold S3 tier).
+ */
+export interface ReadTimeWindow {
+  fromMs: number;
+  toMs: number;
+}
+
+/** The window of `widthMs` on each side of `anchorMs`. */
+export function readWindowAround({
+  anchorMs,
+  widthMs,
+}: {
+  anchorMs: number;
+  widthMs: number;
+}): ReadTimeWindow {
+  return { fromMs: anchorMs - widthMs, toMs: anchorMs + widthMs };
+}
+
+/**
  * Context passed to projection stores for both fold and map projections.
  * Provides the minimum information needed for tenant-scoped persistence.
  */
@@ -16,13 +37,34 @@ export interface ProjectionStoreContext {
   key?: string;
 
   /**
-   * occurredAt (ms) of the event currently being processed, when known. Stores
-   * may use it as a best-effort hint to prune a time-partitioned read of their
-   * backing table (e.g. the trace summary store narrows its trace_summaries
-   * lookup to a window around this time instead of scanning every partition).
-   * It is purely an optimisation — stores must stay correct when it is absent.
+   * occurredAt (ms) of the event currently being processed, when known. It is
+   * purely informational — a store that wants its backing read time-bounded
+   * should rely on `readWindow` (declared on the fold definition) rather than
+   * deriving a window of its own from this value.
    */
   occurredAtMs?: number;
+
+  /**
+   * Time bound for the store's backing-table read, computed by the executor
+   * from the event's business time and the width the fold DECLARED
+   * (`FoldProjectionOptions.readWindow`). A store passes it through to its
+   * repository verbatim; it never chooses a width or implements a miss
+   * fallback itself — on a windowed miss the executor retries the read once
+   * without the window, so a row outside the window is still found and a
+   * live aggregate never reads back as null just because the window missed.
+   */
+  readWindow?: ReadTimeWindow;
+
+  /**
+   * Skip the read cache for this read and go straight to the durable tier.
+   *
+   * Set by the executor on its read-window fallback: the retry runs moments
+   * after the windowed attempt already consulted the cache, so re-reading
+   * Redis is a guaranteed second miss that would double-count the cache (and
+   * dedup-unavailable) metrics and waste a round-trip. Stores without a cache
+   * tier ignore it.
+   */
+  bypassReadCache?: boolean;
 
   /**
    * Resolved retention policy for the tenant. Absent/null means the resolver

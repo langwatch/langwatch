@@ -69,13 +69,7 @@ export const TargetSummary = memo(function TargetSummary({
 
   // Build tooltip content
   const tooltipContent = (
-    <VStack
-      align="stretch"
-      gap={0}
-      fontSize="12px"
-      minWidth="230px"
-      color="fg"
-    >
+    <VStack align="stretch" gap={0} fontSize="12px" minWidth="230px" color="fg">
       <VStack align="stretch" gap={2} padding={2}>
         {/* Progress */}
         <HStack justify="space-between">

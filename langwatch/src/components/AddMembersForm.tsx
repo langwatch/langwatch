@@ -10,24 +10,24 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Checkbox } from "~/components/ui/checkbox";
 import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
 import { Mail, Plus, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useRef } from "react";
 import {
-  Controller,
   type Control,
+  Controller,
   type SubmitHandler,
   type UseFormSetValue,
   useFieldArray,
   useForm,
   useWatch,
 } from "react-hook-form";
-import { useEffect, useMemo, useRef } from "react";
+import { Checkbox } from "~/components/ui/checkbox";
 import { api } from "~/utils/api";
 import {
-  teamRolesOptions,
-  TeamRoleSelectItemContent,
   type RoleOption,
+  TeamRoleSelectItemContent,
+  teamRolesOptions,
 } from "./settings/TeamUserRoleField";
 import { Select } from "./ui/select";
 

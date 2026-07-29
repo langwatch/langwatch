@@ -147,7 +147,13 @@ export function CodePropertiesPanel({ node }: { node: Node<Component> }) {
   );
 
   return (
-    <BasePropertiesPanel node={node} hideParameters hideInputs hideOutputs paddingX={4}>
+    <BasePropertiesPanel
+      node={node}
+      hideParameters
+      hideInputs
+      hideOutputs
+      paddingX={4}
+    >
       {/* Code Editor */}
       <CodeBlockEditor
         code={code}

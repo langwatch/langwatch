@@ -88,7 +88,9 @@ describe("PersonalWorkspaceService — auto-create personal team + project", () 
       where: { team: { organizationId: ORG_ID } },
     });
     await prisma.team.deleteMany({ where: { organizationId: ORG_ID } });
-    await prisma.organizationUser.deleteMany({ where: { organizationId: ORG_ID } });
+    await prisma.organizationUser.deleteMany({
+      where: { organizationId: ORG_ID },
+    });
     await prisma.user.deleteMany({
       where: { id: { in: [USER_ID, SECOND_USER_ID] } },
     });
@@ -148,10 +150,18 @@ describe("PersonalWorkspaceService — auto-create personal team + project", () 
   describe("when ensure is called a second time for the same pair", () => {
     it("returns the existing workspace without creating new rows", async () => {
       const teamCountBefore = await prisma.team.count({
-        where: { organizationId: ORG_ID, isPersonal: true, ownerUserId: USER_ID },
+        where: {
+          organizationId: ORG_ID,
+          isPersonal: true,
+          ownerUserId: USER_ID,
+        },
       });
       const projectCountBefore = await prisma.project.count({
-        where: { team: { organizationId: ORG_ID }, isPersonal: true, ownerUserId: USER_ID },
+        where: {
+          team: { organizationId: ORG_ID },
+          isPersonal: true,
+          ownerUserId: USER_ID,
+        },
       });
 
       const second = await service.ensure({
@@ -162,10 +172,18 @@ describe("PersonalWorkspaceService — auto-create personal team + project", () 
       expect(second.created).toBe(false);
 
       const teamCountAfter = await prisma.team.count({
-        where: { organizationId: ORG_ID, isPersonal: true, ownerUserId: USER_ID },
+        where: {
+          organizationId: ORG_ID,
+          isPersonal: true,
+          ownerUserId: USER_ID,
+        },
       });
       const projectCountAfter = await prisma.project.count({
-        where: { team: { organizationId: ORG_ID }, isPersonal: true, ownerUserId: USER_ID },
+        where: {
+          team: { organizationId: ORG_ID },
+          isPersonal: true,
+          ownerUserId: USER_ID,
+        },
       });
 
       expect(teamCountAfter).toBe(teamCountBefore);

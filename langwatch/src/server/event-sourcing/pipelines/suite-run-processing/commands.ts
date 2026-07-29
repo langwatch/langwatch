@@ -1,8 +1,8 @@
 import { defineCommand } from "../../commands/defineCommand";
 import {
-  suiteRunStartedEventDataSchema,
-  suiteRunItemStartedEventDataSchema,
   suiteRunItemCompletedEventDataSchema,
+  suiteRunItemStartedEventDataSchema,
+  suiteRunStartedEventDataSchema,
 } from "./schemas/events";
 
 /**
@@ -36,12 +36,14 @@ export const RecordSuiteRunItemStartedCommand = defineCommand({
   aggregateType: "suite_run",
   schema: suiteRunItemStartedEventDataSchema,
   aggregateId: (d) => d.batchRunId,
-  idempotencyKey: (d) => `${d.tenantId}:${d.batchRunId}:${d.scenarioRunId}:itemStarted`,
+  idempotencyKey: (d) =>
+    `${d.tenantId}:${d.batchRunId}:${d.scenarioRunId}:itemStarted`,
   spanAttributes: (d) => ({
     "payload.batchRun.id": d.batchRunId,
     "payload.scenarioRun.id": d.scenarioRunId,
   }),
-  makeJobId: (d) => `${d.tenantId}:${d.batchRunId}:${d.scenarioRunId}:itemStarted`,
+  makeJobId: (d) =>
+    `${d.tenantId}:${d.batchRunId}:${d.scenarioRunId}:itemStarted`,
 });
 
 export const CompleteSuiteRunItemCommand = defineCommand({
@@ -51,11 +53,13 @@ export const CompleteSuiteRunItemCommand = defineCommand({
   aggregateType: "suite_run",
   schema: suiteRunItemCompletedEventDataSchema,
   aggregateId: (d) => d.batchRunId,
-  idempotencyKey: (d) => `${d.tenantId}:${d.batchRunId}:${d.scenarioRunId}:itemCompleted`,
+  idempotencyKey: (d) =>
+    `${d.tenantId}:${d.batchRunId}:${d.scenarioRunId}:itemCompleted`,
   spanAttributes: (d) => ({
     "payload.batchRun.id": d.batchRunId,
     "payload.scenarioRun.id": d.scenarioRunId,
     "payload.status": d.status,
   }),
-  makeJobId: (d) => `${d.tenantId}:${d.batchRunId}:${d.scenarioRunId}:itemCompleted`,
+  makeJobId: (d) =>
+    `${d.tenantId}:${d.batchRunId}:${d.scenarioRunId}:itemCompleted`,
 });

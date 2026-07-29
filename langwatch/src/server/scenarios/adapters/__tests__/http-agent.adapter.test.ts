@@ -51,10 +51,12 @@ vi.mock("~/utils/ssrfProtection", () => ({
 }));
 
 vi.mock("@langwatch/observability/tracing", () => ({
-  injectTraceContextHeaders: vi.fn(({ headers }: { headers: Record<string, string> }) => ({
-    headers,
-    traceId: undefined,
-  })),
+  injectTraceContextHeaders: vi.fn(
+    ({ headers }: { headers: Record<string, string> }) => ({
+      headers,
+      traceId: undefined,
+    }),
+  ),
 }));
 
 import { injectTraceContextHeaders } from "@langwatch/observability/tracing";
@@ -674,7 +676,9 @@ describe("HttpAgentAdapter", () => {
       );
 
       expect(mockInjectTraceContextHeaders).toHaveBeenCalledWith({
-        headers: expect.objectContaining({ "Content-Type": "application/json" }),
+        headers: expect.objectContaining({
+          "Content-Type": "application/json",
+        }),
       });
     });
 
@@ -800,9 +804,7 @@ describe("HttpAgentAdapter", () => {
       });
 
       await adapter.call(
-        createAgentInput([
-          { role: "user", content: "hello world & friends?" },
-        ]),
+        createAgentInput([{ role: "user", content: "hello world & friends?" }]),
       );
 
       expect(mockFetch).toHaveBeenCalledWith(
@@ -897,9 +899,7 @@ describe("HttpAgentAdapter", () => {
           agentRepository: createMockAgentRepository(agent),
         });
 
-        await adapter.call(
-          createAgentInput([{ role: "user", content: "Hi" }]),
-        );
+        await adapter.call(createAgentInput([{ role: "user", content: "Hi" }]));
 
         expect(mockFetch).toHaveBeenCalledWith(
           "https://api.example.com/chat/conv-42/message",
@@ -918,9 +918,7 @@ describe("HttpAgentAdapter", () => {
           agentRepository: createMockAgentRepository(agent),
         });
 
-        await adapter.call(
-          createAgentInput([{ role: "user", content: "Hi" }]),
-        );
+        await adapter.call(createAgentInput([{ role: "user", content: "Hi" }]));
 
         expect(mockFetch).toHaveBeenCalledWith(
           "https://api.example.com/chat/start",
@@ -964,30 +962,27 @@ describe("HttpAgentAdapter", () => {
         ["localhost", "localhost"],
         ["127.0.0.1", "127.0.0.1"],
         ["169.254.169.254", "169.254.169.254"],
-      ])(
-        "passes %s-resolved url to ssrfSafeFetch so it can be rejected",
-        async (label, ip) => {
-          const mockFetch = await setupSsrfMock();
-          const agent = createHttpAgent({
-            url: "https://{{input | raw}}/path",
-          });
-          const adapter = new HttpAgentAdapter({
-            agentId: "agent-123",
-            projectId: "project-123",
-            agentRepository: createMockAgentRepository(agent),
-          });
+      ])("passes %s-resolved url to ssrfSafeFetch so it can be rejected", async (label, ip) => {
+        const mockFetch = await setupSsrfMock();
+        const agent = createHttpAgent({
+          url: "https://{{input | raw}}/path",
+        });
+        const adapter = new HttpAgentAdapter({
+          agentId: "agent-123",
+          projectId: "project-123",
+          agentRepository: createMockAgentRepository(agent),
+        });
 
-          await expect(
-            adapter.call(createAgentInput([{ role: "user", content: ip }])),
-          ).rejects.toThrow();
+        await expect(
+          adapter.call(createAgentInput([{ role: "user", content: ip }])),
+        ).rejects.toThrow();
 
-          expect(mockFetch).toHaveBeenCalledWith(
-            `https://${ip}/path`,
-            expect.any(Object),
-          );
-          expect(label).toBeTruthy();
-        },
-      );
+        expect(mockFetch).toHaveBeenCalledWith(
+          `https://${ip}/path`,
+          expect.any(Object),
+        );
+        expect(label).toBeTruthy();
+      });
     });
 
     describe("when url template is malformed", () => {
@@ -1003,15 +998,11 @@ describe("HttpAgentAdapter", () => {
         });
 
         await expect(
-          adapter.call(
-            createAgentInput([{ role: "user", content: "Hello" }]),
-          ),
+          adapter.call(createAgentInput([{ role: "user", content: "Hello" }])),
         ).rejects.toThrow(TemplateRenderError);
 
         await expect(
-          adapter.call(
-            createAgentInput([{ role: "user", content: "Hello" }]),
-          ),
+          adapter.call(createAgentInput([{ role: "user", content: "Hello" }])),
         ).rejects.toMatchObject({ field: "url" });
       });
     });

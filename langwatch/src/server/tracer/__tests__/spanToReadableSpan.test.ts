@@ -1,13 +1,7 @@
-import { describe, expect, it } from "vitest";
 import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
+import { describe, expect, it } from "vitest";
 import { langwatchSpanToReadableSpan } from "../spanToReadableSpan";
-import type {
-  BaseSpan,
-  LLMSpan,
-  RAGSpan,
-  Span,
-  SpanTypes,
-} from "../types";
+import type { BaseSpan, LLMSpan, RAGSpan, Span, SpanTypes } from "../types";
 
 function makeBaseSpan(overrides: Partial<BaseSpan> = {}): BaseSpan {
   return {
@@ -177,7 +171,9 @@ describe("langwatchSpanToReadableSpan", () => {
       ["unknown", SpanKind.INTERNAL],
     ];
 
-    it.each(testCases)("maps type '%s' to SpanKind %s", (type, expectedKind) => {
+    it.each(
+      testCases,
+    )("maps type '%s' to SpanKind %s", (type, expectedKind) => {
       const span = makeBaseSpan({ type });
       const result = langwatchSpanToReadableSpan(span);
       expect(result.kind).toBe(expectedKind);
@@ -203,7 +199,7 @@ describe("langwatchSpanToReadableSpan", () => {
       expect(result.attributes["gen_ai.input.messages"]).toBe(
         JSON.stringify(messages),
       );
-      expect(result.attributes["input"]).toBeUndefined();
+      expect(result.attributes.input).toBeUndefined();
     });
 
     it("maps text input to input attribute", () => {
@@ -211,7 +207,7 @@ describe("langwatchSpanToReadableSpan", () => {
         input: { type: "text", value: "hello world" },
       });
       const result = langwatchSpanToReadableSpan(span);
-      expect(result.attributes["input"]).toBe("hello world");
+      expect(result.attributes.input).toBe("hello world");
       expect(result.attributes["gen_ai.input.messages"]).toBeUndefined();
     });
 
@@ -220,7 +216,7 @@ describe("langwatchSpanToReadableSpan", () => {
         input: { type: "json", value: { key: "val" } },
       });
       const result = langwatchSpanToReadableSpan(span);
-      expect(result.attributes["input"]).toBe('{"key":"val"}');
+      expect(result.attributes.input).toBe('{"key":"val"}');
     });
 
     it("maps raw input to input attribute", () => {
@@ -228,20 +224,20 @@ describe("langwatchSpanToReadableSpan", () => {
         input: { type: "raw", value: "raw-content" },
       });
       const result = langwatchSpanToReadableSpan(span);
-      expect(result.attributes["input"]).toBe("raw-content");
+      expect(result.attributes.input).toBe("raw-content");
     });
 
     it("sets no input attribute when input is null", () => {
       const span = makeBaseSpan({ input: null });
       const result = langwatchSpanToReadableSpan(span);
-      expect(result.attributes["input"]).toBeUndefined();
+      expect(result.attributes.input).toBeUndefined();
       expect(result.attributes["gen_ai.input.messages"]).toBeUndefined();
     });
 
     it("sets no input attribute when input is undefined", () => {
       const span = makeBaseSpan({ input: undefined });
       const result = langwatchSpanToReadableSpan(span);
-      expect(result.attributes["input"]).toBeUndefined();
+      expect(result.attributes.input).toBeUndefined();
     });
   });
 
@@ -255,7 +251,7 @@ describe("langwatchSpanToReadableSpan", () => {
       expect(result.attributes["gen_ai.output.messages"]).toBe(
         JSON.stringify(messages),
       );
-      expect(result.attributes["output"]).toBeUndefined();
+      expect(result.attributes.output).toBeUndefined();
     });
 
     it("maps text output to output attribute", () => {
@@ -263,7 +259,7 @@ describe("langwatchSpanToReadableSpan", () => {
         output: { type: "text", value: "result text" },
       });
       const result = langwatchSpanToReadableSpan(span);
-      expect(result.attributes["output"]).toBe("result text");
+      expect(result.attributes.output).toBe("result text");
     });
 
     it("maps json output to output attribute as JSON string", () => {
@@ -271,7 +267,7 @@ describe("langwatchSpanToReadableSpan", () => {
         output: { type: "json", value: [1, 2, 3] },
       });
       const result = langwatchSpanToReadableSpan(span);
-      expect(result.attributes["output"]).toBe("[1,2,3]");
+      expect(result.attributes.output).toBe("[1,2,3]");
     });
 
     it("maps raw output to output attribute", () => {
@@ -279,13 +275,13 @@ describe("langwatchSpanToReadableSpan", () => {
         output: { type: "raw", value: "raw-output" },
       });
       const result = langwatchSpanToReadableSpan(span);
-      expect(result.attributes["output"]).toBe("raw-output");
+      expect(result.attributes.output).toBe("raw-output");
     });
 
     it("sets no output attribute when output is null", () => {
       const span = makeBaseSpan({ output: null });
       const result = langwatchSpanToReadableSpan(span);
-      expect(result.attributes["output"]).toBeUndefined();
+      expect(result.attributes.output).toBeUndefined();
       expect(result.attributes["gen_ai.output.messages"]).toBeUndefined();
     });
   });
@@ -585,8 +581,8 @@ describe("langwatchSpanToReadableSpan", () => {
 
       expect(result.name).toBe("retrieve-docs");
       expect(result.attributes["langwatch.span.type"]).toBe("rag");
-      expect(result.attributes["input"]).toBe("search query");
-      expect(result.attributes["output"]).toBe('{"results":3}');
+      expect(result.attributes.input).toBe("search query");
+      expect(result.attributes.output).toBe('{"results":3}');
       expect(result.attributes["retrieval.documents"]).toBeDefined();
       const docs = JSON.parse(
         result.attributes["retrieval.documents"] as string,
@@ -718,7 +714,7 @@ describe("langwatchSpanToReadableSpan", () => {
         },
       });
       const result = langwatchSpanToReadableSpan(span);
-      expect(result.attributes["_keys"]).toBeUndefined();
+      expect(result.attributes._keys).toBeUndefined();
       expect(result.attributes["ai.toolCall.name"]).toBe(
         "searchPropertiesTool",
       );
@@ -751,9 +747,9 @@ describe("langwatchSpanToReadableSpan", () => {
       expect(result.attributes["gen_ai.request.max_tokens"]).toBe(1024);
       expect(result.attributes["gen_ai.request.top_p"]).toBe(0.9);
       // Flattened raw versions
-      expect(result.attributes["temperature"]).toBe(0.7);
-      expect(result.attributes["max_tokens"]).toBe(1024);
-      expect(result.attributes["top_p"]).toBe(0.9);
+      expect(result.attributes.temperature).toBe(0.7);
+      expect(result.attributes.max_tokens).toBe(1024);
+      expect(result.attributes.top_p).toBe(0.9);
       expect(result.attributes["ai.operationId"]).toBe("ai.toolCall");
     });
 
@@ -844,7 +840,7 @@ describe("langwatchSpanToReadableSpan", () => {
       expect(result.attributes["ai.operationId"]).toBe("ai.toolCall");
       expect(result.attributes["ai.telemetry.functionId"]).toBe("agent-chat");
       expect(result.attributes["scope.name"]).toBe("ai");
-      expect(result.attributes["_keys"]).toBeUndefined();
+      expect(result.attributes._keys).toBeUndefined();
     });
   });
 
@@ -872,7 +868,7 @@ describe("langwatchSpanToReadableSpan", () => {
         input: { type: "json", value: [1, "two", { three: 3 }] },
       });
       const result = langwatchSpanToReadableSpan(span);
-      expect(result.attributes["input"]).toBe('[1,"two",{"three":3}]');
+      expect(result.attributes.input).toBe('[1,"two",{"three":3}]');
     });
 
     it("handles json input with null value", () => {
@@ -880,7 +876,7 @@ describe("langwatchSpanToReadableSpan", () => {
         input: { type: "json", value: null },
       });
       const result = langwatchSpanToReadableSpan(span);
-      expect(result.attributes["input"]).toBe("null");
+      expect(result.attributes.input).toBe("null");
     });
 
     it("handles json output with string value", () => {
@@ -888,7 +884,7 @@ describe("langwatchSpanToReadableSpan", () => {
         output: { type: "json", value: "just a string" },
       });
       const result = langwatchSpanToReadableSpan(span);
-      expect(result.attributes["output"]).toBe('"just a string"');
+      expect(result.attributes.output).toBe('"just a string"');
     });
   });
 });

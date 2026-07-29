@@ -27,13 +27,13 @@ export type IntegrationMethodValue =
  * - "manually"           -> "manual_sdk"
  */
 export function mapProductSelectionToIntegrationMethod(
-  selection: string
+  selection: string,
 ): IntegrationMethodValue {
   const mapping: Record<string, IntegrationMethodValue> = {
     "via-claude-code": "coding_agent",
     "via-platform": "platform",
     "via-claude-desktop": "mcp",
-    "manually": "manual_sdk",
+    manually: "manual_sdk",
   };
 
   if (!Object.hasOwn(mapping, selection)) {
@@ -62,7 +62,9 @@ export function fireIntegrationMethodNurturing({
   void nurturing
     .identifyUser({
       userId,
-      traits: { integration_method: integrationMethod } as Partial<CioPersonTraits>,
+      traits: {
+        integration_method: integrationMethod,
+      } as Partial<CioPersonTraits>,
     })
     .catch(captureException);
 }

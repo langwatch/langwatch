@@ -177,6 +177,22 @@ export const langyThemeConfig = defineConfig({
           // page). Light is ink-800 eased toward paper; dark is the site's
           // paper-at-alpha move, one notch under full white.
           answerFg: langy("#363530", white(0.87)),
+
+          // The user's message bubble. It has its OWN tokens because the
+          // generic ones do not survive the light ground: `bg.muted` and
+          // `border.muted` BOTH resolve to gray.100 (#f1f5f9) there, so the
+          // bubble was a 3%-off-white fill outlined in exactly its own colour —
+          // no edge at all — floating on a white panel that is itself
+          // translucent over a gray.100 page. It was invisible.
+          //
+          // Light therefore steps the fill down to gray.200 and gives it a real
+          // gray.300 hairline: still quiet, still neutral (the panel keeps the
+          // app's own palette — a warm bubble read as a beige island), but
+          // unmistakably a bubble. Dark already worked and keeps its values:
+          // elevation as white-alpha over the ink ground, the site's one
+          // hairline.
+          userBubbleBg: langy("#e2e8f0", white(0.06)),
+          userBubbleBorder: langy("#cbd5e1", white(0.1)),
         },
       },
 

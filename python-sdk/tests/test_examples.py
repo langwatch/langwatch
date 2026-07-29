@@ -141,6 +141,17 @@ async def test_example(example_file: str):
         pytest.skip(
             "litellm_bot.py skipped — Cerebras API is unreliable (frequent rate limiting)"
         )
+    if example_file in (
+        "streamlit_openai_assistants_api_bot.py",
+        "opentelemetry/openinference_openai_assistants_api_bot.py",
+    ):
+        pytest.skip(
+            "Assistants API examples: CI routes OpenAI traffic through the"
+            " LangWatch gateway, which does not proxy /v1/assistants or"
+            " /v1/threads (the Assistants API is deprecated upstream). Both"
+            " examples fire Assistants calls at import or on_chat_start, so"
+            " they must be skipped before import."
+        )
     if (
         example_file == "langgraph_rag_bot_with_threads.py"
         or example_file == "langchain_rag_bot.py"

@@ -50,7 +50,7 @@ const result = await Bun.build({
   define: {
     __CLI_VERSION__: JSON.stringify(packageJson.version),
   },
-  // @langwatch/cli-cards is a source-only workspace package (the typed
+  // @langwatch/langy/cards is a source-only workspace package (the typed
   // domain-error / card contract). It must be inlined, exactly as tsup does
   // via `noExternal`, or the binary cannot resolve it at runtime. Bun bundles
   // all imports by default, so this is implicit — verify a fresh binary with

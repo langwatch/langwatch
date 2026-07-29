@@ -71,6 +71,7 @@ func countResourceAttr(td ptrace.Traces, k string) int {
 	return n
 }
 
+// @scenario "Repeating the provenance claim does not smuggle it through"
 func TestReparent_StripsForgedOriginRepeatedOnTheResource(t *testing.T) {
 	wire := wirePayload(t, []*commonpb.KeyValue{
 		kvStr(attrOrigin, "platform_internal"),
@@ -85,6 +86,7 @@ func TestReparent_StripsForgedOriginRepeatedOnTheResource(t *testing.T) {
 	}
 }
 
+// @scenario "Moving the provenance claim onto individual spans does not smuggle it through"
 func TestReparent_StripsForgedOriginFromSpans(t *testing.T) {
 	// Ingest resolves span origin before resource origin, so a span-level
 	// claim overrides whatever the resource says.
@@ -106,6 +108,7 @@ func TestReparent_StripsForgedOriginFromSpans(t *testing.T) {
 	}
 }
 
+// @scenario "Repeating a reserved grouping key does not override the manager's value"
 func TestReparent_ReservedKeysCannotBeSmuggledByRepetition(t *testing.T) {
 	wire := wirePayload(t, []*commonpb.KeyValue{
 		kvStr(attrThreadID, "attacker-thread"),

@@ -37,6 +37,14 @@ cp ../langwatch/src/server/evaluations/types.ts src/internal/generated/types/eva
 # copy verbatim — no ts-to-zod step.
 cp ../langevals/ts-integration/evaluators.generated.ts src/internal/generated/types/evaluators.generated.ts
 
+# The platform accepts the langevals catalog PLUS its hand-written native
+# evaluators (pure Zod + literals). Copy the native module verbatim so the
+# CLI's client-side evaluator-type validation accepts exactly the set the API
+# accepts — same two sources, same merge (see the platform's evaluators.ts).
+# NOTE: this file is a build input for Dockerfile.langyagent's curated COPY
+# list; a new input here needs a COPY line there too.
+cp ../langwatch/src/server/evaluations/evaluators.native.ts src/internal/generated/types/evaluators.native.ts
+
 # Default prompt model — derive the newest plain `openai/gpt-<major>.<minor>`
 # flagship from the same llmModels.json the platform reads, so `langwatch
 # prompt create` and the platform stay in lock-step without a hand-edited
@@ -120,3 +128,14 @@ console.log('Wrote ' + out + ' (' + map.features.length + ' top-level features)'
 # re-implementation to drift); metadata comes from the canonical sources.
 # Pure node, no workspace deps — see scripts/generate-skills-bundle.mjs.
 node scripts/generate-skills-bundle.mjs
+
+# Session-report redaction — the CLI ships the EXACT engine the platform uses
+# (langwatch/packages/redaction), copied verbatim so agents auditing the
+# published GitHub source read the same code that scrubs their report before it
+# is sent. The drift test in cli/commands/__tests__/report-redaction-drift
+# pins the mirror byte-for-byte; regenerate with this script after editing the
+# canonical package.
+mkdir -p src/internal/generated/redaction
+for f in markers.ts secrets.ts sessionReport.ts; do
+  cp "../langwatch/packages/redaction/src/$f" "src/internal/generated/redaction/$f"
+done

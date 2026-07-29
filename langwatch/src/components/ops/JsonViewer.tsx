@@ -166,9 +166,7 @@ function renderValue(
     const padding = "  ".repeat(childIndent);
     const closePadding = "  ".repeat(ctx.indent);
 
-    lines.push(
-      <span key={`${path}-open`}>{"["}</span>,
-    );
+    lines.push(<span key={`${path}-open`}>{"["}</span>);
 
     for (let i = 0; i < value.length; i++) {
       const childPath = path ? `${path}[${i}]` : `[${i}]`;
@@ -218,9 +216,7 @@ function renderValue(
     const padding = "  ".repeat(childIndent);
     const closePadding = "  ".repeat(ctx.indent);
 
-    lines.push(
-      <span key={`${path}-open`}>{"{"}</span>,
-    );
+    lines.push(<span key={`${path}-open`}>{"{"}</span>);
 
     for (let i = 0; i < entries.length; i++) {
       const [key, val] = entries[i]!;

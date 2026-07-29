@@ -25,6 +25,8 @@ export class App {
   readonly suiteRuns: AppDependencies["suiteRuns"] & AppCommands["suiteRuns"];
   readonly topicClustering: AppDependencies["topicClustering"] &
     AppCommands["topicClustering"];
+  readonly codingAgents: AppDependencies["codingAgents"] &
+    AppCommands["codingAgents"];
   readonly commands: AppCommands;
   readonly langy: AppDependencies["langy"];
   readonly experiments: AppDependencies["experiments"];
@@ -46,6 +48,7 @@ export class App {
   readonly retentionPolicyCache: AppDependencies["retentionPolicyCache"];
   readonly dataRetention: DataRetentionDependencies;
   readonly share: AppDependencies["share"];
+  readonly sharedTraceCache: AppDependencies["sharedTraceCache"];
 
   /** Keeps EventSourcing infrastructure safe from the greedy garbage men */
   private readonly _eventSourcing?: EventSourcing;
@@ -87,12 +90,17 @@ export class App {
       ...deps.topicClustering,
       ...deps.commands.topicClustering,
     };
+    this.codingAgents = {
+      ...deps.codingAgents,
+      ...deps.commands.codingAgents,
+    };
     this.commands = deps.commands;
     this.langy = deps.langy;
     this.ops = deps.ops;
     this.retentionPolicyCache = deps.retentionPolicyCache;
     this.dataRetention = deps.dataRetention;
     this.share = deps.share;
+    this.sharedTraceCache = deps.sharedTraceCache;
     this._eventSourcing = deps._eventSourcing;
     this._gracefulCloseables = deps._gracefulCloseables ?? [];
   }

@@ -1,8 +1,7 @@
 import { create } from "zustand";
-
-import { shortId } from "./types";
-import type { Preset, TraceConfig } from "./types";
 import { builtInPresets } from "./presets";
+import type { Preset, TraceConfig } from "./types";
+import { shortId } from "./types";
 
 function loadUserPresets(): Preset[] {
   if (typeof window === "undefined") return [];
@@ -91,7 +90,7 @@ export const usePresetStore = create<PresetStore>((set, get) => {
     renamePreset(id, name) {
       set((state) => {
         const updated = state.userPresets.map((p) =>
-          p.id === id ? { ...p, name } : p
+          p.id === id ? { ...p, name } : p,
         );
         saveUserPresets(updated);
         return {

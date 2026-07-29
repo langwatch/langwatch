@@ -1,4 +1,12 @@
-import { Button, Field, Heading, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import {
+  Button,
+  Field,
+  Heading,
+  HStack,
+  Spinner,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import { ExternalLink } from "lucide-react";
 import { LuArrowLeft } from "react-icons/lu";
 
@@ -70,13 +78,18 @@ export function AgentWorkflowTargetEditorDrawer(
   const onInputMappingsChange =
     props.onInputMappingsChange ?? flowCallbacks?.onInputMappingsChange;
 
-  const { workflowQuery, variablesForUI, editorHref, isLoading, hasLookupFailed } =
-    useWorkflowTargetAgentData({
-      agentId,
-      projectId: project?.id,
-      projectSlug: project?.slug,
-      isOpen,
-    });
+  const {
+    workflowQuery,
+    variablesForUI,
+    editorHref,
+    isLoading,
+    hasLookupFailed,
+  } = useWorkflowTargetAgentData({
+    agentId,
+    projectId: project?.id,
+    projectSlug: project?.slug,
+    isOpen,
+  });
 
   return (
     <Drawer.Root
@@ -171,9 +184,9 @@ export function AgentWorkflowTargetEditorDrawer(
                   color="fg.error"
                   data-testid="workflow-lookup-error"
                 >
-                  Couldn't load this workflow's agent or its linked workflow,
-                  so its real input fields aren't known. Mapping is
-                  unavailable until it loads successfully.
+                  Couldn't load this workflow's agent or its linked workflow, so
+                  its real input fields aren't known. Mapping is unavailable
+                  until it loads successfully.
                 </Text>
               ) : (
                 <VariablesSection

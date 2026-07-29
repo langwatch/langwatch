@@ -6,11 +6,7 @@ import {
   RoleBindingScopeType,
 } from "@prisma/client";
 import { getCurrentMonthStart } from "../utils/dateUtils";
-import {
-  isFullMember,
-  isLiteMember,
-  isViewOnlyCustomRole,
-} from "./member-classification";
+import { isFullMember, isLiteMember } from "./member-classification";
 
 /**
  * Type for team assignment in organization invites.
@@ -123,20 +119,30 @@ export class LicenseEnforcementRepository
   }
 
   /**
-   * Counts non-archived projects in organization.
+   * Counts non-archived projects in organization, excluding personal ones.
+   *
+   * A personal workspace belongs to a person, not to the organization that
+   * pays, so it never spends the project allowance bought for real work.
+   * See the "Personal Workspaces" scenarios in
+   * specs/licensing/enforcement-projects.feature.
    */
   async getProjectCount(organizationId: string): Promise<number> {
     return this.prisma.project.count({
-      where: { team: { organizationId }, archivedAt: null },
+      where: { team: { organizationId }, archivedAt: null, isPersonal: false },
     });
   }
 
   /**
-   * Counts teams in organization.
+   * Counts teams in organization, excluding personal ones.
+   *
+   * A personal team is provisioned for a user rather than requested by the
+   * organization, so it never spends the team allowance.
+   * See the "Personal Workspaces" scenarios in
+   * specs/licensing/enforcement-resources.feature.
    */
   async getTeamCount(organizationId: string): Promise<number> {
     return this.prisma.team.count({
-      where: { organizationId },
+      where: { organizationId, isPersonal: false },
     });
   }
 

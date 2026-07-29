@@ -23,10 +23,12 @@ import {
 import { CreateExperimentButton } from "~/components/experiments/CreateExperimentButton";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import { NoDataInfoBlock } from "~/components/NoDataInfoBlock";
+import { SetupWithAgentButton } from "~/components/SetupWithAgentButton";
 import { ListTable } from "~/components/ui/ListTable";
 import { FullWidthListPageContent } from "~/components/ui/layouts/FullWidthListPageContent";
 import { Link } from "~/components/ui/link";
 import { LangyContextTarget } from "~/features/langy/components/LangyContextTarget";
+import { experimentContextChip } from "~/features/langy/logic/langyContextChips";
 import { useRouter } from "~/utils/compat/next-router";
 import { DashboardLayout } from "../../components/DashboardLayout";
 import { formatEvaluationSummary } from "../../components/experiments/BatchEvaluationV2/BatchEvaluationSummary";
@@ -167,9 +169,10 @@ export function ExperimentsPage() {
                 </Text>
               }
             >
-              <Box marginTop={4}>
+              <HStack marginTop={4} gap={2}>
                 <CreateExperimentButton />
-              </Box>
+                <SetupWithAgentButton surface="experiments" />
+              </HStack>
             </NoDataInfoBlock>
           </PageLayout.Content>
         </PageLayout.Container>
@@ -237,14 +240,10 @@ export function ExperimentsPage() {
                           // two. Closed, this is the plain clickable row.
                           <LangyContextTarget
                             key={experiment.id}
-                            target={{
-                              id: `experiment:${experiment.slug}`,
-                              kind: "experiment",
-                              label: `experiment: ${
-                                experiment.name ?? experiment.slug
-                              }`,
-                              ref: experiment.slug,
-                            }}
+                            target={experimentContextChip({
+                              slug: experiment.slug,
+                              name: experiment.name,
+                            })}
                           >
                             <Table.Row
                               cursor="pointer"

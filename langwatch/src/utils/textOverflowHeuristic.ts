@@ -13,7 +13,7 @@
 export const isTextLikelyOverflowing = (
   text: string,
   charThreshold = 500,
-  charsPerLine = 62
+  charsPerLine = 62,
 ): boolean => {
   // Count newlines and treat each as equivalent to charsPerLine characters
   const newlineCount = (text.match(/\n/g) || []).length;

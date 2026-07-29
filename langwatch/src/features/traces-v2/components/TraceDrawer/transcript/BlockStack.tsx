@@ -6,7 +6,7 @@ import {
   LuFileText,
   LuWrench,
 } from "react-icons/lu";
-import { TraceAudioPart } from "~/components/traces/TraceAudioPart";
+import { TraceMediaPart } from "~/components/traces/TraceMediaPart";
 import { splitLeadingContextBlocks } from "../../../utils/leadingContext";
 import { RenderedMarkdown } from "../markdownView";
 import { asMarkdownBody, parseContentBlocks } from "./parsing";
@@ -202,7 +202,7 @@ export function BlockStack({
         );
       }
       case "media":
-        return <TraceAudioPart key={`media-${i}`} part={b.part} />;
+        return <TraceMediaPart key={`media-${i}`} part={b.part} />;
       case "raw":
         return (
           <Box

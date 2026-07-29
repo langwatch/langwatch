@@ -1,5 +1,5 @@
+import { LANGY_CONVERSATION_STATUS } from "@langwatch/langy";
 import { describe, expect, it } from "vitest";
-import { LANGY_CONVERSATION_STATUS } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/constants";
 import { decideSyntheticTerminal } from "../langyTurnSettlement";
 
 describe("decideSyntheticTerminal", () => {

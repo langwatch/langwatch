@@ -66,6 +66,10 @@ export const PLUMBING_COMMANDS: ReadonlySet<string> = new Set([
   "config",
   // Browser openers / local shell helpers.
   "open",
+  // Agent-only signal: `navigate open <id>` prints the resource id for the
+  // control-plane relay to intercept and move the user's browser — it fetches
+  // no platform data and returns no result of its own.
+  "navigate",
   "init-shell",
   "request-increase",
   // Local status + documentation fetchers.
@@ -79,6 +83,10 @@ export const PLUMBING_COMMANDS: ReadonlySet<string> = new Set([
   "cursor",
   "gemini",
   "opencode",
+  // Support reporting: sends an issue report to the LangWatch team; no
+  // platform resource to card. Mirrored in the app's capabilityCatalog
+  // EXCLUDED_COMMANDS.
+  "report",
   // The CLI's own background process management.
   "daemon",
   // Local agent-skill installer: manages files under ~/.agents, not platform

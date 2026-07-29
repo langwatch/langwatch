@@ -11,8 +11,10 @@ import {
 import { Plus, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Select } from "~/components/ui/select";
-import { getFieldSuggestions } from "~/features/traces-v2/components/SearchBar/suggestionItems";
-import { getValueSuggestions } from "~/features/traces-v2/components/SearchBar/suggestionItems";
+import {
+  getFieldSuggestions,
+  getValueSuggestions,
+} from "~/features/traces-v2/components/SearchBar/suggestionItems";
 import {
   type Condition,
   type ConditionOperator,
@@ -172,7 +174,10 @@ function ConditionRow({
   const operatorCollection = useMemo(
     () =>
       createListCollection({
-        items: operators.map((op) => ({ value: op, label: OPERATOR_LABEL[op] })),
+        items: operators.map((op) => ({
+          value: op,
+          label: OPERATOR_LABEL[op],
+        })),
       }),
     [operators],
   );

@@ -10,6 +10,7 @@ import {
   type RawOutputFlags,
 } from "../../utils/output";
 import { createCommandEvents, type CommandEvents } from "../../telemetry/events";
+import { parseOriginOption } from "./origin-filter";
 
 /** Traces are walked in chunks so the progress bar moves rather than jumping 0 → 1. */
 const PROGRESS_CHUNK = 5;
@@ -19,6 +20,7 @@ export const searchTracesCommand = async (options: {
   startDate?: string;
   endDate?: string;
   limit?: string;
+  origin?: string;
 } & RawOutputFlags): Promise<void> => {
   checkApiKey();
 
@@ -41,6 +43,7 @@ export const searchTracesCommand = async (options: {
       ? new Date(options.endDate).getTime()
       : now;
     const pageSize = options.limit ? parseInt(options.limit, 10) : 25;
+    const originFilter = parseOriginOption(options.origin);
 
     // The `format` option controls CLI output (table vs json); the API's
     // `format` parameter controls server response shape ("digest" | "json").
@@ -51,6 +54,7 @@ export const searchTracesCommand = async (options: {
       endDate,
       pageSize,
       format: "json",
+      ...(originFilter ? { filters: { "traces.origin": originFilter } } : {}),
     });
 
     const matched = result.pagination.totalHits;

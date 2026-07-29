@@ -3,11 +3,13 @@ Feature: Langy dual-stream — a raw token fast-path beside the durable event-so
   I want the answer to start typing instantly and smoothly, token by token
   So that Langy feels fast, while the durable reconciled answer stays the source of truth
 
-  # ADR-048. Two streams run per turn:
-  #   - Stream A (durable, the truth): the ADR-044/046 path — the Redis token
-  #     buffer bridged to useChat, the event-sourced agent_responded final answer,
-  #     the langy_conversation_updated broadcast, ephemeral status/progress. It
-  #     survives refresh (the buffered tail is the resume state). UNCHANGED.
+  # ADR-077. Two streams run per turn:
+  #   - Stream A (durable, the truth): the event-driven-turns + ADR-046 path —
+  #     the Redis token buffer bridged to useChat (the event-driven-turns design
+  #     has no live ADR number; see the note atop ADR-077), the event-sourced
+  #     agent_responded final answer, the langy_conversation_updated broadcast,
+  #     ephemeral status/progress. It survives refresh (the buffered tail is the
+  #     resume state). UNCHANGED.
   #   - Stream B (speed, ephemeral): raw opencode text-delta tokens, minimally
   #     parsed, streamed straight to the browser over a per-turn Redis pub/sub
   #     channel. Not persisted; dies on disconnect.
@@ -24,7 +26,7 @@ Feature: Langy dual-stream — a raw token fast-path beside the durable event-so
   # Manager: the multiplexed fast frame
   # ---------------------------------------------------------------------------
 
-  @unit
+  @unimplemented
   Scenario: The manager emits a raw token frame for a text delta
     Given the worker's opencode stream produces a text delta for the routed session
     When the manager forwards the turn
@@ -32,7 +34,7 @@ Feature: Langy dual-stream — a raw token fast-path beside the durable event-so
     And it still forwards the full parsed event as before
     And the raw token frame is flushed ahead of the full event line
 
-  @unit
+  @unimplemented
   Scenario: The manager emits no raw token frame for a non-text event
     Given the worker's opencode stream produces a tool-call or lifecycle event
     When the manager forwards the turn
@@ -85,6 +87,17 @@ Feature: Langy dual-stream — a raw token fast-path beside the durable event-so
     Then it writes a reasoning frame carrying the thinking text
     And a reasoning delta is not treated as an answer token
 
+  @unit
+  # Some models narrate their thinking in the same live stream as the answer,
+  # in whatever order the pieces arrive. That narration belongs on the live
+  # reasoning display while Langy works, never in the reply that is kept.
+  Scenario: Thinking narrated alongside the answer stays out of the reply
+    Given Langy thinks out loud while it writes a reply
+    When I watch the turn live
+    Then the thinking appears as live reasoning while Langy works
+    And the reply I keep reads as the answer alone, in the order Langy wrote it
+    And none of the thinking ends up in it
+
   @integration
   Scenario: Reasoning streams to the browser and vanishes when the turn settles
     Given a turn is running for a conversation I own
@@ -97,14 +110,14 @@ Feature: Langy dual-stream — a raw token fast-path beside the durable event-so
   # Control plane: split at the turn processor, ephemeral pub/sub
   # ---------------------------------------------------------------------------
 
-  @integration
+  @unimplemented
   Scenario: Raw tokens are fanned to the ephemeral fast channel, deltas to the durable buffer
     Given a turn is running for a conversation
     When the manager sends raw token frames and full text-delta events
     Then the raw tokens are published to the per-turn fast channel
     And the durable token buffer is fed by the full text-delta events exactly as before
 
-  @integration
+  @unimplemented
   Scenario: The fast stream endpoint streams raw tokens to the browser
     Given a turn is running for a conversation I own
     When I open the fast stream for that turn
@@ -112,13 +125,13 @@ Feature: Langy dual-stream — a raw token fast-path beside the durable event-so
     And the stream ends when the turn signals end
     And the stream closes when I disconnect
 
-  @integration
+  @unimplemented
   Scenario: The fast stream refuses a turn I cannot see
     Given a conversation that is not mine and not shared
     When I open the fast stream for that turn
     Then the request is refused
 
-  @integration
+  @unimplemented
   Scenario: The fast stream is best-effort and never replays
     Given a turn produced tokens before I subscribed
     When I open the fast stream late
@@ -129,13 +142,13 @@ Feature: Langy dual-stream — a raw token fast-path beside the durable event-so
   # Frontend reconciliation
   # ---------------------------------------------------------------------------
 
-  @unit
+  @unimplemented
   Scenario: The optimistic text leads while it is a superset of the durable text
     Given the durable text so far is a prefix of the fast text
     When the answer is reconciled for display
     Then the fast text is shown
 
-  @unit
+  @unimplemented
   Scenario: The durable text wins when the fast text has a gap
     Given the fast text is not a prefix-consistent superset of the durable text
     When the answer is reconciled for display
@@ -211,6 +224,24 @@ Feature: Langy dual-stream — a raw token fast-path beside the durable event-so
     When a later frame arrives after the token has become readable
     Then the relay re-reads the token instead of reusing the cached miss
     And the later frame is authenticated and applied
+
+  # The other half of the same contract, from the SIGNING side. The turn service
+  # used to collapse a failed or absent runToken read to "", which is an empty
+  # HMAC key: publicly computable, and rejected by the relay as no-run-token. The
+  # turn then ran to completion, emitted nothing, and never reached a terminal
+  # state — a silent hang with no error surfaced to the user.
+  #
+  # One user-visible contract reached three ways: the credential store failing,
+  # no credentials ever recorded, and a read that comes back blank. None of that
+  # is distinguishable from the user's seat, so it is one scenario here and the
+  # unit tests bound to it pin which cause produced it.
+  @unit
+  Scenario: Langy reports the agent unavailable instead of hanging the turn
+    Given Langy cannot access the conversation credentials
+    When the user sends a message
+    Then the turn fails straight away with an agent-unavailable error
+    And no answer ever starts streaming
+    And the user is never left watching a turn that produces nothing
 
   # The durable token buffer used to hold tokens until ~64 words accumulated,
   # so short answers rendered nothing until the turn was nearly over.

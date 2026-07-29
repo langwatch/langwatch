@@ -1,8 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { PrismaClient } from "@prisma/client";
 import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
-import { apiKeyRouter } from "../apiKey";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createInnerTRPCContext } from "../../trpc";
+import { apiKeyRouter } from "../apiKey";
 
 vi.mock("nanoid", () => ({
   nanoid: vi.fn(() => "mock-nano-id"),
@@ -64,17 +64,15 @@ function buildMockPrisma() {
       ]),
     },
     organization: {
-      findMany: vi
-        .fn()
-        .mockResolvedValue([{ id: ORG_ID, name: "Test Org" }]),
+      findMany: vi.fn().mockResolvedValue([{ id: ORG_ID, name: "Test Org" }]),
     },
     team: {
       findMany: vi.fn().mockResolvedValue([]),
     },
     project: {
-      findMany: vi.fn().mockResolvedValue([
-        { id: ACTIVE_PROJECT_ID, name: "Active Project" },
-      ]),
+      findMany: vi
+        .fn()
+        .mockResolvedValue([{ id: ACTIVE_PROJECT_ID, name: "Active Project" }]),
     },
     customRole: {
       findMany: vi.fn().mockResolvedValue([]),
@@ -135,7 +133,7 @@ describe("apiKey.myBindings", () => {
       await caller.myBindings({ organizationId: ORG_ID });
 
       expect(
-        (mockPrisma.project.findMany as ReturnType<typeof vi.fn>),
+        mockPrisma.project.findMany as ReturnType<typeof vi.fn>,
       ).toHaveBeenCalledWith({
         where: {
           id: { in: [ACTIVE_PROJECT_ID, ARCHIVED_PROJECT_ID] },

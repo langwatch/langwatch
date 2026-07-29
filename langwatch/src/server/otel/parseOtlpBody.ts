@@ -26,14 +26,15 @@
  * 2026-04-27: keep public URLs separate; converge the receiver
  * internals into a shared module.
  */
+
+import { promisify } from "node:util";
+import { brotliDecompress, gunzip, inflate } from "node:zlib";
 import type {
   IExportLogsServiceRequest,
   IExportMetricsServiceRequest,
   IExportTraceServiceRequest,
 } from "@opentelemetry/otlp-transformer";
 import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root";
-import { brotliDecompress, gunzip, inflate } from "node:zlib";
-import { promisify } from "node:util";
 
 const gunzipAsync = promisify(gunzip);
 const inflateAsync = promisify(inflate);
@@ -126,7 +127,10 @@ export function parseOtlpMetrics(
 function parseWithFallback<T>(
   body: ArrayBuffer,
   contentType: string | null | undefined,
-  protoType: { decode: (buf: Uint8Array) => T; encode: (msg: T) => { finish: () => Uint8Array } },
+  protoType: {
+    decode: (buf: Uint8Array) => T;
+    encode: (msg: T) => { finish: () => Uint8Array };
+  },
 ): OtlpParseResult<T> {
   let request: T;
   try {

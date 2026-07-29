@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from "vitest";
 import type { Redis as IORedis } from "ioredis";
+import { describe, expect, it, vi } from "vitest";
 
 import { CachedLuaScript } from "../cachedLuaScript";
 

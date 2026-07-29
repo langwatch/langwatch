@@ -41,7 +41,7 @@ export function isViewOnlyCustomRole(permissions: string[]): boolean {
  */
 export function classifyMemberType(
   role: OrganizationUserRole,
-  permissions: string[] | undefined
+  permissions: string[] | undefined,
 ): MemberType {
   // ADMIN or MEMBER roles are always FullMember
   if (
@@ -73,7 +73,7 @@ export function classifyMemberType(
  */
 export function isFullMember(
   role: OrganizationUserRole,
-  permissions: string[] | undefined
+  permissions: string[] | undefined,
 ): boolean {
   return classifyMemberType(role, permissions) === "FullMember";
 }
@@ -89,7 +89,7 @@ export function isFullMember(
  */
 export function isLiteMember(
   role: OrganizationUserRole,
-  permissions: string[] | undefined
+  permissions: string[] | undefined,
 ): boolean {
   return classifyMemberType(role, permissions) === "LiteMember";
 }
@@ -113,7 +113,7 @@ export function getRoleChangeType(
   oldRole: OrganizationUserRole,
   oldPermissions: string[] | undefined,
   newRole: OrganizationUserRole,
-  newPermissions: string[] | undefined
+  newPermissions: string[] | undefined,
 ): RoleChangeType {
   const wasFull = isFullMember(oldRole, oldPermissions);
   const willBeFull = isFullMember(newRole, newPermissions);

@@ -129,6 +129,71 @@ Feature: MCP HTTP Server In-App Integration (Phase 1)
     Then it communicates via stdin/stdout
     And it does not import any main app server or database modules
 
+  # --- OAuth Authorization Code + PKCE: redirect_uri / client_id binding ---
+
+  @regression @integration
+  Scenario: Dynamic client registration persists the redirect_uris binding
+    Given a client posts client_name and redirect_uris to /oauth/register
+    When the registration succeeds
+    Then the client_id is durably bound to those redirect_uris for later lookup
+
+  @regression @integration
+  Scenario: Dynamic client registration rejects a request with no redirect_uris
+    Given a client posts to /oauth/register with no redirect_uris
+    Then the response status is 400
+    And the response error is "invalid_client_metadata"
+
+  @regression @integration
+  Scenario: Authorization succeeds when redirect_uri exactly matches the registered client
+    Given a client registered with redirect_uri "https://registered.example/callback"
+    When an authorization request for that client_id supplies the exact same redirect_uri
+    Then an authorization code is issued
+
+  @regression @integration
+  Scenario: Authorization is rejected when redirect_uri does not match the registered client
+    Given a client registered with redirect_uri "https://registered.example/callback"
+    When an authorization request for that client_id supplies a different redirect_uri
+    Then the response status is 400
+    And no authorization code is issued
+
+  @regression @integration
+  Scenario: Authorization is rejected for an unregistered client_id
+    Given no client is registered with client_id "mcp_never_registered"
+    When an authorization request is made with that client_id
+    Then the response status is 400
+    And the response error is "Unknown or unregistered client_id"
+
+  @regression @integration
+  Scenario: Authorization is rejected when client_id is missing
+    When an authorization request omits client_id
+    Then the response status is 400 before any registration lookup happens
+
+  @regression @integration
+  Scenario: Token exchange is rejected when redirect_uri is missing
+    Given an authorization code exists
+    When the token exchange omits redirect_uri
+    Then the response status is 400 with error "invalid_request"
+
+  @regression @integration
+  Scenario: Token exchange is rejected when client_id is missing
+    Given an authorization code exists
+    When the token exchange omits client_id
+    Then the response status is 400 with error "invalid_request"
+
+  @regression @integration
+  Scenario: Token exchange is rejected when redirect_uri does not match the authorization request
+    Given an authorization code was issued for a specific client_id and redirect_uri
+    When the token exchange presents a different redirect_uri
+    Then the response status is 400 with error "invalid_grant"
+    And no access token is issued
+
+  @regression @integration
+  Scenario: Token exchange is rejected when client_id does not match the authorization request
+    Given an authorization code was issued for a specific client_id and redirect_uri
+    When the token exchange presents a different client_id
+    Then the response status is 400 with error "invalid_grant"
+    And no access token is issued
+
   # --- Tool Availability ---
 
   @integration @unimplemented

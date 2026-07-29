@@ -13,6 +13,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Checkbox } from "~/components/ui/checkbox";
 import { Link } from "~/components/ui/link";
 import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
 
 type GuardrailDirectionEnum = "PRE" | "POST" | "STREAM_CHUNK";
@@ -20,7 +21,11 @@ type WireDirection = "pre" | "post" | "stream_chunk";
 
 type GuardrailAttachment = { direction: WireDirection; guardrailIds: string[] };
 
-const DIRECTION_ORDER: GuardrailDirectionEnum[] = ["PRE", "POST", "STREAM_CHUNK"];
+const DIRECTION_ORDER: GuardrailDirectionEnum[] = [
+  "PRE",
+  "POST",
+  "STREAM_CHUNK",
+];
 
 const DIRECTION_META: Record<
   GuardrailDirectionEnum,
@@ -102,11 +107,12 @@ export function GuardrailAttachmentsSection({
       onSaved();
     },
     onError: (err) => {
-      toaster.create({
-        title: err.message.includes("missing_perm")
-          ? "You don't have permission to attach guardrails in this project"
-          : err.message,
-        type: "error",
+      // The permission denial is a handled `guardrail_attach_forbidden` now,
+      // so its copy lives in the registry with everything else — no branching
+      // on message prose, which the boundary is explicitly free to change.
+      showErrorToast({
+        error: err,
+        fallbackTitle: "Couldn't update the guardrails",
       });
     },
   });

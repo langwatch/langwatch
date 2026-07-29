@@ -1,6 +1,5 @@
 import {
   Alert,
-  Avatar,
   Box,
   Button,
   HStack,
@@ -23,6 +22,7 @@ import {
   ChevronRight,
   Info,
   KeyRound,
+  Monitor,
   Plus,
 } from "lucide-react";
 import numeral from "numeral";
@@ -54,6 +54,10 @@ import { usePublicEnv } from "../hooks/usePublicEnv";
 import { useRequiredSession } from "../hooks/useRequiredSession";
 import { SavedViewsProvider } from "../hooks/useSavedViews";
 import type { FullyLoadedOrganization } from "../server/app-layer/organizations/repositories/organization.repository";
+import {
+  type GraphicsQualityOverride,
+  useGraphicsQualityOverrideStore,
+} from "../stores/graphicsQualityOverrideStore";
 import { api } from "../utils/api";
 import {
   buildProjectSwitchHref,
@@ -74,11 +78,18 @@ import { PersonalSidebar } from "./PersonalSidebar";
 import { ProjectAvatar } from "./ProjectAvatar";
 import { PresenceMenuItem } from "./sidebar/PresenceMenuItem";
 import { GlobalUpgradeModal } from "./UpgradeModal";
+import { UserAvatar } from "./UserAvatar";
 import { Link } from "./ui/link";
 import { Menu } from "./ui/menu";
 import { PageErrorFallback } from "./ui/PageErrorFallback";
 import { useWorkspaceData } from "./useWorkspaceData";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
+
+const GRAPHICS_OVERRIDE_LABELS: Record<GraphicsQualityOverride, string> = {
+  auto: "Auto",
+  on: "On",
+  off: "Off",
+};
 
 const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
   // No redirects from the breadcrumb path - it only reads `project` for the
@@ -469,6 +480,13 @@ export const DashboardLayout = ({
     { organizationId: organization?.id, enabled: !!organization?.id },
   );
 
+  const graphicsQualityOverride = useGraphicsQualityOverrideStore(
+    (s) => s.override,
+  );
+  const setGraphicsQualityOverride = useGraphicsQualityOverrideStore(
+    (s) => s.setOverride,
+  );
+
   usePostHogIdentify({
     session: session ?? null,
     organization,
@@ -583,7 +601,13 @@ export const DashboardLayout = ({
 
   const user = session?.user;
   const currentRoute = findCurrentRoute(router.pathname);
-  const isDemoProject = publicEnv.data?.DEMO_PROJECT_SLUG === project?.slug;
+  // Requires BOTH sides present: an install with no demo project configured
+  // leaves DEMO_PROJECT_SLUG undefined, and `===` against an equally-undefined
+  // `project?.slug` would otherwise read as a match on any route that hasn't
+  // resolved a project yet.
+  const isDemoProject =
+    !!publicEnv.data?.DEMO_PROJECT_SLUG &&
+    publicEnv.data.DEMO_PROJECT_SLUG === project?.slug;
   const userIsPartOfTeam =
     publicPage ||
     // Personal-scope routes (/me/* and the caller's own Personal Workspace
@@ -774,6 +798,13 @@ export const DashboardLayout = ({
                 minWidth="auto"
                 height="auto"
                 borderRadius="full"
+                aria-label={
+                  publicPage
+                    ? "Sign in"
+                    : user?.name
+                      ? `Open user menu for ${user.name}`
+                      : "Open user menu"
+                }
                 {...(publicPage
                   ? {
                       // On a public share page, clicking the avatar offers
@@ -793,18 +824,15 @@ export const DashboardLayout = ({
                     }
                   : {})}
               >
-                <Avatar.Root
+                <UserAvatar
+                  name={user?.name ?? undefined}
+                  image={user?.image ?? undefined}
                   size="xs"
                   backgroundColor="orange.400"
                   color="white"
                   width="28px"
                   height="28px"
-                >
-                  <Avatar.Fallback
-                    name={user?.name ?? undefined}
-                    fontSize="11px"
-                  />
-                </Avatar.Root>
+                />
               </Button>
             </Menu.Trigger>
             {session && (
@@ -827,6 +855,35 @@ export const DashboardLayout = ({
                     <Menu.Item value="settings" asChild>
                       <Link href="/settings">Settings</Link>
                     </Menu.Item>
+                    <Menu.Root
+                      positioning={{ placement: "right-start", gutter: 2 }}
+                    >
+                      <Menu.TriggerItem value="reduced-graphics">
+                        <Monitor size={14} />
+                        Reduced graphics (
+                        {GRAPHICS_OVERRIDE_LABELS[graphicsQualityOverride]})
+                      </Menu.TriggerItem>
+                      <Menu.Content>
+                        <Menu.RadioItemGroup
+                          value={graphicsQualityOverride}
+                          onValueChange={(e) =>
+                            setGraphicsQualityOverride(
+                              e.value as GraphicsQualityOverride,
+                            )
+                          }
+                        >
+                          <Menu.RadioItem value="auto">
+                            Auto — adapts to this device on its own
+                          </Menu.RadioItem>
+                          <Menu.RadioItem value="on">
+                            On — always keep things responsive
+                          </Menu.RadioItem>
+                          <Menu.RadioItem value="off">
+                            Off — always show full decorative effects
+                          </Menu.RadioItem>
+                        </Menu.RadioItemGroup>
+                      </Menu.Content>
+                    </Menu.Root>
                     {showPresenceMenuItem && <PresenceMenuItem />}
                     <Menu.Item value="logout" asChild>
                       <a href="/api/auth/logout">Logout</a>

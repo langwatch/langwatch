@@ -1,10 +1,11 @@
 /**
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem, Menu } from "@chakra-ui/react";
-import { render, screen } from "@testing-library/react";
+
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { ChakraProvider, defaultSystem, Menu } from "@chakra-ui/react";
+import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PresenceMenuItem } from "../PresenceMenuItem";
 
@@ -49,8 +50,12 @@ describe("PresenceMenuItem", () => {
         // toggleHidden); the mock receives a selector each time.
         const toggleHidden = vi.fn();
         usePresencePreferencesStoreMock.mockImplementation(
-          (selector: (s: { hidden: boolean; toggleHidden: () => void }) => unknown) =>
-            selector({ hidden: false, toggleHidden }),
+          (
+            selector: (s: {
+              hidden: boolean;
+              toggleHidden: () => void;
+            }) => unknown,
+          ) => selector({ hidden: false, toggleHidden }),
         );
 
         renderInOpenMenu();
@@ -58,7 +63,6 @@ describe("PresenceMenuItem", () => {
         expect(screen.getAllByText("Sharing presence")[0]!).toBeInTheDocument();
       });
     });
-
   });
 
   describe("given the presence feature is disabled at the organization level", () => {
@@ -70,8 +74,12 @@ describe("PresenceMenuItem", () => {
         });
         const toggleHidden = vi.fn();
         usePresencePreferencesStoreMock.mockImplementation(
-          (selector: (s: { hidden: boolean; toggleHidden: () => void }) => unknown) =>
-            selector({ hidden: false, toggleHidden }),
+          (
+            selector: (s: {
+              hidden: boolean;
+              toggleHidden: () => void;
+            }) => unknown,
+          ) => selector({ hidden: false, toggleHidden }),
         );
 
         renderInOpenMenu();
@@ -95,13 +103,19 @@ describe("PresenceMenuItem", () => {
         });
         const toggleHidden = vi.fn();
         usePresencePreferencesStoreMock.mockImplementation(
-          (selector: (s: { hidden: boolean; toggleHidden: () => void }) => unknown) =>
-            selector({ hidden: true, toggleHidden }),
+          (
+            selector: (s: {
+              hidden: boolean;
+              toggleHidden: () => void;
+            }) => unknown,
+          ) => selector({ hidden: true, toggleHidden }),
         );
 
         renderInOpenMenu();
 
-        expect(screen.getAllByText("Presence hidden").length).toBeGreaterThan(0);
+        expect(screen.getAllByText("Presence hidden").length).toBeGreaterThan(
+          0,
+        );
       });
     });
   });
@@ -135,7 +149,9 @@ describe("PresenceMenuItem", () => {
       expect(src).toMatch(
         /showPresenceMenuItem\s*=\s*router\.pathname\.startsWith\("\/\[project\]\/traces"\)/,
       );
-      expect(src).toMatch(/\{showPresenceMenuItem\s*&&\s*<PresenceMenuItem\s*\/>\}/);
+      expect(src).toMatch(
+        /\{showPresenceMenuItem\s*&&\s*<PresenceMenuItem\s*\/>\}/,
+      );
     });
   });
 });
